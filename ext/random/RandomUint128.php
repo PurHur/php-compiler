@@ -51,12 +51,22 @@ final class RandomUint128
 
     public static function pcgRotr64(self $num): int
     {
+        return self::pcgRotr64U64($num)->toInt() & ~0;
+    }
+
+    public static function pcgRotr64Bytes(self $num): string
+    {
+        return self::pcgRotr64U64($num)->toBytes();
+    }
+
+    private static function pcgRotr64U64(self $num): RandomU64
+    {
         $v = RandomU64::xor($num->hi, $num->lo);
         $s = $num->hi->lo >> 26;
         if (0 === $s) {
-            return $v->toInt() & ~0;
+            return $v;
         }
 
-        return RandomU64::or($v->shiftRight($s), $v->shiftLeft(((-$s) & 63)))->toInt() & ~0;
+        return RandomU64::or($v->shiftRight($s), $v->shiftLeft(((-$s) & 63)));
     }
 }

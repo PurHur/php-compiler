@@ -107,7 +107,7 @@ final class RandomEngineStorage
         return $engineVar->toObject();
     }
 
-    public static function generate(ObjectEntry $engineObject): int
+    public static function generate(ObjectEntry $engineObject): string
     {
         return match (strtolower(ltrim($engineObject->class->name, '\\'))) {
             'random\\engine\\mt19937' => self::mt19937($engineObject)->generate(),
@@ -116,6 +116,26 @@ final class RandomEngineStorage
             'random\\engine\\pcgoneseq128xslrr64' => self::pcg($engineObject)->generate(),
             default => throw new \LogicException('Unsupported random engine: '.$engineObject->class->name),
         };
+    }
+
+    public static function generateUInt32(ObjectEntry $engineObject): int
+    {
+        return self::bytesToUInt32(self::generate($engineObject));
+    }
+
+    public static function generateUInt64(ObjectEntry $engineObject): int
+    {
+        return self::bytesToUInt64(self::generate($engineObject));
+    }
+
+    private static function bytesToUInt32(string $bytes): int
+    {
+        return self::bytesToUInt64($bytes) & 0xFFFFFFFF;
+    }
+
+    private static function bytesToUInt64(string $bytes): int
+    {
+        return (int) (\unpack('P', $bytes)[1] ?? 0);
     }
 
     public static function range(ObjectEntry $engineObject, int $min, int $max): int
@@ -147,16 +167,16 @@ final class RandomEngineStorage
     private static function rangeFromGenerate32(ObjectEntry $engineObject, int $umax): int
     {
         if (0xFFFFFFFF === $umax) {
-            return self::generate($engineObject);
+            return self::generateUInt32($engineObject);
         }
         ++$umax;
         if (($umax & ($umax - 1)) === 0) {
-            return self::generate($engineObject) & ($umax - 1);
+            return self::generateUInt32($engineObject) & ($umax - 1);
         }
         $limit = 0xFFFFFFFF - (int) (0xFFFFFFFF % $umax) - 1;
-        $result = self::generate($engineObject);
+        $result = self::generateUInt32($engineObject);
         while ($result > $limit) {
-            $result = self::generate($engineObject);
+            $result = self::generateUInt32($engineObject);
         }
 
         return $result % $umax;
@@ -166,9 +186,9 @@ final class RandomEngineStorage
     {
         ++$umax;
         $limit = \PHP_INT_MAX - (int) (\PHP_INT_MAX % $umax) - 1;
-        $result = self::generate($engineObject);
+        $result = self::generateUInt64($engineObject);
         while ($result > $limit) {
-            $result = self::generate($engineObject);
+            $result = self::generateUInt64($engineObject);
         }
 
         return $result % $umax;
@@ -387,7 +407,7 @@ final class Mt19937Generate extends VmClassMethod
         if (null === $frame->returnVar) {
             return;
         }
-        $frame->returnVar->int(RandomEngineStorage::mt19937($object)->generate());
+        $frame->returnVar->string(RandomEngineStorage::mt19937($object)->generate());
     }
 }
 
@@ -551,7 +571,7 @@ final class RandomizerNextInt extends VmClassMethod
             return;
         }
         $engine = RandomEngineStorage::engineObject($object);
-        $frame->returnVar->int(RandomEngineStorage::generate($engine));
+        $frame->returnVar->int(RandomEngineStorage::generateUInt64($engine));
     }
 }
 
@@ -607,7 +627,7 @@ final class RandomizerGetBytes extends VmClassMethod
         $engine = RandomEngineStorage::engineObject($object);
         $bytes = '';
         while (\strlen($bytes) < $length) {
-            $bytes .= \pack('V', RandomEngineStorage::generate($engine));
+            $bytes .= RandomEngineStorage::generate($engine);
         }
         $frame->returnVar->string(\substr($bytes, 0, $length));
     }

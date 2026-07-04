@@ -35,6 +35,12 @@ final class RandomU64
         return 0 === $this->hi ? $this->lo : ($this->lo | ($this->hi << 32));
     }
 
+    /** php-src php_random_engine_common.c — u64 as 8-byte little-endian string. */
+    public function toBytes(): string
+    {
+        return \pack('P', $this->toInt());
+    }
+
     public static function add(self $a, self $b): self
     {
         $lo = ($a->lo + $b->lo) & 0xFFFFFFFF;
@@ -56,11 +62,20 @@ final class RandomU64
     public static function mul32(self $a, int $multiplier): self
     {
         $multiplier &= 0xFFFFFFFF;
-        $product = $a->lo * $multiplier;
-        $lo = $product & 0xFFFFFFFF;
-        $hi = (($a->hi * $multiplier) & 0xFFFFFFFF) + (int) ($product / 0x100000000);
+        $a0 = $a->lo & 0xFFFF;
+        $a1 = ($a->lo >> 16) & 0xFFFF;
+        $b0 = $multiplier & 0xFFFF;
+        $b1 = ($multiplier >> 16) & 0xFFFF;
+        $p00 = $a0 * $b0;
+        $p01 = $a0 * $b1;
+        $p10 = $a1 * $b0;
+        $p11 = $a1 * $b1;
+        $mid = (($p00 >> 16) & 0xFFFF) + ($p01 & 0xFFFF) + ($p10 & 0xFFFF);
+        $lo = (($p00 & 0xFFFF) | (($mid & 0xFFFF) << 16)) & 0xFFFFFFFF;
+        $carry = (($mid >> 16) & 0xFFFF) + (($p01 >> 16) & 0xFFFF) + (($p10 >> 16) & 0xFFFF) + $p11;
+        $hi = (($a->hi * $multiplier) + $carry) & 0xFFFFFFFF;
 
-        return new self($hi & 0xFFFFFFFF, $lo);
+        return new self($hi, $lo);
     }
 
     public static function mul64(self $a, self $b): self
