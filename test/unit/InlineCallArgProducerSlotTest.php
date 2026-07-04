@@ -5092,6 +5092,48 @@ PHP;
         self::assertSame("2\n", ob_get_clean());
     }
 
+    /** Issue #15996 — DateTime literal ctor arg must not alias prior inline NEW slot. */
+    public function testDateTimeNewLiteralArgDistinctFromPriorNewResultSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+declare(strict_types=1);
+$tz = new DateTimeZone('UTC');
+$dt = new DateTime('2020-01-01 12:00:00', $tz);
+echo $dt->format('c'), "\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'datetime_new_timezone_var.php');
+
+        $dateTimeArgSends = [];
+        $seenDateTimeNew = false;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_NEW === $op->type) {
+                $classSlot = $op->arg2;
+                if (null !== $classSlot && isset($block->constants[$classSlot])) {
+                    $className = $block->constants[$classSlot]->toString();
+                    if ('DateTime' === $className) {
+                        $seenDateTimeNew = true;
+                        continue;
+                    }
+                }
+            }
+            if ($seenDateTimeNew && OpCode::TYPE_ARG_SEND === $op->type) {
+                $dateTimeArgSends[] = $op->arg1;
+            }
+            if ($seenDateTimeNew && OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
+                break;
+            }
+        }
+
+        self::assertCount(2, $dateTimeArgSends, 'DateTime ctor arg sends='.json_encode($dateTimeArgSends));
+        self::assertNotSame($dateTimeArgSends[0], $dateTimeArgSends[1]);
+
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("2020-01-01T12:00:00+00:00\n", ob_get_clean());
+    }
+
     /** Issue #15422 — in_array/array_search/array_key_exists after UDF with array param. */
     public function testInArrayFamilyAfterUdfArrayParamRuntime(): void
     {
