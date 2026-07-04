@@ -8,7 +8,7 @@ echo "\n";
 $fp = gzopen('php://temp', 'rb');
 var_export(gzread($fp, 10));
 echo "\n";
-var_export(gzeof($fp) === 1);
+var_export(gzeof($fp));
 echo "\n";
 gzclose($fp);
 var_export(@gzopen('php://memory', 'wb') === false);

@@ -12,7 +12,7 @@ namespace PHPCompiler\ext\standard;
  */
 final class VmGzStreamPure
 {
-    /** @var array<int, array{path: string, writing: bool, append: bool, level: int, buffer: string, pos: int}> */
+    /** @var array<int, array{path: string, writing: bool, append: bool, level: int, buffer: string, pos: int, eof: bool}> */
     private static array $streams = [];
 
     public static function available(): bool
@@ -74,6 +74,7 @@ final class VmGzStreamPure
             'level' => $parsed['level'],
             'buffer' => $buffer,
             'pos' => $pos,
+            'eof' => false,
         ];
 
         return $id;
@@ -116,6 +117,9 @@ final class VmGzStreamPure
         }
         $remaining = \strlen($stream['buffer']) - $stream['pos'];
         if ($remaining <= 0) {
+            $stream['eof'] = true;
+            self::$streams[$handle] = $stream;
+
             return '';
         }
         $take = \min($length, $remaining);
@@ -144,6 +148,7 @@ final class VmGzStreamPure
             return -1;
         }
         $stream['pos'] = $pos;
+        $stream['eof'] = false;
         self::$streams[$handle] = $stream;
 
         return 0;
@@ -167,18 +172,18 @@ final class VmGzStreamPure
         return 0 === self::gzseek($handle, 0, \SEEK_SET);
     }
 
-    /** gzeof() — true when read position is at or past EOF (ext/zlib/zlib.c, #14596). */
-    public static function gzeof(int $handle): int
+    /** gzeof() — true after a read hits EOF; false on fresh read handle (ext/zlib/zlib.c, #14596). */
+    public static function gzeof(int $handle): bool
     {
         $stream = self::$streams[$handle] ?? null;
         if (null === $stream) {
-            return 1;
+            return true;
         }
         if ($stream['writing']) {
-            return 0;
+            return false;
         }
 
-        return $stream['pos'] >= \strlen($stream['buffer']) ? 1 : 0;
+        return $stream['eof'];
     }
 
     public static function gzclose(int $handle): bool

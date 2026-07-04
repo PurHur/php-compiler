@@ -123,10 +123,10 @@ final class VmGzStream
     }
 
     /** gzeof() — EOF probe on gzip stream (ext/zlib/zlib.c, #14596). */
-    public static function gzeof(int $handle): int
+    public static function gzeof(int $handle): bool
     {
         if (!VmGzStreamNative::isNativeHandle($handle)) {
-            return 1;
+            return true;
         }
 
         return VmGzStreamNative::gzeof($handle);
