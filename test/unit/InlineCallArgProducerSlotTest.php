@@ -4160,6 +4160,7 @@ PHP;
 
         self::assertCount(2, $arraySlots, 'array inits='.json_encode($arraySlots));
         self::assertCount(3, $sendSlots, 'arg sends='.json_encode($sendSlots));
+        self::assertNotSame($arraySlots[0], $sendSlots[0], 'callback must be null, not first array');
         self::assertSame($arraySlots[0], $sendSlots[1]);
         self::assertSame($arraySlots[1], $sendSlots[2]);
     }
