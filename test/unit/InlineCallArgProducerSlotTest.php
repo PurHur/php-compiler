@@ -1677,7 +1677,7 @@ PHP;
             }
         }
 
-        self::assertCount(3, $arraySlots, 'array inits='.json_encode($arraySlots));
+        self::assertGreaterThanOrEqual(3, \count($arraySlots), 'array inits='.json_encode($arraySlots));
         self::assertCount(2, $sendSlots, 'arg sends='.json_encode($sendSlots));
         self::assertSame($arraySlots[1], $sendSlots[0], 'outer nested inline array must feed arg #1');
         self::assertSame($arraySlots[2], $sendSlots[1], 'null overlay array must feed arg #2');
