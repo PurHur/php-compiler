@@ -29264,12 +29264,32 @@ class Compiler {
             $block->orig->children,
             $cfgCallOp
         );
+        $callArgs = $cfgCallOp->args ?? [];
         $matched = $this->matchArrayColumnNestedHaystackTrailingProducers(
             $producers,
-            $cfgCallOp->args ?? [],
+            $callArgs,
             $argIndex,
             $cfgCallOp
         );
+        // array_column([['n'=>'a'], …], 'n') — nested haystack without trailing null (#13703, #15960).
+        if (!$matched instanceof Op\Expr && 0 === $argIndex) {
+            $matched = $this->matchFoldedFirstNestedSiblingArrayLiteralCallArgProducer(
+                $producers,
+                $argIndex,
+                \count($callArgs),
+                $callArgs
+            );
+            if (null === $matched) {
+                $matched = $this->matchSoleNestedInlineArrayHaystackProducer(
+                    $producers,
+                    $callArgs,
+                    $argIndex
+                );
+            }
+            if (null === $matched) {
+                $matched = $this->inlineArrayProducerImmediatelyBeforeCfgCall($cfgCallOp, $block);
+            }
+        }
         if (!$matched instanceof Op\Expr) {
             return null;
         }

@@ -4711,6 +4711,29 @@ echo "\n";
 PHP;
         $runtime = new Runtime();
         $block = $runtime->parseAndCompile($code, 'array_column_inline_haystack.php');
+
+        $outerHaystackSlot = null;
+        $columnSends = [];
+        $fcallOrdinal = 0;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_ADD_ARRAY_ELEMENT === $op->type && null !== $op->arg1) {
+                $outerHaystackSlot = $op->arg1;
+            }
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                ++$fcallOrdinal;
+                if (1 === $fcallOrdinal) {
+                    $columnSends = [];
+                }
+            }
+            if (1 === $fcallOrdinal && OpCode::TYPE_ARG_SEND === $op->type) {
+                $columnSends[] = $op->arg1;
+            }
+        }
+
+        self::assertNotNull($outerHaystackSlot);
+        self::assertCount(2, $columnSends, 'column sends='.json_encode($columnSends));
+        self::assertSame($outerHaystackSlot, $columnSends[0], 'haystack slot');
+
         ob_start();
         $runtime->run($block);
         self::assertSame("array (\n  0 => 'a',\n  1 => 'b',\n)\n", ob_get_clean());
