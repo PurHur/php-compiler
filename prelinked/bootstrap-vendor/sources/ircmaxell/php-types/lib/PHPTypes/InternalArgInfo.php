@@ -34,7 +34,7 @@ class InternalArgInfo
         'accelerator_reset' => [''],
         'acos' => ['float', 'number' => 'float'],
         'acosh' => ['float', 'number' => 'float'],
-        'addcslashes' => ['string', 'str' => 'string', 'charlist' => 'string'],
+        'addcslashes' => ['string', 'str' => 'string', 'characters' => 'string'],
         'addslashes' => ['string', 'str' => 'string'],
         'aggregate_methods_by_list' => ['', 'object' => 'object', 'class_name' => 'string', 'methods_list' => 'array', 'exclude=' => 'bool'],
         'aggregate_methods_by_regexp' => ['', 'object' => 'object', 'class_name' => 'string', 'regexp' => 'string', 'exclude=' => 'bool'],
