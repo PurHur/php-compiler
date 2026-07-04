@@ -729,7 +729,7 @@ final class VmDom
         }
         $state = DomRegistry::state($element);
         if (!\array_key_exists($name, $state->attributes)) {
-            $var = new Variable(Variable::TYPE_BOOL);
+            $var = new Variable(Variable::TYPE_BOOLEAN);
             $var->bool(false);
 
             return $var;

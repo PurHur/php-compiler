@@ -350,8 +350,8 @@ final class SplFixedArrayBuiltin
                 'SplFixedArray offset must be of type int, '
                 .match ($resolved->type) {
                     Variable::TYPE_NULL => 'null',
-                    Variable::TYPE_BOOL => 'bool',
-                    Variable::TYPE_DOUBLE => 'float',
+                    Variable::TYPE_BOOLEAN => 'bool',
+                    Variable::TYPE_FLOAT => 'float',
                     Variable::TYPE_STRING => 'string',
                     Variable::TYPE_ARRAY => 'array',
                     Variable::TYPE_OBJECT => 'object',

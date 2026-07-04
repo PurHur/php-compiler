@@ -459,7 +459,7 @@ final class SplObjectStorageAddAll extends VmClassMethod
     {
         return match ($value->type) {
             Variable::TYPE_NULL => 'null',
-            Variable::TYPE_BOOL => 'bool',
+            Variable::TYPE_BOOLEAN => 'bool',
             Variable::TYPE_INT => 'int',
             Variable::TYPE_FLOAT => 'float',
             Variable::TYPE_STRING => 'string',
