@@ -26409,18 +26409,56 @@ class Compiler {
                 && $this->callArgIsDeadInlineTemporary($arg)
                 && $this->callArgOperandExpectsArrayProducer($arg)
             ) {
-                $arrayProducerSlot = $this->findInlineExprCallArgProducerSlot($arg, $block, $cfgCallOp);
-                if (null === $arrayProducerSlot) {
-                    $siblingEmit = [];
+                $arrayProducerSlot = null;
+                $siblingEmit = [];
+                $siblingFuncCount = 0;
+                if (null !== $block->orig) {
+                    $callIndex = null;
+                    foreach ($block->orig->children as $i => $child) {
+                        if ($child === $cfgCallOp) {
+                            $callIndex = $i;
+                            break;
+                        }
+                    }
+                    if (null !== $callIndex) {
+                        $firstSibling = $this->firstSiblingInlineFuncCallProducerIndex(
+                            $callIndex,
+                            $block->orig->children
+                        );
+                        if (null !== $firstSibling) {
+                            $siblingFuncCount = $this->countSiblingInlineFuncCallProducers(
+                                $firstSibling,
+                                $callIndex,
+                                $block->orig->children
+                            );
+                        }
+                    }
+                }
+                if ($siblingFuncCount >= 2) {
+                    // array_intersect_assoc(array_keys(), array_keys()) — ordinal sibling wiring (#13778, #15570).
                     $arrayProducerSlot = $this->resolveSiblingInlineCallArgProducerSlot(
                         $block,
                         $cfgCallOp,
                         (int) $argIndex,
                         $siblingEmit
                     );
-                    if ([] !== $siblingEmit) {
-                        $sends = array_merge($sends, $siblingEmit);
+                    if (null === $arrayProducerSlot) {
+                        $arrayProducerSlot = $this->findInlineExprCallArgProducerSlot($arg, $block, $cfgCallOp);
                     }
+                } else {
+                    // in_array('x', g(), true) — lone nested producer after stmt calls (#15612, #15829).
+                    $arrayProducerSlot = $this->findInlineExprCallArgProducerSlot($arg, $block, $cfgCallOp);
+                    if (null === $arrayProducerSlot) {
+                        $arrayProducerSlot = $this->resolveSiblingInlineCallArgProducerSlot(
+                            $block,
+                            $cfgCallOp,
+                            (int) $argIndex,
+                            $siblingEmit
+                        );
+                    }
+                }
+                if ([] !== $siblingEmit) {
+                    $sends = array_merge($sends, $siblingEmit);
                 }
                 if (null !== $arrayProducerSlot) {
                     $valueSlot = (string) $arrayProducerSlot;
