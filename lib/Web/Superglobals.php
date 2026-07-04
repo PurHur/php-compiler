@@ -159,6 +159,9 @@ final class Superglobals
         $argvVar->array($argvHt);
         $argcVar = $context->ensureGlobal('argc');
         $argcVar->int($argc);
+        // CLI SAPI pre-seeds globals before user code — not "unbound" locals (#4139, #16248).
+        $context->markGlobalEverAssigned('argv');
+        $context->markGlobalEverAssigned('argc');
 
         $server = $context->ensureSuperglobal('_SERVER')->toArray();
         $argcServer = new Variable();
