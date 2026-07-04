@@ -34,9 +34,24 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsBuiltinStubEnums());
     }
 
+    public function testJsonValidateWithheldOnReferenceProfile(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsJsonValidate());
+    }
+
     public function testJsonValidateAdvertisedOnForwardProfile(): void
     {
-        $this->assertTrue(CompilerVersion::supportsJsonValidate());
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertTrue(CompilerVersion::supportsJsonValidate());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
     }
 
     public function testMbStrPadWithheldOnReferenceProfileUntilStable84(): void
@@ -376,10 +391,26 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         }
     }
 
-    public function testVmRegistersJsonValidateOnForwardProfile(): void
+    public function testVmDoesNotRegisterJsonValidateOnReferenceProfile(): void
     {
         $runtime = new Runtime();
-        $this->assertTrue(isset($runtime->vmContext->functions['json_validate']));
+        $this->assertFalse(isset($runtime->vmContext->functions['json_validate']));
+    }
+
+    public function testVmRegistersJsonValidateOnForwardProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $runtime = new Runtime();
+            $this->assertTrue(isset($runtime->vmContext->functions['json_validate']));
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
     }
 
     public function testVmDoesNotRegisterStreamSupportsOnReferenceProfile(): void

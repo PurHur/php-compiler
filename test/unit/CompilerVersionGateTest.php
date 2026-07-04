@@ -124,9 +124,24 @@ final class CompilerVersionGateTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsRoundingModeEnum());
     }
 
+    public function testSupportsJsonValidateFalseOnReferenceProfile(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsJsonValidate());
+    }
+
     public function testSupportsJsonValidateTrueOnForwardProfile(): void
     {
-        $this->assertTrue(CompilerVersion::supportsJsonValidate());
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertTrue(CompilerVersion::supportsJsonValidate());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
     }
 
     public function testAdvertisesReflectionConstantClassFalseOnReferenceProfile(): void
@@ -599,10 +614,26 @@ final class CompilerVersionGateTest extends TestCase
         $this->assertFalse(isset($runtime->vmContext->classes['random\\intervalboundary']));
     }
 
-    public function testVmRegistersJsonValidateOnForwardProfile(): void
+    public function testVmDoesNotRegisterJsonValidateOnReferenceProfile(): void
     {
         $runtime = new Runtime();
-        $this->assertTrue(isset($runtime->vmContext->functions['json_validate']));
+        $this->assertFalse(isset($runtime->vmContext->functions['json_validate']));
+    }
+
+    public function testVmRegistersJsonValidateOnForwardProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $runtime = new Runtime();
+            $this->assertTrue(isset($runtime->vmContext->functions['json_validate']));
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
     }
 
     public function testSupportsMbTrimFunctionsFalseOnReferenceProfile(): void

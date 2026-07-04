@@ -127,11 +127,13 @@ class VMTest extends BaseTest {
             }
             if (!CompilerVersion::supportsJsonValidate()
                 && str_contains($name, 'json_validate')
-                && !str_contains($name, 'json_validate_phantom')) {
+                && !str_contains($name, 'json_validate_phantom')
+                && !str_contains($name, 'json_validate_function_exists_profile')) {
                 continue;
             }
             if (CompilerVersion::supportsJsonValidate()
-                && str_contains($name, 'json_validate_phantom')) {
+                && (str_contains($name, 'json_validate_phantom')
+                    || str_contains($name, 'json_validate_function_exists_profile'))) {
                 continue;
             }
             if (!CompilerVersion::supportsSortingEnum()
