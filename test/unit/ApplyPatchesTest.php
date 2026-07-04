@@ -969,4 +969,54 @@ PHP;
         self::assertStringContainsString('public bool $isEnumCase = false', $constBody);
         self::assertStringContainsString('public bool $enumCaseHasExplicitValue = false', $constBody);
     }
+
+    public function testVerifyCriticalLanguagePatchesIncludesTryCatchElseOverlay(): void
+    {
+        $script = (string) file_get_contents(self::$root.'/script/apply-patches.sh');
+        self::assertStringContainsString(
+            'php-cfg-trycatch-else-Parser',
+            $script,
+            'verify_critical_language_patches must require try/catch/else Parser routing (#15832)'
+        );
+        self::assertStringContainsString(
+            'php-cfg-trycatch-else-TryCatch',
+            $script,
+            'verify_critical_language_patches must require TryCatch::$else (#15832)'
+        );
+        self::assertStringContainsString(
+            '\$elseBlock ?? \$endBlock',
+            $script,
+            'patch_already_applied must probe try/catch/else overlay (#15832)'
+        );
+    }
+
+    public function testApplyPatchesLeavesTryCatchElseOnVendorParser(): void
+    {
+        $parser = self::$root.'/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php';
+        $trycatch = self::$root.'/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/TryCatch.php';
+        if (!is_readable($parser) || !is_readable($trycatch)) {
+            self::markTestSkipped('vendor/ircmaxell/php-cfg not installed');
+        }
+
+        $output = [];
+        $exitCode = 0;
+        exec('bash '.escapeshellarg(self::$root.'/script/apply-patches.sh').' 2>&1', $output, $exitCode);
+        $joined = implode("\n", $output);
+        self::assertSame(0, $exitCode, "apply-patches must succeed before try/catch/else marker check:\n".$joined);
+
+        $parserBody = (string) file_get_contents($parser);
+        self::assertStringContainsString(
+            'TryCatchElseSupport::ATTRIBUTE',
+            $parserBody,
+            'Parser must read else source from TryCatchElseSupport (#15832)'
+        );
+        self::assertStringContainsString(
+            '$elseBlock ?? $endBlock',
+            $parserBody,
+            'Parser must fall through to end when else is absent (#15832)'
+        );
+
+        $trycatchBody = (string) file_get_contents($trycatch);
+        self::assertStringContainsString('public $else;', $trycatchBody, 'TryCatch op must expose else property (#15832)');
+    }
 }
