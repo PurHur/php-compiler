@@ -29,7 +29,7 @@ use PHPLLVM\Value;
  * array_map() — null zip, string builtins, and closure callbacks (ext/standard/array.c; #4539).
  *
  * JIT/AOT: null, compile-time string builtins, and closure/arrow callbacks with native int/double
- * returns are lowered (issue #142). [class, method] and invokable object callables deferred (#1154).
+ * returns are lowered (issue #142). [class, method] callables deferred (#1154); invokable objects VM-only (#16228).
  */
 final class array_map extends Internal
 {
@@ -113,13 +113,12 @@ final class array_map extends Internal
 
             return $out;
         }
-        if (VmClosureCall::isClosure($callback)) {
+        if (self::isVmCallableCallback($callback)) {
             if (null === $frame->vmContext) {
                 throw new \LogicException('array_map() requires VM context in this compiler build');
             }
-            $closure = VmClosureCall::resolve($callback);
             foreach ($src->iterateKeyed(true) as [$key, $value]) {
-                $mapped = VmClosureCall::invokeOne($frame->vmContext, $closure, $value);
+                $mapped = VmCallable::invoke($frame->vmContext, $callback, $value);
                 self::appendKeyed($out, $key, $mapped);
             }
 
@@ -159,12 +158,11 @@ final class array_map extends Internal
 
                 continue;
             }
-            if (VmClosureCall::isClosure($callback)) {
+            if (self::isVmCallableCallback($callback)) {
                 if (null === $frame->vmContext) {
                     throw new \LogicException('array_map() requires VM context in this compiler build');
                 }
-                $closure = VmClosureCall::resolve($callback);
-                $mapped = VmClosureCall::invoke($frame->vmContext, $closure, ...$rowArgs);
+                $mapped = VmCallable::invoke($frame->vmContext, $callback, ...$rowArgs);
                 $out->addIndex($destIdx++, $mapped);
 
                 continue;
@@ -180,7 +178,7 @@ final class array_map extends Internal
                 continue;
             }
             throw new \LogicException(
-                'array_map() with multiple arrays requires a null, closure, or string builtin callback in this compiler build'
+                'array_map() with multiple arrays requires a null, closure, invokable object, or string builtin callback in this compiler build'
             );
         }
 
@@ -226,6 +224,12 @@ final class array_map extends Internal
         $result->copyFrom($found);
 
         return $result;
+    }
+
+    private static function isVmCallableCallback(Variable $callback): bool
+    {
+        return VmClosureCall::isClosure($callback)
+            || Variable::TYPE_OBJECT === $callback->type;
     }
 
     private static function typeLabel(Variable $var): string
