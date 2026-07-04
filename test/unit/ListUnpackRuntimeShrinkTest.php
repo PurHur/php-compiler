@@ -27,9 +27,10 @@ final class ListUnpackRuntimeShrinkTest extends TestCase
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/ListUnpackHelper.php');
         $this->assertStringContainsString('ListUnpackRuntime', $source);
+        $this->assertStringContainsString('TypeErrorRaise::emitBranchOrAbortOnFailure', $source);
         $this->assertStringNotContainsString('isRuntimeTypeValue', $source);
-        $this->assertLessThanOrEqual(235, substr_count($source, "\n") + 1);
-        $this->assertLessThan(255, substr_count($source, "\n") + 1);
+        $this->assertStringNotContainsString('LLVMBuildUnreachable', $source);
+        $this->assertLessThanOrEqual(175, substr_count($source, "\n") + 1);
     }
 
     public function testListUnpackJitHelperValueBoxIsArray(): void
