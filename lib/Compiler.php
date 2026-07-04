@@ -20650,6 +20650,18 @@ class Compiler {
                 }
             }
 
+            // array_combine(array_keys(...), [...]) — trailing values Array_ means producer feeds arg #0 (#15949, re-#15857).
+            if (
+                ($consumer instanceof Op\Expr\FuncCall || $consumer instanceof Op\Expr\NsFuncCall)
+                && 'array_combine' === $this->resolveCfgFuncCallName($consumer)
+            ) {
+                for ($j = $producerIndex + 1; $j < $consumerIndex; ++$j) {
+                    if (($cfgChildren[$j] ?? null) instanceof Op\Expr\Array_) {
+                        return false;
+                    }
+                }
+            }
+
             // var_dump(...); ini_get_all(null, false) — completed stmt callee, ConstFetch preludes only (#15931).
             // date_sun_info(strtotime(...), lat, -lon) still handled via producerFeedsConsumerArg0ThroughLiteralPreludesOnly above.
             return $producer instanceof Op\Expr\FuncCall || $producer instanceof Op\Expr\NsFuncCall;
