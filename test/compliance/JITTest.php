@@ -355,6 +355,14 @@ class JITTest extends BaseTest {
                 && str_contains($name, 'deprecated_attribute_class')) {
                 continue;
             }
+            if (!CompilerVersion::supportsDeprecatedAttributeRuntimeNotices()
+                && 'deprecated_attribute.phpt' === $name) {
+                continue;
+            }
+            if (CompilerVersion::supportsDeprecatedAttributeRuntimeNotices()
+                && 'deprecated_attribute_profile.phpt' === $name) {
+                continue;
+            }
             if (!CompilerVersion::advertisesNoDiscardAttributeClass()
                 && str_contains($name, 'nodiscard_class_exists')) {
                 continue;

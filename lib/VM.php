@@ -15462,6 +15462,9 @@ restart:
 
     private function emitDeprecatedNotice(string $message, Frame $frame): void
     {
+        if (!CompilerVersion::supportsDeprecatedAttributeRuntimeNotices()) {
+            return;
+        }
         $this->context->errors->triggerError(
             $message,
             ErrorReporter::E_USER_DEPRECATED,

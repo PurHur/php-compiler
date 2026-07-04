@@ -354,6 +354,26 @@ final class CompilerVersionGateTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsGetDeclaredExcludeDeprecated());
     }
 
+    public function testSupportsDeprecatedAttributeRuntimeNoticesFalseOnReferenceProfile(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsDeprecatedAttributeRuntimeNotices());
+    }
+
+    public function testSupportsDeprecatedAttributeRuntimeNoticesTrueWhenProfile84(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertTrue(CompilerVersion::supportsDeprecatedAttributeRuntimeNotices());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     public function testSupportsExitFunctionFormFalseOnReferenceProfile(): void
     {
         $this->assertFalse(CompilerVersion::supportsExitFunctionForm());
