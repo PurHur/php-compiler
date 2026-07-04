@@ -14,7 +14,7 @@ use PHPCompiler\VM\Variable;
  */
 final class VmRoundMode
 {
-    public static function resolveRoundModeArg(Variable $var, string $fn): int
+    public static function resolveRoundModeArg(Variable $var, string $fn, string $paramName = 'mode'): int
     {
         $var = $var->resolveIndirect();
         $fromEnum = self::tryRoundModeInt($var);
@@ -23,15 +23,17 @@ final class VmRoundMode
         }
         if (EnumCaseSupport::isEnumCaseVariable($var)) {
             throw new \TypeError(sprintf(
-                '%s(): Argument #3 ($mode) must be of type RoundingMode|int, %s given',
+                '%s(): Argument #3 ($%s) must be of type RoundingMode|int, %s given',
                 $fn,
+                $paramName,
                 EnumCaseSupport::typeNameForVariable($var)
             ));
         }
         if (Variable::TYPE_INTEGER !== $var->type) {
             throw new \TypeError(sprintf(
-                '%s(): Argument #3 ($mode) must be of type RoundingMode|int, %s given',
+                '%s(): Argument #3 ($%s) must be of type RoundingMode|int, %s given',
                 $fn,
+                $paramName,
                 EnumCaseSupport::typeNameForVariable($var)
             ));
         }
