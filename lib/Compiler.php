@@ -17337,6 +17337,15 @@ class Compiler {
         if (!$func instanceof Op\Expr\FuncCall && !$func instanceof Op\Expr\NsFuncCall) {
             return null;
         }
+        // probe('label', nested_call()) — ConstFetch+FuncCall preludes belong to nested call (#15846).
+        if (
+            property_exists($callOp, 'args')
+            && \is_array($callOp->args)
+            && isset($callOp->args[0])
+            && $this->isEmbeddedCallLiteralArg($callOp->args[0])
+        ) {
+            return null;
+        }
 
         return [$const, $func];
     }
@@ -19333,6 +19342,25 @@ class Compiler {
         if ($distance < 1) {
             return null;
         }
+        $consumer = $cfgChildren[$consumerIndex] ?? null;
+        if (
+            1 === $distance
+            && ($consumer instanceof Op\Expr\FuncCall || $consumer instanceof Op\Expr\NsFuncCall)
+            && property_exists($consumer, 'args')
+            && \is_array($consumer->args)
+        ) {
+            // probe('label', g()) — adjacent hoisted producer feeds first hoisted arg (#15846).
+            $leadingEmbedded = 0;
+            foreach ($consumer->args as $arg) {
+                if ($this->isEmbeddedCallLiteralArg($arg)) {
+                    ++$leadingEmbedded;
+                    continue;
+                }
+                break;
+            }
+
+            return $leadingEmbedded;
+        }
         $mid = $cfgChildren[$producerIndex + 1] ?? null;
         if (2 === $distance && $this->isUnaryInlineSiblingCallArgExpr($mid)) {
             return 0;
@@ -19348,7 +19376,6 @@ class Compiler {
         $ordinal = $this->siblingFuncCallChainHasArrayPrelude($firstSibling, $consumerIndex, $cfgChildren)
             ? $this->siblingInlineFuncCallProducerOrdinal($producerIndex, $firstSibling, $cfgChildren)
             : ($producerIndex - $firstSibling);
-        $consumer = $cfgChildren[$consumerIndex] ?? null;
         $producer = $cfgChildren[$producerIndex] ?? null;
         if ($producer instanceof Op\Expr) {
             $outerOrdinal = $this->outerSiblingInlineFuncCallProducerOrdinal(
@@ -20024,6 +20051,9 @@ class Compiler {
         }
         $loopBound = $arrayPreludeChain ? min($argCount, $siblingFuncCount) : ($callIndex - $firstSibling);
         for ($argIndex = 0; $argIndex < $loopBound; ++$argIndex) {
+            if ($this->isEmbeddedCallLiteralArg($cfgCallOp->args[$argIndex] ?? null)) {
+                continue;
+            }
             $emitOps = [];
             $slot = $this->resolveSiblingInlineCallArgProducerSlot(
                 $block,
@@ -20893,6 +20923,7 @@ class Compiler {
         if (
             null !== $callArg
             && !$this->operandsReferToSameVariable($prev->result, $callArg)
+            && 1 !== ($callIndex - $probeIndex)
         ) {
             return null;
         }
@@ -26951,7 +26982,16 @@ class Compiler {
                     }
                 }
             }
-            if (null !== $cfgCallOp && null !== $block->orig && \is_array($cfgCallOp->args ?? null) && 2 === \count($cfgCallOp->args)) {
+            if (
+                null !== $cfgCallOp
+                && null !== $block->orig
+                && \is_array($cfgCallOp->args ?? null)
+                && 2 === \count($cfgCallOp->args)
+                && !(
+                    isset($cfgCallOp->args[0])
+                    && $this->isEmbeddedCallLiteralArg($cfgCallOp->args[0])
+                )
+            ) {
                 $constFuncPrelude = $this->leadingConstFetchFuncCallPreludeBeforeCfgCall($cfgCallOp, $block)
                     ?? $this->splitLeadingConstFetchWithFuncCallCallArg(
                         $this->precedingInlineCallArgProducersBeforeCfgOp($block->orig->children, $cfgCallOp)
