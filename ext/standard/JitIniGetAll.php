@@ -44,15 +44,14 @@ final class JitIniGetAll
         return self::invokeMaterialized($context, null, $args);
     }
 
-  /**
+    /**
      * @param list<JITVariable> $args
      */
     private static function invokeWithRuntimeExtension(Context $context, array $args): Value
     {
-        $argc = \count($args);
         $literal = $args[0]->compileTimeString ?? JitStringArg::compileTimeLiteral($args[0]);
         if (null !== $literal) {
-            if ('core' !== strtolower($literal)) {
+            if (!VmIni::isKnownIniExtension($literal)) {
                 $slot = JitValueBox::alloc($context);
                 $ptr = JitValueBox::pointer($context, $slot);
                 JitValueBox::writeBool($context, $slot, $context->constantFromBool(false));
@@ -60,28 +59,55 @@ final class JitIniGetAll
                 return $ptr;
             }
 
-            return self::invokeMaterialized($context, $literal, $args);
+            return self::invokeMaterialized($context, strtolower($literal), $args);
         }
 
-        $detailHt = self::materializeCoreTables($context, true);
-        $flatHt = self::materializeCoreTables($context, false);
+        return self::invokeRuntimeExtensionSelect($context, $args);
+    }
 
+    /**
+     * @param list<JITVariable> $args
+     */
+    private static function invokeRuntimeExtensionSelect(Context $context, array $args): Value
+    {
+        $argc = \count($args);
+        $extStr = JitStringBuiltinArg::lower($context, $args[0], 'ini_get_all', 0, 'extension');
         $slot = JitValueBox::alloc($context);
         $ptr = JitValueBox::pointer($context, $slot);
-        $extStr = JitStringBuiltinArg::lower($context, $args[0], 'ini_get_all', 0, 'extension');
 
-        $okBlock = BasicBlockHelper::append($context, 'iga_ext_runtime_ok');
+        $branches = [
+            ['core', null],
+            ['standard', 'standard'],
+            ['pcre', 'pcre'],
+        ];
+
         $failBlock = BasicBlockHelper::append($context, 'iga_ext_runtime_fail');
         $doneBlock = BasicBlockHelper::append($context, 'iga_ext_runtime_done');
-        $isCore = self::emitStringEqualsCi($context, $extStr, 'core');
-        $context->builder->branchIf($isCore, $okBlock, $failBlock);
+        $nextBlock = BasicBlockHelper::append($context, 'iga_ext_runtime_try0');
+
+        $context->builder->branch($nextBlock);
+
+        foreach ($branches as $index => [$label, $extension]) {
+            $tryBlock = $nextBlock;
+            $matchBlock = BasicBlockHelper::append($context, 'iga_ext_runtime_match'.$index);
+            $nextBlock = BasicBlockHelper::append($context, 'iga_ext_runtime_try'.($index + 1));
+
+            $context->builder->positionAtEnd($tryBlock);
+            $isMatch = self::emitStringEqualsCi($context, $extStr, $label);
+            $context->builder->branchIf($isMatch, $matchBlock, $nextBlock);
+
+            $context->builder->positionAtEnd($matchBlock);
+            $detailHt = self::materializeExtensionTables($context, $extension, true);
+            $flatHt = self::materializeExtensionTables($context, $extension, false);
+            self::writeResultHashtable($context, $ptr, $detailHt, $flatHt, $argc >= 2 ? $args[1] : null);
+            $context->builder->branch($doneBlock);
+        }
+
+        $context->builder->positionAtEnd($nextBlock);
+        $context->builder->branch($failBlock);
 
         $context->builder->positionAtEnd($failBlock);
         JitValueBox::writeBool($context, $slot, $context->constantFromBool(false));
-        $context->builder->branch($doneBlock);
-
-        $context->builder->positionAtEnd($okBlock);
-        self::writeResultHashtable($context, $ptr, $detailHt, $flatHt, $argc >= 2 ? $args[1] : null);
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($doneBlock);
@@ -127,20 +153,25 @@ final class JitIniGetAll
         return $ptr;
     }
 
-    private static function materializeCoreTables(Context $context, bool $details): Value
+    private static function materializeExtensionTables(Context $context, ?string $extension, bool $details): Value
     {
         $vmCtx = $context->runtime->vmContext;
         if (null === $vmCtx) {
             throw new \LogicException('ini_get_all() requires VM context during JIT lowering (issue #3205)');
         }
-        $table = VmIni::getAll($vmCtx, null, $details);
+        $table = VmIni::getAll($vmCtx, $extension, $details);
         if (false === $table) {
-            throw new \LogicException('ini_get_all() core table materialization failed (issue #3205)');
+            throw new \LogicException('ini_get_all() extension table materialization failed (issue #9052)');
         }
 
         return $context->helper->loadValue(
             HashTableHelper::variableFromVmHashTable($context, $table)
         );
+    }
+
+    private static function materializeCoreTables(Context $context, bool $details): Value
+    {
+        return self::materializeExtensionTables($context, null, $details);
     }
 
     private static function writeResultHashtable(
