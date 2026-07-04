@@ -70,4 +70,27 @@ final class GetoptVMTest extends TestCase
         $this->assertIsString($stdout);
         $this->assertStringContainsString("ok\n", $stdout);
     }
+
+    /** Issue #9093 — optional long `opt::` with `--opt=value` must not hang script-file getopt(). */
+    public function testGetoptOptionalLongEqualsSyntax(): void
+    {
+        $repoRoot = \dirname(__DIR__, 2);
+        $vm = $repoRoot.'/bin/vm.php';
+        $script = $repoRoot.'/test/repro/maintainer_getopt_cli.php';
+        $this->assertFileExists($vm);
+        $this->assertFileExists($script);
+
+        $cmd = \sprintf(
+            '%s %s %s -a -b B --long L --opt=V -- -x 2>&1',
+            \escapeshellarg(\PHP_BINARY),
+            \escapeshellarg($vm),
+            \escapeshellarg($script)
+        );
+        $stdout = shell_exec('cd '.\escapeshellarg($repoRoot).' && '.$cmd);
+        $this->assertIsString($stdout);
+        $this->assertStringContainsString("'a' => false", $stdout);
+        $this->assertStringContainsString("'b' => 'B'", $stdout);
+        $this->assertStringContainsString("'long' => 'L'", $stdout);
+        $this->assertStringContainsString("'opt' => 'V'", $stdout);
+    }
 }

@@ -74,6 +74,7 @@ final class GetoptEngine
                 // Optional long argument.
                 if (null !== $optValue) {
                     self::addResult($result, $optName, $optValue);
+                    ++$pos;
                 } elseif ($pos + 1 < $argc && !str_starts_with($argv[$pos + 1], '-')) {
                     self::addResult($result, $optName, $argv[$pos + 1]);
                     $pos += 2;
