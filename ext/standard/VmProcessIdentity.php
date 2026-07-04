@@ -85,9 +85,6 @@ final class VmProcessIdentity
 
     private static function isVirtualScriptPath(string $path): bool
     {
-        return '' === $path
-            || '-' === $path
-            || 'Standard input code' === $path
-            || 'Command line code' === $path;
+        return \PHPCompiler\VM\ScriptStack::isVirtualCompileUnit($path);
     }
 }

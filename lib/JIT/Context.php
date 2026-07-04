@@ -327,7 +327,7 @@ class Context {
     public function recordJitIncludedFile(string $path): void
     {
         $normalized = \PHPCompiler\VM\ScriptStack::normalize($path);
-        if ('' !== $normalized) {
+        if ('' !== $normalized && !\PHPCompiler\VM\ScriptStack::isVirtualCompileUnit($normalized)) {
             $this->jitIncludedFiles[] = $normalized;
         }
     }
