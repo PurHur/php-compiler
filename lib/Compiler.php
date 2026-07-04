@@ -18474,7 +18474,9 @@ class Compiler {
                         $cfgChildren
                     )
                 ) {
-                    // in_array('x', g(), true) — hoisted ConstFetch between g() and consumer (#13507, #15611, #15612).
+                    // flock(fopen(...), LOCK_EX) — ConstFetch feeds consumer arg, not inner callee (#9611).
+                    // in_array('x', g(), true) — same hoisted ConstFetch must stay in producers (#13507).
+                    array_unshift($producers, $child);
                     continue;
                 }
                 if (

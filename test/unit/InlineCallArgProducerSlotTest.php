@@ -5015,4 +5015,16 @@ PHP;
         self::assertSame($sysTempReturnSlot, $tempnamSends[0] ?? null);
         self::assertSame($enumFetchSlot, $tempnamSends[1] ?? null);
     }
+
+    /** Issue #9611 — flock(fopen(...), LOCK_EX) nested inline call runtime parity with Zend. */
+    public function testFlockNestedFopenLockExRuntime(): void
+    {
+        $code = file_get_contents(__DIR__.'/../repro/maintainer_probe_flock_flags.php');
+        self::assertNotFalse($code);
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'flock_nested_fopen_lock_ex.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("true\ntrue\nok\n", ob_get_clean());
+    }
 }
