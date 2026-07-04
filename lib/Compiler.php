@@ -28752,21 +28752,14 @@ class Compiler {
                 }
             }
             if ('array_combine' === strtolower($calleeName ?? '') && null !== $cfgCallOp && null !== $block->orig) {
-                $combineProducers = $this->precedingInlineCallArgProducersBeforeCfgOp(
-                    $block->orig->children,
-                    $cfgCallOp
+                $arrayCombineSlot = $this->finalizeArrayCombineCallArgSlot(
+                    $block,
+                    $cfgCallOp,
+                    (int) $argIndex,
+                    $sends
                 );
-                $combineMapped = $this->matchArrayCombineInlineProducers($combineProducers, (int) $argIndex);
-                if ($combineMapped instanceof Op\Expr && null !== $combineMapped->result) {
-                    if (null === $block->slotForOperand($combineMapped->result)) {
-                        foreach ($this->compileExpr($combineMapped, $block) as $op) {
-                            $sends[] = $op;
-                        }
-                    }
-                    $combineSlot = $block->slotForOperand($combineMapped->result);
-                    if (null !== $combineSlot) {
-                        $valueSlot = (string) $combineSlot;
-                    }
+                if (null !== $arrayCombineSlot) {
+                    $valueSlot = $arrayCombineSlot;
                 }
             }
             $valueSlot = $this->finalizeStmtCoalesceCallArgSlot(
@@ -29057,6 +29050,38 @@ class Compiler {
         }
 
         return null;
+    }
+
+    /**
+     * Last-chance ARG_SEND slot for array_combine() nested array_keys() + trailing Array_ (#15558, #15857).
+     *
+     * @param list<OpCode> $sends
+     */
+    private function finalizeArrayCombineCallArgSlot(
+        Block $block,
+        Op $cfgCallOp,
+        int $argIndex,
+        array &$sends
+    ): ?string {
+        if (2 !== \count($cfgCallOp->args ?? [])) {
+            return null;
+        }
+        $producers = $this->precedingInlineCallArgProducersBeforeCfgOp(
+            $block->orig->children,
+            $cfgCallOp
+        );
+        $matched = $this->matchArrayCombineInlineProducers($producers, $argIndex);
+        if (!$matched instanceof Op\Expr) {
+            return null;
+        }
+        if (null === $block->slotForOperand($matched->result)) {
+            foreach ($this->compileExpr($matched, $block) as $op) {
+                $sends[] = $op;
+            }
+        }
+        $slot = $block->slotForOperand($matched->result);
+
+        return null !== $slot ? (string) $slot : null;
     }
 
     /**
