@@ -303,6 +303,17 @@ final class CompilerVersion
     }
 
     /**
+     * fpow()/fmin()/fmax() visible to function_exists() — stable runtime only (#16086).
+     *
+     * Callable under forward profile via {@see supportsFpow()}; withheld from introspection on 8.4.0-dev
+     * reference harness like Zend 8.2.
+     */
+    public static function advertisesFpow(): bool
+    {
+        return version_compare(self::VERSION, '8.4.0', '>=');
+    }
+
+    /**
      * PHP 8.4+ nextafter() IEEE next representable float (ext/standard/math.c; #9241, #15584, #15677).
      *
      * Gated on stable 8.4.0 / PHP_COMPILER_PROFILE=8.4 so 8.4.0-dev reference profile matches Zend 8.2 phantom gate.
@@ -310,6 +321,12 @@ final class CompilerVersion
     public static function supportsNextafter(): bool
     {
         return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+    }
+
+    /** nextafter() visible to function_exists() — stable runtime only (#16086). */
+    public static function advertisesNextafter(): bool
+    {
+        return version_compare(self::VERSION, '8.4.0', '>=');
     }
 
     /**
@@ -709,6 +726,16 @@ final class CompilerVersion
     }
 
     /**
+     * mb_str_pad() visible to function_exists() — stable runtime only (#16086).
+     *
+     * Callable under forward profile via {@see supportsMbStrPad()}.
+     */
+    public static function advertisesMbStrPad(): bool
+    {
+        return version_compare(self::VERSION, '8.4.0', '>=');
+    }
+
+    /**
      * PHP 8.4+ grapheme_strimwidth() (ext/intl/grapheme/grapheme_string.c, issue #9793).
      */
     public static function supportsGraphemeStrimwidth(): bool
@@ -910,6 +937,14 @@ final class CompilerVersion
     public static function supportsBcmath(): bool
     {
         return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+    }
+
+    /**
+     * ext/bcmath surface visible to extension_loaded()/function_exists() — stable runtime only (#16086).
+     */
+    public static function advertisesBcmath(): bool
+    {
+        return version_compare(self::VERSION, '8.4.0', '>=');
     }
 
     /**

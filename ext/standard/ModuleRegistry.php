@@ -106,7 +106,12 @@ final class ModuleRegistry
 
     public static function extensionLoaded(string $extension): bool
     {
-        return \in_array(strtolower($extension), self::$loaded, true);
+        $ext = strtolower($extension);
+        if (!\in_array($ext, self::$loaded, true)) {
+            return false;
+        }
+
+        return BuiltinIntrospectionPolicy::extensionIsAdvertised($ext);
     }
 
     /**
@@ -161,7 +166,10 @@ final class ModuleRegistry
      */
     public static function getLoadedExtensions(): array
     {
-        return self::$loaded;
+        return array_values(array_filter(
+            self::$loaded,
+            static fn (string $name): bool => BuiltinIntrospectionPolicy::extensionIsAdvertised($name)
+        ));
     }
 
     /**

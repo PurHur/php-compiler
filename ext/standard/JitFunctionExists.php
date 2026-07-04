@@ -26,7 +26,11 @@ final class JitFunctionExists
                 return $i1->constInt(0, false);
             }
 
-            return $i1->constInt($context->functionIsRegistered($literal) ? 1 : 0, false);
+            return $i1->constInt(
+                $context->functionIsRegistered($literal)
+                    && BuiltinIntrospectionPolicy::functionIsAdvertised($literal) ? 1 : 0,
+                false
+            );
         }
 
         $nameStr = JitStringBuiltinArg::lower($context, $nameArg, 'function_exists', 0, 'function');

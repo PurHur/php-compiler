@@ -20,6 +20,6 @@ final class FunctionExistsJitHelper
             return false;
         }
 
-        return null !== BuiltinRegistry::resolve($normalized);
+        return BuiltinRegistry::isAdvertised($normalized);
     }
 }

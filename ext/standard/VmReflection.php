@@ -481,7 +481,11 @@ final class VmReflection
             return false;
         }
 
-        return isset($ctx->functions[$normalized]);
+        if (!isset($ctx->functions[$normalized])) {
+            return false;
+        }
+
+        return BuiltinIntrospectionPolicy::functionIsAdvertised($normalized);
     }
 
     /**
