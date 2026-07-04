@@ -17060,6 +17060,32 @@ class Compiler {
         ) {
             return $producers[0];
         }
+        // in_array(null, [null], true) — Array_ haystack must not lose to hoisted null ConstFetch (#16096, re-#10909).
+        if (
+            \in_array($inlineFuncName, ['in_array', 'array_search'], true)
+            && \count($callArgs) >= 3
+        ) {
+            $arrayProducerIndex = null;
+            $strictBoolProducerIndex = null;
+            foreach ($producers as $pi => $producer) {
+                if ($producer instanceof Op\Expr\Array_) {
+                    $arrayProducerIndex = $pi;
+                } elseif ($producer instanceof Op\Expr\ConstFetch) {
+                    $name = $this->staticNameFromOperand($producer->name);
+                    if (null !== $name && \in_array(strtolower($name), ['true', 'false'], true)) {
+                        $strictBoolProducerIndex = $pi;
+                    }
+                }
+            }
+            if (null !== $arrayProducerIndex) {
+                if (1 === $argIndex) {
+                    return $producers[$arrayProducerIndex];
+                }
+                if (2 === $argIndex && null !== $strictBoolProducerIndex) {
+                    return $producers[$strictBoolProducerIndex];
+                }
+            }
+        }
         // in_array(E::A, [E::A, E::B], true) — Array_ + trailing ConstFetch map to haystack/strict slots (#8796, #9888).
         if (\count($producers) >= 2) {
             $arrayProducerIndex = null;
@@ -28300,6 +28326,13 @@ class Compiler {
         if (null === $callArg || $this->isEmbeddedCallLiteralArg($callArg)) {
             return null;
         }
+        if (
+            \in_array(strtolower($this->resolveCfgFuncCallName($cfgCallOp) ?? ''), ['in_array', 'array_search'], true)
+            && 1 === $argIndex
+            && $this->callArgOperandExpectsArrayProducer($callArg)
+        ) {
+            return null;
+        }
         foreach ($trailingConstFetches as $fetch) {
             if (
                 null !== $fetch->result
@@ -28310,6 +28343,10 @@ class Compiler {
                     return $slot;
                 }
             }
+        }
+        if (\in_array(strtolower($this->resolveCfgFuncCallName($cfgCallOp) ?? ''), ['in_array', 'array_search'], true)) {
+            // Needle/strict slots must not use positional trailingConstFetches — null for [null] sits before Array_ (#16096).
+            return null;
         }
         $nonEmbeddedArgIndices = [];
         foreach ($callArgs as $i => $candidate) {
@@ -29423,23 +29460,24 @@ class Compiler {
                 $inlineArray = null;
             }
             $arrayCombineNestedFuncArg = false;
-            if (null === $inlineArray && null !== $cfgCallOp) {
-                if ('array_combine' === $this->resolveCfgFuncCallName($cfgCallOp)) {
-                    $combineProducers = $this->precedingInlineCallArgProducersBeforeCfgOp(
-                        $block->orig->children,
-                        $cfgCallOp
-                    );
-                    $combineMatch = $this->matchArrayCombineInlineProducers($combineProducers, (int) $argIndex);
-                    if ($combineMatch instanceof Op\Expr\Array_) {
-                        $inlineArray = $combineMatch;
-                    } elseif (
-                        $combineMatch instanceof Op\Expr\FuncCall
-                        || $combineMatch instanceof Op\Expr\NsFuncCall
-                    ) {
-                        // array_combine(array_keys(...), [...]) — arg #0 is nested FuncCall, not trailing Array_ (#15558, #15857).
-                        $arrayCombineNestedFuncArg = true;
-                    }
+            if (null !== $cfgCallOp && 'array_combine' === $this->resolveCfgFuncCallName($cfgCallOp)) {
+                $combineProducers = $this->precedingInlineCallArgProducersBeforeCfgOp(
+                    $block->orig->children,
+                    $cfgCallOp
+                );
+                $combineMatch = $this->matchArrayCombineInlineProducers($combineProducers, (int) $argIndex);
+                if ($combineMatch instanceof Op\Expr\Array_) {
+                    $inlineArray = $combineMatch;
+                } elseif (
+                    $combineMatch instanceof Op\Expr\FuncCall
+                    || $combineMatch instanceof Op\Expr\NsFuncCall
+                ) {
+                    // array_combine(array_keys(...), [...]) — arg #0 is nested FuncCall, not inner haystack Array_ (#15558, #16097).
+                    $inlineArray = null;
+                    $arrayCombineNestedFuncArg = true;
                 }
+            }
+            if (null === $inlineArray && null !== $cfgCallOp) {
                 if (null === $inlineArray && 'substr_replace' === $this->resolveCfgFuncCallName($cfgCallOp)) {
                     $substrReplaceProducers = $this->precedingInlineCallArgProducersBeforeCfgOp(
                         $block->orig->children,
@@ -30526,6 +30564,13 @@ class Compiler {
                         $strictArg = $cfgCallOp->args[2] ?? $arg;
                         foreach ($arraySearchProducers as $producer) {
                             if (!$producer instanceof Op\Expr\ConstFetch) {
+                                continue;
+                            }
+                            $strictName = $this->staticNameFromOperand($producer->name);
+                            if (
+                                null === $strictName
+                                || !\in_array(strtolower($strictName), ['true', 'false'], true)
+                            ) {
                                 continue;
                             }
                             if (
@@ -32532,6 +32577,29 @@ class Compiler {
     }
 
     /**
+     * Nth FUNCCALL_EXEC_RETURN slot including pending call-arg producer ops (#16097).
+     *
+     * @param list<OpCode> $pendingOps
+     */
+    private function slotForFuncCallExecReturnOrdinal(
+        Block $block,
+        int $producerOrdinal,
+        array $pendingOps = []
+    ): ?string {
+        if ($producerOrdinal < 0) {
+            return null;
+        }
+        $execReturnSlots = [];
+        foreach (array_merge($block->opCodes, $pendingOps) as $op) {
+            if (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type && null !== $op->arg1) {
+                $execReturnSlots[] = (string) $op->arg1;
+            }
+        }
+
+        return $execReturnSlots[$producerOrdinal] ?? null;
+    }
+
+    /**
      * Last-chance ARG_SEND slot for array_combine() nested array_keys() + trailing Array_ (#15558, #15857).
      *
      * @param list<OpCode> $sends
@@ -32551,6 +32619,34 @@ class Compiler {
         );
         $matched = $this->matchArrayCombineInlineProducers($producers, $argIndex);
         if (!$matched instanceof Op\Expr) {
+            return null;
+        }
+        if ($matched instanceof Op\Expr\FuncCall || $matched instanceof Op\Expr\NsFuncCall) {
+            $funcOrdinal = 0;
+            foreach ($producers as $producer) {
+                if ($producer === $matched) {
+                    break;
+                }
+                if ($producer instanceof Op\Expr\FuncCall || $producer instanceof Op\Expr\NsFuncCall) {
+                    ++$funcOrdinal;
+                }
+            }
+            $execSlot = $this->slotForFuncCallExecReturnOrdinal($block, $funcOrdinal, $sends);
+            if (null !== $execSlot) {
+                return $execSlot;
+            }
+            foreach ($this->compileExpr($matched, $block) as $op) {
+                $sends[] = $op;
+            }
+            $execSlot = $this->slotForFuncCallExecReturnOrdinal($block, $funcOrdinal, $sends);
+            if (null !== $execSlot) {
+                return $execSlot;
+            }
+            $slot = $block->slotForOperand($matched->result);
+            if (null !== $slot) {
+                return (string) $slot;
+            }
+
             return null;
         }
         if (null === $block->slotForOperand($matched->result)) {
