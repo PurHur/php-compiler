@@ -1,17 +1,22 @@
 --TEST--
-stdlib chmod() numeric-string mode is octal like Zend (ext/standard/filestat.c; #15081)
+stdlib chmod() numeric-string mode uses Z_PARAM_LONG decimal cast (#15902, ext/standard/filestat.c)
 --FILE--
 <?php
 
-$f = sys_get_temp_dir() . '/phpc_chmod_octal_' . uniqid('', true) . '.tmp';
-touch($f);
-chmod($f, 0644);
-$intMode = decoct(fileperms($f) & 0777);
-chmod($f, '0644');
-$strMode = decoct(fileperms($f) & 0777);
-@unlink($f);
+$fInt = sys_get_temp_dir() . '/phpc_chmod_int_' . uniqid('', true) . '.tmp';
+touch($fInt);
+chmod($fInt, 0644);
+$intMode = decoct(fileperms($fInt) & 0777);
+@unlink($fInt);
+
+$fStr = sys_get_temp_dir() . '/phpc_chmod_str_' . uniqid('', true) . '.tmp';
+touch($fStr);
+chmod($fStr, '0644');
+$strMode = decoct(fileperms($fStr) & 0777);
+@unlink($fStr);
+
 echo 'int_mode=', $intMode, ' str_mode=', $strMode, "\n";
-echo $intMode === $strMode ? 'ok' : 'fail', "\n";
+echo $intMode === '644' && $strMode === '204' ? 'ok' : 'fail', "\n";
 --EXPECT--
-int_mode=644 str_mode=644
+int_mode=644 str_mode=204
 ok
