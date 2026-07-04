@@ -26,7 +26,10 @@ final class DateTimeImmutableConstruct extends VmClassMethod
         }
         $receiver = DateTimeSupport::requireDateTimeImmutable(
             $frame->calledArgs[0],
-            'DateTimeImmutable::__construct()'
+            'DateTimeImmutable::__construct()',
+            null,
+            null,
+            $frame->vmContext
         );
         $time = 'now';
         if (isset($frame->calledArgs[1])) {

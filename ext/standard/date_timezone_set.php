@@ -36,7 +36,8 @@ final class date_timezone_set extends Internal
             $frame->calledArgs[0],
             'date_timezone_set(): Argument #1 ($object)',
             1,
-            'object'
+            'object',
+            $frame->vmContext
         );
         $timezone = DateTimeSupport::requireDateTimeZone(
             $frame->calledArgs[1],

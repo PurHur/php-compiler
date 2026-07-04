@@ -24,7 +24,13 @@ final class DateTimeConstruct extends VmClassMethod
         if ($argc < 1) {
             throw new \LogicException('DateTime::__construct() called without $this');
         }
-        $receiver = DateTimeSupport::requireDateTime($frame->calledArgs[0], 'DateTime::__construct()');
+        $receiver = DateTimeSupport::requireDateTime(
+            $frame->calledArgs[0],
+            'DateTime::__construct()',
+            null,
+            null,
+            $frame->vmContext
+        );
         $time = 'now';
         if (isset($frame->calledArgs[1])) {
             InternalStrictArg::rejectNullString($frame->calledArgs[1], 'DateTime::__construct', 'datetime', 0, $frame);

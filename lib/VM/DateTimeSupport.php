@@ -58,14 +58,15 @@ final class DateTimeSupport
         Variable $var,
         string $label,
         ?int $argNum = null,
-        ?string $argName = null
+        ?string $argName = null,
+        ?Context $ctx = null
     ): ObjectEntry {
         $var = $var->resolveIndirect();
         if (Variable::TYPE_OBJECT !== $var->type) {
             throw self::dateTimeTypeError($label, $argNum, $argName, $var);
         }
         $obj = $var->toObject();
-        if (self::CLASS_DATETIME !== strtolower($obj->class->name)) {
+        if (!self::objectIsMutableDateTime($obj, $ctx)) {
             throw self::dateTimeTypeError($label, $argNum, $argName, $var, $obj->class->name);
         }
 
@@ -97,18 +98,51 @@ final class DateTimeSupport
         Variable $var,
         string $label,
         ?int $argNum = null,
-        ?string $argName = null
+        ?string $argName = null,
+        ?Context $ctx = null
     ): ObjectEntry {
         $var = $var->resolveIndirect();
         if (Variable::TYPE_OBJECT !== $var->type) {
             throw self::dateTimeImmutableTypeError($label, $argNum, $argName, $var);
         }
         $obj = $var->toObject();
-        if (self::CLASS_DATETIMEIMMUTABLE !== strtolower($obj->class->name)) {
+        if (!self::objectIsImmutableDateTime($obj, $ctx)) {
             throw self::dateTimeImmutableTypeError($label, $argNum, $argName, $var, $obj->class->name);
         }
 
         return $obj;
+    }
+
+    /** php-src instanceof DateTime — mutable class or subclass (#16204, #7276). */
+    private static function objectIsMutableDateTime(ObjectEntry $obj, ?Context $ctx): bool
+    {
+        if (self::isDateTimeImmutable($obj)) {
+            return false;
+        }
+        $lc = strtolower($obj->class->name);
+        if (self::CLASS_DATETIME === $lc) {
+            return true;
+        }
+        if (null !== $ctx) {
+            return InterfaceCheck::entryIsInstanceOf($obj->class, self::CLASS_DATETIME, $ctx)
+                && !InterfaceCheck::entryIsInstanceOf($obj->class, self::CLASS_DATETIMEIMMUTABLE, $ctx);
+        }
+
+        return self::CLASS_DATETIME === $obj->class->parentLc;
+    }
+
+    /** php-src instanceof DateTimeImmutable — immutable class or subclass (#16204). */
+    private static function objectIsImmutableDateTime(ObjectEntry $obj, ?Context $ctx): bool
+    {
+        $lc = strtolower($obj->class->name);
+        if (self::CLASS_DATETIMEIMMUTABLE === $lc) {
+            return true;
+        }
+        if (null !== $ctx) {
+            return InterfaceCheck::entryIsInstanceOf($obj->class, self::CLASS_DATETIMEIMMUTABLE, $ctx);
+        }
+
+        return self::CLASS_DATETIMEIMMUTABLE === $obj->class->parentLc;
     }
 
     private static function dateTimeImmutableTypeError(
@@ -910,7 +944,8 @@ final class DateTimeSupport
             $immutableArg,
             'DateTime::createFromImmutable()',
             1,
-            'object'
+            'object',
+            $ctx
         );
         self::requireInitializedDateTimeLike($immutable, 'DateTimeImmutable');
         $class = $ctx->classes[self::CLASS_DATETIME] ?? null;
@@ -932,7 +967,8 @@ final class DateTimeSupport
             $mutableArg,
             'DateTimeImmutable::createFromMutable()',
             1,
-            'object'
+            'object',
+            $ctx
         );
         self::requireInitializedDateTimeLike($mutable, 'DateTime');
         $class = $ctx->classes[self::CLASS_DATETIMEIMMUTABLE] ?? null;
