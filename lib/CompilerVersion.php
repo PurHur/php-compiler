@@ -244,24 +244,15 @@ final class CompilerVersion
     }
 
     /**
-     * Whether class constants may use `new Class(...)` initializers (PHP 8.3+).
+     * Whether class constants may use `new Class(...)` initializers.
      *
-     * php-src: Zend/zend_compile.c — zend_compile_const_expr(), ZEND_CONST_EXPR_NEW (#12940).
-     * Withheld on 8.4.0-dev reference profile (matches Zend 8.2). Enable via stable 8.4.0+
-     * or explicit `PHP_COMPILER_PROFILE=8.3` / `8.4` forward profile (#15693).
+     * php-src: Zend/zend_compile.c — zend_compile_const_expr() rejects all `new` in class
+     * constant context ("New expressions are not supported in this context") on 8.2–8.4
+     * (#15766, re-#15608). Forward profile must not enable this until php-src does (#12940).
      */
     public static function supportsClassConstObjectExpressions(): bool
     {
-        if (version_compare(self::VERSION, '8.4.0', '>=')) {
-            return true;
-        }
-
-        $raw = getenv('PHP_COMPILER_PROFILE');
-        if (!\is_string($raw) || '' === trim($raw)) {
-            return false;
-        }
-
-        return version_compare(self::languageProfileVersion(), '8.3.0', '>=');
+        return false;
     }
 
     /** PHP 8.4+ hexadecimal floating-point literals (Zend/zend_language_scanner.l, issue #7041). */
