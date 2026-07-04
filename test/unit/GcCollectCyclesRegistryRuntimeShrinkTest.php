@@ -10,14 +10,17 @@ use PHPUnit\Framework\TestCase;
 /** GcCollectCycles embed registry routes through GcCollectCyclesRegistryJitHelper PHP (#9541). */
 final class GcCollectCyclesRegistryRuntimeShrinkTest extends TestCase
 {
-    public function testGcCollectCyclesRuntimeUsesRegistryJitHelperForEmbedLoadType(): void
+    public function testGcCollectCyclesRuntimeUsesRegistryJitHelperUniversally(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/GcCollectCyclesRuntime.php');
         $this->assertStringContainsString('GcCollectCyclesRegistryJitHelper', $source);
         $this->assertStringContainsString('implementGcRegisterPhpBridge', $source);
-        $this->assertStringContainsString('usesPhpRegistry', $source);
-        $this->assertStringContainsString("G_OBJECTS = 'phpc_gc_objects'", $source);
-        $this->assertStringContainsString('gc_register_entry', $source);
+        $this->assertStringContainsString('gc_register_php_entry', $source);
+        $this->assertStringNotContainsString("G_OBJECTS = 'phpc_gc_objects'", $source);
+        $this->assertStringNotContainsString('gc_register_entry', $source);
+        $lineCount = substr_count($source, "\n");
+        $this->assertGreaterThanOrEqual(400, 1610 - $lineCount, 'phase 3 net shrink (#16069)');
+        $this->assertLessThan(1100, $lineCount, 'GcCollectCyclesRuntime.php shrank vs phase 2 (#16069)');
     }
 
     public function testGcCollectCyclesRegistryJitHelperRoundtrip(): void
