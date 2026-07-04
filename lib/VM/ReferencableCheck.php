@@ -223,9 +223,9 @@ final class ReferencableCheck
                 0 === $paramIdx
                 && self::allowsNonVariableObjectByRef($fn)
                 && !self::isReferenceable($calledArgs[$paramIdx], $caller)
-                && self::isObjectOperand($calledArgs[$paramIdx])
+                && self::isArrayOrObjectOperand($calledArgs[$paramIdx])
             ) {
-                if (self::shouldEmitNonVariableObjectByRefNotice($calledArgs[$paramIdx])) {
+                if (self::shouldEmitNonVariableObjectByRefNotice($calledArgs[$paramIdx], $caller)) {
                     self::emitNonVariableByRefNotice($caller);
                 }
                 continue;
@@ -322,12 +322,15 @@ final class ReferencableCheck
     }
 
     /** Runtime: notice only for ephemeral empty objects (new stdClass()), not (object) array casts (#15874). */
-    public static function shouldEmitNonVariableObjectByRefNotice(Variable $arg, ?Operand $operand = null): bool
+    public static function shouldEmitNonVariableObjectByRefNotice(Variable $arg, Frame $caller, ?Operand $operand = null): bool
     {
         if (self::objectOperandHasDynamicProperties($arg)) {
             return false;
         }
         if (null !== $operand && self::operandIsObjectCastFromNonEmptyArray($operand)) {
+            return false;
+        }
+        if (self::isNonEmptyEphemeralArrayArg($arg, $caller)) {
             return false;
         }
 
@@ -369,6 +372,20 @@ final class ReferencableCheck
         }
 
         return false;
+    }
+
+    /** Inline non-empty array literal — (object) cast may still read as array on the by-ref send path (#15874). */
+    private static function isNonEmptyEphemeralArrayArg(Variable $arg, Frame $caller): bool
+    {
+        if (!self::isEphemeralArrayArg($arg, $caller)) {
+            return false;
+        }
+        $resolved = $arg->resolveIndirect();
+        if (Variable::TYPE_ARRAY !== $resolved->type) {
+            return false;
+        }
+
+        return 0 !== $resolved->toArray()->count();
     }
 
     /** Operand is array or object — other types get TypeError in the builtin (#11984). */
