@@ -17422,6 +17422,14 @@ class Compiler {
                     return true;
                 }
             }
+            foreach ($expr->keys as $key) {
+                if (null === $key) {
+                    continue;
+                }
+                if ($key === $operand || $this->operandsReferToSameVariable($key, $operand)) {
+                    return true;
+                }
+            }
 
             return false;
         }
@@ -26241,9 +26249,11 @@ class Compiler {
                         ) {
                             // array_merge((object)[...], [...]) — Cast feeds arg #0 (#15858).
                         } elseif (
-                            $this->callArgIsDeadInlineTemporary($callArgProbe)
+                            ($this->callArgIsDeadInlineTemporary($callArgProbe)
+                                && $this->callArgOperandExpectsArrayProducer($callArgProbe))
                             || $this->operandsReferToSameVariable($stmtBeforeArray->result, $callArgProbe)
-                            || $this->operandsReferToSameVariable($stmtBeforeArray->result, $arg)
+                            || ($this->operandsReferToSameVariable($stmtBeforeArray->result, $arg)
+                                && $this->callArgOperandExpectsArrayProducer($arg))
                         ) {
                             $inlineArray = $stmtBeforeArray;
                         }
