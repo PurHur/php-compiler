@@ -11,6 +11,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
@@ -22,22 +23,24 @@ use PHPLLVM\Value;
 /**
  * number_format() for integers and floats (C-style locale subset; LLVM JIT/AOT).
  *
- * php-src: ext/standard/number_format.c — Z_PARAM_LONG / Z_PARAM_STR
+ * php-src: ext/standard/number_format.c — Z_PARAM_LONG / Z_PARAM_STR / RoundingMode
  */
 final class number_format extends Internal
 {
     public function execute(Frame $frame): void
     {
         $argc = \count($frame->calledArgs);
+        $maxArgs = CompilerVersion::supportsRoundingModeEnum() ? 5 : 4;
         if ($argc < 1) {
             throw new \ArgumentCountError(\sprintf(
                 'number_format() expects at least 1 argument, %d given',
                 $argc
             ));
         }
-        if ($argc > 4) {
+        if ($argc > $maxArgs) {
             throw new \ArgumentCountError(\sprintf(
-                'number_format() expects at most 4 arguments, %d given',
+                'number_format() expects at most %d arguments, %d given',
+                $maxArgs,
                 $argc
             ));
         }
@@ -73,11 +76,21 @@ final class number_format extends Internal
                 'thousands_separator'
             ) ?? ','
             : ',';
+        $roundingMode = StdlibConstants::PHP_ROUND_HALF_UP;
+        if ($argc >= 5) {
+            $roundingMode = VmRoundMode::resolveRoundModeArg(
+                $frame->calledArgs[4]->resolveIndirect(),
+                'number_format',
+                'rounding_mode',
+                5
+            );
+        }
         $frame->returnVar->string(VmNumberFormat::format(
             $num,
             $decimals,
             $decimalSeparator,
-            $thousandsSeparator
+            $thousandsSeparator,
+            $roundingMode
         ));
     }
 
@@ -86,15 +99,17 @@ final class number_format extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         $argc = \count($args);
+        $maxArgs = CompilerVersion::supportsRoundingModeEnum() ? 5 : 4;
         if ($argc < 1) {
             throw new \ArgumentCountError(\sprintf(
                 'number_format() expects at least 1 argument, %d given',
                 $argc
             ));
         }
-        if ($argc > 4) {
+        if ($argc > $maxArgs) {
             throw new \ArgumentCountError(\sprintf(
-                'number_format() expects at most 4 arguments, %d given',
+                'number_format() expects at most %d arguments, %d given',
+                $maxArgs,
                 $argc
             ));
         }

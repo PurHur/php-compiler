@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitRoundModeArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\NamedOptionalCallArgs;
@@ -16,17 +18,21 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * LLVM JIT/AOT helper for number_format() (int/float/numeric string, 0–4 args; subset of PHP).
+ * LLVM JIT/AOT helper for number_format() (int/float/numeric string, 0–5 args; subset of PHP).
  *
- * php-src: ext/standard/number_format.c — Z_PARAM_LONG / Z_PARAM_STR
+ * php-src: ext/standard/number_format.c — Z_PARAM_LONG / Z_PARAM_STR / RoundingMode
  */
 final class JitNumberFormat
 {
     public static function format(Context $context, JITVariable ...$args): Value
     {
         $argc = count($args);
-        if ($argc < 1 || $argc > 4) {
-            throw new \LogicException('number_format() requires one to four arguments');
+        $maxArgs = CompilerVersion::supportsRoundingModeEnum() ? 5 : 4;
+        if ($argc < 1 || $argc > $maxArgs) {
+            throw new \LogicException(\sprintf(
+                'number_format() requires one to %d arguments',
+                $maxArgs
+            ));
         }
 
         if ($context->callerStrictTypes) {
@@ -41,16 +47,20 @@ final class JitNumberFormat
         $decSep = ($argc >= 3 && !NamedOptionalCallArgs::isOmittedOptional($args[2]))
             ? JitStringBuiltinArg::lower($context, $args[2], 'number_format', 2, 'decimal_separator', '?string')
             : $context->builder->load($context->constantStringFromString('.'));
-        $thouSep = (4 === $argc && !NamedOptionalCallArgs::isOmittedOptional($args[3]))
+        $thouSep = ($argc >= 4 && !NamedOptionalCallArgs::isOmittedOptional($args[3]))
             ? JitStringBuiltinArg::lower($context, $args[3], 'number_format', 3, 'thousands_separator', '?string')
             : $context->builder->load($context->constantStringFromString(','));
+        $mode = ($argc >= 5 && !NamedOptionalCallArgs::isOmittedOptional($args[4]))
+            ? JitRoundModeArg::lower($context, $args[4], 'number_format', 'rounding_mode', 5)
+            : $i64->constInt(StdlibConstants::PHP_ROUND_HALF_UP, false);
 
         return $context->builder->call(
             $context->lookupFunction('__compiler_number_format'),
             $number,
             $decimals,
             $decSep,
-            $thouSep
+            $thouSep,
+            $mode
         );
     }
 

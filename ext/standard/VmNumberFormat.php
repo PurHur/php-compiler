@@ -60,7 +60,8 @@ final class VmNumberFormat
         float $number,
         int $decimals = 0,
         string $decimalSeparator = '.',
-        string $thousandsSeparator = ','
+        string $thousandsSeparator = ',',
+        int $roundingMode = StdlibConstants::PHP_ROUND_HALF_UP
     ): string {
         // php-src ext/standard/math.c _php_math_number_format_ex: non-finite via %F, lowercased
         if (\is_nan($number)) {
@@ -80,11 +81,7 @@ final class VmNumberFormat
             $pow *= 10;
         }
 
-        if ($decimals > 0) {
-            $rounded = round($number, $decimals);
-        } else {
-            $rounded = round($number, 0);
-        }
+        $rounded = VmRound::mathRound($number, $decimals, $roundingMode);
 
         $intPart = (int) floor($rounded);
         $fracPart = 0;
