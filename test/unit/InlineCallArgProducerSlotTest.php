@@ -4221,6 +4221,53 @@ PHP;
         self::assertSame("array (\n  0 => array (\n    0 => 'a',\n    1 => 'b',\n  ),\n)\n", ob_get_clean());
     }
 
+    /** Issue #16194 — array_udiff_assoc sibling inline arrays wire distinct ARG_SEND slots (#16078 regression). */
+    public function testArrayUdiffAssocSiblingInlineArrayLiteralUsesDistinctSlots(): void
+    {
+        $code = <<<'PHP'
+<?php
+array_udiff_assoc(['a' => 1], ['A' => 1], 'strcasecmp');
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'array_udiff_assoc_sibling_inline.php');
+
+        $arraySlots = [];
+        $sendSlots = [];
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_INIT_ARRAY === $op->type) {
+                $arraySlots[] = $op->arg1;
+            }
+            if (OpCode::TYPE_ARG_SEND === $op->type) {
+                $sendSlots[] = $op->arg1;
+            }
+        }
+
+        self::assertCount(2, $arraySlots, 'array inits='.json_encode($arraySlots));
+        self::assertCount(3, $sendSlots, 'arg sends='.json_encode($sendSlots));
+        self::assertSame($arraySlots[0], $sendSlots[0]);
+        self::assertSame($arraySlots[1], $sendSlots[1]);
+    }
+
+    /** Issue #16194 — array_udiff_assoc sibling inline arrays runtime parity (re-#11217). */
+    public function testArrayUdiffAssocSiblingInlineArrayLiteralRuntime(): void
+    {
+        $code = <<<'PHP'
+<?php
+var_export(array_udiff_assoc(['a' => 1], ['A' => 1], 'strcasecmp'));
+echo "\n";
+var_export(array_udiff_assoc(['a' => 1, 'b' => 2], ['A' => 1, 'c' => 3], 'strcasecmp'));
+echo "\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'array_udiff_assoc_sibling_inline_runtime.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame(
+            "array (\n  'a' => 1,\n)\narray (\n  'a' => 1,\n  'b' => 2,\n)\n",
+            ob_get_clean()
+        );
+    }
+
     /** Issue #15976 — array_map(null, [[..]]) wires null ConstFetch + nested inline Array_. */
     public function testArrayMapNullNestedInlineHaystackUsesDistinctSlots(): void
     {
