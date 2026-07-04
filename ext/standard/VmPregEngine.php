@@ -498,6 +498,14 @@ final class VmPregEngine
                 throw new VmPregCompileException();
             }
         }
+        $index = null;
+        if ($capture) {
+            // php-src ext/pcre: capture numbers follow opening-paren order, not close order (#14574).
+            $index = $this->nextGroup++;
+            if (null !== $name) {
+                $this->groupNameToIndex[$name] = $index;
+            }
+        }
         $inner = $this->parseAlternation();
         if ($this->peek() !== ')') {
             throw new VmPregCompileException('missing closing parenthesis', $openPos);
@@ -505,10 +513,6 @@ final class VmPregEngine
         $this->advance(1);
         if (!$capture) {
             return $inner;
-        }
-        $index = $this->nextGroup++;
-        if (null !== $name) {
-            $this->groupNameToIndex[$name] = $index;
         }
 
         return new VmPregAstGroupNode($inner, $index);
