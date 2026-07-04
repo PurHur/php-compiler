@@ -12154,6 +12154,15 @@ class Compiler {
                 null !== $callArg
                 && !$this->callArgOperandExpectsArrayProducer($callArg)
             ) {
+                $outerArray = $this->matchOutermostNestedInlineArrayProducerForArgZero(
+                    $producers,
+                    $argIndex,
+                    \count($callOp->args),
+                    \count($producers)
+                );
+                if (null !== $outerArray) {
+                    return $outerArray;
+                }
                 // var_export(current([1,2]), true) — arg #0 is FuncCall result, not ephemeral Array_ (#10654).
                 return null;
             }
@@ -12853,6 +12862,17 @@ class Compiler {
                 }
                 if (!$matched instanceof Op\Expr) {
                     $matched = $this->matchInlineCallArgProducer($producers, $callOp->args, $argIndex, $callOp, $block);
+                }
+                if ($matched instanceof Op\Expr\Array_) {
+                    $outerArray = $this->matchOutermostNestedInlineArrayProducerForArgZero(
+                        $producers,
+                        $argIndex,
+                        \count($callOp->args),
+                        \count($producers)
+                    );
+                    if (null !== $outerArray) {
+                        $matched = $outerArray;
+                    }
                 }
                 if ($matched instanceof Op\Expr) {
                     if (null === $block->slotForOperand($matched->result)) {
@@ -14652,6 +14672,15 @@ class Compiler {
                         && null !== $callArg
                         && !$this->callArgOperandExpectsArrayProducer($callArg)
                     ) {
+                        $outerArray = $this->matchOutermostNestedInlineArrayProducerForArgZero(
+                            $producers,
+                            $argIndex,
+                            $argCount,
+                            $producerCount
+                        );
+                        if (null !== $outerArray) {
+                            return $outerArray;
+                        }
                         $byIndex = null;
                     }
                     if (
@@ -14722,6 +14751,15 @@ class Compiler {
                     && !$this->callArgOperandExpectsArrayProducer($callArg)
                 ) {
                     // Nested inline array consumed multiple Array_ slots — do not wire trailing int arg (#12008, #13697).
+                    $outerArray = $this->matchOutermostNestedInlineArrayProducerForArgZero(
+                        $producers,
+                        $argIndex,
+                        $argCount,
+                        $producerCount
+                    );
+                    if (null !== $outerArray) {
+                        return $outerArray;
+                    }
                     $byIndex = null;
                 }
                 if ($byIndex instanceof Op\Expr\Array_ && null !== $callArg) {
@@ -14755,6 +14793,18 @@ class Compiler {
                         || $this->inlineCallArgProducerUsesExprResultSlot($byIndex)
                     )
                 ) {
+                    if ($byIndex instanceof Op\Expr\Array_) {
+                        $outerArray = $this->matchOutermostNestedInlineArrayProducerForArgZero(
+                            $producers,
+                            $argIndex,
+                            $argCount,
+                            $producerCount
+                        );
+                        if (null !== $outerArray) {
+                            return $outerArray;
+                        }
+                    }
+
                     return $byIndex;
                 }
                 if (
@@ -14806,6 +14856,15 @@ class Compiler {
             );
             if (null !== $arrayUnionPlus) {
                 return $arrayUnionPlus;
+            }
+            $outerArray = $this->matchOutermostNestedInlineArrayProducerForArgZero(
+                $producers,
+                $argIndex,
+                $argCount,
+                $producerCount
+            );
+            if (null !== $outerArray) {
+                return $outerArray;
             }
             $directProducer = $this->matchDirectResultInlineCallArgProducer($producers, $callArg);
             if (null !== $directProducer) {
@@ -15378,6 +15437,16 @@ class Compiler {
                 }
             }
 
+            $outerArray = $this->matchOutermostNestedInlineArrayProducerForArgZero(
+                $producers,
+                $argIndex,
+                $argCount,
+                $producerCount
+            );
+            if (null !== $outerArray) {
+                return $outerArray;
+            }
+
             return $paired;
         }
         if (1 === $producerCount) {
@@ -15632,6 +15701,16 @@ class Compiler {
                 )
             ) {
                 return null;
+            }
+
+            $outerArray = $this->matchOutermostNestedInlineArrayProducerForArgZero(
+                $producers,
+                $argIndex,
+                $argCount,
+                $producerCount
+            );
+            if (null !== $outerArray) {
+                return $outerArray;
             }
 
             return $paired;
@@ -16834,6 +16913,52 @@ class Compiler {
                 return $fetchIndex;
             }
             ++$fetchIndex;
+        }
+
+        return null;
+    }
+
+    /**
+     * Sole hoisted arg #0 with nested inline Array_ preludes — wire outer root, not inner (#11300, #12008).
+     *
+     * @param list<Op\Expr> $producers
+     */
+    private function matchOutermostNestedInlineArrayProducerForArgZero(
+        array $producers,
+        int $argIndex,
+        int $argCount,
+        int $producerCount
+    ): ?Op\Expr\Array_ {
+        if (0 !== $argIndex) {
+            return null;
+        }
+        $nestedTrailing = $this->splitNestedArrayLiteralChainWithTrailingProducers($producers);
+        if (null !== $nestedTrailing) {
+            [$arrayChain, ] = $nestedTrailing;
+            $outer = $arrayChain[\count($arrayChain) - 1] ?? null;
+
+            return $outer instanceof Op\Expr\Array_ ? $outer : null;
+        }
+        $arrayProducers = array_values(array_filter(
+            $producers,
+            static fn (Op\Expr $producer): bool => $producer instanceof Op\Expr\Array_
+        ));
+        if (
+            \count($arrayProducers) >= 2
+            && $this->producersAreNestedArrayLiteralChain($arrayProducers)
+            && $this->arrayProducersFormNestedChain($arrayProducers)
+        ) {
+            $outer = $arrayProducers[\count($arrayProducers) - 1];
+
+            return $outer instanceof Op\Expr\Array_ ? $outer : null;
+        }
+        if (
+            $argCount > $producerCount
+            && $this->producersAreNestedArrayLiteralChain($producers)
+        ) {
+            $outer = $producers[$producerCount - 1] ?? null;
+
+            return $outer instanceof Op\Expr\Array_ ? $outer : null;
         }
 
         return null;
@@ -24938,7 +25063,18 @@ class Compiler {
                 && null !== $callArgOperand
                 && !$this->callArgOperandExpectsArrayProducer($callArgOperand)
             ) {
-                $inlineArray = null;
+                $producers = (null !== $cfgCallOp && null !== $block->orig)
+                    ? $this->precedingInlineCallArgProducersBeforeCfgOp($block->orig->children, $cfgCallOp)
+                    : [];
+                $outerArray = [] !== $producers
+                    ? $this->matchOutermostNestedInlineArrayProducerForArgZero(
+                        $producers,
+                        (int) $argIndex,
+                        \count($cfgCallOp->args ?? $args),
+                        \count($producers)
+                    )
+                    : null;
+                $inlineArray = $outerArray instanceof Op\Expr\Array_ ? $outerArray : null;
             }
             $prefetchOps = [];
             $assignedNamedLocal = null;
