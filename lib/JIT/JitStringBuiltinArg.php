@@ -84,6 +84,12 @@ final class JitStringBuiltinArg
             return self::unreachableStringPtr($context);
         }
         if (Variable::TYPE_OBJECT === $arg->type) {
+            if ('string' !== $expectedType) {
+                $magic = MagicMethodDispatch::coerceObjectToString($context, $arg);
+                if (null !== $magic) {
+                    return $context->helper->loadValue($magic);
+                }
+            }
             self::emitRejectTypeError($context, $arg, $function, $argIndex, $paramName, $expectedType);
 
             return self::unreachableStringPtr($context);
