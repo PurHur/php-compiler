@@ -14425,6 +14425,33 @@ class Compiler {
                 return $leadingCallback;
             }
         }
+        // array_map(null, [[..], ..]) — ConstFetch callback + nested inline Array_ preludes (#9143).
+        if (
+            'array_map' === $inlineFuncName
+            && 2 === $argCount
+            && null !== $block
+            && null !== $cfgCallOp
+        ) {
+            $nullCallback = $this->arrayMapNullCallbackProducerBeforeCfgCall($cfgCallOp, $block);
+            if ($nullCallback instanceof Op\Expr\ConstFetch) {
+                if (0 === $argIndex) {
+                    return $nullCallback;
+                }
+                if (1 === $argIndex) {
+                    $immediate = $this->inlineArrayProducerImmediatelyBeforeCfgCall($cfgCallOp, $block);
+                    if ($immediate instanceof Op\Expr\Array_) {
+                        return $immediate;
+                    }
+                    $arrayTail = array_values(array_filter(
+                        $producers,
+                        static fn (Op\Expr $producer): bool => $producer instanceof Op\Expr\Array_
+                    ));
+                    if ([] !== $arrayTail) {
+                        return $arrayTail[\count($arrayTail) - 1];
+                    }
+                }
+            }
+        }
         if (
             1 === $callbackArgIndex
             && 0 === $argIndex
@@ -20058,6 +20085,16 @@ class Compiler {
         if (false === $position || !isset($arrayProducers[$position])) {
             return null;
         }
+        if (1 === \count($arrayArgIndices) && \count($arrayProducers) >= 2) {
+            $outer = $arrayProducers[\count($arrayProducers) - 1];
+            foreach (\array_slice($arrayProducers, 0, -1) as $inner) {
+                foreach ($outer->values as $value) {
+                    if (null !== $value && $this->operandsReferToSameVariable($value, $inner->result)) {
+                        return $outer;
+                    }
+                }
+            }
+        }
 
         return $arrayProducers[$position];
     }
@@ -20105,6 +20142,43 @@ class Compiler {
             && null === $funcProducer
         ) {
             return $producers[$argIndex] ?? null;
+        }
+
+        return null;
+    }
+
+    /**
+     * array_map(null, [[..]]) — hoisted null ConstFetch precedes nested Array_ preludes (#9143).
+     */
+    private function arrayMapNullCallbackProducerBeforeCfgCall(Op $cfgCallOp, Block $block): ?Op\Expr\ConstFetch
+    {
+        if (null === $block->orig) {
+            return null;
+        }
+        $callIndex = null;
+        foreach ($block->orig->children as $i => $child) {
+            if ($child === $cfgCallOp) {
+                $callIndex = $i;
+                break;
+            }
+        }
+        if (null === $callIndex) {
+            return null;
+        }
+        for ($i = $callIndex - 1; $i >= 0; --$i) {
+            $child = $block->orig->children[$i];
+            if ($child instanceof Op\Expr\ConstFetch) {
+                $constName = $this->staticNameFromOperand($child->name);
+                if (null !== $constName && 'null' === strtolower($constName)) {
+                    return $child;
+                }
+            }
+            if ($child instanceof Op\Expr\Array_) {
+                continue;
+            }
+            if (!$child instanceof Op\Expr || !$this->isInlineExprCallArgProducer($child)) {
+                break;
+            }
         }
 
         return null;
@@ -20176,6 +20250,14 @@ class Compiler {
         $args = $cfgCallOp->args;
         $callArg = $args[$argIndex] ?? null;
         if (!$this->callArgIsDeadInlineTemporary($callArg)) {
+            return null;
+        }
+        // array_map(null, [[..]]) — null ConstFetch is the callback, not a nested-call prelude (#9143).
+        if (
+            0 === $argIndex
+            && 'array_map' === strtolower($this->resolveCfgFuncCallName($cfgCallOp) ?? '')
+            && null !== $this->arrayMapNullCallbackProducerBeforeCfgCall($cfgCallOp, $block)
+        ) {
             return null;
         }
         $outerSlot = $this->outerSiblingInlineCallArgProducerSlot($block, $cfgCallOp, $argIndex);
@@ -25729,10 +25811,15 @@ class Compiler {
                         $block->orig->children,
                         $cfgCallOp
                     );
-                    foreach ($producers as $producer) {
-                        if (!$producer instanceof Op\Expr\ConstFetch) {
-                            continue;
-                        }
+                    $producer = $this->matchInlineCallArgProducer(
+                        $producers,
+                        $cfgCallOp->args ?? [],
+                        (int) $argIndex,
+                        $cfgCallOp,
+                        $block,
+                        'array_map'
+                    );
+                    if ($producer instanceof Op\Expr\ConstFetch) {
                         $slot = $block->slotForOperand($producer->result);
                         if (null === $slot) {
                             foreach ($this->compileExpr($producer, $block) as $op) {
@@ -25743,7 +25830,6 @@ class Compiler {
                         if (null !== $slot) {
                             $valueSlot = (string) $slot;
                         }
-                        break;
                     }
                 } elseif ((int) $argIndex >= 1) {
                     $callArgProbe = $cfgCallOp->args[(int) $argIndex] ?? $arg;
@@ -25752,19 +25838,22 @@ class Compiler {
                             $block->orig->children,
                             $cfgCallOp
                         );
-                        $arrayProducers = array_values(array_filter(
+                        $producer = $this->matchInlineCallArgProducer(
                             $producers,
-                            static fn (Op\Expr $producer): bool => $producer instanceof Op\Expr\Array_
-                        ));
-                        $arrayArgIndices = [];
-                        foreach ($cfgCallOp->args as $i => $callArg) {
-                            if ($this->callArgOperandExpectsArrayProducer($callArg)) {
-                                $arrayArgIndices[] = $i;
-                            }
+                            $cfgCallOp->args ?? [],
+                            (int) $argIndex,
+                            $cfgCallOp,
+                            $block,
+                            'array_map'
+                        );
+                        if (!$producer instanceof Op\Expr\Array_) {
+                            $producer = $this->matchInlineArrayProducersToArrayCallArgs(
+                                $producers,
+                                $cfgCallOp->args ?? [],
+                                (int) $argIndex
+                            );
                         }
-                        $position = array_search((int) $argIndex, $arrayArgIndices, true);
-                        if (false !== $position && isset($arrayProducers[$position])) {
-                            $producer = $arrayProducers[$position];
+                        if ($producer instanceof Op\Expr\Array_) {
                             $slot = $block->slotForOperand($producer->result);
                             if (null === $slot) {
                                 foreach ($this->compileArrayLiteral($producer, $block) as $op) {
@@ -26030,6 +26119,10 @@ class Compiler {
                     if (
                         null !== $pendingNested
                         && !\in_array($calleeLower, ['exit', 'die'], true)
+                        && !(
+                            'array_map' === $calleeLower
+                            && 0 === (int) $argIndex
+                        )
                     ) {
                         $valueSlot = (string) $pendingNested;
                     }
