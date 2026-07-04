@@ -14611,6 +14611,40 @@ class Compiler {
         return null !== $slot ? (string) $slot : null;
     }
 
+    /**
+     * (new C())->f(E::A) — inline New_ receiver must not steal hoisted enum-case arg slot (#16227).
+     */
+    private function slotForInlineNewMethodCallEnumCaseArg(
+        Block $block,
+        Op\Expr\MethodCall $callOp,
+        int $argIndex
+    ): ?string {
+        if (null === $block->orig) {
+            return null;
+        }
+        $inlineNewReceiver = false;
+        foreach ($block->orig->children as $child) {
+            if ($child instanceof Op\Expr\New_ && $this->inlineNewFeedsCallReceiver($child, $callOp)) {
+                $inlineNewReceiver = true;
+                break;
+            }
+        }
+        if (!$inlineNewReceiver) {
+            return null;
+        }
+        $callArg = $callOp->args[$argIndex] ?? null;
+        if (!$this->callArgUsesHoistedEnumPreludeSlot($callArg)) {
+            return null;
+        }
+
+        return $this->slotForHoistedClassConstFetchCallArg(
+            $callArg instanceof Operand ? $callArg : new Temporary(),
+            $block,
+            $callOp,
+            $argIndex
+        );
+    }
+
     /** Resolve VM slot for a hoisted inline Closure/ArrowFunction call-arg producer (#3673). */
     /** `$cmp = fn(...); f(..., $cmp)` — bind named locals when php-cfg uses assign-var temps (#5644). */
     private function slotForNamedLocalFromAssignVarOperand(Operand $arg, Block $block): ?int
@@ -15502,7 +15536,7 @@ class Compiler {
         }
         $inlineFuncName = $this->resolveInlineCallArgFuncName($cfgCallOp, $calleeName);
         $producers = $this->filterDeadClassConstFetchInlineProducers($producers);
-        $producers = $this->filterNestedNewInlineCallArgProducers($producers);
+        $producers = $this->filterNestedNewInlineCallArgProducers($producers, $cfgCallOp);
         $producers = $this->filterKnownVoidMethodCallPreludes($producers);
         $hoistedScalar = $this->matchHoistedScalarConstFetchInlineCallArgProducer($producers, $callArg);
         if (null !== $hoistedScalar) {
@@ -16276,7 +16310,7 @@ class Compiler {
                 !$this->producersAreNestedArrayLiteralChain($tail)
                 && !$this->producersAreChainedAssignChain($producers)
             ) {
-                $filtered = $this->filterNestedNewInlineCallArgProducers($producers);
+                $filtered = $this->filterNestedNewInlineCallArgProducers($producers, $cfgCallOp);
                 if (\count($filtered) === $argCount) {
                     $mapped = $filtered[$argIndex] ?? null;
                     if (
@@ -17768,12 +17802,19 @@ class Compiler {
      *
      * @return list<Op\Expr>
      */
-    private function filterNestedNewInlineCallArgProducers(array $producers): array
+    private function filterNestedNewInlineCallArgProducers(array $producers, ?Op $consumer = null): array
     {
         $filtered = [];
         $count = \count($producers);
         for ($i = 0; $i < $count; ++$i) {
             $producer = $producers[$i];
+            if (
+                $producer instanceof Op\Expr\New_
+                && null !== $consumer
+                && $this->inlineNewFeedsCallReceiver($producer, $consumer)
+            ) {
+                continue;
+            }
             if ($producer instanceof Op\Expr\New_) {
                 $next = $producers[$i + 1] ?? null;
                 if (
@@ -25837,6 +25878,21 @@ class Compiler {
         return false;
     }
 
+    /** (new C())->f(E::A) — inline New_ feeds MethodCall receiver, not a call arg (#16227). */
+    private function inlineNewFeedsCallReceiver(Op\Expr\New_ $new, Op $consumer): bool
+    {
+        if (!$consumer instanceof Op\Expr\MethodCall) {
+            return false;
+        }
+        $receiver = $consumer->var ?? null;
+        if (null === $receiver || null === $new->result) {
+            return false;
+        }
+
+        return $receiver === $new->result
+            || $this->operandsReferToSameVariable($receiver, $new->result);
+    }
+
     /** True when a call operand is `new ClassName(...)` (#9904). */
     private function callArgIsNewExpression(?Operand $callArg): bool
     {
@@ -29975,6 +30031,26 @@ class Compiler {
             // Early inline-array ARG_SEND paths continue before the main send site — unpack must be known up front (#16151).
             $unpackFlag = $this->callArgUnpack($arg) ? 1 : null;
             $inlineArrayLiteralArgWired = false;
+            if (
+                null !== $cfgCallOp
+                && $cfgCallOp instanceof Op\Expr\MethodCall
+                && null !== $block->orig
+            ) {
+                $inlineNewEnumArgSlot = $this->slotForInlineNewMethodCallEnumCaseArg(
+                    $block,
+                    $cfgCallOp,
+                    (int) $argIndex
+                );
+                if (null !== $inlineNewEnumArgSlot) {
+                    $sends[] = new OpCode(
+                        OpCode::TYPE_ARG_SEND,
+                        $inlineNewEnumArgSlot,
+                        $nameSlot,
+                        $unpackFlag
+                    );
+                    continue;
+                }
+            }
             $castArgZeroSlot = $this->resolveHoistedCastInlineCallArgZeroSlot(
                 $block,
                 $cfgCallOp,
@@ -30585,6 +30661,7 @@ class Compiler {
                     );
                     if (null !== $hoistedPropertyOrConstSlot) {
                         $valueSlot = $hoistedPropertyOrConstSlot;
+                        $hoistedEnumPropertyCallArgSlotWired = true;
                     }
                 }
             }

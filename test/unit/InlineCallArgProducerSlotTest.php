@@ -1060,6 +1060,39 @@ PHP;
         self::assertSame($propSlots, $sendSlots, 'prop='.json_encode($propSlots).' sends='.json_encode($sendSlots));
     }
 
+    /** Issue #16227 — (new C())->f(E::A) wires hoisted enum case slot, not inline-new receiver. */
+    public function testInlineNewMethodCallEnumCaseArgUsesEnumConstSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+enum E: string { case A = 'a'; }
+class C { public function f(E $e): void {} }
+(new C())->f(E::A);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'inline_new_enum_method_arg.php');
+
+        $newSlot = null;
+        $enumSlot = null;
+        $sendSlots = [];
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_NEW === $op->type) {
+                $newSlot = $op->arg1;
+            }
+            if (OpCode::TYPE_CLASS_CONST_FETCH === $op->type) {
+                $enumSlot = $op->arg1;
+            }
+            if (OpCode::TYPE_ARG_SEND === $op->type) {
+                $sendSlots[] = $op->arg1;
+            }
+        }
+
+        self::assertNotNull($newSlot);
+        self::assertNotNull($enumSlot);
+        self::assertSame([$enumSlot], $sendSlots, 'new='.$newSlot.' enum='.$enumSlot.' sends='.json_encode($sendSlots));
+        self::assertNotSame($newSlot, $enumSlot);
+    }
+
     /** Issue #10286 — nullsafe enum ?-> property in call args wires NullsafePropertyFetch slot. */
     public function testVarExportNullsafeEnumCasePropertyUsesNullsafeFetchSlot(): void
     {
