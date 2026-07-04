@@ -187,6 +187,9 @@ class Compiler {
     /** Force FUNCCALL_EXEC_RETURN while lowering hoisted sibling call-arg producers (#10981). */
     private bool $forceDeferredSiblingCallReturnSlot = false;
 
+    /** Reentrancy guard — statementLevel() ↔ firstSibling() mutual recursion (#9321). */
+    private bool $firstSiblingInlineFuncCallProducerIndexActive = false;
+
     /** Catch variable name (lc) => scope slot while lowering catch bodies (#9887). */
     private array $activeCatchVarSlotsByName = [];
 
@@ -20761,6 +20764,16 @@ class Compiler {
         if (2 === $distance && $this->isUnaryInlineSiblingCallArgExpr($mid)) {
             return 0;
         }
+        // tempnam(sys_get_temp_dir(), E::A) — FuncCall arg #0, ClassConstFetch prelude (#10303, #9321).
+        if (
+            2 === $distance
+            && ($mid instanceof Op\Expr\ClassConstFetch || $mid instanceof Op\Expr\ConstFetch)
+        ) {
+            return 0;
+        }
+        if ($this->firstSiblingInlineFuncCallProducerIndexActive) {
+            return $distance - 1;
+        }
         $firstSibling = $this->firstSiblingInlineFuncCallProducerIndex($consumerIndex, $cfgChildren);
         if (null === $firstSibling) {
             return $distance - 1;
@@ -21191,6 +21204,22 @@ class Compiler {
      * @param list<Op> $cfgChildren
      */
     private function firstSiblingInlineFuncCallProducerIndex(int $consumerIndex, array $cfgChildren): ?int
+    {
+        if ($this->firstSiblingInlineFuncCallProducerIndexActive) {
+            return null;
+        }
+        $this->firstSiblingInlineFuncCallProducerIndexActive = true;
+        try {
+            return $this->firstSiblingInlineFuncCallProducerIndexImpl($consumerIndex, $cfgChildren);
+        } finally {
+            $this->firstSiblingInlineFuncCallProducerIndexActive = false;
+        }
+    }
+
+    /**
+     * @param list<Op> $cfgChildren
+     */
+    private function firstSiblingInlineFuncCallProducerIndexImpl(int $consumerIndex, array $cfgChildren): ?int
     {
         $i = $consumerIndex - 1;
         while ($i >= 0) {
