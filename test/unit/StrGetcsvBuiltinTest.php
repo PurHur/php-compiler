@@ -109,6 +109,63 @@ final class StrGetcsvBuiltinTest extends TestCase
         $fn->execute($frame);
     }
 
+    public function testNullSeparatorTypeError(): void
+    {
+        $runtime = new Runtime();
+        $fn = new str_getcsv();
+        $input = new VMVariable();
+        $input->string('a,b');
+        $separator = new VMVariable();
+        $separator->null();
+
+        $frame = $fn->getFrame($runtime->vmContext);
+        $frame->calledArgs = [$input, $separator];
+        $frame->returnVar = new VMVariable();
+        $this->expectException(\TypeError::class);
+        $this->expectExceptionMessage('str_getcsv(): Argument #2 ($separator) must be of type string, null given');
+        $fn->execute($frame);
+    }
+
+    public function testNullEnclosureTypeError(): void
+    {
+        $runtime = new Runtime();
+        $fn = new str_getcsv();
+        $input = new VMVariable();
+        $input->string('a,b');
+        $sep = new VMVariable();
+        $sep->string(',');
+        $enclosure = new VMVariable();
+        $enclosure->null();
+
+        $frame = $fn->getFrame($runtime->vmContext);
+        $frame->calledArgs = [$input, $sep, $enclosure];
+        $frame->returnVar = new VMVariable();
+        $this->expectException(\TypeError::class);
+        $this->expectExceptionMessage('str_getcsv(): Argument #3 ($enclosure) must be of type string, null given');
+        $fn->execute($frame);
+    }
+
+    public function testNullEscapeTypeError(): void
+    {
+        $runtime = new Runtime();
+        $fn = new str_getcsv();
+        $input = new VMVariable();
+        $input->string('a,b');
+        $sep = new VMVariable();
+        $sep->string(',');
+        $enc = new VMVariable();
+        $enc->string('"');
+        $escape = new VMVariable();
+        $escape->null();
+
+        $frame = $fn->getFrame($runtime->vmContext);
+        $frame->calledArgs = [$input, $sep, $enc, $escape];
+        $frame->returnVar = new VMVariable();
+        $this->expectException(\TypeError::class);
+        $this->expectExceptionMessage('str_getcsv(): Argument #4 ($escape) must be of type string, null given');
+        $fn->execute($frame);
+    }
+
     /** @dataProvider newlineOnlyProvider */
     public function testNewlineOnlyInputYieldsNullField(string $input): void
     {

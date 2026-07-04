@@ -40,18 +40,21 @@ final class str_getcsv extends Internal
             }
         }
         InternalStrictArg::rejectNullString($frame->calledArgs[0], 'str_getcsv', 'string', 0, $frame);
-        $input = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'str_getcsv', 0, 'string');
+        $input = VmString::requireStringBuiltinArg($frame->calledArgs[0], 'str_getcsv', 0, 'string');
         $separator = ',';
         $enclosure = '"';
         $escape = '\\';
         if (isset($frame->calledArgs[1])) {
-            $separator = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'str_getcsv', 1, 'separator');
+            InternalStrictArg::rejectNullString($frame->calledArgs[1], 'str_getcsv', 'separator', 1, $frame);
+            $separator = VmString::requireStringBuiltinArg($frame->calledArgs[1], 'str_getcsv', 1, 'separator');
         }
         if (isset($frame->calledArgs[2])) {
-            $enclosure = VmString::coerceStringBuiltinArg($frame->calledArgs[2], 'str_getcsv', 2, 'enclosure');
+            InternalStrictArg::rejectNullString($frame->calledArgs[2], 'str_getcsv', 'enclosure', 2, $frame);
+            $enclosure = VmString::requireStringBuiltinArg($frame->calledArgs[2], 'str_getcsv', 2, 'enclosure');
         }
         if (isset($frame->calledArgs[3])) {
-            $escape = VmString::coerceStringBuiltinArg($frame->calledArgs[3], 'str_getcsv', 3, 'escape');
+            InternalStrictArg::rejectNullString($frame->calledArgs[3], 'str_getcsv', 'escape', 3, $frame);
+            $escape = VmString::requireStringBuiltinArg($frame->calledArgs[3], 'str_getcsv', 3, 'escape');
         }
         if (null === $frame->returnVar) {
             return;
@@ -70,18 +73,21 @@ final class str_getcsv extends Internal
         }
         $strPtr = $context->getTypeFromString('__string__*');
         JitInternalStrictArg::rejectNullString($context, $args[0], 'str_getcsv', 'string', 1);
-        $input = JitStringBuiltinArg::lower($context, $args[0], 'str_getcsv', 0, 'string');
+        $input = JitStringBuiltinArg::lowerRequiredString($context, $args[0], 'str_getcsv', 0, 'string');
         $separator = $strPtr->constNull();
         $enclosure = $strPtr->constNull();
         $escape = $strPtr->constNull();
         if (isset($args[1]) && !NamedOptionalCallArgs::isOmittedOptional($args[1])) {
-            $separator = JitStringBuiltinArg::lower($context, $args[1], 'str_getcsv', 1, 'separator');
+            JitInternalStrictArg::rejectNullString($context, $args[1], 'str_getcsv', 'separator', 2);
+            $separator = JitStringBuiltinArg::lowerRequiredString($context, $args[1], 'str_getcsv', 1, 'separator');
         }
         if (isset($args[2]) && !NamedOptionalCallArgs::isOmittedOptional($args[2])) {
-            $enclosure = JitStringBuiltinArg::lower($context, $args[2], 'str_getcsv', 2, 'enclosure');
+            JitInternalStrictArg::rejectNullString($context, $args[2], 'str_getcsv', 'enclosure', 3);
+            $enclosure = JitStringBuiltinArg::lowerRequiredString($context, $args[2], 'str_getcsv', 2, 'enclosure');
         }
         if (isset($args[3]) && !NamedOptionalCallArgs::isOmittedOptional($args[3])) {
-            $escape = JitStringBuiltinArg::lower($context, $args[3], 'str_getcsv', 3, 'escape');
+            JitInternalStrictArg::rejectNullString($context, $args[3], 'str_getcsv', 'escape', 4);
+            $escape = JitStringBuiltinArg::lowerRequiredString($context, $args[3], 'str_getcsv', 3, 'escape');
         }
 
         return JitStrGetcsv::invoke($context, $input, $separator, $enclosure, $escape);
