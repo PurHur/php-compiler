@@ -28,6 +28,26 @@ PHP
 , 'test.php');
     }
 
+    public function testRejectsBareThrowInsideNonCapturingCatchOnReferenceProfile(): void
+    {
+        if (CompilerVersion::supportsBareRethrow()) {
+            self::markTestSkipped('bare rethrow enabled on PHP 8.4.0+ target');
+        }
+
+        $this->expectException(CompileFatal::class);
+        $this->expectExceptionMessage('syntax error, unexpected token ";"');
+
+        BareThrowSyntaxRejector::reject(<<<'PHP'
+<?php
+try {
+    throw new Inner();
+} catch (Inner) {
+    throw;
+}
+PHP
+, 'test.php');
+    }
+
     public function testAllowsThrowWithExpressionOnReferenceProfile(): void
     {
         if (CompilerVersion::supportsBareRethrow()) {
