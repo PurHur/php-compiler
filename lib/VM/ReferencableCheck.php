@@ -195,20 +195,18 @@ final class ReferencableCheck
                     $paramName = $paramNames[$paramIdx] ?? 'param'.($paramIdx + 1);
                     self::assertArgument($fn, $paramIdx, $paramName, $calledArgs[$paramIdx], $caller);
                 } elseif (!self::isReferenceable($calledArgs[$paramIdx], $caller)) {
+                    $paramName = $paramNames[$paramIdx] ?? 'param'.($paramIdx + 1);
                     if (
                         'array_splice' === strtolower($fn)
                         && self::isEphemeralObjectCastArg($calledArgs[$paramIdx], $caller)
                     ) {
-                        $paramName = $paramNames[$paramIdx] ?? 'param'.($paramIdx + 1);
                         self::assertArgument($fn, $paramIdx, $paramName, $calledArgs[$paramIdx], $caller);
-                    } elseif (
-                        !(
-                            'array_splice' === strtolower($fn)
-                            && self::isObjectOperand($calledArgs[$paramIdx])
-                        )
-                    ) {
-                        // #13435: shuffle/sort* on non-lvalue (e.g. new stdClass()) — E_NOTICE then TypeError.
+                    } elseif (self::isObjectOperand($calledArgs[$paramIdx])) {
+                        // #15216 / #13435: ephemeral object operands — E_NOTICE then TypeError in builtin.
                         self::emitNonVariableByRefNotice($caller);
+                    } else {
+                        // #4881 / #4333: scalar literals (int, string, …) → catchable Error, no notice.
+                        self::assertArgument($fn, $paramIdx, $paramName, $calledArgs[$paramIdx], $caller);
                     }
                 }
                 continue;
