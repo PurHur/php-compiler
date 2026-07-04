@@ -243,6 +243,8 @@ final class ReflectionTypeSupport
         self::storeCommonTypeProps($obj, $typeString, self::allowsNullFromCfg($type));
         $obj->getProperty(ReflectionSupport::PROP_TYPE_NAME)->string($name);
         $obj->getProperty(ReflectionSupport::PROP_TYPE_BUILTIN)->bool(self::isBuiltinTypeName($name));
+        // Named types have no member list; empty array keeps var_export/get_object_vars off uninitialized slots (#9873).
+        $obj->getProperty(ReflectionSupport::PROP_TYPE_MEMBERS)->newArray();
 
         return $obj;
     }
