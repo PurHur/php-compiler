@@ -807,6 +807,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'reflection_property_isdynamic')) {
                 continue;
             }
+            // ReflectionEnumUnitCase::isDeprecated profile gates: VM-only (#15767).
+            if (str_contains($name, 'reflection_enum_unit_case_is_deprecated')) {
+                continue;
+            }
             // Reflection docblock/source getters are VM-only (#7358).
             if (str_contains($name, 'reflection_docblock_source')) {
                 continue;

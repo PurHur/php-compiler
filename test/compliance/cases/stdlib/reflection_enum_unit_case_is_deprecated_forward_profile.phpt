@@ -1,5 +1,5 @@
 --TEST--
-stdlib ReflectionEnumUnitCase::isDeprecated() — PHP 8.4 enum case #[\Deprecated] (#9864, ext/reflection/php_reflection.c)
+stdlib ReflectionEnumUnitCase::isDeprecated() — PHP 8.4 enum case #[\Deprecated] (#9864, #15767, ext/reflection/php_reflection.c)
 --FILE--
 <?php
 enum E: int {
