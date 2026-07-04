@@ -27,6 +27,9 @@ class Module extends ModuleAbstract
     public function init(Runtime $runtime): void
     {
         parent::init($runtime);
+        if (IntlExtensionPolicy::advertisesLocale()) {
+            BuiltinClasses::registerLocale($runtime->vmContext);
+        }
         if (IntlExtensionPolicy::advertisesBuiltins()) {
             BuiltinClasses::register($runtime->vmContext);
         }
@@ -43,11 +46,17 @@ class Module extends ModuleAbstract
 
     public function getFunctions(): array
     {
+        $functions = [];
+        if (IntlExtensionPolicy::advertisesLocale()) {
+            $functions[] = new locale_get_default();
+            $functions[] = new locale_set_default();
+        }
         if (!IntlExtensionPolicy::advertisesBuiltins()) {
-            return [];
+            return $functions;
         }
 
         return [
+            ...$functions,
             new grapheme_strlen(),
             new grapheme_substr(),
             new grapheme_strpos(),
