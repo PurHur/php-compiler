@@ -33315,6 +33315,8 @@ class Compiler {
                 || !$this->callArgIsDeadInlineTemporary($cfgCallOp->args[(int) $argIndex] ?? $arg)
             ) {
                 // keep resolved slot
+            } elseif ($this->shouldSkipFinalAdjacentNestedFuncCallArgProbe($cfgCallOp, (int) $argIndex)) {
+                // array_merge(['a'=>1], array_keys(...)) — arg #0 is leading Array_, not adjacent FuncCall (#16028).
             } else {
                 $callIndex = array_search($cfgCallOp, $block->orig->children, true);
                 if (\is_int($callIndex) && $callIndex > 0) {
