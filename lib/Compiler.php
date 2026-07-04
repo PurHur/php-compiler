@@ -15442,6 +15442,10 @@ class Compiler {
             if (null !== $chainedConcat) {
                 return $chainedConcat;
             }
+            $chainedArithmetic = $this->matchChainedArithmeticInlineCallArgProducer($producers, $callArgs, $argIndex);
+            if (null !== $chainedArithmetic) {
+                return $chainedArithmetic;
+            }
         }
         if ($this->callArgIsNewExpression($callArg)) {
             foreach ($producers as $producer) {
@@ -18226,6 +18230,102 @@ class Compiler {
     }
 
     /**
+     * php-cfg hoists `sprintf('%.10F', 5 * 200.0 / 12)` as sibling Mul/Div before FuncCall (#15929).
+     *
+     * @param list<Op> $cfgChildren
+     *
+     * @return list<Op\Expr\BinaryOp\Div|Op\Expr\BinaryOp\Minus|Op\Expr\BinaryOp\Mul|Op\Expr\BinaryOp\Plus>|null
+     */
+    private function chainedArithmeticInlineCallArgProducersBeforeCall(
+        array $cfgChildren,
+        int $callIndex,
+        Op $callOp
+    ): ?array {
+        if ($callIndex < 1 || !property_exists($callOp, 'args') || !is_array($callOp->args)) {
+            return null;
+        }
+        $soleHoisted = $this->soleNonEmbeddedCallArgIndex($callOp->args);
+        if (null === $soleHoisted) {
+            return null;
+        }
+        $callArg = $callOp->args[$soleHoisted] ?? null;
+        if (!$this->callArgIsDeadInlineTemporary($callArg)) {
+            return null;
+        }
+        $immediate = $cfgChildren[$callIndex - 1] ?? null;
+        if (!$this->isChainedArithmeticBinaryOpExpr($immediate)) {
+            return null;
+        }
+        $chain = [];
+        for ($i = $callIndex - 1; $i >= 0; --$i) {
+            $child = $cfgChildren[$i];
+            if (!$this->isChainedArithmeticBinaryOpExpr($child)) {
+                break;
+            }
+            array_unshift($chain, $child);
+            if ($i > 0) {
+                $prev = $cfgChildren[$i - 1];
+                if (
+                    $this->isChainedArithmeticBinaryOpExpr($prev)
+                    && null !== $child->left
+                    && $this->operandsReferToSameVariable($prev->result, $child->left)
+                ) {
+                    continue;
+                }
+            }
+            break;
+        }
+        if ([] === $chain) {
+            return null;
+        }
+        if (1 === \count($chain)) {
+            return $chain;
+        }
+        if (!$this->producersAreChainedArithmeticProducers($chain)) {
+            return null;
+        }
+
+        return $chain;
+    }
+
+    private function isChainedArithmeticBinaryOpExpr(?Op $expr): bool
+    {
+        return $expr instanceof Op\Expr\BinaryOp\Plus
+            || $expr instanceof Op\Expr\BinaryOp\Minus
+            || $expr instanceof Op\Expr\BinaryOp\Mul
+            || $expr instanceof Op\Expr\BinaryOp\Div
+            || $expr instanceof Op\Expr\BinaryOp\Mod
+            || $expr instanceof Op\Expr\BinaryOp\Pow;
+    }
+
+    /**
+     * @param list<Op\Expr> $producers
+     */
+    private function producersAreChainedArithmeticProducers(array $producers): bool
+    {
+        if (\count($producers) < 2) {
+            return false;
+        }
+        foreach ($producers as $producer) {
+            if (!$this->isChainedArithmeticBinaryOpExpr($producer)) {
+                return false;
+            }
+        }
+        for ($i = 1, $n = \count($producers); $i < $n; ++$i) {
+            $inner = $producers[$i - 1];
+            $outer = $producers[$i];
+            if (
+                null === $outer->left
+                || !$this->operandsReferToSameVariable($inner->result, $outer->left)
+            ) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
      * @param list<Op\Expr> $producers
      */
     private function producersAreChainedConcatProducers(array $producers): bool
@@ -18250,6 +18350,34 @@ class Compiler {
         }
 
         return true;
+    }
+
+    /**
+     * php-cfg hoists chained Mul/Div/Plus/Minus before inline call args — wire final result slot (#15929).
+     *
+     * @param list<Op\Expr> $producers
+     * @param list<Operand> $callArgs
+     */
+    private function matchChainedArithmeticInlineCallArgProducer(
+        array $producers,
+        array $callArgs,
+        int $argIndex
+    ): ?Op\Expr {
+        $soleHoisted = $this->soleNonEmbeddedCallArgIndex($callArgs);
+        if (null === $soleHoisted || $argIndex !== $soleHoisted) {
+            return null;
+        }
+        if ($this->producersAreChainedArithmeticProducers($producers)) {
+            return $producers[\count($producers) - 1];
+        }
+        if (
+            1 === \count($producers)
+            && $this->isChainedArithmeticBinaryOpExpr($producers[0] ?? null)
+        ) {
+            return $producers[0];
+        }
+
+        return null;
     }
 
     private function isInlineExprCallArgConsumer(Op $op): bool
@@ -18755,6 +18883,24 @@ class Compiler {
                     ) {
                         // glob($dir.'/*', GLOB_MARK) — Concat + ConstFetch hoisted siblings (#13660).
                         array_unshift($producers, $child);
+                    }
+                }
+                break;
+            }
+            // sprintf('%.10F', 5 * 200.0 / 12) — inner Mul does not feed outer FuncCall args (#15929).
+            if ($this->isChainedArithmeticBinaryOpExpr($child)) {
+                if ($this->inlineCallArgProducerFeedsConsumer($child, $callOp)) {
+                    array_unshift($producers, $child);
+                } else {
+                    $arithmeticChain = $this->chainedArithmeticInlineCallArgProducersBeforeCall(
+                        $cfgChildren,
+                        $callIndex,
+                        $callOp
+                    );
+                    if (null !== $arithmeticChain) {
+                        foreach ($arithmeticChain as $arithmeticProducer) {
+                            array_unshift($producers, $arithmeticProducer);
+                        }
                     }
                 }
                 break;
@@ -25666,6 +25812,58 @@ class Compiler {
     }
 
     /**
+     * Lower chained Mul/Div/Plus/Minus call args when php-cfg allocates a dead arg temp (#15929).
+     *
+     * @param list<OpCode> $emitOps
+     */
+    private function tryResolveChainedArithmeticCallArgSlot(
+        Operand $arg,
+        Block $block,
+        array &$emitOps,
+        ?Op $cfgCallOp = null,
+        int $argIndex = 0
+    ): ?int {
+        if (null === $cfgCallOp || null === $block->orig) {
+            return null;
+        }
+        $callIndex = null;
+        foreach ($block->orig->children as $i => $child) {
+            if ($child === $cfgCallOp) {
+                $callIndex = $i;
+                break;
+            }
+        }
+        if (null === $callIndex) {
+            return null;
+        }
+        $chain = $this->chainedArithmeticInlineCallArgProducersBeforeCall(
+            $block->orig->children,
+            $callIndex,
+            $cfgCallOp
+        );
+        if (null === $chain) {
+            return null;
+        }
+        $soleHoisted = $this->soleNonEmbeddedCallArgIndex($cfgCallOp->args);
+        if (null === $soleHoisted || $argIndex !== $soleHoisted) {
+            return null;
+        }
+        $last = $chain[\count($chain) - 1];
+        if (null === $last->result) {
+            return null;
+        }
+        if (null === $block->slotForOperand($last->result)) {
+            foreach ($chain as $arithmetic) {
+                foreach ($this->compileExpr($arithmetic, $block) as $op) {
+                    $emitOps[] = $op;
+                }
+            }
+        }
+
+        return $block->slotForOperand($last->result);
+    }
+
+    /**
      * php-cfg hoists encapsed ConcatList before FuncCall with a distinct dead arg temp (#13466).
      */
     private function concatListProducerForHoistedCallArg(
@@ -26353,6 +26551,9 @@ class Compiler {
                 }
                 if (null === $valueSlot) {
                     $valueSlot = $this->tryResolveChainedConcatCallArgSlot($arg, $block, $sends, $cfgCallOp, (int) $argIndex);
+                }
+                if (null === $valueSlot) {
+                    $valueSlot = $this->tryResolveChainedArithmeticCallArgSlot($arg, $block, $sends, $cfgCallOp, (int) $argIndex);
                 }
                 if (null === $valueSlot) {
                     $valueSlot = $this->tryResolveUnaryLiteralCallArgSlot($arg, $block, $sends, $cfgCallOp, (int) $argIndex);
@@ -27506,6 +27707,22 @@ class Compiler {
                         }
                         $valueSlot = (string) $chainedConcatSlot;
                     } else {
+                        $arithmeticChainOps = [];
+                        $chainedArithmeticSlot = $this->tryResolveChainedArithmeticCallArgSlot(
+                            $arg,
+                            $block,
+                            $arithmeticChainOps,
+                            $cfgCallOp,
+                            (int) $argIndex
+                        );
+                        if (null !== $chainedArithmeticSlot) {
+                            if ([] !== $arithmeticChainOps) {
+                                $sends = array_merge($sends, $arithmeticChainOps);
+                            }
+                            $valueSlot = (string) $chainedArithmeticSlot;
+                        }
+                    }
+                    if (null === $valueSlot) {
                         $callArgProbe = $cfgCallOp->args[(int) $argIndex] ?? $arg;
                         $trailingProducers = $this->precedingInlineCallArgProducersBeforeCfgOp(
                             $block->orig->children,
@@ -28196,26 +28413,55 @@ class Compiler {
             if (null !== $cfgCallOp && null !== $block->orig) {
                 $finalArgProbe = $cfgCallOp->args[(int) $argIndex] ?? $arg;
                 if ($this->callArgIsDeadInlineTemporary($finalArgProbe)) {
-                    $finalProducers = $this->precedingInlineCallArgProducersBeforeCfgOp(
-                        $block->orig->children,
-                        $cfgCallOp
-                    );
-                    $finalProducer = $this->inlineHoistedProducerForCallArgIndex(
+                    $finalChainOps = [];
+                    $chainedArithmeticSlot = $this->tryResolveChainedArithmeticCallArgSlot(
+                        $finalArgProbe,
+                        $block,
+                        $finalChainOps,
                         $cfgCallOp,
-                        (int) $argIndex,
-                        $finalProducers,
-                        $block->orig->children,
-                        $block
+                        (int) $argIndex
                     );
-                    if ($finalProducer instanceof Op\Expr && null !== $finalProducer->result) {
-                        if (null === $block->slotForOperand($finalProducer->result)) {
-                            foreach ($this->compileExpr($finalProducer, $block) as $op) {
-                                $sends[] = $op;
-                            }
+                    if (null !== $chainedArithmeticSlot) {
+                        if ([] !== $finalChainOps) {
+                            $sends = array_merge($sends, $finalChainOps);
                         }
-                        $finalProducerSlot = $block->slotForOperand($finalProducer->result);
-                        if (null !== $finalProducerSlot) {
-                            $valueSlot = (string) $finalProducerSlot;
+                        $valueSlot = (string) $chainedArithmeticSlot;
+                    } else {
+                        $chainedConcatSlot = $this->tryResolveChainedConcatCallArgSlot(
+                            $finalArgProbe,
+                            $block,
+                            $finalChainOps,
+                            $cfgCallOp,
+                            (int) $argIndex
+                        );
+                        if (null !== $chainedConcatSlot) {
+                            if ([] !== $finalChainOps) {
+                                $sends = array_merge($sends, $finalChainOps);
+                            }
+                            $valueSlot = (string) $chainedConcatSlot;
+                        } else {
+                            $finalProducers = $this->precedingInlineCallArgProducersBeforeCfgOp(
+                                $block->orig->children,
+                                $cfgCallOp
+                            );
+                            $finalProducer = $this->inlineHoistedProducerForCallArgIndex(
+                                $cfgCallOp,
+                                (int) $argIndex,
+                                $finalProducers,
+                                $block->orig->children,
+                                $block
+                            );
+                            if ($finalProducer instanceof Op\Expr && null !== $finalProducer->result) {
+                                if (null === $block->slotForOperand($finalProducer->result)) {
+                                    foreach ($this->compileExpr($finalProducer, $block) as $op) {
+                                        $sends[] = $op;
+                                    }
+                                }
+                                $finalProducerSlot = $block->slotForOperand($finalProducer->result);
+                                if (null !== $finalProducerSlot) {
+                                    $valueSlot = (string) $finalProducerSlot;
+                                }
+                            }
                         }
                     }
                 }
