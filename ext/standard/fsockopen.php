@@ -82,12 +82,12 @@ final class fsockopen extends Internal
         if ($argc >= 3) {
             $errnoOut = new Variable(Variable::TYPE_INTEGER);
             $errnoOut->int($errno);
-            $frame->calledArgs[2]->copyFrom($errnoOut);
+            $frame->calledArgs[2]->byRefTarget()->copyFrom($errnoOut);
         }
         if ($argc >= 4) {
             $errstrOut = new Variable(Variable::TYPE_STRING);
             $errstrOut->string($errstr);
-            $frame->calledArgs[3]->copyFrom($errstrOut);
+            $frame->calledArgs[3]->byRefTarget()->copyFrom($errstrOut);
         }
 
         if (false === $result) {

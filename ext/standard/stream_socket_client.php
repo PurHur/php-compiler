@@ -96,12 +96,12 @@ final class stream_socket_client extends Internal
         if (isset($frame->calledArgs[1])) {
             $errnoOut = new Variable(Variable::TYPE_INTEGER);
             $errnoOut->int($errno);
-            $frame->calledArgs[1]->copyFrom($errnoOut);
+            $frame->calledArgs[1]->byRefTarget()->copyFrom($errnoOut);
         }
         if (isset($frame->calledArgs[2])) {
             $errstrOut = new Variable(Variable::TYPE_STRING);
             $errstrOut->string($errstr);
-            $frame->calledArgs[2]->copyFrom($errstrOut);
+            $frame->calledArgs[2]->byRefTarget()->copyFrom($errstrOut);
         }
 
         if (false === $result) {

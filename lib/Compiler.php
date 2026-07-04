@@ -8020,6 +8020,7 @@ class Compiler {
         if (null === $primary || !isset($primary->result)) {
             return;
         }
+        $this->inheritErrorSuppressByRefCallArgSlots($suppressCompiled, $endCompiled, $primary);
         $slot = $suppressCompiled->slotForOperand($primary->result);
         if (null === $slot) {
             $slot = $this->findFuncCallExecReturnSlot($suppressCompiled);
@@ -8081,6 +8082,84 @@ class Compiler {
                 $this->bindErrorSuppressResultOperandUsages($endChild, $endCompiled, $suppressResult, $slot);
             }
         }
+    }
+
+    /**
+     * `@` on builtins with by-ref out args must keep errno/errstr slots after END_SILENCE (#9320, #10336).
+     */
+    private function inheritErrorSuppressByRefCallArgSlots(
+        Block $suppressCompiled,
+        Block $endCompiled,
+        Op $primary
+    ): void {
+        if (
+            !$primary instanceof Op\Expr\FuncCall
+            && !$primary instanceof Op\Expr\NsFuncCall
+        ) {
+            return;
+        }
+        if (!property_exists($primary, 'args') || !\is_array($primary->args)) {
+            return;
+        }
+        $name = $this->resolveCfgFuncCallName($primary);
+        if (null === $name) {
+            return;
+        }
+        foreach (BuiltinByRefParams::forFunction($name) as $argIndex) {
+            $arg = $primary->args[$argIndex] ?? null;
+            if (!$arg instanceof Operand) {
+                continue;
+            }
+            $slot = $this->errorSuppressByRefArgSendSlot($suppressCompiled, $primary, (int) $argIndex)
+                ?? $suppressCompiled->slotForOperand($arg);
+            if (null === $slot) {
+                continue;
+            }
+            $endCompiled->forceBindScopeSlot($arg, $slot);
+            $root = Block::cfgVarRoot($arg);
+            if (null !== $root) {
+                $endCompiled->forceBindScopeSlot($root, $slot);
+            }
+        }
+    }
+
+    /**
+     * ARG_SEND slot for a by-ref callee arg inside an {@see ErrorSuppressBlock} (#9320).
+     */
+    private function errorSuppressByRefArgSendSlot(
+        Block $suppressCompiled,
+        Op $primary,
+        int $argIndex
+    ): ?int {
+        unset($primary);
+        $inCall = false;
+        $sendOrdinal = -1;
+        $funcCallInits = 0;
+        foreach ($suppressCompiled->opCodes as $op) {
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                ++$funcCallInits;
+                if (1 === $funcCallInits) {
+                    $inCall = true;
+                    $sendOrdinal = -1;
+                }
+                continue;
+            }
+            if (!$inCall) {
+                continue;
+            }
+            if (OpCode::TYPE_ARG_SEND === $op->type) {
+                ++$sendOrdinal;
+                if ($sendOrdinal === $argIndex) {
+                    return (int) $op->arg1;
+                }
+                continue;
+            }
+            if (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type || OpCode::TYPE_FUNCCALL_EXEC_NORETURN === $op->type) {
+                break;
+            }
+        }
+
+        return null;
     }
 
     /**
