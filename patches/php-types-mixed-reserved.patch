@@ -1,18 +1,19 @@
 --- vendor/ircmaxell/php-types/lib/PHPTypes/Type.php
 +++ vendor/ircmaxell/php-types/lib/PHPTypes/Type.php
-@@ -290,6 +290,9 @@ class Type
-         if ($decl instanceof CfgType\Literal) {
-             return self::fromDecl($decl->name);
+@@ -310,6 +310,10 @@
+             return new self(self::TYPE_INTERSECTION, $subs);
          }
+ 
 +        if ($decl instanceof CfgType\Mixed_) {
 +            return self::mixed();
 +        }
- 
++
          throw new \LogicException('Unsupported declaration type: '.get_class($decl));
      }
+ 
 --- vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php
 +++ vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php
-@@ -393,8 +393,13 @@
+@@ -428,8 +428,13 @@
      protected function resolveOp_Expr_Param(Operand $var, Op\Expr\Param $op, SplObjectStorage $resolved)
      {
          $type = $this->resolveOpType($op->declaredType);
@@ -28,30 +29,37 @@
                  $type = (new Type(Type::TYPE_UNION, [$type, Type::null()]))->simplify();
              }
          }
-@@ -541,7 +546,7 @@
+@@ -576,7 +581,7 @@
          foreach ($this->state->classes as $class) {
              foreach ($class->stmts->children as $stmt) {
                  if ($stmt instanceof Op\Stmt\Property) {
 -                    if ($stmt->declaredType instanceof Op\Type\Mixed) {
-+                    if ($stmt->declaredType instanceof Op\Type\Mixed_) {
++                    if ($stmt->declaredType instanceof Op\Type\Mixed_ || $stmt->declaredType instanceof Op\Type\Mixed) {
                          $stmt->type = Type::extractTypeFromComment('var', $stmt->getAttribute('doccomment'));
                      } else {
                          $stmt->type = $this->resolveOpType($stmt->declaredType);
-@@ -677,7 +682,7 @@
+@@ -712,7 +717,7 @@
                  // Lookup property on class
                  $property = $this->findProperty($class, $propName);
                  if ($property) {
 -                    if ($property->declaredType instanceof Op\Type\Mixed && $property->type) {
-+                    if ($property->declaredType instanceof Op\Type\Mixed_ && $property->type) {
++                    if (($property->declaredType instanceof Op\Type\Mixed_ || $property->declaredType instanceof Op\Type\Mixed) && $property->type) {
                          $types[] = $property->type;
                      } else {
                          $types[] = $this->resolveOpType($property->declaredType);
-@@ -694,7 +699,7 @@
+@@ -729,11 +734,14 @@
  
      private function resolveOpType(Op\Type $type): Type
      {
--        if ($type instanceof Op\Type\Mixed) {
 +        if ($type instanceof Op\Type\Mixed_) {
++            return Type::mixed();
++        }
+         if ($type instanceof Op\Type\Mixed) {
              return Type::mixed();
          }
          if ($type instanceof Op\Type\Nullable) {
+-            (new Type(Type::TYPE_UNION, [
++            return (new Type(Type::TYPE_UNION, [
+                 $this->resolveOpType($type->subtype),
+                 new Type(Type::TYPE_NULL),
+             ]))->simplify();

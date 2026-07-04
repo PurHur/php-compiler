@@ -12,10 +12,10 @@
      public static function object(): self
      {
          return self::makeCachedType(self::TYPE_OBJECT);
-@@ -295,6 +300,9 @@
-         if ($decl instanceof CfgType\Literal) {
-             return self::fromDecl($decl->name);
+@@ -310,6 +315,9 @@
+             return new self(self::TYPE_INTERSECTION, $subs);
          }
+ 
 +        if ($decl instanceof CfgType\Never_) {
 +            return self::never();
 +        }
@@ -34,12 +34,12 @@
 
 --- vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php
 +++ vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php
-@@ -774,6 +774,8 @@
+@@ -776,6 +776,8 @@
              return Type::fromDecl($type->declaration->value);
          } elseif ($type instanceof Op\Type\Literal) {
              return Type::fromDecl($type->name);
 +        } elseif ($type instanceof Op\Type\Never_) {
 +            return Type::never();
-         }
- 
-         throw new \LogicException('Unknown Op\\Type provided: '.get_class($type));
+         } elseif ($type instanceof Op\Type\Union_) {
+             $subs = [];
+             foreach ($type->types as $sub) {

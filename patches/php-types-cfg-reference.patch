@@ -1,6 +1,6 @@
 --- vendor/ircmaxell/php-types/lib/PHPTypes/Type.php
 +++ vendor/ircmaxell/php-types/lib/PHPTypes/Type.php
-@@ -311,6 +311,13 @@
+@@ -326,6 +326,13 @@
                  new self(self::TYPE_NULL),
              ]))->simplify();
          }
@@ -12,5 +12,5 @@
 +            return self::mixed();
 +        }
  
-         if ($decl instanceof CfgType\Union_) {
-             $subs = [];
+         throw new \LogicException('Unsupported declaration type: '.get_class($decl));
+     }
