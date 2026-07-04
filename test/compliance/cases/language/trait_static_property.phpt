@@ -1,5 +1,5 @@
 --TEST--
-Language: trait static properties — per-class late static storage (#4670, Zend/zend_traits.c)
+Language: trait static properties — child shares parent trait-static storage (#4670, Zend/zend_traits.c)
 --FILE--
 <?php
 trait Counter {
@@ -15,4 +15,4 @@ D::inc();
 D::inc();
 echo D::$n, " ", C::$n, "\n";
 --EXPECT--
-2 0
+2 2

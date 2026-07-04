@@ -14055,12 +14055,10 @@ restart:
         }
         foreach ($parent->staticProperties as $name => $storage) {
             if (!isset($entry->staticProperties[$name])) {
+                // Inherited statics share parent storage (class-declared #4668; trait-composed #4670).
+                $entry->staticProperties[$name] = $storage;
                 if (isset($parent->traitStaticPropertyNames[$name])) {
-                    $entry->staticProperties[$name] = $this->cloneStaticPropertyStorage($storage);
                     $entry->traitStaticPropertyNames[$name] = true;
-                } else {
-                    // Class-declared inherited statics share one slot (Zend; #4668).
-                    $entry->staticProperties[$name] = $storage;
                 }
                 if (isset($parent->staticPropertyVisibility[$name])) {
                     $entry->staticPropertyVisibility[$name] = $parent->staticPropertyVisibility[$name];
