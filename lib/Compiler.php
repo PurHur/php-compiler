@@ -1454,7 +1454,7 @@ class Compiler {
         if ($this->ternaryMergePhiRhsSlots->contains($mergeCfg)) {
             return $this->ternaryMergePhiRhsSlots[$mergeCfg];
         }
-        $slot = (int) $branch->getVarSlot($phiOperand, false);
+        $slot = $branch->forceFreshVarSlot($phiOperand);
         $this->ternaryMergePhiRhsSlots[$mergeCfg] = $slot;
         $root = Block::cfgVarRoot($phiOperand);
         if (null !== $root) {
@@ -1573,6 +1573,14 @@ class Compiler {
             $this->recordTernaryMergePhiRhsSlot($mergeCfg, $compiled);
             foreach ($compiled->eachCfgVarRootSlot() as [$root, $slot]) {
                 if (!$map->contains($root)) {
+                    // && / || long arms read named locals (e.g. str_contains($out, …)); do not
+                    // remap those roots through the bool-cast phi merge map (#15183, #10626).
+                    if ($this->mergeCfgBlockUsesLogicalShortCircuit($mergeCfg)) {
+                        $rootName = Block::resolveVariableName($root);
+                        if (null !== $rootName && '' !== $rootName) {
+                            continue;
+                        }
+                    }
                     $map[$root] = $slot;
                 }
             }
@@ -8396,13 +8404,24 @@ class Compiler {
             )];
             if ($expr instanceof Op\Expr\Cast\Bool_) {
                 $phiSlot = $this->logicalShortCircuitPhiMergeSlot($block);
-                if (null !== $phiSlot && $castResultSlot !== $phiSlot) {
-                    $ops[] = new OpCode(
-                        OpCode::TYPE_ASSIGN,
-                        $phiSlot,
-                        $phiSlot,
-                        $castResultSlot
-                    );
+                if (null !== $phiSlot) {
+                    if ($block->isNamedVariableSlot($phiSlot)) {
+                        $phiSlot = $block->forceFreshVarSlot($expr->result, $phiSlot);
+                        if (null !== $block->orig) {
+                            $mergeCfg = $this->branchJumpMergeTarget($block->orig);
+                            if (null !== $mergeCfg) {
+                                $this->ternaryMergePhiRhsSlots[$mergeCfg] = $phiSlot;
+                            }
+                        }
+                    }
+                    if ($castResultSlot !== $phiSlot) {
+                        $ops[] = new OpCode(
+                            OpCode::TYPE_ASSIGN,
+                            $phiSlot,
+                            $phiSlot,
+                            $castResultSlot
+                        );
+                    }
                 }
             }
 
@@ -29403,8 +29422,8 @@ class Compiler {
             }
             if (
                 null !== $cfgCallOp
-                && $this->callArgIsDeadInlineTemporary($arg)
                 && !$this->callArgOperandExpectsArrayProducer($arg)
+                && ($this->callArgIsDeadInlineTemporary($arg) || $this->isNamedVariableOperand($arg))
             ) {
                 $andPhi = $this->logicalShortCircuitPhiMergeSlot($block);
                 if (
@@ -29412,18 +29431,30 @@ class Compiler {
                     && null !== $valueSlot
                     && (string) $valueSlot === (string) $andPhi
                 ) {
-                    $pendingNested = $this->slotForLastPendingInlineCallResultBeforeFuncCallInit($sends)
-                        ?? $this->slotForLastEmittedInlineCallResultBeforePendingFuncCall($block);
-                    $calleeLower = strtolower($calleeName ?? $this->resolveCfgFuncCallName($cfgCallOp) ?? '');
-                    if (
-                        null !== $pendingNested
-                        && !\in_array($calleeLower, ['exit', 'die'], true)
-                        && !(
-                            'array_map' === $calleeLower
-                            && 0 === (int) $argIndex
-                        )
-                    ) {
-                        $valueSlot = (string) $pendingNested;
+                    if ($this->isNamedVariableOperand($arg)) {
+                        $copyOperand = new Operand\Temporary();
+                        $copySlot = $block->forceFreshVarSlot($copyOperand, (int) $andPhi);
+                        $sends[] = new OpCode(
+                            OpCode::TYPE_ASSIGN,
+                            $copySlot,
+                            (int) $valueSlot,
+                            (int) $valueSlot,
+                        );
+                        $valueSlot = (string) $copySlot;
+                    } else {
+                        $pendingNested = $this->slotForLastPendingInlineCallResultBeforeFuncCallInit($sends)
+                            ?? $this->slotForLastEmittedInlineCallResultBeforePendingFuncCall($block);
+                        $calleeLower = strtolower($calleeName ?? $this->resolveCfgFuncCallName($cfgCallOp) ?? '');
+                        if (
+                            null !== $pendingNested
+                            && !\in_array($calleeLower, ['exit', 'die'], true)
+                            && !(
+                                'array_map' === $calleeLower
+                                && 0 === (int) $argIndex
+                            )
+                        ) {
+                            $valueSlot = (string) $pendingNested;
+                        }
                     }
                 }
             }
