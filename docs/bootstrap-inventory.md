@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3992 |
-| Phase A inventory files (M2 ratio SSOT) | 3992 |
+| PHP files on vm.php path | 3994 |
+| Phase A inventory files (M2 ratio SSOT) | 3994 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 10778 |
+| Source constructs flagged (warnings) | 10786 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -314,10 +314,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/mbstring/MbStrwidthJitHelper.php` | 0 | 1 |
 | `ext/mbstring/MbstringEncodingRegistry.php` | 0 | 1 |
 | `ext/mbstring/MbstringState.php` | 0 | 3 |
-| `ext/mbstring/Module.php` | 0 | 36 |
+| `ext/mbstring/Module.php` | 0 | 38 |
 | `ext/mbstring/Utf8CaseMap.php` | 0 | 1 |
 | `ext/mbstring/VmMbstring.php` | 0 | 3 |
 | `ext/mbstring/mb_check_encoding.php` | 0 | 2 |
+| `ext/mbstring/mb_chr.php` | 0 | 3 |
 | `ext/mbstring/mb_convert_case.php` | 0 | 3 |
 | `ext/mbstring/mb_convert_encoding.php` | 0 | 3 |
 | `ext/mbstring/mb_convert_kana.php` | 0 | 2 |
@@ -331,6 +332,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/mbstring/mb_internal_encoding.php` | 0 | 2 |
 | `ext/mbstring/mb_list_encodings.php` | 0 | 1 |
 | `ext/mbstring/mb_ltrim.php` | 0 | 1 |
+| `ext/mbstring/mb_ord.php` | 0 | 3 |
 | `ext/mbstring/mb_preferred_mime_name.php` | 0 | 2 |
 | `ext/mbstring/mb_rtrim.php` | 0 | 1 |
 | `ext/mbstring/mb_scrub.php` | 0 | 2 |
@@ -5914,37 +5916,39 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new mb_check_encoding (line 34)
 - new mb_list_encodings (line 35)
 - new mb_strlen (line 36)
-- new mb_str_split (line 37)
-- new mb_strwidth (line 38)
-- new mb_strimwidth (line 39)
-- new mb_str_pad (line 40)
-- new mb_substr (line 41)
-- new mb_strcut (line 42)
-- new mb_substr_count (line 43)
-- new mb_strpos (line 44)
-- new mb_strtolower (line 45)
-- new mb_strtoupper (line 46)
-- new mb_convert_case (line 47)
-- new mb_convert_encoding (line 48)
-- new mb_stripos (line 49)
-- new mb_strrpos (line 50)
-- new mb_strrichr (line 51)
-- new mb_trim (line 53)
-- new mb_ltrim (line 54)
-- new mb_rtrim (line 55)
-- new mb_scrub (line 57)
-- new mb_encode_numericentity (line 58)
-- new mb_decode_numericentity (line 59)
-- new mb_encode_mimeheader (line 60)
-- new mb_decode_mimeheader (line 61)
-- new mb_http_output (line 62)
-- new mb_internal_encoding (line 63)
-- new mb_detect_order (line 64)
-- new mb_substitute_character (line 65)
-- new mb_preferred_mime_name (line 66)
-- new mb_encoding_aliases (line 67)
-- new mb_convert_kana (line 68)
-- new mb_split (line 69)
+- new mb_chr (line 37)
+- new mb_ord (line 38)
+- new mb_str_split (line 39)
+- new mb_strwidth (line 40)
+- new mb_strimwidth (line 41)
+- new mb_str_pad (line 42)
+- new mb_substr (line 43)
+- new mb_strcut (line 44)
+- new mb_substr_count (line 45)
+- new mb_strpos (line 46)
+- new mb_strtolower (line 47)
+- new mb_strtoupper (line 48)
+- new mb_convert_case (line 49)
+- new mb_convert_encoding (line 50)
+- new mb_stripos (line 51)
+- new mb_strrpos (line 52)
+- new mb_strrichr (line 53)
+- new mb_trim (line 55)
+- new mb_ltrim (line 56)
+- new mb_rtrim (line 57)
+- new mb_scrub (line 59)
+- new mb_encode_numericentity (line 60)
+- new mb_decode_numericentity (line 61)
+- new mb_encode_mimeheader (line 62)
+- new mb_decode_mimeheader (line 63)
+- new mb_http_output (line 64)
+- new mb_internal_encoding (line 65)
+- new mb_detect_order (line 66)
+- new mb_substitute_character (line 67)
+- new mb_preferred_mime_name (line 68)
+- new mb_encoding_aliases (line 69)
+- new mb_convert_kana (line 70)
+- new mb_split (line 71)
 - 2 class method(s)
 
 ### `ext/mbstring/Utf8CaseMap.php`
@@ -5957,13 +5961,20 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 1053)
 - new ArgumentCountError (line 1061)
-- 100 class method(s)
+- 103 class method(s)
 
 ### `ext/mbstring/mb_check_encoding.php`
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 27)
 - 2 class method(s)
+
+### `ext/mbstring/mb_chr.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 30)
+- 2 class method(s)
+- 2 closure(s)
 
 ### `ext/mbstring/mb_convert_case.php`
 
@@ -6042,6 +6053,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
+
+### `ext/mbstring/mb_ord.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 30)
+- 2 class method(s)
+- 2 closure(s)
 
 ### `ext/mbstring/mb_preferred_mime_name.php`
 
@@ -9442,7 +9460,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitFilestatArg.php`
 
 **Warnings** (review for bootstrap subset):
-- new JITVariable (line 162)
+- new JITVariable (line 159)
 - 11 class method(s)
 
 ### `ext/standard/JitFiletype.php`
@@ -20794,85 +20812,85 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 11536)
 - new Operand\Temporary (line 11538)
 - new OpCode (line 11585)
-- new CfgVariable (line 22606)
-- new Literal (line 22606)
-- new Variable (line 22638)
-- new Variable (line 22692)
-- new OpCode (line 22716)
-- new Operand\Temporary (line 23360)
-- new OpCode (line 23362)
-- new OpCode (line 23388)
-- new OpCode (line 23404)
-- new OpCode (line 23412)
-- new OpCode (line 23419)
-- new OpCode (line 23431)
-- new OpCode (line 23448)
-- new OpCode (line 23454)
-- new OpCode (line 23460)
-- new OpCode (line 23465)
-- new OpCode (line 23481)
-- new OpCode (line 23494)
-- new Variable (line 23505)
-- new Operand\Literal (line 23507)
-- new OpCode (line 23510)
-- new OpCode (line 23580)
-- new OpCode (line 23591)
-- new OpCode (line 23604)
-- new OpCode (line 23778)
-- new OpCode (line 24026)
-- new OpCode (line 24032)
-- new OpCode (line 24038)
-- new OpCode (line 24063)
-- new Variable (line 24090)
-- new Temporary (line 24092)
-- new Variable (line 24100)
-- new Temporary (line 24102)
-- new OpCode (line 24147)
-- new Operand\Temporary (line 24167)
-- new Operand\Temporary (line 24173)
-- new Operand\Temporary (line 24179)
-- new Operand\Temporary (line 24185)
-- new Operand\Temporary (line 24194)
-- new Variable (line 25442)
-- new Variable (line 25446)
-- new Variable (line 25454)
-- new Variable (line 25458)
-- new Variable (line 25734)
-- new OpCode (line 25767)
-- new Operand\Literal (line 26505)
-- new Variable (line 26507)
-- new Operand\Temporary (line 27187)
-- new Operand\Temporary (line 27319)
-- new Operand\Temporary (line 27351)
-- new Operand\Temporary (line 27439)
-- new OpCode (line 27769)
-- new OpCode (line 28096)
-- new OpCode (line 28399)
-- new OpCode (line 28600)
-- new OpCode (line 28610)
-- new OpCode (line 28613)
-- new Operand\Temporary (line 28650)
-- new OpCode (line 28652)
-- new OpCode (line 28663)
-- new Operand\Temporary (line 28666)
-- new OpCode (line 28668)
-- new OpCode (line 28676)
-- new OpCode (line 28683)
-- new OpCode (line 28691)
-- new OpCode (line 28694)
-- new OpCode (line 28711)
-- new OpCode (line 28733)
-- new OpCode (line 28749)
-- new OpCode (line 28756)
-- new OpCode (line 29297)
-- new Literal (line 29329)
-- new OpCode (line 29428)
-- new Variable (line 29435)
-- new Temporary (line 29437)
-- new OpCode (line 29440)
-- new CompileFatal (line 29753)
-- new CompileFatal (line 30008)
-- 742 class method(s)
+- new CfgVariable (line 22736)
+- new Literal (line 22736)
+- new Variable (line 22768)
+- new Variable (line 22822)
+- new OpCode (line 22846)
+- new Operand\Temporary (line 23490)
+- new OpCode (line 23492)
+- new OpCode (line 23518)
+- new OpCode (line 23534)
+- new OpCode (line 23542)
+- new OpCode (line 23549)
+- new OpCode (line 23561)
+- new OpCode (line 23578)
+- new OpCode (line 23584)
+- new OpCode (line 23590)
+- new OpCode (line 23595)
+- new OpCode (line 23611)
+- new OpCode (line 23624)
+- new Variable (line 23635)
+- new Operand\Literal (line 23637)
+- new OpCode (line 23640)
+- new OpCode (line 23710)
+- new OpCode (line 23721)
+- new OpCode (line 23734)
+- new OpCode (line 23908)
+- new OpCode (line 24156)
+- new OpCode (line 24162)
+- new OpCode (line 24168)
+- new OpCode (line 24193)
+- new Variable (line 24220)
+- new Temporary (line 24222)
+- new Variable (line 24230)
+- new Temporary (line 24232)
+- new OpCode (line 24277)
+- new Operand\Temporary (line 24297)
+- new Operand\Temporary (line 24303)
+- new Operand\Temporary (line 24309)
+- new Operand\Temporary (line 24315)
+- new Operand\Temporary (line 24324)
+- new Variable (line 25572)
+- new Variable (line 25576)
+- new Variable (line 25584)
+- new Variable (line 25588)
+- new Variable (line 25864)
+- new OpCode (line 25897)
+- new Operand\Literal (line 26635)
+- new Variable (line 26637)
+- new Operand\Temporary (line 27317)
+- new Operand\Temporary (line 27449)
+- new Operand\Temporary (line 27481)
+- new Operand\Temporary (line 27569)
+- new OpCode (line 27925)
+- new OpCode (line 28334)
+- new OpCode (line 28637)
+- new OpCode (line 28838)
+- new OpCode (line 28848)
+- new OpCode (line 28851)
+- new Operand\Temporary (line 28888)
+- new OpCode (line 28890)
+- new OpCode (line 28901)
+- new Operand\Temporary (line 28904)
+- new OpCode (line 28906)
+- new OpCode (line 28914)
+- new OpCode (line 28921)
+- new OpCode (line 28929)
+- new OpCode (line 28932)
+- new OpCode (line 28959)
+- new OpCode (line 28982)
+- new OpCode (line 28998)
+- new OpCode (line 29005)
+- new OpCode (line 29546)
+- new Literal (line 29578)
+- new OpCode (line 29677)
+- new Variable (line 29684)
+- new Temporary (line 29686)
+- new OpCode (line 29689)
+- new CompileFatal (line 30002)
+- new CompileFatal (line 30257)
+- 746 class method(s)
 - 33 closure(s)
 
 ### `lib/Compiler/AbstractMethodVisibilityCheck.php`
