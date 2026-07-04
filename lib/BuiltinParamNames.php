@@ -265,6 +265,17 @@ final class BuiltinParamNames
                 return ['callback', 'args'];
             case 'is_callable':
                 return ['value', 'syntax_only', 'callable_name'];
+            case 'class_exists':
+                return ['class', 'autoload'];
+            case 'interface_exists':
+                return ['interface', 'autoload'];
+            case 'trait_exists':
+                return ['trait', 'autoload'];
+            case 'enum_exists':
+                return ['enum', 'autoload'];
+            case 'is_subclass_of':
+            case 'is_a':
+                return ['object_or_class', 'class', 'allow_string'];
             case 'iterator_to_array':
                 return ['iterator', 'preserve_keys'];
             case 'hrtime':
