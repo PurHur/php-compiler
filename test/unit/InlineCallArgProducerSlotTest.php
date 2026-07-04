@@ -5119,4 +5119,19 @@ PHP;
         $runtime->run($block);
         self::assertSame("true\ntrue\nok\n", ob_get_clean());
     }
+
+    /** Issue #15931 — var_dump(...); ini_get_all(null, false) wires ConstFetch slots, not prior dump return. */
+    public function testIniGetAllAfterVarDumpUsesConstFetchLiteralSlots(): void
+    {
+        $code = file_get_contents(__DIR__.'/../repro/maintainer_gap_ini_get_all_standard.php');
+        self::assertNotFalse($code);
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'ini_get_all_after_var_dump.php');
+
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertStringContainsString('flat string', $out);
+        self::assertStringNotContainsString('details flag must be a boolean', $out);
+    }
 }
