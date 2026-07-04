@@ -3624,6 +3624,7 @@ require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassInitializeLazyObje
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassIsAnonymous.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassIsDeprecated.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassIsEnum.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassIsReadOnly.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassIsInternal.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassIsStatic.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassIsUninitializedLazyObject.php';
