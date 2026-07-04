@@ -23,7 +23,7 @@ use PHPLLVM\Value;
 /**
  * number_format() for integers and floats (C-style locale subset; LLVM JIT/AOT).
  *
- * php-src: ext/standard/number_format.c — Z_PARAM_LONG / Z_PARAM_STR
+ * php-src: ext/standard/number_format.c — Z_PARAM_LONG / Z_PARAM_STR / RoundingMode
  */
 final class number_format extends Internal
 {
@@ -74,7 +74,7 @@ final class number_format extends Internal
                 'number_format',
                 3,
                 'thousands_separator'
-            )             ?? ','
+            ) ?? ','
             : ',';
         $roundingMode = StdlibConstants::PHP_ROUND_HALF_UP;
         if (CompilerVersion::supportsRoundingModeEnum() && isset($frame->calledArgs[4])) {

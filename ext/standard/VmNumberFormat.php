@@ -81,11 +81,7 @@ final class VmNumberFormat
             $pow *= 10;
         }
 
-        if ($decimals > 0) {
-            $rounded = VmRound::mathRound($number, $decimals, $roundingMode);
-        } else {
-            $rounded = VmRound::mathRound($number, 0, $roundingMode);
-        }
+        $rounded = VmRound::mathRound($number, $decimals, $roundingMode);
 
         $intPart = (int) floor($rounded);
         $fracPart = 0;

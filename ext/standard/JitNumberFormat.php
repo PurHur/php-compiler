@@ -8,8 +8,8 @@ use PHPCompiler\CompilerVersion;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitRoundModeArg;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\NamedOptionalCallArgs;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -18,9 +18,9 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * LLVM JIT/AOT helper for number_format() (int/float/numeric string, 0–4 args; subset of PHP).
+ * LLVM JIT/AOT helper for number_format() (int/float/numeric string, 0–5 args; subset of PHP).
  *
- * php-src: ext/standard/number_format.c — Z_PARAM_LONG / Z_PARAM_STR
+ * php-src: ext/standard/number_format.c — Z_PARAM_LONG / Z_PARAM_STR / RoundingMode
  */
 final class JitNumberFormat
 {
@@ -29,9 +29,10 @@ final class JitNumberFormat
         $argc = count($args);
         $maxArgs = CompilerVersion::supportsRoundingModeEnum() ? 5 : 4;
         if ($argc < 1 || $argc > $maxArgs) {
-            throw new \LogicException(
-                sprintf('number_format() requires one to %d arguments', $maxArgs)
-            );
+            throw new \LogicException(\sprintf(
+                'number_format() requires one to %d arguments',
+                $maxArgs
+            ));
         }
 
         if ($context->callerStrictTypes) {
