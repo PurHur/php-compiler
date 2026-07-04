@@ -40,12 +40,22 @@ final class EncapsedCoalesceRejectorTest extends TestCase
 
     public function testAllowsEncapsedCoalesceOnPhp84Profile(): void
     {
-        if (!CompilerVersion::supportsEncapsedCoalesce()) {
-            $this->markTestSkipped('reference profile rejects encapsed ??');
-        }
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            if (!CompilerVersion::supportsEncapsedCoalesce()) {
+                $this->markTestSkipped('reference profile rejects encapsed ??');
+            }
 
-        $code = '<?php echo "{$a[\'b\'] ?? 0}";';
-        $this->assertSame($code, EncapsedCoalesceRejector::reject($code, 'test.php'));
+            $code = '<?php echo "{$a[\'b\'] ?? 0}";';
+            $this->assertSame($code, EncapsedCoalesceRejector::reject($code, 'test.php'));
+        } finally {
+            if (false === $prev || '' === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
     }
 
     public function testNoOpWithoutCoalesce(): void

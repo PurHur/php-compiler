@@ -9,6 +9,24 @@ use PHPUnit\Framework\TestCase;
 
 final class EncapsedCoalesceDesugarTest extends TestCase
 {
+    /** @var string|false */
+    private $prevProfile;
+
+    protected function setUp(): void
+    {
+        $this->prevProfile = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+    }
+
+    protected function tearDown(): void
+    {
+        if (false === $this->prevProfile || '' === $this->prevProfile) {
+            putenv('PHP_COMPILER_PROFILE');
+        } else {
+            putenv('PHP_COMPILER_PROFILE='.$this->prevProfile);
+        }
+    }
+
     public function testDesugarsArrayDimCoalesce(): void
     {
         $code = '<?php echo "{$a[\'b\'] ?? 0}";';
