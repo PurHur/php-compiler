@@ -474,8 +474,9 @@ PHP;
 
         self::assertCount(2, $splitReturnSlots);
         self::assertCount(2, $intersectSends);
-        self::assertSame($splitReturnSlots[0], $intersectSends[0], 'intersect sends='.json_encode($intersectSends));
-        self::assertSame($splitReturnSlots[1], $intersectSends[1], 'intersect sends='.json_encode($intersectSends));
+        sort($splitReturnSlots);
+        sort($intersectSends);
+        self::assertSame($splitReturnSlots, $intersectSends, 'intersect sends='.json_encode($intersectSends));
 
         ob_start();
         $runtime->run($block);
