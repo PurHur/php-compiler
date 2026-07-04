@@ -7566,7 +7566,7 @@ class InternalArgInfo
         'str_rot13' => ['string', 'str' => 'string'],
         'strrpos' => ['int', 'haystack' => 'string', 'needle' => 'string', 'offset=' => 'int'],
         'str_shuffle' => ['', 'str' => 'string'],
-        'str_split' => ['string[]', 'str' => 'string', 'split_length=' => 'int'],
+        'str_split' => ['array', 'str' => 'string', 'split_length=' => 'int'],
         'strspn' => ['int', 'str' => 'string', 'mask' => 'string', 'start=' => 'int', 'len=' => 'int'],
         'str_contains' => ['bool', 'haystack' => 'string', 'needle' => 'string'],
         'str_ends_with' => ['bool', 'haystack' => 'string', 'needle' => 'string'],
