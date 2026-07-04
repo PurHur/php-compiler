@@ -32,6 +32,8 @@ ci_run_inventory_checks
 ci_run_bootstrap_vendor_hygiene
 ci_run_bootstrap_test_subset
 ci_report_llvm_status
+echo 'AOT build smoke (AOT_BUILD_SMOKE_GATE=1, #16010)...'
+./script/check-aot-build-smoke.sh
 ci_configure_serve_tests
 
 echo "PHPUnit (fast): VM, compliance, real-world — excluding @group llvm,serve,cgi..."

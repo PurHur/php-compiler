@@ -10,6 +10,8 @@ ci_prepare_test_runtime
 ci_install_deps
 ci_run_inventory_checks
 ci_report_llvm_status
+echo 'AOT build smoke (AOT_BUILD_SMOKE_GATE=1, #16010)...'
+./script/check-aot-build-smoke.sh
 ci_configure_serve_tests
 
 # MiniWebApp #764 ladder only — avoids running the full suite when bisecting (#880).
