@@ -224,6 +224,7 @@ use PHPCompiler\VM\Builtin\ReflectionParameterConstruct;
 use PHPCompiler\VM\Builtin\ReflectionParameterGetAttributes;
 use PHPCompiler\VM\Builtin\ReflectionParameterGetType;
 use PHPCompiler\VM\Builtin\ReflectionParameterGetValue;
+use PHPCompiler\VM\Builtin\ReflectionParameterIsDeprecated;
 use PHPCompiler\VM\Builtin\ReflectionParameterIsSensitive;
 use PHPCompiler\VM\Builtin\ReflectionPropertyConstruct;
 use PHPCompiler\VM\Builtin\ReflectionPropertyGetAsymmetricVisibility;
@@ -237,6 +238,7 @@ use PHPCompiler\VM\Builtin\ReflectionPropertyIsDefaultValueAvailable;
 use PHPCompiler\VM\Builtin\ReflectionPropertyGetMangledName;
 use PHPCompiler\VM\Builtin\ReflectionPropertyGetName;
 use PHPCompiler\VM\Builtin\ReflectionPropertyHasHook;
+use PHPCompiler\VM\Builtin\ReflectionPropertyIsDeprecated;
 use PHPCompiler\VM\Builtin\ReflectionPropertyIsDynamic;
 use PHPCompiler\VM\Builtin\ReflectionPropertyIsVirtual;
 use PHPCompiler\VM\Builtin\ReflectionPropertyGetRawValue;
@@ -522,6 +524,10 @@ final class BuiltinClasses
         $rparam->methodVisibility['getvalue'] = $pub;
         $rparam->methods['issensitive'] = new ReflectionParameterIsSensitive();
         $rparam->methodVisibility['issensitive'] = $pub;
+        if (CompilerVersion::supportsReflectionPropertyParameterIsDeprecated()) {
+            $rparam->methods['isdeprecated'] = new ReflectionParameterIsDeprecated();
+            $rparam->methodVisibility['isdeprecated'] = $pub;
+        }
         $ctx->classes[ReflectionSupport::REFLECTION_PARAMETER] = $rparam;
 
         $rm = new ClassEntry('ReflectionMethod');
@@ -788,6 +794,10 @@ final class BuiltinClasses
         if (CompilerVersion::supportsReflectionPropertyIsDynamic()) {
             $rp->methods['isdynamic'] = new ReflectionPropertyIsDynamic();
             $rp->methodVisibility['isdynamic'] = $pub;
+        }
+        if (CompilerVersion::supportsReflectionPropertyParameterIsDeprecated()) {
+            $rp->methods['isdeprecated'] = new ReflectionPropertyIsDeprecated();
+            $rp->methodVisibility['isdeprecated'] = $pub;
         }
         $ctx->classes[ReflectionSupport::REFLECTION_PROPERTY] = $rp;
 

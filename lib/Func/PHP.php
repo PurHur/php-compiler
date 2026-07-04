@@ -20,6 +20,8 @@ final class PHP extends Func {
     public Block $block;
     /** #[\Deprecated] metadata when declared on this function/method (#3569). */
     public ?DeprecatedMetadata $deprecated = null;
+    /** @var list<\PHPCompiler\Compiler\ParameterMetadata> */
+    public array $parameterMetadata = [];
 
     public function __construct(string $name, Block $block) {
         parent::__construct($name);
