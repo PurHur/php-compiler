@@ -43,13 +43,23 @@ final class FunctionStaticAnonymousClassCompileCheck
      */
     private function walkBlock(CfgBlock $block, ?Op $contextOp): void
     {
-        foreach ($block->children as $child) {
-            if ($child instanceof Op\Terminal\StaticVar) {
-                $this->rejectAnonymousClassStaticInit($child, $contextOp);
+        // CFG sub-blocks include jump targets, so loops form cycles — BFS with
+        // a seen-set like EnumParentCompileCheck::walkCfg (#15884 recursed
+        // unboundedly and exhausted memory linting any looping function).
+        $seen = new \SplObjectStorage();
+        $queue = [$block];
+        while ([] !== $queue) {
+            $current = array_shift($queue);
+            if ($seen->contains($current)) {
+                continue;
             }
-            OpSubBlockAccess::walkSubBlocks($child, function (CfgBlock $sub) use ($contextOp): void {
-                $this->walkBlock($sub, $contextOp);
-            });
+            $seen->attach($current);
+            foreach ($current->children as $child) {
+                if ($child instanceof Op\Terminal\StaticVar) {
+                    $this->rejectAnonymousClassStaticInit($child, $contextOp);
+                }
+                OpSubBlockAccess::enqueueSubBlocks($child, $queue);
+            }
         }
     }
 
