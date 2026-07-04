@@ -4704,6 +4704,17 @@ class JIT {
     }
 
     /** Host-compile emit-helper probe source and cache linked AOT bytes at link time (#2559, #2567, #2618). */
+    /** Probe-only: skip emit-helper link-time sidecars for inventory argv honesty check (#15604). */
+    private function shouldSkipM3InventoryEmitHelperSidecarsForProbe(): bool
+    {
+        if (!$this->shouldUseM3InventoryEmitDriver() || $this->shouldUseEmitHelperLinkStubs()) {
+            return false;
+        }
+        $flag = getenv('PHP_COMPILER_M3_INVENTORY_NO_EMIT_HELPER_SIDECAR');
+
+        return '1' === $flag || 'true' === strtolower((string) $flag);
+    }
+
     /** Default-on fast inventory link: argv driver only needs compiler_minimal-scale sidecars (#1492). */
     private function shouldUseM3InventoryMinimalSidecars(): bool
     {
@@ -4875,6 +4886,11 @@ class JIT {
     private function cacheM3EmitTuTrivialEchoAtLinkTime(): void
     {
         if ($this->m3EmitTuSidecarsCached) {
+            return;
+        }
+        if ($this->shouldSkipM3InventoryEmitHelperSidecarsForProbe()) {
+            $this->m3EmitTuSidecarsCached = true;
+
             return;
         }
         $this->m3EmitTuSidecarsCached = true;
