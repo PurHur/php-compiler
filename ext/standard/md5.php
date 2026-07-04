@@ -28,7 +28,7 @@ final class md5 extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('md5() requires one or two arguments in this compiler build');
         }
-        $data = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'md5', 0, 'string');
+        $data = VmString::coerceTypedStringBuiltinArg($frame->calledArgs[0], 'md5', 0, 'string');
         $raw = false;
         if (2 === $argc) {
             $rawArg = $frame->calledArgs[1]->resolveIndirect();
@@ -60,7 +60,7 @@ final class md5 extends Internal
 
         return JitMd5::digest(
             $context,
-            JitStringBuiltinArg::lower($context, $args[0], 'md5', 0, 'string'),
+            JitStringBuiltinArg::lowerTypedString($context, $args[0], 'md5', 0, 'string'),
             $raw
         );
     }
