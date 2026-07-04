@@ -18078,21 +18078,34 @@ class Compiler {
                 break;
             }
             if (
-                ($child instanceof Op\Expr\ArrowFunction
-                    || $child instanceof Op\Expr\Closure
-                    || $child instanceof Op\Expr\FirstClassCallable)
-                && ($callOp instanceof Op\Expr\FuncCall || $callOp instanceof Op\Expr\NsFuncCall)
+                $child instanceof Op\Expr\ArrowFunction
+                || $child instanceof Op\Expr\Closure
+                || $child instanceof Op\Expr\FirstClassCallable
             ) {
-                $calleeOperand = $callOp instanceof Op\Expr\NsFuncCall
-                    ? ($callOp->nsName ?? null)
-                    : ($callOp->name ?? null);
-                if (
-                    null !== $calleeOperand
-                    && null !== $child->result
-                    && ($calleeOperand === $child->result
-                        || $this->operandsReferToSameVariable($calleeOperand, $child->result))
-                ) {
-                    continue;
+                if ($callOp instanceof Op\Expr\FuncCall || $callOp instanceof Op\Expr\NsFuncCall) {
+                    $calleeOperand = $callOp instanceof Op\Expr\NsFuncCall
+                        ? ($callOp->nsName ?? null)
+                        : ($callOp->name ?? null);
+                    if (
+                        null !== $calleeOperand
+                        && null !== $child->result
+                        && ($calleeOperand === $child->result
+                            || $this->operandsReferToSameVariable($calleeOperand, $child->result))
+                    ) {
+                        continue;
+                    }
+                }
+                // (fn)->bindTo(new C(), …) — inline closure is MethodCall receiver, not arg0 (#15900).
+                if ($callOp instanceof Op\Expr\MethodCall) {
+                    $receiverOperand = $callOp->var ?? null;
+                    if (
+                        null !== $receiverOperand
+                        && null !== $child->result
+                        && ($receiverOperand === $child->result
+                            || $this->operandsReferToSameVariable($receiverOperand, $child->result))
+                    ) {
+                        continue;
+                    }
                 }
             }
             if (

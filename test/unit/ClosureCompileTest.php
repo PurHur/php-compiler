@@ -63,4 +63,22 @@ PHP;
         $rt->run($block);
         $this->assertSame("9\n", ob_get_clean());
     }
+
+    /** Regression: bindTo(new C(), null) must bind inline new object not receiver (#15900). */
+    public function testVmInlineClosureBindToInlineNewObject(): void
+    {
+        $code = <<<'PHP'
+<?php
+declare(strict_types=1);
+class C { public int $x = 1; }
+echo (function (): int { return $this->x; })->bindTo(new C(), null)(), "\n";
+$o = new C();
+echo (function (): int { return $this->x; })->bindTo($o, null)(), "\n";
+PHP;
+        $rt = new PHPCompiler\Runtime();
+        $block = $rt->parseAndCompile($code, 'test.php');
+        ob_start();
+        $rt->run($block);
+        $this->assertSame("1\n1\n", ob_get_clean());
+    }
 }
