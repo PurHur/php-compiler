@@ -32,6 +32,22 @@ final class JitVmHelperLink
             return;
         }
 
+        // Split compilation (#15889): the cached helper TU provides these
+        // symbols as available_externally imports + helpers.o at link time,
+        // skipping the nested PHP lowering below entirely.
+        if (\PHPCompiler\AOT\HelperRuntimeCache::tryProvide($context, $compiledHelpers)) {
+            $missing = false;
+            foreach ($compiledHelpers as $logical) {
+                if (!isset($context->functions[\strtolower($logical)])) {
+                    $missing = true;
+                    break;
+                }
+            }
+            if (!$missing) {
+                return;
+            }
+        }
+
         $runtime = $context->runtime;
         $path = self::resolveHelperPath($relativeHelperPath);
         $basename = \basename($path);
