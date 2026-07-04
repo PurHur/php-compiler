@@ -45,10 +45,17 @@ final class DomDocumentVMTest extends BaseTest
             __DIR__.'/cases/stdlib/dom_namespace_attributes.phpt',
             'dom_namespace_attributes.phpt'
         );
-        yield 'dom_node_is_equal_node.phpt' => self::parsePHPT(
-            __DIR__.'/cases/stdlib/dom_node_is_equal_node.phpt',
-            'dom_node_is_equal_node.phpt'
-        );
+        if (CompilerVersion::supportsDomNodeIsEqualNode()) {
+            yield 'dom_node_is_equal_node.phpt' => self::parsePHPT(
+                __DIR__.'/cases/stdlib/dom_node_is_equal_node.phpt',
+                'dom_node_is_equal_node.phpt'
+            );
+        } else {
+            yield 'php84_dom_node_is_equal_node_phantom.phpt' => self::parsePHPT(
+                __DIR__.'/cases/stdlib/php84_dom_node_is_equal_node_phantom.phpt',
+                'php84_dom_node_is_equal_node_phantom.phpt'
+            );
+        }
         yield 'dom_create_attribute_ns.phpt' => self::parsePHPT(
             __DIR__.'/cases/stdlib/dom_create_attribute_ns.phpt',
             'dom_create_attribute_ns.phpt'

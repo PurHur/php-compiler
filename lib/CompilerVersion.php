@@ -1024,6 +1024,17 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.4+ DOMNode::isEqualNode() (ext/dom/node.c, #15195, #14599).
+     *
+     * Gated on stable 8.4.0 / PHP_COMPILER_PROFILE=8.4 so 8.4.0-dev reference profile
+     * matches Zend 8.2 phantom gate.
+     */
+    public static function supportsDomNodeIsEqualNode(): bool
+    {
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+    }
+
+    /**
      * PHP 8.4+ DOMElement::insertAdjacentHTML() (ext/dom/dom_element.c, #16128).
      *
      * Gated on stable 8.4.0 / PHP_COMPILER_PROFILE=8.4 so 8.4.0-dev reference profile
