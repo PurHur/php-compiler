@@ -17003,6 +17003,28 @@ class Compiler {
                     continue;
                 }
             }
+            // var_export((int) E::A) — ClassConstFetch prelude feeds Cast, not the call arg (#9479, #15982).
+            if ($producer instanceof Op\Expr\ClassConstFetch) {
+                $next = $producers[$i + 1] ?? null;
+                if (
+                    $next instanceof Op\Expr\Cast
+                    && property_exists($next, 'expr')
+                    && $this->operandsReferToSameVariable($next->expr, $producer->result)
+                ) {
+                    continue;
+                }
+            }
+            // f((int) SOME_CONST) — ConstFetch prelude feeds Cast, not the call arg (#10143).
+            if ($producer instanceof Op\Expr\ConstFetch) {
+                $next = $producers[$i + 1] ?? null;
+                if (
+                    $next instanceof Op\Expr\Cast
+                    && property_exists($next, 'expr')
+                    && $this->operandsReferToSameVariable($next->expr, $producer->result)
+                ) {
+                    continue;
+                }
+            }
             // array_intersect(str_split(str_repeat(...)), ...) — inner g() unary hoisted arg (#15488).
             if ($producer instanceof Op\Expr\FuncCall || $producer instanceof Op\Expr\NsFuncCall) {
                 $next = $producers[$i + 1] ?? null;
@@ -18733,6 +18755,17 @@ class Compiler {
                     $child instanceof Op\Expr\ConstFetch
                     && ($next instanceof Op\Expr\UnaryMinus || $next instanceof Op\Expr\UnaryPlus)
                     && $next->expr === $child->result
+                ) {
+                    continue;
+                }
+                // var_export((int) E::A) — ClassConstFetch prelude feeds sibling Cast, not call arg (#9479, #15982).
+                if (
+                    $next instanceof Op\Expr\Cast
+                    && property_exists($next, 'expr')
+                    && (
+                        $next->expr === $child->result
+                        || $this->operandsReferToSameVariable($next->expr, $child->result)
+                    )
                 ) {
                     continue;
                 }
