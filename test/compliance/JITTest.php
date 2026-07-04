@@ -421,7 +421,12 @@ class JITTest extends BaseTest {
                 && !str_contains($name, 'grapheme_phantom')) {
                 continue;
             }
-            // locale_get_default()/Locale: VM-first (#9576); JIT lowering deferred.
+            if (!\PHPCompiler\ext\intl\IntlExtensionPolicy::advertisesLocale()
+                && str_contains($name, 'locale_get_default')
+                && !str_contains($name, 'locale_gated')) {
+                continue;
+            }
+            // locale_get_default()/Locale: JIT lowering deferred when ext/intl loaded (#9576).
             if (str_contains($name, 'locale_get_default')) {
                 continue;
             }
