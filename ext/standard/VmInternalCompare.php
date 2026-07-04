@@ -344,12 +344,12 @@ final class VmInternalCompare
     }
 
     /** Compare array values for asort/arsort packed lists with SORT_NUMERIC (php-src). */
-    public static function compareValuesForSortFlags(Variable $a, Variable $b, int $flags): int
+    public static function compareValuesForSortFlags(Variable $a, Variable $b, int $flags, bool $descending = false): int
     {
         $caseFlag = $flags & StdlibConstants::SORT_FLAG_CASE;
         $sortType = $flags & ~StdlibConstants::SORT_FLAG_CASE;
         if (StdlibConstants::SORT_NUMERIC === $sortType) {
-            return self::compareNumericOperandsForSort($a, $b);
+            return self::compareNumericOperandsForSort($a, $b, $descending);
         }
         if (StdlibConstants::SORT_LOCALE_STRING === $sortType) {
             return self::invoke(
@@ -369,7 +369,7 @@ final class VmInternalCompare
             );
         }
         if (StdlibConstants::SORT_REGULAR === $sortType) {
-            return self::compareRegularOperands($a, $b, 0 !== $caseFlag);
+            return self::compareRegularOperands($a, $b, 0 !== $caseFlag, $descending);
         }
 
         return self::compareValuesForSort($a, $b);
@@ -378,7 +378,7 @@ final class VmInternalCompare
     /**
      * php-src zend_compare for SORT_REGULAR — numeric strings compare numerically (#13028).
      */
-    public static function compareRegularOperands(Variable $a, Variable $b, bool $caseInsensitive = false): int
+    public static function compareRegularOperands(Variable $a, Variable $b, bool $caseInsensitive = false, bool $descending = false): int
     {
         $a = $a->resolveIndirect();
         $b = $b->resolveIndirect();
@@ -386,26 +386,66 @@ final class VmInternalCompare
             $as = $a->toString();
             $bs = $b->toString();
             if ('' !== $as && '' !== $bs && \is_numeric($as) && \is_numeric($bs)) {
-                return self::compareNumericOperandsForSort($a, $b);
+                return self::compareNumericOperandsForSort($a, $b, $descending);
             }
             $cmp = $caseInsensitive ? strcasecmp($as, $bs) : strcmp($as, $bs);
 
             return $cmp < 0 ? -1 : ($cmp > 0 ? 1 : 0);
+        }
+        if (
+            (Variable::TYPE_INTEGER === $a->type || Variable::TYPE_FLOAT === $a->type)
+            && (Variable::TYPE_INTEGER === $b->type || Variable::TYPE_FLOAT === $b->type)
+        ) {
+            return self::compareNumericOperandsForSort($a, $b, $descending);
         }
 
         return Variable::compareSpaceship($a, $b);
     }
 
     /** php-src zend_compare numeric sort — non-numeric strings compare as 0. */
-    private static function compareNumericOperandsForSort(Variable $a, Variable $b): int
+    private static function compareNumericOperandsForSort(Variable $a, Variable $b, bool $descending = false): int
     {
-        $av = self::numericSortScalar($a);
-        $bv = self::numericSortScalar($b);
-        if (\is_float($av) || \is_float($bv)) {
-            return (float) $av <=> (float) $bv;
+        return self::compareNumericScalarsForSort(
+            self::numericSortScalar($a),
+            self::numericSortScalar($b),
+            $descending
+        );
+    }
+
+    /**
+     * php-src array sort NaN branch — NaN compares less than finite numbers (#10144, ext/standard/array.c).
+     * Differs from {@see Variable::spaceshipNumeric()} (<=> always returns 1 when NaN is involved).
+     * Descending sort keeps NaN slots stable (spaceship-style +1 when NaN is involved).
+     *
+     * @param int|float $left
+     * @param int|float $right
+     */
+    public static function compareNumericScalarsForSort(int|float $left, int|float $right, bool $descending = false): int
+    {
+        if (\is_float($left) && \is_nan($left)) {
+            if (\is_float($right) && \is_nan($right)) {
+                return 0;
+            }
+
+            return $descending ? 1 : -1;
+        }
+        if (\is_float($right) && \is_nan($right)) {
+            return 1;
+        }
+        if (\is_float($left) || \is_float($right)) {
+            $lf = (float) $left;
+            $rf = (float) $right;
+            if ($lf < $rf) {
+                return -1;
+            }
+            if ($lf > $rf) {
+                return 1;
+            }
+
+            return 0;
         }
 
-        return (int) $av <=> (int) $bv;
+        return (int) $left <=> (int) $right;
     }
 
     private static function numericSortScalar(Variable $value): int|float
@@ -539,7 +579,7 @@ final class VmInternalCompare
         for ($i = 1; $i < $n; ++$i) {
             $j = $i;
             while ($j > 0) {
-                $cmp = self::compareValuesForSortFlags($values[$j - 1], $values[$j], $flags);
+                $cmp = self::compareValuesForSortFlags($values[$j - 1], $values[$j], $flags, true);
                 if ($cmp >= 0) {
                     break;
                 }
@@ -834,7 +874,7 @@ final class VmInternalCompare
         for ($i = 1; $i < $n; ++$i) {
             $j = $i;
             while ($j > 0) {
-                $cmp = self::compareValuesForSortFlags($pairs[$j - 1][1], $pairs[$j][1], $flags);
+                $cmp = self::compareValuesForSortFlags($pairs[$j - 1][1], $pairs[$j][1], $flags, true);
                 if ($cmp >= 0) {
                     break;
                 }
