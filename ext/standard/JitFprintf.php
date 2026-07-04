@@ -6,7 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
-use PHPCompiler\JIT\JitStringArg;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -26,7 +26,7 @@ final class JitFprintf
             JitLongArg::lower($context, $args[0], 'fprintf() stream'),
             $i64
         );
-        $fmt = JitStringArg::lower($context, $args[1], 'fprintf() format');
+        $fmt = JitStringBuiltinArg::lowerRequiredString($context, $args[1], 'fprintf', 1, 'format');
         $numArgs = $argc - 2;
         if (0 === $numArgs) {
             $formatted = $context->builder->call(

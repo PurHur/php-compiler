@@ -25,6 +25,15 @@ final class VmSettype
         TypedPropertyCheck::assertWritableByReference($slot);
         $type = strtolower($typeName);
         $value = $slot->resolveIndirect();
+        if ('string' === $type && VmScalarType::isEnumCaseVariable($value)) {
+            $className = EnumCaseSupport::typeNameForVariable($value);
+            $empty = new Variable();
+            $empty->string('');
+            self::assignSettypeResult($slot, $empty, $type, $frame);
+            throw new \Error(
+                'Object of class '.$className.' could not be converted to string'
+            );
+        }
         $result = new Variable();
 
         switch ($type) {

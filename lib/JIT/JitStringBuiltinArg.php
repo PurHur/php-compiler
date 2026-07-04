@@ -375,7 +375,17 @@ final class JitStringBuiltinArg
         $objectTy = $i8->constInt(Variable::TYPE_OBJECT & 0x7f, false);
         $enumCaseTy = $i8->constInt(VmVariable::TYPE_ENUM_CASE, false);
         $stringTy = $i8->constInt(VmVariable::TYPE_STRING, false);
+        $nullTy = $i8->constInt(VmVariable::TYPE_NULL, false);
 
+        $nullBlock = BasicBlockHelper::append($context, 'str_req_null');
+        $afterNull = BasicBlockHelper::append($context, 'str_req_after_null');
+        $isNull = $context->builder->icmp(Builder::INT_EQ, $typeKind, $nullTy);
+        $context->builder->branchIf($isNull, $nullBlock, $afterNull);
+
+        $context->builder->positionAtEnd($nullBlock);
+        self::emitTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'null');
+
+        $context->builder->positionAtEnd($afterNull);
         $arrayBlock = BasicBlockHelper::append($context, 'str_req_array');
         $rejectBlock = BasicBlockHelper::append($context, 'str_req_reject');
         $stringBlock = BasicBlockHelper::append($context, 'str_req_string');
@@ -417,7 +427,17 @@ final class JitStringBuiltinArg
 
         $context->builder->positionAtEnd($scalarBlock);
         $isString = $context->builder->icmp(Builder::INT_EQ, $typeKind, $stringTy);
-        $context->builder->branchIf($isString, $stringBlock, $rejectBlock);
+        $scalarErrBlock = BasicBlockHelper::append($context, 'str_req_scalar_err');
+        $context->builder->branchIf($isString, $stringBlock, $scalarErrBlock);
+
+        $context->builder->positionAtEnd($scalarErrBlock);
+        self::emitRuntimeBoxedNonStringScalarReject(
+            $context,
+            $typeKind,
+            $function,
+            $argIndex,
+            $paramName
+        );
 
         $context->builder->positionAtEnd($stringBlock);
 
@@ -590,6 +610,49 @@ final class JitStringBuiltinArg
         self::emitRuntimeBoxedEnumCaseReject($context, $valuePtr, 'strlen', 0, 'string', 'string');
         $context->builder->positionAtEnd($objectRejectBlock);
         self::emitRuntimeBoxedObjectReject($context, $valuePtr, 'strlen', 0, 'string', 'string');
+    }
+
+    private static function emitRuntimeBoxedNonStringScalarReject(
+        Context $context,
+        Value $typeKind,
+        string $function,
+        int $argIndex,
+        string $paramName
+    ): void {
+        $i8 = $context->getTypeFromString('int8');
+        $longTy = $i8->constInt(VmVariable::TYPE_NATIVE_LONG, false);
+        $doubleTy = $i8->constInt(VmVariable::TYPE_NATIVE_DOUBLE, false);
+        $boolTy = $i8->constInt(VmVariable::TYPE_NATIVE_BOOL, false);
+
+        $intErrBlock = BasicBlockHelper::append($context, 'str_req_scalar_int');
+        $afterInt = BasicBlockHelper::append($context, 'str_req_after_int');
+        $floatErrBlock = BasicBlockHelper::append($context, 'str_req_scalar_float');
+        $afterFloat = BasicBlockHelper::append($context, 'str_req_after_float');
+        $boolErrBlock = BasicBlockHelper::append($context, 'str_req_scalar_bool');
+        $mixedErrBlock = BasicBlockHelper::append($context, 'str_req_scalar_mixed');
+
+        $isInt = $context->builder->icmp(Builder::INT_EQ, $typeKind, $longTy);
+        $context->builder->branchIf($isInt, $intErrBlock, $afterInt);
+
+        $context->builder->positionAtEnd($intErrBlock);
+        self::emitTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'int');
+
+        $context->builder->positionAtEnd($afterInt);
+        $isFloat = $context->builder->icmp(Builder::INT_EQ, $typeKind, $doubleTy);
+        $context->builder->branchIf($isFloat, $floatErrBlock, $afterFloat);
+
+        $context->builder->positionAtEnd($floatErrBlock);
+        self::emitTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'float');
+
+        $context->builder->positionAtEnd($afterFloat);
+        $isBool = $context->builder->icmp(Builder::INT_EQ, $typeKind, $boolTy);
+        $context->builder->branchIf($isBool, $boolErrBlock, $mixedErrBlock);
+
+        $context->builder->positionAtEnd($boolErrBlock);
+        self::emitTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'bool');
+
+        $context->builder->positionAtEnd($mixedErrBlock);
+        self::emitTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'mixed');
     }
 
     private static function emitRuntimeBoxedObjectReject(

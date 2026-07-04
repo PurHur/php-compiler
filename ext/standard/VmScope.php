@@ -106,11 +106,7 @@ final class VmScope
 
                 return 0;
             }
-            $prefixArg = $frame->calledArgs[2]->resolveIndirect();
-            if (Variable::TYPE_STRING !== $prefixArg->type) {
-                throw new \LogicException('extract() prefix must be a string in this compiler build');
-            }
-            $prefix = $prefixArg->toString();
+            $prefix = VmString::requireStringBuiltinArg($frame->calledArgs[2], 'extract', 2, 'prefix');
             if ('' !== $prefix && !self::isValidVarName($prefix)) {
                 self::extractWarning($frame, 'prefix is not a valid identifier');
 
