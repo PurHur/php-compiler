@@ -16927,6 +16927,26 @@ class Compiler {
         if (0 !== $argIndex || null === $cfgCallOp) {
             return null;
         }
+        $callee = $this->resolveInlineCallArgFuncName($cfgCallOp, $calleeName);
+        if (
+            null !== $callee
+            && !\in_array(
+                $callee,
+                [
+                    'array_merge',
+                    'array_merge_recursive',
+                    'array_replace',
+                    'array_replace_recursive',
+                    'array_diff',
+                    'array_intersect',
+                    'array_diff_key',
+                    'array_intersect_key',
+                ],
+                true
+            )
+        ) {
+            return null;
+        }
         $cfgChildren = $this->inlineCallArgProducerCfgChildren($block);
         if ([] === $cfgChildren && null !== $block->orig) {
             $cfgChildren = $block->orig->children;
@@ -16956,7 +16976,10 @@ class Compiler {
         for ($i = $callIndex - 1; $i >= 0; --$i) {
             $child = $cfgChildren[$i] ?? null;
             if ($child instanceof Op\Expr\Array_) {
-                // array_column([(object)[...], ...], 'col') — Cast preludes feed array elements, not arg #0 (#11236).
+                if ($i === $callIndex - 1) {
+                    // array_merge((object)[...], [...]) — stmt-before Array_ is arg #1; scan for Cast (#15858).
+                    continue;
+                }
                 break;
             }
             if (!$child instanceof Op\Expr\Cast) {
