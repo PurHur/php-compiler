@@ -21520,6 +21520,15 @@ class Compiler {
                         || null === $firstSiblingAdjacent
                         || $producerIndex <= $firstSiblingAdjacent
                     )
+                    && (
+                        null === $firstSiblingAdjacent
+                        || $producerIndex === $firstSiblingAdjacent
+                        || $this->countSiblingInlineFuncCallProducers(
+                            $firstSiblingAdjacent,
+                            $consumerIndex,
+                            $cfgChildren
+                        ) < 2
+                    )
                 ) {
                     return $leadingEmbedded;
                 }
@@ -23082,7 +23091,8 @@ class Compiler {
      */
     private function execReturnOrdinalBaseBeforeSiblingInlineFuncCallChain(
         int $firstSibling,
-        array $cfgChildren
+        array $cfgChildren,
+        ?int $consumerIndex = null
     ): int {
         $base = 0;
         for ($j = 0; $j < $firstSibling; ++$j) {
@@ -23095,6 +23105,16 @@ class Compiler {
                 continue;
             }
             if ($child instanceof Op\Expr\FuncCall || $child instanceof Op\Expr\NsFuncCall) {
+                if (
+                    null !== $consumerIndex
+                    && $this->statementLevelFuncCallBeforeHoistedSiblingChain(
+                        $j,
+                        $consumerIndex,
+                        $cfgChildren
+                    )
+                ) {
+                    continue;
+                }
                 ++$base;
                 continue;
             }
@@ -23165,7 +23185,8 @@ class Compiler {
             );
             $execOrdinal = $this->execReturnOrdinalBaseBeforeSiblingInlineFuncCallChain(
                 $firstSibling,
-                $cfgChildren
+                $cfgChildren,
+                $consumerIndex
             ) + $siblingOrdinal;
 
             return $this->slotForSiblingInlineFuncCallProducerExecReturnOrdinal($block, $execOrdinal);
@@ -23231,7 +23252,8 @@ class Compiler {
         );
         $execOrdinal = $this->execReturnOrdinalBaseBeforeSiblingInlineFuncCallChain(
             $firstSibling,
-            $cfgChildren
+            $cfgChildren,
+            $consumerIndex
         ) + $producerOrdinal;
 
         return $this->slotForSiblingInlineFuncCallProducerExecReturnOrdinal($block, $execOrdinal);
