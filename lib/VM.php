@@ -925,6 +925,7 @@ class VM {
         Variable $value,
         Frame $frame
     ): void {
+        $this->assertReadonlyPropertyWriteAllowedForReflection($object, $instanceName, $frame);
         $setLc = $meta?->setHookMethodLc
             ?? strtolower(SourcePreprocessor\PropertyHooks::setHookMethodName($instanceName));
         if (isset($object->class->methods[$setLc])) {
@@ -10821,6 +10822,50 @@ restart:
         $this->raiseUncaughtException($thrown);
 
         return null;
+    }
+
+    /**
+     * ReflectionProperty::setValue on instance props — same readonly guard as ordinary writes (#15749, php_reflection.c).
+     *
+     * @throws \Error
+     */
+    private function assertReadonlyPropertyWriteAllowedForReflection(
+        ObjectEntry $object,
+        string $propName,
+        Frame $frame
+    ): void {
+        if (VM\ObjectReadonlySupport::isDynamicReadonly($object)) {
+            throw new \Error(VM\ObjectReadonlySupport::modifyObjectMessage($object));
+        }
+        $declaringClass = $this->readonlyPropertyDeclaringClass($object, $propName);
+        if (null === $declaringClass) {
+            return;
+        }
+        if (!$object->constructed) {
+            $declaringClassLc = $this->readonlyPropertyDeclaringClassLc($object, $propName);
+            $callerClassLc = $this->callerClassLc($frame);
+            if (null !== $declaringClassLc && null !== $callerClassLc && $callerClassLc !== $declaringClassLc) {
+                throw new \Error(\sprintf(
+                    'Cannot initialize readonly property %s::$%s from %s',
+                    $declaringClass,
+                    $propName,
+                    $this->propertyWriteScopeLabel($frame)
+                ));
+            }
+            if ($object->hasProperty($propName)) {
+                $slot = $object->getProperty($propName);
+                if (!VM\TypedPropertyCheck::isUninitialized($slot)) {
+                    throw new \Error($this->readonlyPropertyWriteErrorMessage($object, $propName, $declaringClass, $frame));
+                }
+            }
+
+            return;
+        }
+        if (VM\CloneWithSupport::consumeReinit($object, $propName)) {
+            return;
+        }
+
+        throw new \Error($this->readonlyPropertyWriteErrorMessage($object, $propName, $declaringClass, $frame));
     }
 
     /** Reject readonly property writes; returns catch frame or throws when uncaught. */
