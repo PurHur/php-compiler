@@ -21355,7 +21355,8 @@ class Compiler {
             return 0;
         }
         if ($this->firstSiblingInlineFuncCallProducerIndexActive) {
-            $firstSiblingWhileActive = $this->firstSiblingInlineFuncCallProducerIndexImpl($consumerIndex, $cfgChildren);
+            // Reentrant siblingMultiArg during firstSibling scan — must not recurse into impl (#16012).
+            $firstSiblingWhileActive = $this->scanFirstSiblingInlineFuncCallProducerIndex($consumerIndex, $cfgChildren);
             if (null !== $firstSiblingWhileActive && $producerIndex >= $firstSiblingWhileActive && $producerIndex < $consumerIndex) {
                 $ordinalWhileActive = $this->siblingFuncCallChainHasArrayPrelude(
                     $firstSiblingWhileActive,
@@ -21386,6 +21387,22 @@ class Compiler {
                             ++$funcArgIndex;
                         }
                     }
+                }
+                if (
+                    ($consumer instanceof Op\Expr\FuncCall || $consumer instanceof Op\Expr\NsFuncCall)
+                    && property_exists($consumer, 'args')
+                    && \is_array($consumer->args)
+                ) {
+                    $leadingEmbeddedWhileActive = 0;
+                    foreach ($consumer->args as $arg) {
+                        if ($this->isEmbeddedCallLiteralArg($arg)) {
+                            ++$leadingEmbeddedWhileActive;
+                            continue;
+                        }
+                        break;
+                    }
+
+                    return $leadingEmbeddedWhileActive + $ordinalWhileActive;
                 }
             }
 
@@ -21844,6 +21861,75 @@ class Compiler {
         }
 
         return true;
+    }
+
+    /**
+     * Non-recursive first-sibling scan for reentrant siblingMultiArg wiring (#16012).
+     *
+     * @param list<Op> $cfgChildren
+     */
+    private function scanFirstSiblingInlineFuncCallProducerIndex(int $consumerIndex, array $cfgChildren): ?int
+    {
+        $i = $consumerIndex - 1;
+        while ($i >= 0) {
+            $child = $cfgChildren[$i] ?? null;
+            if ($this->isSiblingInlineCallProducerExpr($child)) {
+                return $i;
+            }
+            if ($child instanceof Op\Expr\ConstFetch || $child instanceof Op\Expr\ClassConstFetch) {
+                --$i;
+                continue;
+            }
+            if ($child instanceof Op\Expr\Array_) {
+                --$i;
+                continue;
+            }
+            if ($this->isUnaryInlineSiblingCallArgExpr($child)) {
+                --$i;
+                continue;
+            }
+            if ($child instanceof Op\Expr\ArrowFunction
+                || $child instanceof Op\Expr\Closure
+                || $child instanceof Op\Expr\FirstClassCallable) {
+                --$i;
+                continue;
+            }
+            if ($child instanceof Op\Expr\New_ || $child instanceof Op\Expr\Clone_) {
+                --$i;
+                continue;
+            }
+            if ($child instanceof Op\Expr\Isset_ || $child instanceof Op\Expr\Empty_) {
+                --$i;
+                continue;
+            }
+            if (
+                $child instanceof Op\Expr\PropertyFetch
+                && $this->isPropertyFetchOnlyIssetVar($child, $cfgChildren[$i + 1] ?? null)
+            ) {
+                --$i;
+                continue;
+            }
+            if (
+                $child instanceof Op\Expr\ArrayDimFetch
+                && $this->isArrayDimFetchOnlyIssetVar($child, $cfgChildren[$i + 1] ?? null)
+            ) {
+                --$i;
+                continue;
+            }
+            if (
+                $child instanceof Op\Expr\StaticPropertyFetch
+                && $this->isStaticPropertyFetchOnlyIssetVar($child, $cfgChildren[$i + 1] ?? null)
+            ) {
+                --$i;
+                continue;
+            }
+            if ($child instanceof Op\Expr\Assign || $child instanceof Op\Expr\AssignRef) {
+                break;
+            }
+            break;
+        }
+
+        return null;
     }
 
     /**
