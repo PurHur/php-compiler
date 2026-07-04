@@ -4470,10 +4470,12 @@ PHP;
         $constSlot = null;
         $sunriseSends = [];
         $fcallOrdinal = 0;
+        $lastInitOrdinal = 0;
         foreach ($block->opCodes as $op) {
             if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
                 ++$fcallOrdinal;
-                if (2 === $fcallOrdinal) {
+                $lastInitOrdinal = $fcallOrdinal;
+                if ($lastInitOrdinal > 1) {
                     $sunriseSends = [];
                 }
             }
@@ -4483,7 +4485,7 @@ PHP;
             if (OpCode::TYPE_CONST_FETCH === $op->type && null === $constSlot) {
                 $constSlot = $op->arg1;
             }
-            if (2 === $fcallOrdinal && OpCode::TYPE_ARG_SEND === $op->type) {
+            if ($fcallOrdinal === $lastInitOrdinal && $lastInitOrdinal > 1 && OpCode::TYPE_ARG_SEND === $op->type) {
                 $sunriseSends[] = $op->arg1;
             }
         }
