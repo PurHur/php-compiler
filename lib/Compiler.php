@@ -29460,7 +29460,7 @@ class Compiler {
                 $inlineArray = null;
             }
             $arrayCombineNestedFuncArg = false;
-            if (null !== $cfgCallOp && 'array_combine' === $this->resolveCfgFuncCallName($cfgCallOp)) {
+            if (null !== $cfgCallOp && 'array_combine' === $this->resolveCfgFuncCallName($cfgCallOp) && null !== $block->orig) {
                 $combineProducers = $this->precedingInlineCallArgProducersBeforeCfgOp(
                     $block->orig->children,
                     $cfgCallOp
@@ -29473,7 +29473,7 @@ class Compiler {
                     || $combineMatch instanceof Op\Expr\NsFuncCall
                 ) {
                     // array_combine(array_keys(...), [...]) — arg #0 is nested FuncCall, not inner haystack Array_ (#15558, #16097).
-                    $inlineArray = null;
+                    $inlineArray = $combineMatch;
                     $arrayCombineNestedFuncArg = true;
                 }
             }
@@ -29660,13 +29660,30 @@ class Compiler {
                     || $inlineArray instanceof Op\Expr\NsFuncCall
                 )
             ) {
-                // array_combine(array_keys(...), [...]) — sibling FuncCall, not Array_ literal (#15558).
+                // array_combine(array_keys(...), [...]) — sibling FuncCall, not Array_ literal (#15558, #16097).
                 if (null === $block->slotForOperand($inlineArray->result)) {
                     foreach ($this->compileExpr($inlineArray, $block) as $op) {
                         $sends[] = $op;
                     }
                 }
-                $valueSlot = $this->compileOperand($inlineArray->result, $block, true);
+                $funcOrdinal = 0;
+                if (null !== $cfgCallOp && null !== $block->orig) {
+                    foreach ($this->precedingInlineCallArgProducersBeforeCfgOp(
+                        $block->orig->children,
+                        $cfgCallOp
+                    ) as $producer) {
+                        if ($producer === $inlineArray) {
+                            break;
+                        }
+                        if ($producer instanceof Op\Expr\FuncCall || $producer instanceof Op\Expr\NsFuncCall) {
+                            ++$funcOrdinal;
+                        }
+                    }
+                }
+                $valueSlot = $this->slotForFuncCallExecReturnOrdinal($block, $funcOrdinal, $sends);
+                if (null === $valueSlot) {
+                    $valueSlot = $this->compileOperand($inlineArray->result, $block, true);
+                }
             } elseif (null !== $inlineArray) {
                 $callArgProbeForArray = ($cfgCallOp->args[(int) $argIndex] ?? null) ?? $callArgOperand;
                 $existingArraySlot = null;
@@ -32635,8 +32652,10 @@ class Compiler {
             if (null !== $execSlot) {
                 return $execSlot;
             }
-            foreach ($this->compileExpr($matched, $block) as $op) {
-                $sends[] = $op;
+            if (null === $block->slotForOperand($matched->result)) {
+                foreach ($this->compileExpr($matched, $block) as $op) {
+                    $sends[] = $op;
+                }
             }
             $execSlot = $this->slotForFuncCallExecReturnOrdinal($block, $funcOrdinal, $sends);
             if (null !== $execSlot) {
@@ -34220,6 +34239,17 @@ class Compiler {
         $calleeLower = strtolower($calleeName ?? $this->resolveCfgFuncCallName($cfgCallOp) ?? '');
         if ('array_combine' !== $calleeLower) {
             return;
+        }
+        if (null !== $block->orig) {
+            foreach ($this->precedingInlineCallArgProducersBeforeCfgOp(
+                $block->orig->children,
+                $cfgCallOp
+            ) as $producer) {
+                if ($producer instanceof Op\Expr\FuncCall || $producer instanceof Op\Expr\NsFuncCall) {
+                    // array_combine(array_keys(...), [...]) — nested FuncCall feeds arg #0 (#16097).
+                    return;
+                }
+            }
         }
         foreach ($cfgCallOp->args as $callArg) {
             if (
