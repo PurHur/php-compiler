@@ -285,6 +285,7 @@ require_once __DIR__.'/../../../ext/intl/grapheme_extract.php';
 require_once __DIR__.'/../../../ext/intl/grapheme_levenshtein.php';
 require_once __DIR__.'/../../../ext/intl/grapheme_str_contains.php';
 require_once __DIR__.'/../../../ext/intl/grapheme_str_split.php';
+require_once __DIR__.'/../../../ext/intl/grapheme_strimwidth.php';
 require_once __DIR__.'/../../../ext/intl/grapheme_stripos.php';
 require_once __DIR__.'/../../../ext/intl/grapheme_stristr.php';
 require_once __DIR__.'/../../../ext/intl/grapheme_strlen.php';

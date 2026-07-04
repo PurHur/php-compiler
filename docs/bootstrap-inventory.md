@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3994 |
-| Phase A inventory files (M2 ratio SSOT) | 3994 |
+| PHP files on vm.php path | 3995 |
+| Phase A inventory files (M2 ratio SSOT) | 3995 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 10786 |
+| Source constructs flagged (warnings) | 10790 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -262,13 +262,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/IntlDateFormatterCreate.php` | 0 | 1 |
 | `ext/intl/IntlExtensionPolicy.php` | 0 | 1 |
 | `ext/intl/JitGrapheme.php` | 0 | 2 |
-| `ext/intl/Module.php` | 0 | 14 |
+| `ext/intl/Module.php` | 0 | 15 |
 | `ext/intl/UnicodeCanonical.php` | 0 | 1 |
 | `ext/intl/VmGrapheme.php` | 0 | 1 |
 | `ext/intl/grapheme_extract.php` | 0 | 2 |
 | `ext/intl/grapheme_levenshtein.php` | 0 | 2 |
 | `ext/intl/grapheme_str_contains.php` | 0 | 2 |
 | `ext/intl/grapheme_str_split.php` | 0 | 4 |
+| `ext/intl/grapheme_strimwidth.php` | 0 | 3 |
 | `ext/intl/grapheme_stripos.php` | 0 | 4 |
 | `ext/intl/grapheme_stristr.php` | 0 | 4 |
 | `ext/intl/grapheme_strlen.php` | 0 | 2 |
@@ -5582,19 +5583,20 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/intl/Module.php`
 
 **Warnings** (review for bootstrap subset):
-- new VM\Variable (line 37)
-- new grapheme_strlen (line 50)
-- new grapheme_substr (line 51)
-- new grapheme_strpos (line 52)
-- new grapheme_str_contains (line 53)
-- new grapheme_strstr (line 54)
-- new grapheme_stristr (line 55)
-- new grapheme_stripos (line 56)
-- new grapheme_strrpos (line 57)
-- new grapheme_extract (line 58)
-- new grapheme_levenshtein (line 59)
-- new grapheme_str_split (line 60)
-- new intl_get_error_code (line 61)
+- new VM\Variable (line 38)
+- new grapheme_strlen (line 51)
+- new grapheme_substr (line 52)
+- new grapheme_strpos (line 53)
+- new grapheme_str_contains (line 54)
+- new grapheme_strstr (line 55)
+- new grapheme_stristr (line 56)
+- new grapheme_stripos (line 57)
+- new grapheme_strrpos (line 58)
+- new grapheme_extract (line 59)
+- new grapheme_levenshtein (line 60)
+- new grapheme_str_split (line 61)
+- new grapheme_strimwidth (line 62)
+- new intl_get_error_code (line 63)
 - 3 class method(s)
 
 ### `ext/intl/UnicodeCanonical.php`
@@ -5605,7 +5607,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/intl/VmGrapheme.php`
 
 **Warnings** (review for bootstrap subset):
-- 30 class method(s)
+- 34 class method(s)
 
 ### `ext/intl/grapheme_extract.php`
 
@@ -5632,6 +5634,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 64)
 - 2 class method(s)
 - 2 closure(s)
+
+### `ext/intl/grapheme_strimwidth.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 31)
+- 2 class method(s)
+- 1 closure(s)
 
 ### `ext/intl/grapheme_stripos.php`
 
@@ -20863,33 +20872,33 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Operand\Temporary (line 27449)
 - new Operand\Temporary (line 27481)
 - new Operand\Temporary (line 27569)
-- new OpCode (line 27925)
-- new OpCode (line 28334)
-- new OpCode (line 28637)
-- new OpCode (line 28838)
-- new OpCode (line 28848)
-- new OpCode (line 28851)
-- new Operand\Temporary (line 28888)
-- new OpCode (line 28890)
-- new OpCode (line 28901)
-- new Operand\Temporary (line 28904)
-- new OpCode (line 28906)
-- new OpCode (line 28914)
+- new OpCode (line 27932)
+- new OpCode (line 28341)
+- new OpCode (line 28644)
+- new OpCode (line 28845)
+- new OpCode (line 28855)
+- new OpCode (line 28858)
+- new Operand\Temporary (line 28895)
+- new OpCode (line 28897)
+- new OpCode (line 28908)
+- new Operand\Temporary (line 28911)
+- new OpCode (line 28913)
 - new OpCode (line 28921)
-- new OpCode (line 28929)
-- new OpCode (line 28932)
-- new OpCode (line 28959)
-- new OpCode (line 28982)
-- new OpCode (line 28998)
+- new OpCode (line 28928)
+- new OpCode (line 28936)
+- new OpCode (line 28939)
+- new OpCode (line 28966)
+- new OpCode (line 28989)
 - new OpCode (line 29005)
-- new OpCode (line 29546)
-- new Literal (line 29578)
-- new OpCode (line 29677)
-- new Variable (line 29684)
-- new Temporary (line 29686)
-- new OpCode (line 29689)
-- new CompileFatal (line 30002)
-- new CompileFatal (line 30257)
+- new OpCode (line 29012)
+- new OpCode (line 29553)
+- new Literal (line 29585)
+- new OpCode (line 29684)
+- new Variable (line 29691)
+- new Temporary (line 29693)
+- new OpCode (line 29696)
+- new CompileFatal (line 30009)
+- new CompileFatal (line 30264)
 - 746 class method(s)
 - 33 closure(s)
 
@@ -21233,7 +21242,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/CompilerVersion.php`
 
 **Warnings** (review for bootstrap subset):
-- 84 class method(s)
+- 85 class method(s)
 
 ### `lib/CurlyBraceOffsetRejector.php`
 

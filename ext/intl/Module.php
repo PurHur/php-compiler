@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\intl;
 
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\ModuleAbstract;
 use PHPCompiler\Runtime;
 use PHPCompiler\VM;
@@ -58,6 +59,7 @@ class Module extends ModuleAbstract
             new grapheme_extract(),
             new grapheme_levenshtein(),
             new grapheme_str_split(),
+            ...(CompilerVersion::supportsGraphemeStrimwidth() ? [new grapheme_strimwidth()] : []),
             new intl_get_error_code(),
         ];
     }
