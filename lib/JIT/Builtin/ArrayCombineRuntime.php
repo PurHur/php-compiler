@@ -37,6 +37,9 @@ final class ArrayCombineRuntime
             return ArrayBuiltinHelper::combine($context, $keys, $values);
         }
 
+        // JitVmHelperLink bridge does not propagate PHP throws from VmArray::combine (#16080).
+        ArrayBuiltinHelper::guardCombinePackedListLengthMismatch($context, $keys, $values, 'bridge');
+
         self::ensureLinked($context);
         $keysHt = ArrayBuiltinHelper::loadHashTable($context, $keys);
         $valuesHt = ArrayBuiltinHelper::loadHashTable($context, $values);
