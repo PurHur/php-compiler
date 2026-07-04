@@ -26,6 +26,9 @@ final class DomConstants
     /** Internal marker for {@see VmDom::createNodeList()} handles. */
     public const XML_NODELIST = -1;
 
+    /** Internal marker for {@see VmDom::createNamedNodeMap()} handles. */
+    public const XML_NAMEDNODEMAP = -2;
+
     /** DOMNode::compareDocumentPosition() flags (php-src ext/dom/node.c; #14448). */
     public const DOCUMENT_POSITION_DISCONNECTED = 0x01;
 
