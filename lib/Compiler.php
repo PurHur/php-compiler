@@ -14960,7 +14960,7 @@ class Compiler {
         $producerCount = count($producers);
         $argCount = count($callArgs);
         // new LimitIterator(new ArrayIterator([...]), …) — Array_ is inner-ctor prelude (#12916).
-        $nestedCtorNew = $this->matchNestedNewCtorInlineNewProducer($producers, $argIndex, $argCount);
+        $nestedCtorNew = $this->matchNestedNewCtorInlineNewProducer($producers, $argIndex, $argCount, $callArgs);
         if (null !== $nestedCtorNew) {
             return $nestedCtorNew;
         }
@@ -15493,7 +15493,7 @@ class Compiler {
                 return $arrayUnionPlus;
             }
             // new LimitIterator(new ArrayIterator([...]), …) — Array_ is inner-ctor prelude (#12916).
-            $nestedCtorNew = $this->matchNestedNewCtorInlineNewProducer($producers, $argIndex, $argCount);
+            $nestedCtorNew = $this->matchNestedNewCtorInlineNewProducer($producers, $argIndex, $argCount, $callArgs);
             if (null !== $nestedCtorNew) {
                 return $nestedCtorNew;
             }
@@ -15533,7 +15533,7 @@ class Compiler {
             return null;
         }
         // new LimitIterator(new ArrayIterator([...]), …) — inner-ctor Array_ prelude + inline New_ feeds outer arg #0 (#12916).
-        $nestedCtorNew = $this->matchNestedNewCtorInlineNewProducer($producers, $argIndex, $argCount);
+        $nestedCtorNew = $this->matchNestedNewCtorInlineNewProducer($producers, $argIndex, $argCount, $callArgs);
         if (null !== $nestedCtorNew) {
             return $nestedCtorNew;
         }
@@ -16994,6 +16994,28 @@ class Compiler {
             }
             // array_merge((object)[...], [...]) — Array_ prelude feeds Cast, not the call (#15207).
             if ($producer instanceof Op\Expr\Array_) {
+                $next = $producers[$i + 1] ?? null;
+                if (
+                    $next instanceof Op\Expr\Cast
+                    && property_exists($next, 'expr')
+                    && $this->operandsReferToSameVariable($next->expr, $producer->result)
+                ) {
+                    continue;
+                }
+            }
+            // var_export((int) E::A) — ClassConstFetch prelude feeds Cast, not the call arg (#9479, #15982).
+            if ($producer instanceof Op\Expr\ClassConstFetch) {
+                $next = $producers[$i + 1] ?? null;
+                if (
+                    $next instanceof Op\Expr\Cast
+                    && property_exists($next, 'expr')
+                    && $this->operandsReferToSameVariable($next->expr, $producer->result)
+                ) {
+                    continue;
+                }
+            }
+            // f((int) SOME_CONST) — ConstFetch prelude feeds Cast, not the call arg (#10143).
+            if ($producer instanceof Op\Expr\ConstFetch) {
                 $next = $producers[$i + 1] ?? null;
                 if (
                     $next instanceof Op\Expr\Cast
@@ -18733,6 +18755,17 @@ class Compiler {
                     $child instanceof Op\Expr\ConstFetch
                     && ($next instanceof Op\Expr\UnaryMinus || $next instanceof Op\Expr\UnaryPlus)
                     && $next->expr === $child->result
+                ) {
+                    continue;
+                }
+                // var_export((int) E::A) — ClassConstFetch prelude feeds sibling Cast, not call arg (#9479, #15982).
+                if (
+                    $next instanceof Op\Expr\Cast
+                    && property_exists($next, 'expr')
+                    && (
+                        $next->expr === $child->result
+                        || $this->operandsReferToSameVariable($next->expr, $child->result)
+                    )
                 ) {
                     continue;
                 }
@@ -23417,7 +23450,7 @@ class Compiler {
         int $argCount,
         int $producerCount
     ): bool {
-        return null !== $this->matchNestedNewCtorInlineNewProducer($producers, $argIndex, $argCount);
+        return null !== $this->matchNestedNewCtorInlineNewProducer($producers, $argIndex, $argCount, []);
     }
 
     /**
@@ -23428,10 +23461,20 @@ class Compiler {
     private function matchNestedNewCtorInlineNewProducer(
         array $producers,
         int $argIndex,
-        int $argCount
+        int $argCount,
+        array $callArgs = []
     ): ?Op\Expr\New_ {
         if (0 !== $argIndex || $argCount < 2 || \count($producers) < 2) {
             return null;
+        }
+        if ([] !== $callArgs) {
+            $callArg = $callArgs[$argIndex] ?? null;
+            if (
+                !$this->callArgIsNewExpression($callArg)
+                && (!$callArg instanceof Operand || !$this->callArgIsDeadInlineTemporary($callArg))
+            ) {
+                return null;
+            }
         }
         $offset = 0;
         while ($offset < \count($producers)) {
@@ -27166,6 +27209,7 @@ class Compiler {
                 null === $dimFetchSlot
                 && null !== $cfgCallOp
                 && null !== $block->orig
+                && $this->callArgInlineProducerIsNew($cfgCallOp, (int) $argIndex, $block)
             ) {
                 $nestedNewProducers = $this->precedingInlineCallArgProducersBeforeCfgOp(
                     $block->orig->children,
@@ -27176,7 +27220,8 @@ class Compiler {
                 $inlineNewProducer = $this->matchNestedNewCtorInlineNewProducer(
                     $nestedNewProducers,
                     (int) $argIndex,
-                    $nestedNewArgCount
+                    $nestedNewArgCount,
+                    $cfgCallOp->args ?? $args
                 );
                 if (null === $inlineNewProducer) {
                     $inlineNewProducer = $this->matchTrailingInlineNewCallArgProducer(

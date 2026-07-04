@@ -967,7 +967,7 @@ PHP;
         self::assertSame($preDecSlot, $sendSlots[1] ?? null, 'arg sends='.json_encode($sendSlots));
     }
 
-    /** Issue #9479 — inline (int) enum cast producer maps to var_dump arg slot. */
+    /** Issue #9479 / #15982 — inline (int) enum cast producer maps to var_dump arg slot. */
     public function testVarDumpIntCastEnumCaseUsesCastProducerSlot(): void
     {
         $code = <<<'PHP'
@@ -977,6 +977,32 @@ var_dump((int) E::A);
 PHP;
         $runtime = new Runtime();
         $block = $runtime->parseAndCompile($code, 'enum_int_cast_call_arg.php');
+
+        $castSlot = null;
+        $sendSlots = [];
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_CAST_INT === $op->type) {
+                $castSlot = $op->arg1;
+            }
+            if (OpCode::TYPE_ARG_SEND === $op->type) {
+                $sendSlots[] = $op->arg1;
+            }
+        }
+
+        self::assertNotNull($castSlot);
+        self::assertSame([$castSlot], $sendSlots, 'arg sends='.json_encode($sendSlots));
+    }
+
+    /** Issue #15982 — var_export((int) E::A) must send cast result, not enum const fetch. */
+    public function testVarExportIntCastEnumCaseUsesCastProducerSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+enum E: int { case A = 1; }
+var_export((int) E::A);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'enum_int_cast_var_export.php');
 
         $castSlot = null;
         $sendSlots = [];
@@ -5066,6 +5092,48 @@ PHP;
         ob_start();
         $runtime->run($block);
         self::assertSame("2\n", ob_get_clean());
+    }
+
+    /** Issue #15996 — DateTime literal ctor arg must not alias prior inline NEW slot. */
+    public function testDateTimeNewLiteralArgDistinctFromPriorNewResultSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+declare(strict_types=1);
+$tz = new DateTimeZone('UTC');
+$dt = new DateTime('2020-01-01 12:00:00', $tz);
+echo $dt->format('c'), "\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'datetime_new_timezone_var.php');
+
+        $dateTimeArgSends = [];
+        $seenDateTimeNew = false;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_NEW === $op->type) {
+                $classSlot = $op->arg2;
+                if (null !== $classSlot && isset($block->constants[$classSlot])) {
+                    $className = $block->constants[$classSlot]->toString();
+                    if ('DateTime' === $className) {
+                        $seenDateTimeNew = true;
+                        continue;
+                    }
+                }
+            }
+            if ($seenDateTimeNew && OpCode::TYPE_ARG_SEND === $op->type) {
+                $dateTimeArgSends[] = $op->arg1;
+            }
+            if ($seenDateTimeNew && OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
+                break;
+            }
+        }
+
+        self::assertCount(2, $dateTimeArgSends, 'DateTime ctor arg sends='.json_encode($dateTimeArgSends));
+        self::assertNotSame($dateTimeArgSends[0], $dateTimeArgSends[1]);
+
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("2020-01-01T12:00:00+00:00\n", ob_get_clean());
     }
 
     /** Issue #15422 — in_array/array_search/array_key_exists after UDF with array param. */
