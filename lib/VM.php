@@ -15768,6 +15768,35 @@ restart:
         return null !== $frame->listUnpackAssignMergeBlock;
     }
 
+    /** {main} indirect wrappers may alias the same global CV as a named-assign dest (#16040, #15183). */
+    private function vmDeadTempReleaseWouldClobberNamedLocal(Frame $frame, int $slot): bool
+    {
+        if (!$frame->block->isMainScript() || !isset($frame->scope[$slot])) {
+            return false;
+        }
+        try {
+            $target = $frame->scope[$slot]->resolveIndirect();
+        } catch (\LogicException) {
+            return false;
+        }
+        foreach ($frame->block->eachNamedScopeSlot() as [, $namedSlot]) {
+            if ($namedSlot === $slot || !isset($frame->scope[$namedSlot])) {
+                continue;
+            }
+            if (!isset($frame->block->namedAssignDestSlotIndexes[$namedSlot])) {
+                continue;
+            }
+            try {
+                if ($frame->scope[$namedSlot]->resolveIndirect() === $target) {
+                    return true;
+                }
+            } catch (\LogicException) {
+            }
+        }
+
+        return false;
+    }
+
     private function releaseVmStatementDeadTemps(Frame $frame, int ...$keepSlots): void
     {
         if ($this->shouldDeferVmDeadTempRelease($frame)) {
@@ -15847,6 +15876,9 @@ restart:
     private function releaseVmDeadScopeSlot(Frame $frame, int $slot): void
     {
         if (!isset($frame->scope[$slot]) || $frame->block->isNamedVariableSlot($slot)) {
+            return;
+        }
+        if ($this->vmDeadTempReleaseWouldClobberNamedLocal($frame, $slot)) {
             return;
         }
         if (isset($frame->block->deferredArrayLiteralKeepSlots[$slot])) {
