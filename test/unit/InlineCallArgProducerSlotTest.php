@@ -3964,6 +3964,47 @@ PHP;
         self::assertSame($getmyuidReturnSlot, $chownSendSlots[1] ?? null, 'chown sends='.json_encode($chownSendSlots));
     }
 
+    /** Issue #10731 — IIFE `(function ($g) { … })($gen())` wires hoisted $gen() to __invoke arg #0. */
+    public function testIifeHoistedGeneratorCallArgProducerSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+$gen = function () { yield 1; yield 2; };
+$fromClosure = (function ($g) { return iterator_to_array($g); })($gen());
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'iife_iterator_to_array.php');
+
+        $iifeInitRecv = null;
+        $producerReturnSlot = null;
+        $sendSlot = null;
+        $pendingInitRecv = null;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_METHODCALL_INIT === $op->type) {
+                $pendingInitRecv = $op->arg1;
+            }
+            if (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
+                if (null === $producerReturnSlot) {
+                    $producerReturnSlot = $op->arg1;
+                    continue;
+                }
+                if (null === $iifeInitRecv) {
+                    $iifeInitRecv = $pendingInitRecv;
+                }
+            }
+            if (OpCode::TYPE_ARG_SEND === $op->type) {
+                $sendSlot = $op->arg1;
+                if (null === $iifeInitRecv) {
+                    $iifeInitRecv = $pendingInitRecv;
+                }
+            }
+        }
+
+        self::assertNotNull($producerReturnSlot, 'missing hoisted $gen() return slot');
+        self::assertSame($producerReturnSlot, $sendSlot, 'arg send must use hoisted generator slot');
+        self::assertNotSame(1, $iifeInitRecv, 'IIFE __invoke must not target $gen closure slot');
+    }
+
     /** Issue #11321 — iterator_to_array(new ArrayObject([...]), false) uses New_ slot, not ctor Array_. */
     public function testIteratorToArrayInlineNewWithFalsePreserveKeysUsesNewSlot(): void
     {
