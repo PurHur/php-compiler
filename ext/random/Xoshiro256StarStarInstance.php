@@ -42,9 +42,9 @@ final class Xoshiro256StarStarInstance
         $this->seedFromBytes(VmString::randomBytes(32));
     }
 
-    public function generate(): int
+    public function generate(): string
     {
-        return $this->generateState()->toInt() & ~0;
+        return $this->generateState()->toBytes();
     }
 
     public function jump(): void

@@ -10,12 +10,9 @@ use PHPCompiler\ext\standard\VmString;
 /** Random\\Engine\\Secure (php-src ext/random/engine_secure.c; #11550). */
 final class SecureInstance
 {
-    public function generate(): int
+    public function generate(): string
     {
-        $bytes = VmString::randomBytes(\PHP_INT_SIZE);
-        $unpacked = \unpack('P', $bytes);
-
-        return (int) ($unpacked[1] ?? 0);
+        return VmString::randomBytes(8);
     }
 
     public function range(int $min, int $max): int

@@ -35,6 +35,12 @@ final class RandomU64
         return 0 === $this->hi ? $this->lo : ($this->lo | ($this->hi << 32));
     }
 
+    /** Pack u64 little-endian (php-src php_random_engine_common.c). */
+    public function toBytes(): string
+    {
+        return \pack('VV', $this->lo, $this->hi);
+    }
+
     public static function add(self $a, self $b): self
     {
         $lo = ($a->lo + $b->lo) & 0xFFFFFFFF;
@@ -55,28 +61,66 @@ final class RandomU64
 
     public static function mul32(self $a, int $multiplier): self
     {
-        $multiplier &= 0xFFFFFFFF;
-        $product = $a->lo * $multiplier;
-        $lo = $product & 0xFFFFFFFF;
-        $hi = (($a->hi * $multiplier) & 0xFFFFFFFF) + (int) ($product / 0x100000000);
+        return self::mul64($a, self::from32($multiplier & 0xFFFFFFFF));
+    }
 
-        return new self($hi & 0xFFFFFFFF, $lo);
+    /** @return array{0: int, 1: int} upper and lower 32-bit limbs of unsigned product */
+    private static function mul32x32(int $x, int $y): array
+    {
+        $x &= 0xFFFFFFFF;
+        $y &= 0xFFFFFFFF;
+        $xl = [$x & 0xFFFF, ($x >> 16) & 0xFFFF];
+        $yl = [$y & 0xFFFF, ($y >> 16) & 0xFFFF];
+        $r = [0, 0, 0, 0];
+        for ($i = 0; $i < 2; ++$i) {
+            for ($j = 0; $j < 2; ++$j) {
+                $r[$i + $j] += $xl[$i] * $yl[$j];
+            }
+        }
+        for ($k = 0; $k < 3; ++$k) {
+            $r[$k + 1] += $r[$k] >> 16;
+            $r[$k] &= 0xFFFF;
+        }
+        $lo = $r[0] | ($r[1] << 16);
+        $hi = $r[2] | ($r[3] << 16);
+
+        return [$hi & 0xFFFFFFFF, $lo & 0xFFFFFFFF];
     }
 
     public static function mul64(self $a, self $b): self
     {
-        $a0 = $a->lo & 0xFFFFFFFF;
-        $a1 = $a->hi & 0xFFFFFFFF;
-        $b0 = $b->lo & 0xFFFFFFFF;
-        $b1 = $b->hi & 0xFFFFFFFF;
-        $p00 = $a0 * $b0;
-        $p01 = $a0 * $b1;
-        $p10 = $a1 * $b0;
-        $lo = $p00 & 0xFFFFFFFF;
-        $mid = (($p00 >> 32) & 0xFFFFFFFF) + ($p01 & 0xFFFFFFFF) + ($p10 & 0xFFFFFFFF);
-        $hi = (($p01 >> 32) & 0xFFFFFFFF) + (($p10 >> 32) & 0xFFFFFFFF) + (($mid >> 32) & 0xFFFFFFFF);
+        [$p00_hi, $p00_lo] = self::mul32x32($a->lo, $b->lo);
+        [, $p01_lo] = self::mul32x32($a->lo, $b->hi);
+        [, $p10_lo] = self::mul32x32($a->hi, $b->lo);
 
-        return new self($hi & 0xFFFFFFFF, $lo);
+        $mid = ($p00_hi + $p01_lo + $p10_lo) & 0xFFFFFFFF;
+
+        return new self($mid, $p00_lo);
+    }
+
+    /** Upper 64 bits of unsigned 64x64 product (libgcc umul_ppmm high half). */
+    public static function mul64Hi(self $a, self $b): self
+    {
+        $u0 = $a->lo;
+        $u1 = $a->hi;
+        $v0 = $b->lo;
+        $v1 = $b->hi;
+        [$p00_hi, ] = self::mul32x32($u0, $v0);
+        [$u1v0_hi, $u1v0_lo] = self::mul32x32($u1, $v0);
+        [$u0v1_hi, $u0v1_lo] = self::mul32x32($u0, $v1);
+        [$u1v1_hi, $u1v1_lo] = self::mul32x32($u1, $v1);
+
+        $t = $u1v0_lo + $p00_hi;
+        $t_hi = $u1v0_hi + intdiv($t, 0x100000000);
+        $t_lo = $t & 0xFFFFFFFF;
+
+        $inner = $u0v1_lo + $t_lo;
+        $part2 = $u0v1_hi + intdiv($inner, 0x100000000);
+
+        $hi = ($u1v1_lo + $part2 + $t_hi) & 0xFFFFFFFF;
+        $extra = intdiv($u1v1_lo + $part2 + $t_hi, 0x100000000);
+
+        return new self(($u1v1_hi + $extra) & 0xFFFFFFFF, $hi);
     }
 
     public function shiftLeft(int $bits): self

@@ -127,7 +127,7 @@ final class SecureGenerate extends VmClassMethod
     {
         $object = AdditionalEnginesBuiltin::receiver($frame, AdditionalEnginesBuiltin::SECURE_LC, 'generate');
         if (null !== $frame->returnVar) {
-            $frame->returnVar->int(RandomEngineStorage::secure($object)->generate());
+            $frame->returnVar->string(RandomEngineStorage::secure($object)->generate());
         }
     }
 }
@@ -154,7 +154,7 @@ final class XoshiroGenerate extends VmClassMethod
     {
         $object = AdditionalEnginesBuiltin::receiver($frame, AdditionalEnginesBuiltin::XOSHIRO_LC, 'generate');
         if (null !== $frame->returnVar) {
-            $frame->returnVar->int(RandomEngineStorage::xoshiro($object)->generate());
+            $frame->returnVar->string(RandomEngineStorage::xoshiro($object)->generate());
         }
     }
 }
@@ -214,7 +214,7 @@ final class PcgGenerate extends VmClassMethod
     {
         $object = AdditionalEnginesBuiltin::receiver($frame, AdditionalEnginesBuiltin::PCG_LC, 'generate');
         if (null !== $frame->returnVar) {
-            $frame->returnVar->int(RandomEngineStorage::pcg($object)->generate());
+            $frame->returnVar->string(RandomEngineStorage::pcg($object)->generate());
         }
     }
 }

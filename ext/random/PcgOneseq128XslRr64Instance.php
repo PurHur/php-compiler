@@ -11,7 +11,7 @@ final class PcgOneseq128XslRr64Instance
 {
     private RandomUint128 $state;
 
-    private const MULT = [0x235F0936, 0xDCC8A865, 0x4389AAEA, 0x680636A5];
+    private const MULT = [0x2360ED05, 0x1FC65DA4, 0x4385DF64, 0x9FCCF645];
 
     private const PLUS = [0x5851F42D, 0x4C957F2D, 0x14057B7E, 0xF767814F];
 
@@ -47,11 +47,11 @@ final class PcgOneseq128XslRr64Instance
         $this->seedFromBytes(VmString::randomBytes(16));
     }
 
-    public function generate(): int
+    public function generate(): string
     {
         $this->step();
 
-        return RandomUint128::pcgRotr64($this->state);
+        return RandomUint128::pcgRotr64($this->state)->toBytes();
     }
 
     public function jump(int $advance): void
