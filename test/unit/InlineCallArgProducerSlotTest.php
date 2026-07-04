@@ -4309,6 +4309,70 @@ PHP;
         self::assertStringContainsString('2', $out);
     }
 
+    /** Issue #16226 — array_map(null, null, [...]) wires callback + null haystack + array slots. */
+    public function testArrayMapNullNullHaystackInlineUsesDistinctSlots(): void
+    {
+        $code = <<<'PHP'
+<?php
+array_map(null, null, [1, 2]);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'array_map_null_null_haystack.php');
+
+        $nullSlots = [];
+        $arraySlot = null;
+        $mapSends = [];
+        $fcallOrdinal = 0;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_CONST_FETCH === $op->type) {
+                $nullSlots[] = $op->arg1;
+            }
+            if (OpCode::TYPE_INIT_ARRAY === $op->type) {
+                $arraySlot = $op->arg1;
+            }
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                ++$fcallOrdinal;
+                if (1 === $fcallOrdinal) {
+                    $mapSends = [];
+                }
+            }
+            if (1 === $fcallOrdinal && OpCode::TYPE_ARG_SEND === $op->type) {
+                $mapSends[] = $op->arg1;
+            }
+        }
+
+        self::assertCount(2, $nullSlots, 'null fetches='.json_encode($nullSlots));
+        self::assertNotNull($arraySlot);
+        self::assertCount(3, $mapSends, 'map sends='.json_encode($mapSends));
+        self::assertSame($nullSlots[0], $mapSends[0], 'callback null slot');
+        self::assertSame($nullSlots[1], $mapSends[1], 'haystack null slot');
+        self::assertSame($arraySlot, $mapSends[2], 'array haystack slot');
+        self::assertNotSame($mapSends[0], $mapSends[1]);
+        self::assertNotSame($mapSends[1], $mapSends[2]);
+    }
+
+    /** Issue #16226 — array_map(null, null, [...]) runtime TypeError parity. */
+    public function testArrayMapNullNullHaystackInlineRuntimeTypeError(): void
+    {
+        $code = <<<'PHP'
+<?php
+try {
+    array_map(null, null, [1, 2]);
+    echo "unexpected success\n";
+} catch (TypeError $e) {
+    echo $e->getMessage(), "\n";
+}
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'array_map_null_null_haystack_runtime.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame(
+            "array_map(): Argument #2 (\$array) must be of type array, null given\n",
+            ob_get_clean()
+        );
+    }
+
     /** Issue #16116 — array_map('strlen', [null]) must not wire haystack null ConstFetch as callback. */
     public function testArrayMapStringBuiltinNullHaystackUsesDistinctSlots(): void
     {
