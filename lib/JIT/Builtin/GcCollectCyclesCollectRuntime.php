@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT;
+use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPLLVM\BasicBlock;
 use PHPLLVM\Builder;
@@ -13,7 +14,7 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
 /**
  * JIT/AOT link for __compiler_gc_collect_cycles via GcCollectCyclesJitHelper PHP (#9183).
  *
- * Native cycle scan routes through GcCollectCyclesJitHelper PHP for embed + standalone (#9183, #16069).
+ * Native cycle scan remains in {@see GcCollectCyclesRuntime}; stats bookkeeping lives in PHP.
  * php-src: ext/standard/info.c — PHP_FUNCTION(gc_collect_cycles)
  */
 final class GcCollectCyclesCollectRuntime
@@ -79,14 +80,19 @@ final class GcCollectCyclesCollectRuntime
 
         $context->builder->positionAtEnd($work);
         $implResult = $context->builder->call($context->lookupFunction('phpc_gc_collect_cycles_impl'));
-        self::ensureJitHelperCompiled($context);
-        $collected = $context->builder->call(
-            self::helperFunction($context, self::RECORD_COLLECT),
-            $context->builder->sext($implResult, $i64)
-        );
-        self::syncGlobalsFromHelper($context);
-        $resultI64 = $context->builder->sextOrBitCast($collected, $i64);
-        $context->builder->branch($done);
+        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
+            $resultI64 = $context->builder->sext($implResult, $i64);
+            $context->builder->branch($done);
+        } else {
+            self::ensureJitHelperCompiled($context);
+            $collected = $context->builder->call(
+                self::helperFunction($context, self::RECORD_COLLECT),
+                $context->builder->sext($implResult, $i64)
+            );
+            self::syncGlobalsFromHelper($context);
+            $resultI64 = $context->builder->sextOrBitCast($collected, $i64);
+            $context->builder->branch($done);
+        }
 
         $context->builder->positionAtEnd($done);
         $zero = $i64->constInt(0, false);
