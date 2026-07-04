@@ -9,6 +9,7 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -52,6 +53,10 @@ final class crc32 extends Internal
 
     private static function vmStringArg(Frame $frame, int $argIndex): string
     {
+        if (InternalStrictArg::isCallerStrict($frame)) {
+            return InternalStrictArg::requireString($frame, $argIndex, 'crc32', 'string')->toString();
+        }
+
         return VmString::coerceStringBuiltinArg(
             $frame->calledArgs[$argIndex],
             'crc32',
