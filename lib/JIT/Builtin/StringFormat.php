@@ -199,7 +199,7 @@ final class StringFormat
         $strPtr = $context->getTypeFromString('__string__*');
         $double = $context->getTypeFromString('double');
         $i64 = $context->getTypeFromString('int64');
-        $ft = $context->context->functionType($strPtr, false, $double, $i64, $strPtr, $strPtr);
+        $ft = $context->context->functionType($strPtr, false, $double, $i64, $strPtr, $strPtr, $i64);
         $fn = null !== $probe
             ? $probe
             : $context->module->addFunction($abiName, $ft);
@@ -210,12 +210,14 @@ final class StringFormat
         $decimals = $fn->getParam(1);
         $decSep = $context->builder->call($context->lookupFunction('__string__separate'), $fn->getParam(2));
         $thouSep = $context->builder->call($context->lookupFunction('__string__separate'), $fn->getParam(3));
+        $mode = $fn->getParam(4);
         $out = $context->builder->call(
             self::helperFunction($context, self::NUMBER_FORMAT_HELPER),
             $num,
             $decimals,
             $decSep,
-            $thouSep
+            $thouSep,
+            $mode
         );
         $context->builder->returnValue($out);
         $context->registerFunction($abiName, $fn);

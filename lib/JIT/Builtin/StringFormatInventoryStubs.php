@@ -84,8 +84,9 @@ final class StringFormatInventoryStubs
         }
 
         $strPtr = $context->getTypeFromString('__string__*');
+        $double = $context->getTypeFromString('double');
         $i64 = $context->getTypeFromString('int64');
-        $ft = $context->context->functionType($strPtr, false, $strPtr, $i64, $i64, $i64, $strPtr);
+        $ft = $context->context->functionType($strPtr, false, $double, $i64, $strPtr, $strPtr, $i64);
         $fn = null !== $probe
             ? $probe
             : $context->module->addFunction($abiName, $ft);

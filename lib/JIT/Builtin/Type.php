@@ -66,7 +66,8 @@ class Type extends Builtin {
             $this->context->getTypeFromString('double'),
             $this->context->getTypeFromString('int64'),
             $this->context->getTypeFromString('__string__*'),
-            $this->context->getTypeFromString('__string__*')
+            $this->context->getTypeFromString('__string__*'),
+            $this->context->getTypeFromString('int64')
         );
         $fnNumberFormat = $this->context->module->addFunction('__compiler_number_format', $fntypeNumberFormat);
         $this->context->registerFunction('__compiler_number_format', $fnNumberFormat);
