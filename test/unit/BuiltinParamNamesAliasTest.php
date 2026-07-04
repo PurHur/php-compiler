@@ -498,4 +498,35 @@ final class BuiltinParamNamesAliasTest extends TestCase
             }
         }
     }
+
+    /** @covers issue #10071 */
+    public function testTypeProbeAutoloadNamedParamsResolve(): void
+    {
+        self::assertSame(['class', 'autoload'], BuiltinParamNames::forFunction('class_exists'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex(
+            BuiltinParamNames::forFunction('class_exists'),
+            'autoload',
+            'class_exists'
+        ));
+
+        self::assertSame(['interface', 'autoload'], BuiltinParamNames::forFunction('interface_exists'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex(
+            BuiltinParamNames::forFunction('interface_exists'),
+            'autoload',
+            'interface_exists'
+        ));
+
+        self::assertSame(['trait', 'autoload'], BuiltinParamNames::forFunction('trait_exists'));
+        self::assertSame(['enum', 'autoload'], BuiltinParamNames::forFunction('enum_exists'));
+
+        $isSubclass = BuiltinParamNames::forFunction('is_subclass_of');
+        self::assertSame(['object_or_class', 'class', 'allow_string'], $isSubclass);
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($isSubclass, 'allow_string', 'is_subclass_of'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($isSubclass, 'autoload', 'is_subclass_of'));
+
+        $isA = BuiltinParamNames::forFunction('is_a');
+        self::assertSame(['object_or_class', 'class', 'allow_string'], $isA);
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($isA, 'allow_string', 'is_a'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($isA, 'autoload', 'is_a'));
+    }
 }
