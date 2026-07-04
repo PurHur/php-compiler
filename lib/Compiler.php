@@ -22913,6 +22913,28 @@ class Compiler {
     }
 
     /**
+     * Final adjacent nested probe must not clobber callee-specific arg0 wiring (#16023, #13775).
+     */
+    private function shouldSkipFinalAdjacentNestedFuncCallArgProbe(Op $cfgCallOp, int $argIndex): bool
+    {
+        if (0 !== $argIndex || !\is_array($cfgCallOp->args ?? null)) {
+            return false;
+        }
+        $leadingArg = $cfgCallOp->args[0] ?? null;
+        if (!$leadingArg instanceof Operand || !$this->callArgOperandExpectsArrayProducer($leadingArg)) {
+            return false;
+        }
+        $calleeLower = strtolower($this->resolveCfgFuncCallName($cfgCallOp) ?? '');
+
+        return 'array_slice' === $calleeLower
+            || \in_array(
+                $calleeLower,
+                ['array_merge', 'array_merge_recursive', 'array_replace', 'array_replace_recursive'],
+                true
+            );
+    }
+
+    /**
      * Sole dead call-arg temp fed by immediately preceding MethodCall/StaticCall (#14555).
      *
      * Scoped to compileCallArgs ARG_SEND override — not resolveAdjacentNestedFuncCallArgSlot.
@@ -30184,6 +30206,7 @@ class Compiler {
                 && null !== $block->orig
                 && null === $arraySliceSlot
                 && $this->callArgIsDeadInlineTemporary($cfgCallOp->args[(int) $argIndex] ?? $arg)
+                && !$this->shouldSkipFinalAdjacentNestedFuncCallArgProbe($cfgCallOp, (int) $argIndex)
             ) {
                 $nestedCallArgSlot = $this->resolveAdjacentNestedFuncCallArgSlot(
                     $block,
