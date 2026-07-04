@@ -23,14 +23,34 @@ final class ArrayFindHelper
     private const MODE_ANY = 2;
     private const MODE_ALL = 3;
 
-    public static function buildFindArray(Context $context, Variable $array, Variable $callback): Value
-    {
-        return self::buildFromArray($context, $array, $callback, self::MODE_FIND);
+    public static function buildFindArray(
+        Context $context,
+        Variable $array,
+        Variable $callback,
+        ?Variable $strictArg = null
+    ): Value {
+        return self::buildFromArray(
+            $context,
+            $array,
+            $callback,
+            self::MODE_FIND,
+            self::resolveStrictI1($context, $strictArg)
+        );
     }
 
-    public static function buildFindKeyArray(Context $context, Variable $array, Variable $callback): Value
-    {
-        return self::buildFromArray($context, $array, $callback, self::MODE_FIND_KEY);
+    public static function buildFindKeyArray(
+        Context $context,
+        Variable $array,
+        Variable $callback,
+        ?Variable $strictArg = null
+    ): Value {
+        return self::buildFromArray(
+            $context,
+            $array,
+            $callback,
+            self::MODE_FIND_KEY,
+            self::resolveStrictI1($context, $strictArg)
+        );
     }
 
     public static function buildAnyArray(
