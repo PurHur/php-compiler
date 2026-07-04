@@ -29191,7 +29191,27 @@ class Compiler {
                 && !$this->shouldUseArrayProducerCallArgResolution($cfgCallOp, (int) $argIndex, $calleeName)
             ) {
                 // var_export/json_encode([…, $x->format(...)]) — stmt-before Array_ feeds the call arg (#10733, #16067).
-                $inlineArrayProducer = $this->inlineArrayProducerImmediatelyBeforeCfgCall($cfgCallOp, $block);
+                // array_map('explode', [','], ['a,b']) — map each hoisted Array_ to its arg slot (#16085, #16078 regression).
+                $inlineArrayProducer = null;
+                if (
+                    null !== $block->orig
+                    && 'array_map' === $this->resolveCfgFuncCallName($cfgCallOp)
+                    && \count($cfgCallOp->args ?? []) >= 3
+                    && (int) $argIndex >= 1
+                ) {
+                    $mapProducers = $this->precedingInlineCallArgProducersBeforeCfgOp(
+                        $block->orig->children,
+                        $cfgCallOp
+                    );
+                    $inlineArrayProducer = $this->matchInlineArrayProducersToArrayCallArgs(
+                        $mapProducers,
+                        $cfgCallOp->args ?? [],
+                        (int) $argIndex
+                    );
+                }
+                if (!$inlineArrayProducer instanceof Op\Expr\Array_) {
+                    $inlineArrayProducer = $this->inlineArrayProducerImmediatelyBeforeCfgCall($cfgCallOp, $block);
+                }
                 if (
                     $inlineArrayProducer instanceof Op\Expr\Array_
                     && $this->inlineArrayLiteralStmtBeforeOverriddenBySiblingCallProducer(
