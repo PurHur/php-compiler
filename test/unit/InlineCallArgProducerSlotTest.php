@@ -2892,6 +2892,53 @@ PHP;
         self::assertStringContainsString("ok", $out);
     }
 
+    /** Issue #16056 — literal Array_ before array_keys($var) feeds Identical, not array_keys arg #0. */
+    public function testArrayKeysNamedVarNotWiredToPrecedingIdenticalLiteral(): void
+    {
+        $code = <<<'PHP'
+<?php
+declare(strict_types=1);
+$a = ['a10' => 1, 'a2' => 2];
+uksort($a, 'strnatcmp');
+var_export(['a2', 'a10'] === array_keys($a));
+echo "\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'array_keys_identical_literal.php');
+
+        $keysSendSlot = null;
+        $keysReturnSlot = null;
+        $identicalLeftSlot = null;
+        $identicalRightSlot = null;
+        $fcallOrdinal = 0;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                ++$fcallOrdinal;
+            }
+            if (2 === $fcallOrdinal && OpCode::TYPE_ARG_SEND === $op->type && null === $keysSendSlot) {
+                $keysSendSlot = $op->arg1;
+            }
+            if (2 === $fcallOrdinal && OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
+                $keysReturnSlot = $op->arg1;
+            }
+            if (OpCode::TYPE_IDENTICAL === $op->type) {
+                $identicalLeftSlot = $op->arg2;
+                $identicalRightSlot = $op->arg3;
+            }
+        }
+
+        self::assertNotNull($keysSendSlot, 'array_keys arg #0 must be sent');
+        self::assertNotNull($keysReturnSlot, 'array_keys return slot must exist');
+        self::assertSame($keysReturnSlot, $identicalRightSlot, 'array_keys return feeds Identical right');
+        self::assertNotSame($keysSendSlot, $identicalLeftSlot, 'array_keys must not receive Identical literal');
+        self::assertNotSame($keysSendSlot, $identicalRightSlot, 'array_keys haystack slot must differ from return');
+
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertSame("true\n", $out);
+    }
+
     /** Issue #13776 — array_combine(array_keys(...), [...]) wires FuncCall + trailing Array_ producer slots. */
     public function testArrayCombineInlineArrayKeysRuntime(): void
     {
