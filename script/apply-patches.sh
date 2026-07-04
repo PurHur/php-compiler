@@ -2019,6 +2019,7 @@ intersection_branch = """        } elseif ($type instanceof Op\\Type\\Intersecti
             }
 
             return new Type(Type::TYPE_INTERSECTION, $subs);
+        }
 """
 throw_anchor = """        throw new \\LogicException('Unknown Op\\\\Type provided: '.get_class($type));"""
 union_close = (
@@ -2226,6 +2227,7 @@ intersection_branch = """        } elseif ($type instanceof Op\\Type\\Intersecti
             }
 
             return new Type(Type::TYPE_INTERSECTION, $subs);
+        }
 """
 never_union_tail = (
     """        } elseif ($type instanceof Op\\Type\\Never_) {
@@ -3087,6 +3089,12 @@ if 'instanceof CfgType\\Never_' not in text:
             return self::fromDecl($decl->name);
         }
 """ + never_decl + """        if ($decl instanceof CfgType\\Mixed_) {"""),
+        ("""        if ($decl instanceof CfgType\\Mixed_) {
+            return self::mixed();
+        }""",
+         never_decl + """        if ($decl instanceof CfgType\\Mixed_) {
+            return self::mixed();
+        }"""),
         ("""        if ($decl instanceof CfgType\\Literal) {
             return self::fromDecl($decl->name);
         }
