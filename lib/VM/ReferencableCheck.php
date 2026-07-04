@@ -6,13 +6,13 @@ namespace PHPCompiler\VM;
 
 use PHPCfg\Operand;
 use PHPCfg\Operand\Temporary;
-use PHPCfg\Op\Expr\Array_ as ArrayExpr;
 use PHPCfg\Op\Expr\Cast\Object_ as ObjectCastExpr;
 use PHPCompiler\Block;
 use PHPCompiler\BuiltinByRefParams;
 use PHPCompiler\BuiltinParamNames;
 use PHPCompiler\Frame;
 use PHPCompiler\Func;
+use PHPCompiler\OpCode;
 use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPCompiler\VM\ErrorReporter;
 
@@ -194,15 +194,22 @@ final class ReferencableCheck
                 if (Variable::TYPE_NULL === $calledArgs[$paramIdx]->resolveIndirect()->type) {
                     $paramName = $paramNames[$paramIdx] ?? 'param'.($paramIdx + 1);
                     self::assertArgument($fn, $paramIdx, $paramName, $calledArgs[$paramIdx], $caller);
-                } elseif (
-                    !self::isReferenceable($calledArgs[$paramIdx], $caller)
-                    && !(
+                } elseif (!self::isReferenceable($calledArgs[$paramIdx], $caller)) {
+                    if (
                         'array_splice' === strtolower($fn)
-                        && self::isObjectOperand($calledArgs[$paramIdx])
-                    )
-                ) {
-                    // #13435: shuffle/sort* on non-lvalue (e.g. new stdClass()) — E_NOTICE then TypeError.
-                    self::emitNonVariableByRefNotice($caller);
+                        && self::isEphemeralObjectCastArg($calledArgs[$paramIdx], $caller)
+                    ) {
+                        $paramName = $paramNames[$paramIdx] ?? 'param'.($paramIdx + 1);
+                        self::assertArgument($fn, $paramIdx, $paramName, $calledArgs[$paramIdx], $caller);
+                    } elseif (
+                        !(
+                            'array_splice' === strtolower($fn)
+                            && self::isObjectOperand($calledArgs[$paramIdx])
+                        )
+                    ) {
+                        // #13435: shuffle/sort* on non-lvalue (e.g. new stdClass()) — E_NOTICE then TypeError.
+                        self::emitNonVariableByRefNotice($caller);
+                    }
                 }
                 continue;
             }
@@ -225,6 +232,10 @@ final class ReferencableCheck
                 && !self::isReferenceable($calledArgs[$paramIdx], $caller)
                 && self::isArrayOrObjectOperand($calledArgs[$paramIdx])
             ) {
+                if (self::isEphemeralObjectCastArg($calledArgs[$paramIdx], $caller)) {
+                    $paramName = $paramNames[$paramIdx] ?? 'param'.($paramIdx + 1);
+                    self::assertArgument($fn, $paramIdx, $paramName, $calledArgs[$paramIdx], $caller);
+                }
                 if (self::shouldEmitNonVariableObjectByRefNotice($calledArgs[$paramIdx], $caller)) {
                     self::emitNonVariableByRefNotice($caller);
                 }
@@ -321,71 +332,77 @@ final class ReferencableCheck
         return \in_array(strtolower($fn), ['array_walk', 'array_walk_recursive'], true);
     }
 
-    /** Runtime: notice only for ephemeral empty objects (new stdClass()), not (object) array casts (#15874). */
+    /** Runtime: notice only for ephemeral `new` objects, not inline (object) casts (#13237, #15948). */
     public static function shouldEmitNonVariableObjectByRefNotice(Variable $arg, Frame $caller, ?Operand $operand = null): bool
     {
-        if (self::objectOperandHasDynamicProperties($arg)) {
-            return false;
-        }
-        if (null !== $operand && self::operandIsObjectCastFromNonEmptyArray($operand)) {
-            return false;
-        }
-        if (self::isNonEmptyEphemeralArrayArg($arg, $caller)) {
+        if (self::isEphemeralObjectCastArg($arg, $caller)) {
             return false;
         }
 
         return true;
     }
 
-    /** Compile-time: skip notice for inline (object)[...] haystack operands (#15874). */
-    public static function shouldEmitNonVariableObjectByRefNoticeAtCompileTime(?Operand $operand): bool
+    /** Compile-time: skip notice for inline (object) casts — emit by-ref Error instead (#15948). */
+    public static function shouldEmitNonVariableObjectByRefNoticeAtCompileTime(?Operand $operand, ?Block $block = null): bool
     {
-        if (null !== $operand && self::operandIsObjectCastFromNonEmptyArray($operand)) {
+        if (self::operandIsObjectCast($operand, $block)) {
             return false;
         }
 
         return true;
     }
 
-    private static function objectOperandHasDynamicProperties(Variable $arg): bool
+    /** Inline (object) cast operand — by-ref Error on PHP 8.2+ (#15948, ext/standard/array.c). */
+    public static function isEphemeralObjectCastArg(Variable $arg, Frame $caller): bool
     {
+        if ($arg->isIndirect()) {
+            return false;
+        }
         $resolved = $arg->resolveIndirect();
         if (Variable::TYPE_OBJECT !== $resolved->type) {
             return false;
         }
+        $slot = self::scopeSlotForVariable($caller, $arg);
+        if (null === $slot || null === $caller->block) {
+            return false;
+        }
 
-        return [] !== $resolved->toObject()->propertiesWithNames();
+        return self::scopeSlotIsObjectCastResult($caller->block, $slot);
     }
 
-    private static function operandIsObjectCastFromNonEmptyArray(Operand $operand): bool
+    public static function scopeSlotIsObjectCastResult(Block $block, int $slot): bool
     {
-        $current = $operand;
-        while ($current instanceof Temporary && null !== $current->original) {
-            $current = $current->original;
-        }
-        foreach ($current->usages as $usage) {
-            if ($usage instanceof ObjectCastExpr && $usage->result === $current) {
-                $inner = $usage->expr ?? null;
-
-                return $inner instanceof ArrayExpr && [] !== ($inner->values ?? []);
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_CAST_OBJECT === $op->type && (int) $op->arg1 === $slot) {
+                return true;
             }
         }
 
         return false;
     }
 
-    /** Inline non-empty array literal — (object) cast may still read as array on the by-ref send path (#15874). */
-    private static function isNonEmptyEphemeralArrayArg(Variable $arg, Frame $caller): bool
+    public static function operandIsObjectCast(?Operand $operand, ?Block $block = null): bool
     {
-        if (!self::isEphemeralArrayArg($arg, $caller)) {
+        if (null === $operand) {
             return false;
         }
-        $resolved = $arg->resolveIndirect();
-        if (Variable::TYPE_ARRAY !== $resolved->type) {
-            return false;
+        $current = $operand;
+        while ($current instanceof Temporary && null !== $current->original) {
+            $current = $current->original;
+        }
+        foreach ($current->usages as $usage) {
+            if ($usage instanceof ObjectCastExpr && $usage->result === $current) {
+                return true;
+            }
+        }
+        if (null !== $block) {
+            $slot = $block->slotForOperand($operand);
+            if (null !== $slot) {
+                return self::scopeSlotIsObjectCastResult($block, $slot);
+            }
         }
 
-        return 0 !== $resolved->toArray()->count();
+        return false;
     }
 
     /** Operand is array or object — other types get TypeError in the builtin (#11984). */
@@ -482,15 +499,18 @@ final class ReferencableCheck
         if ($caller->block->isNamedVariableSlot($slot)) {
             return true;
         }
+        $operand = $caller->block->operandForScopeSlot($slot);
+        if (null !== $operand && null !== Block::resolveVariableName($operand)) {
+            return true;
+        }
         if (isset($caller->block->constants[$slot])) {
             return false;
         }
-        $operand = $caller->block->operandForScopeSlot($slot);
         if (null === $operand) {
             return false;
         }
 
-        return null !== Block::resolveVariableName($operand);
+        return false;
     }
 
     private static function scopeSlotForVariable(Frame $frame, Variable $var): ?int

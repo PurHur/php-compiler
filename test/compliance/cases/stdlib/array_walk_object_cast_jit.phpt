@@ -1,5 +1,5 @@
 --TEST--
-stdlib array_walk() — inline (object) cast by-ref Error (#15948, ext/standard/array.c)
+stdlib array_walk() — inline (object) cast by-ref Error JIT (#15948, ext/standard/array.c)
 --FILE--
 <?php
 try {
