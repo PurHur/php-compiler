@@ -7680,6 +7680,9 @@ class Compiler {
                 $finallyOp->block2 = $merge;
                 $block->addOpCode($finallyOp);
                 $this->rewriteMergeJumpsToFinally($try, $merge, $compiledFinally);
+                if (null !== $stmt->else && isset($this->seen[$stmt->else])) {
+                    $this->rewriteMergeJumpsToFinally($this->seen[$stmt->else], $merge, $compiledFinally);
+                }
             }
         } elseif ($stmt instanceof Op\Stmt\Switch_) {
             $this->compileSwitchAsJumpIfChain($stmt, $block);

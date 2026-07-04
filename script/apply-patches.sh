@@ -5194,13 +5194,35 @@ apply_php_cfg_trycatch_overlay() {
   local parser="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php"
   local op="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/TryCatch.php"
   local overlay="$PATCH_DIR/overlays/php-cfg"
-  if grep -q 'new Op\\Stmt\\TryCatch' "$parser" 2>/dev/null; then
-    echo "Skip php-cfg-trycatch.patch (already applied)"
-    return 0
-  fi
   if [[ ! -f "$overlay/Op/Stmt/TryCatch.php" || ! -f "$overlay/trycatch-parser-method.php" ]]; then
     echo "Skip php-cfg-trycatch.patch (overlay files missing)" >&2
     return 1
+  fi
+  if grep -q 'new Op\\Stmt\\TryCatch' "$parser" 2>/dev/null; then
+    if grep -q 'compilerTryCatchElseSource' "$parser" 2>/dev/null \
+      && grep -q 'public \$else;' "$op" 2>/dev/null; then
+      echo "Skip php-cfg-trycatch.patch (already applied)"
+      return 0
+    fi
+    mkdir -p "$(dirname "$op")"
+    cp "$overlay/Op/Stmt/TryCatch.php" "$op"
+    python3 - "$parser" "$overlay/trycatch-parser-method.php" <<'PY'
+import re, sys
+from pathlib import Path
+
+parser_path = Path(sys.argv[1])
+method_path = Path(sys.argv[2])
+new = method_path.read_text().rstrip("\n")
+text = parser_path.read_text()
+pat = r'    protected function parseStmt_TryCatch\(Stmt\\TryCatch \$node\)\s*\{.*?\n    \}\n\n    protected function parseStmt_Unset'
+m = re.search(pat, text, re.DOTALL)
+if not m:
+    sys.stderr.write("php-cfg-trycatch: parseStmt_TryCatch block not found for refresh\n")
+    sys.exit(1)
+parser_path.write_text(text[:m.start()] + new + "\n\n    protected function parseStmt_Unset" + text[m.end():])
+PY
+    echo "Refreshed php-cfg-trycatch.patch (try/catch/else overlay #15817)"
+    return 0
   fi
   mkdir -p "$(dirname "$op")"
   cp "$overlay/Op/Stmt/TryCatch.php" "$op"

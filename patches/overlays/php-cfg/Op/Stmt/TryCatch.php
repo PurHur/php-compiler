@@ -19,6 +19,9 @@ class TryCatch extends Stmt
     /** @var Block|null */
     public $finally;
 
+    /** @var Block|null PHP 8.4+ else when no exception (#15817) */
+    public $else;
+
     /** @var Block */
     public $end;
 
@@ -40,12 +43,14 @@ class TryCatch extends Stmt
         Block $end,
         array $catchTypes,
         array $catchVars,
-        array $attributes = []
+        array $attributes = [],
+        ?Block $else = null
     ) {
         parent::__construct($attributes);
         $this->try = $try;
         $this->catches = $catches;
         $this->finally = $finally;
+        $this->else = $else;
         $this->end = $end;
         $this->catchTypes = $catchTypes;
         $this->catchVars = $catchVars;
@@ -53,7 +58,7 @@ class TryCatch extends Stmt
 
     public function getSubBlocks(): array
     {
-        return ['try', 'catches', 'finally', 'end'];
+        return ['try', 'catches', 'finally', 'else', 'end'];
     }
 
     public function getType(): string
