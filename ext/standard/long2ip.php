@@ -9,7 +9,6 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
@@ -25,16 +24,13 @@ final class long2ip extends Internal
     public function execute(Frame $frame): void
     {
         if (1 !== \count($frame->calledArgs)) {
-            throw new \LogicException('long2ip() requires exactly one argument in this compiler build');
-        }
-        $arg = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_INTEGER !== $arg->type) {
-            throw new \LogicException('long2ip() argument must be an integer in this compiler build');
+            throw new \ArgumentCountError('long2ip() expects exactly 1 argument, '.\count($frame->calledArgs).' given');
         }
         if (null === $frame->returnVar) {
             return;
         }
-        $result = VmInet::long2ip($arg->toInt());
+        $properAddress = VmMath::parseIntBuiltinArgForFrame($frame, 0, 'long2ip', 1, 'proper_address');
+        $result = VmInet::long2ip($properAddress);
         if (false === $result) {
             $frame->returnVar->bool(false);
 
@@ -46,7 +42,7 @@ final class long2ip extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         if (1 !== \count($args)) {
-            throw new \LogicException('long2ip() requires exactly one argument in this compiler build');
+            throw new \ArgumentCountError('long2ip() expects exactly 1 argument, '.\count($args).' given');
         }
 
         return JitInet::long2ip(
