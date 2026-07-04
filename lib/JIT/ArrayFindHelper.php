@@ -8,6 +8,7 @@ use PHPCompiler\ext\standard\boolval;
 use PHPCompiler\ext\standard\JitArrayElem;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
+use PHPCompiler\VM\Variable as VmVariable;
 use PHPLLVM\BasicBlock;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -32,22 +33,44 @@ final class ArrayFindHelper
         return self::buildFromArray($context, $array, $callback, self::MODE_FIND_KEY);
     }
 
-    public static function buildAnyArray(Context $context, Variable $array, Variable $callback): Value
-    {
-        return self::buildFromArray($context, $array, $callback, self::MODE_ANY);
+    public static function buildAnyArray(
+        Context $context,
+        Variable $array,
+        Variable $callback,
+        ?Variable $strictArg = null
+    ): Value {
+        return self::buildFromArray(
+            $context,
+            $array,
+            $callback,
+            self::MODE_ANY,
+            self::resolveStrictI1($context, $strictArg)
+        );
     }
 
-    public static function buildAllArray(Context $context, Variable $array, Variable $callback): Value
-    {
-        return self::buildFromArray($context, $array, $callback, self::MODE_ALL);
+    public static function buildAllArray(
+        Context $context,
+        Variable $array,
+        Variable $callback,
+        ?Variable $strictArg = null
+    ): Value {
+        return self::buildFromArray(
+            $context,
+            $array,
+            $callback,
+            self::MODE_ALL,
+            self::resolveStrictI1($context, $strictArg)
+        );
     }
 
     private static function buildFromArray(
         Context $context,
         Variable $array,
         Variable $callback,
-        int $mode
+        int $mode,
+        ?Value $strictI1 = null
     ): Value {
+        $strictI1 ??= $context->constantFromBool(false);
         JitArrayElem::requireArrayArg($context, $array, self::functionNameForMode($mode));
         if (self::MODE_FIND === $mode || self::MODE_FIND_KEY === $mode) {
             self::requireNonEmptyFindArray($context, $array, self::functionNameForMode($mode));
@@ -56,14 +79,15 @@ final class ArrayFindHelper
             throw new \LogicException(ArrayFindCallbackPolicy::jitRejectionMessage());
         }
         if (ArrayBuiltinHelper::isNativeArray($array->type)) {
-            return self::buildFromNativeArray($context, $array, $callback, $mode);
+            return self::buildFromNativeArray($context, $array, $callback, $mode, $strictI1);
         }
 
         return self::buildFromHashTable(
             $context,
             ArrayBuiltinHelper::loadHashTable($context, $array),
             $callback,
-            $mode
+            $mode,
+            $strictI1
         );
     }
 
@@ -71,7 +95,8 @@ final class ArrayFindHelper
         Context $context,
         Variable $array,
         Variable $callback,
-        int $mode
+        int $mode,
+        Value $strictI1
     ): Value {
         $handler = self::resolvePredicateHandler($context, $callback);
         $elemType = $array->type & ~Variable::IS_NATIVE_ARRAY;
@@ -118,7 +143,7 @@ final class ArrayFindHelper
             );
         }
         $keyVar = self::indexToKeyVariable($context, $idx);
-        $truthy = self::invokePredicateTruthy($context, $handler, $elem, $keyVar);
+        $truthy = self::invokePredicateMatch($context, $handler, $elem, $keyVar, $strictI1);
         $shouldStop = self::stopOnPredicate($context, $truthy, $mode);
         $context->builder->branchIf($shouldStop, $match, $advance);
 
@@ -152,7 +177,8 @@ final class ArrayFindHelper
         Context $context,
         Value $ht,
         Variable $callback,
-        int $mode
+        int $mode,
+        Value $strictI1
     ): Value {
         $handler = self::resolvePredicateHandler($context, $callback);
         $map = $context->structFieldMap['__hashtable__'];
@@ -201,7 +227,7 @@ final class ArrayFindHelper
         $context->builder->positionAtEnd($packedCheck);
         $elem = HashTableHelper::readIndexedToValueBox($context, $ht, $idx);
         $keyVar = self::indexToKeyVariable($context, $idx);
-        $truthy = self::invokePredicateTruthy($context, $handler, $elem, $keyVar);
+        $truthy = self::invokePredicateMatch($context, $handler, $elem, $keyVar, $strictI1);
         $shouldStop = self::stopOnPredicate($context, $truthy, $mode);
         $context->builder->branchIf($shouldStop, $packedMatch, $packedNext);
 
@@ -227,7 +253,7 @@ final class ArrayFindHelper
         $context->builder->branch($packedHead);
 
         $context->builder->positionAtEnd($packedDone);
-        self::buildStringKeyPredicateLoop($context, $ht, $handler, $mode, $resultSlot, $boolSlot, $done);
+        self::buildStringKeyPredicateLoop($context, $ht, $handler, $mode, $resultSlot, $boolSlot, $done, $strictI1);
 
         $context->builder->positionAtEnd($done);
         $retBlock = BasicBlockHelper::append($context, 'array_find_ht_return');
@@ -244,7 +270,8 @@ final class ArrayFindHelper
         int $mode,
         ?Value $resultSlot,
         ?Value $boolSlot,
-        BasicBlock $doneBlock
+        BasicBlock $doneBlock,
+        Value $strictI1
     ): void {
         $map = $context->structFieldMap['__hashtable__'];
         $nodeMap = $context->structFieldMap['__strkey_node__'];
@@ -344,7 +371,7 @@ final class ArrayFindHelper
         $elem = new Variable($context, Variable::TYPE_VALUE, Variable::KIND_VARIABLE, $elemSlot);
         $keyStr = $context->builder->load($context->builder->structGep($node, $nodeMap['key']));
         $keyVar = self::separatedStringToKeyVariable($context, $keyStr);
-        $truthy = self::invokePredicateTruthy($context, $handler, $elem, $keyVar);
+        $truthy = self::invokePredicateMatch($context, $handler, $elem, $keyVar, $strictI1);
         $shouldStop = self::stopOnPredicate($context, $truthy, $mode);
         $context->builder->branchIf($shouldStop, $strMatch, $strNext);
 
@@ -422,23 +449,77 @@ final class ArrayFindHelper
         return ['builtin', ArrayBuiltinHelper::resolveMapCallbackForFind($callback)];
     }
 
-    private static function invokePredicateTruthy(
+    private static function invokePredicateMatch(
         Context $context,
         array $handler,
         Variable $elem,
         Variable $key,
+        Value $strictI1,
     ): Value {
         [$kind, $target] = $handler;
         if ('builtin' === $kind) {
             /** @var Internal $target */
             $mapped = $target->call($context, $elem, $key);
 
-            return self::jitCallResultTruthy($context, $mapped);
+            return self::jitCallResultMatch($context, $mapped, $strictI1);
         }
         /** @var Call $target */
         $result = $target->call($context, $elem, $key);
 
-        return self::jitCallResultTruthy($context, $result);
+        return self::jitCallResultMatch($context, $result, $strictI1);
+    }
+
+    private static function resolveStrictI1(Context $context, ?Variable $strictArg): Value
+    {
+        if (null === $strictArg) {
+            return $context->constantFromBool(false);
+        }
+
+        return JitBoolArg::lower($context, $strictArg, 'array_all_key() strict');
+    }
+
+    private static function jitCallResultMatch(Context $context, Value $result, Value $strictI1): Value
+    {
+        $truthy = self::jitCallResultTruthy($context, $result);
+        $strictTrue = self::jitCallResultStrictTrue($context, $result);
+
+        return $context->builder->select($strictI1, $strictTrue, $truthy);
+    }
+
+    private static function jitCallResultStrictTrue(Context $context, Value $result): Value
+    {
+        $i1 = $context->getTypeFromString('int1');
+        $false = $i1->constInt(0, false);
+        $ty = $context->getStringFromType($result->typeOf());
+        if ('int1' === $ty) {
+            return $result;
+        }
+        if ('int64' === $ty || 'double' === $ty) {
+            return $false;
+        }
+        if ('__value__' === $ty) {
+            $slot = BasicBlockHelper::entryAlloca($context, $result->typeOf());
+            $context->builder->store($result, $slot);
+            $valuePtr = JitValueBox::pointer($context, $slot);
+        } elseif ('__value__*' === $ty) {
+            $valuePtr = $result;
+        } else {
+            return $false;
+        }
+        $valueMap = $context->structFieldMap['__value__'];
+        $i8 = $context->getTypeFromString('int8');
+        $i64 = $context->getTypeFromString('int64');
+        $zero = $i64->constInt(0, false);
+        $typeByte = $context->builder->load($context->builder->structGep($valuePtr, $valueMap['type']));
+        $isBool = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(VmVariable::TYPE_BOOLEAN, false)
+        );
+        $longVal = $context->builder->call($context->lookupFunction('__value__readLong'), $valuePtr);
+        $isTrue = $context->builder->icmp(Builder::INT_NE, $longVal, $zero);
+
+        return $context->builder->and($isBool, $isTrue);
     }
 
     private static function indexToKeyVariable(Context $context, Value $idx): Variable

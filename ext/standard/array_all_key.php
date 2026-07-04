@@ -16,12 +16,12 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\ArrayFindCallbackPolicy;
 use PHPCompiler\JIT\ArrayFindHelper;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitBoolArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
  * array_all_key() — true when every element matches a key-aware predicate (PHP 8.4; ext/standard/array.c).
+ * JIT/AOT: optional $strict third parameter via ArrayFindHelper (#15704).
  */
 final class array_all_key extends Internal
 {
@@ -53,10 +53,14 @@ final class array_all_key extends Internal
             throw new \LogicException('array_all_key() requires two or three arguments in this compiler build');
         }
         if (3 === $argc) {
-            JitBoolArg::lower($context, $args[2], 'array_all_key() strict');
-            throw new \LogicException(
-                'array_all_key() $strict third parameter is VM-only in this compiler build'
-            );
+            if (!ArrayFindCallbackPolicy::isJitLowerable($args[1])) {
+                throw new \LogicException(ArrayFindCallbackPolicy::jitRejectionMessage());
+            }
+            if (JITVariable::TYPE_STRING === $args[1]->type || JITVariable::TYPE_VALUE === $args[1]->type) {
+                $this->jitString($context, $args[1], 'array_all_key() callback');
+            }
+
+            return ArrayFindHelper::buildAllArray($context, $args[0], $args[1], $args[2]);
         }
         if (!ArrayFindCallbackPolicy::isJitLowerable($args[1])) {
             throw new \LogicException(ArrayFindCallbackPolicy::jitRejectionMessage());
