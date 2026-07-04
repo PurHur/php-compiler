@@ -266,8 +266,7 @@ final class ScopeBuiltinEmitHelper
     {
         $local = ScopeBuiltinHelper::findVariableByName($context, $name);
         if (null !== $local) {
-            $keyStr = $context->builder->load($context->constantStringFromString($name));
-            self::storeVariableSnapshotAtStringKey($context, $result, $keyStr, $local);
+            self::addCompactLocalByName($context, $result, $name, $local);
 
             return;
         }
@@ -279,6 +278,43 @@ final class ScopeBuiltinEmitHelper
             return;
         }
         self::addCompactFromScriptGlobal($context, $result, $name);
+    }
+
+    /** CV may exist before first assign — runtime assigned flag like VM initializedSlots (#10164). */
+    private static function addCompactLocalByName(
+        Context $context,
+        Value $result,
+        string $name,
+        Variable $local
+    ): void {
+        $block = $context->jitCurrentBlock ?? $context->jitEnclosingBlock;
+        if (!$block instanceof \PHPCompiler\Block || null === $block->slotIndexForVariableName($name)) {
+            $keyStr = $context->builder->load($context->constantStringFromString($name));
+            self::storeVariableSnapshotAtStringKey($context, $result, $keyStr, $local);
+
+            return;
+        }
+
+        $tag = 'cl'.(string) ++self::$blockSeq;
+        $okBlock = BasicBlockHelper::append($context, 'compact_local_ok_'.$tag);
+        $missBlock = BasicBlockHelper::append($context, 'compact_local_miss_'.$tag);
+        $doneBlock = BasicBlockHelper::append($context, 'compact_local_done_'.$tag);
+        $isAssigned = ScopeVariableAssignedFlags::isAssignedCondition(
+            $context,
+            ScopeVariableAssignedFlags::flagKey($context, $name)
+        );
+        $context->builder->branchIf($isAssigned, $okBlock, $missBlock);
+
+        $context->builder->positionAtEnd($okBlock);
+        $keyStr = $context->builder->load($context->constantStringFromString($name));
+        self::storeVariableSnapshotAtStringKey($context, $result, $keyStr, $local);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($missBlock);
+        self::emitCompactUndefinedVariableWarning($context, $name);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
     }
 
     /** $GLOBALS-only symbols — runtime isset before import (#11743, php-src zif_compact). */
