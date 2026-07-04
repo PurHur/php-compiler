@@ -1,5 +1,5 @@
 --TEST--
-Stdlib: ReflectionEnumUnitCase::getValue() on unit enum throws Error (php_reflection.c, #7055)
+Stdlib: ReflectionEnumUnitCase::getValue() returns enum case object (php_reflection.c, #16178)
 --FILE--
 <?php
 enum Pure {
@@ -7,12 +7,9 @@ enum Pure {
 }
 
 $r = new ReflectionEnumUnitCase(Pure::class, 'A');
-try {
-    $r->getValue();
-    echo "no throw\n";
-} catch (Error $e) {
-    echo $e::class, ': ', $e->getMessage(), "\n";
-}
+var_export($r->getValue());
+echo "\n";
+echo $r->getValue()->name, "\n";
 
 enum Backed: string {
     case A = 'x';
@@ -22,5 +19,6 @@ $rb = new ReflectionEnumUnitCase(Backed::class, 'A');
 var_export($rb->getValue());
 echo "\n";
 --EXPECT--
-Error: Cannot get value of a pure enum case
+\Pure::A
+A
 \Backed::A
