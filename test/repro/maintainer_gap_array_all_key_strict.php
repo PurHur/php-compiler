@@ -2,8 +2,12 @@
 
 declare(strict_types=1);
 
-if (!function_exists('array_all_key') || !function_exists('array_any_key')) {
-    echo "fail: array_all_key()/array_any_key() not registered\n";
+if (!function_exists('array_all_key')) {
+    echo "fail: array_all_key() not registered\n";
+    exit(1);
+}
+if (!function_exists('array_any_key')) {
+    echo "fail: array_any_key() not registered\n";
     exit(1);
 }
 
