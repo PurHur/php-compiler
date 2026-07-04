@@ -214,9 +214,7 @@ final class VmJsonFormat
 
     private static function encodeStringValue(string $value, int $flags): string
     {
-        if (VmJsonFlags::substitutesInvalidUtf8($flags) && !VmJsonUtf8::isValidUtf8($value)) {
-            $value = VmJsonUtf8::substituteInvalidUtf8($value);
-        }
+        $value = self::prepareUtf8StringForEncode($value, $flags);
         if (0 !== ($flags & VmJsonFlags::NUMERIC_CHECK)) {
             $numeric = self::tryEncodeNumericStringValue($value, $flags);
             if (null !== $numeric) {
@@ -291,8 +289,24 @@ final class VmJsonFormat
         return 0.0 == $num && 0.0 !== \atan2(0.0, $num);
     }
 
+    /**
+     * php-src ext/json/php_json_encoder.c — reject malformed UTF-8 unless JSON_INVALID_UTF8_* (#9205).
+     */
+    private static function prepareUtf8StringForEncode(string $value, int $flags): string
+    {
+        if (VmJsonUtf8::isValidUtf8($value)) {
+            return $value;
+        }
+        if (VmJsonFlags::substitutesInvalidUtf8($flags)) {
+            return VmJsonUtf8::substituteInvalidUtf8($value);
+        }
+
+        throw new VmJsonExportException(5);
+    }
+
     private static function escapeString(string $value, int $flags): string
     {
+        $value = self::prepareUtf8StringForEncode($value, $flags);
         $unescapedUnicode = 0 !== ($flags & VmJsonFlags::UNESCAPED_UNICODE);
         $unescapedSlashes = 0 !== ($flags & VmJsonFlags::UNESCAPED_SLASHES);
         $out = '';

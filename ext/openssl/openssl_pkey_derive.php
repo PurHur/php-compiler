@@ -32,6 +32,13 @@ final class openssl_pkey_derive extends Internal
             return;
         }
 
+        $publicArg = $frame->calledArgs[0]->resolveIndirect();
+        if (\PHPCompiler\VM\Variable::TYPE_NULL === $publicArg->type) {
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+
         $publicPem = VmOpenssl::coercePkeyPem($frame->calledArgs[0], 'openssl_pkey_derive', 0, 'public_key');
         $privatePem = VmOpenssl::coercePkeyPem($frame->calledArgs[1], 'openssl_pkey_derive', 1, 'private_key');
         $keyLength = 0;
