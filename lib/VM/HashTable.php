@@ -1347,18 +1347,20 @@ final class HashTable {
 
             return $out;
         }
-        $prepend = [];
+        $out = new self();
         for ($i = 0; $i < $padCount; ++$i) {
             $copy = new Variable();
             $copy->copyFrom($pad);
-            $prepend[] = $copy;
+            $out->addIndex($i, $copy);
         }
-        $out = new self();
-        $out->unshiftPrepend(...$prepend);
-        foreach ($this->iterate(true) as $element) {
+        foreach ($this->iterateKeyed(true) as [$key, $element]) {
             $copy = new Variable();
             $copy->copyFrom($element);
-            $out->append($copy);
+            if (Variable::TYPE_INTEGER === $key->type) {
+                $out->addIndex($key->toInt() + $padCount, $copy);
+            } else {
+                $out->add($key->toString(), $copy);
+            }
         }
 
         return $out;
