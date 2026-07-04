@@ -31511,7 +31511,11 @@ class Compiler {
                     $valueSlot = $nestedCallArgSlot;
                 }
             }
-            if (null !== $cfgCallOp) {
+            if (
+                null !== $cfgCallOp
+                && !($cfgCallOp instanceof Op\Expr\MethodCall)
+                && !($cfgCallOp instanceof Op\Expr\NullsafeMethodCall)
+            ) {
                 $immediatePropertyOrMethodSlot = $this->slotForImmediatePropertyOrMethodFetchBeforeCfgCall(
                     $block,
                     $cfgCallOp,
@@ -31524,6 +31528,11 @@ class Compiler {
                     if (null !== $siblingSendSlot) {
                         $valueSlot = $siblingSendSlot;
                     }
+                }
+            } elseif (null !== $cfgCallOp && null !== $block->orig) {
+                $siblingSendSlot = $this->finalSiblingInlineCallArgSendSlot($block, $cfgCallOp, (int) $argIndex);
+                if (null !== $siblingSendSlot) {
+                    $valueSlot = $siblingSendSlot;
                 }
             }
             $sends[] = new OpCode(OpCode::TYPE_ARG_SEND, $valueSlot, $nameSlot, $unpackFlag);
