@@ -16,8 +16,8 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Builtin\StringStrrpos;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringArg;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
@@ -31,13 +31,11 @@ final class strrpos extends Internal
         if ($argc < 2 || $argc > 3) {
             throw new \LogicException('strrpos() requires two or three arguments');
         }
-        $haystack = $frame->calledArgs[0]->resolveIndirect();
-        $needle = $frame->calledArgs[1]->resolveIndirect();
+        $haystackStr = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'strrpos', 0, 'haystack');
+        $needleStr = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'strrpos', 1, 'needle');
         if (null === $frame->returnVar) {
             return;
         }
-        $haystackStr = VmString::coerceOperand($haystack);
-        $needleStr = VmString::coerceOperand($needle);
         $offset = 0;
         if (3 === $argc) {
             $offset = VmMath::parseIntBuiltinArgForFrame($frame, 2, 'strrpos', 3, 'offset');
@@ -72,8 +70,8 @@ final class strrpos extends Internal
         }
 
         StringStrrpos::ensureLinked($context);
-        $hay = $this->jitString($context, $args[0], 'strrpos() argument #1');
-        $needle = $this->jitString($context, $args[1], 'strrpos() argument #2');
+        $hay = JitStringBuiltinArg::lower($context, $args[0], 'strrpos', 0, 'haystack');
+        $needle = JitStringBuiltinArg::lower($context, $args[1], 'strrpos', 1, 'needle');
         $offset = 3 === $argc
             ? JitIntdiv::lowerIntBuiltinArg($context, $args[2], 'strrpos', 3, 'offset')
             : null;
