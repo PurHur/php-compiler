@@ -12499,6 +12499,25 @@ class Compiler {
                 $procOpenProducers,
                 static fn (Op\Expr $producer): bool => $producer instanceof Op\Expr\Array_
             ));
+            if (0 === $argIndex) {
+                $commandArg = $callOp->args[0] ?? null;
+                if ($commandArg instanceof Operand) {
+                    $embeddedCommand = $this->unwrapArrayLiteralExpr($commandArg);
+                    if ($embeddedCommand instanceof Op\Expr\Array_) {
+                        return $embeddedCommand;
+                    }
+                }
+            }
+            if (\in_array($argIndex, [0, 1], true) && [] !== $arrayProducers) {
+                $matched = $this->matchInlineArrayProducersToArrayCallArgs(
+                    $procOpenProducers,
+                    $callOp->args,
+                    $argIndex
+                );
+                if ($matched instanceof Op\Expr\Array_) {
+                    return $matched;
+                }
+            }
             if (1 === $argIndex && [] !== $arrayProducers) {
                 $outer = $this->matchOutermostNestedInlineArrayProducerForCallArg(
                     $procOpenProducers,
@@ -21070,6 +21089,35 @@ class Compiler {
      */
     private function inlineArrayLiteralForDeadCallArg(Op $callOp, int $argIndex, Block $block): ?Op\Expr\Array_
     {
+        if (
+            'proc_open' === $this->resolveCfgFuncCallName($callOp)
+            && \in_array($argIndex, [0, 1], true)
+            && \is_array($callOp->args ?? null)
+        ) {
+            if (0 === $argIndex) {
+                $commandArg = $callOp->args[0] ?? null;
+                if ($commandArg instanceof Operand) {
+                    $embeddedCommand = $this->unwrapArrayLiteralExpr($commandArg);
+                    if ($embeddedCommand instanceof Op\Expr\Array_) {
+                        return $embeddedCommand;
+                    }
+                }
+            }
+            if (null !== $block->orig) {
+                $procOpenProducers = $this->precedingInlineCallArgProducersBeforeCfgOp(
+                    $block->orig->children,
+                    $callOp
+                );
+                $matched = $this->matchInlineArrayProducersToArrayCallArgs(
+                    $procOpenProducers,
+                    $callOp->args,
+                    $argIndex
+                );
+                if ($matched instanceof Op\Expr\Array_) {
+                    return $matched;
+                }
+            }
+        }
         $immediate = $this->inlineArrayProducerImmediatelyBeforeCfgCall($callOp, $block);
         if ($immediate instanceof Op\Expr\Array_) {
             if (null !== $block->orig) {
@@ -29741,16 +29789,35 @@ class Compiler {
             if (
                 null !== $cfgCallOp
                 && 'proc_open' === $this->resolveCfgFuncCallName($cfgCallOp)
-                && \in_array((int) $argIndex, [0, 4], true)
-                && $this->callArgIsDeadInlineTemporary($arg)
-                && $this->callArgOperandExpectsArrayProducer($arg)
+                && \in_array((int) $argIndex, [0, 1, 4], true)
             ) {
-                $procOpenArray = $this->findInlineArrayProducerForCallArg(
-                    $arg,
-                    $block,
-                    $cfgCallOp,
-                    (int) $argIndex
-                );
+                $procOpenArray = null;
+                if (0 === (int) $argIndex) {
+                    $procOpenArray = $this->inlineArrayLiteralForDeadCallArg($cfgCallOp, 0, $block);
+                    if (!$procOpenArray instanceof Op\Expr\Array_) {
+                        $commandArg = $cfgCallOp->args[0] ?? $arg;
+                        if ($commandArg instanceof Operand) {
+                            $procOpenArray = $this->unwrapArrayLiteralExpr($commandArg);
+                        }
+                    }
+                }
+                if (
+                    !$procOpenArray instanceof Op\Expr\Array_
+                    && (
+                        0 === (int) $argIndex
+                        || (
+                            $this->callArgIsDeadInlineTemporary($arg)
+                            && $this->callArgOperandExpectsArrayProducer($arg)
+                        )
+                    )
+                ) {
+                    $procOpenArray = $this->findInlineArrayProducerForCallArg(
+                        $arg,
+                        $block,
+                        $cfgCallOp,
+                        (int) $argIndex
+                    );
+                }
                 if ($procOpenArray instanceof Op\Expr\Array_) {
                     $procOpenSlot = $block->slotForOperand($procOpenArray->result);
                     if (null === $procOpenSlot) {
@@ -29792,8 +29859,11 @@ class Compiler {
                         static fn (Op\Expr $producer): bool => $producer instanceof Op\Expr\Array_
                     ));
                     if (
-                        \count($siblingArrayProducers) >= 2
-                        && !$this->arrayProducersFormNestedChain($siblingArrayProducers)
+                        'proc_open' === strtolower($this->resolveCfgFuncCallName($cfgCallOp) ?? '')
+                        || (
+                            \count($siblingArrayProducers) >= 2
+                            && !$this->arrayProducersFormNestedChain($siblingArrayProducers)
+                        )
                     ) {
                         $inlineArrayProducer = $this->matchInlineArrayProducersToArrayCallArgs(
                             $arrayArgProducers,
@@ -32950,15 +33020,22 @@ class Compiler {
             return null;
         }
         $argCount = \count($cfgCallOp->args);
-        if (1 === $argIndex && $argCount >= 3 && $argCount < 5) {
-            $descriptorArg = $cfgCallOp->args[1] ?? null;
-            if (
-                $descriptorArg instanceof Operand
-                && $this->callArgIsDeadInlineTemporary($descriptorArg)
-                && $this->callArgOperandExpectsArrayProducer($descriptorArg)
-            ) {
-                return $this->resolveInlineArrayProducerSlotBeforeCfgCall($cfgCallOp, $block)
-                    ?? $this->resolveOutermostInitArraySlotBeforePendingFuncCall($block, $pendingSends);
+        if ($argCount >= 3 && $argCount < 5) {
+            if (0 === $argIndex) {
+                return $this->resolveProcOpenInlineArrayCallArgSlot($block, $cfgCallOp, $argIndex);
+            }
+            if (1 === $argIndex) {
+                $descriptorArg = $cfgCallOp->args[1] ?? null;
+                if (
+                    $descriptorArg instanceof Operand
+                    && $this->callArgIsDeadInlineTemporary($descriptorArg)
+                    && $this->callArgOperandExpectsArrayProducer($descriptorArg)
+                ) {
+                    return $this->resolveInlineArrayProducerSlotBeforeCfgCall($cfgCallOp, $block)
+                        ?? $this->resolveOutermostInitArraySlotBeforePendingFuncCall($block, $pendingSends);
+                }
+
+                return null;
             }
 
             return null;
