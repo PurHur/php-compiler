@@ -15564,10 +15564,10 @@ class Compiler {
                 return $leadingCallback;
             }
         }
-        // array_map(null, [[..], ..]) — ConstFetch callback + nested inline Array_ preludes (#9143).
+        // array_map(null, [[..], ..]) — ConstFetch callback + nested inline Array_ preludes (#9143, #16225).
         if (
             'array_map' === $inlineFuncName
-            && 2 === $argCount
+            && $argCount >= 2
             && null !== $block
             && null !== $cfgCallOp
         ) {
@@ -15576,7 +15576,7 @@ class Compiler {
                 if (0 === $argIndex) {
                     return $nullCallback;
                 }
-                if (1 === $argIndex) {
+                if (2 === $argCount && 1 === $argIndex) {
                     $immediate = $this->inlineArrayProducerImmediatelyBeforeCfgCall($cfgCallOp, $block);
                     if ($immediate instanceof Op\Expr\Array_) {
                         return $immediate;
@@ -30024,7 +30024,7 @@ class Compiler {
                 null !== $cfgCallOp
                 && null !== $block->orig
                 && 'array_map' === $this->resolveCfgFuncCallName($cfgCallOp)
-                && 2 === \count($cfgCallOp->args ?? [])
+                && \count($cfgCallOp->args ?? []) >= 2
             ) {
                 $fccInlineArgSlot = null;
                 $nullCallback = $this->arrayMapNullCallbackProducerBeforeCfgCall($cfgCallOp, $block);
@@ -30037,7 +30037,7 @@ class Compiler {
                             }
                             $fccInlineArgSlot = $block->slotForOperand($nullCallback->result);
                         }
-                    } elseif (1 === (int) $argIndex) {
+                    } elseif (2 === \count($cfgCallOp->args ?? []) && 1 === (int) $argIndex) {
                         $haystackArray = $this->inlineArrayProducerImmediatelyBeforeCfgCall($cfgCallOp, $block);
                         if ($haystackArray instanceof Op\Expr\Array_) {
                             $fccInlineArgSlot = $block->slotForOperand($haystackArray->result);
