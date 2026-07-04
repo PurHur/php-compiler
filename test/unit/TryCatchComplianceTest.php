@@ -390,6 +390,40 @@ try {
         );
     }
 
+    /** Issue #15872: try/finally must not read undefined TryCatch::$else during compile. */
+    public function testTryFinallyReturnNoCompileWarning(): void
+    {
+        $warnings = [];
+        set_error_handler(static function (int $errno, string $errstr) use (&$warnings): bool {
+            $warnings[] = $errstr;
+
+            return true;
+        });
+        try {
+            $runtime = new Runtime();
+            $block = $runtime->parseAndCompile(
+                '<?php
+function test(): int {
+    try { return 1; } finally { echo "f"; }
+}
+echo test();
+',
+                'test.php'
+            );
+            ob_start();
+            try {
+                $runtime->run($block);
+            } catch (VM\ScriptExit $e) {
+            }
+            $this->assertSame('f1', ob_get_clean());
+            foreach ($warnings as $warning) {
+                $this->assertStringNotContainsString('TryCatch::$else', $warning);
+            }
+        } finally {
+            restore_error_handler();
+        }
+    }
+
     public function testUncaughtThrowNonZeroExit(): void
     {
         $bin = realpath(__DIR__ . '/../../bin/vm.php');
