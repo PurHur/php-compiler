@@ -54,19 +54,22 @@ final class VmStreamSocketPure
 
         $errno = 0;
         $errstr = '';
+        $beforeSockets = VmSockets::enumerateSocketFds();
         $sock = @\stream_socket_client($remote, $errno, $errstr, $timeout, $flags);
         if (false === $sock) {
             return [false, $errno, '' !== $errstr ? $errstr : 'Connection refused', null];
         }
 
-        $handle = VmFs::adoptStreamResource($sock, $remote);
+        $socketFd = self::discoverNewSocketFd($beforeSockets);
+
+        $handle = VmFs::adoptStreamResource($sock, $remote, $socketFd);
         if (false === $handle) {
             @\fclose($sock);
 
             return [false, 0, 'Unable to create stream from socket', null];
         }
 
-        return [$handle, 0, '', null];
+        return [$handle, 0, '', $socketFd];
     }
 
     /**
