@@ -29,12 +29,19 @@ final class VmTryCatch
         if ('' === $encoded) {
             return true;
         }
-        $types = explode('|', $encoded);
         if (Variable::TYPE_OBJECT !== $thrown->type) {
             return false;
         }
-        $class = $thrown->toObject()->class;
-        foreach ($types as $typeName) {
+
+        return self::encodedTypesMatchClassEntry($encoded, $thrown->toObject()->class, $context);
+    }
+
+    public static function encodedTypesMatchClassEntry(string $encoded, ClassEntry $class, Context $context): bool
+    {
+        if ('' === $encoded) {
+            return true;
+        }
+        foreach (explode('|', $encoded) as $typeName) {
             if ('' === $typeName) {
                 continue;
             }
@@ -44,6 +51,19 @@ final class VmTryCatch
         }
 
         return false;
+    }
+
+    public static function encodedTypesMatchClassName(string $encoded, string $thrownClassLc, Context $context): bool
+    {
+        if ('' === $encoded) {
+            return true;
+        }
+        $entry = $context->classes[strtolower(ltrim($thrownClassLc, '\\'))] ?? null;
+        if (null === $entry) {
+            return false;
+        }
+
+        return self::encodedTypesMatchClassEntry($encoded, $entry, $context);
     }
 
     public static function objectIsInstanceOfClass(ClassEntry $class, string $typeName, Context $context): bool

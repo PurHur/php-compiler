@@ -37,4 +37,10 @@ final class VmTryCatchTest extends TestCase
         $this->assertFalse(VmTryCatch::encodedTypesMatchOpcode($op, $thrown, $ctx));
         $this->assertFalse(VmTryCatch::encodedTypesMatchVariable('exception', $thrown, $ctx));
     }
+
+    public function testEmptyEncodedTypesMatchClassName(): void
+    {
+        $ctx = new VMContext(new Runtime(Runtime::MODE_NORMAL));
+        $this->assertTrue(VmTryCatch::encodedTypesMatchClassName('', 'ex', $ctx));
+    }
 }
