@@ -20939,6 +20939,16 @@ class Compiler {
         }
         $arrayPreludeChain = $this->siblingFuncCallChainHasArrayPrelude($firstSibling, $consumerIndex, $cfgChildren);
         if ($arrayPreludeChain) {
+            if (
+                'array_pad' === strtolower($this->resolveCfgFuncCallName($consumer) ?? '')
+                && $this->priorStmtLevelCallSeparatedByHoistedArrayPreludeOnly(
+                    $producerIndex,
+                    $consumerIndex,
+                    $cfgChildren
+                )
+            ) {
+                return false;
+            }
             $producerOrdinal = $this->siblingInlineFuncCallProducerOrdinal(
                 $producerIndex,
                 $firstSibling,
@@ -22694,6 +22704,16 @@ class Compiler {
                 $block->orig->children
             );
             if (null === $producerIndex) {
+                return null;
+            }
+            if (
+                'array_pad' === strtolower($consumerName ?? '')
+                && $this->priorStmtLevelCallSeparatedByHoistedArrayPreludeOnly(
+                    $producerIndex,
+                    $callIndex,
+                    $block->orig->children
+                )
+            ) {
                 return null;
             }
         } else {
@@ -30458,6 +30478,8 @@ class Compiler {
                             }
                             if (null !== $padArraySlot) {
                                 $valueSlot = (string) $padArraySlot;
+                                // hold([]); array_pad([...], -N, 0) — do not let sibling EXEC_RETURN clobber haystack (#15421, #16066).
+                                $inlineArrayLiteralArgWired = true;
                             }
                             break;
                         }
@@ -30477,6 +30499,7 @@ class Compiler {
                             $lengthSlot = $block->slotForOperand($producer->result);
                             if (null !== $lengthSlot) {
                                 $valueSlot = (string) $lengthSlot;
+                                $inlineArrayLiteralArgWired = true;
                             }
                             break;
                         }
