@@ -22417,6 +22417,24 @@ class Compiler {
                 && $this->isAdjacentNestedFuncCallProducer($chainChild, $nextChild, $first, $first + 1)
                 && ($consumerIndex - $first) > $consumerArgCount
             ) {
+                // array_intersect(f(g()), f(g())) — dual outer producers; do not skip past first f() (#16050, #16031).
+                if (
+                    $this->isSiblingMultiArgInlineCallConsumer($consumer)
+                    && $consumerArgCount >= 2
+                    && property_exists($consumer, 'args')
+                    && \is_array($consumer->args)
+                ) {
+                    $outer = $this->outerSiblingInlineFuncCallProducers($first, $consumerIndex, $cfgChildren);
+                    $hoistedArgCount = 0;
+                    foreach ($consumer->args as $consumerArg) {
+                        if (null !== $consumerArg && !$this->isEmbeddedCallLiteralArg($consumerArg)) {
+                            ++$hoistedArgCount;
+                        }
+                    }
+                    if (\count($outer) === $hoistedArgCount && $hoistedArgCount >= 2) {
+                        break;
+                    }
+                }
                 ++$first;
                 continue;
             }
