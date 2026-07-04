@@ -12993,6 +12993,7 @@ class Compiler {
         }
 
         return \in_array($callee, [
+            'array_combine',
             'array_merge',
             'array_merge_recursive',
             'array_replace',
