@@ -279,11 +279,9 @@ final class VmScope
     private static function resolveCompactVariable(Frame $frame, Frame $caller, string $name): ?Variable
     {
         $value = self::callerVariable($caller, $name);
-        if (null !== $value) {
-            $resolved = $value->resolveIndirect();
-            if (!$resolved->isUndefined()) {
-                return $value;
-            }
+        // Zend zif_compact: CV slots exist before first assign but must warn+skip (#10164).
+        if (null !== $value && self::callerNameExists($caller, $name)) {
+            return $value;
         }
         if (null !== $frame->vmContext) {
             $key = new Variable(Variable::TYPE_STRING);
