@@ -20151,8 +20151,9 @@ class Compiler {
                 }
             }
 
-            // date_sun_info(strtotime(...), lat, -lon) / substr(sprintf(...), -N) — inline hoisted producers (#11336, #10673, #13801).
-            return false;
+            // var_dump(...); ini_get_all(null, false) — completed stmt callee, ConstFetch preludes only (#15931).
+            // date_sun_info(strtotime(...), lat, -lon) still handled via producerFeedsConsumerArg0ThroughLiteralPreludesOnly above.
+            return $producer instanceof Op\Expr\FuncCall || $producer instanceof Op\Expr\NsFuncCall;
         }
 
         return $producer instanceof Op\Expr\FuncCall || $producer instanceof Op\Expr\NsFuncCall;
