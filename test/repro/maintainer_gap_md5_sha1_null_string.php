@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 foreach (['md5', 'sha1'] as $fn) {
