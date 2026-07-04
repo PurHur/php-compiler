@@ -937,8 +937,7 @@ final class VmSerialize
     }
 
     /**
-     * Zend php_var_serialize() plain object branch — public properties + dynamic props (#3621, var.c).
-     * Private/protected mangling deferred to #3497.
+     * Zend php_var_serialize() plain object branch — all declared props + dynamic props (#3621, #15751, var.c).
      */
     private static function encodePlainObject(Context $ctx, ObjectEntry $entry, ?Frame $frame = null): string
     {
@@ -954,7 +953,7 @@ final class VmSerialize
         ?Frame $frame = null
     ): array {
         if (null !== $frame) {
-            return $ctx->runtime->vm()->collectPublicPropertiesForSerialize($entry, $frame);
+            return $ctx->runtime->vm()->collectObjectPropertiesForSerialize($entry, $frame);
         }
 
         /** @var array<string, Variable> $props */
@@ -968,9 +967,6 @@ final class VmSerialize
                     continue;
                 }
                 $seenLc[$lc] = true;
-                if (!MethodVisibility::isPublic($meta->visibility)) {
-                    continue;
-                }
                 if (!$entry->hasProperty($meta->name)) {
                     continue;
                 }
@@ -980,7 +976,7 @@ final class VmSerialize
                 }
                 $copy = new Variable();
                 $copy->copyFrom($value);
-                $props[$meta->name] = $copy;
+                $props[VmReflection::manglePropertyKey($meta, $ctx)] = $copy;
             }
         }
         foreach ($entry->getRawProperties() as $name => $prop) {

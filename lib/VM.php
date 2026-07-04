@@ -2108,6 +2108,77 @@ class VM {
     }
 
     /**
+     * All declared + dynamic properties for plain-object serialize() — mangled visibility keys (#15751, var.c).
+     *
+     * @return array<string, Variable>
+     */
+    public function collectObjectPropertiesForSerialize(ObjectEntry $object, Frame $frame): array
+    {
+        if (SplArrayStorage::hasState($object)) {
+            return SplArrayStorage::collectJsonEncodeProperties($object);
+        }
+        $ctx = $this->context;
+        $hookFrame = $this->resolvePropertyHookParentFrame($frame);
+        $hookBackingLc = $this->separatePropertyHookBackingNameSet($object);
+        /** @var array<string, Variable> $result */
+        $result = [];
+        /** @var array<string, true> $seenLc */
+        $seenLc = [];
+        foreach (array_reverse(ext\standard\VmReflection::classHierarchyChain($object->class, $ctx)) as $class) {
+            foreach ($class->properties as $meta) {
+                $lc = strtolower($meta->name);
+                if (isset($seenLc[$lc]) || isset($hookBackingLc[$lc])) {
+                    continue;
+                }
+                $seenLc[$lc] = true;
+                if ($meta->propertyHookVirtual && null === $meta->getHookMethodLc) {
+                    continue;
+                }
+                if (null !== $meta->getHookMethodLc) {
+                    $hookValue = $this->fetchPropertyWithHooks($object, $meta->name, $hookFrame);
+                    if (null === $hookValue) {
+                        continue;
+                    }
+                    $value = $hookValue->resolveIndirect();
+                    if (VM\TypedPropertyCheck::omitFromSerialize($value)) {
+                        continue;
+                    }
+                    $copy = new Variable();
+                    $copy->copyFrom($value);
+                    $result[ext\standard\VmReflection::manglePropertyKey($meta, $ctx)] = $copy;
+
+                    continue;
+                }
+                if (!$object->hasProperty($meta->name)) {
+                    continue;
+                }
+                $value = $object->getProperty($meta->name)->resolveIndirect();
+                if (VM\TypedPropertyCheck::omitFromSerialize($value)) {
+                    continue;
+                }
+                $copy = new Variable();
+                $copy->copyFrom($value);
+                $result[ext\standard\VmReflection::manglePropertyKey($meta, $ctx)] = $copy;
+            }
+        }
+        foreach ($object->getRawProperties() as $name => $prop) {
+            $nameLc = strtolower($name);
+            if (isset($seenLc[$nameLc]) || isset($hookBackingLc[$nameLc])) {
+                continue;
+            }
+            $value = $prop->resolveIndirect();
+            if (VM\TypedPropertyCheck::omitFromSerialize($value)) {
+                continue;
+            }
+            $copy = new Variable();
+            $copy->copyFrom($value);
+            $result[$name] = $copy;
+        }
+
+        return $result;
+    }
+
+    /**
      * unserialize() property restore — set hooks when declared (#6474, var_unserializer.c).
      */
     public function assignUnserializeProperty(
