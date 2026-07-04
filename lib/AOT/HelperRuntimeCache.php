@@ -7,21 +7,27 @@ namespace PHPCompiler\AOT;
 use PHPCompiler\JIT\Context;
 
 /**
- * Split-compilation cache for php-in-PHP JIT helpers (#15889).
+ * Incremental split-compilation cache for php-in-PHP JIT helpers (#15889).
  *
- * `phpc build` re-lowers the same *JitHelper PHP sources into every user
- * module (~half of a hello-world build). script/emit-helper-runtime-object.php
- * compiles each helper unit once, in isolation, into its own translation unit:
+ * Each helper unit is its own translation unit, cached independently:
  *
- *   build/helper-runtime-cache/<fingerprint>/
- *     <unit>.bc      — bitcode; per-script builds read exact function types
- *     <unit>.o       — object the Linker merges at the end
- *     manifest.json  — logical callee → {symbol, unit}
+ *   build/helper-runtime-cache/units/<slug>/
+ *     unit.bc        — bitcode; per-script builds read exact function types
+ *     unit.o         — object the Linker merges at the end
+ *     manifest.json  — {fingerprint, unit, helpers: logical → symbol}
+ *     failed.json    — {fingerprint, rc} when the unit's lowering crashes;
+ *                      re-attempted only when its fingerprint changes
  *
- * Per-script builds synthesize extern declarations (types shared via the
- * LLVMContext) instead of re-lowering helper bodies; the Linker appends the
- * used unit objects with -z muldefs — the script object is listed first, so
- * its ABI definitions win and runtime state stays single-copy.
+ * Freshness is PER UNIT: sha256(core fingerprint + unit source content).
+ * The core fingerprint covers only the lowering machinery (JIT core,
+ * composer.lock, LLVM path) — editing one helper re-emits one unit, a crash
+ * is remembered per unit, and nothing else recompiles.
+ *
+ * Known approximation: a unit module may embed dependency helpers it pulled
+ * in during nested lowering; an edit to a dependency does not invalidate the
+ * embedding unit's fingerprint. `script/emit-helper-runtime-object.php
+ * --force` re-emits everything; bumping the core (lib/JIT.php etc.) also
+ * invalidates all units.
  *
  * Opt-in: PHP_COMPILER_HELPER_RUNTIME_O=1.
  */
@@ -34,10 +40,8 @@ final class HelperRuntimeCache
     /** Guard so the emitter itself never consumes the cache. */
     private const ENV_EMITTING = 'PHP_COMPILER_HELPER_RUNTIME_EMITTING';
 
-    /** @var array<string, array{symbol: string, unit: string}>|null */
-    private static ?array $manifestHelpers = null;
-
-    private static ?string $manifestFingerprint = null;
+    /** @var array<string, array{symbol: string, unit: string}>|null logical(lower) → binding */
+    private static ?array $helperIndex = null;
 
     /** @var array<string, object> unit slug → parsed bitcode module (kept alive: types are shared) */
     private static array $parsedUnits = [];
@@ -65,70 +69,58 @@ final class HelperRuntimeCache
         return \dirname(__DIR__, 2).'/build/helper-runtime-cache';
     }
 
-    public static function entryDir(): string
+    public static function unitsDir(): string
     {
-        return self::cacheDir().'/'.self::fingerprint();
+        return self::cacheDir().'/units';
+    }
+
+    public static function unitDir(string $slug): string
+    {
+        return self::unitsDir().'/'.$slug;
+    }
+
+    public static function slugFor(string $unitPath): string
+    {
+        return (string) preg_replace('#[^A-Za-z0-9]+#', '_', trim($unitPath, '/'));
     }
 
     /**
-     * Fingerprint of everything that shapes helper lowering: LLVM toolchain,
-     * dependency lock, the JIT core, and the helper source trees
-     * (path+mtime+size — content hashing ~1k files per build would defeat the
-     * point).
+     * Lowering-machinery fingerprint: deliberately narrow so single-helper
+     * edits do not invalidate the whole cache (#15889 incrementality).
      */
-    public static function fingerprint(): string
+    public static function coreFingerprint(): string
     {
-        static $fingerprint = null;
-        if (null !== $fingerprint) {
-            return $fingerprint;
+        static $core = null;
+        if (null !== $core) {
+            return $core;
         }
         $root = \dirname(__DIR__, 2);
-        $parts = [
-            (string) getenv('PHP_COMPILER_LLVM_PATH'),
-            @filemtime($root.'/composer.lock').':'.@filesize($root.'/composer.lock'),
-        ];
-        foreach ([$root.'/lib/JIT.php', $root.'/lib/JIT/Context.php', $root.'/lib/Runtime.php'] as $file) {
+        $parts = [(string) getenv('PHP_COMPILER_LLVM_PATH')];
+        foreach ([
+            $root.'/composer.lock',
+            $root.'/lib/JIT.php',
+            $root.'/lib/JIT/Context.php',
+            $root.'/lib/Runtime.php',
+            $root.'/lib/JIT/JitVmHelperLink.php',
+        ] as $file) {
             $parts[] = $file.':'.@filemtime($file).':'.@filesize($file);
         }
-        foreach ([$root.'/lib/VM', $root.'/lib/JIT', $root.'/ext'] as $dir) {
-            $parts[] = self::treeStamp($dir);
-        }
 
-        return $fingerprint = substr(hash('sha256', implode("\n", $parts)), 0, 24);
+        return $core = substr(hash('sha256', implode("\n", $parts)), 0, 20);
     }
 
-    private static function treeStamp(string $dir): string
+    /** Per-unit fingerprint: core + the helper source content. */
+    public static function unitFingerprint(string $unitSourceAbsPath): string
     {
-        if (!is_dir($dir)) {
-            return $dir.':absent';
-        }
-        $stamp = hash_init('sha256');
-        $it = new \RecursiveIteratorIterator(
-            new \RecursiveDirectoryIterator($dir, \FilesystemIterator::SKIP_DOTS)
-        );
-        foreach ($it as $file) {
-            /** @var \SplFileInfo $file */
-            if ('php' !== $file->getExtension()) {
-                continue;
-            }
-            hash_update($stamp, $file->getPathname().':'.$file->getMTime().':'.$file->getSize()."\n");
-        }
+        $source = @file_get_contents($unitSourceAbsPath);
 
-        return hash_final($stamp);
+        return substr(hash('sha256', self::coreFingerprint()."\n".(string) $source), 0, 20);
     }
 
-    public static function isFresh(): bool
+    /** @return array{fingerprint: string, unit: string, helpers: array<string,string>}|null */
+    public static function unitManifest(string $slug): ?array
     {
-        return null !== self::loadManifest() && self::$manifestFingerprint === self::fingerprint();
-    }
-
-    /** @return array<string, array{symbol: string, unit: string}>|null */
-    private static function loadManifest(): ?array
-    {
-        if (null !== self::$manifestHelpers) {
-            return self::$manifestHelpers;
-        }
-        $path = self::entryDir().'/manifest.json';
+        $path = self::unitDir($slug).'/manifest.json';
         if (!is_readable($path)) {
             return null;
         }
@@ -136,34 +128,88 @@ final class HelperRuntimeCache
         if (!\is_array($decoded) || !isset($decoded['fingerprint'], $decoded['helpers']) || !\is_array($decoded['helpers'])) {
             return null;
         }
-        self::$manifestFingerprint = (string) $decoded['fingerprint'];
 
-        return self::$manifestHelpers = $decoded['helpers'];
+        return $decoded;
+    }
+
+    /** @return array{fingerprint: string, rc: int}|null persisted crash marker */
+    public static function unitFailure(string $slug): ?array
+    {
+        $path = self::unitDir($slug).'/failed.json';
+        if (!is_readable($path)) {
+            return null;
+        }
+        $decoded = json_decode((string) file_get_contents($path), true);
+
+        return \is_array($decoded) && isset($decoded['fingerprint']) ? $decoded : null;
+    }
+
+    /**
+     * logical(lower) → {symbol, unit} across all FRESH unit manifests.
+     * Built lazily once per process; adding a unit invalidates nothing else.
+     *
+     * @return array<string, array{symbol: string, unit: string}>
+     */
+    private static function helperIndex(): array
+    {
+        if (null !== self::$helperIndex) {
+            return self::$helperIndex;
+        }
+        $index = [];
+        $root = \dirname(__DIR__, 2);
+        foreach (glob(self::unitsDir().'/*/manifest.json') ?: [] as $manifestPath) {
+            $slug = basename(\dirname($manifestPath));
+            $manifest = self::unitManifest($slug);
+            if (null === $manifest) {
+                continue;
+            }
+            $sourceAbs = self::resolveUnitSource($root, (string) $manifest['unit']);
+            if (null === $sourceAbs || self::unitFingerprint($sourceAbs) !== $manifest['fingerprint']) {
+                continue; // stale — emitter will refresh it
+            }
+            if (!is_file(self::unitDir($slug).'/unit.o') || !is_file(self::unitDir($slug).'/unit.bc')) {
+                continue;
+            }
+            foreach ($manifest['helpers'] as $logical => $symbol) {
+                $index[$logical] = ['symbol' => (string) $symbol, 'unit' => $slug];
+            }
+        }
+
+        return self::$helperIndex = $index;
+    }
+
+    public static function resolveUnitSource(string $root, string $unitPath): ?string
+    {
+        if (str_starts_with($unitPath, '/ext/') || str_starts_with($unitPath, '/lib/')) {
+            $abs = $root.$unitPath;
+        } else {
+            $abs = $root.'/lib'.$unitPath;
+        }
+
+        return is_file($abs) ? $abs : null;
     }
 
     /**
      * Bind every cached helper among $logicalNames into $context->functions as
      * an extern declaration with the exact type from the unit's bitcode.
-     * Returns true when at least one binding happened; callers re-check for
-     * missing names and fall back to nested lowering.
      *
      * @param list<string> $logicalNames
      */
     public static function tryProvide(Context $context, array $logicalNames): bool
     {
-        if (!self::enabled() || !self::isFresh()) {
+        if (!self::enabled()) {
             return false;
         }
-        $manifest = (array) self::loadManifest();
+        $index = self::helperIndex();
         $lib = $context->llvm->lib;
         $bound = 0;
         foreach ($logicalNames as $logical) {
             $lc = strtolower($logical);
-            if (isset($context->functions[$lc]) || !isset($manifest[$lc])) {
+            if (isset($context->functions[$lc]) || !isset($index[$lc])) {
                 continue;
             }
-            $symbol = $manifest[$lc]['symbol'];
-            $slug = $manifest[$lc]['unit'];
+            $symbol = $index[$lc]['symbol'];
+            $slug = $index[$lc]['unit'];
 
             $existing = $context->module->getNamedFunction($symbol);
             if (null !== $existing) {
@@ -200,11 +246,8 @@ final class HelperRuntimeCache
         if (isset(self::$parsedUnits[$slug])) {
             return self::$parsedUnits[$slug];
         }
-        $path = self::entryDir().'/'.$slug.'.bc';
-        if (!is_file($path) || !is_file(self::entryDir().'/'.$slug.'.o')) {
-            return null;
-        }
-        $data = (string) file_get_contents($path);
+        $path = self::unitDir($slug).'/unit.bc';
+        $data = is_file($path) ? (string) file_get_contents($path) : '';
         if ('' === $data) {
             return null;
         }
@@ -217,7 +260,6 @@ final class HelperRuntimeCache
             // point into the shared LLVMContext.
             return self::$parsedUnits[$slug] = $buffer->parseBitcode($context->context);
         } catch (\Throwable $e) {
-            // Unreadable unit — nested lowering fallback for its helpers.
             return null;
         }
     }
@@ -234,7 +276,7 @@ final class HelperRuntimeCache
         }
         $objects = [];
         foreach (array_keys(self::$usedUnits) as $slug) {
-            $object = self::entryDir().'/'.$slug.'.o';
+            $object = self::unitDir($slug).'/unit.o';
             if (is_file($object)) {
                 $objects[] = $object;
             }

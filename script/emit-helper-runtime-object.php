@@ -4,20 +4,20 @@
 declare(strict_types=1);
 
 /**
- * Emit the split-compilation helper-runtime TUs (#15889).
+ * Incremental emitter for split-compilation helper TUs (#15889).
  *
- * Discovers every JitVmHelperLink::ensureCompiled unit (self::HELPER_PATH /
- * self::COMPILED_HELPERS class constants), lowers each unit in an ISOLATED
- * subprocess into its own translation unit, and writes
+ * Discovers every JitVmHelperLink helper unit (*HELPER_PATH /
+ * *COMPILED_HELPERS class-constant pairs), and for each unit:
  *
- *   build/helper-runtime-cache/<fingerprint>/
- *     <unit>.bc      — bitcode (per-script builds read function types from it)
- *     <unit>.o       — object merged by the Linker (-z muldefs)
- *     manifest.json  — logical callee → {symbol, unit}
+ *   fresh manifest?          -> skip (cached)
+ *   fresh failure marker?    -> skip (known-broken; re-attempted only when
+ *                               the unit source or the compiler core changes)
+ *   otherwise                -> lower in an ISOLATED subprocess into
+ *                               build/helper-runtime-cache/units/<slug>/
+ *                               {unit.bc, unit.o, manifest.json} or failed.json
  *
- * Units whose lowering crashes (#15642 class) are skipped and keep falling
- * back to nested lowering. Per-unit isolation sidesteps cross-unit signature
- * drift that breaks verification when all helpers share one module.
+ * So a crash resumes at the breaking unit, and a helper edit re-emits ONE
+ * unit. --force re-attempts everything (including failure markers).
  *
  * Usage (pinned env, LLVM 9 required):
  *   ./script/docker-exec.sh -- bash -lc 'php script/emit-helper-runtime-object.php'
@@ -34,6 +34,8 @@ HelperRuntimeCache::markEmitting();
 putenv('PHP_COMPILER_AOT_USER_SCRIPT=1');
 $_ENV['PHP_COMPILER_AOT_USER_SCRIPT'] = '1';
 $_SERVER['PHP_COMPILER_AOT_USER_SCRIPT'] = '1';
+
+$force = in_array('--force', $argv, true);
 
 // 1. Discover (helperPath, logicalNames[]) pairs via reflection.
 $sites = [];
@@ -60,9 +62,6 @@ foreach ([$root.'/lib', $root.'/ext'] as $dir) {
         } catch (\Throwable $e) {
             continue;
         }
-        // Pair every *HELPER_PATH constant with its sibling *COMPILED_HELPERS
-        // list (prefix match: FOO_HELPER_PATH ↔ FOO_COMPILED_HELPERS;
-        // HELPER_PATH ↔ COMPILED_HELPERS).
         foreach ($constants as $constName => $path) {
             if (!\is_string($path) || !str_ends_with($constName, 'HELPER_PATH')) {
                 continue;
@@ -78,10 +77,7 @@ foreach ([$root.'/lib', $root.'/ext'] as $dir) {
 }
 ksort($sites);
 
-$entryDir = HelperRuntimeCache::cacheDir().'/'.HelperRuntimeCache::fingerprint();
-
-// --unit=<path> child mode: lower ONE unit into its own TU and write
-// <slug>.bc / <slug>.o / <slug>.manifest.json fragments.
+// --unit=<path> child mode: lower ONE unit into its own TU.
 $unitPath = null;
 foreach ($argv as $arg) {
     if (str_starts_with($arg, '--unit=')) {
@@ -94,16 +90,25 @@ if (null !== $unitPath) {
         fwrite(STDERR, "unknown unit {$unitPath}\n");
         exit(1);
     }
-    $slug = preg_replace('#[^A-Za-z0-9]+#', '_', trim($unitPath, '/'));
+    $slug = HelperRuntimeCache::slugFor($unitPath);
+    $dir = HelperRuntimeCache::unitDir($slug);
+    if (!is_dir($dir) && !mkdir($dir, 0755, true) && !is_dir($dir)) {
+        fwrite(STDERR, "cannot create {$dir}\n");
+        exit(1);
+    }
+    $sourceAbs = HelperRuntimeCache::resolveUnitSource($root, $unitPath);
+    if (null === $sourceAbs) {
+        fwrite(STDERR, "unit source not found for {$unitPath}\n");
+        exit(1);
+    }
+
     $runtime = new Runtime(Runtime::MODE_AOT);
     $context = $runtime->loadJitContext();
     JitVmHelperLink::ensureCompiled($context, $unitPath, $names, 'helper-runtime-emit');
 
     // A stub main drives the same pending-bridge completion a real script
-    // build performs — without it, base-module bridge callsites keep
-    // placeholder signatures and module verification fails. The duplicate
-    // stub main in each unit object is discarded by -z muldefs (script
-    // object is listed first at link).
+    // build performs; the duplicate stub main per unit object is discarded by
+    // -z muldefs (script object is listed first at link).
     $stub = $runtime->parseAndCompile("<?php\n", 'helper-runtime-unit-stub.php');
     if (null !== $stub) {
         $context->setMain($runtime->loadJit()->compile($stub));
@@ -128,69 +133,78 @@ if (null !== $unitPath) {
     putenv('PHP_COMPILER_KEEP_OBJECT_FILE=1');
     $_ENV['PHP_COMPILER_KEEP_OBJECT_FILE'] = '1';
     $_SERVER['PHP_COMPILER_KEEP_OBJECT_FILE'] = '1';
-    $context->compileToFile($entryDir.'/'.$slug.'.o');
+    $context->compileToFile($dir.'/unit.o');
     // Bitcode AFTER compileToFile: compileCommon finalizes lazy builtins and
     // verifies — a pre-finalization snapshot parses back as invalid bitcode.
-    $context->module->writeBitcodeToFile($entryDir.'/'.$slug.'.bc');
-    file_put_contents($entryDir.'/'.$slug.'.manifest.json', json_encode([
+    $context->module->writeBitcodeToFile($dir.'/unit.bc');
+    file_put_contents($dir.'/manifest.json', json_encode([
+        'fingerprint' => HelperRuntimeCache::unitFingerprint($sourceAbs),
         'unit' => $unitPath,
-        'slug' => $slug,
         'helpers' => $helpers,
     ], JSON_UNESCAPED_SLASHES)."\n");
+    @unlink($dir.'/failed.json');
     exit(0);
 }
 
-// Parent: one subprocess per unit; crashes/failures are skipped, not fatal.
+// Parent: incremental sweep.
 fwrite(STDOUT, 'helper-runtime-emit: '.count($sites)." helper units discovered\n");
-if (!is_dir($entryDir) && !mkdir($entryDir, 0755, true) && !is_dir($entryDir)) {
-    fwrite(STDERR, "helper-runtime-emit: cannot create {$entryDir}\n");
-    exit(1);
-}
-
-$units = [];
-$helpers = [];
-$skipped = 0;
+$fresh = 0;
+$emitted = 0;
+$failedNow = 0;
+$knownBroken = 0;
 foreach ($sites as $path => $names) {
+    $slug = HelperRuntimeCache::slugFor($path);
+    $dir = HelperRuntimeCache::unitDir($slug);
+    $sourceAbs = HelperRuntimeCache::resolveUnitSource($root, $path);
+    if (null === $sourceAbs) {
+        fwrite(STDERR, "helper-runtime-emit: SKIP {$path} (source not found)\n");
+
+        continue;
+    }
+    $fingerprint = HelperRuntimeCache::unitFingerprint($sourceAbs);
+
+    if (!$force) {
+        $manifest = HelperRuntimeCache::unitManifest($slug);
+        if (null !== $manifest && $manifest['fingerprint'] === $fingerprint
+            && is_file($dir.'/unit.o') && is_file($dir.'/unit.bc')) {
+            ++$fresh;
+
+            continue;
+        }
+        $failure = HelperRuntimeCache::unitFailure($slug);
+        if (null !== $failure && $failure['fingerprint'] === $fingerprint) {
+            ++$knownBroken;
+
+            continue; // remembered crash; re-attempt only on source/core change
+        }
+    }
+
     $cmd = escapeshellarg(PHP_BINARY).' '.escapeshellarg(__FILE__).' --unit='.escapeshellarg($path);
     exec($cmd.' 2>/dev/null', $ignored, $rc);
-    $slug = preg_replace('#[^A-Za-z0-9]+#', '_', trim($path, '/'));
-    $fragment = $entryDir.'/'.$slug.'.manifest.json';
-    if (0 !== $rc || !is_file($fragment)) {
-        ++$skipped;
-        fwrite(STDERR, "helper-runtime-emit: SKIP {$path} (unit emit rc={$rc} — nested lowering fallback, see #15642)\n");
-        @unlink($entryDir.'/'.$slug.'.bc');
-        @unlink($entryDir.'/'.$slug.'.o');
-        @unlink($fragment);
+    if (0 !== $rc || null === HelperRuntimeCache::unitManifest($slug)) {
+        ++$failedNow;
+        fwrite(STDERR, "helper-runtime-emit: FAILED {$path} (rc={$rc}) — marker written, nested-lowering fallback (#15642)\n");
+        if (!is_dir($dir)) {
+            @mkdir($dir, 0755, true);
+        }
+        @unlink($dir.'/manifest.json');
+        @unlink($dir.'/unit.o');
+        @unlink($dir.'/unit.bc');
+        file_put_contents($dir.'/failed.json', json_encode([
+            'fingerprint' => $fingerprint,
+            'rc' => $rc,
+        ])."\n");
 
         continue;
     }
-    $decoded = json_decode((string) file_get_contents($fragment), true);
-    if (!\is_array($decoded) || !isset($decoded['helpers'])) {
-        ++$skipped;
-
-        continue;
-    }
-    $units[$slug] = $path;
-    foreach ((array) $decoded['helpers'] as $logical => $symbol) {
-        $helpers[$logical] = ['symbol' => (string) $symbol, 'unit' => $slug];
-    }
+    ++$emitted;
 }
 
-if ([] === $helpers) {
-    fwrite(STDERR, "helper-runtime-emit: nothing compiled — aborting\n");
-    exit(1);
-}
-
-file_put_contents($entryDir.'/manifest.json', json_encode([
-    'fingerprint' => HelperRuntimeCache::fingerprint(),
-    'generated_at' => date('c'),
-    'units' => $units,
-    'helpers' => $helpers,
-], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)."\n");
-
-$totalKb = 0;
-foreach (glob($entryDir.'/*.o') as $object) {
-    $totalKb += (int) round(filesize($object) / 1024);
-}
-fwrite(STDOUT, 'helper-runtime-emit: OK '.count($units).' unit objects, '
-    .count($helpers)." helpers, {$skipped} skipped, {$totalKb} KB total — {$entryDir}\n");
+fwrite(STDOUT, sprintf(
+    "helper-runtime-emit: OK — %d emitted, %d fresh (skipped), %d known-broken (skipped), %d failed now\n",
+    $emitted,
+    $fresh,
+    $knownBroken,
+    $failedNow
+));
+exit($emitted + $fresh > 0 ? 0 : 1);
