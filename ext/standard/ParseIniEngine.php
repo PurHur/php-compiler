@@ -7,7 +7,7 @@ namespace PHPCompiler\ext\standard;
 /**
  * Native INI parser — no host PHP \parse_ini_*() (issue #3263, php-src ext/standard/ini.c).
  *
- * v1: INI_SCANNER_NORMAL only; RAW/TYPED deferred.
+ * INI_SCANNER_NORMAL, RAW, and TYPED (issue #9153 / php-src ext/standard/ini.c).
  */
 final class ParseIniEngine
 {
@@ -35,10 +35,8 @@ final class ParseIniEngine
     {
         self::$lastSyntaxError = null;
         self::$lastSyntaxLine = null;
-        if (self::SCANNER_NORMAL !== $scannerMode) {
-            throw new \LogicException(
-                'parse_ini_string(): only INI_SCANNER_NORMAL is supported in this compiler build'
-            );
+        if (!\in_array($scannerMode, [self::SCANNER_NORMAL, self::SCANNER_RAW, self::SCANNER_TYPED], true)) {
+            return false;
         }
 
         $result = [];
@@ -95,14 +93,15 @@ final class ParseIniEngine
                 return false;
             }
             $rawValue = substr($line, $eq + 1);
-            $value = self::parseValueFromLines($lines, $lineNo, $rawValue);
-            if (false === $value) {
+            $parsedValue = self::parseValueFromLines($lines, $lineNo, $rawValue);
+            if (false === $parsedValue) {
                 if (null === self::$lastSyntaxError) {
                     self::setSyntaxError($lineNo + 1, "unexpected '='");
                 }
 
                 return false;
             }
+            $value = self::finalizeValue($parsedValue, $scannerMode);
 
             if ($processSections && null !== $currentSection) {
                 self::assignKeyValue($result[$currentSection], $key, $value);
@@ -117,7 +116,7 @@ final class ParseIniEngine
     /**
      * @param array<string, mixed> $target
      */
-    private static function assignKeyValue(array &$target, string $key, string $value): void
+    private static function assignKeyValue(array &$target, string $key, mixed $value): void
     {
         if (str_ends_with($key, '[]')) {
             $baseKey = substr($key, 0, -2);
@@ -131,6 +130,44 @@ final class ParseIniEngine
             return;
         }
         $target[$key] = $value;
+    }
+
+    private static function finalizeValue(string $raw, int $scannerMode): mixed
+    {
+        return match ($scannerMode) {
+            self::SCANNER_RAW => $raw,
+            self::SCANNER_TYPED => self::coerceTypedValue($raw),
+            default => self::normalizeUnquoted($raw),
+        };
+    }
+
+    /**
+     * INI_SCANNER_TYPED — zend_ini_parse typed coercion (php-src ext/standard/ini.c).
+     */
+    private static function coerceTypedValue(string $raw): mixed
+    {
+        $lower = strtolower($raw);
+        return match ($lower) {
+            'null' => null,
+            'yes', 'on', 'true' => true,
+            'no', 'off', 'false', 'none' => false,
+            default => self::coerceNumericOrString($raw),
+        };
+    }
+
+    private static function coerceNumericOrString(string $raw): mixed
+    {
+        if ('' === $raw) {
+            return '';
+        }
+        if (preg_match('/^-?\d+$/', $raw)) {
+            return (int) $raw;
+        }
+        if (is_numeric($raw)) {
+            return (float) $raw;
+        }
+
+        return $raw;
     }
 
     private static function setSyntaxError(int $line, string $detail): void
@@ -241,7 +278,7 @@ final class ParseIniEngine
             $raw = self::trimWs(substr($raw, 0, $hash));
         }
 
-        return self::normalizeUnquoted($raw);
+        return $raw;
     }
 
     /**
