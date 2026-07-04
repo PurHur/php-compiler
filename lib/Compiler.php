@@ -19136,8 +19136,11 @@ class Compiler {
         } else {
             $outer = $this->outerSiblingInlineFuncCallProducers($firstSibling, $consumerIndex, $cfgChildren);
             $hoistedArgCount = 0;
-            foreach ($consumer->args as $consumerArg) {
+            foreach ($consumer->args as $hoistedArgIndex => $consumerArg) {
                 if (null !== $consumerArg && !$this->isEmbeddedCallLiteralArg($consumerArg)) {
+                    if ($this->isByRefNamedCallArgExcludedFromSiblingProducerWiring($consumer, (int) $hoistedArgIndex, $consumerArg)) {
+                        continue;
+                    }
                     ++$hoistedArgCount;
                 }
             }
@@ -19418,17 +19421,20 @@ class Compiler {
             && property_exists($consumer, 'args')
             && \is_array($consumer->args)
         ) {
-            // probe('label', g()) — adjacent hoisted producer feeds first hoisted arg (#15846).
-            $leadingEmbedded = 0;
-            foreach ($consumer->args as $arg) {
-                if ($this->isEmbeddedCallLiteralArg($arg)) {
-                    ++$leadingEmbedded;
-                    continue;
+            $firstSibling = $this->firstSiblingInlineFuncCallProducerIndex($consumerIndex, $cfgChildren);
+            if (null === $firstSibling || $producerIndex === $firstSibling) {
+                // probe('label', g()) — sole adjacent hoisted producer feeds first hoisted arg (#15846).
+                $leadingEmbedded = 0;
+                foreach ($consumer->args as $arg) {
+                    if ($this->isEmbeddedCallLiteralArg($arg)) {
+                        ++$leadingEmbedded;
+                        continue;
+                    }
+                    break;
                 }
-                break;
-            }
 
-            return $leadingEmbedded;
+                return $leadingEmbedded;
+            }
         }
         $mid = $cfgChildren[$producerIndex + 1] ?? null;
         if (2 === $distance && $this->isUnaryInlineSiblingCallArgExpr($mid)) {
@@ -19461,8 +19467,11 @@ class Compiler {
                     && property_exists($consumer, 'args')
                     && \is_array($consumer->args)
                 ) {
-                    foreach ($consumer->args as $callArg) {
+                    foreach ($consumer->args as $hoistedArgIndex => $callArg) {
                         if (null !== $callArg && !$this->isEmbeddedCallLiteralArg($callArg)) {
+                            if ($this->isByRefNamedCallArgExcludedFromSiblingProducerWiring($consumer, (int) $hoistedArgIndex, $callArg)) {
+                                continue;
+                            }
                             ++$hoistedArgCount;
                         }
                     }
@@ -20336,17 +20345,12 @@ class Compiler {
             }
         }
 
-        // Precompiled hoisted producers: operand map may drift after #15848 rematerialize
-        // paths — use the emitted FUNCCALL ARG_SEND slot (#15476 regression from #15848).
-        $producerOrdinal = $this->siblingInlineFuncCallProducerOrdinal(
-            $producerIndex,
-            $firstSibling,
-            $block->orig->children
-        );
-        if ($producerOrdinal >= 0) {
-            $argSendSlot = $this->slotForSiblingInlineFuncCallProducerArgSendOrdinal($block, $producerOrdinal);
-            if (null !== $argSendSlot) {
-                return $argSendSlot;
+        // Precompiled hoisted producers + trailing by-ref out-param: operand→slot map may
+        // drift after #15848 rematerialize paths — use emitted FUNCCALL EXEC_RETURN (#15476).
+        if ($this->siblingConsumerHasTrailingByRefNamedLocal($cfgCallOp)) {
+            $execReturnSlot = $this->slotForSiblingInlineFuncCallProducerExecReturnOrdinal($block, $argIndex);
+            if (null !== $execReturnSlot) {
+                return $execReturnSlot;
             }
         }
 
@@ -20354,24 +20358,56 @@ class Compiler {
     }
 
     /**
-     * Nth hoisted sibling FuncCall producer's last ARG_SEND slot on the block (#15476, #15848).
+     * similar_text($a, $b, $p) / preg_match(..., $m) — trailing by-ref named local (#15476).
      */
-    private function slotForSiblingInlineFuncCallProducerArgSendOrdinal(Block $block, int $producerOrdinal): ?int
+    private function siblingConsumerHasTrailingByRefNamedLocal(Op $cfgCallOp): bool
+    {
+        if (
+            !($cfgCallOp instanceof Op\Expr\FuncCall || $cfgCallOp instanceof Op\Expr\NsFuncCall)
+            || !property_exists($cfgCallOp, 'args')
+            || !\is_array($cfgCallOp->args)
+        ) {
+            return false;
+        }
+        $argCount = \count($cfgCallOp->args);
+        if ($argCount < 2) {
+            return false;
+        }
+        for ($i = $argCount - 1; $i >= 0; --$i) {
+            $arg = $cfgCallOp->args[$i] ?? null;
+            if (!($arg instanceof Operand)) {
+                break;
+            }
+            if ($this->isByRefNamedCallArgExcludedFromSiblingProducerWiring($cfgCallOp, $i, $arg)) {
+                return true;
+            }
+            if (!$this->isEmbeddedCallLiteralArg($arg)) {
+                return false;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Nth hoisted sibling FuncCall producer's final EXEC_RETURN slot (#15476, #15848).
+     */
+    private function slotForSiblingInlineFuncCallProducerExecReturnOrdinal(Block $block, int $producerOrdinal): ?int
     {
         if ($producerOrdinal < 0) {
             return null;
         }
-        $argSendSlots = [];
+        $execReturnSlots = [];
         foreach ($block->opCodes as $op) {
-            if (OpCode::TYPE_ARG_SEND === $op->type && null !== $op->arg1) {
-                $argSendSlots[] = (int) $op->arg1;
+            if (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type && null !== $op->arg1) {
+                $execReturnSlots[] = (int) $op->arg1;
             }
         }
-        if ($producerOrdinal >= \count($argSendSlots)) {
+        if ($producerOrdinal >= \count($execReturnSlots)) {
             return null;
         }
 
-        return $argSendSlots[$producerOrdinal];
+        return $execReturnSlots[$producerOrdinal];
     }
 
     /**
@@ -26261,6 +26297,20 @@ class Compiler {
                         $sends = array_merge($sends, $siblingOps);
                     }
                     $valueSlot = $siblingSlot;
+                } elseif (
+                    null !== $cfgCallOp
+                    && $this->siblingConsumerHasTrailingByRefNamedLocal($cfgCallOp)
+                    && $this->callArgIsDeadInlineTemporary($arg)
+                ) {
+                    // #15476 regression from #15848: operand→slot map drifts for precompiled
+                    // hoisted str_repeat() producers when a trailing by-ref local follows.
+                    $execReturnSlot = $this->slotForSiblingInlineFuncCallProducerExecReturnOrdinal(
+                        $block,
+                        (int) $argIndex
+                    );
+                    if (null !== $execReturnSlot) {
+                        $valueSlot = (string) $execReturnSlot;
+                    }
                 }
             }
             if (
