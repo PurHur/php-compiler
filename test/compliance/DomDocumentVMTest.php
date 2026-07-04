@@ -141,6 +141,10 @@ final class DomDocumentVMTest extends BaseTest
             __DIR__.'/cases/stdlib/dom_fragment_appendxml_warnings.phpt',
             'dom_fragment_appendxml_warnings.phpt'
         );
+        yield 'dom_loadhtml_unclosed_warnings.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/dom_loadhtml_unclosed_warnings.phpt',
+            'dom_loadhtml_unclosed_warnings.phpt'
+        );
     }
 
     public function setUp(): void
