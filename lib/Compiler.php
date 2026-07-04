@@ -21355,40 +21355,8 @@ class Compiler {
             return 0;
         }
         if ($this->firstSiblingInlineFuncCallProducerIndexActive) {
-            $firstSiblingWhileActive = $this->firstSiblingInlineFuncCallProducerIndexImpl($consumerIndex, $cfgChildren);
-            if (null !== $firstSiblingWhileActive && $producerIndex >= $firstSiblingWhileActive && $producerIndex < $consumerIndex) {
-                $ordinalWhileActive = $this->siblingFuncCallChainHasArrayPrelude(
-                    $firstSiblingWhileActive,
-                    $consumerIndex,
-                    $cfgChildren
-                )
-                    ? $this->siblingInlineFuncCallProducerOrdinal(
-                        $producerIndex,
-                        $firstSiblingWhileActive,
-                        $cfgChildren
-                    )
-                    : ($producerIndex - $firstSiblingWhileActive);
-                $consumerNameWhileActive = $this->resolveCfgFuncCallName($consumer);
-                if ($this->builtinUsesTrailingComparatorCallback($consumerNameWhileActive)) {
-                    $callbackArgIndex = \count($consumer->args) - 1;
-                    $funcArgIndex = 0;
-                    foreach ($consumer->args as $i => $callArg) {
-                        if ($i >= $callbackArgIndex) {
-                            break;
-                        }
-                        if (
-                            $this->isEmbeddedCallLiteralArg($callArg)
-                            || $this->callArgIsDeadInlineTemporary($callArg)
-                        ) {
-                            if ($funcArgIndex === $ordinalWhileActive) {
-                                return $i;
-                            }
-                            ++$funcArgIndex;
-                        }
-                    }
-                }
-            }
-
+            // Reentrancy guard — do not call firstSiblingInlineFuncCallProducerIndexImpl() here;
+            // statementLevelFuncCallBeforeHoistedSiblingChain() invokes this while Impl is active (#16012).
             return $distance - 1;
         }
         $firstSibling = $this->firstSiblingInlineFuncCallProducerIndex($consumerIndex, $cfgChildren);
