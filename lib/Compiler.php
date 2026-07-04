@@ -15145,6 +15145,10 @@ class Compiler {
                         }
                     }
 
+                    if (1 === \count($nonEmbeddedArgIndices)) {
+                        return $funcProducer;
+                    }
+
                     return 0 === $producerOrdinal ? $constFetch : $funcProducer;
                 }
             }
@@ -22898,6 +22902,10 @@ class Compiler {
             foreach ($this->compileExpr($prev, $block) as $op) {
                 $block->addOpCode($op);
             }
+        }
+        $execReturn = $this->slotForLastEmittedInlineCallResultBeforePendingFuncCall($block);
+        if (null !== $execReturn) {
+            return (string) $execReturn;
         }
         $slot = $block->slotForOperand($prev->result);
 
