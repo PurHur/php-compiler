@@ -26658,6 +26658,12 @@ class Compiler {
                 (int) $argIndex
             );
             if (null !== $castArgZeroSlot) {
+                $callArg = $args[$argIndex] ?? null;
+                if ($callArg instanceof Operand && null !== Block::resolveVariableName($callArg)) {
+                    $castArgZeroSlot = null;
+                }
+            }
+            if (null !== $castArgZeroSlot) {
                 $sends[] = new OpCode(OpCode::TYPE_ARG_SEND, $castArgZeroSlot, $nameSlot, $unpackFlag);
                 continue;
             }

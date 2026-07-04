@@ -15294,7 +15294,19 @@ class JIT {
                     ) {
                         JIT\JitReferencableCheck::emitNonVariableByRefNotice($this->context);
                         JIT\JitReferencableCheck::emitByRefError($this->context, $name, $idx);
-                    } else {
+                    } elseif (
+                        'array_splice' === strtolower($name)
+                        && null !== $operand
+                        && VM\ReferencableCheck::operandIsObjectCast($operand, $block)
+                    ) {
+                        JIT\JitReferencableCheck::emitByRefError($this->context, $name, $idx);
+                    } elseif (
+                        !(
+                            'array_splice' === strtolower($name)
+                            && self::jitArgIsArrayOrObject($args[$idx])
+                            && !self::jitArgLooksLikeArray($args[$idx])
+                        )
+                    ) {
                         JIT\JitReferencableCheck::emitNonVariableByRefNotice($this->context);
                     }
                 }
@@ -15311,7 +15323,12 @@ class JIT {
                     && VM\ReferencableCheck::allowsNonVariableObjectByRef($name)
                     && self::jitArgIsArrayOrObject($args[$idx])
                 ) {
-                    if (VM\ReferencableCheck::shouldEmitNonVariableObjectByRefNoticeAtCompileTime($operand)) {
+                    if (null !== $operand && VM\ReferencableCheck::operandIsObjectCast($operand, $block)) {
+                        JIT\JitReferencableCheck::emitByRefError($this->context, $name, $idx);
+
+                        continue;
+                    }
+                    if (VM\ReferencableCheck::shouldEmitNonVariableObjectByRefNoticeAtCompileTime($operand, $block)) {
                         JIT\JitReferencableCheck::emitNonVariableByRefNotice($this->context);
                     }
                     continue;
