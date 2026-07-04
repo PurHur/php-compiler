@@ -185,7 +185,8 @@ final class EnumCaseMatchSwitchRewriter extends NodeVisitorAbstract
             }
         }
 
-        return $this->enumFqcnFromExpr($expr);
+        // Enum case constant scrutinee (E::A) does not import bare case names into arms (#15875).
+        return null;
     }
 
     private function enumFqcnFromExpr(Expr $expr): ?string
