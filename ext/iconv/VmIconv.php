@@ -100,7 +100,7 @@ final class VmIconv
     {
         return match ($var->type) {
             Variable::TYPE_NULL => 'null',
-            Variable::TYPE_BOOL => 'bool',
+            Variable::TYPE_BOOLEAN => 'bool',
             Variable::TYPE_INTEGER => 'int',
             Variable::TYPE_DOUBLE => 'float',
             Variable::TYPE_STRING => 'string',

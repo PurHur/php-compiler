@@ -295,9 +295,9 @@ final class SplFilesystemArg
     {
         return match ($var->type) {
             Variable::TYPE_NULL => 'null',
-            Variable::TYPE_BOOL => 'bool',
+            Variable::TYPE_BOOLEAN => 'bool',
             Variable::TYPE_INTEGER => 'int',
-            Variable::TYPE_DOUBLE => 'float',
+            Variable::TYPE_FLOAT => 'float',
             Variable::TYPE_STRING => 'string',
             Variable::TYPE_ARRAY => 'array',
             Variable::TYPE_OBJECT => 'object',
@@ -354,7 +354,7 @@ final class RecursiveDirectoryIteratorHasChildren extends VmClassMethod
     private static function requireBoolArg(Variable $var, string $function, int $argIndex, string $paramName): bool
     {
         $resolved = $var->resolveIndirect();
-        if (Variable::TYPE_BOOL !== $resolved->type) {
+        if (Variable::TYPE_BOOLEAN !== $resolved->type) {
             throw new \TypeError(
                 $function.'(): Argument #'.$argIndex.' ($'.$paramName.') must be of type bool, '
                 .SplFilesystemArg::typeLabel($resolved).' given'

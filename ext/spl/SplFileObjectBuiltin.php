@@ -578,9 +578,9 @@ final class SplFileObjectFputcsv extends VmClassMethod
                 'SplFileObject::fputcsv(): Argument #1 ($fields) must be of type array, '
                 .match ($fieldsVar->type) {
                     Variable::TYPE_NULL => 'null',
-                    Variable::TYPE_BOOL => 'bool',
+                    Variable::TYPE_BOOLEAN => 'bool',
                     Variable::TYPE_INTEGER => 'int',
-                    Variable::TYPE_DOUBLE => 'float',
+                    Variable::TYPE_FLOAT => 'float',
                     Variable::TYPE_STRING => 'string',
                     Variable::TYPE_OBJECT => 'object',
                     default => 'mixed',

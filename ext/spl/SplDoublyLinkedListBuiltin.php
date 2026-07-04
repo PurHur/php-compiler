@@ -367,8 +367,8 @@ final class SplDoublyLinkedListBuiltin
         }
         if (Variable::TYPE_INTEGER !== $resolved->type) {
             $typeName = match ($resolved->type) {
-                Variable::TYPE_BOOL => 'bool',
-                Variable::TYPE_DOUBLE => 'float',
+                Variable::TYPE_BOOLEAN => 'bool',
+                Variable::TYPE_FLOAT => 'float',
                 Variable::TYPE_STRING => 'string',
                 Variable::TYPE_ARRAY => 'array',
                 Variable::TYPE_OBJECT => 'object',
