@@ -21355,21 +21355,32 @@ class Compiler {
             return 0;
         }
         if ($this->firstSiblingInlineFuncCallProducerIndexActive) {
-            $firstSiblingWhileActive = $this->firstSiblingInlineFuncCallProducerIndexImpl($consumerIndex, $cfgChildren);
-            if (null !== $firstSiblingWhileActive && $producerIndex >= $firstSiblingWhileActive && $producerIndex < $consumerIndex) {
-                $ordinalWhileActive = $this->siblingFuncCallChainHasArrayPrelude(
-                    $firstSiblingWhileActive,
-                    $consumerIndex,
-                    $cfgChildren
-                )
-                    ? $this->siblingInlineFuncCallProducerOrdinal(
-                        $producerIndex,
+            // Re-entering firstSiblingInlineFuncCallProducerIndexImpl while active recurses through
+            // statementLevelFuncCallBeforeHoistedSiblingChain → siblingMultiArgFuncCallProducerTargetArgIndex
+            // (date_sunrise(time(), SUNFUNCS_RET_*, …) OOM — #16012). Trailing-comparator wiring only.
+            $consumerNameWhileActive = ($consumer instanceof Op\Expr\FuncCall || $consumer instanceof Op\Expr\NsFuncCall)
+                ? $this->resolveCfgFuncCallName($consumer)
+                : null;
+            if (
+                null !== $consumerNameWhileActive
+                && $this->builtinUsesTrailingComparatorCallback($consumerNameWhileActive)
+                && ($consumer instanceof Op\Expr\FuncCall || $consumer instanceof Op\Expr\NsFuncCall)
+                && property_exists($consumer, 'args')
+                && \is_array($consumer->args)
+            ) {
+                $firstSiblingWhileActive = $this->firstSiblingInlineFuncCallProducerIndexImpl($consumerIndex, $cfgChildren);
+                if (null !== $firstSiblingWhileActive && $producerIndex >= $firstSiblingWhileActive && $producerIndex < $consumerIndex) {
+                    $ordinalWhileActive = $this->siblingFuncCallChainHasArrayPrelude(
                         $firstSiblingWhileActive,
+                        $consumerIndex,
                         $cfgChildren
                     )
-                    : ($producerIndex - $firstSiblingWhileActive);
-                $consumerNameWhileActive = $this->resolveCfgFuncCallName($consumer);
-                if ($this->builtinUsesTrailingComparatorCallback($consumerNameWhileActive)) {
+                        ? $this->siblingInlineFuncCallProducerOrdinal(
+                            $producerIndex,
+                            $firstSiblingWhileActive,
+                            $cfgChildren
+                        )
+                        : ($producerIndex - $firstSiblingWhileActive);
                     $callbackArgIndex = \count($consumer->args) - 1;
                     $funcArgIndex = 0;
                     foreach ($consumer->args as $i => $callArg) {
@@ -21559,7 +21570,8 @@ class Compiler {
             // date_sun_info(strtotime(...), lat, -lon) still handled via producerFeedsConsumerArg0ThroughLiteralPreludesOnly above.
             // substr(sprintf(...), -N) — hoisted FuncCall arg #0 + UnaryMinus arg #1, not stmt-level (#10673, #16000).
             if (
-                ($producer instanceof Op\Expr\FuncCall || $producer instanceof Op\Expr\NsFuncCall)
+                !$this->firstSiblingInlineFuncCallProducerIndexActive
+                && ($producer instanceof Op\Expr\FuncCall || $producer instanceof Op\Expr\NsFuncCall)
                 && ($consumer instanceof Op\Expr\FuncCall || $consumer instanceof Op\Expr\NsFuncCall)
                 && \is_array($consumer->args ?? null)
                 && \count($consumer->args) >= 2
