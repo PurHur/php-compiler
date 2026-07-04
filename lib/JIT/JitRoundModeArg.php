@@ -15,7 +15,7 @@ use PHPCompiler\JIT\Builtin\TypeErrorRaise;
  */
 final class JitRoundModeArg
 {
-    public static function lower(Context $context, Variable $arg, string $fn): Value
+    public static function lower(Context $context, Variable $arg, string $fn, string $paramName = 'mode'): Value
     {
         $compileTime = RoundingModeJit::compileTimeRoundMode($context, $arg)
             ?? JitRoundModeResolve::tryResolveMode($context, $arg, $context->jitEnclosingBlock);
@@ -28,23 +28,28 @@ final class JitRoundModeArg
         }
 
         if (Variable::TYPE_OBJECT === $arg->type) {
-            self::emitTypeErrorAndAbort($context, $fn, 'object');
+            self::emitTypeErrorAndAbort($context, $fn, 'object', $paramName);
 
             return $context->getTypeFromString('int64')->constInt(StdlibConstants::PHP_ROUND_HALF_UP, false);
         }
 
-        return JitIntdiv::lowerIntBuiltinArg($context, $arg, $fn, 3, 'mode');
+        return JitIntdiv::lowerIntBuiltinArg($context, $arg, $fn, 3, $paramName);
     }
 
-    private static function emitTypeErrorAndAbort(Context $context, string $fn, string $given): void
-    {
+    private static function emitTypeErrorAndAbort(
+        Context $context,
+        string $fn,
+        string $given,
+        string $paramName = 'mode'
+    ): void {
         TypeErrorRaise::registerDeclarations($context);
         TypeErrorRaise::ensureLinked($context);
         TypeErrorRaise::emitRaise(
             $context,
             sprintf(
-                '%s(): Argument #3 ($mode) must be of type RoundingMode|int, %s given',
+                '%s(): Argument #3 ($%s) must be of type RoundingMode|int, %s given',
                 $fn,
+                $paramName,
                 $given
             )
         );
