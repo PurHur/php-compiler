@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace PHPCompiler\Compiler;
 
-use PHPCompiler\CompilerVersion;
 use PHPCfg\Op;
 use PHPCfg\Op\Expr\New_;
 use PHPCfg\Op\Stmt\Property;
@@ -56,9 +55,6 @@ final class NewWithoutParensCompileCheck
 
     private function walkClassConstValue(ConstTerminal $const): void
     {
-        if (CompilerVersion::supportsClassConstObjectExpressions()) {
-            return;
-        }
         $this->walkOpsRejectAllNew($const->valueBlock->children ?? []);
     }
 
