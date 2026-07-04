@@ -29337,11 +29337,7 @@ class Compiler {
                         $cfgCallOp
                     );
                     $combineMatch = $this->matchArrayCombineInlineProducers($combineProducers, (int) $argIndex);
-                    if (
-                        $combineMatch instanceof Op\Expr\Array_
-                        || $combineMatch instanceof Op\Expr\FuncCall
-                        || $combineMatch instanceof Op\Expr\NsFuncCall
-                    ) {
+                    if ($combineMatch instanceof Op\Expr\Array_) {
                         $inlineArray = $combineMatch;
                     } elseif (
                         $combineMatch instanceof Op\Expr\FuncCall
@@ -29526,6 +29522,20 @@ class Compiler {
             }
             if (null !== $dimFetchSlot && null === $valueSlot) {
                 $valueSlot = $dimFetchSlot;
+            } elseif (
+                null !== $inlineArray
+                && (
+                    $inlineArray instanceof Op\Expr\FuncCall
+                    || $inlineArray instanceof Op\Expr\NsFuncCall
+                )
+            ) {
+                // array_combine(array_keys(...), [...]) — sibling FuncCall, not Array_ literal (#15558).
+                if (null === $block->slotForOperand($inlineArray->result)) {
+                    foreach ($this->compileExpr($inlineArray, $block) as $op) {
+                        $sends[] = $op;
+                    }
+                }
+                $valueSlot = $this->compileOperand($inlineArray->result, $block, true);
             } elseif (null !== $inlineArray) {
                 $callArgProbeForArray = ($cfgCallOp->args[(int) $argIndex] ?? null) ?? $callArgOperand;
                 $existingArraySlot = null;
