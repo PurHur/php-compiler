@@ -11978,6 +11978,13 @@ class Compiler {
             if ($combineMatch instanceof Op\Expr\Array_) {
                 return $combineMatch;
             }
+            if (
+                $combineMatch instanceof Op\Expr\FuncCall
+                || $combineMatch instanceof Op\Expr\NsFuncCall
+            ) {
+                // array_combine(array_keys(...), [...]) — nested FuncCall arg, not stmt-before Array_ (#15857).
+                return null;
+            }
         }
         if ('substr_replace' === $this->resolveCfgFuncCallName($callOp)) {
             $substrReplaceProducers = $this->precedingInlineCallArgProducersBeforeCfgOp($block->orig->children, $callOp);
@@ -25381,6 +25388,7 @@ class Compiler {
             $inlineArray = null === $dimFetchSlot
                 ? $this->findInlineArrayProducerForCallArg($arg, $block, $cfgCallOp, (int) $argIndex)
                 : null;
+            $arrayCombineNestedFuncArg = false;
             if (null === $inlineArray && null !== $cfgCallOp) {
                 if ('array_combine' === $this->resolveCfgFuncCallName($cfgCallOp)) {
                     $combineProducers = $this->precedingInlineCallArgProducersBeforeCfgOp(
@@ -25390,6 +25398,12 @@ class Compiler {
                     $combineMatch = $this->matchArrayCombineInlineProducers($combineProducers, (int) $argIndex);
                     if ($combineMatch instanceof Op\Expr\Array_) {
                         $inlineArray = $combineMatch;
+                    } elseif (
+                        $combineMatch instanceof Op\Expr\FuncCall
+                        || $combineMatch instanceof Op\Expr\NsFuncCall
+                    ) {
+                        // array_combine(array_keys(...), [...]) — arg #0 is nested FuncCall, not trailing Array_ (#15558, #15857).
+                        $arrayCombineNestedFuncArg = true;
                     }
                 }
                 if (null === $inlineArray && 'substr_replace' === $this->resolveCfgFuncCallName($cfgCallOp)) {
@@ -25406,7 +25420,7 @@ class Compiler {
                         $inlineArray = $substrReplaceMatch;
                     }
                 }
-                if (null === $inlineArray) {
+                if (null === $inlineArray && !$arrayCombineNestedFuncArg) {
                     $stmtBeforeArray = $this->inlineArrayProducerImmediatelyBeforeCfgCall($cfgCallOp, $block);
                     if ($stmtBeforeArray instanceof Op\Expr\Array_) {
                         $callArgProbe = ($cfgCallOp->args[(int) $argIndex] ?? null) ?? $arg;
