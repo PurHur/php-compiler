@@ -601,12 +601,12 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
-    public function testSupportsBareRethrowTrueOnForwardDevProfile(): void
+    public function testSupportsBareRethrowFalseOnDefaultDevProfile(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE');
         try {
-            $this->assertTrue(CompilerVersion::supportsBareRethrow());
+            $this->assertFalse(CompilerVersion::supportsBareRethrow());
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');
