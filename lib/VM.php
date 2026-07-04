@@ -5435,6 +5435,7 @@ restart:
                         }
                         $frame->callArgs = [];
                         $frame->callArgEntries = [];
+                        $this->restorePendingOutboundCallAfterInlineNew($frame);
                         break;
                     }
                     $frame->callSiteLine = OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type
@@ -5676,6 +5677,7 @@ restart:
                         }
                         $frame->call = null;
                         $this->clearOutgoingCallState($frame);
+                        $this->restorePendingOutboundCallAfterInlineNew($frame);
                         if (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
                             $this->releaseVmStatementDeadTemps($frame, (int) $op->arg1);
                         }
@@ -6122,6 +6124,7 @@ restart:
                     }
                     $result->object($object);
                     $this->markScopeSlotInitialized($frame, (int) $op->arg1);
+                    $this->savePendingOutboundCallForInlineNew($frame);
                     $frame->call = $object->constructor;
                     $frame->callArgs = [$result];
                     $frame->callArgEntries = [];
@@ -7402,10 +7405,7 @@ restart:
         if ($frame->ephemeral) {
             $this->context->scriptStack->pop();
             if (null !== $frame->parent) {
-                $this->markObjectConstructedIfLeavingConstruct($frame);
-                $child = $frame;
-                $frame = $frame->parent;
-                $this->releaseFrameObjectRefs($child);
+                $frame = $this->resumeEphemeralCallerFrame($frame);
                 goto restart;
             }
             $this->releaseFrameObjectRefs($frame);
@@ -7453,9 +7453,7 @@ restart:
             goto nextframe;
         }
         if ($frame->ephemeral && null !== $frame->parent) {
-            $child = $frame;
-            $frame = $frame->parent;
-            $this->releaseFrameObjectRefs($child);
+            $frame = $this->resumeEphemeralCallerFrame($frame);
             goto restart;
         }
         $this->releaseFrameObjectRefs($frame);
@@ -7525,13 +7523,29 @@ restart:
             goto restart;
         }
         if ($frame->ephemeral && null !== $frame->parent) {
-            $child = $frame;
-            $frame = $frame->parent;
-            $this->releaseFrameObjectRefs($child);
+            $frame = $this->resumeEphemeralCallerFrame($frame);
             goto restart;
         }
 
         return self::SUCCESS;
+    }
+
+    /**
+     * Resume the caller after an ephemeral child (constructor, etc.) finishes.
+     */
+    private function resumeEphemeralCallerFrame(Frame $child): Frame
+    {
+        $this->markObjectConstructedIfLeavingConstruct($child);
+        $caller = $child->parent;
+        if (null === $caller) {
+            return $child;
+        }
+        $caller->call = null;
+        $this->clearOutgoingCallState($caller);
+        $this->restorePendingOutboundCallAfterInlineNew($caller);
+        $this->releaseFrameObjectRefs($child);
+
+        return $caller;
     }
 
     /**
@@ -12107,6 +12121,37 @@ restart:
         }
 
         return false;
+    }
+
+    /**
+     * Inline `new` in a call arg overwrites pending FUNCCALL_INIT state (#15217).
+     */
+    private function savePendingOutboundCallForInlineNew(Frame $frame): void
+    {
+        if (null === $frame->call) {
+            return;
+        }
+        $frame->pendingOutboundCallRestore = [
+            'call' => $frame->call,
+            'callArgs' => $frame->callArgs,
+            'callArgEntries' => $frame->callArgEntries,
+            'callSiteLine' => $frame->callSiteLine,
+            'builtinCalleeQualifiedMethod' => $frame->builtinCalleeQualifiedMethod,
+        ];
+    }
+
+    private function restorePendingOutboundCallAfterInlineNew(Frame $frame): void
+    {
+        if (null === $frame->pendingOutboundCallRestore) {
+            return;
+        }
+        $saved = $frame->pendingOutboundCallRestore;
+        $frame->call = $saved['call'];
+        $frame->callArgs = $saved['callArgs'];
+        $frame->callArgEntries = $saved['callArgEntries'];
+        $frame->callSiteLine = $saved['callSiteLine'];
+        $frame->builtinCalleeQualifiedMethod = $saved['builtinCalleeQualifiedMethod'];
+        $frame->pendingOutboundCallRestore = null;
     }
 
     /**

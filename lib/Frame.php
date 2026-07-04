@@ -115,6 +115,13 @@ class Frame {
     /** Scope slots that received a runtime value (assign/param/static/inc-dec write, #6800). */
     public array $initializedSlots = [];
 
+    /**
+     * Saved FUNCCALL_INIT state while TYPE_NEW runs for an inline `new` call arg (#15217).
+     *
+     * @var array{call: Func, callArgs: list<Variable>, callArgEntries: list<array{0: string, 1?: mixed, 2?: Variable}>, callSiteLine: int, builtinCalleeQualifiedMethod: ?string}|null
+     */
+    public ?array $pendingOutboundCallRestore = null;
+
     public function __construct(?Handler $handler, ?Block $block, ?Frame $parent, Variable ...$scope) {
         $this->handler = $handler;
         $this->block = $block;
