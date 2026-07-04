@@ -12122,6 +12122,26 @@ class Compiler {
                 ) {
                     return null;
                 }
+                if ($this->callArgOperandExpectsArrayProducer($positionalCallArg)) {
+                    // array_slice([..], array_search(...)) — sibling FuncCall prelude must not block Array_ (#13684).
+                    $nestedTrailing = $this->splitNestedArrayLiteralChainWithTrailingProducers($producers);
+                    if (null !== $nestedTrailing) {
+                        [$arrayChain, $trailing] = $nestedTrailing;
+                        if (1 + \count($trailing) === \count($callOp->args) && 0 === $argIndex) {
+                            $outer = $arrayChain[\count($arrayChain) - 1] ?? null;
+                            if ($outer instanceof Op\Expr\Array_) {
+                                return $outer;
+                            }
+                        }
+                    }
+                    $arrayProducers = array_values(array_filter(
+                        $producers,
+                        static fn (Op\Expr $p): bool => $p instanceof Op\Expr\Array_
+                    ));
+                    if ([] !== $arrayProducers && 0 === $argIndex) {
+                        return $arrayProducers[\count($arrayProducers) - 1];
+                    }
+                }
                 $embedded = $this->unwrapArrayLiteralExpr($positionalCallArg);
                 if (null === $embedded) {
                     $embeddedProducer = $this->findCfgProducerExprForOperand($positionalCallArg);
@@ -12143,6 +12163,25 @@ class Compiler {
             );
             if ($unassigned instanceof Op\Expr\Array_) {
                 return $unassigned;
+            }
+            if (0 === $argIndex) {
+                $nestedTrailing = $this->splitNestedArrayLiteralChainWithTrailingProducers($producers);
+                if (null !== $nestedTrailing) {
+                    [$arrayChain, $trailing] = $nestedTrailing;
+                    if (1 + \count($trailing) === \count($callOp->args)) {
+                        $outer = $arrayChain[\count($arrayChain) - 1] ?? null;
+                        if ($outer instanceof Op\Expr\Array_) {
+                            return $outer;
+                        }
+                    }
+                }
+                $arrayProducers = array_values(array_filter(
+                    $producers,
+                    static fn (Op\Expr $p): bool => $p instanceof Op\Expr\Array_
+                ));
+                if ([] !== $arrayProducers) {
+                    return $arrayProducers[\count($arrayProducers) - 1];
+                }
             }
         }
         $producer = $this->matchInlineCallArgProducer($producers, $callOp->args, $argIndex, $callOp, $block);
@@ -14899,6 +14938,24 @@ class Compiler {
             }
         }
         if ($this->isEmbeddedCallLiteralArg($callArgs[$argIndex] ?? null)) {
+            $embeddedCallArg = $callArgs[$argIndex] ?? null;
+            if (
+                $embeddedCallArg instanceof Operand
+                && $this->callArgOperandExpectsArrayProducer($embeddedCallArg)
+                && $argCount < $producerCount
+            ) {
+                $nestedTrailing = $this->splitNestedArrayLiteralChainWithTrailingProducers($producers);
+                if (null !== $nestedTrailing) {
+                    [$arrayChain, $trailing] = $nestedTrailing;
+                    if (1 + \count($trailing) === $argCount && 0 === $argIndex) {
+                        $outer = $arrayChain[\count($arrayChain) - 1] ?? null;
+                        if ($outer instanceof Op\Expr\Array_) {
+                            return $outer;
+                        }
+                    }
+                }
+            }
+
             return null;
         }
         if (null !== $callArg) {
@@ -19089,8 +19146,11 @@ class Compiler {
         } else {
             $outer = $this->outerSiblingInlineFuncCallProducers($firstSibling, $consumerIndex, $cfgChildren);
             $hoistedArgCount = 0;
-            foreach ($consumer->args as $consumerArg) {
+            foreach ($consumer->args as $hoistedArgIndex => $consumerArg) {
                 if (null !== $consumerArg && !$this->isEmbeddedCallLiteralArg($consumerArg)) {
+                    if ($this->isByRefNamedCallArgExcludedFromSiblingProducerWiring($consumer, (int) $hoistedArgIndex, $consumerArg)) {
+                        continue;
+                    }
                     ++$hoistedArgCount;
                 }
             }
@@ -19371,17 +19431,20 @@ class Compiler {
             && property_exists($consumer, 'args')
             && \is_array($consumer->args)
         ) {
-            // probe('label', g()) — adjacent hoisted producer feeds first hoisted arg (#15846).
-            $leadingEmbedded = 0;
-            foreach ($consumer->args as $arg) {
-                if ($this->isEmbeddedCallLiteralArg($arg)) {
-                    ++$leadingEmbedded;
-                    continue;
+            $firstSibling = $this->firstSiblingInlineFuncCallProducerIndex($consumerIndex, $cfgChildren);
+            if (null === $firstSibling || $producerIndex === $firstSibling) {
+                // probe('label', g()) — sole adjacent hoisted producer feeds first hoisted arg (#15846).
+                $leadingEmbedded = 0;
+                foreach ($consumer->args as $arg) {
+                    if ($this->isEmbeddedCallLiteralArg($arg)) {
+                        ++$leadingEmbedded;
+                        continue;
+                    }
+                    break;
                 }
-                break;
-            }
 
-            return $leadingEmbedded;
+                return $leadingEmbedded;
+            }
         }
         $mid = $cfgChildren[$producerIndex + 1] ?? null;
         if (2 === $distance && $this->isUnaryInlineSiblingCallArgExpr($mid)) {
@@ -19414,8 +19477,11 @@ class Compiler {
                     && property_exists($consumer, 'args')
                     && \is_array($consumer->args)
                 ) {
-                    foreach ($consumer->args as $callArg) {
+                    foreach ($consumer->args as $hoistedArgIndex => $callArg) {
                         if (null !== $callArg && !$this->isEmbeddedCallLiteralArg($callArg)) {
+                            if ($this->isByRefNamedCallArgExcludedFromSiblingProducerWiring($consumer, (int) $hoistedArgIndex, $callArg)) {
+                                continue;
+                            }
                             ++$hoistedArgCount;
                         }
                     }
@@ -20289,7 +20355,69 @@ class Compiler {
             }
         }
 
+        // Precompiled hoisted producers + trailing by-ref out-param: operand→slot map may
+        // drift after #15848 rematerialize paths — use emitted FUNCCALL EXEC_RETURN (#15476).
+        if ($this->siblingConsumerHasTrailingByRefNamedLocal($cfgCallOp)) {
+            $execReturnSlot = $this->slotForSiblingInlineFuncCallProducerExecReturnOrdinal($block, $argIndex);
+            if (null !== $execReturnSlot) {
+                return $execReturnSlot;
+            }
+        }
+
         return $block->slotForOperand($producer->result);
+    }
+
+    /**
+     * similar_text($a, $b, $p) / preg_match(..., $m) — trailing by-ref named local (#15476).
+     */
+    private function siblingConsumerHasTrailingByRefNamedLocal(Op $cfgCallOp): bool
+    {
+        if (
+            !($cfgCallOp instanceof Op\Expr\FuncCall || $cfgCallOp instanceof Op\Expr\NsFuncCall)
+            || !property_exists($cfgCallOp, 'args')
+            || !\is_array($cfgCallOp->args)
+        ) {
+            return false;
+        }
+        $argCount = \count($cfgCallOp->args);
+        if ($argCount < 2) {
+            return false;
+        }
+        for ($i = $argCount - 1; $i >= 0; --$i) {
+            $arg = $cfgCallOp->args[$i] ?? null;
+            if (!($arg instanceof Operand)) {
+                break;
+            }
+            if ($this->isByRefNamedCallArgExcludedFromSiblingProducerWiring($cfgCallOp, $i, $arg)) {
+                return true;
+            }
+            if (!$this->isEmbeddedCallLiteralArg($arg)) {
+                return false;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Nth hoisted sibling FuncCall producer's final EXEC_RETURN slot (#15476, #15848).
+     */
+    private function slotForSiblingInlineFuncCallProducerExecReturnOrdinal(Block $block, int $producerOrdinal): ?int
+    {
+        if ($producerOrdinal < 0) {
+            return null;
+        }
+        $execReturnSlots = [];
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type && null !== $op->arg1) {
+                $execReturnSlots[] = (int) $op->arg1;
+            }
+        }
+        if ($producerOrdinal >= \count($execReturnSlots)) {
+            return null;
+        }
+
+        return $execReturnSlots[$producerOrdinal];
     }
 
     /**
@@ -25293,14 +25421,20 @@ class Compiler {
             if (null !== $dimFetchSlot) {
                 $valueSlot = $dimFetchSlot;
             } elseif (null !== $inlineArray) {
-                $arrayOps = $this->compileArrayLiteral($inlineArray, $block);
-                if ([] !== $arrayOps) {
-                    $sends = array_merge($sends, $arrayOps);
-                }
-                $initSlot = $this->slotFromInitArrayLiteralOps($arrayOps);
-                $valueSlot = $initSlot ?? $this->compileOperand($inlineArray->result, $block, true);
-                if (null !== $initSlot) {
+                $existingArraySlot = $block->slotForOperand($inlineArray->result);
+                if (null !== $existingArraySlot) {
+                    $valueSlot = (string) $existingArraySlot;
                     $inlineArrayLiteralArgWired = true;
+                } else {
+                    $arrayOps = $this->compileArrayLiteral($inlineArray, $block);
+                    if ([] !== $arrayOps) {
+                        $sends = array_merge($sends, $arrayOps);
+                    }
+                    $initSlot = $this->slotFromInitArrayLiteralOps($arrayOps);
+                    $valueSlot = $initSlot ?? $this->compileOperand($inlineArray->result, $block, true);
+                    if (null !== $initSlot) {
+                        $inlineArrayLiteralArgWired = true;
+                    }
                 }
             } else {
                 if (null === $valueSlot) {
@@ -26180,11 +26314,25 @@ class Compiler {
                     (int) $argIndex,
                     $siblingOps
                 );
-                if (null !== $siblingSlot) {
+                if (null !== $siblingSlot && !$inlineArrayLiteralArgWired) {
                     if ([] !== $siblingOps) {
                         $sends = array_merge($sends, $siblingOps);
                     }
                     $valueSlot = $siblingSlot;
+                } elseif (
+                    null !== $cfgCallOp
+                    && $this->siblingConsumerHasTrailingByRefNamedLocal($cfgCallOp)
+                    && $this->callArgIsDeadInlineTemporary($arg)
+                ) {
+                    // #15476 regression from #15848: operand→slot map drifts for precompiled
+                    // hoisted str_repeat() producers when a trailing by-ref local follows.
+                    $execReturnSlot = $this->slotForSiblingInlineFuncCallProducerExecReturnOrdinal(
+                        $block,
+                        (int) $argIndex
+                    );
+                    if (null !== $execReturnSlot) {
+                        $valueSlot = (string) $execReturnSlot;
+                    }
                 }
             }
             if (
@@ -27100,48 +27248,94 @@ class Compiler {
                     }
                 }
             }
-            if (
-                null !== $cfgCallOp
-                && null !== $block->orig
-                && 'array_slice' === $this->resolveCfgFuncCallName($cfgCallOp)
-            ) {
-                if (0 === (int) $argIndex) {
-                    $sliceProducers = $this->precedingInlineCallArgProducersBeforeCfgOp(
-                        $block->orig->children,
-                        $cfgCallOp
-                    );
-                    foreach ($sliceProducers as $producer) {
-                        if (!$producer instanceof Op\Expr\Array_) {
-                            continue;
-                        }
-                        $arrayOps = $this->compileArrayLiteral($producer, $block);
-                        if ([] !== $arrayOps) {
-                            $sends = array_merge($sends, $arrayOps);
-                        }
-                        $valueSlot = (string) (
-                            $this->slotFromInitArrayLiteralOps($arrayOps)
-                            ?? $this->firstInitArraySlotInBlock($block)
-                            ?? '0'
-                        );
-                        break;
-                    }
-                } elseif (1 === (int) $argIndex) {
-                    for ($scan = \count($block->opCodes) - 1; $scan >= 0; --$scan) {
-                        $scanOp = $block->opCodes[$scan];
-                        if (OpCode::TYPE_FUNCCALL_INIT === $scanOp->type) {
-                            break;
-                        }
-                        if (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $scanOp->type && null !== $scanOp->arg1) {
-                            $valueSlot = (string) $scanOp->arg1;
-                            break;
-                        }
-                    }
-                }
+            $arraySliceEmit = [];
+            $arraySliceSlot = $this->resolveArraySliceInlineCallArgSlot(
+                $block,
+                $cfgCallOp,
+                (int) $argIndex,
+                $arg,
+                $arraySliceEmit
+            );
+            if ([] !== $arraySliceEmit) {
+                $sends = array_merge($sends, $arraySliceEmit);
+            }
+            if (null !== $arraySliceSlot) {
+                $valueSlot = $arraySliceSlot;
             }
             $sends[] = new OpCode(OpCode::TYPE_ARG_SEND, $valueSlot, $nameSlot, $unpackFlag);
         }
 
         return $sends;
+    }
+
+    /**
+     * array_slice([..], array_search(...)) — outer Array_ + nested int offset (#13684).
+     */
+    private function resolveArraySliceInlineCallArgSlot(
+        Block $block,
+        ?Op $cfgCallOp,
+        int $argIndex,
+        Operand $arg,
+        array &$emitOps = []
+    ): ?string {
+        if (
+            null === $cfgCallOp
+            || 'array_slice' !== $this->resolveCfgFuncCallName($cfgCallOp)
+            || $this->callIncludesNamedParameter($cfgCallOp)
+            || !\is_array($cfgCallOp->args ?? null)
+            || \count($cfgCallOp->args) < 2
+            || null === $block->orig
+        ) {
+            return null;
+        }
+        $producers = $this->precedingInlineCallArgProducersBeforeCfgOp(
+            $block->orig->children,
+            $cfgCallOp
+        );
+        if (0 === $argIndex) {
+            $haystackArg = $cfgCallOp->args[0] ?? $arg;
+            if (
+                !$haystackArg instanceof Operand
+                || !$this->callArgOperandExpectsArrayProducer($haystackArg)
+            ) {
+                return null;
+            }
+            $arrayProducers = array_values(array_filter(
+                $producers,
+                static fn (Op\Expr $producer): bool => $producer instanceof Op\Expr\Array_
+            ));
+            if ([] === $arrayProducers) {
+                return null;
+            }
+            $arrayExpr = $arrayProducers[0];
+            $arrayOps = $this->compileArrayLiteral($arrayExpr, $block);
+            if ([] !== $arrayOps) {
+                foreach ($arrayOps as $op) {
+                    $emitOps[] = $op;
+                }
+            }
+            $initSlot = $this->slotFromInitArrayLiteralOps($arrayOps);
+
+            return (string) (
+                $initSlot
+                ?? $this->firstInitArraySlotInBlock($block)
+                ?? '0'
+            );
+        }
+        if (1 !== $argIndex) {
+            return null;
+        }
+        for ($scan = \count($block->opCodes) - 1; $scan >= 0; --$scan) {
+            $scanOp = $block->opCodes[$scan];
+            if (OpCode::TYPE_FUNCCALL_INIT === $scanOp->type) {
+                break;
+            }
+            if (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $scanOp->type && null !== $scanOp->arg1) {
+                return (string) $scanOp->arg1;
+            }
+        }
+
+        return null;
     }
 
     /**

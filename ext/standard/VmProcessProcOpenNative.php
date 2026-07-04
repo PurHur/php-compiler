@@ -114,10 +114,7 @@ final class VmProcessProcOpenNative
                 if (null !== $cwd && '' !== $cwd) {
                     $ffi->chdir($cwd);
                 }
-                if (null !== $env) {
-                    self::applyEnv($ffi, $env);
-                }
-                self::execArgv($ffi, $argv);
+                self::execArgv($ffi, $argv, $env);
                 $ffi->_exit(self::EXIT_127);
             }
 
@@ -249,10 +246,7 @@ final class VmProcessProcOpenNative
                 if (null !== $cwd && '' !== $cwd) {
                     $ffi->chdir($cwd);
                 }
-                if (null !== $env) {
-                    self::applyEnv($ffi, $env);
-                }
-                $ffi->execl('/bin/sh', 'sh', '-c', $command, null);
+                self::execArgv($ffi, ['sh', '-c', $command], $env);
                 $ffi->_exit(self::EXIT_127);
             }
 
@@ -513,16 +507,31 @@ final class VmProcessProcOpenNative
     }
 
     /**
+     * php-src php_array_to_envp() — KEY=value pairs for execvpe (ext/standard/proc_open.c).
+     *
      * @param array<string, string> $env
      */
-    private static function applyEnv(\FFI $ffi, array $env): void
+    private static function buildEnvp(\FFI $ffi, array $env): \FFI\CData
     {
+        $pairs = [];
         foreach ($env as $key => $value) {
-            if (!\is_string($key) || !\is_string($value)) {
+            if (!\is_string($key) || !\is_string($value) || '' === $key || '' === $value) {
                 continue;
             }
-            $ffi->setenv($key, $value, 1);
+            $pairs[] = $key.'='.$value;
         }
+        $count = \count($pairs);
+        $envp = $ffi->new('char*['.($count + 1).']');
+        foreach ($pairs as $i => $pair) {
+            $len = \strlen($pair);
+            $buf = $ffi->new('char['.($len + 1).']', false);
+            \FFI::memcpy($buf, $pair, $len);
+            $buf[$len] = "\0";
+            $envp[$i] = \FFI::cast('char*', $buf);
+        }
+        $envp[$count] = null;
+
+        return $envp;
     }
 
     private static function allocateSlot(): ?int
@@ -656,8 +665,11 @@ final class VmProcessProcOpenNative
         $slot['childPaused'] = false;
     }
 
-    /** @param list<string> $argv */
-    private static function execArgv(\FFI $ffi, array $argv): void
+    /**
+     * @param list<string> $argv
+     * @param array<string, string>|null $env
+     */
+    private static function execArgv(\FFI $ffi, array $argv, ?array $env = null): void
     {
         $argc = \count($argv);
         $argvPtr = $ffi->new('char*['.($argc + 1).']');
@@ -674,7 +686,13 @@ final class VmProcessProcOpenNative
             }
         }
         $argvPtr[$argc] = null;
-        $ffi->execvp($filePtr, $argvPtr);
+        if (null === $env) {
+            $ffi->execvp($filePtr, $argvPtr);
+
+            return;
+        }
+        $envp = self::buildEnvp($ffi, $env);
+        $ffi->execvpe($filePtr, $argvPtr, $envp);
     }
 
     private static function ffiEnabled(): bool
@@ -716,6 +734,7 @@ int chdir(const char *path);
 int setenv(const char *name, const char *value, int overwrite);
 int execl(const char *path, const char *arg, ...);
 int execvp(const char *file, char *const argv[]);
+int execvpe(const char *file, char *const argv[], char *const envp[]);
 void _exit(int status);
 pid_t waitpid(pid_t pid, int *status, int options);
 int kill(pid_t pid, int sig);
