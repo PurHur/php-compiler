@@ -43,8 +43,6 @@ final class opendir extends Internal
         if (1 !== \count($args)) {
             throw new \LogicException('opendir() requires exactly one argument in this compiler build');
         }
-        \PHPCompiler\JIT\Builtin\StringDir::ensureLinked($context);
-
         return JitOpendir::invoke(
             $context,
             JitStringBuiltinArg::lower($context, $args[0], 'opendir', 0, 'directory')
