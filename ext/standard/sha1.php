@@ -30,7 +30,7 @@ final class sha1 extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $data = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'sha1', 0, 'string');
+        $data = VmString::requireStringBuiltinArg($frame->calledArgs[0]->resolveIndirect(), 'sha1', 0, 'string');
         $raw = false;
         if (2 === $argc) {
             $rawArg = $frame->calledArgs[1]->resolveIndirect();
@@ -60,7 +60,7 @@ final class sha1 extends Internal
 
         return JitSha1::digest(
             $context,
-            JitStringBuiltinArg::lower($context, $args[0], 'sha1', 0, 'string'),
+            JitStringBuiltinArg::lowerRequiredString($context, $args[0], 'sha1', 0, 'string'),
             $raw
         );
     }
