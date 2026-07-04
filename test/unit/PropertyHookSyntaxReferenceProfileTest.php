@@ -17,9 +17,19 @@ final class PropertyHookSyntaxReferenceProfileTest extends TestCase
         }
     }
 
-    public function testSupportsPropertyHooksFalseOnReferenceProfile(): void
+    public function testSupportsPropertyHooksFalseWhenProfile82(): void
     {
-        $this->assertFalse(CompilerVersion::supportsPropertyHooks());
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.2');
+        try {
+            $this->assertFalse(CompilerVersion::supportsPropertyHooks());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
     }
 
     public function testRejectorThrowsOnDefaultInitializerHook(): void
