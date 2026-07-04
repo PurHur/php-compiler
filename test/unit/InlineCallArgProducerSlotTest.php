@@ -4846,4 +4846,37 @@ PHP;
         $out = ob_get_clean();
         self::assertStringContainsString('declared_traits_has: false', $out);
     }
+
+    /** Issue #10303 — tempnam(sys_get_temp_dir(), E::A) wires enum case fetch to arg #1. */
+    public function testTempnamNestedFuncCallEnumPrefixUsesClassConstFetchSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+enum E: string { case A = 'x'; }
+tempnam(sys_get_temp_dir(), E::A);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'tempnam_enum_prefix.php');
+
+        $enumFetchSlot = null;
+        $sysTempReturnSlot = null;
+        $argSends = [];
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_CLASS_CONST_FETCH === $op->type) {
+                $enumFetchSlot = $op->arg1;
+            }
+            if (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type && null === $sysTempReturnSlot) {
+                $sysTempReturnSlot = $op->arg1;
+            }
+            if (OpCode::TYPE_ARG_SEND === $op->type) {
+                $argSends[] = $op->arg1;
+            }
+        }
+        $tempnamSends = \array_slice($argSends, -2);
+
+        self::assertNotNull($enumFetchSlot);
+        self::assertNotNull($sysTempReturnSlot);
+        self::assertSame($sysTempReturnSlot, $tempnamSends[0] ?? null);
+        self::assertSame($enumFetchSlot, $tempnamSends[1] ?? null);
+    }
 }
