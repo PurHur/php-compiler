@@ -1592,47 +1592,22 @@ final class VmFs
     public static function fgetc(int $handle) {
         if (VmPhpMemoryStream::isValidHandle($handle)) {
             $byte = VmPhpMemoryStream::read($handle, 1);
-            if (false === $byte) {
-                return false;
-            }
-            if ('' === $byte) {
-                return false;
-            }
-
-            return $byte;
-        }
-        if (VmPhpInputOutputStream::isValidHandle($handle)) {
+        } elseif (VmPhpInputOutputStream::isValidHandle($handle)) {
             $byte = VmPhpInputOutputStream::read($handle, 1);
-            if (false === $byte) {
-                return false;
-            }
-            if ('' === $byte) {
-                return false;
-            }
-
-            return $byte;
-        }
-        if (VmPhpFdStream::isValidHandle($handle)) {
+        } elseif (VmPhpFdStream::isValidHandle($handle)) {
             $byte = VmPhpFdStream::read($handle, 1);
-            if (false === $byte) {
+        } else {
+            $fp = self::lookup($handle);
+            if (null === $fp) {
                 return false;
             }
-            if ('' === $byte) {
-                return false;
-            }
-
-            return $byte;
+            $byte = @\fgetc($fp);
         }
-        $fp = self::lookup($handle);
-        if (null === $fp) {
-            return false;
-        }
-        $byte = @\fgetc($fp);
-        if (false === $byte) {
+        if (false === $byte || '' === $byte) {
             return false;
         }
 
-        return $byte;
+        return VmStreamFilterChain::applyReadFilters($handle, $byte);
     }
 
     public static function fgets(int $handle, ?int $length = null) {
