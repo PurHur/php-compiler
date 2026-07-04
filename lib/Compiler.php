@@ -14834,6 +14834,16 @@ class Compiler {
                         && $this->callArgOperandExpectsArrayProducer($callArg)
                     ) {
                         // array_slice([..], array_search(...)) — nested int builtin is arg #1 (#13684).
+                        $arrayProducers = array_values(array_filter(
+                            $producers,
+                            static fn (Op\Expr $producer): bool => $producer instanceof Op\Expr\Array_
+                        ));
+                        if (isset($arrayProducers[$argIndex])) {
+                            return $arrayProducers[$argIndex];
+                        }
+                        if (0 === $argIndex && [] !== $arrayProducers) {
+                            return $arrayProducers[0];
+                        }
                     } else {
                         if ($byIndex instanceof Op\Expr\Array_) {
                             $outerArray = $this->matchOutermostNestedInlineArrayProducerForArgZero(
@@ -22534,6 +22544,18 @@ class Compiler {
         return null;
     }
 
+    /** First INIT_ARRAY slot in $block — outer haystack for array_slice (#13684). */
+    private function firstInitArraySlotInBlock(Block $block): ?string
+    {
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_INIT_ARRAY === $op->type && null !== $op->arg1) {
+                return (string) $op->arg1;
+            }
+        }
+
+        return null;
+    }
+
     /**
      * CFG stmt children for hoisted inline call-arg producer lookup during rematerialization (#15848).
      *
@@ -27048,6 +27070,7 @@ class Compiler {
                 && null !== $block->orig
                 && \is_array($cfgCallOp->args ?? null)
                 && 2 === \count($cfgCallOp->args)
+                && 'array_slice' !== $this->resolveCfgFuncCallName($cfgCallOp)
                 && !(
                     isset($cfgCallOp->args[0])
                     && $this->isEmbeddedCallLiteralArg($cfgCallOp->args[0])
@@ -27073,6 +27096,44 @@ class Compiler {
                         $splitSlot = $block->slotForOperand($target->result);
                         if (null !== $splitSlot) {
                             $valueSlot = (string) $splitSlot;
+                        }
+                    }
+                }
+            }
+            if (
+                null !== $cfgCallOp
+                && null !== $block->orig
+                && 'array_slice' === $this->resolveCfgFuncCallName($cfgCallOp)
+            ) {
+                if (0 === (int) $argIndex) {
+                    $sliceProducers = $this->precedingInlineCallArgProducersBeforeCfgOp(
+                        $block->orig->children,
+                        $cfgCallOp
+                    );
+                    foreach ($sliceProducers as $producer) {
+                        if (!$producer instanceof Op\Expr\Array_) {
+                            continue;
+                        }
+                        $arrayOps = $this->compileArrayLiteral($producer, $block);
+                        if ([] !== $arrayOps) {
+                            $sends = array_merge($sends, $arrayOps);
+                        }
+                        $valueSlot = (string) (
+                            $this->slotFromInitArrayLiteralOps($arrayOps)
+                            ?? $this->firstInitArraySlotInBlock($block)
+                            ?? '0'
+                        );
+                        break;
+                    }
+                } elseif (1 === (int) $argIndex) {
+                    for ($scan = \count($block->opCodes) - 1; $scan >= 0; --$scan) {
+                        $scanOp = $block->opCodes[$scan];
+                        if (OpCode::TYPE_FUNCCALL_INIT === $scanOp->type) {
+                            break;
+                        }
+                        if (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $scanOp->type && null !== $scanOp->arg1) {
+                            $valueSlot = (string) $scanOp->arg1;
+                            break;
                         }
                     }
                 }
