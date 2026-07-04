@@ -8114,7 +8114,12 @@ class Compiler {
                         continue;
                     }
                     // PhiResolver can replace the suppress inner result with an unrelated temp (#10336).
-                    $endCompiled->forceBindScopeSlot($arg, $slot);
+                    if (
+                        $this->callInErrorSuppressEndBlockUsesInnerResultAsArg($endCompiled, $endChild)
+                        && $this->callArgIsErrorSuppressForwardedResult($arg, $endCompiled)
+                    ) {
+                        $endCompiled->forceBindScopeSlot($arg, $slot);
+                    }
                 }
             }
             foreach ($endCfg->children as $endChild) {
@@ -8125,6 +8130,9 @@ class Compiler {
                     !$endChild instanceof Op\Expr\FuncCall
                     && !$endChild instanceof Op\Expr\NsFuncCall
                 ) {
+                    continue;
+                }
+                if (!$this->callInErrorSuppressEndBlockUsesInnerResultAsArg($endCompiled, $endChild)) {
                     continue;
                 }
                 if (!property_exists($endChild, 'args') || !is_array($endChild->args)) {
@@ -28456,8 +28464,47 @@ class Compiler {
         if (null === $cfgCallOp || !$this->isFirstNonEmbeddedDeadInlineCallArg($cfgCallOp, $argIndex)) {
             return null;
         }
+        if (!$this->callInErrorSuppressEndBlockUsesInnerResultAsArg($block, $cfgCallOp)) {
+            return null;
+        }
 
         return $this->errorSuppressEndBlockInnerResultSlot($block);
+    }
+
+    /**
+     * True when an outer call in a post-@ block consumes the suppressed inner expression (#10336, #15916).
+     *
+     * Standalone `@mkdir(); stream_context_create(null)` must not wire hoisted null to mkdir's return slot.
+     */
+    private function callInErrorSuppressEndBlockUsesInnerResultAsArg(Block $block, Op $cfgCallOp): bool
+    {
+        $endCfg = $block->orig;
+        if (null === $endCfg || !$this->isErrorSuppressEndBlock($endCfg)) {
+            return false;
+        }
+        $parentCfg = $endCfg->parents[0];
+        if (!$parentCfg instanceof ErrorSuppressBlock) {
+            return false;
+        }
+        $primary = $this->findErrorSuppressPrimaryInnerExpr($parentCfg);
+        if (null === $primary || !isset($primary->result)) {
+            return false;
+        }
+        if (!property_exists($cfgCallOp, 'args') || !\is_array($cfgCallOp->args)) {
+            return false;
+        }
+        foreach ($primary->result->usages as $usage) {
+            if ($usage === $cfgCallOp) {
+                return true;
+            }
+        }
+        foreach ($cfgCallOp->args as $arg) {
+            if ($arg instanceof Operand && $this->operandsReferToSameVariable($arg, $primary->result)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

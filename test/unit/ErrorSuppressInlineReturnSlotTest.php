@@ -180,4 +180,57 @@ PHP;
         self::assertSame($suppressReturnSlot, $varExportFirstSendSlot, 'var_export arg #0 must read suppress result');
         self::assertNotSame($varExportFirstSendSlot, $varExportSecondSendSlot, 'var_export arg #1 must not alias arg #0');
     }
+
+    public function testStandaloneSuppressStatementDoesNotAliasHoistedNullCallArg(): void
+    {
+        $code = <<<'PHP'
+<?php
+@mkdir('/tmp/phpc_suppress_hoist_gap');
+$ctx = stream_context_create(null);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'suppress_then_hoisted_null.php');
+
+        $suppressReturnSlot = null;
+        $streamContextSendSlot = null;
+        $walk = static function (Block $b) use (&$walk, &$suppressReturnSlot, &$streamContextSendSlot): void {
+            $inSuppress = null !== $b->orig && $b->orig instanceof \PHPCfg\ErrorSuppressBlock;
+            $inEnd = null !== $b->orig && 1 === \count($b->orig->parents) && $b->orig->parents[0] instanceof \PHPCfg\ErrorSuppressBlock;
+            $pendingInit = false;
+            foreach ($b->opCodes as $op) {
+                if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                    $pendingInit = true;
+                    continue;
+                }
+                if ($pendingInit && OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
+                    if ($inSuppress) {
+                        $suppressReturnSlot = $op->arg1;
+                    }
+                    $pendingInit = false;
+                    continue;
+                }
+                if ($pendingInit && OpCode::TYPE_FUNCCALL_EXEC_NORETURN === $op->type) {
+                    $pendingInit = false;
+                    continue;
+                }
+                if (OpCode::TYPE_ARG_SEND === $op->type && $inEnd && null === $streamContextSendSlot) {
+                    $streamContextSendSlot = $op->arg1;
+                }
+                foreach ([$op->block1, $op->block2, $op->block3] as $sub) {
+                    if ($sub instanceof Block) {
+                        $walk($sub);
+                    }
+                }
+            }
+        };
+        $walk($block);
+
+        self::assertNotNull($suppressReturnSlot, 'suppress mkdir return slot');
+        self::assertNotNull($streamContextSendSlot, 'stream_context_create arg send slot');
+        self::assertNotSame(
+            $suppressReturnSlot,
+            $streamContextSendSlot,
+            'hoisted null must not alias unrelated @mkdir return slot'
+        );
+    }
 }
