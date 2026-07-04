@@ -16,10 +16,10 @@ use PHPCompiler\ext\standard\ModuleRegistry;
  */
 final class IntlExtensionPolicy
 {
-    /** locale_get_default()/Locale v1 without full ext/intl ICU surface (#9576). */
+    /** locale_get_default()/Locale — php-src registers only with loaded ext/intl (#9576, #16214). */
     public static function advertisesLocale(): bool
     {
-        return true;
+        return ModuleRegistry::extensionLoaded('intl');
     }
 
     /** grapheme_* / intl_get_error_code / skeleton OOP — withheld until full ext/intl (#11472). */

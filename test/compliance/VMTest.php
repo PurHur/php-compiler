@@ -303,6 +303,11 @@ class VMTest extends BaseTest {
                 && !str_contains($name, 'grapheme_phantom')) {
                 continue;
             }
+            if (!\PHPCompiler\ext\intl\IntlExtensionPolicy::advertisesLocale()
+                && str_contains($name, 'locale_get_default')
+                && !str_contains($name, 'locale_gated')) {
+                continue;
+            }
             if (!\PHPCompiler\ext\curl\CurlExtensionPolicy::advertisesBuiltins()
                 && str_contains($name, 'curl_escape')
                 && !str_contains($name, 'curl_escape_phantom')) {
