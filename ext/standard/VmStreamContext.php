@@ -70,16 +70,12 @@ final class VmStreamContext
             if (Variable::TYPE_NULL === $resolved->type) {
                 // php-src: null options → default empty context (ext/standard/streams.c, #13356)
             } elseif (Variable::TYPE_ARRAY !== $resolved->type) {
-                throw new \LogicException(
-                    'stream_context_create() argument #1 must be an array in this compiler build'
-                );
+                self::throwCreateArrayTypeError(1, 'options', $resolved);
             } else {
                 VmStreamContextOptions::validateOptionsVariable($optionsVar, 'stream_context_create');
                 $exported = VmHttpBuildQuery::export($resolved);
                 if (!\is_array($exported)) {
-                    throw new \LogicException(
-                        'stream_context_create() argument #1 must be an array in this compiler build'
-                    );
+                    self::throwCreateArrayTypeError(1, 'options', $resolved);
                 }
                 $hostOptions = $exported;
             }
@@ -91,15 +87,11 @@ final class VmStreamContext
             if (Variable::TYPE_NULL === $resolvedParams->type) {
                 // php-src: null params → omitted (#13356)
             } elseif (Variable::TYPE_ARRAY !== $resolvedParams->type) {
-                throw new \LogicException(
-                    'stream_context_create() argument #2 must be an array in this compiler build'
-                );
+                self::throwCreateArrayTypeError(2, 'params', $resolvedParams);
             } else {
                 $exportedParams = VmHttpBuildQuery::export($resolvedParams);
                 if (!\is_array($exportedParams)) {
-                    throw new \LogicException(
-                        'stream_context_create() argument #2 must be an array in this compiler build'
-                    );
+                    self::throwCreateArrayTypeError(2, 'params', $resolvedParams);
                 }
                 $hostParams = $exportedParams;
             }
@@ -207,6 +199,16 @@ final class VmStreamContext
                 VmStreamArg::debugTypeName($resolved)
             ));
         }
+    }
+
+    private static function throwCreateArrayTypeError(int $argNum, string $label, Variable $resolved): void
+    {
+        throw new \TypeError(\sprintf(
+            'stream_context_create(): Argument #%d ($%s) must be of type ?array, %s given',
+            $argNum,
+            $label,
+            VmStreamArg::debugTypeName($resolved)
+        ));
     }
 
     public static function requireOptionsArray(

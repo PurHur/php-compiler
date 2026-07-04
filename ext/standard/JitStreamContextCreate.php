@@ -72,8 +72,26 @@ final class JitStreamContextCreate
             );
         }
 
-        throw new \LogicException(
-            "stream_context_create() argument #{$position} must be an array in this compiler build"
+        throw new \TypeError(self::arrayTypeErrorMessage($position, $arg->type));
+    }
+
+    private static function arrayTypeErrorMessage(int $position, int $type): string
+    {
+        $label = 1 === $position ? 'options' : 'params';
+        $given = match ($type) {
+            JITVariable::TYPE_NATIVE_LONG => 'int',
+            JITVariable::TYPE_NATIVE_BOOL => 'bool',
+            JITVariable::TYPE_NATIVE_DOUBLE => 'float',
+            JITVariable::TYPE_STRING => 'string',
+            JITVariable::TYPE_OBJECT => 'object',
+            default => 'mixed',
+        };
+
+        return \sprintf(
+            'stream_context_create(): Argument #%d ($%s) must be of type ?array, %s given',
+            $position,
+            $label,
+            $given
         );
     }
 }
