@@ -303,6 +303,16 @@ var_dump(array_keys($a["k"] ?? []));
         );
     }
 
+    /** Issue #16127 — inline dim-fetch ?? as call arg (regression from #16125 branch rewire). */
+    public function testArrayDimCoalesceInlineFuncCallArgWithoutAssign(): void
+    {
+        $this->assertVmOutput(
+            file_get_contents(__DIR__ . '/../repro/maintainer_gap_ini_get_all_array_keys_inline.php'),
+            "array(3) {\n [0]=>\n string(12) \"global_value\"\n [1]=>\n string(11) \"local_value\"\n [2]=>\n string(6) \"access\"\n}\n"
+            . "array(1) {\n [0]=>\n string(1) \"x\"\n}\n"
+        );
+    }
+
     /** Issue #10743 — nested dim-fetch ?? before func call must pass coalesce result (#15945). */
     public function testNestedDimFetchCoalesceFuncCallArg(): void
     {
