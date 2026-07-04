@@ -27725,6 +27725,34 @@ class Compiler {
             if (null !== $arraySliceSlot) {
                 $valueSlot = $arraySliceSlot;
             }
+            // Dead hoisted call-arg temps must wire to preceding inline producers, not echo/ternary phi slots (#14419).
+            if (null !== $cfgCallOp && null !== $block->orig) {
+                $finalArgProbe = $cfgCallOp->args[(int) $argIndex] ?? $arg;
+                if ($this->callArgIsDeadInlineTemporary($finalArgProbe)) {
+                    $finalProducers = $this->precedingInlineCallArgProducersBeforeCfgOp(
+                        $block->orig->children,
+                        $cfgCallOp
+                    );
+                    $finalProducer = $this->inlineHoistedProducerForCallArgIndex(
+                        $cfgCallOp,
+                        (int) $argIndex,
+                        $finalProducers,
+                        $block->orig->children,
+                        $block
+                    );
+                    if ($finalProducer instanceof Op\Expr && null !== $finalProducer->result) {
+                        if (null === $block->slotForOperand($finalProducer->result)) {
+                            foreach ($this->compileExpr($finalProducer, $block) as $op) {
+                                $sends[] = $op;
+                            }
+                        }
+                        $finalProducerSlot = $block->slotForOperand($finalProducer->result);
+                        if (null !== $finalProducerSlot) {
+                            $valueSlot = (string) $finalProducerSlot;
+                        }
+                    }
+                }
+            }
             $sends[] = new OpCode(OpCode::TYPE_ARG_SEND, $valueSlot, $nameSlot, $unpackFlag);
         }
 
