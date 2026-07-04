@@ -17376,8 +17376,12 @@ class Compiler {
     }
 
     /** Hoisted compare/spaceship/relational Expr feeds a call arg, not an inner operand (#13694, #13945). */
-    private function isComparisonInlineCallArgProducer(?Op\Expr $expr): bool
+    private function isComparisonInlineCallArgProducer(mixed $expr): bool
     {
+        if (!$expr instanceof Op\Expr) {
+            return false;
+        }
+
         return $expr instanceof Op\Expr\BinaryOp\Identical
             || $expr instanceof Op\Expr\BinaryOp\NotIdentical
             || $expr instanceof Op\Expr\BinaryOp\Equal
