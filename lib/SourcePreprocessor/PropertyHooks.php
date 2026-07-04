@@ -917,6 +917,9 @@ final class PropertyHooks
             );
             if (null !== $asymmetricSetVis) {
                 $marker = '/*phpc-asymmetric-set:'.$asymmetricSetVis.'*/ ';
+                if (preg_match('/\b(public|protected|private)\b/i', $declPrefix.$propDeclHead)) {
+                    $marker .= '/*phpc-asymmetric-explicit-read*/ ';
+                }
                 if (preg_match('/^(\s*)/', $declPrefix, $indentM)) {
                     $declPrefix = $indentM[1].$marker.ltrim($declPrefix);
                 } else {

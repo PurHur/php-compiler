@@ -11,8 +11,8 @@ class C {
 }
 
 class S {
-    public private(set) static int $sx = 1;
-    public protected(set) static string $sp = 'y';
+    private(set) static int $sx = 1;
+    protected(set) static string $sp = 'y';
 }
 
 $r = new ReflectionProperty(C::class, 'name');

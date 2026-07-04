@@ -11376,7 +11376,7 @@ restart:
                 $meta['declaringClassDisplay'],
                 $propName,
                 fn (string $child, string $parent): bool => $this->isSubclassOf($child, $parent),
-                MethodVisibility::mask($meta['visibility']),
+                MethodVisibility::mask($readVis),
                 $meta['asymmetricExplicitRead'] ?? false
             );
         } catch (\LogicException $e) {
@@ -11659,7 +11659,7 @@ restart:
             return null;
         }
         $setVis = PropertyVisibility::effectiveSetVisibility($meta->visibility, $meta->setVisibility);
-        $readVis = MethodVisibility::mask($meta->visibility);
+        $readVis = PropertyVisibility::effectiveGetVisibility($meta->visibility, $meta->getVisibility);
         if ($setVis === $readVis) {
             return null;
         }
@@ -11671,7 +11671,7 @@ restart:
                 $owner->class->name,
                 $propName,
                 fn (string $child, string $parent): bool => $this->isSubclassOf($child, $parent),
-                MethodVisibility::mask($meta->visibility),
+                MethodVisibility::mask($readVis),
                 $meta->asymmetricExplicitRead
             );
         } catch (\LogicException $e) {
