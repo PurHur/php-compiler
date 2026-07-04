@@ -645,6 +645,7 @@ require_once __DIR__.'/../../../ext/standard/Hex2binJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/BuiltinAttributes.php';
 require_once __DIR__.'/../../../ext/standard/BuiltinClasses.php';
 require_once __DIR__.'/../../../ext/standard/BuiltinEnums.php';
+require_once __DIR__.'/../../../ext/standard/BuiltinIntrospectionPolicy.php';
 require_once __DIR__.'/../../../ext/standard/BuiltinRegistry.php';
 require_once __DIR__.'/../../../ext/standard/CheckdateJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/CheckdnsrrJitHelper.php';
