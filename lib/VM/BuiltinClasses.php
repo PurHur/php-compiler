@@ -908,7 +908,7 @@ final class BuiltinClasses
 
         $reuc = new ClassEntry('ReflectionEnumUnitCase');
         $reuc->properties[] = new ClassProperty(ReflectionSupport::PROP_CLASS_NAME, null, $strProto);
-        $reuc->properties[] = new ClassProperty(ReflectionSupport::PROP_ENUM_CASE_NAME, null, $strProto);
+        $reuc->properties[] = new ClassProperty(ReflectionSupport::PROP_ENUM_CLASS_NAME, null, $strProto);
         $reuc->constructor = new ReflectionEnumUnitCaseConstruct();
         $reuc->methods['__construct'] = $reuc->constructor;
         $reuc->methodVisibility['__construct'] = $pub;
@@ -929,7 +929,7 @@ final class BuiltinClasses
         $rebc = new ClassEntry('ReflectionEnumBackedCase');
         $rebc->parentLc = ReflectionSupport::REFLECTION_ENUM_UNIT_CASE;
         $rebc->properties[] = new ClassProperty(ReflectionSupport::PROP_CLASS_NAME, null, $strProto);
-        $rebc->properties[] = new ClassProperty(ReflectionSupport::PROP_ENUM_CASE_NAME, null, $strProto);
+        $rebc->properties[] = new ClassProperty(ReflectionSupport::PROP_ENUM_CLASS_NAME, null, $strProto);
         $rebc->constructor = new ReflectionEnumBackedCaseConstruct();
         $rebc->methods['__construct'] = $rebc->constructor;
         $rebc->methodVisibility['__construct'] = $pub;

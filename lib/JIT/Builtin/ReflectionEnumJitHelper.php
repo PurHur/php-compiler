@@ -193,16 +193,16 @@ final class ReflectionEnumJitHelper
             $obj,
             $className,
             ReflectionSupport::PROP_CLASS_NAME,
-            self::literalCstr($context, $enumName),
-            $context->constantFromInteger(\strlen($enumName), 'size_t')
+            self::literalCstr($context, $canonicalCaseName),
+            $context->constantFromInteger(\strlen($canonicalCaseName), 'size_t')
         );
         ReflectionSetup::emitSetStringPropertyFromCstr(
             $context,
             $obj,
             $className,
-            ReflectionSupport::PROP_ENUM_CASE_NAME,
-            self::literalCstr($context, $canonicalCaseName),
-            $context->constantFromInteger(\strlen($canonicalCaseName), 'size_t')
+            ReflectionSupport::PROP_ENUM_CLASS_NAME,
+            self::literalCstr($context, $enumName),
+            $context->constantFromInteger(\strlen($enumName), 'size_t')
         );
 
         return $obj;
