@@ -8132,13 +8132,10 @@ class Compiler {
                 ) {
                     continue;
                 }
-                if (!$this->callInErrorSuppressEndBlockUsesInnerResultAsArg($endCompiled, $endChild)) {
-                    continue;
-                }
                 if (!property_exists($endChild, 'args') || !is_array($endChild->args)) {
                     continue;
                 }
-                foreach ($endChild->args as $arg) {
+                foreach ($endChild->args as $argIndex => $arg) {
                     if (
                         !$arg instanceof Operand
                         || $this->isEmbeddedCallLiteralArg($arg)
@@ -8146,7 +8143,10 @@ class Compiler {
                     ) {
                         continue;
                     }
-                    // First dead temp in the outer call is the @ inner value (#15916).
+                    if ($this->errorSuppressEndBlockCallArgHasTrailingHoistedScalarProducer($endCompiled, $endChild, (int) $argIndex)) {
+                        continue;
+                    }
+                    // First dead temp in the outer call is the @ inner value (#15916, #10302).
                     $endCompiled->forceBindScopeSlot($arg, $slot);
                     break;
                 }
@@ -28590,11 +28590,90 @@ class Compiler {
         if (null === $cfgCallOp || !$this->isFirstNonEmbeddedDeadInlineCallArg($cfgCallOp, $argIndex)) {
             return null;
         }
-        if (!$this->callInErrorSuppressEndBlockUsesInnerResultAsArg($block, $cfgCallOp)) {
+        if ($this->errorSuppressEndBlockCallArgHasTrailingHoistedScalarProducer($block, $cfgCallOp, $argIndex)) {
             return null;
         }
 
         return $this->errorSuppressEndBlockInnerResultSlot($block);
+    }
+
+    /**
+     * Trailing hoisted true/false/null before a post-@ call feeds this dead-temp arg (#15916).
+     *
+     * When hoisted scalars only cover later args, arg #0 remains the suppress forward (#10302).
+     */
+    private function errorSuppressEndBlockCallArgHasTrailingHoistedScalarProducer(
+        Block $block,
+        Op $cfgCallOp,
+        int $argIndex
+    ): bool {
+        if (null === $block->orig || !property_exists($cfgCallOp, 'args') || !\is_array($cfgCallOp->args)) {
+            return false;
+        }
+        $callArg = $cfgCallOp->args[$argIndex] ?? null;
+        if (!$callArg instanceof Operand || $this->isEmbeddedCallLiteralArg($callArg)) {
+            return false;
+        }
+        if (!$this->callArgIsDeadInlineTemporary($callArg)) {
+            return false;
+        }
+        $children = $block->orig->children;
+        $callIndex = null;
+        foreach ($children as $i => $child) {
+            if ($child === $cfgCallOp) {
+                $callIndex = $i;
+                break;
+            }
+        }
+        if (null === $callIndex) {
+            return false;
+        }
+        $trailingConstFetches = [];
+        for ($i = $callIndex - 1; $i >= 0 && $callIndex - $i <= 8; --$i) {
+            $prev = $children[$i] ?? null;
+            if ($prev instanceof Op\Expr\ConstFetch) {
+                $name = $this->staticNameFromOperand($prev->name);
+                if (null !== $name && \in_array(strtolower($name), ['true', 'false', 'null'], true)) {
+                    array_unshift($trailingConstFetches, $prev);
+                    continue;
+                }
+                break;
+            }
+            if ($prev instanceof Op\Expr\Assign) {
+                continue;
+            }
+            if ($prev instanceof Op\Expr\BinaryOp\Concat) {
+                return false;
+            }
+            break;
+        }
+        if ([] === $trailingConstFetches) {
+            return false;
+        }
+        foreach ($trailingConstFetches as $fetch) {
+            if (null !== $fetch->result && $this->operandsReferToSameVariable($fetch->result, $callArg)) {
+                return true;
+            }
+        }
+        $nonEmbeddedArgIndices = [];
+        foreach ($cfgCallOp->args as $i => $candidate) {
+            if (!$this->isEmbeddedCallLiteralArg($candidate)) {
+                $nonEmbeddedArgIndices[] = (int) $i;
+            }
+        }
+        $producerOrdinal = array_search($argIndex, $nonEmbeddedArgIndices, true);
+        if (false === $producerOrdinal) {
+            return false;
+        }
+        if (
+            0 === $producerOrdinal
+            && \count($nonEmbeddedArgIndices) > 1
+            && \count($trailingConstFetches) < \count($nonEmbeddedArgIndices)
+        ) {
+            return false;
+        }
+
+        return isset($trailingConstFetches[$producerOrdinal]);
     }
 
     /**
