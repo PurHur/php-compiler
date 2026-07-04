@@ -12,7 +12,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
-use PHPCompiler\JIT\JitStringArg;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -31,15 +31,12 @@ final class vfprintf_ extends Internal
             throw new \LogicException('vfprintf() requires exactly three arguments in this compiler build');
         }
         $handleVar = $frame->calledArgs[0]->resolveIndirect();
-        $fmtVar = $frame->calledArgs[1]->resolveIndirect();
         $argsVar = $frame->calledArgs[2]->resolveIndirect();
         $handle = VmStreamArg::requireStreamHandle($handleVar, 'vfprintf', 1);
-        if (Variable::TYPE_STRING !== $fmtVar->type) {
-            throw new \LogicException('vfprintf() format must be a string in this compiler build');
-        }
+        $format = VmString::requireStringBuiltinArg($frame->calledArgs[1], 'vfprintf', 1, 'format');
         $written = VmVprintf::vfprintf(
             $handle,
-            $fmtVar->toString(),
+            $format,
             $argsVar,
             $frame
         );
@@ -58,7 +55,7 @@ final class vfprintf_ extends Internal
             JitLongArg::lower($context, $args[0], 'vfprintf() stream'),
             $i64
         );
-        $fmt = JitStringArg::lower($context, $args[1], 'vfprintf() format');
+        $fmt = JitStringBuiltinArg::lowerRequiredString($context, $args[1], 'vfprintf', 1, 'format');
         $argsArray = JitVfprintf::loadArgsArray($context, $args[2], 'vfprintf');
 
         return JitVfprintf::invoke($context, $handle, $fmt, $argsArray);

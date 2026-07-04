@@ -37,15 +37,12 @@ final class sprintf_ extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $fmtVar = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_STRING !== $fmtVar->type) {
-            throw new \LogicException('sprintf() format must be a string in this compiler build');
-        }
+        $format = VmString::requireStringBuiltinArg($frame->calledArgs[0], 'sprintf', 0, 'format');
         $values = [];
         for ($i = 1; $i < $argc; ++$i) {
             $values[] = $frame->calledArgs[$i]->resolveIndirect();
         }
-        $frame->returnVar->string(VmSprintf::format($fmtVar->toString(), $values, $frame));
+        $frame->returnVar->string(VmSprintf::format($format, $values, $frame));
     }
 
     public Context $context;

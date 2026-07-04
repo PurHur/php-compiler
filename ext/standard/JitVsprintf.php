@@ -7,7 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\Builtin\StringFormat;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitStringArg;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -24,7 +24,7 @@ final class JitVsprintf
         }
         JitVsprintfArrayArg::requireValues($context, $args[1], 'vsprintf');
         StringFormat::ensureLinked($context);
-        $fmt = JitStringArg::lower($context, $args[0], 'vsprintf() format');
+        $fmt = JitStringBuiltinArg::lowerRequiredString($context, $args[0], 'vsprintf', 0, 'format');
         $ht = ArrayBuiltinHelper::loadHashTable($context, $args[1]);
         $num = ArrayBuiltinHelper::getNumElements($context, $ht);
         $map = $context->structFieldMap['__hashtable__'];

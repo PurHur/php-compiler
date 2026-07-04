@@ -78,7 +78,8 @@ final class JitScalarEnumCoerce
         Context $context,
         Value $objPtr,
         string $function,
-        BasicBlock $nonEnumTarget
+        BasicBlock $nonEnumTarget,
+        ?Value $coerceDestPtr = null
     ): bool {
         $jitObject = $context->type->object;
         if (!$jitObject instanceof JitObjectType) {
@@ -117,6 +118,13 @@ final class JitScalarEnumCoerce
                 : $fn->appendBasicBlock($function.'_enum_string_try_'.($idx + 1));
             $context->builder->branchIf($match, $caseBlock, $nextBlock);
             $context->builder->positionAtEnd($caseBlock);
+            if (null !== $coerceDestPtr) {
+                $context->builder->call(
+                    $context->lookupFunction('__value__writeString'),
+                    $coerceDestPtr,
+                    $context->builder->load($context->constantStringFromString(''))
+                );
+            }
             ErrorRaise::ensureLinked($context);
             ErrorRaise::emitRaise(
                 $context,

@@ -595,7 +595,8 @@ final class JitSettype
                 $context,
                 $objPtr,
                 'settype',
-                $afterEnum
+                $afterEnum,
+                $dest
             )) {
                 return;
             }
