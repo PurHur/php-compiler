@@ -4610,7 +4610,7 @@ PHP;
                     $sunriseSends = [];
                 }
             }
-            if (1 === $fcallOrdinal && (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type || OpCode::TYPE_FUNCCALL_EXEC_NORETURN === $op->type)) {
+            if (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type && null === $timeReturnSlot) {
                 $timeReturnSlot = $op->arg1;
             }
             if (OpCode::TYPE_CONST_FETCH === $op->type && null === $constSlot) {

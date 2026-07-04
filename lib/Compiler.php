@@ -6979,6 +6979,13 @@ class Compiler {
 
             return $value;
         }
+        $stdlibInt = \PHPCompiler\ext\standard\StdlibConstants::CORE_INT_BY_NAME[$lc] ?? null;
+        if (null !== $stdlibInt) {
+            $v = new Variable(Variable::TYPE_INTEGER);
+            $v->int($stdlibInt);
+
+            return $v;
+        }
         $dateStr = \PHPCompiler\ext\standard\DateConstants::CORE_STRING_BY_NAME[$lc] ?? null;
         if (null !== $dateStr) {
             $v = new Variable(Variable::TYPE_STRING);
@@ -21355,40 +21362,8 @@ class Compiler {
             return 0;
         }
         if ($this->firstSiblingInlineFuncCallProducerIndexActive) {
-            $firstSiblingWhileActive = $this->firstSiblingInlineFuncCallProducerIndexImpl($consumerIndex, $cfgChildren);
-            if (null !== $firstSiblingWhileActive && $producerIndex >= $firstSiblingWhileActive && $producerIndex < $consumerIndex) {
-                $ordinalWhileActive = $this->siblingFuncCallChainHasArrayPrelude(
-                    $firstSiblingWhileActive,
-                    $consumerIndex,
-                    $cfgChildren
-                )
-                    ? $this->siblingInlineFuncCallProducerOrdinal(
-                        $producerIndex,
-                        $firstSiblingWhileActive,
-                        $cfgChildren
-                    )
-                    : ($producerIndex - $firstSiblingWhileActive);
-                $consumerNameWhileActive = $this->resolveCfgFuncCallName($consumer);
-                if ($this->builtinUsesTrailingComparatorCallback($consumerNameWhileActive)) {
-                    $callbackArgIndex = \count($consumer->args) - 1;
-                    $funcArgIndex = 0;
-                    foreach ($consumer->args as $i => $callArg) {
-                        if ($i >= $callbackArgIndex) {
-                            break;
-                        }
-                        if (
-                            $this->isEmbeddedCallLiteralArg($callArg)
-                            || $this->callArgIsDeadInlineTemporary($callArg)
-                        ) {
-                            if ($funcArgIndex === $ordinalWhileActive) {
-                                return $i;
-                            }
-                            ++$funcArgIndex;
-                        }
-                    }
-                }
-            }
-
+            // Do not re-enter firstSiblingInlineFuncCallProducerIndexImpl — unbounded recursion
+            // for hoisted FuncCall + ConstFetch preludes (date_sunrise/json_decode, #16012).
             return $distance - 1;
         }
         $firstSibling = $this->firstSiblingInlineFuncCallProducerIndex($consumerIndex, $cfgChildren);
@@ -23723,24 +23698,65 @@ class Compiler {
             return null;
         }
         if (0 === $argIndex) {
-            $adjacent = $this->resolveAdjacentNestedFuncCallArgSlot($block, $cfgCallOp, 0);
-            if (null !== $adjacent) {
-                return $adjacent;
-            }
-            foreach ($block->orig->children as $child) {
+            foreach ($block->orig->children as $producerIndex => $child) {
                 if ($child === $cfgCallOp) {
                     return null;
                 }
-                if ($child instanceof Op\Expr\FuncCall || $child instanceof Op\Expr\NsFuncCall) {
-                    if (null === $block->slotForOperand($child->result)) {
+                if (!$child instanceof Op\Expr\FuncCall && !$child instanceof Op\Expr\NsFuncCall) {
+                    continue;
+                }
+                $execReturn = $this->slotForSiblingInlineCallProducerExecReturnByExpr(
+                    $block,
+                    $child,
+                    $cfgCallOp,
+                    $block->orig->children
+                );
+                if (null !== $execReturn) {
+                    return (string) $execReturn;
+                }
+                $execReturn = $this->slotForInlineFuncCallProducerExecReturnByCfgIndex(
+                    $block,
+                    $producerIndex,
+                    $block->orig->children
+                );
+                if (null !== $execReturn) {
+                    return (string) $execReturn;
+                }
+                $operandSlot = $block->slotForOperand($child->result);
+                if (null !== $operandSlot) {
+                    return (string) $operandSlot;
+                }
+                if (null === $block->slotForOperand($child->result)) {
+                    $prevForce = $this->forceDeferredSiblingCallReturnSlot;
+                    $this->forceDeferredSiblingCallReturnSlot = true;
+                    try {
                         foreach ($this->compileExpr($child, $block) as $op) {
                             $block->addOpCode($op);
                         }
+                    } finally {
+                        $this->forceDeferredSiblingCallReturnSlot = $prevForce;
                     }
-                    $slot = $block->slotForOperand($child->result);
-
-                    return null !== $slot ? (string) $slot : null;
                 }
+                $execReturn = $this->slotForSiblingInlineCallProducerExecReturnByExpr(
+                    $block,
+                    $child,
+                    $cfgCallOp,
+                    $block->orig->children
+                );
+                if (null !== $execReturn) {
+                    return (string) $execReturn;
+                }
+                $execReturn = $this->slotForInlineFuncCallProducerExecReturnByCfgIndex(
+                    $block,
+                    $producerIndex,
+                    $block->orig->children
+                );
+                if (null !== $execReturn) {
+                    return (string) $execReturn;
+                }
+                $operandSlot = $block->slotForOperand($child->result);
+
+                return null !== $operandSlot ? (string) $operandSlot : null;
             }
 
             return null;
@@ -23759,6 +23775,10 @@ class Compiler {
             if (!str_starts_with($name, 'sunfuncs_ret_')) {
                 continue;
             }
+            $existing = $block->slotForOperand($child->result);
+            if (null !== $existing) {
+                return (string) $existing;
+            }
             $folded = $this->tryFoldGlobalConstFetch($child);
             if (null === $folded) {
                 continue;
@@ -23768,6 +23788,87 @@ class Compiler {
         }
 
         return null;
+    }
+
+    /**
+     * date_sunrise(time(), SUNFUNCS_RET_*, …) — bypass sibling producer scan (#13749, #16012).
+     *
+     * @return list<OpCode>|null
+     */
+    private function compileDateSunFuncInlineCallArgSends(
+        array $args,
+        Block $block,
+        Op $cfgCallOp
+    ): ?array {
+        if (null === $block->orig) {
+            return null;
+        }
+        $callee = strtolower($this->resolveCfgFuncCallName($cfgCallOp) ?? '');
+        if (!\in_array($callee, ['date_sunrise', 'date_sunset'], true)) {
+            return null;
+        }
+        $producerOps = [];
+        $timeArgSlot = null;
+        foreach ($block->orig->children as $child) {
+            if ($child === $cfgCallOp) {
+                break;
+            }
+            if (!$child instanceof Op\Expr\FuncCall && !$child instanceof Op\Expr\NsFuncCall) {
+                continue;
+            }
+            $prevForce = $this->forceDeferredSiblingCallReturnSlot;
+            $this->forceDeferredSiblingCallReturnSlot = true;
+            try {
+                $producerOps = $this->compileExpr($child, $block);
+            } finally {
+                $this->forceDeferredSiblingCallReturnSlot = $prevForce;
+            }
+            foreach ($producerOps as $op) {
+                if (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type && null !== $op->arg1) {
+                    $timeArgSlot = (string) $op->arg1;
+                    break;
+                }
+            }
+            break;
+        }
+        $sunfuncsArgSlot = null;
+        foreach ($block->orig->children as $child) {
+            if ($child === $cfgCallOp) {
+                break;
+            }
+            if (!$child instanceof Op\Expr\ConstFetch) {
+                continue;
+            }
+            $name = strtolower($this->staticNameFromOperand($child->name) ?? '');
+            if (!str_starts_with($name, 'sunfuncs_ret_')) {
+                continue;
+            }
+            $folded = $this->tryFoldGlobalConstFetch($child);
+            if (null === $folded) {
+                continue;
+            }
+            $sunfuncsArgSlot = (string) $block->registerConstant($child->result, $folded);
+            break;
+        }
+        $sends = [];
+        foreach ($args as $argIndex => $arg) {
+            $valueSlot = null;
+            if (0 === (int) $argIndex && null !== $timeArgSlot) {
+                $valueSlot = $timeArgSlot;
+            } elseif (1 === (int) $argIndex && null !== $sunfuncsArgSlot) {
+                $valueSlot = $sunfuncsArgSlot;
+            }
+            $literalProbe = ($cfgCallOp->args[(int) $argIndex] ?? null) ?? $arg;
+            if (null === $valueSlot && $this->isEmbeddedCallLiteralArg($literalProbe)) {
+                $valueSlot = (string) $this->freshLiteralConstantSlot($literalProbe, $block);
+            }
+            if (null === $valueSlot) {
+                $valueSlot = $this->compileOperand($arg, $block, true);
+            }
+            $sends[] = new OpCode(OpCode::TYPE_ARG_SEND, $valueSlot, null, null);
+        }
+
+        return array_merge($producerOps, $sends);
     }
 
     private function resolveAdjacentNestedFuncCallArgSlot(
@@ -28448,6 +28549,10 @@ class Compiler {
         $this->validateCallArgOrder($args);
 
         if (null !== $cfgCallOp) {
+            $dateSunSends = $this->compileDateSunFuncInlineCallArgSends($args, $block, $cfgCallOp);
+            if (null !== $dateSunSends) {
+                return $dateSunSends;
+            }
             $this->ensureDeferredSiblingInlineCallArgProducersCompiled($block, $cfgCallOp);
         }
 
