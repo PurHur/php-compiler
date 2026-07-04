@@ -31,10 +31,10 @@ final class strtok extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $str = VmString::coerceNullableStringBuiltinArg($frame->calledArgs[0], 'strtok', 0, 'string');
+        $str = VmString::coerceStrtokStringArg($frame->calledArgs[0]);
         $tok = null;
         if (2 === $argc) {
-            $tok = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'strtok', 1, 'token');
+            $tok = VmString::coerceStrtokTokenArg($frame->calledArgs[1]);
         }
         $result = VmString::strtok($str, $tok);
         if (false === $result) {
@@ -55,18 +55,26 @@ final class strtok extends Internal
             return JitStrtok::tokenize(
                 $context,
                 null,
-                JitStringBuiltinArg::lower($context, $args[0], 'strtok', 0, 'token')
+                JitStringBuiltinArg::lower($context, $args[0], 'strtok', 0, 'string', 'string', 'string')
             );
         }
 
-        $tok = JitStringBuiltinArg::lower($context, $args[1], 'strtok', 1, 'token');
+        $tok = JitStringBuiltinArg::lower(
+            $context,
+            $args[1],
+            'strtok',
+            1,
+            'token',
+            '?string',
+            '?string'
+        );
         if (JITVariable::TYPE_NULL === $args[0]->type) {
             return JitStrtok::tokenize($context, null, $tok);
         }
 
         return JitStrtok::tokenize(
             $context,
-            JitStringBuiltinArg::lower($context, $args[0], 'strtok', 0, 'string'),
+            JitStringBuiltinArg::lower($context, $args[0], 'strtok', 0, 'string', 'string', 'string'),
             $tok
         );
     }
