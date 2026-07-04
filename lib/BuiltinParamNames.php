@@ -282,6 +282,8 @@ final class BuiltinParamNames
                 return ['object_or_class', 'class', 'allow_string'];
             case 'iterator_to_array':
                 return ['iterator', 'preserve_keys'];
+            case 'generator_to_array':
+                return ['generator', 'preserve_keys'];
             case 'hrtime':
                 return ['as_number'];
             case 'memory_get_usage':

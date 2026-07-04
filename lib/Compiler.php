@@ -21357,6 +21357,23 @@ class Compiler {
         ) {
             return $stmtCoalesce;
         }
+        if (
+            $candidate instanceof Op\Expr\Array_
+            && null !== $callArg
+            && $this->callArgOperandExpectsArrayProducer($callArg)
+        ) {
+            $nestedTrailing = $this->splitNestedArrayLiteralChainWithTrailingProducers($producers);
+            if (null !== $nestedTrailing) {
+                [$arrayChain, ] = $nestedTrailing;
+                if (
+                    \count($arrayChain) >= 2
+                    && $this->arrayProducersFormNestedChain($arrayChain)
+                ) {
+                    // Nested inline array literal is one call arg — outer Array_ (#11300, #12008).
+                    return $arrayChain[\count($arrayChain) - 1];
+                }
+            }
+        }
 
         return $candidate;
     }
