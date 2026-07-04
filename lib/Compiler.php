@@ -29615,7 +29615,28 @@ class Compiler {
             ) {
                 // var_export/json_encode([…, $x->format(...)]) — stmt-before Array_ feeds the call arg (#10733, #16067).
                 // array_map('explode', [','], ['a,b']) — map each hoisted Array_ to its arg slot (#16085, #16078 regression).
+                // array_udiff_assoc(['a'=>1], ['A'=>1], 'strcasecmp') — sibling Array_ per arg, not stmt-before (#16194).
                 $inlineArrayProducer = null;
+                if (null !== $block->orig) {
+                    $arrayArgProducers = $this->precedingInlineCallArgProducersBeforeCfgOp(
+                        $block->orig->children,
+                        $cfgCallOp
+                    );
+                    $siblingArrayProducers = array_values(array_filter(
+                        $arrayArgProducers,
+                        static fn (Op\Expr $producer): bool => $producer instanceof Op\Expr\Array_
+                    ));
+                    if (
+                        \count($siblingArrayProducers) >= 2
+                        && !$this->arrayProducersFormNestedChain($siblingArrayProducers)
+                    ) {
+                        $inlineArrayProducer = $this->matchInlineArrayProducersToArrayCallArgs(
+                            $arrayArgProducers,
+                            $cfgCallOp->args ?? [],
+                            (int) $argIndex
+                        );
+                    }
+                }
                 if (
                     null !== $block->orig
                     && 'array_map' === $this->resolveCfgFuncCallName($cfgCallOp)
