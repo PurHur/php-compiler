@@ -16107,7 +16107,7 @@ class Compiler {
             }
         }
         // explode(PATH_SEPARATOR, get_include_path()) — ConstFetch prelude + sibling FuncCall (#15833).
-        if ('explode' === $inlineFuncName && 2 === $argCount && $producerCount >= 2) {
+        if ('explode' === $inlineFuncName && 2 === \count($callArgs) && \count($producers) >= 2) {
             $constProducer = null;
             $funcProducer = null;
             foreach ($producers as $producer) {
@@ -27695,8 +27695,18 @@ class Compiler {
                             }
                         }
                         $splitSlot = $block->slotForOperand($target->result);
-                        if (null !== $splitSlot && null === $valueSlot) {
-                            $valueSlot = (string) $splitSlot;
+                        if (null !== $splitSlot) {
+                            $forcePathExplodePrelude = 'explode' === $this->resolveCfgFuncCallName($cfgCallOp)
+                                && $constFetch instanceof Op\Expr\ConstFetch
+                                && 'PATH_SEPARATOR' === strtoupper($this->staticNameFromOperand($constFetch->name) ?? '')
+                                && (
+                                    $funcProducer instanceof Op\Expr\FuncCall
+                                    || $funcProducer instanceof Op\Expr\NsFuncCall
+                                )
+                                && 'get_include_path' === strtolower($this->resolveCfgFuncCallName($funcProducer) ?? '');
+                            if (null === $valueSlot || $forcePathExplodePrelude) {
+                                $valueSlot = (string) $splitSlot;
+                            }
                         }
                     }
                 }
