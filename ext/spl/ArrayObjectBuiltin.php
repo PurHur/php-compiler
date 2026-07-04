@@ -139,7 +139,7 @@ final class ArrayObjectGetArrayCopy extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        $object = SplIteratorSupport::receiver(
+        $object = SplIteratorSupport::receiverIsA(
             $frame,
             ArrayObjectBuiltin::CLASS_LC,
             'ArrayObject::getArrayCopy()'
@@ -160,7 +160,7 @@ final class ArrayObjectCount extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        $object = SplIteratorSupport::receiver(
+        $object = SplIteratorSupport::receiverIsA(
             $frame,
             ArrayObjectBuiltin::CLASS_LC,
             'ArrayObject::count()'
@@ -181,7 +181,7 @@ final class ArrayObjectGetIteratorClass extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        $object = SplIteratorSupport::receiver(
+        $object = SplIteratorSupport::receiverIsA(
             $frame,
             ArrayObjectBuiltin::CLASS_LC,
             'ArrayObject::getIteratorClass()'
@@ -202,7 +202,7 @@ final class ArrayObjectSetIteratorClass extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        $object = SplIteratorSupport::receiver(
+        $object = SplIteratorSupport::receiverIsA(
             $frame,
             ArrayObjectBuiltin::CLASS_LC,
             'ArrayObject::setIteratorClass()'
@@ -240,7 +240,7 @@ final class ArrayObjectGetFlags extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        $object = SplIteratorSupport::receiver(
+        $object = SplIteratorSupport::receiverIsA(
             $frame,
             ArrayObjectBuiltin::CLASS_LC,
             'ArrayObject::getFlags()'
@@ -261,7 +261,7 @@ final class ArrayObjectSetFlags extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        $object = SplIteratorSupport::receiver(
+        $object = SplIteratorSupport::receiverIsA(
             $frame,
             ArrayObjectBuiltin::CLASS_LC,
             'ArrayObject::setFlags()'
@@ -286,7 +286,7 @@ final class ArrayObjectGetIterator extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        $object = SplIteratorSupport::receiver(
+        $object = SplIteratorSupport::receiverIsA(
             $frame,
             ArrayObjectBuiltin::CLASS_LC,
             'ArrayObject::getIterator()'
@@ -310,7 +310,7 @@ final class ArrayObjectOffsetGet extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        $object = SplIteratorSupport::receiver(
+        $object = SplIteratorSupport::receiverIsA(
             $frame,
             ArrayObjectBuiltin::CLASS_LC,
             'ArrayObject::offsetGet()'
@@ -340,7 +340,7 @@ final class ArrayObjectOffsetSet extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        $object = SplIteratorSupport::receiver(
+        $object = SplIteratorSupport::receiverIsA(
             $frame,
             ArrayObjectBuiltin::CLASS_LC,
             'ArrayObject::offsetSet()'
@@ -364,7 +364,7 @@ final class ArrayObjectOffsetExists extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        $object = SplIteratorSupport::receiver(
+        $object = SplIteratorSupport::receiverIsA(
             $frame,
             ArrayObjectBuiltin::CLASS_LC,
             'ArrayObject::offsetExists()'
@@ -391,7 +391,7 @@ final class ArrayObjectOffsetUnset extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        $object = SplIteratorSupport::receiver(
+        $object = SplIteratorSupport::receiverIsA(
             $frame,
             ArrayObjectBuiltin::CLASS_LC,
             'ArrayObject::offsetUnset()'
@@ -415,7 +415,7 @@ final class ArrayObjectExchangeArray extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        $object = SplIteratorSupport::receiver(
+        $object = SplIteratorSupport::receiverIsA(
             $frame,
             ArrayObjectBuiltin::CLASS_LC,
             'ArrayObject::exchangeArray()'
@@ -450,7 +450,7 @@ final class ArrayObjectAppend extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        $object = SplIteratorSupport::receiver(
+        $object = SplIteratorSupport::receiverIsA(
             $frame,
             ArrayObjectBuiltin::CLASS_LC,
             'ArrayObject::append()'
