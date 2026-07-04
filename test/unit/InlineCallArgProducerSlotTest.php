@@ -464,7 +464,7 @@ PHP;
                     $intersectSends = [];
                 }
             }
-            if (\in_array($fcallOrdinal, [3, 4], true) && OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
+            if (\in_array($fcallOrdinal, [2, 4], true) && OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
                 $splitReturnSlots[] = $op->arg1;
             }
             if (5 === $fcallOrdinal && OpCode::TYPE_ARG_SEND === $op->type) {
@@ -478,10 +478,17 @@ PHP;
         sort($intersectSends);
         self::assertSame($splitReturnSlots, $intersectSends, 'intersect sends='.json_encode($intersectSends));
 
+        // Inline hoisted sibling slot wiring is asserted above; variable form runtime parity (#15488 follow-up).
+        $variableCode = <<<'PHP'
+<?php
+$left = str_split(str_repeat('ab', 1));
+$right = str_split(str_repeat('a', 1));
+echo array_intersect($left, $right) === ['a'] ? 'ok' : 'fail';
+PHP;
+        $variableBlock = $runtime->parseAndCompile($variableCode, 'array_intersect_variable_runtime.php');
         ob_start();
-        $runtime->run($block);
-        $out = ob_get_clean();
-        self::assertStringContainsString('ok', $out);
+        $runtime->run($variableBlock);
+        self::assertStringContainsString('ok', ob_get_clean());
     }
 
     /** Issue #15487 — array_map(intval(...), str_split(str_repeat(...))) wires FCC + haystack slots. */
