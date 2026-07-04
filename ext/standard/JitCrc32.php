@@ -4,18 +4,19 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\JIT\Builtin\Crc32Runtime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** LLVM JIT helper for crc32() — table-driven CRC32B from ext/standard/VmCrc32.php (#5389). */
+/** LLVM JIT helper for crc32() — Crc32JitHelper PHP bridge (#5389, #15759). */
 final class JitCrc32
 {
     public static function compute(Context $context, Value $subject, Value $seed): Value
     {
-        $checksum = JitCrcCore::computeCrc32($context, $subject, $seed);
+        $checksum = Crc32Runtime::invokeCrc32($context, $subject, $seed);
         $slot = JitValueBox::alloc($context);
         JitValueBox::writeLong($context, $slot, $checksum);
 

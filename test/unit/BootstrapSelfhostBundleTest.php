@@ -131,7 +131,7 @@ final class BootstrapSelfhostBundleTest extends TestCase
         'ext/standard/ChunkSplitJitHelper.php',
         'ext/standard/CountCharsJitHelper.php',
         'ext/standard/JitChunkSplit.php',
-        'ext/standard/JitCrcCore.php',
+        'ext/standard/Crc32JitHelper.php',
         'ext/standard/JitCrc32.php',
         'ext/standard/JitExplode.php',
         'ext/standard/ChmodJitHelper.php',
