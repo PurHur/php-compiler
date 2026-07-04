@@ -967,7 +967,7 @@ PHP;
         self::assertSame($preDecSlot, $sendSlots[1] ?? null, 'arg sends='.json_encode($sendSlots));
     }
 
-    /** Issue #9479 — inline (int) enum cast producer maps to var_dump arg slot. */
+    /** Issue #9479 / #15982 — inline (int) enum cast producer maps to var_dump arg slot. */
     public function testVarDumpIntCastEnumCaseUsesCastProducerSlot(): void
     {
         $code = <<<'PHP'
@@ -977,6 +977,32 @@ var_dump((int) E::A);
 PHP;
         $runtime = new Runtime();
         $block = $runtime->parseAndCompile($code, 'enum_int_cast_call_arg.php');
+
+        $castSlot = null;
+        $sendSlots = [];
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_CAST_INT === $op->type) {
+                $castSlot = $op->arg1;
+            }
+            if (OpCode::TYPE_ARG_SEND === $op->type) {
+                $sendSlots[] = $op->arg1;
+            }
+        }
+
+        self::assertNotNull($castSlot);
+        self::assertSame([$castSlot], $sendSlots, 'arg sends='.json_encode($sendSlots));
+    }
+
+    /** Issue #15982 — var_export((int) E::A) must send cast result, not enum const fetch. */
+    public function testVarExportIntCastEnumCaseUsesCastProducerSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+enum E: int { case A = 1; }
+var_export((int) E::A);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'enum_int_cast_var_export.php');
 
         $castSlot = null;
         $sendSlots = [];
