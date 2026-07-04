@@ -22382,6 +22382,66 @@ class Compiler {
         return true;
     }
 
+    /**
+     * date_sunrise(time(), SUNFUNCS_RET_*, …) — hoisted FuncCall + SUNFUNCS ConstFetch (#13749, #11070).
+     */
+    private function wireDateSunFuncHoistedCallArgSlot(Block $block, Op $cfgCallOp, int $argIndex): ?string
+    {
+        if (null === $block->orig) {
+            return null;
+        }
+        $callee = strtolower($this->resolveCfgFuncCallName($cfgCallOp) ?? '');
+        if (!\in_array($callee, ['date_sunrise', 'date_sunset'], true)) {
+            return null;
+        }
+        if (0 === $argIndex) {
+            $adjacent = $this->resolveAdjacentNestedFuncCallArgSlot($block, $cfgCallOp, 0);
+            if (null !== $adjacent) {
+                return $adjacent;
+            }
+            foreach ($block->orig->children as $child) {
+                if ($child === $cfgCallOp) {
+                    return null;
+                }
+                if ($child instanceof Op\Expr\FuncCall || $child instanceof Op\Expr\NsFuncCall) {
+                    if (null === $block->slotForOperand($child->result)) {
+                        foreach ($this->compileExpr($child, $block) as $op) {
+                            $block->addOpCode($op);
+                        }
+                    }
+                    $slot = $block->slotForOperand($child->result);
+
+                    return null !== $slot ? (string) $slot : null;
+                }
+            }
+
+            return null;
+        }
+        if (1 !== $argIndex) {
+            return null;
+        }
+        foreach ($block->orig->children as $child) {
+            if ($child === $cfgCallOp) {
+                return null;
+            }
+            if (!$child instanceof Op\Expr\ConstFetch) {
+                continue;
+            }
+            $name = strtolower($this->staticNameFromOperand($child->name) ?? '');
+            if (!str_starts_with($name, 'sunfuncs_ret_')) {
+                continue;
+            }
+            $folded = $this->tryFoldGlobalConstFetch($child);
+            if (null === $folded) {
+                continue;
+            }
+
+            return (string) $block->registerConstant($child->result, $folded);
+        }
+
+        return null;
+    }
+
     private function resolveAdjacentNestedFuncCallArgSlot(
         Block $block,
         Op $cfgCallOp,
@@ -27272,6 +27332,12 @@ class Compiler {
             $prefetchOps = [];
             $assignedNamedLocal = null;
             $valueSlot = null;
+            if (null !== $cfgCallOp && null !== $block->orig) {
+                $dateSunSlot = $this->wireDateSunFuncHoistedCallArgSlot($block, $cfgCallOp, (int) $argIndex);
+                if (null !== $dateSunSlot) {
+                    $valueSlot = $dateSunSlot;
+                }
+            }
             $syncedCoalesceSlot = $this->resolveSyncedCoalesceFuncCallArgSlot($callArgOperand);
             if (null === $syncedCoalesceSlot) {
                 $syncedCoalesceSlot = $this->resolveSyncedCoalesceFuncCallArgSlot($arg);
@@ -29461,6 +29527,17 @@ class Compiler {
                     if (null !== $chainSlot) {
                         $valueSlot = (string) $chainSlot;
                     }
+                }
+            }
+            $literalProbe = ($cfgCallOp->args[(int) $argIndex] ?? null) ?? $arg;
+            if ($this->isEmbeddedCallLiteralArg($literalProbe)) {
+                // Stmt-level inline NEW must not alias embedded literal ctor args (#15996).
+                $valueSlot = $this->freshLiteralConstantSlot($literalProbe, $block);
+            }
+            if (null !== $cfgCallOp && null !== $block->orig) {
+                $dateSunSlot = $this->wireDateSunFuncHoistedCallArgSlot($block, $cfgCallOp, (int) $argIndex);
+                if (null !== $dateSunSlot) {
+                    $valueSlot = $dateSunSlot;
                 }
             }
             $sends[] = new OpCode(OpCode::TYPE_ARG_SEND, $valueSlot, $nameSlot, $unpackFlag);
