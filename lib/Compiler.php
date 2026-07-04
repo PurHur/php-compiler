@@ -12146,6 +12146,12 @@ class Compiler {
                         static fn (Op\Expr $p): bool => $p instanceof Op\Expr\Array_
                     ));
                     if ([] !== $arrayProducers && 0 === $argIndex) {
+                        if ('array_combine' === $this->resolveCfgFuncCallName($callOp)) {
+                            $combineMatch = $this->matchArrayCombineInlineProducers($producers, $argIndex);
+                            if ($combineMatch instanceof Op\Expr\FuncCall || $combineMatch instanceof Op\Expr\NsFuncCall) {
+                                return null;
+                            }
+                        }
                         return $arrayProducers[\count($arrayProducers) - 1];
                     }
                 }
@@ -12187,6 +12193,15 @@ class Compiler {
                     static fn (Op\Expr $p): bool => $p instanceof Op\Expr\Array_
                 ));
                 if ([] !== $arrayProducers) {
+                    if (
+                        'array_combine' === $this->resolveCfgFuncCallName($callOp)
+                        && 0 === $argIndex
+                    ) {
+                        $combineMatch = $this->matchArrayCombineInlineProducers($producers, $argIndex);
+                        if ($combineMatch instanceof Op\Expr\FuncCall || $combineMatch instanceof Op\Expr\NsFuncCall) {
+                            return null;
+                        }
+                    }
                     return $arrayProducers[\count($arrayProducers) - 1];
                 }
             }
@@ -25424,16 +25439,32 @@ class Compiler {
                     $stmtBeforeArray = $this->inlineArrayProducerImmediatelyBeforeCfgCall($cfgCallOp, $block);
                     if ($stmtBeforeArray instanceof Op\Expr\Array_) {
                         $callArgProbe = ($cfgCallOp->args[(int) $argIndex] ?? null) ?? $arg;
+                        $arrayCombineArgZeroSiblingFunc = false;
                         if (
-                            $this->callArgIsDeadInlineTemporary($callArgProbe)
-                            && $this->callArgOperandExpectsArrayProducer($callArgProbe)
-                            && $this->inlineArrayLiteralStmtBeforeOverriddenBySiblingCallProducer(
-                                $cfgCallOp,
-                                (int) $argIndex,
-                                $block
+                            0 === (int) $argIndex
+                            && 'array_combine' === $this->resolveCfgFuncCallName($cfgCallOp)
+                            && null !== $block->orig
+                        ) {
+                            $combineArg0 = $this->matchArrayCombineInlineProducers(
+                                $this->precedingInlineCallArgProducersBeforeCfgOp($block->orig->children, $cfgCallOp),
+                                0
+                            );
+                            $arrayCombineArgZeroSiblingFunc = $combineArg0 instanceof Op\Expr\FuncCall
+                                || $combineArg0 instanceof Op\Expr\NsFuncCall;
+                        }
+                        if (
+                            $arrayCombineArgZeroSiblingFunc
+                            || (
+                                $this->callArgIsDeadInlineTemporary($callArgProbe)
+                                && $this->callArgOperandExpectsArrayProducer($callArgProbe)
+                                && $this->inlineArrayLiteralStmtBeforeOverriddenBySiblingCallProducer(
+                                    $cfgCallOp,
+                                    (int) $argIndex,
+                                    $block
+                                )
                             )
                         ) {
-                            // array_combine(array_keys(...), [...]) — arg #0 is sibling FuncCall, not trailing Array_ (#15553, #13776).
+                            // array_combine(array_keys(...), [...]) — arg #0 is sibling FuncCall, not trailing Array_ (#15558, #13776).
                         } elseif (
                             $this->callArgIsDeadInlineTemporary($callArgProbe)
                             || $this->operandsReferToSameVariable($stmtBeforeArray->result, $callArgProbe)
