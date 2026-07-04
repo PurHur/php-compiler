@@ -12471,6 +12471,47 @@ class Compiler {
     }
 
     /**
+     * Dedicated array-producer ARG_SEND resolution — haystack-family builtins only (#15612, #14134).
+     *
+     * Skips mb_detect_order([...]) and other mutators that take a single inline array operand.
+     */
+    private function shouldUseArrayProducerCallArgResolution(?Op $cfgCallOp, int $argIndex, ?string $calleeName): bool
+    {
+        if (null === $cfgCallOp || $argIndex < 1) {
+            return false;
+        }
+        $callee = strtolower($calleeName ?? $this->resolveCfgFuncCallName($cfgCallOp) ?? '');
+
+        return \in_array($callee, [
+            'in_array',
+            'array_search',
+            'array_key_exists',
+            'key_exists',
+            'array_column',
+            'array_merge',
+            'array_replace',
+            'array_diff',
+            'array_intersect',
+            'array_intersect_assoc',
+            'array_diff_assoc',
+            'array_udiff',
+            'array_uintersect',
+        ], true);
+    }
+
+    /** Dead array temp that needs haystack-family producer wiring (#15612), not embedded literal (#14134). */
+    private function callArgUsesHaystackFamilyArrayProducerResolution(
+        ?Op $cfgCallOp,
+        int $argIndex,
+        ?string $calleeName,
+        Operand $arg
+    ): bool {
+        return $this->callArgIsDeadInlineTemporary($arg)
+            && $this->callArgOperandExpectsArrayProducer($arg)
+            && $this->shouldUseArrayProducerCallArgResolution($cfgCallOp, $argIndex, $calleeName);
+    }
+
+    /**
      * Stmt-level ?? must not supply slots for literal / hoisted scalar call args (#9225, #10380).
      */
     private function isCallArgUnrelatedToPriorStmtCoalesce(Operand $callArg): bool
@@ -26285,6 +26326,10 @@ class Compiler {
                 $sends[] = $assignOp;
             }
             if (null !== $cfgCallOp) {
+                $skipSiblingArrayProducer = $this->callArgIsDeadInlineTemporary($arg)
+                    && $this->callArgOperandExpectsArrayProducer($arg)
+                    && !$this->shouldUseArrayProducerCallArgResolution($cfgCallOp, (int) $argIndex, $calleeName);
+                if (!$skipSiblingArrayProducer) {
                 $siblingOps = [];
                 $siblingSlot = $this->resolveSiblingInlineCallArgProducerSlot(
                     $block,
@@ -26312,12 +26357,12 @@ class Compiler {
                         $valueSlot = (string) $execReturnSlot;
                     }
                 }
+                }
             }
             if (
                 null !== $cfgCallOp
                 && null !== $nameSlot
-                && $this->callArgIsDeadInlineTemporary($arg)
-                && $this->callArgOperandExpectsArrayProducer($arg)
+                && $this->callArgUsesHaystackFamilyArrayProducerResolution($cfgCallOp, (int) $argIndex, $calleeName, $arg)
                 && null !== $block->orig
             ) {
                 $producers = $this->precedingInlineCallArgProducersBeforeCfgOp(
@@ -26421,8 +26466,7 @@ class Compiler {
             if (null === $namedAssignDest) {
             if (
                 null !== $cfgCallOp
-                && $this->callArgIsDeadInlineTemporary($arg)
-                && $this->callArgOperandExpectsArrayProducer($arg)
+                && $this->callArgUsesHaystackFamilyArrayProducerResolution($cfgCallOp, (int) $argIndex, $calleeName, $arg)
                 && $this->countDeadArrayInlineCallArgs($cfgCallOp) >= 1
                 && null !== $block->orig
                 && !$this->precedingInlineCallArgHasPlusOrConcatProducer($block->orig->children, $cfgCallOp)
@@ -27128,8 +27172,7 @@ class Compiler {
             }
             if (
                 null !== $cfgCallOp
-                && $this->callArgIsDeadInlineTemporary($arg)
-                && $this->callArgOperandExpectsArrayProducer($arg)
+                && $this->callArgUsesHaystackFamilyArrayProducerResolution($cfgCallOp, (int) $argIndex, $calleeName, $arg)
                 && !$inlineArrayLiteralArgWired
             ) {
                 $arrayProducerSlot = null;
