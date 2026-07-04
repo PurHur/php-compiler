@@ -14043,7 +14043,14 @@ class Compiler {
                 break;
             }
             if (OpCode::TYPE_CLOSURE === $op->type) {
-                return (int) $op->arg1;
+                $destSlot = (int) $op->arg1;
+                $destOperand = $block->operandForScopeSlot($destSlot);
+                if (
+                    null !== $destOperand
+                    && $this->operandsReferToSameVariable($destOperand, $producer->result)
+                ) {
+                    return $destSlot;
+                }
             }
         }
         foreach ($this->compileExpr($producer, $block) as $op) {
@@ -21801,6 +21808,8 @@ class Compiler {
         if (in_array($funcName, [
             'array_all',
             'array_any',
+            'array_all_key',
+            'array_any_key',
             'array_find',
             'array_find_key',
             'array_reduce',
