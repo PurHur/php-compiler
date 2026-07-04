@@ -23647,7 +23647,17 @@ class Compiler {
                 continue;
             }
             if ($j === $producerIndex) {
-                return $this->slotForSiblingInlineFuncCallProducerExecReturnOrdinal($block, $funcCallOrdinal);
+                $newExecBase = 0;
+                for ($k = 0; $k < $producerIndex; ++$k) {
+                    if (($cfgChildren[$k] ?? null) instanceof Op\Expr\New_) {
+                        ++$newExecBase;
+                    }
+                }
+
+                return $this->slotForSiblingInlineFuncCallProducerExecReturnOrdinal(
+                    $block,
+                    $funcCallOrdinal + $newExecBase
+                );
             }
             ++$funcCallOrdinal;
         }
@@ -25002,11 +25012,20 @@ class Compiler {
                     $block->addOpCode($op);
                 }
             }
-            $adjacentExecReturn = $this->slotForInlineFuncCallProducerExecReturnByCfgIndex(
+            // Prefer sibling EXEC_RETURN ordinal — cfg-index lookup counts TYPE_NEW pseudo returns (#16241).
+            $adjacentExecReturn = $this->slotForSiblingInlineCallProducerExecReturnByExpr(
                 $block,
-                $probeIndex,
+                $prev,
+                $cfgCallOp,
                 $block->orig->children
             );
+            if (null === $adjacentExecReturn) {
+                $adjacentExecReturn = $this->slotForInlineFuncCallProducerExecReturnByCfgIndex(
+                    $block,
+                    $probeIndex,
+                    $block->orig->children
+                );
+            }
             if (null !== $adjacentExecReturn) {
                 // var_dump($s, gettype($s)) — stmt-adjacent hoisted producer for mixed arg list (#11144).
                 return (string) $adjacentExecReturn;
@@ -30562,6 +30581,28 @@ class Compiler {
                 $cfgCallOp,
                 (int) $argIndex
             );
+            // unserialize(serialize($obj)) — adjacent hoisted serialize must feed arg #0, not stale New_ slot (#16241).
+            if (
+                null === $dimFetchSlot
+                && null !== $cfgCallOp
+                && null !== $block->orig
+                && $this->callArgIsDeadInlineTemporary($arg)
+            ) {
+                $adjacentNestedProducerSlot = $this->resolveAdjacentNestedFuncCallArgSlot(
+                    $block,
+                    $cfgCallOp,
+                    (int) $argIndex
+                );
+                if (null !== $adjacentNestedProducerSlot) {
+                    $sends[] = new OpCode(
+                        OpCode::TYPE_ARG_SEND,
+                        $adjacentNestedProducerSlot,
+                        $nameSlot,
+                        $unpackFlag
+                    );
+                    continue;
+                }
+            }
             if (
                 null === $dimFetchSlot
                 && null !== $cfgCallOp
