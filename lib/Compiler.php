@@ -27922,6 +27922,13 @@ class Compiler {
                     $valueSlot = $arrayColumnSlot;
                 }
             }
+            // Final pass: stmt-level ?? merge slot beats dim-fetch producer remaps (#11603).
+            if (!$this->isCallArgDirectArrayDimFetch($arg) && null !== $cfgCallOp) {
+                $coalesceSlot = $this->compileCallArgCoalesceSlot($arg, $block, $cfgCallOp, (int) $argIndex);
+                if (null !== $coalesceSlot) {
+                    $valueSlot = (string) $coalesceSlot;
+                }
+            }
             $sends[] = new OpCode(OpCode::TYPE_ARG_SEND, $valueSlot, $nameSlot, $unpackFlag);
         }
 
