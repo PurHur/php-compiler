@@ -223,6 +223,37 @@ final class WeakRefRegistryJitHelper
         self::$mapKey[$index] = '';
     }
 
+    /** Clear weakref slots and weakmap keys targeting a freed object (#15968). */
+    public static function clearObject(int $targetPtr): void
+    {
+        if ($targetPtr <= 0) {
+            return;
+        }
+        $refCount = self::$refCount;
+        for ($i = 0; $i < $refCount; ++$i) {
+            if (!isset(self::$refTargetPtr[$i]) || self::$refTargetPtr[$i] !== $targetPtr) {
+                continue;
+            }
+            $slot = self::$refSlotPtr[$i] ?? 0;
+            if (0 !== $slot) {
+                phpc_weakref_null_slot($slot);
+                self::clearRefEntry($i);
+            }
+        }
+        $mapCount = self::$mapCount;
+        for ($i = 0; $i < $mapCount; ++$i) {
+            if (!isset(self::$mapTargetPtr[$i]) || self::$mapTargetPtr[$i] !== $targetPtr) {
+                continue;
+            }
+            $ht = self::$mapHtPtr[$i] ?? 0;
+            $key = self::$mapKey[$i] ?? '';
+            if (0 !== $ht && '' !== $key) {
+                phpc_weakref_unset_map_key($ht, $key);
+                self::clearMapEntry($i);
+            }
+        }
+    }
+
     private static function storeMapKey(string $key): string
     {
         return $key;

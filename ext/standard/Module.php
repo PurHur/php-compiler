@@ -697,6 +697,8 @@ class Module extends ModuleAbstract
             new phpc_gc_native_child_at(),
             new phpc_gc_native_object_refcount(),
             new phpc_gc_native_free_object(),
+            new phpc_weakref_null_slot(),
+            new phpc_weakref_unset_map_key(),
             new phpc_native_ht_alloc(),
             new phpc_native_ht_set_string_key(),
             new phpc_native_ht_set_string_key_ht(),
