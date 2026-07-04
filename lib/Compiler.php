@@ -26666,10 +26666,32 @@ class Compiler {
                 && 'array_keys' === $this->resolveCfgFuncCallName($cfgCallOp)
                 && 0 === (int) $argIndex
             ) {
-                $recentArraySlot = $this->slotForRecentInitArrayCallArg($block);
-                if (null !== $recentArraySlot) {
-                    $sends[] = new OpCode(OpCode::TYPE_ARG_SEND, $recentArraySlot, $nameSlot, $unpackFlag);
-                    continue;
+                // array_diff_assoc(array_keys(...), array_keys(...)) — stmt-before Array_, not last INIT_ARRAY (#15959, re-#13779).
+                $keysArrayProducer = $this->inlineArrayProducerImmediatelyBeforeCfgCall($cfgCallOp, $block);
+                if (
+                    !$keysArrayProducer instanceof Op\Expr\Array_
+                    && $this->callArgIsDeadInlineTemporary($arg)
+                    && $this->callArgOperandExpectsArrayProducer($arg)
+                ) {
+                    $keysArrayProducer = $this->findInlineArrayProducerForCallArg(
+                        $arg,
+                        $block,
+                        $cfgCallOp,
+                        (int) $argIndex
+                    );
+                }
+                if ($keysArrayProducer instanceof Op\Expr\Array_) {
+                    $keysArraySlot = $block->slotForOperand($keysArrayProducer->result);
+                    if (null === $keysArraySlot) {
+                        foreach ($this->compileArrayLiteral($keysArrayProducer, $block) as $op) {
+                            $sends[] = $op;
+                        }
+                        $keysArraySlot = $block->slotForOperand($keysArrayProducer->result);
+                    }
+                    if (null !== $keysArraySlot) {
+                        $sends[] = new OpCode(OpCode::TYPE_ARG_SEND, $keysArraySlot, $nameSlot, $unpackFlag);
+                        continue;
+                    }
                 }
             }
             $callOrdinal = 0;
