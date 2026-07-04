@@ -11260,6 +11260,7 @@ restart:
      *     visibility: int,
      *     setVisibility: int,
      *     getVisibility: int,
+     *     asymmetricExplicitRead: bool,
      *     declaringClassLc: string,
      *     declaringClassDisplay: string
      * }|null
@@ -11277,6 +11278,7 @@ restart:
                     'visibility' => $entry->staticPropertyVisibility[$propLc] ?? \PHPCfg\Func::FLAG_PUBLIC,
                     'setVisibility' => $entry->staticPropertySetVisibility[$propLc] ?? 0,
                     'getVisibility' => $entry->staticPropertyGetVisibility[$propLc] ?? 0,
+                    'asymmetricExplicitRead' => $entry->staticPropertyAsymmetricExplicitRead[$propLc] ?? false,
                     'declaringClassLc' => $declLc,
                     'declaringClassDisplay' => $declEntry->name,
                 ];
@@ -11373,7 +11375,9 @@ restart:
                 $meta['declaringClassLc'],
                 $meta['declaringClassDisplay'],
                 $propName,
-                fn (string $child, string $parent): bool => $this->isSubclassOf($child, $parent)
+                fn (string $child, string $parent): bool => $this->isSubclassOf($child, $parent),
+                MethodVisibility::mask($meta['visibility']),
+                $meta['asymmetricExplicitRead'] ?? false
             );
         } catch (\LogicException $e) {
             return $e->getMessage();
@@ -11666,7 +11670,9 @@ restart:
                 strtolower($owner->class->name),
                 $owner->class->name,
                 $propName,
-                fn (string $child, string $parent): bool => $this->isSubclassOf($child, $parent)
+                fn (string $child, string $parent): bool => $this->isSubclassOf($child, $parent),
+                MethodVisibility::mask($meta->visibility),
+                $meta->asymmetricExplicitRead
             );
         } catch (\LogicException $e) {
             return $e->getMessage();
@@ -13388,6 +13394,9 @@ restart:
                     ?? \PHPCfg\Func::FLAG_PUBLIC;
                 $entry->staticPropertySetVisibility[$name] = $trait->staticPropertySetVisibility[$name] ?? 0;
                 $entry->staticPropertyGetVisibility[$name] = $trait->staticPropertyGetVisibility[$name] ?? 0;
+                if (isset($trait->staticPropertyAsymmetricExplicitRead[$name])) {
+                    $entry->staticPropertyAsymmetricExplicitRead[$name] = $trait->staticPropertyAsymmetricExplicitRead[$name];
+                }
                 $entry->staticPropertyDeclaringClassLc[$name] = $trait->staticPropertyDeclaringClassLc[$name]
                     ?? $traitLc;
             }
@@ -13732,7 +13741,8 @@ restart:
             $property->visibility,
             $declaringLc,
             $property->setVisibility,
-            $property->getVisibility
+            $property->getVisibility,
+            $property->asymmetricExplicitRead
         );
         $cloned->getHookMethodLc = $property->getHookMethodLc;
         $cloned->setHookMethodLc = $property->setHookMethodLc;
@@ -13836,6 +13846,9 @@ restart:
                 }
                 if (0 !== $ifaceProp->getVisibility) {
                     $classProp->getVisibility = $ifaceProp->getVisibility;
+                }
+                if ($ifaceProp->asymmetricExplicitRead) {
+                    $classProp->asymmetricExplicitRead = true;
                 }
                 break;
             }
@@ -14068,6 +14081,9 @@ restart:
                 }
                 if (isset($parent->staticPropertyGetVisibility[$name])) {
                     $entry->staticPropertyGetVisibility[$name] = $parent->staticPropertyGetVisibility[$name];
+                }
+                if (isset($parent->staticPropertyAsymmetricExplicitRead[$name])) {
+                    $entry->staticPropertyAsymmetricExplicitRead[$name] = $parent->staticPropertyAsymmetricExplicitRead[$name];
                 }
                 if (isset($parent->staticPropertyDeclaringClassLc[$name])) {
                     $entry->staticPropertyDeclaringClassLc[$name] = $parent->staticPropertyDeclaringClassLc[$name];
@@ -14329,7 +14345,8 @@ restart:
                         MethodVisibility::mask($op->propertyVisibility),
                         strtolower($entry->name),
                         (int) ($op->propertySetVisibility ?? 0),
-                        (int) ($op->propertyGetVisibility ?? 0)
+                        (int) ($op->propertyGetVisibility ?? 0),
+                        (bool) ($op->propertyAsymmetricExplicitRead ?? false)
                     );
                     $prop->fromConstructorPromotion = $op->propertyFromConstructorPromotion;
                     // readonly-class promoted props are readonly even without `readonly` on the param (#15409).
@@ -14382,6 +14399,9 @@ restart:
                     $entry->staticPropertyVisibility[$name] = MethodVisibility::mask($op->propertyVisibility);
                     $entry->staticPropertySetVisibility[$name] = (int) ($op->propertySetVisibility ?? 0);
                     $entry->staticPropertyGetVisibility[$name] = (int) ($op->propertyGetVisibility ?? 0);
+                    if ($op->propertyAsymmetricExplicitRead ?? false) {
+                        $entry->staticPropertyAsymmetricExplicitRead[$name] = true;
+                    }
                     $entry->staticPropertyDeclaringClassLc[$name] = strtolower($entry->name);
                     if (null !== $op->deprecatedMetadata) {
                         $entry->propDeprecated[$name] = $op->deprecatedMetadata;
@@ -14886,6 +14906,9 @@ restart:
             $entry->staticPropertyVisibility[$name] = MethodVisibility::mask($declareOp->propertyVisibility);
             $entry->staticPropertySetVisibility[$name] = (int) ($declareOp->propertySetVisibility ?? 0);
             $entry->staticPropertyGetVisibility[$name] = (int) ($declareOp->propertyGetVisibility ?? 0);
+            if ($declareOp->propertyAsymmetricExplicitRead ?? false) {
+                $entry->staticPropertyAsymmetricExplicitRead[$name] = true;
+            }
             $entry->staticPropertyDeclaringClassLc[$name] = strtolower($entry->name);
 
             return;

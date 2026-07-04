@@ -391,7 +391,11 @@ final class PropertyHookDispatchLlvm
                     $objectType,
                     $child,
                     $parent
-                )
+                ),
+                MethodVisibility::mask($readVis),
+                $staticProperty
+                    ? $objectType->staticPropertyAsymmetricExplicitRead($classId, $propertyName)
+                    : $objectType->propertyAsymmetricExplicitRead($classId, $propertyName)
             );
         } catch (\LogicException $e) {
             $message = $e->getMessage();

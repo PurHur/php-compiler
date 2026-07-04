@@ -72,17 +72,33 @@ final class PropertyVisibility
         string $declaringClassLc,
         string $declaringClassDisplay,
         string $propertyName,
-        callable $isSubclass
+        callable $isSubclass,
+        int $readVisibilityFlags = 0,
+        bool $explicitReadModifier = false
     ): void {
         if (MethodVisibility::isPublic($setVisibilityFlags)) {
             return;
         }
         if (null === $callerClassLc) {
-            self::denyWrite($setVisibilityFlags, $declaringClassDisplay, $propertyName, 'global scope');
+            self::denyWrite(
+                $setVisibilityFlags,
+                $declaringClassDisplay,
+                $propertyName,
+                'global scope',
+                $readVisibilityFlags,
+                $explicitReadModifier
+            );
         }
         if (($setVisibilityFlags & CfgFunc::FLAG_PRIVATE) !== 0) {
             if ($callerClassLc !== $declaringClassLc) {
-                self::denyWrite($setVisibilityFlags, $declaringClassDisplay, $propertyName, $callerClassLc);
+                self::denyWrite(
+                    $setVisibilityFlags,
+                    $declaringClassDisplay,
+                    $propertyName,
+                    $callerClassLc,
+                    $readVisibilityFlags,
+                    $explicitReadModifier
+                );
             }
 
             return;
@@ -91,7 +107,14 @@ final class PropertyVisibility
             if ($callerClassLc === $declaringClassLc || $isSubclass($callerClassLc, $declaringClassLc)) {
                 return;
             }
-            self::denyWrite($setVisibilityFlags, $declaringClassDisplay, $propertyName, $callerClassLc);
+            self::denyWrite(
+                $setVisibilityFlags,
+                $declaringClassDisplay,
+                $propertyName,
+                $callerClassLc,
+                $readVisibilityFlags,
+                $explicitReadModifier
+            );
         }
     }
 
@@ -123,9 +146,13 @@ final class PropertyVisibility
         int $setVisibilityFlags,
         string $className,
         string $propertyName,
-        string $scopeLabel
+        string $scopeLabel,
+        int $readVisibilityFlags = 0,
+        bool $explicitReadModifier = false
     ): void {
-        $kind = Ast\AsymmetricVisibilityRewriter::setModifierLabel($setVisibilityFlags);
+        $kind = 0 !== $readVisibilityFlags
+            ? Ast\AsymmetricVisibilityRewriter::writeModifierLabel($readVisibilityFlags, $setVisibilityFlags, $explicitReadModifier)
+            : Ast\AsymmetricVisibilityRewriter::setModifierLabel($setVisibilityFlags);
         throw new \LogicException(
             sprintf(
                 'Cannot modify %s property %s::$%s from %s',

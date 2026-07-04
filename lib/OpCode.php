@@ -299,6 +299,8 @@ class OpCode {
     public int $propertySetVisibility = 0;
     /** Asymmetric get visibility on TYPE_DECLARE_PROPERTY (#5059); 0 = symmetric with write. */
     public int $propertyGetVisibility = 0;
+    /** Explicit read modifier before asymmetric set in source (#15995). */
+    public bool $propertyAsymmetricExplicitRead = false;
     /** TYPE_CLASS_CONST_FETCH: `::class` on a runtime expression operand (must be object, #4241). */
     public bool $classConstFetchOnObject = false;
     /** TYPE_DECLARE_CLASS_CONST: PHPCfg visibility flags (#4651). */

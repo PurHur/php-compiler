@@ -65,7 +65,9 @@ final class AsymmetricVisibilityGuard
                 $declaringLc,
                 $declaringClass,
                 $propName,
-                static fn (string $child, string $parent): bool => self::isSubclassOf($objectType, $child, $parent)
+                static fn (string $child, string $parent): bool => self::isSubclassOf($objectType, $child, $parent),
+                MethodVisibility::mask($readVis),
+                $objectType->propertyAsymmetricExplicitRead($classId, $propName)
             );
         } catch (\LogicException $e) {
             self::emitViolation($context, $jit, $e->getMessage());
@@ -121,7 +123,9 @@ final class AsymmetricVisibilityGuard
                 $declaringLc,
                 $declaringClass,
                 $propName,
-                static fn (string $child, string $parent): bool => self::isSubclassOf($objectType, $child, $parent)
+                static fn (string $child, string $parent): bool => self::isSubclassOf($objectType, $child, $parent),
+                MethodVisibility::mask($meta['visibility']),
+                $meta['asymmetricExplicitRead'] ?? false
             );
         } catch (\LogicException $e) {
             self::emitViolation($context, $jit, $e->getMessage());

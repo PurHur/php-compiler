@@ -92,6 +92,8 @@ class Object_ extends Type {
     /** @var array<int, array<string, int>> class id => property lc => asymmetric set visibility (#3165) */
     private array $propertySetVisibility = [];
     private array $propertyGetVisibility = [];
+    /** @var array<int, array<string, bool>> class id => property lc => explicit read before set (#15995) */
+    private array $propertyAsymmetricExplicitRead = [];
 
     /** @var array<int, array<string, list<array{kind: string, interfaces?: list<string>, display?: string, name?: string}>>> */
     private array $propertyDnfArms = [];
@@ -144,6 +146,8 @@ class Object_ extends Type {
     private array $staticPropertySetVisibility = [];
     /** @var array<int, array<string, int>> class id => static prop lc => asymmetric get visibility (#8751) */
     private array $staticPropertyGetVisibility = [];
+    /** @var array<int, array<string, bool>> class id => static prop lc => explicit read before set (#15995) */
+    private array $staticPropertyAsymmetricExplicitRead = [];
     /** @var array<int, array<string, int>> class id => static prop lc => declaring class id (#6785) */
     private array $staticPropertyDeclaringClassId = [];
     /** @var array<int, array<string, int>> class id => instance prop lc => declaring trait/class id (#7418) */
@@ -3362,6 +3366,11 @@ class Object_ extends Type {
         }
     }
 
+    public function definePropertyAsymmetricExplicitRead(int $classId, string $name): void
+    {
+        $this->propertyAsymmetricExplicitRead[$classId][strtolower($name)] = true;
+    }
+
     public function propertyVisibility(int $classId, string $name): int
     {
         return $this->propertyVisibility[$classId][strtolower($name)] ?? \PHPCfg\Func::FLAG_PUBLIC;
@@ -3375,6 +3384,11 @@ class Object_ extends Type {
     public function propertyGetVisibility(int $classId, string $name): int
     {
         return $this->propertyGetVisibility[$classId][strtolower($name)] ?? 0;
+    }
+
+    public function propertyAsymmetricExplicitRead(int $classId, string $name): bool
+    {
+        return $this->propertyAsymmetricExplicitRead[$classId][strtolower($name)] ?? false;
     }
 
     public function defineStaticPropertySetVisibility(int $classId, string $name, int $setVisibilityFlags): void
@@ -3391,6 +3405,11 @@ class Object_ extends Type {
         }
     }
 
+    public function defineStaticPropertyAsymmetricExplicitRead(int $classId, string $name): void
+    {
+        $this->staticPropertyAsymmetricExplicitRead[$classId][strtolower($name)] = true;
+    }
+
     public function staticPropertySetVisibility(int $classId, string $name): int
     {
         return $this->staticPropertySetVisibility[$classId][strtolower($name)] ?? 0;
@@ -3399,6 +3418,11 @@ class Object_ extends Type {
     public function staticPropertyGetVisibility(int $classId, string $name): int
     {
         return $this->staticPropertyGetVisibility[$classId][strtolower($name)] ?? 0;
+    }
+
+    public function staticPropertyAsymmetricExplicitRead(int $classId, string $name): bool
+    {
+        return $this->staticPropertyAsymmetricExplicitRead[$classId][strtolower($name)] ?? false;
     }
 
     public function methodVisibility(int $classId, string $methodLc): int
@@ -4017,6 +4041,10 @@ class Object_ extends Type {
             if (isset($this->staticPropertyGetVisibility[$traitId][$name])) {
                 $this->staticPropertyGetVisibility[$classId][$name] = $this->staticPropertyGetVisibility[$traitId][$name];
             }
+            if (isset($this->staticPropertyAsymmetricExplicitRead[$traitId][$name])) {
+                $this->staticPropertyAsymmetricExplicitRead[$classId][$name]
+                    = $this->staticPropertyAsymmetricExplicitRead[$traitId][$name];
+            }
             if (isset($this->staticPropertyDeclaringClassId[$traitId][$name])) {
                 $this->staticPropertyDeclaringClassId[$classId][$name]
                     = $this->staticPropertyDeclaringClassId[$traitId][$name];
@@ -4119,6 +4147,10 @@ class Object_ extends Type {
                 }
                 if (isset($this->staticPropertyGetVisibility[$parentId][$name])) {
                     $this->staticPropertyGetVisibility[$childId][$name] = $this->staticPropertyGetVisibility[$parentId][$name];
+                }
+                if (isset($this->staticPropertyAsymmetricExplicitRead[$parentId][$name])) {
+                    $this->staticPropertyAsymmetricExplicitRead[$childId][$name]
+                        = $this->staticPropertyAsymmetricExplicitRead[$parentId][$name];
                 }
                 if (isset($this->staticPropertyDeclaringClassId[$parentId][$name])) {
                     $this->staticPropertyDeclaringClassId[$childId][$name]
@@ -4444,6 +4476,7 @@ class Object_ extends Type {
                 'visibility' => $this->staticPropertyVisibility[$currentId][$key] ?? \PHPCfg\Func::FLAG_PUBLIC,
                 'setVisibility' => $this->staticPropertySetVisibility[$currentId][$key] ?? 0,
                 'getVisibility' => $this->staticPropertyGetVisibility[$currentId][$key] ?? 0,
+                'asymmetricExplicitRead' => $this->staticPropertyAsymmetricExplicitRead[$currentId][$key] ?? false,
                 'declaringClassId' => $declId,
                 'declaringClassName' => $this->classNameForId($declId),
             ];
@@ -4494,6 +4527,7 @@ class Object_ extends Type {
                 'visibility' => $this->propertyVisibility($currentId, $name),
                 'setVisibility' => $this->propertySetVisibility($currentId, $name),
                 'getVisibility' => $this->propertyGetVisibility($currentId, $name),
+                'asymmetricExplicitRead' => $this->propertyAsymmetricExplicitRead($currentId, $name),
                 'declaringClassId' => $currentId,
                 'declaringClassName' => $this->classNameForId($currentId),
             ];
