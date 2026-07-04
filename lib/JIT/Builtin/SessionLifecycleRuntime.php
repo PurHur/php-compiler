@@ -111,11 +111,14 @@ final class SessionLifecycleRuntime
 
         $context->builder->positionAtEnd($bbStart);
         SessionStorageGlobals::emitCallEnsureDefaults($context);
+        $idLen = $context->builder->load(SessionStorageGlobals::$idLenGlobal);
+        $noExistingId = $context->builder->icmp(Builder::INT_EQ, $idLen, $zeroI64);
         $cookieOk = $context->builder->call($context->lookupFunction('phpc_session_apply_incoming_cookie'));
         $cookieFailed = $context->builder->icmp(Builder::INT_EQ, $cookieOk, $i32->constInt(0, false));
+        $needNewId = $context->builder->and($cookieFailed, $noExistingId);
         $bbNewId = BasicBlockHelper::append($context, 'ssr_new_id');
         $bbAfterCookie = BasicBlockHelper::append($context, 'ssr_after_cookie');
-        $context->builder->branchIf($cookieFailed, $bbNewId, $bbAfterCookie);
+        $context->builder->branchIf($needNewId, $bbNewId, $bbAfterCookie);
 
         $context->builder->positionAtEnd($bbNewId);
         $context->builder->call($context->lookupFunction('__phpc_session_generate_new_id'));
