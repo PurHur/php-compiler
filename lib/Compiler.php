@@ -12327,6 +12327,13 @@ class Compiler {
                             )
                         )
                     ) {
+                        // array_map(null, [[..]]) — stmt-before Array_ is haystack arg #1, not null callback (#15976).
+                        if (
+                            0 === $argIndex
+                            && $this->arrayMapNullCallbackPrecedesInlineHaystack($callOp, $block)
+                        ) {
+                            continue;
+                        }
                         // array_merge((object)[...], [...]) — trailing Array_ is arg #1, not arg #0 (#15858).
                         if (
                             0 === $argIndex
@@ -12499,7 +12506,10 @@ class Compiler {
                 $nestedTrailing = $this->splitNestedArrayLiteralChainWithTrailingProducers($producers);
                 if (null !== $nestedTrailing) {
                     [$arrayChain, $trailing] = $nestedTrailing;
-                    if (1 + \count($trailing) === \count($callOp->args)) {
+                    if (
+                        1 + \count($trailing) === \count($callOp->args)
+                        && !$this->arrayMapNullCallbackPrecedesInlineHaystack($callOp, $block)
+                    ) {
                         $outer = $arrayChain[\count($arrayChain) - 1] ?? null;
                         if ($outer instanceof Op\Expr\Array_) {
                             return $outer;
@@ -12510,7 +12520,7 @@ class Compiler {
                     $producers,
                     static fn (Op\Expr $p): bool => $p instanceof Op\Expr\Array_
                 ));
-                if ([] !== $arrayProducers) {
+                if ([] !== $arrayProducers && !$this->arrayMapNullCallbackPrecedesInlineHaystack($callOp, $block)) {
                     if (
                         'array_combine' === $this->resolveCfgFuncCallName($callOp)
                         && 0 === $argIndex
@@ -22113,6 +22123,17 @@ class Compiler {
     }
 
     /**
+     * array_map(null, [[..]]) — null ConstFetch is callback arg #0, not a nested-call prelude (#9143, #15976).
+     */
+    private function arrayMapNullCallbackPrecedesInlineHaystack(?Op $callOp, ?Block $block): bool
+    {
+        return null !== $callOp
+            && null !== $block
+            && 'array_map' === strtolower($this->resolveCfgFuncCallName($callOp) ?? '')
+            && null !== $this->arrayMapNullCallbackProducerBeforeCfgCall($callOp, $block);
+    }
+
+    /**
      * array_map(null, [[..]]) — hoisted null ConstFetch precedes nested Array_ preludes (#9143).
      */
     private function arrayMapNullCallbackProducerBeforeCfgCall(Op $cfgCallOp, Block $block): ?Op\Expr\ConstFetch
@@ -26867,7 +26888,32 @@ class Compiler {
                 && 2 === \count($cfgCallOp->args ?? [])
             ) {
                 $fccInlineArgSlot = null;
-                if (0 === (int) $argIndex) {
+                $nullCallback = $this->arrayMapNullCallbackProducerBeforeCfgCall($cfgCallOp, $block);
+                if ($nullCallback instanceof Op\Expr\ConstFetch) {
+                    if (0 === (int) $argIndex) {
+                        $fccInlineArgSlot = $block->slotForOperand($nullCallback->result);
+                        if (null === $fccInlineArgSlot) {
+                            foreach ($this->compileExpr($nullCallback, $block) as $op) {
+                                $sends[] = $op;
+                            }
+                            $fccInlineArgSlot = $block->slotForOperand($nullCallback->result);
+                        }
+                    } elseif (1 === (int) $argIndex) {
+                        $haystackArray = $this->inlineArrayProducerImmediatelyBeforeCfgCall($cfgCallOp, $block);
+                        if ($haystackArray instanceof Op\Expr\Array_) {
+                            $fccInlineArgSlot = $block->slotForOperand($haystackArray->result);
+                            if (null === $fccInlineArgSlot) {
+                                $arrayOps = $this->compileArrayLiteral($haystackArray, $block);
+                                if ([] !== $arrayOps) {
+                                    $sends = array_merge($sends, $arrayOps);
+                                }
+                                $fccInlineArgSlot = $this->slotFromInitArrayLiteralOps($arrayOps)
+                                    ?? $block->slotForOperand($haystackArray->result);
+                            }
+                        }
+                    }
+                }
+                if (null === $fccInlineArgSlot && 0 === (int) $argIndex) {
                     $leadingCallback = $this->leadingCallbackFirstInlineProducerBeforeCfgCall($cfgCallOp, $block);
                     if ($leadingCallback instanceof Op\Expr\FirstClassCallable) {
                         $fccInlineArgSlot = $this->slotForInlineFirstClassCallableProducer($leadingCallback, $block);
@@ -26875,7 +26921,7 @@ class Compiler {
                         || $leadingCallback instanceof Op\Expr\Closure) {
                         $fccInlineArgSlot = $this->slotForInlineClosureProducer($leadingCallback, $block);
                     }
-                } elseif (1 === (int) $argIndex) {
+                } elseif (null === $fccInlineArgSlot && 1 === (int) $argIndex) {
                     $haystackProducer = $this->leadingCallbackFirstHaystackFuncCallBeforeCfgCall($cfgCallOp, $block);
                     if ($haystackProducer instanceof Op\Expr\FuncCall
                         || $haystackProducer instanceof Op\Expr\NsFuncCall) {

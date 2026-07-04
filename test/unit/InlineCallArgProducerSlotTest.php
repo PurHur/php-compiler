@@ -3933,6 +3933,46 @@ PHP;
         self::assertSame("array (\n  0 => array (\n    0 => 1,\n    1 => 3,\n  ),\n  1 => array (\n    0 => 2,\n    1 => 4,\n  ),\n)\n", ob_get_clean());
     }
 
+    /** Issue #15976 — array_map(null, [[..]]) wires null ConstFetch + nested inline Array_. */
+    public function testArrayMapNullNestedInlineHaystackUsesDistinctSlots(): void
+    {
+        $code = <<<'PHP'
+<?php
+var_export(array_map(null, [[1], [2]]));
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'array_map_null_nested_inline.php');
+
+        $nullSlot = null;
+        $mapSends = [];
+        $fcallOrdinal = 0;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_CONST_FETCH === $op->type && null === $nullSlot) {
+                $nullSlot = $op->arg1;
+            }
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                ++$fcallOrdinal;
+                if (1 === $fcallOrdinal) {
+                    $mapSends = [];
+                }
+            }
+            if (1 === $fcallOrdinal && OpCode::TYPE_ARG_SEND === $op->type) {
+                $mapSends[] = $op->arg1;
+            }
+        }
+
+        self::assertNotNull($nullSlot);
+        self::assertCount(2, $mapSends, 'map sends='.json_encode($mapSends));
+        self::assertSame($nullSlot, $mapSends[0], 'null callback slot');
+        self::assertNotSame($mapSends[0], $mapSends[1], 'haystack must not reuse callback slot');
+
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertStringContainsString('1', $out);
+        self::assertStringContainsString('2', $out);
+    }
+
     /** Issue #11187 — rename($src, $dst) after file_put_contents must send path locals, not int returns. */
     public function testRenameAfterFilePutContentsUsesNamedPathSlots(): void
     {
