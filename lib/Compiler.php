@@ -14960,7 +14960,7 @@ class Compiler {
         $producerCount = count($producers);
         $argCount = count($callArgs);
         // new LimitIterator(new ArrayIterator([...]), …) — Array_ is inner-ctor prelude (#12916).
-        $nestedCtorNew = $this->matchNestedNewCtorInlineNewProducer($producers, $argIndex, $argCount);
+        $nestedCtorNew = $this->matchNestedNewCtorInlineNewProducer($producers, $argIndex, $argCount, $callArgs);
         if (null !== $nestedCtorNew) {
             return $nestedCtorNew;
         }
@@ -15493,7 +15493,7 @@ class Compiler {
                 return $arrayUnionPlus;
             }
             // new LimitIterator(new ArrayIterator([...]), …) — Array_ is inner-ctor prelude (#12916).
-            $nestedCtorNew = $this->matchNestedNewCtorInlineNewProducer($producers, $argIndex, $argCount);
+            $nestedCtorNew = $this->matchNestedNewCtorInlineNewProducer($producers, $argIndex, $argCount, $callArgs);
             if (null !== $nestedCtorNew) {
                 return $nestedCtorNew;
             }
@@ -15533,7 +15533,7 @@ class Compiler {
             return null;
         }
         // new LimitIterator(new ArrayIterator([...]), …) — inner-ctor Array_ prelude + inline New_ feeds outer arg #0 (#12916).
-        $nestedCtorNew = $this->matchNestedNewCtorInlineNewProducer($producers, $argIndex, $argCount);
+        $nestedCtorNew = $this->matchNestedNewCtorInlineNewProducer($producers, $argIndex, $argCount, $callArgs);
         if (null !== $nestedCtorNew) {
             return $nestedCtorNew;
         }
@@ -23390,7 +23390,7 @@ class Compiler {
         int $argCount,
         int $producerCount
     ): bool {
-        return null !== $this->matchNestedNewCtorInlineNewProducer($producers, $argIndex, $argCount);
+        return null !== $this->matchNestedNewCtorInlineNewProducer($producers, $argIndex, $argCount, []);
     }
 
     /**
@@ -23401,10 +23401,20 @@ class Compiler {
     private function matchNestedNewCtorInlineNewProducer(
         array $producers,
         int $argIndex,
-        int $argCount
+        int $argCount,
+        array $callArgs = []
     ): ?Op\Expr\New_ {
         if (0 !== $argIndex || $argCount < 2 || \count($producers) < 2) {
             return null;
+        }
+        if ([] !== $callArgs) {
+            $callArg = $callArgs[$argIndex] ?? null;
+            if (
+                !$this->callArgIsNewExpression($callArg)
+                && (!$callArg instanceof Operand || !$this->callArgIsDeadInlineTemporary($callArg))
+            ) {
+                return null;
+            }
         }
         $offset = 0;
         while ($offset < \count($producers)) {
@@ -27139,6 +27149,7 @@ class Compiler {
                 null === $dimFetchSlot
                 && null !== $cfgCallOp
                 && null !== $block->orig
+                && $this->callArgInlineProducerIsNew($cfgCallOp, (int) $argIndex, $block)
             ) {
                 $nestedNewProducers = $this->precedingInlineCallArgProducersBeforeCfgOp(
                     $block->orig->children,
@@ -27149,7 +27160,8 @@ class Compiler {
                 $inlineNewProducer = $this->matchNestedNewCtorInlineNewProducer(
                     $nestedNewProducers,
                     (int) $argIndex,
-                    $nestedNewArgCount
+                    $nestedNewArgCount,
+                    $cfgCallOp->args ?? $args
                 );
                 if (null === $inlineNewProducer) {
                     $inlineNewProducer = $this->matchTrailingInlineNewCallArgProducer(
@@ -29495,6 +29507,11 @@ class Compiler {
                         $valueSlot = (string) $chainSlot;
                     }
                 }
+            }
+            $literalProbe = ($cfgCallOp->args[(int) $argIndex] ?? null) ?? $arg;
+            if ($this->isEmbeddedCallLiteralArg($literalProbe)) {
+                // Stmt-level inline NEW must not alias embedded literal ctor args (#15996).
+                $valueSlot = $this->freshLiteralConstantSlot($literalProbe, $block);
             }
             $sends[] = new OpCode(OpCode::TYPE_ARG_SEND, $valueSlot, $nameSlot, $unpackFlag);
         }
