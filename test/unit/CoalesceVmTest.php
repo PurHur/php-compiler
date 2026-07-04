@@ -289,6 +289,20 @@ var_dump(array_keys($a["k"] ?? []));
         );
     }
 
+    /** Issue #10743 — nested dim-fetch ?? before func call must pass coalesce result (#15945). */
+    public function testNestedDimFetchCoalesceFuncCallArg(): void
+    {
+        $this->assertVmOutput(
+            '<?php
+declare(strict_types=1);
+$root = ["warnings" => [10 => "The parsed date was invalid"]];
+var_export($root["warnings"][10] ?? null);
+echo "\n";
+',
+            "'The parsed date was invalid'\n"
+        );
+    }
+
     /** Issue #15946 — ini_get_all details nested under array_keys(??). */
     public function testIniGetAllDetailsCoalesceInArrayKeys(): void
     {

@@ -1481,7 +1481,7 @@ final class VmDateTimeNative
         if (!self::isValidCalendarDate($year, $month, $day)) {
             $result = self::parseResultFromComponents($components);
             $result['warning_count'] = 1;
-            $result['warnings'] = [11 => 'The parsed date was invalid'];
+            $result['warnings'] = [10 => 'The parsed date was invalid'];
 
             return $result;
         }
