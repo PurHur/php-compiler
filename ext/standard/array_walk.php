@@ -139,14 +139,14 @@ final class array_walk extends Internal
         $fn = $internal;
         $out = new HashTable();
         foreach ($src->iterateKeyed(true) as [$key, $value]) {
+            $keyCopy = new Variable();
+            $keyCopy->copyFrom($key);
             if (null !== $userdata) {
-                $keyCopy = new Variable();
-                $keyCopy->copyFrom($key);
                 $userdataCopy = new Variable();
                 $userdataCopy->copyFrom($userdata);
                 $result = VmInternalCall::invoke($fn, $value, $keyCopy, $userdataCopy);
             } else {
-                $result = VmInternalCall::invoke($fn, $value);
+                $result = VmInternalCall::invoke($fn, $value, $keyCopy);
             }
             if (Variable::TYPE_BOOLEAN === $result->type && !$result->toBool()) {
                 return false;
@@ -204,7 +204,7 @@ final class array_walk extends Internal
                     $userdataCopy->copyFrom($userdata);
                     $result = VmInternalCall::invoke($internal, $value, $keyCopy, $userdataCopy);
                 } else {
-                    $result = VmInternalCall::invoke($internal, $value);
+                    $result = VmInternalCall::invoke($internal, $value, $keyCopy);
                 }
             }
             if (VmArrayWalkCallback::callbackFailed($result)) {

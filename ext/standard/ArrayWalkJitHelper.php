@@ -19,8 +19,10 @@ final class ArrayWalkJitHelper
     public static function walkWithBuiltin(HashTable $table, string $builtinName): void
     {
         $fn = VmInternalCall::resolveStringCallback($builtinName);
-        foreach ($table->iterateKeyed(false) as [, $value]) {
-            $result = VmInternalCall::invoke($fn, $value);
+        foreach ($table->iterateKeyed(false) as [$key, $value]) {
+            $keyCopy = new Variable();
+            $keyCopy->copyFrom($key);
+            $result = VmInternalCall::invoke($fn, $value, $keyCopy);
             if (Variable::TYPE_BOOLEAN === $result->type && !$result->toBool()) {
                 return;
             }

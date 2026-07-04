@@ -57,7 +57,9 @@ final class VmArrayWalk
                 }
                 continue;
             }
-            $result = VmInternalCall::invoke($fn, $value);
+            $keyCopy = new Variable();
+            $keyCopy->copyFrom($key);
+            $result = VmInternalCall::invoke($fn, $value, $keyCopy);
             if (Variable::TYPE_BOOLEAN === $result->type && !$result->toBool()) {
                 return false;
             }
@@ -149,7 +151,8 @@ final class VmArrayWalk
                 }
                 continue;
             }
-            $result = VmInternalCall::invoke($fn, $value);
+            $keyCopy = $iterator->currentKey();
+            $result = VmInternalCall::invoke($fn, $value, $keyCopy);
             if (Variable::TYPE_BOOLEAN === $result->type && !$result->toBool()) {
                 return false;
             }
