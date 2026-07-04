@@ -309,9 +309,24 @@ final class CompilerVersionGateTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsCloneWithSyntax());
     }
 
-    public function testSupportsAsymmetricVisibilityFalseOnReferenceProfile(): void
+    public function testSupportsAsymmetricVisibilityTrueOn84DevLine(): void
     {
-        $this->assertFalse(CompilerVersion::supportsAsymmetricVisibility());
+        $this->assertTrue(CompilerVersion::supportsAsymmetricVisibility());
+    }
+
+    public function testSupportsAsymmetricVisibilityFalseWhenProfile82(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.2');
+        try {
+            $this->assertFalse(CompilerVersion::supportsAsymmetricVisibility());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
     }
 
     public function testSupportsAsymmetricVisibilityTrueWhenProfile84(): void
