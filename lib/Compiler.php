@@ -24945,6 +24945,19 @@ class Compiler {
                     return $arrayChain[\count($arrayChain) - 1];
                 }
             }
+            if (
+                1 === $argIndex
+                && \in_array(
+                    strtolower($this->resolveCfgFuncCallName($callOp) ?? ''),
+                    ['in_array', 'array_search'],
+                    true
+                )
+            ) {
+                $haystackProducer = $this->matchInlineArraySearchHaystackProducer($producers, $callArg);
+                if ($haystackProducer instanceof Op\Expr\Array_) {
+                    return $haystackProducer;
+                }
+            }
         }
         if ($candidate instanceof Op\Expr\ClassConstFetch) {
             $nearest = $producers[0] ?? null;
@@ -30469,21 +30482,21 @@ class Compiler {
                             null !== $haystackArg
                             && $this->callArgOperandExpectsArrayProducer($haystackArg)
                         ) {
-                            foreach ($arraySearchProducers as $producer) {
-                                if (!$producer instanceof Op\Expr\Array_) {
-                                    continue;
-                                }
-                                $haystackSlot = $block->slotForOperand($producer->result);
+                            $haystackArrayProducer = $this->matchInlineArraySearchHaystackProducer(
+                                $arraySearchProducers,
+                                $haystackArg
+                            );
+                            if ($haystackArrayProducer instanceof Op\Expr\Array_) {
+                                $haystackSlot = $block->slotForOperand($haystackArrayProducer->result);
                                 if (null === $haystackSlot) {
-                                    foreach ($this->compileArrayLiteral($producer, $block) as $op) {
+                                    foreach ($this->compileArrayLiteral($haystackArrayProducer, $block) as $op) {
                                         $sends[] = $op;
                                     }
-                                    $haystackSlot = $block->slotForOperand($producer->result);
+                                    $haystackSlot = $block->slotForOperand($haystackArrayProducer->result);
                                 }
                                 if (null !== $haystackSlot) {
                                     $valueSlot = (string) $haystackSlot;
                                 }
-                                break;
                             }
                         }
                     } elseif (
@@ -32154,6 +32167,27 @@ class Compiler {
     }
 
     /**
+     * in_array()/array_search() haystack — last hoisted Array_ when array_slice also hoists one (#13684, #16084).
+     */
+    private function matchInlineArraySearchHaystackProducer(array $producers, Operand $haystackArg): ?Op\Expr
+    {
+        $arrayProducers = array_values(array_filter(
+            $producers,
+            static fn (Op\Expr $producer): bool => $producer instanceof Op\Expr\Array_
+        ));
+        if ([] === $arrayProducers) {
+            return null;
+        }
+        foreach ($arrayProducers as $producer) {
+            if ($this->operandsReferToSameVariable($producer->result, $haystackArg)) {
+                return $producer;
+            }
+        }
+
+        return $arrayProducers[\count($arrayProducers) - 1];
+    }
+
+    /**
      * array_slice([..], array_search(...)) — outer Array_ + nested int offset (#13684).
      */
     private function resolveArraySliceInlineCallArgSlot(
@@ -32193,6 +32227,10 @@ class Compiler {
                 return null;
             }
             $arrayExpr = $arrayProducers[0];
+            $existingSlot = $block->slotForOperand($arrayExpr->result);
+            if (null !== $existingSlot) {
+                return (string) $existingSlot;
+            }
             $arrayOps = $this->compileArrayLiteral($arrayExpr, $block);
             if ([] !== $arrayOps) {
                 foreach ($arrayOps as $op) {
