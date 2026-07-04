@@ -2201,6 +2201,19 @@ class Compiler {
                         ));
                         ++$i;
                         break;
+                    } elseif ($this->isForeachListDestructRefFusion($ops, $i, $block)) {
+                        /** @var Op\Iterator\Value $iter */
+                        $iter = $ops[$i];
+                        // Live haystack element for by-ref destructuring slots (#16213, Zend FE_FETCH_R).
+                        $block->addOpCode(new OpCode(
+                            OpCode::TYPE_ITER_VALUE,
+                            $this->compileOperand($iter->result, $block, false),
+                            $this->compileOperand($iter->var, $block, true),
+                            1
+                        ));
+                        ++$i;
+                        [$block, $i] = $this->compileListDestructGroup($ops, $i, $block);
+                        break;
                     } elseif (
                         $child instanceof Op\Expr\ArrayDimFetch
                         && $i + 1 < $opCount
@@ -2317,6 +2330,42 @@ class Compiler {
         return $iter->byRef
             && $iter->result === $assign->expr
             && !$this->operandIsPropertyWriteTarget($assign->var);
+    }
+
+    /**
+     * foreach ($iterable as list(&$v)) / [$x, &$y] — by-ref slots need live iteration value (#16213).
+     *
+     * @param Op[] $ops
+     */
+    private function isForeachListDestructRefFusion(array $ops, int $index, ?Block $block = null): bool
+    {
+        if ($this->isForeachLoopVarAssignRefFusion($ops, $index)) {
+            return false;
+        }
+        if (!$ops[$index] instanceof Op\Iterator\Value) {
+            return false;
+        }
+        $next = $index + 1;
+        if ($next >= count($ops) || !$this->isListDestructGroupStart($ops, $next, $block)) {
+            return false;
+        }
+
+        return $this->listDestructGroupHasAssignRef($ops, $next, $block);
+    }
+
+    /**
+     * @param Op[] $ops
+     */
+    private function listDestructGroupHasAssignRef(array $ops, int $start, ?Block $block = null): bool
+    {
+        $end = $this->listDestructGroupEndIndex($ops, $start, $block);
+        for ($i = $start; $i <= $end; ++$i) {
+            if ($ops[$i] instanceof Op\Expr\AssignRef) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
