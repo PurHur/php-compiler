@@ -1267,10 +1267,35 @@ class Compiler {
         return false;
     }
 
+    /**
+     * ?: arms assign to a shared merge temporary (#15816, Zend/zend_compile.c).
+     */
+    private function mergeCfgBlockUsesTernaryBranchLiteralAssign(CfgBlock $merge): bool
+    {
+        if (\count($merge->parents) < 2) {
+            return false;
+        }
+        $armVar = null;
+        foreach ($merge->parents as $parent) {
+            $tail = $this->branchTailExprBeforeJump($parent);
+            if (!$tail instanceof Op\Expr\Assign) {
+                return false;
+            }
+            if (null === $armVar) {
+                $armVar = $tail->var;
+            } elseif (!$this->operandsReferToSameVariable($tail->var, $armVar)) {
+                return false;
+            }
+        }
+
+        return null !== $armVar;
+    }
+
     private function mergeCfgBlockUsesTernaryPhi(CfgBlock $merge): bool
     {
         return $this->mergeCfgBlockUsesEchoPhi($merge)
             || $this->mergeCfgBlockUsesAssignPhi($merge)
+            || $this->mergeCfgBlockUsesTernaryBranchLiteralAssign($merge)
             || $this->mergeCfgBlockUsesLogicalShortCircuit($merge);
     }
 
@@ -20252,6 +20277,55 @@ class Compiler {
         return null !== $slot ? (string) $slot : null;
     }
 
+    /**
+     * Map dead inline ?: call-arg temps to the innermost ?: merge phi slots for this call (#15816).
+     */
+    private function resolveNestedTernaryMergeCallArgSlot(
+        Block $block,
+        ?Op $cfgCallOp,
+        int $argIndex,
+        Operand $arg
+    ): ?string {
+        if (null === $cfgCallOp || !property_exists($cfgCallOp, 'args') || !\is_array($cfgCallOp->args)) {
+            return null;
+        }
+        if (!$this->callArgIsDeadInlineTemporary($arg)) {
+            return null;
+        }
+        $deadTempCount = 0;
+        foreach ($cfgCallOp->args as $callArg) {
+            if ($callArg instanceof Operand && $this->callArgIsDeadInlineTemporary($callArg)) {
+                ++$deadTempCount;
+            }
+        }
+        if ($deadTempCount < 2) {
+            return null;
+        }
+        $phiSlots = [];
+        foreach ($this->ternaryMergePhiRhsSlots as $mergeCfg) {
+            $phi = $this->ternaryMergePhiRhsSlots[$mergeCfg];
+            if (null !== $phi) {
+                $phiSlots[] = $phi;
+            }
+        }
+        $phiSlots = array_values(array_unique($phiSlots));
+        if (\count($phiSlots) < $deadTempCount) {
+            return null;
+        }
+        $phiSlots = \array_slice($phiSlots, -$deadTempCount);
+        $ordinal = $this->inlineHoistedProducerSlotIndexForCallArg(
+            $cfgCallOp->args,
+            $argIndex,
+            $block,
+            $cfgCallOp
+        );
+        if (null === $ordinal || $ordinal >= \count($phiSlots)) {
+            return null;
+        }
+
+        return (string) $phiSlots[$ordinal];
+    }
+
     private function resolveAdjacentNestedFuncCallArgSlot(
         Block $block,
         Op $cfgCallOp,
@@ -26194,6 +26268,15 @@ class Compiler {
             $procOpenSlot = $this->resolveProcOpenInlineCallArgSlot($block, $cfgCallOp, (int) $argIndex);
             if (null !== $procOpenSlot) {
                 $valueSlot = $procOpenSlot;
+            }
+            $ternaryMergeSlot = $this->resolveNestedTernaryMergeCallArgSlot(
+                $block,
+                $cfgCallOp,
+                (int) $argIndex,
+                $callArgOperand ?? $arg
+            );
+            if (null !== $ternaryMergeSlot) {
+                $valueSlot = $ternaryMergeSlot;
             }
             $sends[] = new OpCode(OpCode::TYPE_ARG_SEND, $valueSlot, $nameSlot, $unpackFlag);
         }
