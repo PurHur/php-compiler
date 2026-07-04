@@ -1265,6 +1265,51 @@ PHP;
         self::assertSame("AbA\nABA\n", ob_get_clean());
     }
 
+    /** Issue #9124 — substr_replace() sibling inline Array_ string/replace/offset/length slots. */
+    public function testSubstrReplaceMultiInlineArrayLiteralsUseDistinctSendSlots(): void
+    {
+        $code = <<<'PHP'
+<?php
+declare(strict_types=1);
+substr_replace(['abcdef', '123'], '.', [2, 1], [2, 1]);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'substr_replace_inline_arrays.php');
+
+        $arraySlots = [];
+        $sendSlots = [];
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_INIT_ARRAY === $op->type) {
+                $arraySlots[] = $op->arg1;
+            }
+            if (OpCode::TYPE_ARG_SEND === $op->type) {
+                $sendSlots[] = $op->arg1;
+            }
+        }
+
+        self::assertCount(3, $arraySlots, 'array inits='.json_encode($arraySlots));
+        self::assertCount(4, $sendSlots, 'arg sends='.json_encode($sendSlots));
+        self::assertSame($arraySlots[0], $sendSlots[0], 'string array must feed arg #1');
+        self::assertSame($arraySlots[1], $sendSlots[2], 'offset array must feed arg #3');
+        self::assertSame($arraySlots[2], $sendSlots[3], 'length array must feed arg #4');
+    }
+
+    /** Issue #9124 — substr_replace() array $string form runtime parity with Zend. */
+    public function testSubstrReplaceArrayFormInlineRuntime(): void
+    {
+        $code = <<<'PHP'
+<?php
+declare(strict_types=1);
+echo json_encode(substr_replace(['abcdef', '123'], '.', [2, 1], [2, 1])), "\n";
+echo json_encode(substr_replace(['abc', 'def'], ['X', 'Y'], 1, 1)), "\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'substr_replace_array_form_runtime.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("[\"ab.ef\",\"1.3\"]\n[\"aXc\",\"dYf\"]\n", ob_get_clean());
+    }
+
     /** Issue #10231 — sibling inline Array_ producers map to distinct array_replace arg slots. */
     public function testArrayReplaceDualInlineArrayLiteralsUseBothArraySlots(): void
     {

@@ -11975,6 +11975,17 @@ class Compiler {
                 return $combineMatch;
             }
         }
+        if ('substr_replace' === $this->resolveCfgFuncCallName($callOp)) {
+            $substrReplaceProducers = $this->precedingInlineCallArgProducersBeforeCfgOp($block->orig->children, $callOp);
+            $substrReplaceMatch = $this->matchInlineArrayProducersToArrayCallArgs(
+                $substrReplaceProducers,
+                $callOp->args,
+                $argIndex
+            );
+            if ($substrReplaceMatch instanceof Op\Expr\Array_) {
+                return $substrReplaceMatch;
+            }
+        }
         if (
             'proc_open' === $this->resolveCfgFuncCallName($callOp)
             && 0 === $argIndex
@@ -14599,7 +14610,7 @@ class Compiler {
                 return $mergeMapped;
             }
         }
-        if ('preg_replace' === $inlineFuncName) {
+        if (\in_array($inlineFuncName, ['preg_replace', 'substr_replace'], true)) {
             $pregReplaceMapped = $this->matchInlineArrayProducersToArrayCallArgs($producers, $callArgs, $argIndex);
             if (null !== $pregReplaceMapped) {
                 return $pregReplaceMapped;
@@ -15979,7 +15990,8 @@ class Compiler {
             }
         }
         // preg_replace(['/a/'], ['A'], 'subj') — sibling Array_ pattern/replacement + embedded subject (#10808).
-        if ('preg_replace' === $inlineFuncName) {
+        // substr_replace(['a','b'], '.', [1,2], [1,1]) — sibling Array_ string/offset/length (#9124).
+        if (\in_array($inlineFuncName, ['preg_replace', 'substr_replace'], true)) {
             $mapped = $this->matchInlineArrayProducersToArrayCallArgs($producers, $callArgs, $argIndex);
             if (null !== $mapped) {
                 return $mapped;
@@ -25108,6 +25120,20 @@ class Compiler {
                         $inlineArray = $combineMatch;
                     }
                 }
+                if (null === $inlineArray && 'substr_replace' === $this->resolveCfgFuncCallName($cfgCallOp)) {
+                    $substrReplaceProducers = $this->precedingInlineCallArgProducersBeforeCfgOp(
+                        $block->orig->children,
+                        $cfgCallOp
+                    );
+                    $substrReplaceMatch = $this->matchInlineArrayProducersToArrayCallArgs(
+                        $substrReplaceProducers,
+                        $cfgCallOp->args ?? [],
+                        (int) $argIndex
+                    );
+                    if ($substrReplaceMatch instanceof Op\Expr\Array_) {
+                        $inlineArray = $substrReplaceMatch;
+                    }
+                }
                 if (null === $inlineArray) {
                     $stmtBeforeArray = $this->inlineArrayProducerImmediatelyBeforeCfgCall($cfgCallOp, $block);
                     if ($stmtBeforeArray instanceof Op\Expr\Array_) {
@@ -26918,7 +26944,11 @@ class Compiler {
                     $sends = array_merge($sends, $siblingEmit);
                 }
                 if (null !== $arrayProducerSlot) {
-                    $valueSlot = (string) $arrayProducerSlot;
+                    $substrReplaceMapped = null !== $inlineArray
+                        && 'substr_replace' === $this->resolveCfgFuncCallName($cfgCallOp);
+                    if (!$substrReplaceMapped) {
+                        $valueSlot = (string) $arrayProducerSlot;
+                    }
                 }
             }
             if (null !== $cfgCallOp && null !== $block->orig && \is_array($cfgCallOp->args ?? null) && 2 === \count($cfgCallOp->args)) {
