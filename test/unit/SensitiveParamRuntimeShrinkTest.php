@@ -27,7 +27,9 @@ final class SensitiveParamRuntimeShrinkTest extends TestCase
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/SensitiveParamRuntime.php');
         $this->assertStringContainsString('SensitiveParamJitHelper', $source);
         $this->assertStringContainsString('shouldIgnoreBacktraceArgs', $source);
+        $this->assertStringContainsString('shouldProvideBacktraceObject', $source);
         $this->assertStringContainsString('__sensitive_param__shouldIgnoreBacktraceArgs', $source);
+        $this->assertStringContainsString('__sensitive_param__shouldProvideBacktraceObject', $source);
         $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $source);
     }
 
@@ -38,6 +40,15 @@ final class SensitiveParamRuntimeShrinkTest extends TestCase
         $this->assertFalse(SensitiveParamJitHelper::shouldIgnoreBacktraceArgs(0));
         $this->assertSame($mask, SensitiveParamJitHelper::ignoreArgsOptionMask());
         $this->assertSame($mask, SensitiveParamSupport::BACKTRACE_IGNORE_ARGS);
+    }
+
+    public function testSensitiveParamJitHelperProvideObjectParity(): void
+    {
+        $mask = VmDebugBacktrace::PROVIDE_OBJECT;
+        $this->assertTrue(SensitiveParamJitHelper::shouldProvideBacktraceObject($mask));
+        $this->assertFalse(SensitiveParamJitHelper::shouldProvideBacktraceObject(0));
+        $this->assertSame($mask, SensitiveParamJitHelper::provideObjectOptionMask());
+        $this->assertSame($mask, SensitiveParamSupport::BACKTRACE_PROVIDE_OBJECT);
     }
 
     public function testCompileTimeParamIsSensitiveShared(): void

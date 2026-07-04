@@ -8,9 +8,7 @@ class C {
     public function m(): void {
         $trace = debug_backtrace(DEBUG_BACKTRACE_PROVIDE_OBJECT);
         echo isset($trace[0]['object']) ? 'has_object' : 'no_object', "\n";
-        if (isset($trace[0]['object'])) {
-            echo $trace[0]['object'] instanceof self ? 'is_self' : 'not_self', "\n";
-        }
+        echo $trace[0]['object'] instanceof self ? 'is_self' : 'not_self', "\n";
     }
 }
 

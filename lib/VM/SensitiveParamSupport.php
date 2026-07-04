@@ -25,6 +25,9 @@ final class SensitiveParamSupport
     /** Mirrors {@see \PHPCompiler\ext\standard\VmDebugBacktrace::IGNORE_ARGS}. */
     public const BACKTRACE_IGNORE_ARGS = 2;
 
+    /** Mirrors {@see \PHPCompiler\ext\standard\VmDebugBacktrace::PROVIDE_OBJECT}. */
+    public const BACKTRACE_PROVIDE_OBJECT = 1;
+
     public static function register(Context $ctx): void
     {
         $mixedProto = new Variable();
