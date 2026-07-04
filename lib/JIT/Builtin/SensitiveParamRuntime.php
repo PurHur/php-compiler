@@ -22,11 +22,16 @@ final class SensitiveParamRuntime
 
     private const SHOULD_IGNORE_ARGS = 'PHPCompiler\\VM\\SensitiveParamJitHelper::shouldIgnoreBacktraceArgs';
 
+    private const SHOULD_PROVIDE_OBJECT = 'PHPCompiler\\VM\\SensitiveParamJitHelper::shouldProvideBacktraceObject';
+
     private const ABI_SHOULD_IGNORE_ARGS = '__sensitive_param__shouldIgnoreBacktraceArgs';
+
+    private const ABI_SHOULD_PROVIDE_OBJECT = '__sensitive_param__shouldProvideBacktraceObject';
 
     /** @var list<string> */
     private const COMPILED_HELPERS = [
         self::SHOULD_IGNORE_ARGS,
+        self::SHOULD_PROVIDE_OBJECT,
     ];
 
     public static function ensureLinked(Context $context): void
@@ -52,6 +57,17 @@ final class SensitiveParamRuntime
             self::HELPER_PATH,
             self::COMPILED_HELPERS,
             '#10394'
+        );
+        JitVmHelperLink::ensureBridge(
+            $context,
+            self::ABI_SHOULD_PROVIDE_OBJECT,
+            'sensitive_param_provide_object_bridge_entry',
+            [$i64],
+            $i1,
+            self::SHOULD_PROVIDE_OBJECT,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#15981'
         );
         $context->builder->clearInsertionPosition();
     }
@@ -80,6 +96,20 @@ final class SensitiveParamRuntime
 
         $options = self::readOptionsLong($context, $optionsArg);
         $fn = $context->lookupFunction(self::ABI_SHOULD_IGNORE_ARGS);
+
+        return $context->builder->call($fn, $options);
+    }
+
+    public static function provideObjectBit(Context $context, ?Variable $optionsArg): Value
+    {
+        self::ensureLinked($context);
+        $i1 = $context->getTypeFromString('int1');
+        if (null === $optionsArg) {
+            return $i1->constInt(0, false);
+        }
+
+        $options = self::readOptionsLong($context, $optionsArg);
+        $fn = $context->lookupFunction(self::ABI_SHOULD_PROVIDE_OBJECT);
 
         return $context->builder->call($fn, $options);
     }

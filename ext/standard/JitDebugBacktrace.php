@@ -7,12 +7,15 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Block;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\Builtin\SensitiveParamRuntime;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\ScriptMagic;
 use PHPCompiler\JIT\SensitiveParamHelper;
+use PHPCompiler\JIT\VarFetchHelper;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\OpCode;
+use PHPCfg\Func;
 use PHPLLVM\Value;
 
 /** LLVM lowering for debug_backtrace() (#1378, #1056, #3626, #4621). */
@@ -83,6 +86,8 @@ final class JitDebugBacktrace
             $context->builder->positionAtEnd($done);
         }
 
+        self::maybeAppendObjectFrame($context, $frame, $block, $optionsArg);
+
         HashTableHelper::setAtIndex(
             $context,
             $traceHt,
@@ -94,6 +99,45 @@ final class JitDebugBacktrace
                 $frame
             )
         );
+    }
+
+    private static function maybeAppendObjectFrame(
+        Context $context,
+        Value $frameHt,
+        Block $block,
+        ?JITVariable $optionsArg,
+    ): void {
+        if (!self::isInstanceMethodBlock($block)) {
+            return;
+        }
+        $thisVar = VarFetchHelper::bindingByName($context, $block, 'this');
+        if (null === $thisVar || JITVariable::TYPE_OBJECT !== $thisVar->type) {
+            return;
+        }
+
+        $provideObject = SensitiveParamRuntime::provideObjectBit($context, $optionsArg);
+        $withObject = BasicBlockHelper::append($context, 'dbg_bt_object');
+        $done = BasicBlockHelper::append($context, 'dbg_bt_object_done');
+        $context->builder->branchIf($provideObject, $withObject, $done);
+
+        $context->builder->positionAtEnd($withObject);
+        HashTableHelper::setAtStringKey(
+            $context,
+            $frameHt,
+            $context->builder->load($context->constantStringFromString('object')),
+            $thisVar
+        );
+        $context->builder->branch($done);
+        $context->builder->positionAtEnd($done);
+    }
+
+    private static function isInstanceMethodBlock(Block $block): bool
+    {
+        if (null === $block->func || null === $block->func->class) {
+            return false;
+        }
+
+        return 0 === (($block->func->flags ?? 0) & Func::FLAG_STATIC);
     }
 
     private static function appendStringFrame(

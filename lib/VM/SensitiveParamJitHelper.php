@@ -17,9 +17,19 @@ final class SensitiveParamJitHelper
         return 0 !== ($options & SensitiveParamSupport::BACKTRACE_IGNORE_ARGS);
     }
 
+    public static function shouldProvideBacktraceObject(int $options): bool
+    {
+        return 0 !== ($options & SensitiveParamSupport::BACKTRACE_PROVIDE_OBJECT);
+    }
+
     public static function ignoreArgsOptionMask(): int
     {
         return SensitiveParamSupport::BACKTRACE_IGNORE_ARGS;
+    }
+
+    public static function provideObjectOptionMask(): int
+    {
+        return SensitiveParamSupport::BACKTRACE_PROVIDE_OBJECT;
     }
 
     /** @param array<int, true> $sensitive */
