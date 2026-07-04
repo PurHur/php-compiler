@@ -20607,6 +20607,31 @@ class Compiler {
         if (null === $producerSlotIndex) {
             return null;
         }
+        // round(...); fmod(-1.5, …) — immediate UnaryMinus is arg #0, not a prior ConstFetch prelude (#13508).
+        if (
+            null !== $callIndex
+            && $callIndex > 0
+            && 0 === $producerSlotIndex
+            && 0 === $argIndex
+            && $callArg instanceof Operand
+            && $this->callArgIsDeadInlineTemporary($callArg)
+        ) {
+            $immediate = $cfgChildren[$callIndex - 1] ?? null;
+            if (
+                ($immediate instanceof Op\Expr\UnaryMinus || $immediate instanceof Op\Expr\UnaryPlus)
+                && \in_array($immediate, $producers, true)
+            ) {
+                $deadHoisted = 0;
+                foreach ($callArgs as $hoistedArg) {
+                    if ($this->callArgIsDeadInlineTemporary($hoistedArg)) {
+                        ++$deadHoisted;
+                    }
+                }
+                if (1 === $deadHoisted) {
+                    return $immediate;
+                }
+            }
+        }
         if (
             null !== $callIndex
             && $callIndex > 0
