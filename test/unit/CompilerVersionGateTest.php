@@ -904,6 +904,11 @@ final class CompilerVersionGateTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsDomNodeContains());
     }
 
+    public function testSupportsDomNodeIsEqualNodeFalseOnReferenceProfile(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsDomNodeIsEqualNode());
+    }
+
     public function testVmRegistersDomNodeContainsOnForwardProfile(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');

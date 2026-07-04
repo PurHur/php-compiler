@@ -327,6 +327,9 @@ PHP;
 
     public function test_dom_node_is_equal_node(): void
     {
+        if (!CompilerVersion::supportsDomNodeIsEqualNode()) {
+            self::markTestSkipped('DOMNode::isEqualNode() withheld on 8.2 reference profile (#15195)');
+        }
         $runtime = new Runtime();
         $code = <<<'PHP'
 <?php

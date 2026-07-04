@@ -164,8 +164,10 @@ final class VmDom
         $node->methodVisibility['removechild'] = $pub;
         $node->methods['issamenode'] = new NodeIsSameNode();
         $node->methodVisibility['issamenode'] = $pub;
-        $node->methods['isequalnode'] = new NodeIsEqualNode();
-        $node->methodVisibility['isequalnode'] = $pub;
+        if (CompilerVersion::supportsDomNodeIsEqualNode()) {
+            $node->methods['isequalnode'] = new NodeIsEqualNode();
+            $node->methodVisibility['isequalnode'] = $pub;
+        }
         $node->methods['haschildnodes'] = new NodeHasChildNodes();
         $node->methodVisibility['haschildnodes'] = $pub;
         if (CompilerVersion::supportsDomNodeContains()) {
@@ -1564,7 +1566,7 @@ final class VmDom
                 'code' => 4,
                 'column' => 0,
                 'message' => 'failed to load external entity "'.$filename.'"',
-                'file' => $filename,
+                'file' => null !== $frame ? '' : $filename,
                 'line' => 0,
             ], $frame, null, 'DOMDocument::load(): I/O warning : failed to load external entity "'.$filename.'"');
 
