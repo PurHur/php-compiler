@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\ArrayRandRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\HashTable;
@@ -15,7 +16,7 @@ use PHPLLVM\Value;
  * array_rand() — random key(s) from an array (issue #2321, #4460).
  *
  * VM: returns actual keys (string or int); MT19937 via {@see VmMt19937} (php-src php_array_pick_keys).
- * JIT/AOT: {@see JitArrayRand} (packed lists; num>1 returns array of keys).
+ * JIT/AOT: {@see \PHPCompiler\JIT\Builtin\ArrayRandRuntime::call()} via {@see ArrayRandJitHelper}.
  */
 final class array_rand extends Internal
 {
@@ -44,6 +45,6 @@ final class array_rand extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        return JitArrayRand::call($context, ...$args);
+        return ArrayRandRuntime::call($context, ...$args);
     }
 }
