@@ -210,6 +210,9 @@ class Block {
     /** Operand / cfg-Var roots assigned in this block (not inherited reads, #2059). */
     private \SplObjectStorage $localWrittenVars;
 
+    /** @var array<string, true> php-cfg may emit distinct Var operands per name (#15658 method_exists $method). */
+    private array $localWrittenVarNames = [];
+
     /** php-cfg assign.var root => result slot for `$local = …` reads (#5644). */
     private \SplObjectStorage $namedAssignDestSlots;
 
@@ -233,11 +236,21 @@ class Block {
     public function slotForNamedAssignDest(Operand $operand): ?int
     {
         $root = self::cfgVarRoot($operand);
-        if (null === $root || !$this->namedAssignDestSlots->contains($root)) {
+        if (null !== $root && $this->namedAssignDestSlots->contains($root)) {
+            return $this->namedAssignDestSlots[$root];
+        }
+        // php-cfg distinct Var operands per name — assign.var vs later read (#15658).
+        $name = self::resolveVariableName($operand);
+        if (null === $name || '' === $name) {
             return null;
         }
+        foreach ($this->namedAssignDestSlots as $storedRoot) {
+            if (self::resolveVariableName($storedRoot) === $name) {
+                return $this->namedAssignDestSlots[$storedRoot];
+            }
+        }
 
-        return $this->namedAssignDestSlots[$root];
+        return null;
     }
 
     public function setScriptPath(string $path): void
@@ -466,6 +479,10 @@ class Block {
         if (null !== $root) {
             $this->localWrittenVars[$root] = true;
         }
+        $name = self::resolveVariableName($operand);
+        if (null !== $name && '' !== $name) {
+            $this->localWrittenVarNames[$name] = true;
+        }
     }
 
     private function isLocallyWritten(Operand $operand): bool
@@ -475,6 +492,10 @@ class Block {
         }
         $root = self::cfgVarRoot($operand);
         if (null !== $root && isset($this->localWrittenVars[$root])) {
+            return true;
+        }
+        $name = self::resolveVariableName($operand);
+        if (null !== $name && '' !== $name && isset($this->localWrittenVarNames[$name])) {
             return true;
         }
 
