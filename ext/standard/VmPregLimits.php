@@ -11,8 +11,16 @@ namespace PHPCompiler\ext\standard;
  */
 final class VmPregLimits
 {
+    /** php-src PCRE2 JIT stack depth — recursive `(?R)` fails fast with code 6. */
+    private const DEFAULT_JIT_STACK_LIMIT = 32;
+
     public static function backtrackLimit(): int
     {
         return VmIni::getPcreBacktrackLimit();
+    }
+
+    public static function jitStackLimit(): int
+    {
+        return self::DEFAULT_JIT_STACK_LIMIT;
     }
 }
