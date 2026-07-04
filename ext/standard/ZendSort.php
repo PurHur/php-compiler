@@ -23,7 +23,27 @@ final class ZendSort
         if ($n < 2) {
             return;
         }
-        self::zendSort($base, 0, $n, $cmp);
+        // php-src zend_sort preserves insertion order among comparator ties (#13762).
+        $wrapped = [];
+        for ($i = 0; $i < $n; ++$i) {
+            $wrapped[] = [$i, $base[$i]];
+        }
+        self::zendSort(
+            $wrapped,
+            0,
+            $n,
+            static function (array $a, array $b) use ($cmp): int {
+                $r = $cmp($a[1], $b[1]);
+                if (0 !== $r) {
+                    return $r;
+                }
+
+                return $a[0] <=> $b[0];
+            }
+        );
+        for ($i = 0; $i < $n; ++$i) {
+            $base[$i] = $wrapped[$i][1];
+        }
     }
 
     /**
