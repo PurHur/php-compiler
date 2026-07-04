@@ -91,7 +91,7 @@ final class VmXml
      */
     public static function validateAndReport(Context $ctx, string $data, ?Frame $frame = null): bool
     {
-        $error = self::validateWellFormed($data);
+        $error = self::validationErrorRecord($data);
         if (null === $error) {
             return true;
         }
@@ -99,6 +99,14 @@ final class VmXml
         \PHPCompiler\ext\libxml\VmLibxml::handleError($ctx, $error, $frame);
 
         return false;
+    }
+
+    /**
+     * @return null|array{level: int, code: int, column: int, message: string, file: string, line: int}
+     */
+    public static function validationErrorRecord(string $data): ?array
+    {
+        return self::validateWellFormed($data);
     }
 
     /**
