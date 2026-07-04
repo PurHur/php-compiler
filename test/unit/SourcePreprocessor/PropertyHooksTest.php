@@ -357,7 +357,7 @@ class C {
 PHP;
         [$out, $registry] = (new PropertyHooks())->process($src);
         self::assertStringNotContainsString('$x {', $out);
-        self::assertStringContainsString('/*phpc-asymmetric-set:protected*/ public string $x;', $out);
+        self::assertStringContainsString('/*phpc-asymmetric-set:protected*/ /*phpc-asymmetric-explicit-read*/ public string $x;', $out);
         self::assertStringContainsString('function __phpc_property_get_x', $out);
         self::assertStringContainsString('function __phpc_property_set_x', $out);
         self::assertStringContainsString('$this->x = ($value);', $out);
@@ -378,7 +378,7 @@ class C {
 }
 PHP;
         [$out] = (new PropertyHooks())->process($src);
-        self::assertStringContainsString('/*phpc-asymmetric-set:private*/ public string $x;', $out);
+        self::assertStringContainsString('/*phpc-asymmetric-set:private*/ /*phpc-asymmetric-explicit-read*/ public string $x;', $out);
         self::assertStringContainsString('function __phpc_property_set_x($value)', $out);
     }
 
@@ -393,7 +393,7 @@ class User {
 PHP;
         [$out, $registry] = (new PropertyHooks())->process($src);
         self::assertStringNotContainsString('$email {', $out);
-        self::assertStringContainsString('/*phpc-asymmetric-set:private*/ public string $email;', $out);
+        self::assertStringContainsString('/*phpc-asymmetric-set:private*/ /*phpc-asymmetric-explicit-read*/ public string $email;', $out);
         self::assertArrayNotHasKey('requiresGet', $registry['user']['email'] ?? []);
         self::assertArrayNotHasKey('requiresSet', $registry['user']['email'] ?? []);
     }
@@ -467,7 +467,7 @@ PHP;
         [$out, $registry] = (new PropertyHooks())->process($src);
         self::assertStringNotContainsString('$x {', $out);
         self::assertStringNotContainsString('private(set)', $out);
-        self::assertStringContainsString('/*phpc-asymmetric-set:private*/ public string $x;', $out);
+        self::assertStringContainsString('/*phpc-asymmetric-set:private*/ /*phpc-asymmetric-explicit-read*/ public string $x;', $out);
         self::assertStringContainsString('function __phpc_property_get_x', $out);
         self::assertArrayNotHasKey('set', $registry['c']['x'] ?? []);
         self::assertTrue($registry['c']['x']['virtual'] ?? false);
@@ -485,7 +485,7 @@ class C {
 }
 PHP;
         [$out] = (new PropertyHooks())->process($src);
-        self::assertStringContainsString('/*phpc-asymmetric-set:private*/ public string $x;', $out);
+        self::assertStringContainsString('/*phpc-asymmetric-set:private*/ /*phpc-asymmetric-explicit-read*/ public string $x;', $out);
         self::assertStringContainsString('function __phpc_property_set_x', $out);
     }
 
