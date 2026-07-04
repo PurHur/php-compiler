@@ -1,5 +1,5 @@
 --TEST--
-str_increment(): empty string throws ValueError (#3726)
+str_increment(): empty string throws Error (#9277, php-src)
 --FILE--
 <?php
 try {
@@ -9,5 +9,5 @@ try {
     echo $e->getMessage(), "\n";
 }
 --EXPECT--
-ValueError
+Error
 str_increment(): Argument #1 ($string) must not be empty
