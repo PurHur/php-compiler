@@ -127,6 +127,7 @@ use PHPCompiler\VM\Builtin\ReflectionClassGetStartLine;
 use PHPCompiler\VM\Builtin\ReflectionClassIsDeprecated;
 use PHPCompiler\VM\Builtin\ReflectionClassIsAnonymous;
 use PHPCompiler\VM\Builtin\ReflectionClassIsEnum;
+use PHPCompiler\VM\Builtin\ReflectionClassIsReadOnly;
 use PHPCompiler\VM\Builtin\ReflectionClassIsInternal;
 use PHPCompiler\VM\Builtin\ReflectionClassIsStatic;
 use PHPCompiler\VM\Builtin\ReflectionClassIsUserDefined;
@@ -699,6 +700,8 @@ final class BuiltinClasses
         $rc->methodVisibility['isinternal'] = $pub;
         $rc->methods['isenum'] = new ReflectionClassIsEnum();
         $rc->methodVisibility['isenum'] = $pub;
+        $rc->methods['isreadonly'] = new ReflectionClassIsReadOnly();
+        $rc->methodVisibility['isreadonly'] = $pub;
         $rc->methods['isanonymous'] = new ReflectionClassIsAnonymous();
         $rc->methodVisibility['isanonymous'] = $pub;
         $rc->methods['isstatic'] = new ReflectionClassIsStatic();
