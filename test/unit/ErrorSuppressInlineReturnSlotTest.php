@@ -286,4 +286,21 @@ PHP;
             'hoisted [] must not alias unrelated @mkdir return slot'
         );
     }
+
+    public function testErrorGetLastAfterStandaloneSuppressDoesNotAliasReturnSlotInCallArg(): void
+    {
+        $code = <<<'PHP'
+<?php
+@openssl_cipher_iv_length('nope');
+$ivLast = error_get_last();
+$ok = str_contains($ivLast['message'] ?? '', 'Unknown cipher algorithm');
+echo $ok ? "ok\n" : "fail\n";
+PHP;
+        $runtime = new Runtime();
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'error_get_last_after_suppress.php'));
+        $out = ob_get_clean();
+
+        self::assertSame("ok\n", $out);
+    }
 }
