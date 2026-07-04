@@ -14132,6 +14132,13 @@ class Compiler {
                 }
             }
         }
+        $name = Block::resolveVariableName($arg);
+        if (null !== $name && '' !== $name) {
+            $namedBySlot = $block->slotIndexForVariableName($name);
+            if (null !== $namedBySlot) {
+                return (int) $namedBySlot;
+            }
+        }
 
         return null;
     }
@@ -14938,6 +14945,11 @@ class Compiler {
         ?string $calleeName = null
     ): ?Op\Expr
     {
+        $callArg = $callArgs[$argIndex] ?? null;
+        // php-cfg distinct Var operands per name — never steal preceding Assign/New slots (#15658).
+        if (null !== $callArg && null !== Block::resolveVariableName($callArg)) {
+            return null;
+        }
         $inlineFuncName = $this->resolveInlineCallArgFuncName($cfgCallOp, $calleeName);
         $producers = $this->filterDeadClassConstFetchInlineProducers($producers);
         $producers = $this->filterNestedNewInlineCallArgProducers($producers);
@@ -25764,8 +25776,13 @@ class Compiler {
         }
         $rootA = Block::cfgVarRoot($a);
         $rootB = Block::cfgVarRoot($b);
+        if (null !== $rootA && null !== $rootB && $rootA === $rootB) {
+            return true;
+        }
+        $nameA = Block::resolveVariableName($a);
+        $nameB = Block::resolveVariableName($b);
 
-        return null !== $rootA && null !== $rootB && $rootA === $rootB;
+        return null !== $nameA && '' !== $nameA && $nameA === $nameB;
     }
 
     protected function operandDerivesFromNew(?Operand $operand, Block $block): bool
@@ -27331,15 +27348,24 @@ class Compiler {
                     );
                 }
                 if ($inlineNewProducer instanceof Op\Expr\New_) {
-                    $innerNewSlot = $this->slotForInlineNewProducer($block, $inlineNewProducer);
-                    if (null !== $innerNewSlot) {
-                        $sends[] = new OpCode(
-                            OpCode::TYPE_ARG_SEND,
-                            $innerNewSlot,
-                            $nameSlot,
-                            $unpackFlag
-                        );
-                        continue;
+                    $nestedNewCallArg = $cfgCallOp->args[(int) $argIndex] ?? $arg;
+                    $nestedNewLocal = null !== Block::resolveVariableName($nestedNewCallArg)
+                        ? (
+                            $this->namedLocalCallArgSlotIfBound($nestedNewCallArg, $block, $cfgCallOp, (int) $argIndex)
+                            ?? $this->slotForNamedLocalFromAssignVarOperand($nestedNewCallArg, $block)
+                        )
+                        : null;
+                    if (null === $nestedNewLocal) {
+                        $innerNewSlot = $this->slotForInlineNewProducer($block, $inlineNewProducer);
+                        if (null !== $innerNewSlot) {
+                            $sends[] = new OpCode(
+                                OpCode::TYPE_ARG_SEND,
+                                $innerNewSlot,
+                                $nameSlot,
+                                $unpackFlag
+                            );
+                            continue;
+                        }
                     }
                 }
             }
@@ -28139,13 +28165,16 @@ class Compiler {
                     $cfgCallOp
                 );
                 $namedLocalSlot = $this->namedLocalCallArgSlotIfBound($arg, $block, $cfgCallOp, (int) $argIndex);
-                if (null === $namedLocalSlot) {
+                if (null === $namedLocalSlot && null === $assignedNamedLocal) {
                     $assignedNamedLocal = $this->slotForNamedLocalFromAssignVarOperand($arg, $block);
-                    if (null !== $assignedNamedLocal) {
-                        $namedLocalSlot = (string) $assignedNamedLocal;
-                    }
                 }
-                if (\count($producers) >= 2 && null === $namedLocalSlot && null === $assignedNamedLocal) {
+                $callArgNamed = Block::resolveVariableName($cfgCallOp->args[(int) $argIndex] ?? $arg);
+                if (
+                    \count($producers) >= 2
+                    && null === $namedLocalSlot
+                    && null === $assignedNamedLocal
+                    && (null === $callArgNamed || '' === $callArgNamed)
+                ) {
                     $matched = $this->matchInlineCallArgProducer(
                         $producers,
                         $cfgCallOp->args ?? [],
@@ -29708,6 +29737,33 @@ class Compiler {
                 $dateSunSlot = $this->wireDateSunFuncHoistedCallArgSlot($block, $cfgCallOp, (int) $argIndex);
                 if (null !== $dateSunSlot) {
                     $valueSlot = $dateSunSlot;
+                }
+            }
+            $finalCallArgProbe = $arg;
+            if (null !== $cfgCallOp && is_array($cfgCallOp->args ?? null) && isset($cfgCallOp->args[(int) $argIndex])) {
+                $finalCallArgProbe = $cfgCallOp->args[(int) $argIndex];
+            }
+            $finalVarName = Block::resolveVariableName($finalCallArgProbe);
+            if (null !== $finalVarName && '' !== $finalVarName) {
+                $finalNamedSlot = $block->slotIndexForVariableName($finalVarName)
+                    ?? $this->namedLocalCallArgSlotIfBound(
+                        $finalCallArgProbe,
+                        $block,
+                        $cfgCallOp,
+                        (int) $argIndex
+                    )
+                    ?? $this->slotForNamedLocalFromAssignVarOperand($finalCallArgProbe, $block);
+                if (null !== $finalNamedSlot) {
+                    $finalNamedAssignDest = $block->slotForNamedAssignDest($finalCallArgProbe);
+                    $valueSlot = null !== $finalNamedAssignDest
+                        ? $this->resolveNamedAssignCallArgSlot(
+                            $block,
+                            (int) $finalNamedAssignDest,
+                            $calleeName,
+                            (int) $argIndex,
+                            $finalCallArgProbe
+                        )
+                        : (string) $this->finalizeOperandSlotForAccess($block, (int) $finalNamedSlot, true);
                 }
             }
             $sends[] = new OpCode(OpCode::TYPE_ARG_SEND, $valueSlot, $nameSlot, $unpackFlag);
