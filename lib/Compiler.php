@@ -12434,19 +12434,15 @@ class Compiler {
             'proc_open' === $this->resolveCfgFuncCallName($callOp)
             && \is_array($callOp->args)
         ) {
+            $hoisted = $this->procOpenHoistedInlineArrayForArg($callOp, $argIndex, $block);
+            if ($hoisted instanceof Op\Expr\Array_) {
+                return $hoisted;
+            }
             $procOpenProducers = $this->precedingInlineCallArgProducersBeforeCfgOp($cfgChildren, $callOp);
             $arrayProducers = array_values(array_filter(
                 $procOpenProducers,
                 static fn (Op\Expr $producer): bool => $producer instanceof Op\Expr\Array_
             ));
-            if (\count($callOp->args) >= 5) {
-                if (0 === $argIndex && isset($arrayProducers[0])) {
-                    return $arrayProducers[0];
-                }
-                if (4 === $argIndex && [] !== $arrayProducers) {
-                    return $arrayProducers[\count($arrayProducers) - 1];
-                }
-            }
             if (1 === $argIndex && [] !== $arrayProducers) {
                 $outer = $this->matchOutermostNestedInlineArrayProducerForCallArg(
                     $procOpenProducers,
@@ -29688,6 +29684,40 @@ class Compiler {
             }
             if (
                 null !== $cfgCallOp
+                && 'proc_open' === $this->resolveCfgFuncCallName($cfgCallOp)
+                && \in_array((int) $argIndex, [0, 4], true)
+                && $this->callArgIsDeadInlineTemporary($arg)
+                && $this->callArgOperandExpectsArrayProducer($arg)
+            ) {
+                $procOpenArray = $this->findInlineArrayProducerForCallArg(
+                    $arg,
+                    $block,
+                    $cfgCallOp,
+                    (int) $argIndex
+                );
+                if ($procOpenArray instanceof Op\Expr\Array_) {
+                    $procOpenSlot = $block->slotForOperand($procOpenArray->result);
+                    if (null === $procOpenSlot) {
+                        $procOpenOps = $this->compileArrayLiteral($procOpenArray, $block);
+                        if ([] !== $procOpenOps) {
+                            $sends = array_merge($sends, $procOpenOps);
+                        }
+                        $procOpenSlot = $this->slotFromInitArrayLiteralOps($procOpenOps)
+                            ?? $block->slotForOperand($procOpenArray->result);
+                    }
+                    if (null !== $procOpenSlot) {
+                        $sends[] = new OpCode(
+                            OpCode::TYPE_ARG_SEND,
+                            (string) $procOpenSlot,
+                            $nameSlot,
+                            $unpackFlag
+                        );
+                        continue;
+                    }
+                }
+            }
+            if (
+                null !== $cfgCallOp
                 && $this->callArgIsDeadInlineTemporary($arg)
                 && $this->callArgOperandExpectsArrayProducer($arg)
                 && !$this->shouldUseArrayProducerCallArgResolution($cfgCallOp, (int) $argIndex, $calleeName)
@@ -29733,7 +29763,16 @@ class Compiler {
                     );
                 }
                 if (!$inlineArrayProducer instanceof Op\Expr\Array_) {
-                    $inlineArrayProducer = $this->inlineArrayProducerImmediatelyBeforeCfgCall($cfgCallOp, $block);
+                    if ('proc_open' === $this->resolveCfgFuncCallName($cfgCallOp)) {
+                        $inlineArrayProducer = $this->findInlineArrayProducerForCallArg(
+                            $arg,
+                            $block,
+                            $cfgCallOp,
+                            (int) $argIndex
+                        );
+                    } else {
+                        $inlineArrayProducer = $this->inlineArrayProducerImmediatelyBeforeCfgCall($cfgCallOp, $block);
+                    }
                 }
                 if (
                     $inlineArrayProducer instanceof Op\Expr\Array_
@@ -32437,7 +32476,7 @@ class Compiler {
                 (int) $argIndex,
                 $valueSlot
             );
-            if ('proc_open' === strtolower($calleeName ?? '') && null !== $cfgCallOp) {
+            if ('proc_open' === strtolower($this->resolveCfgFuncCallName($cfgCallOp) ?? '') && null !== $cfgCallOp) {
                 $procOpenSlot = $this->resolveProcOpenInlineCallArgSlot(
                     $block,
                     $cfgCallOp,
@@ -32871,43 +32910,139 @@ class Compiler {
         if ($argCount < 5) {
             return null;
         }
-        $commandSlot = null;
-        $envSlot = null;
-        $nullSlot = null;
-        $recentArrays = [];
-        $scanOps = array_merge($block->opCodes, $pendingSends);
-        for ($i = \count($scanOps) - 1; $i >= 0; --$i) {
-            $op = $scanOps[$i];
-            if (OpCode::TYPE_CONST_FETCH === $op->type && null === $nullSlot && null !== $op->arg2) {
-                $const = $block->constants[$op->arg2] ?? null;
-                if (null !== $const && 'null' === $const->toString()) {
-                    $nullSlot = (string) $op->arg1;
-                }
+
+        return match ($argIndex) {
+            0, 4 => $this->resolveProcOpenInlineArrayCallArgSlot($block, $cfgCallOp, $argIndex),
+            3 => $this->resolveProcOpenNullCwdCallArgSlot($block, $cfgCallOp, $pendingSends),
+            default => null,
+        };
+    }
+
+    /** proc_open inline command/env array literals — map cfg arg operand, not block INIT_ARRAY scan (#16203). */
+    private function resolveProcOpenInlineArrayCallArgSlot(Block $block, Op $cfgCallOp, int $argIndex): ?string
+    {
+        $arrayExpr = $this->procOpenHoistedInlineArrayForArg($cfgCallOp, $argIndex, $block);
+        if (!$arrayExpr instanceof Op\Expr\Array_) {
+            $callArg = $cfgCallOp->args[$argIndex] ?? null;
+            if ($callArg instanceof Operand) {
+                $embedded = $this->unwrapArrayLiteralExpr($callArg);
+                $arrayExpr = $embedded instanceof Op\Expr\Array_ ? $embedded : null;
             }
-            if (OpCode::TYPE_INIT_ARRAY !== $op->type || null === $op->arg2) {
-                continue;
-            }
-            $slot = (string) $op->arg1;
-            if ([] === $recentArrays || $recentArrays[0] !== $slot) {
-                $recentArrays[] = $slot;
-            }
-            if (\count($recentArrays) >= 2) {
+        }
+
+        return $this->slotForInlineArrayExpr($block, $arrayExpr);
+    }
+
+    /**
+     * php-cfg hoists proc_open(['cmd'], …, null, ['K'=>'V']) preludes as sibling stmts (#9389, #16203).
+     * Trailing group before the call: command Array_, optional null ConstFetch, env Array_.
+     */
+    private function procOpenHoistedInlineArrayForArg(Op $callOp, int $argIndex, Block $block): ?Op\Expr\Array_
+    {
+        if (null === $block->orig || !\is_array($callOp->args ?? null) || \count($callOp->args) < 5) {
+            return null;
+        }
+        if (!\in_array($argIndex, [0, 4], true)) {
+            return null;
+        }
+        $children = $block->orig->children;
+        $callIndex = null;
+        foreach ($children as $i => $child) {
+            if ($child === $callOp) {
+                $callIndex = $i;
                 break;
             }
         }
-        if (isset($recentArrays[0])) {
-            $envSlot = $recentArrays[0];
+        if (null === $callIndex) {
+            return null;
         }
-        if (isset($recentArrays[1])) {
-            $commandSlot = $recentArrays[1];
+        $trail = [];
+        for ($i = $callIndex - 1; $i >= 0; --$i) {
+            $child = $children[$i];
+            if ($child instanceof Op\Expr\Array_) {
+                array_unshift($trail, $child);
+                continue;
+            }
+            if ($child instanceof Op\Expr\ConstFetch) {
+                $name = $this->staticNameFromOperand($child->name);
+                if ('null' === $name) {
+                    array_unshift($trail, $child);
+                    continue;
+                }
+            }
+            if ($child instanceof Op\Expr\Assign) {
+                break;
+            }
+            break;
+        }
+        $arrays = array_values(array_filter(
+            $trail,
+            static fn (Op\Expr $expr): bool => $expr instanceof Op\Expr\Array_
+        ));
+        if (0 === $argIndex) {
+            return $arrays[0] ?? null;
         }
 
-        return match ($argIndex) {
-            0 => $commandSlot,
-            3 => $nullSlot,
-            4 => $envSlot,
-            default => null,
-        };
+        return [] !== $arrays ? $arrays[\count($arrays) - 1] : null;
+    }
+
+    /** @param list<OpCode> $pendingSends */
+    private function resolveProcOpenNullCwdCallArgSlot(Block $block, ?Op $cfgCallOp, array $pendingSends): ?string
+    {
+        if (null !== $cfgCallOp && null !== $block->orig) {
+            $children = $block->orig->children;
+            $callIndex = null;
+            foreach ($children as $i => $child) {
+                if ($child === $cfgCallOp) {
+                    $callIndex = $i;
+                    break;
+                }
+            }
+            if (null !== $callIndex) {
+                for ($i = $callIndex - 1; $i >= 0; --$i) {
+                    $child = $children[$i];
+                    if ($child instanceof Op\Expr\ConstFetch && 'null' === $this->staticNameFromOperand($child->name)) {
+                        $slot = $block->slotForOperand($child->result);
+
+                        return null !== $slot ? (string) $slot : null;
+                    }
+                    if ($child instanceof Op\Expr\Array_) {
+                        continue;
+                    }
+                    if ($child instanceof Op\Expr\Assign) {
+                        break;
+                    }
+                    break;
+                }
+            }
+        }
+        for ($i = \count($pendingSends) - 1; $i >= 0; --$i) {
+            $op = $pendingSends[$i];
+            if (OpCode::TYPE_CONST_FETCH !== $op->type || null === $op->arg2) {
+                continue;
+            }
+            $const = $block->constants[$op->arg2] ?? null;
+            if (null !== $const && 'null' === $const->toString()) {
+                return (string) $op->arg1;
+            }
+        }
+
+        return null;
+    }
+
+    private function slotForInlineArrayExpr(Block $block, ?Op\Expr\Array_ $arrayExpr): ?string
+    {
+        if (!$arrayExpr instanceof Op\Expr\Array_) {
+            return null;
+        }
+        if (null === $block->slotForOperand($arrayExpr->result)) {
+            foreach ($this->compileArrayLiteral($arrayExpr, $block) as $op) {
+                $block->addOpCode($op);
+            }
+        }
+        $slot = $block->slotForOperand($arrayExpr->result);
+
+        return null !== $slot ? (string) $slot : null;
     }
 
     /** Outermost hoisted Array_ stmt immediately before a cfg FuncCall (#11485). */
