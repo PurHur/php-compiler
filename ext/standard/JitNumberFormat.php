@@ -50,9 +50,10 @@ final class JitNumberFormat
         $thouSep = ($argc >= 4 && !NamedOptionalCallArgs::isOmittedOptional($args[3]))
             ? JitStringBuiltinArg::lower($context, $args[3], 'number_format', 3, 'thousands_separator', '?string')
             : $context->builder->load($context->constantStringFromString(','));
-        $mode = ($argc >= 5 && !NamedOptionalCallArgs::isOmittedOptional($args[4]))
-            ? JitRoundModeArg::lower($context, $args[4], 'number_format', 'rounding_mode', 5)
-            : $i64->constInt(StdlibConstants::PHP_ROUND_HALF_UP, false);
+        $mode = $i64->constInt(StdlibConstants::PHP_ROUND_HALF_UP, false);
+        if (CompilerVersion::supportsRoundingModeEnum() && 5 === $argc && !NamedOptionalCallArgs::isOmittedOptional($args[4])) {
+            $mode = JitRoundModeArg::lower($context, $args[4], 'number_format', 'rounding_mode', 5);
+        }
 
         return $context->builder->call(
             $context->lookupFunction('__compiler_number_format'),

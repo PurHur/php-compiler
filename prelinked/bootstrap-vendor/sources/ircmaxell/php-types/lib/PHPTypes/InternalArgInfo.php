@@ -1468,7 +1468,7 @@ class InternalArgInfo
         'expect_expectl' => ['int', 'expect' => '', 'cases' => 'array', 'match=' => 'array'],
         'expect_popen' => ['resource', 'command' => 'string'],
         'exp' => ['float', 'number' => 'float'],
-        'explode' => ['string[]', 'separator' => 'string', 'str' => 'string', 'limit=' => 'int'],
+        'explode' => ['array', 'separator' => 'string', 'str' => 'string', 'limit=' => 'int'],
         'expm1' => ['float', 'number' => 'float'],
         'extension_loaded' => ['bool', 'extension_name' => 'string'],
         'extract' => ['int', 'var_array' => 'array', 'extract_type=' => 'int', 'prefix=' => 'string'],

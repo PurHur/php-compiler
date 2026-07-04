@@ -25,4 +25,10 @@ if ('1.6' !== $oneDecimal) {
     exit(1);
 }
 
+$halfEven = number_format(2.5, 0, '.', '', RoundingMode::HalfEven);
+if ('2' !== $halfEven) {
+    echo 'fail even: got ', var_export($halfEven, true), " expected '2'\n";
+    exit(1);
+}
+
 echo "ok\n";

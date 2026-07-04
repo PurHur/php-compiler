@@ -471,6 +471,7 @@ class JITTest extends BaseTest {
             if (!CompilerVersion::supportsClassConstObjectExpressions()
                 && (str_contains($name, 'class_const_new_expression_run')
                     || str_contains($name, 'class_const_new_object_run')
+                    || str_contains($name, 'class_const_new_stdclass')
                     || str_ends_with($name, 'class_const_new'))) {
                 continue;
             }

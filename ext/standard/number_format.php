@@ -77,7 +77,7 @@ final class number_format extends Internal
             ) ?? ','
             : ',';
         $roundingMode = StdlibConstants::PHP_ROUND_HALF_UP;
-        if ($argc >= 5) {
+        if (CompilerVersion::supportsRoundingModeEnum() && isset($frame->calledArgs[4])) {
             $roundingMode = VmRoundMode::resolveRoundModeArg(
                 $frame->calledArgs[4]->resolveIndirect(),
                 'number_format',
