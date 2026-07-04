@@ -129,4 +129,20 @@ final class VmGzStreamRuntimeShrinkTest extends TestCase
         $this->assertSame('world', VmGzStream::gzread($handle, 10));
         VmGzStream::gzclose($handle);
     }
+
+    public function testGzopenPhpTempReadWrapperAndRejectPhpMemory(): void
+    {
+        if (!VmGzStreamNative::available()) {
+            $this->markTestSkipped('VmZlib backend unavailable on this host');
+        }
+
+        $handle = VmGzStream::gzopen('php://temp', 'rb');
+        $this->assertNotFalse($handle);
+        $this->assertSame('', VmGzStream::gzread($handle, 10));
+        $this->assertSame(1, VmGzStream::gzeof($handle));
+        VmGzStream::gzclose($handle);
+
+        $this->assertFalse(VmGzStream::gzopen('php://memory', 'wb'));
+        $this->assertFalse(VmGzStream::gzopen('php://memory', 'w+b'));
+    }
 }

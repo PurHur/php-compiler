@@ -34,15 +34,24 @@ final class VmGzStreamPure
 
         $innerPath = self::stripCompressZlibWrapper($filename);
 
+        // php-src gzopen cannot bind php://memory streams (#9407).
+        if ('php://memory' === $innerPath) {
+            return false;
+        }
+
         $buffer = '';
         $pos = 0;
         if (!$parsed['writing']) {
             $raw = self::loadReadPayload($innerPath);
-            if (false === $raw || '' === $raw) {
+            if (false === $raw) {
                 return false;
             }
-            $decoded = VmZlib::gzdecode($raw);
-            $buffer = false !== $decoded ? $decoded : $raw;
+            if ('' === $raw) {
+                $buffer = '';
+            } else {
+                $decoded = VmZlib::gzdecode($raw);
+                $buffer = false !== $decoded ? $decoded : $raw;
+            }
         } elseif ($parsed['append'] && self::isReadableRegularFile($innerPath)) {
             $raw = self::loadReadPayload($innerPath);
             if (false !== $raw && '' !== $raw) {
@@ -202,6 +211,10 @@ final class VmGzStreamPure
         if ('' === $mode) {
             return null;
         }
+        // php-src ext/zlib/zlib.c — read+write gz modes rejected (e.g. w+b, rb+).
+        if (str_contains($mode, '+')) {
+            return null;
+        }
         $first = $mode[0];
         $writing = false;
         $append = false;
@@ -259,6 +272,11 @@ final class VmGzStreamPure
         if (VmDataUri::isDataUri($path)) {
             return VmDataUri::decode($path);
         }
+        if (self::isPhpTempWrapperUri($path)) {
+            $payload = VmFs::readPathContentsViaOpen($path);
+
+            return false !== $payload ? $payload : false;
+        }
         if (!self::isReadableRegularFile($path)) {
             return false;
         }
@@ -273,5 +291,11 @@ final class VmGzStreamPure
         }
 
         return \is_readable($path) && \is_file($path);
+    }
+
+    /** php-src rejects php://memory for gzFile; php://temp is supported (#9407). */
+    private static function isPhpTempWrapperUri(string $path): bool
+    {
+        return \str_starts_with($path, 'php://temp');
     }
 }
