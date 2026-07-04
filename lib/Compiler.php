@@ -17450,6 +17450,16 @@ class Compiler {
 
         $producers = $this->prependLeadingCallbackFirstInlineProducer($producers, $cfgChildren, $callOp);
 
+        if ($callOp instanceof Op\Expr\MethodCall || $callOp instanceof Op\Expr\NullsafeMethodCall) {
+            $producers = array_values(array_filter(
+                $producers,
+                fn (Op\Expr $producer): bool => !(
+                    $producer instanceof Op\Expr\ArrayDimFetch
+                    && $this->arrayDimFetchFeedsMethodCallReceiver($producer, $callOp->var)
+                )
+            ));
+        }
+
         return $this->filterDeadVoidStatementMethodCallProducers($producers, $callOp, $cfgChildren);
     }
 
@@ -23095,6 +23105,16 @@ class Compiler {
             }
             break;
         }
+        if ($cfgCallOp instanceof Op\Expr\MethodCall || $cfgCallOp instanceof Op\Expr\NullsafeMethodCall) {
+            // Receiver dim-fetch preludes are not call-arg producers ($tokens[1]->is(T_ECHO); #9703).
+            $dimFetches = array_values(array_filter(
+                $dimFetches,
+                fn (Op\Expr\ArrayDimFetch $fetch): bool => !$this->arrayDimFetchFeedsMethodCallReceiver(
+                    $fetch,
+                    $cfgCallOp->var
+                )
+            ));
+        }
         if ([] === $dimFetches) {
             return null;
         }
@@ -23141,6 +23161,47 @@ class Compiler {
         }
 
         return null !== $slot ? (string) $slot : null;
+    }
+
+    /**
+     * Hoisted dim-fetch on a method-call receiver must not bind to call args (#9703).
+     */
+    private function arrayDimFetchFeedsMethodCallReceiver(
+        Op\Expr\ArrayDimFetch $fetch,
+        ?Operand $receiver
+    ): bool {
+        if (null === $receiver) {
+            return false;
+        }
+        if (
+            null !== $fetch->result
+            && (
+                $fetch->result === $receiver
+                || $this->operandsReferToSameVariable($fetch->result, $receiver)
+            )
+        ) {
+            return true;
+        }
+        $root = $this->unwrapOperandChain($receiver);
+        if (!$root instanceof Op\Expr\ArrayDimFetch) {
+            return false;
+        }
+        $current = $root;
+        while ($current instanceof Op\Expr\ArrayDimFetch) {
+            if (
+                $current === $fetch
+                || (
+                    null !== $fetch->result
+                    && null !== $current->result
+                    && $this->operandsReferToSameVariable($fetch->result, $current->result)
+                )
+            ) {
+                return true;
+            }
+            $current = $this->unwrapOperandChain($current->var);
+        }
+
+        return false;
     }
 
     /**
