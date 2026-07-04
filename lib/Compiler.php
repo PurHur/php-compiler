@@ -12384,12 +12384,18 @@ class Compiler {
             && $this->callArgOperandExpectsArrayProducer($positionalCallArg)
         ) {
             // array_combine(array_keys(...), [...]) — sibling FuncCall feeds arg #0, not trailing Array_ (#15558, #15857).
-            if (
-                'array_combine' === $this->resolveCfgFuncCallName($callOp)
+            $arrayCombinePair = 'array_combine' === $this->resolveCfgFuncCallName($callOp)
                 && 2 === \count($callOp->args ?? [])
-                && null !== $this->matchArrayCombineInlineProducers($producers, $argIndex)
+                ? $this->matchArrayCombineInlineProducers($producers, $argIndex)
+                : null;
+            if (
+                $arrayCombinePair instanceof Op\Expr\FuncCall
+                || $arrayCombinePair instanceof Op\Expr\NsFuncCall
             ) {
                 return null;
+            }
+            if ($arrayCombinePair instanceof Op\Expr\Array_) {
+                return $arrayCombinePair;
             }
             // array_merge((object)[...], [...]) — Cast feeds arg #0, not trailing Array_ (#15207, #15858).
             if (
@@ -28560,6 +28566,7 @@ class Compiler {
                 && \is_array($cfgCallOp->args ?? null)
                 && 2 === \count($cfgCallOp->args)
                 && 'array_slice' !== $this->resolveCfgFuncCallName($cfgCallOp)
+                && 'array_combine' !== $this->resolveCfgFuncCallName($cfgCallOp)
                 && !(
                     isset($cfgCallOp->args[0])
                     && $this->isEmbeddedCallLiteralArg($cfgCallOp->args[0])
