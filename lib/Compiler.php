@@ -21646,7 +21646,33 @@ class Compiler {
                         break;
                     }
                     if ($onlyUnaryPreludes) {
-                        return false;
+                        $hasArrayPreludeBetween = false;
+                        for ($j = $producerIndex + 1; $j < $consumerIndex; ++$j) {
+                            if (($cfgChildren[$j] ?? null) instanceof Op\Expr\Array_) {
+                                $hasArrayPreludeBetween = true;
+                                break;
+                            }
+                        }
+                        if (!$hasArrayPreludeBetween) {
+                            // substr(sprintf(...), -N) — UnaryMinus only, producer feeds arg #0 (#10673, #16000).
+                            return false;
+                        }
+                        // hold([]); array_pad([...], -N, 0) — Array_ + UnaryMinus are consumer args (#15421, #16066).
+                        if (
+                            $producer instanceof Op\Expr
+                            && (
+                                $this->inlineCallArgProducerFeedsConsumer($producer, $consumer)
+                                || $this->isNestedCallArgProducerForConsumer(
+                                    $producer,
+                                    $consumer,
+                                    $producerIndex,
+                                    $consumerIndex,
+                                    $cfgChildren
+                                )
+                            )
+                        ) {
+                            return false;
+                        }
                     }
                 }
             }
