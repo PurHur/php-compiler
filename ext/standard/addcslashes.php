@@ -29,7 +29,7 @@ final class addcslashes extends Internal
             0,
             'str'
         );
-        $charlist = VmString::coerceStringBuiltinArg(
+        $charlist = VmString::requireStringBuiltinArg(
             $frame->calledArgs[1],
             'addcslashes',
             1,
@@ -63,7 +63,7 @@ final class addcslashes extends Internal
                 $context->builder->load($context->constantStringFromString($charlistLit))
             );
         }
-        $charlist = JitStringBuiltinArg::lower($context, $args[1], 'addcslashes', 1, 'charlist');
+        $charlist = JitStringBuiltinArg::lowerRequiredString($context, $args[1], 'addcslashes', 1, 'charlist');
 
         return $context->builder->call(
             $context->lookupFunction('__compiler_addcslashes'),
