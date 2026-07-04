@@ -27,9 +27,16 @@ final class SprintfJitHelper
         float $number,
         int $decimals,
         string $decimalSeparator,
-        string $thousandsSeparator
+        string $thousandsSeparator,
+        int $roundingMode = StdlibConstants::PHP_ROUND_HALF_UP
     ): string {
-        return VmNumberFormat::format($number, $decimals, $decimalSeparator, $thousandsSeparator);
+        return VmNumberFormat::format(
+            $number,
+            $decimals,
+            $decimalSeparator,
+            $thousandsSeparator,
+            $roundingMode
+        );
     }
 
     /**
