@@ -15446,6 +15446,11 @@ restart:
 
             return;
         }
+        // `: Generator`/`: Iterator`/`: Traversable` apply at call time (wrap object), not on
+        // generator body completion / getReturn() (#16141, Zend/zend_generators.c).
+        if ($this->generatorHasTraversableReturnTypeLabel($block)) {
+            return;
+        }
         if (null === $block->returnTypeConstraint) {
             return;
         }
@@ -15458,6 +15463,16 @@ restart:
         );
     }
 
+    private function generatorHasTraversableReturnTypeLabel(Block $block): bool
+    {
+        if (!$block->isGenerator || null === $block->returnClassConstraint) {
+            return false;
+        }
+        $returnLabel = ltrim($block->returnDeclaredTypeLabel ?? $block->returnClassConstraint, '\\');
+
+        return in_array($returnLabel, ['Generator', 'Iterator', 'Traversable'], true);
+    }
+
     private function declaredReturnTypeRequiresValue(Block $block): bool
     {
         if ($block->returnTypeStatic) {
@@ -15467,8 +15482,7 @@ restart:
             return true;
         }
         if (null !== $block->returnClassConstraint) {
-            $returnLabel = ltrim($block->returnDeclaredTypeLabel ?? $block->returnClassConstraint, '\\');
-            if ($block->isGenerator && 'Generator' === $returnLabel) {
+            if ($this->generatorHasTraversableReturnTypeLabel($block)) {
                 return false;
             }
 
