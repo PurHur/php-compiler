@@ -26,9 +26,7 @@ final class array_all extends Internal
 {
     public function execute(Frame $frame): void
     {
-        if (2 !== \count($frame->calledArgs)) {
-            throw new \LogicException('array_all() requires exactly two arguments in this compiler build');
-        }
+        $strict = VmArrayValueCallback::parseOptionalStrictArg($frame->calledArgs, 'array_all');
         if (null === $frame->returnVar) {
             return;
         }
@@ -36,7 +34,7 @@ final class array_all extends Internal
         $callback = $frame->calledArgs[1];
         foreach ($ht->iterateKeyed(true) as [$key, $value]) {
             $result = VmArrayValueCallback::invokePredicate($frame, $callback, $value, $key);
-            if (!VmArrayValueCallback::isTruthy($result)) {
+            if (!VmArrayValueCallback::predicateMatches($result, $strict)) {
                 $frame->returnVar->bool(false);
 
                 return;
@@ -49,14 +47,18 @@ final class array_all extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (2 !== \count($args)) {
-            throw new \LogicException('array_all() requires exactly two arguments in this compiler build');
+        $argc = \count($args);
+        if ($argc < 2 || $argc > 3) {
+            throw new \LogicException('array_all() requires two or three arguments in this compiler build');
         }
         if (!ArrayFindCallbackPolicy::isJitLowerable($args[1])) {
             throw new \LogicException(ArrayFindCallbackPolicy::jitRejectionMessage());
         }
         if (JITVariable::TYPE_STRING === $args[1]->type || JITVariable::TYPE_VALUE === $args[1]->type) {
             $this->jitString($context, $args[1], 'array_all() callback');
+        }
+        if (3 === $argc) {
+            return ArrayFindHelper::buildAllArray($context, $args[0], $args[1], $args[2]);
         }
 
         return ArrayFindHelper::buildAllArray($context, $args[0], $args[1]);
