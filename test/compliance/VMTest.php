@@ -638,6 +638,15 @@ class VMTest extends BaseTest {
                 && str_contains($name, 'gc_status_reference_profile')) {
                 continue;
             }
+            if (!CompilerVersion::supportsDomElementInsertAdjacentHtml()
+                && str_contains($name, 'dom_element_insert_adjacent_html')
+                && !str_contains($name, 'insert_adjacent_html_phantom')) {
+                continue;
+            }
+            if (CompilerVersion::supportsDomElementInsertAdjacentHtml()
+                && str_contains($name, 'insert_adjacent_html_phantom')) {
+                continue;
+            }
             if (!CompilerVersion::supportsClassHasFunctions()
                 && str_contains($name, 'class_has_')) {
                 continue;

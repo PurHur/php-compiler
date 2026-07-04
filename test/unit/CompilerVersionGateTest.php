@@ -979,4 +979,42 @@ final class CompilerVersionGateTest extends TestCase
             }
         }
     }
+
+    public function testSupportsDomElementInsertAdjacentHtmlOnForwardProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertTrue(CompilerVersion::supportsDomElementInsertAdjacentHtml());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testSupportsDomElementInsertAdjacentHtmlFalseOnReferenceProfile(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsDomElementInsertAdjacentHtml());
+    }
+
+    public function testVmRegistersDomElementInsertAdjacentHtmlOnForwardProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $runtime = new Runtime();
+            $element = $runtime->vmContext->classes['domelement'] ?? null;
+            $this->assertNotNull($element);
+            $this->assertTrue(isset($element->methods['insertadjacenthtml']));
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
 }

@@ -561,6 +561,15 @@ class JITTest extends BaseTest {
                 && str_contains($name, 'gc_status_reference_profile')) {
                 continue;
             }
+            if (!CompilerVersion::supportsDomElementInsertAdjacentHtml()
+                && str_contains($name, 'dom_element_insert_adjacent_html')
+                && !str_contains($name, 'insert_adjacent_html_phantom')) {
+                continue;
+            }
+            if (CompilerVersion::supportsDomElementInsertAdjacentHtml()
+                && str_contains($name, 'insert_adjacent_html_phantom')) {
+                continue;
+            }
             // 8.4-target reject gate; skipped when encapsed ?? interpolation enabled (#14063).
             if (CompilerVersion::supportsEncapsedCoalesce()
                 && str_contains($name, 'encapsed_coalesce_parse_error')) {

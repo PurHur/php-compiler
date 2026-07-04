@@ -1013,6 +1013,17 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.4+ DOMElement::insertAdjacentHTML() (ext/dom/dom_element.c, #16128).
+     *
+     * Gated on stable 8.4.0 / PHP_COMPILER_PROFILE=8.4 so 8.4.0-dev reference profile
+     * matches Zend 8.2 phantom gate.
+     */
+    public static function supportsDomElementInsertAdjacentHtml(): bool
+    {
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+    }
+
+    /**
      * PHP 8.3+ parenthesized DNF intersection-only types `(I1&I2) $param` / `(): (I1&I2)`.
      *
      * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev reference profile
