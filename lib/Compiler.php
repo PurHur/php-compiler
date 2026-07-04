@@ -12809,24 +12809,34 @@ class Compiler {
      * Dedicated array-producer ARG_SEND resolution — haystack-family builtins only (#15612, #14134).
      *
      * Skips mb_detect_order([...]) and other mutators that take a single inline array operand.
+     * Multi-array set ops (array_diff/intersect/merge) wire every hoisted array operand (#15947).
      */
     private function shouldUseArrayProducerCallArgResolution(?Op $cfgCallOp, int $argIndex, ?string $calleeName): bool
     {
-        if (null === $cfgCallOp || $argIndex < 1) {
+        if (null === $cfgCallOp || $argIndex < 0) {
             return false;
         }
         $callee = strtolower($calleeName ?? $this->resolveCfgFuncCallName($cfgCallOp) ?? '');
 
-        return \in_array($callee, [
+        if (\in_array($callee, [
             'in_array',
             'array_search',
             'array_key_exists',
             'key_exists',
             'array_column',
+        ], true)) {
+            return $argIndex >= 1;
+        }
+
+        return \in_array($callee, [
             'array_merge',
+            'array_merge_recursive',
             'array_replace',
+            'array_replace_recursive',
             'array_diff',
             'array_intersect',
+            'array_diff_key',
+            'array_intersect_key',
             'array_intersect_assoc',
             'array_diff_assoc',
             'array_udiff',
@@ -21391,7 +21401,7 @@ class Compiler {
             $producerIndex = null;
             for ($j = $firstSibling; $j < $callIndex; ++$j) {
                 $scan = $block->orig->children[$j] ?? null;
-                if (!$this->isSiblingInlineCallProducerExpr($scan)) {
+                if (!$this->isSiblingInlineCallProducerExpr($scan) || !$scan instanceof Op\Expr) {
                     continue;
                 }
                 $targetArg = $this->siblingMultiArgFuncCallProducerTargetArgIndex(
@@ -21399,12 +21409,25 @@ class Compiler {
                     $callIndex,
                     $block->orig->children
                 );
-                if ($targetArg === $argIndex) {
+                if (
+                    $targetArg === $argIndex
+                    && $this->isSiblingMultiArgFuncCallProducer(
+                        $scan,
+                        $cfgCallOp,
+                        $j,
+                        $callIndex,
+                        $block->orig->children
+                    )
+                ) {
                     $producerIndex = $j;
                     break;
                 }
             }
             if (null === $producerIndex) {
+                $outerSlot = $this->outerSiblingInlineCallArgProducerSlot($block, $cfgCallOp, $argIndex);
+                if (null !== $outerSlot) {
+                    return (int) $outerSlot;
+                }
                 $siblingCount = $callIndex - $firstSibling;
                 if ($siblingCount < 2 || $argIndex >= $siblingCount) {
                     return null;
@@ -22744,7 +22767,7 @@ class Compiler {
         if (null !== $firstSibling) {
             for ($j = $firstSibling; $j < $callIndex; ++$j) {
                 $scan = $cfgChildren[$j] ?? null;
-                if (!$scan instanceof Op\Expr || !\in_array($scan, $producers, true)) {
+                if (!$scan instanceof Op\Expr || !$this->isSiblingInlineCallProducerExpr($scan)) {
                     continue;
                 }
                 $targetArg = $this->siblingMultiArgFuncCallProducerTargetArgIndex(
@@ -22752,8 +22775,31 @@ class Compiler {
                     $callIndex,
                     $cfgChildren
                 );
-                if (null !== $targetArg && $targetArg === $argIndex) {
+                if (
+                    null !== $targetArg
+                    && $targetArg === $argIndex
+                    && $this->isSiblingMultiArgFuncCallProducer(
+                        $scan,
+                        $callOp,
+                        $j,
+                        $callIndex,
+                        $cfgChildren
+                    )
+                ) {
                     return $scan;
+                }
+            }
+            $outer = $this->outerSiblingInlineFuncCallProducers($firstSibling, $callIndex, $cfgChildren);
+            $hoistedArgCount = 0;
+            foreach ($callOp->args as $hoistedArg) {
+                if (null !== $hoistedArg && !$this->isEmbeddedCallLiteralArg($hoistedArg)) {
+                    ++$hoistedArgCount;
+                }
+            }
+            if (\count($outer) === $hoistedArgCount && isset($outer[$argIndex])) {
+                $outerProducer = $outer[$argIndex];
+                if ($outerProducer instanceof Op\Expr) {
+                    return $outerProducer;
                 }
             }
         }
