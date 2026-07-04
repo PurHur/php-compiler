@@ -9,6 +9,7 @@ use PHPCompiler\ext\standard\JitRoundModeResolve;
 use PHPCompiler\ext\standard\StdlibConstants;
 use PHPCompiler\JIT\Builtin\RoundingModeJit;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
+use PHPLLVM\Value;
 
 /**
  * Lower round() mode parameter (int legacy + RoundingMode enum, #5934).
