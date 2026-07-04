@@ -5931,4 +5931,54 @@ PHP;
         self::assertStringContainsString('flat string', $out);
         self::assertStringNotContainsString('details flag must be a boolean', $out);
     }
+
+    /** Issue #16241 — unserialize(serialize($obj)) wires serialize EXEC_RETURN, not New_ object slot. */
+    public function testUnserializeSerializeNestedUsesInnerFuncCallReturnSlot(): void
+    {
+        $code = file_get_contents(__DIR__.'/../repro/issue_16241_nested_serialize.php');
+        self::assertNotFalse($code);
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'issue_16241_nested_serialize.php');
+
+        $serializeReturnSlot = null;
+        $unserializeSendSlot = null;
+        $newSlot = null;
+        $fcallOrdinal = 0;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_NEW === $op->type) {
+                $newSlot = $op->arg1;
+            }
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                ++$fcallOrdinal;
+            }
+            if (1 === $fcallOrdinal && OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
+                $serializeReturnSlot = $op->arg1;
+            }
+            if (2 === $fcallOrdinal && OpCode::TYPE_ARG_SEND === $op->type) {
+                $unserializeSendSlot = $op->arg1;
+            }
+        }
+
+        self::assertNotNull($serializeReturnSlot);
+        self::assertNotNull($unserializeSendSlot);
+        self::assertNotSame($newSlot, $unserializeSendSlot, 'must not wire object New_ slot to unserialize');
+        self::assertSame($serializeReturnSlot, $unserializeSendSlot);
+
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("42\n", ob_get_clean());
+    }
+
+    /** Issue #16241 — unserialize(serialize($obj)) runtime parity with Zend (php-src ext/standard/var.c). */
+    public function testUnserializeSerializeNestedRuntime(): void
+    {
+        $code = file_get_contents(__DIR__.'/../repro/maintainer_gap_serialize_unserialize_magic.php');
+        self::assertNotFalse($code);
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'maintainer_gap_serialize_unserialize_magic.php');
+
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("serialize_unserialize_magic_ok\n", ob_get_clean());
+    }
 }
