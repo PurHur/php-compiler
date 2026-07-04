@@ -8077,8 +8077,14 @@ class Compiler {
                         !$arg instanceof Operand
                         || $arg instanceof Operand\Literal
                         || $arg instanceof Operand\NullOperand
-                        || null !== Block::cfgVarRoot($arg)
                     ) {
+                        continue;
+                    }
+                    if (null !== Block::cfgVarRoot($arg)) {
+                        if ($this->operandsReferToSameVariable($arg, $suppressResult)) {
+                            $endCompiled->forceBindScopeSlot($arg, $slot);
+                        }
+
                         continue;
                     }
                     // PhiResolver can replace the suppress inner result with an unrelated temp (#10336).
@@ -8087,6 +8093,29 @@ class Compiler {
             }
             foreach ($endCfg->children as $endChild) {
                 $this->bindErrorSuppressResultOperandUsages($endChild, $endCompiled, $suppressResult, $slot);
+            }
+            foreach ($endCfg->children as $endChild) {
+                if (
+                    !$endChild instanceof Op\Expr\FuncCall
+                    && !$endChild instanceof Op\Expr\NsFuncCall
+                ) {
+                    continue;
+                }
+                if (!property_exists($endChild, 'args') || !is_array($endChild->args)) {
+                    continue;
+                }
+                foreach ($endChild->args as $arg) {
+                    if (
+                        !$arg instanceof Operand
+                        || $this->isEmbeddedCallLiteralArg($arg)
+                        || !$this->callArgIsDeadInlineTemporary($arg)
+                    ) {
+                        continue;
+                    }
+                    // First dead temp in the outer call is the @ inner value (#15916).
+                    $endCompiled->forceBindScopeSlot($arg, $slot);
+                    break;
+                }
             }
         }
     }
@@ -28273,6 +28302,77 @@ class Compiler {
     }
 
     /**
+     * True when a call arg reads the `@`-suppressed inner expression in the post-END_SILENCE block (#15916).
+     */
+    private function callArgIsErrorSuppressForwardedResult(Operand $callArg, Block $block): bool
+    {
+        $endCfg = $block->orig;
+        if (null === $endCfg || 1 !== \count($endCfg->parents)) {
+            return false;
+        }
+        $parent = $endCfg->parents[0];
+        if (!$parent instanceof ErrorSuppressBlock) {
+            return false;
+        }
+        $primary = $this->findErrorSuppressPrimaryInnerExpr($parent);
+        if (null === $primary || !isset($primary->result)) {
+            return false;
+        }
+
+        return $this->operandsReferToSameVariable($callArg, $primary->result);
+    }
+
+    /** FUNCCALL_EXEC_RETURN slot from the {@see ErrorSuppressBlock} parent (#15916). */
+    private function errorSuppressEndBlockInnerResultSlot(Block $block): ?int
+    {
+        $endCfg = $block->orig;
+        if (null === $endCfg || !$this->isErrorSuppressEndBlock($endCfg)) {
+            return null;
+        }
+        $parentCfg = $endCfg->parents[0];
+        if (!$parentCfg instanceof ErrorSuppressBlock || !$this->seen->contains($parentCfg)) {
+            return null;
+        }
+        $parentCompiled = $this->seen[$parentCfg];
+        if (!$parentCompiled instanceof Block) {
+            return null;
+        }
+
+        return $this->findFuncCallExecReturnSlot($parentCompiled);
+    }
+
+    private function isFirstNonEmbeddedDeadInlineCallArg(Op $cfgCallOp, int $argIndex): bool
+    {
+        if (!property_exists($cfgCallOp, 'args') || !is_array($cfgCallOp->args)) {
+            return false;
+        }
+        foreach ($cfgCallOp->args as $i => $candidate) {
+            if (!$candidate instanceof Operand || $this->isEmbeddedCallLiteralArg($candidate)) {
+                continue;
+            }
+            if (!$this->callArgIsDeadInlineTemporary($candidate)) {
+                continue;
+            }
+
+            return (int) $i === $argIndex;
+        }
+
+        return false;
+    }
+
+    private function errorSuppressEndBlockInnerResultSlotForCallArg(
+        Block $block,
+        ?Op $cfgCallOp,
+        int $argIndex
+    ): ?int {
+        if (null === $cfgCallOp || !$this->isFirstNonEmbeddedDeadInlineCallArg($cfgCallOp, $argIndex)) {
+            return null;
+        }
+
+        return $this->errorSuppressEndBlockInnerResultSlot($block);
+    }
+
+    /**
      * php-cfg hoists `true`/`false`/`null` as a ConstFetch stmt before FuncCall with a dead arg temp (#9140, #9260).
      */
     private function tryFoldHoistedBoolNullLiteralCallArg(
@@ -28282,6 +28382,9 @@ class Compiler {
         int $argIndex
     ): ?int {
         if (null === $block->orig || null === $cfgCallOp || !property_exists($cfgCallOp, 'args')) {
+            return null;
+        }
+        if ($this->callArgIsErrorSuppressForwardedResult($arg, $block)) {
             return null;
         }
         $callArgs = $cfgCallOp->args;
@@ -28356,6 +28459,13 @@ class Compiler {
         }
         $producerOrdinal = array_search($argIndex, $nonEmbeddedArgIndices, true);
         if (false === $producerOrdinal) {
+            return null;
+        }
+        if (
+            0 === $producerOrdinal
+            && null !== $block->orig
+            && $this->isErrorSuppressEndBlock($block->orig)
+        ) {
             return null;
         }
         $fetch = $trailingConstFetches[$producerOrdinal] ?? null;
@@ -29135,6 +29245,20 @@ class Compiler {
             }
             if (null !== $castArgZeroSlot) {
                 $sends[] = new OpCode(OpCode::TYPE_ARG_SEND, $castArgZeroSlot, $nameSlot, $unpackFlag);
+                continue;
+            }
+            $errorSuppressArgSlot = $this->errorSuppressEndBlockInnerResultSlotForCallArg(
+                $block,
+                $cfgCallOp,
+                (int) $argIndex
+            );
+            if (null !== $errorSuppressArgSlot) {
+                $sends[] = new OpCode(
+                    OpCode::TYPE_ARG_SEND,
+                    (string) $errorSuppressArgSlot,
+                    $nameSlot,
+                    $unpackFlag
+                );
                 continue;
             }
             if (
