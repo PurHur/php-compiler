@@ -4911,10 +4911,25 @@ PHP;
     /** Issue #16012 — date_sunrise(time(), SUNFUNCS_RET_STRING, lat, lon) compiles without OOM and runs. */
     public function testDateSunriseInlineSunfuncsConstFourArgRuntime(): void
     {
-        $code = file_get_contents(__DIR__.'/../repro/maintainer_gap_date_sunrise_inline_constant.php');
-        self::assertNotFalse($code);
+        $code = <<<'PHP'
+<?php
+
+declare(strict_types=1);
+
+try {
+    $s = date_sunrise(time(), SUNFUNCS_RET_STRING, 40.7, -74.0);
+    if (!\is_string($s) || '' === $s) {
+        echo "fail: expected non-empty string\n";
+        exit(1);
+    }
+    echo 'ok:', \strlen($s), "\n";
+} catch (Throwable $e) {
+    echo 'fail:', \get_class($e), ':', $e->getMessage(), "\n";
+    exit(1);
+}
+PHP;
         $runtime = new Runtime();
-        $block = $runtime->parseAndCompile($code, 'maintainer_gap_date_sunrise_inline_constant.php');
+        $block = $runtime->parseAndCompile($code, 'date_sunrise_inline_sunfuncs_const.php');
         ob_start();
         $runtime->run($block);
         self::assertStringContainsString('ok:', ob_get_clean());
