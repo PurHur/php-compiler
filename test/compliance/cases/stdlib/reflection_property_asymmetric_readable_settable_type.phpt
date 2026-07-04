@@ -1,5 +1,14 @@
 --TEST--
-ReflectionProperty::getReadableType()/getSettableType() asymmetric typed property (#7053)
+ReflectionProperty::getReadableType()/getSettableType() asymmetric typed property (#7053, #9873)
+--SKIPIF--
+<?php
+if (!class_exists('PHPCompiler\\CompilerVersion')) {
+    require __DIR__ . '/../../../../vendor/autoload.php';
+}
+if (!PHPCompiler\CompilerVersion::supportsAsymmetricVisibility()) {
+    die('skip requires PHP_COMPILER_PROFILE=8.4');
+}
+?>
 --FILE--
 <?php
 declare(strict_types=1);
@@ -11,8 +20,6 @@ class C {
 }
 
 $p = new ReflectionProperty(C::class, 'x');
-echo 'x_readable_exists=', method_exists($p, 'getReadableType') ? '1' : '0', "\n";
-echo 'x_settable_exists=', method_exists($p, 'getSettableType') ? '1' : '0', "\n";
 echo 'x_readable=', (string) $p->getReadableType(), "\n";
 echo 'x_settable=', (string) $p->getSettableType(), "\n";
 
@@ -24,8 +31,6 @@ $plain = new ReflectionProperty(C::class, 'plain');
 echo 'plain_readable=', (string) $plain->getReadableType(), "\n";
 echo 'plain_settable=', (string) $plain->getSettableType(), "\n";
 --EXPECT--
-x_readable_exists=1
-x_settable_exists=1
 x_readable=int
 x_settable=int
 p_readable=string
