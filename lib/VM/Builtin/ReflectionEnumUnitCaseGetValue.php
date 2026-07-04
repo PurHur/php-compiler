@@ -22,7 +22,7 @@ final class ReflectionEnumUnitCaseGetValue extends VmClassMethod
     {
         $receiver = ReflectionSupport::requireReflectionEnumCase($frame, $frame->calledArgs[0]);
         $ctx = VmReflection::requireContext($frame);
-        $enumName = ReflectionSupport::classNameFromReflection($receiver);
+        $enumName = ReflectionSupport::enumClassNameFromReflection($receiver);
         $caseName = ReflectionSupport::enumCaseNameFromReflection($receiver);
         $entry = VmReflection::resolveClassEntry($ctx, $enumName);
         if (null === $entry || !$entry->isEnum) {

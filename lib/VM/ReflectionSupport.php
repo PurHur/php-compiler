@@ -97,6 +97,10 @@ final class ReflectionSupport
 
     public const PROP_EXTENSION_NAME = 'extension';
 
+    /** Internal enum class name on ReflectionEnumUnitCase / ReflectionEnumBackedCase (#10000). */
+    public const PROP_ENUM_CLASS_NAME = 'enumClass';
+
+    /** @deprecated Use PROP_CLASS_NAME (`name`) for case name + PROP_ENUM_CLASS_NAME for enum type. */
     public const PROP_ENUM_CASE_NAME = 'case';
 
     public const PROP_FUNC_NAME = 'funcName';
@@ -755,9 +759,19 @@ final class ReflectionSupport
 
     public static function enumCaseNameFromReflection(ObjectEntry $reflection): string
     {
-        $nameVar = $reflection->getProperty(self::PROP_ENUM_CASE_NAME)->resolveIndirect();
+        $nameVar = $reflection->getProperty(self::PROP_CLASS_NAME)->resolveIndirect();
         if (Variable::TYPE_STRING !== $nameVar->type) {
             throw new \LogicException('ReflectionEnumUnitCase missing case name');
+        }
+
+        return $nameVar->toString();
+    }
+
+    public static function enumClassNameFromReflection(ObjectEntry $reflection): string
+    {
+        $nameVar = $reflection->getProperty(self::PROP_ENUM_CLASS_NAME)->resolveIndirect();
+        if (Variable::TYPE_STRING !== $nameVar->type) {
+            throw new \LogicException('ReflectionEnumUnitCase missing enum class name');
         }
 
         return $nameVar->toString();

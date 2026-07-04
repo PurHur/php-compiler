@@ -2713,10 +2713,10 @@ final class VmReflection
         }
         $obj = new \PHPCompiler\VM\ObjectEntry($reucClass);
         $obj->constructed = true;
-        $obj->getProperty(\PHPCompiler\VM\ReflectionSupport::PROP_CLASS_NAME)->string($enumEntry->name);
-        $obj->getProperty(\PHPCompiler\VM\ReflectionSupport::PROP_ENUM_CASE_NAME)->string(
+        $obj->getProperty(\PHPCompiler\VM\ReflectionSupport::PROP_CLASS_NAME)->string(
             $enumEntry->enumCaseCanonicalNames[$caseLc]
         );
+        $obj->getProperty(\PHPCompiler\VM\ReflectionSupport::PROP_ENUM_CLASS_NAME)->string($enumEntry->name);
 
         return $obj;
     }
@@ -2744,10 +2744,10 @@ final class VmReflection
         }
         $obj = new \PHPCompiler\VM\ObjectEntry($rebcClass);
         $obj->constructed = true;
-        $obj->getProperty(\PHPCompiler\VM\ReflectionSupport::PROP_CLASS_NAME)->string($enumEntry->name);
-        $obj->getProperty(\PHPCompiler\VM\ReflectionSupport::PROP_ENUM_CASE_NAME)->string(
+        $obj->getProperty(\PHPCompiler\VM\ReflectionSupport::PROP_CLASS_NAME)->string(
             $enumEntry->enumCaseCanonicalNames[$caseLc]
         );
+        $obj->getProperty(\PHPCompiler\VM\ReflectionSupport::PROP_ENUM_CLASS_NAME)->string($enumEntry->name);
 
         return $obj;
     }
