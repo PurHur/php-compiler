@@ -1,5 +1,6 @@
 --TEST--
-stdlib md5()/sha1() null $string — TypeError (#16139, ext/standard/string.c)
+stdlib md5()/sha1() null $string — TypeError JIT (#16139, ext/standard/string.c)
+--JIT--
 --FILE--
 <?php
 declare(strict_types=1);
