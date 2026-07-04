@@ -83,6 +83,10 @@ final class GcCollectCyclesRuntime
 
     private const REG_MARK_DESTRUCT = 'PHPCompiler\\ext\\standard\\GcCollectCyclesRegistryJitHelper::markDestructInvoked';
 
+    private const REG_DESTRUCT_ALREADY_BY_OBJ = 'PHPCompiler\\ext\\standard\\GcCollectCyclesRegistryJitHelper::destructAlreadyInvokedByObject';
+
+    private const REG_MARK_DESTRUCT_BY_OBJ = 'PHPCompiler\\ext\\standard\\GcCollectCyclesRegistryJitHelper::markDestructInvokedByObject';
+
     /** @var list<string> */
     private const REGISTRY_COMPILED_HELPERS = [
         self::REG_APPEND,
@@ -93,6 +97,8 @@ final class GcCollectCyclesRuntime
         self::REG_PROP_COUNT,
         self::REG_DESTRUCT_INVOKED,
         self::REG_MARK_DESTRUCT,
+        self::REG_DESTRUCT_ALREADY_BY_OBJ,
+        self::REG_MARK_DESTRUCT_BY_OBJ,
     ];
 
     private static int $blockSuffix = 0;
@@ -561,6 +567,12 @@ final class GcCollectCyclesRuntime
 
     private static function implementDestructAlreadyInvoked(Context $context): void
     {
+        if (self::usesPhpRegistry($context)) {
+            self::implementDestructAlreadyInvokedPhpBridge($context);
+
+            return;
+        }
+
         $fn = $context->lookupFunction('phpc_destruct_already_invoked');
         if ($fn->countBasicBlocks() > 0) {
             return;
@@ -590,6 +602,12 @@ final class GcCollectCyclesRuntime
 
     private static function implementDestructMarkInvoked(Context $context): void
     {
+        if (self::usesPhpRegistry($context)) {
+            self::implementDestructMarkInvokedPhpBridge($context);
+
+            return;
+        }
+
         $fn = $context->lookupFunction('phpc_destruct_mark_invoked');
         if ($fn->countBasicBlocks() > 0) {
             return;
@@ -1576,6 +1594,43 @@ final class GcCollectCyclesRuntime
         $objI64 = $context->builder->ptrToInt($fn->getParam(0), $i64);
         $idx = $context->builder->call(self::registryHelperFunction($context, self::REG_INDEX_OF), $objI64);
         $context->builder->returnValue($context->builder->trunc($idx, $i32));
+        $context->builder->clearInsertionPosition();
+    }
+
+    private static function implementDestructAlreadyInvokedPhpBridge(Context $context): void
+    {
+        $fn = $context->lookupFunction('phpc_destruct_already_invoked');
+        if ($fn->countBasicBlocks() > 0) {
+            return;
+        }
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $entry = $fn->appendBasicBlock('destruct_already_php_entry');
+        $context->builder->positionAtEnd($entry);
+        $objI64 = $context->builder->ptrToInt($fn->getParam(0), $i64);
+        $inv = $context->builder->call(
+            self::registryHelperFunction($context, self::REG_DESTRUCT_ALREADY_BY_OBJ),
+            $objI64
+        );
+        $context->builder->returnValue($context->builder->trunc($inv, $i32));
+        $context->builder->clearInsertionPosition();
+    }
+
+    private static function implementDestructMarkInvokedPhpBridge(Context $context): void
+    {
+        $fn = $context->lookupFunction('phpc_destruct_mark_invoked');
+        if ($fn->countBasicBlocks() > 0) {
+            return;
+        }
+        $i64 = $context->getTypeFromString('int64');
+        $entry = $fn->appendBasicBlock('destruct_mark_php_entry');
+        $context->builder->positionAtEnd($entry);
+        $objI64 = $context->builder->ptrToInt($fn->getParam(0), $i64);
+        $context->builder->call(
+            self::registryHelperFunction($context, self::REG_MARK_DESTRUCT_BY_OBJ),
+            $objI64
+        );
+        $context->builder->returnVoid();
         $context->builder->clearInsertionPosition();
     }
 
