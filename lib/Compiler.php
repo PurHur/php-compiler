@@ -25995,21 +25995,26 @@ class Compiler {
                 if (
                     0 === (int) $argIndex
                     && $this->callArgIsDeadInlineTemporary($multisortArgProbe)
+                    && !$this->isCallArgDirectArrayDimFetch($multisortArgProbe)
+                    && null === $this->resolvePrecedingArrayDimFetchCallArgSlot(
+                        $multisortArgProbe,
+                        $block,
+                        $cfgCallOp,
+                        (int) $argIndex
+                    )
                 ) {
-                    foreach ($block->orig->children as $child) {
-                        if (!$child instanceof Op\Expr\Array_) {
-                            continue;
-                        }
-                        if (null === $block->slotForOperand($child->result)) {
-                            foreach ($this->compileArrayLiteral($child, $block) as $op) {
+                    // Inline literal only — not nested Array_ inside $cols = [[...], [...]] (#15151, #6689).
+                    $stmtBefore = $this->inlineArrayProducerImmediatelyBeforeCfgCall($cfgCallOp, $block);
+                    if ($stmtBefore instanceof Op\Expr\Array_) {
+                        if (null === $block->slotForOperand($stmtBefore->result)) {
+                            foreach ($this->compileArrayLiteral($stmtBefore, $block) as $op) {
                                 $sends[] = $op;
                             }
                         }
-                        $leadArraySlot = $block->slotForOperand($child->result);
+                        $leadArraySlot = $block->slotForOperand($stmtBefore->result);
                         if (null !== $leadArraySlot) {
                             $valueSlot = (string) $leadArraySlot;
                         }
-                        break;
                     }
                 }
             }
