@@ -3145,6 +3145,32 @@ class Compiler {
         return null;
     }
 
+    /** True when a call arg reads stmt-level or embedded ?? (merge block must keep coalesce slot, #16127). */
+    private function callArgIsCoalesceMergeProducer(
+        ?Operand $arg,
+        Block $block,
+        ?Op $cfgCallOp = null,
+        ?int $argIndex = null
+    ): bool {
+        if (null === $arg) {
+            return false;
+        }
+        if (
+            null !== $this->resolveSyncedCoalesceFuncCallArgSlot($arg)
+            || null !== $this->findCoalesceStmtForCallArg($arg, $block)
+        ) {
+            return true;
+        }
+        if (null !== $cfgCallOp && null !== $argIndex) {
+            $probe = $cfgCallOp->args[$argIndex] ?? null;
+            if (null !== $probe && $probe !== $arg) {
+                return $this->callArgIsCoalesceMergeProducer($probe, $block);
+            }
+        }
+
+        return false;
+    }
+
     /**
      * Stmt-level ?? immediately before a FuncCall (only inline producers in between, #11601, #15915).
      */
@@ -21848,9 +21874,6 @@ class Compiler {
             if ($mid instanceof Op\Expr\ConstFetch || $mid instanceof Op\Expr\ClassConstFetch) {
                 continue;
             }
-            if ($this->isUnaryInlineSiblingCallArgExpr($mid)) {
-                continue;
-            }
 
             return false;
         }
@@ -28787,13 +28810,7 @@ class Compiler {
         if (null === $last->result) {
             return null;
         }
-        if (
-            null === $block->slotForOperand($last->result)
-            || (
-                $block->inheritUndefinedLocals
-                && $this->callArgIsDeadInlineTemporary($arg)
-            )
-        ) {
+        if (null === $block->slotForOperand($last->result)) {
             foreach ($chain as $arithmetic) {
                 foreach ($this->compileExpr($arithmetic, $block) as $op) {
                     $emitOps[] = $op;
@@ -30108,15 +30125,7 @@ class Compiler {
                                     if (null !== $initSlot) {
                                         $inlineArrayLiteralArgWired = true;
                                     }
-                                } elseif (
-                                    null === $block->slotForOperand($matched->result)
-                                    || (
-                                        $block->inheritUndefinedLocals
-                                        && $this->callArgIsDeadInlineTemporary(
-                                            $cfgCallOp->args[(int) $argIndex] ?? $arg
-                                        )
-                                    )
-                                ) {
+                                } elseif (null === $block->slotForOperand($matched->result)) {
                                     foreach ($this->compileExpr($matched, $block) as $op) {
                                         $sends[] = $op;
                                     }
@@ -32445,17 +32454,6 @@ class Compiler {
                     $valueSlot = $combineForcedSlot;
                 }
             }
-            if (
-                $block->inheritUndefinedLocals
-                && $this->callArgIsDeadInlineTemporary(
-                    ($cfgCallOp->args[(int) $argIndex] ?? null) ?? $arg
-                )
-            ) {
-                $recentArithmetic = $this->slotForRecentInlineArithmeticCallArg($block, $sends);
-                if (null !== $recentArithmetic) {
-                    $valueSlot = $recentArithmetic;
-                }
-            }
             $sends[] = new OpCode(OpCode::TYPE_ARG_SEND, $valueSlot, $nameSlot, $unpackFlag);
         }
 
@@ -34450,7 +34448,11 @@ class Compiler {
             return;
         }
         $callArg = $cfgCallOp->args[0] ?? null;
-        if (1 !== \count($cfgCallOp->args ?? []) || !$this->callArgIsDeadInlineTemporary($callArg)) {
+        if (
+            1 !== \count($cfgCallOp->args ?? [])
+            || !$this->callArgIsDeadInlineTemporary($callArg)
+            || $this->callArgIsCoalesceMergeProducer($callArg, $block, $cfgCallOp, 0)
+        ) {
             return;
         }
         $dest = $this->slotForRecentInlineArithmeticCallArg(

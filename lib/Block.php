@@ -1297,7 +1297,6 @@ class Block {
                     $this->inheritUndefinedLocals
                     && null !== $frame
                     && isset($frame->scope[$pos])
-                    && !isset($this->constants[$pos])
                 ) {
                     $scope[$pos] = $frame->scope[$pos];
                 } else {
