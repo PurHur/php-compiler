@@ -24,7 +24,7 @@ final class SplArrayUserSortMethod extends VmClassMethod
             ArrayObjectBuiltin::CLASS_LC => 'ArrayObject',
             default => throw new \LogicException('Unsupported SPL user-sort class: '.$this->classLc),
         };
-        $object = SplIteratorSupport::receiver(
+        $object = SplIteratorSupport::receiverIsA(
             $frame,
             $this->classLc,
             $className.'::'.$this->methodLc.'()'
