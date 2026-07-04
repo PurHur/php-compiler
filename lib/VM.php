@@ -15449,6 +15449,13 @@ restart:
         if (null === $block->returnTypeConstraint) {
             return;
         }
+        // `: Generator` on a generator body applies to the wrapper at invoke time, not completion (#16141).
+        if ($block->isGenerator && null === $value) {
+            $returnLabel = ltrim($block->returnDeclaredTypeLabel ?? $block->returnClassConstraint ?? '', '\\');
+            if ('Generator' === $returnLabel) {
+                return;
+            }
+        }
         $strict = $block->strictTypes;
         TypeCheck::coerceReturn(
             $value,
