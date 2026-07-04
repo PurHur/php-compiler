@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\intl;
 
+use PHPCompiler\ext\mbstring\EastAsianWidthTable;
+use PHPCompiler\ext\mbstring\VmMbstring;
+use PHPCompiler\ext\standard\VmString;
+
 /**
  * Grapheme cluster string helpers (php-src ext/intl/grapheme/grapheme_string.c; #7128, #7888).
  *
@@ -590,5 +594,104 @@ final class VmGrapheme
         }
 
         return $matches[0];
+    }
+
+    /**
+     * grapheme_strimwidth() — trim by display width in grapheme clusters (php-src ext/intl/grapheme; #9793).
+     */
+    public static function strimwidth(
+        string $string,
+        int $start,
+        int $width,
+        string $trimmarker = ''
+    ): string|false {
+        if ('' === $string) {
+            return '';
+        }
+        $graphemes = self::splitGraphemes($string);
+        if (null === $graphemes) {
+            return false;
+        }
+        $graphemeCount = \count($graphemes);
+        if ($start < 0) {
+            $start += $graphemeCount;
+        }
+        if ($start < 0) {
+            $start = 0;
+        }
+        if ($start >= $graphemeCount) {
+            return '';
+        }
+        $graphemes = \array_slice($graphemes, $start);
+        $totalWidth = self::graphemesDisplayWidth($graphemes);
+        if ($width < 0) {
+            $width = $totalWidth + $width;
+            if ($width < 0) {
+                throw new \ValueError('grapheme_strimwidth(): Argument #3 ($width) is out of range');
+            }
+        }
+        if ($totalWidth <= $width) {
+            return \implode('', $graphemes);
+        }
+        $markerGraphemes = '' !== $trimmarker ? self::splitGraphemes($trimmarker) : null;
+        if (null === $markerGraphemes && '' !== $trimmarker) {
+            return false;
+        }
+        $markerWidth = null !== $markerGraphemes ? self::graphemesDisplayWidth($markerGraphemes) : 0;
+        if ('' !== $trimmarker && $width <= $markerWidth) {
+            return $trimmarker;
+        }
+        $contentWidth = $width - $markerWidth;
+        $out = self::trimGraphemesToWidth($graphemes, $contentWidth);
+
+        return $out.$trimmarker;
+    }
+
+    /**
+     * @param list<string> $graphemes
+     */
+    private static function graphemesDisplayWidth(array $graphemes): int
+    {
+        $width = 0;
+        foreach ($graphemes as $grapheme) {
+            $width += self::graphemeClusterWidth($grapheme);
+        }
+
+        return $width;
+    }
+
+    private static function graphemeClusterWidth(string $grapheme): int
+    {
+        $width = 0;
+        $charLen = VmString::utf8CharLength($grapheme);
+        for ($i = 0; $i < $charLen; ++$i) {
+            $width += EastAsianWidthTable::characterWidth(
+                VmMbstring::utf8CharToCodepoint(VmString::utf8CharSubstr($grapheme, $i, 1))
+            );
+        }
+
+        return $width;
+    }
+
+    /**
+     * @param list<string> $graphemes
+     */
+    private static function trimGraphemesToWidth(array $graphemes, int $contentWidth): string
+    {
+        if ($contentWidth <= 0) {
+            return '';
+        }
+        $used = 0;
+        $out = '';
+        foreach ($graphemes as $grapheme) {
+            $graphemeWidth = self::graphemeClusterWidth($grapheme);
+            if ($used + $graphemeWidth > $contentWidth) {
+                break;
+            }
+            $out .= $grapheme;
+            $used += $graphemeWidth;
+        }
+
+        return $out;
     }
 }
