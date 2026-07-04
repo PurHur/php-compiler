@@ -1479,7 +1479,7 @@ final class VmDom
         }
         $children = self::parseFragmentXmlChildren($ctx, $trimmed);
         if (null === $children) {
-            VmXml::validateAndReport($ctx, $trimmed, $frame);
+            self::reportDomFragmentAppendXmlError($ctx, $trimmed, $frame);
 
             return false;
         }
@@ -1752,6 +1752,59 @@ final class VmDom
             'file' => '',
             'line' => 1,
         ], $frame, null, 'DOMDocument::loadXML(): '.$message.' in Entity, line: 1');
+    }
+
+    /**
+     * DOMDocumentFragment::appendXML() libxml warning surface (php-src ext/dom/php_dom.c; #16162).
+     */
+    private static function reportDomFragmentAppendXmlError(
+        Context $ctx,
+        string $data,
+        ?\PHPCompiler\Frame $frame
+    ): void {
+        $record = VmXml::validationErrorRecord($data);
+        if (null === $record) {
+            $record = [
+                'level' => LibxmlConstants::LIBXML_ERR_FATAL,
+                'code' => 4,
+                'column' => 1,
+                'message' => 'Malformed XML document',
+                'file' => '',
+                'line' => 1,
+            ];
+        }
+
+        $prefix = 'DOMDocumentFragment::appendXML(): ';
+        $line = $record['line'];
+        VmLibxml::handleError(
+            $ctx,
+            $record,
+            $frame,
+            null,
+            $prefix.'Entity: line '.$line.': parser error : '.$record['message']
+        );
+
+        $snippet = trim($data);
+        VmLibxml::handleError($ctx, $record, $frame, null, $prefix.$snippet);
+
+        $caretColumn = self::domLibxmlCaretColumn($snippet, $record);
+        VmLibxml::handleError($ctx, $record, $frame, null, $prefix.str_repeat(' ', $caretColumn).'^');
+    }
+
+    /**
+     * Caret column for DOM libxml context line (libxml xmlerror.c — 0-based offset before '^').
+     */
+    private static function domLibxmlCaretColumn(string $snippet, array $record): int
+    {
+        if ('' === $snippet) {
+            return 0;
+        }
+
+        if (str_contains($record['message'], "Couldn't find end of Start Tag")) {
+            return \strlen($snippet);
+        }
+
+        return max(0, $record['column'] - 1);
     }
 
     private static function approximateXmlColumn(string $xml, string $needle): int

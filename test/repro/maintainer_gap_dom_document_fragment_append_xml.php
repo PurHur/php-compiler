@@ -19,9 +19,27 @@ if ('a' !== $frag->childNodes->item(0)->nodeName || 'b' !== $frag->childNodes->i
 }
 
 $frag2 = $doc->createDocumentFragment();
+$warnings = [];
+set_error_handler(static function (int $severity, string $message) use (&$warnings): bool {
+    $warnings[] = $message;
+
+    return true;
+});
 $bad = $frag2->appendXML('<unclosed');
+restore_error_handler();
 if (false !== $bad) {
     echo 'fail: invalid xml should return false', "\n";
+    exit(1);
+}
+$hasPrefix = false;
+foreach ($warnings as $warning) {
+    if (str_contains($warning, 'DOMDocumentFragment::appendXML(): Entity: line 1: parser error :')) {
+        $hasPrefix = true;
+        break;
+    }
+}
+if (!$hasPrefix) {
+    echo 'fail: missing DOMDocumentFragment::appendXML() warning prefix', "\n";
     exit(1);
 }
 
