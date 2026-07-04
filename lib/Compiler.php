@@ -18787,6 +18787,30 @@ class Compiler {
                     }
                     break;
                 }
+                // var_export(atan2(NAN, INF), true) — ConstFetch chain feeds nested sibling FuncCall (#10070).
+                for ($j = $i + 1; $j < $callIndex; ++$j) {
+                    $scan = $cfgChildren[$j] ?? null;
+                    if ($scan instanceof Op\Expr\ConstFetch || $scan instanceof Op\Expr\ClassConstFetch) {
+                        continue;
+                    }
+                    if (
+                        ($scan instanceof Op\Expr\FuncCall || $scan instanceof Op\Expr\NsFuncCall)
+                        && (
+                            $this->isNestedCallArgProducerForConsumer($scan, $callOp, $j, $callIndex, $cfgChildren)
+                            || $this->isNestedCallArgProducerSeparatedByConsumerLiteralPreludes(
+                                $scan,
+                                $callOp,
+                                $j,
+                                $callIndex,
+                                $cfgChildren
+                            )
+                            || $this->isSiblingMultiArgFuncCallProducer($scan, $callOp, $j, $callIndex, $cfgChildren)
+                        )
+                    ) {
+                        continue 2;
+                    }
+                    break;
+                }
             }
             // php-cfg `var_export(substr(..., -2), true)` — UnaryMinus feeds sibling FuncCall arg, not consumer (#10373).
             if ($child instanceof Op\Expr\UnaryMinus

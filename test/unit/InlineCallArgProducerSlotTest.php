@@ -1291,6 +1291,45 @@ PHP;
         self::assertSame("ok\n", $out);
     }
 
+    /** Issue #10070 — var_export(atan2(NAN/INF, …), true) wires nested FuncCall, not hoisted INF/NAN ConstFetch. */
+    public function testVarExportAtan2NonFiniteLiteralUsesFuncCallProducerSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+declare(strict_types=1);
+echo var_export(atan2(INF, INF), true);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'var_export_atan2_non_finite.php');
+
+        $atan2ReturnSlot = null;
+        $varExportSends = [];
+        $fcallOrdinal = 0;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                ++$fcallOrdinal;
+                if (2 === $fcallOrdinal) {
+                    $varExportSends = [];
+                }
+            }
+            if (1 === $fcallOrdinal && OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
+                $atan2ReturnSlot = $op->arg1;
+            }
+            if (2 === $fcallOrdinal && OpCode::TYPE_ARG_SEND === $op->type) {
+                $varExportSends[] = $op->arg1;
+            }
+        }
+
+        self::assertNotNull($atan2ReturnSlot);
+        self::assertCount(2, $varExportSends);
+        self::assertSame($atan2ReturnSlot, $varExportSends[0], 'arg sends='.json_encode($varExportSends));
+
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertSame('0.7853981633974483', $out);
+    }
+
     /** Issue #10808 — preg_replace() sibling inline Array_ pattern/replacement + embedded subject. */
     public function testPregReplaceDualInlineArrayLiteralsUseBothArraySlots(): void
     {
