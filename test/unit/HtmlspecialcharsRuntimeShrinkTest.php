@@ -6,9 +6,17 @@ namespace PHPCompiler\Test\Unit;
 
 use PHPUnit\Framework\TestCase;
 
-/** StringHtmlspecialchars JIT path uses HtmlspecialcharsJitHelper PHP, not inline LLVM (#9445). */
+/** StringHtmlspecialchars JIT path uses HtmlspecialcharsJitHelper PHP, not inline LLVM (#9445, #15820). */
 final class HtmlspecialcharsRuntimeShrinkTest extends TestCase
 {
+    public function testStandaloneLlvmSourceDeleted(): void
+    {
+        $this->assertFileDoesNotExist(
+            __DIR__.'/../../lib/JIT/Builtin/StringHtmlspecialcharsStandaloneLlvm.php',
+            'StringHtmlspecialcharsStandaloneLlvm must stay deleted (#15820)'
+        );
+    }
+
     public function testStringHtmlspecialcharsUsesJitHelperForJitPath(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringHtmlspecialchars.php');
@@ -44,7 +52,7 @@ final class HtmlspecialcharsRuntimeShrinkTest extends TestCase
     {
         $spine = (string) file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
         $this->assertStringContainsString('HtmlspecialcharsJitHelper.php', $spine);
-        $this->assertStringContainsString('StringHtmlspecialcharsStandaloneLlvm.php', $spine);
+        $this->assertStringNotContainsString('StringHtmlspecialcharsStandaloneLlvm.php', $spine);
         $this->assertStringContainsString('StringHtmlspecialcharsUserScriptLlvm.php', $spine);
     }
 }
