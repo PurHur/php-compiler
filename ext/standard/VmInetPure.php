@@ -15,9 +15,8 @@ final class VmInetPure
 
     public static function long2ip(int $proper_address): string|false
     {
-        if ($proper_address < 0 || $proper_address > self::UINT32_MAX) {
-            return false;
-        }
+        // php-src: ZEND_LONG_UINT cast before octet extraction (#9297).
+        $proper_address &= self::UINT32_MAX;
 
         return \sprintf(
             '%d.%d.%d.%d',

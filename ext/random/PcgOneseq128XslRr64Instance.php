@@ -51,7 +51,7 @@ final class PcgOneseq128XslRr64Instance
     {
         $this->step();
 
-        return RandomUint128::pcgRotr64($this->state)->toBytes();
+        return RandomUint128::pcgRotr64Bytes($this->state);
     }
 
     public function jump(int $advance): void
