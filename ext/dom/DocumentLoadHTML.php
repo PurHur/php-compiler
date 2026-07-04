@@ -33,7 +33,7 @@ final class DocumentLoadHTML extends DomClassMethod
         if (null === $frame->vmContext) {
             throw new \LogicException('DOMDocument::loadHTML() requires VM context in this compiler build');
         }
-        $ok = VmDom::loadHTML($frame->vmContext, $receiver, $html, $options);
+        $ok = VmDom::loadHTML($frame->vmContext, $receiver, $html, $options, $frame);
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool($ok);
         }

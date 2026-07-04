@@ -1807,6 +1807,33 @@ final class VmDom
         return max(0, $record['column'] - 1);
     }
 
+    /**
+     * DOMDocument::loadHTML() unclosed-tag libxml warnings (php-src ext/dom/php_dom.c; #16190).
+     */
+    private static function reportDomLoadHtmlUnclosedTagWarnings(
+        Context $ctx,
+        string $tagName,
+        ?\PHPCompiler\Frame $frame
+    ): void {
+        $prefix = 'DOMDocument::loadHTML(): ';
+        $record = [
+            'level' => LibxmlConstants::LIBXML_ERR_ERROR,
+            'code' => 73,
+            'column' => 1,
+            'message' => "Tag {$tagName} invalid",
+            'file' => '',
+            'line' => 1,
+        ];
+        VmLibxml::handleError($ctx, $record, $frame, null, $prefix."Tag {$tagName} invalid in Entity, line: 1");
+        VmLibxml::handleError(
+            $ctx,
+            $record,
+            $frame,
+            null,
+            $prefix."Couldn't find end of Start Tag {$tagName} in Entity, line: 1"
+        );
+    }
+
     private static function approximateXmlColumn(string $xml, string $needle): int
     {
         $pos = strpos($xml, $needle);
@@ -2784,8 +2811,13 @@ final class VmDom
         }
     }
 
-    public static function loadHTML(Context $ctx, ObjectEntry $document, string $html, int $options = 0): bool
-    {
+    public static function loadHTML(
+        Context $ctx,
+        ObjectEntry $document,
+        string $html,
+        int $options = 0,
+        ?\PHPCompiler\Frame $frame = null
+    ): bool {
         self::ensureDocument($document);
 
         $trimmed = trim($html);
@@ -2805,7 +2837,7 @@ final class VmDom
         }
 
         $source = self::normalizeHtmlLoadSource($html, $options);
-        $root = self::parseHtmlElementTree($ctx, $source, $document);
+        $root = self::parseHtmlElementTree($ctx, $source, $document, $frame);
         if (null === $root) {
             return false;
         }
@@ -2913,17 +2945,21 @@ final class VmDom
         return '<html><body>'.$trimmed.'</body></html>';
     }
 
-    private static function parseHtmlElementTree(Context $ctx, string $html, ObjectEntry $ownerDocument): ?ObjectEntry
-    {
+    private static function parseHtmlElementTree(
+        Context $ctx,
+        string $html,
+        ObjectEntry $ownerDocument,
+        ?\PHPCompiler\Frame $frame = null
+    ): ?ObjectEntry {
         $trimmed = trim($html);
         if (preg_match('/^<([A-Za-z_][\w:.-]*)(\s[^>]*)?\/>$/s', $trimmed, $selfClose)) {
-            return self::createHtmlElementFromTag($ctx, $selfClose[1], $selfClose[2] ?? '', '', $ownerDocument);
+            return self::createHtmlElementFromTag($ctx, $selfClose[1], $selfClose[2] ?? '', '', $ownerDocument, $frame);
         }
         if (!preg_match('/^<([A-Za-z_][\w:.-]*)(\s[^>]*)?>(.*)<\/\1>\s*$/is', $trimmed, $matches)) {
             return null;
         }
 
-        $entry = self::createHtmlElementFromTag($ctx, $matches[1], $matches[2] ?? '', $matches[3], $ownerDocument);
+        $entry = self::createHtmlElementFromTag($ctx, $matches[1], $matches[2] ?? '', $matches[3], $ownerDocument, $frame);
         self::syncSubtree($ctx, $entry);
 
         return $entry;
@@ -2935,6 +2971,7 @@ final class VmDom
         string $attrPart,
         string $inner,
         ObjectEntry $ownerDocument,
+        ?\PHPCompiler\Frame $frame = null,
     ): ObjectEntry {
         $localName = strtolower($tagName);
         $entry = self::createElement($ctx, $localName)->toObject();
@@ -2942,7 +2979,7 @@ final class VmDom
         $state->attributes = self::parseAttributes($attrPart);
         self::applyQualifiedElementNames($state, $localName);
         $state->namespaceDeclarations = self::extractNamespaceDeclarations($state->attributes);
-        self::appendHtmlChildren($ctx, $entry, $inner, $ownerDocument);
+        self::appendHtmlChildren($ctx, $entry, $inner, $ownerDocument, $frame);
 
         return $entry;
     }
@@ -2952,6 +2989,7 @@ final class VmDom
         ObjectEntry $parent,
         string $inner,
         ObjectEntry $ownerDocument,
+        ?\PHPCompiler\Frame $frame = null,
     ): void {
         $state = DomRegistry::state($parent);
         $pos = 0;
@@ -2979,10 +3017,15 @@ final class VmDom
             }
             $end = self::findHtmlElementEnd($inner, $pos);
             if (null === $end) {
+                $tagName = self::detectHtmlUnclosedTagName($inner, $pos);
+                if (null !== $tagName) {
+                    self::reportDomLoadHtmlUnclosedTagWarnings($ctx, $tagName, $frame);
+                }
+
                 return;
             }
             $childHtml = substr($inner, $pos, $end - $pos);
-            $child = self::parseHtmlElementTree($ctx, $childHtml, $ownerDocument);
+            $child = self::parseHtmlElementTree($ctx, $childHtml, $ownerDocument, $frame);
             if (null === $child) {
                 return;
             }
@@ -3037,6 +3080,30 @@ final class VmDom
                 continue;
             }
             ++$scan;
+        }
+
+        return null;
+    }
+
+    /** Innermost unclosed/malformed tag for loadHTML libxml warnings (#16190). */
+    private static function detectHtmlUnclosedTagName(string $content, int $pos): ?string
+    {
+        $tail = substr($content, $pos);
+        if ('' === $tail) {
+            return null;
+        }
+
+        if (preg_match('/<([A-Za-z_][\w:.-]*)(\s[^>]*)?(?=[^>]*(?:<|\z))/s', $tail, $broken)) {
+            return strtolower($broken[1]);
+        }
+
+        if (!preg_match('/\G<([A-Za-z_][\w:.-]*)(\s[^>]*)?>/is', $tail, $open)) {
+            return null;
+        }
+
+        $tag = strtolower($open[1]);
+        if (!preg_match('/<\/'.preg_quote($tag, '/').'\s*>/is', $tail)) {
+            return $tag;
         }
 
         return null;
