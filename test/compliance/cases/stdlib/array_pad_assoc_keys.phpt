@@ -4,6 +4,8 @@ stdlib array_pad() preserves associative keys when shrinking (#10777, ext/standa
 <?php
 echo var_export(array_pad(['a' => 1, 'b' => 2], 2, 0), true), "\n";
 echo var_export(array_pad(['a' => 1, 'b' => 2], 5, 0), true), "\n";
+echo var_export(array_pad(['a' => 1, 'b' => 2, 'c' => 3], -4, 0), true), "\n";
+echo var_export(array_pad(['a' => 1, 'b' => 2, 'c' => 3], -5, 0), true), "\n";
 --EXPECT--
 array (
   'a' => 1,
@@ -15,4 +17,17 @@ array (
   0 => 0,
   1 => 0,
   2 => 0,
+)
+array (
+  0 => 0,
+  'a' => 1,
+  'b' => 2,
+  'c' => 3,
+)
+array (
+  0 => 0,
+  1 => 0,
+  'a' => 1,
+  'b' => 2,
+  'c' => 3,
 )

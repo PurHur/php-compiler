@@ -47,5 +47,26 @@ final class ArrayPadRuntimeShrinkTest extends TestCase
         $this->assertSame(0, $left->findIndex(0)?->resolveIndirect()->toInt());
         $this->assertSame(0, $left->findIndex(1)?->resolveIndirect()->toInt());
         $this->assertSame(1, $left->findIndex(2)?->resolveIndirect()->toInt());
+        $this->assertSame(2, $left->findIndex(3)?->resolveIndirect()->toInt());
+    }
+
+    public function testArrayPadLeftPadPreservesAssociativeStringKeys(): void
+    {
+        $ht = new HashTable();
+        foreach (['a' => 1, 'b' => 2, 'c' => 3] as $key => $raw) {
+            $var = new Variable();
+            $var->int($raw);
+            $ht->add($key, $var);
+        }
+
+        $padValue = new Variable();
+        $padValue->int(0);
+
+        $left = ArrayPadJitHelper::padCopy($ht, -4, $padValue);
+        $this->assertSame(4, $left->getNumElements());
+        $this->assertSame(0, $left->findIndex(0)?->resolveIndirect()->toInt());
+        $this->assertSame(1, $left->find('a')?->resolveIndirect()->toInt());
+        $this->assertSame(2, $left->find('b')?->resolveIndirect()->toInt());
+        $this->assertSame(3, $left->find('c')?->resolveIndirect()->toInt());
     }
 }
