@@ -15362,6 +15362,10 @@ class Compiler {
             && null !== $cfgCallOp
             && null !== $block
             && null !== $block->orig
+            && !(
+                $producerCount > $argCount
+                && null !== $this->soleNonEmbeddedCallArgIndex($callArgs)
+            )
         ) {
             $byIndex = $this->inlineHoistedProducerForCallArgIndex(
                 $cfgCallOp,
@@ -20868,17 +20872,21 @@ class Compiler {
             && property_exists($consumer, 'args')
             && \is_array($consumer->args)
         ) {
+            $leadingEmbedded = 0;
+            foreach ($consumer->args as $arg) {
+                if ($this->isEmbeddedCallLiteralArg($arg)) {
+                    ++$leadingEmbedded;
+                    continue;
+                }
+                break;
+            }
+            // probe('label', g()) / probe('label', in_array(...)) — adjacent hoisted callee (#15846, #16013).
+            if ($producerIndex === $consumerIndex - 1) {
+                return $leadingEmbedded;
+            }
             $firstSibling = $this->firstSiblingInlineFuncCallProducerIndex($consumerIndex, $cfgChildren);
             if (null === $firstSibling || $producerIndex === $firstSibling) {
                 // probe('label', g()) — sole adjacent hoisted producer feeds first hoisted arg (#15846).
-                $leadingEmbedded = 0;
-                foreach ($consumer->args as $arg) {
-                    if ($this->isEmbeddedCallLiteralArg($arg)) {
-                        ++$leadingEmbedded;
-                        continue;
-                    }
-                    break;
-                }
                 $consumerName = $this->resolveCfgFuncCallName($consumer);
                 if (
                     1 === $distance
@@ -20911,10 +20919,31 @@ class Compiler {
             return 0;
         }
         // tempnam(sys_get_temp_dir(), E::A) — FuncCall arg #0, ClassConstFetch prelude (#10303, #9321).
+        // in_array('x', g(), true) — embedded needle + FuncCall haystack + ConstFetch strict (#15612, #16013).
         if (
             2 === $distance
             && ($mid instanceof Op\Expr\ClassConstFetch || $mid instanceof Op\Expr\ConstFetch)
         ) {
+            $producer = $cfgChildren[$producerIndex] ?? null;
+            if (
+                ($producer instanceof Op\Expr\FuncCall || $producer instanceof Op\Expr\NsFuncCall)
+                && ($consumer instanceof Op\Expr\FuncCall || $consumer instanceof Op\Expr\NsFuncCall)
+                && property_exists($consumer, 'args')
+                && \is_array($consumer->args)
+            ) {
+                $leadingEmbedded = 0;
+                foreach ($consumer->args as $arg) {
+                    if ($this->isEmbeddedCallLiteralArg($arg)) {
+                        ++$leadingEmbedded;
+                        continue;
+                    }
+                    break;
+                }
+                if ($leadingEmbedded > 0) {
+                    return $leadingEmbedded;
+                }
+            }
+
             return 0;
         }
         if ($this->firstSiblingInlineFuncCallProducerIndexActive) {
@@ -21101,6 +21130,18 @@ class Compiler {
                         return false;
                     }
                 }
+            }
+
+            if (
+                $this->isNestedCallArgProducerSeparatedByConsumerLiteralPreludes(
+                    $producer,
+                    $consumer,
+                    $producerIndex,
+                    $consumerIndex,
+                    $cfgChildren
+                )
+            ) {
+                return false;
             }
 
             return $producer instanceof Op\Expr\FuncCall || $producer instanceof Op\Expr\NsFuncCall;
@@ -30038,6 +30079,21 @@ class Compiler {
                         }
                         break;
                     }
+                }
+            }
+            // probe('label', in_array(..., g(), true)) — nested callee return, not inner ConstFetch (#14237, #16013).
+            if (
+                null !== $cfgCallOp
+                && null !== $block->orig
+                && $this->callArgIsDeadInlineTemporary($cfgCallOp->args[(int) $argIndex] ?? $arg)
+            ) {
+                $nestedCallArgSlot = $this->resolveAdjacentNestedFuncCallArgSlot(
+                    $block,
+                    $cfgCallOp,
+                    (int) $argIndex
+                );
+                if (null !== $nestedCallArgSlot) {
+                    $valueSlot = $nestedCallArgSlot;
                 }
             }
             $sends[] = new OpCode(OpCode::TYPE_ARG_SEND, $valueSlot, $nameSlot, $unpackFlag);
