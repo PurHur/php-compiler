@@ -3376,23 +3376,11 @@ class Compiler {
             if (null === $targetArg) {
                 return;
             }
-            if ($this->operandsChainEqual($targetArg, $coalesce->result)) {
-                $this->registerSyncedCoalesceFuncCallArgSlot(
-                    $targetArg,
-                    $this->compileOperand($resultOverride ?? $coalesce->result, $block, true)
-                );
-
-                return;
-            }
-            $sourceSlot = $this->compileOperand($resultOverride ?? $coalesce->result, $block, true);
-            $destSlot = $this->compileOperand($targetArg, $block, false);
-            $block->addOpCode(new OpCode(
-                OpCode::TYPE_ASSIGN,
-                $destSlot,
-                $destSlot,
-                $sourceSlot
-            ));
-            $this->registerSyncedCoalesceFuncCallArgSlot($targetArg, $destSlot);
+            // Wire the post-?? merge result slot — not an inner dim-fetch temp (#10743, #15915).
+            $this->registerSyncedCoalesceFuncCallArgSlot(
+                $targetArg,
+                $this->compileOperand($resultOverride ?? $coalesce->result, $block, true)
+            );
 
             return;
         }
@@ -18633,6 +18621,10 @@ class Compiler {
         $producers = [];
         for ($i = $callIndex - 1; $i >= 0; --$i) {
             $child = $cfgChildren[$i];
+            if ($child instanceof Op\Expr\BinaryOp\Coalesce) {
+                // Stmt-level ?? before the call — dim-fetch tails are not arg producers (#10743, #11601).
+                break;
+            }
             if (!$child instanceof Op\Expr || !$this->isInlineExprCallArgProducer($child)) {
                 break;
             }
