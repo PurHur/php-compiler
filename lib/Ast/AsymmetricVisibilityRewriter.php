@@ -16,6 +16,10 @@ final class AsymmetricVisibilityRewriter
 {
     private const MARKER_PREFIX_SET = 'phpc-asymmetric-set:';
     private const MARKER_PREFIX_GET = 'phpc-asymmetric-get:';
+    private const MARKER_PREFIX_EXPLICIT_READ = 'phpc-asymmetric-explicit-read';
+
+    /** @internal Marker when source declares an explicit read modifier before set (#15995). */
+    public const EXPLICIT_READ_MARKER_PATTERN = '/\/\*\s*phpc-asymmetric-explicit-read\s*\*\//i';
 
     /** Self-host parser rejects bare asymmetric modifier tokens outside declarations (#1492). */
     private const SET_MODIFIER_NEEDLE = '('.'set'.')';
@@ -205,13 +209,15 @@ final class AsymmetricVisibilityRewriter
             static function (array $m): string {
                 $set = strtolower($m['set']);
                 $readBefore = trim($m['readBefore']);
+                $explicitReadMarker = '';
                 if ('' !== $readBefore) {
                     $readPrefix = $readBefore.' ';
+                    $explicitReadMarker = '/*'.self::MARKER_PREFIX_EXPLICIT_READ.'*/ ';
                 } else {
                     $readPrefix = 'public ';
                 }
 
-                return $m['prefix'].$m['attrs'].'/*'.self::MARKER_PREFIX_SET.$set.'*/ '.$readPrefix.$m['static'];
+                return $m['prefix'].$m['attrs'].'/*'.self::MARKER_PREFIX_SET.$set.'*/ '.$explicitReadMarker.$readPrefix.$m['static'];
             },
             $source
         );
@@ -225,15 +231,18 @@ final class AsymmetricVisibilityRewriter
                 $set = strtolower($m['set']);
                 $readBefore = trim($m['readBefore']);
                 $readAfter = trim($m['readAfter']);
+                $explicitReadMarker = '';
                 if ('' !== $readAfter) {
                     $readPrefix = $readAfter.' ';
+                    $explicitReadMarker = '/*'.self::MARKER_PREFIX_EXPLICIT_READ.'*/ ';
                 } elseif ('' !== $readBefore) {
                     $readPrefix = $readBefore.' ';
+                    $explicitReadMarker = '/*'.self::MARKER_PREFIX_EXPLICIT_READ.'*/ ';
                 } else {
                     $readPrefix = 'public ';
                 }
 
-                return $m['prefix'].$m['attrs'].'/*'.self::MARKER_PREFIX_SET.$set.'*/ '.$readPrefix;
+                return $m['prefix'].$m['attrs'].'/*'.self::MARKER_PREFIX_SET.$set.'*/ '.$explicitReadMarker.$readPrefix;
             },
             $source
         );
@@ -689,6 +698,49 @@ final class AsymmetricVisibilityRewriter
         }
 
         return 'public'.self::SET_MODIFIER_NEEDLE;
+    }
+
+    /** php-src: zend_object_handlers.c — asymmetric write errors include explicit read modifier (#15995). */
+    public static function writeModifierLabel(int $readVisibilityFlags, int $setVisibilityFlags, bool $explicitReadModifier): string
+    {
+        $setLabel = self::setModifierLabel($setVisibilityFlags);
+        if (!$explicitReadModifier) {
+            return $setLabel;
+        }
+        $readLabel = match (true) {
+            ($readVisibilityFlags & \PHPCfg\Func::FLAG_PRIVATE) !== 0 => 'private',
+            ($readVisibilityFlags & \PHPCfg\Func::FLAG_PROTECTED) !== 0 => 'protected',
+            default => 'public',
+        };
+
+        return $readLabel.' '.$setLabel;
+    }
+
+    /** @param array<string, mixed> $attributes */
+    public static function hasExplicitReadModifierFromAttributes(array $attributes): bool
+    {
+        $chunks = [];
+        if (isset($attributes['comments']) && is_array($attributes['comments'])) {
+            foreach ($attributes['comments'] as $comment) {
+                if (is_object($comment) && method_exists($comment, 'getText')) {
+                    $chunks[] = $comment->getText();
+                } elseif (is_string($comment)) {
+                    $chunks[] = $comment;
+                }
+            }
+        }
+        if (isset($attributes['docComment']) && is_object($attributes['docComment'])
+            && method_exists($attributes['docComment'], 'getText')) {
+            $chunks[] = $attributes['docComment']->getText();
+        }
+
+        foreach ($chunks as $chunk) {
+            if (preg_match(self::EXPLICIT_READ_MARKER_PATTERN, $chunk)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public static function getModifierLabel(int $getVisibilityFlags): string

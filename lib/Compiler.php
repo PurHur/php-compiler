@@ -5384,6 +5384,9 @@ class Compiler {
                     $declare->propertyVisibility = MethodVisibility::mask($child->visibility);
                     $declare->propertySetVisibility = $this->asymmetricSetVisibilityFromCfgOp($child);
                     $declare->propertyGetVisibility = $this->asymmetricGetVisibilityFromCfgOp($child);
+                    $declare->propertyAsymmetricExplicitRead = Ast\AsymmetricVisibilityRewriter::hasExplicitReadModifierFromAttributes(
+                        $child->getAttributes()
+                    );
                     if (!$child->static) {
                         $declare->propertyReadonly = (property_exists($child, 'readonly') && $child->readonly)
                             || (property_exists($child, 'propertyFlags') && $this->isReadonlyPropertyFlags($child->propertyFlags))
@@ -6086,6 +6089,9 @@ class Compiler {
         $declare->propertyVisibility = MethodVisibility::mask($param->promotionFlags);
         $declare->propertySetVisibility = $this->asymmetricSetVisibilityFromCfgOp($param);
         $declare->propertyGetVisibility = $this->asymmetricGetVisibilityFromCfgOp($param);
+        $declare->propertyAsymmetricExplicitRead = Ast\AsymmetricVisibilityRewriter::hasExplicitReadModifierFromAttributes(
+            $param->getAttributes()
+        );
         $declare->deprecatedMetadata = DeprecatedMetadata::fromOp($param);
         $this->assignAttributeMetadata($declare, $param);
         AttributeTargetValidator::assertPromotedParameterTargets($declare->attributeEntries, $this->attributeClassRegistry);

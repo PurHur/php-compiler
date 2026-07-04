@@ -76,6 +76,8 @@ class ClassEntry {
     public array $staticPropertySetVisibility = [];
     /** @var array<string, int> static property name (lowercase) => asymmetric get visibility (#6769) */
     public array $staticPropertyGetVisibility = [];
+    /** @var array<string, bool> static property name (lowercase) => explicit read before set (#15995) */
+    public array $staticPropertyAsymmetricExplicitRead = [];
     /** @var array<string, string> static property name (lowercase) => declaring class lc (#6785) */
     public array $staticPropertyDeclaringClassLc = [];
     /** @var array<string, array{get?: string, set?: string}> static prop (lowercase) => hook method lc (#4751) */

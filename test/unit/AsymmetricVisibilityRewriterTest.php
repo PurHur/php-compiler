@@ -26,7 +26,10 @@ class Demo {
 }
 PHP;
         $rewritten = AsymmetricVisibilityRewriter::rewrite($source);
-        self::assertStringContainsString('/*phpc-asymmetric-set:private*/ public string $name', preg_replace('/\s+/', ' ', $rewritten));
+        self::assertStringContainsString(
+            '/*phpc-asymmetric-set:private*/ /*phpc-asymmetric-explicit-read*/ public string $name',
+            preg_replace('/\s+/', ' ', $rewritten)
+        );
         self::assertSame(
             \PHPCfg\Func::FLAG_PRIVATE,
             AsymmetricVisibilityRewriter::visibilityFromMarker('/*phpc-asymmetric-set:private*/')
@@ -42,7 +45,10 @@ class Demo {
 }
 PHP;
         $rewritten = AsymmetricVisibilityRewriter::rewrite($source);
-        self::assertStringContainsString('/*phpc-asymmetric-set:private*/ public string $name', preg_replace('/\s+/', ' ', $rewritten));
+        self::assertStringContainsString(
+            '/*phpc-asymmetric-set:private*/ /*phpc-asymmetric-explicit-read*/ public string $name',
+            preg_replace('/\s+/', ' ', $rewritten)
+        );
     }
 
     public function testRewritePublicProtectedSet(): void
@@ -54,7 +60,10 @@ class Demo {
 }
 PHP;
         $rewritten = AsymmetricVisibilityRewriter::rewrite($source);
-        self::assertStringContainsString('/*phpc-asymmetric-set:protected*/ public string $name', preg_replace('/\s+/', ' ', $rewritten));
+        self::assertStringContainsString(
+            '/*phpc-asymmetric-set:protected*/ /*phpc-asymmetric-explicit-read*/ public string $name',
+            preg_replace('/\s+/', ' ', $rewritten)
+        );
     }
 
     public function testRewriteProtectedPrivateSet(): void
@@ -66,7 +75,10 @@ class Demo {
 }
 PHP;
         $rewritten = AsymmetricVisibilityRewriter::rewrite($source);
-        self::assertStringContainsString('/*phpc-asymmetric-set:private*/ protected string $name', preg_replace('/\s+/', ' ', $rewritten));
+        self::assertStringContainsString(
+            '/*phpc-asymmetric-set:private*/ /*phpc-asymmetric-explicit-read*/ protected string $name',
+            preg_replace('/\s+/', ' ', $rewritten)
+        );
     }
 
     public function testPublicPublicSetCompileErrors(): void
@@ -91,7 +103,10 @@ class Demo {
 }
 PHP;
         $rewritten = AsymmetricVisibilityRewriter::rewrite($source);
-        self::assertStringContainsString('/*phpc-asymmetric-set:public*/ private string $name', preg_replace('/\s+/', ' ', $rewritten));
+        self::assertStringContainsString(
+            '/*phpc-asymmetric-set:public*/ /*phpc-asymmetric-explicit-read*/ private string $name',
+            preg_replace('/\s+/', ' ', $rewritten)
+        );
     }
 
     public function testBarePrivateSetWithoutReadRewritesWithImplicitPublicRead(): void
@@ -161,7 +176,10 @@ class User {
 }
 PHP;
         $rewritten = AsymmetricVisibilityRewriter::rewrite($source);
-        self::assertStringContainsString('/*phpc-asymmetric-set:private*/ public string $name', preg_replace('/\s+/', ' ', $rewritten));
+        self::assertStringContainsString(
+            '/*phpc-asymmetric-set:private*/ /*phpc-asymmetric-explicit-read*/ public string $name',
+            preg_replace('/\s+/', ' ', $rewritten)
+        );
     }
 
     public function testPromotedSingleLinePublicPrivateSetRewrites(): void
@@ -173,7 +191,10 @@ class D {
 }
 PHP;
         $rewritten = AsymmetricVisibilityRewriter::rewrite($source);
-        self::assertStringContainsString('/*phpc-asymmetric-set:private*/ public int $x', preg_replace('/\s+/', ' ', $rewritten));
+        self::assertStringContainsString(
+            '/*phpc-asymmetric-set:private*/ /*phpc-asymmetric-explicit-read*/ public int $x',
+            preg_replace('/\s+/', ' ', $rewritten)
+        );
     }
 
     public function testParenthesizedPrivateSetWithExplicitReadRewrites(): void
@@ -186,8 +207,28 @@ class Demo {
 PHP;
         $rewritten = AsymmetricVisibilityRewriter::rewrite($source);
         self::assertStringContainsString(
-            '/*phpc-asymmetric-set:private*/ public string $name',
+            '/*phpc-asymmetric-set:private*/ /*phpc-asymmetric-explicit-read*/ public string $name',
             preg_replace('/\s+/', ' ', $rewritten)
+        );
+    }
+
+    public function testWriteModifierLabelIncludesExplicitRead(): void
+    {
+        self::assertSame(
+            'public private(set)',
+            AsymmetricVisibilityRewriter::writeModifierLabel(
+                \PHPCfg\Func::FLAG_PUBLIC,
+                \PHPCfg\Func::FLAG_PRIVATE,
+                true
+            )
+        );
+        self::assertSame(
+            'private(set)',
+            AsymmetricVisibilityRewriter::writeModifierLabel(
+                \PHPCfg\Func::FLAG_PUBLIC,
+                \PHPCfg\Func::FLAG_PRIVATE,
+                false
+            )
         );
     }
 
@@ -244,7 +285,7 @@ class User {
 PHP;
         $rewritten = AsymmetricVisibilityRewriter::rewrite($source);
         self::assertStringContainsString(
-            '/*phpc-asymmetric-set:private*/ public string $name',
+            '/*phpc-asymmetric-set:private*/ /*phpc-asymmetric-explicit-read*/ public string $name',
             preg_replace('/\s+/', ' ', $rewritten)
         );
     }

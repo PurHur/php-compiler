@@ -10931,6 +10931,12 @@ class JIT {
                         $name->value,
                         (int) ($op->propertyGetVisibility ?? 0)
                     );
+                    if ($op->propertyAsymmetricExplicitRead ?? false) {
+                        $this->context->type->object->defineStaticPropertyAsymmetricExplicitRead(
+                            $classId,
+                            $name->value
+                        );
+                    }
                     break;
                 case OpCode::TYPE_DECLARE_PROPERTY:
                     $name = $block->getOperand($op->arg1);
@@ -11002,6 +11008,12 @@ class JIT {
                         $name->value,
                         (int) ($op->propertyGetVisibility ?? 0)
                     );
+                    if ($op->propertyAsymmetricExplicitRead ?? false) {
+                        $this->context->type->object->definePropertyAsymmetricExplicitRead(
+                            $classId,
+                            $name->value
+                        );
+                    }
                     if ($op->propertyReadonly || $this->context->scope->classIsReadonly) {
                         $this->context->type->object->markPropertyReadonly($classId, $name->value);
                     }
