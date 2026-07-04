@@ -12,14 +12,14 @@ use PHPCompiler\VM\Variable as VMVariable;
  *
  * JIT/AOT lowers null (identity copy), compile-time string stdlib builtins, and closure/arrow
  * callbacks with native int/double returns ([#142](https://github.com/PurHur/php-compiler/issues/142)).
- * Array callables ([Class::class, 'method']) and invokable objects stay deferred (#1154).
+ * Array callables ([Class::class, 'method']) stay deferred (#1154). Invokable objects are VM-only (#16228).
  */
 final class ArrayMapCallbackPolicy
 {
     public const DEFERRED_SUMMARY =
         'array_map callbacks: null, compile-time string builtins, closure/arrow (int/double); [class, method] callables deferred';
 
-    public const DEFERRED_KINDS = 'array callables and invokable objects';
+    public const DEFERRED_KINDS = 'array callables';
 
     public const JIT_SUBSET = 'null, compile-time string stdlib builtin names, or closure/arrow callbacks';
 
@@ -63,7 +63,6 @@ final class ArrayMapCallbackPolicy
             VMVariable::TYPE_BOOLEAN,
             VMVariable::TYPE_FLOAT,
             VMVariable::TYPE_ARRAY,
-            VMVariable::TYPE_OBJECT,
         ], true);
     }
 
@@ -95,7 +94,7 @@ final class ArrayMapCallbackPolicy
 
     public static function vmRejectionMessage(): string
     {
-        return 'array_map() callback must be null or a string builtin name in this compiler build; '
+        return 'array_map() callback must be null, a string builtin name, a closure, or an invokable object in this compiler build; '
             .self::DEFERRED_KINDS.' are deferred';
     }
 }
