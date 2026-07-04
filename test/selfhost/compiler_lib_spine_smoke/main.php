@@ -23,6 +23,7 @@ if (!defined('PHP_COMPILER_LIB_SPINE_SMOKE')) {
 
 
 
+
 require_once __DIR__.'/../../../lib/OpCode.php';
 require_once __DIR__.'/../../../lib/Block.php';
 require_once __DIR__.'/../../../lib/Frame.php';
@@ -3971,6 +3972,51 @@ require_once __DIR__.'/../../../ext/sodium/sodium_crypto_stream_xchacha20_keygen
 require_once __DIR__.'/../../../ext/sodium/sodium_crypto_stream_xchacha20_xor.php';
 require_once __DIR__.'/../../../ext/sodium/sodium_crypto_stream_xchacha20_xor_ic.php';
 require_once __DIR__.'/../../../ext/sodium/sodium_crypto_stream_xor.php';
+require_once __DIR__.'/../../../ext/dom/DocumentNormalizeDocument.php';
+require_once __DIR__.'/../../../ext/dom/DocumentRelaxNGValidate.php';
+require_once __DIR__.'/../../../ext/dom/DocumentSchemaValidate.php';
+require_once __DIR__.'/../../../ext/dom/DocumentXInclude.php';
+require_once __DIR__.'/../../../ext/dom/NodeC14N.php';
+require_once __DIR__.'/../../../ext/dom/NodeC14NFile.php';
+require_once __DIR__.'/../../../ext/random/AdditionalEnginesBuiltin.php';
+require_once __DIR__.'/../../../ext/random/PcgOneseq128XslRr64Instance.php';
+require_once __DIR__.'/../../../ext/random/RandomU64.php';
+require_once __DIR__.'/../../../ext/random/RandomUint128.php';
+require_once __DIR__.'/../../../ext/random/SecureInstance.php';
+require_once __DIR__.'/../../../ext/random/Xoshiro256StarStarInstance.php';
+require_once __DIR__.'/../../../ext/spl/SplArrayUserSortMethod.php';
+require_once __DIR__.'/../../../ext/standard/GcDestructAllowDelrefJitHelper.php';
+require_once __DIR__.'/../../../ext/standard/GetHeadersJitHelper.php';
+require_once __DIR__.'/../../../ext/standard/JitGetHeaders.php';
+require_once __DIR__.'/../../../ext/standard/MultisortJitHelper.php';
+require_once __DIR__.'/../../../ext/standard/SessionCookieParams.php';
+require_once __DIR__.'/../../../ext/standard/array_all_key.php';
+require_once __DIR__.'/../../../ext/standard/array_any_key.php';
+require_once __DIR__.'/../../../ext/standard/date_format.php';
+require_once __DIR__.'/../../../ext/standard/date_get_last_errors.php';
+require_once __DIR__.'/../../../ext/standard/date_timestamp_get.php';
+require_once __DIR__.'/../../../ext/standard/date_timestamp_set.php';
+require_once __DIR__.'/../../../ext/standard/date_timezone_get.php';
+require_once __DIR__.'/../../../ext/standard/date_timezone_set.php';
+require_once __DIR__.'/../../../ext/standard/session_cache_limiter_.php';
+require_once __DIR__.'/../../../ext/standard/session_get_cookie_params_.php';
+require_once __DIR__.'/../../../ext/standard/session_set_cookie_params_.php';
+require_once __DIR__.'/../../../lib/Compiler/FunctionStaticAnonymousClassCompileCheck.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/GetHeadersRuntime.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/MultisortRuntime.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/UndefinedPropertyFetchRuntime.php';
+require_once __DIR__.'/../../../lib/JIT/UndefinedPropertyFetchHelper.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionEnumUnitCaseIsDeprecated.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionFunctionIsAccessible.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionFunctionIsDeprecated.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionFunctionSetAccessible.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionMethodIsAccessible.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionMethodSetAccessible.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionParameterIsDeprecated.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertyIsAccessible.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertyIsDeprecated.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertySetAccessible.php';
+require_once __DIR__.'/../../../lib/VM/UndefinedPropertyFetchJitHelper.php';
 // VM -r smoke: bootstrap-selfhost-lib-spine-vm-smoke.sh (#1846).
 // VM driver execute: bootstrap-selfhost-vm-driver-execute-probe.sh (#2201).
 
