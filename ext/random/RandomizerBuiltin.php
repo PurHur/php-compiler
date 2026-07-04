@@ -110,7 +110,15 @@ final class RandomEngineStorage
     public static function generate(ObjectEntry $engineObject): string
     {
         return match (strtolower(ltrim($engineObject->class->name, '\\'))) {
-            'random\\engine\\mt19937' => self::mt19937($engineObject)->generate(),
+            'random\\engine\\mt19937' => \pack('V', self::mt19937($engineObject)->generate()),
+            'random\\engine\\secure', 'random\\engine\\xoshiro256starstar', 'random\\engine\\pcgoneseq128xslrr64' => self::generateBytes($engineObject),
+            default => throw new \LogicException('Unsupported random engine: '.$engineObject->class->name),
+        };
+    }
+
+    public static function generateBytes(ObjectEntry $engineObject): string
+    {
+        return match (strtolower(ltrim($engineObject->class->name, '\\'))) {
             'random\\engine\\secure' => self::secure($engineObject)->generate(),
             'random\\engine\\xoshiro256starstar' => self::xoshiro($engineObject)->generate(),
             'random\\engine\\pcgoneseq128xslrr64' => self::pcg($engineObject)->generate(),
@@ -135,7 +143,9 @@ final class RandomEngineStorage
 
     private static function bytesToUInt64(string $bytes): int
     {
-        return (int) (\unpack('P', $bytes)[1] ?? 0);
+        $parts = \unpack('V2', $bytes);
+
+        return (int) (($parts[2] ?? 0) << 32 | ($parts[1] ?? 0));
     }
 
     public static function range(ObjectEntry $engineObject, int $min, int $max): int

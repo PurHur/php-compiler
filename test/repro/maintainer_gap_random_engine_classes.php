@@ -7,15 +7,18 @@ var_dump(class_exists('Random\\Engine\\Xoshiro256StarStar'));
 var_dump(class_exists('Random\\Engine\\PcgOneseq128XslRr64'));
 
 $secure = new Random\Engine\Secure();
-var_dump(is_string($secure->generate()));
-var_dump(strlen($secure->generate()) === 8);
+$g = $secure->generate();
+var_dump(is_string($g));
+var_dump(strlen($g) === 8);
 
 $xoshiro = new Random\Engine\Xoshiro256StarStar(42);
-var_dump(is_string($xoshiro->generate()));
-var_dump(strlen($xoshiro->generate()) === 8);
+$x = $xoshiro->generate();
+var_dump(is_string($x));
+var_dump(bin2hex($x));
 
 $pcg = new Random\Engine\PcgOneseq128XslRr64(42);
-var_dump(is_string($pcg->generate()));
-var_dump(strlen($pcg->generate()) === 8);
+$p = $pcg->generate();
+var_dump(is_string($p));
+var_dump(bin2hex($p));
 
 echo "ok\n";
