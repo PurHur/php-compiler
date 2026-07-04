@@ -7709,7 +7709,9 @@ class Compiler {
                 $finallyOp->block2 = $merge;
                 $block->addOpCode($finallyOp);
                 $this->rewriteMergeJumpsToFinally($try, $merge, $compiledFinally);
-                if (null !== $stmt->else && isset($this->seen[$stmt->else])) {
+                if (property_exists($stmt, 'else')
+                    && null !== $stmt->else
+                    && isset($this->seen[$stmt->else])) {
                     $this->rewriteMergeJumpsToFinally($this->seen[$stmt->else], $merge, $compiledFinally);
                 }
             }
