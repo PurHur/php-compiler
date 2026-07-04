@@ -16,6 +16,15 @@ use PHPCompiler\VM\Context;
  */
 final class BuiltinClasses
 {
+    public static function registerLocale(Context $ctx): void
+    {
+        $before = array_keys($ctx->classes);
+        self::registerLocaleClass($ctx);
+        foreach (array_diff(array_keys($ctx->classes), $before) as $lc) {
+            $ctx->classes[$lc]->isInternal = true;
+        }
+    }
+
     public static function register(Context $ctx): void
     {
         $before = array_keys($ctx->classes);
@@ -25,6 +34,19 @@ final class BuiltinClasses
         foreach (array_diff(array_keys($ctx->classes), $before) as $lc) {
             $ctx->classes[$lc]->isInternal = true;
         }
+    }
+
+    private static function registerLocaleClass(Context $ctx): void
+    {
+        $entry = new ClassEntry('Locale');
+        $pubStatic = CfgFunc::FLAG_PUBLIC | CfgFunc::FLAG_STATIC;
+        $entry->methods['getdefault'] = new LocaleGetDefault();
+        $entry->methodVisibility['getdefault'] = $pubStatic;
+        $entry->methodNames['getdefault'] = 'getDefault';
+        $entry->methods['setdefault'] = new LocaleSetDefault();
+        $entry->methodVisibility['setdefault'] = $pubStatic;
+        $entry->methodNames['setdefault'] = 'setDefault';
+        $ctx->classes['locale'] = $entry;
     }
 
     private static function registerIntlDateFormatter(Context $ctx): void
