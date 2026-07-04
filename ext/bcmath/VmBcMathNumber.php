@@ -71,6 +71,60 @@ final class VmBcMathNumber
         $entry->constructed = true;
     }
 
+    public static function scaleOfObject(ObjectEntry $entry): int
+    {
+        return $entry->getProperty(self::PROP_SCALE)->resolveIndirect()->toInt();
+    }
+
+    /**
+     * Operand scale for BcMath\Number binary ops when $scale arg is omitted (php-src ext/bcmath/bcmath.c).
+     */
+    public static function operandScale(Variable $var): int
+    {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_OBJECT === $var->type) {
+            $object = $var->toObject();
+            if (self::CLASS_LC === strtolower($object->class->name) && $object->constructed) {
+                return self::scaleOfObject($object);
+            }
+        }
+        if (Variable::TYPE_INTEGER === $var->type) {
+            return 0;
+        }
+        if (Variable::TYPE_STRING === $var->type) {
+            return VmBcmath::decimalScale($var->toString());
+        }
+
+        return 0;
+    }
+
+    public static function automaticBinaryScale(string $op, int $leftScale, int $rightScale): int
+    {
+        return match ($op) {
+            'add', 'sub' => max($leftScale, $rightScale),
+            'mul' => $leftScale + $rightScale,
+            'div' => max($leftScale, $rightScale),
+            default => max($leftScale, $rightScale),
+        };
+    }
+
+    public static function resolveBinaryScale(
+        string $op,
+        ObjectEntry $left,
+        Variable $rightVar,
+        ?int $explicitScale
+    ): int {
+        if (null !== $explicitScale) {
+            return $explicitScale;
+        }
+
+        return self::automaticBinaryScale(
+            $op,
+            self::scaleOfObject($left),
+            self::operandScale($rightVar)
+        );
+    }
+
     public static function fromComputedValue(Context $ctx, string $value, ?int $scale = null): Variable
     {
         $class = $ctx->classes[self::CLASS_LC] ?? null;

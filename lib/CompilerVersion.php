@@ -782,10 +782,15 @@ final class CompilerVersion
         return false;
     }
 
-    /** ext/bcmath not on Docker Zend 8.2 reference profile — withhold phantom registration (#12131). */
+    /**
+     * ext/bcmath + BcMath\Number OOP (php-src ext/bcmath/bcmath.c; #12131, #15705).
+     *
+     * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev reference profile
+     * matches Zend 8.2 phantom gate (bc* / BcMath\Number absent).
+     */
     public static function supportsBcmath(): bool
     {
-        return false;
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
     }
 
     /**

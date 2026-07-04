@@ -1325,6 +1325,28 @@ function withheldBuiltinGateDefinitions(): array
             'module' => 'mbstring',
             'relPath' => 'ext/mbstring/mb_trim.php',
         ],
+        [
+            'names' => [
+                'bcadd',
+                'bcsub',
+                'bcmul',
+                'bcdiv',
+                'bcdivmod',
+                'bcmod',
+                'bcpow',
+                'bcsqrt',
+                'bcscale',
+                'bccomp',
+                'bcpowmod',
+                'bcceil',
+                'bcfloor',
+                'bcround',
+            ],
+            'gate' => [PHPCompiler\CompilerVersion::class, 'supportsBcmath'],
+            'since' => '8.4.0',
+            'module' => 'bcmath',
+            'relPath' => 'ext/bcmath/bcadd.php',
+        ],
     ];
 }
 

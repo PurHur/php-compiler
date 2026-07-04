@@ -16,9 +16,23 @@ use PHPUnit\Framework\TestCase;
  */
 final class BcmathModuleTest extends TestCase
 {
+    /** @var string|false */
+    private $prevProfile;
+
     protected function setUp(): void
     {
+        $this->prevProfile = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
         VmBcmath::scale(0);
+    }
+
+    protected function tearDown(): void
+    {
+        if (false === $this->prevProfile) {
+            putenv('PHP_COMPILER_PROFILE');
+        } else {
+            putenv('PHP_COMPILER_PROFILE='.$this->prevProfile);
+        }
     }
 
     public function test_bcmath_module_skeleton_functions(): void

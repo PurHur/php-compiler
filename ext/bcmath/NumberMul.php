@@ -21,7 +21,8 @@ final class NumberMul extends BcMathNumberMethod
             throw new \ArgumentCountError('BcMath\\Number::mul() expects at least 1 argument, 0 given');
         }
         $right = $this->coerceOperand($frame, 1, 'BcMath\\Number::mul', 'num');
-        $scale = $this->optionalScale($frame, 2, 'BcMath\\Number::mul');
+        $explicitScale = $this->optionalScale($frame, 2, 'BcMath\\Number::mul');
+        $scale = VmBcMathNumber::resolveBinaryScale('mul', $receiver, $frame->calledArgs[1], $explicitScale);
         $result = VmBcmath::mul(VmBcMathNumber::valueString($receiver), $right, $scale);
         $this->returnNumber($frame, $result, $scale);
     }

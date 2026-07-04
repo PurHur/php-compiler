@@ -21,7 +21,8 @@ final class NumberSub extends BcMathNumberMethod
             throw new \ArgumentCountError('BcMath\\Number::sub() expects at least 1 argument, 0 given');
         }
         $right = $this->coerceOperand($frame, 1, 'BcMath\\Number::sub', 'num');
-        $scale = $this->optionalScale($frame, 2, 'BcMath\\Number::sub');
+        $explicitScale = $this->optionalScale($frame, 2, 'BcMath\\Number::sub');
+        $scale = VmBcMathNumber::resolveBinaryScale('sub', $receiver, $frame->calledArgs[1], $explicitScale);
         $result = VmBcmath::sub(VmBcMathNumber::valueString($receiver), $right, $scale);
         $this->returnNumber($frame, $result, $scale);
     }

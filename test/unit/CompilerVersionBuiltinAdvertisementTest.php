@@ -211,6 +211,56 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         }
     }
 
+    public function testBcmathWithheldOnReferenceProfileUntilStable84(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsBcmath());
+    }
+
+    public function testBcmathAdvertisedOnForwardProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertTrue(CompilerVersion::supportsBcmath());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testVmDoesNotRegisterBcmathOnReferenceProfile(): void
+    {
+        $runtime = new Runtime();
+        $ctx = $runtime->vmContext;
+        foreach (['bcadd', 'bcsub', 'bcmul', 'bcdiv'] as $fn) {
+            $this->assertFalse(isset($ctx->functions[$fn]), $fn);
+        }
+        $this->assertFalse(isset($ctx->classes['bcmath\\number']));
+    }
+
+    public function testVmRegistersBcmathOnForwardProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $runtime = new Runtime();
+            $ctx = $runtime->vmContext;
+            foreach (['bcadd', 'bcsub', 'bcmul', 'bcdiv', 'bcround'] as $fn) {
+                $this->assertTrue(isset($ctx->functions[$fn]), $fn);
+            }
+            $this->assertTrue(isset($ctx->classes['bcmath\\number']));
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     public function testRandomIntervalBoundaryWithheldOnReferenceProfile(): void
     {
         $this->assertFalse(CompilerVersion::supportsRandomIntervalBoundary());

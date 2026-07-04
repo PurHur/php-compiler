@@ -21,7 +21,8 @@ final class NumberDiv extends BcMathNumberMethod
             throw new \ArgumentCountError('BcMath\\Number::div() expects at least 1 argument, 0 given');
         }
         $right = $this->coerceOperand($frame, 1, 'BcMath\\Number::div', 'num');
-        $scale = $this->optionalScale($frame, 2, 'BcMath\\Number::div');
+        $explicitScale = $this->optionalScale($frame, 2, 'BcMath\\Number::div');
+        $scale = VmBcMathNumber::resolveBinaryScale('div', $receiver, $frame->calledArgs[1], $explicitScale);
         $result = VmBcmath::div(VmBcMathNumber::valueString($receiver), $right, $scale);
         $this->returnNumber($frame, $result, $scale);
     }
