@@ -325,12 +325,14 @@ class Block {
             && !$this->inheritUndefinedLocals;
     }
 
-    public function getOperand(int $offset): Operand {
+    public function getOperand(int $offset): ?Operand {
         foreach ($this->scope as $operand) {
             if ($this->scope[$operand] === $offset) {
                 return $operand;
             }
         }
+
+        return null;
     }
 
     /**
