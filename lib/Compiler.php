@@ -19955,13 +19955,26 @@ class Compiler {
             return false;
         }
 
+        $consumer = $ops[$consumerIndex] ?? null;
+
         return $this->countSiblingInlineFuncCallProducers($firstSibling, $consumerIndex, $ops) >= 2
             || $this->isNestedCallArgProducerSeparatedByConsumerLiteralPreludes(
                 $op,
-                $ops[$consumerIndex],
+                $consumer,
                 $producerIndex,
                 $consumerIndex,
                 $ops
+            )
+            || (
+                $op instanceof Op\Expr
+                && null !== $consumer
+                && $this->isSiblingMultiArgFuncCallProducer(
+                    $op,
+                    $consumer,
+                    $producerIndex,
+                    $consumerIndex,
+                    $ops
+                )
             );
     }
 
@@ -20889,6 +20902,42 @@ class Compiler {
 
             // var_dump(...); ini_get_all(null, false) — completed stmt callee, ConstFetch preludes only (#15931).
             // date_sun_info(strtotime(...), lat, -lon) still handled via producerFeedsConsumerArg0ThroughLiteralPreludesOnly above.
+            // substr(sprintf(...), -N) — hoisted FuncCall arg #0 + UnaryMinus arg #1, not stmt-level (#10673, #16000).
+            if (
+                ($producer instanceof Op\Expr\FuncCall || $producer instanceof Op\Expr\NsFuncCall)
+                && ($consumer instanceof Op\Expr\FuncCall || $consumer instanceof Op\Expr\NsFuncCall)
+                && \is_array($consumer->args ?? null)
+                && \count($consumer->args) >= 2
+                && $this->callArgIsDeadInlineTemporary($consumer->args[0] ?? null)
+                && $this->callArgIsDeadInlineTemporary($consumer->args[1] ?? null)
+            ) {
+                $targetArgIndex = $this->siblingMultiArgFuncCallProducerTargetArgIndex(
+                    $producerIndex,
+                    $consumerIndex,
+                    $cfgChildren
+                );
+                if (0 === $targetArgIndex) {
+                    $onlyUnaryPreludes = true;
+                    for ($j = $producerIndex + 1; $j < $consumerIndex; ++$j) {
+                        $mid = $cfgChildren[$j] ?? null;
+                        if ($this->isUnaryInlineSiblingCallArgExpr($mid)) {
+                            continue;
+                        }
+                        if ($mid instanceof Op\Expr\ConstFetch || $mid instanceof Op\Expr\ClassConstFetch) {
+                            continue;
+                        }
+                        if ($mid instanceof Op\Expr\Array_) {
+                            continue;
+                        }
+                        $onlyUnaryPreludes = false;
+                        break;
+                    }
+                    if ($onlyUnaryPreludes) {
+                        return false;
+                    }
+                }
+            }
+
             return $producer instanceof Op\Expr\FuncCall || $producer instanceof Op\Expr\NsFuncCall;
         }
 
@@ -21421,6 +21470,13 @@ class Compiler {
                         $block->orig->children
                     )
                     && !$this->isIifeHoistedFuncCallArgProducer(
+                        $producer,
+                        $cfgCallOp,
+                        $producerIndex,
+                        $callIndex,
+                        $block->orig->children
+                    )
+                    && !$this->isSiblingMultiArgFuncCallProducer(
                         $producer,
                         $cfgCallOp,
                         $producerIndex,
