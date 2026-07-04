@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\Variable;
 
@@ -14,8 +15,55 @@ use PHPCompiler\VM\Variable;
  */
 final class VmRoundMode
 {
-    public static function resolveRoundModeArg(Variable $var, string $fn, string $paramName = 'mode'): int
+    /** @var array<int, true> */
+    private const VALID_LEGACY_INT_MODES = [
+        StdlibConstants::PHP_ROUND_HALF_UP => true,
+        StdlibConstants::PHP_ROUND_HALF_DOWN => true,
+        StdlibConstants::PHP_ROUND_HALF_EVEN => true,
+        StdlibConstants::PHP_ROUND_HALF_ODD => true,
+        StdlibConstants::PHP_ROUND_CEILING => true,
+        StdlibConstants::PHP_ROUND_FLOOR => true,
+        StdlibConstants::PHP_ROUND_TOWARD_ZERO => true,
+        StdlibConstants::PHP_ROUND_AWAY_FROM_ZERO => true,
+    ];
+
+    public static function isValidLegacyIntMode(int $mode): bool
     {
+        return isset(self::VALID_LEGACY_INT_MODES[$mode]);
+    }
+
+    public static function invalidModeMessage(string $fn, int $argNum, string $paramName): string
+    {
+        return sprintf(
+            '%s(): Argument #%d ($%s) must be a valid rounding mode (RoundingMode::*)',
+            $fn,
+            $argNum,
+            $paramName
+        );
+    }
+
+    public static function assertValidLegacyIntMode(
+        int $mode,
+        string $fn,
+        int $argNum = 3,
+        string $paramName = 'mode'
+    ): void {
+        if (!CompilerVersion::supportsRoundingModeEnum()) {
+            return;
+        }
+        if (self::isValidLegacyIntMode($mode)) {
+            return;
+        }
+
+        throw new \ValueError(self::invalidModeMessage($fn, $argNum, $paramName));
+    }
+
+    public static function resolveRoundModeArg(
+        Variable $var,
+        string $fn,
+        string $paramName = 'mode',
+        int $argNum = 3
+    ): int {
         $var = $var->resolveIndirect();
         $fromEnum = self::tryRoundModeInt($var);
         if (null !== $fromEnum) {
@@ -23,22 +71,27 @@ final class VmRoundMode
         }
         if (EnumCaseSupport::isEnumCaseVariable($var)) {
             throw new \TypeError(sprintf(
-                '%s(): Argument #3 ($%s) must be of type RoundingMode|int, %s given',
+                '%s(): Argument #%d ($%s) must be of type RoundingMode|int, %s given',
                 $fn,
+                $argNum,
                 $paramName,
                 EnumCaseSupport::typeNameForVariable($var)
             ));
         }
         if (Variable::TYPE_INTEGER !== $var->type) {
             throw new \TypeError(sprintf(
-                '%s(): Argument #3 ($%s) must be of type RoundingMode|int, %s given',
+                '%s(): Argument #%d ($%s) must be of type RoundingMode|int, %s given',
                 $fn,
+                $argNum,
                 $paramName,
                 EnumCaseSupport::typeNameForVariable($var)
             ));
         }
 
-        return $var->toInt();
+        $mode = $var->toInt();
+        self::assertValidLegacyIntMode($mode, $fn, $argNum, $paramName);
+
+        return $mode;
     }
 
     public static function tryRoundModeInt(Variable $var): ?int

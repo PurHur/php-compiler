@@ -55,6 +55,14 @@ class VMTest extends BaseTest {
                 && str_contains($name, 'rounding_mode_reference_profile')) {
                 continue;
             }
+            if (!CompilerVersion::supportsRoundingModeEnum()
+                && str_contains($name, 'round_invalid_mode_84')) {
+                continue;
+            }
+            if (CompilerVersion::supportsRoundingModeEnum()
+                && 'round_invalid_mode.phpt' === $name) {
+                continue;
+            }
             if (!CompilerVersion::supportsRandomIntervalBoundary()
                 && str_contains($name, 'random_interval_boundary')
                 && !str_contains($name, 'random_interval_boundary_reference_profile')) {
