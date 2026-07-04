@@ -276,6 +276,35 @@ echo "y=", var_export($a["k"] ?? null, true), "\n";
         );
     }
 
+    /** Issue #15946 — outer call must use inner callee result, not ?? slot (array_keys after dim ??). */
+    public function testArrayDimCoalesceNestedFuncCallArg(): void
+    {
+        $this->assertVmOutput(
+            '<?php
+declare(strict_types=1);
+$a = ["k" => ["x" => 1]];
+var_dump(array_keys($a["k"] ?? []));
+',
+            "array(1) {\n [0]=>\n string(1) \"x\"\n}\n"
+        );
+    }
+
+    /** Issue #15946 — ini_get_all details nested under array_keys(??). */
+    public function testIniGetAllDetailsCoalesceInArrayKeys(): void
+    {
+        $this->assertVmOutput(
+            '<?php
+declare(strict_types=1);
+
+$all = ini_get_all(null, true);
+var_dump(array_keys($all[\'display_errors\'] ?? []));
+$flat = ini_get_all(null, false);
+echo is_string($flat[\'display_errors\'] ?? null) ? "flat string\n" : "flat not string\n";
+',
+            "array(3) {\n [0]=>\n string(12) \"global_value\"\n [1]=>\n string(11) \"local_value\"\n [2]=>\n string(6) \"access\"\n}\nflat string\n"
+        );
+    }
+
     /** Issue #11801: ?? binds below additive/concat; deferred RHS must run on the null branch. */
     public function testNullCoalesceOperatorPrecedence(): void
     {

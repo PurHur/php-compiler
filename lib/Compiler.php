@@ -3168,6 +3168,13 @@ class Compiler {
             if ($prev instanceof Op\Expr\BinaryOp\Coalesce) {
                 return $prev;
             }
+            // var_dump(array_keys($arr['k'] ?? [])) — ?? feeds the inner call only (#15946).
+            if (
+                $j === $callIndex - 1
+                && ($prev instanceof Op\Expr\FuncCall || $prev instanceof Op\Expr\NsFuncCall)
+            ) {
+                return null;
+            }
             if ($prev instanceof Op\Expr && $this->isInlineExprCallArgProducer($prev)) {
                 continue;
             }
