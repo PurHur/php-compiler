@@ -14959,6 +14959,15 @@ class Compiler {
         }
         $producerCount = count($producers);
         $argCount = count($callArgs);
+        $filterInline = $this->matchFilterExtensionInlineCallArgProducer(
+            $producers,
+            $callArgs,
+            $argIndex,
+            $inlineFuncName
+        );
+        if (null !== $filterInline) {
+            return $filterInline;
+        }
         // new LimitIterator(new ArrayIterator([...]), …) — Array_ is inner-ctor prelude (#12916).
         $nestedCtorNew = $this->matchNestedNewCtorInlineNewProducer($producers, $argIndex, $argCount, $callArgs);
         if (null !== $nestedCtorNew) {
@@ -16452,6 +16461,63 @@ class Compiler {
         return null;
     }
 
+    private function matchFilterExtensionInlineCallArgProducer(
+        array $producers,
+        array $callArgs,
+        int $argIndex,
+        ?string $inlineFuncName
+    ): ?Op\Expr {
+        if ('filter_var' === $inlineFuncName && 3 === \count($callArgs)) {
+            $leadingConstNested = $this->splitLeadingConstFetchWithNestedArrayLiteralChain($producers);
+            if (null !== $leadingConstNested) {
+                [$constFetch, $arrayChain] = $leadingConstNested;
+
+                return match ($argIndex) {
+                    1 => $constFetch,
+                    2 => $arrayChain[\count($arrayChain) - 1],
+                    default => null,
+                };
+            }
+            $leadingConstArray = $this->splitLeadingConstFetchWithArrayLiteralCallArg($producers);
+            if (null !== $leadingConstArray) {
+                [$constFetch, $array] = $leadingConstArray;
+
+                return match ($argIndex) {
+                    1 => $constFetch,
+                    2 => $array,
+                    default => null,
+                };
+            }
+        }
+        if ('filter_input' === $inlineFuncName && 4 === \count($callArgs)) {
+            $constFetches = array_values(array_filter(
+                $producers,
+                static fn (Op\Expr $producer): bool => $producer instanceof Op\Expr\ConstFetch
+            ));
+            $arrayProducers = array_values(array_filter(
+                $producers,
+                static fn (Op\Expr $producer): bool => $producer instanceof Op\Expr\Array_
+            ));
+            if (1 === \count($constFetches) && \count($arrayProducers) >= 1) {
+                return match ($argIndex) {
+                    2 => $constFetches[0],
+                    3 => $arrayProducers[\count($arrayProducers) - 1],
+                    default => null,
+                };
+            }
+            if (\count($constFetches) >= 2 && [] !== $arrayProducers) {
+                return match ($argIndex) {
+                    0 => $constFetches[0],
+                    2 => $constFetches[1],
+                    3 => $arrayProducers[\count($arrayProducers) - 1],
+                    default => null,
+                };
+            }
+        }
+
+        return null;
+    }
+
     private function matchInlineCallArgProducerWithEmbeddedLiterals(
         array $producers,
         array $callArgs,
@@ -16461,6 +16527,15 @@ class Compiler {
         ?string $calleeName = null
     ): ?Op\Expr {
         $inlineFuncName = $this->resolveInlineCallArgFuncName($cfgCallOp, $calleeName);
+        $filterInline = $this->matchFilterExtensionInlineCallArgProducer(
+            $producers,
+            $callArgs,
+            $argIndex,
+            $inlineFuncName
+        );
+        if (null !== $filterInline) {
+            return $filterInline;
+        }
         $mappedArraySplice = $this->matchArraySpliceUnaryOffsetReplacementProducers(
             $producers,
             $argIndex,
@@ -16920,6 +16995,9 @@ class Compiler {
         }
         $producerOrdinal = array_search($argIndex, $nonEmbeddedArgIndices, true);
         if (false === $producerOrdinal) {
+            return null;
+        }
+        if ('filter_input' === $inlineFuncName && 4 === \count($callArgs) && 0 === $argIndex) {
             return null;
         }
 
@@ -27284,6 +27362,18 @@ class Compiler {
             $inlineArray = null === $dimFetchSlot
                 ? $this->findInlineArrayProducerForCallArg($arg, $block, $cfgCallOp, (int) $argIndex)
                 : null;
+            if (
+                null !== $inlineArray
+                && null !== $cfgCallOp
+                && 2 === (int) $argIndex
+                && \in_array(
+                    strtolower($this->resolveCfgFuncCallName($cfgCallOp) ?? ''),
+                    ['filter_var', 'filter_input'],
+                    true
+                )
+            ) {
+                $inlineArray = null;
+            }
             $arrayCombineNestedFuncArg = false;
             if (null === $inlineArray && null !== $cfgCallOp) {
                 if ('array_combine' === $this->resolveCfgFuncCallName($cfgCallOp)) {
@@ -29111,6 +29201,17 @@ class Compiler {
                     $folded = $this->tryFoldGlobalConstFetch($target);
                     if (null !== $folded) {
                         $valueSlot = (string) $block->registerConstant(new Operand\Temporary(), $folded);
+                    } else {
+                        $slot = $block->slotForOperand($target->result);
+                        if (null === $slot) {
+                            foreach ($this->compileExpr($target, $block) as $op) {
+                                $sends[] = $op;
+                            }
+                            $slot = $block->slotForOperand($target->result);
+                        }
+                        if (null !== $slot) {
+                            $valueSlot = (string) $slot;
+                        }
                     }
                 } elseif ($target instanceof Op\Expr\Array_) {
                     $slot = $block->slotForOperand($target->result);
@@ -29585,6 +29686,47 @@ class Compiler {
                     }
                 }
             }
+            if (
+                null !== $cfgCallOp
+                && 'filter_var' === strtolower($this->resolveCfgFuncCallName($cfgCallOp) ?? '')
+                && 2 === (int) $argIndex
+            ) {
+                $optionsArg = $cfgCallOp->args[2] ?? $arg;
+                if (
+                    $this->callArgIsDeadInlineTemporary($optionsArg)
+                    && $this->callArgOperandExpectsArrayProducer($optionsArg)
+                ) {
+                    $outerSlot = $this->resolveOutermostInitArraySlotBeforePendingFuncCall($block, $sends);
+                    if (null !== $outerSlot) {
+                        $valueSlot = $outerSlot;
+                    }
+                }
+            }
+            if (
+                null !== $cfgCallOp
+                && 'filter_input' === strtolower($this->resolveCfgFuncCallName($cfgCallOp) ?? '')
+                && 3 === (int) $argIndex
+            ) {
+                $optionsArg = $cfgCallOp->args[3] ?? $arg;
+                if (
+                    $this->callArgIsDeadInlineTemporary($optionsArg)
+                    && $this->callArgOperandExpectsArrayProducer($optionsArg)
+                ) {
+                    $outerSlot = $this->resolveOutermostInitArraySlotBeforePendingFuncCall($block, $sends);
+                    if (null !== $outerSlot) {
+                        $valueSlot = $outerSlot;
+                    }
+                }
+            }
+            $filterInputSlot = $this->finalizeFilterInputCallArgSlot(
+                $block,
+                $cfgCallOp,
+                (int) $argIndex,
+                $sends
+            );
+            if (null !== $filterInputSlot) {
+                $valueSlot = $filterInputSlot;
+            }
             // var_dump(E::A <=> E::B) — immediate spaceship prelude wins over hoisted enum temps (#10203).
             if (null !== $cfgCallOp && null !== $block->orig) {
                 $callArgProbe = $cfgCallOp->args[(int) $argIndex] ?? $arg;
@@ -29858,6 +30000,91 @@ class Compiler {
         }
 
         return $arrayProducers[\count($arrayProducers) - 1];
+    }
+
+    /**
+     * Last-chance ARG_SEND slots for filter_input() hoisted ConstFetch / nested options (#15194).
+     *
+     * @param list<OpCode> $pendingSends
+     */
+    private function finalizeFilterInputCallArgSlot(
+        Block $block,
+        ?Op $cfgCallOp,
+        int $argIndex,
+        array &$pendingSends = []
+    ): ?string {
+        if (null === $cfgCallOp || null === $block->orig) {
+            return null;
+        }
+        if ('filter_input' !== strtolower($this->resolveCfgFuncCallName($cfgCallOp) ?? '')) {
+            return null;
+        }
+        if (3 === $argIndex) {
+            $optionsArg = $cfgCallOp->args[3] ?? null;
+            if (
+                $optionsArg instanceof Operand
+                && $this->callArgIsDeadInlineTemporary($optionsArg)
+                && $this->callArgOperandExpectsArrayProducer($optionsArg)
+            ) {
+                return $this->resolveOutermostInitArraySlotBeforePendingFuncCall($block, $pendingSends);
+            }
+
+            return null;
+        }
+        if (0 !== $argIndex && 2 !== $argIndex) {
+            return null;
+        }
+        $hoisted = [];
+        $callIndex = null;
+        foreach ($block->orig->children as $i => $child) {
+            if ($child === $cfgCallOp) {
+                $callIndex = $i;
+                break;
+            }
+        }
+        if (null === $callIndex) {
+            return null;
+        }
+        for ($i = $callIndex - 1; $i >= 0; --$i) {
+            $child = $block->orig->children[$i];
+            if ($child instanceof Op\Expr\ConstFetch) {
+                array_unshift($hoisted, $child);
+                continue;
+            }
+            if ($child instanceof Op\Expr\Array_) {
+                continue;
+            }
+            if ($child instanceof Op\Expr\Assign) {
+                break;
+            }
+            break;
+        }
+        $constFetches = array_values(array_filter(
+            $hoisted,
+            static fn (Op\Expr $producer): bool => $producer instanceof Op\Expr\ConstFetch
+        ));
+        $target = match ($argIndex) {
+            0 => $constFetches[0] ?? null,
+            2 => $constFetches[1] ?? ($constFetches[0] ?? null),
+            default => null,
+        };
+        if (!$target instanceof Op\Expr\ConstFetch) {
+            return null;
+        }
+        $folded = $this->tryFoldGlobalConstFetch($target);
+        if (null !== $folded) {
+            return (string) $block->registerConstant(new Operand\Temporary(), $folded);
+        }
+        $slot = $block->slotForOperand($target->result);
+        if (null !== $slot) {
+            return (string) $slot;
+        }
+        foreach ($this->compileExpr($target, $block) as $op) {
+            $pendingSends[] = $op;
+        }
+        $slot = $block->slotForOperand($target->result);
+
+        return null !== $slot ? (string) $slot : null;
     }
 
     /**
