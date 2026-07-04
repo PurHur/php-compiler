@@ -54,6 +54,26 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
+    public function testSupportsHex2binStrictFalseOnReferenceProfile(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsHex2binStrict());
+    }
+
+    public function testSupportsHex2binStrictTrueOnForwardProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertTrue(CompilerVersion::supportsHex2binStrict());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     public function testSupportsFpowFalseOnReferenceProfile(): void
     {
         $this->assertFalse(CompilerVersion::supportsFpow());
