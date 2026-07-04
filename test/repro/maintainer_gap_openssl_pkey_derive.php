@@ -37,11 +37,10 @@ if ('a89ceecb80ea0e5b66a50bb93ca3bb8f9a490c67897cc56734d28061a086d6b5' !== bin2h
     exit(1);
 }
 
-try {
-    openssl_pkey_derive(null, $alicePrivate);
-    echo "fail: null public_key did not TypeError\n";
+$nullPublic = openssl_pkey_derive(null, $alicePrivate);
+if (false !== $nullPublic) {
+    echo 'fail: null public_key expected false, got '.var_export($nullPublic, true)."\n";
     exit(1);
-} catch (TypeError) {
 }
 
 echo "ok\n";
