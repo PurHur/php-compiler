@@ -16226,6 +16226,21 @@ class Compiler {
                 if (null !== $dimIdx && null !== $concatIdx) {
                     return (0 === $argIndex) ? $producers[$dimIdx] : $producers[$concatIdx];
                 }
+                $constIdx = null;
+                $bitwiseIdx = null;
+                foreach ($producers as $pi => $producer) {
+                    if ($producer instanceof Op\Expr\ConstFetch) {
+                        $constIdx = $pi;
+                    } elseif ($producer instanceof Op\Expr\BinaryOp\BitwiseOr
+                        || $producer instanceof Op\Expr\BinaryOp\BitwiseAnd
+                        || $producer instanceof Op\Expr\BinaryOp\BitwiseXor
+                    ) {
+                        $bitwiseIdx = $pi;
+                    }
+                }
+                if (null !== $constIdx && null !== $bitwiseIdx) {
+                    return (0 === $argIndex) ? $producers[$constIdx] : $producers[$bitwiseIdx];
+                }
             }
             // array_merge(array_keys($src), ['b']) / array_merge(['a'=>1], array_keys(...)) (#12450, #13704, #13760).
             if (\in_array($inlineFuncName, ['array_merge', 'array_merge_recursive'], true)) {
@@ -19734,6 +19749,15 @@ class Compiler {
                         foreach ($arithmeticChain as $arithmeticProducer) {
                             array_unshift($producers, $arithmeticProducer);
                         }
+                    } elseif (
+                        ($child instanceof Op\Expr\BinaryOp\BitwiseOr
+                            || $child instanceof Op\Expr\BinaryOp\BitwiseAnd
+                            || $child instanceof Op\Expr\BinaryOp\BitwiseXor)
+                        && $i === $callIndex - 1
+                    ) {
+                        // get_html_translation_table(HTML_ENTITIES, ENT_QUOTES | ENT_HTML5) — lone hoisted bitmask (#16152, #11804).
+                        array_unshift($producers, $child);
+                        continue;
                     }
                 }
                 break;
@@ -25064,6 +25088,14 @@ class Compiler {
         }
         $candidate = $cfgChildren[$cfgProducerIndex] ?? null;
         if (!$candidate instanceof Op\Expr || !\in_array($candidate, $producers, true)) {
+            // ConstFetch + BitwiseOr call args with filtered operand ConstFetch preludes (#16152, #11804).
+            if ($producerSlotIndex < $producerCount) {
+                $direct = $producers[$producerSlotIndex] ?? null;
+                if ($direct instanceof Op\Expr) {
+                    return $direct;
+                }
+            }
+
             return null;
         }
         $callArg = $callOp->args[$argIndex] ?? null;
