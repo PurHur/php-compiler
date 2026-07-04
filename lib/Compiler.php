@@ -27577,6 +27577,14 @@ class Compiler {
         if (1 !== $argIndex) {
             return null;
         }
+        $offsetArg = $cfgCallOp->args[1] ?? $arg;
+        // array_slice($b, 1, -2) — embedded literal offset must not steal prior EXEC_RETURN (#10229, #10579).
+        if ($this->isEmbeddedCallLiteralArg($offsetArg)) {
+            return null;
+        }
+        if (!$this->callArgIsDeadInlineTemporary($offsetArg)) {
+            return null;
+        }
         for ($scan = \count($block->opCodes) - 1; $scan >= 0; --$scan) {
             $scanOp = $block->opCodes[$scan];
             if (OpCode::TYPE_FUNCCALL_INIT === $scanOp->type) {
