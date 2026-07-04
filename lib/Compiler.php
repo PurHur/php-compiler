@@ -8596,6 +8596,7 @@ class Compiler {
                     $destSlot,
                     $rhsSlot
                 );
+                $block->registerAssignResultLvalue((int) $resultSlot, (int) $destSlot);
                 $this->assignSourceMetadata($assignOp, $expr);
 
                 return [$assignOp];
@@ -14186,6 +14187,10 @@ class Compiler {
     /** TYPE_ASSIGN arg2 for a registered assign.result temp — the live CV for by-ref sends (#12690). */
     private function slotForAssignLvalueFromResultSlot(Block $block, int $resultSlot): ?int
     {
+        $mapped = $block->lvalueSlotForAssignResult($resultSlot);
+        if (null !== $mapped) {
+            return $mapped;
+        }
         foreach ($block->opCodes as $op) {
             if (OpCode::TYPE_ASSIGN === $op->type && (int) $op->arg1 === $resultSlot) {
                 return (int) $op->arg2;
