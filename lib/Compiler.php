@@ -30065,38 +30065,41 @@ class Compiler {
                 null !== $cfgCallOp
                 && !$this->callArgOperandExpectsArrayProducer($arg)
                 && !$inlineArrayLiteralArgWired
-                && ($this->callArgIsDeadInlineTemporary($arg) || $this->isNamedVariableOperand($arg))
             ) {
                 $andPhi = $this->logicalShortCircuitPhiMergeSlot($block);
                 if (
                     null !== $andPhi
                     && null !== $valueSlot
-                    && (string) $valueSlot === (string) $andPhi
+                    && $this->isNamedVariableOperand($arg)
                 ) {
-                    if ($this->isNamedVariableOperand($arg)) {
-                        $copyOperand = new Operand\Temporary();
-                        $copySlot = $block->forceFreshVarSlot($copyOperand, (int) $andPhi);
-                        $sends[] = new OpCode(
-                            OpCode::TYPE_ASSIGN,
-                            $copySlot,
-                            (int) $valueSlot,
-                            (int) $valueSlot,
-                        );
-                        $valueSlot = (string) $copySlot;
-                    } else {
-                        $pendingNested = $this->slotForLastPendingInlineCallResultBeforeFuncCallInit($sends)
-                            ?? $this->slotForLastEmittedInlineCallResultBeforePendingFuncCall($block);
-                        $calleeLower = strtolower($calleeName ?? $this->resolveCfgFuncCallName($cfgCallOp) ?? '');
-                        if (
-                            null !== $pendingNested
-                            && !\in_array($calleeLower, ['exit', 'die'], true)
-                            && !(
-                                'array_map' === $calleeLower
-                                && 0 === (int) $argIndex
-                            )
-                        ) {
-                            $valueSlot = (string) $pendingNested;
-                        }
+                    $namedSlot = $block->slotForNamedAssignDest($arg) ?? (int) $valueSlot;
+                    $copyOperand = new Operand\Temporary();
+                    $copySlot = $block->forceFreshVarSlot($copyOperand, (int) $andPhi);
+                    $sends[] = new OpCode(
+                        OpCode::TYPE_ASSIGN,
+                        $copySlot,
+                        $copySlot,
+                        $namedSlot,
+                    );
+                    $valueSlot = (string) $copySlot;
+                } elseif (
+                    null !== $andPhi
+                    && null !== $valueSlot
+                    && (string) $valueSlot === (string) $andPhi
+                    && $this->callArgIsDeadInlineTemporary($arg)
+                ) {
+                    $pendingNested = $this->slotForLastPendingInlineCallResultBeforeFuncCallInit($sends)
+                        ?? $this->slotForLastEmittedInlineCallResultBeforePendingFuncCall($block);
+                    $calleeLower = strtolower($calleeName ?? $this->resolveCfgFuncCallName($cfgCallOp) ?? '');
+                    if (
+                        null !== $pendingNested
+                        && !\in_array($calleeLower, ['exit', 'die'], true)
+                        && !(
+                            'array_map' === $calleeLower
+                            && 0 === (int) $argIndex
+                        )
+                    ) {
+                        $valueSlot = (string) $pendingNested;
                     }
                 }
             }

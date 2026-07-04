@@ -378,6 +378,23 @@ class Block {
     }
 
     public function getVarSlot(Operand $operand, bool $isRead): int {
+        if ($isRead) {
+            $namedDest = $this->slotForNamedAssignDest($operand);
+            if (null === $namedDest) {
+                $name = self::resolveVariableName($operand);
+                if (null !== $name && '' !== $name) {
+                    $namedDest = $this->slotIndexForVariableName($name);
+                }
+            }
+            if (null !== $namedDest) {
+                $this->scope[$operand] = $namedDest;
+                if ($this->shouldRegisterInheritedArg($operand)) {
+                    $this->args[$operand] = $namedDest;
+                }
+
+                return $namedDest;
+            }
+        }
         if ($this->scope->contains($operand)) {
             if ($isRead && $this->shouldRegisterInheritedArg($operand)) {
                 $this->args[$operand] = $this->scope[$operand];
@@ -595,6 +612,19 @@ class Block {
     /** Pre-bind a cfg Var root before lowering branch assigns (#3790). */
     public function prebindCfgVarRoot(VarOperand $root, int $slot): void
     {
+        if ($this->namedAssignDestSlots->contains($root)) {
+            $dest = $this->namedAssignDestSlots[$root];
+            if ($dest !== $slot) {
+                return;
+            }
+        }
+        $name = self::resolveVariableName($root);
+        if (null !== $name && '' !== $name) {
+            $existing = $this->slotForNamedAssignDest($root);
+            if (null !== $existing && $existing !== $slot) {
+                return;
+            }
+        }
         if (!$this->scope->contains($root)) {
             $this->scope[$root] = $slot;
         }
