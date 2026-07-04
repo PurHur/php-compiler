@@ -44,6 +44,9 @@ use PHPCompiler\Ast\PipeOperatorDesugar;
 use PHPCompiler\Ast\EncapsedCoalesceDesugar;
 use PHPCompiler\EncapsedCoalesceRejector;
 use PHPCompiler\BareThrowSyntaxRejector;
+use PHPCompiler\TryCatchElseSyntaxRejector;
+use PHPCompiler\Ast\TryCatchElseSupport;
+use PHPCompiler\Ast\TryCatchElseAttacher;
 use PHPCompiler\Ast\VoidCastDesugar;
 use PHPCompiler\Visitor\InOperatorResolver;
 use PHPCompiler\Visitor\ExitFunctionResolver;
@@ -136,6 +139,7 @@ class Runtime {
         $astTraverser->addVisitor($this->staticClassAnnotator);
         $astTraverser->addVisitor(new Ast\EnumPropertyCompileCheck());
         $astTraverser->addVisitor(new Ast\GeneratorYieldSourceMarker());
+        $astTraverser->addVisitor(new TryCatchElseAttacher());
         $this->parser = new Parser(
             (new ParserFactory)->create(ParserFactory::ONLY_PHP7),
             $astTraverser
@@ -378,6 +382,9 @@ class Runtime {
         DnfParenIntersectionSyntaxRejector::reject($code, $filename);
         ExitFunctionSyntaxRejector::reject($code, $filename);
         PropertyHookSyntaxRejector::reject($code, $filename);
+        TryCatchElseSyntaxRejector::reject($code, $filename);
+        TryCatchElseSupport::beginCompilationUnit();
+        $code = TryCatchElseSupport::extract($code);
         $sealedPreprocessor = new SealedClassPreprocessor();
         [$code, $permitsByLine] = $sealedPreprocessor->preprocess($code);
         $this->sealedClassAnnotator->setPermitsByLine($permitsByLine);

@@ -410,6 +410,18 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.4+ try/catch/else — else runs when no exception was thrown (#15817).
+     *
+     * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev reference profile matches Zend 8.2
+     * parse error. Enable forward profile on dev via `PHP_COMPILER_PROFILE=8.4`.
+     * php-src: Zend/zend_language_parser.y try_catch_list else; zend_compile.c zend_compile_try.
+     */
+    public static function supportsTryCatchElse(): bool
+    {
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+    }
+
+    /**
      * PHP 8.4+ null coalesce (??) inside double-quoted `{$...}` interpolation (#14063, #14113).
      *
      * Gated on stable 8.4.0 so 8.4.0-dev reference profile rejects ?? in encapsed braces like Zend 8.2.
