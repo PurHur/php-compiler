@@ -9,7 +9,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\VM\DateTimeSupport;
 use PHPCompiler\VM\ObjectEntry;
 
-/** DateTime::createFromTimestamp(int $timestamp): static — VM (#5973, ext/date/php_date.c). */
+/** DateTime::createFromTimestamp(int|float $timestamp): static — VM (#5973, #9984, ext/date/php_date.c). */
 final class DateTimeCreateFromTimestamp extends VmClassMethod
 {
     public function __construct()
@@ -25,7 +25,7 @@ final class DateTimeCreateFromTimestamp extends VmClassMethod
         if (\count($frame->calledArgs) < 1) {
             throw new \LogicException('DateTime::createFromTimestamp() expects exactly 1 argument');
         }
-        $timestamp = VmMath::parseIntBuiltinArg(
+        $timestamp = VmMath::parseNumberBuiltinArg(
             $frame->calledArgs[0],
             'DateTime::createFromTimestamp',
             1,

@@ -527,8 +527,8 @@ final class DateTimeSupport
         self::markDateTimeLikeInitialized($dt);
     }
 
-    /** php-src zim_DateTime_createFromTimestamp / zim_DateTimeImmutable_createFromTimestamp (#5973). */
-    public static function initDateTimeFromTimestamp(ObjectEntry $dt, int $timestamp): void
+    /** php-src zim_DateTime_createFromTimestamp / zim_DateTimeImmutable_createFromTimestamp (#5973, #9984). */
+    public static function initDateTimeFromTimestamp(ObjectEntry $dt, int|float $timestamp): void
     {
         $tzName = VmDate::defaultTimezoneGet();
         try {
@@ -536,14 +536,47 @@ final class DateTimeSupport
         } catch (NativeDateInvalidTimeZoneException) {
             self::throwDateInvalidTimeZoneException($tzName);
         }
+        $parts = self::splitTimestampNumber($timestamp);
+        $seconds = $parts['timestamp'];
         if (4 === \PHP_INT_SIZE) {
-            if ($timestamp > \PHP_INT_MAX || $timestamp < \PHP_INT_MIN) {
+            if ($seconds > \PHP_INT_MAX || $seconds < \PHP_INT_MIN) {
                 self::throwDateRangeError('Epoch doesn\'t fit in a PHP integer');
             }
         }
-        self::applyParsedState($dt, ['timestamp' => $timestamp, 'microsecond' => 0], $tzName);
+        self::applyParsedState(
+            $dt,
+            ['timestamp' => $seconds, 'microsecond' => $parts['microsecond']],
+            $tzName
+        );
         $dt->constructed = true;
         self::markDateTimeLikeInitialized($dt);
+    }
+
+    /**
+     * php-src ext/date/php_date.c — float timestamp → epoch seconds + usec (#9984).
+     *
+     * @return array{timestamp: int, microsecond: int}
+     */
+    public static function splitTimestampNumber(int|float $timestamp): array
+    {
+        if (\is_int($timestamp)) {
+            return ['timestamp' => $timestamp, 'microsecond' => 0];
+        }
+        if (!\is_finite($timestamp)) {
+            throw new \ValueError('Invalid timestamp');
+        }
+        $seconds = (int) $timestamp;
+        $fraction = $timestamp - $seconds;
+        $microsecond = (int) \round($fraction * 1_000_000);
+        if (1_000_000 === $microsecond) {
+            $seconds += $timestamp >= 0.0 ? 1 : -1;
+            $microsecond = 0;
+        } elseif ($microsecond < 0) {
+            --$seconds;
+            $microsecond += 1_000_000;
+        }
+
+        return ['timestamp' => $seconds, 'microsecond' => $microsecond];
     }
 
     public static function initDateTimeFromFormat(
