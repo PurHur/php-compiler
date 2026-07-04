@@ -55,6 +55,8 @@ final class WeakRefRegistryRuntime
 
     private const CLEAR_MAP = 'PHPCompiler\\ext\\standard\\WeakRefRegistryJitHelper::clearMapEntry';
 
+    private const CLEAR_OBJECT = 'PHPCompiler\\ext\\standard\\WeakRefRegistryJitHelper::clearObject';
+
     /** @var list<string> */
     private const COMPILED_HELPERS = [
         self::RESET,
@@ -71,6 +73,7 @@ final class WeakRefRegistryRuntime
         self::MAP_HT,
         self::MAP_KEY,
         self::CLEAR_MAP,
+        self::CLEAR_OBJECT,
     ];
 
     public static function ensureLinked(Context $context): void
@@ -372,29 +375,16 @@ final class WeakRefRegistryRuntime
 
         $voidTy = $context->getTypeFromString('void');
         $i8p = $context->getTypeFromString('int8*');
+        $i64 = $context->getTypeFromString('int64');
         $ft = $context->context->functionType($voidTy, false, $i8p);
         $fn = null !== $probe ? $probe : $context->module->addFunction($abiName, $ft);
         $entry = $fn->appendBasicBlock('wr_clear_bridge_entry');
-        $doneBb = $fn->appendBasicBlock('wr_clear_bridge_done');
-        $refsInit = $fn->appendBasicBlock('wr_clear_bridge_refs_init');
-        $mapsInit = $fn->appendBasicBlock('wr_clear_bridge_maps_init');
         $context->builder->positionAtEnd($entry);
-
-        $target = $fn->getParam(0);
-        $null = $i8p->constNull();
-        $context->builder->branchIf(
-            $context->builder->icmp(Builder::INT_EQ, $target, $null),
-            $doneBb,
-            $refsInit
+        $context->builder->call(
+            self::helperFunction($context, self::CLEAR_OBJECT),
+            $context->builder->pointerCast($fn->getParam(0), $i64)
         );
-        $context->builder->clearInsertionPosition();
-
-        self::emitClearRefLoop($context, $fn, $target, $refsInit, $mapsInit);
-        self::emitClearMapLoop($context, $fn, $target, $mapsInit, $doneBb);
-
-        $context->builder->positionAtEnd($doneBb);
         $context->builder->returnVoid();
-        $context->builder->clearInsertionPosition();
         $context->registerFunction($abiName, $fn);
     }
 
@@ -445,136 +435,6 @@ final class WeakRefRegistryRuntime
         $context->builder->clearInsertionPosition();
 
         $context->registerFunction('phpc_gc_notify_object_freed', $fn);
-    }
-
-    private static function emitClearRefLoop(
-        Context $context,
-        Value $fn,
-        Value $target,
-        $loopInit,
-        $afterBb,
-    ): void {
-        $i32 = $context->getTypeFromString('int32');
-        $i64 = $context->getTypeFromString('int64');
-        $i8p = $context->getTypeFromString('int8*');
-        $null = $i8p->constNull();
-        $valuePtr = $context->getTypeFromString('__value__*');
-        $writeNull = $context->lookupFunction('__value__writeNull');
-
-        $loopCond = $fn->appendBasicBlock('wr_clear_refs_cond');
-        $loopBody = $fn->appendBasicBlock('wr_clear_refs_body');
-        $clearBb = $fn->appendBasicBlock('wr_clear_refs_do');
-        $loopInc = $fn->appendBasicBlock('wr_clear_refs_inc');
-
-        $context->builder->positionAtEnd($loopInit);
-        $targetI64 = $context->builder->pointerCast($target, $i64);
-        $count = $context->builder->call(self::helperFunction($context, self::REF_COUNT));
-        $countI32 = $context->builder->trunc($count, $i32);
-        $idx = $context->builder->alloca($i32, 1, 'wr_clear_ref_i');
-        $context->builder->store($i32->constInt(0, false), $idx);
-        $context->builder->branch($loopCond);
-
-        $context->builder->positionAtEnd($loopCond);
-        $i = $context->builder->load($idx);
-        $context->builder->branchIf(
-            $context->builder->icmp(Builder::INT_SLT, $i, $countI32),
-            $loopBody,
-            $afterBb
-        );
-
-        $context->builder->positionAtEnd($loopBody);
-        $i64Idx = $context->builder->sext($i, $i64);
-        $storedTarget = $context->builder->call(self::helperFunction($context, self::REF_TARGET), $i64Idx);
-        $storedSlot = $context->builder->call(self::helperFunction($context, self::REF_SLOT), $i64Idx);
-        $targetMatch = $context->builder->icmp(Builder::INT_EQ, $storedTarget, $targetI64);
-        $slotNonNull = $context->builder->icmp(Builder::INT_NE, $storedSlot, $i64->constInt(0, false));
-        $doClear = $context->builder->and($targetMatch, $slotNonNull);
-        $context->builder->branchIf($doClear, $clearBb, $loopInc);
-
-        $context->builder->positionAtEnd($clearBb);
-        $slotAsValue = $context->builder->pointerCast(
-            $context->builder->intToPtr($storedSlot, $i8p),
-            $valuePtr
-        );
-        $context->builder->call($writeNull, $slotAsValue);
-        $context->builder->call(self::helperFunction($context, self::CLEAR_REF), $i64Idx);
-        $context->builder->branch($loopInc);
-
-        $context->builder->positionAtEnd($loopInc);
-        $context->builder->store(
-            $context->builder->add($context->builder->load($idx), $i32->constInt(1, false)),
-            $idx
-        );
-        $context->builder->branch($loopCond);
-        $context->builder->clearInsertionPosition();
-    }
-
-    private static function emitClearMapLoop(
-        Context $context,
-        Value $fn,
-        Value $target,
-        $loopInit,
-        $doneBb,
-    ): void {
-        $i32 = $context->getTypeFromString('int32');
-        $i64 = $context->getTypeFromString('int64');
-        $i8p = $context->getTypeFromString('int8*');
-        $null = $i8p->constNull();
-        $htPtr = $context->getTypeFromString('__hashtable__*');
-        $strPtr = $context->getTypeFromString('__string__*');
-        $unsetKey = $context->lookupFunction('__hashtable__unsetStringKey');
-        $strInit = $context->lookupFunction('__string__init');
-
-        $loopCond = $fn->appendBasicBlock('wr_clear_maps_cond');
-        $loopBody = $fn->appendBasicBlock('wr_clear_maps_body');
-        $clearBb = $fn->appendBasicBlock('wr_clear_maps_do');
-        $loopInc = $fn->appendBasicBlock('wr_clear_maps_inc');
-
-        $context->builder->positionAtEnd($loopInit);
-        $targetI64 = $context->builder->pointerCast($target, $i64);
-        $count = $context->builder->call(self::helperFunction($context, self::MAP_COUNT));
-        $countI32 = $context->builder->trunc($count, $i32);
-        $idx = $context->builder->alloca($i32, 1, 'wr_clear_map_i');
-        $context->builder->store($i32->constInt(0, false), $idx);
-        $context->builder->branch($loopCond);
-
-        $context->builder->positionAtEnd($loopCond);
-        $i = $context->builder->load($idx);
-        $context->builder->branchIf(
-            $context->builder->icmp(Builder::INT_SLT, $i, $countI32),
-            $loopBody,
-            $doneBb
-        );
-
-        $context->builder->positionAtEnd($loopBody);
-        $i64Idx = $context->builder->sext($i, $i64);
-        $storedTarget = $context->builder->call(self::helperFunction($context, self::MAP_TARGET), $i64Idx);
-        $storedHt = $context->builder->call(self::helperFunction($context, self::MAP_HT), $i64Idx);
-        $keyStr = $context->builder->call(self::helperFunction($context, self::MAP_KEY), $i64Idx);
-        $targetMatch = $context->builder->icmp(Builder::INT_EQ, $storedTarget, $targetI64);
-        $htNonNull = $context->builder->icmp(Builder::INT_NE, $storedHt, $i64->constInt(0, false));
-        $doClear = $context->builder->and($targetMatch, $htNonNull);
-        $context->builder->branchIf($doClear, $clearBb, $loopInc);
-
-        $context->builder->positionAtEnd($clearBb);
-        $context->builder->call(
-            $unsetKey,
-            $context->builder->pointerCast(
-                $context->builder->intToPtr($storedHt, $i8p),
-                $htPtr
-            ),
-            $keyStr
-        );
-        $context->builder->call(self::helperFunction($context, self::CLEAR_MAP), $i64Idx);
-        $context->builder->branch($loopInc);
-
-        $context->builder->positionAtEnd($loopInc);
-        $context->builder->store(
-            $context->builder->add($context->builder->load($idx), $i32->constInt(1, false)),
-            $idx
-        );
-        $context->builder->branch($loopCond);
-        $context->builder->clearInsertionPosition();
     }
 
     private static function emitUnregisterMapLoop(
