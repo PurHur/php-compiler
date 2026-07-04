@@ -226,6 +226,7 @@ use PHPCompiler\VM\Builtin\ReflectionParameterGetType;
 use PHPCompiler\VM\Builtin\ReflectionParameterGetValue;
 use PHPCompiler\VM\Builtin\ReflectionParameterIsDeprecated;
 use PHPCompiler\VM\Builtin\ReflectionParameterIsSensitive;
+use PHPCompiler\VM\Builtin\ReflectionParameterIsSensitiveParameter;
 use PHPCompiler\VM\Builtin\ReflectionPropertyConstruct;
 use PHPCompiler\VM\Builtin\ReflectionPropertyGetAsymmetricVisibility;
 use PHPCompiler\VM\Builtin\ReflectionPropertyGetAttributes;
@@ -524,6 +525,10 @@ final class BuiltinClasses
         $rparam->methodVisibility['getvalue'] = $pub;
         $rparam->methods['issensitive'] = new ReflectionParameterIsSensitive();
         $rparam->methodVisibility['issensitive'] = $pub;
+        if (CompilerVersion::supportsReflectionParameterIsSensitiveParameter()) {
+            $rparam->methods['issensitiveparameter'] = new ReflectionParameterIsSensitiveParameter();
+            $rparam->methodVisibility['issensitiveparameter'] = $pub;
+        }
         if (CompilerVersion::supportsReflectionPropertyParameterIsDeprecated()) {
             $rparam->methods['isdeprecated'] = new ReflectionParameterIsDeprecated();
             $rparam->methodVisibility['isdeprecated'] = $pub;

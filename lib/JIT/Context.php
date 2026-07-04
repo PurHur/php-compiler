@@ -840,6 +840,9 @@ class Context {
         $this->functionProxies['reflectionconstant::__construct'] = new Call\ReflectionConstantConstruct();
         $this->functionProxies['reflectionconstant::getattributes'] = new Call\ReflectionConstantGetAttributes();
         $this->functionProxies['reflectionmethod::getattributes'] = new Call\ReflectionMethodGetAttributes();
+        if (CompilerVersion::supportsReflectionParameterIsSensitiveParameter()) {
+            $this->functionProxies['reflectionparameter::issensitiveparameter'] = new Call\ReflectionParameterIsSensitiveParameter();
+        }
         $this->functionProxies['reflectionattribute::getname'] = new Call\ReflectionAttributeGetName();
         $this->functionProxies['reflectionattribute::newinstance'] = new Call\ReflectionAttributeNewInstance();
         $this->functionProxies['reflectionenum::__construct'] = new Call\ReflectionEnumConstruct();
@@ -1273,6 +1276,7 @@ class Context {
             $builtin->shutdown();
         }
         Builtin\AttributeRegistryLowering::implementLookupFunctions($this);
+        Builtin\ParamSensitiveLowering::implementLookupFunctions($this);
         $this->sealInitFunction();
         $this->sealInitShutdownReturn($this->shutdownBlock);
         $this->sealInitShutdownReturn($this->headerPreFlushBlock);

@@ -638,6 +638,7 @@ require_once __DIR__.'/../../../ext/standard/AtanJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/AtanhJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/AttributeRegistryArgsJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/AttributeRegistryJitHelper.php';
+require_once __DIR__.'/../../../ext/standard/ParamSensitiveJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/Bin2hexJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/CaseCompareJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/NCompareJitHelper.php';
@@ -3696,6 +3697,7 @@ require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionParameterGetAttributes.
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionParameterGetType.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionParameterGetValue.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionParameterIsSensitive.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionParameterIsSensitiveParameter.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertyAccessProbe.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertyAsymmetricProbe.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertyConstruct.php';

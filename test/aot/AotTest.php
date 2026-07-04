@@ -83,6 +83,15 @@ class AotTest extends BaseTest
                 && str_contains($name, 'reflection_probe_builtins_phantom')) {
                 continue;
             }
+            if (!CompilerVersion::supportsReflectionParameterIsSensitiveParameter()
+                && str_contains($name, 'reflection_parameter_is_sensitive_parameter')
+                && !str_contains($name, 'reflection_parameter_is_sensitive_parameter_phantom')) {
+                continue;
+            }
+            if (CompilerVersion::supportsReflectionParameterIsSensitiveParameter()
+                && str_contains($name, 'reflection_parameter_is_sensitive_parameter_phantom')) {
+                continue;
+            }
             if (!CompilerVersion::supportsHex2binStrict()
                 && str_contains($name, 'hex2bin_strict')
                 && !str_contains($name, 'hex2bin_strict_arity_reference_profile')) {

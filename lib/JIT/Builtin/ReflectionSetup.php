@@ -180,6 +180,26 @@ final class ReflectionSetup
         return [$safe, $lenSafe];
     }
 
+    public static function integerPropertyAsI64(
+        Context $context,
+        Value $obj,
+        string $className,
+        string $propName
+    ): Value {
+        $propVar = $context->type->object->propertyFetch($obj, $className, $propName);
+        if (Variable::TYPE_NATIVE_LONG === $propVar->type) {
+            return $context->helper->loadValue($propVar);
+        }
+        $valuePtr = Variable::KIND_VARIABLE === $propVar->kind
+            ? JitValueBox::pointer($context, $propVar->value)
+            : $propVar->value;
+
+        return $context->builder->call(
+            $context->lookupFunction('__value__readLong'),
+            $valuePtr
+        );
+    }
+
     /**
      * @return array{0: Value, 1: Value} cstr pointer and byte length (size_t)
      */
