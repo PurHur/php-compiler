@@ -53,9 +53,6 @@ final class VmFloatDtoa
         }
 
         $precision = \max(0, $precision);
-        if ($precision >= self::NDIGIT - 1) {
-            $precision = self::NDIGIT - 2;
-        }
 
         $negative = $value < 0.0;
         $abs = $negative ? -$value : $value;
