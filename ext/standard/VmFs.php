@@ -32,6 +32,9 @@ final class VmFs
     /** @var array<int, true> popen() handles — pclose() vs fclose() at libc layer in JIT/AOT */
     private static array $popenHandles = [];
 
+    /** @var array<int, string> unread bytes after scanf over-read on non-seekable streams (#15992) */
+    private static array $readPushback = [];
+
     /** @var array<int, int> pclose tokens from VmPopenPure (#8250, #12266) */
     private static array $popenNativeFiles = [];
 
@@ -970,43 +973,68 @@ final class VmFs
         return $handle;
     }
 
+    /** Push back bytes after scanf over-read — php-src stream read buffer (#15992). */
+    public static function pushbackUnread(int $handle, string $bytes): void
+    {
+        if ('' === $bytes) {
+            return;
+        }
+        self::$readPushback[$handle] = (self::$readPushback[$handle] ?? '').$bytes;
+    }
+
+    private static function takeReadPushback(int $handle, int $length): string
+    {
+        $pending = self::$readPushback[$handle] ?? '';
+        if ('' === $pending) {
+            return '';
+        }
+        $take = min($length, \strlen($pending));
+        if ($take < \strlen($pending)) {
+            self::$readPushback[$handle] = \substr($pending, $take);
+        } else {
+            unset(self::$readPushback[$handle]);
+        }
+
+        return \substr($pending, 0, $take);
+    }
+
     public static function fread(int $handle, int $length) {
         if ($length <= 0) {
             throw new \ValueError('fread(): Argument #2 ($length) must be greater than 0');
         }
+        $fromPushback = self::takeReadPushback($handle, $length);
+        if (\strlen($fromPushback) === $length) {
+            return VmStreamFilterChain::applyReadFilters($handle, $fromPushback);
+        }
+        $length -= \strlen($fromPushback);
         if (VmUserStream::isValidHandle($handle)) {
-            return VmUserStream::read($handle, $length);
+            return self::freadMergePushback($handle, $fromPushback, VmUserStream::read($handle, $length));
         }
         if (VmPhpMemoryStream::isValidHandle($handle)) {
-            $data = VmPhpMemoryStream::read($handle, $length);
-            if (false === $data) {
-                return false;
-            }
-
-            return VmStreamFilterChain::applyReadFilters($handle, $data);
+            return self::freadMergePushback($handle, $fromPushback, VmPhpMemoryStream::read($handle, $length));
         }
         if (VmPhpInputOutputStream::isValidHandle($handle)) {
-            return VmPhpInputOutputStream::read($handle, $length);
+            return self::freadMergePushback($handle, $fromPushback, VmPhpInputOutputStream::read($handle, $length));
         }
         if (VmPhpFdStream::isValidHandle($handle)) {
-            $data = VmPhpFdStream::read($handle, $length);
-            if (false === $data) {
-                return false;
-            }
-
-            return VmStreamFilterChain::applyReadFilters($handle, $data);
+            return self::freadMergePushback($handle, $fromPushback, VmPhpFdStream::read($handle, $length));
         }
         $fp = self::lookup($handle);
         if (null === $fp) {
-            return false;
+            return '' !== $fromPushback ? VmStreamFilterChain::applyReadFilters($handle, $fromPushback) : false;
         }
 
-        $data = @fread($fp, $length);
+        return self::freadMergePushback($handle, $fromPushback, @fread($fp, $length));
+    }
+
+    /** @return string|false */
+    private static function freadMergePushback(int $handle, string $fromPushback, string|false $data)
+    {
         if (false === $data) {
-            return false;
+            return '' !== $fromPushback ? VmStreamFilterChain::applyReadFilters($handle, $fromPushback) : false;
         }
 
-        return VmStreamFilterChain::applyReadFilters($handle, $data);
+        return VmStreamFilterChain::applyReadFilters($handle, $fromPushback.$data);
     }
 
     public static function fpassthru(int $handle) {
@@ -1100,6 +1128,7 @@ final class VmFs
 
     public static function fclose(int $handle): bool
     {
+        unset(self::$readPushback[$handle]);
         if (VmUserStream::isValidHandle($handle)) {
             return VmUserStream::close($handle);
         }
