@@ -15311,7 +15311,9 @@ class JIT {
                     && VM\ReferencableCheck::allowsNonVariableObjectByRef($name)
                     && self::jitArgIsObject($args[$idx])
                 ) {
-                    JIT\JitReferencableCheck::emitNonVariableByRefNotice($this->context);
+                    if (VM\ReferencableCheck::shouldEmitNonVariableObjectByRefNoticeAtCompileTime($operand)) {
+                        JIT\JitReferencableCheck::emitNonVariableByRefNotice($this->context);
+                    }
                     continue;
                 }
                 if (

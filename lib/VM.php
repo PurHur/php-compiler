@@ -12235,6 +12235,13 @@ restart:
                 if (null === $const || $resolved->type === $const->type) {
                     return $frame->scope[$slot];
                 }
+                // Object-cast assign ($a = (object)[...]) keeps array block constants on the CV slot (#15874).
+                if (null !== $frame->block) {
+                    $operand = $frame->block->operandForScopeSlot($slot);
+                    if (null !== $operand && null !== Block::resolveVariableName($operand)) {
+                        return $frame->scope[$slot];
+                    }
+                }
                 // Array dim fetch / spread temps hold live objects; do not substitute NULL block constants (#8814).
                 if (!$this->isEnumSlotClobberCandidate($resolved)) {
                     return $frame->scope[$slot];
@@ -12242,6 +12249,15 @@ restart:
             }
         }
         if (null !== $const) {
+            if (null !== $frame->block) {
+                $operand = $frame->block->operandForScopeSlot($slot);
+                if (null !== $operand && null !== Block::resolveVariableName($operand)) {
+                    $resolved = $frame->scope[$slot]->resolveIndirect();
+                    if (Variable::TYPE_NULL !== $resolved->type && !$resolved->isUndefined()) {
+                        return $frame->scope[$slot];
+                    }
+                }
+            }
             $value = new Variable();
             $value->copyFrom($const);
 
