@@ -67,6 +67,12 @@ final class BuiltinRegistry
         return self::$byName[$lc] ?? null;
     }
 
+    public static function isAdvertised(string $name): bool
+    {
+        return null !== self::resolve($name)
+            && BuiltinIntrospectionPolicy::functionIsAdvertised($name);
+    }
+
     /** @internal PHPUnit isolation when SAPI/env gating changes (#11780). */
     public static function resetForTest(): void
     {
