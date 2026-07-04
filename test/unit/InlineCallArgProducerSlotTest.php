@@ -1048,6 +1048,38 @@ PHP;
         self::assertSame($propSlots, $sendSlots, 'prop='.json_encode($propSlots).' sends='.json_encode($sendSlots));
     }
 
+    /** Issue #10286 — nullsafe enum ?-> property in call args wires NullsafePropertyFetch slot. */
+    public function testVarExportNullsafeEnumCasePropertyUsesNullsafeFetchSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+enum E: int { case A = 1; }
+var_export(E::A?->name);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'nullsafe_enum_call_arg.php');
+
+        $nullsafeSlots = [];
+        $sendSlots = [];
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_NULLSAFE === $op->type) {
+                $nullsafeSlots[] = $op->arg1;
+            }
+            if (OpCode::TYPE_ARG_SEND === $op->type) {
+                $sendSlots[] = $op->arg1;
+            }
+        }
+
+        if ([] !== $sendSlots) {
+            self::assertSame($nullsafeSlots, $sendSlots, 'nullsafe='.json_encode($nullsafeSlots).' sends='.json_encode($sendSlots));
+        } else {
+            ob_start();
+            $runtime->run($block);
+            $out = ob_get_clean();
+            self::assertSame("'A'", trim($out));
+        }
+    }
+
     /** Issue #9504 — var_export((string) new C()) wires Cast producer, not dead arg temp. */
     public function testStringCastNewObjectUsesCastProducerSlot(): void
     {
