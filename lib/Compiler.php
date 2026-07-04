@@ -27185,11 +27185,27 @@ class Compiler {
                 }
             }
             if (null !== $cfgCallOp && null !== $block->orig) {
-                $trailingProducers = $this->precedingInlineCallArgProducersBeforeCfgOp(
-                    $block->orig->children,
-                    $cfgCallOp
-                );
-                $trailingComparisonProducer = $trailingProducers[\count($trailingProducers) - 1] ?? null;
+                $trailingComparisonProducer = null;
+                $cfgCallIndex = null;
+                foreach ($block->orig->children as $ci => $cfgChild) {
+                    if ($cfgChild === $cfgCallOp) {
+                        $cfgCallIndex = $ci;
+                        break;
+                    }
+                }
+                if (null !== $cfgCallIndex && $cfgCallIndex > 0) {
+                    $immediatePrelude = $block->orig->children[$cfgCallIndex - 1] ?? null;
+                    if ($this->isComparisonInlineCallArgProducer($immediatePrelude)) {
+                        $trailingComparisonProducer = $immediatePrelude;
+                    }
+                }
+                if (null === $trailingComparisonProducer) {
+                    $trailingProducers = $this->precedingInlineCallArgProducersBeforeCfgOp(
+                        $block->orig->children,
+                        $cfgCallOp
+                    );
+                    $trailingComparisonProducer = $trailingProducers[\count($trailingProducers) - 1] ?? null;
+                }
                 $comparisonFeedsCallArg = $this->isComparisonInlineCallArgProducer($trailingComparisonProducer);
                 if (
                     $comparisonFeedsCallArg
@@ -27198,6 +27214,12 @@ class Compiler {
                     && null !== $trailingComparisonProducer->result
                 ) {
                     $comparisonSlot = $block->slotForOperand($trailingComparisonProducer->result);
+                    if (null === $comparisonSlot) {
+                        foreach ($this->compileExpr($trailingComparisonProducer, $block) as $op) {
+                            $sends[] = $op;
+                        }
+                        $comparisonSlot = $block->slotForOperand($trailingComparisonProducer->result);
+                    }
                     if (null !== $comparisonSlot) {
                         $valueSlot = (string) $comparisonSlot;
                     }
@@ -27224,6 +27246,10 @@ class Compiler {
                         $valueSlot = (string) $chainedConcatSlot;
                     } else {
                         $callArgProbe = $cfgCallOp->args[(int) $argIndex] ?? $arg;
+                        $trailingProducers = $this->precedingInlineCallArgProducersBeforeCfgOp(
+                            $block->orig->children,
+                            $cfgCallOp
+                        );
                         foreach ($trailingProducers as $producer) {
                             if (!$producer instanceof Op\Expr\FuncCall && !$producer instanceof Op\Expr\NsFuncCall) {
                                 continue;
@@ -27975,6 +28001,37 @@ class Compiler {
                 );
                 if (null !== $procOpenSlot) {
                     $valueSlot = $procOpenSlot;
+                }
+            }
+            // var_dump(E::A <=> E::B) — immediate spaceship prelude wins over hoisted enum temps (#10203).
+            if (null !== $cfgCallOp && null !== $block->orig) {
+                $callArgProbe = $cfgCallOp->args[(int) $argIndex] ?? $arg;
+                if ($this->callArgIsDeadInlineTemporary($callArgProbe)) {
+                    $cfgCallIndex = null;
+                    foreach ($block->orig->children as $ci => $cfgChild) {
+                        if ($cfgChild === $cfgCallOp) {
+                            $cfgCallIndex = $ci;
+                            break;
+                        }
+                    }
+                    if (null !== $cfgCallIndex && $cfgCallIndex > 0) {
+                        $immediatePrelude = $block->orig->children[$cfgCallIndex - 1] ?? null;
+                        if (
+                            $this->isComparisonInlineCallArgProducer($immediatePrelude)
+                            && $immediatePrelude instanceof Op\Expr
+                            && null !== $immediatePrelude->result
+                        ) {
+                            if (null === $block->slotForOperand($immediatePrelude->result)) {
+                                foreach ($this->compileExpr($immediatePrelude, $block) as $op) {
+                                    $sends[] = $op;
+                                }
+                            }
+                            $comparisonSlot = $block->slotForOperand($immediatePrelude->result);
+                            if (null !== $comparisonSlot) {
+                                $valueSlot = (string) $comparisonSlot;
+                            }
+                        }
+                    }
                 }
             }
             $sends[] = new OpCode(OpCode::TYPE_ARG_SEND, $valueSlot, $nameSlot, $unpackFlag);

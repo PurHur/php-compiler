@@ -1861,6 +1861,35 @@ PHP;
         self::assertSame($spaceshipSlot, $varDumpSend, 'var_dump arg send='.$varDumpSend);
     }
 
+    /** Issue #10203 — var_dump(E::A <=> E::B) must send spaceship int, not hoisted enum case (#9575). */
+    public function testVarDumpEnumSpaceshipSendsSpaceshipResultSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+declare(strict_types=1);
+enum E: int { case A = 1; case B = 2; }
+var_dump(E::A <=> E::B);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'enum_spaceship_var_dump.php');
+
+        $spaceshipSlot = null;
+        $varDumpSend = null;
+        $seenSpaceship = false;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_SPACESHIP === $op->type) {
+                $spaceshipSlot = $op->arg1;
+                $seenSpaceship = true;
+            }
+            if ($seenSpaceship && OpCode::TYPE_ARG_SEND === $op->type && null === $varDumpSend) {
+                $varDumpSend = $op->arg1;
+            }
+        }
+
+        self::assertNotNull($spaceshipSlot, 'spaceship result slot must be lowered');
+        self::assertSame($spaceshipSlot, $varDumpSend, 'var_dump arg send='.$varDumpSend);
+    }
+
     /** Issue #13945 — hoisted null operand before spaceship must not bind ConstFetch slot to var_dump arg. */
     public function testVarDumpNullSpaceshipSendsSpaceshipResultSlot(): void
     {
