@@ -414,6 +414,11 @@ final class VmDom
         $element->methods['getelementsbytagnamens'] = new ElementGetElementsByTagNameNS();
         $element->methodVisibility['getelementsbytagnamens'] = $pub;
         $element->methodNames['getelementsbytagnamens'] = 'getElementsByTagNameNS';
+        if (CompilerVersion::supportsDomElementInsertAdjacentHtml()) {
+            $element->methods['insertadjacenthtml'] = new ElementInsertAdjacentHTML();
+            $element->methodVisibility['insertadjacenthtml'] = $pub;
+            $element->methodNames['insertadjacenthtml'] = 'insertAdjacentHTML';
+        }
         $ctx->classes[self::CLASS_ELEMENT] = $element;
 
         $fragment = new ClassEntry('DOMDocumentFragment');
@@ -2213,6 +2218,102 @@ final class VmDom
             }
         }
         self::syncSubtree($ctx, $parent);
+    }
+
+    /**
+     * DOMElement::insertAdjacentHTML() — parse HTML and insert by position (php-src ext/dom/dom_element.c; #16128).
+     */
+    public static function insertAdjacentHTML(
+        Context $ctx,
+        ObjectEntry $element,
+        string $position,
+        string $html
+    ): void {
+        if (!self::isElement($element)) {
+            throw new \LogicException('insertAdjacentHTML() expects a DOMElement in this compiler build');
+        }
+        $pos = strtolower($position);
+        if (!\in_array($pos, ['beforebegin', 'afterbegin', 'beforeend', 'afterend'], true)) {
+            throw new \ValueError(
+                'DOMElement::insertAdjacentHTML(): Argument #1 ($position) must be a valid adjacency insertion position'
+            );
+        }
+        $ownerDocument = self::ownerDocumentEntry($element);
+        if (null === $ownerDocument) {
+            throw new \DOMException('Hierarchy request error');
+        }
+        $fragment = self::parseHtmlIntoFragment($ctx, $html, $ownerDocument);
+        match ($pos) {
+            'beforebegin' => self::insertAdjacentHtmlBeforeBegin($ctx, $element, $fragment),
+            'afterbegin' => self::insertAdjacentHtmlAfterBegin($ctx, $element, $fragment),
+            'beforeend' => self::insertAdjacentHtmlBeforeEnd($ctx, $element, $fragment),
+            'afterend' => self::insertAdjacentHtmlAfterEnd($ctx, $element, $fragment),
+        };
+    }
+
+    private static function insertAdjacentHtmlBeforeBegin(
+        Context $ctx,
+        ObjectEntry $element,
+        ObjectEntry $fragment
+    ): void {
+        $parent = self::parentEntryForSiblingMutation($element);
+        self::insertBeforeSibling($ctx, $parent, $fragment, $element);
+        self::syncSubtree($ctx, $parent);
+    }
+
+    private static function insertAdjacentHtmlAfterBegin(
+        Context $ctx,
+        ObjectEntry $element,
+        ObjectEntry $fragment
+    ): void {
+        self::prependLiveStandardChild($ctx, $element, $fragment);
+        self::syncSubtree($ctx, $element);
+    }
+
+    private static function insertAdjacentHtmlBeforeEnd(
+        Context $ctx,
+        ObjectEntry $element,
+        ObjectEntry $fragment
+    ): void {
+        self::appendLiveStandardChild($ctx, $element, $fragment);
+        self::syncSubtree($ctx, $element);
+    }
+
+    private static function insertAdjacentHtmlAfterEnd(
+        Context $ctx,
+        ObjectEntry $element,
+        ObjectEntry $fragment
+    ): void {
+        $parent = self::parentEntryForSiblingMutation($element);
+        self::insertAfterSibling($ctx, $parent, $fragment, $element);
+        self::syncSubtree($ctx, $parent);
+    }
+
+    private static function parseHtmlIntoFragment(
+        Context $ctx,
+        string $html,
+        ObjectEntry $ownerDocument
+    ): ObjectEntry {
+        $fragment = self::createDocumentFragment($ctx, $ownerDocument)->toObject();
+        if ('' === $html) {
+            return $fragment;
+        }
+        $wrapper = self::createElement($ctx, 'div')->toObject();
+        self::appendHtmlChildren($ctx, $wrapper, $html, $ownerDocument);
+        $wrapperState = DomRegistry::state($wrapper);
+        $fragState = DomRegistry::state($fragment);
+        foreach ($wrapperState->childIds as $childId) {
+            $child = DomRegistry::entry($childId);
+            if (null === $child) {
+                continue;
+            }
+            self::linkChildToParent($child, null);
+            $fragState->childIds[] = $childId;
+            self::propagateDocumentId($child, $ownerDocument->id);
+        }
+        $wrapperState->childIds = [];
+
+        return $fragment;
     }
 
     /**
