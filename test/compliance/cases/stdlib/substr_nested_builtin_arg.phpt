@@ -1,5 +1,5 @@
 --TEST--
-stdlib nested substr(sprintf()) — inner string preserved (#10673, ext/standard/string.c)
+stdlib substr() nested sprintf/dechex/str_pad arg #1 — inner call evaluated (#15859, #10673, ext/standard/string.c)
 --FILE--
 <?php
 declare(strict_types=1);
