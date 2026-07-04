@@ -61,6 +61,27 @@ PHP;
         $this->assertSame('dev', trim($this->runAot($readCode)));
     }
 
+    public function testSessionPersistsAcrossWriteCloseWithinAotRun(): void
+    {
+        if (!LlvmToolchain::isReady(dirname(__DIR__, 2))) {
+            $this->markTestSkipped('LLVM 9 toolchain not available');
+        }
+
+        $this->sessionDir = sys_get_temp_dir().'/phpc_aot_session_'.uniqid('', true);
+        @mkdir($this->sessionDir, 0700, true);
+
+        $code = <<<'PHP'
+<?php
+session_start();
+$_SESSION['k'] = 'v';
+session_write_close();
+session_start();
+echo $_SESSION['k'] ?? 'missing';
+PHP;
+
+        $this->assertSame('v', trim($this->runAot($code)));
+    }
+
     private function extractSessionId(string $output): string
     {
         $lines = preg_split('/\r?\n/', trim($output)) ?: [];

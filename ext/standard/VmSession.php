@@ -419,7 +419,8 @@ final class VmSession
         $incomingId = self::readCookieId($ctx);
         if ('' !== $incomingId) {
             self::$id = $incomingId;
-        } else {
+        } elseif ('' === self::$id) {
+            // php-src ext/session/session.c — reuse PS(id) after session_write_close() in-request.
             self::$id = self::generateId();
             ResponseContext::addHeader(
                 self::buildSessionSetCookieLine(self::$id),
@@ -682,13 +683,9 @@ final class VmSession
 
             return;
         }
-        $decoded = VmUnserializeFormat::decodePayload($raw);
-        if (!is_array($decoded)) {
+        if (!VmSessionSerializer::decodePhp($ctx, $raw)) {
             $sessionVar->array(new HashTable());
-
-            return;
         }
-        $sessionVar->array(self::importArray($decoded));
     }
 
     private static function saveSession(Context $ctx): void
@@ -697,32 +694,18 @@ final class VmSession
             return;
         }
         $sessionVar = $ctx->getSuperglobal('_SESSION');
-        if (null === $sessionVar) {
+        if (null === $sessionVar || Variable::TYPE_ARRAY !== $sessionVar->type) {
             return;
         }
-        $exported = VmJson::export($sessionVar);
-        $payload = serialize($exported);
+        $payload = VmSessionSerializer::encodePhp($ctx, $sessionVar->toArray());
+        if (false === $payload) {
+            return;
+        }
         $dir = SessionFileStorage::storageDir();
         if (!VmStatPath::isDir($dir)) {
             VmFs::mkdir($dir, 0700, true);
         }
         VmFs::filePutContents(SessionFileStorage::storagePath(self::$id), $payload, \LOCK_EX);
-    }
-
-    private static function importArray(array $decoded): HashTable
-    {
-        $ht = new HashTable();
-        $isList = array_is_list($decoded);
-        foreach ($decoded as $key => $item) {
-            $slot = VmJson::import($item);
-            if ($isList) {
-                $ht->addIndex((int) $key, $slot);
-            } else {
-                $ht->add((string) $key, $slot);
-            }
-        }
-
-        return $ht;
     }
 
     private static function generateId(): string
