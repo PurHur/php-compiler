@@ -2389,6 +2389,53 @@ PHP;
         self::assertStringContainsString("'2020-01-01'", $out);
     }
 
+    /** Issue #15783 — var_export([0, strlen('x')]) wires Array_ producer, not hoisted strlen element. */
+    public function testVarExportInlineArrayWithFuncCallElementUsesArrayProducerSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+var_export([0, strlen('x')]);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'var_export_inline_array_func_element.php');
+
+        $initArraySlot = null;
+        $strlenReturnSlot = null;
+        $varExportSendSlot = null;
+        $pendingStrlen = false;
+        $fcallOrdinal = 0;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                ++$fcallOrdinal;
+                if (1 === $fcallOrdinal) {
+                    $pendingStrlen = true;
+                }
+            }
+            if ($pendingStrlen && OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
+                $strlenReturnSlot = $op->arg1;
+                $pendingStrlen = false;
+            }
+            if (OpCode::TYPE_INIT_ARRAY === $op->type) {
+                $initArraySlot = $op->arg1;
+            }
+            if (2 === $fcallOrdinal && OpCode::TYPE_ARG_SEND === $op->type) {
+                $varExportSendSlot = $op->arg1;
+            }
+        }
+
+        self::assertNotNull($initArraySlot);
+        self::assertNotNull($strlenReturnSlot);
+        self::assertNotNull($varExportSendSlot);
+        self::assertSame($initArraySlot, $varExportSendSlot, 'var_export must send array slot, not strlen return');
+        self::assertNotSame($strlenReturnSlot, $varExportSendSlot);
+
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertStringContainsString('array (', $out);
+        self::assertStringContainsString('1', $out);
+    }
+
     /** Issue #12450 — array_merge(array_keys($src), [...]) wires FuncCall + sibling Array_ producer slots. */
     public function testArrayMergeInlineArrayKeysRuntime(): void
     {
