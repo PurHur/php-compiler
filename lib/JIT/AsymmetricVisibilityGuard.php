@@ -49,11 +49,15 @@ final class AsymmetricVisibilityGuard
         $declaringLc = strtolower(ltrim($declaringClass, '\\'));
         $classId = $objectType->lookup($declaringClass);
         $readVis = $objectType->propertyVisibility($classId, $propName);
+        $effectiveRead = PropertyVisibility::effectiveGetVisibility(
+            $readVis,
+            $objectType->propertyGetVisibility($classId, $propName)
+        );
         $setVis = PropertyVisibility::effectiveSetVisibility(
             $readVis,
             $objectType->propertySetVisibility($classId, $propName)
         );
-        if ($setVis === MethodVisibility::mask($readVis)) {
+        if ($setVis === MethodVisibility::mask($effectiveRead)) {
             return false;
         }
 
@@ -66,7 +70,7 @@ final class AsymmetricVisibilityGuard
                 $declaringClass,
                 $propName,
                 static fn (string $child, string $parent): bool => self::isSubclassOf($objectType, $child, $parent),
-                MethodVisibility::mask($readVis),
+                MethodVisibility::mask($effectiveRead),
                 $objectType->propertyAsymmetricExplicitRead($classId, $propName)
             );
         } catch (\LogicException $e) {
@@ -106,11 +110,15 @@ final class AsymmetricVisibilityGuard
         if (null === $meta) {
             return false;
         }
+        $effectiveRead = PropertyVisibility::effectiveGetVisibility(
+            $meta['visibility'],
+            $meta['getVisibility'] ?? 0
+        );
         $setVis = PropertyVisibility::effectiveSetVisibility(
             $meta['visibility'],
             $meta['setVisibility'] ?? 0
         );
-        if ($setVis === MethodVisibility::mask($meta['visibility'])) {
+        if ($setVis === MethodVisibility::mask($effectiveRead)) {
             return false;
         }
         $declaringClass = $meta['declaringClassName'];
@@ -124,7 +132,7 @@ final class AsymmetricVisibilityGuard
                 $declaringClass,
                 $propName,
                 static fn (string $child, string $parent): bool => self::isSubclassOf($objectType, $child, $parent),
-                MethodVisibility::mask($meta['visibility']),
+                MethodVisibility::mask($effectiveRead),
                 $meta['asymmetricExplicitRead'] ?? false
             );
         } catch (\LogicException $e) {

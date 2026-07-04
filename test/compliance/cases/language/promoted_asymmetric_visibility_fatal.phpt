@@ -9,8 +9,9 @@ class C {
     }
 }
 echo (new C('alice'))->name, "\n";
+$c = new C('alice');
 try {
-    (new C('alice'))->name = 'bob';
+    $c->name = 'bob';
 } catch (Error $e) {
     echo get_class($e), ': ', $e->getMessage(), "\n";
 }
