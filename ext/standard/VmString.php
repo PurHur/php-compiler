@@ -358,6 +358,82 @@ final class VmString
         return self::coerceOperand($var);
     }
 
+    /**
+     * strtok() arg #1 ($string) — accepts null; invalid types report "string" not "?string" (#9207, php-src string.c).
+     *
+     * @throws \TypeError when the operand cannot be converted like Zend PHP 8.x
+     */
+    public static function coerceStrtokStringArg(Variable $var): ?string
+    {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_NULL === $var->type) {
+            return null;
+        }
+        if (Variable::TYPE_ARRAY === $var->type) {
+            throw new \TypeError(self::stringBuiltinTypeError('strtok', 0, 'string', 'array'));
+        }
+        if (EnumCaseSupport::isEnumCaseVariable($var)) {
+            throw new \TypeError(
+                self::stringBuiltinTypeError(
+                    'strtok',
+                    0,
+                    'string',
+                    EnumCaseSupport::typeNameForVariable($var)
+                )
+            );
+        }
+        if (Variable::TYPE_OBJECT === $var->type) {
+            $vm = VM::running();
+            $object = $var->toObject();
+            if (null === $vm || !$vm->hasInstanceMethod($object->class, '__tostring')) {
+                throw new \TypeError(
+                    self::stringBuiltinTypeError('strtok', 0, 'string', $object->class->name)
+                );
+            }
+        }
+
+        return self::coerceOperand($var);
+    }
+
+    /**
+     * strtok() arg #2 ($token) — TypeError labels "?string" like php-src (#9207, ext/standard/string.c).
+     *
+     * @throws \TypeError when the operand cannot be converted like Zend PHP 8.x
+     */
+    public static function coerceStrtokTokenArg(Variable $var): string
+    {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_NULL === $var->type) {
+            VmNullStringParamDeprecation::emit(null, 'strtok', 1, 'token');
+
+            return '';
+        }
+        if (Variable::TYPE_ARRAY === $var->type) {
+            throw new \TypeError(self::nullableStringBuiltinTypeError('strtok', 1, 'token', 'array'));
+        }
+        if (RuntimeStrictness::enforceStringBuiltinParityGuards() && EnumCaseSupport::isEnumCaseVariable($var)) {
+            throw new \TypeError(
+                self::nullableStringBuiltinTypeError(
+                    'strtok',
+                    1,
+                    'token',
+                    EnumCaseSupport::typeNameForVariable($var)
+                )
+            );
+        }
+        if (Variable::TYPE_OBJECT === $var->type) {
+            $vm = VM::running();
+            $object = $var->toObject();
+            if (null === $vm || !$vm->hasInstanceMethod($object->class, '__tostring')) {
+                throw new \TypeError(
+                    self::nullableStringBuiltinTypeError('strtok', 1, 'token', $object->class->name)
+                );
+            }
+        }
+
+        return self::coerceOperand($var);
+    }
+
     private static function stringBuiltinTypeError(
         string $function,
         int $argIndex,
