@@ -4805,8 +4805,9 @@ apply_php_cfg_compiler_halt_offset_overlay() {
   local msc="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/MagicScriptConst.php"
   local halt="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/HaltCompiler.php"
   local overlay="$PATCH_DIR/overlays/php-cfg"
-  if grep -q 'KIND_HALT_OFFSET' "$msc" 2>/dev/null \
-    && grep -q 'parseSourceCode' "$parser" 2>/dev/null \
+  if grep -q 'protected string $parseSourceCode' "$parser" 2>/dev/null \
+    && grep -q 'parseSourceCode = $code' "$parser" 2>/dev/null \
+    && grep -q 'KIND_HALT_OFFSET' "$msc" 2>/dev/null \
     && grep -q 'haltOffset' "$halt" 2>/dev/null; then
     echo "Skip php-cfg-compiler-halt-offset overlay (already applied)"
     return 0
@@ -4829,26 +4830,27 @@ method_path = Path(sys.argv[2])
 property_path = Path(sys.argv[3])
 text = parser_path.read_text()
 prop = property_path.read_text().rstrip("\n")
-if "parseSourceCode" not in text:
+if "protected string $parseSourceCode" not in text:
     anchor = "    protected $anonId = 0;\n"
     if anchor not in text:
         sys.stderr.write("php-cfg-compiler-halt-offset: Parser anonId anchor not found\n")
         raise SystemExit(1)
     text = text.replace(anchor, anchor + "\n" + prop + "\n", 1)
-    old_parse = """    public function parse($code, $fileName)
+old_parse = """    public function parse($code, $fileName)
     {
         return $this->parseAst($this->astParser->parse($code), $fileName);
     }"""
-    new_parse = """    public function parse($code, $fileName)
+new_parse = """    public function parse($code, $fileName)
     {
         $this->parseSourceCode = $code;
 
         return $this->parseAst($this->astParser->parse($code), $fileName);
     }"""
-    if old_parse not in text:
-        sys.stderr.write("php-cfg-compiler-halt-offset: Parser::parse anchor not found\n")
-        raise SystemExit(1)
+if old_parse in text:
     text = text.replace(old_parse, new_parse, 1)
+elif "parseSourceCode = $code" not in text:
+    sys.stderr.write("php-cfg-compiler-halt-offset: Parser::parse anchor not found\n")
+    raise SystemExit(1)
 old_halt = """    protected function parseStmt_HaltCompiler(Stmt\\HaltCompiler $node)
     {
         $attrs = $this->mapAttributes($node);
