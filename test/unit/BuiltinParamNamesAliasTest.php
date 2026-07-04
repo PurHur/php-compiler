@@ -499,6 +499,27 @@ final class BuiltinParamNamesAliasTest extends TestCase
         }
     }
 
+    /** @covers issue #9990 */
+    public function testFpowRoundingModeNamedParameters(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $names = BuiltinParamNames::forFunction('fpow');
+            self::assertSame(['num', 'exponent', 'rounding_mode'], $names);
+            self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'num', 'fpow'));
+            self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'exponent', 'fpow'));
+            self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'rounding_mode', 'fpow'));
+            self::assertSame(3, BuiltinParamNames::paramCountForInternalFunction('fpow'));
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     /** @covers issue #10071 */
     public function testTypeProbeAutoloadNamedParamsResolve(): void
     {
