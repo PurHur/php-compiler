@@ -12,6 +12,10 @@ final class TryCatchComplianceTest extends TestCase
     /** Issue #10016 / #3508: bare `throw;` rethrows active catch exception to outer handler. */
     public function testBareThrowRethrowNestedCatchPrintsMessage(): void
     {
+        if (!CompilerVersion::supportsBareRethrow()) {
+            self::markTestSkipped('bare rethrow disabled on reference profile (#15719)');
+        }
+
         $this->assertVmOutput(
             <<<'PHP'
 <?php
@@ -33,6 +37,10 @@ PHP
     /** Issue #10016: same-line throw expr + bare rethrow must not treat `throw new` as rethrow. */
     public function testBareThrowRethrowSameLineAsThrowExpression(): void
     {
+        if (!CompilerVersion::supportsBareRethrow()) {
+            self::markTestSkipped('bare rethrow disabled on reference profile (#15719)');
+        }
+
         $this->assertVmOutput(
             <<<'PHP'
 <?php

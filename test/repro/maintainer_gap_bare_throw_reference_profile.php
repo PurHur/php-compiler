@@ -13,3 +13,5 @@ try {
 } catch (Ex $e) {
     echo "inner\n";
 }
+
+exit(1);
