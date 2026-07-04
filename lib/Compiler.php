@@ -187,6 +187,9 @@ class Compiler {
     /** Force FUNCCALL_EXEC_RETURN while lowering hoisted sibling call-arg producers (#10981). */
     private bool $forceDeferredSiblingCallReturnSlot = false;
 
+    /** Reentrancy guard — statementLevel() ↔ firstSibling() mutual recursion (#9321). */
+    private bool $firstSiblingInlineFuncCallProducerIndexActive = false;
+
     /** Catch variable name (lc) => scope slot while lowering catch bodies (#9887). */
     private array $activeCatchVarSlotsByName = [];
 
@@ -1451,16 +1454,19 @@ class Compiler {
         if ($this->ternaryMergePhiRhsSlots->contains($mergeCfg)) {
             return $this->ternaryMergePhiRhsSlots[$mergeCfg];
         }
-        $slot = (int) $branch->getVarSlot($phiOperand, false);
+        $slot = $branch->forceFreshVarSlot($phiOperand);
         $this->ternaryMergePhiRhsSlots[$mergeCfg] = $slot;
         $root = Block::cfgVarRoot($phiOperand);
         if (null !== $root) {
-            if (!$this->ternaryMergeVarSlots->contains($mergeCfg)) {
-                $this->ternaryMergeVarSlots[$mergeCfg] = new SplObjectStorage();
+            $rootName = Block::resolveVariableName($root);
+            if (null === $rootName || '' === $rootName) {
+                if (!$this->ternaryMergeVarSlots->contains($mergeCfg)) {
+                    $this->ternaryMergeVarSlots[$mergeCfg] = new SplObjectStorage();
+                }
+                /** @var SplObjectStorage<CfgVariable, int> $map */
+                $map = $this->ternaryMergeVarSlots[$mergeCfg];
+                $map[$root] = $slot;
             }
-            /** @var SplObjectStorage<CfgVariable, int> $map */
-            $map = $this->ternaryMergeVarSlots[$mergeCfg];
-            $map[$root] = $slot;
         }
 
         return $slot;
@@ -1570,6 +1576,14 @@ class Compiler {
             $this->recordTernaryMergePhiRhsSlot($mergeCfg, $compiled);
             foreach ($compiled->eachCfgVarRootSlot() as [$root, $slot]) {
                 if (!$map->contains($root)) {
+                    // && / || long arms read named locals (e.g. str_contains($out, …)); do not
+                    // remap those roots through the bool-cast phi merge map (#15183, #10626).
+                    if ($this->mergeCfgBlockUsesLogicalShortCircuit($mergeCfg)) {
+                        $rootName = Block::resolveVariableName($root);
+                        if (null !== $rootName && '' !== $rootName) {
+                            continue;
+                        }
+                    }
                     $map[$root] = $slot;
                 }
             }
@@ -1622,6 +1636,12 @@ class Compiler {
             /** @var SplObjectStorage<CfgVariable, int> $map */
             $map = $this->ternaryMergeVarSlots[$mergeCfg];
             foreach ($map as $root) {
+                if ($this->mergeCfgBlockUsesLogicalShortCircuit($mergeCfg)) {
+                    $rootName = Block::resolveVariableName($root);
+                    if (null !== $rootName && '' !== $rootName) {
+                        continue;
+                    }
+                }
                 $compiled->prebindCfgVarRoot($root, $map[$root]);
             }
         }
@@ -8393,13 +8413,24 @@ class Compiler {
             )];
             if ($expr instanceof Op\Expr\Cast\Bool_) {
                 $phiSlot = $this->logicalShortCircuitPhiMergeSlot($block);
-                if (null !== $phiSlot && $castResultSlot !== $phiSlot) {
-                    $ops[] = new OpCode(
-                        OpCode::TYPE_ASSIGN,
-                        $phiSlot,
-                        $phiSlot,
-                        $castResultSlot
-                    );
+                if (null !== $phiSlot) {
+                    if ($block->isNamedVariableSlot($phiSlot)) {
+                        $phiSlot = $block->forceFreshVarSlot($expr->result, $phiSlot);
+                        if (null !== $block->orig) {
+                            $mergeCfg = $this->branchJumpMergeTarget($block->orig);
+                            if (null !== $mergeCfg) {
+                                $this->ternaryMergePhiRhsSlots[$mergeCfg] = $phiSlot;
+                            }
+                        }
+                    }
+                    if ($castResultSlot !== $phiSlot) {
+                        $ops[] = new OpCode(
+                            OpCode::TYPE_ASSIGN,
+                            $phiSlot,
+                            $phiSlot,
+                            $castResultSlot
+                        );
+                    }
                 }
             }
 
@@ -15340,6 +15371,10 @@ class Compiler {
             && null !== $cfgCallOp
             && null !== $block
             && null !== $block->orig
+            && !(
+                $producerCount > $argCount
+                && null !== $this->soleNonEmbeddedCallArgIndex($callArgs)
+            )
         ) {
             $byIndex = $this->inlineHoistedProducerForCallArgIndex(
                 $cfgCallOp,
@@ -15886,6 +15921,17 @@ class Compiler {
             $leadingConstNested = $this->splitLeadingConstFetchWithNestedArrayLiteralChain($producers);
             if (null !== $leadingConstNested) {
                 [$constFetch, $arrayChain] = $leadingConstNested;
+                /** @var list<Op\Expr\ConstFetch> $leadingConsts */
+                $leadingConsts = [];
+                foreach ($producers as $producer) {
+                    if ($producer instanceof Op\Expr\ConstFetch) {
+                        $leadingConsts[] = $producer;
+                        continue;
+                    }
+                    if ($producer instanceof Op\Expr\Array_) {
+                        break;
+                    }
+                }
                 $arrayArgIndex = $argCount - 1;
                 if ($argIndex === $arrayArgIndex) {
                     return $arrayChain[\count($arrayChain) - 1];
@@ -15898,7 +15944,10 @@ class Compiler {
                     }
                 }
                 if ($argIndex === $constArgIndex) {
-                    return $constFetch;
+                    return $leadingConsts[\count($leadingConsts) - 1] ?? $constFetch;
+                }
+                if (isset($leadingConsts[$argIndex])) {
+                    return $leadingConsts[$argIndex];
                 }
 
                 return null;
@@ -15907,6 +15956,17 @@ class Compiler {
             $leadingConstArray = $this->splitLeadingConstFetchWithArrayLiteralCallArg($producers);
             if (null !== $leadingConstArray) {
                 [$constFetch, $array] = $leadingConstArray;
+                /** @var list<Op\Expr\ConstFetch> $leadingConsts */
+                $leadingConsts = [];
+                foreach ($producers as $producer) {
+                    if ($producer instanceof Op\Expr\ConstFetch) {
+                        $leadingConsts[] = $producer;
+                        continue;
+                    }
+                    if ($producer instanceof Op\Expr\Array_) {
+                        break;
+                    }
+                }
                 $arrayArgIndex = $argCount - 1;
                 if ($argIndex === $arrayArgIndex) {
                     return $array;
@@ -15919,7 +15979,10 @@ class Compiler {
                     }
                 }
                 if ($argIndex === $constArgIndex) {
-                    return $constFetch;
+                    return $leadingConsts[\count($leadingConsts) - 1] ?? $constFetch;
+                }
+                if (isset($leadingConsts[$argIndex])) {
+                    return $leadingConsts[$argIndex];
                 }
 
                 return null;
@@ -20818,17 +20881,21 @@ class Compiler {
             && property_exists($consumer, 'args')
             && \is_array($consumer->args)
         ) {
+            $leadingEmbedded = 0;
+            foreach ($consumer->args as $arg) {
+                if ($this->isEmbeddedCallLiteralArg($arg)) {
+                    ++$leadingEmbedded;
+                    continue;
+                }
+                break;
+            }
+            // probe('label', g()) / probe('label', in_array(...)) — adjacent hoisted callee (#15846, #16013).
+            if ($producerIndex === $consumerIndex - 1) {
+                return $leadingEmbedded;
+            }
             $firstSibling = $this->firstSiblingInlineFuncCallProducerIndex($consumerIndex, $cfgChildren);
             if (null === $firstSibling || $producerIndex === $firstSibling) {
                 // probe('label', g()) — sole adjacent hoisted producer feeds first hoisted arg (#15846).
-                $leadingEmbedded = 0;
-                foreach ($consumer->args as $arg) {
-                    if ($this->isEmbeddedCallLiteralArg($arg)) {
-                        ++$leadingEmbedded;
-                        continue;
-                    }
-                    break;
-                }
                 $consumerName = $this->resolveCfgFuncCallName($consumer);
                 if (
                     1 === $distance
@@ -20859,6 +20926,37 @@ class Compiler {
         $mid = $cfgChildren[$producerIndex + 1] ?? null;
         if (2 === $distance && $this->isUnaryInlineSiblingCallArgExpr($mid)) {
             return 0;
+        }
+        // tempnam(sys_get_temp_dir(), E::A) — FuncCall arg #0, ClassConstFetch prelude (#10303, #9321).
+        // in_array('x', g(), true) — embedded needle + FuncCall haystack + ConstFetch strict (#15612, #16013).
+        if (
+            2 === $distance
+            && ($mid instanceof Op\Expr\ClassConstFetch || $mid instanceof Op\Expr\ConstFetch)
+        ) {
+            $producer = $cfgChildren[$producerIndex] ?? null;
+            if (
+                ($producer instanceof Op\Expr\FuncCall || $producer instanceof Op\Expr\NsFuncCall)
+                && ($consumer instanceof Op\Expr\FuncCall || $consumer instanceof Op\Expr\NsFuncCall)
+                && property_exists($consumer, 'args')
+                && \is_array($consumer->args)
+            ) {
+                $leadingEmbedded = 0;
+                foreach ($consumer->args as $arg) {
+                    if ($this->isEmbeddedCallLiteralArg($arg)) {
+                        ++$leadingEmbedded;
+                        continue;
+                    }
+                    break;
+                }
+                if ($leadingEmbedded > 0) {
+                    return $leadingEmbedded;
+                }
+            }
+
+            return 0;
+        }
+        if ($this->firstSiblingInlineFuncCallProducerIndexActive) {
+            return $distance - 1;
         }
         $firstSibling = $this->firstSiblingInlineFuncCallProducerIndex($consumerIndex, $cfgChildren);
         if (null === $firstSibling) {
@@ -21041,6 +21139,18 @@ class Compiler {
                         return false;
                     }
                 }
+            }
+
+            if (
+                $this->isNestedCallArgProducerSeparatedByConsumerLiteralPreludes(
+                    $producer,
+                    $consumer,
+                    $producerIndex,
+                    $consumerIndex,
+                    $cfgChildren
+                )
+            ) {
+                return false;
             }
 
             return $producer instanceof Op\Expr\FuncCall || $producer instanceof Op\Expr\NsFuncCall;
@@ -21290,6 +21400,22 @@ class Compiler {
      * @param list<Op> $cfgChildren
      */
     private function firstSiblingInlineFuncCallProducerIndex(int $consumerIndex, array $cfgChildren): ?int
+    {
+        if ($this->firstSiblingInlineFuncCallProducerIndexActive) {
+            return null;
+        }
+        $this->firstSiblingInlineFuncCallProducerIndexActive = true;
+        try {
+            return $this->firstSiblingInlineFuncCallProducerIndexImpl($consumerIndex, $cfgChildren);
+        } finally {
+            $this->firstSiblingInlineFuncCallProducerIndexActive = false;
+        }
+    }
+
+    /**
+     * @param list<Op> $cfgChildren
+     */
+    private function firstSiblingInlineFuncCallProducerIndexImpl(int $consumerIndex, array $cfgChildren): ?int
     {
         $i = $consumerIndex - 1;
         while ($i >= 0) {
@@ -29461,9 +29587,9 @@ class Compiler {
             }
             if (
                 null !== $cfgCallOp
-                && $this->callArgIsDeadInlineTemporary($arg)
                 && !$this->callArgOperandExpectsArrayProducer($arg)
                 && !$inlineArrayLiteralArgWired
+                && ($this->callArgIsDeadInlineTemporary($arg) || $this->isNamedVariableOperand($arg))
             ) {
                 $andPhi = $this->logicalShortCircuitPhiMergeSlot($block);
                 if (
@@ -29471,18 +29597,30 @@ class Compiler {
                     && null !== $valueSlot
                     && (string) $valueSlot === (string) $andPhi
                 ) {
-                    $pendingNested = $this->slotForLastPendingInlineCallResultBeforeFuncCallInit($sends)
-                        ?? $this->slotForLastEmittedInlineCallResultBeforePendingFuncCall($block);
-                    $calleeLower = strtolower($calleeName ?? $this->resolveCfgFuncCallName($cfgCallOp) ?? '');
-                    if (
-                        null !== $pendingNested
-                        && !\in_array($calleeLower, ['exit', 'die'], true)
-                        && !(
-                            'array_map' === $calleeLower
-                            && 0 === (int) $argIndex
-                        )
-                    ) {
-                        $valueSlot = (string) $pendingNested;
+                    if ($this->isNamedVariableOperand($arg)) {
+                        $copyOperand = new Operand\Temporary();
+                        $copySlot = $block->forceFreshVarSlot($copyOperand, (int) $andPhi);
+                        $sends[] = new OpCode(
+                            OpCode::TYPE_ASSIGN,
+                            $copySlot,
+                            (int) $valueSlot,
+                            (int) $valueSlot,
+                        );
+                        $valueSlot = (string) $copySlot;
+                    } else {
+                        $pendingNested = $this->slotForLastPendingInlineCallResultBeforeFuncCallInit($sends)
+                            ?? $this->slotForLastEmittedInlineCallResultBeforePendingFuncCall($block);
+                        $calleeLower = strtolower($calleeName ?? $this->resolveCfgFuncCallName($cfgCallOp) ?? '');
+                        if (
+                            null !== $pendingNested
+                            && !\in_array($calleeLower, ['exit', 'die'], true)
+                            && !(
+                                'array_map' === $calleeLower
+                                && 0 === (int) $argIndex
+                            )
+                        ) {
+                            $valueSlot = (string) $pendingNested;
+                        }
                     }
                 }
             }
@@ -29994,6 +30132,56 @@ class Compiler {
                             $finalCallArgProbe
                         )
                         : (string) $this->finalizeOperandSlotForAccess($block, (int) $finalNamedSlot, true);
+                }
+            }
+            if (
+                null !== $cfgCallOp
+                && null !== $block->orig
+                && 'filter_input' === strtolower($this->resolveCfgFuncCallName($cfgCallOp) ?? '')
+                && (0 === (int) $argIndex || 2 === (int) $argIndex)
+            ) {
+                $callIndex = null;
+                foreach ($block->orig->children as $i => $child) {
+                    if ($child === $cfgCallOp) {
+                        $callIndex = $i;
+                        break;
+                    }
+                }
+                if (null !== $callIndex) {
+                    $wantPrefix = 0 === (int) $argIndex ? 'input_' : 'filter_';
+                    for ($i = $callIndex - 1; $i >= 0; --$i) {
+                        $child = $block->orig->children[$i];
+                        if (!$child instanceof Op\Expr\ConstFetch) {
+                            if ($child instanceof Op\Expr\Assign) {
+                                break;
+                            }
+                            continue;
+                        }
+                        $name = strtolower($this->staticNameFromOperand($child->name) ?? '');
+                        if (!str_starts_with($name, $wantPrefix)) {
+                            continue;
+                        }
+                        $slot = $block->slotForOperand($child->result);
+                        if (null !== $slot) {
+                            $valueSlot = (string) $slot;
+                        }
+                        break;
+                    }
+                }
+            }
+            // probe('label', in_array(..., g(), true)) — nested callee return, not inner ConstFetch (#14237, #16013).
+            if (
+                null !== $cfgCallOp
+                && null !== $block->orig
+                && $this->callArgIsDeadInlineTemporary($cfgCallOp->args[(int) $argIndex] ?? $arg)
+            ) {
+                $nestedCallArgSlot = $this->resolveAdjacentNestedFuncCallArgSlot(
+                    $block,
+                    $cfgCallOp,
+                    (int) $argIndex
+                );
+                if (null !== $nestedCallArgSlot) {
+                    $valueSlot = $nestedCallArgSlot;
                 }
             }
             $sends[] = new OpCode(OpCode::TYPE_ARG_SEND, $valueSlot, $nameSlot, $unpackFlag);

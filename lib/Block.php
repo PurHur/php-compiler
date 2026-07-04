@@ -630,6 +630,14 @@ class Block {
                 $this->constants[$slot] = $parent->constants[$slot];
             }
         }
+        foreach ($parent->namedAssignDestSlotIndexes as $slot => $_) {
+            $this->namedAssignDestSlotIndexes[$slot] = true;
+        }
+        foreach ($parent->namedAssignDestSlots as $root) {
+            if (!$this->namedAssignDestSlots->contains($root)) {
+                $this->namedAssignDestSlots[$root] = $parent->namedAssignDestSlots[$root];
+            }
+        }
         // literal/deploy include path tables are per-block; inheriting parent paths breaks
         // arg3 indices and can recurse into the wrong TU (layout vs partial, issue #784).
         if (null !== $parent->func) {
@@ -712,13 +720,21 @@ class Block {
 
     public function slotIndexForVariableName(string $name): ?int
     {
+        $fallback = null;
         foreach ($this->scope as $operand) {
-            if (self::resolveVariableName($operand) === $name) {
-                return $this->scope[$operand];
+            if (self::resolveVariableName($operand) !== $name) {
+                continue;
+            }
+            $slot = $this->scope[$operand];
+            if (isset($this->namedAssignDestSlotIndexes[$slot])) {
+                return $slot;
+            }
+            if (null === $fallback) {
+                $fallback = $slot;
             }
         }
 
-        return null;
+        return $fallback;
     }
 
     /** True when $slot holds a named local ($a), not a compiler temporary (#5340). */
