@@ -4577,6 +4577,23 @@ PHP;
         self::assertSame("array (\n  0 => 'a',\n  1 => 'b',\n)\n", ob_get_clean());
     }
 
+    /** Issue #11236 — array_column() inline (object)[] haystack must not bind Cast slot to arg #0. */
+    public function testArrayColumnInlineObjectCastHaystackRuntime(): void
+    {
+        $code = <<<'PHP'
+<?php
+declare(strict_types=1);
+$r = array_column([(object) ['id' => 10], (object) ['id' => 20]], 'id');
+var_export($r);
+echo "\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'array_column_object_cast_haystack.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("array (\n  0 => 10,\n  1 => 20,\n)\n", ob_get_clean());
+    }
+
     /** Issue #13800 — extract(inline array) then var_export($local) must not re-compile extract for var_export arg. */
     public function testExtractInlineArrayThenVarExportNamedLocal(): void
     {

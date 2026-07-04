@@ -14652,6 +14652,25 @@ class Compiler {
         }
         $producerCount = count($producers);
         $argCount = count($callArgs);
+        // array_column([(object)[...], ...], 'col') — outer haystack Array_, not (object) Cast preludes (#11236).
+        if (
+            'array_column' === $inlineFuncName
+            && 0 === $argIndex
+            && null !== $block
+            && null !== $cfgCallOp
+        ) {
+            $immediate = $this->inlineArrayProducerImmediatelyBeforeCfgCall($cfgCallOp, $block);
+            if ($immediate instanceof Op\Expr\Array_) {
+                return $immediate;
+            }
+            $arrayTail = array_values(array_filter(
+                $producers,
+                static fn (Op\Expr $producer): bool => $producer instanceof Op\Expr\Array_
+            ));
+            if ([] !== $arrayTail) {
+                return $arrayTail[\count($arrayTail) - 1];
+            }
+        }
         // tempnam(sys_get_temp_dir(), E::CASE) — nested FuncCall + trailing enum ClassConstFetch (#10303).
         if (2 === $argCount && 1 === $producerCount && 1 === $argIndex) {
             $sole = $producers[0] ?? null;
@@ -15836,6 +15855,10 @@ class Compiler {
                 && !($producers[0] instanceof Op\Expr\UnaryPlus)
                 && !$this->isComparisonInlineCallArgProducer($producers[0])
                 && !$this->isEmbeddedCallLiteralArg($callArgs[0] ?? null)
+                && !(
+                    'array_column' === $inlineFuncName
+                    && $producers[0] instanceof Op\Expr\Cast
+                )
             ) {
                 $callArg = $callArgs[$argIndex] ?? null;
                 if (
@@ -16930,6 +16953,10 @@ class Compiler {
         }
         for ($i = $callIndex - 1; $i >= 0; --$i) {
             $child = $cfgChildren[$i] ?? null;
+            if ($child instanceof Op\Expr\Array_) {
+                // array_column([(object)[...], ...], 'col') — Cast preludes feed array elements, not arg #0 (#11236).
+                break;
+            }
             if (!$child instanceof Op\Expr\Cast) {
                 continue;
             }
@@ -16952,6 +16979,12 @@ class Compiler {
         Block $block
     ): bool {
         if (null === $block->orig) {
+            return false;
+        }
+        if (
+            0 === $argIndex
+            && 'array_column' === $this->resolveCfgFuncCallName($cfgCallOp)
+        ) {
             return false;
         }
         $producers = $this->precedingInlineCallArgProducersBeforeCfgOp($block->orig->children, $cfgCallOp);
@@ -19360,6 +19393,9 @@ class Compiler {
         for ($probe = $callIndex - 1; $probe >= 0; --$probe) {
             $prev = $cfgChildren[$probe] ?? null;
             if ($prev instanceof Op\Expr\ConstFetch || $prev instanceof Op\Expr\ClassConstFetch) {
+                continue;
+            }
+            if ($prev instanceof Op\Expr\Cast) {
                 continue;
             }
             if ($this->isUnaryInlineSiblingCallArgExpr($prev)) {
@@ -26502,19 +26538,7 @@ class Compiler {
                 }
                 if ('array_column' === strtolower($calleeName ?? '')) {
                     if (0 === $argIndex) {
-                        $arrayExpr = null;
-                        foreach ($block->orig->children as $i => $child) {
-                            if ($child !== $cfgCallOp) {
-                                continue;
-                            }
-                            $prev = $block->orig->children[$i - 1] ?? null;
-                            if ($prev instanceof Op\Expr\ConstFetch) {
-                                $arrayExpr = $block->orig->children[$i - 2] ?? null;
-                            } elseif ($prev instanceof Op\Expr\Array_) {
-                                $arrayExpr = $prev;
-                            }
-                            break;
-                        }
+                        $arrayExpr = $this->inlineArrayProducerImmediatelyBeforeCfgCall($cfgCallOp, $block);
                         if ($arrayExpr instanceof Op\Expr\Array_) {
                             if (null === $block->slotForOperand($arrayExpr->result)) {
                                 foreach ($this->compileExpr($arrayExpr, $block) as $op) {
