@@ -20225,7 +20225,42 @@ class Compiler {
             }
         }
 
+        // Precompiled hoisted producers: operand map may drift after #15848 rematerialize
+        // paths — use the emitted FUNCCALL ARG_SEND slot (#15476 regression from #15848).
+        $producerOrdinal = $this->siblingInlineFuncCallProducerOrdinal(
+            $producerIndex,
+            $firstSibling,
+            $block->orig->children
+        );
+        if ($producerOrdinal >= 0) {
+            $argSendSlot = $this->slotForSiblingInlineFuncCallProducerArgSendOrdinal($block, $producerOrdinal);
+            if (null !== $argSendSlot) {
+                return $argSendSlot;
+            }
+        }
+
         return $block->slotForOperand($producer->result);
+    }
+
+    /**
+     * Nth hoisted sibling FuncCall producer's last ARG_SEND slot on the block (#15476, #15848).
+     */
+    private function slotForSiblingInlineFuncCallProducerArgSendOrdinal(Block $block, int $producerOrdinal): ?int
+    {
+        if ($producerOrdinal < 0) {
+            return null;
+        }
+        $argSendSlots = [];
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_ARG_SEND === $op->type && null !== $op->arg1) {
+                $argSendSlots[] = (int) $op->arg1;
+            }
+        }
+        if ($producerOrdinal >= \count($argSendSlots)) {
+            return null;
+        }
+
+        return $argSendSlots[$producerOrdinal];
     }
 
     /**
