@@ -1415,6 +1415,8 @@ class Type extends Builtin {
         LastErrorRuntime::ensureLinked($this->context);
         CliArgvRuntime::ensureLinked($this->context);
         FunctionExistsRuntime::ensureLinked($this->context);
+        EnumExistsRuntime::ensureLinked($this->context);
+        UnitEnumExistsRuntime::ensureLinked($this->context);
         WeakRefRegistryRuntime::ensureLinked($this->context);
         MemoryRuntime::ensureLinked($this->context);
         IniRuntime::ensureLinked($this->context);
