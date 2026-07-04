@@ -12913,10 +12913,15 @@ class Compiler {
                                 return (string) $block->registerConstant($arg, $vm);
                             }
                         }
+                        // json_decode('...', true, N) — hoisted true feeds assoc (arg 1), not trailing depth (#9489).
+                        $jsonDecodeAssocArg = 'json_decode' === strtolower($this->resolveCfgFuncCallName($callOp) ?? '')
+                            && 1 === $argIndex
+                            && $this->isEmbeddedCallLiteralArg($callOp->args[0] ?? null)
+                            && $this->callArgIsDeadInlineTemporary($callArg);
                         // Hoisted true/false/null only feeds the trailing call arg (#9140, #9660).
                         if (
                             null !== $callArg
-                            && $isLastArg
+                            && ($isLastArg || $jsonDecodeAssocArg)
                             && !$this->operandsReferToSameVariable($prev->result, $callArg)
                             && \in_array($lookup, ['true', 'false', 'null'], true)
                         ) {
