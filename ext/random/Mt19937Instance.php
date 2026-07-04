@@ -38,7 +38,12 @@ final class Mt19937Instance
         $this->reload();
     }
 
-    public function generate(): int
+    public function generate(): string
+    {
+        return RandomU64::from32($this->generateRaw())->toBytes();
+    }
+
+    private function generateRaw(): int
     {
         if ($this->count >= self::MT_N) {
             $this->reload();
@@ -76,18 +81,18 @@ final class Mt19937Instance
     private function range32(int $umax): int
     {
         if (0xFFFFFFFF === $umax) {
-            return $this->generate();
+            return $this->generateRaw();
         }
 
         ++$umax;
         if (($umax & ($umax - 1)) === 0) {
-            return $this->generate() & ($umax - 1);
+            return $this->generateRaw() & ($umax - 1);
         }
 
         $limit = 0xFFFFFFFF - (int) (0xFFFFFFFF % $umax) - 1;
-        $result = $this->generate();
+        $result = $this->generateRaw();
         while ($result > $limit) {
-            $result = $this->generate();
+            $result = $this->generateRaw();
         }
 
         return $result % $umax;
@@ -97,12 +102,17 @@ final class Mt19937Instance
     {
         ++$umax;
         $limit = \PHP_INT_MAX - (int) (\PHP_INT_MAX % $umax) - 1;
-        $result = $this->generate();
+        $result = self::bytesToUInt64($this->generate());
         while ($result > $limit) {
-            $result = $this->generate();
+            $result = self::bytesToUInt64($this->generate());
         }
 
         return $result % $umax;
+    }
+
+    private static function bytesToUInt64(string $bytes): int
+    {
+        return (int) (\unpack('P', $bytes)[1] ?? 0);
     }
 
     private function reload(): void

@@ -47,11 +47,11 @@ final class PcgOneseq128XslRr64Instance
         $this->seedFromBytes(VmString::randomBytes(16));
     }
 
-    public function generate(): int
+    public function generate(): string
     {
         $this->step();
 
-        return RandomUint128::pcgRotr64($this->state);
+        return RandomUint128::pcgRotr64Bytes($this->state);
     }
 
     public function jump(int $advance): void
