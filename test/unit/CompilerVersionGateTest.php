@@ -44,6 +44,26 @@ final class CompilerVersionGateTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsFpow());
     }
 
+    public function testSupportsBcmathFalseOnReferenceProfile(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsBcmath());
+    }
+
+    public function testSupportsBcmathTrueOnForwardProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertTrue(CompilerVersion::supportsBcmath());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     public function testSupportsNextafterFalseOnReferenceProfile(): void
     {
         $this->assertFalse(CompilerVersion::supportsNextafter());

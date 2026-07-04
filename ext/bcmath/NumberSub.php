@@ -22,7 +22,8 @@ final class NumberSub extends BcMathNumberMethod
         }
         $right = $this->coerceOperand($frame, 1, 'BcMath\\Number::sub', 'num');
         $scale = $this->optionalScale($frame, 2, 'BcMath\\Number::sub');
-        $result = VmBcmath::sub(VmBcMathNumber::valueString($receiver), $right, $scale);
-        $this->returnNumber($frame, $result, $scale);
+        $effectiveScale = $this->effectiveAddSubScale($receiver, $right, $scale);
+        $result = VmBcmath::sub(VmBcMathNumber::valueString($receiver), $right, $effectiveScale);
+        $this->returnNumber($frame, $result, $effectiveScale);
     }
 }

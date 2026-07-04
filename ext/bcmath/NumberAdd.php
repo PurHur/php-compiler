@@ -22,7 +22,8 @@ final class NumberAdd extends BcMathNumberMethod
         }
         $right = $this->coerceOperand($frame, 1, 'BcMath\\Number::add', 'num');
         $scale = $this->optionalScale($frame, 2, 'BcMath\\Number::add');
-        $result = VmBcmath::add(VmBcMathNumber::valueString($receiver), $right, $scale);
-        $this->returnNumber($frame, $result, $scale);
+        $effectiveScale = $this->effectiveAddSubScale($receiver, $right, $scale);
+        $result = VmBcmath::add(VmBcMathNumber::valueString($receiver), $right, $effectiveScale);
+        $this->returnNumber($frame, $result, $effectiveScale);
     }
 }
