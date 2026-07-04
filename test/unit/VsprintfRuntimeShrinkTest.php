@@ -15,9 +15,13 @@ final class VsprintfRuntimeShrinkTest extends TestCase
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/JitVsprintf.php');
         $this->assertStringContainsString('__compiler_sprintf', $source);
+        $this->assertStringContainsString('StringFormat::ensureLinked', $source);
         $this->assertStringNotContainsString('requireValuesArrayArg', $source);
         $this->assertStringContainsString('JitVsprintfArrayArg::requireValues', $source);
         $this->assertStringNotContainsString('emitBoxedValuesTypeError', $source);
+        $this->assertStringNotContainsString('__mm__malloc', $source);
+        $this->assertStringNotContainsString('vsprintf_loop', $source);
+        $this->assertLessThanOrEqual(40, substr_count($source, "\n") + 1);
     }
 
     public function testStringVsprintfUsesJitHelperNotDirectSprintfLlvm(): void
