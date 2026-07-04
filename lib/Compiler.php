@@ -12521,6 +12521,7 @@ class Compiler {
                     if (
                         1 + \count($trailing) === \count($callOp->args)
                         && !$this->arrayMapNullCallbackPrecedesInlineHaystack($callOp, $block)
+                        && !($trailing[0] ?? null) instanceof Op\Expr\New_
                     ) {
                         $outer = $arrayChain[\count($arrayChain) - 1] ?? null;
                         if ($outer instanceof Op\Expr\Array_) {
@@ -14958,6 +14959,15 @@ class Compiler {
         }
         $producerCount = count($producers);
         $argCount = count($callArgs);
+        // new LimitIterator(new ArrayIterator([...]), …) — Array_ is inner-ctor prelude (#12916).
+        $nestedCtorNew = $this->matchNestedNewCtorInlineNewProducer($producers, $argIndex, $argCount);
+        if (null !== $nestedCtorNew) {
+            return $nestedCtorNew;
+        }
+        $trailingInlineNew = $this->matchTrailingInlineNewCallArgProducer($producers, $callArgs, $argIndex);
+        if (null !== $trailingInlineNew) {
+            return $trailingInlineNew;
+        }
         // array_column([(object)[...], ...], 'col') — outer haystack Array_, not (object) Cast preludes (#11236).
         if (
             'array_column' === $inlineFuncName
@@ -15482,6 +15492,11 @@ class Compiler {
             if (null !== $arrayUnionPlus) {
                 return $arrayUnionPlus;
             }
+            // new LimitIterator(new ArrayIterator([...]), …) — Array_ is inner-ctor prelude (#12916).
+            $nestedCtorNew = $this->matchNestedNewCtorInlineNewProducer($producers, $argIndex, $argCount);
+            if (null !== $nestedCtorNew) {
+                return $nestedCtorNew;
+            }
             $outerArray = $this->matchOutermostNestedInlineArrayProducerForArgZero(
                 $producers,
                 $argIndex,
@@ -15518,14 +15533,9 @@ class Compiler {
             return null;
         }
         // new LimitIterator(new ArrayIterator([...]), …) — inner-ctor Array_ prelude + inline New_ feeds outer arg #0 (#12916).
-        if (
-            0 === $argIndex
-            && $producerCount >= 2
-            && $argCount > $producerCount
-            && ($producers[0] ?? null) instanceof Op\Expr\Array_
-            && ($producers[1] ?? null) instanceof Op\Expr\New_
-        ) {
-            return $producers[1];
+        $nestedCtorNew = $this->matchNestedNewCtorInlineNewProducer($producers, $argIndex, $argCount);
+        if (null !== $nestedCtorNew) {
+            return $nestedCtorNew;
         }
         if ($argCount < $producerCount) {
             $chainedDimFetch = $this->matchChainedArrayDimFetchInlineCallArgProducer($producers, $argIndex);
@@ -17761,7 +17771,11 @@ class Compiler {
         }
         $nestedTrailing = $this->splitNestedArrayLiteralChainWithTrailingProducers($producers);
         if (null !== $nestedTrailing) {
-            [$arrayChain, ] = $nestedTrailing;
+            [$arrayChain, $trailing] = $nestedTrailing;
+            // new LimitIterator(new ArrayIterator([...]), …) — Array_ feeds inner ctor, not outer arg (#12916).
+            if (($trailing[0] ?? null) instanceof Op\Expr\New_) {
+                return null;
+            }
             $outer = $arrayChain[\count($arrayChain) - 1] ?? null;
 
             return $outer instanceof Op\Expr\Array_ ? $outer : null;
@@ -23332,6 +23346,80 @@ class Compiler {
         }
     }
 
+    /**
+     * new LimitIterator(new ArrayIterator([...]), …) — Array_ prelude + inline New_ feeds outer arg #0 (#12916).
+     *
+     * @param list<Op\Expr> $producers
+     */
+    private function isNestedNewCtorArrayPreludeProducerPattern(
+        array $producers,
+        int $argIndex,
+        int $argCount,
+        int $producerCount
+    ): bool {
+        return null !== $this->matchNestedNewCtorInlineNewProducer($producers, $argIndex, $argCount);
+    }
+
+    /**
+     * Inline `new Outer(new Inner([...]), …)` — Array_ prelude (optional) + first New_ (#12916).
+     *
+     * @param list<Op\Expr> $producers
+     */
+    private function matchNestedNewCtorInlineNewProducer(
+        array $producers,
+        int $argIndex,
+        int $argCount
+    ): ?Op\Expr\New_ {
+        if (0 !== $argIndex || $argCount < 2 || \count($producers) < 2) {
+            return null;
+        }
+        $offset = 0;
+        while ($offset < \count($producers)) {
+            $candidate = $producers[$offset];
+            if ($candidate instanceof Op\Expr\New_) {
+                return $candidate;
+            }
+            if (
+                $candidate instanceof Op\Expr\Array_
+                || $candidate instanceof Op\Expr\ConstFetch
+                || $candidate instanceof Op\Expr\ClassConstFetch
+            ) {
+                ++$offset;
+                continue;
+            }
+
+            return null;
+        }
+
+        return null;
+    }
+
+    /**
+     * iterator_to_array(new LimitIterator(new ArrayIterator([...]), …)) — trailing inline New_ (#12916).
+     *
+     * @param list<Op\Expr> $producers
+     */
+    private function matchTrailingInlineNewCallArgProducer(
+        array $producers,
+        array $callArgs,
+        int $argIndex
+    ): ?Op\Expr\New_ {
+        if (0 !== $argIndex || 1 !== \count($callArgs)) {
+            return null;
+        }
+        $callArg = $callArgs[$argIndex] ?? null;
+        if (
+            !$callArg instanceof Operand
+            || !$this->callArgIsDeadInlineTemporary($callArg)
+            || $this->callArgOperandExpectsArrayProducer($callArg)
+        ) {
+            return null;
+        }
+        $last = $producers[\count($producers) - 1] ?? null;
+
+        return $last instanceof Op\Expr\New_ ? $last : null;
+    }
+
     /** Slot for hoisted inline `new` when php-cfg dead temps omit result→slot mapping (#11321). */
     private function slotForInlineNewProducer(Block $block, Op\Expr\New_ $new): ?string
     {
@@ -23339,11 +23427,26 @@ class Compiler {
         if (null !== $slot) {
             return (string) $slot;
         }
-        for ($i = \count($block->opCodes) - 1; $i >= 0; --$i) {
-            $op = $block->opCodes[$i];
-            if (OpCode::TYPE_NEW === $op->type) {
+        $newOrdinal = 0;
+        if (null !== $block->orig) {
+            foreach ($block->orig->children as $child) {
+                if ($child === $new) {
+                    break;
+                }
+                if ($child instanceof Op\Expr\New_) {
+                    ++$newOrdinal;
+                }
+            }
+        }
+        $seen = 0;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_NEW !== $op->type) {
+                continue;
+            }
+            if ($seen === $newOrdinal) {
                 return (string) $op->arg1;
             }
+            ++$seen;
         }
 
         return null;
@@ -26999,6 +27102,42 @@ class Compiler {
                 $cfgCallOp,
                 (int) $argIndex
             );
+            if (
+                null === $dimFetchSlot
+                && null !== $cfgCallOp
+                && null !== $block->orig
+            ) {
+                $nestedNewProducers = $this->precedingInlineCallArgProducersBeforeCfgOp(
+                    $block->orig->children,
+                    $cfgCallOp
+                );
+                $nestedNewArgCount = \count($cfgCallOp->args ?? $args);
+                $nestedNewProducerCount = \count($nestedNewProducers);
+                $inlineNewProducer = $this->matchNestedNewCtorInlineNewProducer(
+                    $nestedNewProducers,
+                    (int) $argIndex,
+                    $nestedNewArgCount
+                );
+                if (null === $inlineNewProducer) {
+                    $inlineNewProducer = $this->matchTrailingInlineNewCallArgProducer(
+                        $nestedNewProducers,
+                        $cfgCallOp->args ?? $args,
+                        (int) $argIndex
+                    );
+                }
+                if ($inlineNewProducer instanceof Op\Expr\New_) {
+                    $innerNewSlot = $this->slotForInlineNewProducer($block, $inlineNewProducer);
+                    if (null !== $innerNewSlot) {
+                        $sends[] = new OpCode(
+                            OpCode::TYPE_ARG_SEND,
+                            $innerNewSlot,
+                            $nameSlot,
+                            $unpackFlag
+                        );
+                        continue;
+                    }
+                }
+            }
             $inlineArray = null === $dimFetchSlot
                 ? $this->findInlineArrayProducerForCallArg($arg, $block, $cfgCallOp, (int) $argIndex)
                 : null;
@@ -27345,9 +27484,14 @@ class Compiler {
                                     foreach ($this->compileExpr($matched, $block) as $op) {
                                         $sends[] = $op;
                                     }
-                                    $matchedSlot = $block->slotForOperand($matched->result);
+                                    $matchedSlot = $matched instanceof Op\Expr\New_
+                                        ? $this->slotForInlineNewProducer($block, $matched)
+                                        : $block->slotForOperand($matched->result);
                                 } else {
-                                    $matchedSlot = $block->slotForOperand($matched->result);
+                                    $matchedSlot = $matched instanceof Op\Expr\New_
+                                        ? ($this->slotForInlineNewProducer($block, $matched)
+                                            ?? $block->slotForOperand($matched->result))
+                                        : $block->slotForOperand($matched->result);
                                 }
                                 if (null !== $matchedSlot) {
                                     $valueSlot = $matchedSlot;
@@ -27532,7 +27676,10 @@ class Compiler {
                                     $block->addOpCode($op);
                                 }
                             }
-                            $matchedSlot = $block->slotForOperand($matched->result);
+                            $matchedSlot = $matched instanceof Op\Expr\New_
+                                ? ($this->slotForInlineNewProducer($block, $matched)
+                                    ?? $block->slotForOperand($matched->result))
+                                : $block->slotForOperand($matched->result);
                             if (null !== $matchedSlot) {
                                 $valueSlot = $matchedSlot;
                             }
