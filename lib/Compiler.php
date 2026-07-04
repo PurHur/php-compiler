@@ -29060,9 +29060,8 @@ class Compiler {
             }
             if (null !== $arraySliceSlot) {
                 $valueSlot = $arraySliceSlot;
-            }
-            // Dead hoisted call-arg temps must wire to preceding inline producers, not echo/ternary phi slots (#14419).
-            if (null !== $cfgCallOp && null !== $block->orig) {
+            } elseif (null !== $cfgCallOp && null !== $block->orig) {
+                // Dead hoisted call-arg temps must wire to preceding inline producers, not echo/ternary phi slots (#14419).
                 $finalArgProbe = $cfgCallOp->args[(int) $argIndex] ?? $arg;
                 if ($this->callArgIsDeadInlineTemporary($finalArgProbe)) {
                     $finalChainOps = [];
