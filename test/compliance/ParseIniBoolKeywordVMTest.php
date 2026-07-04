@@ -6,7 +6,7 @@ namespace PHPCompiler;
 
 require_once __DIR__.'/../BaseTest.php';
 
-/** VM compliance for parse_ini_string() bool keyword keys (#11025). */
+/** VM compliance for parse_ini_string() (#11025, #9153). */
 final class ParseIniBoolKeywordVMTest extends BaseTest
 {
     protected static string $DIR = __DIR__;
@@ -16,6 +16,10 @@ final class ParseIniBoolKeywordVMTest extends BaseTest
         yield 'parse_ini_bool_keyword_key.phpt' => self::parsePHPT(
             __DIR__.'/cases/stdlib/parse_ini_bool_keyword_key.phpt',
             'parse_ini_bool_keyword_key.phpt'
+        );
+        yield 'parse_ini_scanner_typed.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/parse_ini_scanner_typed.phpt',
+            'parse_ini_scanner_typed.phpt'
         );
     }
 

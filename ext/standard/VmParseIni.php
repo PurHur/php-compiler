@@ -16,6 +16,18 @@ final class VmParseIni
 {
     public static function parseString(string $ini, bool $processSections, int $scannerMode, ?Frame $frame = null): array|false
     {
+        if (!\in_array($scannerMode, [
+            ParseIniEngine::SCANNER_NORMAL,
+            ParseIniEngine::SCANNER_RAW,
+            ParseIniEngine::SCANNER_TYPED,
+        ], true)) {
+            if (null !== $frame) {
+                self::triggerInvalidScannerWarning($frame);
+            }
+
+            return false;
+        }
+
         $parsed = ParseIniEngine::parse($ini, $processSections, $scannerMode);
         if (false === $parsed) {
             if (null !== $frame) {
@@ -118,6 +130,20 @@ final class VmParseIni
         $line = ParseIniEngine::lastSyntaxLine() ?? 1;
         $frame->vmContext->errors->triggerError(
             'syntax error, '.$detail.' in Unknown on line '.$line,
+            ErrorReporter::E_WARNING,
+            '' !== $frame->scriptPath ? $frame->scriptPath : null,
+            $frame->vmContext,
+            $frame
+        );
+    }
+
+    public static function triggerInvalidScannerWarning(Frame $frame): void
+    {
+        if (null === $frame->vmContext) {
+            return;
+        }
+        $frame->vmContext->errors->triggerError(
+            'Invalid scanner mode',
             ErrorReporter::E_WARNING,
             '' !== $frame->scriptPath ? $frame->scriptPath : null,
             $frame->vmContext,
