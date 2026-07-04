@@ -27,7 +27,7 @@ final class VmFloatDtoaTest extends TestCase
         $this->assertSame('42', VmFloatDtoa::formatVarDump(42.0));
     }
 
-    /** php-src main/snprintf.c php_fcvt parity (#10796). */
+    /** php-src main/snprintf.c php_fcvt parity (#10796, #10415). */
     public function testSprintfFixedRoundingMatchesZend(): void
     {
         $this->assertSame('1.00', VmFloatDtoa::formatSprintfF(1.005, 2));
@@ -35,5 +35,7 @@ final class VmFloatDtoaTest extends TestCase
         $this->assertSame('0', VmFloatDtoa::formatSprintfF(0.5, 0));
         $this->assertSame('2', VmFloatDtoa::formatSprintfF(1.5, 0));
         $this->assertSame('0.00', VmFloatDtoa::formatSprintfF(0.0, 2));
+        // #10415 — %.17F must not cap at 15 fractional digits (DBL_DECIMAL_DIG parity).
+        $this->assertSame('83.33333333333332860', VmFloatDtoa::formatSprintfF(5 * 200.0 / 12, 17));
     }
 }
