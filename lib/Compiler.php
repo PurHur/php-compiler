@@ -19006,6 +19006,17 @@ class Compiler {
                     // Hoisted operand inside sibling inline Array_ / bitmask call arg (#10612, #11304, #11387).
                     continue;
                 }
+                // php-cfg hoists `E::A` before `E::A::class` — case fetch feeds sibling ::class, not call arg (#9426, #16030).
+                if (
+                    $child instanceof Op\Expr\ClassConstFetch
+                    && $next instanceof Op\Expr\ClassConstFetch
+                    && $this->operandsReferToSameVariable($next->class, $child->result)
+                ) {
+                    $pseudoName = $this->staticNameFromOperand($next->name);
+                    if (null !== $pseudoName && 'class' === strtolower($pseudoName)) {
+                        continue;
+                    }
+                }
                 // php-cfg `var_export([NAN, INF], true)` — ConstFetch chain before sibling Array_ (#12824).
                 for ($j = $i + 1; $j < $callIndex; ++$j) {
                     $scan = $cfgChildren[$j];
