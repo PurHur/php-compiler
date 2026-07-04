@@ -33,12 +33,9 @@ final class vsprintf extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $fmtVar = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_STRING !== $fmtVar->type) {
-            throw new \LogicException('vsprintf() format must be a string in this compiler build');
-        }
+        $format = VmString::requireStringBuiltinArg($frame->calledArgs[0], 'vsprintf', 0, 'format');
         $argsVar = $frame->calledArgs[1]->resolveIndirect();
-        $frame->returnVar->string(VmVprintf::formatString($fmtVar->toString(), $argsVar, $frame, 'vsprintf'));
+        $frame->returnVar->string(VmVprintf::formatString($format, $argsVar, $frame, 'vsprintf'));
     }
 
     public function call(Context $context, JITVariable ...$args): Value

@@ -14,7 +14,7 @@ namespace PHPCompiler\JIT;
 use PHPCompiler\Block as CompilerBlock;
 use PHPCompiler\ext\standard\VmScope;
 use PHPCompiler\JIT\JitLongArg;
-use PHPCompiler\JIT\JitStringArg;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\Web\Superglobals;
 use PHPLLVM\Value;
 
@@ -77,7 +77,7 @@ final class ScopeBuiltinHelper
 
         $prefixStr = $context->builder->load($context->constantStringFromString(''));
         if (null !== $prefixArg) {
-            $prefixStr = JitStringArg::lower($context, $prefixArg, 'extract() prefix');
+            $prefixStr = JitStringBuiltinArg::lowerRequiredString($context, $prefixArg, 'extract', 2, 'prefix');
         }
 
         ScopeBuiltinEmitHelper::walkStringKeyNodes($context, $ht, $named, $flags, $countSlot, $prefixStr);
