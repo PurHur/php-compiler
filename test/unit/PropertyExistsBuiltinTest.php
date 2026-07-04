@@ -25,6 +25,8 @@ final class PropertyExistsBuiltinTest extends BaseTest
             'property_exists_null_jit.phpt',
             'property_exists_private_parent.phpt',
             'property_exists_private_parent_jit.phpt',
+            'unset_dynamic_property_exists.phpt',
+            'unset_dynamic_property_exists_jit.phpt',
         ] as $file) {
             $path = __DIR__.'/../compliance/cases/stdlib/'.$file;
             yield $file => self::parsePHPT($path, $file);

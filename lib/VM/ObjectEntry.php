@@ -233,7 +233,8 @@ class ObjectEntry {
 
             return;
         }
-        $slot->null();
+        // Dynamic property unset → remove slot (Zend zend_std_unset_property; #15750).
+        unset($this->properties[$name]);
     }
 
     /** @return array<string, Variable> */
