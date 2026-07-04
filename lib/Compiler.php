@@ -30288,6 +30288,21 @@ class Compiler {
                 && 'proc_open' === $this->resolveCfgFuncCallName($cfgCallOp)
                 && \in_array((int) $argIndex, [0, 1, 4], true)
             ) {
+                $procOpenMappedSlot = $this->resolveProcOpenInlineCallArgSlot(
+                    $block,
+                    $cfgCallOp,
+                    (int) $argIndex,
+                    $sends
+                );
+                if (null !== $procOpenMappedSlot) {
+                    $sends[] = new OpCode(
+                        OpCode::TYPE_ARG_SEND,
+                        $procOpenMappedSlot,
+                        $nameSlot,
+                        $unpackFlag
+                    );
+                    continue;
+                }
                 $procOpenArray = null;
                 if (0 === (int) $argIndex) {
                     $procOpenArray = $this->inlineArrayLiteralForDeadCallArg($cfgCallOp, 0, $block);
@@ -33447,6 +33462,17 @@ class Compiler {
                             $valueSlot = (string) $adjacentExec;
                         }
                     }
+                }
+            }
+            if ('proc_open' === strtolower($this->resolveCfgFuncCallName($cfgCallOp) ?? '') && null !== $cfgCallOp) {
+                $procOpenFinalSlot = $this->resolveProcOpenInlineCallArgSlot(
+                    $block,
+                    $cfgCallOp,
+                    (int) $argIndex,
+                    $sends
+                );
+                if (null !== $procOpenFinalSlot) {
+                    $valueSlot = $procOpenFinalSlot;
                 }
             }
             $sends[] = new OpCode(OpCode::TYPE_ARG_SEND, $valueSlot, $nameSlot, $unpackFlag);
