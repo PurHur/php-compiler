@@ -25585,6 +25585,7 @@ class Compiler {
         }
         if (
             0 === $argIndex
+            && $immediatePrelude instanceof Op\Expr\ConstFetch
             && (
                 null !== $this->nestedFuncCallProducerBeforeTrailingConstFetchPreludes(
                     $cfgCallOp,
@@ -27329,19 +27330,26 @@ class Compiler {
         ) {
             return null;
         }
-        $outerSlot = $this->outerSiblingInlineCallArgProducerSlot($block, $cfgCallOp, $argIndex);
-        if (null !== $outerSlot) {
-            return $outerSlot;
-        }
-        if (1 === \count($args) && 0 !== $argIndex) {
-            return null;
-        }
         $callIndex = null;
         foreach ($block->orig->children as $i => $child) {
             if ($child === $cfgCallOp) {
                 $callIndex = $i;
                 break;
             }
+        }
+        if (\is_int($callIndex) && $callIndex > 0) {
+            $immediatePrelude = $block->orig->children[$callIndex - 1] ?? null;
+            // method_exists(I::class, 'm') after var_dump(...) — immediate ::class prelude is arg #0 (#9486).
+            if ($immediatePrelude instanceof Op\Expr\ClassConstFetch) {
+                return null;
+            }
+        }
+        $outerSlot = $this->outerSiblingInlineCallArgProducerSlot($block, $cfgCallOp, $argIndex);
+        if (null !== $outerSlot) {
+            return $outerSlot;
+        }
+        if (1 === \count($args) && 0 !== $argIndex) {
+            return null;
         }
         if (null === $callIndex) {
             return null;
@@ -33215,6 +33223,48 @@ class Compiler {
                                 $sends[] = new OpCode(
                                     OpCode::TYPE_ARG_SEND,
                                     $nullSlot,
+                                    $nameSlot,
+                                    $unpackFlag
+                                );
+                                continue;
+                            }
+                        }
+                    }
+                }
+            }
+            if (
+                null !== $cfgCallOp
+                && null !== $block->orig
+                && 0 === (int) $argIndex
+            ) {
+                $callIndex = array_search($cfgCallOp, $block->orig->children, true);
+                if (\is_int($callIndex) && $callIndex > 0) {
+                    $immediatePrelude = $block->orig->children[$callIndex - 1] ?? null;
+                    if ($immediatePrelude instanceof Op\Expr\ClassConstFetch) {
+                        $callArg = $cfgCallOp->args[(int) $argIndex] ?? $arg;
+                        if ($callArg instanceof Operand && $this->callArgIsDeadInlineTemporary($callArg)) {
+                            $folded = $this->tryFoldClassConstFetchDefault($immediatePrelude, $block, true);
+                            if (null !== $folded) {
+                                $constSlot = $block->registerConstant($immediatePrelude->result, $folded);
+                                $sends[] = new OpCode(
+                                    OpCode::TYPE_ARG_SEND,
+                                    $constSlot,
+                                    $nameSlot,
+                                    $unpackFlag
+                                );
+                                continue;
+                            }
+                            $classConstSlot = $block->slotForOperand($immediatePrelude->result);
+                            if (null === $classConstSlot) {
+                                foreach ($this->compileExpr($immediatePrelude, $block) as $op) {
+                                    $sends[] = $op;
+                                }
+                                $classConstSlot = $block->slotForOperand($immediatePrelude->result);
+                            }
+                            if (null !== $classConstSlot) {
+                                $sends[] = new OpCode(
+                                    OpCode::TYPE_ARG_SEND,
+                                    $classConstSlot,
                                     $nameSlot,
                                     $unpackFlag
                                 );
