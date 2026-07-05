@@ -1896,6 +1896,31 @@ return_bool:
                 return $valuePtr;
             }
 
+            if (Variable::TYPE_NATIVE_LONG === $variable->objectPropertyType) {
+                $nativePtr = $this->context->builder->pointerCast(
+                    $loaded,
+                    $this->context->getTypeFromString('int64*')
+                );
+
+                return $this->context->builder->load($nativePtr);
+            }
+            if (Variable::TYPE_NATIVE_BOOL === $variable->objectPropertyType) {
+                $nativePtr = $this->context->builder->pointerCast(
+                    $loaded,
+                    $this->context->getTypeFromString('int1*')
+                );
+
+                return $this->context->builder->load($nativePtr);
+            }
+            if (Variable::TYPE_NATIVE_DOUBLE === $variable->objectPropertyType) {
+                $nativePtr = $this->context->builder->pointerCast(
+                    $loaded,
+                    $this->context->getTypeFromString('double*')
+                );
+
+                return $this->context->builder->load($nativePtr);
+            }
+
             $llvmType = Variable::getStringType($variable->objectPropertyType);
 
             return $this->context->builder->pointerCast(
