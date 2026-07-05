@@ -1650,6 +1650,22 @@ PHP;
         self::assertSame("array (\n  0 => \E::A,\n  1 => \E::B,\n)\n", ob_get_clean());
     }
 
+    /** Issue #16316 / #8886 — inline [int, enum] haystack must keep scalar before enum case. */
+    public function testArraySearchStrictMixedHaystackInlineLiteralRuntime(): void
+    {
+        $code = <<<'PHP'
+<?php
+enum E: int { case A = 1; }
+var_export(array_search(1, [1, E::A], true));
+echo "\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'array_search_strict_scalar_order.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("0\n", ob_get_clean());
+    }
+
     /** Issue #10196 — nested inline array literals map to outermost Array_ per arg slot. */
     public function testArrayReplaceRecursiveNestedInlineLiteralsUseRootArraySlots(): void
     {

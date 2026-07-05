@@ -36335,7 +36335,8 @@ class Compiler {
         Operand $valueOperand,
         Block $block,
         Op\Expr\Array_ $arrayExpr,
-        int $elementIndex
+        int $elementIndex,
+        bool $forKeyOperand = false
     ): ?Op\Expr\ClassConstFetch {
         $root = $this->unwrapOperandChain($valueOperand);
         if ($root instanceof Op\Expr\ClassConstFetch
@@ -36367,9 +36368,11 @@ class Compiler {
                             return $fetch;
                         }
                     }
-                    // php-cfg may drop the fetch result and leave a literal backing scalar element/key
+                    // php-cfg may drop the fetch result and leave a literal backing scalar key
                     // (e.g. `E::A; [ E::A => 1 ]` lowered to key Literal(1)) — recover the enum case fetch (#9024).
-                    if ($valueOperand instanceof Operand\Literal
+                    // Scalar array values must not alias enum backing (#8930, #16316).
+                    if ($forKeyOperand
+                        && $valueOperand instanceof Operand\Literal
                         && (\is_int($valueOperand->value) || \is_string($valueOperand->value))
                     ) {
                         // Enum-as-key recovery requires key/value literals to match (both the backing scalar).
@@ -36410,6 +36413,17 @@ class Compiler {
                                 }
                             }
                         }
+                    }
+                }
+                // Hoisted enum fetches may be fewer than mixed scalar/case elements (#16316).
+                foreach ($fetches as $fetch) {
+                    if (!$fetch instanceof Op\Expr\ClassConstFetch
+                        || !$this->isCompileTimeEnumCaseClassConstFetch($fetch, $block)
+                    ) {
+                        continue;
+                    }
+                    if ($this->operandsReferToSameVariable($fetch->result, $valueOperand)) {
+                        return $fetch;
                     }
                 }
 
@@ -36570,7 +36584,8 @@ class Compiler {
                 $keyOperand,
                 $block,
                 $expr,
-                $i
+                $i,
+                true
             );
             if (null !== $keyFetch) {
                 $keyTemp = new Operand\Temporary();
