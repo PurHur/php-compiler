@@ -797,6 +797,23 @@ final class VmDateTimeNative
         $useTz = isset($matched['timezone']) && \is_string($matched['timezone'])
             ? $matched['timezone']
             : $tzName;
+        if (!self::formatStringHasTimeTokens($format)) {
+            $now = self::readNow();
+            $nowTm = self::withTimezone($useTz, static function () use ($now): ?array {
+                return self::localtime($now['timestamp']);
+            });
+            if (null !== $nowTm) {
+                if (false === $matched['hour']) {
+                    $hour = self::tmInt($nowTm, 'tm_hour');
+                }
+                if (false === $matched['minute']) {
+                    $minute = self::tmInt($nowTm, 'tm_min');
+                }
+                if (false === $matched['second']) {
+                    $second = self::tmInt($nowTm, 'tm_sec');
+                }
+            }
+        }
 
         try {
             $result = [
@@ -2371,6 +2388,31 @@ final class VmDateTimeNative
         $tv = VmDatePure::readTimeval();
 
         return ['timestamp' => $tv['sec'], 'microsecond' => $tv['usec']];
+    }
+
+    /**
+     * php-src timelib have_time — any H/G/i/s/u/U token in the format string (#16383).
+     */
+    private static function formatStringHasTimeTokens(string $format): bool
+    {
+        if (\str_starts_with($format, '!')) {
+            $format = \substr($format, 1);
+        }
+        $len = \strlen($format);
+        for ($i = 0; $i < $len; ++$i) {
+            if ('\\' === $format[$i]) {
+                if ($i + 1 < $len) {
+                    ++$i;
+                }
+
+                continue;
+            }
+            if (\str_contains('HGiisuU', $format[$i])) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
