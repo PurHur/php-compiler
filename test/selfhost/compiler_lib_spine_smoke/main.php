@@ -1179,6 +1179,7 @@ require_once __DIR__.'/../../../ext/standard/JitStreamSocketAccept.php';
 require_once __DIR__.'/../../../ext/standard/JitStreamSocketGetName.php';
 require_once __DIR__.'/../../../ext/standard/JitStreamSocketPair.php';
 require_once __DIR__.'/../../../ext/standard/JitStreamSupports.php';
+require_once __DIR__.'/../../../ext/standard/JitStreamSupportsFeatureArg.php';
 require_once __DIR__.'/../../../ext/standard/JitStreamWrapperRegistry.php';
 require_once __DIR__.'/../../../ext/standard/JitStringConcat.php';
 require_once __DIR__.'/../../../ext/standard/JitStringIndex.php';
