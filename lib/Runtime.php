@@ -382,6 +382,7 @@ class Runtime {
         ReadonlyAnonymousClassSyntaxRejector::reject($code, $filename);
         DnfParenIntersectionSyntaxRejector::reject($code, $filename);
         ExitFunctionSyntaxRejector::reject($code, $filename);
+        TypedFunctionStaticSyntaxRejector::reject($code, $filename);
         PropertyHookSyntaxRejector::reject($code, $filename);
         TryCatchElseSyntaxRejector::reject($code, $filename);
         TryCatchElseSupport::beginCompilationUnit();

@@ -177,10 +177,28 @@ final class CompilerVersion
         return version_compare(self::VERSION, '8.3', '>=');
     }
 
-    /** PHP 8.3+ typed function-local static variables (Zend/zend_compile.c, issue #9998). */
+    /**
+     * PHP 8.3+ typed function-local static variables (Zend/zend_compile.c, issue #9998, #16512).
+     *
+     * Withheld on 8.4.0-dev reference profile (matches Zend 8.2 parse error). Enable via stable
+     * 8.4.0+ or explicit `PHP_COMPILER_PROFILE=8.3` / `8.4` forward profile.
+     */
     public static function supportsTypedFunctionStatic(): bool
     {
-        return version_compare(self::VERSION, '8.3', '>=');
+        if (version_compare(self::VERSION, '8.3', '<')) {
+            return false;
+        }
+
+        if (version_compare(self::VERSION, '8.4.0', '>=')) {
+            return true;
+        }
+
+        $raw = getenv('PHP_COMPILER_PROFILE');
+        if (!\is_string($raw) || '' === trim($raw)) {
+            return false;
+        }
+
+        return version_compare(self::languageProfileVersion(), '8.3.0', '>=');
     }
 
     /**
