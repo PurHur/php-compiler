@@ -67,8 +67,22 @@ fi
 
 _run_in_container() {
   local inner="$1"
+  local bind_src
+  bind_src="$(_docker_bind_src)"
   # shellcheck disable=SC2086
-  ci_docker_run -v "$(pwd):/compiler" -w /compiler "$IMAGE" bash -lc "$inner"
+  ci_docker_run -v "${bind_src}:/compiler" -w /compiler "$IMAGE" bash -lc "$inner"
+}
+
+_docker_bind_src() {
+  if [[ -n "${PHP_COMPILER_DOCKER_BIND_SRC:-}" ]]; then
+    printf '%s' "${PHP_COMPILER_DOCKER_BIND_SRC}"
+    return
+  fi
+  if [[ -n "${HARNESS_HOST_DATA_DIR:-}" && "$(pwd)" == /app/var/* ]]; then
+    printf '%s' "${HARNESS_HOST_DATA_DIR}${PWD#/app/var}"
+    return
+  fi
+  printf '%s' "$(pwd)"
 }
 
 _llvm_exports='export PHP_COMPILER_LLVM_PATH=/opt/llvm9; export LD_LIBRARY_PATH=/opt/llvm9${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}; unset PHP_COMPILER_SKIP_LLVM_PRELOAD;'
@@ -137,7 +151,9 @@ fi
 
 # Bind-mount completeness probe: some harness hosts report a partial tree where a few files exist
 # but script/ paths are missing (#272). Require a couple of repo-sentinel files before trusting the mount.
-if [[ -f vendor/bin/phpunit ]] && ci_docker_run -v "$(pwd):/compiler" -w /compiler "$IMAGE" bash -lc "test -f vendor/bin/phpunit && test -f script/ci-local.sh && test -f script/bootstrap-selfhost-cli-driver-emit.sh" 2>/dev/null; then
+# On RunForge, docker run -v must use the host path (see PHP_COMPILER_DOCKER_BIND_SRC / HARNESS_HOST_DATA_DIR).
+_bind_src="$(_docker_bind_src)"
+if [[ -f vendor/bin/phpunit ]] && ci_docker_run -v "${_bind_src}:/compiler" -w /compiler "$IMAGE" bash -lc "test -f vendor/bin/phpunit && test -f script/ci-local.sh && test -f script/bootstrap-selfhost-cli-driver-emit.sh" 2>/dev/null; then
   _run_in_container "$inner"
   exit $?
 fi
