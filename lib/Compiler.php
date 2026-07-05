@@ -13785,7 +13785,8 @@ class Compiler {
             }
             $funcCallProducerCount = 0;
             foreach ($producers as $producer) {
-                if ($producer instanceof Op\Expr\FuncCall || $producer instanceof Op\Expr\NsFuncCall) {
+                if ($producer instanceof Op\Expr\FuncCall || $producer instanceof Op\Expr\NsFuncCall
+                    || $producer instanceof Op\Expr\MethodCall || $producer instanceof Op\Expr\StaticCall) {
                     ++$funcCallProducerCount;
                 }
             }
@@ -13799,7 +13800,8 @@ class Compiler {
             }
             if ($arrayProducerCount >= 2 || $funcCallProducerCount >= 2
                 || null !== $this->splitLeadingConstFetchWithArrayLiteralCallArg($producers)
-                || null !== $this->splitLeadingConstFetchWithFuncCallCallArg($producers)) {
+                || null !== $this->splitLeadingConstFetchWithFuncCallCallArg($producers)
+                || $this->producersAreSiblingCallWithHoistedScalarConstFetch($producers)) {
                 $matched = null;
                 if (
                     $this->callIncludesNamedParameter($callOp)
@@ -15731,7 +15733,8 @@ class Compiler {
             $enumFetch = null;
             $constFetch = null;
             foreach ($producers as $producer) {
-                if ($producer instanceof Op\Expr\FuncCall || $producer instanceof Op\Expr\NsFuncCall) {
+                if ($producer instanceof Op\Expr\FuncCall || $producer instanceof Op\Expr\NsFuncCall
+                    || $producer instanceof Op\Expr\MethodCall || $producer instanceof Op\Expr\StaticCall) {
                     $funcProducer = $producer;
                 } elseif ($producer instanceof Op\Expr\ClassConstFetch) {
                     $enumFetch = $producer;
@@ -15782,12 +15785,16 @@ class Compiler {
                         ) {
                             $consumerIndex = null;
                             $funcProducerIndex = null;
+                            $constFetchIndex = null;
                             foreach ($block->orig->children as $i => $child) {
                                 if ($child === $cfgCallOp) {
                                     $consumerIndex = $i;
                                 }
                                 if ($child === $funcProducer) {
                                     $funcProducerIndex = $i;
+                                }
+                                if ($child === $constFetch) {
+                                    $constFetchIndex = $i;
                                 }
                             }
                             if (
@@ -15803,6 +15810,16 @@ class Compiler {
                             ) {
                                 // var_export(f(), true) / array_keys($a, null) — nested result is arg0 (#11272, #10373).
                                 return 0 === $argIndex ? $funcProducer : $constFetch;
+                            }
+                            if (
+                                null !== $funcProducerIndex
+                                && null !== $constFetchIndex
+                                && $funcProducerIndex !== $constFetchIndex
+                            ) {
+                                // Sibling call + hoisted true/false/null — wire by CFG order (#10778, #15833).
+                                $earlierIsFunc = $funcProducerIndex < $constFetchIndex;
+
+                                return (0 === $producerOrdinal) === $earlierIsFunc ? $funcProducer : $constFetch;
                             }
                         }
 
@@ -19247,6 +19264,31 @@ class Compiler {
     }
 
     /**
+     * @param list<Op\Expr> $producers
+     */
+    private function producersAreSiblingCallWithHoistedScalarConstFetch(array $producers): bool
+    {
+        if (2 !== \count($producers)) {
+            return false;
+        }
+        $call = null;
+        $scalarConst = null;
+        foreach ($producers as $producer) {
+            if ($producer instanceof Op\Expr\FuncCall || $producer instanceof Op\Expr\NsFuncCall
+                || $producer instanceof Op\Expr\MethodCall || $producer instanceof Op\Expr\StaticCall) {
+                $call = $producer;
+            } elseif ($producer instanceof Op\Expr\ConstFetch) {
+                $name = $this->staticNameFromOperand($producer->name);
+                if (null !== $name && \in_array(strtolower($name), ['true', 'false', 'null'], true)) {
+                    $scalarConst = $producer;
+                }
+            }
+        }
+
+        return null !== $call && null !== $scalarConst;
+    }
+
+    /**
      * @return array{0: Op\Expr\ConstFetch, 1: Op\Expr\FuncCall|Op\Expr\NsFuncCall}|null
      */
     private function leadingConstFetchFuncCallPreludeBeforeCfgCall(Op $callOp, Block $block): ?array
@@ -20039,6 +20081,20 @@ class Compiler {
                     && null !== ($method = $this->staticNameFromOperand($child->name))
                     && $this->methodCallIsKnownVoidReturn($method)
                 ) {
+                    continue;
+                }
+                // var_export($ao->getIteratorClass(), true) — MethodCall before hoisted true/false/null (#10778).
+                if (
+                    ($child instanceof Op\Expr\MethodCall || $child instanceof Op\Expr\StaticCall)
+                    && $i + 1 < $callIndex
+                    && ($cfgChildren[$i + 1] ?? null) instanceof Op\Expr\ConstFetch
+                    && $this->isHoistedScalarConstFetchImmediatelyBeforeCall($cfgChildren[$callIndex - 1] ?? null)
+                    && property_exists($callOp, 'args')
+                    && is_array($callOp->args)
+                    && count($callOp->args) >= 2
+                    && $this->methodCallInlineProducerSuppliesCallArgValue($child)
+                ) {
+                    array_unshift($producers, $child);
                     continue;
                 }
                 break;
@@ -25776,16 +25832,27 @@ class Compiler {
             break;
         }
         $prev = $cfgChildren[$probeIndex] ?? null;
-        if (
-            !($prev instanceof Op\Expr\FuncCall || $prev instanceof Op\Expr\NsFuncCall)
-            || !$this->isNestedCallArgProducerForConsumer(
+        if ($prev instanceof Op\Expr\FuncCall || $prev instanceof Op\Expr\NsFuncCall) {
+            if (!$this->isNestedCallArgProducerForConsumer(
                 $prev,
                 $consumer,
                 $probeIndex,
                 $consumerIndex,
                 $cfgChildren
-            )
-        ) {
+            )) {
+                return null;
+            }
+        } elseif ($prev instanceof Op\Expr\MethodCall || $prev instanceof Op\Expr\StaticCall) {
+            if (!$this->isNestedCallArgProducerSeparatedByConsumerLiteralPreludes(
+                $prev,
+                $consumer,
+                $probeIndex,
+                $consumerIndex,
+                $cfgChildren
+            )) {
+                return null;
+            }
+        } else {
             return null;
         }
         $targetArgIndex = $this->siblingMultiArgFuncCallProducerTargetArgIndex(
