@@ -78,6 +78,31 @@ final class CompilerVersion
         return version_compare(self::languageProfileVersion(), '8.3.0', '>=');
     }
 
+    /**
+     * PHP 8.3+ `new readonly class` anonymous readonly modifier (#6991, #16255).
+     *
+     * Rejected on the 8.4.0-dev reference profile (matches Zend 8.2 parse error). Enable via stable
+     * 8.4.0+ or explicit `PHP_COMPILER_PROFILE=8.3` / `8.4` forward profile.
+     * php-src: Zend/zend_compile.c ZEND_ACC_READONLY_ANON_CLASS.
+     */
+    public static function supportsReadonlyAnonymousClass(): bool
+    {
+        if (version_compare(self::VERSION, '8.3', '<')) {
+            return false;
+        }
+
+        if (version_compare(self::VERSION, '8.4.0', '>=')) {
+            return true;
+        }
+
+        $raw = getenv('PHP_COMPILER_PROFILE');
+        if (!\is_string($raw) || '' === trim($raw)) {
+            return false;
+        }
+
+        return version_compare(self::languageProfileVersion(), '8.3.0', '>=');
+    }
+
     /** PHP 8.3+ typed constants at compile-unit scope (Zend/zend_compile.c, issue #7081). */
     public static function supportsGlobalTypedConstants(): bool
     {

@@ -2622,6 +2622,7 @@
         "lib/Ast/MultiBlockNameResolver.php",
         "lib/Ast/NewDereferenceableDesugar.php",
         "lib/Ast/PipeOperatorDesugar.php",
+        "lib/Ast/ReadonlyAnonymousClassSyntax.php",
         "lib/Ast/SealedClassAnnotator.php",
         "lib/Ast/SealedClassPreprocessor.php",
         "lib/Ast/StaticClassAnnotator.php",
@@ -3240,6 +3241,7 @@
         "lib/JIT/Builtin/TimezoneLocationRuntime.php",
         "lib/JIT/Builtin/TimezoneOffsetRuntime.php",
         "lib/JIT/Builtin/TokenGetAll.php",
+        "lib/JIT/Builtin/TryCatchRuntime.php",
         "lib/JIT/Builtin/Type.php",
         "lib/JIT/Builtin/Type/HashTable.php",
         "lib/JIT/Builtin/Type/MaskedArray.php",
@@ -3510,6 +3512,7 @@
         "lib/PropertyHookSyntaxRejector.php",
         "lib/PropertyVisibility.php",
         "lib/PseudoClassScope.php",
+        "lib/ReadonlyAnonymousClassSyntaxRejector.php",
         "lib/ReadonlyFunctionRejector.php",
         "lib/ReadonlyMethodModifierRejector.php",
         "lib/Runtime.php",
@@ -3964,6 +3967,7 @@
         "lib/VM/StringableSupport.php",
         "lib/VM/TraitCompositionConflictMessage.php",
         "lib/VM/TraversableSupport.php",
+        "lib/VM/TryCatchJitHelper.php",
         "lib/VM/TypeCheck.php",
         "lib/VM/TypedPropertyCheck.php",
         "lib/VM/TypedPropertyReadSignal.php",
@@ -4266,9 +4270,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 4032,
+        "inventory_files": 4036,
         "excluded": 0,
-        "eligible": 4032,
+        "eligible": 4036,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1

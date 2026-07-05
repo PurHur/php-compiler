@@ -382,6 +382,7 @@ class Runtime {
         DnfParenIntersectionSyntaxRejector::reject($code, $filename);
         ExitFunctionSyntaxRejector::reject($code, $filename);
         PropertyHookSyntaxRejector::reject($code, $filename);
+        ReadonlyAnonymousClassSyntaxRejector::reject($code, $filename);
         TryCatchElseSyntaxRejector::reject($code, $filename);
         TryCatchElseSupport::beginCompilationUnit();
         $code = TryCatchElseSupport::extract($code);
