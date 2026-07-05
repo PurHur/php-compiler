@@ -199,7 +199,7 @@ final class VmInfo
 
     public static function phpcredits(int $flags = self::CREDITS_ALL): void
     {
-        OutputBuffer::append(self::renderPhpcreditsHtml($flags));
+        OutputBuffer::append(self::renderPhpcreditsText($flags));
     }
 
     /** Shared phpinfo() HTML for VM + JIT ({@see PhpinfoJitHelper}, issue #9256). */
@@ -229,9 +229,16 @@ final class VmInfo
         return $html;
     }
 
+    /** php-src phpcredits() plain-text credits (ext/standard/credits.c, sapi_module.phpinfo_as_text). */
+    public static function renderPhpcreditsText(int $flags): string
+    {
+        return 'PHP Credits'."\n".self::creditsSectionText($flags);
+    }
+
+    /** @deprecated Alias for {@see renderPhpcreditsText()}. */
     public static function renderPhpcreditsHtml(int $flags): string
     {
-        return self::creditsSectionHtml($flags);
+        return self::renderPhpcreditsText($flags);
     }
 
     public static function version_compare(string $ver1, string $ver2, ?string $operator = null): int|bool
@@ -596,6 +603,56 @@ final class VmInfo
         return $sections;
     }
 
+    /** php-src php_print_credits() text layout (ext/standard/info.c php_info_print_table_*). */
+    private static function creditsSectionText(int $flags): string
+    {
+        $sections = '';
+        if (self::creditsFlagSelected($flags, self::CREDITS_GROUP)) {
+            $sections .= self::creditsGroupSectionText();
+        }
+        if (self::creditsFlagSelected($flags, self::CREDITS_GENERAL)) {
+            $sections .= self::creditsGeneralSectionText();
+        }
+        if (self::creditsFlagSelected($flags, self::CREDITS_QA)) {
+            $sections .= self::creditsQaSectionText();
+        }
+        if (self::creditsFlagSelected($flags, self::CREDITS_SAPI)) {
+            $sections .= self::creditsSapiSectionText();
+        }
+        if (self::creditsFlagSelected($flags, self::CREDITS_MODULES)) {
+            $sections .= self::creditsModulesSectionText();
+        }
+        if (self::creditsFlagSelected($flags, self::CREDITS_DOCS)) {
+            $sections .= self::creditsDocsSectionText();
+        }
+
+        return $sections;
+    }
+
+    private static function creditsColspanHeaderText(string $header): string
+    {
+        $spaces = 74 - \strlen($header);
+        if ($spaces < 0) {
+            $spaces = 0;
+        }
+        $left = intdiv($spaces, 2);
+        $right = $spaces - $left;
+
+        return str_repeat(' ', $left).$header.str_repeat(' ', $right)."\n";
+    }
+
+    /** @param non-empty-list<string> $columns */
+    private static function creditsTableHeaderText(array $columns): string
+    {
+        return implode(' => ', $columns)."\n";
+    }
+
+    /** @param non-empty-list<string> $columns */
+    private static function creditsTableRowText(array $columns): string
+    {
+        return implode(' => ', $columns)."\n";
+    }
+
     private static function creditsGroupSectionHtml(): string
     {
         $html = '<table><tr class="h"><td colspan="2"><h2>PHP Group</h2></td></tr>';
@@ -643,6 +700,75 @@ final class VmInfo
         $html .= '</table><br />';
 
         return $html;
+    }
+
+    private static function creditsGroupSectionText(): string
+    {
+        $text = "\n";
+        $text .= self::creditsColspanHeaderText('PHP Group');
+        $text .= VmCreditsData::PHP_GROUP."\n";
+
+        return $text;
+    }
+
+    private static function creditsGeneralSectionText(): string
+    {
+        $text = "\n";
+        $text .= self::creditsColspanHeaderText('Language Design & Concept');
+        $text .= "Andi Gutmans, Rasmus Lerdorf, Zeev Suraski, Marcus Boerger\n";
+        $text .= "\n";
+        $text .= self::creditsColspanHeaderText('PHP Authors');
+        $text .= self::creditsTableHeaderText(['Contribution', 'Authors']);
+        foreach (VmCreditsData::PHP_AUTHORS as $contribution => $authors) {
+            $text .= self::creditsTableRowText([$contribution, $authors]);
+        }
+
+        return $text;
+    }
+
+    private static function creditsQaSectionText(): string
+    {
+        $text = "\n";
+        $text .= self::creditsColspanHeaderText('PHP Quality Assurance Team');
+        $text .= VmCreditsData::QA_TEAM."\n";
+
+        return $text;
+    }
+
+    private static function creditsSapiSectionText(): string
+    {
+        $text = "\n";
+        $text .= self::creditsColspanHeaderText('SAPI Modules');
+        $text .= self::creditsTableHeaderText(['Contribution', 'Authors']);
+        foreach (VmCreditsData::SAPI_MODULES as $contribution => $authors) {
+            $text .= self::creditsTableRowText([$contribution, $authors]);
+        }
+        $text .= "\n";
+        $text .= self::creditsColspanHeaderText('Debian Packaging');
+        $text .= VmCreditsData::DEBIAN_PACKAGING_AUTHOR."\n";
+
+        return $text;
+    }
+
+    private static function creditsModulesSectionText(): string
+    {
+        $text = "\n";
+        $text .= self::creditsColspanHeaderText('Module Authors');
+        $text .= self::creditsTableHeaderText(['Module', 'Authors']);
+        foreach (VmCreditsData::creditsModuleAuthorsForLoadedExtensions() as $module => $authors) {
+            $text .= self::creditsTableRowText([$module, $authors]);
+        }
+
+        return $text;
+    }
+
+    private static function creditsDocsSectionText(): string
+    {
+        $text = "\n";
+        $text .= self::creditsColspanHeaderText('PHP Documentation Team');
+        $text .= VmCreditsData::DOCS_TEAM."\n";
+
+        return $text;
     }
 
     private static function creditsModulesSectionHtml(): string

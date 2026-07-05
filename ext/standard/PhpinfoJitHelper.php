@@ -7,7 +7,7 @@ namespace PHPCompiler\ext\standard;
 /**
  * Lowered into JIT/AOT modules for phpinfo()/phpcredits() (#9256, php-in-PHP).
  *
- * SSOT: {@see VmInfo::renderPhpinfoHtml()} / {@see VmInfo::renderPhpcreditsHtml()}; echo → ob_*.
+ * SSOT: {@see VmInfo::renderPhpinfoHtml()} / {@see VmInfo::renderPhpcreditsText()}; echo → ob_*.
  * php-src: ext/standard/info.c — phpinfo(), phpcredits()
  */
 final class PhpinfoJitHelper
@@ -21,6 +21,6 @@ final class PhpinfoJitHelper
 
     public static function phpcredits(int $flags): void
     {
-        echo VmInfo::renderPhpcreditsHtml($flags);
+        echo VmInfo::renderPhpcreditsText($flags);
     }
 }
