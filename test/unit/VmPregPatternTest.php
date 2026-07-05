@@ -33,6 +33,15 @@ final class VmPregPatternTest extends TestCase
         );
     }
 
+    /** Issue #16407 — unclosed character class maps to PCRE compile message (ext/pcre/php_pcre.c). */
+    public function testCompileWarningMessageForUnclosedCharacterClass(): void
+    {
+        $this->assertSame(
+            'Compilation failed: missing terminating ] for character class at offset 1',
+            VmPregPattern::compileWarningMessage('/[/')
+        );
+    }
+
     public function testVmPregPureDelegatesPatternParseToVmPregPattern(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/VmPregPure.php');
