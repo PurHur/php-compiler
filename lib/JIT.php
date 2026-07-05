@@ -15589,36 +15589,7 @@ class JIT {
     }
 
     private function jitVariableFromVmConstant(VM\Variable $vm): Variable {
-        switch ($vm->type) {
-            case VM\Variable::TYPE_INTEGER:
-                return Variable::fromConstantInt($this->context, $vm->toInt());
-            case VM\Variable::TYPE_STRING:
-                $lit = new Operand\Literal($vm->toString());
-                $lit->type = Type::string();
-                return Variable::fromLiteral($this->context, $lit);
-            case VM\Variable::TYPE_FLOAT:
-                $lit = new Operand\Literal($vm->toFloat());
-                $lit->type = Type::float();
-                return Variable::fromLiteral($this->context, $lit);
-            case VM\Variable::TYPE_BOOLEAN:
-                $lit = new Operand\Literal($vm->toBool());
-                $lit->type = Type::bool();
-                return Variable::fromLiteral($this->context, $lit);
-            case VM\Variable::TYPE_NULL:
-                $nullVar = new Variable(
-                    $this->context,
-                    Variable::TYPE_NULL,
-                    Variable::KIND_VALUE,
-                    $this->context->getTypeFromString('__value__*')->constNull()
-                );
-                $nullVar->isNullConstant = true;
-
-                return $nullVar;
-            case VM\Variable::TYPE_ARRAY:
-                return $this->jitVariableFromVmArray($vm);
-            default:
-                throw new \LogicException('Unsupported default parameter type for JIT (vm type ' . $vm->type . ')');
-        }
+        return JIT\VmConstantJit::toVariable($this->context, $vm);
     }
 
     private function jitNullVariable(): Variable
@@ -15639,27 +15610,7 @@ class JIT {
 
     private function jitVariableFromVmArray(VM\Variable $vm): Variable
     {
-        $ht = $vm->toArray();
-        $jitHt = JIT\HashTableHelper::alloc($this->context);
-        $var = new Variable(
-            $this->context,
-            Variable::TYPE_HASHTABLE,
-            Variable::KIND_VALUE,
-            $jitHt
-        );
-        if (0 === $ht->getNumElements()) {
-            return $var;
-        }
-        foreach ($ht->iterateKeyed(true) as [$key, $value]) {
-            JIT\HashTableHelper::addElement(
-                $this->context,
-                $var,
-                $this->jitVariableFromVmConstant($value),
-                $this->jitVariableFromVmConstant($key)
-            );
-        }
-
-        return $var;
+        return JIT\VmConstantJit::toVariable($this->context, $vm);
     }
 
     private function loadPropertyFetchReceiver(Operand $objOp): PHPLLVM\Value

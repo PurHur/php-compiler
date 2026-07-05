@@ -1855,6 +1855,12 @@ class Context {
                 return;
             }
         }
+        $slot = $block->slotForOperand($op);
+        if (null !== $slot && isset($block->constants[$slot])) {
+            $this->scope->variables[$op] = VmConstantJit::toVariable($this, $block->constants[$slot]);
+
+            return;
+        }
         $this->scope->variables[$op] = Variable::fromOp($this, $func, $basicBlock, $block, $op);
         $this->scope->variables[$op]->initialize();
     }
@@ -2060,6 +2066,18 @@ class Context {
                     throw new \LogicException("Unknown variable referenced: " . get_class($op));
                 }
             } elseif ($op instanceof Operand\Temporary) {
+                $block = $this->jitCurrentBlock;
+                if (null !== $block) {
+                    $slot = $block->slotForOperand($op);
+                    if (null !== $slot && isset($block->constants[$slot])) {
+                        $this->scope->variables[$op] = VmConstantJit::toVariable(
+                            $this,
+                            $block->constants[$slot]
+                        );
+
+                        return $this->scope->variables[$op];
+                    }
+                }
                 // Temporaries can be introduced by CFG transforms after scope variable allocation.
                 // Treat unknown temporaries as boxed __value__ slots to keep self-host emit paths alive.
                 $slot = JitValueBox::alloc($this);
