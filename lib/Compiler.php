@@ -30405,12 +30405,23 @@ class Compiler {
             return null;
         }
         $trailingConstFetches = [];
+        $skipNonBoolNullConstFetch = 'json_decode' === strtolower($this->resolveCfgFuncCallName($cfgCallOp) ?? '')
+            && \count($callArgs) >= 4;
         for ($i = $callIndex - 1; $i >= 0 && $callIndex - $i <= 8; --$i) {
             $prev = $children[$i] ?? null;
             if ($prev instanceof Op\Expr\ConstFetch) {
                 $name = $this->staticNameFromOperand($prev->name);
                 if (null !== $name && \in_array(strtolower($name), ['true', 'false', 'null'], true)) {
                     array_unshift($trailingConstFetches, $prev);
+                    continue;
+                }
+                if ($skipNonBoolNullConstFetch) {
+                    continue;
+                }
+                break;
+            }
+            if ($prev instanceof Op\Expr\ClassConstFetch) {
+                if ($skipNonBoolNullConstFetch) {
                     continue;
                 }
                 break;
@@ -30421,6 +30432,11 @@ class Compiler {
             // Hoisted null feeds Concat operands, not a trailing call arg (#10663, zend_operators.c).
             if ($prev instanceof Op\Expr\BinaryOp\Concat) {
                 return null;
+            }
+            if ($skipNonBoolNullConstFetch
+                && ($prev instanceof Op\Expr\FuncCall || $prev instanceof Op\Expr\NsFuncCall)
+            ) {
+                break;
             }
             break;
         }
@@ -30470,7 +30486,19 @@ class Compiler {
                 $nonEmbeddedArgIndices[] = (int) $i;
             }
         }
-        $producerOrdinal = array_search($argIndex, $nonEmbeddedArgIndices, true);
+        $boolNullArgIndices = $nonEmbeddedArgIndices;
+        if (
+            $skipNonBoolNullConstFetch
+            && isset($nonEmbeddedArgIndices[0])
+            && 0 === $nonEmbeddedArgIndices[0]
+            && null !== $this->nestedFuncCallProducerBeforeTrailingConstFetchPreludes($cfgCallOp, $callIndex, $children)
+        ) {
+            $boolNullArgIndices = array_values(array_filter(
+                $boolNullArgIndices,
+                static fn (int $idx): bool => 0 !== $idx
+            ));
+        }
+        $producerOrdinal = array_search($argIndex, $boolNullArgIndices, true);
         if (false === $producerOrdinal) {
             return null;
         }
@@ -33556,17 +33584,14 @@ class Compiler {
                         $block->orig->children,
                         $cfgCallOp
                     );
-                    $constProducers = array_values(array_filter(
+                    $target = $this->matchInlineCallArgProducerWithEmbeddedLiterals(
                         $producers,
-                        static fn (Op\Expr $producer): bool => $producer instanceof Op\Expr\ConstFetch
-                            || $producer instanceof Op\Expr\ClassConstFetch
-                    ));
-                    $target = match (true) {
-                        1 === (int) $argIndex => $constProducers[0] ?? null,
-                        // Lone hoisted ConstFetch is $assoc (arg 1); flags stays embedded (#15486).
-                        3 === (int) $argIndex && \count($constProducers) >= 2 => $constProducers[\count($constProducers) - 1],
-                        default => null,
-                    };
+                        $cfgCallOp->args ?? [],
+                        (int) $argIndex,
+                        $cfgCallOp,
+                        $block,
+                        'json_decode'
+                    );
                     if ($target instanceof Op\Expr) {
                         $folded = $target instanceof Op\Expr\ConstFetch
                             ? $this->tryFoldGlobalConstFetch($target)
