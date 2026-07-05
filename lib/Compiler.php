@@ -22574,6 +22574,15 @@ class Compiler {
             return false;
         }
         if (!$this->operandsReferToSameVariable($producer->result, $targetArg)) {
+            if (
+                $this->stmtLevelNamedFuncCallPrecedesNestedInlineCallArgChain(
+                    $producerIndex,
+                    $consumerIndex,
+                    $cfgChildren
+                )
+            ) {
+                return false;
+            }
             if (!$this->siblingMultiArgProducerWiresByDistinctDeadArgOrdinal(
                 $producer,
                 $producerIndex,
@@ -23092,6 +23101,52 @@ class Compiler {
         }
 
         return $ordinal;
+    }
+
+    /**
+     * chmod($path, …); substr(sprintf('%o', fileperms($path)), -N) — named-arg stmt call is not a hoisted producer (#16451, #16480).
+     *
+     * @param list<Op> $cfgChildren
+     */
+    private function stmtLevelNamedFuncCallPrecedesNestedInlineCallArgChain(
+        int $producerIndex,
+        int $consumerIndex,
+        array $cfgChildren
+    ): bool {
+        $producer = $cfgChildren[$producerIndex] ?? null;
+        if (!$producer instanceof Op\Expr\FuncCall && !$producer instanceof Op\Expr\NsFuncCall) {
+            return false;
+        }
+        if (!$this->funcCallHasNamedVariableOperand($producer)) {
+            return false;
+        }
+        for ($k = $producerIndex + 1; $k < $consumerIndex - 1; ++$k) {
+            $inner = $cfgChildren[$k] ?? null;
+            $outer = $cfgChildren[$k + 1] ?? null;
+            if (
+                $inner instanceof Op\Expr
+                && ($outer instanceof Op\Expr\FuncCall || $outer instanceof Op\Expr\NsFuncCall)
+                && $this->isAdjacentNestedFuncCallProducer($inner, $outer, $k, $k + 1)
+            ) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function funcCallHasNamedVariableOperand(Op\Expr $call): bool
+    {
+        if (!property_exists($call, 'args') || !\is_array($call->args)) {
+            return false;
+        }
+        foreach ($call->args as $arg) {
+            if ($arg instanceof Operand && $this->isNamedVariableOperand($arg)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -23859,6 +23914,22 @@ class Compiler {
         $firstChild = $cfgChildren[$first] ?? null;
         if (!$this->isSiblingInlineCallProducerExpr($firstChild)) {
             return null;
+        }
+        if (
+            $this->stmtLevelNamedFuncCallPrecedesNestedInlineCallArgChain(
+                $first,
+                $consumerIndex,
+                $cfgChildren
+            )
+        ) {
+            ++$first;
+            if ($first >= $consumerIndex) {
+                return null;
+            }
+            $firstChild = $cfgChildren[$first] ?? null;
+            if (!$this->isSiblingInlineCallProducerExpr($firstChild)) {
+                return null;
+            }
         }
         $consumer = $cfgChildren[$consumerIndex] ?? null;
         // fileperms(); sprintf('%o', …); substr(…, -N) — skip nested-only producers (#13616).
