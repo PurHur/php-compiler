@@ -4,63 +4,33 @@ declare(strict_types=1);
 
 namespace PHPCompiler;
 
-use PHPCompiler\Ast\ReadonlyAnonymousClassSyntax;
 use PHPUnit\Framework\TestCase;
 
-/** `new readonly class` reference profile gate (#16255). */
+/** `new readonly class` enabled on 8.4.0-dev line (#16255, #16348). */
 final class ReadonlyAnonymousClassSyntaxReferenceProfileTest extends TestCase
 {
-    public function testSupportsReadonlyAnonymousClassFalseOnReferenceProfile(): void
+    public function testSupportsReadonlyAnonymousClassTrueOn84DevLine(): void
     {
-        $this->assertFalse(CompilerVersion::supportsReadonlyAnonymousClass());
+        $this->assertTrue(CompilerVersion::supportsReadonlyAnonymousClass());
     }
 
-    public function testSupportsReadonlyAnonymousClassTrueWhenProfile83(): void
+    public function testRejectorAllowsMaintainerGapRepro(): void
     {
-        $prev = getenv('PHP_COMPILER_PROFILE');
-        putenv('PHP_COMPILER_PROFILE=8.3');
-        try {
-            $this->assertTrue(CompilerVersion::supportsReadonlyAnonymousClass());
-        } finally {
-            if (false === $prev) {
-                putenv('PHP_COMPILER_PROFILE');
-            } else {
-                putenv('PHP_COMPILER_PROFILE='.$prev);
-            }
-        }
+        $code = file_get_contents(dirname(__DIR__).'/repro/maintainer_gap_anonymous_readonly_class.php');
+        $this->assertSame($code, ReadonlyAnonymousClassSyntaxRejector::reject($code, 'maintainer_gap_anonymous_readonly_class.php'));
     }
 
-    public function testRejectorThrowsOnMaintainerGapRepro(): void
+    public function testRuntimeCompilesMaintainerGapRepro(): void
     {
-        if (CompilerVersion::supportsReadonlyAnonymousClass()) {
-            $this->markTestSkipped('new readonly class enabled on PHP 8.3+ forward profile');
-        }
-        $this->expectException(\PHPCompiler\Compiler\CompileFatal::class);
-        $this->expectExceptionMessage(ReadonlyAnonymousClassSyntax::REFERENCE_PROFILE_UNEXPECTED_READONLY);
-        ReadonlyAnonymousClassSyntaxRejector::reject(
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile(
             file_get_contents(dirname(__DIR__).'/repro/maintainer_gap_anonymous_readonly_class.php'),
             'maintainer_gap_anonymous_readonly_class.php'
         );
-    }
-
-    public function testRuntimeRejectsMaintainerGapRepro(): void
-    {
-        if (CompilerVersion::supportsReadonlyAnonymousClass()) {
-            $this->markTestSkipped('new readonly class enabled on PHP 8.3+ forward profile');
-        }
-        $runtime = new Runtime();
-        try {
-            $runtime->parseAndCompile(
-                file_get_contents(dirname(__DIR__).'/repro/maintainer_gap_anonymous_readonly_class.php'),
-                'maintainer_gap_anonymous_readonly_class.php'
-            );
-            $this->fail('Expected compile failure');
-        } catch (\PHPCompiler\Compiler\CompileFatal $e) {
-            $this->assertStringContainsString(
-                ReadonlyAnonymousClassSyntax::REFERENCE_PROFILE_UNEXPECTED_READONLY,
-                $e->getMessage()
-            );
-        }
+        $this->assertNotNull($block);
+        ob_start();
+        $runtime->run($block);
+        $this->assertSame("1\n", ob_get_clean());
     }
 
     public function testNamedReadonlyClassStillCompilesOnReferenceProfile(): void
