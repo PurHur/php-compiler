@@ -29,11 +29,12 @@ final class stream_set_chunk_size_ extends Internal
             'stream_set_chunk_size',
             1
         );
-        $chunkSize = VmMath::parseIntBuiltinArg(
-            $frame->calledArgs[1]->resolveIndirect(),
+        $chunkSize = VmMath::parseIntBuiltinArgForFrame(
+            $frame,
+            1,
             'stream_set_chunk_size',
             2,
-            'chunk_size'
+            'size'
         );
         $previous = VmFs::streamSetChunkSize($handle, $chunkSize);
         if (null === $frame->returnVar) {
