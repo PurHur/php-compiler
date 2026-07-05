@@ -35501,8 +35501,12 @@ class Compiler {
 
         $rhsSlot = (int) $valueSlot;
         if ($rhsSlot === (int) $destSlot) {
+            // `$path = 'a' . 'b'` — CONCAT already wrote into destSlot; self-sync would clobber (#16281).
+            if ($this->assignAdjacentToBinaryExprProducer($block, $prev)) {
+                return [];
+            }
             $exprSlot = $block->slotForOperand($prev->expr);
-            if (null !== $exprSlot) {
+            if (null !== $exprSlot && (int) $exprSlot !== (int) $destSlot) {
                 $rhsSlot = (int) $exprSlot;
             } else {
                 // Reassigned locals (e.g. $f = fopen after fclose($f)) — use latest ASSIGN RHS (#16271).
@@ -35523,6 +35527,26 @@ class Compiler {
             $destSlot,
             $rhsSlot
         )];
+    }
+
+    /** `$x = 'a' . 'b'; f($x)` — CFG places BinaryOp immediately before Assign (#16281). */
+    private function assignAdjacentToBinaryExprProducer(Block $block, Op\Expr\Assign $assign): bool
+    {
+        if (null === $block->orig) {
+            return false;
+        }
+        $assignIndex = null;
+        foreach ($block->orig->children as $i => $child) {
+            if ($child === $assign) {
+                $assignIndex = $i;
+                break;
+            }
+        }
+        if (null === $assignIndex || $assignIndex < 1) {
+            return false;
+        }
+
+        return $block->orig->children[$assignIndex - 1] instanceof Op\Expr\BinaryOp;
     }
 
     private function blockHasAssignToSlot(Block $block, int $destSlot): bool
