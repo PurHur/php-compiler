@@ -1,24 +1,27 @@
 --TEST--
-Stdlib: method_exists() accepts interface/abstract ::class — bool not TypeError (#9486, ext/standard/class.c)
+Stdlib: method_exists() with interface/abstract ::class after prior call (#9486)
 --FILE--
 <?php
 interface I {
     public function m(): void;
 }
 
+var_dump(get_class_methods(I::class));
+var_dump(method_exists(I::class, 'm'));
+
 abstract class A {
     abstract public function m(): void;
 }
 
-var_export(method_exists(I::class, 'm'));
-echo "\n";
-var_export(method_exists(A::class, 'm'));
-echo "\n";
+var_dump(method_exists(A::class, 'm'));
 
 class_alias(I::class, 'IAlias');
-var_export(method_exists('IAlias', 'm'));
-echo "\n";
+var_dump(method_exists('IAlias', 'm'));
 --EXPECT--
-true
-true
-true
+array(1) {
+  [0]=>
+  string(1) "m"
+}
+bool(true)
+bool(true)
+bool(true)
