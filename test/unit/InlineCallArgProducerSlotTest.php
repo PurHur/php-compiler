@@ -5312,6 +5312,52 @@ PHP;
         self::assertStringNotContainsString('TypeError', $out);
     }
 
+    /** Issue #11767 — array_chunk(range(1,5), 2, true) wires range EXEC_RETURN + hoisted true slots. */
+    public function testArrayChunkInlineRangeUsesNestedFuncCallAndPreserveKeysSlots(): void
+    {
+        $code = <<<'PHP'
+<?php
+array_chunk(range(1, 5), 2, true);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'array_chunk_inline_range.php');
+
+        $rangeReturnSlot = null;
+        $chunkSends = [];
+        $fcallOrdinal = 0;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                ++$fcallOrdinal;
+                if (2 === $fcallOrdinal) {
+                    $chunkSends = [];
+                }
+            }
+            if (1 === $fcallOrdinal && OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
+                $rangeReturnSlot = $op->arg1;
+            }
+            if (2 === $fcallOrdinal && OpCode::TYPE_ARG_SEND === $op->type) {
+                $chunkSends[] = $op->arg1;
+            }
+        }
+
+        self::assertNotNull($rangeReturnSlot, 'range must FUNCCALL_EXEC_RETURN');
+        self::assertCount(3, $chunkSends, 'array_chunk arg sends='.json_encode($chunkSends));
+        self::assertSame($rangeReturnSlot, $chunkSends[0], 'haystack must use range return slot');
+        self::assertNotSame($chunkSends[0], $chunkSends[2], 'preserve_keys must not reuse haystack slot');
+    }
+
+    /** Issue #11767 — array_chunk inline range runtime parity. */
+    public function testArrayChunkInlineRangeRuntime(): void
+    {
+        $code = file_get_contents(__DIR__.'/../repro/maintainer_gap_array_chunk_inline_range.php');
+        self::assertNotFalse($code);
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'array_chunk_inline_range_runtime.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("count=3\n", ob_get_clean());
+    }
+
     /** Issue #13694 — comparison inside call arg must not bind as (call($x)) !== false. */
     public function testNotIdenticalInsideCallArgUsesComparisonSlot(): void
     {
