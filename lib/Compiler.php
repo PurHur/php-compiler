@@ -20184,9 +20184,18 @@ class Compiler {
                         ($child instanceof Op\Expr\BinaryOp\BitwiseOr
                             || $child instanceof Op\Expr\BinaryOp\BitwiseAnd
                             || $child instanceof Op\Expr\BinaryOp\BitwiseXor)
-                        && $i === $callIndex - 1
+                        && (
+                            $i === $callIndex - 1
+                            || (
+                                $i === $callIndex - 2
+                                && $this->isHoistedScalarConstFetchImmediatelyBeforeCall(
+                                    $cfgChildren[$callIndex - 1] ?? null
+                                )
+                            )
+                        )
                     ) {
                         // get_html_translation_table(HTML_ENTITIES, ENT_QUOTES | ENT_HTML5) — lone hoisted bitmask (#16152, #11804).
+                        // htmlspecialchars(..., ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8', false) — bitmask before trailing bool (#11407).
                         array_unshift($producers, $child);
                         continue;
                     }
@@ -29431,6 +29440,17 @@ class Compiler {
         }
 
         return null;
+    }
+
+    /** Stmt immediately before FuncCall is hoisted true/false/null for a trailing call arg (#11407). */
+    private function isHoistedScalarConstFetchImmediatelyBeforeCall(?Op $expr): bool
+    {
+        if (!$expr instanceof Op\Expr\ConstFetch) {
+            return false;
+        }
+        $name = $this->staticNameFromOperand($expr->name);
+
+        return null !== $name && \in_array(strtolower($name), ['true', 'false', 'null'], true);
     }
 
     /**
