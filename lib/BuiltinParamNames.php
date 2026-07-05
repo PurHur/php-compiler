@@ -73,6 +73,8 @@ final class BuiltinParamNames
             case 'uksort':
                 return ['array', 'callback'];
             case 'shuffle':
+            case 'array_sum':
+            case 'array_product':
                 return ['array'];
             case 'array_push':
             case 'array_pop':

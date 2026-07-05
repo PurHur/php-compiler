@@ -290,6 +290,16 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex(['array', 'flags', 'direction'], 'direction', 'sort'));
     }
 
+    /** @covers issue #16463 */
+    public function testArraySumProductNamedParameters(): void
+    {
+        foreach (['array_sum', 'array_product'] as $fn) {
+            $names = BuiltinParamNames::forFunction($fn);
+            self::assertSame(['array'], $names, $fn);
+            self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'array', $fn));
+        }
+    }
+
     /** @covers issue #11147 */
     public function testArrayPadNamedParameters(): void
     {
