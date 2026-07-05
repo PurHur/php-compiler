@@ -24,6 +24,10 @@ final class JitPasswordAlgo
         int $argIndex,
         string $paramName
     ): Value {
+        $folded = self::lowerCompileTimeStringAlgo($context, $arg);
+        if (null !== $folded) {
+            return $folded;
+        }
         if (JITVariable::TYPE_NATIVE_LONG === $arg->type) {
             return self::lowerNativeInt($context, $arg);
         }
@@ -40,6 +44,32 @@ final class JitPasswordAlgo
         );
 
         return $context->getTypeFromString('int64')->constInt(0, false);
+    }
+
+    /** Fold PASSWORD_* string literals without strcmp CFG (#9275). */
+    private static function lowerCompileTimeStringAlgo(Context $context, JITVariable $arg): ?Value
+    {
+        $lit = null;
+        if (JITVariable::TYPE_STRING === $arg->type) {
+            $lit = $arg->compileTimeString;
+        } elseif (JITVariable::TYPE_VALUE === $arg->type) {
+            $lit = $arg->compileTimeString;
+        }
+        if (null === $lit) {
+            return null;
+        }
+        $i64 = $context->getTypeFromString('int64');
+        if ('2y' === $lit) {
+            return $i64->constInt(VmPassword::PASSWORD_BCRYPT, false);
+        }
+        if ('argon2i' === $lit && VmPasswordNative::argon2Available()) {
+            return $i64->constInt(VmPassword::PASSWORD_ARGON2I, false);
+        }
+        if ('argon2id' === $lit && VmPasswordNative::argon2Available()) {
+            return $i64->constInt(VmPassword::PASSWORD_ARGON2ID, false);
+        }
+
+        return null;
     }
 
     private static function lowerNativeInt(Context $context, JITVariable $arg): Value
@@ -104,7 +134,6 @@ final class JitPasswordAlgo
         );
         $context->builder->positionAtEnd($intBad);
         self::emitValueErrorAndAbort($context);
-        $context->builder->branch($doneBlock);
         $context->builder->positionAtEnd($intOk);
         $intEnd = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);
@@ -134,7 +163,6 @@ final class JitPasswordAlgo
         );
         $context->builder->positionAtEnd($strBad);
         self::emitValueErrorAndAbort($context);
-        $context->builder->branch($doneBlock);
         $context->builder->positionAtEnd($strOk);
         $strEnd = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);
@@ -151,7 +179,6 @@ final class JitPasswordAlgo
             $paramName,
             JitOperandTypeLabel::givenLabel($context, $arg)
         );
-        $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($badBlock);
         self::emitTypeErrorAndAbort(
@@ -161,16 +188,11 @@ final class JitPasswordAlgo
             $paramName,
             JitOperandTypeLabel::givenLabel($context, $arg)
         );
-        $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($doneBlock);
         $phi = $context->builder->phi($i64);
         $phi->addIncoming($intVal, $intEnd);
         $phi->addIncoming($bcrypt, $strEnd);
-        $phi->addIncoming($i64->constInt(0, false), $intBad);
-        $phi->addIncoming($i64->constInt(0, false), $strBad);
-        $phi->addIncoming($i64->constInt(0, false), $enumErr);
-        $phi->addIncoming($i64->constInt(0, false), $badBlock);
 
         return $phi;
     }
@@ -187,9 +209,7 @@ final class JitPasswordAlgo
 
     private static function cstr(Context $context, string $literal): Value
     {
-        $charPtr = $context->getTypeFromString('char*');
-
-        return $context->builder->pointerCast($context->constantFromString($literal), $charPtr);
+        return $context->pointerFromStringConstant($literal);
     }
 
     private static function emitValueErrorAndAbort(Context $context): void
