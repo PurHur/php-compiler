@@ -41,7 +41,7 @@ final class JitFlock
             $context,
             $context->getTypeFromString('int1')->constInt(0, false),
             'flock_null_const',
-            VmFlockArg::OPERATION_VALUE_ERROR
+            VmFlockOperation::VALUE_ERROR_MSG
         );
     }
 
@@ -64,7 +64,7 @@ final class JitFlock
             $context,
             $context->builder->not($isNull),
             'flock_op_null',
-            VmFlockArg::OPERATION_VALUE_ERROR
+            VmFlockOperation::VALUE_ERROR_MSG
         );
     }
 }

@@ -21,11 +21,12 @@ final class flock extends Internal
             throw new \LogicException('flock() requires at least two arguments in this compiler build');
         }
         $handleVar = $frame->calledArgs[0]->resolveIndirect();
+        $operationVar = $frame->calledArgs[1]->resolveIndirect();
         $handle = VmStreamArg::requireStreamHandle($handleVar, 'flock');
         if (null === $frame->returnVar) {
             return;
         }
-        $operation = VmFlockArg::parseOperation($frame->calledArgs[1]);
+        $operation = VmFlockOperation::parseOperation($operationVar);
         $frame->returnVar->bool(VmFs::flock($handle, $operation));
     }
 

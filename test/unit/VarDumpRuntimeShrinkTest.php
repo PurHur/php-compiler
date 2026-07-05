@@ -6,7 +6,7 @@ namespace PHPCompiler\Test\Unit;
 
 use PHPUnit\Framework\TestCase;
 
-/** StringVarDump JIT/AOT path uses VarDumpJitHelper PHP, not StringVarDumpJit monolith (#9195, #13241). */
+/** StringVarDump JIT/AOT path uses VarDumpJitHelper PHP, not StringVarDumpJit monolith (#9195, #13241, #16565). */
 final class VarDumpRuntimeShrinkTest extends TestCase
 {
     public function testStringVarDumpUsesVarDumpJitHelperForJitPath(): void
@@ -22,6 +22,8 @@ final class VarDumpRuntimeShrinkTest extends TestCase
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/VarDumpJitHelper.php');
         $this->assertStringContainsString('VmVarDump::dumpVariable', $source);
+        $this->assertStringContainsString('formatVariableValue', $source);
+        $this->assertStringNotContainsString('function dumpValue', $source);
     }
 
     public function testVarDumpBuiltinUsesStringVarDumpNotMonolith(): void
