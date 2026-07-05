@@ -40,10 +40,10 @@ final class Mt19937Instance
 
     public function generate(): string
     {
-        return RandomU64::from32($this->generateRaw())->toBytes();
+        return \pack('V', $this->generateRaw());
     }
 
-    private function generateRaw(): int
+    public function generateRaw(): int
     {
         if ($this->count >= self::MT_N) {
             $this->reload();
