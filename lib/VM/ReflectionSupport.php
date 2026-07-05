@@ -757,8 +757,25 @@ final class ReflectionSupport
         };
     }
 
+    /**
+     * Wire declared properties + sidecar fields on ReflectionEnum*Case wrappers (#10000, #16331).
+     */
+    public static function initReflectionEnumCaseMetadata(
+        ObjectEntry $reflection,
+        string $enumClassName,
+        string $caseCanonicalName
+    ): void {
+        $reflection->reflectionEnumClassName = $enumClassName;
+        $reflection->reflectionEnumCaseName = $caseCanonicalName;
+        $reflection->getProperty(self::PROP_CLASS_NAME)->string($caseCanonicalName);
+        $reflection->getProperty(self::PROP_ENUM_CLASS_NAME)->string($enumClassName);
+    }
+
     public static function enumCaseNameFromReflection(ObjectEntry $reflection): string
     {
+        if (null !== $reflection->reflectionEnumCaseName && '' !== $reflection->reflectionEnumCaseName) {
+            return $reflection->reflectionEnumCaseName;
+        }
         $nameVar = $reflection->getProperty(self::PROP_CLASS_NAME)->resolveIndirect();
         if (Variable::TYPE_STRING !== $nameVar->type) {
             throw new \LogicException('ReflectionEnumUnitCase missing case name');
@@ -769,6 +786,9 @@ final class ReflectionSupport
 
     public static function enumClassNameFromReflection(ObjectEntry $reflection): string
     {
+        if (null !== $reflection->reflectionEnumClassName && '' !== $reflection->reflectionEnumClassName) {
+            return $reflection->reflectionEnumClassName;
+        }
         $nameVar = $reflection->getProperty(self::PROP_ENUM_CLASS_NAME)->resolveIndirect();
         if (Variable::TYPE_STRING !== $nameVar->type) {
             throw new \LogicException('ReflectionEnumUnitCase missing enum class name');
