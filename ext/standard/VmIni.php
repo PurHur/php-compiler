@@ -122,6 +122,7 @@ final class VmIni
         'zend.enable_gc',
         'max_execution_time',
         'default_charset',
+        'date.timezone',
         'cfg_file_path',
         'user_agent',
         'pcre.backtrack_limit',
@@ -185,6 +186,8 @@ final class VmIni
                 return IncludePathJitHelper::push($newValue);
             case 'default_charset':
                 return self::setDefaultCharset($newValue);
+            case 'date.timezone':
+                return self::setDateTimezone($newValue);
             case 'user_agent':
                 return self::setUserAgent($newValue);
             case 'pcre.backtrack_limit':
@@ -251,6 +254,8 @@ final class VmIni
                 return IncludePathJitHelper::get();
             case 'default_charset':
                 return self::$defaultCharset;
+            case 'date.timezone':
+                return VmDate::defaultTimezoneGet();
             case 'user_agent':
                 return self::$userAgent;
             case 'pcre.backtrack_limit':
@@ -508,6 +513,17 @@ final class VmIni
     {
         $old = self::$defaultCharset;
         self::$defaultCharset = $newValue;
+
+        return $old;
+    }
+
+    /** @return string|false */
+    private static function setDateTimezone(string $newValue): string|false
+    {
+        $old = VmDate::defaultTimezoneGet();
+        if (!VmDate::tryDefaultTimezoneSet($newValue)) {
+            return false;
+        }
 
         return $old;
     }
