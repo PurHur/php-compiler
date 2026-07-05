@@ -24215,6 +24215,16 @@ class Compiler {
         ) {
             return null;
         }
+        $hoistedScalarSlot = $this->tryFoldHoistedBoolNullLiteralCallArg(
+            $callArg,
+            $block,
+            $cfgCallOp,
+            $argIndex
+        );
+        if (null !== $hoistedScalarSlot) {
+            return (string) $hoistedScalarSlot;
+        }
+
         $callIndex = array_search($cfgCallOp, $block->orig->children, true);
         if (!\is_int($callIndex) || $callIndex < 1) {
             return null;
@@ -34465,7 +34475,7 @@ class Compiler {
                     (int) $argIndex,
                     $sends
                 );
-                if (null !== $constPreludeSlot) {
+                if (null !== $constPreludeSlot && null === $valueSlot) {
                     $valueSlot = $constPreludeSlot;
                 }
                 $callIndex = array_search($cfgCallOp, $block->orig->children, true);
