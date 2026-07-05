@@ -82,4 +82,54 @@ final class ForwardProfilePhantomIntrospectionTest extends TestCase
             }
         }
     }
+
+    public function testHttpLastResponseHeadersCallableButNotAdvertisedOnForwardProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertTrue(CompilerVersion::supportsHttpLastResponseHeaders());
+            $this->assertFalse(CompilerVersion::advertisesHttpLastResponseHeaders());
+            foreach (['http_get_last_response_headers', 'get_last_response_headers', 'http_clear_last_response_headers'] as $fn) {
+                $this->assertFalse(BuiltinIntrospectionPolicy::functionIsAdvertised($fn));
+            }
+
+            $runtime = new Runtime();
+            $ctx = $runtime->vmContext;
+            $this->assertTrue(isset($ctx->functions['http_get_last_response_headers']));
+            $this->assertFalse(
+                \PHPCompiler\ext\standard\VmReflection::functionExists($ctx, 'http_get_last_response_headers')
+            );
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testStreamContextSetOptionsCallableButNotAdvertisedOnForwardProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertTrue(CompilerVersion::supportsStreamContextSetOptions());
+            $this->assertFalse(CompilerVersion::advertisesStreamContextSetOptions());
+            $this->assertFalse(BuiltinIntrospectionPolicy::functionIsAdvertised('stream_context_set_options'));
+
+            $runtime = new Runtime();
+            $ctx = $runtime->vmContext;
+            $this->assertTrue(isset($ctx->functions['stream_context_set_options']));
+            $this->assertFalse(
+                \PHPCompiler\ext\standard\VmReflection::functionExists($ctx, 'stream_context_set_options')
+            );
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
 }

@@ -33,6 +33,16 @@ final class BuiltinIntrospectionPolicy
         if (str_starts_with($lc, 'bc')) {
             return CompilerVersion::advertisesBcmath();
         }
+        if (\in_array($lc, [
+            'http_get_last_response_headers',
+            'get_last_response_headers',
+            'http_clear_last_response_headers',
+        ], true)) {
+            return CompilerVersion::advertisesHttpLastResponseHeaders();
+        }
+        if ('stream_context_set_options' === $lc) {
+            return CompilerVersion::advertisesStreamContextSetOptions();
+        }
 
         return true;
     }

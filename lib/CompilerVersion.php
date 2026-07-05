@@ -857,6 +857,15 @@ final class CompilerVersion
     }
 
     /**
+     * http_get_last_response_headers()/get_last_response_headers()/http_clear_last_response_headers()
+     * visible to function_exists() — stable runtime only (#16346).
+     */
+    public static function advertisesHttpLastResponseHeaders(): bool
+    {
+        return version_compare(self::VERSION, '8.4.0', '>=');
+    }
+
+    /**
      * PHP 8.4+ stream_context_set_options() (ext/standard/streams.c, #12597, #10056).
      *
      * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev reference profile matches Zend 8.2 phantom gate (#15706).
@@ -864,6 +873,12 @@ final class CompilerVersion
     public static function supportsStreamContextSetOptions(): bool
     {
         return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+    }
+
+    /** stream_context_set_options() visible to function_exists() — stable runtime only (#16346). */
+    public static function advertisesStreamContextSetOptions(): bool
+    {
+        return version_compare(self::VERSION, '8.4.0', '>=');
     }
 
     /**
