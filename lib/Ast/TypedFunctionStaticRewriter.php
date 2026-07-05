@@ -18,6 +18,77 @@ final class TypedFunctionStaticRewriter
     /** @internal Marker embedded before the variable name for PHPCfg recovery. */
     public const MARKER_PATTERN = '/\/\*\s*phpc-typed-function-static:([^*]+?)\s*\*\//';
 
+    /**
+     * Zend 8.2 reference profile diagnostic for `static T $var` (#16512).
+     *
+     * @return array{line: int, message: string}|null
+     */
+    public static function referenceProfileSyntaxError(string $source): ?array
+    {
+        if (false === stripos($source, 'static')) {
+            return null;
+        }
+
+        $tokens = token_get_all($source);
+        $n = \count($tokens);
+        $classLikeDepth = 0;
+        $pendingClassLike = false;
+        $pendingFunction = false;
+        $inFunction = false;
+        $functionBraceLevel = 0;
+        $braceDepth = 0;
+
+        for ($i = 0; $i < $n; ++$i) {
+            $tok = $tokens[$i];
+            $text = self::tokenText($tok);
+
+            if (\is_array($tok)) {
+                if (\in_array($tok[0], [T_CLASS, T_INTERFACE, T_TRAIT, T_ENUM], true)) {
+                    $pendingClassLike = true;
+                } elseif (T_FUNCTION === $tok[0]) {
+                    $pendingFunction = true;
+                } elseif (T_STATIC === $tok[0]
+                    && !self::staticIsVisibilityModifierContext($tokens, $i)
+                    && !($classLikeDepth > 0 && !$inFunction)) {
+                    $typed = self::tryParseTypedStaticVar($tokens, $i + 1);
+                    if (null !== $typed) {
+                        $typeStartIdx = self::skipIgnorable($tokens, $i + 1, $n);
+                        $line = self::tokenLine($tokens[$typeStartIdx]);
+                        $typeExpr = $typed[0];
+
+                        return [
+                            'line' => $line,
+                            'message' => self::zendUnexpectedTypeMessage($tokens, $typeStartIdx, $typeExpr),
+                        ];
+                    }
+                }
+            } elseif ('{' === $text) {
+                if ($pendingClassLike) {
+                    ++$classLikeDepth;
+                    $pendingClassLike = false;
+                }
+                if ($pendingFunction) {
+                    $inFunction = true;
+                    $functionBraceLevel = $braceDepth + 1;
+                    $pendingFunction = false;
+                }
+                ++$braceDepth;
+            } elseif ('}' === $text) {
+                if ($inFunction && $braceDepth === $functionBraceLevel) {
+                    $inFunction = false;
+                }
+                if ($classLikeDepth > 0 && 1 === $braceDepth) {
+                    --$classLikeDepth;
+                }
+                if ($braceDepth > 0) {
+                    --$braceDepth;
+                }
+            }
+        }
+
+        return null;
+    }
+
     public static function rewrite(string $source): string
     {
         if (!CompilerVersion::supportsTypedFunctionStatic()) {
@@ -287,6 +358,38 @@ final class TypedFunctionStaticRewriter
     private static function collapseWhitespace(string $typeExpr): string
     {
         return trim((string) preg_replace('/\s+/', ' ', $typeExpr));
+    }
+
+    /**
+     * @param list<array{0: int, 1: string, 2: int}|string> $tokens
+     */
+    private static function zendUnexpectedTypeMessage(array $tokens, int $typeStartIdx, string $typeExpr): string
+    {
+        $tok = $tokens[$typeStartIdx];
+        if ('?' === self::tokenText($tok)) {
+            return 'syntax error, unexpected token "?", expecting "::"';
+        }
+        if (\is_array($tok) && T_ARRAY === $tok[0]) {
+            return 'syntax error, unexpected token "array", expecting "::"';
+        }
+        if (\is_array($tok) && T_CALLABLE === $tok[0]) {
+            return 'syntax error, unexpected token "callable", expecting "::"';
+        }
+        if (\is_array($tok) && \in_array($tok[0], [T_STRING, T_NAME_QUALIFIED, T_NAME_FULLY_QUALIFIED], true)) {
+            return sprintf('syntax error, unexpected identifier "%s", expecting "::"', $tok[1]);
+        }
+
+        $first = strtok($typeExpr, " \t|&()");
+
+        return sprintf('syntax error, unexpected identifier "%s", expecting "::"', $first ?: $typeExpr);
+    }
+
+    /**
+     * @param array{0: int, 1: string, 2: int}|string $token
+     */
+    private static function tokenLine($token): int
+    {
+        return \is_array($token) ? (int) ($token[2] ?? 1) : 1;
     }
 
     /**

@@ -673,6 +673,16 @@ class VMTest extends BaseTest {
                 && str_contains($name, 'readonly_anonymous_defaults')) {
                 continue;
             }
+            // 8.3-target reject gate; skipped when typed function-local static enabled (#16512, #9998).
+            if (CompilerVersion::supportsTypedFunctionStatic()
+                && str_contains($name, 'typed_function_static_reference_profile')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsTypedFunctionStatic()
+                && str_contains($name, 'typed_function_static')
+                && !str_contains($name, 'typed_function_static_reference_profile')) {
+                continue;
+            }
             // 8.4-target reject gate; skipped when parenthesized DNF intersection types enabled (#14904).
             if (CompilerVersion::supportsParenthesizedDnfIntersectionTypes()
                 && str_contains($name, 'dnf_paren_intersection_reference_profile')) {
