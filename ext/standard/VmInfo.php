@@ -551,9 +551,11 @@ final class VmInfo
             }
             $html .= '<tr><td class="e">'.$label.' </td><td class="v">'.$value.' </td></tr>';
         }
-        $html .= '<tr><td class="e">PHP Version </td><td class="v">'.$version.' </td></tr>';
-        $html .= '<tr><td class="e">Zend Engine Version </td><td class="v">'.CompilerVersion::zendVersion().' </td></tr>';
-        $html .= '</table><br />';
+        foreach (self::PHPINFO_GENERAL_TAIL_ROWS as $label) {
+            $html .= '<tr><td class="e">'.$label.' </td><td class="v">'.self::phpinfoGeneralTailRow($label).' </td></tr>';
+        }
+        $html .= '</table>';
+        $html .= '<p>'.self::generalSectionEngineCreditText().'</p><br />';
 
         return $html;
     }
@@ -588,9 +590,10 @@ final class VmInfo
             }
             $text .= self::phpinfoRowText($label, $value);
         }
-        $text .= self::phpinfoRowText('PHP Version', $version);
-        $text .= self::phpinfoRowText('Zend Engine Version', CompilerVersion::zendVersion());
-        $text .= "\n";
+        foreach (self::PHPINFO_GENERAL_TAIL_ROWS as $label) {
+            $text .= self::phpinfoRowText($label, self::phpinfoGeneralTailRow($label));
+        }
+        $text .= "\n".self::generalSectionEngineCreditText()."\n";
 
         return $text;
     }
@@ -655,6 +658,46 @@ final class VmInfo
         'Debug Build',
         'Thread Safety',
     ];
+
+    /** php-src phpinfo(INFO_GENERAL) tail after Thread Safety — signal/stream rows (#16551). */
+    private const PHPINFO_GENERAL_TAIL_ROWS = [
+        'Zend Signal Handling',
+        'Zend Memory Manager',
+        'Zend Multibyte Support',
+        'Zend Max Execution Timers',
+        'IPv6 Support',
+        'DTrace Support',
+        'Registered PHP Streams',
+        'Registered Stream Socket Transports',
+        'Registered Stream Filters',
+    ];
+
+    private static function phpinfoGeneralTailRow(string $label): string
+    {
+        $seeded = VmIniIntrospection::phpinfoGeneralRow($label, '');
+        if ('' !== $seeded) {
+            return $seeded;
+        }
+
+        return match ($label) {
+            'Zend Signal Handling' => 'enabled',
+            'Zend Memory Manager' => 'enabled',
+            'Zend Multibyte Support' => self::extension_loaded('mbstring') ? 'provided by mbstring' : 'disabled',
+            'Zend Max Execution Timers' => 'disabled',
+            'IPv6 Support' => 'enabled',
+            'DTrace Support' => 'available, disabled',
+            'Registered PHP Streams' => implode(', ', VmStreamWrapperRegistry::getWrappers()),
+            'Registered Stream Socket Transports' => implode(', ', VmStreamTransports::getTransports()),
+            'Registered Stream Filters' => implode(', ', VmStreamFilters::allFilterNames()),
+            default => '',
+        };
+    }
+
+    private static function generalSectionEngineCreditText(): string
+    {
+        return 'This program makes use of the Zend Scripting Language Engine:'."\n"
+            .'Zend Engine v'.CompilerVersion::zendVersion().', Copyright (c) Zend Technologies';
+    }
 
     private static function formatPhpinfoAdditionalIniFilesHtml(string $value): string
     {
