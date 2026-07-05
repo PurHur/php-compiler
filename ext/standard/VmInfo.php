@@ -222,7 +222,7 @@ final class VmInfo
             $html .= self::licenseSectionHtml();
         }
         if (self::infoFlagSelected($flags, self::INFO_CREDITS)) {
-            $html .= self::creditsSectionHtml(self::PHPINFO_CREDITS_FLAGS);
+            $html .= self::creditsSectionHtml(self::PHPINFO_CREDITS_FLAGS, true);
         }
         $html .= '</div></body></html>';
 
@@ -572,7 +572,7 @@ final class VmInfo
         return $html;
     }
 
-    private static function creditsSectionHtml(int $flags): string
+    private static function creditsSectionHtml(int $flags, bool $fullModuleCreditsTable = false): string
     {
         $sections = '';
         if (self::creditsFlagSelected($flags, self::CREDITS_GROUP)) {
@@ -588,7 +588,7 @@ final class VmInfo
             $sections .= self::creditsSapiSectionHtml();
         }
         if (self::creditsFlagSelected($flags, self::CREDITS_MODULES)) {
-            $sections .= self::creditsModulesSectionHtml();
+            $sections .= self::creditsModulesSectionHtml($fullModuleCreditsTable);
         }
         if (self::creditsFlagSelected($flags, self::CREDITS_DOCS)) {
             $sections .= self::creditsDocsSectionHtml();
@@ -620,13 +620,21 @@ final class VmInfo
             $sections .= self::creditsSapiSectionText();
         }
         if (self::creditsFlagSelected($flags, self::CREDITS_MODULES)) {
-            $sections .= self::creditsModulesSectionText();
+            $sections .= self::creditsModulesSectionText(false);
         }
         if (self::creditsFlagSelected($flags, self::CREDITS_DOCS)) {
             $sections .= self::creditsDocsSectionText();
         }
 
         return $sections;
+    }
+
+    /** @return array<string, string> */
+    private static function creditsModuleAuthorRows(bool $fullModuleCreditsTable): array
+    {
+        return $fullModuleCreditsTable
+            ? VmCreditsData::creditsModuleAuthorsForPhpinfo()
+            : VmCreditsData::creditsModuleAuthorsForLoadedExtensions();
     }
 
     private static function creditsColspanHeaderText(string $header): string
@@ -750,12 +758,12 @@ final class VmInfo
         return $text;
     }
 
-    private static function creditsModulesSectionText(): string
+    private static function creditsModulesSectionText(bool $fullModuleCreditsTable): string
     {
         $text = "\n";
         $text .= self::creditsColspanHeaderText('Module Authors');
         $text .= self::creditsTableHeaderText(['Module', 'Authors']);
-        foreach (VmCreditsData::creditsModuleAuthorsForLoadedExtensions() as $module => $authors) {
+        foreach (self::creditsModuleAuthorRows($fullModuleCreditsTable) as $module => $authors) {
             $text .= self::creditsTableRowText([$module, $authors]);
         }
 
@@ -771,11 +779,11 @@ final class VmInfo
         return $text;
     }
 
-    private static function creditsModulesSectionHtml(): string
+    private static function creditsModulesSectionHtml(bool $fullModuleCreditsTable): string
     {
         $html = '<table><tr class="h"><td colspan="2"><h2>Module Authors</h2></td></tr>';
         $html .= '<tr><td class="e">Module </td><td class="v">Authors </td></tr>';
-        foreach (VmCreditsData::creditsModuleAuthorsForLoadedExtensions() as $module => $authors) {
+        foreach (self::creditsModuleAuthorRows($fullModuleCreditsTable) as $module => $authors) {
             $html .= '<tr><td class="e">'.$module.' </td><td class="v">'.$authors.' </td></tr>';
         }
         $html .= '</table><br />';
