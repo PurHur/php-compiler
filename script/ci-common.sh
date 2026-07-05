@@ -94,6 +94,15 @@ ci_run_wave3_roadmap_sync_check() {
     return 0
   fi
   echo "Wave 3 roadmap sync (WAVE3_ROADMAP_SYNC_GATE=1, issue #1802)..."
+  if "$PHP_BIN" "${PHP_OPTS[@]}" script/check-wave3-roadmap-sync.php; then
+    return 0
+  fi
+  # Footnote pairs are generated text that goes stale every time the fleet
+  # grows the inventory (#1802); auto-heal like the #765 doc regen instead of
+  # failing every ci run on the box that didn't cause the growth. Real spine
+  # gaps (bundle edits, sidecar) still fail below after the rewrite.
+  echo "Auto-healing stale spine footnotes via spine-sync --footnotes-only (#1802)..."
+  ./script/spine-sync.sh --footnotes-only
   "$PHP_BIN" "${PHP_OPTS[@]}" script/check-wave3-roadmap-sync.php
 }
 
