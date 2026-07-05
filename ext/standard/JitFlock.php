@@ -37,11 +37,11 @@ final class JitFlock
     {
         TypeErrorRaise::registerDeclarations($context);
         TypeErrorRaise::ensureLinked($context);
-        TypeErrorRaise::emitBranchOrAbortOnValueErrorFailure(
+        TypeErrorRaise::emitBranchOrAbortOnFailure(
             $context,
             $context->getTypeFromString('int1')->constInt(0, false),
             'flock_null_const',
-            VmFlockOperation::VALUE_ERROR_MSG
+            VmFlockOperation::TYPE_ERROR_NULL_MSG
         );
     }
 
@@ -60,11 +60,11 @@ final class JitFlock
         );
         TypeErrorRaise::registerDeclarations($context);
         TypeErrorRaise::ensureLinked($context);
-        TypeErrorRaise::emitBranchOrAbortOnValueErrorFailure(
+        TypeErrorRaise::emitBranchOrAbortOnFailure(
             $context,
             $context->builder->not($isNull),
             'flock_op_null',
-            VmFlockOperation::VALUE_ERROR_MSG
+            VmFlockOperation::TYPE_ERROR_NULL_MSG
         );
     }
 }

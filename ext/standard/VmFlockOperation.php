@@ -11,13 +11,15 @@ final class VmFlockOperation
 {
     public const VALUE_ERROR_MSG = 'flock(): Argument #2 ($operation) must be one of LOCK_SH, LOCK_EX, or LOCK_UN';
 
+    public const TYPE_ERROR_NULL_MSG = 'flock(): Argument #2 ($operation) must be of type int, null given';
+
     private const LOCK_NB = 4;
 
     public static function parseOperation(Variable $var): int
     {
         $var = $var->resolveIndirect();
         if (Variable::TYPE_NULL === $var->type) {
-            throw new \ValueError(self::VALUE_ERROR_MSG);
+            throw new \TypeError(self::TYPE_ERROR_NULL_MSG);
         }
         if (Variable::TYPE_BOOLEAN === $var->type) {
             $operation = $var->toBool() ? 1 : 0;
