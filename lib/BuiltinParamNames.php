@@ -210,8 +210,8 @@ final class BuiltinParamNames
                 return ['min', 'max'];
             case 'hex2bin':
                 return \PHPCompiler\CompilerVersion::supportsHex2binStrict()
-                    ? ['data', 'strict']
-                    : ['data'];
+                    ? ['string', 'strict']
+                    : ['string'];
             case 'unpack':
                 return ['format', 'string', 'offset'];
             case 'hash':
