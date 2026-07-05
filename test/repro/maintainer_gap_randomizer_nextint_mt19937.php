@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 $r = new Random\Randomizer(new Random\Engine\Mt19937(99));
