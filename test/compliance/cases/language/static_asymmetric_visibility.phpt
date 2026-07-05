@@ -9,4 +9,4 @@ echo C::$name, "\n";
 --EXPECT_EXIT--
 255
 --EXPECTF--
-Fatal error: syntax error, unexpected token ")", expecting variable in %s on line %d
+parseAndCompile failure: target=%s: syntax error, unexpected token ")", expecting variable

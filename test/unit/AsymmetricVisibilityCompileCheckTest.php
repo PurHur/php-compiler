@@ -139,16 +139,14 @@ PHP, 'asymmetric_set_before_read.php');
         $this->assertNotNull($block);
     }
 
-    public function testBarePrivateSetCompiles(): void
+    public function testBarePrivateSetRejects(): void
     {
-        $runtime = new Runtime();
-        $block = $runtime->parseAndCompile(<<<'PHP'
+        $this->expectCompileError(<<<'PHP'
 <?php
 class C {
     private(set) string $p = 'x';
 }
-PHP, 'asymmetric_bare_private_set.php');
-        $this->assertNotNull($block);
+PHP, AsymmetricVisibilityRewriter::BARE_SET_WITHOUT_READ_MESSAGE);
     }
 
     private function expectCompileError(string $code, string $messageNeedle): void
