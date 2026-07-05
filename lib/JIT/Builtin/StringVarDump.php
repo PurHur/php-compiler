@@ -11,21 +11,20 @@ use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_var_dump (#9195, #13241, #16565).
+ * JIT/AOT link for __compiler_var_dump via VarDumpJitHelper PHP (#9195, #13241, #16565).
  *
- * Embed/self-host: VarDumpJitHelper PHP via nested JIT (php-in-PHP).
- * Standalone user AOT: StringVarDumpJit LLVM — nested compile of VmVarDump SIGSEGVs LLVM 9.
+ * Embed and standalone AOT compile the same PHP bridge; no var_dump LLVM monolith.
  * php-src: ext/standard/var.c — php_var_dump_ex
  */
 final class StringVarDump
 {
     private const HELPER_PATH = '/ext/standard/VarDumpJitHelper.php';
 
-    private const DUMP_VALUE_HELPER = 'PHPCompiler\\ext\\standard\\VarDumpJitHelper::dumpValue';
+    private const FORMAT_VALUE_HELPER = 'PHPCompiler\\ext\\standard\\VarDumpJitHelper::formatVariableValue';
 
     /** @var list<string> */
     private const COMPILED_HELPERS = [
-        self::DUMP_VALUE_HELPER,
+        self::FORMAT_VALUE_HELPER,
     ];
 
     /** @var list<string> */
@@ -45,6 +44,10 @@ final class StringVarDump
 
     public static function implement(Context $context): void
     {
+        if (NestedJitCompileScope::isActive()) {
+            return;
+        }
+
         $probe = $context->module->getNamedFunction('__compiler_var_dump');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);
@@ -52,21 +55,15 @@ final class StringVarDump
             return;
         }
 
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            $restoreBlock = BasicBlockHelper::tryGetInsertBlock($context);
-            StringVarDumpJit::ensureLinked($context);
-            self::registerLinkedRuntime($context);
-            if (null !== $restoreBlock) {
-                BasicBlockHelper::restoreInsertBlock($context, $restoreBlock);
-            }
-
-            return;
-        }
-
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
         self::ensureJitHelperCompiled($context);
         self::implementBridge($context);
         self::registerLinkedRuntime($context);
-        $context->builder->clearInsertionPosition();
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
     }
 
     private static function implementBridge(Context $context): void
@@ -81,6 +78,7 @@ final class StringVarDump
 
         $voidTy = $context->getTypeFromString('void');
         $valuePtr = $context->getTypeFromString('__value__*');
+        $i64 = $context->getTypeFromString('int64');
         $ft = $context->context->functionType($voidTy, false, $valuePtr);
         $fn = null !== $probe
             ? $probe
@@ -89,8 +87,9 @@ final class StringVarDump
         $entry = $fn->appendBasicBlock('var_dump_bridge_entry');
         $context->builder->positionAtEnd($entry);
         $context->builder->call(
-            self::helperFunction($context, self::DUMP_VALUE_HELPER),
-            $fn->getParam(0)
+            self::helperFunction($context, self::FORMAT_VALUE_HELPER),
+            $fn->getParam(0),
+            $i64->constInt(0, false)
         );
         $context->builder->returnVoid();
         $context->registerFunction($abiName, $fn);
