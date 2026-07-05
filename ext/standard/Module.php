@@ -14,6 +14,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\CompilerVersion;
 use PHPCompiler\JIT;
 use PHPCompiler\JIT\Builtin\StringCaseCompare;
+use PHPCompiler\JIT\Builtin\StringStrcoll;
 use PHPCompiler\JIT\Builtin\StringStrpbrk;
 use PHPCompiler\ModuleAbstract;
 use PHPCompiler\Runtime;
@@ -974,15 +975,6 @@ class Module extends ModuleAbstract
             $context->registerFunction('strcmp', $fn);
         }
         try {
-            $context->lookupFunction('strcoll');
-        } catch (\Throwable $e) {
-            $i8p = $context->getTypeFromString('int8*');
-            $i32 = $context->getTypeFromString('int32');
-            $ft = $context->context->functionType($i32, false, $i8p, $i8p);
-            $fn = $context->module->addFunction('strcoll', $ft);
-            $context->registerFunction('strcoll', $fn);
-        }
-        try {
             $context->lookupFunction('nl_langinfo');
         } catch (\Throwable $e) {
             $i8p = $context->getTypeFromString('int8*');
@@ -1024,6 +1016,7 @@ class Module extends ModuleAbstract
         }
         StringCaseCompare::ensureStrcasecmpLinked($context);
         StringCaseCompare::ensureStrncasecmpLinked($context);
+        StringStrcoll::ensureLinked($context);
         try {
             $context->lookupFunction('substr_compare');
         } catch (\Throwable $e) {
