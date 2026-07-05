@@ -9449,7 +9449,7 @@ class Compiler {
             case Op\Expr\Yield_::class:
                 $this->markFunctionGenerator($block);
 
-                return [new OpCode(
+                $yieldOp = new OpCode(
                     OpCode::TYPE_YIELD,
                     [] !== $expr->result->usages
                         ? $this->compileOperand($expr->result, $block, false)
@@ -9462,16 +9462,22 @@ class Compiler {
                     null !== $expr->value && null !== $expr->key
                         ? $this->compileOperand($expr->key, $block, true)
                         : null,
-                )];
+                );
+                $this->assignSourceMetadata($yieldOp, $expr);
+
+                return [$yieldOp];
             case Op\Expr\YieldFrom::class:
                 $this->markFunctionGenerator($block);
-                return [new OpCode(
+                $yieldFromOp = new OpCode(
                     OpCode::TYPE_YIELD_FROM,
                     [] !== $expr->result->usages
                         ? $this->compileOperand($expr->result, $block, false)
                         : null,
                     $this->compileOperand($expr->expr, $block, true),
-                )];
+                );
+                $this->assignSourceMetadata($yieldFromOp, $expr);
+
+                return [$yieldFromOp];
             case Op\Expr\NullsafePropertyFetch::class:
                 $this->compileNullsafePropertyFetch($expr, $block);
 

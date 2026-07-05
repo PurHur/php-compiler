@@ -169,6 +169,11 @@ use PHPCompiler\VM\Builtin\ReflectionEnumUnitCaseIsDeprecated;
 use PHPCompiler\VM\Builtin\ReflectionExtensionConstruct;
 use PHPCompiler\VM\Builtin\ReflectionExtensionGetName;
 use PHPCompiler\VM\Builtin\ReflectionFiberGetExecutingFiber;
+use PHPCompiler\VM\Builtin\ReflectionGeneratorConstruct;
+use PHPCompiler\VM\Builtin\ReflectionGeneratorGetExecutingFile;
+use PHPCompiler\VM\Builtin\ReflectionGeneratorGetExecutingGenerator;
+use PHPCompiler\VM\Builtin\ReflectionGeneratorGetExecutingLine;
+use PHPCompiler\VM\Builtin\ReflectionGeneratorGetFunction;
 use PHPCompiler\VM\Builtin\ReflectionFunctionConstruct;
 use PHPCompiler\VM\Builtin\ReflectionFunctionCreateFromCallable;
 use PHPCompiler\VM\Builtin\ReflectionFunctionCreateFromFunction;
@@ -1032,6 +1037,24 @@ final class BuiltinClasses
         $rfiber->methods['getexecutingfiber'] = new ReflectionFiberGetExecutingFiber();
         $rfiber->methodVisibility['getexecutingfiber'] = $pub | CfgFunc::FLAG_STATIC;
         $ctx->classes[ReflectionSupport::REFLECTION_FIBER] = $rfiber;
+
+        $rgen = new ClassEntry('ReflectionGenerator');
+        $rgen->properties[] = new ClassProperty(ReflectionSupport::PROP_GENERATOR_TARGET, null, $objProto);
+        $rgen->constructor = new ReflectionGeneratorConstruct();
+        $rgen->methods['__construct'] = $rgen->constructor;
+        $rgen->methodVisibility['__construct'] = $pub;
+        foreach (
+            [
+                'getfunction' => new ReflectionGeneratorGetFunction(),
+                'getexecutingline' => new ReflectionGeneratorGetExecutingLine(),
+                'getexecutingfile' => new ReflectionGeneratorGetExecutingFile(),
+                'getexecutinggenerator' => new ReflectionGeneratorGetExecutingGenerator(),
+            ] as $name => $method
+        ) {
+            $rgen->methods[$name] = $method;
+            $rgen->methodVisibility[$name] = $pub;
+        }
+        $ctx->classes[ReflectionSupport::REFLECTION_GENERATOR] = $rgen;
     }
 
     /**

@@ -68,6 +68,8 @@ final class ReflectionSupport
 
     public const REFLECTION_FIBER = 'reflectionfiber';
 
+    public const REFLECTION_GENERATOR = 'reflectiongenerator';
+
     public const PROP_CLASS_NAME = 'name';
 
     public const PROP_METHOD_NAME = 'method';
@@ -107,6 +109,9 @@ final class ReflectionSupport
 
     /** Wrapped Fiber object on ReflectionFiber instances (#6793). */
     public const PROP_FIBER_TARGET = 'fiber';
+
+    /** Wrapped Generator object on ReflectionGenerator instances (#5964). */
+    public const PROP_GENERATOR_TARGET = 'generator';
 
     public const PROP_PARAM_INDEX = 'paramIndex';
 
@@ -642,6 +647,34 @@ final class ReflectionSupport
         }
 
         return $obj;
+    }
+
+    public static function requireReflectionGenerator(Frame $frame, Variable $receiver): ObjectEntry
+    {
+        $receiver = $receiver->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $receiver->type) {
+            throw new \LogicException('ReflectionGenerator method called without object');
+        }
+        $obj = $receiver->toObject();
+        if (strtolower($obj->class->name) !== self::REFLECTION_GENERATOR) {
+            throw new \LogicException('Expected ReflectionGenerator instance');
+        }
+
+        return $obj;
+    }
+
+    public static function reflectionFunctionFromGenerator(Context $ctx, GeneratorState $gen): ObjectEntry
+    {
+        if (null !== $gen->closureCall) {
+            return self::reflectionFunctionFromClosureState($ctx, $gen->closureCall);
+        }
+
+        return self::reflectionFunctionFromFunctionName($ctx, $gen->func->getName());
+    }
+
+    public static function reflectionFunctionFromClosureState(Context $ctx, ClosureState $state): ObjectEntry
+    {
+        return self::populateReflectionFunctionFromClosureState($ctx, $state);
     }
 
     public static function isReflectionEnumCaseObject(ObjectEntry $obj): bool
