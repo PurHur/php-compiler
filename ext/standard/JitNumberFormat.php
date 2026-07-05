@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\CompilerVersion;
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\RoundingModeJit;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitRoundModeArg;
@@ -24,16 +25,41 @@ use PHPLLVM\Value;
  */
 final class JitNumberFormat
 {
-    public static function format(Context $context, JITVariable ...$args): Value
+    private const MAX_ARGS = 4;
+
+    /**
+     * @param JITVariable ...$args
+     */
+    public static function assertArgCount(Context $context, JITVariable ...$args): void
     {
-        $argc = count($args);
-        $maxArgs = CompilerVersion::supportsRoundingModeEnum() ? 5 : 4;
-        if ($argc < 1 || $argc > $maxArgs) {
-            throw new \LogicException(\sprintf(
-                'number_format() requires one to %d arguments',
-                $maxArgs
+        $argc = \count($args);
+        if ($argc < 1) {
+            throw new \ArgumentCountError(\sprintf(
+                'number_format() expects at least 1 argument, %d given',
+                $argc
             ));
         }
+        if ($argc <= self::MAX_ARGS) {
+            return;
+        }
+        if (5 === $argc
+            && CompilerVersion::supportsRoundingModeEnum()
+            && isset($args[4])
+            && !NamedOptionalCallArgs::isOmittedOptional($args[4])
+            && null !== RoundingModeJit::compileTimeRoundMode($context, $args[4])) {
+            return;
+        }
+
+        throw new \ArgumentCountError(\sprintf(
+            'number_format() expects at most %d arguments, %d given',
+            self::MAX_ARGS,
+            $argc
+        ));
+    }
+
+    public static function format(Context $context, JITVariable ...$args): Value
+    {
+        $argc = \count($args);
 
         if ($context->callerStrictTypes) {
             self::rejectNullNum($context, $args[0]);

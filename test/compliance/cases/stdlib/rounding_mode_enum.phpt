@@ -27,5 +27,5 @@ true
 2
 2
 -2
-LogicException
+ArgumentCountError
 round(): Argument #3 ($mode) must be of type RoundingMode|int, Es given
