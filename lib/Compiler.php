@@ -21274,6 +21274,12 @@ class Compiler {
         int $consumerIndex,
         array $cfgChildren
     ): bool {
+        if (
+            ($producer instanceof Op\Expr\FuncCall || $producer instanceof Op\Expr\NsFuncCall)
+            && $this->funcCallExprHasByRefMutatingSideEffects($producer)
+        ) {
+            return false;
+        }
         if ($this->isAdjacentNestedFuncCallProducer($producer, $consumer, $producerIndex, $consumerIndex)) {
             return true;
         }
@@ -21496,6 +21502,13 @@ class Compiler {
             && !$producer instanceof Op\Expr\NsFuncCall
             && !$producer instanceof Op\Expr\StaticCall
             && !$producer instanceof Op\Expr\MethodCall
+        ) {
+            return false;
+        }
+        // array_splice($a, …); json_encode($a, JSON_*) — by-ref stmt must not re-emit as producer (#13573).
+        if (
+            ($producer instanceof Op\Expr\FuncCall || $producer instanceof Op\Expr\NsFuncCall)
+            && $this->funcCallExprHasByRefMutatingSideEffects($producer)
         ) {
             return false;
         }
@@ -21784,6 +21797,12 @@ class Compiler {
     private function deferredSiblingInlineCallArgConsumerIndex(Op $op, array $ops, int $producerIndex): ?int
     {
         if (!$this->isSiblingInlineCallProducerExpr($op)) {
+            return null;
+        }
+        if (
+            ($op instanceof Op\Expr\FuncCall || $op instanceof Op\Expr\NsFuncCall)
+            && $this->funcCallExprHasByRefMutatingSideEffects($op)
+        ) {
             return null;
         }
         $opCount = \count($ops);
@@ -22516,6 +22535,12 @@ class Compiler {
         array $cfgChildren
     ): bool {
         if (!$this->isSiblingInlineCallProducerExpr($producer)) {
+            return false;
+        }
+        if (
+            ($producer instanceof Op\Expr\FuncCall || $producer instanceof Op\Expr\NsFuncCall)
+            && $this->funcCallExprHasByRefMutatingSideEffects($producer)
+        ) {
             return false;
         }
         // Prior array_udiff*(...) / array_uintersect*(...) stmts are not arg producers for a later u* call (#16045).
@@ -24323,6 +24348,9 @@ class Compiler {
                 if (!$producer instanceof Op\Expr\FuncCall && !$producer instanceof Op\Expr\NsFuncCall) {
                     continue;
                 }
+                if ($this->funcCallExprHasByRefMutatingSideEffects($producer)) {
+                    continue;
+                }
                 $producerIndex = array_search($producer, $block->orig->children, true);
                 if (!is_int($producerIndex)) {
                     continue;
@@ -24407,6 +24435,12 @@ class Compiler {
         for ($j = $contiguousFirst; $j < $callIndex; ++$j) {
             $producer = $cfgChildren[$j] ?? null;
             if (!$producer instanceof Op\Expr) {
+                continue;
+            }
+            if (
+                ($producer instanceof Op\Expr\FuncCall || $producer instanceof Op\Expr\NsFuncCall)
+                && $this->funcCallExprHasByRefMutatingSideEffects($producer)
+            ) {
                 continue;
             }
             if (!$this->isSiblingMultiArgFuncCallProducer(
@@ -33005,6 +33039,20 @@ class Compiler {
             $nameSlot = $this->callArgNameSlot($arg, $block);
             // Early inline-array ARG_SEND paths continue before the main send site — unpack must be known up front (#16151).
             $unpackFlag = $this->callArgUnpack($arg) ? 1 : null;
+            if (
+                null !== $cfgCallOp
+                && 'array_splice' === strtolower($this->resolveCfgFuncCallName($cfgCallOp) ?? '')
+                && \in_array((int) $argIndex, [1, 2], true)
+                && $this->isEmbeddedCallLiteralArg($cfgCallOp->args[(int) $argIndex] ?? $arg)
+            ) {
+                $sends[] = new OpCode(
+                    OpCode::TYPE_ARG_SEND,
+                    $this->compileOperand($arg, $block, true),
+                    $nameSlot,
+                    $unpackFlag
+                );
+                continue;
+            }
             if (
                 null !== $cfgCallOp
                 && $cfgCallOp instanceof Op\Expr\MethodCall
