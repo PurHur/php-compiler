@@ -576,4 +576,14 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($isA, 'allow_string', 'is_a'));
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($isA, 'autoload', 'is_a'));
     }
+
+    /** @covers issue #16615 */
+    public function testStringTransformNamedStringParamResolves(): void
+    {
+        foreach (['ucfirst', 'lcfirst', 'strtoupper', 'strtolower', 'addslashes', 'bin2hex'] as $fn) {
+            $names = BuiltinParamNames::forFunction($fn);
+            self::assertSame(['string'], $names, $fn);
+            self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'string', $fn), $fn);
+        }
+    }
 }
