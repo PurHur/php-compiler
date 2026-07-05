@@ -543,6 +543,10 @@ final class VmInfo
         $html .= '<tr><td class="e">System </td><td class="v">'.$system.' '.$host.' '.$release.' '.$versionStr.' '.$machine.' </td></tr>';
         $html .= '<tr><td class="e">Build Date </td><td class="v">'.CompilerVersion::BUILD_DATE.' </td></tr>';
         $html .= '<tr><td class="e">Build System </td><td class="v">'.$system.' '.$machine.' </td></tr>';
+        $buildProvider = VmIniIntrospection::phpinfoGeneralRow('Build Provider');
+        if ('' !== $buildProvider) {
+            $html .= '<tr><td class="e">Build Provider </td><td class="v">'.$buildProvider.' </td></tr>';
+        }
         $html .= '<tr><td class="e">Server API </td><td class="v">'.$sapi.' </td></tr>';
         foreach (self::PHPINFO_GENERAL_EXTRA_ROWS as $label) {
             $value = VmIniIntrospection::phpinfoGeneralRow($label);
@@ -569,19 +573,35 @@ final class VmInfo
         return "\n\n ".str_repeat('_', 71)."\n\nPHP Credits\n";
     }
 
+    /** php-src sapi_module.name long label in phpinfo text mode (main/SAPI.c, #14283). */
+    private static function phpinfoServerApiLabel(): string
+    {
+        return match (strtolower(self::php_sapi_name())) {
+            'cli' => 'Command Line Interface',
+            'cli-server' => 'Development Server',
+            'cgi-fcgi', 'cgi' => 'CGI/FastCGI',
+            default => self::php_sapi_name(),
+        };
+    }
+
     private static function generalSectionText(): string
     {
-        $version = CompilerVersion::VERSION;
+        $version = CompilerVersion::reportedPhpVersion();
         $system = self::php_uname('s');
         $host = self::php_uname('n');
         $release = self::php_uname('r');
         $versionStr = self::php_uname('v');
         $machine = self::php_uname('m');
+        $buildDate = VmIniIntrospection::phpinfoGeneralRow('Build Date', CompilerVersion::BUILD_DATE);
         $text = self::phpinfoRowText('PHP Version', $version)."\n";
         $text .= self::phpinfoRowText('System', trim($system.' '.$host.' '.$release.' '.$versionStr.' '.$machine));
-        $text .= self::phpinfoRowText('Build Date', CompilerVersion::BUILD_DATE);
-        $text .= self::phpinfoRowText('Build System', trim($system.' '.$machine));
-        $text .= self::phpinfoRowText('Server API', self::php_sapi_name());
+        $text .= self::phpinfoRowText('Build Date', $buildDate);
+        $text .= self::phpinfoRowText('Build System', $system);
+        $buildProvider = VmIniIntrospection::phpinfoGeneralRow('Build Provider');
+        if ('' !== $buildProvider) {
+            $text .= self::phpinfoRowText('Build Provider', $buildProvider);
+        }
+        $text .= self::phpinfoRowText('Server API', self::phpinfoServerApiLabel());
         foreach (self::PHPINFO_GENERAL_EXTRA_ROWS as $label) {
             $value = VmIniIntrospection::phpinfoGeneralRow($label);
             if ('Additional .ini files parsed' === $label) {
@@ -656,6 +676,15 @@ final class VmInfo
         'PHP Extension Build',
         'Debug Build',
         'Thread Safety',
+        'Zend Signal Handling',
+        'Zend Memory Manager',
+        'Zend Multibyte Support',
+        'Zend Max Execution Timers',
+        'IPv6 Support',
+        'DTrace Support',
+        'Registered PHP Streams',
+        'Registered Stream Socket Transports',
+        'Registered Stream Filters',
     ];
 
     /** php-src phpinfo(INFO_GENERAL) runtime rows before stream registry tail (#16551). */

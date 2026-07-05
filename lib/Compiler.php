@@ -18025,6 +18025,29 @@ class Compiler {
 
                 return null;
             }
+            // extract([...], EXTR_PREFIX_ALL, Prefix::A) — Array_ + ConstFetch + ClassConstFetch (#16041).
+            if ('extract' === $inlineFuncName && 3 === \count($callArgs) && null !== $arrayProducerIndex) {
+                $classConstIndex = null;
+                foreach ($producers as $pi => $producer) {
+                    if ($producer instanceof Op\Expr\ClassConstFetch) {
+                        $classConstIndex = $pi;
+                        break;
+                    }
+                }
+                if (null !== $classConstIndex && [] !== $constFetchIndices) {
+                    if (0 === $argIndex) {
+                        return $producers[$arrayProducerIndex];
+                    }
+                    if (1 === $argIndex) {
+                        return $producers[$constFetchIndices[0]];
+                    }
+                    if (2 === $argIndex) {
+                        return $producers[$classConstIndex];
+                    }
+
+                    return null;
+                }
+            }
             // array_slice($a, -2, 2, true) — Array_ + UnaryMinus + trailing ConstFetch (#10579, #10809).
             if (
                 null !== $arrayProducerIndex
@@ -25793,6 +25816,13 @@ class Compiler {
         ) {
             return null;
         }
+        if (
+            0 === $argIndex
+            && 'extract' === strtolower($this->resolveCfgFuncCallName($cfgCallOp) ?? '')
+            && !($immediatePrelude instanceof Op\Expr\Array_)
+        ) {
+            return null;
+        }
 
         return null !== $constSlot ? (string) $constSlot : null;
     }
@@ -27354,6 +27384,96 @@ class Compiler {
             if (null === $valueSlot && $this->isEmbeddedCallLiteralArg($literalProbe)) {
                 $valueSlot = (string) $this->freshLiteralConstantSlot($literalProbe, $block);
             }
+            if (null === $valueSlot) {
+                $valueSlot = $this->compileOperand($arg, $block, true);
+            }
+            $sends[] = new OpCode(
+                OpCode::TYPE_ARG_SEND,
+                $valueSlot,
+                $this->callArgNameSlot($arg, $block),
+                $this->callArgUnpack($arg) ? 1 : null
+            );
+        }
+
+        return array_merge($producerOps, $sends);
+    }
+
+    /**
+     * extract(['a' => 1], EXTR_PREFIX_ALL, Prefix::A) — inline Array_ + flags ConstFetch + prefix ClassConstFetch (#16041).
+     *
+     * @param list<Operand|null> $args
+     *
+     * @return list<OpCode>|null
+     */
+    private function compileExtractInlineMultiArgCallArgSends(
+        array $args,
+        Block $block,
+        Op $cfgCallOp
+    ): ?array {
+        if (null === $block->orig || !\is_array($cfgCallOp->args ?? null)) {
+            return null;
+        }
+        if ('extract' !== $this->resolveCfgFuncCallName($cfgCallOp)) {
+            return null;
+        }
+        if (3 !== \count($cfgCallOp->args)) {
+            return null;
+        }
+        foreach ($cfgCallOp->args as $callArg) {
+            if (!$this->callArgIsDeadInlineTemporary($callArg)) {
+                return null;
+            }
+        }
+        $producers = $this->precedingInlineCallArgProducersBeforeCfgOp($block->orig->children, $cfgCallOp);
+        $arrayProducer = null;
+        $flagsProducer = null;
+        $prefixProducer = null;
+        foreach ($producers as $producer) {
+            if ($producer instanceof Op\Expr\Array_) {
+                $arrayProducer = $producer;
+            } elseif ($producer instanceof Op\Expr\ConstFetch) {
+                $flagsProducer = $producer;
+            } elseif ($producer instanceof Op\Expr\ClassConstFetch) {
+                $prefixProducer = $producer;
+            }
+        }
+        if (null === $arrayProducer || null === $flagsProducer || null === $prefixProducer) {
+            return null;
+        }
+        $producerOps = [];
+        foreach ($this->compileArrayLiteral($arrayProducer, $block) as $op) {
+            $producerOps[] = $op;
+        }
+        $arraySlot = $this->slotForInitArrayOrdinal($block, 0, $producerOps);
+        if (null === $arraySlot) {
+            return null;
+        }
+        if (null === $block->slotForOperand($flagsProducer->result)) {
+            foreach ($this->compileExpr($flagsProducer, $block) as $op) {
+                $producerOps[] = $op;
+            }
+        }
+        $flagsSlot = $block->slotForOperand($flagsProducer->result);
+        if (null === $flagsSlot) {
+            return null;
+        }
+        if (null === $block->slotForOperand($prefixProducer->result)) {
+            foreach ($this->compileExpr($prefixProducer, $block) as $op) {
+                $producerOps[] = $op;
+            }
+        }
+        $prefixSlot = $block->slotForOperand($prefixProducer->result);
+        if (null === $prefixSlot) {
+            return null;
+        }
+        $sends = [];
+        foreach ($args as $argIndex => $arg) {
+            $valueSlot = match ((int) $argIndex) {
+                0 => (string) $arraySlot,
+                1 => (string) $flagsSlot,
+                2 => (string) $prefixSlot,
+                default => null,
+            };
             if (null === $valueSlot) {
                 $valueSlot = $this->compileOperand($arg, $block, true);
             }
@@ -33536,6 +33656,10 @@ class Compiler {
             $arrayPadSends = $this->compileArrayPadInlineHaystackCallArgSends($args, $block, $cfgCallOp);
             if (null !== $arrayPadSends) {
                 return $arrayPadSends;
+            }
+            $extractSends = $this->compileExtractInlineMultiArgCallArgSends($args, $block, $cfgCallOp);
+            if (null !== $extractSends) {
+                return $extractSends;
             }
             $dateSunSends = $this->compileDateSunFuncInlineCallArgSends($args, $block, $cfgCallOp);
             if (null !== $dateSunSends) {
@@ -40759,7 +40883,7 @@ class Compiler {
             null !== $callArg
             && !$this->operandsReferToSameVariable($prelude->result, $callArg)
         ) {
-            // array_pad([E::A], N, E::B) — immediate ClassConstFetch is pad value, not haystack (#8883).
+            // array_pad([E::A], N, E::B) / extract([...], FLAGS, Prefix::A) — immediate ClassConstFetch is not arg #0 (#8883, #16041).
             return;
         }
         if (null === $block->slotForOperand($prelude->result)) {

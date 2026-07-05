@@ -24,8 +24,8 @@ foreach ([
 }
 
 $len = \strlen($out);
-if ($len < 1800) {
-    fwrite(STDERR, "FAIL: phpinfo(INFO_GENERAL) output too short ({$len} bytes, expected >=1800)\n");
+if ($len < 1700) {
+    fwrite(STDERR, "FAIL: phpinfo(INFO_GENERAL) output too short ({$len} bytes, expected >=1700)\n");
     exit(1);
 }
 

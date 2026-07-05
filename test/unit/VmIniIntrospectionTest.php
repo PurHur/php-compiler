@@ -16,6 +16,7 @@ final class VmIniIntrospectionTest extends TestCase
         putenv('PHP_COMPILER_INI_LOADED_FILE');
         putenv('PHP_COMPILER_INI_SCANNED_FILES');
         putenv('PHP_COMPILER_INI_REGISTRY_JSON');
+        putenv('PHP_COMPILER_PHPINFO_GENERAL_JSON');
         VmIniIntrospection::resetIniSnapshotForTesting();
     }
 
