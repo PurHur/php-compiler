@@ -363,7 +363,15 @@ ci_run_bootstrap_inventory_triage_sync_check() {
     return 0
   fi
   echo "Bootstrap inventory triage snapshot sync (BOOTSTRAP_INVENTORY_TRIAGE_SYNC_GATE=1, issue #2265)..."
-  "$PHP_BIN" "${PHP_OPTS[@]}" script/check-bootstrap-inventory-triage-sync.php
+  if ! "$PHP_BIN" "${PHP_OPTS[@]}" script/check-bootstrap-inventory-triage-sync.php; then
+    # Generated snapshot goes stale on every fleet inventory growth; regen is
+    # ~0.5s warm since the lint cache (#16394) — auto-heal like the other
+    # generated docs (#765/#16415/#16572 pattern, #16508).
+    echo "Auto-healing stale docs/bootstrap-inventory-triage-top50.json..."
+    "$PHP_BIN" "${PHP_OPTS[@]}" script/bootstrap-inventory-triage.php --json --top 50 \
+      > docs/bootstrap-inventory-triage-top50.json
+    "$PHP_BIN" "${PHP_OPTS[@]}" script/check-bootstrap-inventory-triage-sync.php
+  fi
 }
 
 ci_run_stdlib_jit_deferred_sync_check() {

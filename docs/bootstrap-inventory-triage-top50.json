@@ -1,5 +1,5 @@
 {
-    "scanned": 4038,
+    "scanned": 4066,
     "top": 50,
     "rows": [
         {
@@ -25,13 +25,24 @@
             "rank": 2
         },
         {
+            "message": "syntax error, unexpected token \"private\"",
+            "file_count": 3,
+            "examples": [
+                "lib/Ast/AsymmetricVisibilityRewriter.php",
+                "lib/AsymmetricVisibilityRejector.php",
+                "lib/CompilerVersion.php"
+            ],
+            "issue": null,
+            "rank": 3
+        },
+        {
             "message": "Cannot redeclare class::$func",
             "file_count": 1,
             "examples": [
                 "ext/standard/VmSplAutoload.php"
             ],
             "issue": null,
-            "rank": 3
+            "rank": 4
         },
         {
             "message": "Cannot redeclare class::$multiline",
@@ -40,7 +51,7 @@
                 "ext/standard/VmPregEngine.php"
             ],
             "issue": null,
-            "rank": 4
+            "rank": 5
         },
         {
             "message": "Cannot redeclare class::$ownerLc",
@@ -49,7 +60,7 @@
                 "ext/spl/SplLegacySerializableMethods.php"
             ],
             "issue": null,
-            "rank": 5
+            "rank": 6
         },
         {
             "message": "syntax error, unexpected token \"{\", expecting \",\" or \";\"",
@@ -58,7 +69,7 @@
                 "lib/JIT/Builtin/GetClassRuntime.php"
             ],
             "issue": null,
-            "rank": 6
+            "rank": 7
         }
     ],
     "source": "live"
