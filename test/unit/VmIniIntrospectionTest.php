@@ -15,6 +15,7 @@ final class VmIniIntrospectionTest extends TestCase
     {
         putenv('PHP_COMPILER_INI_LOADED_FILE');
         putenv('PHP_COMPILER_INI_SCANNED_FILES');
+        putenv('PHP_COMPILER_INI_REGISTRY_JSON');
         VmIniIntrospection::resetIniSnapshotForTesting();
     }
 
@@ -51,5 +52,23 @@ final class VmIniIntrospectionTest extends TestCase
         $before = VmIniIntrospection::loadedFile();
         VmEnv::putenv('PHP_COMPILER_INI_LOADED_FILE=/etc/custom/php.ini');
         $this->assertSame($before, VmIniIntrospection::loadedFile());
+    }
+
+    public function testSeedHostIniRegistryFromZendPopulatesWhenUnset(): void
+    {
+        if (!function_exists('ini_get_all')) {
+            $this->markTestSkipped('Host PHP lacks ini_get_all()');
+        }
+
+        putenv('PHP_COMPILER_INI_REGISTRY_JSON');
+        VmIniIntrospection::resetIniSnapshotForTesting();
+
+        VmIniIntrospection::seedHostIniRegistryFromZend();
+
+        $keys = VmIniIntrospection::registryKeysForExtension(null);
+        $this->assertIsArray($keys);
+        $this->assertGreaterThan(200, count($keys));
+        $this->assertContains('allow_url_fopen', $keys);
+        $this->assertTrue(VmIniIntrospection::isKnownIniExtension('session'));
     }
 }

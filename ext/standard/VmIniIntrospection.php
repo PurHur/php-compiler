@@ -14,8 +14,18 @@ final class VmIniIntrospection
     /** JSON map of phpinfo(INFO_GENERAL) label => value rows mirrored from host Zend (#14283). */
     private const ENV_PHPINFO_GENERAL = 'PHP_COMPILER_PHPINFO_GENERAL_JSON';
 
+    /** JSON snapshot of host ini_get_all() registry (#16433, ext/standard/ini.c). */
+    private const ENV_INI_REGISTRY = 'PHP_COMPILER_INI_REGISTRY_JSON';
+
     /** @var array<string, string>|null */
     private static ?array $phpinfoGeneralRows = null;
+
+    /**
+     * Host ini_get_all() registry — keys, per-extension filters, access metadata (#16433).
+     *
+     * @var array{all: array<string, array{global_value: string, local_value: string, access: int}>, extensions: array<string, list<string>>}|null|false
+     */
+    private static array|false|null $iniRegistry = null;
 
     /** Bootstrap snapshot of loaded php.ini path — not updated by runtime putenv() (#15111). */
     private static string|false|null $frozenLoadedFile = null;
@@ -72,6 +82,7 @@ final class VmIniIntrospection
             }
         }
         self::seedHostPhpinfoGeneralEnvFromZend();
+        self::seedHostIniRegistryFromZend();
         self::freezeIniSnapshot();
     }
 
@@ -81,6 +92,140 @@ final class VmIniIntrospection
         self::$iniSnapshotFrozen = false;
         self::$frozenLoadedFile = null;
         self::$frozenScannedFiles = null;
+        self::$iniRegistry = null;
+    }
+
+    /**
+     * Mirror host Zend ini_get_all() tables for ini_get_all() parity (#16433).
+     */
+    public static function seedHostIniRegistryFromZend(): void
+    {
+        if (!\function_exists('putenv') || !\function_exists('ini_get_all')) {
+            return;
+        }
+        if ('' !== self::envString(self::ENV_INI_REGISTRY)) {
+            return;
+        }
+        $all = @\ini_get_all(null, true);
+        if (!\is_array($all) || [] === $all) {
+            return;
+        }
+
+        $normalized = [];
+        foreach ($all as $key => $entry) {
+            if (!\is_string($key) || !\is_array($entry)) {
+                continue;
+            }
+            $normalized[$key] = [
+                'global_value' => (string) ($entry['global_value'] ?? ''),
+                'local_value' => (string) ($entry['local_value'] ?? ''),
+                'access' => (int) ($entry['access'] ?? 7),
+            ];
+        }
+        if ([] === $normalized) {
+            return;
+        }
+
+        $extensions = ['core' => \array_keys($normalized)];
+        if (\function_exists('get_loaded_extensions')) {
+            foreach (\get_loaded_extensions() as $ext) {
+                if (!\is_string($ext) || '' === $ext) {
+                    continue;
+                }
+                $sub = @\ini_get_all($ext, true);
+                if (!\is_array($sub) || [] === $sub) {
+                    continue;
+                }
+                $extensions[\strtolower($ext)] = \array_keys($sub);
+            }
+        }
+
+        $encoded = \json_encode(
+            ['all' => $normalized, 'extensions' => $extensions],
+            \JSON_UNESCAPED_UNICODE
+        );
+        if (\is_string($encoded)) {
+            \putenv(self::ENV_INI_REGISTRY.'='.$encoded);
+        }
+    }
+
+    public static function isKnownIniExtension(string $extension): bool
+    {
+        return null !== self::registryKeysForExtension($extension);
+    }
+
+    /**
+     * @return list<string>|null null when extension is unknown
+     */
+    public static function registryKeysForExtension(?string $extension): ?array
+    {
+        $data = self::iniRegistryData();
+        if (null === $data) {
+            return null;
+        }
+        if (null === $extension) {
+            return \array_keys($data['all']);
+        }
+
+        return $data['extensions'][\strtolower($extension)] ?? null;
+    }
+
+    /**
+     * @return array{global_value: string, local_value: string, access: int}|null
+     */
+    public static function registryEntry(string $key): ?array
+    {
+        $data = self::iniRegistryData();
+        if (null === $data) {
+            return null;
+        }
+        if (isset($data['all'][$key])) {
+            return $data['all'][$key];
+        }
+        $lower = \strtolower($key);
+        foreach ($data['all'] as $regKey => $entry) {
+            if (\strtolower((string) $regKey) === $lower) {
+                return $entry;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @return array{all: array<string, array{global_value: string, local_value: string, access: int}>, extensions: array<string, list<string>>}|null
+     */
+    private static function iniRegistryData(): ?array
+    {
+        if (false === self::$iniRegistry) {
+            return null;
+        }
+        if (null !== self::$iniRegistry) {
+            return self::$iniRegistry;
+        }
+
+        $json = self::envString(self::ENV_INI_REGISTRY);
+        if ('' === $json) {
+            self::$iniRegistry = false;
+
+            return null;
+        }
+        $decoded = \json_decode($json, true);
+        if (
+            !\is_array($decoded)
+            || !isset($decoded['all'], $decoded['extensions'])
+            || !\is_array($decoded['all'])
+            || !\is_array($decoded['extensions'])
+        ) {
+            self::$iniRegistry = false;
+
+            return null;
+        }
+
+        /** @var array{all: array<string, array{global_value: string, local_value: string, access: int}>, extensions: array<string, list<string>>} $decoded */
+        self::$iniRegistry = $decoded;
+
+        return self::$iniRegistry;
     }
 
     /**

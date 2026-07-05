@@ -220,6 +220,11 @@ final class VmIni
             return $mirrored;
         }
         if (!in_array($key, self::SUPPORTED_KEYS, true)) {
+            $registry = VmIniIntrospection::registryEntry($key);
+            if (null !== $registry) {
+                return $registry['local_value'];
+            }
+
             return false;
         }
 
@@ -284,6 +289,11 @@ final class VmIni
             return VmAssertState::iniGet($option);
         }
         if (!in_array($key, self::SUPPORTED_KEYS, true)) {
+            $registry = VmIniIntrospection::registryEntry($key);
+            if (null !== $registry) {
+                return $registry['global_value'];
+            }
+
             return false;
         }
 
@@ -660,9 +670,13 @@ final class VmIni
         return $old;
     }
 
-    /** Known ini_get_all() extension filters (ext/standard/ini.c, #9052). */
+    /** Known ini_get_all() extension filters (ext/standard/ini.c, #9052, #16433). */
     public static function isKnownIniExtension(string $extension): bool
     {
+        if (VmIniIntrospection::isKnownIniExtension($extension)) {
+            return true;
+        }
+
         return null !== self::keysForExtension($extension);
     }
 
@@ -698,9 +712,14 @@ final class VmIni
                 if (false === $global) {
                     $global = $local;
                 }
+                $access = self::INI_ACCESS_ALL;
+                $registry = VmIniIntrospection::registryEntry($key);
+                if (null !== $registry) {
+                    $access = $registry['access'];
+                }
                 $entry->add('global_value', self::stringVar($global));
                 $entry->add('local_value', self::stringVar($local));
-                $entry->add('access', self::intVar(self::INI_ACCESS_ALL));
+                $entry->add('access', self::intVar($access));
                 $slot = new Variable();
                 $slot->array($entry);
                 $result->add($key, $slot);
@@ -715,16 +734,34 @@ final class VmIni
     /** @return list<string>|null */
     private static function keysForExtension(?string $extension): ?array
     {
+        $registry = VmIniIntrospection::registryKeysForExtension($extension);
+        if (null !== $registry) {
+            return $registry;
+        }
+
         if (null === $extension) {
-            return self::SUPPORTED_KEYS;
+            return self::allStaticRegistryKeys();
         }
 
         return match (strtolower($extension)) {
-            'core' => self::SUPPORTED_KEYS,
+            'core' => self::allStaticRegistryKeys(),
             'standard' => self::STANDARD_EXTENSION_KEYS,
             'pcre' => self::PCRE_EXTENSION_KEYS,
             default => null,
         };
+    }
+
+    /** Static fallback when host ini registry is unavailable (#16433). */
+    private static function allStaticRegistryKeys(): array
+    {
+        return array_values(array_unique(array_merge(
+            self::SUPPORTED_KEYS,
+            array_keys(self::READONLY_BOOL_DEFAULTS),
+            array_keys(self::READONLY_STRING_DEFAULTS),
+            self::EMPTY_STRING_INI_KEYS,
+            VmIniIntrospection::MIRRORED_HOST_INI_KEYS,
+            ['engine', 'zend.exception_ignore_args'],
+        )));
     }
 
     private static function stringVar(string $value): Variable
