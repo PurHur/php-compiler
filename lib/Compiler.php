@@ -14633,6 +14633,51 @@ class Compiler {
     /**
      * (new C())->f(E::A) — inline New_ receiver must not steal hoisted enum-case arg slot (#16227).
      */
+    /**
+     * bindTo(new C(), null) — php-cfg hoists null after New_; prelude wiring must not steal arg #0 (#15900, #16340).
+     */
+    private function slotForInlineNewClosureBindNewThisArg(
+        Block $block,
+        Op\Expr\MethodCall $callOp,
+        int $argIndex
+    ): ?string {
+        if (0 !== $argIndex || null === $block->orig) {
+            return null;
+        }
+        $method = $this->staticNameFromOperand($callOp->name);
+        if (null === $method || !\in_array(strtolower($method), ['bind', 'bindto'], true)) {
+            return null;
+        }
+        $callArg = $callOp->args[0] ?? null;
+        if (!$this->callArgUsesHoistedEnumPreludeSlot($callArg)) {
+            return null;
+        }
+        $callIndex = $this->cfgCallOpIndex($block, $callOp);
+        if (!\is_int($callIndex) || $callIndex < 2) {
+            return null;
+        }
+        $newExpr = null;
+        for ($i = $callIndex - 1; $i >= 0; --$i) {
+            $child = $block->orig->children[$i];
+            if ($child instanceof Op\Expr\ConstFetch || $child instanceof Op\Expr\ClassConstFetch) {
+                continue;
+            }
+            if ($child instanceof Op\Expr\New_) {
+                $newExpr = $child;
+            }
+            break;
+        }
+        if (!$newExpr instanceof Op\Expr\New_) {
+            return null;
+        }
+        $slot = $block->slotForOperand($newExpr->result);
+        if (null !== $slot) {
+            return (string) $slot;
+        }
+
+        return $this->slotForInlineNewProducer($block, $newExpr);
+    }
+
     private function slotForInlineNewMethodCallEnumCaseArg(
         Block $block,
         Op\Expr\MethodCall $callOp,
@@ -31618,6 +31663,26 @@ class Compiler {
             $nameSlot = $this->callArgNameSlot($arg, $block);
             // Early inline-array ARG_SEND paths continue before the main send site — unpack must be known up front (#16151).
             $unpackFlag = $this->callArgUnpack($arg) ? 1 : null;
+            if (
+                null !== $cfgCallOp
+                && $cfgCallOp instanceof Op\Expr\MethodCall
+                && null !== $block->orig
+            ) {
+                $inlineNewBindArgSlot = $this->slotForInlineNewClosureBindNewThisArg(
+                    $block,
+                    $cfgCallOp,
+                    (int) $argIndex
+                );
+                if (null !== $inlineNewBindArgSlot) {
+                    $sends[] = new OpCode(
+                        OpCode::TYPE_ARG_SEND,
+                        $inlineNewBindArgSlot,
+                        $nameSlot,
+                        $unpackFlag
+                    );
+                    continue;
+                }
+            }
             if (null !== $cfgCallOp && null !== $block->orig) {
                 $preludeProducer = $this->hoistedPreludeProducerForCallArgIndex($cfgCallOp, (int) $argIndex, $block);
                 if ($preludeProducer instanceof Op\Expr\ConstFetch) {
