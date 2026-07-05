@@ -29,6 +29,9 @@ class Module extends ModuleAbstract
         return [
             new filter_var(),
             new filter_input(),
+            new filter_has_var(),
+            new filter_input_array(),
+            new filter_var_array(),
             new filter_list(),
             new filter_id(),
         ];
