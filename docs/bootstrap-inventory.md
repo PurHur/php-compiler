@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 4089 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 11028 |
+| Source constructs flagged (warnings) | 11027 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -2633,7 +2633,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/Compiler/CompileFatal.php` | 0 | 1 |
 | `lib/Compiler/DeprecatedMetadata.php` | 0 | 2 |
 | `lib/Compiler/EnumAbstractMethodCompileCheck.php` | 0 | 4 |
-| `lib/Compiler/EnumBackedCaseCheck.php` | 0 | 5 |
+| `lib/Compiler/EnumBackedCaseCheck.php` | 0 | 4 |
 | `lib/Compiler/EnumMagicMethodCheck.php` | 0 | 3 |
 | `lib/Compiler/EnumParentCompileCheck.php` | 0 | 3 |
 | `lib/Compiler/FinalClassConstCheck.php` | 0 | 4 |
@@ -21459,10 +21459,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new self (line 50)
-- new CompileFatal (line 81)
-- new CompileFatal (line 98)
-- new CompileFatal (line 123)
-- 12 class method(s)
+- new CompileFatal (line 79)
+- new CompileFatal (line 105)
+- 11 class method(s)
 
 ### `lib/Compiler/EnumMagicMethodCheck.php`
 
