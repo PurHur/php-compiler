@@ -1,9 +1,11 @@
 /**
- * Thin libcrypto EVP sign/verify for AOT/JIT (#3324).
+ * Thin libcrypto EVP sign/verify for AOT/JIT (#3324, #16454).
  *
  * PHP semantics live in ext/openssl/VmOpenssl.php (VM). These symbols satisfy
  * __compiler_openssl_sign / __compiler_openssl_verify LLVM ABI for standalone
  * link when PHP FFI is unavailable in the AOT binary.
+ *
+ * Location: lib/JIT/Builtin/runtime/ (shrunk out of lib/AOT/runtime/).
  *
  * php-src: ext/openssl/openssl.c
  */

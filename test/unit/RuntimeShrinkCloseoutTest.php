@@ -82,6 +82,7 @@ final class RuntimeShrinkCloseoutTest extends TestCase
             'ext/standard/GzStreamJitHelper.php' => 'VmGzStream',
             'lib/JIT/Builtin/StringFsDirJit.php' => 'StringFsDirJit',
             'ext/standard/stripcslashes.php' => 'VmString',
+            'lib/JIT/Builtin/OpensslSignRuntime.php' => 'opensslEvRuntimeSources',
         ];
 
         foreach ($checks as $relativePath => $needle) {
@@ -102,5 +103,7 @@ final class RuntimeShrinkCloseoutTest extends TestCase
             $cFiles,
             'Only phpc_progress.c (frozen SIGSEGV ABI) may remain under lib/AOT/runtime/'
         );
+        $this->assertFileDoesNotExist($runtimeDir.'/openssl_ev.c', 'openssl_ev.c moved to lib/JIT/Builtin/runtime/ (#16454)');
+        $this->assertFileExists($this->repoRoot.'/lib/JIT/Builtin/runtime/openssl_ev.c');
     }
 }

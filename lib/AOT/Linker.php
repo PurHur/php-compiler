@@ -24,11 +24,13 @@ final class Linker
      */
     private const RUNTIME_C_SOURCES = [
         __DIR__.'/runtime/phpc_progress.c',
-        __DIR__.'/runtime/openssl_ev.c',
     ];
 
     /** libz.so symlink is often absent without zlib1g-dev; link the versioned .so directly. */
-    private const RUNTIME_LINK_LIBS = '-lpcre2-8 -lcrypt -l:libz.so.1 -l:libbz2.so.1.0 -lcrypto';
+    private const RUNTIME_LINK_LIBS = '-lpcre2-8 -lcrypt -l:libz.so.1 -l:libbz2.so.1.0';
+
+    /** Appended when lib/JIT/Builtin/runtime/openssl_ev.c is linked (#16454). */
+    private const OPENSSL_LINK_LIB = '-lcrypto';
 
     /** Host multiarch lib dir for bundled LLVM ld (libz.so.1 lives here, not in LLVM sysroot). */
     private const HOST_LIB_SEARCH = '-L/usr/lib/x86_64-linux-gnu';
@@ -113,7 +115,7 @@ final class Linker
                 '-lc',
                 '-lm',
                 self::HOST_LIB_SEARCH,
-                self::RUNTIME_LINK_LIBS,
+                self::runtimeLinkLibs(),
                 escapeshellarg($libgcc),
                 escapeshellarg($crtend),
                 escapeshellarg('/usr/lib/x86_64-linux-gnu/crtn.o'),
@@ -140,7 +142,7 @@ final class Linker
             // When linking with the bundled clang, ensure we can still resolve host libraries
             // (libpcre2-8, libcrypt, ...). Some bootstrap envs only ship the runtime .so/.a under
             // /usr/lib/x86_64-linux-gnu without a full sysroot lib tree.
-            $cmd = escapeshellarg($clang).' '.AotDebugSymbols::linkFlag().$objects.' '.self::HOST_LIB_SEARCH.' -lm '.self::RUNTIME_LINK_LIBS.' -o '.escapeshellarg($executable);
+            $cmd = escapeshellarg($clang).' '.AotDebugSymbols::linkFlag().$objects.' '.self::HOST_LIB_SEARCH.' -lm '.self::runtimeLinkLibs().' -o '.escapeshellarg($executable);
             self::run($cmd, $env);
             self::unlinkIfTemp($runtimeObjects);
 
@@ -205,11 +207,17 @@ final class Linker
             ));
         }
 
-        return array_values(array_filter(
-            $sources,
-            static fn (string $source): bool => !str_ends_with($source, 'openssl_ev.c')
-                || OpensslSignRuntime::opensslEvRuntimeAvailable()
-        ));
+        return array_merge($sources, OpensslSignRuntime::opensslEvRuntimeSources());
+    }
+
+    private static function runtimeLinkLibs(): string
+    {
+        $libs = self::RUNTIME_LINK_LIBS;
+        if ([] !== OpensslSignRuntime::opensslEvRuntimeSources()) {
+            $libs .= ' '.self::OPENSSL_LINK_LIB;
+        }
+
+        return $libs;
     }
 
     private static function progressAbiEnabled(): bool
