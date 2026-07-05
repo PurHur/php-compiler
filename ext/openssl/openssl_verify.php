@@ -46,8 +46,19 @@ final class openssl_verify extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException(
-            'openssl_verify() is not implemented for JIT in this compiler build (issue #11535)'
+        $argc = \count($args);
+        if ($argc < 3 || $argc > 4) {
+            throw new \ArgumentCountError(
+                'openssl_verify() expects 3 or 4 arguments, '.$argc.' given'
+            );
+        }
+
+        return JitOpensslSign::verify(
+            $context,
+            $args[0],
+            $args[1],
+            $args[2],
+            $args[3] ?? null
         );
     }
 
