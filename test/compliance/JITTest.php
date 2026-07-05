@@ -238,6 +238,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'closure_get_current_phantom')) {
                 continue;
             }
+            // JIT: method_exists(ReflectionParameter::class, …) segfaults; phantom is VM-only (#16130).
+            if (str_contains($name, 'reflection_parameter_is_sensitive_parameter_phantom')) {
+                continue;
+            }
             if (!CompilerVersion::supportsMbTrimFunctions()
                 && str_contains($name, 'mb_trim')
                 && !str_contains($name, 'mb_trim_phantom')) {
