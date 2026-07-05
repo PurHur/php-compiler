@@ -5407,7 +5407,12 @@ restart:
                     }
                     if (!$needsRef) {
                         $snapshot = new Variable();
-                        $snapshot->duplicateFrom($value);
+                        if ($value->isIndirect()) {
+                            // CV/indirect send-by-value must not share cells with the snapshot (#16331).
+                            $snapshot->copyFrom($value->resolveIndirect());
+                        } else {
+                            $snapshot->duplicateFrom($value);
+                        }
                         $value = $snapshot;
                     }
                     if (null !== $op->arg3) {
