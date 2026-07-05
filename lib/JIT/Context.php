@@ -1855,6 +1855,12 @@ class Context {
                 return;
             }
         }
+        $constantVar = HoistedConstantInit::tryVariableFromBlockConstant($this, $block, $op);
+        if (null !== $constantVar) {
+            $this->scope->variables[$op] = $constantVar;
+
+            return;
+        }
         $this->scope->variables[$op] = Variable::fromOp($this, $func, $basicBlock, $block, $op);
         $this->scope->variables[$op]->initialize();
     }
@@ -2060,6 +2066,15 @@ class Context {
                     throw new \LogicException("Unknown variable referenced: " . get_class($op));
                 }
             } elseif ($op instanceof Operand\Temporary) {
+                $block = $this->jitCurrentBlock;
+                if (null !== $block) {
+                    $constantVar = HoistedConstantInit::tryVariableFromBlockConstant($this, $block, $op);
+                    if (null !== $constantVar) {
+                        $this->scope->variables[$op] = $constantVar;
+
+                        return $constantVar;
+                    }
+                }
                 // Temporaries can be introduced by CFG transforms after scope variable allocation.
                 // Treat unknown temporaries as boxed __value__ slots to keep self-host emit paths alive.
                 $slot = JitValueBox::alloc($this);
