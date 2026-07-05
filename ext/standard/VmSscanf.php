@@ -917,20 +917,20 @@ final class VmSscanf
     {
         $tmp = new Variable();
         $tmp->int($value);
-        $dest->copyFrom($tmp);
+        $dest->byRefTarget()->copyFrom($tmp);
     }
 
     private static function assignString(Variable $dest, string $value): void
     {
         $tmp = new Variable();
         $tmp->string($value);
-        $dest->copyFrom($tmp);
+        $dest->byRefTarget()->copyFrom($tmp);
     }
 
     private static function assignFloat(Variable $dest, float $value): void
     {
         $tmp = new Variable();
         $tmp->float($value);
-        $dest->copyFrom($tmp);
+        $dest->byRefTarget()->copyFrom($tmp);
     }
 }

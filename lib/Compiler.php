@@ -10505,6 +10505,34 @@ class Compiler {
     }
 
     /**
+     * Compile dim-fetch for call-arg wiring — force write fetch for by-ref builtins (#4512).
+     */
+    private function compileArrayDimFetchForCallArg(
+        Op\Expr\ArrayDimFetch $fetch,
+        Block $block,
+        ?Op $cfgCallOp,
+        int $argIndex
+    ): void {
+        $forWrite = false;
+        if (null !== $cfgCallOp) {
+            $calleeName = $this->funcCallExprCalleeName($cfgCallOp);
+            if (null !== $calleeName && $this->callArgRequiresByRef($calleeName, $argIndex, $fetch->result, $block)) {
+                $forWrite = true;
+            }
+        }
+        if (!$forWrite) {
+            $forWrite = $this->isArrayDimFetchForWrite($fetch, $block);
+        }
+        if ($forWrite) {
+            $this->compileArrayDimFetchWrite($fetch, $block);
+        } else {
+            foreach ($this->compileExpr($fetch, $block) as $op) {
+                $block->addOpCode($op);
+            }
+        }
+    }
+
+    /**
      * Container slot for array dim fetch/write opcodes.
      *
      * PhiResolver may clear {@see Op\Expr\ArrayDimFetch::$var} after param phi merge in large
@@ -12578,6 +12606,9 @@ class Compiler {
             ) {
                 return true;
             }
+            if ($this->arrayDimFetchUsedAsByRefCallArg($fetch, $usage, $block)) {
+                continue;
+            }
 
             return false;
         }
@@ -12617,8 +12648,108 @@ class Compiler {
             ) {
                 return true;
             }
+            if ($this->arrayDimFetchPrecedesByRefBuiltinCall($fetch, $next, $block, $i, $children)) {
+                return true;
+            }
 
             return false;
+        }
+
+        return false;
+    }
+
+    /**
+     * sscanf('%d', $a[0]) — php-cfg dead arg temps; dim fetch immediately precedes call (#4512).
+     */
+    private function arrayDimFetchPrecedesByRefBuiltinCall(
+        Op\Expr\ArrayDimFetch $fetch,
+        Op $maybeCall,
+        Block $block,
+        int $fetchChildIndex,
+        array $children
+    ): bool {
+        if (!$maybeCall instanceof Op\Expr\FuncCall && !$maybeCall instanceof Op\Expr\NsFuncCall) {
+            return false;
+        }
+        $callIndex = $fetchChildIndex + 1;
+        if ($callIndex >= \count($children) || $children[$callIndex] !== $maybeCall) {
+            return false;
+        }
+        $calleeName = $this->funcCallExprCalleeName($maybeCall);
+        if (null === $calleeName) {
+            return false;
+        }
+        /** @var list<Op\Expr\ArrayDimFetch> $dimFetches */
+        $dimFetches = [];
+        for ($j = $fetchChildIndex; $j >= 0; --$j) {
+            $child = $children[$j];
+            if ($child instanceof Op\Expr\ArrayDimFetch) {
+                array_unshift($dimFetches, $child);
+                continue;
+            }
+            if ($child instanceof Op\Expr\ConstFetch || $child instanceof Op\Expr\ClassConstFetch) {
+                continue;
+            }
+            break;
+        }
+        if ([] === $dimFetches) {
+            return false;
+        }
+        $dimFetchIndex = array_search($fetch, $dimFetches, true);
+        if (false === $dimFetchIndex) {
+            return false;
+        }
+        $callArgs = property_exists($maybeCall, 'args') && is_array($maybeCall->args)
+            ? $maybeCall->args
+            : [];
+        $argIndex = (int) $dimFetchIndex;
+        if (\count($dimFetches) < \count($callArgs)) {
+            $nonEmbeddedArgIndices = [];
+            foreach ($callArgs as $idx => $callArg) {
+                if (null !== $callArg && !$this->isEmbeddedCallLiteralArg($callArg)) {
+                    $nonEmbeddedArgIndices[] = $idx;
+                }
+            }
+            if (!isset($nonEmbeddedArgIndices[$dimFetchIndex])) {
+                return false;
+            }
+            $argIndex = (int) $nonEmbeddedArgIndices[$dimFetchIndex];
+        }
+
+        return $this->callArgRequiresByRef($calleeName, $argIndex, null, $block);
+    }
+
+    /**
+     * sscanf('%d', $a[0]) — by-ref builtin args need FETCH_DIM_W (#4512, zend_execute.c ZEND_SEND_REF).
+     */
+    private function arrayDimFetchUsedAsByRefCallArg(
+        Op\Expr\ArrayDimFetch $fetch,
+        Op $usage,
+        Block $block
+    ): bool {
+        if (!$usage instanceof Op\Expr\FuncCall && !$usage instanceof Op\Expr\NsFuncCall) {
+            return false;
+        }
+        if (!property_exists($usage, 'args') || !is_array($usage->args)) {
+            return false;
+        }
+        $calleeName = $this->funcCallExprCalleeName($usage);
+        if (null === $calleeName) {
+            return false;
+        }
+        foreach ($usage->args as $argIndex => $callArg) {
+            if (
+                null === $callArg
+                || (
+                    $callArg !== $fetch->result
+                    && !$this->operandsReferToSameVariable($callArg, $fetch->result)
+                )
+            ) {
+                continue;
+            }
+            if ($this->callArgRequiresByRef($calleeName, (int) $argIndex, $callArg, $block)) {
+                return true;
+            }
         }
 
         return false;
@@ -32236,9 +32367,7 @@ class Compiler {
                 $slot = $block->slotForOperand($fetch->result);
             }
             if (null === $slot) {
-                foreach ($this->compileExpr($fetch, $block) as $op) {
-                    $block->addOpCode($op);
-                }
+                $this->compileArrayDimFetchForCallArg($fetch, $block, $cfgCallOp, (int) $argIndex);
                 $slot = $this->compiledArrayDimFetchResultSlotBeforePendingFuncCall($block, $opcodeDimIndex)
                     ?? $block->slotForOperand($fetch->result);
             }
@@ -32272,9 +32401,7 @@ class Compiler {
             $slot = $block->slotForOperand($fetch->result);
         }
         if (null === $slot) {
-            foreach ($this->compileExpr($fetch, $block) as $op) {
-                $block->addOpCode($op);
-            }
+            $this->compileArrayDimFetchForCallArg($fetch, $block, $cfgCallOp, (int) $argIndex);
             $slot = $this->compiledArrayDimFetchResultSlotBeforePendingFuncCall($block, $opcodeDimIndex)
                 ?? $block->slotForOperand($fetch->result);
         }
