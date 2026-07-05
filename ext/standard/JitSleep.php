@@ -88,6 +88,17 @@ final class JitSleep
         return self::lowerZParamLong($context, $arg, $function, $argIndex, $paramName);
     }
 
+    /** Z_PARAM_LONG_OR_NULL-style lowering (php-src filestat.c umask; #9628). */
+    public static function zParamNullableLong(
+        Context $context,
+        JITVariable $arg,
+        string $function,
+        int $argIndex,
+        string $paramName
+    ): Value {
+        return self::lowerZParamNullableLong($context, $arg, $function, $argIndex, $paramName);
+    }
+
     /**
      * Z_PARAM_LONG-style lowering (php-src basic_functions.c sleep/usleep; #6148).
      */
@@ -383,6 +394,132 @@ final class JitSleep
             $paramName,
             $given
         );
+    }
+
+    private static function nullableIntTypeError(
+        string $function,
+        int $argIndex,
+        string $paramName,
+        string $given
+    ): string {
+        return sprintf(
+            '%s(): Argument #%d ($%s) must be of type ?int, %s given',
+            $function,
+            $argIndex,
+            $paramName,
+            $given
+        );
+    }
+
+    private static function lowerZParamNullableLong(
+        Context $context,
+        JITVariable $arg,
+        string $function,
+        int $argIndex,
+        string $paramName
+    ): Value {
+        if (JITVariable::TYPE_NULL === $arg->type) {
+            return $context->getTypeFromString('int64')->constInt(0, false);
+        }
+        if (($arg->type & JITVariable::IS_NATIVE_ARRAY) || JITVariable::TYPE_HASHTABLE === $arg->type) {
+            self::emitNullableIntTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'array');
+
+            return $context->getTypeFromString('int64')->constInt(0, false);
+        }
+        if (JITVariable::TYPE_OBJECT === $arg->type) {
+            self::emitNullableIntTypeErrorAndAbort(
+                $context,
+                $function,
+                $argIndex,
+                $paramName,
+                self::compileTimeObjectGivenLabel($context, $arg)
+            );
+
+            return $context->getTypeFromString('int64')->constInt(0, false);
+        }
+        if (JITVariable::TYPE_NATIVE_DOUBLE === $arg->type) {
+            return self::lowerNativeDoubleOperandNullable($context, $arg, $function, $argIndex, $paramName);
+        }
+        if (JITVariable::TYPE_STRING === $arg->type) {
+            return self::lowerStringOperandNullable($context, $arg, $function, $argIndex, $paramName);
+        }
+        if (JITVariable::TYPE_VALUE === $arg->type) {
+            return self::lowerBoxedOperandNullable($context, $arg, $function, $argIndex, $paramName);
+        }
+
+        return JitLongArg::lower($context, $arg, sprintf('%s() %s', $function, $paramName));
+    }
+
+    private static function lowerStringOperandNullable(
+        Context $context,
+        JITVariable $arg,
+        string $function,
+        int $argIndex,
+        string $paramName
+    ): Value {
+        $strPtr = JitStringArg::lower($context, $arg, sprintf('%s() argument #%d', $function, $argIndex));
+        $isNumeric = self::stringPtrIsNumeric($context, $strPtr);
+        $okBlock = BasicBlockHelper::append($context, 'nullable_long_str_ok');
+        $errBlock = BasicBlockHelper::append($context, 'nullable_long_str_err');
+        $context->builder->branchIf($isNumeric, $okBlock, $errBlock);
+        $context->builder->positionAtEnd($errBlock);
+        self::emitNullableIntTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'string');
+        $context->builder->positionAtEnd($okBlock);
+
+        return self::stringPtrToLong($context, $strPtr);
+    }
+
+    private static function lowerNativeDoubleOperandNullable(
+        Context $context,
+        JITVariable $arg,
+        string $function,
+        int $argIndex,
+        string $paramName
+    ): Value {
+        $doubleVal = $context->helper->loadValue($arg);
+
+        return self::lowerFiniteDoubleToLongNullable($context, $doubleVal, $function, $argIndex, $paramName);
+    }
+
+    private static function lowerFiniteDoubleToLongNullable(
+        Context $context,
+        Value $doubleVal,
+        string $function,
+        int $argIndex,
+        string $paramName
+    ): Value {
+        $isFinite = MathIsFinite::invoke($context, $doubleVal);
+        $okBlock = BasicBlockHelper::append($context, 'nullable_long_dbl_ok');
+        $errBlock = BasicBlockHelper::append($context, 'nullable_long_dbl_err');
+        $context->builder->branchIf($isFinite, $okBlock, $errBlock);
+        $context->builder->positionAtEnd($errBlock);
+        self::emitNullableIntTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'float');
+        $context->builder->positionAtEnd($okBlock);
+
+        return $context->builder->fptosi($doubleVal, $context->getTypeFromString('int64'));
+    }
+
+    private static function lowerBoxedOperandNullable(
+        Context $context,
+        JITVariable $arg,
+        string $function,
+        int $argIndex,
+        string $paramName
+    ): Value {
+        return self::lowerBoxedOperand($context, $arg, $function, $argIndex, $paramName);
+    }
+
+    private static function emitNullableIntTypeErrorAndAbort(
+        Context $context,
+        string $function,
+        int $argIndex,
+        string $paramName,
+        string $given
+    ): void {
+        TypeErrorRaise::registerDeclarations($context);
+        TypeErrorRaise::ensureLinked($context);
+        TypeErrorRaise::emitRaise($context, self::nullableIntTypeError($function, $argIndex, $paramName, $given));
+        $context->builder->call($context->lookupFunction('abort'));
     }
 
     private static function emitIntTypeErrorAndAbort(
