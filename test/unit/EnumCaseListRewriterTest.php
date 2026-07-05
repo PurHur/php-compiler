@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\Test\Unit;
 
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\EnumCaseListRewriter;
 use PHPUnit\Framework\TestCase;
 
@@ -11,6 +12,9 @@ final class EnumCaseListRewriterTest extends TestCase
 {
     public function testExpandsUnitEnumCaseList(): void
     {
+        if (!CompilerVersion::supportsEnumCaseList()) {
+            $this->markTestSkipped('enum case list syntax disabled on reference profile');
+        }
         $src = <<<'PHP'
 <?php
 enum E {
@@ -26,6 +30,9 @@ PHP;
 
     public function testExpandsBackedEnumCaseList(): void
     {
+        if (!CompilerVersion::supportsEnumCaseList()) {
+            $this->markTestSkipped('enum case list syntax disabled on reference profile');
+        }
         $src = <<<'PHP'
 <?php
 enum Color: string {

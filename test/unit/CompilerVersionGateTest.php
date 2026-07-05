@@ -384,6 +384,11 @@ final class CompilerVersionGateTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsCloneWithSyntax());
     }
 
+    public function testSupportsEnumCaseListFalseOnReferenceProfile(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsEnumCaseList());
+    }
+
     public function testSupportsAsymmetricVisibilityTrueOn84DevLine(): void
     {
         $this->assertTrue(CompilerVersion::supportsAsymmetricVisibility());

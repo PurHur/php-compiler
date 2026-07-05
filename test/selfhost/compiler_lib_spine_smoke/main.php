@@ -2741,6 +2741,7 @@ require_once __DIR__.'/../../../lib/DnfParenIntersectionSyntaxRejector.php';
 require_once __DIR__.'/../../../lib/DnfType.php';
 require_once __DIR__.'/../../../lib/Doctor.php';
 require_once __DIR__.'/../../../lib/EncapsedCoalesceRejector.php';
+require_once __DIR__.'/../../../lib/EnumCaseListSyntaxRejector.php';
 require_once __DIR__.'/../../../lib/EnumCaseListRewriter.php';
 require_once __DIR__.'/../../../lib/ExitFunctionSyntaxRejector.php';
 require_once __DIR__.'/../../../lib/GlobalTypedConstSyntaxRejector.php';
