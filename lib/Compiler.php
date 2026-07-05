@@ -33370,7 +33370,15 @@ class Compiler {
                     $immediatePrelude = $block->orig->children[$callIndex - 1] ?? null;
                     if ($immediatePrelude instanceof Op\Expr\ClassConstFetch) {
                         $callArg = $cfgCallOp->args[(int) $argIndex] ?? $arg;
-                        if ($callArg instanceof Operand && $this->callArgIsDeadInlineTemporary($callArg)) {
+                        if (
+                            $callArg instanceof Operand
+                            && $this->callArgIsDeadInlineTemporary($callArg)
+                            && !(
+                                $cfgCallOp instanceof Op\Expr\New_
+                                && 0 === (int) $argIndex
+                                && $this->callArgOperandExpectsArrayProducer($callArg)
+                            )
+                        ) {
                             $folded = $this->tryFoldClassConstFetchDefault($immediatePrelude, $block, true);
                             if (null !== $folded) {
                                 $constSlot = $block->registerConstant($immediatePrelude->result, $folded);
