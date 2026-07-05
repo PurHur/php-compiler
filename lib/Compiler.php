@@ -24033,6 +24033,49 @@ class Compiler {
     }
 
     /**
+     * Hoisted ConstFetch immediately before a multi-arg consumer — map dead temps to literal slots (#16272, #13829).
+     *
+     * @param list<OpCode> $emitOps
+     */
+    private function slotForImmediateConstFetchPreludeCallArg(
+        Block $block,
+        Op $cfgCallOp,
+        int $argIndex,
+        array &$emitOps = []
+    ): ?string {
+        if (null === $block->orig || !\is_array($cfgCallOp->args ?? null)) {
+            return null;
+        }
+        $callArg = $cfgCallOp->args[$argIndex] ?? null;
+        if (!$this->callArgIsDeadInlineTemporary($callArg)) {
+            return null;
+        }
+        $callIndex = array_search($cfgCallOp, $block->orig->children, true);
+        if (!\is_int($callIndex) || $callIndex < 1) {
+            return null;
+        }
+        $immediatePrelude = $block->orig->children[$callIndex - 1] ?? null;
+        if (
+            !($immediatePrelude instanceof Op\Expr\ConstFetch || $immediatePrelude instanceof Op\Expr\ClassConstFetch)
+            || null === $immediatePrelude->result
+        ) {
+            return null;
+        }
+        if (null === $block->slotForOperand($immediatePrelude->result)) {
+            foreach ($this->compileExpr($immediatePrelude, $block) as $op) {
+                if ([] !== $emitOps) {
+                    $emitOps[] = $op;
+                } else {
+                    $block->addOpCode($op);
+                }
+            }
+        }
+        $constSlot = $block->slotForOperand($immediatePrelude->result);
+
+        return null !== $constSlot ? (string) $constSlot : null;
+    }
+
+    /**
      * var_dump($g(), $g()) — ARG_SEND must use FUNCCALL_EXEC_RETURN slots, not drifted operand temps (#16029).
      */
     private function finalSiblingInlineCallArgSendSlot(
@@ -24046,6 +24089,10 @@ class Compiler {
         $callArg = $cfgCallOp->args[$argIndex] ?? null;
         if (!$this->callArgIsDeadInlineTemporary($callArg)) {
             return null;
+        }
+        $constPreludeSlot = $this->slotForImmediateConstFetchPreludeCallArg($block, $cfgCallOp, $argIndex);
+        if (null !== $constPreludeSlot) {
+            return $constPreludeSlot;
         }
         $callIndex = array_search($cfgCallOp, $block->orig->children, true);
         if (!\is_int($callIndex)) {
@@ -33922,15 +33969,19 @@ class Compiler {
                 if (null !== $immediatePropertyOrMethodSlot) {
                     $valueSlot = $immediatePropertyOrMethodSlot;
                 } elseif (null !== $block->orig) {
+                    if (null === $valueSlot) {
+                        $siblingSendSlot = $this->finalSiblingInlineCallArgSendSlot($block, $cfgCallOp, (int) $argIndex);
+                        if (null !== $siblingSendSlot) {
+                            $valueSlot = $siblingSendSlot;
+                        }
+                    }
+                }
+            } elseif (null !== $cfgCallOp && null !== $block->orig) {
+                if (null === $valueSlot) {
                     $siblingSendSlot = $this->finalSiblingInlineCallArgSendSlot($block, $cfgCallOp, (int) $argIndex);
                     if (null !== $siblingSendSlot) {
                         $valueSlot = $siblingSendSlot;
                     }
-                }
-            } elseif (null !== $cfgCallOp && null !== $block->orig) {
-                $siblingSendSlot = $this->finalSiblingInlineCallArgSendSlot($block, $cfgCallOp, (int) $argIndex);
-                if (null !== $siblingSendSlot) {
-                    $valueSlot = $siblingSendSlot;
                 }
             }
             if (
@@ -34018,11 +34069,20 @@ class Compiler {
                 && $this->hasSiblingMultiArgInlineCallProducers($block, $cfgCallOp)
                 && $this->callArgIsDeadInlineTemporary($cfgCallOp->args[(int) $argIndex] ?? $arg)
             ) {
+                $constPreludeSlot = $this->slotForImmediateConstFetchPreludeCallArg(
+                    $block,
+                    $cfgCallOp,
+                    (int) $argIndex,
+                    $sends
+                );
+                if (null !== $constPreludeSlot) {
+                    $valueSlot = $constPreludeSlot;
+                }
                 $callIndex = array_search($cfgCallOp, $block->orig->children, true);
                 $firstSibling = \is_int($callIndex)
                     ? $this->firstSiblingInlineFuncCallProducerIndexImpl($callIndex, $block->orig->children)
                     : null;
-                if (\is_int($callIndex) && \is_int($firstSibling)) {
+                if (null === $valueSlot && \is_int($callIndex) && \is_int($firstSibling)) {
                     $chainProducerCount = $this->countSiblingInlineFuncCallProducers(
                         $firstSibling,
                         $callIndex,
