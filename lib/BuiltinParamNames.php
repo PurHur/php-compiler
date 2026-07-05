@@ -36,6 +36,12 @@ final class BuiltinParamNames
         $lc = strtolower($name);
         switch ($lc) {
             case 'strlen':
+            case 'ucfirst':
+            case 'lcfirst':
+            case 'strtoupper':
+            case 'strtolower':
+            case 'addslashes':
+            case 'bin2hex':
                 return ['string'];
             case 'substr':
                 return ['string', 'offset', 'length'];
