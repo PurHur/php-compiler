@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
+use PHPCompiler\VM\Context;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\Variable;
@@ -94,7 +95,7 @@ final class VmArrayPointer
     /**
      * @throws \TypeError when {@param $value} is not an array or object
      */
-    public static function requirePointerTarget(Variable $value, string $fn, bool $mutator): VmPointerTarget
+    public static function requirePointerTarget(Variable $value, string $fn, bool $mutator, ?Context $ctx = null): VmPointerTarget
     {
         if (Variable::TYPE_INDIRECT === $value->type) {
             $value = $value->resolveIndirect();
@@ -107,7 +108,7 @@ final class VmArrayPointer
             return self::fromArray(VmArray::requireArray($value, $fn));
         }
         if (Variable::TYPE_OBJECT === $value->type) {
-            return self::fromObject($value->toObject());
+            return self::fromObject($value->toObject(), $ctx);
         }
 
         throw new \TypeError(
@@ -120,9 +121,9 @@ final class VmArrayPointer
         return VmPointerTarget::fromArray($array);
     }
 
-    public static function fromObject(ObjectEntry $object): VmPointerTarget
+    public static function fromObject(ObjectEntry $object, ?Context $ctx = null): VmPointerTarget
     {
-        return VmPointerTarget::fromObject($object);
+        return VmPointerTarget::fromObject($object, $ctx);
     }
 
     /**
