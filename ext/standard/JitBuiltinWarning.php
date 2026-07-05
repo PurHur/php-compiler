@@ -24,6 +24,89 @@ final class JitBuiltinWarning
         self::emitLevel($context, $message, ErrorReporter::E_DEPRECATED);
     }
 
+    public static function emitNotice(Context $context, string $message): void
+    {
+        self::emitLevel($context, $message, ErrorReporter::E_NOTICE);
+    }
+
+    /**
+     * getimagesize*(): Error reading from {source}! — php-src php_getimagesize_from_any() (#16408).
+     */
+    public static function emitImageReadFailed(Context $context, Value $sourceStr, string $function): void
+    {
+        $map = $context->structFieldMap['__string__'];
+        $sourcePtr = $context->builder->structGep($sourceStr, $map['value']);
+        $sizeT = $context->getTypeFromString('size_t');
+        $charPtr = $context->getTypeFromString('char*');
+        $i8p = $context->getTypeFromString('int8*');
+        $i32 = $context->getTypeFromString('int32');
+        $bufSize = $sizeT->constInt(512, false);
+        $buf = $context->builder->call($context->lookupFunction('__mm__malloc'), $bufSize);
+        $bufChar = $context->builder->pointerCast($buf, $charPtr);
+        $fmt = $context->builder->pointerCast(
+            $context->constantFromString('%s(): Error reading from %s!'),
+            $charPtr
+        );
+        $fnPtr = $context->builder->pointerCast($context->constantFromString($function), $charPtr);
+        $written = $context->builder->call(
+            $context->lookupFunction('snprintf'),
+            $bufChar,
+            $bufSize,
+            $fmt,
+            $fnPtr,
+            $sourcePtr
+        );
+        $msgPtr = $context->builder->pointerCast($bufChar, $i8p);
+        $emptyFile = $context->builder->pointerCast($context->constantFromString(''), $i8p);
+        $context->builder->call(
+            $context->lookupFunction('__compiler_trigger_error'),
+            $msgPtr,
+            $context->builder->zExt($written, $sizeT),
+            $i32->constInt(ErrorReporter::E_NOTICE, false),
+            $emptyFile,
+            $i32->constInt(0, false)
+        );
+        $context->builder->call($context->lookupFunction('__mm__free'), $buf);
+    }
+
+    /** php-src streams.c — fopen/file read failure before getimagesize probe (#16408). */
+    public static function emitStreamOpenFailed(Context $context, Value $pathStr, string $function): void
+    {
+        $map = $context->structFieldMap['__string__'];
+        $pathPtr = $context->builder->structGep($pathStr, $map['value']);
+        $sizeT = $context->getTypeFromString('size_t');
+        $charPtr = $context->getTypeFromString('char*');
+        $i8p = $context->getTypeFromString('int8*');
+        $i32 = $context->getTypeFromString('int32');
+        $bufSize = $sizeT->constInt(512, false);
+        $buf = $context->builder->call($context->lookupFunction('__mm__malloc'), $bufSize);
+        $bufChar = $context->builder->pointerCast($buf, $charPtr);
+        $fmt = $context->builder->pointerCast(
+            $context->constantFromString('%s(%s): Failed to open stream: No such file or directory'),
+            $charPtr
+        );
+        $fnPtr = $context->builder->pointerCast($context->constantFromString($function), $charPtr);
+        $written = $context->builder->call(
+            $context->lookupFunction('snprintf'),
+            $bufChar,
+            $bufSize,
+            $fmt,
+            $fnPtr,
+            $pathPtr
+        );
+        $msgPtr = $context->builder->pointerCast($bufChar, $i8p);
+        $emptyFile = $context->builder->pointerCast($context->constantFromString(''), $i8p);
+        $context->builder->call(
+            $context->lookupFunction('__compiler_trigger_error'),
+            $msgPtr,
+            $context->builder->zExt($written, $sizeT),
+            $i32->constInt(ErrorReporter::E_WARNING, false),
+            $emptyFile,
+            $i32->constInt(0, false)
+        );
+        $context->builder->call($context->lookupFunction('__mm__free'), $buf);
+    }
+
     private static function emitLevel(Context $context, string $message, int $level): void
     {
         $i8p = $context->getTypeFromString('int8*');

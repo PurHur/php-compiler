@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\GetimagesizeJit;
 use PHPCompiler\JIT\Builtin\StringFileGetContents;
+use PHPCompiler\JIT\Builtin\StringTriggerErrorJit;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
@@ -44,7 +45,7 @@ final class JitGetimagesize
             $path
         );
 
-        return self::lowerBytesValue($context, $data);
+        return self::lowerBytesValue($context, $data, $path, 'getimagesize');
     }
 
     public static function fromBytes(Context $context, JITVariable ...$args): Value
@@ -58,36 +59,55 @@ final class JitGetimagesize
         }
         $data = JitStringBuiltinArg::lower($context, $args[0], 'getimagesizefromstring', 0, 'data');
 
-        return self::lowerBytesValue($context, $data);
+        return self::lowerBytesValue($context, $data, null, 'getimagesizefromstring', $data);
     }
 
-    private static function lowerBytesValue(Context $context, Value $data): Value
-    {
+    private static function lowerBytesValue(
+        Context $context,
+        Value $data,
+        ?Value $pathForOpenWarning = null,
+        string $function = 'getimagesize',
+        ?Value $noticeSource = null
+    ): Value {
         GetimagesizeJit::ensureLinked($context);
+        StringTriggerErrorJit::implement($context);
 
         $tag = 'getimagesize'.(string) ++self::$seq;
         $strPtr = $context->getTypeFromString('__string__*');
         $htPtr = $context->getTypeFromString('__hashtable__*');
         $i1 = $context->getTypeFromString('int1');
         $falseVal = $i1->constInt(0, false);
+        $noticeSource ??= $pathForOpenWarning ?? $data;
 
         $missingData = $context->builder->icmp(Builder::INT_EQ, $data, $strPtr->constNull());
-        $failBlock = BasicBlockHelper::append($context, $tag.'_fail');
+        $openFailBlock = BasicBlockHelper::append($context, $tag.'_open_fail');
+        $readFailBlock = BasicBlockHelper::append($context, $tag.'_read_fail');
         $parseBlock = BasicBlockHelper::append($context, $tag.'_parse');
         $doneBlock = BasicBlockHelper::append($context, $tag.'_done');
-        $context->builder->branchIf($missingData, $failBlock, $parseBlock);
+
+        if (null !== $pathForOpenWarning) {
+            $context->builder->branchIf($missingData, $openFailBlock, $parseBlock);
+        } else {
+            $context->builder->branchIf($missingData, $readFailBlock, $parseBlock);
+        }
 
         $context->builder->positionAtEnd($parseBlock);
         $ht = $context->builder->call(GetimagesizeJit::helperFunction($context), $data);
         $parseFailed = $context->builder->icmp(Builder::INT_EQ, $ht, $htPtr->constNull());
         $okBlock = BasicBlockHelper::append($context, $tag.'_ok');
-        $context->builder->branchIf($parseFailed, $failBlock, $okBlock);
+        $context->builder->branchIf($parseFailed, $readFailBlock, $okBlock);
 
-        $context->builder->positionAtEnd($failBlock);
-        $failSlot = JitValueBox::alloc($context);
-        $failPtr = JitValueBox::pointer($context, $failSlot);
-        JitValueBox::writeBool($context, $failSlot, $falseVal);
-        $context->builder->branch($doneBlock);
+        if (null !== $pathForOpenWarning) {
+            $context->builder->positionAtEnd($openFailBlock);
+            JitBuiltinWarning::emitStreamOpenFailed($context, $pathForOpenWarning, $function);
+            $openFailTail = self::writeFalseAndBranch($context, $doneBlock, $falseVal);
+        } else {
+            $openFailTail = null;
+        }
+
+        $context->builder->positionAtEnd($readFailBlock);
+        JitBuiltinWarning::emitImageReadFailed($context, $noticeSource, $function);
+        $readFailTail = self::writeFalseAndBranch($context, $doneBlock, $falseVal);
 
         $context->builder->positionAtEnd($okBlock);
         $context->refcount->addref($ht);
@@ -100,9 +120,23 @@ final class JitGetimagesize
         $context->builder->positionAtEnd($doneBlock);
         $valuePtrTy = $context->getTypeFromString('__value__*');
         $result = $context->builder->phi($valuePtrTy);
-        $result->addIncoming($failPtr, $failBlock);
+        if (null !== $openFailTail) {
+            $result->addIncoming($openFailTail, $openFailBlock);
+        }
+        $result->addIncoming($readFailTail, $readFailBlock);
         $result->addIncoming($okPtr, $okTail);
 
         return $result;
+    }
+
+    private static function writeFalseAndBranch(Context $context, \PHPLLVM\BasicBlock $doneBlock, Value $falseVal): Value
+    {
+        $failSlot = JitValueBox::alloc($context);
+        $failPtr = JitValueBox::pointer($context, $failSlot);
+        JitValueBox::writeBool($context, $failSlot, $falseVal);
+        $failTail = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        return $failPtr;
     }
 }
