@@ -604,6 +604,15 @@ class VMTest extends BaseTest {
                 continue;
             }
             if (!CompilerVersion::supportsPropertyHooks()
+                && (str_contains($name, 'asymmetric_get_only_hook_compile')
+                    || str_contains($name, 'asymmetric_get_only_hook_write'))) {
+                continue;
+            }
+            if (CompilerVersion::supportsPropertyHooks()
+                && str_contains($name, 'asymmetric_get_only_hook_reference_profile')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsPropertyHooks()
                 && str_contains($name, 'asymmetric_visibility_set_modifier')) {
                 continue;
             }

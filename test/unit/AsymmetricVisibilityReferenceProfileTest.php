@@ -134,4 +134,36 @@ final class AsymmetricVisibilityReferenceProfileTest extends TestCase
             $this->assertStringContainsString(AsymmetricVisibilityRewriter::MULTIPLE_MODIFIERS_MESSAGE, $e->getMessage());
         }
     }
+
+    /** @covers issue #16452 — asymmetric scope + hook block on reference profile */
+    public function testRuntimeRejectsAsymmetricGetOnlyHookWithZendPrivateTokenMessage(): void
+    {
+        if (CompilerVersion::supportsPropertyHooks()) {
+            $this->markTestSkipped('property hooks enabled on PHP 8.4.0+ target');
+        }
+        $runtime = new Runtime();
+        try {
+            $runtime->parseAndCompile(
+                file_get_contents(__DIR__.'/../repro/maintainer_gap_asymmetric_get_only_hook_compile.php'),
+                'maintainer_gap_asymmetric_get_only_hook_compile.php'
+            );
+            $this->fail('Expected compile failure');
+        } catch (\PHPCompiler\Compiler\CompileFatal $e) {
+            $this->assertStringContainsString('syntax error, unexpected token "private"', $e->getMessage());
+            $this->assertSame(5, $e->sourceLine);
+        }
+    }
+
+    public function testRejectorThrowsAsymmetricGetOnlyHookOnReferenceProfile(): void
+    {
+        if (CompilerVersion::supportsPropertyHooks()) {
+            $this->markTestSkipped('property hooks enabled on PHP 8.4.0+ target');
+        }
+        $this->expectException(\PHPCompiler\Compiler\CompileFatal::class);
+        $this->expectExceptionMessage('syntax error, unexpected token "private"');
+        AsymmetricVisibilityRejector::reject(
+            file_get_contents(__DIR__.'/../repro/maintainer_gap_asymmetric_get_only_hook_compile.php'),
+            'maintainer_gap_asymmetric_get_only_hook_compile.php'
+        );
+    }
 }

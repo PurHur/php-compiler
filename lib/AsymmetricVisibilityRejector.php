@@ -6,6 +6,7 @@ namespace PHPCompiler;
 
 use PHPCompiler\Ast\AsymmetricVisibilityRewriter;
 use PHPCompiler\Compiler\CompileFatal;
+use PHPCompiler\SourcePreprocessor\PropertyHooks;
 
 /**
  * Reject PHP 8.4 asymmetric visibility on the Zend 8.2 reference profile (#12508).
@@ -24,6 +25,18 @@ final class AsymmetricVisibilityRejector
             return $code;
         }
 
+        $parenSet = AsymmetricVisibilityRewriter::findParenthesizedAsymmetricSetModifierError($code);
+        $hasPropertyHooks = null !== PropertyHooks::referenceProfileHookSyntaxError($code);
+
+        // php-src: Zend/zend_compile.c — asymmetric scope before hook block on reference profile (#16452).
+        if ($hasPropertyHooks && !CompilerVersion::supportsPropertyHooks() && null !== $parenSet) {
+            throw new CompileFatal(
+                $filename,
+                $parenSet['line'],
+                self::parenthesizedSetModifierMessage($parenSet['token'])
+            );
+        }
+
         if (CompilerVersion::supportsAsymmetricVisibility()) {
             return $code;
         }
@@ -33,8 +46,21 @@ final class AsymmetricVisibilityRejector
             throw new CompileFatal($filename, $multipleLine, AsymmetricVisibilityRewriter::MULTIPLE_MODIFIERS_MESSAGE);
         }
 
+        if (null !== $parenSet) {
+            throw new CompileFatal(
+                $filename,
+                $parenSet['line'],
+                self::parenthesizedSetModifierMessage($parenSet['token'])
+            );
+        }
+
         $line = self::lineOfFirstAsymmetricSyntax($code);
         throw new CompileFatal($filename, $line, self::PARSE_MESSAGE);
+    }
+
+    private static function parenthesizedSetModifierMessage(string $token): string
+    {
+        return sprintf(AsymmetricVisibilityRewriter::PROMOTED_PARENTHESIZED_SET_MESSAGE, $token);
     }
 
     private static function lineOfFirstAsymmetricSyntax(string $code): int
