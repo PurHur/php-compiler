@@ -23229,6 +23229,19 @@ class Compiler {
         if (\count($hoistedArgs) < 2 || !$this->callArgsAreDistinctInlineTemporaries($hoistedArgs)) {
             return false;
         }
+        // chmod(); substr(sprintf('%o', fileperms($path)), -N) — stmt-level callee is not chain start (#16451).
+        if (
+            $this->statementLevelFuncCallBeforeHoistedSiblingChain($fromIndex, $consumerIndex, $cfgChildren)
+        ) {
+            $contiguousFirst = $this->firstContiguousSiblingMultiArgProducerIndex(
+                $consumerIndex,
+                $consumer,
+                $cfgChildren
+            );
+            if (null === $contiguousFirst || $fromIndex !== $contiguousFirst) {
+                return false;
+            }
+        }
         $outerProducerCount = \count(
             $this->outerSiblingInlineFuncCallProducers($fromIndex, $consumerIndex, $cfgChildren)
         );
