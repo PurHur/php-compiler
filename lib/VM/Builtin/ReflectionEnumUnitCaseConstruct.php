@@ -35,10 +35,11 @@ final class ReflectionEnumUnitCaseConstruct extends VmClassMethod
             );
         }
         $receiver = ReflectionSupport::requireReflectionEnumCase($frame, $frame->calledArgs[0]);
-        $receiver->getProperty(ReflectionSupport::PROP_CLASS_NAME)->string(
+        ReflectionSupport::initReflectionEnumCaseMetadata(
+            $receiver,
+            $enumEntry->name,
             $enumEntry->enumCaseCanonicalNames[$caseLc]
         );
-        $receiver->getProperty(ReflectionSupport::PROP_ENUM_CLASS_NAME)->string($enumEntry->name);
         $receiver->constructed = true;
         // Do not touch returnVar: it may alias the `new ReflectionEnumUnitCase()` result slot (#1885, #5699).
     }

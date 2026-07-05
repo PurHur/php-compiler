@@ -97,6 +97,12 @@ class ObjectEntry {
     /** Canonical IANA id for DateTimeZone instances — survives scope temp clobber (#6041). */
     public ?string $dateTimeZoneName = null;
 
+    /** Enum class on ReflectionEnumUnitCase / ReflectionEnumBackedCase — survives scope temp clobber (#16331, #6041). */
+    public ?string $reflectionEnumClassName = null;
+
+    /** Case name on ReflectionEnumUnitCase / ReflectionEnumBackedCase — survives scope temp clobber (#16331, #6041). */
+    public ?string $reflectionEnumCaseName = null;
+
     /** PHP 8.4 Resource object handle payload (#7073). */
     public ?ResourceState $resourceState = null;
 
