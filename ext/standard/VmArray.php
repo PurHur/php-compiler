@@ -1076,6 +1076,16 @@ final class VmArray
      */
     public static function shufflePacked(HashTable $ht): void
     {
+        self::shufflePackedWithPicker($ht, static fn (int $upper): int => self::randomIndexBelow($upper));
+    }
+
+    /**
+     * Fisher–Yates shuffle using a caller-supplied index picker (Random\Randomizer::shuffleArray()).
+     *
+     * {@param $pickIndex} receives the exclusive upper bound and returns an index in [0, upper).
+     */
+    public static function shufflePackedWithPicker(HashTable $ht, callable $pickIndex): void
+    {
         $n = $ht->getNumElements();
         if ($n < 2) {
             return;
@@ -1086,7 +1096,7 @@ final class VmArray
             $copy->copyFrom($value);
             $values[] = $copy;
         }
-        self::fisherYatesShuffleVariables($values);
+        self::fisherYatesShuffleVariablesWithPicker($values, $pickIndex);
         if (self::isList($ht)) {
             $ht->replacePackedValues($values);
         } else {
@@ -1192,9 +1202,20 @@ final class VmArray
      */
     private static function fisherYatesShuffleVariables(array &$values): void
     {
+        self::fisherYatesShuffleVariablesWithPicker(
+            $values,
+            static fn (int $upper): int => self::randomIndexBelow($upper)
+        );
+    }
+
+    /**
+     * @param list<Variable> $values
+     */
+    private static function fisherYatesShuffleVariablesWithPicker(array &$values, callable $pickIndex): void
+    {
         $n = \count($values);
         for ($i = $n - 1; $i > 0; --$i) {
-            $j = self::randomIndexBelow($i + 1);
+            $j = $pickIndex($i + 1);
             $tmp = $values[$i];
             $values[$i] = $values[$j];
             $values[$j] = $tmp;
