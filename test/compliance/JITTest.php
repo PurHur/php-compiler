@@ -659,6 +659,16 @@ class JITTest extends BaseTest {
                 && !str_contains($name, 'typed_function_static_reference_profile')) {
                 continue;
             }
+            // 8.3-target reject gate; skipped when file/namespace typed constants enabled (#16651, #7081).
+            if (CompilerVersion::supportsGlobalTypedConstants()
+                && str_contains($name, 'typed_top_level_const_82')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsGlobalTypedConstants()
+                && str_contains($name, 'global_typed_const')
+                && !str_contains($name, 'typed_top_level_const_82')) {
+                continue;
+            }
             // 8.3-target reject gate; skipped when class const brace deref enabled (#16597).
             if (CompilerVersion::supportsClassConstBraceDeref()
                 && str_contains($name, 'class_const_brace_deref')

@@ -2740,6 +2740,7 @@ require_once __DIR__.'/../../../lib/Doctor.php';
 require_once __DIR__.'/../../../lib/EncapsedCoalesceRejector.php';
 require_once __DIR__.'/../../../lib/EnumCaseListRewriter.php';
 require_once __DIR__.'/../../../lib/ExitFunctionSyntaxRejector.php';
+require_once __DIR__.'/../../../lib/GlobalTypedConstSyntaxRejector.php';
 require_once __DIR__.'/../../../lib/Frame.php';
 require_once __DIR__.'/../../../lib/Func.php';
 require_once __DIR__.'/../../../lib/Func/Internal.php';
