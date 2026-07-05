@@ -180,6 +180,22 @@ final class VmImage
     }
 
     /**
+     * php-src php_getimagesize_from_any() — E_NOTICE only for data: URIs, not regular files (#16434).
+     */
+    public static function shouldEmitImageReadNoticeForPath(string $filename): bool
+    {
+        return VmDataUri::isDataUri($filename);
+    }
+
+    /**
+     * php-src getimagesizefromstring() — E_NOTICE only when $data is empty (#12930).
+     */
+    public static function shouldEmitImageReadNoticeForBytes(string $data): bool
+    {
+        return '' === $data;
+    }
+
+    /**
      * php-src ext/standard/image.c php_getimagesize_from_any() — E_NOTICE on read/parse failure.
      */
     public static function emitImageReadNotice(Frame $frame, string $function, string $source): void

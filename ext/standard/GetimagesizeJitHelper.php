@@ -13,6 +13,16 @@ use PHPCompiler\VM\HashTable;
  */
 final class GetimagesizeJitHelper
 {
+    public static function shouldEmitReadNoticeForPath(string $path): bool
+    {
+        return VmImage::shouldEmitImageReadNoticeForPath($path);
+    }
+
+    public static function shouldEmitReadNoticeForBytes(string $data): bool
+    {
+        return VmImage::shouldEmitImageReadNoticeForBytes($data);
+    }
+
     public static function fromBytes(string $data): ?HashTable
     {
         $result = VmImage::getImageSizeFromBytes($data);
