@@ -196,14 +196,52 @@ final class VmInfo
 
     public static function phpinfo(int $flags = self::INFO_ALL): bool
     {
-        OutputBuffer::append(self::renderPhpinfoHtml($flags));
+        OutputBuffer::append(self::renderPhpinfo($flags));
 
         return true;
+    }
+
+    /** php-src sapi_module.phpinfo_as_text — CLI emits plain-text rows (#16489). */
+    public static function phpinfoUsesTextFormat(): bool
+    {
+        return 'cli' === strtolower(self::php_sapi_name());
+    }
+
+    /** Shared phpinfo() output for VM + JIT ({@see PhpinfoJitHelper}, issue #9256, #16489). */
+    public static function renderPhpinfo(int $flags): string
+    {
+        return self::phpinfoUsesTextFormat()
+            ? self::renderPhpinfoText($flags)
+            : self::renderPhpinfoHtml($flags);
     }
 
     public static function phpcredits(int $flags = self::CREDITS_ALL): void
     {
         OutputBuffer::append(self::renderPhpcreditsText($flags));
+    }
+
+    /** php-src php_print_info() text layout for CLI SAPI (ext/standard/info.c, #16489). */
+    public static function renderPhpinfoText(int $flags): string
+    {
+        $text = "phpinfo()\n";
+        if (self::infoFlagSelected($flags, self::INFO_GENERAL)) {
+            $text .= self::generalSectionText();
+        }
+        if (self::infoFlagSelected($flags, self::INFO_MODULES)) {
+            $text .= self::modulesSectionText();
+        }
+        if (self::infoFlagSelected($flags, self::INFO_CONFIGURATION)) {
+            $text .= self::configurationSectionText();
+        }
+        if (self::infoFlagSelected($flags, self::INFO_LICENSE)) {
+            $text .= self::licenseSectionText();
+        }
+        if (self::infoFlagSelected($flags, self::INFO_CREDITS)) {
+            $text .= self::phpinfoCreditsIntroText();
+            $text .= self::creditsSectionText(self::PHPINFO_CREDITS_FLAGS, true);
+        }
+
+        return $text;
     }
 
     /** Shared phpinfo() HTML for VM + JIT ({@see PhpinfoJitHelper}, issue #9256). */
@@ -520,6 +558,88 @@ final class VmInfo
         return $html;
     }
 
+    private static function phpinfoRowText(string $label, string $value): string
+    {
+        return $label.' => '.$value."\n";
+    }
+
+    private static function phpinfoCreditsIntroText(): string
+    {
+        return "\n\n ".str_repeat('_', 71)."\n\nPHP Credits\n";
+    }
+
+    private static function generalSectionText(): string
+    {
+        $version = CompilerVersion::VERSION;
+        $system = self::php_uname('s');
+        $host = self::php_uname('n');
+        $release = self::php_uname('r');
+        $versionStr = self::php_uname('v');
+        $machine = self::php_uname('m');
+        $text = self::phpinfoRowText('PHP Version', $version)."\n";
+        $text .= self::phpinfoRowText('System', trim($system.' '.$host.' '.$release.' '.$versionStr.' '.$machine));
+        $text .= self::phpinfoRowText('Build Date', CompilerVersion::BUILD_DATE);
+        $text .= self::phpinfoRowText('Build System', trim($system.' '.$machine));
+        $text .= self::phpinfoRowText('Server API', self::php_sapi_name());
+        foreach (self::PHPINFO_GENERAL_EXTRA_ROWS as $label) {
+            $value = VmIniIntrospection::phpinfoGeneralRow($label);
+            if ('Additional .ini files parsed' === $label) {
+                $value = self::formatPhpinfoAdditionalIniFilesText($value);
+            }
+            $text .= self::phpinfoRowText($label, $value);
+        }
+        $text .= self::phpinfoRowText('PHP Version', $version);
+        $text .= self::phpinfoRowText('Zend Engine Version', CompilerVersion::zendVersion());
+        $text .= "\n";
+
+        return $text;
+    }
+
+    private static function formatPhpinfoAdditionalIniFilesText(string $value): string
+    {
+        if ('(none)' === $value || '' === $value) {
+            return $value;
+        }
+        $parts = preg_split('/,\s*\n?/', $value) ?: [];
+        $parts = array_values(array_filter(array_map('trim', $parts), static fn (string $part): bool => '' !== $part));
+        if ([] === $parts) {
+            return $value;
+        }
+
+        return implode(",\n", $parts);
+    }
+
+    private static function modulesSectionText(): string
+    {
+        $extensions = ModuleRegistry::getLoadedExtensions();
+        sort($extensions, SORT_STRING);
+        $text = "\nPHP Modules\n\n";
+        $text .= self::phpinfoRowText('Module Name', 'Enabled');
+        foreach ($extensions as $name) {
+            $text .= self::phpinfoRowText($name, 'enabled');
+        }
+        $text .= "\n";
+
+        return $text;
+    }
+
+    private static function configurationSectionText(): string
+    {
+        $text = "\nConfiguration\n\n";
+        $text .= self::phpinfoRowText('Compiler', 'PurHur/php-compiler');
+        $text .= "\n";
+
+        return $text;
+    }
+
+    private static function licenseSectionText(): string
+    {
+        $text = "\nPHP License\n\n";
+        $text .= "This program is free software; you can redistribute it and/or modify it under the terms of the PHP License.\n\n";
+
+        return $text;
+    }
+
     /** php-src phpinfo(INFO_GENERAL) rows after Server API (ext/standard/info.c, #14283). */
     private const PHPINFO_GENERAL_EXTRA_ROWS = [
         'Virtual Directory Support',
@@ -620,7 +740,7 @@ final class VmInfo
     }
 
     /** php-src php_print_credits() text layout (ext/standard/info.c php_info_print_table_*). */
-    private static function creditsSectionText(int $flags): string
+    private static function creditsSectionText(int $flags, bool $fullModuleCreditsTable = false): string
     {
         $sections = '';
         if (self::creditsFlagSelected($flags, self::CREDITS_GROUP)) {
@@ -635,7 +755,7 @@ final class VmInfo
         if (self::creditsFlagSelected($flags, self::CREDITS_MODULES)) {
             // php-src php_print_credits(CREDITS_ALL): full credits_modules[] table;
             // CREDITS_MODULES alone lists loaded extensions only (#14799, #16338).
-            $sections .= self::creditsModulesSectionText(self::isCreditsAll($flags));
+            $sections .= self::creditsModulesSectionText($fullModuleCreditsTable || self::isCreditsAll($flags));
         }
         if (self::creditsFlagSelected($flags, self::CREDITS_DOCS)) {
             $sections .= self::creditsDocsSectionText();
