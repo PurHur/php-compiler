@@ -12935,6 +12935,10 @@ class Compiler {
                     return $embedded;
                 }
 
+                if ($this->inlineCallArgProducerFeedsCallArgOp($directCall, $callOp, $positionalCallArg)) {
+                    return $directCall;
+                }
+
                 return null;
             }
             if (
@@ -17374,6 +17378,28 @@ class Compiler {
                     0 => $funcProducer,
                     1 => $constProducers[0],
                     3 => $constProducers[\count($constProducers) - 1],
+                    default => null,
+                };
+            }
+        }
+        // array_chunk(range(1,5), 2, true) — FuncCall haystack + trailing preserve_keys ConstFetch (#11767).
+        if ('array_chunk' === $inlineFuncName && \count($callArgs) >= 3) {
+            $funcProducer = null;
+            $boolConstProducer = null;
+            foreach ($producers as $producer) {
+                if ($producer instanceof Op\Expr\FuncCall || $producer instanceof Op\Expr\NsFuncCall) {
+                    $funcProducer = $producer;
+                } elseif ($producer instanceof Op\Expr\ConstFetch || $producer instanceof Op\Expr\ClassConstFetch) {
+                    $name = $this->staticNameFromOperand($producer->name);
+                    if (null !== $name && \in_array(strtolower($name), ['true', 'false'], true)) {
+                        $boolConstProducer = $producer;
+                    }
+                }
+            }
+            if (null !== $funcProducer && null !== $boolConstProducer) {
+                return match ($argIndex) {
+                    0 => $funcProducer,
+                    2 => $boolConstProducer,
                     default => null,
                 };
             }
@@ -25249,6 +25275,109 @@ class Compiler {
     }
 
     /**
+     * array_chunk(range(1,5), 2, true) — hoisted FuncCall haystack + ConstFetch preserve_keys (#11767).
+     *
+     * @return list<OpCode>|null
+     */
+    private function compileArrayChunkInlineNestedCallArgSends(
+        array $args,
+        Block $block,
+        Op $cfgCallOp
+    ): ?array {
+        if (null === $block->orig || !property_exists($cfgCallOp, 'args') || !is_array($cfgCallOp->args)) {
+            return null;
+        }
+        if ('array_chunk' !== $this->resolveCfgFuncCallName($cfgCallOp)) {
+            return null;
+        }
+        if (\count($cfgCallOp->args) < 3) {
+            return null;
+        }
+        if (!$this->isEmbeddedCallLiteralArg($cfgCallOp->args[1] ?? null)) {
+            return null;
+        }
+        $callIndex = null;
+        foreach ($block->orig->children as $i => $child) {
+            if ($child === $cfgCallOp) {
+                $callIndex = $i;
+                break;
+            }
+        }
+        if (null === $callIndex || $callIndex < 2) {
+            return null;
+        }
+        $funcProducer = $block->orig->children[$callIndex - 2] ?? null;
+        $constProducer = $block->orig->children[$callIndex - 1] ?? null;
+        if (
+            !($funcProducer instanceof Op\Expr\FuncCall || $funcProducer instanceof Op\Expr\NsFuncCall)
+            || !$constProducer instanceof Op\Expr\ConstFetch
+        ) {
+            return null;
+        }
+        $constName = strtolower($this->staticNameFromOperand($constProducer->name) ?? '');
+        if (!\in_array($constName, ['true', 'false'], true)) {
+            return null;
+        }
+        if (
+            !$this->isNestedCallArgProducerSeparatedByConsumerLiteralPreludes(
+                $funcProducer,
+                $cfgCallOp,
+                $callIndex - 2,
+                $callIndex,
+                $block->orig->children
+            )
+        ) {
+            return null;
+        }
+        $producerOps = [];
+        $haystackSlot = null;
+        $prevForce = $this->forceDeferredSiblingCallReturnSlot;
+        $this->forceDeferredSiblingCallReturnSlot = true;
+        try {
+            $producerOps = $this->compileExpr($funcProducer, $block);
+        } finally {
+            $this->forceDeferredSiblingCallReturnSlot = $prevForce;
+        }
+        foreach ($producerOps as $op) {
+            if (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type && null !== $op->arg1) {
+                $haystackSlot = (string) $op->arg1;
+                break;
+            }
+        }
+        if (null === $haystackSlot) {
+            return null;
+        }
+        $preserveKeysSlot = $this->slotForHoistedScalarConstFetchCallArg($constProducer, $block);
+        if (null === $preserveKeysSlot) {
+            foreach ($this->compileExpr($constProducer, $block) as $op) {
+                $producerOps[] = $op;
+            }
+            $preserveKeysSlot = $this->slotForHoistedScalarConstFetchCallArg($constProducer, $block);
+        }
+        if (null === $preserveKeysSlot) {
+            return null;
+        }
+        $sends = [];
+        foreach ($args as $argIndex => $arg) {
+            $valueSlot = match ((int) $argIndex) {
+                0 => $haystackSlot,
+                2 => (string) $preserveKeysSlot,
+                default => null,
+            };
+            $literalProbe = ($cfgCallOp->args[(int) $argIndex] ?? null) ?? $arg;
+            if (null === $valueSlot && $this->isEmbeddedCallLiteralArg($literalProbe)) {
+                $valueSlot = (string) $this->freshLiteralConstantSlot($literalProbe, $block);
+            }
+            if (null === $valueSlot) {
+                $valueSlot = $this->compileOperand($arg, $block, true);
+            }
+            $sends[] = new OpCode(OpCode::TYPE_ARG_SEND, $valueSlot, null, null);
+        }
+
+        return array_merge($producerOps, $sends);
+    }
+
+    /**
      * date_sunrise(time(), SUNFUNCS_RET_*, …) — bypass sibling producer scan (#13749, #16012).
      *
      * @return list<OpCode>|null
@@ -29896,6 +30025,17 @@ class Compiler {
             // Needle/strict slots must not use positional trailingConstFetches — null for [null] sits before Array_ (#16096).
             return null;
         }
+        if (
+            'array_chunk' === strtolower($this->resolveCfgFuncCallName($cfgCallOp) ?? '')
+            && 2 === $argIndex
+            && 1 === \count($trailingConstFetches)
+            && !$this->isEmbeddedCallLiteralArg($callArgs[1] ?? null)
+        ) {
+            $fetch = $trailingConstFetches[0];
+            if ($fetch instanceof Op\Expr\ConstFetch) {
+                return $this->slotForHoistedScalarConstFetchCallArg($fetch, $block);
+            }
+        }
         $nonEmbeddedArgIndices = [];
         foreach ($callArgs as $i => $candidate) {
             if (!$this->isEmbeddedCallLiteralArg($candidate)) {
@@ -30662,6 +30802,10 @@ class Compiler {
         $this->validateCallArgOrder($args);
 
         if (null !== $cfgCallOp) {
+            $arrayChunkSends = $this->compileArrayChunkInlineNestedCallArgSends($args, $block, $cfgCallOp);
+            if (null !== $arrayChunkSends) {
+                return $arrayChunkSends;
+            }
             $dateSunSends = $this->compileDateSunFuncInlineCallArgSends($args, $block, $cfgCallOp);
             if (null !== $dateSunSends) {
                 return $dateSunSends;
