@@ -41,12 +41,14 @@ final class ArrayElemRuntimeShrinkTest extends TestCase
         $this->assertSame(2, $last->resolveIndirect()->toInt());
     }
 
-    public function testArrayElemJitHelperRejectsEmptyArray(): void
+    public function testArrayElemJitHelperReturnsNullForEmptyArray(): void
     {
         $ht = new HashTable();
-        $this->expectException(\Error::class);
-        $this->expectExceptionMessage('array_first(): Argument #1 ($array) must not be empty');
-        ArrayElemJitHelper::firstArgv($ht);
+        $first = ArrayElemJitHelper::firstArgv($ht);
+        $this->assertSame(Variable::TYPE_NULL, $first->resolveIndirect()->type);
+
+        $last = ArrayElemJitHelper::lastArgv($ht);
+        $this->assertSame(Variable::TYPE_NULL, $last->resolveIndirect()->type);
     }
 
     public function testSpineBundleIncludesArrayElemJitHelper(): void
