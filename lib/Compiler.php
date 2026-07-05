@@ -22806,6 +22806,9 @@ class Compiler {
             if ($mid instanceof Op\Expr\ConstFetch || $mid instanceof Op\Expr\ClassConstFetch) {
                 continue;
             }
+            if ($this->isUnaryInlineSiblingCallArgExpr($mid)) {
+                continue;
+            }
 
             return false;
         }
