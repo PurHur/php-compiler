@@ -29537,6 +29537,47 @@ class Compiler {
     }
 
     /**
+     * `$v = @f(); g($v)` in END_SILENCE — reads must use the assign CV lvalue, not assign.result temp (#16262).
+     */
+    private function slotForPostErrorSuppressAssignNamedLocalCallArg(Operand $arg, Block $block): ?int
+    {
+        $endCfg = $block->orig;
+        if (null === $endCfg || !$this->isErrorSuppressEndBlock($endCfg)) {
+            return null;
+        }
+        $parentCfg = $endCfg->parents[0] ?? null;
+        if (!$parentCfg instanceof ErrorSuppressBlock) {
+            return null;
+        }
+        $primary = $this->findErrorSuppressPrimaryInnerExpr($parentCfg);
+        if (null === $primary || !isset($primary->result)) {
+            return null;
+        }
+        foreach ($endCfg->children as $child) {
+            if (!$child instanceof Op\Expr\Assign) {
+                continue;
+            }
+            if (!$this->operandsReferToSameVariable($child->expr, $primary->result)) {
+                continue;
+            }
+            if (!$this->operandsReferToSameVariable($child->var, $arg)) {
+                continue;
+            }
+            $namedDest = $block->slotForNamedAssignDest($child->var);
+            if (null !== $namedDest) {
+                return (int) $namedDest;
+            }
+            foreach ($block->opCodes as $op) {
+                if (OpCode::TYPE_ASSIGN === $op->type && (int) $op->arg2 === $block->getVarSlot($child->var, false)) {
+                    return (int) $op->arg2;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * Trailing hoisted Array_ before a post-@ call feeds this dead-temp arg (#16205).
      */
     private function errorSuppressEndBlockCallArgHasTrailingHoistedArrayProducer(
@@ -34006,6 +34047,10 @@ class Compiler {
                     $valueSlot = (string) $this->finalizeOperandSlotForAccess($block, $paramSlot, true);
                 }
             }
+            $postSuppressAssignSlot = $this->slotForPostErrorSuppressAssignNamedLocalCallArg($sendProbe, $block);
+            if (null !== $postSuppressAssignSlot) {
+                $valueSlot = (string) $postSuppressAssignSlot;
+            }
             $sends[] = new OpCode(OpCode::TYPE_ARG_SEND, $valueSlot, $nameSlot, $unpackFlag);
         }
 
@@ -34919,11 +34964,24 @@ class Compiler {
             return [];
         }
 
+        $rhsSlot = (int) $valueSlot;
+        if ($rhsSlot === (int) $destSlot) {
+            foreach ($block->opCodes as $op) {
+                if (OpCode::TYPE_ASSIGN === $op->type && (int) $op->arg2 === (int) $destSlot) {
+                    $rhsSlot = (int) $op->arg3;
+                    break;
+                }
+            }
+            if ($rhsSlot === (int) $destSlot) {
+                return [];
+            }
+        }
+
         return [new OpCode(
             OpCode::TYPE_ASSIGN,
             $this->compileOperand($prev->result, $block, false),
             $destSlot,
-            $valueSlot
+            $rhsSlot
         )];
     }
 
