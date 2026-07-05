@@ -29,7 +29,7 @@ final class Linker
     /** libz.so symlink is often absent without zlib1g-dev; link the versioned .so directly. */
     private const RUNTIME_LINK_LIBS = '-lpcre2-8 -lcrypt -l:libz.so.1 -l:libbz2.so.1.0';
 
-    /** Appended when lib/JIT/Builtin/runtime/openssl_ev.c is linked (#16454). */
+    /** Appended when OpensslSignJitHelper FFI is available at link time (#16454). */
     private const OPENSSL_LINK_LIB = '-lcrypto';
 
     /** Host multiarch lib dir for bundled LLVM ld (libz.so.1 lives here, not in LLVM sysroot). */
@@ -38,12 +38,6 @@ final class Linker
     /** Runtime units that need host libc headers layered on the LLVM sysroot (incomplete headers). */
     private const RUNTIME_HOST_LIBC_BASENAMES = [
         'phpc_progress.c',
-        'openssl_ev.c',
-    ];
-
-    /** Runtime units that include OpenSSL headers (libssl-dev). */
-    private const RUNTIME_OPENSSL_BASENAMES = [
-        'openssl_ev.c',
     ];
 
     private static function which(string $binary): ?string
@@ -207,13 +201,13 @@ final class Linker
             ));
         }
 
-        return array_merge($sources, OpensslSignRuntime::opensslEvRuntimeSources());
+        return $sources;
     }
 
     private static function runtimeLinkLibs(): string
     {
         $libs = self::RUNTIME_LINK_LIBS;
-        if ([] !== OpensslSignRuntime::opensslEvRuntimeSources()) {
+        if (OpensslSignRuntime::opensslEvRuntimeAvailable()) {
             $libs .= ' '.self::OPENSSL_LINK_LIB;
         }
 
@@ -280,32 +274,8 @@ final class Linker
         } else {
             $flags = self::runtimeCIncludeFlags();
         }
-        if (in_array($basename, self::RUNTIME_OPENSSL_BASENAMES, true)) {
-            $flags .= self::runtimeOpensslIncludeFlags();
-        }
 
         return $flags;
-    }
-
-    private static function runtimeOpensslIncludeFlags(): string
-    {
-        $pkg = self::which('pkg-config');
-        if (null !== $pkg) {
-            $captured = self::runCaptured($pkg.' --cflags libcrypto 2>/dev/null', null);
-            if (0 === $captured['code']) {
-                $out = trim($captured['stdout']);
-                if ('' !== $out) {
-                    return ' '.$out;
-                }
-            }
-        }
-        foreach (['/usr/include', '/usr/local/include'] as $dir) {
-            if (is_file($dir.'/openssl/evp.h')) {
-                return ' -isystem '.escapeshellarg($dir);
-            }
-        }
-
-        return '';
     }
 
     private static function runtimeCIncludeFlags(): string
