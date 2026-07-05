@@ -560,6 +560,15 @@ class JITTest extends BaseTest {
                 && !str_contains($name, 'reference_profile')) {
                 continue;
             }
+            if (!CompilerVersion::supportsPropertyHooks()
+                && (str_contains($name, 'asymmetric_get_only_hook_compile')
+                    || str_contains($name, 'asymmetric_get_only_hook_write'))) {
+                continue;
+            }
+            if (CompilerVersion::supportsPropertyHooks()
+                && str_contains($name, 'asymmetric_get_only_hook_reference_profile')) {
+                continue;
+            }
             // 8.4-target reject gate; skipped when bare rethrow enabled (#3508, #14239, #15357).
             if (CompilerVersion::supportsBareRethrow()
                 && str_contains($name, 'bare_throw_reference_profile')) {

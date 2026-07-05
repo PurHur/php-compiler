@@ -130,6 +130,30 @@ final class AsymmetricVisibilityRewriter
         return 0;
     }
 
+    /**
+     * First parenthesized asymmetric set modifier `(private(set))` for Zend-aligned diagnostics (#16452).
+     *
+     * @return array{line: int, token: string}|null
+     */
+    public static function findParenthesizedAsymmetricSetModifierError(string $source): ?array
+    {
+        if (!preg_match(
+            '/\(\s*(?<token>private|protected|public)\s*\(\s*set\s*\)\s*\)/i',
+            $source,
+            $match,
+            PREG_OFFSET_CAPTURE
+        )) {
+            return null;
+        }
+
+        $token = strtolower($match['token'][0]);
+        $tokenPos = $match['token'][1];
+
+        return [
+            'line' => substr_count(substr($source, 0, $tokenPos), "\n") + 1,
+            'token' => $token,
+        ];
+    }
 
     public static function rewrite(string $source): string
     {
