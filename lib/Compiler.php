@@ -35309,10 +35309,15 @@ class Compiler {
 
         $rhsSlot = (int) $valueSlot;
         if ($rhsSlot === (int) $destSlot) {
-            foreach ($block->opCodes as $op) {
-                if (OpCode::TYPE_ASSIGN === $op->type && (int) $op->arg2 === (int) $destSlot) {
-                    $rhsSlot = (int) $op->arg3;
-                    break;
+            $exprSlot = $block->slotForOperand($prev->expr);
+            if (null !== $exprSlot) {
+                $rhsSlot = (int) $exprSlot;
+            } else {
+                // Reassigned locals (e.g. $f = fopen after fclose($f)) — use latest ASSIGN RHS (#16271).
+                foreach ($block->opCodes as $op) {
+                    if (OpCode::TYPE_ASSIGN === $op->type && (int) $op->arg2 === (int) $destSlot) {
+                        $rhsSlot = (int) $op->arg3;
+                    }
                 }
             }
             if ($rhsSlot === (int) $destSlot) {
