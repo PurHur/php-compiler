@@ -22,4 +22,4 @@ point
 end
 libver
 setget
-endlen
+badend
