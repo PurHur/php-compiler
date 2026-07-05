@@ -24819,20 +24819,47 @@ class Compiler {
             return 0 === $argIndex ? $funcProducer : $arrayProducers[0];
         }
         // array_combine(array_keys(['a'=>1,'b'=>2]), [10,20]) — inner Array_ + FuncCall + trailing Array_ (#15558, #13776).
+        // array_combine($k, [10,20]) after $k=array_keys(...) — trailing values Array_, not haystack (#16295).
         if (null !== $funcProducer && null !== $funcPos && \count($producers) >= 3) {
             if (0 === $argIndex) {
                 return $funcProducer;
             }
-            for ($j = $funcPos + 1, $n = \count($producers); $j < $n; ++$j) {
-                if ($producers[$j] instanceof Op\Expr\Array_) {
-                    return $producers[$j];
-                }
+            $arrayProducers = array_values(array_filter(
+                $producers,
+                static fn (Op\Expr $producer): bool => $producer instanceof Op\Expr\Array_
+            ));
+            if ([] !== $arrayProducers) {
+                return $arrayProducers[\count($arrayProducers) - 1];
             }
 
             return null;
         }
 
         return null;
+    }
+
+    /**
+     * array_combine($k, […]) — sibling array_keys EXEC_RETURN must not steal inline values arg (#16295).
+     */
+    private function arrayCombineSkipsSiblingFuncExecArgSlot(
+        Op $cfgCallOp,
+        int $argIndex,
+        ?Block $block = null
+    ): bool {
+        if (
+            'array_combine' !== $this->resolveCfgFuncCallName($cfgCallOp)
+            || 1 !== $argIndex
+            || !property_exists($cfgCallOp, 'args')
+            || !\is_array($cfgCallOp->args)
+        ) {
+            return false;
+        }
+        $valuesArg = $cfgCallOp->args[1] ?? null;
+        $keysArg = $cfgCallOp->args[0] ?? null;
+
+        return !$this->callArgIsDeadInlineTemporary($keysArg)
+            && $this->callArgIsDeadInlineTemporary($valuesArg)
+            && $this->callArgOperandExpectsArrayProducer($valuesArg);
     }
 
     /**
@@ -34573,6 +34600,7 @@ class Compiler {
                 && null !== $block->orig
                 && $this->hasSiblingMultiArgInlineCallProducers($block, $cfgCallOp)
                 && $this->callArgIsDeadInlineTemporary($cfgCallOp->args[(int) $argIndex] ?? $arg)
+                && !$this->arrayCombineSkipsSiblingFuncExecArgSlot($cfgCallOp, (int) $argIndex, $block)
             ) {
                 $constPreludeSlot = $this->slotForImmediateConstFetchPreludeCallArg(
                     $block,
