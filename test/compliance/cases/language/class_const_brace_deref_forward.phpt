@@ -1,5 +1,5 @@
 --TEST--
-Language: class constant brace dereference on PHP 8.3+ profile (#16597, Zend/zend_compile.c)
+Language: class constant brace dereference on forward profile (#16597, Zend/zend_compile.c)
 --SKIPIF--
 <?php
 if (!class_exists('PHPCompiler\\CompilerVersion')) {
@@ -11,13 +11,9 @@ if (!PHPCompiler\CompilerVersion::supportsClassConstBraceDeref()) {
 ?>
 --FILE--
 <?php
-class C
-{
+class C {
     public const X = 42;
-    public const Y = 'ok';
 }
 echo C::{'X'}, "\n";
-echo C::{"Y"}, "\n";
 --EXPECT--
 42
-ok

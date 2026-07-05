@@ -15,8 +15,11 @@ use PHPCompiler\CompilerVersion;
  */
 final class ClassConstBraceDerefRejector
 {
+    /** Zend 8.2 parse error for `echo C::{'X'}, ...` (unexpected comma). */
+    public const PARSE_MESSAGE_COMMA = 'syntax error, unexpected token ","';
+
     /** Zend 8.2 parse error for `echo C::{'X'};` (unexpected statement terminator). */
-    public const PARSE_MESSAGE = 'syntax error, unexpected token ";", expecting "("';
+    public const PARSE_MESSAGE_SEMICOLON = 'syntax error, unexpected token ";"';
 
     public static function reject(string $code, string $filename = 'unknown'): string
     {
@@ -48,9 +51,13 @@ final class ClassConstBraceDerefRejector
             if (null === $closeIdx || !self::isToken($tokens, $closeIdx, '}')) {
                 continue;
             }
-            $semiIdx = self::nextSignificantIndex($tokens, $closeIdx + 1);
-            $line = self::lineForIndex($tokens, $semiIdx ?? $closeIdx);
-            throw new CompileFatal($filename, $line, self::PARSE_MESSAGE);
+            $afterClose = self::nextSignificantIndex($tokens, $closeIdx + 1);
+            $line = self::lineForIndex($tokens, $literalIdx);
+            $message = self::PARSE_MESSAGE_COMMA;
+            if (null !== $afterClose && self::isToken($tokens, $afterClose, ';')) {
+                $message = self::PARSE_MESSAGE_SEMICOLON;
+            }
+            throw new CompileFatal($filename, $line, $message);
         }
 
         return $code;

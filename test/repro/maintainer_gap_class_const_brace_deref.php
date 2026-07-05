@@ -10,4 +10,4 @@ class C
     public const X = 42;
 }
 
-echo C::{'X'};
+echo C::{'X'}, "\n";

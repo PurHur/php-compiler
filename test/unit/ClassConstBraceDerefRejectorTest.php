@@ -12,6 +12,21 @@ use PHPUnit\Framework\TestCase;
 
 final class ClassConstBraceDerefRejectorTest extends TestCase
 {
+    public function testRejectsCommaSeparatedBraceDerefOnReferenceProfile(): void
+    {
+        if (CompilerVersion::supportsClassConstBraceDeref()) {
+            $this->markTestSkipped('PHP 8.3+ allows class const brace deref');
+        }
+
+        $this->expectException(CompileFatal::class);
+        $this->expectExceptionMessage('unexpected token ","');
+
+        ClassConstBraceDerefRejector::reject(
+            "<?php\nclass C { public const X = 42; }\necho C::{'X'}, \"\\n\";\n",
+            'test.php'
+        );
+    }
+
     public function testRejectsSingleQuotedBraceDerefOnReferenceProfile(): void
     {
         if (CompilerVersion::supportsClassConstBraceDeref()) {
@@ -35,7 +50,7 @@ final class ClassConstBraceDerefRejectorTest extends TestCase
 
         $runtime = new Runtime();
         $this->expectException(CompileFatal::class);
-        $this->expectExceptionMessage('unexpected token ";"');
+        $this->expectExceptionMessage('unexpected token ","');
         $runtime->parseAndCompile(
             file_get_contents(dirname(__DIR__).'/repro/maintainer_gap_class_const_brace_deref.php'),
             'maintainer_gap_class_const_brace_deref.php'
