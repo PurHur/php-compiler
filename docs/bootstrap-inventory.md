@@ -14283,7 +14283,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 114)
 - new HashTable (line 131)
 - new Variable (line 133)
-- 68 class method(s)
+- 75 class method(s)
 - 2 closure(s)
 
 ### `ext/standard/VmIni.php`
@@ -14299,7 +14299,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmIniIntrospection.php`
 
 **Warnings** (review for bootstrap subset):
-- 19 class method(s)
+- 20 class method(s)
 
 ### `ext/standard/VmIniQuantity.php`
 
@@ -15371,7 +15371,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmStreamTransports.php`
 
 **Warnings** (review for bootstrap subset):
-- 1 class method(s)
+- 2 class method(s)
 
 ### `ext/standard/VmStreamWrapperRegistry.php`
 
