@@ -17988,6 +17988,23 @@ class Compiler {
                     $unaryProducerIndex = $pi;
                 }
             }
+            // array_pad([E::A], N, E::B) — inline enum haystack Array_ + trailing pad-value ConstFetch (#8883).
+            if (
+                'array_pad' === $inlineFuncName
+                && \count($callArgs) >= 3
+                && null !== $arrayProducerIndex
+                && [] !== $constFetchIndices
+            ) {
+                $padValueArgIndex = $nonEmbeddedArgIndices[\count($nonEmbeddedArgIndices) - 1] ?? 2;
+                if (0 === $argIndex) {
+                    return $producers[$arrayProducerIndex];
+                }
+                if ($argIndex === $padValueArgIndex) {
+                    return $producers[$constFetchIndices[\count($constFetchIndices) - 1]];
+                }
+
+                return null;
+            }
             // array_slice($a, -2, 2, true) — Array_ + UnaryMinus + trailing ConstFetch (#10579, #10809).
             if (
                 null !== $arrayProducerIndex
@@ -25708,6 +25725,22 @@ class Compiler {
             // var_export(g(), true) / importNode($doc->documentElement, true) — trailing ConstFetch is not arg #0 (#11272, #16318).
             return null;
         }
+        if (
+            0 === $argIndex
+            && null !== $callArg
+            && $this->callArgOperandExpectsArrayProducer($callArg)
+            && !($immediatePrelude instanceof Op\Expr\Array_)
+        ) {
+            // array_pad([E::A], N, E::B) — immediate ClassConstFetch is pad value, not haystack (#8883).
+            return null;
+        }
+        if (
+            0 === $argIndex
+            && 'array_pad' === strtolower($this->resolveCfgFuncCallName($cfgCallOp) ?? '')
+            && !($immediatePrelude instanceof Op\Expr\Array_)
+        ) {
+            return null;
+        }
 
         return null !== $constSlot ? (string) $constSlot : null;
     }
@@ -27198,6 +27231,86 @@ class Compiler {
                 $valueSlot = $this->compileOperand($arg, $block, true);
             }
             $sends[] = new OpCode(OpCode::TYPE_ARG_SEND, $valueSlot, null, null);
+        }
+
+        return array_merge($producerOps, $sends);
+    }
+
+    /**
+     * array_pad([E::A], N, E::B) — inline enum haystack Array_ + trailing pad-value ConstFetch (#8883).
+     *
+     * @param list<Operand|null> $args
+     *
+     * @return list<OpCode>|null
+     */
+    private function compileArrayPadInlineHaystackCallArgSends(
+        array $args,
+        Block $block,
+        Op $cfgCallOp
+    ): ?array {
+        if (null === $block->orig || !\is_array($cfgCallOp->args ?? null)) {
+            return null;
+        }
+        if ('array_pad' !== $this->resolveCfgFuncCallName($cfgCallOp)) {
+            return null;
+        }
+        if (\count($cfgCallOp->args) < 3) {
+            return null;
+        }
+        $haystackArg = $cfgCallOp->args[0] ?? null;
+        if (!$this->callArgIsDeadInlineTemporary($haystackArg)) {
+            return null;
+        }
+        $producers = $this->precedingInlineCallArgProducersBeforeCfgOp($block->orig->children, $cfgCallOp);
+        $arrayProducer = null;
+        $padValueProducer = null;
+        foreach ($producers as $producer) {
+            if ($producer instanceof Op\Expr\Array_) {
+                $arrayProducer = $producer;
+            } elseif ($producer instanceof Op\Expr\ClassConstFetch) {
+                $padValueProducer = $producer;
+            }
+        }
+        if (null === $arrayProducer || null === $padValueProducer) {
+            return null;
+        }
+        $producerOps = [];
+        foreach ($this->compileArrayLiteral($arrayProducer, $block) as $op) {
+            $producerOps[] = $op;
+        }
+        $haystackSlot = $this->slotForInitArrayOrdinal($block, 0, $producerOps);
+        if (null === $haystackSlot) {
+            return null;
+        }
+        if (null === $block->slotForOperand($padValueProducer->result)) {
+            foreach ($this->compileExpr($padValueProducer, $block) as $op) {
+                $producerOps[] = $op;
+            }
+        }
+        $padValueSlot = $block->slotForOperand($padValueProducer->result);
+        if (null === $padValueSlot) {
+            return null;
+        }
+        $sends = [];
+        foreach ($args as $argIndex => $arg) {
+            $valueSlot = match ((int) $argIndex) {
+                0 => (string) $haystackSlot,
+                2 => (string) $padValueSlot,
+                default => null,
+            };
+            $literalProbe = $cfgCallOp->args[(int) $argIndex] ?? $arg;
+            if (null === $valueSlot && $this->isEmbeddedCallLiteralArg($literalProbe)) {
+                $valueSlot = (string) $this->freshLiteralConstantSlot($literalProbe, $block);
+            }
+            if (null === $valueSlot) {
+                $valueSlot = $this->compileOperand($arg, $block, true);
+            }
+            $sends[] = new OpCode(
+                OpCode::TYPE_ARG_SEND,
+                $valueSlot,
+                $this->callArgNameSlot($arg, $block),
+                $this->callArgUnpack($arg) ? 1 : null
+            );
         }
 
         return array_merge($producerOps, $sends);
@@ -33328,6 +33441,10 @@ class Compiler {
             if (null !== $arrayChunkSends) {
                 return $arrayChunkSends;
             }
+            $arrayPadSends = $this->compileArrayPadInlineHaystackCallArgSends($args, $block, $cfgCallOp);
+            if (null !== $arrayPadSends) {
+                return $arrayPadSends;
+            }
             $dateSunSends = $this->compileDateSunFuncInlineCallArgSends($args, $block, $cfgCallOp);
             if (null !== $dateSunSends) {
                 return $dateSunSends;
@@ -35564,7 +35681,7 @@ class Compiler {
                     }
                 }
                 if (
-                    'array_pad' === strtolower($calleeName ?? '')
+                    'array_pad' === strtolower($this->resolveCfgFuncCallName($cfgCallOp) ?? $calleeName ?? '')
                     && null !== $block->orig
                 ) {
                     $padProducers = $this->precedingInlineCallArgProducersBeforeCfgOp(
@@ -35576,12 +35693,16 @@ class Compiler {
                             if (!$producer instanceof Op\Expr\Array_) {
                                 continue;
                             }
-                            $padArraySlot = $block->slotForOperand($producer->result);
+                            $padArraySlot = $this->slotForInitArrayOrdinal($block, 0, $sends);
+                            if (null === $padArraySlot) {
+                                $padArraySlot = $block->slotForOperand($producer->result);
+                            }
                             if (null === $padArraySlot) {
                                 foreach ($this->compileArrayLiteral($producer, $block) as $op) {
                                     $sends[] = $op;
                                 }
-                                $padArraySlot = $block->slotForOperand($producer->result);
+                                $padArraySlot = $this->slotForInitArrayOrdinal($block, 0, $sends)
+                                    ?? $block->slotForOperand($producer->result);
                             }
                             if (null !== $padArraySlot) {
                                 $valueSlot = (string) $padArraySlot;
@@ -37646,6 +37767,19 @@ class Compiler {
                             }
                         }
                     }
+                }
+            }
+            if (
+                null !== $cfgCallOp
+                && null !== $block->orig
+                && 0 === (int) $argIndex
+                && 'array_pad' === strtolower($this->resolveCfgFuncCallName($cfgCallOp) ?? '')
+                && $this->callArgIsDeadInlineTemporary($sendProbe)
+            ) {
+                $padHaystackSlot = $this->slotForInitArrayOrdinal($block, 0, $sends);
+                if (null !== $padHaystackSlot) {
+                    $valueSlot = $padHaystackSlot;
+                    $inlineArrayLiteralArgWired = true;
                 }
             }
             if (
@@ -40458,6 +40592,13 @@ class Compiler {
         }
         $callArg = $cfgCallOp->args[0] ?? null;
         if (!$this->callArgIsDeadInlineTemporary($callArg)) {
+            return;
+        }
+        if (
+            null !== $callArg
+            && !$this->operandsReferToSameVariable($prelude->result, $callArg)
+        ) {
+            // array_pad([E::A], N, E::B) — immediate ClassConstFetch is pad value, not haystack (#8883).
             return;
         }
         if (null === $block->slotForOperand($prelude->result)) {
