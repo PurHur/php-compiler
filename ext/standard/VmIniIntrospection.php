@@ -268,10 +268,18 @@ final class VmIniIntrospection
                 $rows[$currentLabel] = '' === ($rows[$currentLabel] ?? '')
                     ? $continuation
                     : \rtrim((string) $rows[$currentLabel], ',').",\n".$continuation;
+                continue;
             }
+            $currentLabel = null;
         }
         if ([] === $rows) {
             return;
+        }
+        if (\function_exists('php_ini_scanned_files')) {
+            $scanned = \php_ini_scanned_files();
+            if (\is_string($scanned) && '' !== $scanned) {
+                $rows['Additional .ini files parsed'] = $scanned;
+            }
         }
         $encoded = \json_encode($rows, \JSON_UNESCAPED_UNICODE);
         if (\is_string($encoded)) {
@@ -282,6 +290,12 @@ final class VmIniIntrospection
     /** phpinfo(INFO_GENERAL) row value; mirrors host Zend when seeded (#14283). */
     public static function phpinfoGeneralRow(string $label, string $default = ''): string
     {
+        if ('Additional .ini files parsed' === $label) {
+            $scanned = self::scannedFiles();
+            if (\is_string($scanned) && '' !== $scanned) {
+                return $scanned;
+            }
+        }
         $rows = self::phpinfoGeneralRows();
 
         return $rows[$label] ?? $default;
@@ -333,6 +347,15 @@ final class VmIniIntrospection
             'PHP Extension Build' => 'API20240924,NTS',
             'Debug Build' => 'no',
             'Thread Safety' => 'disabled',
+            'Zend Signal Handling' => 'enabled',
+            'Zend Memory Manager' => 'enabled',
+            'Zend Multibyte Support' => 'provided by mbstring',
+            'Zend Max Execution Timers' => 'disabled',
+            'IPv6 Support' => 'enabled',
+            'DTrace Support' => 'available, disabled',
+            'Registered PHP Streams' => 'php, file, glob, data, http, ftp',
+            'Registered Stream Socket Transports' => 'tcp, udp, unix, udg',
+            'Registered Stream Filters' => 'string.rot13, string.toupper, string.tolower, convert.*, consumed',
         ];
     }
 
