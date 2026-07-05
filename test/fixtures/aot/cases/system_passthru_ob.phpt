@@ -7,7 +7,7 @@ declare(strict_types=1);
 ob_start();
 $systemLast = system('printf "sysline\n"');
 $systemBuf = ob_get_clean();
-$systemObOk = ('sysline' === $systemLast && "sysline\n" === $systemBuf) ? 1 : 0;
+$systemObOk = ('sysline' === $systemLast) ? (("sysline\n" === $systemBuf) ? 1 : 0) : 0;
 
 ob_start();
 passthru('printf "pasline\n"');

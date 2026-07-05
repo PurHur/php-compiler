@@ -243,11 +243,10 @@ final class JitExec
     /** @return Value int1 — true when all lines were written */
     private static function writeLinesToStdout(Context $context, Value $linesHt): Value
     {
-        ObOutputRuntime::ensureLinked($context);
+        self::ensureObEchoAbi($context);
 
         $map = $context->structFieldMap['__hashtable__'];
         $sizeT = $context->getTypeFromString('size_t');
-        $i8p = $context->getTypeFromString('int8*');
         $i1 = $context->getTypeFromString('int1');
         $count = $context->builder->load($context->builder->structGep($linesHt, $map['nextFreeElement']));
         $indexSlot = BasicBlockHelper::entryAlloca($context, $sizeT);
@@ -270,13 +269,12 @@ final class JitExec
         $context->builder->positionAtEnd($loopBody);
         $line = HashTableHelper::readStringAt($context, $linesHt, $index);
         $lineMap = $context->structFieldMap['__string__'];
-        $lineData = $context->builder->load($context->builder->structGep($line, $lineMap['value']));
+        $lineChars = $context->builder->structGep($line, $lineMap['value']);
         $lineLen = $context->builder->load($context->builder->structGep($line, $lineMap['length']));
-        $lineLenSizeT = $context->builder->truncOrBitCast($lineLen, $sizeT);
         $context->builder->call(
             $echoSubstr,
-            $context->builder->pointerCast($lineData, $i8p),
-            $lineLenSizeT
+            $lineChars,
+            $context->builder->zExt($lineLen, $sizeT)
         );
         $context->builder->call($echoCstr, $nl);
         $context->builder->store(
@@ -288,6 +286,23 @@ final class JitExec
         $context->builder->positionAtEnd($loopDone);
 
         return $i1->constInt(1, false);
+    }
+
+    /** User-script AOT links ob echo ABI during Context init — avoid nested ensureLinked here (#10492). */
+    private static function ensureObEchoAbi(Context $context): void
+    {
+        $restoreBlock = BasicBlockHelper::tryGetInsertBlock($context);
+        try {
+            $echoSubstr = $context->lookupFunction('__phpc_ob_echo_substr');
+            if ($echoSubstr->countBasicBlocks() > 0) {
+                return;
+            }
+        } catch (\Throwable) {
+        }
+        ObOutputRuntime::ensureLinked($context);
+        if (null !== $restoreBlock) {
+            BasicBlockHelper::restoreInsertBlock($context, $restoreBlock);
+        }
     }
 
     private static function literalKey(Context $context, string $text): Value
