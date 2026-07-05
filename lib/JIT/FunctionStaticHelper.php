@@ -19,8 +19,29 @@ final class FunctionStaticHelper
 
     private static int $nextSlotIndex = 0;
 
+    /**
+     * Init-table ABI bodies live in FunctionStaticRuntime, which only the full
+     * standalone-bodies path emits; user-script AOT uses the minimal list and
+     * crashed on lookup ('non-existing function phpc_fn_static_is_initialized').
+     * Ensure idempotently here, preserving the caller's insertion point
+     * (implement() clears it) — same pattern as JitVmHelperLink::ensureBridge.
+     */
+    private static function ensureRuntime(Context $context): void
+    {
+        $saved = null;
+        try {
+            $saved = $context->builder->getInsertBlock();
+        } catch (\Throwable) {
+        }
+        Builtin\FunctionStaticRuntime::ensureLinked($context);
+        if (null !== $saved) {
+            $context->builder->positionAtEnd($saved);
+        }
+    }
+
     public static function emitLazyInit(Context $context, string $key, Variable $storage, Variable $default): void
     {
+        self::ensureRuntime($context);
         $slotId = self::slotConst($context, $key);
         $isInit = $context->builder->call(
             $context->lookupFunction('phpc_fn_static_is_initialized'),
@@ -41,6 +62,8 @@ final class FunctionStaticHelper
 
     public static function isInitializedCondition(Context $context, string $key): Value
     {
+        self::ensureRuntime($context);
+
         return $context->builder->call(
             $context->lookupFunction('phpc_fn_static_is_initialized'),
             self::slotConst($context, $key)
@@ -49,6 +72,7 @@ final class FunctionStaticHelper
 
     public static function emitRuntimeInitStore(Context $context, string $key, Variable $storage, Variable $value): void
     {
+        self::ensureRuntime($context);
         self::writeDefault($context, $storage, $value);
         $context->builder->call(
             $context->lookupFunction('phpc_fn_static_mark_initialized'),

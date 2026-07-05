@@ -13434,7 +13434,9 @@ class JIT {
             );
         }
         if (JIT\Variable::TYPE_NULL === $read->type || ($read->isNullConstant ?? false)) {
-            return $readPtr->typeOf()->constInt(0, false);
+            // int64 like __value__readLong — $readPtr->typeOf() is the value-box
+            // POINTER type and mistypes every consumer (verifier phi mismatch).
+            return $this->context->getTypeFromString('int64')->constInt(0, false);
         }
         if (!JIT\JitValueBox::isValueOperand($read)) {
             return $this->context->builder->call(
@@ -13443,7 +13445,7 @@ class JIT {
             );
         }
         $isNull = JIT\JitValueCompare::valueBoxIsNull($this->context, $read);
-        $zero = $readPtr->typeOf()->constInt(0, false);
+        $zero = $this->context->getTypeFromString('int64')->constInt(0, false);
         $readLong = $this->context->builder->call(
             $this->context->lookupFunction('__value__readLong'),
             $readPtr
