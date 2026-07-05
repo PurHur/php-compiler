@@ -380,6 +380,7 @@ class Runtime {
         AsymmetricVisibilityRejector::reject($code, $filename);
         CloneWithSyntaxRejector::reject($code, $filename);
         ReadonlyAnonymousClassSyntaxRejector::reject($code, $filename);
+        ClassConstBraceSyntaxRejector::reject($code, $filename);
         DnfParenIntersectionSyntaxRejector::reject($code, $filename);
         ExitFunctionSyntaxRejector::reject($code, $filename);
         TypedFunctionStaticSyntaxRejector::reject($code, $filename);
