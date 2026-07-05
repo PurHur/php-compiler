@@ -36,6 +36,15 @@ final class flock extends Internal
             throw new \LogicException('flock() requires at least two arguments in this compiler build');
         }
         JitResourceArg::rejectEnumCaseOperand($context, $args[0], 'flock', 0, 'stream');
+        if (JitFlock::isCompileTimeNullOperation($args[1])) {
+            JitFlock::emitCompileTimeNullOperationError($context);
+            $i1 = $context->getTypeFromString('int1');
+
+            return $i1->constInt(0, false);
+        }
+        if (JITVariable::TYPE_VALUE === $args[1]->type) {
+            JitFlock::guardValueBoxNullOperation($context, $args[1]);
+        }
 
         return JitFlock::invoke(
             $context,
