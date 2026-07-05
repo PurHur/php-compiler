@@ -33,7 +33,7 @@ final class pow extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        VmMath::applyPow($frame->returnVar, $base, $exp);
+        VmMath::applyPow($frame->returnVar, $base, $exp, $frame);
     }
 
     public function call(Context $context, JITVariable ...$args): Value
