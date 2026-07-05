@@ -36,7 +36,8 @@ final class round extends Internal
             $frame->calledArgs[0]->resolveIndirect(),
             'round',
             1,
-            'num'
+            'num',
+            $frame
         );
         $numVar = new Variable();
         if (\is_int($num)) {

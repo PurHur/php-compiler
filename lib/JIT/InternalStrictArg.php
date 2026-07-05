@@ -123,6 +123,31 @@ final class InternalStrictArg
         );
     }
 
+    /** int|float builtin args under caller strict_types (php-src math.c Z_PARAM_NUMBER; #16410). */
+    public static function requireNumber(
+        Context $context,
+        Variable $arg,
+        string $function,
+        string $paramName,
+        int $argNumber
+    ): void {
+        if (!$context->callerStrictTypes) {
+            return;
+        }
+        if (Variable::TYPE_NATIVE_LONG === $arg->type || Variable::TYPE_NATIVE_DOUBLE === $arg->type) {
+            return;
+        }
+        if (Variable::TYPE_VALUE === $arg->type) {
+            self::enforceNumberValueBox($context, $arg, $function, $paramName, $argNumber);
+
+            return;
+        }
+        self::raiseTypeErrorAndAbort(
+            $context,
+            self::message($context, $function, $argNumber, $paramName, 'int|float', $arg)
+        );
+    }
+
     /**
      * Reject null for internal string parameters when caller uses strict_types (#4365, #11322).
      */
@@ -526,6 +551,49 @@ final class InternalStrictArg
             $context,
             sprintf(
                 '%s(): Argument #%d ($%s) must be of type float, %s given',
+                $function,
+                $argNumber,
+                $paramName,
+                'mixed'
+            )
+        );
+        $context->builder->positionAtEnd($okBlock);
+    }
+
+    private static function enforceNumberValueBox(
+        Context $context,
+        Variable $arg,
+        string $function,
+        string $paramName,
+        int $argNumber
+    ): void {
+        TypeErrorRaise::registerDeclarations($context);
+        TypeErrorRaise::ensureLinked($context);
+        $valuePtr = JitValueBox::valuePtrFromVariable($context, $arg);
+        $map = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($valuePtr, $map['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $okBlock = BasicBlockHelper::append($context, 'internal_strict_number_ok');
+        $failBlock = BasicBlockHelper::append($context, 'internal_strict_number_fail');
+        $isInt = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(VmVariable::TYPE_INTEGER, false)
+        );
+        $isFloat = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(VmVariable::TYPE_FLOAT, false)
+        );
+        $isOk = $context->builder->or($isInt, $isFloat);
+        $context->builder->branchIf($isOk, $okBlock, $failBlock);
+        $context->builder->positionAtEnd($failBlock);
+        ExceptionBridge::emitTypeErrorAndAbort(
+            $context,
+            sprintf(
+                '%s(): Argument #%d ($%s) must be of type int|float, %s given',
                 $function,
                 $argNumber,
                 $paramName,

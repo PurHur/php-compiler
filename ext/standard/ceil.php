@@ -32,7 +32,8 @@ final class ceil extends Internal
             $frame->calledArgs[0]->resolveIndirect(),
             'ceil',
             1,
-            'num'
+            'num',
+            $frame
         );
         if (null === $frame->returnVar) {
             return;

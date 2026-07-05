@@ -5,10 +5,45 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
+use PHPCompiler\VM;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
+
+/** @internal php-src math.c — E_DEPRECATED before null→0 coercion for Z_PARAM_NUMBER (#16410). */
+final class VmNullNumberParamDeprecation
+{
+    public static function message(string $function, int $argIndex, string $paramName): string
+    {
+        return sprintf(
+            '%s(): Passing null to parameter #%d ($%s) of type int|float is deprecated',
+            $function,
+            $argIndex,
+            $paramName
+        );
+    }
+
+    public static function emit(?Frame $frame, string $function, int $argIndex, string $paramName): void
+    {
+        $vm = VM::running();
+        if (null === $vm) {
+            return;
+        }
+        if (null === $frame) {
+            $frame = $vm->builtinHandlerFrame();
+            if (null === $frame) {
+                $frames = $vm->context->runStackFrames();
+                $frame = [] !== $frames ? $frames[0] : null;
+            }
+        }
+        $vm->context->errors->internalDeprecated(
+            self::message($function, $argIndex, $paramName),
+            $vm->context,
+            $frame
+        );
+    }
+}
 
 /** Shared math coercion helpers for ext/standard (issue #3578) and base_convert (#3173). */
 final class VmMath
@@ -179,7 +214,8 @@ final class VmMath
         Variable $var,
         string $function,
         int $argIndex,
-        string $paramName
+        string $paramName,
+        ?Frame $frame = null
     ): int|float {
         $var = $var->resolveIndirect();
         self::rejectEnumCaseNumberBuiltinArg($var, $function, $argIndex, $paramName);
@@ -206,6 +242,11 @@ final class VmMath
             return $var->toBool() ? 1 : 0;
         }
         if (Variable::TYPE_NULL === $var->type) {
+            if (null !== $frame && InternalStrictArg::isCallerStrict($frame)) {
+                throw new \TypeError(self::numberBuiltinTypeError($function, $argIndex, $paramName, 'null'));
+            }
+            VmNullNumberParamDeprecation::emit($frame, $function, $argIndex, $paramName);
+
             return 0;
         }
         if (Variable::TYPE_STRING === $var->type) {
