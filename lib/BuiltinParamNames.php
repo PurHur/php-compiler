@@ -287,6 +287,8 @@ final class BuiltinParamNames
                 return ['url', 'component'];
             case 'proc_open':
                 return ['command', 'descriptor_spec', 'pipes', 'cwd', 'env', 'options'];
+            case 'proc_get_status':
+                return ['process'];
             case 'getopt':
                 return ['short_options', 'long_options', 'rest_index'];
             case 'call_user_func':
