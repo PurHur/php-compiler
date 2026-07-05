@@ -16120,6 +16120,13 @@ class Compiler {
                         if (0 === $argIndex && [] !== $arrayProducers) {
                             return $arrayProducers[0];
                         }
+                        // in_array('x', g(), true) — hoisted FuncCall haystack, not Array_ (#16265).
+                        if (
+                            \in_array($inlineFuncName, ['in_array', 'array_search'], true)
+                            && 1 === $argIndex
+                        ) {
+                            return $byIndex;
+                        }
                     } else {
                         if ($byIndex instanceof Op\Expr\Array_) {
                             $outerArray = $this->matchOutermostNestedInlineArrayProducerForArgZero(
@@ -17174,6 +17181,34 @@ class Compiler {
                     return $embeddedMapped;
                 }
             }
+            if (
+                \in_array($inlineFuncName, ['in_array', 'array_search'], true)
+                && \count($callArgs) >= 3
+                && $this->isEmbeddedCallLiteralArg($callArgs[0] ?? null)
+                && 2 === $producerCount
+            ) {
+                $constFuncSplit = $this->splitLeadingConstFetchWithFuncCallCallArg($producers);
+                if (null !== $constFuncSplit) {
+                    [$constFetch, $funcProducer] = $constFuncSplit;
+                    if (1 === $argIndex) {
+                        return $funcProducer;
+                    }
+                    if (2 === $argIndex) {
+                        return $constFetch;
+                    }
+                }
+                if (
+                    ($producers[0] instanceof Op\Expr\FuncCall || $producers[0] instanceof Op\Expr\NsFuncCall)
+                    && $producers[1] instanceof Op\Expr\ConstFetch
+                ) {
+                    if (1 === $argIndex) {
+                        return $producers[0];
+                    }
+                    if (2 === $argIndex) {
+                        return $producers[1];
+                    }
+                }
+            }
 
             return $paired;
         }
@@ -17544,6 +17579,29 @@ class Compiler {
                 }
                 if (2 === $argIndex && null !== $strictBoolProducerIndex) {
                     return $producers[$strictBoolProducerIndex];
+                }
+            }
+            $constFuncSplit = $this->splitLeadingConstFetchWithFuncCallCallArg($producers);
+            if (null !== $constFuncSplit) {
+                [$constFetch, $funcProducer] = $constFuncSplit;
+                if (1 === $argIndex) {
+                    return $funcProducer;
+                }
+                if (2 === $argIndex) {
+                    return $constFetch;
+                }
+            }
+            if (
+                2 === \count($producers)
+                && ($producers[0] instanceof Op\Expr\FuncCall || $producers[0] instanceof Op\Expr\NsFuncCall)
+                && $producers[1] instanceof Op\Expr\ConstFetch
+            ) {
+                // in_array('x', g(), true) — cfg unshift order [FuncCall, ConstFetch] (#16265).
+                if (1 === $argIndex) {
+                    return $producers[0];
+                }
+                if (2 === $argIndex) {
+                    return $producers[1];
                 }
             }
         }
@@ -24076,6 +24134,14 @@ class Compiler {
         if (!$this->callArgIsDeadInlineTemporary($callArg)) {
             return null;
         }
+        // in_array('x', g(), true) — immediate ConstFetch is strict, not haystack (#16265).
+        if (
+            \in_array(strtolower($this->resolveCfgFuncCallName($cfgCallOp) ?? ''), ['in_array', 'array_search'], true)
+            && 1 === $argIndex
+            && $this->callArgOperandExpectsArrayProducer($callArg)
+        ) {
+            return null;
+        }
         $callIndex = array_search($cfgCallOp, $block->orig->children, true);
         if (!\is_int($callIndex) || $callIndex < 1) {
             return null;
@@ -26344,6 +26410,13 @@ class Compiler {
                 $haystackProducer = $this->matchInlineArraySearchHaystackProducer($producers, $callArg);
                 if ($haystackProducer instanceof Op\Expr\Array_) {
                     return $haystackProducer;
+                }
+                $constFuncSplit = $this->splitLeadingConstFetchWithFuncCallCallArg($producers);
+                if (null !== $constFuncSplit) {
+                    [, $funcProducer] = $constFuncSplit;
+                    if ($funcProducer instanceof Op\Expr\FuncCall || $funcProducer instanceof Op\Expr\NsFuncCall) {
+                        return $funcProducer;
+                    }
                 }
             }
         }
@@ -32467,6 +32540,36 @@ class Compiler {
                                 }
                                 if (null !== $haystackSlot) {
                                     $valueSlot = (string) $haystackSlot;
+                                }
+                            }
+                            if (null === $valueSlot) {
+                                $constFuncSplit = $this->splitLeadingConstFetchWithFuncCallCallArg($arraySearchProducers);
+                                $funcHaystack = null;
+                                if (null !== $constFuncSplit) {
+                                    [, $funcHaystack] = $constFuncSplit;
+                                } elseif (
+                                    2 === \count($arraySearchProducers)
+                                    && ($arraySearchProducers[0] instanceof Op\Expr\FuncCall
+                                        || $arraySearchProducers[0] instanceof Op\Expr\NsFuncCall)
+                                    && $arraySearchProducers[1] instanceof Op\Expr\ConstFetch
+                                ) {
+                                    $funcHaystack = $arraySearchProducers[0];
+                                }
+                                if ($funcHaystack instanceof Op\Expr) {
+                                    if (null === $block->slotForOperand($funcHaystack->result)) {
+                                        foreach ($this->compileExpr($funcHaystack, $block) as $op) {
+                                            $sends[] = $op;
+                                        }
+                                    }
+                                    $haystackFuncSlot = $this->slotForInlineCallArgProducerResult(
+                                        $block,
+                                        $funcHaystack,
+                                        $cfgCallOp,
+                                        $block->orig->children
+                                    );
+                                    if (null !== $haystackFuncSlot) {
+                                        $valueSlot = (string) $haystackFuncSlot;
+                                    }
                                 }
                             }
                         }

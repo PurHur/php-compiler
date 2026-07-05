@@ -5936,7 +5936,7 @@ PHP;
         self::assertStringContainsString('declared_traits_has: false', $out);
     }
 
-    /** Issue #16253 — strlen(); probe(..., in_array(..., g(), true)) wires in_array EXEC_RETURN, not haystack slot. */
+    /** Issue #16253 / #16265 — strlen(); probe(..., in_array(..., g(), true)) wires in_array EXEC_RETURN, not haystack slot. */
     public function testInArrayStrictAfterVoidStmtCallUsesCalleeExecReturnSlot(): void
     {
         $code = <<<'PHP'
@@ -5961,14 +5961,15 @@ PHP;
         foreach ($block->opCodes as $op) {
             if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
                 ++$fcallOrdinal;
-                if (3 === $fcallOrdinal) {
+                if (4 === $fcallOrdinal) {
                     $probeSends = [];
                 }
             }
-            if (2 === $fcallOrdinal && OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
+            // strlen, get_declared_classes(), in_array() — third INIT is nested in_array (#16265).
+            if (3 === $fcallOrdinal && OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
                 $inArrayReturnSlot = $op->arg1;
             }
-            if (3 === $fcallOrdinal && OpCode::TYPE_ARG_SEND === $op->type) {
+            if (4 === $fcallOrdinal && OpCode::TYPE_ARG_SEND === $op->type) {
                 $probeSends[] = $op->arg1;
             }
         }
