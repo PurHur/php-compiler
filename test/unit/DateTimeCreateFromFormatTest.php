@@ -58,6 +58,24 @@ PHP;
         $this->assertStringContainsString('DateTime', $out);
     }
 
+    public function testVmDateOnlyCreateFromFormatUsesCurrentTime(): void
+    {
+        $repo = dirname(__DIR__, 2);
+        $path = $repo.'/test/repro/maintainer_gap_datetime_createfromformat_time_default.php';
+        $descriptor = [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']];
+        $env = $_ENV;
+        LlvmToolchain::applyProcessEnv($env, $repo);
+        $proc = proc_open(['php', $repo.'/bin/vm.php', $path], $descriptor, $pipes, $repo, $env);
+        $this->assertIsResource($proc);
+        fclose($pipes[0]);
+        $stderr = stream_get_contents($pipes[2]);
+        fclose($pipes[2]);
+        $out = stream_get_contents($pipes[1]);
+        fclose($pipes[1]);
+        $this->assertSame(0, proc_close($proc));
+        $this->assertStringContainsString('ok', trim((string) $stderr)."\n".(string) $out);
+    }
+
     private function runBin(string $bin, string $code): string
     {
         $repo = dirname(__DIR__, 2);
