@@ -27440,15 +27440,30 @@ class Compiler {
         }
         $producers = $this->precedingInlineCallArgProducersBeforeCfgOp($block->orig->children, $cfgCallOp);
         $arrayProducer = null;
-        $padValueProducer = null;
         foreach ($producers as $producer) {
             if ($producer instanceof Op\Expr\Array_) {
                 $arrayProducer = $producer;
-            } elseif ($producer instanceof Op\Expr\ClassConstFetch) {
-                $padValueProducer = $producer;
+                break;
             }
         }
-        if (null === $arrayProducer || null === $padValueProducer) {
+        if (null === $arrayProducer) {
+            return null;
+        }
+        $fetches = $this->precedingCallArgClassConstFetchesBeforeCfgOp(
+            $block->orig->children,
+            $cfgCallOp,
+            $block
+        );
+        /** @var array<int, Op\Expr\ClassConstFetch> $classConstFetchByArgIndex */
+        $classConstFetchByArgIndex = [];
+        foreach ([1, 2] as $constArgIndex) {
+            $fetch = $this->precedingClassConstFetchForCallArgIndex($cfgCallOp, $constArgIndex, $fetches);
+            if ($fetch instanceof Op\Expr\ClassConstFetch) {
+                $classConstFetchByArgIndex[$constArgIndex] = $fetch;
+            }
+        }
+        // array_pad([E::A], N, E::B) — pad-value ClassConstFetch is arg #2 only (#8883, #16560).
+        if ([] === $classConstFetchByArgIndex) {
             return null;
         }
         $producerOps = [];
@@ -27459,20 +27474,24 @@ class Compiler {
         if (null === $haystackSlot) {
             return null;
         }
-        if (null === $block->slotForOperand($padValueProducer->result)) {
-            foreach ($this->compileExpr($padValueProducer, $block) as $op) {
-                $producerOps[] = $op;
+        $constFetchSlots = [];
+        foreach ($classConstFetchByArgIndex as $constArgIndex => $fetchProducer) {
+            if (null === $block->slotForOperand($fetchProducer->result)) {
+                foreach ($this->compileExpr($fetchProducer, $block) as $op) {
+                    $producerOps[] = $op;
+                }
             }
-        }
-        $padValueSlot = $block->slotForOperand($padValueProducer->result);
-        if (null === $padValueSlot) {
-            return null;
+            $fetchSlot = $block->slotForOperand($fetchProducer->result);
+            if (null === $fetchSlot) {
+                return null;
+            }
+            $constFetchSlots[$constArgIndex] = (string) $fetchSlot;
         }
         $sends = [];
         foreach ($args as $argIndex => $arg) {
             $valueSlot = match ((int) $argIndex) {
                 0 => (string) $haystackSlot,
-                2 => (string) $padValueSlot,
+                1, 2 => $constFetchSlots[(int) $argIndex] ?? null,
                 default => null,
             };
             $literalProbe = $cfgCallOp->args[(int) $argIndex] ?? $arg;
