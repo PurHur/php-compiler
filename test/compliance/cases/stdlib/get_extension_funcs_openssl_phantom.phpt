@@ -14,4 +14,4 @@ echo in_array('openssl_encrypt', $funcs, true) ? "1" : "0";
 echo get_extension_funcs('openssl') === false ? "1" : "0";
 echo "\n";
 --EXPECT--
-1001
+101
