@@ -609,6 +609,20 @@ class JITTest extends BaseTest {
                 && !str_contains($name, 'clone_with_reference_profile')) {
                 continue;
             }
+            // 8.3-target reject gate; skipped when new readonly class enabled (#16255).
+            if (CompilerVersion::supportsReadonlyAnonymousClass()
+                && str_contains($name, 'readonly_anonymous_class_reference_profile')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsReadonlyAnonymousClass()
+                && str_contains($name, 'readonly_anonymous_class')
+                && !str_contains($name, 'readonly_anonymous_class_reference_profile')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsReadonlyAnonymousClass()
+                && str_contains($name, 'readonly_anonymous_defaults')) {
+                continue;
+            }
             // 8.4-target reject gate; skipped when parenthesized DNF intersection types enabled (#14904).
             if (CompilerVersion::supportsParenthesizedDnfIntersectionTypes()
                 && str_contains($name, 'dnf_paren_intersection_reference_profile')) {
