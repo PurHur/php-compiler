@@ -1,24 +1,28 @@
 --TEST--
-stdlib str_getcsv() — null optional delimiter args use Zend defaults (#16492, ext/standard/string.c)
+stdlib str_getcsv() — explicit null optional string args TypeError (#16511, ext/standard/string.c)
 --FILE--
 <?php
 declare(strict_types=1);
 
-var_export(str_getcsv('a,b', null));
-echo "\n";
-var_export(str_getcsv('a,b', ',', null));
-echo "\n";
-var_export(str_getcsv('a,b', ',', '"', null));
+try {
+    str_getcsv('a,b', null);
+    echo "uncaught separator\n";
+} catch (TypeError $e) {
+    echo $e->getMessage(), "\n";
+}
+try {
+    str_getcsv('a,b', ',', null);
+    echo "uncaught enclosure\n";
+} catch (TypeError $e) {
+    echo $e->getMessage(), "\n";
+}
+try {
+    str_getcsv('a,b', ',', '"', null);
+    echo "uncaught escape\n";
+} catch (TypeError $e) {
+    echo $e->getMessage(), "\n";
+}
 --EXPECT--
-array (
-  0 => 'a',
-  1 => 'b',
-)
-array (
-  0 => 'a',
-  1 => 'b',
-)
-array (
-  0 => 'a',
-  1 => 'b',
-)
+str_getcsv(): Argument #2 ($separator) must be of type string, null given
+str_getcsv(): Argument #3 ($enclosure) must be of type string, null given
+str_getcsv(): Argument #4 ($escape) must be of type string, null given
