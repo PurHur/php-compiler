@@ -3172,6 +3172,7 @@
         "lib/JIT/Builtin/StringPregMatchJit.php",
         "lib/JIT/Builtin/StringPregQuote.php",
         "lib/JIT/Builtin/StringPrintR.php",
+        "lib/JIT/Builtin/StringPrintRJit.php",
         "lib/JIT/Builtin/StringPropertyExists.php",
         "lib/JIT/Builtin/StringQuotPrint.php",
         "lib/JIT/Builtin/StringQuotemeta.php",
@@ -3245,6 +3246,7 @@
         "lib/JIT/Builtin/StringUtf8Latin1.php",
         "lib/JIT/Builtin/StringUtf8Runtime.php",
         "lib/JIT/Builtin/StringVarDump.php",
+        "lib/JIT/Builtin/StringVarDumpJit.php",
         "lib/JIT/Builtin/StringVarExport.php",
         "lib/JIT/Builtin/StringVersionCompare.php",
         "lib/JIT/Builtin/StringVersionCompareJit.php",
@@ -4298,9 +4300,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 4064,
+        "inventory_files": 4066,
         "excluded": 0,
-        "eligible": 4064,
+        "eligible": 4066,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1

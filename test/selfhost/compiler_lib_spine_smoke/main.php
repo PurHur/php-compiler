@@ -4119,4 +4119,9 @@ unset($__spineMimeSample, $__spineMimeEnc, $__spineMimeDec);
 \PHPCompiler\ext\standard\SetcookieOptions::spineSmokeParse();
 
 require_once __DIR__.'/../../../lib/JIT/VmConstantJit.php';
+require_once __DIR__.'/../../../ext/standard/ProcessExecCaptureNativeJitHelper.php';
+require_once __DIR__.'/../../../ext/standard/ProcessPhpcRunCommandJitHelper.php';
+require_once __DIR__.'/../../../ext/standard/phpc_native_ht_set_string_key_long.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/StringPrintRJit.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/StringVarDumpJit.php';
 echo "compiler_lib_spine_smoke bundle OK\n";
