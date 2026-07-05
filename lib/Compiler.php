@@ -15735,6 +15735,7 @@ class Compiler {
         $producers = $this->filterDeadClassConstFetchInlineProducers($producers);
         $producers = $this->filterNestedNewInlineCallArgProducers($producers, $cfgCallOp);
         $producers = $this->filterKnownVoidMethodCallPreludes($producers);
+        $producers = $this->filterStmtLevelArrayPointerFuncPreludes($producers);
         $hoistedScalar = $this->matchHoistedScalarConstFetchInlineCallArgProducer($producers, $callArg);
         if (null !== $hoistedScalar) {
             return $hoistedScalar;
@@ -18117,6 +18118,45 @@ class Compiler {
         }
 
         return $filtered;
+    }
+
+    /**
+     * Drop stmt-level array pointer mutators before a sibling FuncCall producer (#13829, ext/standard/array.c).
+     *
+     * @param list<Op\Expr> $producers
+     *
+     * @return list<Op\Expr>
+     */
+    private function filterStmtLevelArrayPointerFuncPreludes(array $producers): array
+    {
+        $filtered = [];
+        $count = \count($producers);
+        for ($i = 0; $i < $count; ++$i) {
+            $producer = $producers[$i];
+            if (
+                ($producer instanceof Op\Expr\FuncCall || $producer instanceof Op\Expr\NsFuncCall)
+                && $this->isArrayInternalPointerMutatorFuncName($this->resolveCfgFuncCallName($producer))
+                && (
+                    ($producers[$i + 1] ?? null) instanceof Op\Expr\FuncCall
+                    || ($producers[$i + 1] ?? null) instanceof Op\Expr\NsFuncCall
+                )
+            ) {
+                continue;
+            }
+            $filtered[] = $producer;
+        }
+
+        return $filtered;
+    }
+
+    /** next/prev/reset/end/pos — stmt-level pointer advance, not var_export/var_dump arg producers (#13829). */
+    private function isArrayInternalPointerMutatorFuncName(?string $name): bool
+    {
+        if (null === $name) {
+            return false;
+        }
+
+        return \in_array(strtolower($name), ['next', 'prev', 'reset', 'end', 'pos'], true);
     }
 
     /**
@@ -21798,6 +21838,14 @@ class Compiler {
             ) {
                 continue;
             }
+            if (
+                ($child instanceof Op\Expr\FuncCall || $child instanceof Op\Expr\NsFuncCall)
+                && $this->isArrayInternalPointerMutatorFuncName($this->resolveCfgFuncCallName($child))
+                && ($next instanceof Op\Expr\FuncCall || $next instanceof Op\Expr\NsFuncCall)
+            ) {
+                // next($a); var_export(key($a), true) — pointer stmt, not outer arg producer (#13829).
+                continue;
+            }
             $producers[] = $child;
         }
 
@@ -23785,6 +23833,133 @@ class Compiler {
                 continue;
             }
             break;
+        }
+
+        $consumer = $cfgChildren[$consumerIndex] ?? null;
+        if ($this->isSiblingMultiArgInlineCallConsumer($consumer)) {
+            $contiguousFirst = $this->firstContiguousHoistedFuncCallProducerForMultiArgConsumer(
+                $consumerIndex,
+                $consumer,
+                $cfgChildren
+            );
+            if (null !== $contiguousFirst && $contiguousFirst < $first) {
+                $hoistedArgCount = 0;
+                if (property_exists($consumer, 'args') && \is_array($consumer->args)) {
+                    foreach ($consumer->args as $consumerArg) {
+                        if (null !== $consumerArg && !$this->isEmbeddedCallLiteralArg($consumerArg)) {
+                            ++$hoistedArgCount;
+                        }
+                    }
+                }
+                if ($hoistedArgCount >= 2) {
+                    $outerFromFirst = \count(
+                        $this->outerSiblingInlineFuncCallProducers($first, $consumerIndex, $cfgChildren)
+                    );
+                    $outerFromContiguous = \count(
+                        $this->outerSiblingInlineFuncCallProducers($contiguousFirst, $consumerIndex, $cfgChildren)
+                    );
+                    if (
+                        $outerFromContiguous === $hoistedArgCount
+                        && $outerFromFirst !== $hoistedArgCount
+                    ) {
+                        $first = $contiguousFirst;
+                    }
+                }
+            }
+        }
+
+        return $first;
+    }
+
+    /**
+     * var_dump(strlen($s), substr($s, 0, 2)) — N stmt-level FuncCalls before a multi-arg consumer (#16254).
+     *
+     * php-cfg hoists each arg producer as a sibling; statementLevelFuncCallBeforeHoistedSiblingChain would
+     * otherwise trim strlen when substr sits between it and var_dump.
+     *
+     * @param list<Op> $cfgChildren
+     */
+    private function firstContiguousHoistedFuncCallProducerForMultiArgConsumer(
+        int $consumerIndex,
+        Op $consumer,
+        array $cfgChildren
+    ): ?int {
+        if (
+            !$this->isSiblingMultiArgInlineCallConsumer($consumer)
+            || !property_exists($consumer, 'args')
+            || !\is_array($consumer->args)
+            || \count($consumer->args) < 2
+        ) {
+            return null;
+        }
+        $hoistedArgs = [];
+        foreach ($consumer->args as $argIndex => $callArg) {
+            if (null === $callArg || $this->isEmbeddedCallLiteralArg($callArg)) {
+                continue;
+            }
+            if ($this->isByRefNamedCallArgExcludedFromSiblingProducerWiring($consumer, (int) $argIndex, $callArg)) {
+                continue;
+            }
+            $hoistedArgs[] = $callArg;
+        }
+        if (
+            \count($hoistedArgs) < 2
+            || !$this->callArgsAreDistinctInlineTemporaries($hoistedArgs)
+        ) {
+            return null;
+        }
+        $hoistedArgCount = \count($hoistedArgs);
+        $first = $consumerIndex - $hoistedArgCount;
+        if ($first < 0) {
+            return null;
+        }
+        for ($j = $first; $j < $consumerIndex; ++$j) {
+            $child = $cfgChildren[$j] ?? null;
+            if ($child instanceof Op\Expr\ConstFetch || $child instanceof Op\Expr\ClassConstFetch) {
+                continue;
+            }
+            if ($child instanceof Op\Expr\Array_) {
+                continue;
+            }
+            if ($this->isUnaryInlineSiblingCallArgExpr($child)) {
+                continue;
+            }
+            if ($child instanceof Op\Expr\ArrowFunction
+                || $child instanceof Op\Expr\Closure
+                || $child instanceof Op\Expr\FirstClassCallable) {
+                continue;
+            }
+            if ($child instanceof Op\Expr\New_ || $child instanceof Op\Expr\Clone_) {
+                continue;
+            }
+            if ($child instanceof Op\Expr\Isset_ || $child instanceof Op\Expr\Empty_) {
+                continue;
+            }
+            if (
+                $child instanceof Op\Expr\PropertyFetch
+                && $this->isPropertyFetchOnlyIssetVar($child, $cfgChildren[$j + 1] ?? null)
+            ) {
+                continue;
+            }
+            if (
+                $child instanceof Op\Expr\ArrayDimFetch
+                && $this->isArrayDimFetchOnlyIssetVar($child, $cfgChildren[$j + 1] ?? null)
+            ) {
+                continue;
+            }
+            if (
+                $child instanceof Op\Expr\StaticPropertyFetch
+                && $this->isStaticPropertyFetchOnlyIssetVar($child, $cfgChildren[$j + 1] ?? null)
+            ) {
+                continue;
+            }
+            if (!$this->isSiblingInlineCallProducerExpr($child)) {
+                return null;
+            }
+        }
+        $outer = $this->outerSiblingInlineFuncCallProducers($first, $consumerIndex, $cfgChildren);
+        if (\count($outer) !== $hoistedArgCount) {
+            return null;
         }
 
         return $first;
@@ -37904,6 +38079,7 @@ class Compiler {
             || $this->cfgCallOpImmediatelyVoidDiscarded($cfgCallOp, $block)
             || $this->siblingInlineCallArgProducerNeedsReturnSlot($cfgCallOp, $block)
             || $this->outerSiblingInlineFuncCallProducerNeedsReturnSlot($cfgCallOp, $block)
+            || $this->hoistedSiblingFeedsLaterMultiArgConsumer($cfgCallOp, $block)
             || $this->isAdjacentOuterHoistedFuncCallBeforeMultiArgConsumer($cfgCallOp, $block)
             || $this->nestedLiteralPreludeInlineCallProducerNeedsReturnSlot($cfgCallOp, $block)
             || $this->cfgCallIsHoistedArrayKeysForArrayCombine($cfgCallOp, $block)
@@ -38020,6 +38196,47 @@ class Compiler {
                 if ($outerProducer === $cfgCallOp) {
                     return true;
                 }
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * php-cfg var_dump(strlen($s), substr($s, 0, 2)) — hoisted sibling producers need EXEC_RETURN (#16254).
+     */
+    private function hoistedSiblingFeedsLaterMultiArgConsumer(?Op $cfgCallOp, Block $block): bool
+    {
+        if (
+            !$cfgCallOp instanceof Op\Expr\FuncCall
+            && !$cfgCallOp instanceof Op\Expr\NsFuncCall
+        ) {
+            return false;
+        }
+        if (null === $block->orig) {
+            return false;
+        }
+        $cfgChildren = $block->orig->children;
+        $producerIndex = array_search($cfgCallOp, $cfgChildren, true);
+        if (!\is_int($producerIndex)) {
+            return false;
+        }
+        for ($consumerIndex = $producerIndex + 1, $n = \count($cfgChildren); $consumerIndex < $n; ++$consumerIndex) {
+            $consumer = $cfgChildren[$consumerIndex] ?? null;
+            if (!$this->isSiblingMultiArgInlineCallConsumer($consumer)) {
+                continue;
+            }
+            if (!\is_array($consumer->args ?? null) || \count($consumer->args) < 2) {
+                continue;
+            }
+            if ($this->isSiblingMultiArgFuncCallProducer(
+                $cfgCallOp,
+                $consumer,
+                $producerIndex,
+                $consumerIndex,
+                $cfgChildren
+            )) {
+                return true;
             }
         }
 
