@@ -6,6 +6,7 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitNativeString;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Value\Function_ as LlvmFunction;
@@ -89,10 +90,16 @@ final class PasswordCryptoRuntime
         self::registerLinkedRuntime($context);
 
         if (null !== $savedBlock) {
-            $context->builder->positionAtEnd($savedBlock);
+            try {
+                $context->builder->positionAtEnd($savedBlock);
+            } catch (\Throwable) {
+                JitNativeString::ensureInsertBlock($context);
+            }
         } else {
-            $context->builder->clearInsertionPosition();
+            JitNativeString::ensureInsertBlock($context);
         }
+        // Nested helper compile swaps builders; stale intrinsic emits cross-block (#9275, #2967).
+        $context->intrinsic->builder = $context->builder;
     }
 
     /**

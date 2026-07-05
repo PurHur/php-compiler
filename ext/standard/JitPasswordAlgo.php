@@ -8,6 +8,7 @@ use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitOperandTypeLabel;
+use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable as VmVariable;
@@ -49,10 +50,10 @@ final class JitPasswordAlgo
     /** Fold PASSWORD_* string literals without strcmp CFG (#9275). */
     private static function lowerCompileTimeStringAlgo(Context $context, JITVariable $arg): ?Value
     {
-        $lit = null;
-        if (JITVariable::TYPE_STRING === $arg->type) {
+        $lit = JitStringArg::compileTimeLiteral($arg);
+        if (null === $lit && JITVariable::TYPE_STRING === $arg->type) {
             $lit = $arg->compileTimeString;
-        } elseif (JITVariable::TYPE_VALUE === $arg->type) {
+        } elseif (null === $lit && JITVariable::TYPE_VALUE === $arg->type) {
             $lit = $arg->compileTimeString;
         }
         if (null === $lit) {

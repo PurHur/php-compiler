@@ -8183,6 +8183,8 @@ class JIT {
                     break;
                 case OpCode::TYPE_ECHO:
                 case OpCode::TYPE_PRINT:
+                    JIT\JitNativeString::ensureInsertBlock($this->context);
+                    $this->context->intrinsic->builder = $this->context->builder;
                     $this->context->callSiteLine = OpCode::TYPE_ECHO === $op->type
                         ? (int) ($op->arg2 ?? 0)
                         : (int) ($op->arg3 ?? 0);
@@ -8235,7 +8237,11 @@ class JIT {
                                 );
                                 break;
                             }
-                            $argValue = $this->context->helper->loadValue($arg);
+                            $argValue = JIT\JitStringArg::lowerDominating(
+                                $this->context,
+                                $arg,
+                                'echo string operand'
+                            );
                             $offset = $this->context->structFieldIndex($argValue, 'length');
                             $__str__length = $this->context->builder->load(
                                 $this->context->builder->structGep($argValue, $offset)

@@ -7,7 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\JIT\Builtin\StringPasswordCrypto;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitStringArg;
+use PHPCompiler\JIT\JitNativeString;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Builder;
@@ -25,6 +25,7 @@ final class JitPassword
         ?JITVariable $options = null
     ): Value {
         StringPasswordCrypto::ensureLinked($context);
+        JitNativeString::ensureInsertBlock($context);
 
         $cost = JitPasswordBcryptCost::lowerFromOptions($context, $options, 'password_hash');
         $digest = $context->builder->call(
@@ -40,6 +41,7 @@ final class JitPassword
     public static function verify(Context $context, Value $password, Value $hash): Value
     {
         StringPasswordCrypto::ensureLinked($context);
+        JitNativeString::ensureInsertBlock($context);
 
         $i32 = $context->getTypeFromString('int32');
 
