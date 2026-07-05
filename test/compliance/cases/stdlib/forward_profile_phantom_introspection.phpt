@@ -19,11 +19,6 @@ if (extension_loaded('bcmath')) {
 if (function_exists('bcadd')) {
     $fail[] = 'bcadd';
 }
-foreach (['http_get_last_response_headers', 'get_last_response_headers', 'http_clear_last_response_headers'] as $fn) {
-    if (function_exists($fn)) {
-        $fail[] = $fn;
-    }
-}
 if (function_exists('stream_context_set_options')) {
     $fail[] = 'stream_context_set_options';
 }

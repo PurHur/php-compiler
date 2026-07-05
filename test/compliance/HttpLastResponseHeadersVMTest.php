@@ -33,6 +33,10 @@ final class HttpLastResponseHeadersVMTest extends BaseTest
             __DIR__.'/cases/stdlib/http_get_last_response_headers_https.phpt',
             'http_get_last_response_headers_https.phpt'
         );
+        yield 'http_last_response_headers_profile_84.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/http_last_response_headers_profile_84.phpt',
+            'http_last_response_headers_profile_84.phpt'
+        );
     }
 
     public function setUp(): void

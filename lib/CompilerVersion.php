@@ -890,11 +890,13 @@ final class CompilerVersion
 
     /**
      * http_get_last_response_headers()/get_last_response_headers()/http_clear_last_response_headers()
-     * visible to function_exists() — stable runtime only (#16346).
+     * visible to function_exists() — forward {@see languageProfileVersion()} 8.4+ (#16494).
+     *
+     * Withheld on 8.4.0-dev reference profile (matches Zend 8.2 function_exists gate, #16346).
      */
     public static function advertisesHttpLastResponseHeaders(): bool
     {
-        return version_compare(self::VERSION, '8.4.0', '>=');
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
     }
 
     /**
