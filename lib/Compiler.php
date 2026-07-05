@@ -23591,24 +23591,35 @@ class Compiler {
         if (!$producer instanceof Op\Expr\FuncCall && !$producer instanceof Op\Expr\NsFuncCall) {
             return null;
         }
-        if (null === $block->slotForOperand($producer->result)) {
-            $prevForce = $this->forceDeferredSiblingCallReturnSlot;
-            $this->forceDeferredSiblingCallReturnSlot = true;
-            try {
-                foreach ($this->compileExpr($producer, $block) as $op) {
+        // Compile every deferred sibling array_keys() before resolving slots — per-arg compile
+        // leaves exec-return ordinals short for arg #0 (#16300, re-#14021).
+        $prevForce = $this->forceDeferredSiblingCallReturnSlot;
+        $this->forceDeferredSiblingCallReturnSlot = true;
+        try {
+            foreach ($keysProducers as $keysProducer) {
+                if (
+                    !($keysProducer instanceof Op\Expr\FuncCall || $keysProducer instanceof Op\Expr\NsFuncCall)
+                    || null !== $block->slotForOperand($keysProducer->result)
+                ) {
+                    continue;
+                }
+                foreach ($this->compileExpr($keysProducer, $block) as $op) {
                     $emitOps[] = $op;
                 }
-            } finally {
-                $this->forceDeferredSiblingCallReturnSlot = $prevForce;
             }
+        } finally {
+            $this->forceDeferredSiblingCallReturnSlot = $prevForce;
         }
-        $execReturnSlot = $this->slotForInlineFuncCallProducerExecReturnByCfgIndex(
+        $operandSlot = $block->slotForOperand($producer->result);
+        if (null !== $operandSlot) {
+            return (int) $operandSlot;
+        }
+        $keysExecOrdinal = $this->slotForSiblingInlineFuncCallProducerExecReturnOrdinal(
             $block,
-            (int) array_search($producer, $cfgChildren, true),
-            $cfgChildren
+            $targetFuncArgIndex
         );
-        if (null !== $execReturnSlot) {
-            return $execReturnSlot;
+        if (null !== $keysExecOrdinal) {
+            return $keysExecOrdinal;
         }
         $slot = $this->slotForInlineCallArgProducerResult($block, $producer, $cfgCallOp, $cfgChildren);
 
@@ -26814,20 +26825,16 @@ class Compiler {
         }
         if (null === $callbackProducer) {
             $callbackArg = $callArgs[$callbackArgIndex] ?? null;
-            if (
-                null !== $callbackArg
-                && !$this->isEmbeddedCallLiteralArg($callbackArg)
-                && !$this->callArgIsDeadInlineTemporary($callbackArg)
-            ) {
+            if (null !== $callbackArg && (
+                $this->isEmbeddedCallLiteralArg($callbackArg)
+                || !$this->callArgIsDeadInlineTemporary($callbackArg)
+            )) {
                 $funcArgIndex = 0;
                 foreach ($callArgs as $i => $callArg) {
                     if ($i >= $callbackArgIndex) {
                         break;
                     }
-                    if (
-                        $this->isEmbeddedCallLiteralArg($callArg)
-                        || $this->callArgIsDeadInlineTemporary($callArg)
-                    ) {
+                    if ($this->callArgIsDeadInlineTemporary($callArg)) {
                         if ($i === $argIndex) {
                             return $funcProducers[$funcArgIndex] ?? null;
                         }
