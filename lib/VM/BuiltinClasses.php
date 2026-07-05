@@ -88,6 +88,9 @@ use PHPCompiler\VM\Builtin\ReflectionClassConstantGetType;
 use PHPCompiler\VM\Builtin\ReflectionClassConstantIsDeprecated;
 use PHPCompiler\VM\Builtin\ReflectionClassConstantIsEnumCase;
 use PHPCompiler\VM\Builtin\ReflectionClassConstantIsFinal;
+use PHPCompiler\VM\Builtin\ReflectionClassConstantIsPrivate;
+use PHPCompiler\VM\Builtin\ReflectionClassConstantIsProtected;
+use PHPCompiler\VM\Builtin\ReflectionClassConstantIsPublic;
 use PHPCompiler\VM\Builtin\ReflectionClassConstruct;
 use PHPCompiler\VM\Builtin\ReflectionClassGetAttributes;
 use PHPCompiler\VM\Builtin\ReflectionClassGetConstant;
@@ -876,6 +879,12 @@ final class BuiltinClasses
             $rconst->methodVisibility['isfinal'] = $pub;
             $rconst->methods['isenumcase'] = new ReflectionClassConstantIsEnumCase();
             $rconst->methodVisibility['isenumcase'] = $pub;
+            $rconst->methods['ispublic'] = new ReflectionClassConstantIsPublic();
+            $rconst->methodVisibility['ispublic'] = $pub;
+            $rconst->methods['isprotected'] = new ReflectionClassConstantIsProtected();
+            $rconst->methodVisibility['isprotected'] = $pub;
+            $rconst->methods['isprivate'] = new ReflectionClassConstantIsPrivate();
+            $rconst->methodVisibility['isprivate'] = $pub;
             $ctx->classes[ReflectionSupport::REFLECTION_CONSTANT] = $rconst;
         }
 
@@ -903,6 +912,12 @@ final class BuiltinClasses
         $rcc->methodVisibility['isfinal'] = $pub;
         $rcc->methods['isenumcase'] = new ReflectionClassConstantIsEnumCase();
         $rcc->methodVisibility['isenumcase'] = $pub;
+        $rcc->methods['ispublic'] = new ReflectionClassConstantIsPublic();
+        $rcc->methodVisibility['ispublic'] = $pub;
+        $rcc->methods['isprotected'] = new ReflectionClassConstantIsProtected();
+        $rcc->methodVisibility['isprotected'] = $pub;
+        $rcc->methods['isprivate'] = new ReflectionClassConstantIsPrivate();
+        $rcc->methodVisibility['isprivate'] = $pub;
         $ctx->classes[ReflectionSupport::REFLECTION_CLASS_CONSTANT] = $rcc;
 
         $ctx->classes[ReflectionSupport::REFLECTION_CLASS] = $rc;
