@@ -249,14 +249,29 @@ final class VmIniIntrospection
             return;
         }
         $rows = [];
+        $currentLabel = null;
         foreach (\explode("\n", $text) as $line) {
             $line = \rtrim($line);
             if (\preg_match('/^(.+?) => (.*)$/', $line, $matches)) {
-                $rows[\trim($matches[1])] = \trim($matches[2]);
+                $currentLabel = \trim($matches[1]);
+                $rows[$currentLabel] = \trim($matches[2]);
+                continue;
             }
+            // phpinfo text wraps long values (Additional .ini files parsed) across lines (#14283).
+            if (null !== $currentLabel && '' !== $line && !\str_contains($line, ' => ')) {
+                $rows[$currentLabel] .= ",\n".$line;
+                continue;
+            }
+            $currentLabel = null;
         }
         if ([] === $rows) {
             return;
+        }
+        if (\function_exists('php_ini_scanned_files')) {
+            $scanned = \php_ini_scanned_files();
+            if (\is_string($scanned) && '' !== $scanned) {
+                $rows['Additional .ini files parsed'] = $scanned;
+            }
         }
         $encoded = \json_encode($rows, \JSON_UNESCAPED_UNICODE);
         if (\is_string($encoded)) {
@@ -267,6 +282,12 @@ final class VmIniIntrospection
     /** phpinfo(INFO_GENERAL) row value; mirrors host Zend when seeded (#14283). */
     public static function phpinfoGeneralRow(string $label, string $default = ''): string
     {
+        if ('Additional .ini files parsed' === $label) {
+            $scanned = self::scannedFiles();
+            if (\is_string($scanned) && '' !== $scanned) {
+                return $scanned;
+            }
+        }
         $rows = self::phpinfoGeneralRows();
 
         return $rows[$label] ?? $default;
@@ -318,6 +339,15 @@ final class VmIniIntrospection
             'PHP Extension Build' => 'API20240924,NTS',
             'Debug Build' => 'no',
             'Thread Safety' => 'disabled',
+            'Zend Signal Handling' => 'enabled',
+            'Zend Memory Manager' => 'enabled',
+            'Zend Multibyte Support' => 'provided by mbstring',
+            'Zend Max Execution Timers' => 'disabled',
+            'IPv6 Support' => 'enabled',
+            'DTrace Support' => 'available, disabled',
+            'Registered PHP Streams' => 'php, file, glob, data, http, ftp',
+            'Registered Stream Socket Transports' => 'tcp, udp, unix, udg',
+            'Registered Stream Filters' => 'string.rot13, string.toupper, string.tolower, convert.*, consumed',
         ];
     }
 

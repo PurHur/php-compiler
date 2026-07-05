@@ -543,6 +543,10 @@ final class VmInfo
         $html .= '<tr><td class="e">System </td><td class="v">'.$system.' '.$host.' '.$release.' '.$versionStr.' '.$machine.' </td></tr>';
         $html .= '<tr><td class="e">Build Date </td><td class="v">'.CompilerVersion::BUILD_DATE.' </td></tr>';
         $html .= '<tr><td class="e">Build System </td><td class="v">'.$system.' '.$machine.' </td></tr>';
+        $buildProvider = VmIniIntrospection::phpinfoGeneralRow('Build Provider');
+        if ('' !== $buildProvider) {
+            $html .= '<tr><td class="e">Build Provider </td><td class="v">'.$buildProvider.' </td></tr>';
+        }
         $html .= '<tr><td class="e">Server API </td><td class="v">'.$sapi.' </td></tr>';
         foreach (self::PHPINFO_GENERAL_EXTRA_ROWS as $label) {
             $value = VmIniIntrospection::phpinfoGeneralRow($label);
@@ -580,6 +584,10 @@ final class VmInfo
         $text .= self::phpinfoRowText('System', trim($system.' '.$host.' '.$release.' '.$versionStr.' '.$machine));
         $text .= self::phpinfoRowText('Build Date', CompilerVersion::BUILD_DATE);
         $text .= self::phpinfoRowText('Build System', trim($system.' '.$machine));
+        $buildProvider = VmIniIntrospection::phpinfoGeneralRow('Build Provider');
+        if ('' !== $buildProvider) {
+            $text .= self::phpinfoRowText('Build Provider', $buildProvider);
+        }
         $text .= self::phpinfoRowText('Server API', self::php_sapi_name());
         foreach (self::PHPINFO_GENERAL_EXTRA_ROWS as $label) {
             $value = VmIniIntrospection::phpinfoGeneralRow($label);
@@ -654,6 +662,15 @@ final class VmInfo
         'PHP Extension Build',
         'Debug Build',
         'Thread Safety',
+        'Zend Signal Handling',
+        'Zend Memory Manager',
+        'Zend Multibyte Support',
+        'Zend Max Execution Timers',
+        'IPv6 Support',
+        'DTrace Support',
+        'Registered PHP Streams',
+        'Registered Stream Socket Transports',
+        'Registered Stream Filters',
     ];
 
     private static function formatPhpinfoAdditionalIniFilesHtml(string $value): string
