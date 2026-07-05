@@ -303,4 +303,65 @@ PHP;
 
         self::assertSame("ok\n", $out);
     }
+
+    public function testStrictTypesSuppressAssignNamedLocalCallArgUsesAssignLvalueSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+declare(strict_types=1);
+$v = @get_cfg_var('display_errors');
+echo gettype($v), "\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'strict_suppress_assign_gettype.php');
+
+        $suppressReturnSlot = null;
+        $assignDestSlot = null;
+        $gettypeSendSlot = null;
+        $adjacentSelfCopyAssign = false;
+        $walk = static function (Block $b) use (&$walk, &$suppressReturnSlot, &$assignDestSlot, &$gettypeSendSlot, &$adjacentSelfCopyAssign): void {
+            $inSuppress = null !== $b->orig && $b->orig instanceof \PHPCfg\ErrorSuppressBlock;
+            $inEnd = null !== $b->orig && 1 === \count($b->orig->parents) && $b->orig->parents[0] instanceof \PHPCfg\ErrorSuppressBlock;
+            $pendingInit = false;
+            $pendingCallee = null;
+            foreach ($b->opCodes as $op) {
+                if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                    $pendingInit = true;
+                    $pendingCallee = $b->constants[$op->arg1] ?? null;
+                    continue;
+                }
+                if ($pendingInit && OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
+                    if ($inSuppress) {
+                        $suppressReturnSlot = $op->arg1;
+                    }
+                    $pendingInit = false;
+                    continue;
+                }
+                if ($pendingInit && OpCode::TYPE_FUNCCALL_EXEC_NORETURN === $op->type) {
+                    $pendingInit = false;
+                    continue;
+                }
+                if (OpCode::TYPE_ASSIGN === $op->type && $inEnd && null === $assignDestSlot) {
+                    $assignDestSlot = $op->arg2;
+                }
+                if (OpCode::TYPE_ASSIGN === $op->type && $inEnd && $op->arg2 === $op->arg3) {
+                    $adjacentSelfCopyAssign = true;
+                }
+                if (OpCode::TYPE_ARG_SEND === $op->type && $inEnd && null === $gettypeSendSlot) {
+                    $gettypeSendSlot = $op->arg1;
+                }
+                foreach ([$op->block1, $op->block2, $op->block3] as $sub) {
+                    if ($sub instanceof Block) {
+                        $walk($sub);
+                    }
+                }
+            }
+        };
+        $walk($block);
+
+        self::assertNotNull($suppressReturnSlot, 'suppress get_cfg_var return slot');
+        self::assertNotNull($assignDestSlot, 'assign dest slot');
+        self::assertSame($assignDestSlot, $gettypeSendSlot, 'gettype arg must read assign lvalue slot');
+        self::assertFalse($adjacentSelfCopyAssign, 'must not emit arg2===arg3 adjacent assign sync');
+    }
 }
