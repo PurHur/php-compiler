@@ -412,6 +412,15 @@ patch_already_applied() {
     php-cfg-is-resource-no-assertion.patch)
       ! grep -q "'is_resource' => 'resource'" "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null
       ;;
+    php-cfg-simplifier-use-chain.patch)
+      grep -q 'replaceVariablesByCfgWalk' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Visitor/Simplifier.php" 2>/dev/null
+      ;;
+    php-cfg-operand-usage-dedup.patch)
+      grep -q 'usageIds' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Operand.php" 2>/dev/null
+      ;;
+    php-types-resolver-worklist.patch)
+      grep -q 'PHPTYPES_RESOLVER_WORKLIST' "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php" 2>/dev/null
+      ;;
     php-types-never-type.patch)
       grep -q 'function never(): self' "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php" 2>/dev/null \
         && grep -q 'instanceof CfgType\\Never_' "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php" 2>/dev/null \
@@ -6074,6 +6083,9 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-cfg" ]]; then
   apply_php_cfg_trait_use_overlay
   apply_patch "$PATCH_DIR/php-cfg-throw-expr.patch"
   apply_patch "$PATCH_DIR/php-cfg-is-resource-no-assertion.patch"
+  # Perf patches last: their hunks are diffed against the fully-patched files (#16077).
+  apply_patch "$PATCH_DIR/php-cfg-simplifier-use-chain.patch"
+  apply_patch "$PATCH_DIR/php-cfg-operand-usage-dedup.patch"
 fi
 
 if [[ -d "$ROOT/vendor/ircmaxell/php-types" ]]; then
@@ -6138,6 +6150,8 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-types" ]]; then
   apply_patch "$PATCH_DIR/php-types-throw-expr.patch"
   apply_php_types_fcc_overlay_final_repair
   apply_php_types_compiler_halt_offset_overlay
+  # Perf patch last: diffed against the fully-patched TypeReconstructor.php (#16077).
+  apply_patch "$PATCH_DIR/php-types-resolver-worklist.patch"
 fi
 
 if [[ -d "$ROOT/vendor/pre/plugin" ]]; then
