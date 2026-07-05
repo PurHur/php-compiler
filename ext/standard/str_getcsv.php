@@ -39,8 +39,7 @@ final class str_getcsv extends Internal
                 ));
             }
         }
-        InternalStrictArg::rejectNullString($frame->calledArgs[0], 'str_getcsv', 'string', 0, $frame);
-        $input = VmString::requireStringBuiltinArg($frame->calledArgs[0], 'str_getcsv', 0, 'string');
+        $input = VmString::stringBuiltinArgForFrame($frame, 0, 'str_getcsv', 0, 'string');
         $separator = ',';
         $enclosure = '"';
         $escape = '\\';
@@ -72,8 +71,7 @@ final class str_getcsv extends Internal
             throw new \LogicException('str_getcsv() expects at most 4 arguments');
         }
         $strPtr = $context->getTypeFromString('__string__*');
-        JitInternalStrictArg::rejectNullString($context, $args[0], 'str_getcsv', 'string', 1);
-        $input = JitStringBuiltinArg::lowerRequiredString($context, $args[0], 'str_getcsv', 0, 'string');
+        $input = JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'str_getcsv', 0, 'string');
         $separator = $strPtr->constNull();
         $enclosure = $strPtr->constNull();
         $escape = $strPtr->constNull();
