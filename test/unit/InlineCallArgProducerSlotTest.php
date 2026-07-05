@@ -3466,6 +3466,24 @@ PHP;
         self::assertSame("current=2\n", $out);
     }
 
+    /** Issue #16272 — var_export($nested, true) after chown assign must not wire sibling chown EXEC_RETURN as return arg. */
+    public function testVarExportAfterChownAssignUsesConstFetchTrueSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+$path = '/nope/' . getmypid();
+$nested = chown($path, getmyuid());
+echo 'nested: ' . var_export($nested, true) . "\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'var_export_after_chown_assign.php');
+
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertSame("nested: false\n", $out);
+    }
+
     /** Issue #13901 — var_export($it->current(), true) in concat after next(). */
     public function testVarExportNestedArrayIteratorCurrentUsesMethodCallProducerSlot(): void
     {
