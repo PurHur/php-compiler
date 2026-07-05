@@ -29,6 +29,8 @@ final class Variable {
 
     /** @see Zend/zend_operators.c increment_function() / decrement_function() on TYPE_STRING offsets */
     public const STRING_OFFSET_INCDEC_ERROR = 'Cannot increment/decrement string offsets';
+    /** @see Zend/zend_execute.c zend_assign_to_string_offset() — empty/null RHS */
+    public const STRING_OFFSET_EMPTY_ASSIGN_ERROR = 'Cannot assign an empty string to a string offset';
     /** Zend enum case object for E::Case fetches (#3420, #3554). */
     const TYPE_ENUM_CASE = 9;
     /** Writable ArrayAccess dimension ($obj[$key] assignment, #3331). */
@@ -2813,19 +2815,26 @@ restart:
     private static function byteFromAssignValue(self $value): string
     {
         $value = $value->resolveIndirect();
+        if (self::TYPE_NULL === $value->type) {
+            throw new \Error(self::STRING_OFFSET_EMPTY_ASSIGN_ERROR);
+        }
         switch ($value->type) {
             case self::TYPE_STRING:
                 $s = $value->string;
+                if ('' === $s) {
+                    throw new \Error(self::STRING_OFFSET_EMPTY_ASSIGN_ERROR);
+                }
 
-                return '' === $s ? '' : $s[0];
+                return $s[0];
             case self::TYPE_INTEGER:
                 return chr($value->integer & 0xff);
-            case self::TYPE_NULL:
-                return "\0";
             default:
                 $s = $value->toString();
+                if ('' === $s) {
+                    throw new \Error(self::STRING_OFFSET_EMPTY_ASSIGN_ERROR);
+                }
 
-                return '' === $s ? '' : $s[0];
+                return $s[0];
         }
     }
 }
