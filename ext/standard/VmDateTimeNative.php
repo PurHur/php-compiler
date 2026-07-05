@@ -2611,14 +2611,41 @@ final class VmDateTimeNative
     private static function buildTransitionRecord(string $tzName, int $timestamp): array
     {
         $state = self::transitionState($tzName, $timestamp);
+        $isdst = $state['isdst'];
+        if (!$isdst) {
+            // VmDatePure::localtime tm_isdst is unreliable at DST boundaries; infer from standard offset (#16291).
+            $standardOffset = self::standardOffsetForTimezone($tzName, $timestamp);
+            if ($state['offset'] !== $standardOffset) {
+                $isdst = $state['offset'] > $standardOffset;
+            }
+        }
 
         return [
             'ts' => $timestamp,
             'time' => self::format($timestamp, 0, $tzName, 'c'),
             'offset' => $state['offset'],
-            'isdst' => $state['isdst'],
+            'isdst' => $isdst,
             'abbr' => self::timezoneAbbreviation($tzName, $timestamp),
         ];
+    }
+
+    /** php-src timelib ttinfo tt_isdst — winter reference offset for DST inference (#16291). */
+    private static function standardOffsetForTimezone(string $tzName, int $timestamp): int
+    {
+        $fixed = self::parseNumericTimezoneOffset($tzName);
+        if (null !== $fixed) {
+            return $fixed;
+        }
+
+        return self::withTimezone($tzName, static function () use ($timestamp): int {
+            $year = (int) \date('Y', $timestamp);
+            $winter = VmDatePure::mktime(12, 0, 0, 1, 15, $year);
+            if (false === $winter) {
+                return self::offsetSecondsForTimestamp($timestamp);
+            }
+
+            return self::offsetSecondsForTimestamp($winter);
+        });
     }
 
     private static function timezoneAbbreviation(string $tzName, int $timestamp): string
