@@ -890,11 +890,15 @@ final class CompilerVersion
 
     /**
      * http_get_last_response_headers()/get_last_response_headers()/http_clear_last_response_headers()
-     * visible to function_exists() — stable runtime only (#16346).
+     * visible to function_exists() — stable runtime or forward 8.4+ profile (#16346, #16494).
      */
     public static function advertisesHttpLastResponseHeaders(): bool
     {
-        return version_compare(self::VERSION, '8.4.0', '>=');
+        if (version_compare(self::VERSION, '8.4.0', '>=')) {
+            return true;
+        }
+
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
     }
 
     /**
@@ -907,10 +911,14 @@ final class CompilerVersion
         return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
     }
 
-    /** stream_context_set_options() visible to function_exists() — stable runtime only (#16346). */
+    /** stream_context_set_options() visible to function_exists() — stable runtime or forward 8.4+ profile (#16346, #16494). */
     public static function advertisesStreamContextSetOptions(): bool
     {
-        return version_compare(self::VERSION, '8.4.0', '>=');
+        if (version_compare(self::VERSION, '8.4.0', '>=')) {
+            return true;
+        }
+
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
     }
 
     /**
