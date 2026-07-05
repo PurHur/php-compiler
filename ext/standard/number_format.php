@@ -30,20 +30,7 @@ final class number_format extends Internal
     public function execute(Frame $frame): void
     {
         $argc = \count($frame->calledArgs);
-        $maxArgs = CompilerVersion::supportsRoundingModeEnum() ? 5 : 4;
-        if ($argc < 1) {
-            throw new \ArgumentCountError(\sprintf(
-                'number_format() expects at least 1 argument, %d given',
-                $argc
-            ));
-        }
-        if ($argc > $maxArgs) {
-            throw new \ArgumentCountError(\sprintf(
-                'number_format() expects at most %d arguments, %d given',
-                $maxArgs,
-                $argc
-            ));
-        }
+        VmNumberFormat::assertArgCount($argc, $frame->calledArgs[4] ?? null);
         if (null === $frame->returnVar) {
             return;
         }
@@ -77,13 +64,9 @@ final class number_format extends Internal
             ) ?? ','
             : ',';
         $roundingMode = StdlibConstants::PHP_ROUND_HALF_UP;
-        if (CompilerVersion::supportsRoundingModeEnum() && isset($frame->calledArgs[4])) {
-            $roundingMode = VmRoundMode::resolveRoundModeArg(
-                $frame->calledArgs[4]->resolveIndirect(),
-                'number_format',
-                'rounding_mode',
-                5
-            );
+        if (5 === $argc && CompilerVersion::supportsRoundingModeEnum() && isset($frame->calledArgs[4])) {
+            $roundingMode = VmRoundMode::tryRoundModeInt($frame->calledArgs[4]->resolveIndirect())
+                ?? StdlibConstants::PHP_ROUND_HALF_UP;
         }
         $frame->returnVar->string(VmNumberFormat::format(
             $num,
@@ -98,21 +81,7 @@ final class number_format extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        $argc = \count($args);
-        $maxArgs = CompilerVersion::supportsRoundingModeEnum() ? 5 : 4;
-        if ($argc < 1) {
-            throw new \ArgumentCountError(\sprintf(
-                'number_format() expects at least 1 argument, %d given',
-                $argc
-            ));
-        }
-        if ($argc > $maxArgs) {
-            throw new \ArgumentCountError(\sprintf(
-                'number_format() expects at most %d arguments, %d given',
-                $maxArgs,
-                $argc
-            ));
-        }
+        JitNumberFormat::assertArgCount($context, ...$args);
 
         return JitNumberFormat::format($context, ...$args);
     }

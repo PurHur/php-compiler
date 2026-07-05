@@ -14,6 +14,38 @@ use PHPCompiler\VM\Variable;
 
 final class VmNumberFormat
 {
+    private const MAX_ARGS = 4;
+
+    /**
+     * php-src ext/standard/math.c — ZEND_PARSE_PARAMETERS_START(1, 4).
+     *
+     * PHP 8.4 forward profile allows a fifth positional only when it is a RoundingMode enum (#9438).
+     */
+    public static function assertArgCount(int $argc, ?Variable $fifthArg = null): void
+    {
+        if ($argc < 1) {
+            throw new \ArgumentCountError(\sprintf(
+                'number_format() expects at least 1 argument, %d given',
+                $argc
+            ));
+        }
+        if ($argc <= self::MAX_ARGS) {
+            return;
+        }
+        if (5 === $argc
+            && CompilerVersion::supportsRoundingModeEnum()
+            && null !== $fifthArg
+            && null !== VmRoundMode::tryRoundModeInt($fifthArg->resolveIndirect())) {
+            return;
+        }
+
+        throw new \ArgumentCountError(\sprintf(
+            'number_format() expects at most %d arguments, %d given',
+            self::MAX_ARGS,
+            $argc
+        ));
+    }
+
     /**
      * Coerce number_format() argument #1 to float (php-src ext/standard/number_format.c).
      *
