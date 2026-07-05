@@ -24489,13 +24489,19 @@ class Compiler {
         }
         if (
             0 === $argIndex
-            && null !== $this->nestedFuncCallProducerBeforeTrailingConstFetchPreludes(
-                $cfgCallOp,
-                $callIndex,
-                $block->orig->children
+            && (
+                null !== $this->nestedFuncCallProducerBeforeTrailingConstFetchPreludes(
+                    $cfgCallOp,
+                    $callIndex,
+                    $block->orig->children
+                )
+                || null !== $this->nonConstInlineProducerBeforeTrailingScalarConstFetchPreludes(
+                    $callIndex,
+                    $block->orig->children
+                )
             )
         ) {
-            // var_export(g(), true) — trailing ConstFetch is arg #1, not nested callee return (#11272, #16298).
+            // var_export(g(), true) / importNode($doc->documentElement, true) — trailing ConstFetch is not arg #0 (#11272, #16318).
             return null;
         }
         $constSlot = $block->slotForOperand($immediatePrelude->result);
@@ -25919,6 +25925,52 @@ class Compiler {
         }
 
         return 0 === $targetArgIndex ? $prev : null;
+    }
+
+    /**
+     * importNode($doc->documentElement, true) — PropertyFetch sibling before trailing ConstFetch (#16318).
+     *
+     * @param list<Op> $cfgChildren
+     */
+    private function nonConstInlineProducerBeforeTrailingScalarConstFetchPreludes(
+        int $consumerIndex,
+        array $cfgChildren
+    ): ?Op\Expr {
+        if ($consumerIndex < 2) {
+            return null;
+        }
+        $probeIndex = $consumerIndex - 1;
+        while ($probeIndex >= 0) {
+            $probe = $cfgChildren[$probeIndex] ?? null;
+            if ($probe instanceof Op\Expr\ConstFetch) {
+                $name = $this->staticNameFromOperand($probe->name);
+                if (null !== $name && \in_array(strtolower($name), ['true', 'false', 'null'], true)) {
+                    --$probeIndex;
+                    continue;
+                }
+
+                return null;
+            }
+            if ($probe instanceof Op\Expr\ClassConstFetch) {
+                --$probeIndex;
+                continue;
+            }
+            if ($probe instanceof Op\Expr\Assign) {
+                --$probeIndex;
+                continue;
+            }
+            if ($probe instanceof Op\Expr && $this->isInlineExprCallArgProducer($probe)) {
+                if ($probe instanceof Op\Expr\ConstFetch || $probe instanceof Op\Expr\ClassConstFetch) {
+                    return null;
+                }
+
+                return $probe;
+            }
+
+            return null;
+        }
+
+        return null;
     }
 
     private function resolveAdjacentNestedFuncCallArgSlot(
@@ -30670,6 +30722,16 @@ class Compiler {
                 $boolNullArgIndices,
                 static fn (int $idx): bool => 0 !== $idx
             ));
+        }
+        if (
+            null !== $this->nonConstInlineProducerBeforeTrailingScalarConstFetchPreludes($callIndex, $children)
+            && \count($trailingConstFetches) < \count($nonEmbeddedArgIndices)
+        ) {
+            // importNode($doc->documentElement, true) — scalar ConstFetch maps to trailing args only (#16318).
+            $boolNullArgIndices = \array_slice(
+                $nonEmbeddedArgIndices,
+                \count($nonEmbeddedArgIndices) - \count($trailingConstFetches)
+            );
         }
         $producerOrdinal = array_search($argIndex, $boolNullArgIndices, true);
         if (false === $producerOrdinal) {
