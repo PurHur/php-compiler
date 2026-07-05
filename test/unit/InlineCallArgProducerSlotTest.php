@@ -5967,6 +5967,45 @@ PHP;
         );
     }
 
+    /** Issue #16328 — array_splice($a, -3, 2, null) wires UnaryMinus offset + null replacement (#10589). */
+    public function testArraySpliceNegativeOffsetNullReplacementRuntime(): void
+    {
+        $code = <<<'PHP'
+<?php
+declare(strict_types=1);
+
+$a = [1, 2, 3, 4];
+array_splice($a, -3, 2, null);
+var_export($a);
+echo "\n";
+
+foreach (['usort', 'uasort', 'uksort'] as $fn) {
+    try {
+        if ('usort' === $fn) {
+            $arr = [1, 2];
+            $fn($arr, null);
+        } else {
+            $arr = [1 => 2, 3 => 4];
+            $fn($arr, null);
+        }
+    } catch (Throwable $e) {
+        echo $fn, ': ', get_class($e), "\n";
+    }
+}
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'array_splice_neg_null_repl.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame(
+            "array (\n  0 => 1,\n  1 => 4,\n)\n"
+            ."usort: TypeError\n"
+            ."uasort: TypeError\n"
+            ."uksort: TypeError\n",
+            ob_get_clean()
+        );
+    }
+
     /** Issue #9292 — && merge phi must not clobber nested stream_set_blocking var_dump arg. */
     public function testStreamSetBlockingAfterLogicalAndUsesNestedCallSlot(): void
     {

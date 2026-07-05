@@ -17289,22 +17289,27 @@ class Compiler {
             return null;
         }
         $unaryProducer = null;
-        $arrayProducer = null;
+        $replacementProducer = null;
         foreach ($producers as $producer) {
             if ($producer instanceof Op\Expr\UnaryMinus || $producer instanceof Op\Expr\UnaryPlus) {
                 $unaryProducer = $producer;
             } elseif ($producer instanceof Op\Expr\Array_) {
-                $arrayProducer = $producer;
+                $replacementProducer = $producer;
+            } elseif ($producer instanceof Op\Expr\ConstFetch) {
+                $name = $this->staticNameFromOperand($producer->name);
+                if (null !== $name && 'null' === strtolower($name)) {
+                    $replacementProducer = $producer;
+                }
             }
         }
-        if (null === $unaryProducer || null === $arrayProducer) {
+        if (null === $unaryProducer || null === $replacementProducer) {
             return null;
         }
         if (1 === $argIndex) {
             return $unaryProducer;
         }
         if ($argIndex === $argCount - 1) {
-            return $arrayProducer;
+            return $replacementProducer;
         }
 
         return null;
@@ -25686,6 +25691,83 @@ class Compiler {
     }
 
     /**
+     * array_splice($a, -N, $len, null) — UnaryMinus offset + null replacement (#16328, #10589).
+     *
+     * @param list<OpCode> $emitOps
+     */
+    private function wireArraySpliceUnaryOffsetReplacementCallArgSlot(
+        Block $block,
+        Op $cfgCallOp,
+        int $argIndex,
+        array &$emitOps = []
+    ): ?string {
+        if (null === $block->orig) {
+            return null;
+        }
+        if ('array_splice' !== strtolower($this->resolveCfgFuncCallName($cfgCallOp) ?? '')) {
+            return null;
+        }
+        if (!\is_array($cfgCallOp->args ?? null) || \count($cfgCallOp->args) < 4) {
+            return null;
+        }
+        $producers = $this->precedingInlineCallArgProducersBeforeCfgOp($block->orig->children, $cfgCallOp);
+        $target = $this->matchArraySpliceUnaryOffsetReplacementProducers(
+            $producers,
+            $argIndex,
+            \count($cfgCallOp->args),
+            'array_splice'
+        );
+        if (!$target instanceof Op\Expr) {
+            return null;
+        }
+        if ($target instanceof Op\Expr\ConstFetch) {
+            $folded = $this->tryFoldGlobalConstFetch($target);
+            if (null !== $folded) {
+                return (string) $block->registerConstant(new Operand\Temporary(), $folded);
+            }
+        } elseif ($target instanceof Op\Expr\UnaryMinus || $target instanceof Op\Expr\UnaryPlus) {
+            $folded = $this->tryFoldUnaryLiteralDefault($target);
+            if (null !== $folded) {
+                return (string) $block->registerConstant(new Operand\Temporary(), $folded);
+            }
+        }
+        $slot = $block->slotForOperand($target->result);
+        if (null === $slot) {
+            foreach ($this->compileExpr($target, $block) as $op) {
+                $emitOps[] = $op;
+            }
+            $slot = $block->slotForOperand($target->result);
+        }
+
+        return null !== $slot ? (string) $slot : null;
+    }
+
+    /** array_splice($a, -N, $len, null) — skip generic hoisted-null prelude on offset/replacement slots (#16328). */
+    private function arraySpliceUnaryOffsetReplacementUsesDedicatedProducerWiring(
+        Op $cfgCallOp,
+        int $argIndex,
+        Block $block
+    ): bool {
+        if (null === $block->orig) {
+            return false;
+        }
+        if ('array_splice' !== strtolower($this->resolveCfgFuncCallName($cfgCallOp) ?? '')) {
+            return false;
+        }
+        if (!\is_array($cfgCallOp->args ?? null) || \count($cfgCallOp->args) < 4) {
+            return false;
+        }
+        $producers = $this->precedingInlineCallArgProducersBeforeCfgOp($block->orig->children, $cfgCallOp);
+
+        return null !== $this->matchArraySpliceUnaryOffsetReplacementProducers(
+            $producers,
+            $argIndex,
+            \count($cfgCallOp->args),
+            'array_splice'
+        );
+    }
+
+    /**
      * array_chunk(range(1,5), 2, true) — hoisted FuncCall haystack + ConstFetch preserve_keys (#11767).
      *
      * @return list<OpCode>|null
@@ -30668,6 +30750,17 @@ class Compiler {
         if ([] === $trailingConstFetches) {
             return null;
         }
+        if ('array_splice' === strtolower($this->resolveCfgFuncCallName($cfgCallOp) ?? '')) {
+            $producers = $this->precedingInlineCallArgProducersBeforeCfgOp($children, $cfgCallOp);
+            if (null !== $this->matchArraySpliceUnaryOffsetReplacementProducers(
+                $producers,
+                $argIndex,
+                \count($callArgs),
+                'array_splice'
+            )) {
+                return null;
+            }
+        }
         $callArg = $callArgs[$argIndex] ?? null;
         if (null === $callArg || $this->isEmbeddedCallLiteralArg($callArg)) {
             return null;
@@ -31544,6 +31637,8 @@ class Compiler {
                                 && $this->callArgOperandExpectsArrayProducer($callArg)
                             ) {
                                 // array_column([...], null, 'x') — haystack must not steal trailing null prelude (#15914, #16324).
+                            } elseif ($this->arraySpliceUnaryOffsetReplacementUsesDedicatedProducerWiring($cfgCallOp, (int) $argIndex, $block)) {
+                                // array_splice($a, -N, $len, null) — offset is UnaryMinus, not hoisted null (#16328).
                             } else {
                                 $sends[] = new OpCode(
                                     OpCode::TYPE_ARG_SEND,
@@ -32245,6 +32340,17 @@ class Compiler {
                 $dateSunSlot = $this->wireDateSunFuncHoistedCallArgSlot($block, $cfgCallOp, (int) $argIndex);
                 if (null !== $dateSunSlot) {
                     $valueSlot = $dateSunSlot;
+                }
+                if (null === $valueSlot) {
+                    $arraySpliceSlot = $this->wireArraySpliceUnaryOffsetReplacementCallArgSlot(
+                        $block,
+                        $cfgCallOp,
+                        (int) $argIndex,
+                        $sends
+                    );
+                    if (null !== $arraySpliceSlot) {
+                        $valueSlot = $arraySpliceSlot;
+                    }
                 }
             }
             // E::A->name / E::A?->name in call args — wire PropertyFetch slot before enum const fold (#10286, #9684).
@@ -34799,6 +34905,17 @@ class Compiler {
                 $dateSunSlot = $this->wireDateSunFuncHoistedCallArgSlot($block, $cfgCallOp, (int) $argIndex);
                 if (null !== $dateSunSlot) {
                     $valueSlot = $dateSunSlot;
+                }
+                if (null === $valueSlot) {
+                    $arraySpliceSlot = $this->wireArraySpliceUnaryOffsetReplacementCallArgSlot(
+                        $block,
+                        $cfgCallOp,
+                        (int) $argIndex,
+                        $sends
+                    );
+                    if (null !== $arraySpliceSlot) {
+                        $valueSlot = $arraySpliceSlot;
+                    }
                 }
             }
             $finalCallArgProbe = $arg;
