@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
+use PHPCompiler\OpCode;
 use PHPCompiler\VM;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\ErrorReporter;
@@ -776,25 +777,13 @@ final class VmMath
     }
 
     /**
-     * pow() return typing — int when both operands are int with integral result (php-src math.c, issue #3678).
+     * pow() — delegate to {@see Variable::numericOp()} ** semantics (php-src math.c / zend_operators.c; #3678, #4888).
      */
-    public static function applyPow(Variable $returnVar, Variable $base, Variable $exp): void
+    public static function applyPow(Variable $returnVar, Variable $base, Variable $exp, ?Frame $frame = null): void
     {
         $returnVar->reset();
-        $baseNum = self::parseNumberBuiltinArg($base, 'pow', 1, 'num');
-        $expNum = self::parseNumberBuiltinArg($exp, 'pow', 2, 'exponent');
-        if (\is_int($baseNum) && \is_int($expNum)) {
-            $result = self::powInt($baseNum, $expNum);
-            if (\is_int($result)) {
-                $returnVar->int($result);
-
-                return;
-            }
-            $returnVar->float($result);
-
-            return;
-        }
-        $returnVar->float(\pow((float) $baseNum, (float) $expNum));
+        $vm = null !== $frame && null !== $frame->vmContext ? $frame->vmContext->runtime->vm : null;
+        $returnVar->numericOp(OpCode::TYPE_POW, $base, $exp, $vm, $frame);
     }
 
     /**
