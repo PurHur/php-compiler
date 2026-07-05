@@ -100,38 +100,23 @@ final class ScopeBuiltinEmitHelper
         $isEmpty = $context->builder->icmp(Builder::INT_EQ, $firstChar, $i8->constInt(0, false));
         $context->builder->branchIf($isEmpty, $emptyDone, $nonEmpty);
 
-        $names = array_keys($named);
-        $n = \count($names);
-        $missDone = BasicBlockHelper::append($context, 'extract_target_miss_'.$tag);
-        $checkBlocks = [];
-        for ($i = 0; $i < $n; ++$i) {
-            $checkBlocks[$i] = 0 === $i
-                ? $nonEmpty
-                : BasicBlockHelper::append($context, 'extract_target_check_'.$tag.'_'.$i);
-        }
-
         $merge = BasicBlockHelper::append($context, 'extract_import_done_'.$tag);
-        foreach ($names as $i => $name) {
-            $dest = $named[$name];
-            $context->builder->positionAtEnd($checkBlocks[$i]);
-            $nameGlobal = $context->builder->load($context->constantStringFromString($name));
-            $cmp = $context->builder->call(
-                $context->lookupFunction('strcmp'),
-                self::stringDataPtr($context, $targetStr),
-                self::stringDataPtr($context, $nameGlobal)
-            );
-            $i32 = $context->getTypeFromString('int32');
-            $isMatch = $context->builder->icmp(Builder::INT_EQ, $cmp, $i32->constInt(0, false));
-            $onMatch = BasicBlockHelper::append($context, 'extract_on_match_'.$tag.'_'.$i);
-            $onMiss = ($i < $n - 1) ? $checkBlocks[$i + 1] : $missDone;
-            $context->builder->branchIf($isMatch, $onMatch, $onMiss);
-
-            $context->builder->positionAtEnd($onMatch);
-            self::maybeAssignExtract($context, $dest, $valEntry, $flags, $countSlot, $merge);
-        }
-
-        $context->builder->positionAtEnd($missDone);
-        $context->builder->branch($emptyDone);
+        $context->builder->positionAtEnd($nonEmpty);
+        self::branchOnNamedVariableIndex(
+            $context,
+            ScopeBuiltinRuntime::matchNamedVariableIndex(
+                $context,
+                $targetStr,
+                self::namedVariablesTable($named)
+            ),
+            $named,
+            'extract_target_'.$tag,
+            $emptyDone,
+            static function (Context $context, Variable $dest, string $name) use ($valEntry, $flags, $countSlot, $merge): void {
+                self::maybeAssignExtract($context, $dest, $valEntry, $flags, $countSlot, $merge);
+            },
+            $nonEmpty
+        );
 
         $context->builder->positionAtEnd($emptyDone);
     }
@@ -150,38 +135,29 @@ final class ScopeBuiltinEmitHelper
             return $context->getTypeFromString('int1')->constInt(0, false);
         }
 
+        $index = ScopeBuiltinRuntime::matchNamedVariableIndex(
+            $context,
+            $keyStr,
+            self::namedVariablesTable($named)
+        );
+        $i1 = $context->getTypeFromString('int1');
         $tag = 've'.(string) ++self::$blockSeq;
         $falseDone = BasicBlockHelper::append($context, 'extract_key_exists_false_'.$tag);
-        $checkBlocks = [];
-        for ($i = 0; $i < $n; ++$i) {
-            $checkBlocks[$i] = 0 === $i
-                ? $context->builder->getInsertBlock()
-                : BasicBlockHelper::append($context, 'extract_key_exists_check_'.$tag.'_'.$i);
-        }
-
         $trueBlock = BasicBlockHelper::append($context, 'extract_key_exists_true_'.$tag);
         $phiBlock = BasicBlockHelper::append($context, 'extract_key_exists_phi_'.$tag);
-        $i1 = $context->getTypeFromString('int1');
-
-        foreach ($names as $i => $name) {
-            $dest = $named[$name];
-            $context->builder->positionAtEnd($checkBlocks[$i]);
-            $nameGlobal = $context->builder->load($context->constantStringFromString($name));
-            $cmp = $context->builder->call(
-                $context->lookupFunction('strcmp'),
-                self::stringDataPtr($context, $keyStr),
-                self::stringDataPtr($context, $nameGlobal)
-            );
-            $i32 = $context->getTypeFromString('int32');
-            $isMatch = $context->builder->icmp(Builder::INT_EQ, $cmp, $i32->constInt(0, false));
-            $onMatch = BasicBlockHelper::append($context, 'extract_key_exists_match_'.$tag.'_'.$i);
-            $onMiss = ($i < $n - 1) ? $checkBlocks[$i + 1] : $falseDone;
-            $context->builder->branchIf($isMatch, $onMatch, $onMiss);
-
-            $context->builder->positionAtEnd($onMatch);
-            $isSet = IssetHelper::compile($context, $dest, null);
-            $context->builder->branchIf($isSet, $trueBlock, $falseDone);
-        }
+        $entry = $context->builder->getInsertBlock();
+        self::branchOnNamedVariableIndex(
+            $context,
+            $index,
+            $named,
+            'extract_key_exists_'.$tag,
+            $falseDone,
+            static function (Context $context, Variable $dest, string $name) use ($trueBlock, $falseDone): void {
+                $isSet = IssetHelper::compile($context, $dest, null);
+                $context->builder->branchIf($isSet, $trueBlock, $falseDone);
+            },
+            $entry
+        );
 
         $context->builder->positionAtEnd($falseDone);
         $context->builder->branch($phiBlock);
@@ -500,35 +476,25 @@ final class ScopeBuiltinEmitHelper
         $isEmpty = $context->builder->icmp(Builder::INT_EQ, $firstChar, $i8->constInt(0, false));
         $context->builder->branchIf($isEmpty, $emptyDone, $nonEmpty);
 
-        $names = array_keys($named);
-        $n = \count($names);
+        $context->builder->positionAtEnd($nonEmpty);
         $missDone = BasicBlockHelper::append($context, 'compact_name_miss_'.$tag);
-        $checkBlocks = [];
-        for ($i = 0; $i < $n; ++$i) {
-            $checkBlocks[$i] = 0 === $i
-                ? $nonEmpty
-                : BasicBlockHelper::append($context, 'compact_name_check_'.$tag.'_'.$i);
-        }
-
-        foreach ($names as $i => $name) {
-            $context->builder->positionAtEnd($checkBlocks[$i]);
-            $nameGlobal = $context->builder->load($context->constantStringFromString($name));
-            $cmp = $context->builder->call(
-                $context->lookupFunction('strcmp'),
+        self::branchOnNamedVariableIndex(
+            $context,
+            ScopeBuiltinRuntime::matchNamedVariableIndexFromCstr(
+                $context,
                 $namePtr,
-                self::stringDataPtr($context, $nameGlobal)
-            );
-            $i32 = $context->getTypeFromString('int32');
-            $isMatch = $context->builder->icmp(Builder::INT_EQ, $cmp, $i32->constInt(0, false));
-            $onMatch = BasicBlockHelper::append($context, 'compact_name_match_'.$tag.'_'.$i);
-            $onMiss = ($i < $n - 1) ? $checkBlocks[$i + 1] : $missDone;
-            $context->builder->branchIf($isMatch, $onMatch, $onMiss);
-
-            $context->builder->positionAtEnd($onMatch);
-            $keyStr = $context->builder->load($context->constantStringFromString($name));
-            self::storeVariableSnapshotAtStringKey($context, $result, $keyStr, $named[$name]);
-            $context->builder->branch($emptyDone);
-        }
+                self::namedVariablesTable($named)
+            ),
+            $named,
+            'compact_name_'.$tag,
+            $missDone,
+            static function (Context $context, Variable $dest, string $name) use ($result, $emptyDone): void {
+                $keyStr = $context->builder->load($context->constantStringFromString($name));
+                self::storeVariableSnapshotAtStringKey($context, $result, $keyStr, $dest);
+                $context->builder->branch($emptyDone);
+            },
+            $nonEmpty
+        );
 
         $context->builder->positionAtEnd($missDone);
         self::emitCompactUndefinedVariableWarningFromCstr($context, $namePtr);
@@ -796,5 +762,67 @@ final class ScopeBuiltinEmitHelper
     private static function emitCompactUndefinedVariableWarning(Context $context, string $name): void
     {
         ScopeBuiltinRuntime::emitCompactUndefinedVariableWarning($context, $name);
+    }
+
+    /**
+     * @param array<string, Variable> $named
+     * @param callable(Context, Variable, string): void $onMatch  third arg is the variable name
+     */
+    private static function branchOnNamedVariableIndex(
+        Context $context,
+        Value $index,
+        array $named,
+        string $tag,
+        BasicBlock $missBlock,
+        callable $onMatch,
+        ?BasicBlock $entryBlock = null
+    ): void {
+        $names = \array_keys($named);
+        $n = \count($names);
+        if (0 === $n) {
+            if (null !== $entryBlock) {
+                $context->builder->positionAtEnd($entryBlock);
+            }
+            $context->builder->branch($missBlock);
+
+            return;
+        }
+
+        $i32 = $context->getTypeFromString('int32');
+        $minusOne = $i32->constInt(-1, true);
+        $isMiss = $context->builder->icmp(Builder::INT_EQ, $index, $minusOne);
+        $dispatchEntry = BasicBlockHelper::append($context, $tag.'_dispatch');
+        if (null !== $entryBlock) {
+            $context->builder->positionAtEnd($entryBlock);
+        }
+        $context->builder->branchIf($isMiss, $missBlock, $dispatchEntry);
+
+        $checkBlocks = [$dispatchEntry];
+        for ($i = 1; $i < $n; ++$i) {
+            $checkBlocks[$i] = BasicBlockHelper::append($context, $tag.'_idx_'.$i);
+        }
+
+        foreach ($names as $i => $name) {
+            $context->builder->positionAtEnd($checkBlocks[$i]);
+            $isCase = $context->builder->icmp(
+                Builder::INT_EQ,
+                $index,
+                $i32->constInt($i, false)
+            );
+            $caseMatch = BasicBlockHelper::append($context, $tag.'_match_'.$i);
+            $onMiss = ($i < $n - 1) ? $checkBlocks[$i + 1] : $missBlock;
+            $context->builder->branchIf($isCase, $caseMatch, $onMiss);
+
+            $context->builder->positionAtEnd($caseMatch);
+            $onMatch($context, $named[$name], $name);
+        }
+    }
+
+    /**
+     * @param array<string, Variable> $named
+     */
+    private static function namedVariablesTable(array $named): string
+    {
+        return \implode("\0", \array_keys($named));
     }
 }

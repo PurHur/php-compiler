@@ -38,11 +38,15 @@ final class ScopeBuiltinRuntime
 
     private const STORE_VAR_SNAPSHOT_HELPER = 'PHPCompiler\\ext\\standard\\ScopeBuiltinJitHelper::storeVarSnapshotAtStringKey';
 
+    private const MATCH_NAMED_VAR_INDEX_HELPER = 'PHPCompiler\\ext\\standard\\ScopeBuiltinJitHelper::matchNamedVariableIndex';
+
     private const ABI_RESOLVE_EXTRACT_TARGET = '__scope_extract_resolve_target';
 
     private const ABI_COLLECT_COMPACT_NAMES_HT = '__scope_compact_collect_names_ht';
 
     private const ABI_STORE_VAR_SNAPSHOT = '__scope_store_var_snapshot';
+
+    private const ABI_MATCH_NAMED_VAR_INDEX = '__scope_match_named_var_index';
 
     /** @var list<string> */
     private const COMPILED_HELPERS = [
@@ -51,6 +55,7 @@ final class ScopeBuiltinRuntime
         self::RESOLVE_EXTRACT_TARGET_HELPER,
         self::COLLECT_COMPACT_NAMES_HT_HELPER,
         self::STORE_VAR_SNAPSHOT_HELPER,
+        self::MATCH_NAMED_VAR_INDEX_HELPER,
     ];
 
     public static function ensureLinked(Context $context): void
@@ -59,6 +64,7 @@ final class ScopeBuiltinRuntime
         self::ensureExtractResolveLinked($context);
         self::ensureCompactCollectLinked($context);
         self::ensureStoreSnapshotLinked($context);
+        self::ensureMatchNamedVarLinked($context);
     }
 
     public static function resolveExtractTargetName(
@@ -230,6 +236,82 @@ final class ScopeBuiltinRuntime
         } else {
             $context->builder->clearInsertionPosition();
         }
+    }
+
+    public static function matchNamedVariableIndex(
+        Context $context,
+        Value $needleStr,
+        string $namesTable
+    ): Value {
+        self::ensureMatchNamedVarLinked($context);
+
+        return $context->builder->call(
+            $context->lookupFunction(self::ABI_MATCH_NAMED_VAR_INDEX),
+            $needleStr,
+            $context->builder->load($context->constantStringFromString($namesTable))
+        );
+    }
+
+    public static function matchNamedVariableIndexFromCstr(
+        Context $context,
+        Value $namePtr,
+        string $namesTable
+    ): Value {
+        return self::matchNamedVariableIndex($context, self::cstrToStringPtr($context, $namePtr), $namesTable);
+    }
+
+    public static function ensureMatchNamedVarLinked(Context $context): void
+    {
+        $probe = $context->module->getNamedFunction(self::ABI_MATCH_NAMED_VAR_INDEX);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction(self::ABI_MATCH_NAMED_VAR_INDEX, $probe);
+
+            return;
+        }
+
+        $savedBlock = null;
+        try {
+            $savedBlock = $context->builder->getInsertBlock();
+        } catch (\Throwable) {
+        }
+
+        $strPtr = $context->getTypeFromString('__string__*');
+        $i32 = $context->getTypeFromString('int32');
+        JitVmHelperLink::ensureBridge(
+            $context,
+            self::ABI_MATCH_NAMED_VAR_INDEX,
+            'scope_match_named_var_index_entry',
+            [$strPtr, $strPtr],
+            $i32,
+            self::MATCH_NAMED_VAR_INDEX_HELPER,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#16534'
+        );
+        $context->registerFunction(
+            self::ABI_MATCH_NAMED_VAR_INDEX,
+            $context->module->getNamedFunction(self::ABI_MATCH_NAMED_VAR_INDEX)
+        );
+
+        if (null !== $savedBlock) {
+            $context->builder->positionAtEnd($savedBlock);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
+    }
+
+    private static function cstrToStringPtr(Context $context, Value $namePtr): Value
+    {
+        $i64 = $context->getTypeFromString('int64');
+
+        return $context->builder->call(
+            $context->lookupFunction('__string__init'),
+            $context->builder->zExt(
+                $context->builder->call($context->lookupFunction('strlen'), $namePtr),
+                $i64
+            ),
+            $namePtr
+        );
     }
 
     public static function emitCompactUndefinedVariableWarning(Context $context, string $name): void
