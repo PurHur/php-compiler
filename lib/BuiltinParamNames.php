@@ -337,6 +337,8 @@ final class BuiltinParamNames
                 return ['options', 'limit'];
             case 'pathinfo':
                 return ['path', 'flags'];
+            case 'dirname':
+                return ['path', 'levels'];
             case 'extract':
                 return ['array', 'flags', 'prefix'];
             case 'file':
