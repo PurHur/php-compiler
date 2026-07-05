@@ -392,6 +392,7 @@ require_once __DIR__.'/../../../ext/openssl/OpensslCipherRegistry.php';
 require_once __DIR__.'/../../../ext/openssl/OpensslConstants.php';
 require_once __DIR__.'/../../../ext/openssl/OpensslExtensionPolicy.php';
 require_once __DIR__.'/../../../ext/openssl/OpensslFunction.php';
+require_once __DIR__.'/../../../ext/openssl/OpensslSignJitHelper.php';
 require_once __DIR__.'/../../../ext/openssl/VmOpenssl.php';
 require_once __DIR__.'/../../../ext/openssl/VmOpensslObjects.php';
 require_once __DIR__.'/../../../ext/openssl/VmOpensslX509Native.php';
