@@ -34648,28 +34648,29 @@ class Compiler {
             if (null !== $cfgCallOp && is_array($cfgCallOp->args ?? null) && isset($cfgCallOp->args[(int) $argIndex])) {
                 $finalCallArgProbe = $cfgCallOp->args[(int) $argIndex];
             }
-            $finalVarName = Block::resolveVariableName($finalCallArgProbe);
-            if (null !== $finalVarName && '' !== $finalVarName) {
-                $finalNamedSlot = $block->slotIndexForVariableName($finalVarName)
-                    ?? $this->namedLocalCallArgSlotIfBound(
-                        $finalCallArgProbe,
-                        $block,
-                        $cfgCallOp,
-                        (int) $argIndex
-                    )
-                    ?? $this->slotForNamedLocalFromAssignVarOperand($finalCallArgProbe, $block);
-                if (null !== $finalNamedSlot) {
-                    $finalNamedAssignDest = $block->slotForNamedAssignDest($finalCallArgProbe);
-                    $valueSlot = null !== $finalNamedAssignDest
-                        ? $this->resolveNamedAssignCallArgSlot(
-                            $block,
-                            (int) $finalNamedAssignDest,
-                            $calleeName,
-                            (int) $argIndex,
-                            $finalCallArgProbe
-                        )
-                        : (string) $this->finalizeOperandSlotForAccess($block, (int) $finalNamedSlot, true);
+            $finalNamedSlot = $this->namedLocalCallArgSlotIfBound(
+                $finalCallArgProbe,
+                $block,
+                $cfgCallOp,
+                (int) $argIndex
+            ) ?? $this->slotForNamedLocalFromAssignVarOperand($finalCallArgProbe, $block);
+            if (null === $finalNamedSlot) {
+                $finalVarName = Block::resolveVariableName($finalCallArgProbe);
+                if (null !== $finalVarName && '' !== $finalVarName) {
+                    $finalNamedSlot = $block->slotIndexForVariableName($finalVarName);
                 }
+            }
+            if (null !== $finalNamedSlot) {
+                $finalNamedAssignDest = $block->slotForNamedAssignDest($finalCallArgProbe);
+                $valueSlot = null !== $finalNamedAssignDest
+                    ? $this->resolveNamedAssignCallArgSlot(
+                        $block,
+                        (int) $finalNamedAssignDest,
+                        $calleeName,
+                        (int) $argIndex,
+                        $finalCallArgProbe
+                    )
+                    : (string) $this->finalizeOperandSlotForAccess($block, (int) $finalNamedSlot, true);
             }
             if (
                 null !== $cfgCallOp
@@ -35043,6 +35044,25 @@ class Compiler {
             $postSuppressAssignSlot = $this->slotForPostErrorSuppressAssignNamedLocalCallArg($sendProbe, $block);
             if (null !== $postSuppressAssignSlot) {
                 $valueSlot = (string) $postSuppressAssignSlot;
+            }
+            // substr(sprintf('%o', fileperms($path)), -N) — adjacent nested wiring must not clobber named path locals (#13636, #16055).
+            $sendNamedLocalSlot = $this->namedLocalCallArgSlotIfBound(
+                $sendProbe,
+                $block,
+                $cfgCallOp,
+                (int) $argIndex
+            ) ?? $this->slotForNamedLocalFromAssignVarOperand($sendProbe, $block);
+            if (null !== $sendNamedLocalSlot) {
+                $sendNamedAssignDest = $block->slotForNamedAssignDest($sendProbe);
+                $valueSlot = null !== $sendNamedAssignDest
+                    ? $this->resolveNamedAssignCallArgSlot(
+                        $block,
+                        (int) $sendNamedAssignDest,
+                        $calleeName,
+                        (int) $argIndex,
+                        $sendProbe
+                    )
+                    : (string) $this->finalizeOperandSlotForAccess($block, (int) $sendNamedLocalSlot, true);
             }
             $sends[] = new OpCode(OpCode::TYPE_ARG_SEND, $valueSlot, $nameSlot, $unpackFlag);
         }
