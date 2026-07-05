@@ -1345,11 +1345,11 @@ final class ReflectionSupport
         ) {
             return true;
         }
-        $meta = VmReflection::findClassProperty($entry, $property, $ctx);
-        if (null === $meta) {
+        $visibilityMeta = VmReflection::propertyVisibilityMeta($entry, $property, $ctx);
+        if (null === $visibilityMeta) {
             return false;
         }
-        if (MethodVisibility::isPublic($meta->visibility)) {
+        if (MethodVisibility::isPublic($visibilityMeta['visibility'])) {
             return true;
         }
 
