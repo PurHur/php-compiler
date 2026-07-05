@@ -177,7 +177,7 @@ class AotTest extends BaseTest
                 && str_contains($name, 'strxfrm')) {
                 continue;
             }
-            if (!\PHPCompiler\ext\intl\IntlExtensionPolicy::advertisesBuiltins()
+            if (!\PHPCompiler\ext\intl\IntlExtensionPolicy::runsGraphemeCompliance($name)
                 && str_contains($name, 'grapheme_')
                 && !str_contains($name, 'grapheme_phantom')) {
                 continue;

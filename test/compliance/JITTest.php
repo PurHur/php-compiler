@@ -434,7 +434,7 @@ class JITTest extends BaseTest {
                 && str_contains($name, 'builtin_attribute_classes_84')) {
                 continue;
             }
-            if (!\PHPCompiler\ext\intl\IntlExtensionPolicy::advertisesBuiltins()
+            if (!\PHPCompiler\ext\intl\IntlExtensionPolicy::runsGraphemeCompliance($name)
                 && str_contains($name, 'grapheme_')
                 && !str_contains($name, 'grapheme_phantom')) {
                 continue;
