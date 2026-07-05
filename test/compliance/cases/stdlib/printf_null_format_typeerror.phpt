@@ -2,6 +2,7 @@
 stdlib printf()/sprintf() null format — TypeError not LogicException (#16042, ext/standard/sprintf.c)
 --FILE--
 <?php
+declare(strict_types=1);
 try {
     printf(null);
     echo "printf: ok\n";

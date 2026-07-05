@@ -37,7 +37,7 @@ final class sprintf_ extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $format = VmString::requireStringBuiltinArg($frame->calledArgs[0], 'sprintf', 0, 'format');
+        $format = VmString::stringBuiltinArgForFrame($frame, 0, 'sprintf', 0, 'format');
         $values = [];
         for ($i = 1; $i < $argc; ++$i) {
             $values[] = $frame->calledArgs[$i]->resolveIndirect();
@@ -49,10 +49,6 @@ final class sprintf_ extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        return JitSprintf::formatWithFmt(
-            $context,
-            $this->jitString($context, $args[0], 'sprintf() format'),
-            ...\array_slice($args, 1)
-        );
+        return JitSprintf::format($context, ...$args);
     }
 }

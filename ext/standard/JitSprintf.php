@@ -28,7 +28,7 @@ final class JitSprintf
         if ($argc < 1) {
             throw new \LogicException('sprintf() requires at least one argument');
         }
-        $fmt = JitStringBuiltinArg::lowerRequiredString($context, $args[0], 'sprintf', 0, 'format');
+        $fmt = JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'sprintf', 0, 'format');
         $numArgs = $argc - 1;
         if (0 === $numArgs) {
             $nullArgv = $context->builder->pointerCast(
