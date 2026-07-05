@@ -212,6 +212,36 @@ final class DatePeriodSupport
         DateTimeSupport::addInterval($current, $interval);
     }
 
+    /** php-src date_period_get_start_date — clone of stored start (#16614). */
+    public static function getStartDate(ObjectEntry $period): ObjectEntry
+    {
+        self::requireConstructedPeriod($period);
+        $start = self::requireObjectProperty($period, 'start');
+
+        return DateTimeSupport::cloneDateTimeLike($start);
+    }
+
+    /** php-src date_period_get_date_interval — clone of stored interval (#16614). */
+    public static function getDateInterval(ObjectEntry $period, ?Context $ctx = null): ObjectEntry
+    {
+        self::requireConstructedPeriod($period);
+        $interval = self::requireObjectProperty($period, 'interval');
+
+        return self::cloneIntervalForStorage($interval, $ctx);
+    }
+
+    /** php-src date_period_get_recurrences — user recurrence count or null for end-date form (#16614). */
+    public static function getRecurrences(ObjectEntry $period): ?int
+    {
+        self::requireConstructedPeriod($period);
+        $recurrences = self::requireIntProperty($period, 'recurrences')->toInt();
+        if (self::RECURRENCES_END_DATE === $recurrences) {
+            return null;
+        }
+
+        return $recurrences - 1;
+    }
+
     private static function cloneIntervalForStorage(ObjectEntry $interval, ?Context $ctx): ObjectEntry
     {
         if (!$interval->constructed || null === $ctx) {
@@ -237,6 +267,14 @@ final class DatePeriodSupport
     {
         if (self::CLASS_DATEPERIOD !== strtolower($period->class->name)) {
             throw new \LogicException('DatePeriod iterator called on non-DatePeriod object');
+        }
+    }
+
+    private static function requireConstructedPeriod(ObjectEntry $period): void
+    {
+        self::requireDatePeriodFromObject($period);
+        if (!$period->constructed) {
+            throw new \LogicException('The DatePeriod object has not been initialized correctly');
         }
     }
 
