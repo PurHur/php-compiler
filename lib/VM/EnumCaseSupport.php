@@ -306,9 +306,10 @@ final class EnumCaseSupport
     }
 
     /**
-     * Transitive ordering for sort()/asort() on enum case arrays (#5546, php-src array.c php_array_compare_transitive).
+     * Transitive ordering for sort()/asort() on enum case arrays (#5546, #5691, php-src array.c).
      *
-     * Backed enums: backing scalar spaceship. Unit enums: object handle (spl_object_id order).
+     * php-src SORT_REGULAR uses stable object-handle order for enum zvals, not backing scalars
+     * (php_array_data_compare_unstable_i / php_array_compare_transitive, PR #20517).
      */
     public static function compareEnumCasesForSort(Variable $left, Variable $right): int
     {
@@ -322,12 +323,6 @@ final class EnumCaseSupport
         }
         if ($leftName === $rightName) {
             return 0;
-        }
-        if (null !== $leftClass->backedType) {
-            return Variable::spaceshipCompare(
-                self::backingValueForMinMax($left),
-                self::backingValueForMinMax($right)
-            );
         }
 
         return self::objectIdForEnumSort($left) <=> self::objectIdForEnumSort($right);
