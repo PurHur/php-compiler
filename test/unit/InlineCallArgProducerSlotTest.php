@@ -5232,6 +5232,25 @@ PHP;
         self::assertStringContainsString('ok:', ob_get_clean());
     }
 
+    /** Issue #16640 — multiple date_sunrise/date_sunset calls wire per-call SUNFUNCS + UnaryMinus longitude. */
+    public function testDateSunriseSunsetMultiCallHoistedPreludesRuntime(): void
+    {
+        $code = <<<'PHP'
+<?php
+declare(strict_types=1);
+
+$ts = gmmktime(12, 0, 0, 6, 21, 2020);
+$riseStr = date_sunrise($ts, SUNFUNCS_RET_STRING, 40.7, -74.0);
+$setStr = date_sunset($ts, SUNFUNCS_RET_STRING, 40.7, -74.0);
+echo $riseStr, ':', $setStr, "\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'date_sunrise_sunset_multi.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("09:23:00:32\n", ob_get_clean());
+    }
+
     /** Issue #11336 — date_sun_info(strtotime(...), lat, lon) wires hoisted FuncCall + UnaryMinus slots. */
     public function testDateSunInfoInlineStrtotimeAndUnaryLongitudeUsesProducerSlots(): void
     {
