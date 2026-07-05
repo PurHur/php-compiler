@@ -6318,4 +6318,26 @@ PHP;
         $runtime->run($block);
         self::assertSame("1\n", ob_get_clean());
     }
+
+    /** Issue #16331 — method_exists($rA) must not clobber named ReflectionEnumUnitCase CV. */
+    public function testMethodExistsJumpIfPreservesReflectionEnumUnitCaseNamedLocal(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $code = file_get_contents(__DIR__ . '/../repro/maintainer_gap_reflection_enum_unit_case_isdeprecated.php');
+            self::assertIsString($code);
+            $runtime = new Runtime();
+            $block = $runtime->parseAndCompile($code, 'reflection_enum_unit_case_isdeprecated.php');
+            ob_start();
+            $runtime->run($block);
+            self::assertSame("bool(true)\nbool(true)\nbool(false)\n", ob_get_clean());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
 }
