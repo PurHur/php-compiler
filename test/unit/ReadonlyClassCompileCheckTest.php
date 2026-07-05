@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\Test\Unit;
 
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
@@ -196,6 +197,9 @@ PHP;
     /** @covers issue #6991 */
     public function testReadonlyAnonymousClassCompiles(): void
     {
+        if (!CompilerVersion::supportsReadonlyAnonymousClass()) {
+            $this->markTestSkipped('new readonly class requires PHP 8.3+ forward profile');
+        }
         $runtime = new Runtime();
         $code = <<<'PHP'
 <?php
