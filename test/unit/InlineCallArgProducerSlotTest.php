@@ -5704,6 +5704,44 @@ PHP;
         self::assertSame("'a'\n'a'\n", $out);
     }
 
+    /** Issue #16461 — var_export('abc'[-1], true) wires dim-fetch char, not UnaryMinus dim index. */
+    public function testVarExportStringNegativeOffsetInlineDimFetchUsesFetchResultSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+echo var_export('abc'[-1], true);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'string_negative_offset_var_export.php');
+
+        $dimFetchResultSlot = null;
+        $varExportSends = [];
+        $fcallOrdinal = 0;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_ARRAY_DIM_FETCH === $op->type) {
+                $dimFetchResultSlot = $op->arg1;
+            }
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                ++$fcallOrdinal;
+                if (1 === $fcallOrdinal) {
+                    $varExportSends = [];
+                }
+            }
+            if (1 === $fcallOrdinal && OpCode::TYPE_ARG_SEND === $op->type) {
+                $varExportSends[] = $op->arg1;
+            }
+        }
+
+        self::assertNotNull($dimFetchResultSlot);
+        self::assertCount(2, $varExportSends);
+        self::assertSame($dimFetchResultSlot, $varExportSends[0], 'arg sends='.json_encode($varExportSends));
+
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertSame("'c'", $out);
+    }
+
     /** Issue #14828 — DateTimeZone::getTransitions(strtotime(), strtotime()) distinct arg slots. */
     public function testDateTimeZoneGetTransitionsDualInlineStrtotimeUsesDistinctArgSlots(): void
     {

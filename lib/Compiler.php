@@ -20247,6 +20247,18 @@ class Compiler {
                 || $child instanceof Op\Expr\BooleanNot
             ) {
                 $next = $cfgChildren[$i + 1] ?? null;
+                // php-cfg var_export('abc'[-1], true) — UnaryMinus feeds sibling ArrayDimFetch dim (#16461).
+                if (
+                    $next instanceof Op\Expr\ArrayDimFetch
+                    && null !== $child->result
+                    && null !== $next->dim
+                    && (
+                        $next->dim === $child->result
+                        || $this->operandsReferToSameVariable($next->dim, $child->result)
+                    )
+                ) {
+                    continue;
+                }
                 if (
                     ($next instanceof Op\Expr\FuncCall || $next instanceof Op\Expr\NsFuncCall)
                     && (
@@ -31482,6 +31494,13 @@ class Compiler {
         ?Op $cfgCallOp = null,
         int $argIndex = 0
     ): ?int {
+        if (
+            null !== $cfgCallOp
+            && null !== $block->orig
+            && $this->unaryLiteralFeedsSiblingArrayDimFetchDim($cfgCallOp, $block)
+        ) {
+            return null;
+        }
         $unaryRoot = $this->unwrapOperandChain($arg);
         if (!$unaryRoot instanceof Op\Expr\UnaryMinus && !$unaryRoot instanceof Op\Expr\UnaryPlus) {
             $unaryRoot = $this->unaryLiteralProducerForHoistedCallArg($cfgCallOp, $argIndex, $block, $arg);
@@ -31682,6 +31701,43 @@ class Compiler {
     /**
      * php-cfg echo ConcatList hoists sibling FuncCalls with Concat stmts between them (#13387).
      */
+    private function unaryLiteralFeedsSiblingArrayDimFetchDim(?Op $callOp, Block $block): bool
+    {
+        if (null === $callOp || null === $block->orig) {
+            return false;
+        }
+        $callIndex = null;
+        foreach ($block->orig->children as $i => $child) {
+            if ($child === $callOp) {
+                $callIndex = $i;
+                break;
+            }
+        }
+        if (null === $callIndex || $callIndex < 2) {
+            return false;
+        }
+        for ($i = $callIndex - 1; $i >= 0; --$i) {
+            $child = $block->orig->children[$i];
+            if ($child instanceof Op\Expr\ConstFetch || $child instanceof Op\Expr\ClassConstFetch) {
+                continue;
+            }
+            if (!$child instanceof Op\Expr\UnaryMinus && !$child instanceof Op\Expr\UnaryPlus) {
+                return false;
+            }
+            $next = $block->orig->children[$i + 1] ?? null;
+
+            return $next instanceof Op\Expr\ArrayDimFetch
+                && null !== $child->result
+                && null !== $next->dim
+                && (
+                    $next->dim === $child->result
+                    || $this->operandsReferToSameVariable($next->dim, $child->result)
+                );
+        }
+
+        return false;
+    }
+
     private function unaryLiteralProducerForHoistedCallArg(
         ?Op $callOp,
         int $argIndex,

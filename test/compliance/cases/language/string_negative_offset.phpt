@@ -7,7 +7,9 @@ echo "abc"[-2], "\n";
 $s = 'abc';
 $s[-1] = 'z';
 echo $s, "\n";
+echo var_export('abc'[-1], true), "\n";
 --EXPECT--
 c
 b
 abz
+'c'
