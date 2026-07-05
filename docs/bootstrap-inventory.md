@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 4077 |
-| Phase A inventory files (M2 ratio SSOT) | 4077 |
+| PHP files on vm.php path | 4079 |
+| Phase A inventory files (M2 ratio SSOT) | 4079 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 10993 |
+| Source constructs flagged (warnings) | 10994 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -710,6 +710,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/GetClassJitHelper.php` | 0 | 1 |
 | `ext/standard/GetDeclaredExcludeDeprecatedJit.php` | 0 | 1 |
 | `ext/standard/GetHeadersJitHelper.php` | 0 | 1 |
+| `ext/standard/GetObjectVarsJitHelper.php` | 0 | 1 |
 | `ext/standard/GetcwdJitHelper.php` | 0 | 1 |
 | `ext/standard/GetdateJitHelper.php` | 0 | 1 |
 | `ext/standard/GetenvJitHelper.php` | 0 | 3 |
@@ -910,7 +911,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitGetIncludedFiles.php` | 0 | 2 |
 | `ext/standard/JitGetMetaTags.php` | 0 | 1 |
 | `ext/standard/JitGetObjectId.php` | 0 | 1 |
-| `ext/standard/JitGetObjectVars.php` | 0 | 2 |
+| `ext/standard/JitGetObjectVars.php` | 0 | 1 |
 | `ext/standard/JitGetParentClass.php` | 0 | 2 |
 | `ext/standard/JitGetResourceId.php` | 0 | 1 |
 | `ext/standard/JitGetResourceType.php` | 0 | 1 |
@@ -3064,6 +3065,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringFsGlob.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringFsGlobVecJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringFunctionExists.php` | 0 | 1 |
+| `lib/JIT/Builtin/StringGetObjectVars.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringGetdate.php` | 0 | 2 |
 | `lib/JIT/Builtin/StringGetenv.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringGetenvAll.php` | 0 | 3 |
@@ -8880,6 +8882,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `ext/standard/GetObjectVarsJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
 ### `ext/standard/GetcwdJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
@@ -9957,8 +9964,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitGetObjectVars.php`
 
 **Warnings** (review for bootstrap subset):
-- new JITVariable (line 340)
-- 22 class method(s)
+- 8 class method(s)
 
 ### `ext/standard/JitGetParentClass.php`
 
@@ -20854,7 +20860,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinParamNames.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 418)
+- new ArgumentCountError (line 426)
 - 9 class method(s)
 
 ### `lib/BuiltinTypeClassConstant.php`
@@ -24192,6 +24198,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 5 class method(s)
+
+### `lib/JIT/Builtin/StringGetObjectVars.php`
+
+**Warnings** (review for bootstrap subset):
+- 4 class method(s)
 
 ### `lib/JIT/Builtin/StringGetdate.php`
 
