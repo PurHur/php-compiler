@@ -41,14 +41,14 @@ final class ReflectionPropertyIsProtected extends VmClassMethod
 
             return;
         }
-        $meta = VmReflection::findClassProperty($entry, $property, $ctx);
+        $meta = VmReflection::propertyVisibilityMeta($entry, $property, $ctx);
         if (null === $meta) {
             ReflectionSupport::throwReflectionException(
                 ReflectionSupport::propertyNotFoundMessage($className, $property)
             );
         }
         if (null !== $frame->returnVar) {
-            $frame->returnVar->bool(($meta->visibility & CfgFunc::FLAG_PROTECTED) !== 0);
+            $frame->returnVar->bool(($meta['visibility'] & CfgFunc::FLAG_PROTECTED) !== 0);
         }
     }
 }

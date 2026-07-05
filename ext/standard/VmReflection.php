@@ -2194,12 +2194,14 @@ final class VmReflection
         return $current->block->func->class->value;
     }
 
-    /** php-src ZEND_ACC_* filter bitmask for getProperties()/getMethods() (not getModifiers()). */
-    public const REFLECTION_IS_PUBLIC = 256;
+    /** php-src ZEND_ACC_* filter bitmask for getProperties() (ReflectionProperty::IS_*). */
+    public const REFLECTION_IS_PUBLIC = \PHPCfg\Func::FLAG_PUBLIC;
 
-    public const REFLECTION_IS_PROTECTED = 512;
+    public const REFLECTION_IS_PROTECTED = \PHPCfg\Func::FLAG_PROTECTED;
 
-    public const REFLECTION_IS_PRIVATE = 1024;
+    public const REFLECTION_IS_PRIVATE = \PHPCfg\Func::FLAG_PRIVATE;
+
+    public const REFLECTION_IS_STATIC = 16;
 
     /** Register ReflectionAttribute::IS_INSTANCEOF (#11471, ext/reflection/php_reflection.c). */
     public static function registerReflectionAttributeClassConstants(ClassEntry $entry): void
@@ -2210,7 +2212,7 @@ final class VmReflection
         $entry->constNames['is_instanceof'] = 'IS_INSTANCEOF';
     }
 
-    /** Register ReflectionProperty::IS_* class constants (#5060). */
+    /** Register ReflectionProperty::IS_* class constants (#5060, #4470). */
     public static function registerReflectionPropertyClassConstants(ClassEntry $entry): void
     {
         foreach (
@@ -2218,6 +2220,7 @@ final class VmReflection
                 'is_public' => self::REFLECTION_IS_PUBLIC,
                 'is_protected' => self::REFLECTION_IS_PROTECTED,
                 'is_private' => self::REFLECTION_IS_PRIVATE,
+                'is_static' => self::REFLECTION_IS_STATIC,
             ] as $name => $value
         ) {
             $const = new Variable();
@@ -2259,11 +2262,20 @@ final class VmReflection
 
     public static function matchesReflectionVisibilityFilter(int $cfgVisibility, int $filter): bool
     {
+        return self::propertyMatchesReflectionFilter($cfgVisibility, false, $filter);
+    }
+
+    public static function propertyMatchesReflectionFilter(int $cfgVisibility, bool $isStatic, int $filter): bool
+    {
         if (0 === $filter) {
             return true;
         }
+        $flags = self::visibilityToReflectionBitmask($cfgVisibility);
+        if ($isStatic) {
+            $flags |= self::REFLECTION_IS_STATIC;
+        }
 
-        return (self::visibilityToReflectionBitmask($cfgVisibility) & $filter) !== 0;
+        return ($flags & $filter) !== 0;
     }
 
     public static function visibilityToReflectionBitmask(int $cfgVisibility): int
@@ -2302,23 +2314,65 @@ final class VmReflection
     }
 
     /**
-     * Instance properties visible on $entry (child overrides parent), php-src ReflectionClass::getProperties.
+     * Instance and static properties visible on $entry, php-src ReflectionClass::getProperties (#4470).
      *
      * @return list<ClassProperty>
      */
     public static function collectClassPropertiesForReflection(ClassEntry $entry, Context $ctx, int $filter = 0): array
     {
-        $byLc = [];
-        foreach (array_reverse(self::classHierarchyChain($entry, $ctx)) as $class) {
+        $result = [];
+        /** @var array<string, true> */
+        $seenLc = [];
+        foreach (self::classHierarchyChain($entry, $ctx) as $class) {
             foreach ($class->properties as $prop) {
-                if (!self::matchesReflectionVisibilityFilter($prop->visibility, $filter)) {
+                $declLc = '' !== $prop->declaringClassLc
+                    ? $prop->declaringClassLc
+                    : strtolower(ltrim($class->name, '\\'));
+                if (
+                    ($prop->visibility & \PHPCfg\Func::FLAG_PRIVATE) !== 0
+                    && $declLc !== strtolower(ltrim($entry->name, '\\'))
+                ) {
                     continue;
                 }
-                $byLc[strtolower($prop->name)] = $prop;
+                $lc = strtolower($prop->name);
+                if (isset($seenLc[$lc])) {
+                    continue;
+                }
+                if (!self::propertyMatchesReflectionFilter($prop->visibility, false, $filter)) {
+                    continue;
+                }
+                $seenLc[$lc] = true;
+                $result[] = $prop;
+            }
+            $classLc = strtolower(ltrim($class->name, '\\'));
+            foreach ($class->staticProperties as $propLc => $storage) {
+                if (isset($seenLc[$propLc])) {
+                    continue;
+                }
+                $vis = $class->staticPropertyVisibility[$propLc] ?? CfgFunc::FLAG_PUBLIC;
+                $declLc = $class->staticPropertyDeclaringClassLc[$propLc] ?? $classLc;
+                if (($vis & CfgFunc::FLAG_PRIVATE) !== 0 && $declLc !== strtolower(ltrim($entry->name, '\\'))) {
+                    continue;
+                }
+                if (!self::propertyMatchesReflectionFilter($vis, true, $filter)) {
+                    continue;
+                }
+                $seenLc[$propLc] = true;
+                $displayName = $storage->objectPropertyName ?? $propLc;
+                $proto = new Variable();
+                $proto->copyFrom($storage->resolveIndirect());
+                $result[] = new ClassProperty(
+                    $displayName,
+                    null,
+                    $proto,
+                    false,
+                    $vis,
+                    $declLc,
+                );
             }
         }
 
-        return array_values($byLc);
+        return $result;
     }
 
     /**
