@@ -31538,13 +31538,21 @@ class Compiler {
                             $nullSlot = $block->slotForOperand($preludeProducer->result);
                         }
                         if (null !== $nullSlot) {
-                            $sends[] = new OpCode(
-                                OpCode::TYPE_ARG_SEND,
-                                $nullSlot,
-                                $nameSlot,
-                                $unpackFlag
-                            );
-                            continue;
+                            $callArg = $cfgCallOp->args[(int) $argIndex] ?? $arg;
+                            if (
+                                $callArg instanceof Operand
+                                && $this->callArgOperandExpectsArrayProducer($callArg)
+                            ) {
+                                // array_column([...], null, 'x') — haystack must not steal trailing null prelude (#15914, #16324).
+                            } else {
+                                $sends[] = new OpCode(
+                                    OpCode::TYPE_ARG_SEND,
+                                    $nullSlot,
+                                    $nameSlot,
+                                    $unpackFlag
+                                );
+                                continue;
+                            }
                         }
                     }
                 }
