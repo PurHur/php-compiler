@@ -59,8 +59,8 @@
       <div class="cap-summary">
         <article>
           <div>Language constructs</div>
-          <strong>82</strong> / 89 full (VM+JIT+AOT)
-          <p style="margin:0.35rem 0 0;font-size:0.88rem;color:var(--text-muted)">3 partial · 4 gaps</p>
+          <strong>80</strong> / 89 full (VM+JIT+AOT)
+          <p style="margin:0.35rem 0 0;font-size:0.88rem;color:var(--text-muted)">5 partial · 4 gaps</p>
         </article>
         <article>
           <div>Stdlib builtins</div>
@@ -115,7 +115,7 @@
 <tr data-support="full"><td><code>Fibers (`Fiber`, `Fiber::suspend()`, start/resume)</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td><a href="https://github.com/PurHur/php-compiler/issues/3130">#3130</a></td></tr>
 <tr data-support="full"><td><code>`ClassName::class` / `static::class`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td><a href="https://github.com/PurHur/php-compiler/issues/740">#740</a></td></tr>
 <tr data-support="full"><td><code>Class member constants `public` / `private` / `protected const`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td><a href="https://github.com/PurHur/php-compiler/issues/2199">#2199</a></td></tr>
-<tr data-support="full"><td><code>PHP 8.3 typed class constants (`const array X = [1,2];`, `const string S = &#039;a&#039;;`)</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td><a href="https://github.com/PurHur/php-compiler/issues/3592">#3592</a></td></tr>
+<tr data-support="partial"><td><code>PHP 8.3 typed class constants (`const array X = [1,2];`, `const string S = &#039;a&#039;;`)</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-no">no</td><td><a href="https://github.com/PurHur/php-compiler/issues/3592">#3592</a></td></tr>
 <tr data-support="full"><td><code>PHP 8.3+ file/namespace typed constants (`const string X = &#039;a&#039;;`)</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td><a href="https://github.com/PurHur/php-compiler/issues/7081">#7081</a></td></tr>
 <tr data-support="full"><td><code>PHP 8.3 typed interface constants (`interface I { public const string X = &#039;a&#039;; }`)</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td><a href="https://github.com/PurHur/php-compiler/issues/5980">#5980</a></td></tr>
 <tr data-support="partial"><td><code>Class constants with `new` object expressions</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-no">no</td><td><a href="https://github.com/PurHur/php-compiler/issues/15608">#15608</a></td></tr>
@@ -163,7 +163,7 @@
 <tr data-support="full"><td><code>readonly classes</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td><a href="https://github.com/PurHur/php-compiler/issues/1360">#1360</a></td></tr>
 <tr data-support="full"><td><code>readonly properties (per-property)</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td><a href="https://github.com/PurHur/php-compiler/issues/3149">#3149</a></td></tr>
 <tr data-support="full"><td><code>Property hooks (`get` / `set` on properties)</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td><a href="https://github.com/PurHur/php-compiler/issues/3145">#3145</a></td></tr>
-<tr data-support="full"><td><code>PHP 8.4 asymmetric property visibility (private(set), protected(set), etc.)</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td><a href="https://github.com/PurHur/php-compiler/issues/3165">#3165</a></td></tr>
+<tr data-support="partial"><td><code>PHP 8.4 asymmetric property visibility (private(set), protected(set), etc.)</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-no">no</td><td><a href="https://github.com/PurHur/php-compiler/issues/3165">#3165</a></td></tr>
 <tr data-support="full"><td><code>User __destruct()</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td><a href="https://github.com/PurHur/php-compiler/issues/4096">#4096</a></td></tr>
 <tr data-support="full"><td><code>PHP 8 attributes — `ReflectionClass` / `ReflectionMethod` metadata</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td><a href="https://github.com/PurHur/php-compiler/issues/1936">#1936</a></td></tr>
 <tr data-support="full"><td><code>WeakReference / WeakMap</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td><a href="https://github.com/PurHur/php-compiler/issues/3667">#3667</a></td></tr>
