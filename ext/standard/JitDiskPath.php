@@ -41,8 +41,8 @@ final class JitDiskPath
         $path = self::lowerPathString($context, $arg, $function);
 
         return $freeSpace
-            ? JitStat::pathDiskFreeSpaceBoxed($context, $path)
-            : JitStat::pathDiskTotalSpaceBoxed($context, $path);
+            ? JitStat::pathDiskFreeSpaceBoxed($context, $path, $function)
+            : JitStat::pathDiskTotalSpaceBoxed($context, $path, $function);
     }
 
     /** @return Value */
@@ -141,8 +141,8 @@ final class JitDiskPath
 
         $context->builder->positionAtEnd($statBlock);
         $statResult = $freeSpace
-            ? JitStat::pathDiskFreeSpaceBoxed($context, $path)
-            : JitStat::pathDiskTotalSpaceBoxed($context, $path);
+            ? JitStat::pathDiskFreeSpaceBoxed($context, $path, $function)
+            : JitStat::pathDiskTotalSpaceBoxed($context, $path, $function);
         $statEnd = $context->builder->getInsertBlock();
         $context->builder->branch($mergeBlock);
 

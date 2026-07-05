@@ -182,15 +182,15 @@ final class JitStat
     }
 
     /** @return Value */
-    public static function pathDiskFreeSpaceBoxed(Context $context, Value $str): Value
+    public static function pathDiskFreeSpaceBoxed(Context $context, Value $str, string $warnFunction = 'disk_free_space'): Value
     {
-        return self::pathDiskSpaceBoxed($context, $str, StatPathRuntime::FN_DISK_FREE);
+        return self::pathDiskSpaceBoxed($context, $str, StatPathRuntime::FN_DISK_FREE, $warnFunction);
     }
 
     /** @return Value */
-    public static function pathDiskTotalSpaceBoxed(Context $context, Value $str): Value
+    public static function pathDiskTotalSpaceBoxed(Context $context, Value $str, string $warnFunction = 'disk_total_space'): Value
     {
-        return self::pathDiskSpaceBoxed($context, $str, StatPathRuntime::FN_DISK_TOTAL);
+        return self::pathDiskSpaceBoxed($context, $str, StatPathRuntime::FN_DISK_TOTAL, $warnFunction);
     }
 
     public static function warnPathStatArrayFailed(
@@ -262,7 +262,7 @@ final class JitStat
     }
 
     /** @return Value */
-    private static function pathDiskSpaceBoxed(Context $context, Value $str, string $abiName): Value
+    private static function pathDiskSpaceBoxed(Context $context, Value $str, string $abiName, string $warnFunction): Value
     {
         StringTriggerErrorJit::implement($context);
         StatPathRuntime::ensureLinked($context);
@@ -279,8 +279,7 @@ final class JitStat
         $context->builder->branchIf($failed, $failBlock, $okBlock);
 
         $context->builder->positionAtEnd($failBlock);
-        $warnFn = StatPathRuntime::FN_DISK_FREE === $abiName ? 'disk_free_space' : 'disk_total_space';
-        self::emitStatWarning($context, $warnFn.'(): No such file or directory');
+        self::emitStatWarning($context, $warnFunction.'(): No such file or directory');
         $i1 = $context->getTypeFromString('int1');
         JitValueBox::writeBool($context, $slot, $i1->constInt(0, false));
         $context->builder->branch($doneBlock);
