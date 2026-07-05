@@ -24376,6 +24376,17 @@ class Compiler {
                 }
             }
         }
+        if (
+            0 === $argIndex
+            && null !== $this->nestedFuncCallProducerBeforeTrailingConstFetchPreludes(
+                $cfgCallOp,
+                $callIndex,
+                $block->orig->children
+            )
+        ) {
+            // var_export(g(), true) — trailing ConstFetch is arg #1, not nested callee return (#11272, #16298).
+            return null;
+        }
         $constSlot = $block->slotForOperand($immediatePrelude->result);
 
         return null !== $constSlot ? (string) $constSlot : null;
@@ -24438,6 +24449,11 @@ class Compiler {
             $block->orig->children
         );
         if ($siblingFuncCount < 2) {
+            $nestedSlot = $this->resolveAdjacentNestedFuncCallArgSlot($block, $cfgCallOp, $argIndex);
+            if (null !== $nestedSlot) {
+                return $nestedSlot;
+            }
+
             return null;
         }
         if ($this->callIncludesNamedParameter($cfgCallOp)) {
@@ -25734,6 +25750,53 @@ class Compiler {
         }
 
         return array_merge($producerOps, $sends);
+    }
+
+    /**
+     * var_export(g(), true) — nested callee before trailing ConstFetch preludes feeds arg #0 (#11272, #16298).
+     *
+     * @param list<Op> $cfgChildren
+     */
+    private function nestedFuncCallProducerBeforeTrailingConstFetchPreludes(
+        Op $consumer,
+        int $consumerIndex,
+        array $cfgChildren
+    ): ?Op\Expr {
+        if ($consumerIndex < 1) {
+            return null;
+        }
+        $probeIndex = $consumerIndex - 1;
+        while ($probeIndex >= 0) {
+            $probe = $cfgChildren[$probeIndex] ?? null;
+            if ($probe instanceof Op\Expr\ConstFetch || $probe instanceof Op\Expr\ClassConstFetch) {
+                --$probeIndex;
+                continue;
+            }
+            break;
+        }
+        $prev = $cfgChildren[$probeIndex] ?? null;
+        if (
+            !($prev instanceof Op\Expr\FuncCall || $prev instanceof Op\Expr\NsFuncCall)
+            || !$this->isNestedCallArgProducerForConsumer(
+                $prev,
+                $consumer,
+                $probeIndex,
+                $consumerIndex,
+                $cfgChildren
+            )
+        ) {
+            return null;
+        }
+        $targetArgIndex = $this->siblingMultiArgFuncCallProducerTargetArgIndex(
+            $probeIndex,
+            $consumerIndex,
+            $cfgChildren
+        );
+        if (null === $targetArgIndex) {
+            $targetArgIndex = 0;
+        }
+
+        return 0 === $targetArgIndex ? $prev : null;
     }
 
     private function resolveAdjacentNestedFuncCallArgSlot(
@@ -30373,6 +30436,18 @@ class Compiler {
             && null !== $block->orig
             && $this->isErrorSuppressEndBlock($block->orig)
         ) {
+            return null;
+        }
+        if (
+            0 === $producerOrdinal
+            && \count($trailingConstFetches) < \count($nonEmbeddedArgIndices)
+            && null !== $this->nestedFuncCallProducerBeforeTrailingConstFetchPreludes(
+                $cfgCallOp,
+                $callIndex,
+                $children
+            )
+        ) {
+            // var_export(array_keys($a, null), true) — sole trailing ConstFetch is arg #1 (#11272, #16298).
             return null;
         }
         $fetch = $trailingConstFetches[$producerOrdinal] ?? null;
