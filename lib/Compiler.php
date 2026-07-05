@@ -25618,6 +25618,7 @@ class Compiler {
         if (
             0 === $argIndex
             && !$this->operandsReferToSameVariable($callArg, $prev->result)
+            && !$this->isAssignInCallFromPrecedingProducer($block, $prev)
         ) {
             return null;
         }
@@ -25630,6 +25631,41 @@ class Compiler {
         }
 
         return (string) $slot;
+    }
+
+    /**
+     * `strlen(($q = pack(...)))` — assign.expr references the FuncCall sibling immediately before Assign (#16273, re-#11365).
+     */
+    private function isAssignInCallFromPrecedingProducer(Block $block, Op\Expr\Assign $assign): bool
+    {
+        if (null === $block->orig) {
+            return false;
+        }
+        $assignIndex = null;
+        foreach ($block->orig->children as $i => $child) {
+            if ($child === $assign) {
+                $assignIndex = $i;
+                break;
+            }
+        }
+        if (null === $assignIndex || $assignIndex < 1) {
+            return false;
+        }
+        $before = $block->orig->children[$assignIndex - 1] ?? null;
+        if (
+            !$before instanceof Op\Expr\FuncCall
+            && !$before instanceof Op\Expr\NsFuncCall
+            && !$before instanceof Op\Expr\StaticCall
+            && !$before instanceof Op\Expr\MethodCall
+            && !$before instanceof Op\Expr\New_
+        ) {
+            return false;
+        }
+        if (null === $before->result) {
+            return false;
+        }
+
+        return $this->operandsReferToSameVariable($assign->expr, $before->result);
     }
 
     /** TYPE_ASSIGN arg3 for a registered assign.expr temp (#15151). */

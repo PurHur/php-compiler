@@ -6029,4 +6029,47 @@ PHP;
         $runtime->run($block);
         self::assertSame("serialize_unserialize_magic_ok\n", ob_get_clean());
     }
+
+    /** Issue #16273 — assign-in-call must wire pack() RHS when php-cfg dead arg ≠ assign.result (#11365). */
+    public function testStrlenAssignExprPackCallArgUsesPackReturnSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+declare(strict_types=1);
+echo strlen(($q = pack('C', 0))), "\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'strlen_assign_expr_pack.php');
+
+        $packReturnSlot = null;
+        $strlenArgSlot = null;
+        $pendingInit = null;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                $name = $block->constants[$op->arg1]->toString();
+                $pendingInit = $name;
+                if ('pack' === $name) {
+                    $packReturnSlot = null;
+                }
+                if ('strlen' === $name) {
+                    $strlenArgSlot = null;
+                }
+                continue;
+            }
+            if (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type && 'pack' === $pendingInit) {
+                $packReturnSlot = $op->arg1;
+            }
+            if (OpCode::TYPE_ARG_SEND === $op->type && 'strlen' === $pendingInit) {
+                $strlenArgSlot = $op->arg1;
+            }
+        }
+
+        self::assertNotNull($packReturnSlot, 'pack return slot missing');
+        self::assertNotNull($strlenArgSlot, 'strlen arg send missing');
+        self::assertSame($packReturnSlot, $strlenArgSlot, 'strlen must consume pack() return slot');
+
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("1\n", ob_get_clean());
+    }
 }
