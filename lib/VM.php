@@ -5385,7 +5385,8 @@ restart:
                         goto restart;
                     }
                     $argSlot = (int) $op->arg1;
-                    $argIndex = \count($frame->callArgEntries);
+                    // Implicit $this / new() prefix occupies low call-arg indices (#6739, #11844).
+                    $argIndex = \count($frame->callArgs) + \count($frame->callArgEntries);
                     $value = $this->resolveOutgoingCallArgValue($frame, $argSlot);
                     $needsRef = $this->outgoingCallArgNeedsReference($frame, $argIndex, $value);
                     if (!$needsRef) {
