@@ -15809,6 +15809,18 @@ class Compiler {
         $producers = $this->filterNestedNewInlineCallArgProducers($producers, $cfgCallOp);
         $producers = $this->filterKnownVoidMethodCallPreludes($producers);
         $producers = $this->filterStmtLevelArrayPointerFuncPreludes($producers);
+        // var_export(reset($a), true) — arg #0 must bind hoisted reset(), not ConstFetch true (#16556, #13829).
+        if (0 === $argIndex) {
+            foreach ($producers as $producer) {
+                if (!($producer instanceof Op\Expr\FuncCall || $producer instanceof Op\Expr\NsFuncCall)) {
+                    continue;
+                }
+                $fn = $this->resolveCfgFuncCallName($producer);
+                if (null !== $fn && ReferencableCheck::isArrayInternalPointerBuiltin($fn)) {
+                    return $producer;
+                }
+            }
+        }
         $hoistedScalar = $this->matchHoistedScalarConstFetchInlineCallArgProducer($producers, $callArg);
         if (null !== $hoistedScalar) {
             return $hoistedScalar;
@@ -19321,6 +19333,31 @@ class Compiler {
         if ($callArg instanceof Operand && $this->callArgOperandExpectsArrayProducer($callArg)) {
             return null;
         }
+        // var_export(reset($a), true) — ConstFetch true sits between reset and consumer; arg #0 is reset (#16556).
+        if (0 === $argIndex && null !== $block->orig) {
+            $callIndex = null;
+            foreach ($block->orig->children as $i => $child) {
+                if ($child === $callOp) {
+                    $callIndex = $i;
+                    break;
+                }
+            }
+            if (null !== $callIndex) {
+                for ($i = $callIndex - 1; $i >= 0; --$i) {
+                    $prev = $block->orig->children[$i] ?? null;
+                    if ($prev instanceof Op\Expr\ConstFetch || $prev instanceof Op\Expr\ClassConstFetch) {
+                        continue;
+                    }
+                    if ($prev instanceof Op\Expr\FuncCall || $prev instanceof Op\Expr\NsFuncCall) {
+                        $fn = $this->resolveCfgFuncCallName($prev);
+                        if (null !== $fn && ReferencableCheck::isArrayInternalPointerBuiltin($fn)) {
+                            return null;
+                        }
+                    }
+                    break;
+                }
+            }
+        }
         if (!$this->callArgHasHoistedConstPrelude($callOp, $argIndex, $block)) {
             return null;
         }
@@ -21518,6 +21555,7 @@ class Compiler {
         if (
             ($producer instanceof Op\Expr\FuncCall || $producer instanceof Op\Expr\NsFuncCall)
             && $this->funcCallExprHasByRefMutatingSideEffects($producer)
+            && !$this->isArrayInternalPointerMutatorFuncName($this->resolveCfgFuncCallName($producer))
         ) {
             return false;
         }
@@ -21750,6 +21788,7 @@ class Compiler {
         if (
             ($producer instanceof Op\Expr\FuncCall || $producer instanceof Op\Expr\NsFuncCall)
             && $this->funcCallExprHasByRefMutatingSideEffects($producer)
+            && !$this->isArrayInternalPointerMutatorFuncName($this->resolveCfgFuncCallName($producer))
         ) {
             return false;
         }
@@ -32703,6 +32742,22 @@ class Compiler {
         }
         if (null === $callIndex) {
             return null;
+        }
+        // var_export(reset($a), true) — arg #0 is hoisted reset(), not ConstFetch true (#16556, #13829).
+        if (0 === $argIndex) {
+            for ($i = $callIndex - 1; $i >= 0; --$i) {
+                $prev = $children[$i] ?? null;
+                if ($prev instanceof Op\Expr\ConstFetch || $prev instanceof Op\Expr\ClassConstFetch) {
+                    continue;
+                }
+                if ($prev instanceof Op\Expr\FuncCall || $prev instanceof Op\Expr\NsFuncCall) {
+                    $fn = $this->resolveCfgFuncCallName($prev);
+                    if (null !== $fn && ReferencableCheck::isArrayInternalPointerBuiltin($fn)) {
+                        return null;
+                    }
+                }
+                break;
+            }
         }
         $trailingConstFetches = [];
         $skipNonBoolNullConstFetch = 'json_decode' === strtolower($this->resolveCfgFuncCallName($cfgCallOp) ?? '')
