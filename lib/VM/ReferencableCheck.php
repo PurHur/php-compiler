@@ -234,6 +234,11 @@ final class ReferencableCheck
                     $paramName = $paramNames[$paramIdx] ?? 'param'.($paramIdx + 1);
                     self::assertArgument($fn, $paramIdx, $paramName, $calledArgs[$paramIdx], $caller);
                 }
+                // Inline array literals must Error before callback validation (#10819, #16259).
+                if (self::isEphemeralArrayArg($calledArgs[$paramIdx], $caller)) {
+                    $paramName = $paramNames[$paramIdx] ?? 'param'.($paramIdx + 1);
+                    self::assertArgument($fn, $paramIdx, $paramName, $calledArgs[$paramIdx], $caller);
+                }
                 if (self::shouldEmitNonVariableObjectByRefNotice($calledArgs[$paramIdx], $caller)) {
                     self::emitNonVariableByRefNotice($caller);
                 }

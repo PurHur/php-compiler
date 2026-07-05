@@ -15353,6 +15353,12 @@ class JIT {
 
                         continue;
                     }
+                    // Inline array literals must Error before callback validation (#10819, #16259).
+                    if (JIT\JitReferencableCheck::isEphemeralArrayArg($args[$idx])) {
+                        JIT\JitReferencableCheck::emitByRefError($this->context, $name, $idx);
+
+                        continue;
+                    }
                     if (VM\ReferencableCheck::shouldEmitNonVariableObjectByRefNoticeAtCompileTime($operand, $block)) {
                         JIT\JitReferencableCheck::emitNonVariableByRefNotice($this->context);
                     }
