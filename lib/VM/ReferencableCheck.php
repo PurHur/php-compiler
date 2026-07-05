@@ -288,21 +288,33 @@ final class ReferencableCheck
     }
 
     /**
-     * Zend accepts inline array/object operands for internal-pointer builtins and array_multisort()
-     * (zend_compile.c ZEND_SEND_REF temp materialization). Also used when wiring hoisted pointer
-     * FuncCall siblings before var_export(..., true) (#13829, #16556).
+     * Read-only pointer builtins may use materialized array literals (current/key/pos).
+     * Mutators (next/prev/reset/end) require an lvalue (#10557, #10295, #16594).
+     * array_multisort() also accepts inline arrays (zend_compile.c ZEND_SEND_REF).
+     * Also used when wiring hoisted pointer FuncCall siblings before var_export(..., true) (#13829, #16556).
      */
     public static function allowsEphemeralArrayLiteralByRef(string $fn): bool
     {
-        return self::isArrayInternalPointerBuiltin($fn) || 'array_multisort' === strtolower($fn);
+        return self::isArrayInternalPointerReadBuiltin($fn) || 'array_multisort' === strtolower($fn);
+    }
+
+    /** current/key/pos — read-only internal pointer API (#4967, #11196). */
+    public static function isArrayInternalPointerReadBuiltin(string $fn): bool
+    {
+        return \in_array(strtolower($fn), ['current', 'key', 'pos'], true);
+    }
+
+    /** next/prev/reset/end — mutating internal pointer API (#4967, #16594). */
+    public static function isArrayInternalPointerMutatorBuiltin(string $fn): bool
+    {
+        return \in_array(strtolower($fn), ['next', 'prev', 'reset', 'end'], true);
     }
 
     /** reset/current/key/… — ext/standard/array.c internal pointer API (#4967, #11196). */
     public static function isArrayInternalPointerBuiltin(string $fn): bool
     {
-        return \in_array(strtolower($fn), [
-            'current', 'key', 'pos', 'next', 'prev', 'reset', 'end',
-        ], true);
+        return self::isArrayInternalPointerReadBuiltin($fn)
+            || self::isArrayInternalPointerMutatorBuiltin($fn);
     }
 
     /**
