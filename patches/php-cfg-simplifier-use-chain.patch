@@ -1,0 +1,45 @@
+--- vendor/ircmaxell/php-cfg/lib/PHPCfg/Visitor/Simplifier.php
++++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Visitor/Simplifier.php
+@@ -206,6 +206,42 @@
+ 
+     private function replaceVariables(Operand $from, Operand $to, Block $block)
+     {
++        if ('1' !== getenv('PHPCFG_SIMPLIFIER_USECHAIN')) {
++            // Default: legacy CFG walk. The use-chain path changes replacement
++            // ORDER, which is observable in downstream codegen (phi operand
++            // types) — safe and proven only for lint workloads, which opt in
++            // via bin/lint.php (#16077).
++            $this->replaceVariablesByCfgWalk($from, $to, $block);
++
++            return;
++        }
++        // Use-chain replacement: visit only the ops that actually reference
++        // $from (Operand tracks usages/write-ops) instead of re-walking the
++        // whole CFG per removed phi. The CFG walk was O(phis × blocks) and
++        // took 121 s on a 32k-line file; this is O(uses) (#16077 root cause).
++        $ops = array_merge($from->usages, $from->ops);
++        foreach ($ops as $op) {
++            if ($op instanceof Op\Phi) {
++                if ($op->hasOperand($from)) {
++                    // Since we're removing from the phi, it may become trivial.
++                    // The stored block is only carried through to
++                    // tryRemoveTrivialPhi, which no longer depends on it.
++                    $this->trivialPhiCandidates[$op] = $block;
++                    $op->removeOperand($from);
++                    $op->addOperand($to);
++                }
++
++                continue;
++            }
++            $this->replaceOpVariable($from, $to, $op);
++        }
++        $from->usages = [];
++        $from->ops = [];
++    }
++
++    /** Legacy whole-CFG replacement, selectable via PHPCFG_SIMPLIFIER_LEGACY=1. */
++    private function replaceVariablesByCfgWalk(Operand $from, Operand $to, Block $block)
++    {
+         $toReplace = new \SplObjectStorage();
+         $replaced = new \SplObjectStorage();
+         $toReplace->attach($block);

@@ -484,6 +484,14 @@ Harness hosts and contributors without host PHP/LLVM should use the **22.04 dev 
 
 `make docker-build-22` tags both `php-compiler:22.04-dev` and `ghcr.io/PurHur/php-compiler:dev`. CI wrappers default to the local tag unless `PHP_COMPILER_DEV_IMAGE` is set.
 
+## AOT build smoke (`AOT_BUILD_SMOKE_GATE`, #16010/#16072)
+
+`AOT_BUILD_SMOKE_GATE=1` (default) runs `script/check-aot-build-smoke.sh` after the LLVM status report in `ci-fast`/`ci-local`: builds a variable-using script with `./phpc build`, executes the binary, and diffs its output against `bin/vm.php` (tier 1, enforced ~3 s). Tier 2 reports known-broken builtins (#15642) without failing. Would have caught all three of the 2026-07 week's master AOT breakages at merge time. `AOT_BUILD_SMOKE_GATE=0` opts out.
+
+## Gen-0 manifest sync (`BOOTSTRAP_GEN0_MANIFEST_SYNC_GATE`, #8713)
+
+`BOOTSTRAP_GEN0_MANIFEST_SYNC_GATE=1` (default) runs `script/check-bootstrap-gen0-manifest-sync.php` in `ci-fast`: verifies `prelinked/bootstrap-gen0/manifest.json` matches the committed gen-0 argv driver and compiler_lib sidecar byte sizes, so a sidecar refresh cannot land half-synced. `BOOTSTRAP_GEN0_MANIFEST_SYNC_GATE=0` opts out.
+
 ## Related issues
 
 - [#472](https://github.com/PurHur/php-compiler/issues/472) — MiniWebApp gate ladder umbrella

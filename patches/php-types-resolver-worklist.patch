@@ -1,0 +1,104 @@
+--- vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php
++++ vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php
+@@ -48,21 +48,89 @@
+             return;
+         }
+ 
+-        $round = 1;
+-        do {
+-            $start = count($resolved);
+-            $toRemove = [];
+-            foreach ($unresolved as $k => $var) {
+-                $type = $this->resolveVar($var, $resolved);
+-                if ($type) {
+-                    $toRemove[] = $var;
+-                    $resolved[$var] = $type;
++        if ('1' !== getenv('PHPTYPES_RESOLVER_WORKLIST')) {
++            $round = 1;
++            do {
++                $start = count($resolved);
++                $toRemove = [];
++                foreach ($unresolved as $k => $var) {
++                    $type = $this->resolveVar($var, $resolved);
++                    if ($type) {
++                        $toRemove[] = $var;
++                        $resolved[$var] = $type;
++                    }
++                }
++                foreach ($toRemove as $remove) {
++                    $unresolved->detach($remove);
++                }
++            } while (count($unresolved) > 0 && $start < count($resolved));
++        } else {
++            // Dependency-driven worklist: the round-based loop rescanned every
++            // unresolved variable per round — O(rounds × vars), minutes on
++            // 30k-line files (#16077). Resolution ORDER differs from the round
++            // loop and the fixpoint is order-sensitive for codegen, so this is
++            // opt-in for lint workloads only (bin/lint.php sets the flag);
++            // default stays on the legacy round loop.
++            $dependents = new SplObjectStorage();
++            foreach ($unresolved as $var) {
++                foreach ($var->ops as $op) {
++                    foreach ($op->getVariableNames() as $name) {
++                        if ($op->isWriteVariable($name)) {
++                            continue;
++                        }
++                        $inputs = $op->{$name};
++                        if (! is_array($inputs)) {
++                            $inputs = [$inputs];
++                        }
++                        foreach ($inputs as $input) {
++                            if (! $input instanceof Operand || $input === $var) {
++                                continue;
++                            }
++                            if (! isset($dependents[$input])) {
++                                $dependents[$input] = [];
++                            }
++                            $deps = $dependents[$input];
++                            $deps[] = $var;
++                            $dependents[$input] = $deps;
++                        }
++                    }
+                 }
+             }
+-            foreach ($toRemove as $remove) {
+-                $unresolved->detach($remove);
++            $queue = [];
++            foreach ($unresolved as $var) {
++                $queue[] = $var;
++            }
++            $queued = new SplObjectStorage();
++            foreach ($queue as $var) {
++                $queued->attach($var);
++            }
++            // Head-index pop: array_shift() reindexes (O(n) per pop, quadratic
++            // on large queues); appends keep integer keys sequential.
++            $head = 0;
++            while (isset($queue[$head])) {
++                $var = $queue[$head];
++                unset($queue[$head]);
++                ++$head;
++                $queued->detach($var);
++                if (! $unresolved->contains($var)) {
++                    continue;
++                }
++                $type = $this->resolveVar($var, $resolved);
++                if (! $type) {
++                    continue;
++                }
++                $resolved[$var] = $type;
++                $unresolved->detach($var);
++                if (isset($dependents[$var])) {
++                    foreach ($dependents[$var] as $dep) {
++                        if ($unresolved->contains($dep) && ! $queued->contains($dep)) {
++                            $queue[] = $dep;
++                            $queued->attach($dep);
++                        }
++                    }
++                }
+             }
+-        } while (count($unresolved) > 0 && $start < count($resolved));
++        }
+         foreach ($resolved as $var) {
+             $var->type = $resolved[$var];
+         }
