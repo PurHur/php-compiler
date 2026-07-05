@@ -479,11 +479,17 @@ final class VmInfo
 
     private static function creditsFlagSelected(int $flags, int $section): bool
     {
-        if (self::CREDITS_ALL === $flags) {
+        if (self::isCreditsAll($flags)) {
             return true;
         }
 
         return 0 !== ($flags & $section);
+    }
+
+    /** CREDITS_ALL is -1; userland constant may surface as uint32 max (#16367). */
+    private static function isCreditsAll(int $flags): bool
+    {
+        return self::CREDITS_ALL === $flags || 0xFFFFFFFF === ($flags & 0xFFFFFFFF);
     }
 
     private static function generalSectionHtml(): string
@@ -627,7 +633,9 @@ final class VmInfo
             $sections .= self::creditsSapiSectionText();
         }
         if (self::creditsFlagSelected($flags, self::CREDITS_MODULES)) {
-            $sections .= self::creditsModulesSectionText(false);
+            // php-src php_print_credits(CREDITS_ALL): full credits_modules[] table;
+            // CREDITS_MODULES alone lists loaded extensions only (#14799, #16338).
+            $sections .= self::creditsModulesSectionText(self::isCreditsAll($flags));
         }
         if (self::creditsFlagSelected($flags, self::CREDITS_DOCS)) {
             $sections .= self::creditsDocsSectionText();
