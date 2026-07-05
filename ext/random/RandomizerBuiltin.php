@@ -111,7 +111,7 @@ final class RandomEngineStorage
     public static function generate(ObjectEntry $engineObject): string
     {
         return match (strtolower(ltrim($engineObject->class->name, '\\'))) {
-            'random\\engine\\mt19937' => \pack('V', self::mt19937($engineObject)->generate()),
+            'random\\engine\\mt19937' => self::mt19937($engineObject)->generate(),
             'random\\engine\\secure', 'random\\engine\\xoshiro256starstar', 'random\\engine\\pcgoneseq128xslrr64' => self::generateBytes($engineObject),
             default => throw new \LogicException('Unsupported random engine: '.$engineObject->class->name),
         };
@@ -135,6 +135,15 @@ final class RandomEngineStorage
     public static function generateUInt64(ObjectEntry $engineObject): int
     {
         return self::bytesToUInt64(self::generate($engineObject));
+    }
+
+    /** php-src randomizer.c Randomizer::nextInt() — generate then >> 1. */
+    public static function generateForNextInt(ObjectEntry $engineObject): int
+    {
+        return match (strtolower(ltrim($engineObject->class->name, '\\'))) {
+            'random\\engine\\mt19937' => self::mt19937($engineObject)->generateRaw() >> 1,
+            default => self::generateUInt64($engineObject) >> 1,
+        };
     }
 
     private static function bytesToUInt32(string $bytes): int
@@ -582,7 +591,7 @@ final class RandomizerNextInt extends VmClassMethod
             return;
         }
         $engine = RandomEngineStorage::engineObject($object);
-        $frame->returnVar->int(RandomEngineStorage::generateUInt64($engine));
+        $frame->returnVar->int(RandomEngineStorage::generateForNextInt($engine));
     }
 }
 
