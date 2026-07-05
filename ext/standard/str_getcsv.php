@@ -42,13 +42,13 @@ final class str_getcsv extends Internal
         $separator = ',';
         $enclosure = '"';
         $escape = '\\';
-        if (isset($frame->calledArgs[1]) && Variable::TYPE_NULL !== $frame->calledArgs[1]->resolveIndirect()->type) {
+        if (isset($frame->calledArgs[1])) {
             $separator = VmString::requireStringBuiltinArg($frame->calledArgs[1], 'str_getcsv', 1, 'separator');
         }
-        if (isset($frame->calledArgs[2]) && Variable::TYPE_NULL !== $frame->calledArgs[2]->resolveIndirect()->type) {
+        if (isset($frame->calledArgs[2])) {
             $enclosure = VmString::requireStringBuiltinArg($frame->calledArgs[2], 'str_getcsv', 2, 'enclosure');
         }
-        if (isset($frame->calledArgs[3]) && Variable::TYPE_NULL !== $frame->calledArgs[3]->resolveIndirect()->type) {
+        if (isset($frame->calledArgs[3])) {
             $escape = VmString::requireStringBuiltinArg($frame->calledArgs[3], 'str_getcsv', 3, 'escape');
         }
         if (null === $frame->returnVar) {
@@ -71,13 +71,13 @@ final class str_getcsv extends Internal
         $separator = $strPtr->constNull();
         $enclosure = $strPtr->constNull();
         $escape = $strPtr->constNull();
-        if (isset($args[1]) && !NamedOptionalCallArgs::isOmittedOptional($args[1]) && JITVariable::TYPE_NULL !== $args[1]->type) {
+        if (isset($args[1]) && !NamedOptionalCallArgs::isOmittedOptional($args[1])) {
             $separator = JitStringBuiltinArg::lowerRequiredString($context, $args[1], 'str_getcsv', 1, 'separator');
         }
-        if (isset($args[2]) && !NamedOptionalCallArgs::isOmittedOptional($args[2]) && JITVariable::TYPE_NULL !== $args[2]->type) {
+        if (isset($args[2]) && !NamedOptionalCallArgs::isOmittedOptional($args[2])) {
             $enclosure = JitStringBuiltinArg::lowerRequiredString($context, $args[2], 'str_getcsv', 2, 'enclosure');
         }
-        if (isset($args[3]) && !NamedOptionalCallArgs::isOmittedOptional($args[3]) && JITVariable::TYPE_NULL !== $args[3]->type) {
+        if (isset($args[3]) && !NamedOptionalCallArgs::isOmittedOptional($args[3])) {
             $escape = JitStringBuiltinArg::lowerRequiredString($context, $args[3], 'str_getcsv', 3, 'escape');
         }
 
