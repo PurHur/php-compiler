@@ -16075,6 +16075,15 @@ class Compiler {
         if (null !== $mappedArraySplice) {
             return $mappedArraySplice;
         }
+        $mappedMbstring = $this->matchMbstringUnaryOffsetNullLengthProducers(
+            $producers,
+            $argIndex,
+            $argCount,
+            $inlineFuncName
+        );
+        if (null !== $mappedMbstring) {
+            return $mappedMbstring;
+        }
         $callbackArgIndex = $this->inlineClosureArrayPairCallbackArgIndex($inlineFuncName);
         if (
             $callbackArgIndex >= 0
@@ -17545,6 +17554,46 @@ class Compiler {
         return null;
     }
 
+    /**
+     * mb_substr($s, -N, null[, $enc]) / mb_strcut — hoisted UnaryMinus offset + null length (#16481).
+     *
+     * @param list<Op\Expr> $producers
+     */
+    private function matchMbstringUnaryOffsetNullLengthProducers(
+        array $producers,
+        int $argIndex,
+        int $argCount,
+        ?string $inlineFuncName
+    ): ?Op\Expr {
+        $func = strtolower((string) $inlineFuncName);
+        if (!\in_array($func, ['mb_substr', 'mb_strcut'], true) || $argCount < 3 || 2 !== \count($producers)) {
+            return null;
+        }
+        $unaryProducer = null;
+        $nullProducer = null;
+        foreach ($producers as $producer) {
+            if ($producer instanceof Op\Expr\UnaryMinus || $producer instanceof Op\Expr\UnaryPlus) {
+                $unaryProducer = $producer;
+            } elseif ($producer instanceof Op\Expr\ConstFetch) {
+                $name = $this->staticNameFromOperand($producer->name);
+                if (null !== $name && 'null' === strtolower($name)) {
+                    $nullProducer = $producer;
+                }
+            }
+        }
+        if (null === $unaryProducer || null === $nullProducer) {
+            return null;
+        }
+        if (1 === $argIndex) {
+            return $unaryProducer;
+        }
+        if (2 === $argIndex) {
+            return $nullProducer;
+        }
+
+        return null;
+    }
+
     private function matchFilterExtensionInlineCallArgProducer(
         array $producers,
         array $callArgs,
@@ -17628,6 +17677,15 @@ class Compiler {
         );
         if (null !== $mappedArraySplice) {
             return $mappedArraySplice;
+        }
+        $mappedMbstring = $this->matchMbstringUnaryOffsetNullLengthProducers(
+            $producers,
+            $argIndex,
+            \count($callArgs),
+            $inlineFuncName
+        );
+        if (null !== $mappedMbstring) {
+            return $mappedMbstring;
         }
         // array_combine([...], [...]) — sibling Array_ producers map to keys/values by order (#10214).
         if (
@@ -26603,6 +26661,85 @@ class Compiler {
     }
 
     /**
+     * mb_substr($s, -N, null[, $enc]) / mb_strcut — UnaryMinus offset + null length (#16481).
+     *
+     * @param list<OpCode> $emitOps
+     */
+    private function wireMbstringUnaryOffsetNullLengthCallArgSlot(
+        Block $block,
+        Op $cfgCallOp,
+        int $argIndex,
+        array &$emitOps = []
+    ): ?string {
+        if (null === $block->orig) {
+            return null;
+        }
+        $func = strtolower($this->resolveCfgFuncCallName($cfgCallOp) ?? '');
+        if (!\in_array($func, ['mb_substr', 'mb_strcut'], true)) {
+            return null;
+        }
+        if (!\is_array($cfgCallOp->args ?? null) || \count($cfgCallOp->args) < 3) {
+            return null;
+        }
+        $producers = $this->precedingInlineCallArgProducersBeforeCfgOp($block->orig->children, $cfgCallOp);
+        $target = $this->matchMbstringUnaryOffsetNullLengthProducers(
+            $producers,
+            $argIndex,
+            \count($cfgCallOp->args),
+            $func
+        );
+        if (!$target instanceof Op\Expr) {
+            return null;
+        }
+        if ($target instanceof Op\Expr\ConstFetch) {
+            $folded = $this->tryFoldGlobalConstFetch($target);
+            if (null !== $folded) {
+                return (string) $block->registerConstant(new Operand\Temporary(), $folded);
+            }
+        } elseif ($target instanceof Op\Expr\UnaryMinus || $target instanceof Op\Expr\UnaryPlus) {
+            $folded = $this->tryFoldUnaryLiteralDefault($target);
+            if (null !== $folded) {
+                return (string) $block->registerConstant(new Operand\Temporary(), $folded);
+            }
+        }
+        $slot = $block->slotForOperand($target->result);
+        if (null === $slot) {
+            foreach ($this->compileExpr($target, $block) as $op) {
+                $emitOps[] = $op;
+            }
+            $slot = $block->slotForOperand($target->result);
+        }
+
+        return null !== $slot ? (string) $slot : null;
+    }
+
+    /** mb_substr/mb_strcut($s, -N, null) — skip generic hoisted-null prelude on offset/length slots (#16481). */
+    private function mbstringUnaryOffsetNullLengthUsesDedicatedProducerWiring(
+        Op $cfgCallOp,
+        int $argIndex,
+        Block $block
+    ): bool {
+        if (null === $block->orig) {
+            return false;
+        }
+        $func = strtolower($this->resolveCfgFuncCallName($cfgCallOp) ?? '');
+        if (!\in_array($func, ['mb_substr', 'mb_strcut'], true)) {
+            return false;
+        }
+        if (!\is_array($cfgCallOp->args ?? null) || \count($cfgCallOp->args) < 3) {
+            return false;
+        }
+        $producers = $this->precedingInlineCallArgProducersBeforeCfgOp($block->orig->children, $cfgCallOp);
+
+        return null !== $this->matchMbstringUnaryOffsetNullLengthProducers(
+            $producers,
+            $argIndex,
+            \count($cfgCallOp->args),
+            $func
+        );
+    }
+
+    /**
      * array_chunk(range(1,5), 2, true) — hoisted FuncCall haystack + ConstFetch preserve_keys (#11767).
      *
      * @return list<OpCode>|null
@@ -27614,6 +27751,15 @@ class Compiler {
         );
         if (null !== $mappedArraySplice) {
             return $mappedArraySplice;
+        }
+        $mappedMbstring = $this->matchMbstringUnaryOffsetNullLengthProducers(
+            $producers,
+            $argIndex,
+            \count($callArgs),
+            $this->resolveCfgFuncCallName($callOp)
+        );
+        if (null !== $mappedMbstring) {
+            return $mappedMbstring;
         }
         $callIndex = null;
         foreach ($cfgChildren as $i => $child) {
@@ -31646,6 +31792,18 @@ class Compiler {
                 return null;
             }
         }
+        $mbFunc = strtolower($this->resolveCfgFuncCallName($cfgCallOp) ?? '');
+        if (\in_array($mbFunc, ['mb_substr', 'mb_strcut'], true)) {
+            $producers = $this->precedingInlineCallArgProducersBeforeCfgOp($children, $cfgCallOp);
+            if (null !== $this->matchMbstringUnaryOffsetNullLengthProducers(
+                $producers,
+                $argIndex,
+                \count($callArgs),
+                $mbFunc
+            )) {
+                return null;
+            }
+        }
         $callArg = $callArgs[$argIndex] ?? null;
         if (null === $callArg || $this->isEmbeddedCallLiteralArg($callArg)) {
             return null;
@@ -32588,6 +32746,8 @@ class Compiler {
                                 // array_column([...], null, 'x') — haystack must not steal trailing null prelude (#15914, #16324).
                             } elseif ($this->arraySpliceUnaryOffsetReplacementUsesDedicatedProducerWiring($cfgCallOp, (int) $argIndex, $block)) {
                                 // array_splice($a, -N, $len, null) — offset is UnaryMinus, not hoisted null (#16328).
+                            } elseif ($this->mbstringUnaryOffsetNullLengthUsesDedicatedProducerWiring($cfgCallOp, (int) $argIndex, $block)) {
+                                // mb_substr($s, -N, null) — offset is UnaryMinus, not hoisted null (#16481).
                             } else {
                                 $sends[] = new OpCode(
                                     OpCode::TYPE_ARG_SEND,
@@ -33414,6 +33574,17 @@ class Compiler {
                     );
                     if (null !== $arraySpliceSlot) {
                         $valueSlot = $arraySpliceSlot;
+                    }
+                }
+                if (null === $valueSlot) {
+                    $mbstringSlot = $this->wireMbstringUnaryOffsetNullLengthCallArgSlot(
+                        $block,
+                        $cfgCallOp,
+                        (int) $argIndex,
+                        $sends
+                    );
+                    if (null !== $mbstringSlot) {
+                        $valueSlot = $mbstringSlot;
                     }
                 }
             }
@@ -36120,6 +36291,17 @@ class Compiler {
                     );
                     if (null !== $arraySpliceSlot) {
                         $valueSlot = $arraySpliceSlot;
+                    }
+                }
+                if (null === $valueSlot) {
+                    $mbstringSlot = $this->wireMbstringUnaryOffsetNullLengthCallArgSlot(
+                        $block,
+                        $cfgCallOp,
+                        (int) $argIndex,
+                        $sends
+                    );
+                    if (null !== $mbstringSlot) {
+                        $valueSlot = $mbstringSlot;
                     }
                 }
             }
