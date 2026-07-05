@@ -19180,6 +19180,10 @@ class Compiler {
         if (null === $callArg || $this->isEmbeddedCallLiteralArg($callArg)) {
             return false;
         }
+        // extract([...], flags: EXTR_SKIP) — array arg must not steal hoisted ConstFetch (#16539).
+        if ($this->callArgOperandExpectsArrayProducer($callArg)) {
+            return false;
+        }
         $root = $this->unwrapOperandChain($callArg);
         if ($root instanceof Temporary) {
             return true;
@@ -19290,6 +19294,10 @@ class Compiler {
 
     private function hoistedConstPreludeProducerForCallArgIndex(Op $callOp, int $argIndex, Block $block): ?Op\Expr
     {
+        $callArg = $callOp->args[$argIndex] ?? null;
+        if ($callArg instanceof Operand && $this->callArgOperandExpectsArrayProducer($callArg)) {
+            return null;
+        }
         if (!$this->callArgHasHoistedConstPrelude($callOp, $argIndex, $block)) {
             return null;
         }
@@ -19303,6 +19311,9 @@ class Compiler {
                 continue;
             }
             if (!$this->callArgIsDeadInlineTemporary($callArg)) {
+                continue;
+            }
+            if ($callArg instanceof Operand && $this->callArgOperandExpectsArrayProducer($callArg)) {
                 continue;
             }
             if ($i === $argIndex) {
@@ -40569,6 +40580,9 @@ class Compiler {
         if (!$this->callArgIsDeadInlineTemporary($callArg)) {
             return null;
         }
+        if ($callArg instanceof Operand && $this->callArgOperandExpectsArrayProducer($callArg)) {
+            return null;
+        }
         $preludes = $this->hoistedPreludeProducersImmediatelyBeforeCall($callOp, $block);
         if ([] === $preludes) {
             return null;
@@ -40579,6 +40593,9 @@ class Compiler {
                 continue;
             }
             if (!$this->callArgIsDeadInlineTemporary($deadArg)) {
+                continue;
+            }
+            if ($deadArg instanceof Operand && $this->callArgOperandExpectsArrayProducer($deadArg)) {
                 continue;
             }
             if ($i === $argIndex) {

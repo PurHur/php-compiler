@@ -5551,6 +5551,60 @@ PHP;
         self::assertSame("array (\n  1 => array (\n    'x' => 1,\n    'y' => 2,\n  ),\n)\n", ob_get_clean());
     }
 
+    /** Issue #16539 — extract([...], flags: EXTR_SKIP) must ARG_SEND array + named flags, not double ConstFetch. */
+    public function testExtractNamedFlagsArgSendUsesArrayNotHoistedConst(): void
+    {
+        $code = <<<'PHP'
+<?php
+declare(strict_types=1);
+$a = 1;
+$n = extract(['a' => 99, 'b' => 2], flags: EXTR_SKIP);
+echo "n={$n}\n";
+echo "a={$a}\n";
+echo isset($b) ? "b={$b}\n" : "b=unset\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'extract_flags_named.php');
+
+        $constSlots = [];
+        $initArraySlots = [];
+        $extractSends = [];
+        $inExtract = false;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_CONST_FETCH === $op->type) {
+                $constSlots[] = $op->arg1;
+            }
+            if (OpCode::TYPE_INIT_ARRAY === $op->type) {
+                $initArraySlots[] = $op->arg1;
+            }
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type
+                && 'extract' === $block->constants[$op->arg1]->toString()) {
+                $inExtract = true;
+                continue;
+            }
+            if ($inExtract && OpCode::TYPE_ARG_SEND === $op->type) {
+                $extractSends[] = $op->arg1;
+                if (\count($extractSends) >= 2) {
+                    $inExtract = false;
+                }
+            }
+            if ($inExtract && OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
+                $inExtract = false;
+            }
+        }
+
+        self::assertNotEmpty($initArraySlots, 'inline array must compile');
+        self::assertNotEmpty($constSlots, 'EXTR_SKIP ConstFetch must compile');
+        self::assertCount(2, $extractSends, 'extract arg sends='.json_encode($extractSends));
+        self::assertSame($initArraySlots[0], $extractSends[0], 'array INIT_ARRAY must feed extract arg #0');
+        self::assertSame($constSlots[0], $extractSends[1], 'EXTR_SKIP must feed named flags arg');
+        self::assertNotSame($extractSends[0], $extractSends[1], 'array and flags must use distinct slots');
+
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("n=1\na=1\nb=2\n", ob_get_clean());
+    }
+
     /** Issue #13800 — extract(inline array) then var_export($local) must not re-compile extract for var_export arg. */
     public function testExtractInlineArrayThenVarExportNamedLocal(): void
     {
