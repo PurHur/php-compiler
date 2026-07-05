@@ -3,8 +3,9 @@ stdlib array_walk_recursive() closure callback with userdata (#4913)
 --FILE--
 <?php
 $seen = [];
+$nested = ['a' => [1]];
 array_walk_recursive(
-    ['a' => [1]],
+    $nested,
     static function (&$v, $k, $userdata) use (&$seen) {
         $seen[] = $k . ':' . $userdata;
     },

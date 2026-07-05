@@ -20,7 +20,7 @@ PHP;
 
     private const EXPECT = <<<'TXT'
 ok
- a | b 
+ a | b
 TXT;
 
     public function testVmMatchesPhpSubset(): void
