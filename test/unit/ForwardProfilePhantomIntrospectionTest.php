@@ -180,4 +180,33 @@ final class ForwardProfilePhantomIntrospectionTest extends TestCase
             }
         }
     }
+
+    public function testStrIncrementCallableButNotAdvertisedOnForwardProfile84(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertTrue(CompilerVersion::supportsStrIncrement());
+            $this->assertFalse(CompilerVersion::advertisesStrIncrement());
+            $this->assertFalse(BuiltinIntrospectionPolicy::functionIsAdvertised('str_increment'));
+
+            $runtime = new Runtime();
+            $ctx = $runtime->vmContext;
+            $this->assertTrue(isset($ctx->functions['str_increment']));
+            $this->assertFalse(
+                \PHPCompiler\ext\standard\VmReflection::functionExists($ctx, 'str_increment')
+            );
+
+            $internal = \PHPCompiler\ext\standard\VmReflection::internalFunctionNameList();
+            $this->assertNotContains('str_increment', $internal);
+            $this->assertNotContains('str_decrement', $internal);
+            $this->assertNotContains('fpow', $internal);
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
 }

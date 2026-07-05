@@ -347,6 +347,9 @@ final class VmReflection
                 if (isset($seen[$lc]) || !self::isVisibleToFunctionExists($name)) {
                     continue;
                 }
+                if (!BuiltinIntrospectionPolicy::functionIsAdvertised($lc)) {
+                    continue;
+                }
                 $seen[$lc] = true;
                 $names[] = $name;
             }
