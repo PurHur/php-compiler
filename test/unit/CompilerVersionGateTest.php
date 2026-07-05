@@ -69,9 +69,24 @@ final class CompilerVersionGateTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsClassUsesRecursive());
     }
 
-    public function testSupportsReadonlyAnonymousClassTrueOn84DevLine(): void
+    public function testSupportsReadonlyAnonymousClassFalseOnReferenceProfile(): void
     {
-        $this->assertTrue(CompilerVersion::supportsReadonlyAnonymousClass());
+        $this->assertFalse(CompilerVersion::supportsReadonlyAnonymousClass());
+    }
+
+    public function testSupportsReadonlyAnonymousClassTrueOnForwardProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.3');
+        try {
+            $this->assertTrue(CompilerVersion::supportsReadonlyAnonymousClass());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
     }
 
     public function testSupportsMbStrPadFalseOnReferenceProfile(): void
