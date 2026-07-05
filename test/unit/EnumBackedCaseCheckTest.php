@@ -100,36 +100,50 @@ PHP,
         $this->assertNotNull($block);
     }
 
-    public function testIntBackedDuplicateBackingValueFailsAtCompileTime(): void
+    public function testIntBackedDuplicateBackingValueThrowsErrorAtFirstUse(): void
     {
         $runtime = new Runtime();
-        $this->expectException(\CompileError::class);
-        $this->expectExceptionMessage('Duplicate value in enum E for cases A and B');
-        $runtime->parseAndCompile(<<<'PHP'
+        $block = $runtime->parseAndCompile(<<<'PHP'
 <?php
 enum E: int {
     case A = 1;
     case B = 1;
 }
+try {
+    echo E::A->name, "\n";
+} catch (Throwable $e) {
+    echo get_class($e), ': ', $e->getMessage(), "\n";
+}
 PHP,
             'enum_dup_int.php'
         );
+        ob_start();
+        $runtime->run($block);
+        $output = ob_get_clean();
+        $this->assertSame("Error: Duplicate value in enum E for cases A and B\n", $output);
     }
 
-    public function testStringBackedDuplicateBackingValueFailsAtCompileTime(): void
+    public function testStringBackedDuplicateBackingValueThrowsErrorAtFirstUse(): void
     {
         $runtime = new Runtime();
-        $this->expectException(\CompileError::class);
-        $this->expectExceptionMessage('Duplicate value in enum E for cases A and B');
-        $runtime->parseAndCompile(<<<'PHP'
+        $block = $runtime->parseAndCompile(<<<'PHP'
 <?php
 enum E: string {
     case A = 'x';
     case B = 'x';
 }
+try {
+    echo E::A->name, "\n";
+} catch (Throwable $e) {
+    echo get_class($e), ': ', $e->getMessage(), "\n";
+}
 PHP,
             'enum_dup_string.php'
         );
+        ob_start();
+        $runtime->run($block);
+        $output = ob_get_clean();
+        $this->assertSame("Error: Duplicate value in enum E for cases A and B\n", $output);
     }
 
     public function testUnitEnumDuplicateCaseNameFailsAtCompileTime(): void

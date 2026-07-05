@@ -12,7 +12,7 @@ use PHPCfg\Script;
 /**
  * Compile-time check: backed enum cases must declare an explicit scalar value (#5397).
  * Duplicate case names are rejected at compile (#5218, zend_compile.c).
- * Duplicate backing values are rejected at compile when values are known (#5773, #9677, zend_enum.c).
+ * Duplicate backing values are validated at first case use via {@see \PHPCompiler\VM\EnumSupport::ensureBackedEnumValuesUnique()} (#5773, #8687, zend_enum.c).
  *
  * php-src: Zend/zend_enum.c — zend_register_enum_case; Zend/zend_compile.c — enum case registration
  */
@@ -67,8 +67,6 @@ final class EnumBackedCaseCheck
         if ('int' !== $backedType && 'string' !== $backedType) {
             return;
         }
-        $cases = [];
-        $duplicateSite = null;
         foreach ($enum->stmts->children as $member) {
             if (!$member instanceof Op\Terminal\Const_) {
                 continue;
@@ -84,22 +82,6 @@ final class EnumBackedCaseCheck
                     "Enum case {$enumDisplay}::{$caseName} must have a value"
                 );
             }
-            $backing = $this->compileTimeBackingScalar($member, $backedType);
-            if (null === $backing) {
-                continue;
-            }
-            $cases[] = ['name' => $caseName, 'backing' => $backing];
-            if (null === $duplicateSite) {
-                $duplicateSite = $member;
-            }
-        }
-        $message = self::duplicateBackingErrorMessage($enumDisplay, $cases);
-        if (null !== $message && null !== $duplicateSite) {
-            throw new CompileFatal(
-                $duplicateSite->getFile(),
-                $duplicateSite->getLine(),
-                $message
-            );
         }
     }
 
@@ -158,33 +140,6 @@ final class EnumBackedCaseCheck
         }
 
         return \is_string($literal->value);
-    }
-
-    /**
-     * @return int|string|null when the case initializer is a compile-time scalar
-     */
-    private function compileTimeBackingScalar(Op\Terminal\Const_ $member, string $backedType): int|string|null
-    {
-        $literal = $this->literalFromEnumCaseValue($member);
-        if (null === $literal) {
-            return null;
-        }
-        if ('int' === $backedType) {
-            if (!\is_int($literal->value)) {
-                return null;
-            }
-
-            return $literal->value;
-        }
-        if ('string' === $backedType) {
-            if (!\is_string($literal->value)) {
-                return null;
-            }
-
-            return $literal->value;
-        }
-
-        return null;
     }
 
     private function literalFromEnumCaseValue(Op\Terminal\Const_ $member): ?OperandLiteral

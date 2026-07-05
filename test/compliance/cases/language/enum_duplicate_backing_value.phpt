@@ -1,5 +1,5 @@
 --TEST--
-Language: duplicate backed enum values — compile-time fatal (#9193, #9677, zend_enum.c)
+Language: duplicate backed enum values — definition compiles (#8687, zend_enum.c)
 --FILE--
 <?php
 enum E: int {
@@ -7,5 +7,5 @@ enum E: int {
     case B = 1;
 }
 echo "run\n";
---EXPECT_EXIT--
-255
+--EXPECT--
+run
