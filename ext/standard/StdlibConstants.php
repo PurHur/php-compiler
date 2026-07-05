@@ -162,6 +162,18 @@ final class StdlibConstants
 
     public const PASSWORD_ARGON2ID = 'argon2id';
 
+    /**
+     * Lowercase name => string value for compile-time ConstFetch (ext/standard/password.c).
+     *
+     * @var array<string, string>
+     */
+    public const CORE_STRING_BY_NAME = [
+        'password_bcrypt' => self::PASSWORD_BCRYPT,
+        'password_default' => self::PASSWORD_DEFAULT,
+        'password_argon2i' => self::PASSWORD_ARGON2I,
+        'password_argon2id' => self::PASSWORD_ARGON2ID,
+    ];
+
     /** assert_options() selectors (ext/standard/assert.c). */
     public const ASSERT_ACTIVE = 1;
     public const ASSERT_CALLBACK = 2;

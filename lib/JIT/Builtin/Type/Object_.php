@@ -4203,6 +4203,10 @@ class Object_ extends Type {
         $this->emitDirectTraitConstAccessErrorIfNeeded($classId, $constName, $block);
         $key = strtolower($constName);
         if (!isset($this->classConstants[$classId][$key])) {
+            $native = $this->tryJitNativeClassConstant($this->classNameForId($classId), $constName);
+            if (null !== $native) {
+                return $native;
+            }
             throw new \LogicException("Undefined constant: {$constName}");
         }
 
@@ -4211,6 +4215,38 @@ class Object_ extends Type {
         }
 
         return $this->jitConstantFromEntry($this->classConstants[$classId][$key]);
+    }
+
+    /** Native PHP class constants for nested JIT helper compiles (PasswordJitHelper → VmPassword, #9275). */
+    private function tryJitNativeClassConstant(string $className, string $constName): ?Variable
+    {
+        $fqcn = ltrim($className, '\\');
+        if ('' === $fqcn || !class_exists($fqcn, false)) {
+            return null;
+        }
+        try {
+            $ref = new \ReflectionClassConstant($fqcn, $constName);
+        } catch (\ReflectionException) {
+            return null;
+        }
+        $raw = $ref->getValue();
+        if (\is_int($raw)) {
+            return $this->jitConstantFromEntry(['type' => Variable::TYPE_NATIVE_LONG, 'value' => $raw]);
+        }
+        if (\is_bool($raw)) {
+            return $this->jitConstantFromEntry(['type' => Variable::TYPE_NATIVE_BOOL, 'value' => $raw]);
+        }
+        if (\is_float($raw)) {
+            return $this->jitConstantFromEntry(['type' => Variable::TYPE_NATIVE_DOUBLE, 'value' => $raw]);
+        }
+        if (\is_string($raw)) {
+            return $this->jitConstantFromEntry(['type' => Variable::TYPE_STRING, 'value' => $raw]);
+        }
+        if (null === $raw) {
+            return $this->jitConstantFromEntry(['type' => Variable::TYPE_NULL, 'value' => null]);
+        }
+
+        return null;
     }
 
     public function classConstFetchDynamic(

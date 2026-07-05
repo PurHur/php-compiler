@@ -7117,6 +7117,13 @@ class Compiler {
 
             return $v;
         }
+        $stdlibStr = \PHPCompiler\ext\standard\StdlibConstants::CORE_STRING_BY_NAME[$lc] ?? null;
+        if (null !== $stdlibStr) {
+            $v = new Variable(Variable::TYPE_STRING);
+            $v->string($stdlibStr);
+
+            return $v;
+        }
 
         return null;
     }

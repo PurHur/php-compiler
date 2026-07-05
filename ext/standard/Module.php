@@ -162,6 +162,12 @@ class Module extends ModuleAbstract
             $var->string($value);
             $runtime->vmContext->defineConstant($name, $var);
         }
+        foreach (StdlibConstants::CORE_STRING_BY_NAME as $lc => $value) {
+            $name = strtoupper($lc);
+            $var = new VM\Variable();
+            $var->string($value);
+            $runtime->vmContext->defineConstant($name, $var);
+        }
     }
 
     public function getFunctions(): array
