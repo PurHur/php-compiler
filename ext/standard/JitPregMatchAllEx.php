@@ -8,6 +8,7 @@ use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\StringPregMatch;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
+use PHPCompiler\JIT\NamedOptionalCallArgs;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -38,10 +39,10 @@ final class JitPregMatchAllEx
         $i64 = $context->getTypeFromString('int64');
         $flags = $i64->constInt(0, false);
         $offset = $i64->constInt(0, false);
-        if ($argc >= 4) {
+        if (isset($args[3]) && !NamedOptionalCallArgs::isOmittedOptional($args[3])) {
             $flags = JitLongArg::lower($context, $args[3], 'preg_match_all() flags');
         }
-        if ($argc >= 5) {
+        if (isset($args[4]) && !NamedOptionalCallArgs::isOmittedOptional($args[4])) {
             $offset = JitLongArg::lower($context, $args[4], 'preg_match_all() offset');
         }
 
