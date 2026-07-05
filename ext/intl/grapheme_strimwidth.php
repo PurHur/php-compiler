@@ -9,6 +9,7 @@ use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\Variable;
@@ -70,8 +71,21 @@ final class grapheme_strimwidth extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
+        $argc = \count($args);
+        if ($argc < 3 || $argc > 4) {
+            throw new \ArgumentCountError(sprintf(
+                'grapheme_strimwidth() expects between 3 and 4 arguments, %d given',
+                $argc
+            ));
+        }
+        $folded = JitGrapheme::tryStrimwidthFold($context, $args);
+        if (null !== $folded) {
+            return $folded;
+        }
+        JitStringBuiltinArg::lower($context, $args[0], 'grapheme_strimwidth', 0, 'string');
+
         throw new \LogicException(
-            'grapheme_strimwidth() is not lowered for JIT/AOT in this compiler build'
+            'grapheme_strimwidth() JIT runtime lowering is deferred; use VM or compile-time literals (#9793)'
         );
     }
 }
