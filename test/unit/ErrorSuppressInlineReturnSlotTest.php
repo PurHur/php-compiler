@@ -364,4 +364,76 @@ PHP;
         self::assertSame($assignDestSlot, $gettypeSendSlot, 'gettype arg must read assign lvalue slot');
         self::assertFalse($adjacentSelfCopyAssign, 'must not emit arg2===arg3 adjacent assign sync');
     }
+
+    public function testSuppressStatementThenNestedGettypeVarExportUsesGettypeReturnSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+declare(strict_types=1);
+
+enum E: int
+{
+    case A = 42;
+}
+
+$x = E::A;
+@settype($x, 'int');
+var_export($x);
+echo "\n";
+var_export(gettype($x));
+echo "\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'suppress_settype_var_export_gettype.php');
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+
+        self::assertSame("1\n'integer'\n", $out);
+
+        $suppressReturnSlots = [];
+        $gettypeReturnSlot = null;
+        $lastVarExportSendSlot = null;
+        $walk = static function (Block $b) use (&$walk, &$suppressReturnSlots, &$gettypeReturnSlot, &$lastVarExportSendSlot): void {
+            $inSuppress = null !== $b->orig && $b->orig instanceof \PHPCfg\ErrorSuppressBlock;
+            $inEnd = null !== $b->orig && 1 === \count($b->orig->parents) && $b->orig->parents[0] instanceof \PHPCfg\ErrorSuppressBlock;
+            $pendingInit = false;
+            $pendingInEnd = false;
+            foreach ($b->opCodes as $op) {
+                if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                    $pendingInit = true;
+                    $pendingInEnd = $inEnd;
+                    continue;
+                }
+                if ($pendingInit && OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
+                    if ($inSuppress) {
+                        $suppressReturnSlots[] = $op->arg1;
+                    } elseif ($pendingInEnd && null === $gettypeReturnSlot) {
+                        $gettypeReturnSlot = $op->arg1;
+                    }
+                    $pendingInit = false;
+                    continue;
+                }
+                if ($pendingInit && OpCode::TYPE_FUNCCALL_EXEC_NORETURN === $op->type) {
+                    $pendingInit = false;
+                    continue;
+                }
+                if (OpCode::TYPE_ARG_SEND === $op->type && $inEnd) {
+                    $lastVarExportSendSlot = $op->arg1;
+                }
+                foreach ([$op->block1, $op->block2, $op->block3] as $sub) {
+                    if ($sub instanceof Block) {
+                        $walk($sub);
+                    }
+                }
+            }
+        };
+        $walk($block);
+
+        self::assertNotEmpty($suppressReturnSlots, 'suppress settype return slot');
+        self::assertNotNull($gettypeReturnSlot, 'gettype return slot');
+        self::assertNotNull($lastVarExportSendSlot, 'var_export arg send slot');
+        self::assertSame($gettypeReturnSlot, $lastVarExportSendSlot, 'var_export must read gettype return, not @settype');
+        self::assertNotContains($lastVarExportSendSlot, $suppressReturnSlots, 'var_export must not alias @settype return');
+    }
 }

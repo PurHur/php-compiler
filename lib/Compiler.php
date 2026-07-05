@@ -8204,6 +8204,7 @@ class Compiler {
                     if (
                         $this->errorSuppressEndBlockCallArgHasTrailingHoistedScalarProducer($endCompiled, $endChild, (int) $argIndex)
                         || $this->errorSuppressEndBlockCallArgHasTrailingHoistedArrayProducer($endCompiled, $endChild, (int) $argIndex)
+                        || $this->errorSuppressEndBlockCallArgHasAdjacentNestedFuncCallProducer($endCompiled, $endChild, (int) $argIndex)
                     ) {
                         continue;
                     }
@@ -30172,8 +30173,59 @@ class Compiler {
         if ($this->errorSuppressEndBlockCallArgHasTrailingHoistedArrayProducer($block, $cfgCallOp, $argIndex)) {
             return null;
         }
+        if ($this->errorSuppressEndBlockCallArgHasAdjacentNestedFuncCallProducer($block, $cfgCallOp, $argIndex)) {
+            return null;
+        }
 
         return $this->errorSuppressEndBlockInnerResultSlot($block);
+    }
+
+    /**
+     * `@f(); g(); var_export(h(), true)` — adjacent hoisted callee feeds dead-temp arg, not @ return (#8974).
+     */
+    private function errorSuppressEndBlockCallArgHasAdjacentNestedFuncCallProducer(
+        Block $block,
+        Op $cfgCallOp,
+        int $argIndex
+    ): bool {
+        if (null === $block->orig || !property_exists($cfgCallOp, 'args') || !\is_array($cfgCallOp->args)) {
+            return false;
+        }
+        $callArg = $cfgCallOp->args[$argIndex] ?? null;
+        if (!$callArg instanceof Operand || $this->isEmbeddedCallLiteralArg($callArg)) {
+            return false;
+        }
+        if (!$this->callArgIsDeadInlineTemporary($callArg)) {
+            return false;
+        }
+        $callIndex = array_search($cfgCallOp, $block->orig->children, true);
+        if (!\is_int($callIndex) || $callIndex < 1) {
+            return false;
+        }
+        $producerIndex = $callIndex - 1;
+        $producer = $block->orig->children[$producerIndex] ?? null;
+        if (
+            !($producer instanceof Op\Expr\FuncCall || $producer instanceof Op\Expr\NsFuncCall)
+            || !$this->isNestedCallArgProducerForConsumer(
+                $producer,
+                $cfgCallOp,
+                $producerIndex,
+                $callIndex,
+                $block->orig->children
+            )
+        ) {
+            return false;
+        }
+        $targetArgIndex = $this->siblingMultiArgFuncCallProducerTargetArgIndex(
+            $producerIndex,
+            $callIndex,
+            $block->orig->children
+        );
+        if (null === $targetArgIndex) {
+            $targetArgIndex = 0;
+        }
+
+        return $argIndex === $targetArgIndex;
     }
 
     /**
