@@ -367,6 +367,12 @@ final class VmIni
         self::$maxExecutionTime = (string) $seconds;
     }
 
+    /** Stored ini_get('max_execution_time') without VM context — timer bootstrap (#15906). */
+    public static function getStoredMaxExecutionTime(): string
+    {
+        return self::$maxExecutionTime;
+    }
+
     public static function getPcreBacktrackLimit(): int
     {
         return self::$pcreBacktrackLimit;
