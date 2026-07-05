@@ -267,6 +267,19 @@ final class VmCreditsData
     }
 
     /**
+     * php-src credits_modules[] for phpinfo(INFO_CREDITS) — full static table (ext/standard/info.c).
+     *
+     * @return array<string, string> module label => authors
+     */
+    public static function creditsModuleAuthorsForPhpinfo(): array
+    {
+        $rows = self::CREDITS_MODULE_AUTHORS;
+        ksort($rows, SORT_STRING);
+
+        return $rows;
+    }
+
+    /**
      * credits_modules rows for loaded extensions only (php-src info.c, #14799).
      *
      * @return array<string, string> module label => authors
