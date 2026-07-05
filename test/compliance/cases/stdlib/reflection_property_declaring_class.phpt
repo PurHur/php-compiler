@@ -20,8 +20,7 @@ echo 'direct ap: ', $p->getDeclaringClass()->getName(), "\n";
 $p = new ReflectionProperty(A::class, 'ai');
 echo 'direct ai: ', $p->getDeclaringClass()->getName(), "\n";
 --EXPECT--
-ap: A
-ai: A
 bp: B
+ap: A
 direct ap: A
 direct ai: A
