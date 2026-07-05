@@ -813,6 +813,16 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.4+ FTP\Connection internal class (ext/ftp/ftp.stub.php; #7270, #3353).
+     *
+     * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev reference profile matches Zend 8.2 phantom gate.
+     */
+    public static function supportsFtpConnection(): bool
+    {
+        return self::supportsBuiltinStubEnums();
+    }
+
+    /**
      * PHP 8.3+ stream_supports() / STREAM_SUPPORT_* (ext/standard/streams.c, issue #11819, #13238, #15692).
      *
      * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev reference profile matches Zend 8.2 phantom gate.
