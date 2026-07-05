@@ -35066,6 +35066,50 @@ class Compiler {
                     )
                     : (string) $this->finalizeOperandSlotForAccess($block, (int) $sendNamedLocalSlot, true);
             }
+            // probe('label', in_array(...)) — lone nested callee EXEC_RETURN, not strict/haystack operand (#16312).
+            if (
+                null !== $cfgCallOp
+                && null !== $block->orig
+                && \is_array($cfgCallOp->args ?? null)
+                && $this->callArgIsDeadInlineTemporary($sendProbe)
+            ) {
+                $deadTempCount = 0;
+                foreach ($cfgCallOp->args as $deadArg) {
+                    if ($this->callArgIsDeadInlineTemporary($deadArg)) {
+                        ++$deadTempCount;
+                    }
+                }
+                if (1 === $deadTempCount) {
+                    $callIndex = array_search($cfgCallOp, $block->orig->children, true);
+                    if (\is_int($callIndex) && $callIndex > 0) {
+                        $adjacentIndex = $callIndex - 1;
+                        while ($adjacentIndex >= 0) {
+                            $skip = $block->orig->children[$adjacentIndex] ?? null;
+                            if ($skip instanceof Op\Expr\ConstFetch || $skip instanceof Op\Expr\ClassConstFetch) {
+                                --$adjacentIndex;
+                                continue;
+                            }
+                            break;
+                        }
+                        $adjacent = $block->orig->children[$adjacentIndex] ?? null;
+                        if (
+                            ($adjacent instanceof Op\Expr\FuncCall || $adjacent instanceof Op\Expr\NsFuncCall)
+                            && $this->isAdjacentNestedFuncCallProducer(
+                                $adjacent,
+                                $cfgCallOp,
+                                $adjacentIndex,
+                                $callIndex
+                            )
+                        ) {
+                            $singleNestedExec = $this->slotForLastPendingInlineCallResultBeforeFuncCallInit($sends)
+                                ?? $this->slotForLastEmittedInlineCallResultBeforePendingFuncCall($block);
+                            if (null !== $singleNestedExec) {
+                                $valueSlot = (string) $singleNestedExec;
+                            }
+                        }
+                    }
+                }
+            }
             $sends[] = new OpCode(OpCode::TYPE_ARG_SEND, $valueSlot, $nameSlot, $unpackFlag);
         }
 
