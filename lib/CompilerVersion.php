@@ -627,6 +627,22 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.5+ comma-separated enum case declarations (`case A, B, C;`).
+     *
+     * Withheld on 8.4.0-dev reference profile (matches Zend 8.2 parse error). Enable via
+     * stable 8.5.0+ or explicit `PHP_COMPILER_PROFILE=8.5` forward profile (#16665).
+     * php-src: Zend/zend_language_parser.y enum_case_list (PHP 8.5); Zend/zend_compile.c.
+     */
+    public static function supportsEnumCaseList(): bool
+    {
+        if (version_compare(self::VERSION, '8.5.0', '>=')) {
+            return true;
+        }
+
+        return version_compare(self::languageProfileVersion(), '8.5.0', '>=');
+    }
+
+    /**
      * PHP 8.4+ asymmetric property visibility (private(set), protected(set), …).
      *
      * Enabled on the 8.4 development line by default (#16068, #3165). Explicit
