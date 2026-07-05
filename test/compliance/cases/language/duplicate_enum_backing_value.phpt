@@ -6,6 +6,10 @@ enum E: int {
     case A = 1;
     case B = 1;
 }
-echo "run\n";
---EXPECT_EXIT--
-255
+try {
+    echo E::A->name, "\n";
+} catch (Throwable $e) {
+    echo get_class($e), ': ', $e->getMessage(), "\n";
+}
+--EXPECT--
+Error: Duplicate value in enum E for cases A and B
