@@ -1723,6 +1723,29 @@ PHP;
         );
     }
 
+    /** Issue #16560 — array_pad([1], Len::Two, 0) must wire enum length to arg #2, not pad value. */
+    public function testArrayPadEnumLengthArgNotMisboundToPadValue(): void
+    {
+        $code = <<<'PHP'
+<?php
+enum Len: int { case Two = 2; }
+try {
+    array_pad([1], Len::Two, 0);
+    echo "uncaught\n";
+} catch (TypeError $e) {
+    echo $e->getMessage(), "\n";
+}
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'array_pad_enum_length.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame(
+            "array_pad(): Argument #2 (\$length) must be of type int, Len given\n",
+            ob_get_clean()
+        );
+    }
+
     /** Issue #16316 / #8886 — inline [int, enum] haystack must keep scalar before enum case. */
     public function testArraySearchStrictMixedHaystackInlineLiteralRuntime(): void
     {
