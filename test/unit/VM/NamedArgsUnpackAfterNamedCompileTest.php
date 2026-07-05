@@ -27,17 +27,19 @@ PHP;
         $runtime->parseAndCompile($code, 'named_unpack_after_named.php');
     }
 
-    public function testDuplicateNamedIsCompileError(): void
+    public function testDuplicateNamedThrowsAtRuntime(): void
     {
-        $runtime = new Runtime();
-        $code = <<<'PHP'
-<?php
-function f(int $a, int $b = 0): void {}
-f(a: 1, a: 2);
-PHP;
-        $this->expectException(\CompileError::class);
+        $a = new Variable(Variable::TYPE_INTEGER);
+        $a->int(1);
+        $b = new Variable(Variable::TYPE_INTEGER);
+        $b->int(2);
+        $this->expectException(\Error::class);
         $this->expectExceptionMessage('Named parameter $a overwrites previous argument');
-        $runtime->parseAndCompile($code, 'named_duplicate_compile.php');
+        NamedArgs::resolve(
+            [['n', 'a', $a], ['n', 'a', $b]],
+            ['a', 'b'],
+            null
+        );
     }
 
     public function testPositionalAfterNamedIsCompileError(): void

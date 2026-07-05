@@ -28,17 +28,17 @@ PHP;
 
     public function testDuplicateNamedParameterRejects(): void
     {
-        $runtime = new Runtime();
-        $code = <<<'PHP'
-<?php
-function f(int $a, int $b): int {
-    return $a + $b;
-}
-f(a: 1, a: 2);
-PHP;
-        $this->expectException(\CompileError::class);
+        $a = new Variable(Variable::TYPE_INTEGER);
+        $a->int(1);
+        $b = new Variable(Variable::TYPE_INTEGER);
+        $b->int(2);
+        $this->expectException(\Error::class);
         $this->expectExceptionMessage('Named parameter $a overwrites previous argument');
-        $runtime->parseAndCompile($code, 'named_args_duplicate.php');
+        NamedArgs::resolve(
+            [['n', 'a', $a], ['n', 'a', $b]],
+            ['a', 'b'],
+            null
+        );
     }
 
     public function testResolverReordersNamedArguments(): void
