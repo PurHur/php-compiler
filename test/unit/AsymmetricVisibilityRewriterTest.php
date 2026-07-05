@@ -17,8 +17,16 @@ final class AsymmetricVisibilityRewriterTest extends TestCase
         }
     }
 
+    private function requireParenthesizedAsymmetricSetModifier(): void
+    {
+        if (!CompilerVersion::supportsParenthesizedAsymmetricSetModifier()) {
+            $this->markTestSkipped('parenthesized asymmetric set modifier disabled on reference profile (#16450)');
+        }
+    }
+
     public function testRewritePrivateSet(): void
     {
+        $this->requireParenthesizedAsymmetricSetModifier();
         $source = <<<'PHP'
 <?php
 class Demo {
@@ -38,6 +46,7 @@ PHP;
 
     public function testRewritePublicPrivateSet(): void
     {
+        $this->requireParenthesizedAsymmetricSetModifier();
         $source = <<<'PHP'
 <?php
 class Demo {
@@ -53,6 +62,7 @@ PHP;
 
     public function testRewritePublicProtectedSet(): void
     {
+        $this->requireParenthesizedAsymmetricSetModifier();
         $source = <<<'PHP'
 <?php
 class Demo {
@@ -68,6 +78,7 @@ PHP;
 
     public function testRewriteProtectedPrivateSet(): void
     {
+        $this->requireParenthesizedAsymmetricSetModifier();
         $source = <<<'PHP'
 <?php
 class Demo {
@@ -236,6 +247,7 @@ PHP;
 
     public function testParenthesizedPrivateSetWithExplicitReadRewrites(): void
     {
+        $this->requireParenthesizedAsymmetricSetModifier();
         $source = <<<'PHP'
 <?php
 class Demo {
@@ -271,6 +283,7 @@ PHP;
 
     public function testTraitStaticExplicitReadProtectedSetCompileErrors(): void
     {
+        $this->requireParenthesizedAsymmetricSetModifier();
         $source = <<<'PHP'
 <?php
 trait T {
@@ -284,6 +297,7 @@ PHP;
 
     public function testStaticPublicPrivateSetCompileErrors(): void
     {
+        $this->requireParenthesizedAsymmetricSetModifier();
         $source = <<<'PHP'
 <?php
 class C {
@@ -328,6 +342,7 @@ PHP;
 
     public function testPublicParenthesizedPublicSetCompileErrors(): void
     {
+        $this->requireParenthesizedAsymmetricSetModifier();
         $source = <<<'PHP'
 <?php
 class Demo {

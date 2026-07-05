@@ -166,4 +166,36 @@ final class AsymmetricVisibilityReferenceProfileTest extends TestCase
             'maintainer_gap_asymmetric_get_only_hook_compile.php'
         );
     }
+
+    /** @covers issue #16450 — parenthesized asymmetric set on reference profile */
+    public function testRejectorThrowsParenthesizedAsymmetricSetOnReferenceProfile(): void
+    {
+        if (CompilerVersion::supportsParenthesizedAsymmetricSetModifier()) {
+            $this->markTestSkipped('parenthesized asymmetric set modifier enabled on PHP 8.4.0+ target');
+        }
+        $this->expectException(\PHPCompiler\Compiler\CompileFatal::class);
+        $this->expectExceptionMessage('syntax error, unexpected token "private"');
+        AsymmetricVisibilityRejector::reject(
+            file_get_contents(__DIR__.'/../repro/maintainer_gap_asymmetric_paren_reference_profile.php'),
+            'maintainer_gap_asymmetric_paren_reference_profile.php'
+        );
+    }
+
+    public function testRuntimeRejectsParenthesizedAsymmetricSetOnReferenceProfile(): void
+    {
+        if (CompilerVersion::supportsParenthesizedAsymmetricSetModifier()) {
+            $this->markTestSkipped('parenthesized asymmetric set modifier enabled on PHP 8.4.0+ target');
+        }
+        $runtime = new Runtime();
+        try {
+            $runtime->parseAndCompile(
+                file_get_contents(__DIR__.'/../repro/maintainer_gap_asymmetric_paren_reference_profile.php'),
+                'maintainer_gap_asymmetric_paren_reference_profile.php'
+            );
+            $this->fail('Expected compile failure');
+        } catch (\PHPCompiler\Compiler\CompileFatal $e) {
+            $this->assertStringContainsString('syntax error, unexpected token "private"', $e->getMessage());
+            $this->assertSame(7, $e->sourceLine);
+        }
+    }
 }

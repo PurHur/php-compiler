@@ -230,26 +230,35 @@ final class AsymmetricVisibilityRewriter
         self::rejectAsymmetricSetOnStaticProperty($source);
         self::rejectBareSetModifierWithoutRead($source);
 
-        $source = (string) preg_replace_callback(
-            '/(?P<prefix>(?:\/\*(?:[^*]|\*(?!\/))*\*\/\s*)*)(?P<attrs>(?:#\[[^\]]*\]\s*)*)'
-            .'(?P<readBefore>(?:(?:public|protected|private)\s+)?)'
-            .'(?P<static>(?:static\s+)?)'
-            .'\(\s*(?P<set>public|protected|private)\s*\(\s*set\s*\)\s*\)\s*/i',
-            static function (array $m): string {
-                $set = strtolower($m['set']);
-                $readBefore = trim($m['readBefore']);
-                $explicitReadMarker = '';
-                if ('' !== $readBefore) {
-                    $readPrefix = $readBefore.' ';
-                    $explicitReadMarker = '/*'.self::MARKER_PREFIX_EXPLICIT_READ.'*/ ';
-                } else {
-                    $readPrefix = 'public ';
-                }
+        $hasUnsupportedPropertyParenSet = !CompilerVersion::supportsParenthesizedAsymmetricSetModifier()
+            && null !== self::findParenthesizedAsymmetricSetModifierError($source);
 
-                return $m['prefix'].$m['attrs'].'/*'.self::MARKER_PREFIX_SET.$set.'*/ '.$explicitReadMarker.$readPrefix.$m['static'];
-            },
-            $source
-        );
+        if (CompilerVersion::supportsParenthesizedAsymmetricSetModifier()) {
+            $source = (string) preg_replace_callback(
+                '/(?P<prefix>(?:\/\*(?:[^*]|\*(?!\/))*\*\/\s*)*)(?P<attrs>(?:#\[[^\]]*\]\s*)*)'
+                .'(?P<readBefore>(?:(?:public|protected|private)\s+)?)'
+                .'(?P<static>(?:static\s+)?)'
+                .'\(\s*(?P<set>public|protected|private)\s*\(\s*set\s*\)\s*\)\s*/i',
+                static function (array $m): string {
+                    $set = strtolower($m['set']);
+                    $readBefore = trim($m['readBefore']);
+                    $explicitReadMarker = '';
+                    if ('' !== $readBefore) {
+                        $readPrefix = $readBefore.' ';
+                        $explicitReadMarker = '/*'.self::MARKER_PREFIX_EXPLICIT_READ.'*/ ';
+                    } else {
+                        $readPrefix = 'public ';
+                    }
+
+                    return $m['prefix'].$m['attrs'].'/*'.self::MARKER_PREFIX_SET.$set.'*/ '.$explicitReadMarker.$readPrefix.$m['static'];
+                },
+                $source
+            );
+        }
+
+        if ($hasUnsupportedPropertyParenSet) {
+            return $source;
+        }
 
         return (string) preg_replace_callback(
             '/(?P<prefix>(?:\/\*(?:[^*]|\*(?!\/))*\*\/\s*)*)(?P<attrs>(?:#\[[^\]]*\]\s*)*)'

@@ -582,6 +582,14 @@ class VMTest extends BaseTest {
                     || str_contains($name, 'asymmetric_visibility_public_protected_set_compile_error'))) {
                 continue;
             }
+            if (CompilerVersion::supportsParenthesizedAsymmetricSetModifier()
+                && str_contains($name, 'asymmetric_visibility_paren_reference_profile')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsParenthesizedAsymmetricSetModifier()
+                && str_contains($name, 'asymmetric_visibility_paren_syntax')) {
+                continue;
+            }
             if (!CompilerVersion::supportsAsymmetricVisibility()
                 && (str_contains($name, 'asymmetric')
                     || str_contains($name, 'property_hook_private_set')
