@@ -402,6 +402,10 @@ class JITTest extends BaseTest {
                 && str_contains($name, 'dateexception_reference_profile')) {
                 continue;
             }
+            if (CompilerVersion::advertisesDateExceptionHierarchy()
+                && str_contains($name, 'date_interval_malformed_exception_class_reference_profile')) {
+                continue;
+            }
             if (!CompilerVersion::advertisesRequestParseBodyExceptionClass()
                 && str_contains($name, 'request_parse_body_exception')
                 && !str_contains($name, 'reference_profile')) {
