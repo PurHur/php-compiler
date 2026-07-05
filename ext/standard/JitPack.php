@@ -6,7 +6,6 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\Builtin\PackJitRuntime;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -23,14 +22,6 @@ final class JitPack
             throw new \LogicException('pack() requires at least one argument');
         }
         $fmt = JitStringBuiltinArg::lower($context, $args[0], 'pack', 0, 'format');
-        $fmtLiteral = JitStringArg::compileTimeLiteral($args[0]);
-        if (null !== $fmtLiteral && $argc > 1) {
-            JitPackNumericGuard::rejectEnumCaseOperandsForLiteralFormat(
-                $context,
-                $fmtLiteral,
-                ...\array_slice($args, 1)
-            );
-        }
         $numArgs = $argc - 1;
         if (0 === $numArgs) {
             $nullArgv = $context->builder->pointerCast(

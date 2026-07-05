@@ -614,7 +614,6 @@ final class PackEngine
     {
         if ($value instanceof Variable) {
             $resolved = $value->resolveIndirect();
-            EnumCaseSupport::packRejectNumericOperand($resolved, $valueArgIndex, 'int');
             $enumLong = EnumCaseSupport::packCoerceToLong($resolved, $frame?->vmContext, $frame);
             if (null !== $enumLong) {
                 return $enumLong;
@@ -657,7 +656,6 @@ final class PackEngine
     {
         if ($value instanceof Variable) {
             $resolved = $value->resolveIndirect();
-            EnumCaseSupport::packRejectNumericOperand($resolved, $valueArgIndex, 'float');
             $enumDouble = EnumCaseSupport::packCoerceToDouble($resolved, $frame?->vmContext, $frame);
             if (null !== $enumDouble) {
                 return $enumDouble;
