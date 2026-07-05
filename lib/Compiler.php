@@ -2294,6 +2294,18 @@ class Compiler {
         if ($this->isKeyedListDestructDimFetch($ops, $index, $block)) {
             return false;
         }
+        // Zend materializes inline array literals before dim-fetch; splitting drops dead temps (#16462).
+        if (
+            null !== $op->var
+            && (
+                ($ops[$index - 1] ?? null) instanceof Op\Expr\Array_
+                && $this->operandsReferToSameVariable($op->var, $ops[$index - 1]->result)
+            )
+            || null !== $this->unwrapArrayLiteralExpr($op->var)
+            || null !== $this->findArrayExprForResult($op->var, $block)
+        ) {
+            return false;
+        }
         foreach ($block->opCodes as $prev) {
             if (OpCode::TYPE_INIT_ARRAY === $prev->type && null !== $prev->arg3) {
                 return true;
@@ -11775,6 +11787,7 @@ class Compiler {
         if (
             $this->callArgIsDeadInlineTemporary($callArg)
             && !$this->operandsReferToSameVariable($producer->result, $callArg)
+            && !$this->issetOrEmptyProducerIsImmediateCallPrelude($producer, $cfgCallOp, $block)
         ) {
             // isset() && … as call arg — php-cfg dead temp is && merge, not hoisted Isset_ (#10704).
             return null;
@@ -11839,6 +11852,44 @@ class Compiler {
         $producer = $hoisted[$argIndex] ?? null;
 
         return ($producer instanceof Op\Expr\Isset_ || $producer instanceof Op\Expr\Empty_) ? $producer : null;
+    }
+
+    /**
+     * var_dump(isset(['a'=>1]['a'])) — php-cfg dead arg temp ≠ Isset_.result (#16462).
+     */
+    private function issetOrEmptyProducerIsImmediateCallPrelude(
+        Op\Expr $producer,
+        Op $cfgCallOp,
+        Block $block
+    ): bool {
+        if (null === $block->orig) {
+            return false;
+        }
+        $callIndex = null;
+        foreach ($block->orig->children as $i => $child) {
+            if ($child === $cfgCallOp) {
+                $callIndex = $i;
+                break;
+            }
+        }
+        if (null === $callIndex || $callIndex < 1) {
+            return false;
+        }
+        for ($i = $callIndex - 1; $i >= 0; --$i) {
+            $child = $block->orig->children[$i];
+            if ($child instanceof Op\Expr\Isset_ || $child instanceof Op\Expr\Empty_) {
+                return $child === $producer;
+            }
+            if ($child instanceof Op\Expr\ArrayDimFetch) {
+                continue;
+            }
+            if ($child instanceof Op\Expr\ConstFetch || $child instanceof Op\Expr\ClassConstFetch) {
+                continue;
+            }
+            break;
+        }
+
+        return false;
     }
 
     /**
@@ -30455,6 +30506,14 @@ class Compiler {
         if ($this->isEmbeddedCallLiteralArg($arg)) {
             return null;
         }
+        $inlineLiteralFetchSlot = $this->resolveInlineArrayLiteralDimFetchCallArgSlot(
+            $block,
+            $cfgCallOp,
+            $argIndex
+        );
+        if (null !== $inlineLiteralFetchSlot) {
+            return $inlineLiteralFetchSlot;
+        }
         $children = $block->orig->children;
         $callIndex = null;
         foreach ($children as $i => $child) {
@@ -30553,6 +30612,48 @@ class Compiler {
             $slot = $this->compiledArrayDimFetchResultSlotBeforePendingFuncCall($block, $opcodeDimIndex)
                 ?? $block->slotForOperand($fetch->result);
         }
+
+        return null !== $slot ? (string) $slot : null;
+    }
+
+    /**
+     * var_dump((['a'=>1])['a']) — php-cfg dead arg temp; Array_ + ArrayDimFetch immediately precede call (#16462).
+     */
+    private function resolveInlineArrayLiteralDimFetchCallArgSlot(
+        Block $block,
+        Op $cfgCallOp,
+        int $argIndex
+    ): ?string {
+        if (null === $block->orig || $argIndex < 0) {
+            return null;
+        }
+        $callIndex = null;
+        foreach ($block->orig->children as $i => $child) {
+            if ($child === $cfgCallOp) {
+                $callIndex = $i;
+                break;
+            }
+        }
+        if (null === $callIndex || $callIndex < 1) {
+            return null;
+        }
+        $fetch = $block->orig->children[$callIndex - 1] ?? null;
+        if (!$fetch instanceof Op\Expr\ArrayDimFetch) {
+            return null;
+        }
+        $array = $callIndex >= 2 ? ($block->orig->children[$callIndex - 2] ?? null) : null;
+        if (
+            !$array instanceof Op\Expr\Array_
+            || !$this->operandsReferToSameVariable($fetch->var, $array->result)
+        ) {
+            return null;
+        }
+        if (null === $block->slotForOperand($fetch->result)) {
+            foreach ($this->compileExpr($fetch, $block) as $op) {
+                $block->addOpCode($op);
+            }
+        }
+        $slot = $block->slotForOperand($fetch->result);
 
         return null !== $slot ? (string) $slot : null;
     }
@@ -32431,6 +32532,37 @@ class Compiler {
                     continue;
                 }
             }
+            if (null !== $cfgCallOp && null !== $block->orig) {
+                $hoistedIssetEmptyArgSlot = $this->resolveHoistedIssetOrEmptyCallArgSlot(
+                    $arg,
+                    $block,
+                    $cfgCallOp,
+                    (int) $argIndex
+                );
+                if (null !== $hoistedIssetEmptyArgSlot) {
+                    $sends[] = new OpCode(
+                        OpCode::TYPE_ARG_SEND,
+                        (string) $hoistedIssetEmptyArgSlot,
+                        $nameSlot,
+                        $unpackFlag
+                    );
+                    continue;
+                }
+                $inlineLiteralDimArgSlot = $this->resolveInlineArrayLiteralDimFetchCallArgSlot(
+                    $block,
+                    $cfgCallOp,
+                    (int) $argIndex
+                );
+                if (null !== $inlineLiteralDimArgSlot) {
+                    $sends[] = new OpCode(
+                        OpCode::TYPE_ARG_SEND,
+                        $inlineLiteralDimArgSlot,
+                        $nameSlot,
+                        $unpackFlag
+                    );
+                    continue;
+                }
+            }
             $inlineArrayLiteralArgWired = false;
             if (
                 null !== $cfgCallOp
@@ -32975,6 +33107,22 @@ class Compiler {
             $inlineArray = null === $dimFetchSlot
                 ? $this->findInlineArrayProducerForCallArg($arg, $block, $cfgCallOp, (int) $argIndex)
                 : null;
+            if (null !== $inlineArray && null !== $cfgCallOp && null !== $block->orig) {
+                $consumerCallIndex = null;
+                foreach ($block->orig->children as $ci => $cfgChild) {
+                    if ($cfgChild === $cfgCallOp) {
+                        $consumerCallIndex = $ci;
+                        break;
+                    }
+                }
+                if (\is_int($consumerCallIndex) && $consumerCallIndex > 0) {
+                    $immediatePrelude = $block->orig->children[$consumerCallIndex - 1] ?? null;
+                    if ($immediatePrelude instanceof Op\Expr\Isset_ || $immediatePrelude instanceof Op\Expr\Empty_) {
+                        // isset(['a'=>1]['a']) / empty([...]) — prelude owns dim semantics (#16462).
+                        $inlineArray = null;
+                    }
+                }
+            }
             if (
                 null !== $inlineArray
                 && null !== $cfgCallOp
@@ -34638,7 +34786,12 @@ class Compiler {
                     // Array union arg is Plus.result, not the trailing INIT_ARRAY temp (#10490, #12763).
                     if (!$hasArrayUnionPlus && !$lastProducer instanceof Op\Expr\BinaryOp\Plus) {
                         $immediateArray = $this->inlineArrayLiteralForDeadCallArg($cfgCallOp, (int) $argIndex, $block);
-                        if ($immediateArray instanceof Op\Expr\Array_) {
+                        if (
+                            $immediateArray instanceof Op\Expr\Array_
+                            && null !== $dimFetchSlot
+                        ) {
+                            // Inline literal dim-fetch feeds the call arg — not the array temp (#16462).
+                        } elseif ($immediateArray instanceof Op\Expr\Array_) {
                             $immediateSlot = $block->slotForOperand($immediateArray->result);
                             if (null === $immediateSlot) {
                                 foreach ($this->compileExpr($immediateArray, $block) as $op) {
@@ -36430,6 +36583,26 @@ class Compiler {
                         // array_merge(['a'=>1], array_keys(...)) — arg #0 stays on leading INIT_ARRAY (#13760, #16418).
                     } else {
                         $valueSlot = (string) $haystackExecSlot;
+                    }
+                }
+            }
+            if (null !== $cfgCallOp && null !== $block->orig) {
+                $finalIssetEmptySlot = $this->resolveHoistedIssetOrEmptyCallArgSlot(
+                    $arg,
+                    $block,
+                    $cfgCallOp,
+                    (int) $argIndex
+                );
+                if (null !== $finalIssetEmptySlot) {
+                    $valueSlot = (string) $finalIssetEmptySlot;
+                } else {
+                    $inlineLiteralDimSlot = $this->resolveInlineArrayLiteralDimFetchCallArgSlot(
+                        $block,
+                        $cfgCallOp,
+                        (int) $argIndex
+                    );
+                    if (null !== $inlineLiteralDimSlot) {
+                        $valueSlot = $inlineLiteralDimSlot;
                     }
                 }
             }
