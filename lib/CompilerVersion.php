@@ -29,6 +29,19 @@ final class CompilerVersion
     /** Zend engine version for Docker/php-src 8.2 reference profile (Zend/zend.c, #12471). */
     public const REFERENCE_ZEND_VERSION = '4.2.31';
 
+    /** PHP version for Docker/php-src 8.2 reference profile (ext/standard/info.c, #16337). */
+    public const REFERENCE_PHP_VERSION = '8.2.31';
+
+    public const REFERENCE_PHP_VERSION_ID = 80231;
+
+    public const REFERENCE_PHP_MAJOR_VERSION = 8;
+
+    public const REFERENCE_PHP_MINOR_VERSION = 2;
+
+    public const REFERENCE_PHP_RELEASE_VERSION = 31;
+
+    public const REFERENCE_PHP_EXTRA_VERSION = '';
+
     /** Zend engine version when VERSION is stable 8.4+ (php-src 8.4.x → 4.4.x). */
     public const FORWARD_ZEND_VERSION = '4.4.0';
 
@@ -40,6 +53,61 @@ final class CompilerVersion
         }
 
         return self::FORWARD_ZEND_VERSION;
+    }
+
+    /** PHP version reported by phpversion() / PHP_VERSION (ext/standard/info.c, #11470, #16337). */
+    public static function reportedPhpVersion(): string
+    {
+        if (version_compare(self::VERSION, '8.4.0', '<')) {
+            return self::REFERENCE_PHP_VERSION;
+        }
+
+        return self::VERSION;
+    }
+
+    public static function reportedPhpVersionId(): int
+    {
+        if (version_compare(self::VERSION, '8.4.0', '<')) {
+            return self::REFERENCE_PHP_VERSION_ID;
+        }
+
+        return self::VERSION_ID;
+    }
+
+    public static function reportedPhpMajorVersion(): int
+    {
+        if (version_compare(self::VERSION, '8.4.0', '<')) {
+            return self::REFERENCE_PHP_MAJOR_VERSION;
+        }
+
+        return self::MAJOR_VERSION;
+    }
+
+    public static function reportedPhpMinorVersion(): int
+    {
+        if (version_compare(self::VERSION, '8.4.0', '<')) {
+            return self::REFERENCE_PHP_MINOR_VERSION;
+        }
+
+        return self::MINOR_VERSION;
+    }
+
+    public static function reportedPhpReleaseVersion(): int
+    {
+        if (version_compare(self::VERSION, '8.4.0', '<')) {
+            return self::REFERENCE_PHP_RELEASE_VERSION;
+        }
+
+        return self::RELEASE_VERSION;
+    }
+
+    public static function reportedPhpExtraVersion(): string
+    {
+        if (version_compare(self::VERSION, '8.4.0', '<')) {
+            return self::REFERENCE_PHP_EXTRA_VERSION;
+        }
+
+        return self::EXTRA_VERSION;
     }
 
     /** PHP 8.3+ typed class constants in traits (Zend/zend_compile.c, issue #5212). */

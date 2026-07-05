@@ -74,14 +74,15 @@ final class VmInfo
 
     public static function phpversion(?string $extension = null): string|false
     {
+        $runtimeVersion = CompilerVersion::reportedPhpVersion();
         if (null === $extension || self::isEngineExtensionName($extension)) {
-            return CompilerVersion::VERSION;
+            return $runtimeVersion;
         }
         if (!self::extension_loaded($extension)) {
             return false;
         }
 
-        return ModuleRegistry::getExtensionVersion($extension) ?? CompilerVersion::VERSION;
+        return ModuleRegistry::getExtensionVersion($extension) ?? $runtimeVersion;
     }
 
     public static function php_sapi_name(): string

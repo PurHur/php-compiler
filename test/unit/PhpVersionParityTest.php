@@ -17,14 +17,18 @@ final class PhpVersionParityTest extends TestCase
     {
         $constant = VmPhpCoreConstants::fetch('PHP_VERSION');
         $this->assertNotNull($constant);
-        $this->assertSame(CompilerVersion::VERSION, $constant->toString());
+        $reported = CompilerVersion::reportedPhpVersion();
+        $this->assertSame($reported, $constant->toString());
         $this->assertSame(VmInfo::phpversion(), $constant->toString());
         $this->assertSame(0, version_compare(VmInfo::phpversion(), $constant->toString()));
     }
 
-    public function testInfoJitHelperUsesCompilerVersion(): void
+    public function testInfoJitHelperUsesReportedPhpVersion(): void
     {
-        $this->assertSame(CompilerVersion::VERSION, InfoJitHelper::phpversion(null));
+        $reported = CompilerVersion::reportedPhpVersion();
+        $this->assertSame($reported, InfoJitHelper::phpversion(null));
+        $this->assertSame($reported, InfoJitHelper::phpversion('Core'));
+        $this->assertSame($reported, InfoJitHelper::phpversion('standard'));
         $this->assertStringNotContainsString(
             'VERSION_STRING',
             (string) file_get_contents(__DIR__.'/../../ext/standard/InfoJitHelper.php')

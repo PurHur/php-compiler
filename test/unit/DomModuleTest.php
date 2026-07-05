@@ -50,8 +50,8 @@ PHP;
         new Runtime();
         self::assertSame('20031129', VmInfo::phpversion('dom'));
         self::assertSame('20031129', InfoJitHelper::phpversion('dom'));
-        self::assertSame(CompilerVersion::VERSION, VmInfo::phpversion('pcre'));
-        self::assertSame(CompilerVersion::VERSION, InfoJitHelper::phpversion('pcre'));
+        self::assertSame(CompilerVersion::reportedPhpVersion(), VmInfo::phpversion('pcre'));
+        self::assertSame(CompilerVersion::reportedPhpVersion(), InfoJitHelper::phpversion('pcre'));
     }
 
     public function test_dom_node_is_same_node_identity(): void
