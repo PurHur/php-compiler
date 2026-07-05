@@ -687,6 +687,7 @@
         "ext/standard/ChownJitHelper.php",
         "ext/standard/ChunkSplitJitHelper.php",
         "ext/standard/ClassExistsJitHelper.php",
+        "ext/standard/ClassParentsJitHelper.php",
         "ext/standard/ClassUsesJitHelper.php",
         "ext/standard/CliArgvJitHelper.php",
         "ext/standard/ClockGettimeJitHelper.php",
@@ -1510,6 +1511,7 @@
         "ext/standard/VmFilestatArg.php",
         "ext/standard/VmFilestatFailure.php",
         "ext/standard/VmFloatDtoa.php",
+        "ext/standard/VmFlockOperation.php",
         "ext/standard/VmFminMax.php",
         "ext/standard/VmFnmatch.php",
         "ext/standard/VmFnmatchPure.php",
@@ -3080,6 +3082,7 @@
         "lib/JIT/Builtin/StringChmod.php",
         "lib/JIT/Builtin/StringChunkSplit.php",
         "lib/JIT/Builtin/StringClassExists.php",
+        "lib/JIT/Builtin/StringClassParents.php",
         "lib/JIT/Builtin/StringClassUses.php",
         "lib/JIT/Builtin/StringClockGettime.php",
         "lib/JIT/Builtin/StringClockGettimeRuntime.php",
@@ -4299,9 +4302,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 4065,
+        "inventory_files": 4068,
         "excluded": 0,
-        "eligible": 4065,
+        "eligible": 4068,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
