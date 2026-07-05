@@ -50,7 +50,6 @@ final class StrcasecmpRuntimeShrinkTest extends TestCase
             'ext/standard/JitClassExists.php',
             'ext/standard/JitInterfaceExists.php',
             'ext/standard/JitTraitExists.php',
-            'ext/standard/JitMethodExists.php',
             'ext/standard/JitGetClassMethods.php',
             'ext/standard/JitClassUses.php',
             'ext/standard/JitIniGetAll.php',

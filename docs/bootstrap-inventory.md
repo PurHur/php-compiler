@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 4050 |
-| Phase A inventory files (M2 ratio SSOT) | 4050 |
+| PHP files on vm.php path | 4052 |
+| Phase A inventory files (M2 ratio SSOT) | 4052 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 10921 |
+| Source constructs flagged (warnings) | 10923 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1207,6 +1207,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/MemoryJitHelper.php` | 0 | 1 |
 | `ext/standard/MetaTagsJitHelper.php` | 0 | 1 |
 | `ext/standard/MetaphoneJitHelper.php` | 0 | 1 |
+| `ext/standard/MethodExistsJitHelper.php` | 0 | 1 |
 | `ext/standard/MicrotimeJitHelper.php` | 0 | 1 |
 | `ext/standard/MimeContentTypeJitHelper.php` | 0 | 1 |
 | `ext/standard/MkdirJitHelper.php` | 0 | 1 |
@@ -3076,6 +3077,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringLzf.php` | 0 | 2 |
 | `lib/JIT/Builtin/StringMemcmp.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringMetaphone.php` | 0 | 3 |
+| `lib/JIT/Builtin/StringMethodExists.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringMicrotime.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringMkdir.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringMktime.php` | 0 | 3 |
@@ -10264,8 +10266,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitMethodExists.php`
 
 **Warnings** (review for bootstrap subset):
-- new JITVariable (line 85)
-- 13 class method(s)
+- new JITVariable (line 101)
+- 9 class method(s)
 
 ### `ext/standard/JitMimeContentType.php`
 
@@ -11464,6 +11466,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 1 class method(s)
 
 ### `ext/standard/MetaphoneJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/standard/MethodExistsJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
@@ -20502,10 +20509,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new CompileError (line 394)
 - new CompileError (line 419)
 - new CompileError (line 472)
-- new CompileError (line 590)
-- new CompileError (line 667)
-- new CompileError (line 673)
-- new CompileError (line 685)
+- new CompileError (line 589)
+- new CompileError (line 666)
+- new CompileError (line 672)
+- new CompileError (line 684)
 - 43 class method(s)
 - 8 closure(s)
 
@@ -24224,6 +24231,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new JIT (line 117)
 - 7 class method(s)
 - 1 closure(s)
+
+### `lib/JIT/Builtin/StringMethodExists.php`
+
+**Warnings** (review for bootstrap subset):
+- 4 class method(s)
 
 ### `lib/JIT/Builtin/StringMicrotime.php`
 

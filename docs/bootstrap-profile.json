@@ -1252,6 +1252,7 @@
         "ext/standard/MemoryJitHelper.php",
         "ext/standard/MetaTagsJitHelper.php",
         "ext/standard/MetaphoneJitHelper.php",
+        "ext/standard/MethodExistsJitHelper.php",
         "ext/standard/MicrotimeJitHelper.php",
         "ext/standard/MimeContentTypeJitHelper.php",
         "ext/standard/MkdirJitHelper.php",
@@ -3136,6 +3137,7 @@
         "lib/JIT/Builtin/StringLzf.php",
         "lib/JIT/Builtin/StringMemcmp.php",
         "lib/JIT/Builtin/StringMetaphone.php",
+        "lib/JIT/Builtin/StringMethodExists.php",
         "lib/JIT/Builtin/StringMicrotime.php",
         "lib/JIT/Builtin/StringMkdir.php",
         "lib/JIT/Builtin/StringMktime.php",
@@ -4284,9 +4286,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 4050,
+        "inventory_files": 4052,
         "excluded": 0,
-        "eligible": 4050,
+        "eligible": 4052,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
