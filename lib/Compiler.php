@@ -31522,7 +31522,7 @@ class Compiler {
 
         $sends = [];
         foreach ($args as $argIndex => $arg) {
-            $nameSlot = null;
+            $nameSlot = $this->callArgNameSlot($arg, $block);
             // Early inline-array ARG_SEND paths continue before the main send site — unpack must be known up front (#16151).
             $unpackFlag = $this->callArgUnpack($arg) ? 1 : null;
             if (null !== $cfgCallOp && null !== $block->orig) {
@@ -33091,14 +33091,6 @@ class Compiler {
                         ) ? null : $calleeName
                     );
                 }
-            }
-            $argName = $this->callArgName($arg);
-            if (null !== $argName) {
-                $nameOp = new Operand\Literal($argName);
-                $nameOp->type = Type::string();
-                $nameVar = new Variable(Variable::TYPE_STRING);
-                $nameVar->string($argName);
-                $nameSlot = $block->registerConstant($nameOp, $nameVar);
             }
             if ([] !== $prefetchOps) {
                 $sends = array_merge($sends, $prefetchOps);
@@ -36489,6 +36481,23 @@ class Compiler {
         }
 
         return null;
+    }
+
+    /**
+     * Constant slot for TYPE_ARG_SEND named-parameter label (#11052, #12018).
+     */
+    private function callArgNameSlot(Operand $arg, Block $block): ?string
+    {
+        $argName = $this->callArgName($arg);
+        if (null === $argName) {
+            return null;
+        }
+        $nameOp = new Operand\Literal($argName);
+        $nameOp->type = Type::string();
+        $nameVar = new Variable(Variable::TYPE_STRING);
+        $nameVar->string($argName);
+
+        return $block->registerConstant($nameOp, $nameVar);
     }
 
     /**

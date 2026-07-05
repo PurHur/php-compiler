@@ -432,6 +432,17 @@ final class BuiltinParamNames
                 'input' => 0,
             ];
         }
+        if ('fgetcsv' === $lc) {
+            // php-src 8.2 arginfo `delimiter` → 8.4 stub `separator` (#12018).
+            return [
+                'delimiter' => 2,
+            ];
+        }
+        if ('str_getcsv' === $lc) {
+            return [
+                'delimiter' => 1,
+            ];
+        }
 
         return [];
     }
