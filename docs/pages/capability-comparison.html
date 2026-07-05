@@ -59,13 +59,13 @@
       <div class="cap-summary">
         <article>
           <div>Language constructs</div>
-          <strong>81</strong> / 89 full (VM+JIT+AOT)
-          <p style="margin:0.35rem 0 0;font-size:0.88rem;color:var(--text-muted)">4 partial · 4 gaps</p>
+          <strong>80</strong> / 89 full (VM+JIT+AOT)
+          <p style="margin:0.35rem 0 0;font-size:0.88rem;color:var(--text-muted)">5 partial · 4 gaps</p>
         </article>
         <article>
           <div>Stdlib builtins</div>
-          <strong>866</strong> / 897 full (VM+JIT+AOT)
-          <p style="margin:0.35rem 0 0;font-size:0.88rem;color:var(--text-muted)">11 partial · 20 gaps</p>
+          <strong>868</strong> / 897 full (VM+JIT+AOT)
+          <p style="margin:0.35rem 0 0;font-size:0.88rem;color:var(--text-muted)">9 partial · 20 gaps</p>
         </article>
         <article>
           <div>Legend</div>
@@ -163,7 +163,7 @@
 <tr data-support="full"><td><code>readonly classes</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td><a href="https://github.com/PurHur/php-compiler/issues/1360">#1360</a></td></tr>
 <tr data-support="full"><td><code>readonly properties (per-property)</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td><a href="https://github.com/PurHur/php-compiler/issues/3149">#3149</a></td></tr>
 <tr data-support="full"><td><code>Property hooks (`get` / `set` on properties)</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td><a href="https://github.com/PurHur/php-compiler/issues/3145">#3145</a></td></tr>
-<tr data-support="full"><td><code>PHP 8.4 asymmetric property visibility (private(set), protected(set), etc.)</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td><a href="https://github.com/PurHur/php-compiler/issues/3165">#3165</a></td></tr>
+<tr data-support="partial"><td><code>PHP 8.4 asymmetric property visibility (private(set), protected(set), etc.)</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-no">no</td><td><a href="https://github.com/PurHur/php-compiler/issues/3165">#3165</a></td></tr>
 <tr data-support="full"><td><code>User __destruct()</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td><a href="https://github.com/PurHur/php-compiler/issues/4096">#4096</a></td></tr>
 <tr data-support="full"><td><code>PHP 8 attributes — `ReflectionClass` / `ReflectionMethod` metadata</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td><a href="https://github.com/PurHur/php-compiler/issues/1936">#1936</a></td></tr>
 <tr data-support="full"><td><code>WeakReference / WeakMap</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td><a href="https://github.com/PurHur/php-compiler/issues/3667">#3667</a></td></tr>
@@ -720,8 +720,8 @@
 <tr data-support="partial"><td><code>`openssl_pkey_derive`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td>—</td></tr>
 <tr data-support="partial"><td><code>`openssl_pkey_new`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td>—</td></tr>
 <tr data-support="full"><td><code>`openssl_random_pseudo_bytes`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
-<tr data-support="partial"><td><code>`openssl_sign`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td>—</td></tr>
-<tr data-support="partial"><td><code>`openssl_verify`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td>—</td></tr>
+<tr data-support="full"><td><code>`openssl_sign`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
+<tr data-support="full"><td><code>`openssl_verify`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="partial"><td><code>`openssl_x509_read`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td>—</td></tr>
 <tr data-support="full"><td><code>`ord`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`output_add_rewrite_var`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
