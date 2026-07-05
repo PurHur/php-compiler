@@ -247,6 +247,8 @@ final class BuiltinParamNames
             case 'nl2br':
                 return ['string', 'use_xhtml'];
             case 'str_contains':
+            case 'str_starts_with':
+            case 'str_ends_with':
                 return ['haystack', 'needle'];
             case 'preg_match':
                 return ['pattern', 'subject', 'matches', 'flags', 'offset'];
