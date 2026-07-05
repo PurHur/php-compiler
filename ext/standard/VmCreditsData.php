@@ -55,7 +55,7 @@ final class VmCreditsData
         'Date/Time Support' => 'Derick Rethans',
         'DB-LIB (MS SQL, Sybase)' => 'Wez Furlong, Frank M. Kromann, Adam Baratz',
         'DBA' => 'Sascha Schumann, Marcus Boerger',
-        'DOM' => 'Christian Stocker, Rob Richards, Marcus Boerger',
+        'DOM' => 'Christian Stocker, Rob Richards, Marcus Boerger, Nora Dossche',
         'enchant' => 'Pierre-Alain Joye, Ilia Alshanetsky',
         'EXIF' => 'Rasmus Lerdorf, Marcus Boerger',
         'FFI' => 'Dmitry Stogov',
@@ -115,6 +115,7 @@ final class VmCreditsData
         'XSL' => 'Christian Stocker, Rob Richards',
         'Zip' => 'Pierre-Alain Joye, Remi Collet',
         'Zlib' => 'Rasmus Lerdorf, Stefan Roehrich, Zeev Suraski, Jade Nicoletti, Michael Wallner',
+        'uri' => 'Máté Kocsis, Tim Düsterhus, Ignace Nyamagana Butera, Arnaud Le Blanc, Dennis Snell, Nora Dossche, Nicolas Grekas',
     ];
 
     /**
@@ -169,10 +170,34 @@ final class VmCreditsData
         'phpdbg' => 'Felipe Pena, Joe Watkins, Bob Weinand',
     ];
 
-    /** php-src Debian Packaging credits row bundled under CREDITS_SAPI (ext/standard/info.c). */
-    public const DEBIAN_PACKAGING_AUTHOR = 'Ondřej Surý';
+    /** php-src Debian Packaging credits row (ext/standard/credits.c, CREDITS_SAPI tail). */
+    public const DEBIAN_PACKAGING_AUTHOR = 'DEB.SURY.ORG, an Ondřej Surý project';
 
-    /** php-src PHP_CREDITS_DOCS — documentation team. */
+    /**
+     * php-src PHP Documentation credits rows (ext/standard/credits.c, CREDITS_DOCS).
+     *
+     * @var array<string, string>
+     */
+    public const DOCS_CREDITS = [
+        'Authors' => 'Mehdi Achour, Friedhelm Betz, Antony Dovgal, Nuno Lopes, Hannes Magnusson, Philip Olson, Georg Richter, Damien Seguy, Jakub Vrana, Adam Harvey',
+        'Editor' => 'Peter Cowburn',
+        'User Note Maintainers' => 'Daniel P. Brown, Thiago Henrique Pojda',
+        'Other Contributors' => 'Previously active authors, editors and other contributors are listed in the manual.',
+    ];
+
+    /**
+     * php-src Websites and Infrastructure credits (ext/standard/credits.c, CREDITS_WEB).
+     *
+     * @var array<string, string>
+     */
+    public const WEB_CREDITS = [
+        'PHP Websites Team' => 'Rasmus Lerdorf, Hannes Magnusson, Philip Olson, Lukas Kahwe Smith, Pierre-Alain Joye, Kalle Sommer Nielsen, Peter Cowburn, Adam Harvey, Ferenc Kovacs, Levi Morrison',
+        'Event Maintainers' => 'Damien Seguy, Daniel P. Brown',
+        'Network Infrastructure' => 'Daniel P. Brown',
+        'Windows Infrastructure' => 'Alex Schoenmaker',
+    ];
+
+    /** @deprecated Use {@see DOCS_CREDITS} — kept for legacy callers. */
     public const DOCS_TEAM =
         'Mehdi Achour, Vincent Gevers, Stig Bakken, Rasmus Lerdorf, '
         .'Gabor Egressy, Hartmut Holzgraefe, Jouni Ahto';
@@ -254,6 +279,7 @@ final class VmCreditsData
         'xsl' => 'XSL',
         'zip' => 'Zip',
         'zlib' => 'Zlib',
+        'uri' => 'uri',
     ];
 
     /**

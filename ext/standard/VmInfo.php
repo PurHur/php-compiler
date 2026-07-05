@@ -50,15 +50,19 @@ final class VmInfo
 
     public const CREDITS_QA = 64;
 
+    public const CREDITS_WEB = 128;
+
     public const CREDITS_ALL = -1;
 
-    /** phpinfo(INFO_CREDITS) embeds these sections without CREDITS_FULLPAGE wrap (ext/standard/info.c, #14296). */
+    /** phpinfo(INFO_CREDITS) → php_print_credits(CREDITS_ALL & ~FULLPAGE) (ext/standard/info.c, #16347). */
     private const PHPINFO_CREDITS_FLAGS =
         self::CREDITS_GROUP
         | self::CREDITS_GENERAL
         | self::CREDITS_SAPI
         | self::CREDITS_MODULES
-        | self::CREDITS_QA;
+        | self::CREDITS_DOCS
+        | self::CREDITS_QA
+        | self::CREDITS_WEB;
 
     /** php-src maps the Zend engine module to extension name Core (ext/standard/info.c). */
     public static function isEngineExtensionName(string $extension): bool
@@ -581,9 +585,6 @@ final class VmInfo
         if (self::creditsFlagSelected($flags, self::CREDITS_GENERAL)) {
             $sections .= self::creditsGeneralSectionHtml();
         }
-        if (self::creditsFlagSelected($flags, self::CREDITS_QA)) {
-            $sections .= self::creditsQaSectionHtml();
-        }
         if (self::creditsFlagSelected($flags, self::CREDITS_SAPI)) {
             $sections .= self::creditsSapiSectionHtml();
         }
@@ -592,6 +593,15 @@ final class VmInfo
         }
         if (self::creditsFlagSelected($flags, self::CREDITS_DOCS)) {
             $sections .= self::creditsDocsSectionHtml();
+        }
+        if (self::creditsFlagSelected($flags, self::CREDITS_QA)) {
+            $sections .= self::creditsQaSectionHtml();
+        }
+        if (self::creditsFlagSelected($flags, self::CREDITS_WEB)) {
+            $sections .= self::creditsWebSectionHtml();
+        }
+        if (self::creditsFlagSelected($flags, self::CREDITS_SAPI)) {
+            $sections .= self::creditsDebianSectionHtml();
         }
         if ('' === $sections) {
             return '';
@@ -613,9 +623,6 @@ final class VmInfo
         if (self::creditsFlagSelected($flags, self::CREDITS_GENERAL)) {
             $sections .= self::creditsGeneralSectionText();
         }
-        if (self::creditsFlagSelected($flags, self::CREDITS_QA)) {
-            $sections .= self::creditsQaSectionText();
-        }
         if (self::creditsFlagSelected($flags, self::CREDITS_SAPI)) {
             $sections .= self::creditsSapiSectionText();
         }
@@ -624,6 +631,15 @@ final class VmInfo
         }
         if (self::creditsFlagSelected($flags, self::CREDITS_DOCS)) {
             $sections .= self::creditsDocsSectionText();
+        }
+        if (self::creditsFlagSelected($flags, self::CREDITS_QA)) {
+            $sections .= self::creditsQaSectionText();
+        }
+        if (self::creditsFlagSelected($flags, self::CREDITS_WEB)) {
+            $sections .= self::creditsWebSectionText();
+        }
+        if (self::creditsFlagSelected($flags, self::CREDITS_SAPI)) {
+            $sections .= self::creditsDebianSectionText();
         }
 
         return $sections;
@@ -703,9 +719,6 @@ final class VmInfo
             $html .= '<tr><td class="e">'.$contribution.' </td><td class="v">'.$authors.' </td></tr>';
         }
         $html .= '</table><br />';
-        $html .= '<table><tr class="h"><td colspan="2"><h2>Debian Packaging</h2></td></tr>';
-        $html .= '<tr><td class="v" colspan="2">'.VmCreditsData::DEBIAN_PACKAGING_AUTHOR.'</td></tr>';
-        $html .= '</table><br />';
 
         return $html;
     }
@@ -751,9 +764,6 @@ final class VmInfo
         foreach (VmCreditsData::SAPI_MODULES as $contribution => $authors) {
             $text .= self::creditsTableRowText([$contribution, $authors]);
         }
-        $text .= "\n";
-        $text .= self::creditsColspanHeaderText('Debian Packaging');
-        $text .= VmCreditsData::DEBIAN_PACKAGING_AUTHOR."\n";
 
         return $text;
     }
@@ -773,8 +783,30 @@ final class VmInfo
     private static function creditsDocsSectionText(): string
     {
         $text = "\n";
-        $text .= self::creditsColspanHeaderText('PHP Documentation Team');
-        $text .= VmCreditsData::DOCS_TEAM."\n";
+        $text .= self::creditsColspanHeaderText('PHP Documentation');
+        foreach (VmCreditsData::DOCS_CREDITS as $contribution => $authors) {
+            $text .= self::creditsTableRowText([$contribution, $authors]);
+        }
+
+        return $text;
+    }
+
+    private static function creditsWebSectionText(): string
+    {
+        $text = "\n";
+        $text .= self::creditsColspanHeaderText('Websites and Infrastructure team');
+        foreach (VmCreditsData::WEB_CREDITS as $contribution => $authors) {
+            $text .= self::creditsTableRowText([$contribution, $authors]);
+        }
+
+        return $text;
+    }
+
+    private static function creditsDebianSectionText(): string
+    {
+        $text = "\n";
+        $text .= self::creditsColspanHeaderText('Debian Packaging');
+        $text .= VmCreditsData::DEBIAN_PACKAGING_AUTHOR."\n";
 
         return $text;
     }
@@ -793,8 +825,32 @@ final class VmInfo
 
     private static function creditsDocsSectionHtml(): string
     {
-        $html = '<table><tr class="h"><td colspan="2"><h2>PHP Documentation Team</h2></td></tr>';
-        $html .= '<tr><td class="v" colspan="2">'.VmCreditsData::DOCS_TEAM.'</td></tr>';
+        $html = '<table><tr class="h"><td colspan="2"><h2>PHP Documentation</h2></td></tr>';
+        $html .= '<tr><td class="e">Contribution </td><td class="v">Authors </td></tr>';
+        foreach (VmCreditsData::DOCS_CREDITS as $contribution => $authors) {
+            $html .= '<tr><td class="e">'.$contribution.' </td><td class="v">'.$authors.' </td></tr>';
+        }
+        $html .= '</table><br />';
+
+        return $html;
+    }
+
+    private static function creditsWebSectionHtml(): string
+    {
+        $html = '<table><tr class="h"><td colspan="2"><h2>Websites and Infrastructure team</h2></td></tr>';
+        $html .= '<tr><td class="e">Contribution </td><td class="v">Authors </td></tr>';
+        foreach (VmCreditsData::WEB_CREDITS as $contribution => $authors) {
+            $html .= '<tr><td class="e">'.$contribution.' </td><td class="v">'.$authors.' </td></tr>';
+        }
+        $html .= '</table><br />';
+
+        return $html;
+    }
+
+    private static function creditsDebianSectionHtml(): string
+    {
+        $html = '<table><tr class="h"><td colspan="2"><h2>Debian Packaging</h2></td></tr>';
+        $html .= '<tr><td class="v" colspan="2">'.VmCreditsData::DEBIAN_PACKAGING_AUTHOR.'</td></tr>';
         $html .= '</table><br />';
 
         return $html;
