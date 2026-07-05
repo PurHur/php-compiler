@@ -58,7 +58,7 @@ PHP;
 
     public function testMalformedSpecThrowsException(): void
     {
-        if (CompilerVersion::advertisesDateExceptionHierarchy()) {
+        if (CompilerVersion::throwsDateMalformedIntervalException()) {
             $this->expectException(NativeDateMalformedIntervalException::class);
         } else {
             $this->expectException(\Exception::class);
@@ -69,8 +69,8 @@ PHP;
 
     public function testVmDateIntervalMalformedSpecThrowsTypedException(): void
     {
-        if (!CompilerVersion::advertisesDateExceptionHierarchy()) {
-            $this->markTestSkipped('DateMalformedIntervalException requires PHP 8.3+ date hierarchy');
+        if (!CompilerVersion::throwsDateMalformedIntervalException()) {
+            $this->markTestSkipped('DateMalformedIntervalException requires PHP 8.3+ forward profile');
         }
         $runtime = new Runtime();
         $code = <<<'PHP'

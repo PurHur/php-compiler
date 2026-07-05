@@ -231,7 +231,7 @@ final class VmDateInterval
     private static function throwBadFormat(string $spec): never
     {
         $message = 'Unknown or bad format ('.$spec.')';
-        if (CompilerVersion::advertisesDateExceptionHierarchy()) {
+        if (CompilerVersion::throwsDateMalformedIntervalException()) {
             throw new NativeDateMalformedIntervalException($message);
         }
         throw new \Exception($message);

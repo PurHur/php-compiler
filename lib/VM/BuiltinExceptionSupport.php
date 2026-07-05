@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace PHPCompiler\VM;
 
+use PHPCompiler\CompilerVersion;
+
 /**
  * Minimal Throwable / Error / TypeError VM registration for runtime TypeError dispatch (#3445, #3371).
  *
@@ -182,7 +184,8 @@ final class BuiltinExceptionSupport
         string $file = '',
         int $line = 0
     ): Variable {
-        if (!isset($ctx->classes[self::CLASS_DATE_MALFORMED_INTERVAL_EXCEPTION])) {
+        if (!CompilerVersion::throwsDateMalformedIntervalException()
+            || !isset($ctx->classes[self::CLASS_DATE_MALFORMED_INTERVAL_EXCEPTION])) {
             return self::materializeException($ctx, $message, $file, $line);
         }
 

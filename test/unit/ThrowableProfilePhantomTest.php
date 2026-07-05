@@ -15,6 +15,7 @@ final class ThrowableProfilePhantomTest extends TestCase
     public function testForwardCompatDateHierarchyOn84DevProfile(): void
     {
         $this->assertTrue(CompilerVersion::advertisesDateExceptionHierarchy());
+        $this->assertFalse(CompilerVersion::throwsDateMalformedIntervalException());
         $this->assertFalse(CompilerVersion::advertisesRequestParseBodyExceptionClass());
     }
 

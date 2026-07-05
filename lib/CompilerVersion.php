@@ -1085,6 +1085,30 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.3+ DateMalformedIntervalException on malformed DateInterval spec (ext/date/php_date.c, #16490).
+     *
+     * Withheld on 8.4.0-dev reference profile (matches Zend 8.2 plain Exception). Enable via stable
+     * 8.4.0+ or explicit `PHP_COMPILER_PROFILE=8.3` / `8.4` forward profile.
+     */
+    public static function throwsDateMalformedIntervalException(): bool
+    {
+        if (version_compare(self::VERSION, '8.3', '<')) {
+            return false;
+        }
+
+        if (version_compare(self::VERSION, '8.4.0', '>=')) {
+            return true;
+        }
+
+        $raw = getenv('PHP_COMPILER_PROFILE');
+        if (!\is_string($raw) || '' === trim($raw)) {
+            return false;
+        }
+
+        return version_compare(self::languageProfileVersion(), '8.3.0', '>=');
+    }
+
+    /**
      * PHP 8.4+ RequestParseBodyException (ext/standard/http.c, #13124).
      *
      * Gated on stable 8.4.0 so 8.4.0-dev reference profile matches Zend 8.2 phantom gate.
