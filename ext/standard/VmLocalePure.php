@@ -134,8 +134,8 @@ final class VmLocalePure
                 return self::querySetlocale($category, '0');
             }
 
-            self::bootstrapTrackingIfNeeded();
-
+            // Bootstrap only for setlocale(LC_ALL, null) queries (#8684). Running it before
+            // category mutations (e.g. setlocale(LC_TIME, 'C')) poisons nl_langinfo(CODESET).
             $result = @\setlocale($category, $locale);
             if (false !== $result && '' !== $result) {
                 if (self::isLcAll($category)) {

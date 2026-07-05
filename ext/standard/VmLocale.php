@@ -55,7 +55,21 @@ final class VmLocale
      */
     public static function nlLanginfo(int $item): string|false
     {
+        if (!self::isValidNlLanginfoItem($item)) {
+            \trigger_error(
+                \sprintf("nl_langinfo(): Item '%d' is not valid", $item),
+                \E_USER_WARNING
+            );
+
+            return false;
+        }
+
         return VmLocalePure::nlLanginfo($item);
+    }
+
+    public static function isValidNlLanginfoItem(int $item): bool
+    {
+        return \in_array($item, self::nlLanginfoConstants(), true);
     }
 
     /**
