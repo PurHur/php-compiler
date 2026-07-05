@@ -14,7 +14,7 @@ use PHPLLVM\Value;
 /**
  * JIT/AOT link for array_pad() via ArrayPadJitHelper PHP (#12476).
  *
- * Standalone AOT compiles {@see ArrayPadJitHelper} via JitVmHelperLink (#14286); native literal arrays keep LLVM in {@see ArrayBuiltinHelper::pad()}.
+ * Standalone AOT compiles {@see ArrayPadJitHelper} via JitVmHelperLink (#14286); native literal arrays may use LLVM in {@see ArrayBuiltinHelper::pad()}.
  * SSOT: {@see \PHPCompiler\VM\HashTable::padCopy()}
  * php-src: ext/standard/array.c — php_array_pad()
  */
@@ -26,11 +26,14 @@ final class ArrayPadRuntime
 
     private const HELPER_PATH = '/ext/standard/ArrayPadJitHelper.php';
 
-    private const PAD_HELPER = 'PHPCompiler\\ext\\standard\\ArrayPadJitHelper::padCopy';
+    private const PAD_LEGACY_HELPER = 'PHPCompiler\\ext\\standard\\ArrayPadJitHelper::padCopyLegacy';
+
+    private const PAD_TYPED_HELPER = 'PHPCompiler\\ext\\standard\\ArrayPadJitHelper::padCopyTyped';
 
     /** @var list<string> */
     private const COMPILED_HELPERS = [
-        self::PAD_HELPER,
+        self::PAD_LEGACY_HELPER,
+        self::PAD_TYPED_HELPER,
     ];
 
     public static function pad(
@@ -106,7 +109,7 @@ final class ArrayPadRuntime
             'array_pad_bridge_entry',
             [$htPtr, $i64, $valuePtr],
             $htPtr,
-            self::PAD_HELPER,
+            self::PAD_LEGACY_HELPER,
             self::HELPER_PATH,
             self::COMPILED_HELPERS,
             '#12476'
@@ -117,7 +120,7 @@ final class ArrayPadRuntime
             'array_pad_typed_bridge_entry',
             [$htPtr, $i64, $valuePtr, $i64],
             $htPtr,
-            self::PAD_HELPER,
+            self::PAD_TYPED_HELPER,
             self::HELPER_PATH,
             self::COMPILED_HELPERS,
             '#14993'
