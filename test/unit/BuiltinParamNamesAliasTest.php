@@ -113,6 +113,22 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'flags', 'file'));
     }
 
+    /** @covers issue #9565 */
+    public function testPathinfoFlagsNamedParamResolves(): void
+    {
+        $names = BuiltinParamNames::forFunction('pathinfo');
+        self::assertSame(['path', 'flags'], $names);
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'flags', 'pathinfo'));
+    }
+
+    /** @covers issue #9620 */
+    public function testExtractFlagsNamedParamResolves(): void
+    {
+        $names = BuiltinParamNames::forFunction('extract');
+        self::assertSame(['array', 'flags', 'prefix'], $names);
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'flags', 'extract'));
+    }
+
     /** @covers issue #10644 */
     public function testMicrotimeAsFloatNamedParamResolves(): void
     {
