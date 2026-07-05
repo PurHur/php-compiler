@@ -8,7 +8,10 @@ use PHPCompiler\ext\standard\StdlibConstants;
 use PHPCompiler\ext\standard\VmInetPure;
 use PHPCompiler\ext\standard\VmPregNative;
 use PHPCompiler\ext\standard\VmString;
+use PHPCompiler\Frame;
+use PHPCompiler\VM\Context;
 use PHPCompiler\VM\EnumCaseSupport;
+use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 
 /**
@@ -1252,5 +1255,137 @@ final class VmFilter
             || ($ch >= 'A' && $ch <= 'Z')
             || ($ch >= '0' && $ch <= '9')
             || '.' === $ch || '-' === $ch;
+    }
+
+    /** filter_has_var() — key present in INPUT_* superglobal (php-src ext/filter/filter.c; #3294). */
+    public static function hasInputVar(Context $ctx, int $type, string $key): bool
+    {
+        $sgName = self::inputSuperglobalName($type);
+        $sg = $ctx->getSuperglobal($sgName);
+        if (null === $sg || Variable::TYPE_ARRAY !== $sg->type) {
+            return false;
+        }
+        $keyVar = new Variable();
+        $keyVar->string($key);
+
+        return $sg->toArray()->offsetIsSet($keyVar);
+    }
+
+    /**
+     * filter_input_array() — batch filter from superglobal (#3294).
+     *
+     * @return HashTable|null null when the input superglobal is missing or not an array
+     */
+    public static function filterInputArray(
+        Context $ctx,
+        int $type,
+        ?HashTable $definition,
+        int $addEmpty,
+        Frame $frame
+    ): ?HashTable {
+        $sgName = self::inputSuperglobalName($type);
+        $sg = $ctx->getSuperglobal($sgName);
+        if (null === $sg || Variable::TYPE_ARRAY !== $sg->type) {
+            return null;
+        }
+
+        return self::filterVarArray($sg->toArray(), $definition, $addEmpty, $frame);
+    }
+
+    /**
+     * filter_var_array() — batch filter_var() over keys (#3294).
+     *
+     * @return HashTable|null false-equivalent when definition is null and FILTER_DEFAULT fails
+     */
+    public static function filterVarArray(
+        HashTable $data,
+        ?HashTable $definition,
+        int $addEmpty,
+        Frame $frame
+    ): ?HashTable {
+        if (null === $definition) {
+            return self::filterVarArrayWithDefaultFilter($data, $frame);
+        }
+
+        return self::filterVarArrayWithDefinition($data, $definition, $addEmpty, $frame);
+    }
+
+    /** php-src php_filter_var_array — no definition uses FILTER_DEFAULT for every element. */
+    private static function filterVarArrayWithDefaultFilter(HashTable $data, Frame $frame): ?HashTable
+    {
+        $filterId = self::FILTER_DEFAULT;
+        if (!self::isSupportedFilter($filterId)) {
+            filter_var::triggerUnknownFilterWarning($frame, $filterId);
+
+            return null;
+        }
+        $out = new HashTable();
+        foreach ($data->iterateKeyed(true) as [$keyVar, $valueVar]) {
+            $filtered = self::filterVar($valueVar->resolveIndirect(), $filterId, null);
+            self::storeFilteredEntry($out, $keyVar, $filtered);
+        }
+
+        return $out;
+    }
+
+    private static function filterVarArrayWithDefinition(
+        HashTable $data,
+        HashTable $definition,
+        int $addEmpty,
+        Frame $frame
+    ): HashTable {
+        $out = new HashTable();
+        foreach ($definition->iterateKeyed(true) as [$defKeyVar, $filterVar]) {
+            $defKey = $defKeyVar->resolveIndirect();
+            $filterResolved = $filterVar->resolveIndirect();
+            if (Variable::TYPE_INTEGER !== $filterResolved->type) {
+                throw new \LogicException('filter_var_array() definition values must be filter IDs');
+            }
+            $filterId = $filterResolved->toInt();
+            if (!self::isSupportedFilter($filterId)) {
+                filter_var::triggerUnknownFilterWarning($frame, $filterId);
+            }
+            $stored = self::lookupDataValue($data, $defKey);
+            if (null === $stored) {
+                if (0 !== $addEmpty) {
+                    self::storeFilteredEntry($out, $defKeyVar, self::failureResult(false));
+                }
+                continue;
+            }
+            $filtered = self::filterVar($stored->resolveIndirect(), $filterId, null);
+            self::storeFilteredEntry($out, $defKeyVar, $filtered);
+        }
+
+        return $out;
+    }
+
+    private static function lookupDataValue(HashTable $data, Variable $key): ?Variable
+    {
+        if (Variable::TYPE_INTEGER === $key->type) {
+            return $data->findIndex($key->toInt());
+        }
+        if (Variable::TYPE_STRING === $key->type) {
+            return $data->find($key->toString());
+        }
+
+        return null;
+    }
+
+    private static function storeFilteredEntry(HashTable $out, Variable $keyVar, Variable $filtered): void
+    {
+        $stored = new Variable();
+        $stored->copyFrom($filtered);
+        $key = $keyVar->resolveIndirect();
+        if (Variable::TYPE_INTEGER === $key->type) {
+            $out->addIndex($key->toInt(), $stored);
+
+            return;
+        }
+        if (Variable::TYPE_STRING === $key->type) {
+            $out->add($key->toString(), $stored);
+
+            return;
+        }
+        throw new \LogicException('filter_var_array() only supports string or integer keys');
     }
 }
