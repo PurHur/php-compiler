@@ -15822,14 +15822,10 @@ class Compiler {
         $producers = $this->filterNestedNewInlineCallArgProducers($producers, $cfgCallOp);
         $producers = $this->filterKnownVoidMethodCallPreludes($producers);
         $producers = $this->filterStmtLevelArrayPointerFuncPreludes($producers);
-        // var_export(reset($a), true) — arg #0 must bind hoisted reset(), not ConstFetch true (#16556, #13829).
-        if (0 === $argIndex) {
+        // var_export(f(), true) — arg #0 must bind hoisted nested call, not ConstFetch true (#16556, #16557).
+        if (0 === $argIndex && 'var_export' === $inlineFuncName) {
             foreach ($producers as $producer) {
-                if (!($producer instanceof Op\Expr\FuncCall || $producer instanceof Op\Expr\NsFuncCall)) {
-                    continue;
-                }
-                $fn = $this->resolveCfgFuncCallName($producer);
-                if (null !== $fn && ReferencableCheck::isArrayInternalPointerBuiltin($fn)) {
+                if ($producer instanceof Op\Expr\FuncCall || $producer instanceof Op\Expr\NsFuncCall) {
                     return $producer;
                 }
             }
@@ -19346,7 +19342,7 @@ class Compiler {
         if ($callArg instanceof Operand && $this->callArgOperandExpectsArrayProducer($callArg)) {
             return null;
         }
-        // var_export(reset($a), true) — ConstFetch true sits between reset and consumer; arg #0 is reset (#16556).
+        // var_export(f(), true) — ConstFetch true sits between nested call and consumer; arg #0 is f() (#16556, #16557).
         if (0 === $argIndex && null !== $block->orig) {
             $callIndex = null;
             foreach ($block->orig->children as $i => $child) {
@@ -19362,6 +19358,10 @@ class Compiler {
                         continue;
                     }
                     if ($prev instanceof Op\Expr\FuncCall || $prev instanceof Op\Expr\NsFuncCall) {
+                        $consumerFn = strtolower($this->resolveCfgFuncCallName($callOp) ?? '');
+                        if ('var_export' === $consumerFn) {
+                            return null;
+                        }
                         $fn = $this->resolveCfgFuncCallName($prev);
                         if (null !== $fn && ReferencableCheck::isArrayInternalPointerBuiltin($fn)) {
                             return null;
@@ -32880,7 +32880,7 @@ class Compiler {
         if (null === $callIndex) {
             return null;
         }
-        // var_export(reset($a), true) — arg #0 is hoisted reset(), not ConstFetch true (#16556, #13829).
+        // var_export(f(), true) — arg #0 is hoisted nested call, not ConstFetch true (#16556, #16557).
         if (0 === $argIndex) {
             for ($i = $callIndex - 1; $i >= 0; --$i) {
                 $prev = $children[$i] ?? null;
@@ -32888,6 +32888,10 @@ class Compiler {
                     continue;
                 }
                 if ($prev instanceof Op\Expr\FuncCall || $prev instanceof Op\Expr\NsFuncCall) {
+                    $consumerFn = strtolower($this->resolveCfgFuncCallName($cfgCallOp) ?? '');
+                    if ('var_export' === $consumerFn) {
+                        return null;
+                    }
                     $fn = $this->resolveCfgFuncCallName($prev);
                     if (null !== $fn && ReferencableCheck::isArrayInternalPointerBuiltin($fn)) {
                         return null;
@@ -39522,7 +39526,20 @@ class Compiler {
             return true;
         }
 
-        return null !== BuiltinByRefParams::variadicByRefFromIndex($calleeName);
+        $variadicFrom = BuiltinByRefParams::variadicByRefFromIndex($calleeName);
+        if (null !== $variadicFrom) {
+            if (
+                property_exists($op, 'args')
+                && \is_array($op->args)
+                && \count($op->args) <= $variadicFrom
+            ) {
+                return false;
+            }
+
+            return true;
+        }
+
+        return false;
     }
 
     /**
