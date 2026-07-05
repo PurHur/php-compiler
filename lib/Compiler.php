@@ -12936,7 +12936,7 @@ class Compiler {
                 }
 
                 if ($this->inlineCallArgProducerFeedsCallArgOp($directCall, $callOp, $positionalCallArg)) {
-                    return $directCall;
+                    return null;
                 }
 
                 return null;
