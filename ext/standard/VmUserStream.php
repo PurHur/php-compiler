@@ -127,7 +127,7 @@ final class VmUserStream
         return \array_keys(self::$streams);
     }
 
-    private static function instantiateWrapper(VM $vm, Context $ctx, string $className): ?ObjectEntry
+    public static function instantiateWrapper(VM $vm, Context $ctx, string $className): ?ObjectEntry
     {
         $lc = \strtolower($className);
         if (!isset($ctx->classes[$lc])) {

@@ -41,7 +41,8 @@ final class touch_ extends Internal
         }
         $ok = VmFs::touch($path, $mtime, $atime);
         // php-src filestat.c php_touch — empty path returns false without E_WARNING (#13343).
-        if (!$ok && '' !== $path) {
+        // Custom wrapper URLs without stream_metadata also fail silently (userspace.c).
+        if (!$ok && '' !== $path && !VmStreamWrapperRegistry::isCustomProtocol($path)) {
             VmFilestatFailure::warnTouchCreateFailed($frame, $path);
         }
         if (null !== $frame->returnVar) {
