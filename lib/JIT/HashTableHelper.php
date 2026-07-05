@@ -648,7 +648,7 @@ final class HashTableHelper
             return $context->getTypeFromString('int1')->constInt(0, false);
         }
         if (Variable::TYPE_VALUE === $dim->type) {
-            return self::offsetIsSetValueBoxKey($context, $ht, $dim);
+            return HashTableReadLlvm::offsetIsSetValueBoxKey($context, $ht, $dim);
         }
 
         throw new \LogicException(
@@ -687,7 +687,7 @@ final class HashTableHelper
             return self::readObjectKeyToValueBox($context, $ht, $context->helper->loadValue($dim));
         }
         if (Variable::TYPE_VALUE === $dim->type) {
-            return self::readValueBoxKeyToValueBox($context, $ht, $dim, $superglobalName);
+            return HashTableReadLlvm::readValueBoxKeyToValueBox($context, $ht, $dim, $superglobalName);
         }
 
         throw new \LogicException(
@@ -695,196 +695,9 @@ final class HashTableHelper
         );
     }
 
-    private static function valuePtrFromDim(Context $context, Variable $dim): Value
-    {
-        if (Variable::TYPE_VALUE !== $dim->type) {
-            throw new \LogicException('valuePtrFromDim requires TYPE_VALUE');
-        }
-
-        return Variable::KIND_VARIABLE === $dim->kind
-            ? JitValueBox::pointer($context, $dim->value)
-            : $context->helper->loadValue($dim);
-    }
-
-    private static function offsetIsSetValueBoxKey(Context $context, Value $ht, Variable $dim): Value
-    {
-        $valPtr = self::valuePtrFromDim($context, $dim);
-        $valueMap = $context->structFieldMap['__value__'];
-        $i8 = $context->getTypeFromString('int8');
-        $i1 = $context->getTypeFromString('int1');
-        $sizeT = $context->getTypeFromString('size_t');
-        $typeByte = $context->builder->load(
-            $context->builder->structGep($valPtr, $valueMap['type'])
-        );
-        $fn = $context->builder->getInsertBlock()->getParent();
-        $stringBlock = $fn->appendBasicBlock('ht_isset_vk_str');
-        $longBlock = $fn->appendBasicBlock('ht_isset_vk_long');
-        $objectBlock = $fn->appendBasicBlock('ht_isset_vk_obj');
-        $falseBlock = $fn->appendBasicBlock('ht_isset_vk_false');
-        $merge = $fn->appendBasicBlock('ht_isset_vk_merge');
-        $afterString = $fn->appendBasicBlock('ht_isset_vk_after_str');
-        $context->builder->branchIf(
-            $context->builder->icmp(
-                Builder::INT_EQ,
-                $typeByte,
-                $i8->constInt(Variable::TYPE_STRING, false)
-            ),
-            $stringBlock,
-            $afterString
-        );
-        $context->builder->positionAtEnd($stringBlock);
-        $keyStr = $context->builder->call($context->lookupFunction('__value__readString'), $valPtr);
-        $strResult = $context->builder->call(
-            $context->lookupFunction('__hashtable__offsetIsSetStringKey'),
-            $ht,
-            $keyStr
-        );
-        $context->builder->branch($merge);
-        $context->builder->positionAtEnd($afterString);
-        $afterLong = $fn->appendBasicBlock('ht_isset_vk_after_long');
-        $context->builder->branchIf(
-            $context->builder->icmp(
-                Builder::INT_EQ,
-                $typeByte,
-                $i8->constInt(Variable::TYPE_NATIVE_LONG, false)
-            ),
-            $longBlock,
-            $afterLong
-        );
-        $context->builder->positionAtEnd($longBlock);
-        $index = $context->builder->truncOrBitCast(
-            $context->builder->call($context->lookupFunction('__value__readLong'), $valPtr),
-            $sizeT
-        );
-        $longResult = $context->builder->call(
-            $context->lookupFunction('__hashtable__offsetIsSet'),
-            $ht,
-            $index
-        );
-        $context->builder->branch($merge);
-        $context->builder->positionAtEnd($afterLong);
-        $context->builder->branchIf(
-            $context->builder->icmp(
-                Builder::INT_EQ,
-                $typeByte,
-                $i8->constInt(Variable::TYPE_OBJECT, false)
-            ),
-            $objectBlock,
-            $falseBlock
-        );
-        $context->builder->positionAtEnd($objectBlock);
-        self::emitIllegalOffsetType($context, 'Illegal offset type in isset or empty');
-        $objResult = $context->getTypeFromString('int1')->constInt(0, false);
-        $context->builder->branch($merge);
-        $context->builder->positionAtEnd($falseBlock);
-        $context->builder->branch($merge);
-        $context->builder->positionAtEnd($merge);
-        $phi = $context->builder->phi($i1);
-        $phi->addIncoming($strResult, $stringBlock);
-        $phi->addIncoming($longResult, $longBlock);
-        $phi->addIncoming($objResult, $objectBlock);
-        $phi->addIncoming($i1->constInt(0, false), $falseBlock);
-
-        return $phi;
-    }
-
-    private static function readValueBoxKeyToValueBox(
-        Context $context,
-        Value $ht,
-        Variable $dim,
-        ?string $superglobalName
-    ): Variable {
-        $valPtr = self::valuePtrFromDim($context, $dim);
-        $valueMap = $context->structFieldMap['__value__'];
-        $i8 = $context->getTypeFromString('int8');
-        $slot = JitValueBox::alloc($context);
-        $destPtr = JitValueBox::pointer($context, $slot);
-        $typeByte = $context->builder->load(
-            $context->builder->structGep($valPtr, $valueMap['type'])
-        );
-        $fn = $context->builder->getInsertBlock()->getParent();
-        $stringBlock = $fn->appendBasicBlock('ht_read_vk_str');
-        $longBlock = $fn->appendBasicBlock('ht_read_vk_long');
-        $objectBlock = $fn->appendBasicBlock('ht_read_vk_obj');
-        $nullBlock = $fn->appendBasicBlock('ht_read_vk_null');
-        $merge = $fn->appendBasicBlock('ht_read_vk_merge');
-        $afterString = $fn->appendBasicBlock('ht_read_vk_after_str');
-        $context->builder->branchIf(
-            $context->builder->icmp(
-                Builder::INT_EQ,
-                $typeByte,
-                $i8->constInt(Variable::TYPE_STRING, false)
-            ),
-            $stringBlock,
-            $afterString
-        );
-        $context->builder->positionAtEnd($stringBlock);
-        $keyStr = $context->builder->call($context->lookupFunction('__value__readString'), $valPtr);
-        $strBox = null !== $superglobalName
-            ? self::readSuperglobalStringKeyToValueBox($context, $ht, $keyStr)
-            : self::readStringKeyToValueBox($context, $ht, $keyStr);
-        JitValueBox::copyFromPointer(
-            $context,
-            $destPtr,
-            JitValueBox::pointer($context, $strBox->value)
-        );
-        $context->builder->branch($merge);
-        $context->builder->positionAtEnd($afterString);
-        $afterLong = $fn->appendBasicBlock('ht_read_vk_after_long');
-        $context->builder->branchIf(
-            $context->builder->icmp(
-                Builder::INT_EQ,
-                $typeByte,
-                $i8->constInt(Variable::TYPE_NATIVE_LONG, false)
-            ),
-            $longBlock,
-            $afterLong
-        );
-        $context->builder->positionAtEnd($longBlock);
-        $index = $context->builder->truncOrBitCast(
-            $context->builder->call($context->lookupFunction('__value__readLong'), $valPtr),
-            $context->getTypeFromString('size_t')
-        );
-        $longBox = self::readIndexedToValueBox($context, $ht, $index);
-        JitValueBox::copyFromPointer(
-            $context,
-            $destPtr,
-            JitValueBox::pointer($context, $longBox->value)
-        );
-        $context->builder->branch($merge);
-        $context->builder->positionAtEnd($afterLong);
-        $context->builder->branchIf(
-            $context->builder->icmp(
-                Builder::INT_EQ,
-                $typeByte,
-                $i8->constInt(Variable::TYPE_OBJECT, false)
-            ),
-            $objectBlock,
-            $nullBlock
-        );
-        $context->builder->positionAtEnd($objectBlock);
-        $keyObj = $context->builder->call($context->lookupFunction('__value__readObject'), $valPtr);
-        $objBox = self::readObjectKeyToValueBox($context, $ht, $keyObj);
-        JitValueBox::copyFromPointer(
-            $context,
-            $destPtr,
-            JitValueBox::pointer($context, $objBox->value)
-        );
-        $context->builder->branch($merge);
-        $context->builder->positionAtEnd($nullBlock);
-        $context->builder->call(
-            $context->lookupFunction('__value__writeNull'),
-            $destPtr
-        );
-        $context->builder->branch($merge);
-        $context->builder->positionAtEnd($merge);
-
-        return new Variable($context, Variable::TYPE_VALUE, Variable::KIND_VARIABLE, $slot);
-    }
-
     private static function unsetValueBoxKey(Context $context, Value $ht, Variable $dim): void
     {
-        $valPtr = self::valuePtrFromDim($context, $dim);
+        $valPtr = HashTableReadLlvm::valuePtrFromDim($context, $dim);
         $valueMap = $context->structFieldMap['__value__'];
         $i8 = $context->getTypeFromString('int8');
         $typeByte = $context->builder->load(
