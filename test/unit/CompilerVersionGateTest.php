@@ -990,6 +990,34 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
+    public function testSupportsClosureFromStaticFalseOnReferenceProfile(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsClosureFromStatic());
+    }
+
+    public function testSupportsClosureFromStaticTrueOnForwardProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertTrue(CompilerVersion::supportsClosureFromStatic());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testVmDoesNotRegisterClosureFromStaticOnReferenceProfile(): void
+    {
+        $runtime = new Runtime();
+        $closure = $runtime->vmContext->classes['closure'] ?? null;
+        $this->assertNotNull($closure);
+        $this->assertFalse(isset($closure->methods['fromstatic']));
+    }
+
     public function testSupportsBareRethrowFalseOnReferenceProfile(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');

@@ -257,9 +257,11 @@ final class ClosureState
         $entry->methods['fromcallable'] = new Builtin\ClosureFromCallable();
         $entry->methodVisibility['fromcallable'] = $pubStatic;
         $entry->methodNames['fromcallable'] = 'fromCallable';
-        $entry->methods['fromstatic'] = new Builtin\ClosureFromStatic();
-        $entry->methodVisibility['fromstatic'] = $pubStatic;
-        $entry->methodNames['fromstatic'] = 'fromStatic';
+        if (CompilerVersion::supportsClosureFromStatic()) {
+            $entry->methods['fromstatic'] = new Builtin\ClosureFromStatic();
+            $entry->methodVisibility['fromstatic'] = $pubStatic;
+            $entry->methodNames['fromstatic'] = 'fromStatic';
+        }
         $entry->methods['bind'] = new Builtin\ClosureBind();
         $entry->methodVisibility['bind'] = $pubStatic;
         $entry->methodNames['bind'] = 'bind';
