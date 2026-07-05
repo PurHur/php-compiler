@@ -13902,7 +13902,8 @@ class Compiler {
             if ($arrayProducerCount >= 2 || $funcCallProducerCount >= 2
                 || null !== $this->splitLeadingConstFetchWithArrayLiteralCallArg($producers)
                 || null !== $this->splitLeadingConstFetchWithFuncCallCallArg($producers)
-                || $this->producersAreSiblingCallWithHoistedScalarConstFetch($producers)) {
+                || $this->producersAreSiblingCallWithHoistedScalarConstFetch($producers)
+                || $this->producersIncludeUnaryOffsetWithConstWhence($producers)) {
                 $matched = null;
                 if (
                     $this->callIncludesNamedParameter($callOp)
@@ -17724,6 +17725,25 @@ class Compiler {
                 return (0 === $argIndex) ? $constProducer : $funcProducer;
             }
         }
+        // fseek($stream, -1, SEEK_END) — hoisted UnaryMinus offset + ConstFetch whence (#16523, #13451).
+        if ('fseek' === $inlineFuncName && \count($callArgs) >= 3) {
+            $unaryProducer = null;
+            $constProducer = null;
+            foreach ($producers as $producer) {
+                if ($producer instanceof Op\Expr\UnaryMinus || $producer instanceof Op\Expr\UnaryPlus) {
+                    $unaryProducer = $producer;
+                } elseif ($producer instanceof Op\Expr\ConstFetch) {
+                    $constProducer = $producer;
+                }
+            }
+            if (null !== $unaryProducer && null !== $constProducer) {
+                return match ($argIndex) {
+                    1 => $unaryProducer,
+                    2 => $constProducer,
+                    default => null,
+                };
+            }
+        }
         // preg_split(..., -1, PREG_SPLIT_*) / explode(..., -1) — limit/flags from UnaryMinus/ConstFetch, not prior sibling FuncCall (#13423, #13424).
         if (
             ('preg_split' === $inlineFuncName && ($argIndex === 2 || $argIndex === 3))
@@ -19167,6 +19187,11 @@ class Compiler {
                 array_unshift($producers, $child);
                 continue;
             }
+            if ($child instanceof Op\Expr\UnaryMinus || $child instanceof Op\Expr\UnaryPlus) {
+                // fseek($stream, -1, SEEK_END) — UnaryMinus offset prelude before ConstFetch whence (#16523).
+                array_unshift($producers, $child);
+                break;
+            }
             if ($child instanceof Op\Expr\Assign) {
                 break;
             }
@@ -19813,6 +19838,26 @@ class Compiler {
         }
 
         return null !== $call && null !== $scalarConst;
+    }
+
+    /**
+     * fseek($stream, -N, SEEK_*) — hoisted UnaryMinus offset + ConstFetch whence preludes (#16523).
+     *
+     * @param list<Op\Expr> $producers
+     */
+    private function producersIncludeUnaryOffsetWithConstWhence(array $producers): bool
+    {
+        $hasUnary = false;
+        $hasConst = false;
+        foreach ($producers as $producer) {
+            if ($producer instanceof Op\Expr\UnaryMinus || $producer instanceof Op\Expr\UnaryPlus) {
+                $hasUnary = true;
+            } elseif ($producer instanceof Op\Expr\ConstFetch) {
+                $hasConst = true;
+            }
+        }
+
+        return $hasUnary && $hasConst;
     }
 
     /**
@@ -28165,6 +28210,7 @@ class Compiler {
         $unaryArg = match ($name) {
             'explode' => 2,
             'preg_split' => 2,
+            'fseek' => 1,
             default => null,
         };
         if (\in_array($name, ['substr', 'mb_substr', 'mb_strcut'], true)) {
@@ -28192,7 +28238,46 @@ class Compiler {
             return null;
         }
         $immediate = $block->orig->children[$callIndex - 1] ?? null;
+        if ('fseek' === $name && 1 === $argIndex) {
+            $immediate = $block->orig->children[$callIndex - 2] ?? null;
+        }
         if (!$immediate instanceof Op\Expr\UnaryMinus && !$immediate instanceof Op\Expr\UnaryPlus) {
+            return null;
+        }
+        $slot = $block->slotForOperand($immediate->result);
+        if (null === $slot) {
+            foreach ($this->compileExpr($immediate, $block) as $op) {
+                $block->addOpCode($op);
+            }
+            $slot = $block->slotForOperand($immediate->result);
+        }
+
+        return null !== $slot ? (string) $slot : null;
+    }
+
+    /** fseek($stream, -N, SEEK_*) — ConstFetch whence is the immediate prelude before the call (#16523). */
+    private function slotForFseekWhenceHoistedCallArg(
+        Block $block,
+        Op $cfgCallOp,
+        int $argIndex,
+        ?string $calleeName
+    ): ?string {
+        $name = strtolower($calleeName ?? $this->resolveCfgFuncCallName($cfgCallOp) ?? '');
+        if ('fseek' !== $name || 2 !== $argIndex || null === $block->orig) {
+            return null;
+        }
+        $callIndex = null;
+        foreach ($block->orig->children as $i => $child) {
+            if ($child === $cfgCallOp) {
+                $callIndex = $i;
+                break;
+            }
+        }
+        if (null === $callIndex || $callIndex < 1) {
+            return null;
+        }
+        $immediate = $block->orig->children[$callIndex - 1] ?? null;
+        if (!$immediate instanceof Op\Expr\ConstFetch) {
             return null;
         }
         $slot = $block->slotForOperand($immediate->result);
@@ -34981,6 +35066,17 @@ class Compiler {
                         );
                         if (null !== $immediateUnarySlot) {
                             $valueSlot = $immediateUnarySlot;
+                        }
+                        if (null === $valueSlot) {
+                            $fseekWhenceSlot = $this->slotForFseekWhenceHoistedCallArg(
+                                $block,
+                                $cfgCallOp,
+                                (int) $argIndex,
+                                $calleeName
+                            );
+                            if (null !== $fseekWhenceSlot) {
+                                $valueSlot = $fseekWhenceSlot;
+                            }
                         }
                     }
                     if (
