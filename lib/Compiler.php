@@ -14582,6 +14582,10 @@ class Compiler {
         if (!$this->callArgUsesHoistedEnumPreludeSlot($callArg)) {
             return null;
         }
+        $preludeProducer = $this->hoistedPreludeProducerForCallArgIndex($callOp, $argIndex, $block);
+        if (null !== $preludeProducer && !$preludeProducer instanceof Op\Expr\ClassConstFetch) {
+            return null;
+        }
         $fetch = $this->precedingClassConstFetchForCallArgIndex(
             $callOp,
             $argIndex,
@@ -18746,6 +18750,56 @@ class Compiler {
 
         // php-cfg dead call-arg Variable temps (e.g. var_dump(E::A::class); #9426).
         return $root instanceof Operand\Variable && !$this->isNamedVariableOperand($callArg);
+    }
+
+    /**
+     * Hoisted ConstFetch / ClassConstFetch stmts immediately before a call (#15899, bindTo(null, C::class)).
+     *
+     * @return list<Op\Expr\ConstFetch|Op\Expr\ClassConstFetch>
+     */
+    private function hoistedPreludeProducersImmediatelyBeforeCall(Op $callOp, Block $block): array
+    {
+        if (null === $block->orig) {
+            return [];
+        }
+        $callIndex = null;
+        foreach ($block->orig->children as $i => $child) {
+            if ($child === $callOp) {
+                $callIndex = $i;
+                break;
+            }
+        }
+        if (null === $callIndex || $callIndex < 1) {
+            return [];
+        }
+        $producers = [];
+        for ($i = $callIndex - 1; $i >= 0; --$i) {
+            $child = $block->orig->children[$i];
+            if ($child instanceof Op\Expr\ConstFetch || $child instanceof Op\Expr\ClassConstFetch) {
+                array_unshift($producers, $child);
+                continue;
+            }
+            if ($child instanceof Op\Expr\Assign) {
+                break;
+            }
+            if ($this->isInlineExprCallArgProducer($child)) {
+                break;
+            }
+            break;
+        }
+
+        return $producers;
+    }
+
+    private function hoistedPreludeProducerForCallArgIndex(Op $callOp, int $argIndex, Block $block): ?Op\Expr
+    {
+        $ordinal = $this->hoistedEnumPreludeSlotOrdinalForCallArg($callOp, $argIndex);
+        if (null === $ordinal) {
+            return null;
+        }
+        $producers = $this->hoistedPreludeProducersImmediatelyBeforeCall($callOp, $block);
+
+        return $producers[$ordinal] ?? null;
     }
 
     /**
@@ -31409,6 +31463,45 @@ class Compiler {
             $nameSlot = null;
             // Early inline-array ARG_SEND paths continue before the main send site — unpack must be known up front (#16151).
             $unpackFlag = $this->callArgUnpack($arg) ? 1 : null;
+            if (null !== $cfgCallOp && null !== $block->orig) {
+                $preludeProducer = $this->hoistedPreludeProducerForCallArgIndex($cfgCallOp, (int) $argIndex, $block);
+                if ($preludeProducer instanceof Op\Expr\ConstFetch) {
+                    $constName = $this->staticNameFromOperand($preludeProducer->name);
+                    if (null !== $constName && 'null' === strtolower($constName)) {
+                        $nullSlot = $block->slotForOperand($preludeProducer->result);
+                        if (null === $nullSlot) {
+                            foreach ($this->compileExpr($preludeProducer, $block) as $op) {
+                                $sends[] = $op;
+                            }
+                            $nullSlot = $block->slotForOperand($preludeProducer->result);
+                        }
+                        if (null !== $nullSlot) {
+                            $sends[] = new OpCode(
+                                OpCode::TYPE_ARG_SEND,
+                                $nullSlot,
+                                $nameSlot,
+                                $unpackFlag
+                            );
+                            continue;
+                        }
+                    }
+                }
+            }
+            if (
+                null !== $cfgCallOp
+                && $this->callArgIsNullLiteral($cfgCallOp->args[(int) $argIndex] ?? $arg)
+            ) {
+                $nullArg = $cfgCallOp->args[(int) $argIndex] ?? $arg;
+                if ($nullArg instanceof Operand) {
+                    $sends[] = new OpCode(
+                        OpCode::TYPE_ARG_SEND,
+                        $this->registerNullConstantSlot($block, $nullArg),
+                        $nameSlot,
+                        $unpackFlag
+                    );
+                    continue;
+                }
+            }
             $inlineArrayLiteralArgWired = false;
             if (
                 null !== $cfgCallOp
