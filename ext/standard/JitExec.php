@@ -153,7 +153,7 @@ final class JitExec
 
     private static function capture(Context $context, Value $cmdStr): Value
     {
-        ProcessRuntime::ensureLinked($context);
+        ProcessRuntime::ensureExecCaptureLinked($context);
 
         return $context->builder->call(
             $context->lookupFunction('__compiler_process_exec_capture'),
