@@ -9,7 +9,6 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /** stream_set_write_buffer() — VM via VmFs; JIT/AOT via __compiler_stream_set_write_buffer (issue #3755). */
@@ -30,16 +29,21 @@ final class stream_set_write_buffer_ extends Internal
         if (2 !== \count($frame->calledArgs)) {
             throw new \LogicException($functionName.'() requires exactly two arguments in this compiler build');
         }
-        $handleVar = $frame->calledArgs[0]->resolveIndirect();
-        $bufferVar = $frame->calledArgs[1]->resolveIndirect();
-        if (Variable::TYPE_INTEGER !== $bufferVar->type) {
-            throw new \TypeError($functionName.'(): Argument #2 ($buffer) must be of type int');
-        }
-        $handle = VmStreamArg::requireStreamHandle($handleVar, $functionName);
+        $handle = VmStreamArg::requireStreamHandle(
+            $frame->calledArgs[0]->resolveIndirect(),
+            $functionName
+        );
+        $buffer = VmMath::parseIntBuiltinArgForFrame(
+            $frame,
+            1,
+            $functionName,
+            2,
+            'buffer'
+        );
         if (null === $frame->returnVar) {
             return;
         }
-        $previous = VmFs::streamSetWriteBuffer($handle, $bufferVar->toInt());
+        $previous = VmFs::streamSetWriteBuffer($handle, $buffer);
         if (false === $previous) {
             $frame->returnVar->bool(false);
 
