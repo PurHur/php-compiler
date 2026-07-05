@@ -14657,32 +14657,35 @@ class Compiler {
     /** `$cmp = fn(...); f(..., $cmp)` — bind named locals when php-cfg uses assign-var temps (#5644). */
     private function slotForNamedLocalFromAssignVarOperand(Operand $arg, Block $block): ?int
     {
-        if (null === $block->orig) {
-            return null;
-        }
-        foreach ($block->orig->children as $child) {
-            if (!$child instanceof Op\Expr\Assign) {
-                continue;
-            }
-            if (!$this->operandsReferToSameVariable($child->var, $arg)) {
-                continue;
-            }
-            $registered = $block->slotForNamedAssignDest($arg);
-            if (null !== $registered) {
-                return $registered;
-            }
-            if (null !== $child->result) {
-                $namedSlot = $block->slotForOperand($child->result);
-                if (null === $namedSlot) {
-                    $namedSlot = $this->slotForEmittedAssignResultSlot($block, $child);
+        if (null !== $block->orig) {
+            foreach ($block->orig->children as $child) {
+                if (!$child instanceof Op\Expr\Assign) {
+                    continue;
                 }
-                if (null !== $namedSlot) {
-                    return (int) $namedSlot;
+                if (!$this->operandsReferToSameVariable($child->var, $arg)) {
+                    continue;
+                }
+                $registered = $block->slotForNamedAssignDest($arg);
+                if (null !== $registered) {
+                    return $registered;
+                }
+                if (null !== $child->result) {
+                    $namedSlot = $block->slotForOperand($child->result);
+                    if (null === $namedSlot) {
+                        $namedSlot = $this->slotForEmittedAssignResultSlot($block, $child);
+                    }
+                    if (null !== $namedSlot) {
+                        return (int) $namedSlot;
+                    }
                 }
             }
         }
         $name = Block::resolveVariableName($arg);
         if (null !== $name && '' !== $name) {
+            $paramSlot = $block->paramSlotForName($name);
+            if (null !== $paramSlot) {
+                return $paramSlot;
+            }
             $namedBySlot = $block->slotIndexForVariableName($name);
             if (null !== $namedBySlot) {
                 return (int) $namedBySlot;
@@ -33974,6 +33977,14 @@ class Compiler {
             if ($this->isEmbeddedCallLiteralArg($literalProbe)) {
                 // Must run after sibling/adjacent wiring — do not alias prior EXEC_RETURN (#16254, array_slice #10229).
                 $valueSlot = (string) $this->freshLiteralConstantSlot($literalProbe, $block);
+            }
+            $sendProbe = $literalProbe;
+            $sendName = Block::resolveVariableName($sendProbe);
+            if (null !== $sendName && '' !== $sendName) {
+                $paramSlot = $block->paramSlotForName($sendName);
+                if (null !== $paramSlot) {
+                    $valueSlot = (string) $this->finalizeOperandSlotForAccess($block, $paramSlot, true);
+                }
             }
             $sends[] = new OpCode(OpCode::TYPE_ARG_SEND, $valueSlot, $nameSlot, $unpackFlag);
         }

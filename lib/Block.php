@@ -379,11 +379,38 @@ class Block {
         return $frag;
     }
 
+    /** Scope slot for a declared parameter by name (php-cfg clones Var operands per read site, #16264). */
+    public function paramSlotForName(string $name): ?int
+    {
+        $paramIdx = array_search($name, $this->paramNames, true);
+        if (false === $paramIdx) {
+            return null;
+        }
+        foreach ($this->opCodes as $op) {
+            if (OpCode::TYPE_ARG_RECV === $op->type && (int) $op->arg2 === $paramIdx) {
+                return (int) $op->arg1;
+            }
+        }
+
+        return $this->slotIndexForVariableName($name);
+    }
+
     public function getVarSlot(Operand $operand, bool $isRead): int {
         if ($isRead) {
+            $name = self::resolveVariableName($operand);
+            if (null !== $name && '' !== $name) {
+                $paramSlot = $this->paramSlotForName($name);
+                if (null !== $paramSlot) {
+                    $this->scope[$operand] = $paramSlot;
+                    if ($this->shouldRegisterInheritedArg($operand)) {
+                        $this->args[$operand] = $paramSlot;
+                    }
+
+                    return $paramSlot;
+                }
+            }
             $namedDest = $this->slotForNamedAssignDest($operand);
             if (null === $namedDest) {
-                $name = self::resolveVariableName($operand);
                 if (null !== $name && '' !== $name) {
                     $namedDest = $this->slotIndexForVariableName($name);
                 }
