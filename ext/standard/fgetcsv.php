@@ -83,10 +83,12 @@ final class fgetcsv extends Internal
         );
         $length = $i64->constInt(-1, true);
         if (isset($args[1]) && !NamedOptionalCallArgs::isOmittedOptional($args[1])) {
-            $length = $context->builder->truncOrBitCast(
-                JitLongArg::lower($context, $args[1], 'fgetcsv() length'),
-                $i64
-            );
+            if (JITVariable::TYPE_NULL !== $args[1]->type) {
+                $length = $context->builder->truncOrBitCast(
+                    JitLongArg::lower($context, $args[1], 'fgetcsv() length'),
+                    $i64
+                );
+            }
         }
         $separator = $strPtr->constNull();
         $enclosure = $strPtr->constNull();
@@ -124,6 +126,8 @@ final class fgetcsv extends Internal
             throw new \TypeError(self::lengthTypeError('object'));
         }
         switch ($var->type) {
+            case Variable::TYPE_NULL:
+                return null;
             case Variable::TYPE_INTEGER:
                 $length = $var->toInt();
                 break;
