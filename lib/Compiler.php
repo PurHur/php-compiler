@@ -22985,6 +22985,43 @@ class Compiler {
      *
      * @param list<Op> $cfgChildren
      */
+    private function producerIsHoistedMultiArgSiblingChainStart(
+        int $producerIndex,
+        int $consumerIndex,
+        array $cfgChildren
+    ): bool {
+        $consumer = $cfgChildren[$consumerIndex] ?? null;
+        if (
+            !$consumer instanceof Op\Expr
+            || !$this->isSiblingMultiArgInlineCallConsumer($consumer)
+            || !\is_array($consumer->args ?? null)
+            || \count($consumer->args) < 2
+        ) {
+            return false;
+        }
+        $deadArgs = [];
+        foreach ($consumer->args as $arg) {
+            if ($this->callArgIsDeadInlineTemporary($arg)) {
+                $deadArgs[] = $arg;
+            }
+        }
+        if (\count($deadArgs) < 2 || \count($deadArgs) !== \count($consumer->args)) {
+            return false;
+        }
+        if (!$this->callArgsAreDistinctInlineTemporaries($deadArgs)) {
+            return false;
+        }
+        $funcProducerCount = 0;
+        for ($j = $producerIndex; $j < $consumerIndex; ++$j) {
+            $mid = $cfgChildren[$j] ?? null;
+            if ($mid instanceof Op\Expr\FuncCall || $mid instanceof Op\Expr\NsFuncCall) {
+                ++$funcProducerCount;
+            }
+        }
+
+        return $funcProducerCount >= 2;
+    }
+
     private function statementLevelFuncCallBeforeHoistedSiblingChain(
         int $producerIndex,
         int $consumerIndex,
@@ -23014,6 +23051,10 @@ class Compiler {
                 continue;
             }
             if ($this->isSiblingInlineCallProducerExpr($mid)) {
+                if ($this->producerIsHoistedMultiArgSiblingChainStart($producerIndex, $consumerIndex, $cfgChildren)) {
+                    return false;
+                }
+
                 return true;
             }
             $onlySkippablePreludes = false;
@@ -23042,6 +23083,10 @@ class Compiler {
             for ($j = $producerIndex + 1; $j < $consumerIndex; ++$j) {
                 $mid = $cfgChildren[$j] ?? null;
                 if ($this->isSiblingInlineCallProducerExpr($mid)) {
+                    if ($this->producerIsHoistedMultiArgSiblingChainStart($producerIndex, $consumerIndex, $cfgChildren)) {
+                        return false;
+                    }
+
                     return $producer instanceof Op\Expr\FuncCall || $producer instanceof Op\Expr\NsFuncCall;
                 }
             }
@@ -23490,6 +23535,16 @@ class Compiler {
      */
     private function firstSiblingInlineFuncCallProducerIndexImpl(int $consumerIndex, array $cfgChildren): ?int
     {
+        $deadInlineArgCount = 0;
+        $consumer = $cfgChildren[$consumerIndex] ?? null;
+        if ($consumer instanceof Op\Expr && \is_array($consumer->args ?? null)) {
+            foreach ($consumer->args as $arg) {
+                if ($this->callArgIsDeadInlineTemporary($arg)) {
+                    ++$deadInlineArgCount;
+                }
+            }
+        }
+        $funcProducersSeen = 0;
         $i = $consumerIndex - 1;
         while ($i >= 0) {
             $child = $cfgChildren[$i] ?? null;
@@ -23501,6 +23556,17 @@ class Compiler {
                 }
             }
             if ($this->isSiblingInlineCallProducerExpr($child)) {
+                if (
+                    ($child instanceof Op\Expr\FuncCall || $child instanceof Op\Expr\NsFuncCall)
+                    && $deadInlineArgCount >= 2
+                    && $deadInlineArgCount === \count($consumer->args ?? [])
+                ) {
+                    ++$funcProducersSeen;
+                    if ($funcProducersSeen > $deadInlineArgCount) {
+                        // var_dump(ftell(), fgetc()) after fseek/fwrite — only trailing N producers (#16254).
+                        break;
+                    }
+                }
                 if (
                     ($child instanceof Op\Expr\FuncCall || $child instanceof Op\Expr\NsFuncCall)
                     && $this->builtinUsesTrailingComparatorCallback($this->resolveCfgFuncCallName($child))
