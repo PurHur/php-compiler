@@ -113,6 +113,7 @@ final class JitExec
         $ptr = JitValueBox::pointer($context, $slot);
         $failBlock = BasicBlockHelper::append($context, 'proc_fail');
         $okBlock = BasicBlockHelper::append($context, 'proc_ok');
+        $writeOkBlock = BasicBlockHelper::append($context, 'proc_write_ok');
         $doneBlock = BasicBlockHelper::append($context, 'proc_done');
         $context->builder->branchIf($failed, $failBlock, $okBlock);
 
@@ -122,24 +123,29 @@ final class JitExec
 
         $context->builder->positionAtEnd($okBlock);
         $lines = self::readLines($context, $capture);
-        $writeOk = self::writeLinesToStdout($context, $lines);
-        $writeFailBlock = BasicBlockHelper::append($context, 'proc_write_fail');
-        $writeOkBlock = BasicBlockHelper::append($context, 'proc_write_ok');
-        $context->builder->branchIf($writeOk, $writeOkBlock, $writeFailBlock);
+        $stdoutBlock = BasicBlockHelper::append($context, 'proc_stdout');
+        $context->builder->branch($stdoutBlock);
 
-        $context->builder->positionAtEnd($writeFailBlock);
-        JitValueBox::writeBool($context, $slot, $context->getTypeFromString('int1')->constInt(0, false));
-        $context->builder->branch($doneBlock);
+        $context->builder->positionAtEnd($stdoutBlock);
+        self::writeLinesToStdout($context, $lines);
+        $context->builder->branch($writeOkBlock);
 
         $context->builder->positionAtEnd($writeOkBlock);
         if (null !== $statusArg) {
             self::writeStatusRef($context, $statusArg, self::readStatus($context, $capture));
         }
         if ($returnLastLine) {
+            $lastLineBlock = BasicBlockHelper::append($context, 'proc_last_line');
+            $lastLineDone = BasicBlockHelper::append($context, 'proc_last_line_done');
+            $context->builder->branch($lastLineBlock);
+            $context->builder->positionAtEnd($lastLineBlock);
+            $last = self::lastLine($context, $lines);
+            $context->builder->branch($lastLineDone);
+            $context->builder->positionAtEnd($lastLineDone);
             $context->builder->call(
                 $context->lookupFunction('__value__writeString'),
                 $ptr,
-                self::lastLine($context, $lines)
+                $last
             );
         } else {
             $context->builder->call($context->lookupFunction('__value__writeNull'), $ptr);
@@ -240,21 +246,19 @@ final class JitExec
         return $context->builder->load($lastSlot);
     }
 
-    /** @return Value int1 — true when all lines were written */
-    private static function writeLinesToStdout(Context $context, Value $linesHt): Value
+    /** Route captured stdout lines through the active output buffer (php-src exec.c, #10492). */
+    private static function writeLinesToStdout(Context $context, Value $linesHt): void
     {
-        self::ensureObEchoAbi($context);
+        ObOutputRuntime::ensureObStackLinked($context);
 
         $map = $context->structFieldMap['__hashtable__'];
         $sizeT = $context->getTypeFromString('size_t');
-        $i1 = $context->getTypeFromString('int1');
         $count = $context->builder->load($context->builder->structGep($linesHt, $map['nextFreeElement']));
         $indexSlot = BasicBlockHelper::entryAlloca($context, $sizeT);
         $context->builder->store($sizeT->constInt(0, false), $indexSlot);
 
         $nl = self::literalCstr($context, "\n");
-        $echoSubstr = $context->lookupFunction('__phpc_ob_echo_substr');
-        $echoCstr = $context->lookupFunction('__phpc_ob_echo_cstr');
+        $appendBytes = $context->lookupFunction('__phpc_ob_append_bytes');
 
         $loopHead = BasicBlockHelper::append($context, 'exec_stdout_head');
         $loopBody = BasicBlockHelper::append($context, 'exec_stdout_body');
@@ -269,14 +273,14 @@ final class JitExec
         $context->builder->positionAtEnd($loopBody);
         $line = HashTableHelper::readStringAt($context, $linesHt, $index);
         $lineMap = $context->structFieldMap['__string__'];
-        $lineChars = $context->builder->structGep($line, $lineMap['value']);
+        $lineData = $context->builder->structGep($line, $lineMap['value']);
         $lineLen = $context->builder->load($context->builder->structGep($line, $lineMap['length']));
         $context->builder->call(
-            $echoSubstr,
-            $lineChars,
+            $appendBytes,
+            $lineData,
             $context->builder->zExt($lineLen, $sizeT)
         );
-        $context->builder->call($echoCstr, $nl);
+        $context->builder->call($appendBytes, $nl, $sizeT->constInt(1, false));
         $context->builder->store(
             $context->builder->add($index, $sizeT->constInt(1, false)),
             $indexSlot
@@ -284,25 +288,6 @@ final class JitExec
         $context->builder->branch($loopHead);
 
         $context->builder->positionAtEnd($loopDone);
-
-        return $i1->constInt(1, false);
-    }
-
-    /** User-script AOT links ob echo ABI during Context init — avoid nested ensureLinked here (#10492). */
-    private static function ensureObEchoAbi(Context $context): void
-    {
-        $restoreBlock = BasicBlockHelper::tryGetInsertBlock($context);
-        try {
-            $echoSubstr = $context->lookupFunction('__phpc_ob_echo_substr');
-            if ($echoSubstr->countBasicBlocks() > 0) {
-                return;
-            }
-        } catch (\Throwable) {
-        }
-        ObOutputRuntime::ensureLinked($context);
-        if (null !== $restoreBlock) {
-            BasicBlockHelper::restoreInsertBlock($context, $restoreBlock);
-        }
     }
 
     private static function literalKey(Context $context, string $text): Value

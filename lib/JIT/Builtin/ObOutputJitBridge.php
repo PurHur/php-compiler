@@ -96,6 +96,14 @@ final class ObOutputJitBridge
             return;
         }
 
+        self::implementObStack($context, false);
+    }
+
+    /**
+     * Full ob_* LLVM stack (ObOutputJitHelper nested JIT). $forceFull skips inventory defer stubs (#10492).
+     */
+    public static function implementObStack(Context $context, bool $forceFull): void
+    {
         $restore = self::captureInsertBlock($context);
 
         $probe = $context->module->getNamedFunction('__phpc_ob_start');
@@ -106,7 +114,7 @@ final class ObOutputJitBridge
             return;
         }
 
-        if (StreamIoRuntime::shouldDeferHeavyStreamIoEmitters($context)) {
+        if (!$forceFull && StreamIoRuntime::shouldDeferHeavyStreamIoEmitters($context)) {
             self::ensureExtraGlobals($context);
             self::implementDeferredInventoryStubs($context);
             self::restoreInsertBlock($context, $restore);

@@ -7,12 +7,20 @@ declare(strict_types=1);
 ob_start();
 $systemLast = system('printf "sysline\n"');
 $systemBuf = ob_get_clean();
-$systemObOk = ('sysline' === $systemLast) ? (("sysline\n" === $systemBuf) ? 1 : 0) : 0;
+$systemObOk = 0;
+if ('sysline' === $systemLast) {
+    if ("sysline\n" === $systemBuf) {
+        $systemObOk = 1;
+    }
+}
 
 ob_start();
 passthru('printf "pasline\n"');
 $passthruBuf = ob_get_clean();
-$passthruObOk = ("pasline\n" === $passthruBuf) ? 1 : 0;
+$passthruObOk = 0;
+if ("pasline\n" === $passthruBuf) {
+    $passthruObOk = 1;
+}
 
 echo 'system_ob_ok=', $systemObOk, "\n";
 echo 'passthru_ob_ok=', $passthruObOk, "\n";
