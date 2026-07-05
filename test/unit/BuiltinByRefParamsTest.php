@@ -105,4 +105,16 @@ final class BuiltinByRefParamsTest extends TestCase
         $this->assertSame([2], BuiltinByRefParams::forFunction('proc_open'));
         $this->assertSame([2], BuiltinByRefParams::forFunction('PROC_OPEN'));
     }
+
+    public function testStreamSocketAcceptPeerByRef(): void
+    {
+        $this->assertSame([2], BuiltinByRefParams::forFunction('stream_socket_accept'));
+        $this->assertSame([2], BuiltinByRefParams::forFunction('STREAM_SOCKET_ACCEPT'));
+    }
+
+    public function testStreamSocketServerErrnoErrstrByRef(): void
+    {
+        $this->assertSame([1, 2], BuiltinByRefParams::forFunction('stream_socket_server'));
+        $this->assertSame([1, 2], BuiltinByRefParams::forFunction('STREAM_SOCKET_SERVER'));
+    }
 }
