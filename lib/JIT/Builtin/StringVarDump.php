@@ -5,14 +5,16 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_var_dump via VarDumpJitHelper PHP (#9195, #13241).
+ * JIT/AOT link for __compiler_var_dump (#9195, #13241, #16565).
  *
- * Embed and standalone AOT compile the same PHP bridge; no var_dump LLVM monolith.
+ * Embed/self-host: VarDumpJitHelper PHP via nested JIT (php-in-PHP).
+ * Standalone user AOT: StringVarDumpJit LLVM — nested compile of VmVarDump SIGSEGVs LLVM 9.
  * php-src: ext/standard/var.c — php_var_dump_ex
  */
 final class StringVarDump
@@ -46,6 +48,17 @@ final class StringVarDump
         $probe = $context->module->getNamedFunction('__compiler_var_dump');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);
+
+            return;
+        }
+
+        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
+            $restoreBlock = BasicBlockHelper::tryGetInsertBlock($context);
+            StringVarDumpJit::ensureLinked($context);
+            self::registerLinkedRuntime($context);
+            if (null !== $restoreBlock) {
+                BasicBlockHelper::restoreInsertBlock($context, $restoreBlock);
+            }
 
             return;
         }

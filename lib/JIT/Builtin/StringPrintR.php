@@ -5,14 +5,16 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_print_r via PrintRJitHelper PHP (#9190, #13240).
+ * JIT/AOT link for __compiler_print_r (#9190, #13240, #16565).
  *
- * Embed and standalone AOT compile the same PHP bridge; no print_r LLVM monolith.
+ * Embed/self-host: PrintRJitHelper PHP via nested JIT (php-in-PHP).
+ * Standalone user AOT: StringPrintRJit LLVM — nested compile of VmPrintR SIGSEGVs LLVM 9.
  * php-src: ext/standard/var.c — php_print_r_ex
  */
 final class StringPrintR
@@ -46,6 +48,17 @@ final class StringPrintR
         $probe = $context->module->getNamedFunction('__compiler_print_r');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);
+
+            return;
+        }
+
+        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
+            $restoreBlock = BasicBlockHelper::tryGetInsertBlock($context);
+            StringPrintRJit::ensureLinked($context);
+            self::registerLinkedRuntime($context);
+            if (null !== $restoreBlock) {
+                BasicBlockHelper::restoreInsertBlock($context, $restoreBlock);
+            }
 
             return;
         }
