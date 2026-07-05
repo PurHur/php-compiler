@@ -84,6 +84,18 @@ class Compiler {
     protected ?SplObjectStorage $seen = null;
     protected ?SplObjectStorage $funcs = null;
 
+    /** @var ?SplObjectStorage<Operand, Op\Expr> producer-expr index over $seen block trees (#16077) */
+    private ?SplObjectStorage $cfgProducerExprIndex = null;
+
+    /** @var ?SplObjectStorage<CfgBlock, int> indexed blocks -> children count at index time (#16077) */
+    private ?SplObjectStorage $cfgProducerIndexedBlocks = null;
+
+    /** @var array<int, true> spl_object_id of cfg var roots that have >=1 indexed producer candidate */
+    private array $cfgProducerRootsWithCandidates = [];
+
+    /** Identity of the $seen storage the index was built against; rebuilt when $seen is replaced. */
+    private ?SplObjectStorage $cfgProducerIndexSeenSource = null;
+
     /** @var SplObjectStorage<CfgBlock, SplObjectStorage<CfgVariable, int>> ?: merge var slots (#3790) */
     private SplObjectStorage $ternaryMergeVarSlots;
 
@@ -29858,6 +29870,26 @@ class Compiler {
         if (null === $this->seen) {
             return null;
         }
+        if ('1' !== getenv('PHP_COMPILER_PRODUCER_INDEX_LEGACY')) {
+            // O(1) exact lookup instead of re-walking every seen block tree per
+            // call — the walk was the top lint/compile hotspot on 30k-line files
+            // (#16077). Index misses (root-match producers, blocks mutated after
+            // indexing) fall through to the legacy scan below, whose non-exact
+            // arm still matches exact producers first.
+            $this->syncCfgProducerExprIndex();
+            if ($this->cfgProducerExprIndex->contains($operand)) {
+                return $this->cfgProducerExprIndex[$operand];
+            }
+            // No exact producer indexed. The root-match arm below can only hit
+            // when some indexed expr shares the operand's cfg var root; when no
+            // such root exists anywhere (the overwhelmingly common case), the
+            // legacy scan is a guaranteed null — skip it.
+            $missRoot = Block::cfgVarRoot($operand);
+            if (null === $missRoot
+                || !isset($this->cfgProducerRootsWithCandidates[spl_object_id($missRoot)])) {
+                return null;
+            }
+        }
         $returnRoot = Block::cfgVarRoot($operand);
         $rootMatch = null;
         foreach ($this->seen as $cfgBlock) {
@@ -29877,6 +29909,59 @@ class Compiler {
         }
 
         return $rootMatch;
+    }
+
+    /**
+     * Bring the producer index up to date with $this->seen: index newly seen
+     * blocks, re-index blocks whose child list grew or shrank since indexing.
+     */
+    private function syncCfgProducerExprIndex(): void
+    {
+        if ($this->cfgProducerIndexSeenSource !== $this->seen || null === $this->cfgProducerExprIndex) {
+            $this->cfgProducerExprIndex = new SplObjectStorage();
+            $this->cfgProducerIndexedBlocks = new SplObjectStorage();
+            $this->cfgProducerRootsWithCandidates = [];
+            $this->cfgProducerIndexSeenSource = $this->seen;
+        }
+        foreach ($this->seen as $cfgBlock) {
+            if ($cfgBlock instanceof CfgBlock) {
+                $this->indexCfgProducerBlockTree($cfgBlock);
+            }
+        }
+    }
+
+    private function indexCfgProducerBlockTree(CfgBlock $cfgBlock): void
+    {
+        $childCount = \count($cfgBlock->children);
+        if ($this->cfgProducerIndexedBlocks->contains($cfgBlock)
+            && $this->cfgProducerIndexedBlocks[$cfgBlock] === $childCount) {
+            return;
+        }
+        $this->cfgProducerIndexedBlocks[$cfgBlock] = $childCount;
+        foreach ($cfgBlock->children as $child) {
+            if ($child instanceof Op\Expr) {
+                $result = $child->result;
+                if ($result instanceof Operand) {
+                    if (!$this->cfgProducerExprIndex->contains($result)) {
+                        $this->cfgProducerExprIndex[$result] = $child;
+                    }
+                    $resultRoot = Block::cfgVarRoot($result);
+                    if (null !== $resultRoot) {
+                        $this->cfgProducerRootsWithCandidates[spl_object_id($resultRoot)] = true;
+                    }
+                }
+            }
+            if ($child instanceof CfgBlock) {
+                $this->indexCfgProducerBlockTree($child);
+            }
+            if ($child instanceof Op\Stmt\JumpIf) {
+                foreach ([$child->if ?? null, $child->else ?? null] as $branch) {
+                    if ($branch instanceof CfgBlock) {
+                        $this->indexCfgProducerBlockTree($branch);
+                    }
+                }
+            }
+        }
     }
 
     private function findCfgProducerInBlockTree(

@@ -543,7 +543,101 @@ final class PropertyHooks
     }
 
 
+    /** Body whose comment intervals are cached in $commentIntervals (#16077). */
+    private string $commentScanBody = "\0none";
+
+    /** @var list<array{0: int, 1: int}> sorted disjoint [first, last] offsets inside comments */
+    private array $commentIntervals = [];
+
     private function isOffsetInComment(string $body, int $offset): bool
+    {
+        // findNextPropertyHookDecl probes every `$var` occurrence; rescanning
+        // the body from byte 0 per probe was O(vars x body) — the top lint
+        // hotspot on lib/VM.php (#16077). Scan once per body, then binary
+        // search. The interval builder replicates the legacy state machine's
+        // exact boundary semantics (loop ran strictly below $offset).
+        if ('1' === getenv('PHP_COMPILER_COMMENT_SCAN_LEGACY')) {
+            return $this->isOffsetInCommentScan($body, $offset);
+        }
+        if ($body !== $this->commentScanBody) {
+            $this->commentScanBody = $body;
+            $this->commentIntervals = $this->buildCommentIntervals($body);
+        }
+        $lo = 0;
+        $hi = \count($this->commentIntervals) - 1;
+        while ($lo <= $hi) {
+            $mid = ($lo + $hi) >> 1;
+            [$first, $last] = $this->commentIntervals[$mid];
+            if ($offset < $first) {
+                $hi = $mid - 1;
+            } elseif ($offset > $last) {
+                $lo = $mid + 1;
+            } else {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @return list<array{0: int, 1: int}>
+     */
+    private function buildCommentIntervals(string $body): array
+    {
+        $len = strlen($body);
+        $intervals = [];
+        $inString = false;
+        $stringChar = '';
+        for ($i = 0; $i < $len; ++$i) {
+            $ch = $body[$i];
+            $next = $i + 1 < $len ? $body[$i + 1] : '';
+            if ($inString) {
+                if ('\\' === $ch) {
+                    ++$i;
+                    continue;
+                }
+                if ($ch === $stringChar) {
+                    $inString = false;
+                }
+                continue;
+            }
+            if ('"' === $ch || '\'' === $ch) {
+                $inString = true;
+                $stringChar = $ch;
+                continue;
+            }
+            if ('/' === $ch && '/' === $next) {
+                $lineEnd = strpos($body, "\n", $i);
+                if (false === $lineEnd) {
+                    $lineEnd = $len;
+                }
+                // Legacy: true for $offset with $i < $offset < $lineEnd.
+                if ($i + 1 <= $lineEnd - 1) {
+                    $intervals[] = [$i + 1, $lineEnd - 1];
+                }
+                $i = $lineEnd;
+                continue;
+            }
+            if ('/' === $ch && '*' === $next) {
+                $start = $i;
+                $end = strpos($body, '*/', $i + 2);
+                if (false === $end) {
+                    // Unterminated: legacy stays in-block to end of body.
+                    $intervals[] = [$start + 1, $len];
+                    break;
+                }
+                // Legacy: true for $start < $offset <= position of '*' in '*/'.
+                $intervals[] = [$start + 1, $end];
+                $i = $end + 1;
+            }
+        }
+
+        return $intervals;
+    }
+
+    /** Legacy per-offset scan, selectable via PHP_COMPILER_COMMENT_SCAN_LEGACY=1. */
+    private function isOffsetInCommentScan(string $body, int $offset): bool
     {
         $len = strlen($body);
         $inString = false;
