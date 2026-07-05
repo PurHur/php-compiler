@@ -1650,6 +1650,28 @@ PHP;
         self::assertSame("array (\n  0 => \E::A,\n  1 => \E::B,\n)\n", ob_get_clean());
     }
 
+    /** Issue #8883 — array_pad([E::A], N, E::B) wires inline enum haystack + pad-value ConstFetch. */
+    public function testArrayPadInlineEnumHaystackAndPadValueRuntime(): void
+    {
+        $code = <<<'PHP'
+<?php
+enum E: int { case A = 1; case B = 2; }
+var_export(array_pad([E::A], 3, E::B));
+echo "\n";
+foreach (array_pad([E::A], 3, E::B) as $v) {
+    echo get_debug_type($v), "\n";
+}
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'array_pad_inline_enum.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame(
+            "array (\n  0 => \n  \\E::A,\n  1 => \n  \\E::B,\n  2 => \n  \\E::B,\n)\nE\nE\nE\n",
+            ob_get_clean()
+        );
+    }
+
     /** Issue #16316 / #8886 — inline [int, enum] haystack must keep scalar before enum case. */
     public function testArraySearchStrictMixedHaystackInlineLiteralRuntime(): void
     {
