@@ -171,6 +171,21 @@ class AotTest extends BaseTest
                 && str_contains($name, 'strxfrm')) {
                 continue;
             }
+            if (!\PHPCompiler\ext\intl\IntlExtensionPolicy::advertisesBuiltins()
+                && str_contains($name, 'grapheme_')
+                && !str_contains($name, 'grapheme_phantom')) {
+                continue;
+            }
+            if (!\PHPCompiler\ext\intl\IntlExtensionPolicy::advertisesLocale()
+                && str_contains($name, 'locale_get_default')
+                && !str_contains($name, 'locale_gated')) {
+                continue;
+            }
+            if (!\PHPCompiler\ext\curl\CurlExtensionPolicy::advertisesBuiltins()
+                && str_contains($name, 'curl_escape')
+                && !str_contains($name, 'curl_escape_phantom')) {
+                continue;
+            }
             if (!CompilerVersion::supportsArrayReplaceKey()
                 && str_contains($name, 'array_replace_key')
                 && !str_contains($name, 'array_replace_key_phantom')) {
