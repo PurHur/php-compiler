@@ -32,20 +32,20 @@ final class preg_match_all extends Internal
 
         $flags = 0;
         $offset = 0;
-        $hasMatches = $argc >= 3;
-        if ($argc >= 4) {
+        $hasMatches = isset($frame->calledArgs[2]);
+        if (isset($frame->calledArgs[3])) {
             $flagsVar = $frame->calledArgs[3]->resolveIndirect();
             if (Variable::TYPE_INTEGER !== $flagsVar->type) {
                 throw new \LogicException('preg_match_all() flags must be an integer in this compiler build');
             }
             $flags = $flagsVar->toInt();
         }
-        if ($argc >= 5) {
+        if (isset($frame->calledArgs[4])) {
             $offset = VmMath::parseIntBuiltinArgForFrame(
                 $frame,
                 4,
                 'preg_match_all',
-                4,
+                5,
                 'offset'
             );
         }
