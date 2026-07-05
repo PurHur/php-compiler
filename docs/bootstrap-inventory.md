@@ -14305,13 +14305,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmLocale.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 75)
-- new Variable (line 257)
-- new HashTable (line 258)
-- new Variable (line 260)
-- new Variable (line 270)
-- new Variable (line 277)
-- 16 class method(s)
+- new HashTable (line 89)
+- new Variable (line 271)
+- new HashTable (line 272)
+- new Variable (line 274)
+- new Variable (line 284)
+- new Variable (line 291)
+- 17 class method(s)
 
 ### `ext/standard/VmLocaleCollate.php`
 
@@ -14687,7 +14687,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmProcNicePure.php`
 
 **Warnings** (review for bootstrap subset):
-- 5 class method(s)
+- 6 class method(s)
 
 ### `ext/standard/VmProcess.php`
 
@@ -20463,10 +20463,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new CompileError (line 269)
 - new CompileError (line 357)
 - new CompileError (line 405)
-- new CompileError (line 521)
-- new CompileError (line 598)
-- new CompileError (line 604)
-- new CompileError (line 616)
+- new CompileError (line 523)
+- new CompileError (line 600)
+- new CompileError (line 606)
+- new CompileError (line 618)
 - 41 class method(s)
 - 8 closure(s)
 

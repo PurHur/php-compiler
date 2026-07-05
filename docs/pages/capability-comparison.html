@@ -59,8 +59,8 @@
       <div class="cap-summary">
         <article>
           <div>Language constructs</div>
-          <strong>82</strong> / 89 full (VM+JIT+AOT)
-          <p style="margin:0.35rem 0 0;font-size:0.88rem;color:var(--text-muted)">3 partial · 4 gaps</p>
+          <strong>81</strong> / 89 full (VM+JIT+AOT)
+          <p style="margin:0.35rem 0 0;font-size:0.88rem;color:var(--text-muted)">4 partial · 4 gaps</p>
         </article>
         <article>
           <div>Stdlib builtins</div>
@@ -115,7 +115,7 @@
 <tr data-support="full"><td><code>Fibers (`Fiber`, `Fiber::suspend()`, start/resume)</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td><a href="https://github.com/PurHur/php-compiler/issues/3130">#3130</a></td></tr>
 <tr data-support="full"><td><code>`ClassName::class` / `static::class`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td><a href="https://github.com/PurHur/php-compiler/issues/740">#740</a></td></tr>
 <tr data-support="full"><td><code>Class member constants `public` / `private` / `protected const`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td><a href="https://github.com/PurHur/php-compiler/issues/2199">#2199</a></td></tr>
-<tr data-support="full"><td><code>PHP 8.3 typed class constants (`const array X = [1,2];`, `const string S = &#039;a&#039;;`)</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td><a href="https://github.com/PurHur/php-compiler/issues/3592">#3592</a></td></tr>
+<tr data-support="partial"><td><code>PHP 8.3 typed class constants (`const array X = [1,2];`, `const string S = &#039;a&#039;;`)</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-no">no</td><td><a href="https://github.com/PurHur/php-compiler/issues/3592">#3592</a></td></tr>
 <tr data-support="full"><td><code>PHP 8.3+ file/namespace typed constants (`const string X = &#039;a&#039;;`)</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td><a href="https://github.com/PurHur/php-compiler/issues/7081">#7081</a></td></tr>
 <tr data-support="full"><td><code>PHP 8.3 typed interface constants (`interface I { public const string X = &#039;a&#039;; }`)</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td><a href="https://github.com/PurHur/php-compiler/issues/5980">#5980</a></td></tr>
 <tr data-support="partial"><td><code>Class constants with `new` object expressions</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-no">no</td><td><a href="https://github.com/PurHur/php-compiler/issues/15608">#15608</a></td></tr>
