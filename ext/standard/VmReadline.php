@@ -21,6 +21,9 @@ final class VmReadline
 
     private static int $point = 0;
 
+    /** readline_info('end') — independent of line_buffer length until explicitly set (#16365). */
+    private static int $end = 0;
+
     private static string $readlineName = 'php';
 
     private static int $attemptedCompletionOver = 0;
@@ -123,7 +126,7 @@ final class VmReadline
             return self::assocArrayToHashTable([
                 'line_buffer' => self::$lineBuffer,
                 'point' => self::$point,
-                'end' => self::lineBufferEnd(),
+                'end' => self::$end,
                 'readline_name' => self::$readlineName,
                 'attempted_completion_over' => self::$attemptedCompletionOver,
                 'library_version' => self::$libraryVersion,
@@ -135,7 +138,6 @@ final class VmReadline
             if ($hasNewvalue) {
                 $old = self::$lineBuffer;
                 self::$lineBuffer = \is_string($newvalue) ? $newvalue : (string) $newvalue;
-                self::$point = self::lineBufferEnd();
 
                 return $old;
             }
@@ -154,16 +156,17 @@ final class VmReadline
         }
         if ('end' === $key) {
             if ($hasNewvalue) {
-                $old = self::lineBufferEnd();
-                self::$lineBuffer = \substr(self::$lineBuffer, 0, (int) $newvalue);
-                if (self::$point > self::lineBufferEnd()) {
-                    self::$point = self::lineBufferEnd();
+                $old = self::$end;
+                self::$end = (int) $newvalue;
+                self::$lineBuffer = \substr(self::$lineBuffer, 0, self::$end);
+                if (self::$point > self::$end) {
+                    self::$point = self::$end;
                 }
 
                 return $old;
             }
 
-            return self::lineBufferEnd();
+            return self::$end;
         }
         if ('library_version' === $key) {
             if ($hasNewvalue) {
@@ -237,11 +240,6 @@ final class VmReadline
         return $ht;
     }
 
-    private static function lineBufferEnd(): int
-    {
-        return \strlen(self::$lineBuffer);
-    }
-
     private static function readStdinFallback(?string $prompt): string|false
     {
         if (!\defined('STDIN')) {
@@ -277,8 +275,10 @@ final class VmReadline
             $line = \substr($line, 0, -1);
         }
 
+        $len = \strlen($line);
         self::$lineBuffer = $line;
-        self::$point = \strlen($line);
+        self::$point = $len;
+        self::$end = $len;
 
         return $line;
     }
