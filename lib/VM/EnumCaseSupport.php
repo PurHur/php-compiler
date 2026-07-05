@@ -851,34 +851,6 @@ final class EnumCaseSupport
     }
 
     /**
-     * pack() numeric operand — TypeError under php-src-strict (#8816, #6267); else E_WARNING + backing scalar (#5713).
-     *
-     * @throws \TypeError when $value is an enum case and php-src-strict is active
-     */
-    public static function packRejectNumericOperand(
-        Variable $value,
-        int $valueArgIndexZeroBased,
-        string $expectedType
-    ): void {
-        if (!RuntimeStrictness::isPhpSrcStrict()) {
-            return;
-        }
-        $entry = self::enumCaseEntryForVariable($value);
-        if (null === $entry) {
-            return;
-        }
-        $argNum = $valueArgIndexZeroBased + 2;
-        $given = $entry->enumClass->name;
-
-        throw new \TypeError(sprintf(
-            'pack(): Argument #%d ($values) must be of type %s, %s given',
-            $argNum,
-            $expectedType,
-            $given
-        ));
-    }
-
-    /**
      * pack() numeric operand — E_WARNING + backing scalar (#5713, #6213, ext/standard/pack.c).
      *
      * @return int|null backing int when $value is an enum case, or null otherwise
