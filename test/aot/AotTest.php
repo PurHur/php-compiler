@@ -6,6 +6,8 @@ namespace PHPCompiler;
 
 require_once __DIR__ . '/../BaseTest.php';
 
+use PHPCompiler\JIT\Builtin\OpensslSignRuntime;
+
 /**
  * End-to-end AOT tests: compile PHP to a native binary via LLVM and run it.
  *
@@ -219,6 +221,11 @@ class AotTest extends BaseTest
             // Concat-on-LHS (`"a" . "b" |> f`) remains VM/JIT-only until inline concat-in-call AOT lands.
             // preg_match() float offset: VM (#13818); native AOT emits float→int deprecation on stderr before stdout.
             if (str_contains($name, 'preg_match_float_offset')) {
+                continue;
+            }
+            if (str_contains($name, 'openssl_sign_verify')
+                && (!OpensslSignRuntime::opensslEvRuntimeAvailable()
+                    || !\PHPCompiler\ext\openssl\VmOpensslSignNative::available())) {
                 continue;
             }
             yield $name => $case;

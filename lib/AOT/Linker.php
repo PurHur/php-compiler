@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\AOT;
 
 use PHPCompiler\JIT\AotDebugSymbols;
+use PHPCompiler\JIT\Builtin\OpensslSignRuntime;
 
 /**
  * Link an LLVM object file into a standalone executable using the bundled toolchain.
@@ -23,10 +24,11 @@ final class Linker
      */
     private const RUNTIME_C_SOURCES = [
         __DIR__.'/runtime/phpc_progress.c',
+        __DIR__.'/runtime/openssl_ev.c',
     ];
 
     /** libz.so symlink is often absent without zlib1g-dev; link the versioned .so directly. */
-    private const RUNTIME_LINK_LIBS = '-lpcre2-8 -lcrypt -l:libz.so.1 -l:libbz2.so.1.0';
+    private const RUNTIME_LINK_LIBS = '-lpcre2-8 -lcrypt -l:libz.so.1 -l:libbz2.so.1.0 -lcrypto';
 
     /** Host multiarch lib dir for bundled LLVM ld (libz.so.1 lives here, not in LLVM sysroot). */
     private const HOST_LIB_SEARCH = '-L/usr/lib/x86_64-linux-gnu';
@@ -34,6 +36,12 @@ final class Linker
     /** Runtime units that need host libc headers layered on the LLVM sysroot (incomplete headers). */
     private const RUNTIME_HOST_LIBC_BASENAMES = [
         'phpc_progress.c',
+        'openssl_ev.c',
+    ];
+
+    /** Runtime units that include OpenSSL headers (libssl-dev). */
+    private const RUNTIME_OPENSSL_BASENAMES = [
+        'openssl_ev.c',
     ];
 
     private static function which(string $binary): ?string
@@ -189,13 +197,18 @@ final class Linker
      */
     private static function runtimeCSources(): array
     {
-        if (self::progressAbiEnabled()) {
-            return self::RUNTIME_C_SOURCES;
+        $sources = self::RUNTIME_C_SOURCES;
+        if (!self::progressAbiEnabled()) {
+            $sources = array_values(array_filter(
+                $sources,
+                static fn (string $source): bool => !str_ends_with($source, 'phpc_progress.c')
+            ));
         }
 
         return array_values(array_filter(
-            self::RUNTIME_C_SOURCES,
-            static fn (string $source): bool => !str_ends_with($source, 'phpc_progress.c')
+            $sources,
+            static fn (string $source): bool => !str_ends_with($source, 'openssl_ev.c')
+                || OpensslSignRuntime::opensslEvRuntimeAvailable()
         ));
     }
 
@@ -259,7 +272,32 @@ final class Linker
         } else {
             $flags = self::runtimeCIncludeFlags();
         }
+        if (in_array($basename, self::RUNTIME_OPENSSL_BASENAMES, true)) {
+            $flags .= self::runtimeOpensslIncludeFlags();
+        }
+
         return $flags;
+    }
+
+    private static function runtimeOpensslIncludeFlags(): string
+    {
+        $pkg = self::which('pkg-config');
+        if (null !== $pkg) {
+            $captured = self::runCaptured($pkg.' --cflags libcrypto 2>/dev/null', null);
+            if (0 === $captured['code']) {
+                $out = trim($captured['stdout']);
+                if ('' !== $out) {
+                    return ' '.$out;
+                }
+            }
+        }
+        foreach (['/usr/include', '/usr/local/include'] as $dir) {
+            if (is_file($dir.'/openssl/evp.h')) {
+                return ' -isystem '.escapeshellarg($dir);
+            }
+        }
+
+        return '';
     }
 
     private static function runtimeCIncludeFlags(): string

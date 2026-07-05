@@ -54,8 +54,19 @@ final class openssl_sign extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException(
-            'openssl_sign() is not implemented for JIT in this compiler build (issue #3324)'
+        $argc = \count($args);
+        if ($argc < 3 || $argc > 4) {
+            throw new \ArgumentCountError(
+                'openssl_sign() expects 3 or 4 arguments, '.$argc.' given'
+            );
+        }
+
+        return JitOpensslSign::sign(
+            $context,
+            $args[0],
+            $args[1],
+            $args[2],
+            $args[3] ?? null
         );
     }
 

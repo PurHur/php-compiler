@@ -420,7 +420,8 @@ final class JitStringBuiltinArg
             $valuePtr,
             $function,
             $argIndex,
-            $paramName
+            $paramName,
+            'string'
         );
         $context->builder->positionAtEnd($objectRejectBlock);
         self::emitRuntimeBoxedObjectReject(
@@ -428,7 +429,8 @@ final class JitStringBuiltinArg
             $valuePtr,
             $function,
             $argIndex,
-            $paramName
+            $paramName,
+            'string'
         );
 
         $context->builder->positionAtEnd($scalarBlock);
@@ -626,9 +628,9 @@ final class JitStringBuiltinArg
         string $paramName
     ): void {
         $i8 = $context->getTypeFromString('int8');
-        $longTy = $i8->constInt(VmVariable::TYPE_NATIVE_LONG, false);
-        $doubleTy = $i8->constInt(VmVariable::TYPE_NATIVE_DOUBLE, false);
-        $boolTy = $i8->constInt(VmVariable::TYPE_NATIVE_BOOL, false);
+        $longTy = $i8->constInt(VmVariable::TYPE_INTEGER & 0x7f, false);
+        $doubleTy = $i8->constInt(VmVariable::TYPE_FLOAT & 0x7f, false);
+        $boolTy = $i8->constInt(VmVariable::TYPE_BOOLEAN & 0x7f, false);
 
         $intErrBlock = BasicBlockHelper::append($context, 'str_req_scalar_int');
         $afterInt = BasicBlockHelper::append($context, 'str_req_after_int');

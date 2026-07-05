@@ -662,6 +662,12 @@ class Type extends Builtin {
             $fntypeHashHmacAlgos
         );
         $this->context->registerFunction('__compiler_hash_algos', $fnHashAlgos);
+        $fntypeOpensslSign = $this->context->context->functionType($strPtr, false, $strPtr, $strPtr, $i64);
+        $fnOpensslSign = $this->context->module->addFunction('__compiler_openssl_sign', $fntypeOpensslSign);
+        $this->context->registerFunction('__compiler_openssl_sign', $fnOpensslSign);
+        $fntypeOpensslVerify = $this->context->context->functionType($i32, false, $strPtr, $strPtr, $strPtr, $i64);
+        $fnOpensslVerify = $this->context->module->addFunction('__compiler_openssl_verify', $fntypeOpensslVerify);
+        $this->context->registerFunction('__compiler_openssl_verify', $fnOpensslVerify);
         $double = $this->context->getTypeFromString('double');
         $fntypeMicrotimeStr = $this->context->context->functionType($strPtr, false);
         $fnMicrotimeStr = $this->context->module->addFunction('__compiler_microtime_string', $fntypeMicrotimeStr);

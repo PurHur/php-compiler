@@ -1266,7 +1266,7 @@ final class HashTableHelper
         Variable $dim,
         Variable $element
     ): void {
-        $valPtr = self::valuePtrFromDim($context, $dim);
+        $valPtr = HashTableReadLlvm::valuePtrFromDim($context, $dim);
         $valueMap = $context->structFieldMap['__value__'];
         $i8 = $context->getTypeFromString('int8');
         $typeByte = $context->builder->load(
