@@ -403,6 +403,7 @@ class Runtime {
             $this->vmContext->propertyHookRegistry = $newRegistry;
         }
         CurlyBraceOffsetRejector::reject($code, $filename);
+        ClassConstBraceDerefRejector::reject($code, $filename);
         EncapsedCoalesceRejector::reject($code, $filename);
         ReadonlyMethodModifierRejector::reject($code, $filename);
         ReadonlyFunctionRejector::reject($code, $filename);
