@@ -13915,6 +13915,7 @@ class Compiler {
                 || null !== $this->splitLeadingConstFetchWithArrayLiteralCallArg($producers)
                 || null !== $this->splitLeadingConstFetchWithFuncCallCallArg($producers)
                 || $this->producersAreSiblingCallWithHoistedScalarConstFetch($producers)
+                || $this->producersAreSiblingCallWithHoistedEnumConstFetch($producers)
                 || $this->producersIncludeUnaryOffsetWithConstWhence($producers)) {
                 $matched = null;
                 if (
@@ -14719,6 +14720,14 @@ class Compiler {
                     if (
                         $prev instanceof Op\Expr\ClassConstFetch
                         && null !== $callArg
+                        && !(
+                            0 === $argIndex
+                            && null !== $this->nestedFuncCallProducerBeforeTrailingConstFetchPreludes(
+                                $callOp,
+                                $i,
+                                $block->orig->children
+                            )
+                        )
                         && $this->operandsReferToSameVariable($prev->result, $callArg)
                     ) {
                         $fetch = $prev;
@@ -19399,6 +19408,25 @@ class Compiler {
             return null;
         }
         $producers = $this->hoistedPreludeProducersImmediatelyBeforeCall($callOp, $block);
+        if (null !== $block->orig) {
+            $callIndex = array_search($callOp, $block->orig->children, true);
+            if (\is_int($callIndex)) {
+                $nestedForArgZero = $this->nestedFuncCallProducerBeforeTrailingConstFetchPreludes(
+                    $callOp,
+                    $callIndex,
+                    $block->orig->children
+                );
+                if (null !== $nestedForArgZero) {
+                    if (0 === $argIndex) {
+                        // tempnam(g(), E::A) — nested FuncCall feeds arg #0, not trailing enum (#10303, #16558).
+                        return null;
+                    }
+                    $sole = $producers[0] ?? null;
+
+                    return $sole instanceof Op\Expr ? $sole : null;
+                }
+            }
+        }
 
         return $producers[$ordinal] ?? null;
     }
@@ -19422,6 +19450,13 @@ class Compiler {
                 continue;
             }
             if ($i === $argIndex) {
+                if (
+                    1 === \count($precedingFetches)
+                    && $i < \count($callOp->args) - 1
+                ) {
+                    // Sole hoisted enum feeds trailing arg when arg #0 is a nested FuncCall (#10303, #16558).
+                    return null;
+                }
                 $fetch = $precedingFetches[$fetchIndex] ?? null;
                 // Trailing enum case when an earlier arg uses a nested FuncCall (#10303).
                 if (
@@ -19941,6 +19976,27 @@ class Compiler {
         }
 
         return null !== $call && null !== $scalarConst;
+    }
+
+    /**
+     * @param list<Op\Expr> $producers
+     */
+    private function producersAreSiblingCallWithHoistedEnumConstFetch(array $producers): bool
+    {
+        if (2 !== \count($producers)) {
+            return false;
+        }
+        $call = null;
+        $enumFetch = null;
+        foreach ($producers as $producer) {
+            if ($producer instanceof Op\Expr\FuncCall || $producer instanceof Op\Expr\NsFuncCall) {
+                $call = $producer;
+            } elseif ($producer instanceof Op\Expr\ClassConstFetch) {
+                $enumFetch = $producer;
+            }
+        }
+
+        return null !== $call && null !== $enumFetch;
     }
 
     /**
@@ -27772,7 +27828,16 @@ class Compiler {
             $immediatePrelude = $block->orig->children[$callIndex - 1] ?? null;
             // method_exists(I::class, 'm') after var_dump(...) — immediate ::class prelude is arg #0 (#9486).
             if ($immediatePrelude instanceof Op\Expr\ClassConstFetch) {
-                return null;
+                // tempnam(g(), E::A) — skip trailing enum; probe loop finds nested FuncCall (#10303, #16558).
+                if (
+                    null === $this->nestedFuncCallProducerBeforeTrailingConstFetchPreludes(
+                        $cfgCallOp,
+                        $callIndex,
+                        $block->orig->children
+                    )
+                ) {
+                    return null;
+                }
             }
         }
         $outerSlot = $this->outerSiblingInlineCallArgProducerSlot($block, $cfgCallOp, $argIndex);
@@ -33866,21 +33931,31 @@ class Compiler {
                         $block
                     )) instanceof Op\Expr\ClassConstFetch
                 ) {
-                    $classConstSlot = $block->slotForOperand($preludeProducer->result);
-                    if (null === $classConstSlot) {
-                        foreach ($this->compileExpr($preludeProducer, $block) as $op) {
-                            $sends[] = $op;
-                        }
-                        $classConstSlot = $block->slotForOperand($preludeProducer->result);
-                    }
-                    if (null !== $classConstSlot) {
-                        $sends[] = new OpCode(
-                            OpCode::TYPE_ARG_SEND,
-                            (string) $classConstSlot,
-                            $nameSlot,
-                            $unpackFlag
+                    $callIndexForEnumPrelude = array_search($cfgCallOp, $block->orig->children, true);
+                    $enumFeedsTrailingArgOnly = \is_int($callIndexForEnumPrelude)
+                        && 0 === (int) $argIndex
+                        && null !== $this->nestedFuncCallProducerBeforeTrailingConstFetchPreludes(
+                            $cfgCallOp,
+                            $callIndexForEnumPrelude,
+                            $block->orig->children
                         );
-                        continue;
+                    if (!$enumFeedsTrailingArgOnly) {
+                        $classConstSlot = $block->slotForOperand($preludeProducer->result);
+                        if (null === $classConstSlot) {
+                            foreach ($this->compileExpr($preludeProducer, $block) as $op) {
+                                $sends[] = $op;
+                            }
+                            $classConstSlot = $block->slotForOperand($preludeProducer->result);
+                        }
+                        if (null !== $classConstSlot) {
+                            $sends[] = new OpCode(
+                                OpCode::TYPE_ARG_SEND,
+                                (string) $classConstSlot,
+                                $nameSlot,
+                                $unpackFlag
+                            );
+                            continue;
+                        }
                     }
                 }
             }
@@ -33894,8 +33969,16 @@ class Compiler {
                     $immediatePrelude = $block->orig->children[$callIndex - 1] ?? null;
                     if ($immediatePrelude instanceof Op\Expr\ClassConstFetch) {
                         $callArg = $cfgCallOp->args[(int) $argIndex] ?? $arg;
+                        $enumFeedsTrailingArgOnly = $callArg instanceof Operand
+                            && $this->callArgIsDeadInlineTemporary($callArg)
+                            && null !== $this->nestedFuncCallProducerBeforeTrailingConstFetchPreludes(
+                                $cfgCallOp,
+                                $callIndex,
+                                $block->orig->children
+                            );
                         if (
-                            $callArg instanceof Operand
+                            !$enumFeedsTrailingArgOnly
+                            && $callArg instanceof Operand
                             && $this->callArgIsDeadInlineTemporary($callArg)
                             && !(
                                 $cfgCallOp instanceof Op\Expr\New_
@@ -34452,6 +34535,11 @@ class Compiler {
                 && !(
                     $this->hasSiblingMultiArgInlineCallProducers($block, $cfgCallOp)
                     && $this->callArgIsDeadInlineTemporary($cfgCallOp->args[(int) $argIndex] ?? $arg)
+                    && null === $this->nestedFuncCallProducerBeforeTrailingConstFetchPreludes(
+                        $cfgCallOp,
+                        (int) ($this->cfgCallOpIndex($block, $cfgCallOp) ?? -1),
+                        $block->orig->children
+                    )
                 )
             ) {
                 $adjacentNestedProducerSlot = $this->resolveAdjacentNestedFuncCallArgSlot(
