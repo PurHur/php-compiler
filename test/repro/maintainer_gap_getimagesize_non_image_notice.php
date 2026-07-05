@@ -2,27 +2,31 @@
 
 declare(strict_types=1);
 
-$path = sys_get_temp_dir().'/phpc_getimagesize_non_image_'.getmypid().'.txt';
-file_put_contents($path, 'not an image');
+/**
+ * Maintainer repro for #16434 — readable non-image file must return false silently.
+ *
+ * php-src: ext/standard/image.c php_getimagesize() (no notice for unrecognized format).
+ */
+error_reporting(E_ALL);
+ini_set('display_errors', '0');
 
-$warnings = [];
-set_error_handler(static function (int $severity, string $message) use (&$warnings): bool {
-    $warnings[] = $severity.': '.$message;
+$tmp = tempnam(sys_get_temp_dir(), 'img');
+if (false === $tmp) {
+    echo "fail: tempnam\n";
+    exit(1);
+}
+file_put_contents($tmp, 'not an image');
 
-    return true;
-});
-
-$result = getimagesize($path);
-@unlink($path);
+$result = @getimagesize($tmp);
+$last = error_get_last();
+unlink($tmp);
 
 if (false !== $result) {
-    echo 'fail: getimagesize() returned ', var_export($result, true), "\n";
+    echo 'fail: expected false, got '.var_export($result, true)."\n";
     exit(1);
 }
-
-if ([] !== $warnings) {
-    echo 'fail: unexpected warnings: ', implode('; ', $warnings), "\n";
+if (null !== $last) {
+    echo 'fail: unexpected warning: '.($last['message'] ?? '')."\n";
     exit(1);
 }
-
 echo "ok\n";

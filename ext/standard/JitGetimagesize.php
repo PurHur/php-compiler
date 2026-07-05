@@ -106,7 +106,20 @@ final class JitGetimagesize
         }
 
         $context->builder->positionAtEnd($readFailBlock);
+        $shouldNoticeFn = null !== $pathForOpenWarning
+            ? GetimagesizeJit::shouldNoticeForPathHelper($context)
+            : GetimagesizeJit::shouldNoticeForBytesHelper($context);
+        $shouldNotice = $context->builder->call($shouldNoticeFn, $noticeSource);
+        $shouldNoticeBool = $context->builder->icmp(Builder::INT_NE, $shouldNotice, $i1->constInt(0, false));
+        $noticeEmitBlock = BasicBlockHelper::append($context, $tag.'_notice_emit');
+        $readFailTailBlock = BasicBlockHelper::append($context, $tag.'_read_fail_tail');
+        $context->builder->branchIf($shouldNoticeBool, $noticeEmitBlock, $readFailTailBlock);
+
+        $context->builder->positionAtEnd($noticeEmitBlock);
         JitBuiltinWarning::emitImageReadFailed($context, $noticeSource, $function);
+        $context->builder->branch($readFailTailBlock);
+
+        $context->builder->positionAtEnd($readFailTailBlock);
         $readFailTail = self::writeFalseAndBranch($context, $doneBlock, $falseVal);
 
         $context->builder->positionAtEnd($okBlock);
@@ -123,7 +136,7 @@ final class JitGetimagesize
         if (null !== $openFailTail) {
             $result->addIncoming($openFailTail, $openFailBlock);
         }
-        $result->addIncoming($readFailTail, $readFailBlock);
+        $result->addIncoming($readFailTail, $readFailTailBlock);
         $result->addIncoming($okPtr, $okTail);
 
         return $result;

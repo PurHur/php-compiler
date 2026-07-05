@@ -38,7 +38,9 @@ final class getimagesizefromstring extends Internal
         }
         $result = VmImage::getImageSizeFromBytes($data, $imageinfo);
         if (false === $result) {
-            VmImage::emitImageReadNotice($frame, 'getimagesizefromstring', $data);
+            if (VmImage::shouldEmitImageReadNoticeForBytes($data)) {
+                VmImage::emitImageReadNotice($frame, 'getimagesizefromstring', $data);
+            }
             $frame->returnVar->bool(false);
 
             return;
