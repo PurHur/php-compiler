@@ -48,6 +48,14 @@ class VMTest extends BaseTest {
                 && str_contains($name, 'nextafter_profile')) {
                 continue;
             }
+            if (CompilerVersion::supportsNextafter()
+                && !CompilerVersion::advertisesNextafter()
+                && str_contains($name, 'nextafter')
+                && !str_contains($name, 'nextafter_profile')
+                && !str_contains($name, 'php84_math_string_builtins_phantom')
+                && !str_contains($name, 'forward_profile_phantom_introspection')) {
+                continue;
+            }
             if (!CompilerVersion::supportsRoundingModeEnum()
                 && (str_contains($name, 'rounding_mode') || str_contains($name, 'bcround'))
                 && !str_contains($name, 'rounding_mode_reference_profile')) {
