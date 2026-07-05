@@ -1,23 +1,19 @@
 --TEST--
-Language: class constant brace dereference on PHP 8.3+ profile (#16597, Zend/zend_compile.c)
+Language: class constant brace dereference rejected on 8.2 reference profile (#16597, Zend/zend_compile.c)
 --SKIPIF--
 <?php
 if (!class_exists('PHPCompiler\\CompilerVersion')) {
     require __DIR__ . '/../../../../vendor/autoload.php';
 }
-if (!PHPCompiler\CompilerVersion::supportsClassConstBraceDereference()) {
-    die('skip class const brace deref disabled on reference profile');
+if (PHPCompiler\CompilerVersion::supportsClassConstBraceDeref()) {
+    die('skip class const brace deref enabled on 8.3+ forward profile');
 }
 ?>
 --FILE--
 <?php
-class C
-{
+class C {
     public const X = 42;
-    public const Y = 'ok';
 }
-echo C::{'X'}, "\n";
-echo C::{"Y"}, "\n";
---EXPECT--
-42
-ok
+echo C::{'X'};
+--EXPECT_EXIT--
+255

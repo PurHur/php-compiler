@@ -380,7 +380,6 @@ class Runtime {
         AsymmetricVisibilityRejector::reject($code, $filename);
         CloneWithSyntaxRejector::reject($code, $filename);
         ReadonlyAnonymousClassSyntaxRejector::reject($code, $filename);
-        ClassConstBraceSyntaxRejector::reject($code, $filename);
         DnfParenIntersectionSyntaxRejector::reject($code, $filename);
         ExitFunctionSyntaxRejector::reject($code, $filename);
         TypedFunctionStaticSyntaxRejector::reject($code, $filename);
@@ -404,6 +403,7 @@ class Runtime {
             $this->vmContext->propertyHookRegistry = $newRegistry;
         }
         CurlyBraceOffsetRejector::reject($code, $filename);
+        ClassConstBraceDerefRejector::reject($code, $filename);
         EncapsedCoalesceRejector::reject($code, $filename);
         ReadonlyMethodModifierRejector::reject($code, $filename);
         ReadonlyFunctionRejector::reject($code, $filename);

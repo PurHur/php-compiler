@@ -684,13 +684,13 @@ class VMTest extends BaseTest {
                 continue;
             }
             // 8.3-target reject gate; skipped when class const brace deref enabled (#16597).
-            if (CompilerVersion::supportsClassConstBraceDereference()
-                && str_contains($name, 'class_const_brace_deref_reference_profile')) {
+            if (CompilerVersion::supportsClassConstBraceDeref()
+                && str_contains($name, 'class_const_brace_deref')
+                && !str_contains($name, '_forward')) {
                 continue;
             }
-            if (!CompilerVersion::supportsClassConstBraceDereference()
-                && str_contains($name, 'class_const_brace_deref')
-                && !str_contains($name, 'class_const_brace_deref_reference_profile')) {
+            if (!CompilerVersion::supportsClassConstBraceDeref()
+                && str_contains($name, 'class_const_brace_deref_forward')) {
                 continue;
             }
             // 8.4-target reject gate; skipped when parenthesized DNF intersection types enabled (#14904).

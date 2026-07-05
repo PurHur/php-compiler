@@ -147,13 +147,13 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.3+ `new readonly class` anonymous readonly modifier (#6991, #16255, #16348, #16379).
+     * PHP 8.3+ class constant brace dereference (`C::{'NAME'}`, `C::{"NAME"}`).
      *
-     * Withheld on 8.4.0-dev reference profile (matches Zend 8.2 parse error). Enable via stable
-     * 8.4.0+ or explicit `PHP_COMPILER_PROFILE=8.3` / `8.4` forward profile.
-     * php-src: Zend/zend_compile.c ZEND_ACC_READONLY_ANON_CLASS.
+     * Rejected on the 8.4.0-dev reference profile (matches Zend 8.2 parse error). Enable via stable
+     * 8.4.0+ or explicit `PHP_COMPILER_PROFILE=8.3` / `8.4` forward profile (#16597).
+     * php-src: Zend/zend_language_parser.y class_constant; Zend/zend_compile.c.
      */
-    public static function supportsReadonlyAnonymousClass(): bool
+    public static function supportsClassConstBraceDeref(): bool
     {
         if (version_compare(self::VERSION, '8.3', '<')) {
             return false;
@@ -172,13 +172,13 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.3+ class constant brace dereference `Class::{'NAME'}` / `Class::{"NAME"}` (#16597, #5923).
+     * PHP 8.3+ `new readonly class` anonymous readonly modifier (#6991, #16255, #16348, #16379).
      *
      * Withheld on 8.4.0-dev reference profile (matches Zend 8.2 parse error). Enable via stable
      * 8.4.0+ or explicit `PHP_COMPILER_PROFILE=8.3` / `8.4` forward profile.
-     * php-src: Zend/zend_language_parser.y — braced class constant name.
+     * php-src: Zend/zend_compile.c ZEND_ACC_READONLY_ANON_CLASS.
      */
-    public static function supportsClassConstBraceDereference(): bool
+    public static function supportsReadonlyAnonymousClass(): bool
     {
         if (version_compare(self::VERSION, '8.3', '<')) {
             return false;
