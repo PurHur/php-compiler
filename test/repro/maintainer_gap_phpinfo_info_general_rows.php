@@ -12,6 +12,10 @@ foreach ([
     'PHP API',
     'PHP Extension',
     'Zend Extension',
+    'Registered PHP Streams',
+    'Registered Stream Socket Transports',
+    'Registered Stream Filters',
+    'Zend Signal Handling',
 ] as $row) {
     if (!str_contains($out, $row)) {
         fwrite(STDERR, "FAIL: phpinfo(INFO_GENERAL) missing {$row}\n");

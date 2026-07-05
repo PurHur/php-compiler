@@ -555,6 +555,7 @@ final class VmInfo
             }
             $html .= '<tr><td class="e">'.$label.' </td><td class="v">'.$value.' </td></tr>';
         }
+        $html .= self::generalSectionRuntimeTailHtml();
         $html .= '<tr><td class="e">PHP Version </td><td class="v">'.$version.' </td></tr>';
         $html .= '<tr><td class="e">Zend Engine Version </td><td class="v">'.CompilerVersion::zendVersion().' </td></tr>';
         $html .= '</table><br />';
@@ -608,6 +609,7 @@ final class VmInfo
             }
             $text .= self::phpinfoRowText($label, $value);
         }
+        $text .= self::generalSectionRuntimeTailText();
         $text .= self::phpinfoRowText('PHP Version', $version);
         $text .= self::phpinfoRowText('Zend Engine Version', CompilerVersion::zendVersion());
         $text .= "\n";
@@ -660,7 +662,7 @@ final class VmInfo
         return $text;
     }
 
-    /** php-src phpinfo(INFO_GENERAL) rows after Server API (ext/standard/info.c, #14283). */
+    /** php-src phpinfo(INFO_GENERAL) rows after Thread Safety (ext/standard/info.c, #14283). */
     private const PHPINFO_GENERAL_EXTRA_ROWS = [
         'Virtual Directory Support',
         'Configuration File (php.ini) Path',
@@ -684,6 +686,113 @@ final class VmInfo
         'Registered Stream Socket Transports',
         'Registered Stream Filters',
     ];
+
+    /** php-src phpinfo(INFO_GENERAL) runtime rows before stream registry tail (#16551). */
+    private const PHPINFO_GENERAL_RUNTIME_ROWS = [
+        'Zend Signal Handling',
+        'Zend Memory Manager',
+        'Zend Multibyte Support',
+        'Zend Max Execution Timers',
+        'IPv6 Support',
+        'DTrace Support',
+    ];
+
+    /** @var array<string, string> */
+    private const PHPINFO_GENERAL_RUNTIME_DEFAULTS = [
+        'Zend Signal Handling' => 'enabled',
+        'Zend Memory Manager' => 'enabled',
+        'Zend Multibyte Support' => 'disabled',
+        'Zend Max Execution Timers' => 'disabled',
+        'IPv6 Support' => 'enabled',
+        'DTrace Support' => 'available, disabled',
+    ];
+
+    private static function generalSectionRuntimeTailText(): string
+    {
+        $text = '';
+        foreach (self::PHPINFO_GENERAL_RUNTIME_ROWS as $label) {
+            $text .= self::phpinfoRowText($label, self::phpinfoGeneralRuntimeRowValue($label));
+        }
+        $text .= self::phpinfoRowText('Registered PHP Streams', self::phpinfoRegisteredStreamsValue());
+        $text .= self::phpinfoRowText('Registered Stream Socket Transports', self::phpinfoRegisteredTransportsValue());
+        $text .= self::phpinfoRowText('Registered Stream Filters', self::phpinfoRegisteredStreamFiltersValue());
+        $text .= self::generalSectionCreditFooterText();
+
+        return $text;
+    }
+
+    private static function generalSectionRuntimeTailHtml(): string
+    {
+        $html = '';
+        foreach (self::PHPINFO_GENERAL_RUNTIME_ROWS as $label) {
+            $value = self::phpinfoGeneralRuntimeRowValue($label);
+            $html .= '<tr><td class="e">'.$label.' </td><td class="v">'.$value.' </td></tr>';
+        }
+        $html .= '<tr><td class="e">Registered PHP Streams </td><td class="v">'.self::phpinfoRegisteredStreamsValue().' </td></tr>';
+        $html .= '<tr><td class="e">Registered Stream Socket Transports </td><td class="v">'.self::phpinfoRegisteredTransportsValue().' </td></tr>';
+        $html .= '<tr><td class="e">Registered Stream Filters </td><td class="v">'.self::phpinfoRegisteredStreamFiltersValue().' </td></tr>';
+
+        return $html;
+    }
+
+    private static function phpinfoGeneralRuntimeRowValue(string $label): string
+    {
+        if ('Zend Multibyte Support' === $label) {
+            $mirrored = VmIniIntrospection::phpinfoGeneralRow($label, '');
+            if ('' !== $mirrored) {
+                return $mirrored;
+            }
+
+            return ModuleRegistry::extensionLoaded('mbstring') ? 'provided by mbstring' : 'disabled';
+        }
+
+        return VmIniIntrospection::phpinfoGeneralRow(
+            $label,
+            self::PHPINFO_GENERAL_RUNTIME_DEFAULTS[$label] ?? ''
+        );
+    }
+
+    private static function phpinfoRegisteredStreamsValue(): string
+    {
+        $mirrored = VmIniIntrospection::phpinfoGeneralRow('Registered PHP Streams', '');
+        if ('' !== $mirrored) {
+            return $mirrored;
+        }
+
+        return \implode(', ', VmStreamWrapperRegistry::getWrappers());
+    }
+
+    private static function phpinfoRegisteredTransportsValue(): string
+    {
+        $mirrored = VmIniIntrospection::phpinfoGeneralRow('Registered Stream Socket Transports', '');
+        if ('' !== $mirrored) {
+            return $mirrored;
+        }
+
+        return \implode(', ', VmStreamTransports::getRegistrationOrderTransports());
+    }
+
+    private static function phpinfoRegisteredStreamFiltersValue(): string
+    {
+        $mirrored = VmIniIntrospection::phpinfoGeneralRow('Registered Stream Filters', '');
+        if ('' !== $mirrored) {
+            return $mirrored;
+        }
+
+        return \implode(', ', VmStreamFilters::allFilterNames());
+    }
+
+    private static function generalSectionCreditFooterText(): string
+    {
+        $footer = VmIniIntrospection::phpinfoCreditFooter();
+        if ('' !== $footer) {
+            return "\n".$footer."\n";
+        }
+        $zendVer = CompilerVersion::zendVersion();
+
+        return "\nThis program makes use of the Zend Scripting Language Engine:\n"
+            .'Zend Engine v'.$zendVer.', Copyright (c) Zend Technologies'."\n";
+    }
 
     private static function formatPhpinfoAdditionalIniFilesHtml(string $value): string
     {

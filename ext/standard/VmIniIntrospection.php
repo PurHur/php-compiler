@@ -14,6 +14,9 @@ final class VmIniIntrospection
     /** JSON map of phpinfo(INFO_GENERAL) label => value rows mirrored from host Zend (#14283). */
     private const ENV_PHPINFO_GENERAL = 'PHP_COMPILER_PHPINFO_GENERAL_JSON';
 
+    /** Base64 phpinfo(INFO_GENERAL) Zend engine credit footer mirrored from host Zend (#16551). */
+    private const ENV_PHPINFO_CREDIT_FOOTER = 'PHP_COMPILER_PHPINFO_CREDIT_FOOTER';
+
     /** JSON snapshot of host ini_get_all() registry (#16433, ext/standard/ini.c). */
     private const ENV_INI_REGISTRY = 'PHP_COMPILER_INI_REGISTRY_JSON';
 
@@ -260,7 +263,11 @@ final class VmIniIntrospection
                 $rows[$currentLabel] = \trim($matches[2]);
                 continue;
             }
-            if (null !== $currentLabel && !\str_contains($line, ' => ')) {
+            if (
+                null !== $currentLabel
+                && !\str_contains($line, ' => ')
+                && !\str_starts_with($line, 'This program makes use')
+            ) {
                 $continuation = \rtrim($line, ", \t");
                 if ('' === $continuation) {
                     continue;
@@ -285,6 +292,27 @@ final class VmIniIntrospection
         if (\is_string($encoded)) {
             \putenv(self::ENV_PHPINFO_GENERAL.'='.$encoded);
         }
+        if (\preg_match('/(\nThis program makes use[\s\S]*)$/', $text, $matches)) {
+            $footer = \rtrim($matches[1], "\r\n");
+            if ('' !== $footer) {
+                \putenv(self::ENV_PHPINFO_CREDIT_FOOTER.'='.\base64_encode($footer));
+            }
+        }
+    }
+
+    /** phpinfo(INFO_GENERAL) Zend engine credit footer; mirrors host Zend when seeded (#16551). */
+    public static function phpinfoCreditFooter(): string
+    {
+        $encoded = self::envString(self::ENV_PHPINFO_CREDIT_FOOTER);
+        if ('' === $encoded) {
+            return '';
+        }
+        $decoded = \base64_decode($encoded, true);
+        if (!\is_string($decoded) || '' === $decoded) {
+            return '';
+        }
+
+        return $decoded;
     }
 
     /** phpinfo(INFO_GENERAL) row value; mirrors host Zend when seeded (#14283). */
