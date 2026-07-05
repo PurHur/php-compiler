@@ -22040,6 +22040,9 @@ class Compiler {
         ) {
             return false;
         }
+        if ($op instanceof Op\Expr\MethodCall && $this->methodCallHasStatementLevelSideEffects($op)) {
+            return false;
+        }
         // By-ref builtins (sort/natcasesort/array_push/…) mutate args — never defer as inline producers (#12732).
         if ($this->funcCallExprHasByRefMutatingSideEffects($op)) {
             return false;
@@ -22902,6 +22905,12 @@ class Compiler {
         if (
             ($producer instanceof Op\Expr\FuncCall || $producer instanceof Op\Expr\NsFuncCall)
             && $this->funcCallExprHasByRefMutatingSideEffects($producer)
+        ) {
+            return false;
+        }
+        if (
+            $producer instanceof Op\Expr\MethodCall
+            && $this->methodCallHasStatementLevelSideEffects($producer)
         ) {
             return false;
         }
@@ -28625,6 +28634,24 @@ class Compiler {
             ],
             true
         );
+    }
+
+    /**
+     * Generator/Iterator resume methods — stmt-level side effects, not hoisted fwrite/var_dump arg producers (#16609, re-#13989).
+     */
+    private function methodCallHasStatementLevelSideEffects(Op\Expr\MethodCall $call): bool
+    {
+        $method = $this->staticNameFromOperand($call->name);
+        if (null === $method) {
+            return false;
+        }
+
+        return \in_array(strtolower($method), [
+            'next',
+            'send',
+            'rewind',
+            'throw',
+        ], true);
     }
 
     /**
