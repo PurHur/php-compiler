@@ -13907,6 +13907,7 @@ class Compiler {
                 null !== $cfgCallOp
                 && $this->hasSiblingMultiArgInlineCallProducers($block, $callOp)
                 && $this->callArgIsDeadInlineTemporary($callOp->args[$argIndex] ?? null)
+                && !$this->nestedFuncCallFeedsDeadInlineCallArgZero($block, $callOp, $argIndex)
             ) {
                 // var_dump(f(), g()) after an earlier sibling chain — ordinal wiring is resolveSiblingInlineCallArgProducerSlot (#16254).
                 return null;
@@ -14695,6 +14696,9 @@ class Compiler {
         }
         $callArg = $callOp->args[$argIndex] ?? null;
         if (!$this->callArgUsesHoistedEnumPreludeSlot($callArg)) {
+            return null;
+        }
+        if ($this->nestedFuncCallFeedsDeadInlineCallArgZero($block, $callOp, $argIndex)) {
             return null;
         }
         $preludeProducer = $this->hoistedPreludeProducerForCallArgIndex($callOp, $argIndex, $block);
@@ -19407,6 +19411,9 @@ class Compiler {
         if (null === $ordinal) {
             return null;
         }
+        if ($this->nestedFuncCallFeedsDeadInlineCallArgZero($block, $callOp, $argIndex)) {
+            return null;
+        }
         $producers = $this->hoistedPreludeProducersImmediatelyBeforeCall($callOp, $block);
         if (null !== $block->orig) {
             $callIndex = array_search($callOp, $block->orig->children, true);
@@ -19458,6 +19465,25 @@ class Compiler {
                     return null;
                 }
                 $fetch = $precedingFetches[$fetchIndex] ?? null;
+                // tempnam(sys_get_temp_dir(), E::A) — sole enum prelude feeds trailing arg (#10303, #16558).
+                if (
+                    0 === $argIndex
+                    && 1 === \count($precedingFetches)
+                    && 2 === \count($callOp->args)
+                ) {
+                    $hoistedArgIndices = [];
+                    foreach ($callOp->args as $hi => $ha) {
+                        if ($this->callArgUsesHoistedEnumPreludeSlot($ha)) {
+                            $hoistedArgIndices[] = (int) $hi;
+                        }
+                    }
+                    if (
+                        \count($hoistedArgIndices) >= 2
+                        && ($hoistedArgIndices[1] ?? null) === \count($callOp->args) - 1
+                    ) {
+                        return null;
+                    }
+                }
                 // Trailing enum case when an earlier arg uses a nested FuncCall (#10303).
                 if (
                     null === $fetch
@@ -27447,15 +27473,30 @@ class Compiler {
         }
         $producers = $this->precedingInlineCallArgProducersBeforeCfgOp($block->orig->children, $cfgCallOp);
         $arrayProducer = null;
-        $padValueProducer = null;
         foreach ($producers as $producer) {
             if ($producer instanceof Op\Expr\Array_) {
                 $arrayProducer = $producer;
-            } elseif ($producer instanceof Op\Expr\ClassConstFetch) {
-                $padValueProducer = $producer;
+                break;
             }
         }
-        if (null === $arrayProducer || null === $padValueProducer) {
+        if (null === $arrayProducer) {
+            return null;
+        }
+        $fetches = $this->precedingCallArgClassConstFetchesBeforeCfgOp(
+            $block->orig->children,
+            $cfgCallOp,
+            $block
+        );
+        /** @var array<int, Op\Expr\ClassConstFetch> $classConstFetchByArgIndex */
+        $classConstFetchByArgIndex = [];
+        foreach ([1, 2] as $constArgIndex) {
+            $fetch = $this->precedingClassConstFetchForCallArgIndex($cfgCallOp, $constArgIndex, $fetches);
+            if ($fetch instanceof Op\Expr\ClassConstFetch) {
+                $classConstFetchByArgIndex[$constArgIndex] = $fetch;
+            }
+        }
+        // array_pad([E::A], N, E::B) — pad-value ClassConstFetch is arg #2 only (#8883, #16560).
+        if ([] === $classConstFetchByArgIndex) {
             return null;
         }
         $producerOps = [];
@@ -27466,20 +27507,24 @@ class Compiler {
         if (null === $haystackSlot) {
             return null;
         }
-        if (null === $block->slotForOperand($padValueProducer->result)) {
-            foreach ($this->compileExpr($padValueProducer, $block) as $op) {
-                $producerOps[] = $op;
+        $constFetchSlots = [];
+        foreach ($classConstFetchByArgIndex as $constArgIndex => $fetchProducer) {
+            if (null === $block->slotForOperand($fetchProducer->result)) {
+                foreach ($this->compileExpr($fetchProducer, $block) as $op) {
+                    $producerOps[] = $op;
+                }
             }
-        }
-        $padValueSlot = $block->slotForOperand($padValueProducer->result);
-        if (null === $padValueSlot) {
-            return null;
+            $fetchSlot = $block->slotForOperand($fetchProducer->result);
+            if (null === $fetchSlot) {
+                return null;
+            }
+            $constFetchSlots[$constArgIndex] = (string) $fetchSlot;
         }
         $sends = [];
         foreach ($args as $argIndex => $arg) {
             $valueSlot = match ((int) $argIndex) {
                 0 => (string) $haystackSlot,
-                2 => (string) $padValueSlot,
+                1, 2 => $constFetchSlots[(int) $argIndex] ?? null,
                 default => null,
             };
             $literalProbe = $cfgCallOp->args[(int) $argIndex] ?? $arg;
@@ -28525,6 +28570,33 @@ class Compiler {
         }
 
         return true;
+    }
+
+    /**
+     * tempnam(sys_get_temp_dir(), E::A) — nested FuncCall feeds arg #0; trailing enum is arg #1 (#10303, #16558).
+     */
+    private function nestedFuncCallFeedsDeadInlineCallArgZero(Block $block, Op $callOp, int $argIndex): bool
+    {
+        if (0 !== $argIndex || null === $block->orig) {
+            return false;
+        }
+        $callIndex = $this->cfgCallOpIndex($block, $callOp);
+        if (null === $callIndex || $callIndex < 2) {
+            return false;
+        }
+        $priorProducer = $block->orig->children[$callIndex - 2] ?? null;
+        if (
+            !($priorProducer instanceof Op\Expr\FuncCall || $priorProducer instanceof Op\Expr\NsFuncCall)
+            || !$this->nestedFuncCallProducerSeparatedBySkippablePreludesOnly(
+                $callIndex - 2,
+                $callIndex,
+                $block->orig->children
+            )
+        ) {
+            return false;
+        }
+
+        return 2 === \count($callOp->args ?? []);
     }
 
     /** Stmt-level side-effect builtins — not hoisted multi-arg producers (#16451, #16480). */
@@ -35588,6 +35660,7 @@ class Compiler {
                     && !(
                         $this->hasSiblingMultiArgInlineCallProducers($block, $cfgCallOp)
                         && $this->callArgIsDeadInlineTemporary($cfgCallOp->args[(int) $argIndex] ?? $arg)
+                        && !$this->nestedFuncCallFeedsDeadInlineCallArgZero($block, $cfgCallOp, (int) $argIndex)
                     )
                 ) {
                     $producers = $this->precedingInlineCallArgProducersBeforeCfgOp(
@@ -35795,6 +35868,7 @@ class Compiler {
                         && !(
                             $this->hasSiblingMultiArgInlineCallProducers($block, $cfgCallOp)
                             && $this->callArgIsDeadInlineTemporary($cfgCallOp->args[(int) $argIndex] ?? $arg)
+                            && !$this->nestedFuncCallFeedsDeadInlineCallArgZero($block, $cfgCallOp, (int) $argIndex)
                         )
                     ) {
                         $valueSlot = $this->findInlineExprCallArgProducerSlot($arg, $block, $cfgCallOp);
@@ -40863,6 +40937,81 @@ class Compiler {
     }
 
     /**
+     * tempnam(sys_get_temp_dir(), E::A) — nested FuncCall EXEC_RETURN is arg #0; enum ClassConstFetch is arg #1 (#10303, #16558).
+     *
+     * @param list<OpCode> $outerArgSends
+     * @param list<OpCode> $pendingNestedProducerOps
+     */
+    private function rewireNestedFuncCallEnumPrefixCallArgSendSlots(
+        array &$outerArgSends,
+        Block $block,
+        Op $cfgCallOp,
+        array $pendingNestedProducerOps = []
+    ): void {
+        if (null === $block->orig || 2 !== \count($cfgCallOp->args ?? [])) {
+            return;
+        }
+        $callIndex = $this->cfgCallOpIndex($block, $cfgCallOp);
+        if (!\is_int($callIndex) || $callIndex < 2) {
+            return;
+        }
+        $nestedCall = $block->orig->children[$callIndex - 2] ?? null;
+        $enumFetch = $block->orig->children[$callIndex - 1] ?? null;
+        if (
+            !($nestedCall instanceof Op\Expr\FuncCall || $nestedCall instanceof Op\Expr\NsFuncCall)
+            || !$enumFetch instanceof Op\Expr\ClassConstFetch
+            || !$this->nestedFuncCallProducerSeparatedBySkippablePreludesOnly(
+                $callIndex - 2,
+                $callIndex,
+                $block->orig->children
+            )
+        ) {
+            return;
+        }
+        $execReturnCount = 0;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type && null !== $op->arg1) {
+                ++$execReturnCount;
+            }
+        }
+        foreach ($pendingNestedProducerOps as $op) {
+            if (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type && null !== $op->arg1) {
+                ++$execReturnCount;
+            }
+        }
+        $execSlot = $this->slotForSiblingInlineFuncCallProducerExecReturnOrdinalWithPending(
+            $block,
+            max(0, $execReturnCount - 1),
+            $pendingNestedProducerOps
+        );
+        if (null === $execSlot) {
+            $execSlot = $block->slotForOperand($nestedCall->result);
+        }
+        $enumSlot = $block->slotForOperand($enumFetch->result);
+        if (null === $enumSlot) {
+            foreach ($this->compileExpr($enumFetch, $block) as $op) {
+                $block->addOpCode($op);
+            }
+            $enumSlot = $block->slotForOperand($enumFetch->result);
+        }
+        if (null === $execSlot || null === $enumSlot) {
+            return;
+        }
+        $argIndex = 0;
+        foreach ($outerArgSends as $send) {
+            if (OpCode::TYPE_ARG_SEND !== $send->type) {
+                continue;
+            }
+            if (0 === $argIndex) {
+                $send->arg1 = (string) $execSlot;
+            } elseif (1 === $argIndex) {
+                $send->arg1 = (string) $enumSlot;
+            }
+            ++$argIndex;
+        }
+    }
+
+    /**
      * var_dump(f(), g()) after an earlier sibling chain — map ARG_SEND to chain EXEC_RETURN slots (#16254).
      *
      * @param list<OpCode> $outerArgSends
@@ -40908,6 +41057,16 @@ class Compiler {
             $cfgChildren
         );
         if ($chainProducerCount < 2) {
+            if (!$this->nestedFuncCallFeedsDeadInlineCallArgZero($block, $cfgCallOp, 0)) {
+                return;
+            }
+            $this->rewireNestedFuncCallEnumPrefixCallArgSendSlots(
+                $outerArgSends,
+                $block,
+                $cfgCallOp,
+                $pendingNestedProducerOps
+            );
+
             return;
         }
         $execReturnCount = 0;
@@ -41197,6 +41356,9 @@ class Compiler {
         }
         $prelude = $block->orig->children[$callIndex - 1] ?? null;
         if (!$prelude instanceof Op\Expr\ClassConstFetch) {
+            return;
+        }
+        if ($this->nestedFuncCallFeedsDeadInlineCallArgZero($block, $cfgCallOp, 0)) {
             return;
         }
         $callArg = $cfgCallOp->args[0] ?? null;

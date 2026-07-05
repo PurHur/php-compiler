@@ -1723,8 +1723,8 @@ PHP;
         );
     }
 
-    /** Issue #9971 / #16560 — array_pad([1], Len::Two, 0) wires haystack Array_ + length ClassConstFetch. */
-    public function testArrayPadInlineArrayEnumLengthTypeErrorRuntime(): void
+    /** Issue #16560 — array_pad([1], Len::Two, 0) must wire enum length to arg #2, not pad value. */
+    public function testArrayPadEnumLengthArgNotMisboundToPadValue(): void
     {
         $code = <<<'PHP'
 <?php
