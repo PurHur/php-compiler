@@ -70,6 +70,12 @@ class VM {
         return self::$running;
     }
 
+    /** Builtin handler frame while {@see executeInternalHandler} runs (#16409). */
+    public function builtinHandlerFrame(): ?Frame
+    {
+        return $this->builtinHandlerFrameForTrace;
+    }
+
     /**
      * Named locals, dynamic locals, globals, and in-flight builtin args — not compiler temps (#14103).
      *
