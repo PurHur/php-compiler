@@ -568,19 +568,35 @@ final class VmInfo
         return "\n\n ".str_repeat('_', 71)."\n\nPHP Credits\n";
     }
 
+    /** php-src sapi_module.name long label in phpinfo text mode (main/SAPI.c, #14283). */
+    private static function phpinfoServerApiLabel(): string
+    {
+        return match (strtolower(self::php_sapi_name())) {
+            'cli' => 'Command Line Interface',
+            'cli-server' => 'Development Server',
+            'cgi-fcgi', 'cgi' => 'CGI/FastCGI',
+            default => self::php_sapi_name(),
+        };
+    }
+
     private static function generalSectionText(): string
     {
-        $version = CompilerVersion::VERSION;
+        $version = CompilerVersion::reportedPhpVersion();
         $system = self::php_uname('s');
         $host = self::php_uname('n');
         $release = self::php_uname('r');
         $versionStr = self::php_uname('v');
         $machine = self::php_uname('m');
+        $buildDate = VmIniIntrospection::phpinfoGeneralRow('Build Date', CompilerVersion::BUILD_DATE);
         $text = self::phpinfoRowText('PHP Version', $version)."\n";
         $text .= self::phpinfoRowText('System', trim($system.' '.$host.' '.$release.' '.$versionStr.' '.$machine));
-        $text .= self::phpinfoRowText('Build Date', CompilerVersion::BUILD_DATE);
-        $text .= self::phpinfoRowText('Build System', trim($system.' '.$machine));
-        $text .= self::phpinfoRowText('Server API', self::php_sapi_name());
+        $text .= self::phpinfoRowText('Build Date', $buildDate);
+        $text .= self::phpinfoRowText('Build System', $system);
+        $buildProvider = VmIniIntrospection::phpinfoGeneralRow('Build Provider');
+        if ('' !== $buildProvider) {
+            $text .= self::phpinfoRowText('Build Provider', $buildProvider);
+        }
+        $text .= self::phpinfoRowText('Server API', self::phpinfoServerApiLabel());
         foreach (self::PHPINFO_GENERAL_EXTRA_ROWS as $label) {
             $value = VmIniIntrospection::phpinfoGeneralRow($label);
             if ('Additional .ini files parsed' === $label) {

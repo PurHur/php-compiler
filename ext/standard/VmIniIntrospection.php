@@ -249,10 +249,25 @@ final class VmIniIntrospection
             return;
         }
         $rows = [];
+        $currentLabel = null;
         foreach (\explode("\n", $text) as $line) {
             $line = \rtrim($line);
+            if ('' === $line) {
+                continue;
+            }
             if (\preg_match('/^(.+?) => (.*)$/', $line, $matches)) {
-                $rows[\trim($matches[1])] = \trim($matches[2]);
+                $currentLabel = \trim($matches[1]);
+                $rows[$currentLabel] = \trim($matches[2]);
+                continue;
+            }
+            if (null !== $currentLabel && !\str_contains($line, ' => ')) {
+                $continuation = \rtrim($line, ", \t");
+                if ('' === $continuation) {
+                    continue;
+                }
+                $rows[$currentLabel] = '' === ($rows[$currentLabel] ?? '')
+                    ? $continuation
+                    : \rtrim((string) $rows[$currentLabel], ',').",\n".$continuation;
             }
         }
         if ([] === $rows) {
