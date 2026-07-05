@@ -1,5 +1,5 @@
 --TEST--
-PHP 8.4 asymmetric visibility: promoted public (private(set)) rejected at compile (#16436, zend_compile.c)
+Language: promoted constructor public (private(set)) rejected at compile (#16436, Zend/zend_compile.c)
 --FILE--
 <?php
 class D {

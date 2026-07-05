@@ -31,6 +31,9 @@ final class AsymmetricVisibilityRewriter
     /** php-src: Zend/zend_language_scanner.l — invalid set/read modifier ordering on reference profile (#15446). */
     public const BARE_SET_WITHOUT_READ_MESSAGE = 'syntax error, unexpected token ")", expecting variable';
 
+    /** php-src: Zend/zend_language_parser.y — parenthesized `(private(set))` invalid on promoted params (#16436). */
+    public const PROMOTED_PARENTHESIZED_SET_MESSAGE = 'syntax error, unexpected token "%s"';
+
     /**
      * @internal Marker embedded in source for PHPCfg to recover set visibility.
      */
@@ -198,6 +201,7 @@ final class AsymmetricVisibilityRewriter
 
         self::rejectExplicitPublicBeforeSetModifier($source);
         self::rejectExplicitPublicAfterSetModifier($source);
+        self::rejectPromotedParamParenthesizedAsymmetricSet($source);
         self::rejectPromotedParamMultipleAccessModifiers($source);
         self::rejectAsymmetricSetOnStaticProperty($source);
         self::rejectBareSetModifierWithoutRead($source);
@@ -355,6 +359,36 @@ final class AsymmetricVisibilityRewriter
         $line = self::findBareSetModifierLine($source);
         if ($line > 0) {
             throw new \CompileError(self::BARE_SET_WITHOUT_READ_MESSAGE);
+        }
+    }
+
+    /**
+     * Promoted constructor parameters reject parenthesized asymmetric set modifiers (#16436).
+     *
+     * php-src: Zend/zend_language_parser.y — `(private(set))` is property syntax only; promotion uses
+     * `public private(set)` without inner parens (RFC asymmetric-visibility-v2).
+     */
+    private static function rejectPromotedParamParenthesizedAsymmetricSet(string $source): void
+    {
+        if (!preg_match('/\b__construct\b/i', $source) || !preg_match('/\(\s*set\s*\)/i', $source)) {
+            return;
+        }
+
+        $offset = 0;
+        while (preg_match('/\bfunction\s+__construct\s*\(/i', $source, $m, PREG_OFFSET_CAPTURE, $offset)) {
+            $openPos = $m[0][1] + strlen($m[0][0]) - 1;
+            $paramsText = self::extractBalancedParenContent($source, $openPos);
+            if (null !== $paramsText && preg_match(
+                '/\(\s*(?<token>private|protected|public)\s*\(\s*set\s*\)\s*\)/i',
+                $paramsText,
+                $tokenMatch
+            )) {
+                throw new \CompileError(sprintf(
+                    self::PROMOTED_PARENTHESIZED_SET_MESSAGE,
+                    strtolower($tokenMatch['token'])
+                ));
+            }
+            $offset = $openPos + 1;
         }
     }
 
