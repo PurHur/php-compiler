@@ -8119,6 +8119,12 @@ class Compiler {
         if (null === $slot) {
             $slot = $this->findFuncCallExecReturnSlot($suppressCompiled);
         }
+        if (null === $slot && $primary instanceof Op\Expr\ArrayDimFetch) {
+            $slot = $this->compiledArrayDimFetchResultSlotBeforePendingFuncCall($suppressCompiled, 0);
+        }
+        if (null === $slot && ($primary instanceof Op\Expr\Isset_ || $primary instanceof Op\Expr\Empty_)) {
+            $slot = $this->slotForEmittedIssetOrEmptyProducer($suppressCompiled, $primary);
+        }
         if (null === $slot) {
             return;
         }
@@ -8329,7 +8335,10 @@ class Compiler {
             || $child instanceof Op\Expr\MethodCall
             || $child instanceof Op\Expr\StaticCall
             || $child instanceof Op\Expr\New_
-            || $child instanceof Op\Expr\Include_;
+            || $child instanceof Op\Expr\Include_
+            || $child instanceof Op\Expr\ArrayDimFetch
+            || $child instanceof Op\Expr\Isset_
+            || $child instanceof Op\Expr\Empty_;
     }
 
     /**
@@ -32568,6 +32577,7 @@ class Compiler {
                 }
             }
             $inlineArrayLiteralArgWired = false;
+            $outerMultiArraySetOpArgWired = false;
             if (
                 null !== $cfgCallOp
                 && $cfgCallOp instanceof Op\Expr\MethodCall
@@ -35678,6 +35688,7 @@ class Compiler {
                         && 'substr_replace' === $this->resolveCfgFuncCallName($cfgCallOp);
                     if (!$substrReplaceMapped) {
                         $valueSlot = (string) $arrayProducerSlot;
+                        $outerMultiArraySetOpArgWired = true;
                     }
                 }
             }
@@ -35741,7 +35752,7 @@ class Compiler {
             }
             if (null !== $arraySliceSlot) {
                 $valueSlot = $arraySliceSlot;
-            } elseif (null !== $cfgCallOp && null !== $block->orig) {
+            } elseif (null !== $cfgCallOp && null !== $block->orig && !$outerMultiArraySetOpArgWired) {
                 // Dead hoisted call-arg temps must wire to preceding inline producers, not echo/ternary phi slots (#14419).
                 $finalArgProbe = $cfgCallOp->args[(int) $argIndex] ?? $arg;
                 if ($this->callArgIsDeadInlineTemporary($finalArgProbe)) {
