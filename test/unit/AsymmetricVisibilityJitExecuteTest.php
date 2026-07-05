@@ -24,6 +24,9 @@ final class AsymmetricVisibilityJitExecuteTest extends TestCase
         if (!CompilerVersion::supportsAsymmetricVisibility()) {
             $this->markTestSkipped('asymmetric visibility disabled on reference profile (#12508)');
         }
+        if (!CompilerVersion::supportsParenthesizedAsymmetricSetModifier()) {
+            $this->markTestSkipped('parenthesized asymmetric set modifier disabled on 8.4.0-dev reference profile (#16450)');
+        }
         $this->repoRoot = dirname(__DIR__, 2);
         LlvmToolchain::applyCurrentProcessEnv($this->repoRoot);
         if (!LlvmToolchain::isReady($this->repoRoot)) {
