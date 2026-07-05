@@ -32,7 +32,8 @@ final class floor extends Internal
             $frame->calledArgs[0]->resolveIndirect(),
             'floor',
             1,
-            'num'
+            'num',
+            $frame
         );
         if (null === $frame->returnVar) {
             return;

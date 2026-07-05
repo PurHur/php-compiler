@@ -24,7 +24,8 @@ final class abs extends Internal
             $frame->calledArgs[0]->resolveIndirect(),
             'abs',
             1,
-            'num'
+            'num',
+            $frame
         );
         if (null === $frame->returnVar) {
             return;
