@@ -606,13 +606,14 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.4+ pipe operator (|>) — Zend/zend_language_parser.y (#7219, #12424).
+     * PHP 8.4+ pipe operator (|>) — Zend/zend_language_parser.y (#7219, #12424, #16675).
      *
-     * Gated on stable 8.4.0 so 8.4.0-dev reference profile rejects |> like Zend 8.2.
+     * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev reference profile
+     * rejects |> like Zend 8.2. Forward profile via `PHP_COMPILER_PROFILE=8.4` enables desugar.
      */
     public static function supportsPipeOperator(): bool
     {
-        return version_compare(self::VERSION, '8.4.0', '>=');
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
     }
 
     /**
