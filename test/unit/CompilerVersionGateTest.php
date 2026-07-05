@@ -69,9 +69,9 @@ final class CompilerVersionGateTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsClassUsesRecursive());
     }
 
-    public function testSupportsReadonlyAnonymousClassFalseOnReferenceProfile(): void
+    public function testSupportsReadonlyAnonymousClassTrueOn84DevLine(): void
     {
-        $this->assertFalse(CompilerVersion::supportsReadonlyAnonymousClass());
+        $this->assertTrue(CompilerVersion::supportsReadonlyAnonymousClass());
     }
 
     public function testSupportsMbStrPadFalseOnReferenceProfile(): void
