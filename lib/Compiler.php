@@ -22040,6 +22040,19 @@ class Compiler {
         ) {
             return false;
         }
+        // Generator::next(); fwrite(STDERR, …) — stmt-level MethodCall does not feed consumer args (#16610).
+        if ($op instanceof Op\Expr\MethodCall || $op instanceof Op\Expr\StaticCall) {
+            $stmtConsumerIndex = $this->deferredSiblingInlineCallArgConsumerIndex($op, $ops, $producerIndex);
+            if (null !== $stmtConsumerIndex) {
+                $stmtConsumer = $ops[$stmtConsumerIndex] ?? null;
+                if (
+                    $stmtConsumer instanceof Op\Expr
+                    && !$this->inlineCallArgProducerFeedsConsumer($op, $stmtConsumer)
+                ) {
+                    return false;
+                }
+            }
+        }
         // By-ref builtins (sort/natcasesort/array_push/…) mutate args — never defer as inline producers (#12732).
         if ($this->funcCallExprHasByRefMutatingSideEffects($op)) {
             return false;
