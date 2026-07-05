@@ -23896,6 +23896,47 @@ class Compiler {
         if (null !== $outerSlot) {
             return $outerSlot;
         }
+        // probe('label', in_array(..., g(), true)) — one hoisted arg maps to adjacent callee, not firstSibling (#16253).
+        if (1 === $deadInlineTempCount && $callIndex > 0) {
+            $adjacentIndex = $callIndex - 1;
+            while ($adjacentIndex >= 0) {
+                $adjacentSkip = $block->orig->children[$adjacentIndex] ?? null;
+                if ($adjacentSkip instanceof Op\Expr\ConstFetch || $adjacentSkip instanceof Op\Expr\ClassConstFetch) {
+                    --$adjacentIndex;
+                    continue;
+                }
+                break;
+            }
+            $adjacentProducer = $block->orig->children[$adjacentIndex] ?? null;
+            if (
+                ($adjacentProducer instanceof Op\Expr\FuncCall || $adjacentProducer instanceof Op\Expr\NsFuncCall)
+                && $this->isAdjacentNestedFuncCallProducer(
+                    $adjacentProducer,
+                    $cfgCallOp,
+                    $adjacentIndex,
+                    $callIndex
+                )
+            ) {
+                $adjacentTargetArg = $this->siblingMultiArgFuncCallProducerTargetArgIndex(
+                    $adjacentIndex,
+                    $callIndex,
+                    $block->orig->children
+                );
+                if (null === $adjacentTargetArg) {
+                    $adjacentTargetArg = $leadingEmbedded;
+                }
+                if ($adjacentTargetArg === $argIndex) {
+                    $adjacentExecReturn = $this->slotForInlineFuncCallProducerExecReturnByCfgIndex(
+                        $block,
+                        $adjacentIndex,
+                        $block->orig->children
+                    );
+                    if (null !== $adjacentExecReturn) {
+                        return (string) $adjacentExecReturn;
+                    }
+                }
+            }
+        }
         $producerOrdinal = $argIndex - $leadingEmbedded;
         if ($producerOrdinal < 0 || $producerOrdinal >= $siblingFuncCount) {
             return null;
@@ -25059,6 +25100,11 @@ class Compiler {
                 foreach ($this->compileExpr($prev, $block) as $op) {
                     $block->addOpCode($op);
                 }
+            }
+            // probe('label', in_array(..., g(), true)) — adjacent callee EXEC_RETURN, not haystack ordinal (#16253).
+            $lastAdjacentExecReturn = $this->slotForLastEmittedInlineCallResultBeforePendingFuncCall($block);
+            if (null !== $lastAdjacentExecReturn) {
+                return (string) $lastAdjacentExecReturn;
             }
             // Prefer sibling EXEC_RETURN ordinal — cfg-index lookup counts TYPE_NEW pseudo returns (#16241).
             $adjacentExecReturn = $this->slotForSiblingInlineCallProducerExecReturnByExpr(

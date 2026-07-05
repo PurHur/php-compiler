@@ -5872,6 +5872,54 @@ PHP;
         self::assertStringContainsString('declared_traits_has: false', $out);
     }
 
+    /** Issue #16253 — strlen(); probe(..., in_array(..., g(), true)) wires in_array EXEC_RETURN, not haystack slot. */
+    public function testInArrayStrictAfterVoidStmtCallUsesCalleeExecReturnSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+declare(strict_types=1);
+
+function probe(string $label, mixed $result): void {
+    echo $label . ': ' . (is_bool($result) ? ($result ? 'true' : 'false') : json_encode($result)) . "\n";
+}
+
+strlen('probe');
+probe('in_array_strict', in_array('stdClass', get_declared_classes(), true));
+PHP;
+
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'in_array_strict_after_strlen.php');
+
+        $inArrayReturnSlot = null;
+        $probeResultSend = null;
+        $fcallOrdinal = 0;
+        $probeSends = [];
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                ++$fcallOrdinal;
+                if (3 === $fcallOrdinal) {
+                    $probeSends = [];
+                }
+            }
+            if (2 === $fcallOrdinal && OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
+                $inArrayReturnSlot = $op->arg1;
+            }
+            if (3 === $fcallOrdinal && OpCode::TYPE_ARG_SEND === $op->type) {
+                $probeSends[] = $op->arg1;
+            }
+        }
+        $probeResultSend = $probeSends[1] ?? null;
+
+        self::assertNotNull($inArrayReturnSlot, 'in_array() must emit EXEC_RETURN before probe send');
+        self::assertNotNull($probeResultSend);
+        self::assertSame($inArrayReturnSlot, $probeResultSend, 'probe result must reuse in_array() EXEC_RETURN slot');
+
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertStringContainsString('in_array_strict: true', $out);
+    }
+
     /** Issue #10303 — tempnam(sys_get_temp_dir(), E::A) wires enum case fetch to arg #1. */
     public function testTempnamNestedFuncCallEnumPrefixUsesClassConstFetchSlot(): void
     {
