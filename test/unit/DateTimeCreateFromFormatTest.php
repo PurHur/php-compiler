@@ -60,20 +60,29 @@ PHP;
 
     public function testVmDateOnlyCreateFromFormatUsesCurrentTime(): void
     {
-        $repo = dirname(__DIR__, 2);
-        $path = $repo.'/test/repro/maintainer_gap_datetime_createfromformat_time_default.php';
-        $descriptor = [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']];
-        $env = $_ENV;
-        LlvmToolchain::applyProcessEnv($env, $repo);
-        $proc = proc_open(['php', $repo.'/bin/vm.php', $path], $descriptor, $pipes, $repo, $env);
-        $this->assertIsResource($proc);
-        fclose($pipes[0]);
-        $stderr = stream_get_contents($pipes[2]);
-        fclose($pipes[2]);
-        $out = stream_get_contents($pipes[1]);
-        fclose($pipes[1]);
-        $this->assertSame(0, proc_close($proc));
-        $this->assertStringContainsString('ok', trim((string) $stderr)."\n".(string) $out);
+        $code = <<<'PHP'
+$dt = DateTime::createFromFormat('Y-m-d', '2020-02-30');
+if (false === $dt) {
+    fwrite(STDERR, "createFromFormat failed\n");
+    exit(1);
+}
+if ('2020-03-01' !== $dt->format('Y-m-d')) {
+    fwrite(STDERR, 'date rollover mismatch: '.$dt->format('Y-m-d')."\n");
+    exit(1);
+}
+if ($dt->format('H:i:s') !== date('H:i:s')) {
+    fwrite(STDERR, 'time default mismatch: '.$dt->format('H:i:s').' vs '.date('H:i:s')."\n");
+    exit(1);
+}
+$partial = DateTime::createFromFormat('Y-m-d H', '2020-01-01 14');
+if ('14:00:00' !== $partial->format('H:i:s')) {
+    fwrite(STDERR, 'partial time mismatch: '.$partial->format('H:i:s')."\n");
+    exit(1);
+}
+echo "ok\n";
+PHP;
+        $out = $this->runBin('bin/vm.php', $code);
+        $this->assertStringContainsString('ok', $out);
     }
 
     private function runBin(string $bin, string $code): string
