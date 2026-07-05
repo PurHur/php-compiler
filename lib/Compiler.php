@@ -27136,13 +27136,29 @@ class Compiler {
             return null;
         }
         if (0 === $argIndex) {
-            foreach ($block->orig->children as $producerIndex => $child) {
+            $callIndex = null;
+            foreach ($block->orig->children as $i => $child) {
                 if ($child === $cfgCallOp) {
+                    $callIndex = $i;
+                    break;
+                }
+            }
+            if (null === $callIndex) {
+                return null;
+            }
+            for ($i = $callIndex - 1; $i >= 0; --$i) {
+                $child = $block->orig->children[$i];
+                if ($child instanceof Op\Expr\Assign) {
                     return null;
                 }
                 if (!$child instanceof Op\Expr\FuncCall && !$child instanceof Op\Expr\NsFuncCall) {
                     continue;
                 }
+                $producerName = strtolower($this->resolveCfgFuncCallName($child) ?? '');
+                if (!\in_array($producerName, ['time', 'gmmktime', 'strtotime'], true)) {
+                    return null;
+                }
+                $producerIndex = $i;
                 $execReturn = $this->slotForSiblingInlineCallProducerExecReturnByExpr(
                     $block,
                     $child,
@@ -27199,30 +27215,46 @@ class Compiler {
 
             return null;
         }
+        if (3 === $argIndex) {
+            foreach ($this->hoistedPreludeProducersImmediatelyBeforeCall($cfgCallOp, $block) as $prelude) {
+                if (!$prelude instanceof Op\Expr\UnaryMinus && !$prelude instanceof Op\Expr\UnaryPlus) {
+                    continue;
+                }
+                $existing = $block->slotForOperand($prelude->result);
+                if (null !== $existing) {
+                    return (string) $existing;
+                }
+                $folded = $this->tryFoldUnaryLiteralDefault($prelude);
+                if (null === $folded) {
+                    continue;
+                }
+
+                return (string) $block->registerConstant($prelude->result, $folded);
+            }
+
+            return null;
+        }
         if (1 !== $argIndex) {
             return null;
         }
-        foreach ($block->orig->children as $child) {
-            if ($child === $cfgCallOp) {
-                return null;
-            }
-            if (!$child instanceof Op\Expr\ConstFetch) {
+        foreach ($this->hoistedPreludeProducersImmediatelyBeforeCall($cfgCallOp, $block) as $prelude) {
+            if (!$prelude instanceof Op\Expr\ConstFetch) {
                 continue;
             }
-            $name = strtolower($this->staticNameFromOperand($child->name) ?? '');
+            $name = strtolower($this->staticNameFromOperand($prelude->name) ?? '');
             if (!str_starts_with($name, 'sunfuncs_ret_')) {
                 continue;
             }
-            $existing = $block->slotForOperand($child->result);
+            $existing = $block->slotForOperand($prelude->result);
             if (null !== $existing) {
                 return (string) $existing;
             }
-            $folded = $this->tryFoldGlobalConstFetch($child);
+            $folded = $this->tryFoldGlobalConstFetch($prelude);
             if (null === $folded) {
                 continue;
             }
 
-            return (string) $block->registerConstant($child->result, $folded);
+            return (string) $block->registerConstant($prelude->result, $folded);
         }
 
         return null;
@@ -27868,46 +27900,62 @@ class Compiler {
         }
         $producerOps = [];
         $timeArgSlot = null;
-        foreach ($block->orig->children as $child) {
+        $callIndex = null;
+        foreach ($block->orig->children as $i => $child) {
             if ($child === $cfgCallOp) {
+                $callIndex = $i;
                 break;
             }
-            if (!$child instanceof Op\Expr\FuncCall && !$child instanceof Op\Expr\NsFuncCall) {
-                continue;
-            }
-            $prevForce = $this->forceDeferredSiblingCallReturnSlot;
-            $this->forceDeferredSiblingCallReturnSlot = true;
-            try {
-                $producerOps = $this->compileExpr($child, $block);
-            } finally {
-                $this->forceDeferredSiblingCallReturnSlot = $prevForce;
-            }
-            foreach ($producerOps as $op) {
-                if (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type && null !== $op->arg1) {
-                    $timeArgSlot = (string) $op->arg1;
+        }
+        if (null !== $callIndex) {
+            for ($i = $callIndex - 1; $i >= 0; --$i) {
+                $child = $block->orig->children[$i];
+                if ($child instanceof Op\Expr\Assign) {
                     break;
                 }
-            }
-            break;
-        }
-        $sunfuncsArgSlot = null;
-        foreach ($block->orig->children as $child) {
-            if ($child === $cfgCallOp) {
+                if (!$child instanceof Op\Expr\FuncCall && !$child instanceof Op\Expr\NsFuncCall) {
+                    continue;
+                }
+                $producerName = strtolower($this->resolveCfgFuncCallName($child) ?? '');
+                if (!\in_array($producerName, ['time', 'gmmktime', 'strtotime'], true)) {
+                    break;
+                }
+                $prevForce = $this->forceDeferredSiblingCallReturnSlot;
+                $this->forceDeferredSiblingCallReturnSlot = true;
+                try {
+                    $producerOps = $this->compileExpr($child, $block);
+                } finally {
+                    $this->forceDeferredSiblingCallReturnSlot = $prevForce;
+                }
+                foreach ($producerOps as $op) {
+                    if (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type && null !== $op->arg1) {
+                        $timeArgSlot = (string) $op->arg1;
+                        break;
+                    }
+                }
                 break;
             }
-            if (!$child instanceof Op\Expr\ConstFetch) {
-                continue;
+        }
+        $sunfuncsArgSlot = null;
+        $longitudeSlot = null;
+        foreach ($this->hoistedPreludeProducersImmediatelyBeforeCall($cfgCallOp, $block) as $prelude) {
+            if ($prelude instanceof Op\Expr\ConstFetch) {
+                $name = strtolower($this->staticNameFromOperand($prelude->name) ?? '');
+                if (!str_starts_with($name, 'sunfuncs_ret_')) {
+                    continue;
+                }
+                $folded = $this->tryFoldGlobalConstFetch($prelude);
+                if (null === $folded) {
+                    continue;
+                }
+                $sunfuncsArgSlot = (string) $block->registerConstant($prelude->result, $folded);
             }
-            $name = strtolower($this->staticNameFromOperand($child->name) ?? '');
-            if (!str_starts_with($name, 'sunfuncs_ret_')) {
-                continue;
+            if ($prelude instanceof Op\Expr\UnaryMinus || $prelude instanceof Op\Expr\UnaryPlus) {
+                $foldedUnary = $this->tryFoldUnaryLiteralDefault($prelude);
+                if (null !== $foldedUnary) {
+                    $longitudeSlot = (string) $block->registerConstant($prelude->result, $foldedUnary);
+                }
             }
-            $folded = $this->tryFoldGlobalConstFetch($child);
-            if (null === $folded) {
-                continue;
-            }
-            $sunfuncsArgSlot = (string) $block->registerConstant($child->result, $folded);
-            break;
         }
         $sends = [];
         foreach ($args as $argIndex => $arg) {
@@ -27916,6 +27964,8 @@ class Compiler {
                 $valueSlot = $timeArgSlot;
             } elseif (1 === (int) $argIndex && null !== $sunfuncsArgSlot) {
                 $valueSlot = $sunfuncsArgSlot;
+            } elseif (3 === (int) $argIndex && null !== $longitudeSlot) {
+                $valueSlot = $longitudeSlot;
             }
             $literalProbe = ($cfgCallOp->args[(int) $argIndex] ?? null) ?? $arg;
             if (null === $valueSlot && $this->isEmbeddedCallLiteralArg($literalProbe)) {
@@ -28670,6 +28720,8 @@ class Compiler {
                 'fwrite',
                 'fputs',
                 'ftruncate',
+                'date_sunrise',
+                'date_sunset',
             ],
             true
         );
