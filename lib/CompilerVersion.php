@@ -1075,13 +1075,25 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.3+ DateException / DateError hierarchy (ext/date/php_date.h, #7276, #7277, #13118, #15382).
+     * PHP 8.3+ DateException / DateError hierarchy (ext/date/php_date.h, #7276, #7277, #13118, #15382, #16490).
      *
-     * Forward profile on 8.4.0-dev — advertisesBuiltinSince treats -dev as 8.4.0 (#7129 interval/period exceptions).
+     * Withheld on 8.4.0-dev reference profile (matches Zend 8.2 Exception on malformed DateInterval).
+     * Enable via stable 8.4.0+ or explicit `PHP_COMPILER_PROFILE=8.3` / `8.4` forward profile.
      */
     public static function advertisesDateExceptionHierarchy(): bool
     {
-        return self::advertisesBuiltinSince('8.3.0');
+        if (version_compare(self::VERSION, '8.3', '<')) {
+            return false;
+        }
+        if (version_compare(self::VERSION, '8.4.0', '>=')) {
+            return true;
+        }
+        $raw = getenv('PHP_COMPILER_PROFILE');
+        if (!\is_string($raw) || '' === trim($raw)) {
+            return false;
+        }
+
+        return version_compare(self::languageProfileVersion(), '8.3.0', '>=');
     }
 
     /**

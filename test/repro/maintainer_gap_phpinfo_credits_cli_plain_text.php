@@ -6,6 +6,10 @@ ob_start();
 phpinfo(INFO_CREDITS);
 $out = ob_get_clean();
 
+if (str_starts_with($out, '<!DOCTYPE')) {
+    fwrite(STDERR, "FAIL: phpinfo(INFO_CREDITS) emitted HTML in CLI SAPI\n");
+    exit(1);
+}
 foreach (['SAPI Modules', 'Module Authors', 'PHP Authors', 'PHP Quality Assurance Team'] as $section) {
     if (!str_contains($out, $section)) {
         fwrite(STDERR, "FAIL: phpinfo(INFO_CREDITS) missing {$section}\n");

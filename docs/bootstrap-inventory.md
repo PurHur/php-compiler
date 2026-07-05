@@ -9331,11 +9331,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitDateCreate.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 24)
-- new JITVariable (line 165)
-- new JITVariable (line 175)
-- new JITVariable (line 183)
-- 7 class method(s)
+- new ArgumentCountError (line 22)
+- new JITVariable (line 143)
+- new JITVariable (line 153)
+- new JITVariable (line 161)
+- 6 class method(s)
 
 ### `ext/standard/JitDateCreateFromFormat.php`
 
@@ -14265,8 +14265,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 114)
 - new HashTable (line 131)
 - new Variable (line 133)
-- 57 class method(s)
-- 1 closure(s)
+- 66 class method(s)
+- 2 closure(s)
 
 ### `ext/standard/VmIni.php`
 
@@ -16449,7 +16449,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/date_create.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 34)
+- new ArgumentCountError (line 33)
 - 2 class method(s)
 - 2 closure(s)
 
@@ -16463,7 +16463,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/date_create_immutable.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 34)
+- new ArgumentCountError (line 33)
 - 2 class method(s)
 - 2 closure(s)
 
@@ -29511,22 +29511,22 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 351)
 - new ObjectEntry (line 432)
 - new Variable (line 436)
-- new ObjectEntry (line 479)
-- new Variable (line 492)
-- new NativeDateInvalidTimeZoneException (line 501)
-- new NativeDateRangeError (line 509)
-- new NativeDateObjectError (line 515)
-- new NativeDateMalformedStringException (line 541)
-- new ObjectEntry (line 955)
-- new ObjectEntry (line 978)
-- new ObjectEntry (line 1001)
-- new ObjectEntry (line 1024)
-- new ObjectEntry (line 1034)
-- new Error (line 1159)
-- new Error (line 1165)
-- new Error (line 1169)
-- new ObjectEntry (line 1171)
-- 78 class method(s)
+- new ObjectEntry (line 491)
+- new Variable (line 506)
+- new NativeDateInvalidTimeZoneException (line 515)
+- new NativeDateRangeError (line 523)
+- new NativeDateObjectError (line 529)
+- new NativeDateMalformedStringException (line 555)
+- new ObjectEntry (line 969)
+- new ObjectEntry (line 992)
+- new ObjectEntry (line 1015)
+- new ObjectEntry (line 1038)
+- new ObjectEntry (line 1048)
+- new Error (line 1173)
+- new Error (line 1179)
+- new Error (line 1183)
+- new ObjectEntry (line 1185)
+- 79 class method(s)
 
 ### `lib/VM/DateTimeZoneSupport.php`
 

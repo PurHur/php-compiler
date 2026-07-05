@@ -14,7 +14,9 @@ final class PhpinfoJitHelper
 {
     public static function phpinfo(int $flags): bool
     {
-        echo VmInfo::renderPhpinfoHtml($flags);
+        echo VmInfo::phpinfoUsesTextFormat()
+            ? VmInfo::renderPhpinfoText($flags)
+            : VmInfo::renderPhpinfoHtml($flags);
 
         return true;
     }

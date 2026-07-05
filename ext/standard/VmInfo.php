@@ -196,7 +196,9 @@ final class VmInfo
 
     public static function phpinfo(int $flags = self::INFO_ALL): bool
     {
-        OutputBuffer::append(self::renderPhpinfoHtml($flags));
+        OutputBuffer::append(self::phpinfoUsesTextFormat()
+            ? self::renderPhpinfoText($flags)
+            : self::renderPhpinfoHtml($flags));
 
         return true;
     }
@@ -206,7 +208,13 @@ final class VmInfo
         OutputBuffer::append(self::renderPhpcreditsText($flags));
     }
 
-    /** Shared phpinfo() HTML for VM + JIT ({@see PhpinfoJitHelper}, issue #9256). */
+    /** php-src sapi_module.phpinfo_as_text — CLI uses plain-text tables (ext/standard/info.c, #16489). */
+    public static function phpinfoUsesTextFormat(): bool
+    {
+        return 'cli' === strtolower(self::php_sapi_name());
+    }
+
+    /** Shared phpinfo() HTML for CGI/web SAPI ({@see PhpinfoJitHelper}, issue #9256). */
     public static function renderPhpinfoHtml(int $flags): string
     {
         $html = '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "DTD/xhtml1-transitional.dtd">';
@@ -231,6 +239,31 @@ final class VmInfo
         $html .= '</div></body></html>';
 
         return $html;
+    }
+
+    /** php-src php_print_info() text layout for CLI SAPI (ext/standard/info.c, #16489). */
+    public static function renderPhpinfoText(int $flags): string
+    {
+        $text = "phpinfo()\n";
+        if (self::infoFlagSelected($flags, self::INFO_GENERAL)) {
+            $text .= self::generalSectionText();
+        }
+        if (self::infoFlagSelected($flags, self::INFO_MODULES)) {
+            $text .= self::modulesSectionText();
+        }
+        if (self::infoFlagSelected($flags, self::INFO_CONFIGURATION)) {
+            $text .= self::configurationSectionText();
+        }
+        if (self::infoFlagSelected($flags, self::INFO_LICENSE)) {
+            $text .= self::licenseSectionText();
+        }
+        if (self::infoFlagSelected($flags, self::INFO_CREDITS)) {
+            $text .= "\n\n _______________________________________________________________________\n\n";
+            $text .= "PHP Credits\n";
+            $text .= self::creditsSectionText(self::PHPINFO_CREDITS_FLAGS);
+        }
+
+        return $text;
     }
 
     /** php-src phpcredits() plain-text credits (ext/standard/credits.c, sapi_module.phpinfo_as_text). */
@@ -518,6 +551,85 @@ final class VmInfo
         $html .= '</table><br />';
 
         return $html;
+    }
+
+    private static function generalSectionText(): string
+    {
+        $version = CompilerVersion::reportedPhpVersion();
+        $system = self::php_uname('s');
+        $host = self::php_uname('n');
+        $release = self::php_uname('r');
+        $versionStr = self::php_uname('v');
+        $machine = self::php_uname('m');
+        $text = 'PHP Version => '.$version."\n\n";
+        $text .= self::phpinfoTextRow('System', $system.' '.$host.' '.$release.' '.$versionStr.' '.$machine);
+        $text .= self::phpinfoTextRow('Build Date', CompilerVersion::BUILD_DATE);
+        $text .= self::phpinfoTextRow('Build System', $system);
+        $text .= self::phpinfoTextRow('Server API', self::phpinfoServerApiLabel());
+        foreach (self::PHPINFO_GENERAL_EXTRA_ROWS as $label) {
+            $value = VmIniIntrospection::phpinfoGeneralRow($label);
+            if ('Additional .ini files parsed' === $label) {
+                $value = self::formatPhpinfoAdditionalIniFilesText($value);
+            }
+            $text .= self::phpinfoTextRow($label, $value);
+        }
+        $text .= self::phpinfoTextRow('PHP Version', $version);
+        $text .= self::phpinfoTextRow('Zend Engine Version', CompilerVersion::zendVersion());
+
+        return $text;
+    }
+
+    private static function phpinfoTextRow(string $label, string $value): string
+    {
+        return $label.' => '.$value."\n";
+    }
+
+    /** php-src sapi_module.name long label in phpinfo text mode (main/SAPI.c). */
+    private static function phpinfoServerApiLabel(): string
+    {
+        return match (strtolower(self::php_sapi_name())) {
+            'cli' => 'Command Line Interface',
+            'cli-server' => 'Development Server',
+            'cgi-fcgi', 'cgi' => 'CGI/FastCGI',
+            default => self::php_sapi_name(),
+        };
+    }
+
+    private static function formatPhpinfoAdditionalIniFilesText(string $value): string
+    {
+        if ('(none)' === $value || '' === $value) {
+            return $value;
+        }
+        $parts = preg_split('/,\s*\n?/', $value) ?: [];
+        $parts = array_values(array_filter(array_map('trim', $parts), static fn (string $part): bool => '' !== $part));
+        if ([] === $parts) {
+            return $value;
+        }
+
+        return implode(",\n", $parts);
+    }
+
+    private static function modulesSectionText(): string
+    {
+        $extensions = ModuleRegistry::getLoadedExtensions();
+        sort($extensions, SORT_STRING);
+        $text = "\nPHP Modules\n\n";
+        $text .= self::phpinfoTextRow('Module Name', 'Enabled');
+        foreach ($extensions as $name) {
+            $text .= self::phpinfoTextRow($name, 'enabled');
+        }
+
+        return $text."\n";
+    }
+
+    private static function configurationSectionText(): string
+    {
+        return "\nConfiguration\n\n".self::phpinfoTextRow('Compiler', 'PurHur/php-compiler')."\n";
+    }
+
+    private static function licenseSectionText(): string
+    {
+        return "\nPHP License\n\nThis program is free software; you can redistribute it and/or modify it under the terms of the PHP License.\n";
     }
 
     /** php-src phpinfo(INFO_GENERAL) rows after Server API (ext/standard/info.c, #14283). */
