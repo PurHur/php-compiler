@@ -19153,9 +19153,9 @@ class Compiler {
     }
 
     /**
-     * Hoisted ConstFetch / ClassConstFetch stmts immediately before a call (#15899, bindTo(null, C::class)).
+     * Hoisted ConstFetch / ClassConstFetch / UnaryMinus|Plus stmts immediately before a call (#15899, #16523).
      *
-     * @return list<Op\Expr\ConstFetch|Op\Expr\ClassConstFetch>
+     * @return list<Op\Expr\ConstFetch|Op\Expr\ClassConstFetch|Op\Expr\UnaryMinus|Op\Expr\UnaryPlus>
      */
     private function hoistedPreludeProducersImmediatelyBeforeCall(Op $callOp, Block $block): array
     {
@@ -19176,6 +19176,10 @@ class Compiler {
         for ($i = $callIndex - 1; $i >= 0; --$i) {
             $child = $block->orig->children[$i];
             if ($child instanceof Op\Expr\ConstFetch || $child instanceof Op\Expr\ClassConstFetch) {
+                array_unshift($producers, $child);
+                continue;
+            }
+            if ($child instanceof Op\Expr\UnaryMinus || $child instanceof Op\Expr\UnaryPlus) {
                 array_unshift($producers, $child);
                 continue;
             }
@@ -19266,7 +19270,10 @@ class Compiler {
             if ($i === $argIndex) {
                 $prelude = $preludes[$preludeOrdinal] ?? null;
 
-                return $prelude instanceof Op\Expr\ConstFetch || $prelude instanceof Op\Expr\ClassConstFetch
+                return $prelude instanceof Op\Expr\ConstFetch
+                    || $prelude instanceof Op\Expr\ClassConstFetch
+                    || $prelude instanceof Op\Expr\UnaryMinus
+                    || $prelude instanceof Op\Expr\UnaryPlus
                     ? $prelude
                     : null;
             }
@@ -33370,6 +33377,31 @@ class Compiler {
                 }
             }
             if (null !== $cfgCallOp && null !== $block->orig) {
+                $deadInlinePrelude = $this->hoistedDeadInlinePreludeProducerForCallArgIndex(
+                    $cfgCallOp,
+                    (int) $argIndex,
+                    $block
+                );
+                if ($deadInlinePrelude instanceof Op\Expr) {
+                    $preludeSlot = $block->slotForOperand($deadInlinePrelude->result);
+                    if (null === $preludeSlot) {
+                        foreach ($this->compileExpr($deadInlinePrelude, $block) as $op) {
+                            $sends[] = $op;
+                        }
+                        $preludeSlot = $block->slotForOperand($deadInlinePrelude->result);
+                    }
+                    if (null !== $preludeSlot) {
+                        $sends[] = new OpCode(
+                            OpCode::TYPE_ARG_SEND,
+                            (string) $preludeSlot,
+                            $nameSlot,
+                            $unpackFlag
+                        );
+                        continue;
+                    }
+                }
+            }
+            if (null !== $cfgCallOp && null !== $block->orig) {
                 $preludeProducer = $this->hoistedPreludeProducerForCallArgIndex($cfgCallOp, (int) $argIndex, $block);
                 if ($preludeProducer instanceof Op\Expr\ConstFetch) {
                     $constName = $this->staticNameFromOperand($preludeProducer->name);
@@ -40297,6 +40329,41 @@ class Compiler {
             }
             ++$argIndex;
         }
+    }
+
+    /**
+     * Map dead inline call-arg temps to hoisted UnaryMinus/ConstFetch preludes before the callee (#16523).
+     */
+    private function hoistedDeadInlinePreludeProducerForCallArgIndex(Op $callOp, int $argIndex, Block $block): ?Op\Expr
+    {
+        if (!property_exists($callOp, 'args') || !\is_array($callOp->args)) {
+            return null;
+        }
+        $callArg = $callOp->args[$argIndex] ?? null;
+        if (!$this->callArgIsDeadInlineTemporary($callArg)) {
+            return null;
+        }
+        $preludes = $this->hoistedPreludeProducersImmediatelyBeforeCall($callOp, $block);
+        if ([] === $preludes) {
+            return null;
+        }
+        $preludeOrdinal = 0;
+        foreach ($callOp->args as $i => $deadArg) {
+            if ($this->isEmbeddedCallLiteralArg($deadArg)) {
+                continue;
+            }
+            if (!$this->callArgIsDeadInlineTemporary($deadArg)) {
+                continue;
+            }
+            if ($i === $argIndex) {
+                $prelude = $preludes[$preludeOrdinal] ?? null;
+
+                return $prelude instanceof Op\Expr ? $prelude : null;
+            }
+            ++$preludeOrdinal;
+        }
+
+        return null;
     }
 
     /**
