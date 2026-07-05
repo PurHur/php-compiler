@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 4093 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 11034 |
+| Source constructs flagged (warnings) | 11042 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -558,7 +558,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/spl/RecursiveArrayIteratorBuiltin.php` | 0 | 12 |
 | `ext/spl/RecursiveCallbackFilterIteratorBuiltin.php` | 0 | 16 |
 | `ext/spl/RecursiveTreeIteratorBuiltin.php` | 0 | 6 |
-| `ext/spl/RegexIteratorBuiltin.php` | 0 | 12 |
+| `ext/spl/RegexIteratorBuiltin.php` | 0 | 20 |
 | `ext/spl/SplArraySerializeSupport.php` | 0 | 2 |
 | `ext/spl/SplArrayStorage.php` | 0 | 19 |
 | `ext/spl/SplArrayUserSortMethod.php` | 0 | 2 |
@@ -7866,15 +7866,23 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ClassEntry (line 55)
 - new RegexIteratorConstruct (line 74)
 - new RegexIteratorAccept (line 77)
-- new Variable (line 225)
-- new Variable (line 250)
-- new Variable (line 269)
-- new Variable (line 290)
-- new ArgumentCountError (line 403)
-- new ArgumentCountError (line 646)
-- new ArgumentCountError (line 701)
-- new ArgumentCountError (line 756)
-- 37 class method(s)
+- new Variable (line 227)
+- new Variable (line 252)
+- new Variable (line 271)
+- new Variable (line 292)
+- new ArgumentCountError (line 405)
+- new ArgumentCountError (line 648)
+- new ArgumentCountError (line 703)
+- new ArgumentCountError (line 758)
+- new ClassEntry (line 791)
+- new RecursiveRegexIteratorConstruct (line 800)
+- new RecursiveRegexIteratorHasChildren (line 803)
+- new RecursiveRegexIteratorGetChildren (line 806)
+- new ObjectEntry (line 824)
+- new Variable (line 834)
+- new ArgumentCountError (line 857)
+- new UnexpectedValueException (line 954)
+- 42 class method(s)
 
 ### `ext/spl/SplArraySerializeSupport.php`
 
