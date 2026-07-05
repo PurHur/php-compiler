@@ -9,6 +9,7 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin\Type;
 
 use PHPCompiler\JIT\Builtin\Refcount;
+use PHPCompiler\JIT\Builtin\StringStrcoll;
 use PHPCompiler\JIT\Builtin\Type;
 use PHPCompiler\JIT\Variable;
 use PHPLLVM;
@@ -243,8 +244,7 @@ class HashTable extends Type
         try {
             $this->context->lookupFunction('strcoll');
         } catch (\Throwable $e) {
-            $fn = $this->context->module->addFunction('strcoll', $ft);
-            $this->context->registerFunction('strcoll', $fn);
+            StringStrcoll::ensureLinked($this->context);
         }
     }
 
