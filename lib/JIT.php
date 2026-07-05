@@ -11964,6 +11964,7 @@ class JIT {
         if (
             ($resultOp instanceof \PHPCfg\Operand\Temporary || $resultOp instanceof \PHPCfg\Operand\Literal)
             && Variable::KIND_VALUE === $result->kind
+            && null === $result->objectPropertySlot
             && (
                 Variable::TYPE_STRING !== $result->type
                 || !JIT\StringOffsetHelper::isWritableCharOffsetLvalue($result, $this->context)
