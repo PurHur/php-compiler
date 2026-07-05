@@ -33600,13 +33600,32 @@ class Compiler {
                         $preludeSlot = $block->slotForOperand($deadInlinePrelude->result);
                     }
                     if (null !== $preludeSlot) {
-                        $sends[] = new OpCode(
-                            OpCode::TYPE_ARG_SEND,
-                            (string) $preludeSlot,
-                            $nameSlot,
-                            $unpackFlag
-                        );
-                        continue;
+                        $callArg = $cfgCallOp->args[(int) $argIndex] ?? $arg;
+                        if (
+                            $callArg instanceof Operand
+                            && $this->callArgOperandExpectsArrayProducer($callArg)
+                            && (
+                                $deadInlinePrelude instanceof Op\Expr\ConstFetch
+                                || $deadInlinePrelude instanceof Op\Expr\ClassConstFetch
+                            )
+                        ) {
+                            // in_array(..., get_declared_classes(), true) — haystack must not steal strict prelude (#16540).
+                        } elseif (
+                            $deadInlinePrelude instanceof Op\Expr\FuncCall
+                            || $deadInlinePrelude instanceof Op\Expr\NsFuncCall
+                            || $deadInlinePrelude instanceof Op\Expr\StaticCall
+                            || $deadInlinePrelude instanceof Op\Expr\MethodCall
+                        ) {
+                            // Array haystack nested FuncCall — EXEC_RETURN wiring in haystack-family resolution (#16540).
+                        } else {
+                            $sends[] = new OpCode(
+                                OpCode::TYPE_ARG_SEND,
+                                (string) $preludeSlot,
+                                $nameSlot,
+                                $unpackFlag
+                            );
+                            continue;
+                        }
                     }
                 }
             }
@@ -40613,6 +40632,26 @@ class Compiler {
             }
             if ($i === $argIndex) {
                 $prelude = $preludes[$preludeOrdinal] ?? null;
+                if (
+                    ($prelude instanceof Op\Expr\ConstFetch || $prelude instanceof Op\Expr\ClassConstFetch)
+                    && $callArg instanceof Operand
+                    && $this->callArgOperandExpectsArrayProducer($callArg)
+                    && null !== $block->orig
+                ) {
+                    // in_array('x', get_declared_classes(), true) — strict ConstFetch is not haystack (#16540, re-#16312).
+                    $producers = $this->precedingInlineCallArgProducersBeforeCfgOp($block->orig->children, $callOp);
+                    $matched = $this->matchInlineCallArgProducer($producers, $callOp->args, $argIndex, $callOp, $block);
+                    if (
+                        $matched instanceof Op\Expr\FuncCall
+                        || $matched instanceof Op\Expr\NsFuncCall
+                        || $matched instanceof Op\Expr\StaticCall
+                        || $matched instanceof Op\Expr\MethodCall
+                    ) {
+                        return $matched;
+                    }
+
+                    return null;
+                }
 
                 return $prelude instanceof Op\Expr ? $prelude : null;
             }
