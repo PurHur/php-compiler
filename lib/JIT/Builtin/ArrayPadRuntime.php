@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\ArrayBuiltinHelper;
+use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\JitVmHelperLink;
@@ -52,6 +53,14 @@ final class ArrayPadRuntime
         JITVariable $value,
         ?Value $padType
     ): Value {
+        // Standalone AOT keeps LLVM in ArrayBuiltinHelper; embed/JIT uses PHP bridge (#12476).
+        if (null === $padType && (
+            Builtin::LOAD_TYPE_STANDALONE === $context->loadType
+            || ArrayBuiltinHelper::isNativeArray($array->type)
+        )) {
+            return ArrayBuiltinHelper::pad($context, $array, $length, $value);
+        }
+
         self::ensureLinked($context);
         $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
         $valuePtr = JitValueBox::valuePtrFromVariable($context, $value);
