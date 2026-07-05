@@ -78,6 +78,38 @@ final class JitGrapheme
     /**
      * @param JITVariable[] $args
      */
+    public static function tryStrimwidthFold(Context $context, array $args): ?Value
+    {
+        $string = self::compileTimeString($args, 0);
+        if (null === $string) {
+            return null;
+        }
+        $start = self::compileTimeInt($args, 1);
+        if (null === $start) {
+            return null;
+        }
+        $width = self::compileTimeInt($args, 2);
+        if (null === $width) {
+            return null;
+        }
+        $trimmarker = '';
+        if (isset($args[3])) {
+            $trimmarker = self::compileTimeString($args, 3);
+            if (null === $trimmarker) {
+                return null;
+            }
+        }
+        $result = VmGrapheme::strimwidth($string, $start, $width, $trimmarker);
+        if (false === $result) {
+            return $context->getTypeFromString('bool')->constInt(0, false);
+        }
+
+        return $context->builder->load($context->constantStringFromString($result));
+    }
+
+    /**
+     * @param JITVariable[] $args
+     */
     public static function trySubstrFold(Context $context, array $args): ?Value
     {
         $string = self::compileTimeString($args, 0);
