@@ -30636,8 +30636,10 @@ class Compiler {
                 $callIndex,
                 $children
             )
+            && !$skipNonBoolNullConstFetch
         ) {
             // var_export(array_keys($a, null), true) — sole trailing ConstFetch is arg #1 (#11272, #16298).
+            // json_decode(g(), true, N, JSON_*) — boolNullArgIndices already excludes arg #0 (#16319).
             return null;
         }
         $fetch = $trailingConstFetches[$producerOrdinal] ?? null;
