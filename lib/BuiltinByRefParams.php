@@ -80,6 +80,7 @@ final class BuiltinByRefParams
             case 'is_callable':
                 return [2];
             case 'openssl_random_pseudo_bytes':
+            case 'openssl_sign':
                 return [1];
             case 'exec':
                 return [1, 2];
