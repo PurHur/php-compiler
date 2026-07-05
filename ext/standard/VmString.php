@@ -36,8 +36,11 @@ final class VmNullStringParamDeprecation
             return;
         }
         if (null === $frame) {
-            $frames = $vm->context->runStackFrames();
-            $frame = [] !== $frames ? $frames[0] : null;
+            $frame = $vm->builtinHandlerFrame();
+            if (null === $frame) {
+                $frames = $vm->context->runStackFrames();
+                $frame = [] !== $frames ? $frames[0] : null;
+            }
         }
         $vm->context->errors->internalDeprecated(
             self::message($function, $argIndex, $paramName),
