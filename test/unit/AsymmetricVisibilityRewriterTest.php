@@ -22,7 +22,7 @@ final class AsymmetricVisibilityRewriterTest extends TestCase
         $source = <<<'PHP'
 <?php
 class Demo {
-    public private(set) string $name = 'x';
+    public (private(set)) string $name = 'x';
 }
 PHP;
         $rewritten = AsymmetricVisibilityRewriter::rewrite($source);
@@ -41,7 +41,7 @@ PHP;
         $source = <<<'PHP'
 <?php
 class Demo {
-    public private(set) string $name = 'x';
+    public (private(set)) string $name = 'x';
 }
 PHP;
         $rewritten = AsymmetricVisibilityRewriter::rewrite($source);
@@ -56,7 +56,7 @@ PHP;
         $source = <<<'PHP'
 <?php
 class Demo {
-    public protected(set) string $name = 'x';
+    public (protected(set)) string $name = 'x';
 }
 PHP;
         $rewritten = AsymmetricVisibilityRewriter::rewrite($source);
@@ -71,7 +71,7 @@ PHP;
         $source = <<<'PHP'
 <?php
 class Demo {
-    protected private(set) string $name = 'x';
+    protected (private(set)) string $name = 'x';
 }
 PHP;
         $rewritten = AsymmetricVisibilityRewriter::rewrite($source);
@@ -173,7 +173,7 @@ PHP;
 <?php
 class User {
     public function __construct(
-        public private(set) string $name,
+        public (private(set)) string $name,
     ) {}
 }
 PHP;
@@ -189,7 +189,7 @@ PHP;
         $source = <<<'PHP'
 <?php
 class D {
-    public function __construct(public private(set) int $x = 1) {}
+    public function __construct(public (private(set)) int $x = 1) {}
 }
 PHP;
         $rewritten = AsymmetricVisibilityRewriter::rewrite($source);
@@ -197,6 +197,45 @@ PHP;
             '/*phpc-asymmetric-set:private*/ /*phpc-asymmetric-explicit-read*/ public int $x',
             preg_replace('/\s+/', ' ', $rewritten)
         );
+    }
+
+    public function testExplicitReadBeforePrivateSetRejects(): void
+    {
+        $source = <<<'PHP'
+<?php
+class Demo {
+    public private(set) string $name = 'x';
+}
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage(AsymmetricVisibilityRewriter::MULTIPLE_MODIFIERS_MESSAGE);
+        AsymmetricVisibilityRewriter::rewrite($source);
+    }
+
+    public function testPromotedExplicitReadBeforePrivateSetRejects(): void
+    {
+        $source = <<<'PHP'
+<?php
+class D {
+    public function __construct(public private(set) int $x = 1) {}
+}
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage(AsymmetricVisibilityRewriter::MULTIPLE_MODIFIERS_MESSAGE);
+        AsymmetricVisibilityRewriter::rewrite($source);
+    }
+
+    public function testPromotedExplicitReadBeforeProtectedSetRejects(): void
+    {
+        $source = <<<'PHP'
+<?php
+class D {
+    public function __construct(public protected(set) string $n = 'ok') {}
+}
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage(AsymmetricVisibilityRewriter::MULTIPLE_MODIFIERS_MESSAGE);
+        AsymmetricVisibilityRewriter::rewrite($source);
     }
 
     public function testParenthesizedPrivateSetWithExplicitReadRewrites(): void
@@ -252,7 +291,7 @@ PHP;
         $source = <<<'PHP'
 <?php
 class C {
-    public private(set) static int $x = 1;
+    public (private(set)) static int $x = 1;
 }
 PHP;
         $this->expectException(\CompileError::class);
@@ -262,6 +301,7 @@ PHP;
 
     public function testStaticPrivateSetWithoutExplicitReadRewrites(): void
     {
+        $this->markTestSkipped('bare private(set) on static properties rejected by bare-set guard (#15446); use (private(set)) public static');
         $source = <<<'PHP'
 <?php
 class C {

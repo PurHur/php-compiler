@@ -1,7 +1,7 @@
 <?php
 class User {
     public function __construct(
-        public private(set) string $name,
+        public (private(set)) string $name,
     ) {}
 }
 $u = new User('alice');

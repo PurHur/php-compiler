@@ -1,9 +1,9 @@
 --TEST--
-Language: promoted constructor public private(set) — read OK, write Error (#15368, Zend/zend_compile.c)
+Language: promoted constructor public (private(set)) — read OK, write Error (#15368, Zend/zend_compile.c)
 --FILE--
 <?php
 class D {
-    public function __construct(public private(set) int $x = 1) {}
+    public function __construct(public (private(set)) int $x = 1) {}
 }
 $d = new D();
 echo $d->x, "\n";

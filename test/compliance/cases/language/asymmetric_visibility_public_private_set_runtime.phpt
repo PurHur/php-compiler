@@ -1,9 +1,9 @@
 --TEST--
-Language: public private(set) — read OK, write Error (#15368, Zend/zend_execute.c)
+Language: public (private(set)) — read OK, write Error (#15368, Zend/zend_execute.c)
 --FILE--
 <?php
 class B {
-    public private(set) string $label = 'hi';
+    public (private(set)) string $label = 'hi';
 }
 $b = new B();
 echo $b->label, "\n";

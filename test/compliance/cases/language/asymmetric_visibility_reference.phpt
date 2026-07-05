@@ -3,8 +3,8 @@ PHP 8.4 asymmetric visibility: reference bind and array append follow set visibi
 --FILE--
 <?php
 class C {
-    public private(set) int $x = 1;
-    public private(set) array $arr = [];
+    public (private(set)) int $x = 1;
+    public (private(set)) array $arr = [];
 }
 
 $c = new C();

@@ -16,7 +16,7 @@ class ReflectionReadableReadonly {
 }
 
 class ReflectionReadableAsymmetric {
-    public private(set) int $z = 1;
+    public (private(set)) int $z = 1;
 }
 
 $r = new ReflectionProperty(ReflectionReadablePublic::class, 'x');
@@ -38,7 +38,7 @@ if (!$readonly->isReadable(null) || $readonly->isWritable(null)) {
 
 $asymmetric = new ReflectionProperty(ReflectionReadableAsymmetric::class, 'z');
 if (!$asymmetric->isReadable(null) || $asymmetric->isWritable(null)) {
-    echo 'fail: public private(set) $z expected readable true, writable false from global scope', PHP_EOL;
+    echo 'fail: public (private(set)) $z expected readable true, writable false from global scope', PHP_EOL;
     exit(1);
 }
 

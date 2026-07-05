@@ -1,9 +1,9 @@
 --TEST--
-Language: public private(set) get-only hook write enforcement (#13983, Zend/zend_execute.c)
+Language: public (private(set)) get-only hook write enforcement (#13983, Zend/zend_execute.c)
 --FILE--
 <?php
 class C {
-    public private(set) string $x {
+    public (private(set)) string $x {
         get => 'hi';
     }
 }

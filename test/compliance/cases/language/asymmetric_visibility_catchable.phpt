@@ -3,7 +3,7 @@ Language: asymmetric visibility — catchable Error on illegal external write (#
 --FILE--
 <?php
 class PrivateSet {
-    public private(set) string $name = 'x';
+    public (private(set)) string $name = 'x';
 }
 $p = new PrivateSet();
 try {

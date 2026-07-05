@@ -1,9 +1,9 @@
 --TEST--
-Language: public private(set) read + write enforcement (#12856, Zend/zend_execute.c)
+Language: public (private(set)) read + write enforcement (#12856, Zend/zend_execute.c)
 --FILE--
 <?php
 class C {
-    public private(set) int $x = 1;
+    public (private(set)) int $x = 1;
 }
 $c = new C();
 echo $c->x, "\n";

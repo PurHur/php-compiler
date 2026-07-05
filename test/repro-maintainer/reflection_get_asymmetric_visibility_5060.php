@@ -3,8 +3,8 @@ declare(strict_types=1);
 
 class C
 {
-    public private(set) string $name = 'x';
-    public private(set) static int $sx = 1;
+    public (private(set)) string $name = 'x';
+    public (private(set)) static int $sx = 1;
     public int $plain = 0;
 }
 

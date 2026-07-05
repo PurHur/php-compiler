@@ -413,9 +413,11 @@ final class AsymmetricVisibilityRewriter
 
     private static function lineViolatesMultipleSetModifierRules(string $line): bool
     {
-        // php-src 8.4: duplicate PPP / PPP_SET only; explicit read + different set is valid asymmetric visibility (#15368).
+        // php-src: Zend/zend_compile.c — duplicate PPP / PPP_SET and explicit read before set (#16142, #16195).
+        // Valid asymmetric forms use set-first / parenthesized set, e.g. `(private(set)) public`.
         // Weaker-than-set pairs are rejected later by AsymmetricVisibilityCompileCheck.
-        return self::lineViolatesDuplicateSetModifierRules($line);
+        return self::lineViolatesDuplicateSetModifierRules($line)
+            || self::lineHasExplicitReadPlusSetModifier($line);
     }
 
     /**

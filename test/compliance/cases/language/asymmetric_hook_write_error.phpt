@@ -1,5 +1,5 @@
 --TEST--
-Language: public private(set) get-only property hook write — asymmetric Error not read-only (#9842, zend_property_hooks.c)
+Language: public (private(set)) get-only property hook write — asymmetric Error not read-only (#9842, zend_property_hooks.c)
 --FILE--
 <?php
 class C {
