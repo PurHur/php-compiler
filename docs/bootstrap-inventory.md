@@ -21376,16 +21376,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Compiler/ReadonlyClassCompileCheck.php`
 
 **Warnings** (review for bootstrap subset):
-- new self (line 36)
-- new CompileError (line 117)
-- new CompileError (line 133)
-- new CompileError (line 162)
-- new CompileError (line 180)
-- new CompileError (line 224)
-- new CompileError (line 242)
-- new CompileError (line 247)
-- new CompileError (line 267)
-- new CompileError (line 276)
+- new self (line 37)
+- new CompileError (line 118)
+- new CompileError (line 134)
+- new CompileError (line 163)
+- new CompileError (line 181)
+- new CompileError (line 225)
+- new CompileError (line 243)
+- new CompileError (line 248)
+- new CompileError (line 268)
+- new CompileError (line 277)
 - 23 class method(s)
 
 ### `lib/Compiler/SourceLocation.php`

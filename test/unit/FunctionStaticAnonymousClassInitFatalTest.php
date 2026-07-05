@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace PHPCompiler\Test\Unit;
 
+use PHPCompiler\Ast\ReadonlyAnonymousClassSyntax;
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
@@ -27,7 +29,20 @@ final class FunctionStaticAnonymousClassInitFatalTest extends TestCase
     {
         yield 'named function' => ['<?php function f() { static $x = new class {}; }'];
         yield 'closure' => ['<?php function() { static $x = new class {}; };'];
-        yield 'readonly anonymous class' => ['<?php function f() { static $x = new readonly class {}; }'];
+    }
+
+    public function testReadonlyStaticAnonymousInitRejectedOnReferenceProfile(): void
+    {
+        if (CompilerVersion::supportsReadonlyAnonymousClass()) {
+            $this->markTestSkipped('new readonly class enabled on PHP 8.3+ forward profile');
+        }
+        $runtime = new Runtime();
+        $this->expectException(\PHPCompiler\Compiler\CompileFatal::class);
+        $this->expectExceptionMessage(ReadonlyAnonymousClassSyntax::REFERENCE_PROFILE_UNEXPECTED_READONLY);
+        $runtime->parseAndCompile(
+            '<?php function f() { static $x = new readonly class {}; }',
+            'static_readonly_anonymous_class_init.php'
+        );
     }
 
     public function testLegalStaticNamedClassInitStillCompiles(): void

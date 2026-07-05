@@ -9,6 +9,7 @@ use PHPCfg\Op\Expr\Param;
 use PHPCfg\Operand;
 use PHPCfg\Script;
 use PHPCompiler\Ast\AsymmetricVisibilityRewriter;
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\MethodVisibility;
 use PHPCompiler\VM\ClassReadonly;
 
@@ -204,8 +205,8 @@ final class ReadonlyClassCompileCheck
 
     private function verifyNoPropertyDefaults(Op\Stmt\Class_ $class, string $classDisplay, bool $classReadonly): void
     {
-        // php-src ZEND_ACC_ANON_READONLY: per-property readonly on anonymous classes (#6724).
-        if ($this->isAnonymousClass($class->name)) {
+        // php-src ZEND_ACC_ANON_READONLY: per-property readonly on anonymous classes (#6724, PHP 8.3+).
+        if ($this->isAnonymousClass($class->name) && CompilerVersion::supportsReadonlyAnonymousClass()) {
             return;
         }
 
