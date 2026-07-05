@@ -4,7 +4,7 @@ PHP 8.4 asymmetric visibility on interface properties: JIT (#4876)
 --FILE--
 <?php
 interface I {
-    public private(set) string $slug;
+    public (private(set)) string $slug;
 }
 class C implements I {
     public string $slug = 'b';

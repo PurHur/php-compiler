@@ -1,9 +1,9 @@
 --TEST--
-Language: public protected(set) parses and enforces set visibility (#9310, zend_compile.c)
+Language: public (protected(set)) parses and enforces set visibility (#9310, zend_compile.c)
 --FILE--
 <?php
 class A {
-    public protected(set) string $x = 'ok';
+    public (protected(set)) string $x = 'ok';
 
     public function setX(string $v): void {
         $this->x = $v;

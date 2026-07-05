@@ -1,10 +1,10 @@
 --TEST--
-PHP 8.4 asymmetric visibility: JIT read + catchable Error on public private(set) write (#4020)
+PHP 8.4 asymmetric visibility: JIT read + catchable Error on public (private(set)) write (#4020)
 --JIT--
 --FILE--
 <?php
 class Demo {
-    public private(set) string $name = 'x';
+    public (private(set)) string $name = 'x';
 }
 $d = new Demo();
 echo $d->name, "\n";

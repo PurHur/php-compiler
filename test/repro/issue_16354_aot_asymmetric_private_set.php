@@ -1,6 +1,6 @@
 <?php
 class C {
-    public private(set) int $x = 1;
+    public (private(set)) int $x = 1;
     public function bump(): void {
         $this->x++;
     }

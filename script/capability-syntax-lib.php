@@ -830,7 +830,7 @@ function syntaxRowDefinitions(): array
                 'php-src: Zend/zend_compile.c ZEND_ACC_*_SET; AsymmetricVisibilityGuard + AsymmetricVisibilityJitCompileTest (#4020)',
                 'AOT: native typed property fetch/store + write guard (#16354); asymmetric_visibility_public_private_set_int.phpt',
             ],
-            'probe' => 'class D { public private(set) string $n = "x"; } $d = new D(); echo $d->n; try { $d->n = "y"; } catch (Error $e) {}',
+            'probe' => 'class D { public (private(set)) string $n = "x"; } $d = new D(); echo $d->n; try { $d->n = "y"; } catch (Error $e) {}',
         ],
         [
             'id' => 'class_destruct',

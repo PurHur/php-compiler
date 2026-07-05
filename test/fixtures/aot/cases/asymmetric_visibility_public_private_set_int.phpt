@@ -1,9 +1,9 @@
 --TEST--
-AOT: public private(set) int — read + catchable write guard (#16354, Zend/zend_object_handlers.c)
+AOT: public (private(set)) int — read + catchable write guard (#16354, Zend/zend_object_handlers.c)
 --FILE--
 <?php
 class C {
-    public private(set) int $x = 1;
+    public (private(set)) int $x = 1;
     public function bump(): void {
         $this->x++;
     }

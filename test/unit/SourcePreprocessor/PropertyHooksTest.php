@@ -404,14 +404,14 @@ PHP;
         $src = <<<'PHP'
 <?php
 class C {
-    public private(set) string $x {
+    public (private(set)) string $x {
         get => 'hi';
     }
 }
 PHP;
         [$out, $registry] = (new PropertyHooks())->process($src);
         self::assertStringNotContainsString('$x {', $out);
-        self::assertStringContainsString('public private(set) string $x;', $out);
+        self::assertStringContainsString('public (private(set)) string $x;', $out);
         self::assertStringContainsString('function __phpc_property_get_x', $out);
         self::assertArrayHasKey('get', $registry['c']['x'] ?? []);
         self::assertArrayNotHasKey('set', $registry['c']['x'] ?? []);
@@ -424,7 +424,7 @@ PHP;
         $src = <<<'PHP'
 <?php
 class C {
-    public private(set) string $x {
+    public (private(set)) string $x {
         get;
     }
 }
@@ -441,7 +441,7 @@ PHP;
         $src = <<<'PHP'
 <?php
 class C {
-    public private(set) string $x {
+    public (private(set)) string $x {
         get;
         private set;
     }
@@ -449,7 +449,7 @@ class C {
 PHP;
         [$out] = (new PropertyHooks())->process($src);
         self::assertStringNotContainsString('$x {', $out);
-        self::assertStringContainsString('public private(set) string $x;', $out);
+        self::assertStringContainsString('public (private(set)) string $x;', $out);
     }
 
     /** @covers issue #9872 — PHP 8.4 `private(set);` inside property hook block */
@@ -681,7 +681,7 @@ PHP;
         $src = <<<'PHP'
 <?php
 class D {
-    public function __construct(public private(set) int $x = 1) {}
+    public function __construct(public (private(set)) int $x = 1) {}
 }
 $d = new D();
 echo $d->x, "\n";

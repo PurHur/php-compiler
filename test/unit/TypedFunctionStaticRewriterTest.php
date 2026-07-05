@@ -38,12 +38,12 @@ PHP;
         $src = <<<'PHP'
 <?php
 class C {
-    public private(set) static int $sx = 1;
+    public (private(set)) static int $sx = 1;
 }
 PHP;
         $out = TypedFunctionStaticRewriter::rewrite($src);
         self::assertStringNotContainsString('phpc-typed-function-static', $out);
-        self::assertStringContainsString('public private(set) static int $sx', preg_replace('/\s+/', ' ', $out));
+        self::assertStringContainsString('public (private(set)) static int $sx', preg_replace('/\s+/', ' ', $out));
     }
 
     public function testRewritesTypedFunctionStaticInsideClassMethod(): void

@@ -1,5 +1,5 @@
 --TEST--
-Language: property hook block public private(set) asymmetric visibility (#9872, Zend/zend_compile.c)
+Language: property hook block public (private(set)) asymmetric visibility (#9872, Zend/zend_compile.c)
 --FILE--
 <?php
 class C {

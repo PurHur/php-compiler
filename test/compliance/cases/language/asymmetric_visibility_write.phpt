@@ -3,7 +3,7 @@ PHP 8.4 asymmetric visibility: write scope Error parity (#5635, zend_object_hand
 --FILE--
 <?php
 class PrivateSet {
-    public private(set) string $name = 'x';
+    public (private(set)) string $name = 'x';
 
     public function mutate(): void {
         $this->name = 'y';
@@ -11,7 +11,7 @@ class PrivateSet {
 }
 
 class ProtectedSet {
-    public protected(set) string $tag = 'a';
+    public (protected(set)) string $tag = 'a';
 
     public function mutate(): void {
         $this->tag = 'b';

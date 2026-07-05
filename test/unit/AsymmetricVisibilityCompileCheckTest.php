@@ -51,7 +51,7 @@ PHP,
             <<<'PHP'
 <?php
 class C {
-    public private(set) $x = 1;
+    public (private(set)) $x = 1;
 }
 PHP,
             'must have type'
@@ -64,7 +64,7 @@ PHP,
         $block = $runtime->parseAndCompile(<<<'PHP'
 <?php
 class Demo {
-    public private(set) string $name = 'a';
+    public (private(set)) string $name = 'a';
 }
 PHP, 'asymmetric_public_private_set.php');
         $this->assertNotNull($block);
@@ -77,7 +77,7 @@ PHP, 'asymmetric_public_private_set.php');
 <?php
 class User {
     public function __construct(
-        public private(set) string $name,
+        public (private(set)) string $name,
     ) {}
 }
 PHP, 'asymmetric_promoted_public_private_set.php');
@@ -90,10 +90,30 @@ PHP, 'asymmetric_promoted_public_private_set.php');
         $block = $runtime->parseAndCompile(<<<'PHP'
 <?php
 class D {
-    public function __construct(public private(set) int $x = 1) {}
+    public function __construct(public (private(set)) int $x = 1) {}
 }
 PHP, 'asymmetric_promoted_single_line.php');
         $this->assertNotNull($block);
+    }
+
+    public function testPromotedExplicitReadBeforePrivateSetRejects(): void
+    {
+        $this->expectCompileError(<<<'PHP'
+<?php
+class D {
+    public function __construct(public private(set) int $x = 1) {}
+}
+PHP, AsymmetricVisibilityCompileCheck::MULTIPLE_MODIFIERS_MESSAGE);
+    }
+
+    public function testExplicitReadBeforePrivateSetRejects(): void
+    {
+        $this->expectCompileError(<<<'PHP'
+<?php
+class Demo {
+    public private(set) string $name = 'a';
+}
+PHP, AsymmetricVisibilityCompileCheck::MULTIPLE_MODIFIERS_MESSAGE);
     }
 
     public function testValidPrivateSetStillCompiles(): void
@@ -102,7 +122,7 @@ PHP, 'asymmetric_promoted_single_line.php');
         $block = $runtime->parseAndCompile(<<<'PHP'
 <?php
 class Demo {
-    public private(set) string $name = 'a';
+    public (private(set)) string $name = 'a';
 }
 PHP, 'asymmetric_ok.php');
         $this->assertNotNull($block);
@@ -115,7 +135,7 @@ PHP, 'asymmetric_ok.php');
             $runtime->parseAndCompile(<<<'PHP'
 <?php
 class C {
-    public private(set) static int $x = 1;
+    public (private(set)) static int $x = 1;
 }
 PHP, 'static_asymmetric_reject.php');
             $this->fail('Expected compile failure');

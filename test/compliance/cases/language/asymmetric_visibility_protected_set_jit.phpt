@@ -1,10 +1,10 @@
 --TEST--
-Language: public protected(set) JIT read + catchable Error on write (#9310)
+Language: public (protected(set)) JIT read + catchable Error on write (#9310)
 --JIT--
 --FILE--
 <?php
 class A {
-    public protected(set) string $x = 'ok';
+    public (protected(set)) string $x = 'ok';
 }
 $a = new A();
 echo $a->x, "\n";
