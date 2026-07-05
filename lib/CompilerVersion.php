@@ -590,16 +590,7 @@ final class CompilerVersion
      */
     public static function supportsPropertyHooks(): bool
     {
-        if (version_compare(self::languageProfileVersion(), '8.4.0', '>=')) {
-            return true;
-        }
-        $raw = getenv('PHP_COMPILER_PROFILE');
-        if (\is_string($raw) && '' !== trim($raw)) {
-            return false;
-        }
-
-        return self::MAJOR_VERSION > 8
-            || (self::MAJOR_VERSION === 8 && self::MINOR_VERSION >= 4);
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
     }
 
     /**
