@@ -56,6 +56,12 @@ final class BuiltinByRefParamsTest extends TestCase
         $this->assertSame([1], BuiltinByRefParams::forFunction('openssl_random_pseudo_bytes'));
     }
 
+    public function testOpensslSignSignatureArgument(): void
+    {
+        $this->assertSame([1], BuiltinByRefParams::forFunction('openssl_sign'));
+        $this->assertSame([1], BuiltinByRefParams::forFunction('OPENSSL_SIGN'));
+    }
+
     public function testIsCallableThirdArgument(): void
     {
         $this->assertSame([2], BuiltinByRefParams::forFunction('is_callable'));
