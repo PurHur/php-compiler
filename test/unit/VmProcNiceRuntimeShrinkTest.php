@@ -38,4 +38,13 @@ final class VmProcNiceRuntimeShrinkTest extends TestCase
             }
         }
     }
+
+    public function testProcNiceLargePositiveIncrementClampsLikeLibc(): void
+    {
+        if (!VmProcNicePure::available()) {
+            $this->markTestSkipped('/proc/self/autogroup unavailable');
+        }
+
+        $this->assertTrue(VmProcNicePure::proc_nice(999999));
+    }
 }
