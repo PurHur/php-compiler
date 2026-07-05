@@ -155,6 +155,42 @@ final class VmStreamMeta
         return true;
     }
 
+    /** stream_supports(..., 'read') — php-src read op probe (PHP 8.4, issue #16329). */
+    public static function supportsRead(string $uri, string $mode): bool
+    {
+        $lower = \strtolower($uri);
+        if ('php://output' === $lower) {
+            return false;
+        }
+
+        return self::modeAllowsRead($mode);
+    }
+
+    /** stream_supports(..., 'write') — php-src write op probe (PHP 8.4, issue #16329). */
+    public static function supportsWrite(string $uri, string $mode): bool
+    {
+        $lower = \strtolower($uri);
+        if (\str_starts_with($lower, 'php://input') || 'php://stdin' === $lower) {
+            return false;
+        }
+
+        return self::modeAllowsWrite($mode);
+    }
+
+    private static function modeAllowsRead(string $mode): bool
+    {
+        $stripped = \strtr(\strtolower($mode), ['b' => '', 't' => '']);
+
+        return \str_contains($stripped, 'r') || \str_contains($stripped, '+') || \str_contains($stripped, 'a');
+    }
+
+    private static function modeAllowsWrite(string $mode): bool
+    {
+        $stripped = \strtr(\strtolower($mode), ['b' => '', 't' => '']);
+
+        return \str_contains($stripped, 'w') || \str_contains($stripped, '+') || \str_contains($stripped, 'a');
+    }
+
     public static function supportsMetadata(string $uri): bool
     {
         if (\str_starts_with($uri, 'php://')) {

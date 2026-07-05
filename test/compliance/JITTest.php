@@ -250,6 +250,7 @@ class JITTest extends BaseTest {
             if (!CompilerVersion::supportsStreamSupports()
                 && (str_contains($name, 'stream_supports.phpt')
                     || str_contains($name, 'stream_support_constants')
+                    || str_contains($name, 'stream_supports_string_feature')
                     || str_contains($name, 'stream_meta_seekable'))
                 && !str_contains($name, 'stream_supports_phantom')) {
                 continue;

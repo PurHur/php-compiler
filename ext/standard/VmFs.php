@@ -1502,6 +1502,10 @@ final class VmFs
                 return self::streamSupportsSeekable($handle);
             case VmStreamSupports::STREAM_SUPPORT_TELL:
                 return self::streamSupportsTell($handle);
+            case VmStreamSupports::STREAM_SUPPORT_READ:
+                return self::streamSupportsRead($handle);
+            case VmStreamSupports::STREAM_SUPPORT_WRITE:
+                return self::streamSupportsWrite($handle);
             case VmStreamSupports::STREAM_META_TOUCH:
             case VmStreamSupports::STREAM_META_OWNER_NAME:
             case VmStreamSupports::STREAM_META_OWNER:
@@ -1527,6 +1531,30 @@ final class VmFs
     private static function streamSupportsTell(int $handle): bool
     {
         return VmStreamMeta::supportsTell(self::handleUri($handle));
+    }
+
+    private static function streamSupportsRead(int $handle): bool
+    {
+        if (!self::isValidHandle($handle)) {
+            return false;
+        }
+
+        return VmStreamMeta::supportsRead(
+            self::handleUri($handle),
+            self::handleMode($handle) ?? 'rb'
+        );
+    }
+
+    private static function streamSupportsWrite(int $handle): bool
+    {
+        if (!self::isValidHandle($handle)) {
+            return false;
+        }
+
+        return VmStreamMeta::supportsWrite(
+            self::handleUri($handle),
+            self::handleMode($handle) ?? 'wb'
+        );
     }
 
     private static function streamSupportsMetadata(int $handle): bool
