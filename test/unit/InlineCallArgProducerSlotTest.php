@@ -719,6 +719,51 @@ PHP;
         self::assertSame("array (\n  1 => 'b',\n)", ob_get_clean());
     }
 
+    /** Issue #16300 — array_udiff(array_keys(), array_keys(), 'strcmp') wires distinct sibling slots. */
+    public function testArrayUdiffDualInlineArrayKeysUsesDistinctProducerSlots(): void
+    {
+        $code = <<<'PHP'
+<?php
+array_udiff(array_keys(['a' => 1, 'b' => 2]), array_keys(['a' => 9]), 'strcmp');
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'array_udiff_inline_array_keys.php');
+
+        $returnSlots = [];
+        $sendSlots = [];
+        $fcallOrdinal = 0;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                ++$fcallOrdinal;
+                if (3 === $fcallOrdinal) {
+                    $sendSlots = [];
+                }
+            }
+            if (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
+                $returnSlots[] = $op->arg1;
+            }
+            if (3 === $fcallOrdinal && OpCode::TYPE_ARG_SEND === $op->type) {
+                $sendSlots[] = $op->arg1;
+            }
+        }
+
+        self::assertCount(3, $sendSlots, 'arg sends='.json_encode($sendSlots));
+        self::assertNotSame($sendSlots[0], $sendSlots[1], 'arg sends='.json_encode($sendSlots));
+        self::assertContains($sendSlots[0], $returnSlots, 'fcall returns='.json_encode($returnSlots));
+        self::assertContains($sendSlots[1], $returnSlots, 'fcall returns='.json_encode($returnSlots));
+    }
+
+    /** Issue #16300 — array_udiff(array_keys(), array_keys(), 'strcmp') runtime parity with Zend. */
+    public function testArrayUdiffDualInlineArrayKeysRuntime(): void
+    {
+        $code = file_get_contents(dirname(__DIR__).'/repro/maintainer_gap_array_udiff_inline_array_keys.php');
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'maintainer_gap_array_udiff_inline_array_keys.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("ok\n", ob_get_clean());
+    }
+
     /** Issue #10918 — sibling str_repeat() producers map to distinct similar_text() arg slots. */
     public function testSimilarTextDualStrRepeatUsesDistinctProducerSlots(): void
     {
