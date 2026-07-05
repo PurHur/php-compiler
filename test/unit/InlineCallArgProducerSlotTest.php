@@ -1723,6 +1723,52 @@ PHP;
         );
     }
 
+    /** Issue #9971 / #16560 — array_pad([1], Len::Two, 0) wires haystack Array_ + length ClassConstFetch. */
+    public function testArrayPadInlineArrayEnumLengthTypeErrorRuntime(): void
+    {
+        $code = <<<'PHP'
+<?php
+enum Len: int { case Two = 2; }
+try {
+    array_pad([1], Len::Two, 0);
+    echo "uncaught\n";
+} catch (TypeError $e) {
+    echo $e->getMessage(), "\n";
+}
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'array_pad_enum_length.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame(
+            "array_pad(): Argument #2 (\$length) must be of type int, Len given\n",
+            ob_get_clean()
+        );
+    }
+
+    /** Issue #9971 / #16560 — array_chunk([1,2,3], Len::Two) wires haystack Array_ + length ClassConstFetch. */
+    public function testArrayChunkInlineArrayEnumLengthTypeErrorRuntime(): void
+    {
+        $code = <<<'PHP'
+<?php
+enum Len: int { case Two = 2; }
+try {
+    array_chunk([1, 2, 3], Len::Two);
+    echo "uncaught\n";
+} catch (TypeError $e) {
+    echo $e->getMessage(), "\n";
+}
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'array_chunk_enum_length.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame(
+            "array_chunk(): Argument #2 (\$length) must be of type int, Len given\n",
+            ob_get_clean()
+        );
+    }
+
     /** Issue #16316 / #8886 — inline [int, enum] haystack must keep scalar before enum case. */
     public function testArraySearchStrictMixedHaystackInlineLiteralRuntime(): void
     {

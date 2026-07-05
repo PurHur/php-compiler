@@ -27434,6 +27434,13 @@ class Compiler {
         if (\count($cfgCallOp->args) < 3) {
             return null;
         }
+        // array_pad([1], Len::Two, 0) — ClassConstFetch is length, not pad value (#16560).
+        if (
+            $this->callArgIsDeadInlineTemporary($cfgCallOp->args[1] ?? null)
+            && !$this->callArgIsDeadInlineTemporary($cfgCallOp->args[2] ?? null)
+        ) {
+            return null;
+        }
         $haystackArg = $cfgCallOp->args[0] ?? null;
         if (!$this->callArgIsDeadInlineTemporary($haystackArg)) {
             return null;
@@ -27473,6 +27480,172 @@ class Compiler {
             $valueSlot = match ((int) $argIndex) {
                 0 => (string) $haystackSlot,
                 2 => (string) $padValueSlot,
+                default => null,
+            };
+            $literalProbe = $cfgCallOp->args[(int) $argIndex] ?? $arg;
+            if (null === $valueSlot && $this->isEmbeddedCallLiteralArg($literalProbe)) {
+                $valueSlot = (string) $this->freshLiteralConstantSlot($literalProbe, $block);
+            }
+            if (null === $valueSlot) {
+                $valueSlot = $this->compileOperand($arg, $block, true);
+            }
+            $sends[] = new OpCode(
+                OpCode::TYPE_ARG_SEND,
+                $valueSlot,
+                $this->callArgNameSlot($arg, $block),
+                $this->callArgUnpack($arg) ? 1 : null
+            );
+        }
+
+        return array_merge($producerOps, $sends);
+    }
+
+    /**
+     * array_chunk([1, 2, 3], Len::Two) — inline Array_ haystack + ClassConstFetch length (#9971, #16560).
+     *
+     * @param list<Operand|null> $args
+     *
+     * @return list<OpCode>|null
+     */
+    private function compileArrayChunkInlineArrayClassConstArgSends(
+        array $args,
+        Block $block,
+        Op $cfgCallOp
+    ): ?array {
+        if (null === $block->orig || !\is_array($cfgCallOp->args ?? null)) {
+            return null;
+        }
+        if ('array_chunk' !== $this->resolveCfgFuncCallName($cfgCallOp)) {
+            return null;
+        }
+        if (2 !== \count($cfgCallOp->args)) {
+            return null;
+        }
+        $haystackArg = $cfgCallOp->args[0] ?? null;
+        $lengthArg = $cfgCallOp->args[1] ?? null;
+        if (!$this->callArgIsDeadInlineTemporary($haystackArg) || !$this->callArgIsDeadInlineTemporary($lengthArg)) {
+            return null;
+        }
+        $producers = $this->precedingInlineCallArgProducersBeforeCfgOp($block->orig->children, $cfgCallOp);
+        $arrayProducer = null;
+        $lengthProducer = null;
+        foreach ($producers as $producer) {
+            if ($producer instanceof Op\Expr\Array_) {
+                $arrayProducer = $producer;
+            } elseif ($producer instanceof Op\Expr\ClassConstFetch) {
+                $lengthProducer = $producer;
+            }
+        }
+        if (null === $arrayProducer || null === $lengthProducer) {
+            return null;
+        }
+        $producerOps = [];
+        foreach ($this->compileArrayLiteral($arrayProducer, $block) as $op) {
+            $producerOps[] = $op;
+        }
+        $haystackSlot = $this->slotForInitArrayOrdinal($block, 0, $producerOps);
+        if (null === $haystackSlot) {
+            return null;
+        }
+        if (null === $block->slotForOperand($lengthProducer->result)) {
+            foreach ($this->compileExpr($lengthProducer, $block) as $op) {
+                $producerOps[] = $op;
+            }
+        }
+        $lengthSlot = $block->slotForOperand($lengthProducer->result);
+        if (null === $lengthSlot) {
+            return null;
+        }
+        $sends = [];
+        foreach ($args as $argIndex => $arg) {
+            $valueSlot = match ((int) $argIndex) {
+                0 => (string) $haystackSlot,
+                1 => (string) $lengthSlot,
+                default => null,
+            };
+            $literalProbe = $cfgCallOp->args[(int) $argIndex] ?? $arg;
+            if (null === $valueSlot && $this->isEmbeddedCallLiteralArg($literalProbe)) {
+                $valueSlot = (string) $this->freshLiteralConstantSlot($literalProbe, $block);
+            }
+            if (null === $valueSlot) {
+                $valueSlot = $this->compileOperand($arg, $block, true);
+            }
+            $sends[] = new OpCode(
+                OpCode::TYPE_ARG_SEND,
+                $valueSlot,
+                $this->callArgNameSlot($arg, $block),
+                $this->callArgUnpack($arg) ? 1 : null
+            );
+        }
+
+        return array_merge($producerOps, $sends);
+    }
+
+    /**
+     * array_pad([1], Len::Two, 0) — inline Array_ haystack + ClassConstFetch length (#9971, #16560).
+     *
+     * @param list<Operand|null> $args
+     *
+     * @return list<OpCode>|null
+     */
+    private function compileArrayPadInlineArrayClassConstLengthCallArgSends(
+        array $args,
+        Block $block,
+        Op $cfgCallOp
+    ): ?array {
+        if (null === $block->orig || !\is_array($cfgCallOp->args ?? null)) {
+            return null;
+        }
+        if ('array_pad' !== $this->resolveCfgFuncCallName($cfgCallOp)) {
+            return null;
+        }
+        if (3 !== \count($cfgCallOp->args)) {
+            return null;
+        }
+        $haystackArg = $cfgCallOp->args[0] ?? null;
+        $lengthArg = $cfgCallOp->args[1] ?? null;
+        if (
+            !$this->callArgIsDeadInlineTemporary($haystackArg)
+            || !$this->callArgIsDeadInlineTemporary($lengthArg)
+            || $this->callArgIsDeadInlineTemporary($cfgCallOp->args[2] ?? null)
+        ) {
+            return null;
+        }
+        $producers = $this->precedingInlineCallArgProducersBeforeCfgOp($block->orig->children, $cfgCallOp);
+        $arrayProducer = null;
+        $lengthProducer = null;
+        foreach ($producers as $producer) {
+            if ($producer instanceof Op\Expr\Array_) {
+                $arrayProducer = $producer;
+            } elseif ($producer instanceof Op\Expr\ClassConstFetch) {
+                $lengthProducer = $producer;
+            }
+        }
+        if (null === $arrayProducer || null === $lengthProducer) {
+            return null;
+        }
+        $producerOps = [];
+        foreach ($this->compileArrayLiteral($arrayProducer, $block) as $op) {
+            $producerOps[] = $op;
+        }
+        $haystackSlot = $this->slotForInitArrayOrdinal($block, 0, $producerOps);
+        if (null === $haystackSlot) {
+            return null;
+        }
+        if (null === $block->slotForOperand($lengthProducer->result)) {
+            foreach ($this->compileExpr($lengthProducer, $block) as $op) {
+                $producerOps[] = $op;
+            }
+        }
+        $lengthSlot = $block->slotForOperand($lengthProducer->result);
+        if (null === $lengthSlot) {
+            return null;
+        }
+        $sends = [];
+        foreach ($args as $argIndex => $arg) {
+            $valueSlot = match ((int) $argIndex) {
+                0 => (string) $haystackSlot,
+                1 => (string) $lengthSlot,
                 default => null,
             };
             $literalProbe = $cfgCallOp->args[(int) $argIndex] ?? $arg;
@@ -33773,9 +33946,17 @@ class Compiler {
             if (null !== $arrayChunkSends) {
                 return $arrayChunkSends;
             }
+            $arrayChunkEnumLengthSends = $this->compileArrayChunkInlineArrayClassConstArgSends($args, $block, $cfgCallOp);
+            if (null !== $arrayChunkEnumLengthSends) {
+                return $arrayChunkEnumLengthSends;
+            }
             $arrayPadSends = $this->compileArrayPadInlineHaystackCallArgSends($args, $block, $cfgCallOp);
             if (null !== $arrayPadSends) {
                 return $arrayPadSends;
+            }
+            $arrayPadEnumLengthSends = $this->compileArrayPadInlineArrayClassConstLengthCallArgSends($args, $block, $cfgCallOp);
+            if (null !== $arrayPadEnumLengthSends) {
+                return $arrayPadEnumLengthSends;
             }
             $extractSends = $this->compileExtractInlineMultiArgCallArgSends($args, $block, $cfgCallOp);
             if (null !== $extractSends) {
