@@ -2566,7 +2566,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/Ast/MultiBlockNameResolver.php` | 0 | 3 |
 | `lib/Ast/NewDereferenceableDesugar.php` | 0 | 2 |
 | `lib/Ast/PipeOperatorDesugar.php` | 0 | 1 |
-| `lib/Ast/ReadonlyAnonymousClassSupport.php` | 0 | 1 |
+| `lib/Ast/ReadonlyAnonymousClassSyntax.php` | 0 | 1 |
 | `lib/Ast/SealedClassAnnotator.php` | 0 | 1 |
 | `lib/Ast/SealedClassPreprocessor.php` | 0 | 1 |
 | `lib/Ast/StaticClassAnnotator.php` | 0 | 1 |
@@ -20561,10 +20561,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 22 class method(s)
 
-### `lib/Ast/ReadonlyAnonymousClassSupport.php`
+### `lib/Ast/ReadonlyAnonymousClassSyntax.php`
 
 **Warnings** (review for bootstrap subset):
-- 2 class method(s)
+- 6 class method(s)
 
 ### `lib/Ast/SealedClassAnnotator.php`
 

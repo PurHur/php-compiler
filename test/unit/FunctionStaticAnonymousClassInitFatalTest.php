@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\Test\Unit;
 
-use PHPCompiler\Ast\ReadonlyAnonymousClassSupport;
+use PHPCompiler\Ast\ReadonlyAnonymousClassSyntax;
 use PHPCompiler\CompilerVersion;
 use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
@@ -38,7 +38,7 @@ final class FunctionStaticAnonymousClassInitFatalTest extends TestCase
         }
         $runtime = new Runtime();
         $this->expectException(\PHPCompiler\Compiler\CompileFatal::class);
-        $this->expectExceptionMessage(ReadonlyAnonymousClassSupport::REFERENCE_PROFILE_UNEXPECTED_READONLY);
+        $this->expectExceptionMessage(ReadonlyAnonymousClassSyntax::REFERENCE_PROFILE_UNEXPECTED_READONLY);
         $runtime->parseAndCompile(
             '<?php function f() { static $x = new readonly class {}; }',
             'static_readonly_anonymous_class_init.php'

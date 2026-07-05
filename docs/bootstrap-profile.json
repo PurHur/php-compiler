@@ -2622,7 +2622,7 @@
         "lib/Ast/MultiBlockNameResolver.php",
         "lib/Ast/NewDereferenceableDesugar.php",
         "lib/Ast/PipeOperatorDesugar.php",
-        "lib/Ast/ReadonlyAnonymousClassSupport.php",
+        "lib/Ast/ReadonlyAnonymousClassSyntax.php",
         "lib/Ast/SealedClassAnnotator.php",
         "lib/Ast/SealedClassPreprocessor.php",
         "lib/Ast/StaticClassAnnotator.php",
