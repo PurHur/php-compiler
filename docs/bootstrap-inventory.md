@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 4090 |
-| Phase A inventory files (M2 ratio SSOT) | 4090 |
+| PHP files on vm.php path | 4093 |
+| Phase A inventory files (M2 ratio SSOT) | 4093 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 11029 |
+| Source constructs flagged (warnings) | 11034 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -209,6 +209,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/filter/filter_list.php` | 0 | 1 |
 | `ext/filter/filter_var.php` | 0 | 1 |
 | `ext/filter/filter_var_array.php` | 0 | 1 |
+| `ext/ftp/BuiltinClasses.php` | 0 | 1 |
+| `ext/ftp/Module.php` | 0 | 1 |
+| `ext/ftp/VmFtpConnection.php` | 0 | 2 |
 | `ext/gd/BuiltinClasses.php` | 0 | 2 |
 | `ext/gd/GdExtensionPolicy.php` | 0 | 1 |
 | `ext/gd/GdFunction.php` | 0 | 3 |
@@ -3494,7 +3497,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/ReadonlyAnonymousClassSyntaxRejector.php` | 0 | 2 |
 | `lib/ReadonlyFunctionRejector.php` | 0 | 2 |
 | `lib/ReadonlyMethodModifierRejector.php` | 0 | 2 |
-| `lib/Runtime.php` | 0 | 69 |
+| `lib/Runtime.php` | 0 | 70 |
 | `lib/RuntimeStrictness.php` | 0 | 1 |
 | `lib/SourceBareThrowRewriter.php` | 0 | 1 |
 | `lib/SourcePreprocessor/PropertyHooks.php` | 0 | 4 |
@@ -5341,6 +5344,22 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 3 class method(s)
+
+### `ext/ftp/BuiltinClasses.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/ftp/Module.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s)
+
+### `ext/ftp/VmFtpConnection.php`
+
+**Warnings** (review for bootstrap subset):
+- new ClassEntry (line 25)
+- 1 class method(s)
 
 ### `ext/gd/BuiltinClasses.php`
 
@@ -21325,34 +21344,34 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new OpCode (line 38667)
 - new Operand\Temporary (line 39125)
 - new OpCode (line 39649)
-- new Operand\Literal (line 39954)
-- new Variable (line 39956)
-- new OpCode (line 40002)
-- new OpCode (line 40217)
-- new OpCode (line 40227)
-- new OpCode (line 40230)
-- new Operand\Temporary (line 40268)
-- new OpCode (line 40270)
-- new OpCode (line 40281)
-- new Operand\Temporary (line 40284)
-- new OpCode (line 40286)
-- new OpCode (line 40294)
-- new OpCode (line 40301)
-- new OpCode (line 40309)
-- new OpCode (line 40312)
-- new OpCode (line 40339)
-- new OpCode (line 40362)
-- new OpCode (line 40379)
-- new OpCode (line 40386)
-- new Operand\Literal (line 41065)
-- new OpCode (line 41727)
-- new Literal (line 41759)
-- new OpCode (line 41858)
-- new Variable (line 41865)
-- new Temporary (line 41867)
-- new OpCode (line 41870)
-- new CompileFatal (line 42183)
-- new CompileFatal (line 42438)
+- new Operand\Literal (line 39948)
+- new Variable (line 39950)
+- new OpCode (line 39996)
+- new OpCode (line 40211)
+- new OpCode (line 40221)
+- new OpCode (line 40224)
+- new Operand\Temporary (line 40262)
+- new OpCode (line 40264)
+- new OpCode (line 40275)
+- new Operand\Temporary (line 40278)
+- new OpCode (line 40280)
+- new OpCode (line 40288)
+- new OpCode (line 40295)
+- new OpCode (line 40303)
+- new OpCode (line 40306)
+- new OpCode (line 40333)
+- new OpCode (line 40356)
+- new OpCode (line 40373)
+- new OpCode (line 40380)
+- new Operand\Literal (line 41059)
+- new OpCode (line 41721)
+- new Literal (line 41753)
+- new OpCode (line 41852)
+- new Variable (line 41859)
+- new Temporary (line 41861)
+- new OpCode (line 41864)
+- new CompileFatal (line 42177)
+- new CompileFatal (line 42432)
 - 908 class method(s)
 - 45 closure(s)
 
@@ -21695,7 +21714,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/CompilerVersion.php`
 
 **Warnings** (review for bootstrap subset):
-- 107 class method(s)
+- 108 class method(s)
 
 ### `lib/CurlyBraceOffsetRejector.php`
 
@@ -26982,26 +27001,27 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ext\hash\Module (line 234)
 - new ext\posix\Module (line 235)
 - new ext\sockets\Module (line 236)
-- new ext\ctype\Module (line 237)
-- new ext\tokenizer\Module (line 238)
-- new ext\random\Module (line 239)
-- new ext\igbinary\Module (line 240)
-- new ext\msgpack\Module (line 241)
-- new ext\zstd\Module (line 242)
-- new ext\lzf\Module (line 243)
-- new ext\bz2\Module (line 244)
-- new ext\sodium\Module (line 245)
-- new ext\standard\Module (line 246)
-- new JIT (line 322)
-- new JITContext (line 336)
-- new SealedClassPreprocessor (line 391)
-- new StaticClassPreprocessor (line 394)
-- new SourcePreprocessor\PropertyHooks (line 397)
-- new State (line 521)
-- new ReflectionProperty (line 548)
-- new ReflectionProperty (line 551)
-- new LintCompiler (line 942)
-- new Variable (line 1069)
+- new ext\ftp\Module (line 237)
+- new ext\ctype\Module (line 238)
+- new ext\tokenizer\Module (line 239)
+- new ext\random\Module (line 240)
+- new ext\igbinary\Module (line 241)
+- new ext\msgpack\Module (line 242)
+- new ext\zstd\Module (line 243)
+- new ext\lzf\Module (line 244)
+- new ext\bz2\Module (line 245)
+- new ext\sodium\Module (line 246)
+- new ext\standard\Module (line 247)
+- new JIT (line 323)
+- new JITContext (line 337)
+- new SealedClassPreprocessor (line 392)
+- new StaticClassPreprocessor (line 395)
+- new SourcePreprocessor\PropertyHooks (line 398)
+- new State (line 522)
+- new ReflectionProperty (line 549)
+- new ReflectionProperty (line 552)
+- new LintCompiler (line 943)
+- new Variable (line 1070)
 - 53 class method(s)
 
 ### `lib/RuntimeStrictness.php`
