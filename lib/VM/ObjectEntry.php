@@ -9,6 +9,7 @@
 
 namespace PHPCompiler\VM;
 
+use PHPCompiler\ext\standard\VmReflection;
 use PHPCompiler\Func;
 // Bug in phan: https://github.com/phan/phan/issues/2661
 // @phan-suppress-next-line PhanUnreferencedUseNormal
@@ -347,16 +348,24 @@ class ObjectEntry {
     }
 
     /**
-     * Zend object property internal pointer — key() (ext/standard/array.c; #11196).
+     * Zend object property internal pointer — key() (ext/standard/array.c; #11196, #3312).
      */
-    public function pointerKey(): ?Variable
+    public function pointerKey(?Context $ctx = null): ?Variable
     {
         if (!$this->propertyPointerIsValid()) {
             return null;
         }
         $names = $this->propertyNameList();
+        $name = $names[$this->propertyInternalPointer];
+        $displayName = $name;
+        if (null !== $ctx) {
+            $meta = VmReflection::findClassProperty($this->class, $name, $ctx);
+            if (null !== $meta) {
+                $displayName = VmReflection::manglePropertyKey($meta, $ctx);
+            }
+        }
         $key = new Variable(Variable::TYPE_STRING);
-        $key->string($names[$this->propertyInternalPointer]);
+        $key->string($displayName);
 
         return $key;
     }
