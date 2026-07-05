@@ -81,6 +81,7 @@ final class BuiltinByRefParams
                 return [2];
             case 'openssl_random_pseudo_bytes':
             case 'openssl_sign':
+            case 'openssl_pkey_export':
                 return [1];
             case 'exec':
                 return [1, 2];
