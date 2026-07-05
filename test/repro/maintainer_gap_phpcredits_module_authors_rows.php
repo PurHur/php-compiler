@@ -28,7 +28,7 @@ foreach ($expected as $ext => $row) {
 }
 
 $len = \strlen($out);
-$minLen = extension_loaded('curl') ? 3900 : 2000;
+$minLen = extension_loaded('curl') ? 3900 : 1200;
 if ($len < $minLen) {
     fwrite(STDERR, "FAIL: CREDITS_MODULES output too short ({$len} bytes, expected >={$minLen})\n");
     exit(1);

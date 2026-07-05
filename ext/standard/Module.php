@@ -81,6 +81,7 @@ class Module extends ModuleAbstract
             'CREDITS_DOCS' => VmInfo::CREDITS_DOCS,
             'CREDITS_FULLPAGE' => VmInfo::CREDITS_FULLPAGE,
             'CREDITS_QA' => VmInfo::CREDITS_QA,
+            'CREDITS_WEB' => VmInfo::CREDITS_WEB,
             'CREDITS_ALL' => VmInfo::CREDITS_ALL,
             'PHP_QUERY_RFC1738' => VmHttpBuildQuery::ENCODING_RFC1738,
             'PHP_QUERY_RFC3986' => VmHttpBuildQuery::ENCODING_RFC3986,
