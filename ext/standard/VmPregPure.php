@@ -43,11 +43,18 @@ final class VmPregPure
             return false;
         }
 
+        $normalizedOffset = self::normalizeMatchSubjectOffset($offset, \strlen($subject));
+        if (false === $normalizedOffset) {
+            self::$lastError = StdlibConstants::PREG_INTERNAL_ERROR;
+
+            return false;
+        }
+
         $ovector = self::engineMatch(
             $compiled['ast'],
             $compiled['groupNameToIndex'],
             $subject,
-            $offset,
+            $normalizedOffset,
             $compiled['opts'],
             self::fixedStartMatch($regex, $compiled['opts'])
         );
@@ -98,12 +105,19 @@ final class VmPregPure
             return false;
         }
 
-        $start = $offset;
+        $subjectLen = \strlen($subject);
+        $normalizedOffset = self::normalizeMatchSubjectOffset($offset, $subjectLen);
+        if (false === $normalizedOffset) {
+            self::$lastError = StdlibConstants::PREG_INTERNAL_ERROR;
+
+            return false;
+        }
+
+        $start = $normalizedOffset;
         $count = 0;
         $setOrder = 0 !== ($flags & StdlibConstants::PREG_SET_ORDER);
         $offsetCapture = 0 !== ($flags & StdlibConstants::PREG_OFFSET_CAPTURE);
         $allMatches = [];
-        $subjectLen = \strlen($subject);
         $fixedStart = self::fixedStartMatch($regex, $compiled['opts']);
 
         while ($start <= $subjectLen) {
@@ -113,7 +127,7 @@ final class VmPregPure
                 $subject,
                 $start,
                 $compiled['opts'],
-                $fixedStart && $start === $offset
+                $fixedStart && $start === $normalizedOffset
             );
             if (false === $ovector) {
                 return false;
@@ -513,6 +527,27 @@ final class VmPregPure
         }
 
         return str_starts_with($regex, '^');
+    }
+
+    /**
+     * php-src ext/pcre/php_pcre.c — negative $offset counts from end of subject.
+     *
+     * @return int|false normalized byte offset, or false when offset > subject length
+     */
+    private static function normalizeMatchSubjectOffset(int $offset, int $subjectLen): int|false
+    {
+        if ($offset < 0) {
+            if (-$offset <= $subjectLen) {
+                $offset = $subjectLen + $offset;
+            } else {
+                $offset = 0;
+            }
+        }
+        if ($offset > $subjectLen) {
+            return false;
+        }
+
+        return $offset;
     }
 
     /**
