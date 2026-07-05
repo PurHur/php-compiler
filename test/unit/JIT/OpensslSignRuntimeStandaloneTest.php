@@ -5,22 +5,24 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT;
 
 use PHPCompiler\JIT\Builtin\OpensslSignCrypto;
+use PHPCompiler\JIT\Builtin\OpensslSignRuntime;
 use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Issue #3324: openssl_sign/verify LLVM ABI + lib/AOT/runtime/openssl_ev.c.
+ * Issue #16454: openssl_sign/verify LLVM ABI — lib/JIT/Builtin/runtime/openssl_ev.c (not lib/AOT/runtime/).
  *
  * @group aot-lint
  */
 final class OpensslSignRuntimeStandaloneTest extends TestCase
 {
-    public function testRuntimeUsesThinLibcryptoC(): void
+    public function testRuntimeEvCUnderJitBuiltinNotAotRuntime(): void
     {
-        $this->assertFileExists(__DIR__.'/../../../lib/AOT/runtime/openssl_ev.c');
+        $this->assertFileDoesNotExist(__DIR__.'/../../../lib/AOT/runtime/openssl_ev.c');
+        $this->assertFileExists(__DIR__.'/../../../lib/JIT/Builtin/runtime/openssl_ev.c');
         $linker = (string) file_get_contents(__DIR__.'/../../../lib/AOT/Linker.php');
-        $this->assertStringContainsString('openssl_ev.c', $linker);
-        $this->assertStringContainsString('-lcrypto', $linker);
+        $this->assertStringNotContainsString("'/runtime/openssl_ev.c'", $linker);
+        $this->assertStringContainsString('OpensslSignRuntime::opensslEvRuntimeSources', $linker);
     }
 
     /**
@@ -39,5 +41,13 @@ final class OpensslSignRuntimeStandaloneTest extends TestCase
             $fn = $ctx->lookupFunction($name);
             $this->assertNotNull($fn, $name);
         }
+    }
+
+    public function testOpensslEvRuntimeSourcesEmptyWithoutHeaders(): void
+    {
+        if (OpensslSignRuntime::opensslEvRuntimeAvailable()) {
+            $this->markTestSkipped('libssl-dev headers present');
+        }
+        $this->assertSame([], OpensslSignRuntime::opensslEvRuntimeSources());
     }
 }

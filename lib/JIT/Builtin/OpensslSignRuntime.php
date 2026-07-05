@@ -8,13 +8,17 @@ use PHPCompiler\JIT\Context;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for openssl_sign()/openssl_verify() (#3324).
+ * JIT/AOT link for openssl_sign()/openssl_verify() (#3324, #16454).
  *
- * When libssl-dev is present, lib/AOT/runtime/openssl_ev.c satisfies the ABI at
- * link time. Otherwise LLVM stub bridges return failure (sign=null, verify=-1).
+ * When libssl-dev headers are present, lib/JIT/Builtin/runtime/openssl_ev.c satisfies the ABI at
+ * link time (moved out of lib/AOT/runtime/). Otherwise LLVM stub bridges return failure.
+ *
+ * php-src: ext/openssl/openssl.c
  */
 final class OpensslSignRuntime
 {
+    private const OPENSSL_EV_C = __DIR__.'/runtime/openssl_ev.c';
+
     /** @var list<string> */
     private const RUNTIME_FUNCTIONS = [
         '__compiler_openssl_sign',
@@ -30,6 +34,16 @@ final class OpensslSignRuntime
         }
 
         return false;
+    }
+
+    /** @return list<string> */
+    public static function opensslEvRuntimeSources(): array
+    {
+        if (!self::opensslEvRuntimeAvailable() || !is_file(self::OPENSSL_EV_C)) {
+            return [];
+        }
+
+        return [self::OPENSSL_EV_C];
     }
 
     public static function ensureLinked(Context $context): void
