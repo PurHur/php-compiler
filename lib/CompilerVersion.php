@@ -283,7 +283,12 @@ final class CompilerVersion
             return false;
         }
 
-        return version_compare(self::languageProfileVersion(), '8.3.0', '>=');
+        $profile = self::languageProfileVersion();
+        if (version_compare($profile, '8.4.0', '>=')) {
+            return false;
+        }
+
+        return version_compare($profile, '8.3.0', '>=');
     }
 
     /**
