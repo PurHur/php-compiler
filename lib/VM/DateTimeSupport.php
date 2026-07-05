@@ -461,6 +461,18 @@ final class DateTimeSupport
         ];
     }
 
+    /** php-src ext/date/php_date.c — date_create() failure populates getLastErrors() without E_WARNING (#16488). */
+    private static function recordDateTimeParseFailure(string $time): void
+    {
+        $components = VmDateTimeNative::parseDate($time);
+        self::$createFromFormatLastErrors = [
+            'warning_count' => $components['warning_count'],
+            'warnings' => $components['warnings'],
+            'error_count' => $components['error_count'],
+            'errors' => $components['errors'],
+        ];
+    }
+
     private static function clearCreateFromFormatLastErrors(): void
     {
         self::$createFromFormatLastErrors = false;
@@ -484,6 +496,8 @@ final class DateTimeSupport
             VmDateTimeNative::validateTimezoneId($tzName);
             $parsed = VmDateTimeNative::parseDateTime($time, $tzName);
         } catch (NativeDateInvalidTimeZoneException|NativeDateMalformedStringException) {
+            self::recordDateTimeParseFailure($time);
+
             return null;
         }
         self::applyParsedState($entry, $parsed, $tzName);
