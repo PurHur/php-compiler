@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 4065 |
-| Phase A inventory files (M2 ratio SSOT) | 4065 |
+| PHP files on vm.php path | 4066 |
+| Phase A inventory files (M2 ratio SSOT) | 4066 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 10963 |
+| Source constructs flagged (warnings) | 10964 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1462,6 +1462,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VmFilestatArg.php` | 0 | 2 |
 | `ext/standard/VmFilestatFailure.php` | 0 | 1 |
 | `ext/standard/VmFloatDtoa.php` | 0 | 1 |
+| `ext/standard/VmFlockOperation.php` | 0 | 1 |
 | `ext/standard/VmFminMax.php` | 0 | 2 |
 | `ext/standard/VmFnmatch.php` | 0 | 1 |
 | `ext/standard/VmFnmatchPure.php` | 0 | 1 |
@@ -9663,7 +9664,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitFlock.php`
 
 **Warnings** (review for bootstrap subset):
-- 1 class method(s)
+- 4 class method(s)
 
 ### `ext/standard/JitFlush.php`
 
@@ -13867,6 +13868,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 23 class method(s)
+
+### `ext/standard/VmFlockOperation.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
 
 ### `ext/standard/VmFminMax.php`
 
