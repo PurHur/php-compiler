@@ -105,6 +105,8 @@ final class RegexIteratorBuiltin
 
         $entry->isInternal = true;
         $ctx->classes[self::CLASS_LC] = $entry;
+
+        RecursiveRegexIteratorBuiltin::registerClass($ctx);
     }
 
     private static function classIsComplete(ClassEntry $entry): bool
@@ -769,5 +771,195 @@ final class RegexIteratorSetPregFlags extends VmClassMethod
         if (null !== $frame->returnVar) {
             $frame->returnVar->null();
         }
+    }
+}
+
+/** RecursiveRegexIterator — regex filter over recursive inner iterator (php-src ext/spl/spl_iterators.c; #6693). */
+final class RecursiveRegexIteratorBuiltin
+{
+    public const CLASS_LC = 'recursiveregexiterator';
+
+    public static function registerClass(Context $ctx): void
+    {
+        if (isset($ctx->classes[self::CLASS_LC]) && isset($ctx->classes[self::CLASS_LC]->methods['__construct'])) {
+            return;
+        }
+
+        $pub = CfgFunc::FLAG_PUBLIC;
+        $entry = isset($ctx->classes[self::CLASS_LC])
+            ? $ctx->classes[self::CLASS_LC]
+            : new ClassEntry('RecursiveRegexIterator');
+        $entry->parentLc = RegexIteratorBuiltin::CLASS_LC;
+        foreach (['OuterIterator', 'Traversable', 'Iterator', 'RecursiveIterator'] as $iface) {
+            if (isset($ctx->classes[strtolower($iface)])
+                && !\in_array($iface, $entry->interfaces, true)) {
+                $entry->interfaces[] = $iface;
+            }
+        }
+
+        $entry->constructor = new RecursiveRegexIteratorConstruct();
+        $entry->methods['__construct'] = $entry->constructor;
+        $entry->methodVisibility['__construct'] = $pub;
+        $entry->methods['haschildren'] = new RecursiveRegexIteratorHasChildren();
+        $entry->methodVisibility['haschildren'] = $pub;
+        $entry->methodNames['haschildren'] = 'hasChildren';
+        $entry->methods['getchildren'] = new RecursiveRegexIteratorGetChildren();
+        $entry->methodVisibility['getchildren'] = $pub;
+        $entry->methodNames['getchildren'] = 'getChildren';
+
+        $entry->isInternal = true;
+        $ctx->classes[self::CLASS_LC] = $entry;
+    }
+
+    public static function createFromInnerTemplate(
+        Context $ctx,
+        ObjectEntry $childInner,
+        ObjectEntry $template
+    ): Variable {
+        $class = $ctx->classes[self::CLASS_LC] ?? null;
+        if (null === $class) {
+            throw new \LogicException('RecursiveRegexIterator is not registered in this compiler build');
+        }
+        $state = RegexIteratorBuiltin::requireState($template);
+        $object = new ObjectEntry($class);
+        $object->constructed = true;
+        SplDualIteratorStorage::initSimple($object, $childInner);
+        RegexIteratorBuiltin::initState(
+            $object,
+            $state['regex'],
+            $state['mode'],
+            $state['flags'],
+            $state['pregFlags']
+        );
+        $var = new Variable(Variable::TYPE_OBJECT);
+        $var->object($object);
+
+        return $var;
+    }
+}
+
+final class RecursiveRegexIteratorConstruct extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('__construct');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            RecursiveRegexIteratorBuiltin::CLASS_LC,
+            'RecursiveRegexIterator::__construct()'
+        );
+        $argc = \count($frame->calledArgs);
+        if ($argc < 3) {
+            throw new \ArgumentCountError(
+                'RecursiveRegexIterator::__construct() expects at least 2 arguments, '
+                .($argc - 1).' given'
+            );
+        }
+        if (null === $frame->vmContext) {
+            throw new \LogicException('RecursiveRegexIterator::__construct() requires VM context');
+        }
+        $inner = SplDualIteratorStorage::resolveRecursiveIterator(
+            $frame->vmContext,
+            $frame,
+            $frame->calledArgs[1]
+        );
+        SplDualIteratorStorage::initSimple($object, $inner);
+
+        $regex = VmReflection::stringArg($frame->calledArgs[2], 'RecursiveRegexIterator::__construct() regex', 1);
+        $mode = RegexIteratorBuiltin::MATCH;
+        $flags = 0;
+        $pregFlags = 0;
+        if ($argc >= 4) {
+            $modeVar = $frame->calledArgs[3]->resolveIndirect();
+            if (Variable::TYPE_INTEGER !== $modeVar->type) {
+                throw new \TypeError(
+                    'RecursiveRegexIterator::__construct(): Argument #3 ($mode) must be of type int, '
+                    .RegexIteratorBuiltin::typeLabelFor($modeVar).' given'
+                );
+            }
+            $mode = $modeVar->toInt();
+        }
+        if ($argc >= 5) {
+            $flagsVar = $frame->calledArgs[4]->resolveIndirect();
+            if (Variable::TYPE_INTEGER !== $flagsVar->type) {
+                throw new \TypeError(
+                    'RecursiveRegexIterator::__construct(): Argument #4 ($flags) must be of type int, '
+                    .RegexIteratorBuiltin::typeLabelFor($flagsVar).' given'
+                );
+            }
+            $flags = $flagsVar->toInt();
+        }
+        if ($argc >= 6) {
+            $pregVar = $frame->calledArgs[5]->resolveIndirect();
+            if (Variable::TYPE_INTEGER !== $pregVar->type) {
+                throw new \TypeError(
+                    'RecursiveRegexIterator::__construct(): Argument #5 ($preg_flags) must be of type int, '
+                    .RegexIteratorBuiltin::typeLabelFor($pregVar).' given'
+                );
+            }
+            $pregFlags = $pregVar->toInt();
+        }
+
+        RegexIteratorBuiltin::initState($object, $regex, $mode, $flags, $pregFlags);
+    }
+}
+
+final class RecursiveRegexIteratorHasChildren extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('hasChildren');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            RecursiveRegexIteratorBuiltin::CLASS_LC,
+            'RecursiveRegexIterator::hasChildren()'
+        );
+        $inner = SplDualIteratorStorage::inner($object);
+        $result = SplDualIteratorStorage::callInner($frame, $inner, 'hasChildren')->resolveIndirect();
+        SplIteratorSupport::setReturnBool(
+            $frame,
+            Variable::TYPE_BOOLEAN === $result->type && $result->toBool()
+        );
+    }
+}
+
+final class RecursiveRegexIteratorGetChildren extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getChildren');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            RecursiveRegexIteratorBuiltin::CLASS_LC,
+            'RecursiveRegexIterator::getChildren()'
+        );
+        if (null === $frame->vmContext) {
+            throw new \LogicException('RecursiveRegexIterator::getChildren() requires VM context');
+        }
+        $inner = SplDualIteratorStorage::inner($object);
+        $childInnerVar = SplDualIteratorStorage::callInner($frame, $inner, 'getChildren')->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $childInnerVar->type) {
+            throw new \UnexpectedValueException('RecursiveIterator::getChildren() must return an object');
+        }
+        SplIteratorSupport::copyReturnFrom(
+            $frame,
+            RecursiveRegexIteratorBuiltin::createFromInnerTemplate(
+                $frame->vmContext,
+                $childInnerVar->toObject(),
+                $object
+            )
+        );
     }
 }
