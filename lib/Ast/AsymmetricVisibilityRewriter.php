@@ -484,10 +484,9 @@ final class AsymmetricVisibilityRewriter
 
     private static function lineViolatesMultipleSetModifierRules(string $line): bool
     {
-        // php-src 8.4: `public protected(set)` / `public private(set)` are valid asymmetric visibility.
-        // Duplicate modifiers (public public(set)) remain fatal here; weaker-than-set is CompileCheck.
-        // Reference profile rejects explicit read+set via lineViolatesMultipleSetModifierRulesForReferenceProfile().
-        return self::lineViolatesDuplicateSetModifierRules($line);
+        // php-src: Zend/zend_compile.c — unparenthesized `public private(set)` is multiple modifiers (#16142).
+        // Valid 8.4 form is parenthesized `public (private(set))`; duplicate modifiers stay fatal too.
+        return self::lineViolatesMultipleSetModifierRulesForReferenceProfile($line);
     }
 
     /**

@@ -21,11 +21,14 @@ final class AsymmetricVisibilityCompileCheckTest extends TestCase
     }
     public function testProtectedPublicSetCompileErrors(): void
     {
+        if (!CompilerVersion::supportsParenthesizedAsymmetricSetModifier()) {
+            $this->markTestSkipped('parenthesized asymmetric set modifier disabled on 8.4.0-dev reference profile (#16450)');
+        }
         $this->expectCompileError(
             <<<'PHP'
 <?php
 class C {
-    protected public(set) string $x = 'a';
+    protected (public(set)) string $x = 'a';
 }
 PHP,
             AsymmetricVisibilityCompileCheck::WEAKER_THAN_SET_MESSAGE
@@ -34,11 +37,14 @@ PHP,
 
     public function testPrivateProtectedSetCompileErrors(): void
     {
+        if (!CompilerVersion::supportsParenthesizedAsymmetricSetModifier()) {
+            $this->markTestSkipped('parenthesized asymmetric set modifier disabled on 8.4.0-dev reference profile (#16450)');
+        }
         $this->expectCompileError(
             <<<'PHP'
 <?php
 class C {
-    private protected(set) string $x = 'a';
+    private (protected(set)) string $x = 'a';
 }
 PHP,
             AsymmetricVisibilityCompileCheck::WEAKER_THAN_SET_MESSAGE
@@ -61,16 +67,14 @@ PHP,
         );
     }
 
-    public function testPublicPrivateSetCompiles(): void
+    public function testPublicPrivateSetCompileErrors(): void
     {
-        $runtime = new Runtime();
-        $block = $runtime->parseAndCompile(<<<'PHP'
+        $this->expectCompileError(<<<'PHP'
 <?php
 class Demo {
     public private(set) string $name = 'a';
 }
-PHP, 'asymmetric_public_private_set.php');
-        $this->assertNotNull($block);
+PHP, AsymmetricVisibilityRewriter::MULTIPLE_MODIFIERS_MESSAGE);
     }
 
     public function testPromotedPublicPrivateSetParenthesizedFormRejects(): void
@@ -95,37 +99,36 @@ class D {
 PHP, 'syntax error, unexpected token "private"');
     }
 
-    public function testPromotedExplicitReadBeforePrivateSetCompiles(): void
+    public function testPromotedExplicitReadBeforePrivateSetCompileErrors(): void
     {
-        $runtime = new Runtime();
-        $block = $runtime->parseAndCompile(<<<'PHP'
+        $this->expectCompileError(<<<'PHP'
 <?php
 class D {
     public function __construct(public private(set) int $x = 1) {}
 }
-PHP, 'asymmetric_promoted_public_private_set.php');
-        $this->assertNotNull($block);
+PHP, AsymmetricVisibilityRewriter::MULTIPLE_MODIFIERS_MESSAGE);
     }
 
-    public function testExplicitReadBeforePrivateSetCompiles(): void
+    public function testExplicitReadBeforePrivateSetCompileErrors(): void
     {
-        $runtime = new Runtime();
-        $block = $runtime->parseAndCompile(<<<'PHP'
+        $this->expectCompileError(<<<'PHP'
 <?php
 class Demo {
     public private(set) string $name = 'a';
 }
-PHP, 'asymmetric_public_private_set.php');
-        $this->assertNotNull($block);
+PHP, AsymmetricVisibilityRewriter::MULTIPLE_MODIFIERS_MESSAGE);
     }
 
-    public function testValidPrivateSetStillCompiles(): void
+    public function testValidParenthesizedPrivateSetStillCompiles(): void
     {
+        if (!CompilerVersion::supportsParenthesizedAsymmetricSetModifier()) {
+            $this->markTestSkipped('parenthesized asymmetric set modifier disabled on 8.4.0-dev reference profile (#16450)');
+        }
         $runtime = new Runtime();
         $block = $runtime->parseAndCompile(<<<'PHP'
 <?php
 class Demo {
-    public private(set) string $name = 'a';
+    public (private(set)) string $name = 'a';
 }
 PHP, 'asymmetric_ok.php');
         $this->assertNotNull($block);
@@ -153,16 +156,14 @@ PHP, 'static_asymmetric_reject.php');
         }
     }
 
-    public function testSetBeforeReadCompiles(): void
+    public function testSetBeforeReadRejects(): void
     {
-        $runtime = new Runtime();
-        $block = $runtime->parseAndCompile(<<<'PHP'
+        $this->expectCompileError(<<<'PHP'
 <?php
 class C {
     private(set) public string $x = 'a';
 }
-PHP, 'asymmetric_set_before_read.php');
-        $this->assertNotNull($block);
+PHP, AsymmetricVisibilityRewriter::BARE_SET_WITHOUT_READ_MESSAGE);
     }
 
     public function testBarePrivateSetRejects(): void

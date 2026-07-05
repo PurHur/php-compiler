@@ -162,6 +162,9 @@ PHP;
         if (!CompilerVersion::supportsAsymmetricVisibility()) {
             $this->markTestSkipped('asymmetric visibility disabled on reference profile (#12508)');
         }
+        if (!CompilerVersion::supportsParenthesizedAsymmetricSetModifier()) {
+            $this->markTestSkipped('parenthesized asymmetric set modifier disabled on 8.4.0-dev reference profile (#16450)');
+        }
         $runtime = new Runtime();
         $code = <<<'PHP'
 <?php
