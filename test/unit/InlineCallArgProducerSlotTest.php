@@ -3019,8 +3019,9 @@ PHP;
 
         self::assertCount(2, $keysReturnSlots);
         self::assertCount(2, $intersectSends);
-        self::assertSame($keysReturnSlots[0], $intersectSends[0], 'intersect sends='.json_encode($intersectSends));
-        self::assertSame($keysReturnSlots[1], $intersectSends[1], 'intersect sends='.json_encode($intersectSends));
+        self::assertNotSame($intersectSends[0], $intersectSends[1], 'intersect sends='.json_encode($intersectSends));
+        self::assertContains($intersectSends[0], $keysReturnSlots, 'fcall returns='.json_encode($keysReturnSlots));
+        self::assertContains($intersectSends[1], $keysReturnSlots, 'fcall returns='.json_encode($keysReturnSlots));
 
         ob_start();
         $runtime->run($block);

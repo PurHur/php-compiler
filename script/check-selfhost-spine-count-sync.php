@@ -27,6 +27,14 @@ if ($spineCount <= 0) {
     $errors[] = 'compiler_lib_spine_smoke: missing or empty require_once spine bundle';
 }
 
+// Duplicate require_once entries skew the M2 ratio and every footnote pair
+// downstream (two racing spine-sync PRs squash-merged the same file, #16381).
+$spinePaths = bootstrap_spine_require_paths($root.'/test/selfhost/compiler_lib_spine_smoke/main.php');
+$dupes = array_keys(array_filter(array_count_values($spinePaths), static fn (int $n): bool => $n > 1));
+foreach ($dupes as $dupe) {
+    $errors[] = "compiler_lib_spine_smoke: duplicate require_once for {$dupe} — remove the extra line";
+}
+
 if ($inventoryTotal <= 0) {
     $errors[] = 'docs/bootstrap-inventory.md: missing PHP files on vm.php path count';
 }

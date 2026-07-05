@@ -645,6 +645,7 @@ final class VmPregEngine
 
     private function parseClass(): VmPregAstNode
     {
+        $openPos = $this->pos;
         $this->advance(1);
         $negated = false;
         if ($this->peek() === '^') {
@@ -667,7 +668,7 @@ final class VmPregEngine
             }
         }
         if ($this->peek() !== ']') {
-            throw new VmPregCompileException();
+            throw new VmPregCompileException('missing terminating ] for character class', $openPos);
         }
         $this->advance(1);
 
