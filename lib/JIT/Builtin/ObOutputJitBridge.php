@@ -96,9 +96,12 @@ final class ObOutputJitBridge
             return;
         }
 
+        $restore = self::captureInsertBlock($context);
+
         $probe = $context->module->getNamedFunction('__phpc_ob_start');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);
+            self::restoreInsertBlock($context, $restore);
 
             return;
         }
@@ -106,11 +109,11 @@ final class ObOutputJitBridge
         if (StreamIoRuntime::shouldDeferHeavyStreamIoEmitters($context)) {
             self::ensureExtraGlobals($context);
             self::implementDeferredInventoryStubs($context);
+            self::restoreInsertBlock($context, $restore);
 
             return;
         }
 
-        $restore = self::captureInsertBlock($context);
         self::ensureExtraGlobals($context);
         self::ensureLibc($context);
         self::ensureValueHelpers($context);
@@ -137,7 +140,9 @@ final class ObOutputJitBridge
         self::implementShutdownMarkRegistered($context);
         self::registerLinkedRuntime($context);
         self::restoreInsertBlock($context, $restore);
-        $context->builder->clearInsertionPosition();
+        if (null === $restore) {
+            $context->builder->clearInsertionPosition();
+        }
     }
 
     private static function implementVoidBridge(Context $context, string $abiName, string $helperLogical): void

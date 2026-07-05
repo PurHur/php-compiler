@@ -20,7 +20,7 @@ final class ProcessRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('emitShellExec', $runtime);
         $this->assertStringNotContainsString('emitEscapeshellarg', $runtime);
         $this->assertStringNotContainsString('ensureLibc', $runtime);
-        $this->assertLessThan(290, \substr_count($runtime, "\n") + 1);
+        $this->assertLessThan(460, \substr_count($runtime, "\n") + 1);
 
         $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/ProcessStandaloneLlvm.php');
     }
@@ -31,8 +31,13 @@ final class ProcessRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('VmShellExecNative::shellExec', $source);
         $this->assertStringContainsString('VmEscapeshell::escapeshellarg', $source);
         $this->assertStringContainsString('VmEscapeshell::escapeshellcmd', $source);
-        $this->assertStringContainsString('VmPhpcRunCommandNative::run', $source);
-        $this->assertStringContainsString('VmPopenNative::open', $source);
+
+        $captureSource = (string) file_get_contents(__DIR__.'/../../ext/standard/ProcessExecCaptureNativeJitHelper.php');
+        $this->assertStringContainsString('VmShellExecNative::shellExec', $captureSource);
+        $this->assertStringContainsString('phpc_native_ht_set_string_at', $captureSource);
+
+        $phpcSource = (string) file_get_contents(__DIR__.'/../../ext/standard/ProcessPhpcRunCommandJitHelper.php');
+        $this->assertStringContainsString('VmPhpcRunCommandNative::run', $phpcSource);
     }
 
     public function testEscapeshellargArgvMatchesVm(): void

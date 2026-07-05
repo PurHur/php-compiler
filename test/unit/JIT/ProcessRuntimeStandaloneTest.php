@@ -34,6 +34,7 @@ final class ProcessRuntimeStandaloneTest extends TestCase
         $runtime = new Runtime(Runtime::MODE_AOT);
         $ctx = new Context($runtime, Builtin::LOAD_TYPE_STANDALONE);
         ProcessRuntime::ensureLinked($ctx);
+        ProcessRuntime::ensurePhpcRunCommandLinked($ctx);
 
         foreach (
             [

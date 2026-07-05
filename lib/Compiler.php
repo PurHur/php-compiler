@@ -25657,8 +25657,23 @@ class Compiler {
                 }
             }
         }
+        $constSlot = $block->slotForOperand($immediatePrelude->result);
+        $callArg = $cfgCallOp->args[$argIndex] ?? null;
+        if (
+            $immediatePrelude instanceof Op\Expr\ClassConstFetch
+            && null !== $callArg
+            && null !== $constSlot
+            && (
+                $immediatePrelude->result === $callArg
+                || $this->operandsReferToSameVariable($immediatePrelude->result, $callArg)
+            )
+        ) {
+            // method_exists(I::class, 'm') after earlier stmts — hoisted ::class is arg #0 (#9486).
+            return (string) $constSlot;
+        }
         if (
             0 === $argIndex
+            && $immediatePrelude instanceof Op\Expr\ConstFetch
             && (
                 null !== $this->nestedFuncCallProducerBeforeTrailingConstFetchPreludes(
                     $cfgCallOp,
@@ -25674,7 +25689,6 @@ class Compiler {
             // var_export(g(), true) / importNode($doc->documentElement, true) — trailing ConstFetch is not arg #0 (#11272, #16318).
             return null;
         }
-        $constSlot = $block->slotForOperand($immediatePrelude->result);
 
         return null !== $constSlot ? (string) $constSlot : null;
     }
@@ -27404,19 +27418,26 @@ class Compiler {
         ) {
             return null;
         }
-        $outerSlot = $this->outerSiblingInlineCallArgProducerSlot($block, $cfgCallOp, $argIndex);
-        if (null !== $outerSlot) {
-            return $outerSlot;
-        }
-        if (1 === \count($args) && 0 !== $argIndex) {
-            return null;
-        }
         $callIndex = null;
         foreach ($block->orig->children as $i => $child) {
             if ($child === $cfgCallOp) {
                 $callIndex = $i;
                 break;
             }
+        }
+        if (\is_int($callIndex) && $callIndex > 0) {
+            $immediatePrelude = $block->orig->children[$callIndex - 1] ?? null;
+            // method_exists(I::class, 'm') after var_dump(...) — immediate ::class prelude is arg #0 (#9486).
+            if ($immediatePrelude instanceof Op\Expr\ClassConstFetch) {
+                return null;
+            }
+        }
+        $outerSlot = $this->outerSiblingInlineCallArgProducerSlot($block, $cfgCallOp, $argIndex);
+        if (null !== $outerSlot) {
+            return $outerSlot;
+        }
+        if (1 === \count($args) && 0 !== $argIndex) {
+            return null;
         }
         if (null === $callIndex) {
             return null;
@@ -33341,6 +33362,48 @@ class Compiler {
             }
             if (
                 null !== $cfgCallOp
+                && null !== $block->orig
+                && 0 === (int) $argIndex
+            ) {
+                $callIndex = array_search($cfgCallOp, $block->orig->children, true);
+                if (\is_int($callIndex) && $callIndex > 0) {
+                    $immediatePrelude = $block->orig->children[$callIndex - 1] ?? null;
+                    if ($immediatePrelude instanceof Op\Expr\ClassConstFetch) {
+                        $callArg = $cfgCallOp->args[(int) $argIndex] ?? $arg;
+                        if ($callArg instanceof Operand && $this->callArgIsDeadInlineTemporary($callArg)) {
+                            $folded = $this->tryFoldClassConstFetchDefault($immediatePrelude, $block, true);
+                            if (null !== $folded) {
+                                $constSlot = $block->registerConstant($immediatePrelude->result, $folded);
+                                $sends[] = new OpCode(
+                                    OpCode::TYPE_ARG_SEND,
+                                    $constSlot,
+                                    $nameSlot,
+                                    $unpackFlag
+                                );
+                                continue;
+                            }
+                            $classConstSlot = $block->slotForOperand($immediatePrelude->result);
+                            if (null === $classConstSlot) {
+                                foreach ($this->compileExpr($immediatePrelude, $block) as $op) {
+                                    $sends[] = $op;
+                                }
+                                $classConstSlot = $block->slotForOperand($immediatePrelude->result);
+                            }
+                            if (null !== $classConstSlot) {
+                                $sends[] = new OpCode(
+                                    OpCode::TYPE_ARG_SEND,
+                                    $classConstSlot,
+                                    $nameSlot,
+                                    $unpackFlag
+                                );
+                                continue;
+                            }
+                        }
+                    }
+                }
+            }
+            if (
+                null !== $cfgCallOp
                 && $this->callArgIsNullLiteral($cfgCallOp->args[(int) $argIndex] ?? $arg)
             ) {
                 $nullArg = $cfgCallOp->args[(int) $argIndex] ?? $arg;
@@ -37194,7 +37257,7 @@ class Compiler {
                     (int) $argIndex,
                     $sends
                 );
-                if (null !== $constPreludeSlot && null === $valueSlot) {
+                if (null !== $constPreludeSlot) {
                     $valueSlot = $constPreludeSlot;
                 }
                 $callIndex = array_search($cfgCallOp, $block->orig->children, true);
@@ -37343,7 +37406,10 @@ class Compiler {
                                 }
                             }
                         }
-                    } elseif (!$this->callArgHasHoistedConstPrelude($cfgCallOp, (int) $argIndex, $block)) {
+                    } elseif (
+                        null === $constPreludeSlot
+                        && !$this->callArgHasHoistedConstPrelude($cfgCallOp, (int) $argIndex, $block)
+                    ) {
                         $valueSlot = (string) $forcedSiblingSlot;
                     }
                 }
@@ -40064,6 +40130,12 @@ class Compiler {
                 ++$argIndex;
                 continue;
             }
+            $preludeSlot = $this->slotForImmediateConstFetchPreludeCallArg($block, $cfgCallOp, $argIndex);
+            if (null !== $preludeSlot) {
+                $send->arg1 = (string) $preludeSlot;
+                ++$argIndex;
+                continue;
+            }
             $producerIndex = null;
             for ($j = $firstSibling; $j < $callIndex; ++$j) {
                 $scan = $cfgChildren[$j] ?? null;
@@ -40196,6 +40268,65 @@ class Compiler {
         }
 
         return false;
+    }
+
+    /**
+     * method_exists(I::class, 'm') after earlier stmts — sibling rewire must not steal hoisted ::class slot (#9486).
+     *
+     * @param list<OpCode> $outerArgSends
+     * @param list<OpCode> $pendingNestedProducerOps
+     */
+    private function rewireHoistedClassConstPreludeCallArgSendSlots(
+        array &$outerArgSends,
+        Block $block,
+        ?Op $cfgCallOp,
+        array $pendingNestedProducerOps = []
+    ): void {
+        if (null === $cfgCallOp || null === $block->orig) {
+            return;
+        }
+        if (!\is_array($cfgCallOp->args ?? null) || [] === $cfgCallOp->args) {
+            return;
+        }
+        $callIndex = array_search($cfgCallOp, $block->orig->children, true);
+        if (!\is_int($callIndex) || $callIndex < 1) {
+            return;
+        }
+        $prelude = $block->orig->children[$callIndex - 1] ?? null;
+        if (!$prelude instanceof Op\Expr\ClassConstFetch) {
+            return;
+        }
+        $callArg = $cfgCallOp->args[0] ?? null;
+        if (!$this->callArgIsDeadInlineTemporary($callArg)) {
+            return;
+        }
+        if (null === $block->slotForOperand($prelude->result)) {
+            foreach ($this->compileExpr($prelude, $block) as $op) {
+                $block->addOpCode($op);
+            }
+        }
+        $preludeSlot = $block->slotForOperand($prelude->result);
+        if (null === $preludeSlot) {
+            foreach ($pendingNestedProducerOps as $op) {
+                if (OpCode::TYPE_CLASS_CONST_FETCH === $op->type) {
+                    $preludeSlot = (string) $op->arg1;
+                    break;
+                }
+            }
+        }
+        if (null === $preludeSlot) {
+            return;
+        }
+        $argIndex = 0;
+        foreach ($outerArgSends as $send) {
+            if (OpCode::TYPE_ARG_SEND !== $send->type) {
+                continue;
+            }
+            if (0 === $argIndex) {
+                $send->arg1 = (string) $preludeSlot;
+            }
+            ++$argIndex;
+        }
     }
 
     /**
@@ -40366,6 +40497,7 @@ class Compiler {
         [$nestedProducerOps, $outerArgSends] = $this->partitionNestedInlineCallArgProducerOps($argSends);
         $this->rewireInlineArithmeticBranchCallArgSendSlots($outerArgSends, $nestedProducerOps, $block, $cfgCallOp);
         $this->rewireSiblingMultiArgInlineCallArgSendSlots($outerArgSends, $block, $cfgCallOp, $nestedProducerOps);
+        $this->rewireHoistedClassConstPreludeCallArgSendSlots($outerArgSends, $block, $cfgCallOp, $nestedProducerOps);
         $this->rewireSubstrNestedSprintfArgSendSlots($outerArgSends, $block, $cfgCallOp, $calleeName);
         $this->rewireArrayKeysInlineInitArrayArgSendSlots(
             $outerArgSends,

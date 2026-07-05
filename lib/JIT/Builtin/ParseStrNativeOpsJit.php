@@ -72,6 +72,19 @@ final class ParseStrNativeOpsJit
         );
     }
 
+    public static function setStringKeyLong(Context $context, JITVariable $htPtr, JITVariable $key, JITVariable $value): void
+    {
+        $ht = self::htFromI64($context, $htPtr);
+        $keyStr = self::loadStringArg($context, $key);
+        $longVal = JitLongArg::lower($context, $value, 'phpc_native_ht long value');
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setStringKeyLong'),
+            $ht,
+            $keyStr,
+            $longVal
+        );
+    }
+
     public static function setHashtableAt(Context $context, JITVariable $htPtr, JITVariable $index, JITVariable $childPtr): void
     {
         $ht = self::htFromI64($context, $htPtr);

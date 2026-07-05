@@ -44,7 +44,9 @@ final class ObOutputUserScriptLlvm
         EmbedObEchoBridge::implementAll($context);
         ObOutputJitBridge::finishUserScriptEmit($context);
         self::restoreInsertBlock($context, $restore);
-        $context->builder->clearInsertionPosition();
+        if (null === $restore) {
+            $context->builder->clearInsertionPosition();
+        }
     }
 
     private static function ensureWriteLibc(Context $context): void

@@ -30,7 +30,8 @@ final class ExecJitRuntimeShrinkTest extends TestCase
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ProcessRuntime.php');
         $this->assertStringContainsString('__compiler_process_exec_capture', $source);
-        $this->assertStringContainsString('__phpc_process_read_stream_lines', $source);
+        $this->assertStringContainsString('ProcessExecCaptureNativeJitHelper', $source);
+        $this->assertStringContainsString('phpc_native_ht_set_string_key_long', $source);
     }
 
     public function testNoNewAotRuntimeCSources(): void

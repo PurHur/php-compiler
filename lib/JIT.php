@@ -15720,6 +15720,17 @@ class JIT {
             return $const->toString();
         }
         foreach ($block->opCodes as $prior) {
+            if (OpCode::TYPE_CLASS_CONST_FETCH === $prior->type && $prior->arg1 === $slot) {
+                $classOp = $block->getOperand($prior->arg2);
+                $nameOp = $block->getOperand($prior->arg3);
+                if (
+                    $classOp instanceof Operand\Literal
+                    && $nameOp instanceof Operand\Literal
+                    && 'class' === strtolower($nameOp->value)
+                ) {
+                    return $this->resolveClassNameForPseudoConst($block, $classOp);
+                }
+            }
             if (OpCode::TYPE_CONCAT === $prior->type && $prior->arg1 === $slot) {
                 $left = $this->resolveJitCompileTimeStringSlot($block, (int) $prior->arg2, $visited);
                 $right = $this->resolveJitCompileTimeStringSlot($block, (int) $prior->arg3, $visited);

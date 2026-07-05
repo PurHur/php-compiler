@@ -19,7 +19,7 @@ final class JitPhpcRunCommand
     /** @return Value */
     public static function invoke(Context $context, Value $cmdStr, ?JITVariable $envArg): Value
     {
-        ProcessRuntime::ensureLinked($context);
+        ProcessRuntime::ensurePhpcRunCommandLinked($context);
         $htPtrTy = $context->getTypeFromString('__hashtable__*');
         $envHt = $htPtrTy->constNull();
         if (null !== $envArg) {
