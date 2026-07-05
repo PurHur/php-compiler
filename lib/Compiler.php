@@ -12916,7 +12916,10 @@ class Compiler {
                         static fn (Op\Expr $p): bool => $p instanceof Op\Expr\Array_
                     ));
                     if ([] !== $arrayProducers && 0 === $argIndex) {
-                        if ('array_keys' === $this->resolveCfgFuncCallName($callOp)) {
+                        if (
+                            'array_keys' === $this->resolveCfgFuncCallName($callOp)
+                            && !$this->callArgIsCoalesceMergeProducer($positionalCallArg, $block, $callOp, $argIndex)
+                        ) {
                             $keysArray = $this->inlineArrayProducerForArrayKeysDeadCallArg(
                                 $positionalCallArg,
                                 $block,
@@ -14963,9 +14966,18 @@ class Compiler {
             }
         }
         if (!$this->callArgIsNestedFuncCallResult($cfgCallOp, $argIndex, $block)) {
-            $immediateSlot = $this->slotForInitArrayProducerBeforeCfgCall($block, $cfgCallOp);
-            if (null !== $immediateSlot) {
-                return $immediateSlot;
+            $callArg = $cfgCallOp->args[$argIndex] ?? null;
+            if (
+                !(
+                    'array_keys' === $this->resolveCfgFuncCallName($cfgCallOp)
+                    && $callArg instanceof Operand
+                    && $this->callArgIsCoalesceMergeProducer($callArg, $block, $cfgCallOp, $argIndex)
+                )
+            ) {
+                $immediateSlot = $this->slotForInitArrayProducerBeforeCfgCall($block, $cfgCallOp);
+                if (null !== $immediateSlot) {
+                    return $immediateSlot;
+                }
             }
 
             return $this->slotForRecentInitArrayCallArg($block);
@@ -32182,9 +32194,11 @@ class Compiler {
                 null !== $cfgCallOp
                 && 'array_keys' === $this->resolveCfgFuncCallName($cfgCallOp)
                 && 0 === (int) $argIndex
+                && !$this->callArgIsCoalesceMergeProducer($arg, $block, $cfgCallOp, (int) $argIndex)
             ) {
                 // array_diff_assoc(array_keys(...), array_keys(...)) — stmt-before Array_, not last INIT_ARRAY (#15959, re-#13779).
                 // ['a','b'] === array_keys($a) — stmt-before Array_ feeds Identical, not array_keys arg (#16056).
+                // array_keys(f()[k] ?? []) — ?? RHS [] must not steal INIT_ARRAY ordinal (#16127, re-#16435).
                 $keysArrayProducer = null;
                 if (
                     $this->callArgIsDeadInlineTemporary($arg)
@@ -32893,6 +32907,25 @@ class Compiler {
             if (null !== $syncedCoalesceSlot) {
                 $valueSlot = (string) $syncedCoalesceSlot;
             }
+            if (null === $valueSlot) {
+                $coalesceArgSlot = $this->compileCallArgCoalesceSlot(
+                    $callArgOperand,
+                    $block,
+                    $cfgCallOp,
+                    (int) $argIndex
+                );
+                if (null === $coalesceArgSlot) {
+                    $coalesceArgSlot = $this->compileCallArgCoalesceSlot(
+                        $arg,
+                        $block,
+                        $cfgCallOp,
+                        (int) $argIndex
+                    );
+                }
+                if (null !== $coalesceArgSlot) {
+                    $valueSlot = (string) $coalesceArgSlot;
+                }
+            }
             $callArgConstRoot = $this->unwrapOperandChain($callArgOperand);
             if ($callArgConstRoot instanceof Op\Expr\ConstFetch) {
                 $foldedGlobalConst = $this->tryFoldGlobalConstFetch($callArgConstRoot);
@@ -32900,7 +32933,12 @@ class Compiler {
                     $valueSlot = (string) $block->registerConstant($callArgOperand, $foldedGlobalConst);
                 }
             }
-            if (null !== $dimFetchSlot && null === $valueSlot) {
+            if (
+                null !== $dimFetchSlot
+                && null === $valueSlot
+                && !$this->callArgIsCoalesceMergeProducer($callArgOperand, $block, $cfgCallOp, (int) $argIndex)
+                && !$this->callArgIsCoalesceMergeProducer($arg, $block, $cfgCallOp, (int) $argIndex)
+            ) {
                 $valueSlot = $dimFetchSlot;
             } elseif (
                 null !== $inlineArray
@@ -38256,6 +38294,10 @@ class Compiler {
             return;
         }
         if (!$this->callArgIsDeadInlineTemporary($callArg) || !$this->callArgOperandExpectsArrayProducer($callArg)) {
+            return;
+        }
+        if ($this->callArgIsCoalesceMergeProducer($callArg, $block, $cfgCallOp, 0)) {
+            // array_keys(f()[k] ?? []) — keep coalesce merge slot, not ?? RHS INIT_ARRAY (#16127, re-#16435).
             return;
         }
         $correctOrdinal = $this->inlineArrayKeysHoistedArrayOrdinal($block, $cfgCallOp);
