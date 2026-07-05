@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 4089 |
-| Phase A inventory files (M2 ratio SSOT) | 4089 |
+| PHP files on vm.php path | 4090 |
+| Phase A inventory files (M2 ratio SSOT) | 4090 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 11027 |
+| Source constructs flagged (warnings) | 11029 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -2676,6 +2676,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/Func/PHP.php` | 0 | 1 |
 | `lib/GenericArrayTypeSourceRewriter.php` | 0 | 1 |
 | `lib/GenericArrayTypeSpec.php` | 0 | 4 |
+| `lib/GlobalTypedConstSyntaxRejector.php` | 0 | 2 |
 | `lib/Handler.php` | 0 | 1 |
 | `lib/HexFloat.php` | 0 | 1 |
 | `lib/JIT.php` | 0 | 109 |
@@ -20740,10 +20741,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Ast/GlobalTypedConstRewriter.php`
 
 **Warnings** (review for bootstrap subset):
-- new ParserError (line 297)
-- new ParserError (line 308)
-- new ParserError (line 318)
-- 13 class method(s)
+- new ParserError (line 348)
+- new ParserError (line 359)
+- new ParserError (line 369)
+- 14 class method(s)
 
 ### `lib/Ast/GroupUseStripper.php`
 
@@ -21780,6 +21781,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new self (line 49)
 - new self (line 52)
 - 4 class method(s)
+
+### `lib/GlobalTypedConstSyntaxRejector.php`
+
+**Warnings** (review for bootstrap subset):
+- new CompileFatal (line 27)
+- 1 class method(s)
 
 ### `lib/Handler.php`
 
@@ -26987,14 +26994,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ext\standard\Module (line 246)
 - new JIT (line 322)
 - new JITContext (line 336)
-- new SealedClassPreprocessor (line 390)
-- new StaticClassPreprocessor (line 393)
-- new SourcePreprocessor\PropertyHooks (line 396)
-- new State (line 520)
-- new ReflectionProperty (line 547)
-- new ReflectionProperty (line 550)
-- new LintCompiler (line 941)
-- new Variable (line 1068)
+- new SealedClassPreprocessor (line 391)
+- new StaticClassPreprocessor (line 394)
+- new SourcePreprocessor\PropertyHooks (line 397)
+- new State (line 521)
+- new ReflectionProperty (line 548)
+- new ReflectionProperty (line 551)
+- new LintCompiler (line 942)
+- new Variable (line 1069)
 - 53 class method(s)
 
 ### `lib/RuntimeStrictness.php`

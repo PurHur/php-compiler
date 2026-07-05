@@ -2747,6 +2747,7 @@ require_once __DIR__.'/../../../lib/Func/JIT.php';
 require_once __DIR__.'/../../../lib/Func/PHP.php';
 require_once __DIR__.'/../../../lib/GenericArrayTypeSourceRewriter.php';
 require_once __DIR__.'/../../../lib/GenericArrayTypeSpec.php';
+require_once __DIR__.'/../../../lib/GlobalTypedConstSyntaxRejector.php';
 require_once __DIR__.'/../../../lib/Handler.php';
 require_once __DIR__.'/../../../lib/HexFloat.php';
 require_once __DIR__.'/../../../lib/JIT.php';

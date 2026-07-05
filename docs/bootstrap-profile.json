@@ -2734,6 +2734,7 @@
         "lib/Func/PHP.php",
         "lib/GenericArrayTypeSourceRewriter.php",
         "lib/GenericArrayTypeSpec.php",
+        "lib/GlobalTypedConstSyntaxRejector.php",
         "lib/Handler.php",
         "lib/HexFloat.php",
         "lib/JIT.php",
@@ -4323,9 +4324,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 4089,
+        "inventory_files": 4090,
         "excluded": 0,
-        "eligible": 4089,
+        "eligible": 4090,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1

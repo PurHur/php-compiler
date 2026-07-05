@@ -9,6 +9,24 @@ use PHPUnit\Framework\TestCase;
 
 final class GlobalTypedConstRewriterTest extends TestCase
 {
+    /** @var false|string */
+    private $savedProfile;
+
+    protected function setUp(): void
+    {
+        $this->savedProfile = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+    }
+
+    protected function tearDown(): void
+    {
+        if (false === $this->savedProfile) {
+            putenv('PHP_COMPILER_PROFILE');
+        } else {
+            putenv('PHP_COMPILER_PROFILE='.$this->savedProfile);
+        }
+    }
+
     public function testRewritesFileScopeTypedConst(): void
     {
         $src = <<<'PHP'
