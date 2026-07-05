@@ -217,12 +217,12 @@ final class VmPhpCoreConstants
     private static function compilerVersionConstantExact(string $canonical): mixed
     {
         return match ($canonical) {
-            'PHP_VERSION' => CompilerVersion::VERSION,
-            'PHP_MAJOR_VERSION' => CompilerVersion::MAJOR_VERSION,
-            'PHP_MINOR_VERSION' => CompilerVersion::MINOR_VERSION,
-            'PHP_RELEASE_VERSION' => CompilerVersion::RELEASE_VERSION,
-            'PHP_EXTRA_VERSION' => CompilerVersion::EXTRA_VERSION,
-            'PHP_VERSION_ID' => CompilerVersion::VERSION_ID,
+            'PHP_VERSION' => CompilerVersion::reportedPhpVersion(),
+            'PHP_MAJOR_VERSION' => CompilerVersion::reportedPhpMajorVersion(),
+            'PHP_MINOR_VERSION' => CompilerVersion::reportedPhpMinorVersion(),
+            'PHP_RELEASE_VERSION' => CompilerVersion::reportedPhpReleaseVersion(),
+            'PHP_EXTRA_VERSION' => CompilerVersion::reportedPhpExtraVersion(),
+            'PHP_VERSION_ID' => CompilerVersion::reportedPhpVersionId(),
             default => null,
         };
     }

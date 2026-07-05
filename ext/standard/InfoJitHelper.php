@@ -17,24 +17,25 @@ final class InfoJitHelper
 {
     public static function phpversion(?string $extension): string
     {
+        $runtimeVersion = CompilerVersion::reportedPhpVersion();
         if (null === $extension || '' === $extension) {
-            return CompilerVersion::VERSION;
+            return $runtimeVersion;
         }
         if (VmInfo::isEngineExtensionName($extension) || VmInfo::isBundledExtensionName($extension)) {
-            return CompilerVersion::VERSION;
+            return $runtimeVersion;
         }
         if (!ModuleRegistry::extensionLoaded($extension)) {
             return '';
         }
 
-        return ModuleRegistry::getExtensionVersion($extension) ?? CompilerVersion::VERSION;
+        return ModuleRegistry::getExtensionVersion($extension) ?? $runtimeVersion;
     }
 
     /** ABI: unknown extension version → null {@see __string__*} (#13803). */
     public static function phpversionArgv(?string $extension): ?string
     {
         if (null === $extension) {
-            return CompilerVersion::VERSION;
+            return CompilerVersion::reportedPhpVersion();
         }
         $v = self::phpversion($extension);
 
