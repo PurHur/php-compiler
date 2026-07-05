@@ -21945,6 +21945,9 @@ class Compiler {
         Block $block,
         Op $cfgCallOp
     ): ?Op\Expr\Array_ {
+        if ($this->callArgIsCoalesceMergeProducer($arg, $block, $cfgCallOp, 0)) {
+            return null;
+        }
         $cfgChildren = $this->inlineCallArgProducerCfgChildren($block);
         if ([] === $cfgChildren && null !== $block->orig) {
             $cfgChildren = $block->orig->children;
@@ -32203,6 +32206,7 @@ class Compiler {
                 if (
                     $this->callArgIsDeadInlineTemporary($arg)
                     && $this->callArgOperandExpectsArrayProducer($arg)
+                    && !$this->callArgIsCoalesceMergeProducer($arg, $block, $cfgCallOp, 0)
                 ) {
                     $keysArrayProducer = $this->inlineArrayProducerForArrayKeysDeadCallArg(
                         $arg,
@@ -38293,7 +38297,11 @@ class Compiler {
         if (!$callArg instanceof Operand) {
             return;
         }
-        if (!$this->callArgIsDeadInlineTemporary($callArg) || !$this->callArgOperandExpectsArrayProducer($callArg)) {
+        if (
+            !$this->callArgIsDeadInlineTemporary($callArg)
+            || !$this->callArgOperandExpectsArrayProducer($callArg)
+            || $this->callArgIsCoalesceMergeProducer($callArg, $block, $cfgCallOp, 0)
+        ) {
             return;
         }
         if ($this->callArgIsCoalesceMergeProducer($callArg, $block, $cfgCallOp, 0)) {
