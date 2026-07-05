@@ -21129,6 +21129,42 @@ class Compiler {
      *
      * @param list<Op> $cfgChildren
      */
+    /**
+     * Stmt-level var_dump(g()) — adjacent nested void consumer, no FUNCCALL_EXEC_RETURN slot (#9390).
+     *
+     * var_export(f()) still emits EXEC_RETURN and must stay in the ordinal map (#8796).
+     *
+     * @param list<Op> $cfgChildren
+     */
+    private function siblingInlineFuncCallSkipsExecReturnOrdinal(
+        Op $child,
+        int $childIndex,
+        array $cfgChildren
+    ): bool {
+        if (!$child instanceof Op\Expr\FuncCall && !$child instanceof Op\Expr\NsFuncCall) {
+            return false;
+        }
+        if ($childIndex < 1) {
+            return false;
+        }
+        $prev = $cfgChildren[$childIndex - 1] ?? null;
+        if (!$prev instanceof Op\Expr\FuncCall && !$prev instanceof Op\Expr\NsFuncCall) {
+            return false;
+        }
+        if (!$this->isAdjacentNestedFuncCallProducer($prev, $child, $childIndex - 1, $childIndex)) {
+            return false;
+        }
+        if ('var_dump' !== strtolower($this->resolveCfgFuncCallName($child) ?? '')) {
+            return false;
+        }
+        // var_dump($g(), $h()) — multi-arg sibling wiring still uses EXEC_RETURN (#16029).
+        if (\is_array($child->args ?? null) && \count($child->args) >= 2) {
+            return false;
+        }
+
+        return true;
+    }
+
     private function siblingInlineFuncCallProducerOrdinal(
         int $producerIndex,
         int $firstSibling,
@@ -21144,6 +21180,9 @@ class Compiler {
                 ($child instanceof Op\Expr\FuncCall || $child instanceof Op\Expr\NsFuncCall)
                 && $this->builtinUsesTrailingComparatorCallback($this->resolveCfgFuncCallName($child))
             ) {
+                continue;
+            }
+            if ($this->siblingInlineFuncCallSkipsExecReturnOrdinal($child, $j, $cfgChildren)) {
                 continue;
             }
             ++$ordinal;
@@ -21239,6 +21278,9 @@ class Compiler {
             ) {
                 continue;
             }
+            if ($this->siblingInlineFuncCallSkipsExecReturnOrdinal($child, $j, $cfgChildren)) {
+                continue;
+            }
             ++$seen;
             if ($seen === $ordinal) {
                 return $j;
@@ -21267,6 +21309,9 @@ class Compiler {
                 ($child instanceof Op\Expr\FuncCall || $child instanceof Op\Expr\NsFuncCall)
                 && $this->builtinUsesTrailingComparatorCallback($this->resolveCfgFuncCallName($child))
             ) {
+                continue;
+            }
+            if ($this->siblingInlineFuncCallSkipsExecReturnOrdinal($child, $j, $cfgChildren)) {
                 continue;
             }
             ++$seen;
@@ -23644,6 +23689,9 @@ class Compiler {
                 continue;
             }
             if ($this->builtinUsesTrailingComparatorCallback($this->resolveCfgFuncCallName($child))) {
+                continue;
+            }
+            if ($this->siblingInlineFuncCallSkipsExecReturnOrdinal($child, $j, $cfgChildren)) {
                 continue;
             }
             if ($j === $producerIndex) {
