@@ -12,6 +12,22 @@ use PHPUnit\Framework\TestCase;
 /** VmPassword bcrypt/crypt without libcrypt FFI (#14182, php-in-php). */
 final class VmPasswordRuntimeShrinkTest extends TestCase
 {
+    public static function setUpBeforeClass(): void
+    {
+        if (!\function_exists('__compiler_libcrypt')) {
+            eval('function __compiler_libcrypt(string $key, string $salt): ?string {
+                if (!\\function_exists("crypt")) { return null; }
+                $result = \\crypt($key, $salt);
+                return \\is_string($result) && "" !== $result ? $result : null;
+            }');
+        }
+        if (!\function_exists('__compiler_password_random_bytes')) {
+            eval('function __compiler_password_random_bytes(int $length): string {
+                return \\random_bytes($length);
+            }');
+        }
+    }
+
     public function testVmPasswordNativeHasNoLibcryptFfi(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/VmPasswordNative.php');
@@ -24,8 +40,7 @@ final class VmPasswordRuntimeShrinkTest extends TestCase
     public function testVmPasswordPureHasNoLibcFfi(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/VmPasswordPure.php');
-        $this->assertStringContainsString('function_exists', $source);
-        $this->assertStringContainsString('\\crypt(', $source);
+        $this->assertStringContainsString('__compiler_libcrypt', $source);
         $this->assertStringNotContainsString('\\FFI', $source);
         $this->assertStringNotContainsString('FFI::cdef', $source);
     }

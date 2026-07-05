@@ -77,7 +77,7 @@ final class VmPasswordNative
         }
 
         try {
-            $rnd = \random_bytes(16);
+            $rnd = self::secureRandomBytes(16);
         } catch (\Throwable) {
             return false;
         }
@@ -375,6 +375,17 @@ final class VmPasswordNative
         }
 
         return \substr($out, 0, 22);
+    }
+
+    /** @throws \RuntimeException when CSPRNG fails */
+    private static function secureRandomBytes(int $length): string
+    {
+        $bytes = __compiler_password_random_bytes($length);
+        if (!\is_string($bytes) || \strlen($bytes) !== $length) {
+            throw new \RuntimeException('password random bytes failed');
+        }
+
+        return $bytes;
     }
 
     private static function libcrypt(string $key, string $salt): ?string

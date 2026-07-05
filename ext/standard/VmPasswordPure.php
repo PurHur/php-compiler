@@ -18,12 +18,8 @@ final class VmPasswordPure
 
     public static function crypt(string $key, string $salt): ?string
     {
-        if (!\function_exists('crypt')) {
-            return null;
-        }
-
-        $result = \crypt($key, $salt);
-        if (!\is_string($result) || '' === $result) {
+        $result = __compiler_libcrypt($key, $salt);
+        if (!\is_string($result) || '' === $result || '*' === $result[0]) {
             return null;
         }
 

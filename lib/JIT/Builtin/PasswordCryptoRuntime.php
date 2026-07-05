@@ -69,6 +69,8 @@ final class PasswordCryptoRuntime
     {
         $probe = $context->module->getNamedFunction('__compiler_password_hash');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            LibcryptThinRuntime::ensureLinked($context);
+            PasswordRandomBytesRuntime::ensureLinked($context);
             self::registerLinkedRuntime($context);
 
             return;
@@ -80,6 +82,8 @@ final class PasswordCryptoRuntime
         } catch (\Throwable) {
         }
 
+        LibcryptThinRuntime::ensureLinked($context);
+        PasswordRandomBytesRuntime::ensureLinked($context);
         self::ensureJitHelperCompiled($context);
         self::implementIfMissing($context, '__compiler_password_hash', self::implementHashBridge(...));
         self::implementIfMissing($context, '__compiler_password_verify', self::implementVerifyBridge(...));
