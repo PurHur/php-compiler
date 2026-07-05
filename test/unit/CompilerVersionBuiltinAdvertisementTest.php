@@ -81,9 +81,24 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         }
     }
 
+    public function testClassHasFunctionsWithheldOnReferenceProfile(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsClassHasFunctions());
+    }
+
     public function testClassHasFunctionsAdvertisedOnForwardProfile(): void
     {
-        $this->assertTrue(CompilerVersion::supportsClassHasFunctions());
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertTrue(CompilerVersion::supportsClassHasFunctions());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
     }
 
     public function testPhp84ReflectionProbeBuiltinsWithheldOnReferenceProfile(): void

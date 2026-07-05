@@ -54,9 +54,24 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
+    public function testSupportsClassHasFunctionsFalseOnReferenceProfile(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsClassHasFunctions());
+    }
+
     public function testSupportsClassHasFunctionsTrueOnForwardProfile(): void
     {
-        $this->assertTrue(CompilerVersion::supportsClassHasFunctions());
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertTrue(CompilerVersion::supportsClassHasFunctions());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
     }
 
     public function testSupportsPhp84ReflectionProbeBuiltinsFalseOnReferenceProfile(): void
@@ -705,12 +720,31 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
-    public function testVmRegistersClassHasFunctionsOnForwardProfile(): void
+    public function testVmDoesNotRegisterClassHasFunctionsOnReferenceProfile(): void
     {
         $runtime = new Runtime();
         $ctx = $runtime->vmContext;
         foreach (['class_has_method', 'class_has_property', 'class_has_constant'] as $fn) {
-            $this->assertTrue(isset($ctx->functions[$fn]), $fn);
+            $this->assertFalse(isset($ctx->functions[$fn]), $fn);
+        }
+    }
+
+    public function testVmRegistersClassHasFunctionsOnForwardProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $runtime = new Runtime();
+            $ctx = $runtime->vmContext;
+            foreach (['class_has_method', 'class_has_property', 'class_has_constant'] as $fn) {
+                $this->assertTrue(isset($ctx->functions[$fn]), $fn);
+            }
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
         }
     }
 

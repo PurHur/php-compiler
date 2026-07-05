@@ -55,6 +55,9 @@ final class BuiltinIntrospectionPolicy
         if ('grapheme_strimwidth' === $lc) {
             return CompilerVersion::advertisesGraphemeStrimwidth();
         }
+        if (\in_array($lc, ['class_has_method', 'class_has_property', 'class_has_constant'], true)) {
+            return CompilerVersion::supportsClassHasFunctions();
+        }
 
         return true;
     }

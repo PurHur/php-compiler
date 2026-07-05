@@ -743,7 +743,13 @@ class VMTest extends BaseTest {
                 continue;
             }
             if (!CompilerVersion::supportsClassHasFunctions()
-                && str_contains($name, 'class_has_')) {
+                && str_contains($name, 'class_has_')
+                && !str_contains($name, 'class_has_lazy_object')
+                && !str_contains($name, 'class_has_functions_phantom')) {
+                continue;
+            }
+            if (CompilerVersion::supportsClassHasFunctions()
+                && str_contains($name, 'class_has_functions_phantom')) {
                 continue;
             }
             if (str_contains(strtolower($case[0]), 'splobjectstorage')) {
