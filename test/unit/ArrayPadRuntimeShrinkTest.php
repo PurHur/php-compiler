@@ -16,8 +16,8 @@ final class ArrayPadRuntimeShrinkTest extends TestCase
     {
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ArrayPadRuntime.php');
         $this->assertStringContainsString('ArrayPadJitHelper', $runtime);
-        $this->assertStringContainsString('isNativeArray', $runtime);
-        $this->assertStringContainsString('ArrayBuiltinHelper::pad', $runtime);
+        $this->assertStringContainsString('padCopyLegacy', $runtime);
+        $this->assertStringContainsString('padCopyTyped', $runtime);
         $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);
 
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/array_pad.php');
@@ -37,12 +37,12 @@ final class ArrayPadRuntimeShrinkTest extends TestCase
         $padValue = new Variable();
         $padValue->int(0);
 
-        $right = ArrayPadJitHelper::padCopy($ht, 4, $padValue);
+        $right = ArrayPadJitHelper::padCopyLegacy($ht, 4, $padValue);
         $this->assertSame(4, $right->getNumElements());
         $this->assertSame(0, $right->findIndex(2)?->resolveIndirect()->toInt());
         $this->assertSame(0, $right->findIndex(3)?->resolveIndirect()->toInt());
 
-        $left = ArrayPadJitHelper::padCopy($ht, -4, $padValue);
+        $left = ArrayPadJitHelper::padCopyLegacy($ht, -4, $padValue);
         $this->assertSame(4, $left->getNumElements());
         $this->assertSame(0, $left->findIndex(0)?->resolveIndirect()->toInt());
         $this->assertSame(0, $left->findIndex(1)?->resolveIndirect()->toInt());
@@ -62,7 +62,7 @@ final class ArrayPadRuntimeShrinkTest extends TestCase
         $padValue = new Variable();
         $padValue->int(0);
 
-        $left = ArrayPadJitHelper::padCopy($ht, -4, $padValue);
+        $left = ArrayPadJitHelper::padCopyLegacy($ht, -4, $padValue);
         $this->assertSame(4, $left->getNumElements());
         $this->assertSame(0, $left->findIndex(0)?->resolveIndirect()->toInt());
         $this->assertSame(1, $left->find('a')?->resolveIndirect()->toInt());
