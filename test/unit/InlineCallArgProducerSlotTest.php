@@ -6396,4 +6396,52 @@ PHP;
             }
         }
     }
+
+    /** Issue #10177 — sequential setlocale(LC_ALL, …) must not steal prior EXEC_RETURN for LC_ALL prelude. */
+    public function testSequentialSetlocaleQueryNullKeepsHoistedLcAllPreludeSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+declare(strict_types=1);
+$q1 = setlocale(LC_ALL, null);
+setlocale(LC_ALL, 'C');
+$q2 = setlocale(LC_ALL, null);
+echo $q1, ':', $q2, "\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'setlocale_query_null_chain.php');
+
+        $returnSlots = [];
+        $thirdCallSends = [];
+        $fcallOrdinal = 0;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                ++$fcallOrdinal;
+                if (3 === $fcallOrdinal) {
+                    $thirdCallSends = [];
+                }
+            }
+            if (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
+                $returnSlots[] = $op->arg1;
+            }
+            if (3 === $fcallOrdinal && OpCode::TYPE_ARG_SEND === $op->type) {
+                $thirdCallSends[] = $op->arg1;
+            }
+        }
+
+        self::assertCount(2, $thirdCallSends);
+        self::assertNotContains(
+            $thirdCallSends[0],
+            $returnSlots,
+            'third setlocale category must not use prior EXEC_RETURN; sends='.json_encode($thirdCallSends)
+                .' returns='.json_encode($returnSlots)
+        );
+
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertMatchesRegularExpression('/^[^:]+:.*\n$/', $out);
+        [$first, $second] = explode(':', trim($out));
+        self::assertSame($first, $second);
+    }
 }

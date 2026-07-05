@@ -19179,6 +19179,91 @@ class Compiler {
         return $producers;
     }
 
+    /**
+     * $q = setlocale(LC_ALL, null) — hoisted ConstFetch preludes sit before the Assign stmt (#10177).
+     *
+     * @return list<Op\Expr\ConstFetch|Op\Expr\ClassConstFetch>
+     */
+    private function hoistedPreludeProducersBeforeAssignStmt(Op $callOp, Block $block): array
+    {
+        if (null === $block->orig) {
+            return [];
+        }
+        $walkFrom = null;
+        foreach ($block->orig->children as $i => $child) {
+            if (
+                $child instanceof Op\Expr\Assign
+                && null !== $child->expr
+                && ($child->expr === $callOp || $this->exprContainsCfgOp($child->expr, $callOp))
+            ) {
+                $walkFrom = $i - 1;
+                break;
+            }
+        }
+        if (!\is_int($walkFrom)) {
+            return [];
+        }
+        $producers = [];
+        for ($i = $walkFrom; $i >= 0; --$i) {
+            $child = $block->orig->children[$i];
+            if ($child instanceof Op\Expr\ConstFetch || $child instanceof Op\Expr\ClassConstFetch) {
+                array_unshift($producers, $child);
+                continue;
+            }
+            if ($child instanceof Op\Expr\Assign) {
+                break;
+            }
+            if ($this->isInlineExprCallArgProducer($child)) {
+                break;
+            }
+            break;
+        }
+
+        return $producers;
+    }
+
+    private function exprContainsCfgOp(Op\Expr $expr, Op $needle): bool
+    {
+        if ($expr === $needle) {
+            return true;
+        }
+        if (!property_exists($expr, 'expr') || !$expr->expr instanceof Op\Expr) {
+            return false;
+        }
+
+        return $this->exprContainsCfgOp($expr->expr, $needle);
+    }
+
+    private function hoistedConstPreludeProducerForCallArgIndex(Op $callOp, int $argIndex, Block $block): ?Op\Expr
+    {
+        if (!$this->callArgHasHoistedConstPrelude($callOp, $argIndex, $block)) {
+            return null;
+        }
+        $preludes = $this->hoistedPreludeProducersImmediatelyBeforeCall($callOp, $block);
+        if ([] === $preludes) {
+            $preludes = $this->hoistedPreludeProducersBeforeAssignStmt($callOp, $block);
+        }
+        $preludeOrdinal = 0;
+        foreach ($callOp->args as $i => $callArg) {
+            if ($this->isEmbeddedCallLiteralArg($callArg)) {
+                continue;
+            }
+            if (!$this->callArgIsDeadInlineTemporary($callArg)) {
+                continue;
+            }
+            if ($i === $argIndex) {
+                $prelude = $preludes[$preludeOrdinal] ?? null;
+
+                return $prelude instanceof Op\Expr\ConstFetch || $prelude instanceof Op\Expr\ClassConstFetch
+                    ? $prelude
+                    : null;
+            }
+            ++$preludeOrdinal;
+        }
+
+        return null;
+    }
+
     private function hoistedPreludeProducerForCallArgIndex(Op $callOp, int $argIndex, Block $block): ?Op\Expr
     {
         $ordinal = $this->hoistedEnumPreludeSlotOrdinalForCallArg($callOp, $argIndex);
@@ -24763,6 +24848,9 @@ class Compiler {
             return null;
         }
         $callArg = $cfgCallOp->args[$argIndex] ?? null;
+        if ($this->callArgHasHoistedConstPrelude($cfgCallOp, $argIndex, $block)) {
+            return null;
+        }
         if ($callArg instanceof Operand) {
             $hoistedScalarSlot = $this->tryFoldHoistedBoolNullLiteralCallArg(
                 $callArg,
@@ -33229,6 +33317,46 @@ class Compiler {
                                 continue;
                             }
                         }
+                    } elseif (
+                        ($preludeProducer = $this->hoistedConstPreludeProducerForCallArgIndex(
+                            $cfgCallOp,
+                            (int) $argIndex,
+                            $block
+                        )) instanceof Op\Expr\ConstFetch
+                    ) {
+                        $constSlot = $this->slotForHoistedScalarConstFetchCallArg($preludeProducer, $block);
+                        if (null !== $constSlot) {
+                            $sends[] = new OpCode(
+                                OpCode::TYPE_ARG_SEND,
+                                (string) $constSlot,
+                                $nameSlot,
+                                $unpackFlag
+                            );
+                            continue;
+                        }
+                    }
+                } elseif (
+                    ($preludeProducer = $this->hoistedConstPreludeProducerForCallArgIndex(
+                        $cfgCallOp,
+                        (int) $argIndex,
+                        $block
+                    )) instanceof Op\Expr\ClassConstFetch
+                ) {
+                    $classConstSlot = $block->slotForOperand($preludeProducer->result);
+                    if (null === $classConstSlot) {
+                        foreach ($this->compileExpr($preludeProducer, $block) as $op) {
+                            $sends[] = $op;
+                        }
+                        $classConstSlot = $block->slotForOperand($preludeProducer->result);
+                    }
+                    if (null !== $classConstSlot) {
+                        $sends[] = new OpCode(
+                            OpCode::TYPE_ARG_SEND,
+                            (string) $classConstSlot,
+                            $nameSlot,
+                            $unpackFlag
+                        );
+                        continue;
                     }
                 }
             }
@@ -37216,7 +37344,12 @@ class Compiler {
                         if (null !== $callbackSlot) {
                             $valueSlot = (string) $callbackSlot;
                         }
-                    } elseif (null !== $producerOrdinal && $producerOrdinal < $chainProducerCount && null === $valueSlot) {
+                    } elseif (
+                        null !== $producerOrdinal
+                        && $producerOrdinal < $chainProducerCount
+                        && null === $valueSlot
+                        && !$this->callArgHasHoistedConstPrelude($cfgCallOp, (int) $argIndex, $block)
+                    ) {
                         $execReturnCount = 0;
                         foreach ($block->opCodes as $op) {
                             if (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type && null !== $op->arg1) {
@@ -37273,7 +37406,10 @@ class Compiler {
                                 }
                             }
                         }
-                    } elseif (null === $constPreludeSlot) {
+                    } elseif (
+                        null === $constPreludeSlot
+                        && !$this->callArgHasHoistedConstPrelude($cfgCallOp, (int) $argIndex, $block)
+                    ) {
                         $valueSlot = (string) $forcedSiblingSlot;
                     }
                 }
@@ -39973,6 +40109,23 @@ class Compiler {
                 ++$argIndex;
                 continue;
             }
+            $hoistedPrelude = $this->hoistedPreludeProducerForCallArgIndex($cfgCallOp, $argIndex, $block);
+            if (
+                $hoistedPrelude instanceof Op\Expr\ConstFetch
+                || $hoistedPrelude instanceof Op\Expr\ClassConstFetch
+            ) {
+                // setlocale(LC_ALL, null) after earlier setlocale stmts — keep hoisted LC_* / null prelude (#10177).
+                ++$argIndex;
+                continue;
+            }
+            if ($this->callArgHasHoistedConstPrelude($cfgCallOp, $argIndex, $block)) {
+                ++$argIndex;
+                continue;
+            }
+            if ($this->opcodeSlotIsHoistedConstPrelude($block, $send->arg1, $pendingNestedProducerOps)) {
+                ++$argIndex;
+                continue;
+            }
             if (!$this->callArgIsDeadInlineTemporary($cfgCallOp->args[$argIndex] ?? null)) {
                 ++$argIndex;
                 continue;
@@ -40051,6 +40204,70 @@ class Compiler {
             }
             ++$argIndex;
         }
+    }
+
+    /**
+     * Hoisted ConstFetch/ClassConstFetch immediately before a call feeds a dead inline arg (#10177).
+     */
+    private function callArgHasHoistedConstPrelude(Op $cfgCallOp, int $argIndex, Block $block): bool
+    {
+        if ('setlocale' !== strtolower($this->resolveCfgFuncCallName($cfgCallOp) ?? '')) {
+            return false;
+        }
+        if (!property_exists($cfgCallOp, 'args') || !\is_array($cfgCallOp->args)) {
+            return false;
+        }
+        $preludes = $this->hoistedPreludeProducersImmediatelyBeforeCall($cfgCallOp, $block);
+        if ([] === $preludes) {
+            $preludes = $this->hoistedPreludeProducersBeforeAssignStmt($cfgCallOp, $block);
+        }
+        if ([] === $preludes) {
+            return false;
+        }
+        $preludeOrdinal = 0;
+        foreach ($cfgCallOp->args as $i => $callArg) {
+            if ($this->isEmbeddedCallLiteralArg($callArg)) {
+                continue;
+            }
+            if (!$this->callArgIsDeadInlineTemporary($callArg)) {
+                continue;
+            }
+            if ($i === $argIndex) {
+                $prelude = $preludes[$preludeOrdinal] ?? null;
+
+                return $prelude instanceof Op\Expr\ConstFetch
+                    || $prelude instanceof Op\Expr\ClassConstFetch;
+            }
+            ++$preludeOrdinal;
+        }
+
+        return false;
+    }
+
+    /**
+     * ARG_SEND already wired to hoisted ConstFetch — do not replace with sibling EXEC_RETURN (#10177).
+     *
+     * @param list<OpCode> $pendingNestedProducerOps
+     */
+    private function opcodeSlotIsHoistedConstPrelude(
+        Block $block,
+        int|string|null $slot,
+        array $pendingNestedProducerOps = []
+    ): bool {
+        if (null === $slot) {
+            return false;
+        }
+        $slot = (string) $slot;
+        foreach (array_merge($block->opCodes, $pendingNestedProducerOps) as $op) {
+            if (
+                (OpCode::TYPE_CONST_FETCH === $op->type || OpCode::TYPE_CLASS_CONST_FETCH === $op->type)
+                && (string) $op->arg1 === $slot
+            ) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
