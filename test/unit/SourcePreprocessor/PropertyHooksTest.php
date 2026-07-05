@@ -671,8 +671,8 @@ PHP;
         self::assertStringNotContainsString('__phpc_property_', $out);
     }
 
-    /** @covers issue #9729 — promoted asymmetric visibility with defaults end-to-end */
-    public function testPromotedAsymmetricVisibilityWithDefaultSurvivesRuntimePreprocess(): void
+    /** @covers issue #16436 — parenthesized asymmetric set invalid on promoted params (Zend parse error) */
+    public function testPromotedAsymmetricVisibilityParenthesizedFormRejectsAtCompile(): void
     {
         $this->skipUnlessPropertyHooksEnabled();
         if (!CompilerVersion::supportsAsymmetricVisibility()) {
@@ -683,14 +683,14 @@ PHP;
 class D {
     public function __construct(public (private(set)) int $x = 1) {}
 }
-$d = new D();
-echo $d->x, "\n";
 PHP;
         $runtime = new Runtime();
-        $block = $runtime->parseAndCompile($src, 'promoted_asymmetric_default.php');
-        ob_start();
-        $runtime->run($block);
-        self::assertSame("1\n", ob_get_clean());
+        try {
+            $runtime->parseAndCompile($src, 'promoted_asymmetric_default.php');
+            self::fail('Expected compile failure');
+        } catch (\CompileError $e) {
+            self::assertStringContainsString('syntax error, unexpected token "private"', $e->getMessage());
+        }
     }
 
     /** @covers bootstrap spine — method param defaults before typed body must not match hook scanner */

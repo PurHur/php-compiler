@@ -70,30 +70,26 @@ PHP, 'asymmetric_public_private_set.php');
         $this->assertNotNull($block);
     }
 
-    public function testPromotedPublicPrivateSetCompiles(): void
+    public function testPromotedPublicPrivateSetParenthesizedFormRejects(): void
     {
-        $runtime = new Runtime();
-        $block = $runtime->parseAndCompile(<<<'PHP'
+        $this->expectCompileError(<<<'PHP'
 <?php
 class User {
     public function __construct(
         public (private(set)) string $name,
     ) {}
 }
-PHP, 'asymmetric_promoted_public_private_set.php');
-        $this->assertNotNull($block);
+PHP, 'syntax error, unexpected token "private"');
     }
 
-    public function testPromotedSingleLinePublicPrivateSetCompiles(): void
+    public function testPromotedSingleLinePublicPrivateSetParenthesizedFormRejects(): void
     {
-        $runtime = new Runtime();
-        $block = $runtime->parseAndCompile(<<<'PHP'
+        $this->expectCompileError(<<<'PHP'
 <?php
 class D {
     public function __construct(public (private(set)) int $x = 1) {}
 }
-PHP, 'asymmetric_promoted_single_line.php');
-        $this->assertNotNull($block);
+PHP, 'syntax error, unexpected token "private"');
     }
 
     public function testPromotedExplicitReadBeforePrivateSetRejects(): void
