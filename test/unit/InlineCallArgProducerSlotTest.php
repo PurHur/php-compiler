@@ -5777,6 +5777,47 @@ PHP;
         self::assertSame("ok bytes=59\n", ob_get_clean());
     }
 
+    /** Issue #16318 — importNode($doc->documentElement, true) must not misbind deep to property-fetch slot. */
+    public function testDomDocumentImportNodePropertyFetchAndTrueUseDistinctArgSlots(): void
+    {
+        $code = <<<'PHP'
+<?php
+declare(strict_types=1);
+$doc1 = new DOMDocument();
+$doc1->loadXML('<x>text</x>');
+$doc2 = new DOMDocument();
+$imported = $doc2->importNode($doc1->documentElement, true);
+echo $imported->nodeName, ':', $imported->textContent, "\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'dom_import_node_property_fetch_true.php');
+
+        $importArgSendSlots = [];
+        $seenImportNode = false;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_METHODCALL_INIT === $op->type
+                && null !== $op->arg2
+                && isset($block->constants[$op->arg2])
+                && 'importNode' === $block->constants[$op->arg2]->toString()) {
+                $seenImportNode = true;
+                continue;
+            }
+            if ($seenImportNode && OpCode::TYPE_ARG_SEND === $op->type) {
+                $importArgSendSlots[] = $op->arg1;
+            }
+            if ($seenImportNode && OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
+                break;
+            }
+        }
+
+        self::assertCount(2, $importArgSendSlots, 'importNode arg sends='.json_encode($importArgSendSlots));
+        self::assertNotSame($importArgSendSlots[0], $importArgSendSlots[1]);
+
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("x:text\n", ob_get_clean());
+    }
+
     /** Issue #15996 — DateTime literal ctor arg must not alias prior inline NEW slot. */
     public function testDateTimeNewLiteralArgDistinctFromPriorNewResultSlot(): void
     {
