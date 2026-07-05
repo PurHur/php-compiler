@@ -23,6 +23,52 @@ final class GlobalTypedConstRewriter
     /** Zend/php-src: `final const` at compile-unit scope is invalid at all versions (#10324, #15185). */
     public const FINAL_GLOBAL_CONST_REJECT_MESSAGE = 'syntax error, unexpected token "const", expecting "abstract" or "final" or "readonly" or "class"';
 
+    /**
+     * Zend 8.2 reference profile diagnostic for file/namespace `const T $name` (#16651).
+     *
+     * @return array{line: int, message: string}|null
+     */
+    public static function referenceProfileSyntaxError(string $source): ?array
+    {
+        if (false === stripos($source, 'const')) {
+            return null;
+        }
+
+        $tokens = token_get_all($source);
+        $n = \count($tokens);
+        $classLikeDepth = 0;
+        $pendingClassLike = false;
+
+        for ($i = 0; $i < $n; ++$i) {
+            $tok = $tokens[$i];
+            $text = self::tokenText($tok);
+
+            if (\is_array($tok)) {
+                if (\in_array($tok[0], [T_CLASS, T_INTERFACE, T_TRAIT, T_ENUM], true)) {
+                    $pendingClassLike = true;
+                } elseif (T_CONST === $tok[0] && 0 === $classLikeDepth) {
+                    $typed = self::tryParseTypedConst($tokens, $i + 1);
+                    if (null !== $typed) {
+                        [$typeExpr, $nameIdx] = $typed;
+                        $typeStartIdx = self::skipIgnorable($tokens, $i + 1, $n);
+
+                        return [
+                            'line' => self::tokenLine($tokens[$typeStartIdx]),
+                            'message' => self::zendReferenceProfileSyntaxMessage($tokens, $typeStartIdx, $nameIdx, $typeExpr),
+                        ];
+                    }
+                }
+            } elseif ('{' === $text && $pendingClassLike) {
+                ++$classLikeDepth;
+                $pendingClassLike = false;
+            } elseif ('}' === $text && $classLikeDepth > 0) {
+                --$classLikeDepth;
+            }
+        }
+
+        return null;
+    }
+
     public static function rewrite(string $source): string
     {
         if (!CompilerVersion::supportsGlobalTypedConstants()) {
@@ -283,6 +329,38 @@ final class GlobalTypedConstRewriter
     private static function collapseWhitespace(string $typeExpr): string
     {
         return trim((string) preg_replace('/\s+/', ' ', $typeExpr));
+    }
+
+    /**
+     * @param list<array{0: int, 1: string, 2: int}|string> $tokens
+     */
+    private static function tokenLine($token): int
+    {
+        return \is_array($token) ? ($token[2] ?? 1) : 1;
+    }
+
+    /**
+     * @param list<array{0: int, 1: string, 2: int}|string> $tokens
+     */
+    private static function zendReferenceProfileSyntaxMessage(
+        array $tokens,
+        int $typeStartIdx,
+        int $nameIdx,
+        string $typeExpr
+    ): string {
+        $typeTok = $tokens[$typeStartIdx];
+        if (\is_array($typeTok) && T_ARRAY === $typeTok[0]) {
+            return 'syntax error, unexpected token "array", expecting identifier';
+        }
+
+        $nameTok = $tokens[$nameIdx];
+        if (\is_array($nameTok) && T_STRING === $nameTok[0]) {
+            return sprintf('syntax error, unexpected identifier "%s", expecting "="', $nameTok[1]);
+        }
+
+        $first = strtok($typeExpr, " \t|&()");
+
+        return sprintf('syntax error, unexpected identifier "%s", expecting "="', $first ?: $typeExpr);
     }
 
     /**

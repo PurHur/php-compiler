@@ -654,6 +654,26 @@ final class CompilerVersionGateTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsFinalGlobalTypedConstants());
     }
 
+    public function testSupportsGlobalTypedConstantsWithheldOnReferenceProfile(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsGlobalTypedConstants());
+    }
+
+    public function testSupportsGlobalTypedConstantsOnForwardProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.3');
+        try {
+            $this->assertTrue(CompilerVersion::supportsGlobalTypedConstants());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     public function testVmDoesNotRegisterStrIncrementOnReferenceProfile(): void
     {
         $runtime = new Runtime();

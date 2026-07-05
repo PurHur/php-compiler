@@ -9,6 +9,24 @@ use PHPUnit\Framework\TestCase;
 
 final class GlobalTypedConstRewriterTest extends TestCase
 {
+    /** @var string|false */
+    private $prevProfile = false;
+
+    protected function setUp(): void
+    {
+        $this->prevProfile = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.3');
+    }
+
+    protected function tearDown(): void
+    {
+        if (false === $this->prevProfile) {
+            putenv('PHP_COMPILER_PROFILE');
+        } else {
+            putenv('PHP_COMPILER_PROFILE='.$this->prevProfile);
+        }
+    }
+
     public function testRewritesFileScopeTypedConst(): void
     {
         $src = <<<'PHP'
@@ -70,5 +88,36 @@ PHP;
         $this->expectException(\PhpParser\Error::class);
         $this->expectExceptionMessage(GlobalTypedConstRewriter::FINAL_GLOBAL_CONST_REJECT_MESSAGE);
         GlobalTypedConstRewriter::rewrite($src);
+    }
+
+    public function testReferenceProfileSyntaxErrorIntConst(): void
+    {
+        $src = <<<'PHP'
+<?php
+const int X = 7;
+PHP;
+        $error = GlobalTypedConstRewriter::referenceProfileSyntaxError($src);
+        self::assertNotNull($error);
+        self::assertSame('syntax error, unexpected identifier "X", expecting "="', $error['message']);
+    }
+
+    public function testReferenceProfileSyntaxErrorArrayConst(): void
+    {
+        $src = <<<'PHP'
+<?php
+const array A = [];
+PHP;
+        $error = GlobalTypedConstRewriter::referenceProfileSyntaxError($src);
+        self::assertNotNull($error);
+        self::assertSame('syntax error, unexpected token "array", expecting identifier', $error['message']);
+    }
+
+    public function testReferenceProfileSyntaxErrorIgnoresClassConst(): void
+    {
+        $src = <<<'PHP'
+<?php
+class C { public const string X = 'a'; }
+PHP;
+        self::assertNull(GlobalTypedConstRewriter::referenceProfileSyntaxError($src));
     }
 }
