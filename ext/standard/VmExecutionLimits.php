@@ -15,11 +15,9 @@ use PHPCompiler\VM\ScriptExit;
  */
 final class VmExecutionLimits
 {
-    private const DEFAULT_MAX_SECONDS = 30;
-
     private float $deadline = 0.0;
 
-    private int $activeLimitSeconds = self::DEFAULT_MAX_SECONDS;
+    private int $activeLimitSeconds = 0;
 
     private int $ignoreUserAbort = 0;
 
@@ -28,7 +26,7 @@ final class VmExecutionLimits
     /** Start counting from script entry (VM::run). */
     public function begin(): void
     {
-        $this->resetTimer(self::DEFAULT_MAX_SECONDS);
+        $this->applyMaxExecutionTime(self::parseIniMaxExecutionSeconds(VmIni::getStoredMaxExecutionTime()));
     }
 
     /**
@@ -85,12 +83,18 @@ final class VmExecutionLimits
 
     private function resetTimer(int $seconds): void
     {
-        if (0 === $seconds) {
+        if ($seconds <= 0) {
             $this->deadline = 0.0;
 
             return;
         }
         $this->deadline = microtime(true) + (float) $seconds;
+    }
+
+    /** php-src: 0 / -1 ini and set_time_limit(0|-1) disable the timer (#15906). */
+    private static function parseIniMaxExecutionSeconds(string $raw): int
+    {
+        return (int) trim($raw);
     }
 
     /**
@@ -109,9 +113,7 @@ final class VmExecutionLimits
             $message .= " in {$file} on line {$line}";
         }
         $formatted = "PHP Fatal error:  {$message}\n";
-        if ($ctx->errors->getDisplayErrors()) {
-            fwrite(STDERR, $formatted);
-        }
+        fwrite(STDERR, $formatted);
         throw new ScriptExit(255);
     }
 }
