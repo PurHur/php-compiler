@@ -35450,31 +35450,6 @@ class Compiler {
                     }
                 }
             }
-            if (
-                null !== $cfgCallOp
-                && null !== $block->orig
-                && $this->callArgIsDeadInlineTemporary($sendProbe)
-                && $this->callArgUsesHaystackFamilyArrayProducerResolution(
-                    $cfgCallOp,
-                    (int) $argIndex,
-                    $calleeName,
-                    $sendProbe
-                )
-            ) {
-                $haystackSiblingEmit = [];
-                $haystackExecSlot = $this->resolveSiblingInlineCallArgProducerSlot(
-                    $block,
-                    $cfgCallOp,
-                    (int) $argIndex,
-                    $haystackSiblingEmit
-                );
-                if (null !== $haystackExecSlot) {
-                    if ([] !== $haystackSiblingEmit) {
-                        $sends = array_merge($sends, $haystackSiblingEmit);
-                    }
-                    $valueSlot = (string) $haystackExecSlot;
-                }
-            }
             $sends[] = new OpCode(OpCode::TYPE_ARG_SEND, $valueSlot, $nameSlot, $unpackFlag);
         }
 
