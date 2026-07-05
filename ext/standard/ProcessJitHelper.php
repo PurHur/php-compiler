@@ -51,44 +51,6 @@ final class ProcessJitHelper
         return VmEscapeshell::escapeshellcmd($command);
     }
 
-    /** @return HashTable|null null when command fails */
-    public static function phpcRunCommandArgv(?string $command, ?HashTable $env): ?HashTable
-    {
-        if (null === $command || '' === $command) {
-            return null;
-        }
-
-        $envArray = null;
-        if (null !== $env) {
-            $envArray = [];
-            foreach ($env->iterateKeyed(true) as $pair) {
-                [$keyVar, $valVar] = $pair;
-                if (Variable::TYPE_STRING !== $keyVar->type || Variable::TYPE_STRING !== $valVar->type) {
-                    continue;
-                }
-                $envArray[$keyVar->toString()] = $valVar->toString();
-            }
-        }
-
-        $captured = VmPhpcRunCommandNative::run($command, $envArray);
-        if (null === $captured) {
-            return null;
-        }
-
-        $ht = new HashTable();
-        $codeVar = new Variable();
-        $codeVar->int($captured['code']);
-        $ht->add('code', $codeVar);
-        $stdoutVar = new Variable();
-        $stdoutVar->string($captured['stdout']);
-        $ht->add('stdout', $stdoutVar);
-        $stderrVar = new Variable();
-        $stderrVar->string($captured['stderr']);
-        $ht->add('stderr', $stderrVar);
-
-        return $ht;
-    }
-
     /** @return HashTable|null hashtable {lines, status} for exec()/passthru()/system() */
     public static function processExecCaptureArgv(?string $command): ?HashTable
     {

@@ -20,31 +20,31 @@ final class ProcessRuntime
 {
     private const HELPER_PATH = '/ext/standard/ProcessJitHelper.php';
 
+    private const PHPC_RUN_COMMAND_HELPER_PATH = '/ext/standard/ProcessPhpcRunCommandJitHelper.php';
+
     private const SHELL_EXEC = 'PHPCompiler\\ext\\standard\\ProcessJitHelper::shellExecArgv';
 
     private const ESCAPESHELLARG = 'PHPCompiler\\ext\\standard\\ProcessJitHelper::escapeshellargArgv';
 
     private const ESCAPESHELLCMD = 'PHPCompiler\\ext\\standard\\ProcessJitHelper::escapeshellcmdArgv';
 
-    private const PHPC_RUN_COMMAND = 'PHPCompiler\\ext\\standard\\ProcessJitHelper::phpcRunCommandArgv';
+    private const PHPC_RUN_COMMAND = 'PHPCompiler\\ext\\standard\\ProcessPhpcRunCommandJitHelper::phpcRunCommandArgv';
 
     private const PROCESS_EXEC_CAPTURE = 'PHPCompiler\\ext\\standard\\ProcessJitHelper::processExecCaptureArgv';
 
     /** @var list<string> */
-    private const COMPILED_HELPERS = [
+    private const CAPTURE_COMPILED_HELPERS = [
         self::SHELL_EXEC,
         self::ESCAPESHELLARG,
         self::ESCAPESHELLCMD,
-        self::PHPC_RUN_COMMAND,
         self::PROCESS_EXEC_CAPTURE,
     ];
 
     /** @var list<string> */
-    private const RUNTIME_FUNCTIONS = [
+    private const CAPTURE_RUNTIME_FUNCTIONS = [
         '__compiler_shell_exec',
         '__compiler_escapeshellarg',
         '__compiler_escapeshellcmd',
-        '__compiler_phpc_run_command',
         '__compiler_process_exec_capture',
     ];
 
@@ -68,11 +68,10 @@ final class ProcessRuntime
         } catch (\Throwable) {
         }
 
-        self::ensureJitHelperCompiled($context);
+        self::ensureCaptureHelperCompiled($context);
         self::implementNullableStringBridge($context, '__compiler_shell_exec', self::SHELL_EXEC);
         self::implementStringBridge($context, '__compiler_escapeshellarg', self::ESCAPESHELLARG);
         self::implementStringBridge($context, '__compiler_escapeshellcmd', self::ESCAPESHELLCMD);
-        self::implementPhpcRunCommandBridge($context);
         self::implementHashtableBridge($context, '__compiler_process_exec_capture', self::PROCESS_EXEC_CAPTURE);
         self::registerLinkedRuntime($context);
 
@@ -180,6 +179,37 @@ final class ProcessRuntime
         $context->registerFunction($abiName, $fn);
     }
 
+    public static function ensurePhpcRunCommandLinked(Context $context): void
+    {
+        self::ensureLinked($context);
+        $probe = $context->module->getNamedFunction('__compiler_phpc_run_command');
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction('__compiler_phpc_run_command', $probe);
+
+            return;
+        }
+
+        $savedBlock = null;
+        try {
+            $savedBlock = $context->builder->getInsertBlock();
+        } catch (\Throwable) {
+        }
+
+        self::ensurePhpcRunCommandHelperCompiled($context);
+        self::implementPhpcRunCommandBridge($context);
+        $fn = $context->module->getNamedFunction('__compiler_phpc_run_command');
+        if (null === $fn || 0 === $fn->countBasicBlocks()) {
+            throw new \LogicException('__compiler_phpc_run_command missing after ProcessRuntime bridge (#9337)');
+        }
+        $context->registerFunction('__compiler_phpc_run_command', $fn);
+
+        if (null !== $savedBlock) {
+            $context->builder->positionAtEnd($savedBlock);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
+    }
+
     private static function implementPhpcRunCommandBridge(Context $context): void
     {
         $abiName = '__compiler_phpc_run_command';
@@ -219,7 +249,11 @@ final class ProcessRuntime
 
     private static function helperFunction(Context $context, string $logical): LlvmFunction
     {
-        self::ensureJitHelperCompiled($context);
+        if (\strtolower(self::PHPC_RUN_COMMAND) === \strtolower($logical)) {
+            self::ensurePhpcRunCommandHelperCompiled($context);
+        } else {
+            self::ensureCaptureHelperCompiled($context);
+        }
         $lc = \strtolower($logical);
         $fn = $context->functions[$lc] ?? null;
         if (null === $fn) {
@@ -229,30 +263,63 @@ final class ProcessRuntime
         return $fn;
     }
 
-    private static function ensureJitHelperCompiled(Context $context): void
+    private static function ensureCaptureHelperCompiled(Context $context): void
     {
-        $missing = false;
-        foreach (self::COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                $missing = true;
-                break;
-            }
-        }
-        if (!$missing) {
+        if (self::helpersPresent($context, self::CAPTURE_COMPILED_HELPERS)) {
             return;
         }
 
+        self::compileHelperFile($context, self::HELPER_PATH, 'ProcessJitHelper.php', self::CAPTURE_COMPILED_HELPERS);
+    }
+
+    private static function ensurePhpcRunCommandHelperCompiled(Context $context): void
+    {
+        if (self::helpersPresent($context, [self::PHPC_RUN_COMMAND])) {
+            return;
+        }
+
+        self::compileHelperFile(
+            $context,
+            self::PHPC_RUN_COMMAND_HELPER_PATH,
+            'ProcessPhpcRunCommandJitHelper.php',
+            [self::PHPC_RUN_COMMAND]
+        );
+    }
+
+    /**
+     * @param list<string> $expectedHelpers
+     */
+    private static function helpersPresent(Context $context, array $expectedHelpers): bool
+    {
+        foreach ($expectedHelpers as $logical) {
+            if (!isset($context->functions[\strtolower($logical)])) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * @param list<string> $expectedHelpers
+     */
+    private static function compileHelperFile(
+        Context $context,
+        string $relativePath,
+        string $basename,
+        array $expectedHelpers
+    ): void {
         $runtime = $context->runtime;
-        $path = \dirname(__DIR__, 3).self::HELPER_PATH;
-        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
-            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'ProcessJitHelper.php');
+        $path = \dirname(__DIR__, 3).$relativePath;
+        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path, $basename): void {
+            $block = $runtime->parseAndCompile((string) \file_get_contents($path), $basename);
             if (null === $block) {
-                throw new \LogicException('ProcessJitHelper.php parseAndCompile failed (#9337)');
+                throw new \LogicException($basename.' parseAndCompile failed (#9337)');
             }
             $jit = new JIT($context);
             $jit->compile($block);
         });
-        foreach (self::COMPILED_HELPERS as $logical) {
+        foreach ($expectedHelpers as $logical) {
             $lc = \strtolower($logical);
             if (!isset($context->functions[$lc])) {
                 throw new \LogicException($lc.' was not compiled for JIT process helpers (#9337)');
@@ -262,7 +329,7 @@ final class ProcessRuntime
 
     private static function registerLinkedRuntime(Context $context): void
     {
-        foreach (self::RUNTIME_FUNCTIONS as $name) {
+        foreach (self::CAPTURE_RUNTIME_FUNCTIONS as $name) {
             $fn = $context->module->getNamedFunction($name);
             if (null === $fn || 0 === $fn->countBasicBlocks()) {
                 throw new \LogicException($name.' missing after ProcessRuntime bridge (#9337)');
