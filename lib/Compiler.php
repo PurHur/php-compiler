@@ -34484,11 +34484,9 @@ class Compiler {
                     }
                 }
             } elseif (null !== $cfgCallOp && null !== $block->orig) {
-                if (null === $valueSlot) {
-                    $siblingSendSlot = $this->finalSiblingInlineCallArgSendSlot($block, $cfgCallOp, (int) $argIndex);
-                    if (null !== $siblingSendSlot) {
-                        $valueSlot = $siblingSendSlot;
-                    }
+                $siblingSendSlot = $this->finalSiblingInlineCallArgSendSlot($block, $cfgCallOp, (int) $argIndex);
+                if (null !== $siblingSendSlot) {
+                    $valueSlot = $siblingSendSlot;
                 }
             }
             if (
@@ -34589,7 +34587,7 @@ class Compiler {
                 $firstSibling = \is_int($callIndex)
                     ? $this->firstSiblingInlineFuncCallProducerIndexImpl($callIndex, $block->orig->children)
                     : null;
-                if (null === $valueSlot && \is_int($callIndex) && \is_int($firstSibling)) {
+                if (\is_int($callIndex) && \is_int($firstSibling)) {
                     if (
                         0 === (int) $argIndex
                         && 'array_map' === strtolower($this->resolveCfgFuncCallName($cfgCallOp) ?? '')
@@ -34617,7 +34615,6 @@ class Compiler {
                             }
                         }
                     }
-                    if (null === $valueSlot) {
                     $chainProducerCount = $this->countSiblingInlineFuncCallProducers(
                         $firstSibling,
                         $callIndex,
@@ -34665,25 +34662,22 @@ class Compiler {
                             $valueSlot = (string) $forcedSiblingSlot;
                         }
                     }
+                }
+                $forcedSiblingSlot = $this->finalSiblingInlineCallArgSendSlot($block, $cfgCallOp, (int) $argIndex);
+                if (null === $forcedSiblingSlot) {
+                    $forcedSiblingOps = [];
+                    $forcedSiblingSlot = $this->resolveSiblingInlineCallArgProducerSlot(
+                        $block,
+                        $cfgCallOp,
+                        (int) $argIndex,
+                        $forcedSiblingOps
+                    );
+                    if ([] !== $forcedSiblingOps) {
+                        $sends = array_merge($sends, $forcedSiblingOps);
                     }
                 }
-                if (null === $valueSlot) {
-                    $forcedSiblingSlot = $this->finalSiblingInlineCallArgSendSlot($block, $cfgCallOp, (int) $argIndex);
-                    if (null === $forcedSiblingSlot) {
-                        $forcedSiblingOps = [];
-                        $forcedSiblingSlot = $this->resolveSiblingInlineCallArgProducerSlot(
-                            $block,
-                            $cfgCallOp,
-                            (int) $argIndex,
-                            $forcedSiblingOps
-                        );
-                        if ([] !== $forcedSiblingOps) {
-                            $sends = array_merge($sends, $forcedSiblingOps);
-                        }
-                    }
-                    if (null !== $forcedSiblingSlot) {
-                        $valueSlot = (string) $forcedSiblingSlot;
-                    }
+                if (null !== $forcedSiblingSlot) {
+                    $valueSlot = (string) $forcedSiblingSlot;
                 }
             }
             if (
