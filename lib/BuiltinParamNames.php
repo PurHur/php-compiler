@@ -60,7 +60,7 @@ final class BuiltinParamNames
             case 'str_ireplace':
                 return ['search', 'replace', 'subject', 'count'];
             case 'parse_str':
-                return ['string', 'array'];
+                return ['string', 'result'];
             case 'dns_get_mx':
             case 'getmxrr':
                 return ['hostname', 'mxhosts', 'weight'];
