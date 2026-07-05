@@ -23,6 +23,7 @@ final class VmStreamMeta
             || \str_starts_with($uri, 'php://fd/');
 
         $socketType = self::streamTypeForUri($uri);
+        $phpNativeStreamType = self::phpNativeStreamType($uri);
         $eof = null !== $eofOverride ? $eofOverride : \feof($fp);
         $reportedMode = null !== $mode ? $mode : self::defaultReportedMode($uri, $isPhpMemory);
 
@@ -31,7 +32,7 @@ final class VmStreamMeta
             'blocked' => $blocked ?? true,
             'eof' => $eof,
             'unread_bytes' => 0,
-            'stream_type' => $socketType ?? ($isPhpMemory ? 'MEMORY' : ($isPhp ? 'STDIO' : 'STDIO')),
+            'stream_type' => $socketType ?? $phpNativeStreamType ?? ($isPhp ? 'STDIO' : 'STDIO'),
             'mode' => $reportedMode,
             'seekable' => true,
             'uri' => $uri,
@@ -203,6 +204,21 @@ final class VmStreamMeta
     public static function isSocketTransport(string $uri): bool
     {
         return null !== self::streamTypeForUri($uri);
+    }
+
+    /**
+     * php-src stream_type for php://memory / php://temp / php://fd (main/streams/php_stream_memory.c, php_stream_temp.c).
+     */
+    public static function phpNativeStreamType(string $uri): ?string
+    {
+        if (\str_starts_with($uri, 'php://temp')) {
+            return 'TEMP';
+        }
+        if (\str_starts_with($uri, 'php://memory') || \str_starts_with($uri, 'php://fd/')) {
+            return 'MEMORY';
+        }
+
+        return null;
     }
 
     /**

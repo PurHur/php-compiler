@@ -25,6 +25,38 @@ final class VmStreamMetaRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('\\stream_set_blocking(', $source);
     }
 
+    public function testBuildMetaArrayForPhpTempStream(): void
+    {
+        $handle = VmFs::fopen('php://temp', 'r+');
+        $this->assertNotFalse($handle);
+        $meta = VmFs::streamGetMetaData($handle);
+        $this->assertInstanceOf(\PHPCompiler\VM\HashTable::class, $meta);
+        $streamType = null;
+        foreach ($meta->iterateKeyed(false) as [$keyVar, $value]) {
+            if (Variable::TYPE_STRING === $keyVar->type && 'stream_type' === $keyVar->toString()) {
+                $streamType = $value->toString();
+            }
+        }
+        $this->assertSame('TEMP', $streamType);
+        VmFs::fclose($handle);
+    }
+
+    public function testBuildMetaArrayForPhpMemoryStream(): void
+    {
+        $handle = VmFs::fopen('php://memory', 'r+');
+        $this->assertNotFalse($handle);
+        $meta = VmFs::streamGetMetaData($handle);
+        $this->assertInstanceOf(\PHPCompiler\VM\HashTable::class, $meta);
+        $streamType = null;
+        foreach ($meta->iterateKeyed(false) as [$keyVar, $value]) {
+            if (Variable::TYPE_STRING === $keyVar->type && 'stream_type' === $keyVar->toString()) {
+                $streamType = $value->toString();
+            }
+        }
+        $this->assertSame('MEMORY', $streamType);
+        VmFs::fclose($handle);
+    }
+
     public function testBuildMetaArrayForPlainFilePath(): void
     {
         $fp = fopen('php://memory', 'r+');
