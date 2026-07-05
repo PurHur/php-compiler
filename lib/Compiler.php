@@ -2076,6 +2076,12 @@ class Compiler {
                         break;
                     } elseif (
                         $child instanceof Op\Expr\PropertyFetch
+                        && $this->isPropertyFetchNullsafeReceiver($child, $ops, $i)
+                    ) {
+                        // Lowered inside compileNullsafePropertyFetch / coalesce chain eval (#16637).
+                        break;
+                    } elseif (
+                        $child instanceof Op\Expr\PropertyFetch
                         && null !== ($coalesceMatch = $this->findCoalesceUsingPropertyFetchLeft($child, $ops, $i))
                     ) {
                         /** @var Op\Expr\BinaryOp\Coalesce $coalesce */
@@ -4140,6 +4146,25 @@ class Compiler {
         }
 
         return false;
+    }
+
+    /**
+     * php-cfg lowers $a->b?->v as PropertyFetch then NullsafePropertyFetch — skip eager fetch (#16637).
+     *
+     * @param Op[] $ops
+     */
+    private function isPropertyFetchNullsafeReceiver(
+        Op\Expr\PropertyFetch $fetch,
+        array $ops,
+        int $index
+    ): bool {
+        if ($index + 1 >= count($ops)) {
+            return false;
+        }
+        $next = $ops[$index + 1];
+
+        return $next instanceof Op\Expr\NullsafePropertyFetch
+            && $this->operandsChainEqual($next->var, $fetch->result);
     }
 
     private function isPropertyWriteAssign(Op\Expr\Assign $assign, Block $block): bool
@@ -10721,7 +10746,7 @@ class Compiler {
         bool $allowUninitNullableShortCircuit = false
     ): Block {
         $resultSlot = $this->compileOperand($expr->result, $block, false);
-        $receiverSlot = $this->compileNullsafeReceiverSlot($expr->var, $block);
+        $receiverSlot = $this->compileNullsafeReceiverSlot($expr->var, $block, $allowUninitNullableShortCircuit);
 
         $endBlock = new Block($block->orig);
         $endBlock->inheritUndefinedLocals = true;
@@ -10792,20 +10817,28 @@ class Compiler {
     /**
      * Bind a ?-> receiver without reading typed slots (#5220, $a->b?->v).
      */
-    private function compileNullsafeReceiverSlot(?Operand $var, Block $block): int
-    {
+    private function compileNullsafeReceiverSlot(
+        ?Operand $var,
+        Block $block,
+        bool $allowUninitNullableShortCircuit = false
+    ): int {
         if (null === $var) {
             throw new \LogicException('Nullsafe property fetch requires a receiver operand');
         }
         $propFetch = $this->unwrapPropertyFetch($var);
         if (null !== $propFetch) {
             $receiverSlot = $this->compileOperand($propFetch->result, $block, false);
-            $block->addOpCode(new OpCode(
+            $receiverFetch = new OpCode(
                 OpCode::TYPE_PROPERTY_FETCH,
                 $receiverSlot,
                 $this->compileOperand($propFetch->var, $block, true),
                 $this->compileOperand($propFetch->name, $block, true)
-            ));
+            );
+            if ($allowUninitNullableShortCircuit) {
+                $receiverFetch->nullsafeFetchPropertyRead = true;
+                $receiverFetch->nullsafeUninitNullableToNull = true;
+            }
+            $block->addOpCode($receiverFetch);
 
             return $receiverSlot;
         }
@@ -10859,7 +10892,7 @@ class Compiler {
     ): void {
         $fetch = $chain[$index];
         $isLast = $index === count($chain) - 1;
-        $receiverSlot = $this->compileNullsafeReceiverSlot($fetch->var, $block);
+        $receiverSlot = $this->compileNullsafeReceiverSlot($fetch->var, $block, true);
 
         $nullBlock = new Block($block->orig);
         $nullBlock->inheritUndefinedLocals = true;
@@ -10928,7 +10961,7 @@ class Compiler {
     ): void {
         $fetch = $chain[$index];
         $isLast = $index === count($chain) - 1;
-        $receiverSlot = $this->compileNullsafeReceiverSlot($fetch->var, $block);
+        $receiverSlot = $this->compileNullsafeReceiverSlot($fetch->var, $block, true);
 
         $nullBlock = new Block($block->orig);
         $nullBlock->inheritUndefinedLocals = true;
