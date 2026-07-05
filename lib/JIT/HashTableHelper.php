@@ -270,6 +270,8 @@ final class HashTableHelper
 
     public static function alloc(Context $context): Value
     {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'ht_alloc_cont');
+
         return $context->builder->call($context->lookupFunction('__hashtable__alloc'));
     }
 

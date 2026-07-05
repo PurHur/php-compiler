@@ -42,33 +42,40 @@ final class EnumCasesHelper
         $context->functionProxies[$lc] = new NativeCall($fn, $funcName, []);
 
         $restore = $context->builder->getInsertBlock();
+        $savedActive = $context->activeFunction;
+        $context->activeFunction = $lc;
         $entry = $fn->appendBasicBlock('entry');
         $context->builder->positionAtEnd($entry);
 
-        EnumCasesRuntime::ensureLinked($context);
-        $i64 = $context->getTypeFromString('int64');
-        EnumCasesRuntime::callCasesListLength(
-            $context,
-            $i64->constInt($caseCount, false)
-        );
+        try {
+            EnumCasesRuntime::ensureLinked($context);
+            $context->builder->positionAtEnd($entry);
+            $i64 = $context->getTypeFromString('int64');
+            EnumCasesRuntime::callCasesListLength(
+                $context,
+                $i64->constInt($caseCount, false)
+            );
 
-        $caseVars = [];
-        foreach ($caseKeys as $caseKey) {
-            $caseVars[] = $object->jitEnumCaseFromBacking($classId, $caseKey);
-        }
-        $htVar = HashTableHelper::packVariables($context, $caseVars);
-        $slot = JitValueBox::alloc($context);
-        $ptr = JitValueBox::pointer($context, $slot);
-        $context->builder->call(
-            $context->lookupFunction('__value__writeHashtable'),
-            $ptr,
-            $htVar->value
-        );
-        $context->builder->returnValue($ptr);
-        if (null !== $restore) {
-            $context->builder->positionAtEnd($restore);
-        } else {
-            $context->builder->clearInsertionPosition();
+            $caseVars = [];
+            foreach ($caseKeys as $caseKey) {
+                $caseVars[] = $object->jitEnumCaseFromBacking($classId, $caseKey);
+            }
+            $htVar = HashTableHelper::packVariables($context, $caseVars);
+            $slot = JitValueBox::alloc($context);
+            $ptr = JitValueBox::pointer($context, $slot);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeHashtable'),
+                $ptr,
+                $htVar->value
+            );
+            $context->builder->returnValue($ptr);
+        } finally {
+            $context->activeFunction = $savedActive;
+            if (null !== $restore) {
+                $context->builder->positionAtEnd($restore);
+            } else {
+                $context->builder->clearInsertionPosition();
+            }
         }
     }
 }
