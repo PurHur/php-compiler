@@ -510,6 +510,7 @@ function syntaxRowDefinitions(): array
         ],
         [
             'id' => 'typed_function_static',
+            'profile' => '8.3',
             'construct' => 'PHP 8.3+ typed function-local static (`static T $var`)',
             'opcodes' => ['TYPE_DECLARE_FUNCTION_STATIC', 'TYPE_ASSIGN'],
             'issue' => 9998,
@@ -821,6 +822,7 @@ function syntaxRowDefinitions(): array
         ],
         [
             'id' => 'asymmetric_visibility',
+            'profile' => '8.4',
             'construct' => 'PHP 8.4 asymmetric property visibility (private(set), protected(set), etc.)',
             'opcodes' => ['TYPE_DECLARE_PROPERTY', 'TYPE_PROPERTY_FETCH', 'TYPE_ASSIGN'],
             'issue' => 3165,
@@ -977,6 +979,16 @@ function collectSyntaxCapabilities(string $root, array $definitions, array $hand
     $rows = [];
 
     foreach ($definitions as $def) {
+        // Profile-gated features (typed statics 8.3+, asymmetric visibility
+        // 8.4) parse-fail on the bare 8.4.0-dev reference profile since the
+        // function_exists/reference gating tightened; probe them under the
+        // profile they target, then restore (#16508).
+        $probeProfile = $def['profile'] ?? null;
+        $prevProfile = null;
+        if (null !== $probeProfile) {
+            $prevProfile = getenv('PHP_COMPILER_PROFILE');
+            putenv('PHP_COMPILER_PROFILE=' . $probeProfile);
+        }
         $opcodeDriven = $def['opcodes'] !== [];
         $vm = $opcodeDriven
             ? opcodesSupported($handlers['vm'], $def['opcodes'])
@@ -994,6 +1006,11 @@ function collectSyntaxCapabilities(string $root, array $definitions, array $hand
             $aot = probeAotCompile($def['probe']);
         } else {
             $aot = $jit;
+        }
+        if (null !== $probeProfile) {
+            putenv(false === $prevProfile || '' === $prevProfile
+                ? 'PHP_COMPILER_PROFILE'
+                : 'PHP_COMPILER_PROFILE=' . $prevProfile);
         }
         $notes = $def['notes'];
         foreach ($phpt[$def['id']] ?? [] as $tag) {

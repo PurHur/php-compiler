@@ -86,7 +86,12 @@ ci_run_capability_syntax_check() {
     return 0
   fi
   echo "capability-syntax: stale check (CAPABILITY_SYNTAX_CHECK=1 default, issue #803)..."
-  "$PHP_BIN" "${PHP_OPTS[@]}" script/capability-syntax.php --check
+  if ! "$PHP_BIN" "${PHP_OPTS[@]}" script/capability-syntax.php --check; then
+    # Auto-heal like capability-matrix above (#765/#16415 pattern, #16508).
+    echo "Auto-healing stale docs/capabilities-syntax.md via capability-syntax.php..."
+    "$PHP_BIN" "${PHP_OPTS[@]}" script/capability-syntax.php
+    "$PHP_BIN" "${PHP_OPTS[@]}" script/capability-syntax.php --check
+  fi
 }
 
 ci_run_wave3_roadmap_sync_check() {
@@ -527,7 +532,14 @@ ci_run_inventory_checks() {
   ci_run_init_selfhostprobe_parity_check
   ci_run_init_fastcgiweb_parity_check
   ci_run_init_apijson_parity_check
-  "$PHP_BIN" "${PHP_OPTS[@]}" script/capability-matrix.php --check
+  if ! "$PHP_BIN" "${PHP_OPTS[@]}" script/capability-matrix.php --check; then
+    # Generated doc: auto-heal like bootstrap-inventory (#765) and wave3
+    # footnotes (#16415) — fleet merges add builtins hourly and a stale
+    # matrix should not fail every other agent's run (#16508).
+    echo "Auto-healing stale docs/capabilities.md via capability-matrix.php..."
+    "$PHP_BIN" "${PHP_OPTS[@]}" script/capability-matrix.php
+    "$PHP_BIN" "${PHP_OPTS[@]}" script/capability-matrix.php --check
+  fi
   ci_run_capability_syntax_check
   ci_ensure_generated_doc script/generate-pages-capability-comparison.php capability-comparison.html
   ci_ensure_generated_doc script/bootstrap-inventory.php docs/bootstrap-inventory.md
