@@ -710,6 +710,17 @@ final class CompilerVersion
     }
 
     /**
+     * zend_thread_id() visible to function_exists() — stable runtime only (#16357, re-#16292).
+     *
+     * Callable under forward profile via {@see supportsZendThreadId()}; withheld from introspection on 8.4.0-dev
+     * reference harness like Zend 8.2.
+     */
+    public static function advertisesZendThreadId(): bool
+    {
+        return version_compare(self::VERSION, '8.4.0', '>=');
+    }
+
+    /**
      * PHP 8.4+ Sorting / SortDirection builtin enums (ext/standard/basic_functions.stub.php, #7229, #7261, #12362).
      *
      * Gated on stable 8.4.0 so 8.4.0-dev reference profile matches Zend 8.2 phantom gate.
@@ -772,6 +783,17 @@ final class CompilerVersion
     public static function supportsReadonlyBuiltin(): bool
     {
         return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+    }
+
+    /**
+     * readonly() visible to function_exists() — stable runtime only (#16357, re-#16292).
+     *
+     * Callable under forward profile via {@see supportsReadonlyBuiltin()}; withheld from introspection on 8.4.0-dev
+     * reference harness like Zend 8.2.
+     */
+    public static function advertisesReadonlyBuiltin(): bool
+    {
+        return version_compare(self::VERSION, '8.4.0', '>=');
     }
 
     /**

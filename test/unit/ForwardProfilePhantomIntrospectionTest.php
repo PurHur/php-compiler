@@ -132,4 +132,52 @@ final class ForwardProfilePhantomIntrospectionTest extends TestCase
             }
         }
     }
+
+    public function testZendThreadIdCallableButNotAdvertisedOnForwardProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertTrue(CompilerVersion::supportsZendThreadId());
+            $this->assertFalse(CompilerVersion::advertisesZendThreadId());
+            $this->assertFalse(BuiltinIntrospectionPolicy::functionIsAdvertised('zend_thread_id'));
+
+            $runtime = new Runtime();
+            $ctx = $runtime->vmContext;
+            $this->assertTrue(isset($ctx->functions['zend_thread_id']));
+            $this->assertFalse(
+                \PHPCompiler\ext\standard\VmReflection::functionExists($ctx, 'zend_thread_id')
+            );
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testReadonlyCallableButNotAdvertisedOnForwardProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertTrue(CompilerVersion::supportsReadonlyBuiltin());
+            $this->assertFalse(CompilerVersion::advertisesReadonlyBuiltin());
+            $this->assertFalse(BuiltinIntrospectionPolicy::functionIsAdvertised('readonly'));
+
+            $runtime = new Runtime();
+            $ctx = $runtime->vmContext;
+            $this->assertTrue(isset($ctx->functions['readonly']));
+            $this->assertFalse(
+                \PHPCompiler\ext\standard\VmReflection::functionExists($ctx, 'readonly')
+            );
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
 }
