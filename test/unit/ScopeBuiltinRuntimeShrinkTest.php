@@ -27,11 +27,30 @@ final class ScopeBuiltinRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('ScopeBuiltinRuntime::resolveExtractTargetName', $source);
         $this->assertStringContainsString('ScopeBuiltinRuntime::collectCompactNamesFromHashtable', $source);
         $this->assertStringContainsString('ScopeBuiltinRuntime::storeVarSnapshotAtStringKey', $source);
+        $this->assertStringContainsString('ScopeBuiltinRuntime::matchNamedVariableIndex', $source);
+        $this->assertStringContainsString('ScopeBuiltinRuntime::matchNamedVariableIndexFromCstr', $source);
         $this->assertStringNotContainsString('snprintf', $source);
         $this->assertStringNotContainsString('emitCompactInvalidArgumentWarningMessage', $source);
         $this->assertStringNotContainsString('importKeyIntoScope', $source);
         $this->assertStringNotContainsString('storeDefinedVarAtStringKey', $source);
         $this->assertStringNotContainsString('collectCompactFromHashtable', $source);
+        $this->assertStringNotContainsString("lookupFunction('strcmp')", $source);
+    }
+
+    public function testScopeBuiltinRuntimeLinksMatchNamedVariableIndex(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ScopeBuiltinRuntime.php');
+        $this->assertStringContainsString('matchNamedVariableIndex', $source);
+        $this->assertStringContainsString('__scope_match_named_var_index', $source);
+        $this->assertStringContainsString('ScopeBuiltinJitHelper::matchNamedVariableIndex', $source);
+    }
+
+    public function testScopeBuiltinJitHelperMatchNamedVariableIndex(): void
+    {
+        $table = "foo\0bar";
+        $this->assertSame(0, \PHPCompiler\ext\standard\ScopeBuiltinJitHelper::matchNamedVariableIndex('foo', $table));
+        $this->assertSame(1, \PHPCompiler\ext\standard\ScopeBuiltinJitHelper::matchNamedVariableIndex('BAR', $table));
+        $this->assertSame(-1, \PHPCompiler\ext\standard\ScopeBuiltinJitHelper::matchNamedVariableIndex('missing', $table));
     }
 
     public function testScopeBuiltinJitHelperCompactAndDefinedVarsBridges(): void
@@ -67,5 +86,14 @@ final class ScopeBuiltinRuntimeShrinkTest extends TestCase
             $loc,
             'ScopeBuiltinHelper.php LOC'
         );
+    }
+
+    public function testScopeBuiltinEmitHelperShrunkBelowPhase2Baseline(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/ScopeBuiltinEmitHelper.php');
+        $loc = substr_count($source, "\n") + 1;
+        $this->assertLessThan(835, $loc, 'ScopeBuiltinEmitHelper.php LOC');
+        $this->assertStringContainsString('branchOnNamedVariableIndex', $source);
+        $this->assertStringNotContainsString("lookupFunction('strcmp')", $source);
     }
 }
