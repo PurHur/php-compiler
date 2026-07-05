@@ -288,12 +288,21 @@ final class ReferencableCheck
     }
 
     /**
-     * Zend accepts inline array literals for current()/key() and array_multisort() array operands
-     * (zend_compile.c ZEND_SEND_REF temp materialization).
+     * Zend accepts inline array/object operands for internal-pointer builtins and array_multisort()
+     * (zend_compile.c ZEND_SEND_REF temp materialization). Also used when wiring hoisted pointer
+     * FuncCall siblings before var_export(..., true) (#13829, #16556).
      */
     public static function allowsEphemeralArrayLiteralByRef(string $fn): bool
     {
-        return \in_array(strtolower($fn), ['current', 'key', 'array_multisort'], true);
+        return self::isArrayInternalPointerBuiltin($fn) || 'array_multisort' === strtolower($fn);
+    }
+
+    /** reset/current/key/… — ext/standard/array.c internal pointer API (#4967, #11196). */
+    public static function isArrayInternalPointerBuiltin(string $fn): bool
+    {
+        return \in_array(strtolower($fn), [
+            'current', 'key', 'pos', 'next', 'prev', 'reset', 'end',
+        ], true);
     }
 
     /**
