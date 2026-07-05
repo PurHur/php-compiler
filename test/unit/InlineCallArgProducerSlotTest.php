@@ -1650,6 +1650,57 @@ PHP;
         self::assertSame("array (\n  0 => \E::A,\n  1 => \E::B,\n)\n", ob_get_clean());
     }
 
+    /** Issue #16041 — extract([...], EXTR_PREFIX_ALL, Prefix::A) wires Array_ + ConstFetch + ClassConstFetch. */
+    public function testExtractInlineArrayFlagsAndEnumPrefixArgSlots(): void
+    {
+        $code = <<<'PHP'
+<?php
+enum Prefix { case A; }
+extract(['a' => 2], EXTR_PREFIX_ALL, Prefix::A);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'extract_enum_prefix.php');
+
+        $initArraySlots = [];
+        $constFetchSlots = [];
+        $classConstSlots = [];
+        $sendSlots = [];
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_INIT_ARRAY === $op->type && null !== $op->arg1) {
+                $initArraySlots[] = $op->arg1;
+            }
+            if (OpCode::TYPE_CONST_FETCH === $op->type && null !== $op->arg1) {
+                $constFetchSlots[] = $op->arg1;
+            }
+            if (OpCode::TYPE_CLASS_CONST_FETCH === $op->type && null !== $op->arg1) {
+                $classConstSlots[] = $op->arg1;
+            }
+            if (OpCode::TYPE_ARG_SEND === $op->type) {
+                $sendSlots[] = $op->arg1;
+            }
+        }
+
+        self::assertNotSame([], $sendSlots, 'expected ARG_SEND opcodes');
+        self::assertSame($initArraySlots[0] ?? null, $sendSlots[0] ?? null, 'array arg');
+        self::assertSame($constFetchSlots[0] ?? null, $sendSlots[1] ?? null, 'flags arg');
+        self::assertSame($classConstSlots[0] ?? null, $sendSlots[2] ?? null, 'prefix arg');
+    }
+
+    /** Issue #16041 — extract enum prefix throws TypeError on argument #3 at runtime. */
+    public function testExtractInlineEnumPrefixRuntimeTypeError(): void
+    {
+        $code = file_get_contents(__DIR__.'/../repro/maintainer_gap_extract_enum_prefix.php');
+        self::assertIsString($code);
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'extract_enum_prefix.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame(
+            "TypeError: extract(): Argument #3 (\$prefix) must be of type string, Prefix given\n",
+            ob_get_clean()
+        );
+    }
+
     /** Issue #8883 — array_pad([E::A], N, E::B) wires inline enum haystack + pad-value ConstFetch. */
     public function testArrayPadInlineEnumHaystackAndPadValueRuntime(): void
     {

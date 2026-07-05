@@ -252,14 +252,22 @@ final class VmIniIntrospection
         $currentLabel = null;
         foreach (\explode("\n", $text) as $line) {
             $line = \rtrim($line);
+            if ('' === $line) {
+                continue;
+            }
             if (\preg_match('/^(.+?) => (.*)$/', $line, $matches)) {
                 $currentLabel = \trim($matches[1]);
                 $rows[$currentLabel] = \trim($matches[2]);
                 continue;
             }
-            // phpinfo text wraps long values (Additional .ini files parsed) across lines (#14283).
-            if (null !== $currentLabel && '' !== $line && !\str_contains($line, ' => ')) {
-                $rows[$currentLabel] .= ",\n".$line;
+            if (null !== $currentLabel && !\str_contains($line, ' => ')) {
+                $continuation = \rtrim($line, ", \t");
+                if ('' === $continuation) {
+                    continue;
+                }
+                $rows[$currentLabel] = '' === ($rows[$currentLabel] ?? '')
+                    ? $continuation
+                    : \rtrim((string) $rows[$currentLabel], ',').",\n".$continuation;
                 continue;
             }
             $currentLabel = null;
