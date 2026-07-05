@@ -650,7 +650,8 @@ class JITTest extends BaseTest {
             }
             if (!CompilerVersion::supportsCloneWithSyntax()
                 && str_contains($name, 'clone_with')
-                && !str_contains($name, 'clone_with_reference_profile')) {
+                && !str_contains($name, 'clone_with_reference_profile')
+                && !str_contains($name, 'clone_with_forward_profile')) {
                 continue;
             }
             // 8.3-target reject gate; skipped when new readonly class enabled (#16255).

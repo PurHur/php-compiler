@@ -619,11 +619,21 @@ final class CompilerVersion
      * PHP 8.3+ clone-with syntax (`clone $obj with { }`, `clone($obj, [...])`, `clone ($obj, with: [...])`).
      *
      * Gated on stable 8.4.0 so 8.4.0-dev reference profile rejects like Zend 8.2 parse error (#12987).
+     * Forward profile via {@see languageProfileVersion()} enables clone-with on 8.4.0-dev (#16676).
      * php-src: Zend/zend_language_parser.y clone_expr with clause; zend_clones.c.
      */
     public static function supportsCloneWithSyntax(): bool
     {
-        return version_compare(self::VERSION, '8.4.0', '>=');
+        if (version_compare(self::VERSION, '8.4.0', '>=')) {
+            return true;
+        }
+
+        $raw = getenv('PHP_COMPILER_PROFILE');
+        if (!\is_string($raw) || '' === trim($raw)) {
+            return false;
+        }
+
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
     }
 
     /**

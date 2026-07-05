@@ -399,6 +399,21 @@ final class CompilerVersionGateTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsCloneWithSyntax());
     }
 
+    public function testSupportsCloneWithSyntaxTrueWhenProfile84(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertTrue(CompilerVersion::supportsCloneWithSyntax());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     public function testSupportsEnumCaseListFalseOnReferenceProfile(): void
     {
         $this->assertFalse(CompilerVersion::supportsEnumCaseList());
