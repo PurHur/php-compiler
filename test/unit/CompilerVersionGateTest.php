@@ -399,9 +399,19 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
-    public function testSupportsPropertyHooksTrueOn84DevLine(): void
+    public function testSupportsPropertyHooksFalseOn84DevReferenceProfile(): void
     {
-        $this->assertTrue(CompilerVersion::supportsPropertyHooks());
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE');
+        try {
+            $this->assertFalse(CompilerVersion::supportsPropertyHooks());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
     }
 
     public function testSupportsPropertyHooksFalseWhenProfile82(): void
