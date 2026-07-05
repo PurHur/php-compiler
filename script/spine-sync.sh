@@ -7,8 +7,11 @@
 # Fleet agents run this several times a day by hand (~1 h each). This script
 # does the whole chain:
 #
-#   ./script/spine-sync.sh            # full chain incl. sidecar refresh
-#   ./script/spine-sync.sh --no-link  # skip the sidecar relink (stamp-only PRs)
+#   ./script/spine-sync.sh                  # full chain incl. sidecar refresh
+#   ./script/spine-sync.sh --no-link        # skip the sidecar relink (stamp-only PRs)
+#   ./script/spine-sync.sh --footnotes-only # recount + rewrite footnote pairs only
+#                                           # (no bundle edit, no regen, no sidecar —
+#                                           # what ci-fast auto-heal runs, #1802)
 #
 # Requires the pinned env for the sidecar step (LLVM 9).
 set -euo pipefail
@@ -18,10 +21,16 @@ SPINE="test/selfhost/compiler_lib_spine_smoke/main.php"
 PHP_BIN="${PHP_BIN:-php}"
 
 NO_LINK=0
+FOOTNOTES_ONLY=0
 for arg in "$@"; do
   [[ "$arg" == "--no-link" ]] && NO_LINK=1
+  [[ "$arg" == "--footnotes-only" ]] && { FOOTNOTES_ONLY=1; NO_LINK=1; }
 done
 
+if [[ "$FOOTNOTES_ONLY" == "1" ]]; then
+  echo "==> spine-sync 1/6+2/6: SKIP bundle discovery/regen (--footnotes-only)"
+fi
+if [[ "$FOOTNOTES_ONLY" != "1" ]]; then
 echo "==> spine-sync 1/6: discover missing inventory files"
 # Diff Phase A inventory against LITERAL spine requires (the M2 counter's own
 # logic) — the coverage checker tolerates renamed-path shadows (#2202 gap).
@@ -62,6 +71,7 @@ echo "    added ${added} spine entries"
 echo "==> spine-sync 2/6: regenerate inventory + profile"
 "$PHP_BIN" script/bootstrap-inventory.php >/dev/null
 "$PHP_BIN" script/bootstrap-profile.php >/dev/null
+fi
 
 echo "==> spine-sync 3/6: recount and rewrite footnotes"
 read -r NEW_SPINE NEW_INV < <("$PHP_BIN" script/bootstrap-spine-count.php --json \

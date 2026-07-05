@@ -3494,6 +3494,7 @@
         "lib/JIT/VariableFunctionCallHelper.php",
         "lib/JIT/VariableFunctionCallRuntime.php",
         "lib/JIT/VariableTypeMapNative.php",
+        "lib/JIT/VmConstantJit.php",
         "lib/JIT/VmDriverExecuteNative.php",
         "lib/JIT/VmSpineSmokeNative.php",
         "lib/JIT/VmUnitProbeExecuteNative.php",
@@ -4271,9 +4272,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 4037,
+        "inventory_files": 4038,
         "excluded": 0,
-        "eligible": 4037,
+        "eligible": 4038,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
