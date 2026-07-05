@@ -8,7 +8,7 @@ use PHPUnit\Framework\TestCase;
 
 final class ArrayFirstLastEmptyErrorTest extends TestCase
 {
-    public function testEmptyArrayThrowsError(): void
+    public function testEmptyArrayReturnsNull(): void
     {
         if (!CompilerVersion::supportsPhp84ArraySearchFunctions()) {
             $this->markTestSkipped('array_first/array_last withheld on PHP 8.2 reference profile (#14505)');
@@ -16,20 +16,16 @@ final class ArrayFirstLastEmptyErrorTest extends TestCase
         $code = <<<'PHP'
 <?php
 foreach (['array_first', 'array_last'] as $fn) {
-    try {
-        $fn([]);
-        echo $fn, ": uncaught\n";
-    } catch (Error $e) {
-        echo $fn, ': ', $e->getMessage(), "\n";
-    }
+    $v = $fn([]);
+    echo $fn, ': ', var_export($v, true), "\n";
 }
 PHP;
         $runtime = new Runtime();
         ob_start();
         $runtime->run($runtime->parseAndCompile($code, 'array_first_last_empty.php'));
         self::assertSame(
-            "array_first: array_first(): Argument #1 (\$array) must not be empty\n"
-            ."array_last: array_last(): Argument #1 (\$array) must not be empty\n",
+            "array_first: NULL\n"
+            ."array_last: NULL\n",
             ob_get_clean()
         );
     }

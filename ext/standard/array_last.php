@@ -27,7 +27,6 @@ final class array_last extends Internal
             return;
         }
         $ht = VmArray::requireArray($frame->calledArgs[0]->resolveIndirect(), 'array_last');
-        VmArray::requireNonEmptyFirstLastArray($ht, 'array_last');
         $value = VmArray::valueLast($ht);
         if (null === $value) {
             $frame->returnVar->null();
