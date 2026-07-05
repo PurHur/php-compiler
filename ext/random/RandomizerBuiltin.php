@@ -137,17 +137,13 @@ final class RandomEngineStorage
         return self::bytesToUInt64(self::generate($engineObject));
     }
 
-    /**
-     * php-src randomizer.c — Randomizer::nextInt() uses algo generate result >> 1.
-     */
-    public static function nextIntValue(ObjectEntry $engineObject): int
+    /** php-src randomizer.c Randomizer::nextInt() — generate then >> 1. */
+    public static function generateForNextInt(ObjectEntry $engineObject): int
     {
-        $result = match (strtolower(ltrim($engineObject->class->name, '\\'))) {
-            'random\\engine\\mt19937' => self::mt19937($engineObject)->generateRaw(),
-            default => self::bytesToUInt64(self::generateBytes($engineObject)),
+        return match (strtolower(ltrim($engineObject->class->name, '\\'))) {
+            'random\\engine\\mt19937' => self::mt19937($engineObject)->generateRaw() >> 1,
+            default => self::generateUInt64($engineObject) >> 1,
         };
-
-        return intdiv($result, 2);
     }
 
     private static function bytesToUInt32(string $bytes): int
@@ -595,7 +591,7 @@ final class RandomizerNextInt extends VmClassMethod
             return;
         }
         $engine = RandomEngineStorage::engineObject($object);
-        $frame->returnVar->int(RandomEngineStorage::nextIntValue($engine));
+        $frame->returnVar->int(RandomEngineStorage::generateForNextInt($engine));
     }
 }
 

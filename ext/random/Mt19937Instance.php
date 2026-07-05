@@ -43,6 +43,7 @@ final class Mt19937Instance
         return \pack('V', $this->generateRaw());
     }
 
+    /** php-src engine_mt19937.c generate() — 32-bit tempered output before nextInt >> 1. */
     public function generateRaw(): int
     {
         if ($this->count >= self::MT_N) {
@@ -102,17 +103,12 @@ final class Mt19937Instance
     {
         ++$umax;
         $limit = \PHP_INT_MAX - (int) (\PHP_INT_MAX % $umax) - 1;
-        $result = self::bytesToUInt64($this->generate());
+        $result = $this->generateRaw() | ($this->generateRaw() << 32);
         while ($result > $limit) {
-            $result = self::bytesToUInt64($this->generate());
+            $result = $this->generateRaw() | ($this->generateRaw() << 32);
         }
 
         return $result % $umax;
-    }
-
-    private static function bytesToUInt64(string $bytes): int
-    {
-        return (int) (\unpack('P', $bytes)[1] ?? 0);
     }
 
     private function reload(): void

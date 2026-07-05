@@ -1,5 +1,5 @@
 --TEST--
-stdlib array_keys() — null search literal with null key haystack (#11272, ext/standard/array.c)
+stdlib array_keys() — null search literal with null key haystack (#11272, #16298, ext/standard/array.c)
 --FILE--
 <?php
 declare(strict_types=1);
