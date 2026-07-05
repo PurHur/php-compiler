@@ -14,9 +14,44 @@ final class CompilerVersionGateTest extends TestCase
         $this->assertSame('8.4.0-dev', CompilerVersion::VERSION);
     }
 
+    public function testSupportsStrIncrementFalseOnReferenceProfile(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsStrIncrement());
+    }
+
     public function testSupportsStrIncrementTrueOnForwardProfile(): void
     {
-        $this->assertTrue(CompilerVersion::supportsStrIncrement());
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.3');
+        try {
+            $this->assertTrue(CompilerVersion::supportsStrIncrement());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testAdvertisesStrIncrementFalseOnReferenceProfile(): void
+    {
+        $this->assertFalse(CompilerVersion::advertisesStrIncrement());
+    }
+
+    public function testAdvertisesStrIncrementTrueOnForwardProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.3');
+        try {
+            $this->assertTrue(CompilerVersion::advertisesStrIncrement());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
     }
 
     public function testSupportsClassHasFunctionsTrueOnForwardProfile(): void
@@ -574,12 +609,30 @@ final class CompilerVersionGateTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsFinalGlobalTypedConstants());
     }
 
-    public function testVmRegistersStrIncrementOnForwardProfile(): void
+    public function testVmDoesNotRegisterStrIncrementOnReferenceProfile(): void
     {
         $runtime = new Runtime();
         $ctx = $runtime->vmContext;
-        $this->assertTrue(isset($ctx->functions['str_decrement']));
-        $this->assertTrue(isset($ctx->functions['str_increment']));
+        $this->assertFalse(isset($ctx->functions['str_decrement']));
+        $this->assertFalse(isset($ctx->functions['str_increment']));
+    }
+
+    public function testVmRegistersStrIncrementOnForwardProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.3');
+        try {
+            $runtime = new Runtime();
+            $ctx = $runtime->vmContext;
+            $this->assertTrue(isset($ctx->functions['str_decrement']));
+            $this->assertTrue(isset($ctx->functions['str_increment']));
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
     }
 
     public function testVmRegistersClassHasFunctionsOnForwardProfile(): void
