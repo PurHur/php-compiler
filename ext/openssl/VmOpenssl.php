@@ -120,6 +120,65 @@ final class VmOpenssl
     }
 
     /**
+     * openssl_spki_new() — create Netscape SPKAC (php-src ext/openssl/openssl.c; #8690).
+     *
+     * @return string|false SPKAC=… encoded certificate request
+     */
+    public static function spkiNew(
+        Variable $keyArg,
+        string $challenge,
+        int|string $algorithm,
+        ?Frame $frame = null
+    ): string|false {
+        if (!VmOpensslSpkiNative::available()) {
+            self::userWarning('openssl_spki_new(): OpenSSL SPKI is unavailable in this compiler build', $frame);
+
+            return false;
+        }
+
+        $pem = self::coercePkeyPem($keyArg, 'openssl_spki_new', 0, 'private_key');
+        $digestName = self::resolveDigestName($algorithm, 'openssl_spki_new', $frame);
+        if (false === $digestName) {
+            return false;
+        }
+
+        $spkac = VmOpensslSpkiNative::spkiNew($pem, $challenge, $digestName);
+        if (false === $spkac) {
+            self::userWarning('openssl_spki_new(): Unable to create new SPKAC', $frame);
+
+            return false;
+        }
+
+        return $spkac;
+    }
+
+    /**
+     * openssl_spki_verify() — verify Netscape SPKAC (php-src ext/openssl/openssl.c; #8690).
+     */
+    public static function spkiVerify(string $spkac, ?Frame $frame = null): bool
+    {
+        if (!VmOpensslSpkiNative::available()) {
+            self::userWarning('openssl_spki_verify(): OpenSSL SPKI is unavailable in this compiler build', $frame);
+
+            return false;
+        }
+
+        $cleaned = VmOpensslSpkiNative::spkiCleanup($spkac);
+        if ('' === $cleaned) {
+            self::userWarning('openssl_spki_verify(): Invalid SPKAC', $frame);
+
+            return false;
+        }
+
+        $verified = VmOpensslSpkiNative::spkiVerify($spkac);
+        if (!$verified) {
+            self::userWarning('openssl_spki_verify(): Unable to decode supplied SPKAC', $frame);
+        }
+
+        return $verified;
+    }
+
+    /**
      * openssl_pkey_derive() — ECDH/X25519 shared secret (EVP_PKEY_derive; issue #15428).
      *
      * @return string|false
