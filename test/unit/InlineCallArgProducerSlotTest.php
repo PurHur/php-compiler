@@ -6444,4 +6444,18 @@ PHP;
         [$first, $second] = explode(':', trim($out));
         self::assertSame($first, $second);
     }
+
+    /** Issue #10174 — new ArrayObject([...], C::FLAGS) must not wire ClassConst prelude to array arg #0. */
+    public function testArrayObjectConstructClassConstFlagsArgRuntime(): void
+    {
+        $code = file_get_contents(__DIR__.'/../repro/maintainer_gap_arrayobject_array_as_props.php');
+        self::assertNotFalse($code);
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'maintainer_gap_arrayobject_array_as_props.php');
+
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertSame("q\nq\nv\n", $out);
+    }
 }
