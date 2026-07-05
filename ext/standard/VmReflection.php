@@ -344,7 +344,9 @@ final class VmReflection
             foreach ($module->getFunctions() as $func) {
                 $name = $func->getName();
                 $lc = strtolower($name);
-                if (isset($seen[$lc]) || !self::isVisibleToFunctionExists($name)) {
+                if (isset($seen[$lc])
+                    || !self::isVisibleToFunctionExists($name)
+                    || !BuiltinIntrospectionPolicy::functionIsAdvertised($lc)) {
                     continue;
                 }
                 $seen[$lc] = true;

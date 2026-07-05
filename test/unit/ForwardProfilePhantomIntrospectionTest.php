@@ -180,4 +180,55 @@ final class ForwardProfilePhantomIntrospectionTest extends TestCase
             }
         }
     }
+
+    public function testStrIncrementCallableButNotAdvertisedOnForwardProfile84(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertTrue(CompilerVersion::supportsStrIncrement());
+            $this->assertFalse(CompilerVersion::advertisesStrIncrement());
+            $this->assertFalse(BuiltinIntrospectionPolicy::functionIsAdvertised('str_increment'));
+
+            $runtime = new Runtime();
+            $ctx = $runtime->vmContext;
+            $this->assertTrue(isset($ctx->functions['str_increment']));
+            $this->assertFalse(
+                \PHPCompiler\ext\standard\VmReflection::functionExists($ctx, 'str_increment')
+            );
+
+            $names = \PHPCompiler\ext\standard\VmReflection::internalFunctionNameList();
+            $this->assertNotContains('str_increment', $names);
+            $this->assertNotContains('str_decrement', $names);
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testFpowNotListedInGetDefinedFunctionsOnForwardProfile84(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $runtime = new Runtime();
+            $ctx = $runtime->vmContext;
+            $this->assertFalse(
+                \PHPCompiler\ext\standard\VmReflection::functionExists($ctx, 'fpow')
+            );
+
+            $names = \PHPCompiler\ext\standard\VmReflection::internalFunctionNameList();
+            $this->assertNotContains('fpow', $names);
+            $this->assertNotContains('nextafter', $names);
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
 }

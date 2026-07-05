@@ -27,6 +27,18 @@ foreach (['http_get_last_response_headers', 'get_last_response_headers', 'http_c
 if (function_exists('stream_context_set_options')) {
     $fail[] = 'stream_context_set_options';
 }
+$internal = get_defined_functions()['internal'] ?? [];
+foreach (['str_increment', 'str_decrement', 'fpow', 'nextafter'] as $fn) {
+    if (\in_array($fn, $internal, true)) {
+        $fail[] = $fn.'_internal';
+    }
+}
+if (function_exists('str_increment')) {
+    $fail[] = 'str_increment';
+}
+if (function_exists('str_decrement')) {
+    $fail[] = 'str_decrement';
+}
 echo [] === $fail ? "ok\n" : 'fail: '.implode(',', $fail)."\n";
 echo 'callable=', (int) is_float(fpow(2.0, 3.0)), "\n";
 echo 'http_callable=', (int) \is_array(http_get_last_response_headers()), "\n";

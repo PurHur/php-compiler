@@ -283,7 +283,10 @@ final class CompilerVersion
             return false;
         }
 
-        return version_compare(self::languageProfileVersion(), '8.3.0', '>=');
+        $profile = self::languageProfileVersion();
+
+        // Forward 8.3 profile advertises; 8.4 forward on 8.4.0-dev matches Zend 8.2 phantom gate (#16482).
+        return version_compare($profile, '8.3.0', '>=') && version_compare($profile, '8.4.0', '<');
     }
 
     /**
