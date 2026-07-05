@@ -6046,6 +6046,46 @@ PHP;
         self::assertStringContainsString('in_array_strict: true', $out);
     }
 
+    /** Issue #16312 — stmt follow-on probe() must not clobber prior in_array EXEC_RETURN wiring. */
+    public function testInArrayStrictAfterVoidStmtCallWithFollowOnProbe(): void
+    {
+        $code = file_get_contents(
+            __DIR__.'/../repro/maintainer_gap_in_array_strict_null_after_call.php'
+        );
+
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'in_array_strict_follow_on_probe.php');
+
+        $inArrayReturnSlot = null;
+        $probeResultSend = null;
+        $fcallOrdinal = 0;
+        $probeSends = [];
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                ++$fcallOrdinal;
+                if (4 === $fcallOrdinal) {
+                    $probeSends = [];
+                }
+            }
+            if (3 === $fcallOrdinal && OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
+                $inArrayReturnSlot = $op->arg1;
+            }
+            if (4 === $fcallOrdinal && OpCode::TYPE_ARG_SEND === $op->type) {
+                $probeSends[] = $op->arg1;
+            }
+        }
+        $probeResultSend = $probeSends[1] ?? null;
+
+        self::assertNotNull($inArrayReturnSlot);
+        self::assertSame($inArrayReturnSlot, $probeResultSend);
+
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertStringContainsString('in_array_strict: true', $out);
+        self::assertStringContainsString('array_search_strict: false', $out);
+    }
+
     /** Issue #10303 — tempnam(sys_get_temp_dir(), E::A) wires enum case fetch to arg #1. */
     public function testTempnamNestedFuncCallEnumPrefixUsesClassConstFetchSlot(): void
     {
