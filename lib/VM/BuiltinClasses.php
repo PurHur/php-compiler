@@ -8,6 +8,9 @@ use PHPCompiler\CompilerVersion;
 use PHPCfg\Func as CfgFunc;
 use PHPCompiler\VM\Builtin\DatePeriodConstruct;
 use PHPCompiler\VM\Builtin\DatePeriodCurrent;
+use PHPCompiler\VM\Builtin\DatePeriodGetDateInterval;
+use PHPCompiler\VM\Builtin\DatePeriodGetRecurrences;
+use PHPCompiler\VM\Builtin\DatePeriodGetStartDate;
 use PHPCompiler\VM\Builtin\DatePeriodKey;
 use PHPCompiler\VM\Builtin\DatePeriodNext;
 use PHPCompiler\VM\Builtin\DatePeriodRewind;
@@ -1205,6 +1208,12 @@ final class BuiltinClasses
         $dp->methodVisibility['key'] = $pub;
         $dp->methods['next'] = new DatePeriodNext();
         $dp->methodVisibility['next'] = $pub;
+        $dp->methods['getstartdate'] = new DatePeriodGetStartDate();
+        $dp->methodVisibility['getstartdate'] = $pub;
+        $dp->methods['getdateinterval'] = new DatePeriodGetDateInterval();
+        $dp->methodVisibility['getdateinterval'] = $pub;
+        $dp->methods['getrecurrences'] = new DatePeriodGetRecurrences();
+        $dp->methodVisibility['getrecurrences'] = $pub;
         $ctx->classes[DatePeriodSupport::CLASS_DATEPERIOD] = $dp;
     }
 
