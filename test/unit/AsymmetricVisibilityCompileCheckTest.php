@@ -47,6 +47,9 @@ PHP,
 
     public function testUntypedAsymmetricSetCompileErrors(): void
     {
+        if (!CompilerVersion::supportsParenthesizedAsymmetricSetModifier()) {
+            $this->markTestSkipped('parenthesized asymmetric set modifier disabled on 8.4.0-dev reference profile (#16450)');
+        }
         $this->expectCompileError(
             <<<'PHP'
 <?php
@@ -64,7 +67,7 @@ PHP,
         $block = $runtime->parseAndCompile(<<<'PHP'
 <?php
 class Demo {
-    public (private(set)) string $name = 'a';
+    public private(set) string $name = 'a';
 }
 PHP, 'asymmetric_public_private_set.php');
         $this->assertNotNull($block);
@@ -92,24 +95,28 @@ class D {
 PHP, 'syntax error, unexpected token "private"');
     }
 
-    public function testPromotedExplicitReadBeforePrivateSetRejects(): void
+    public function testPromotedExplicitReadBeforePrivateSetCompiles(): void
     {
-        $this->expectCompileError(<<<'PHP'
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile(<<<'PHP'
 <?php
 class D {
     public function __construct(public private(set) int $x = 1) {}
 }
-PHP, AsymmetricVisibilityCompileCheck::MULTIPLE_MODIFIERS_MESSAGE);
+PHP, 'asymmetric_promoted_public_private_set.php');
+        $this->assertNotNull($block);
     }
 
-    public function testExplicitReadBeforePrivateSetRejects(): void
+    public function testExplicitReadBeforePrivateSetCompiles(): void
     {
-        $this->expectCompileError(<<<'PHP'
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile(<<<'PHP'
 <?php
 class Demo {
     public private(set) string $name = 'a';
 }
-PHP, AsymmetricVisibilityCompileCheck::MULTIPLE_MODIFIERS_MESSAGE);
+PHP, 'asymmetric_public_private_set.php');
+        $this->assertNotNull($block);
     }
 
     public function testValidPrivateSetStillCompiles(): void
@@ -118,7 +125,7 @@ PHP, AsymmetricVisibilityCompileCheck::MULTIPLE_MODIFIERS_MESSAGE);
         $block = $runtime->parseAndCompile(<<<'PHP'
 <?php
 class Demo {
-    public (private(set)) string $name = 'a';
+    public private(set) string $name = 'a';
 }
 PHP, 'asymmetric_ok.php');
         $this->assertNotNull($block);
@@ -126,6 +133,9 @@ PHP, 'asymmetric_ok.php');
 
     public function testStaticPublicPrivateSetCompileErrors(): void
     {
+        if (!CompilerVersion::supportsParenthesizedAsymmetricSetModifier()) {
+            $this->markTestSkipped('parenthesized asymmetric set modifier disabled on 8.4.0-dev reference profile (#16450)');
+        }
         $runtime = new Runtime();
         try {
             $runtime->parseAndCompile(<<<'PHP'
