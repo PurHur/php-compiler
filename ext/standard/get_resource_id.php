@@ -8,6 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\ResourceSupport;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -34,16 +35,37 @@ final class get_resource_id extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        if (!is_resource_::isResource($v)) {
-            throw new \TypeError(\sprintf(self::TYPE_ERROR, VmStreamArg::debugTypeName($v)));
-        }
-        $contextId = VmStreamContext::idFrom($v);
-        if (null !== $contextId) {
-            $frame->returnVar->int($contextId);
+        VmStreamArg::rejectEnumCaseOperand($v, 'get_resource_id');
+        $resourceId = self::resolveResourceId($v);
+        if (null !== $resourceId) {
+            $frame->returnVar->int($resourceId);
 
             return;
         }
+        if (!is_resource_::isResource($v)) {
+            throw new \TypeError(\sprintf(self::TYPE_ERROR, VmStreamArg::debugTypeName($v)));
+        }
         $frame->returnVar->int($v->toInt());
+    }
+
+    /** php-src: stale resource zvals keep list id after fclose (#5133, #5179). */
+    private static function resolveResourceId(Variable $v): ?int
+    {
+        $contextId = VmStreamContext::idFrom($v);
+        if (null !== $contextId) {
+            return $contextId;
+        }
+        if ($v->isStreamResource()
+            || $v->isDirResource()
+            || $v->isBrigadeResource()
+            || $v->isBucketResource()
+            || $v->isStreamFilterResource()
+            || $v->isProcessResource()
+            || ResourceSupport::isStreamContextResource($v)) {
+            return ResourceSupport::resolveHandle($v);
+        }
+
+        return null;
     }
 
     public function call(Context $context, JITVariable ...$args): Value

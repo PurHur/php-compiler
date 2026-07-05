@@ -1,10 +1,10 @@
 --TEST--
-Language: promoted constructor public (private(set)) — compile rejected (#16436, Zend/zend_compile.c)
+Language: promoted constructor public (private(set)) — parses and reads on 8.4 profile (#16495, Zend/zend_compile.c)
 --FILE--
 <?php
 class D {
     public function __construct(public (private(set)) int $x = 1) {}
 }
-echo "should not run\n";
---EXPECT_EXIT--
-255
+echo (new D())->x, "\n";
+--EXPECT--
+1

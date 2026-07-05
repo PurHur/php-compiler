@@ -14,6 +14,9 @@ final class VmIniIntrospection
     /** JSON map of phpinfo(INFO_GENERAL) label => value rows mirrored from host Zend (#14283). */
     private const ENV_PHPINFO_GENERAL = 'PHP_COMPILER_PHPINFO_GENERAL_JSON';
 
+    /** Base64 phpinfo(INFO_GENERAL) Zend engine credit footer mirrored from host Zend (#16551). */
+    private const ENV_PHPINFO_CREDIT_FOOTER = 'PHP_COMPILER_PHPINFO_CREDIT_FOOTER';
+
     /** JSON snapshot of host ini_get_all() registry (#16433, ext/standard/ini.c). */
     private const ENV_INI_REGISTRY = 'PHP_COMPILER_INI_REGISTRY_JSON';
 
@@ -249,24 +252,78 @@ final class VmIniIntrospection
             return;
         }
         $rows = [];
+        $currentLabel = null;
         foreach (\explode("\n", $text) as $line) {
             $line = \rtrim($line);
-            if (\preg_match('/^(.+?) => (.*)$/', $line, $matches)) {
-                $rows[\trim($matches[1])] = \trim($matches[2]);
+            if ('' === $line) {
+                continue;
             }
+            if (\preg_match('/^(.+?) => (.*)$/', $line, $matches)) {
+                $currentLabel = \trim($matches[1]);
+                $rows[$currentLabel] = \trim($matches[2]);
+                continue;
+            }
+            if (
+                null !== $currentLabel
+                && !\str_contains($line, ' => ')
+                && !\str_starts_with($line, 'This program makes use')
+            ) {
+                $continuation = \rtrim($line, ", \t");
+                if ('' === $continuation) {
+                    continue;
+                }
+                $rows[$currentLabel] = '' === ($rows[$currentLabel] ?? '')
+                    ? $continuation
+                    : \rtrim((string) $rows[$currentLabel], ',').",\n".$continuation;
+                continue;
+            }
+            $currentLabel = null;
         }
         if ([] === $rows) {
             return;
+        }
+        if (\function_exists('php_ini_scanned_files')) {
+            $scanned = \php_ini_scanned_files();
+            if (\is_string($scanned) && '' !== $scanned) {
+                $rows['Additional .ini files parsed'] = $scanned;
+            }
         }
         $encoded = \json_encode($rows, \JSON_UNESCAPED_UNICODE);
         if (\is_string($encoded)) {
             \putenv(self::ENV_PHPINFO_GENERAL.'='.$encoded);
         }
+        if (\preg_match('/(\nThis program makes use[\s\S]*)$/', $text, $matches)) {
+            $footer = \rtrim($matches[1], "\r\n");
+            if ('' !== $footer) {
+                \putenv(self::ENV_PHPINFO_CREDIT_FOOTER.'='.\base64_encode($footer));
+            }
+        }
+    }
+
+    /** phpinfo(INFO_GENERAL) Zend engine credit footer; mirrors host Zend when seeded (#16551). */
+    public static function phpinfoCreditFooter(): string
+    {
+        $encoded = self::envString(self::ENV_PHPINFO_CREDIT_FOOTER);
+        if ('' === $encoded) {
+            return '';
+        }
+        $decoded = \base64_decode($encoded, true);
+        if (!\is_string($decoded) || '' === $decoded) {
+            return '';
+        }
+
+        return $decoded;
     }
 
     /** phpinfo(INFO_GENERAL) row value; mirrors host Zend when seeded (#14283). */
     public static function phpinfoGeneralRow(string $label, string $default = ''): string
     {
+        if ('Additional .ini files parsed' === $label) {
+            $scanned = self::scannedFiles();
+            if (\is_string($scanned) && '' !== $scanned) {
+                return $scanned;
+            }
+        }
         $rows = self::phpinfoGeneralRows();
 
         return $rows[$label] ?? $default;
@@ -318,6 +375,15 @@ final class VmIniIntrospection
             'PHP Extension Build' => 'API20240924,NTS',
             'Debug Build' => 'no',
             'Thread Safety' => 'disabled',
+            'Zend Signal Handling' => 'enabled',
+            'Zend Memory Manager' => 'enabled',
+            'Zend Multibyte Support' => 'provided by mbstring',
+            'Zend Max Execution Timers' => 'disabled',
+            'IPv6 Support' => 'enabled',
+            'DTrace Support' => 'available, disabled',
+            'Registered PHP Streams' => 'php, file, glob, data, http, ftp',
+            'Registered Stream Socket Transports' => 'tcp, udp, unix, udg',
+            'Registered Stream Filters' => 'string.rot13, string.toupper, string.tolower, convert.*, consumed',
         ];
     }
 

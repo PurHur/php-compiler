@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\openssl;
 
 use PHPCompiler\ext\standard\VmHash;
 use PHPCompiler\Frame;
+use PHPCompiler\VM\Context;
 use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
@@ -119,6 +120,65 @@ final class VmOpenssl
     }
 
     /**
+     * openssl_spki_new() — create Netscape SPKAC (php-src ext/openssl/openssl.c; #8690).
+     *
+     * @return string|false SPKAC=… encoded certificate request
+     */
+    public static function spkiNew(
+        Variable $keyArg,
+        string $challenge,
+        int|string $algorithm,
+        ?Frame $frame = null
+    ): string|false {
+        if (!VmOpensslSpkiNative::available()) {
+            self::userWarning('openssl_spki_new(): OpenSSL SPKI is unavailable in this compiler build', $frame);
+
+            return false;
+        }
+
+        $pem = self::coercePkeyPem($keyArg, 'openssl_spki_new', 0, 'private_key');
+        $digestName = self::resolveDigestName($algorithm, 'openssl_spki_new', $frame);
+        if (false === $digestName) {
+            return false;
+        }
+
+        $spkac = VmOpensslSpkiNative::spkiNew($pem, $challenge, $digestName);
+        if (false === $spkac) {
+            self::userWarning('openssl_spki_new(): Unable to create new SPKAC', $frame);
+
+            return false;
+        }
+
+        return $spkac;
+    }
+
+    /**
+     * openssl_spki_verify() — verify Netscape SPKAC (php-src ext/openssl/openssl.c; #8690).
+     */
+    public static function spkiVerify(string $spkac, ?Frame $frame = null): bool
+    {
+        if (!VmOpensslSpkiNative::available()) {
+            self::userWarning('openssl_spki_verify(): OpenSSL SPKI is unavailable in this compiler build', $frame);
+
+            return false;
+        }
+
+        $cleaned = VmOpensslSpkiNative::spkiCleanup($spkac);
+        if ('' === $cleaned) {
+            self::userWarning('openssl_spki_verify(): Invalid SPKAC', $frame);
+
+            return false;
+        }
+
+        $verified = VmOpensslSpkiNative::spkiVerify($spkac);
+        if (!$verified) {
+            self::userWarning('openssl_spki_verify(): Unable to decode supplied SPKAC', $frame);
+        }
+
+        return $verified;
+    }
+
+    /**
      * openssl_pkey_derive() — ECDH/X25519 shared secret (EVP_PKEY_derive; issue #15428).
      *
      * @return string|false
@@ -139,6 +199,149 @@ final class VmOpenssl
         }
 
         return VmOpensslPkeyDeriveNative::derive($publicKeyPem, $privateKeyPem, $keyLength);
+    }
+
+    /**
+     * openssl_pkey_new() — generate asymmetric key pair (php-src ext/openssl/xp.c; #6295).
+     *
+     * @return \PHPCompiler\VM\Variable|false OpenSSLAsymmetricKey wrapper
+     */
+    public static function pkeyNew(?Variable $configVar, Context $ctx, ?Frame $frame = null): Variable|false
+    {
+        if (!VmOpensslPkeyNative::available()) {
+            self::userWarning('openssl_pkey_new(): OpenSSL key generation is unavailable in this compiler build', $frame);
+
+            return false;
+        }
+
+        $bits = 2048;
+        $type = OpensslConstants::OPENSSL_KEYTYPE_RSA;
+        if (null !== $configVar) {
+            $configVar = $configVar->resolveIndirect();
+            if (Variable::TYPE_ARRAY === $configVar->type) {
+                foreach ($configVar->toArray()->iterateKeyed(true) as [$keyVar, $valueVar]) {
+                    if (Variable::TYPE_STRING !== $keyVar->type) {
+                        continue;
+                    }
+                    $key = $keyVar->toString();
+                    $valueVar = $valueVar->resolveIndirect();
+                    if ('private_key_bits' === $key && Variable::TYPE_INTEGER === $valueVar->type) {
+                        $bits = $valueVar->toInt();
+                    }
+                    if ('private_key_type' === $key && Variable::TYPE_INTEGER === $valueVar->type) {
+                        $type = $valueVar->toInt();
+                    }
+                }
+            }
+        }
+
+        if (OpensslConstants::OPENSSL_KEYTYPE_RSA !== $type) {
+            self::userWarning('openssl_pkey_new(): Unknown private key type', $frame);
+
+            return false;
+        }
+
+        $pem = VmOpensslPkeyNative::generateRsa($bits);
+        if (false === $pem) {
+            self::userWarning('openssl_pkey_new(): Unable to generate key pair', $frame);
+
+            return false;
+        }
+
+        return VmOpensslObjects::wrapKey($ctx, $pem);
+    }
+
+    /**
+     * openssl_pkey_get_private() — load private key from PEM/path (php-src ext/openssl/xp.c; #6295).
+     *
+     * @return \PHPCompiler\VM\Variable|false
+     */
+    public static function pkeyGetPrivate(Variable $arg, ?string $passphrase, Context $ctx, ?Frame $frame = null): Variable|false
+    {
+        if (!VmOpensslPkeyNative::available()) {
+            self::userWarning('openssl_pkey_get_private(): OpenSSL is unavailable in this compiler build', $frame);
+
+            return false;
+        }
+
+        $arg = $arg->resolveIndirect();
+        if (Variable::TYPE_OBJECT === $arg->type && VmOpensslObjects::isAsymmetricKey($arg)) {
+            return VmOpensslObjects::wrapKey($ctx, VmOpensslObjects::keyPem($arg->toObject()));
+        }
+        if (Variable::TYPE_STRING !== $arg->type) {
+            throw new \TypeError(\sprintf(
+                'openssl_pkey_get_private(): Argument #1 ($private_key) must be of type OpenSSLAsymmetricKey|string, %s given',
+                match ($arg->type) {
+                    Variable::TYPE_NULL => 'null',
+                    Variable::TYPE_BOOLEAN => 'bool',
+                    Variable::TYPE_INTEGER => 'int',
+                    Variable::TYPE_FLOAT => 'float',
+                    Variable::TYPE_ARRAY => 'array',
+                    Variable::TYPE_OBJECT => $arg->toObject()->class->name,
+                    default => 'mixed',
+                }
+            ));
+        }
+
+        $material = $arg->toString();
+        if ('' !== $material && @\is_file($material)) {
+            $contents = @\file_get_contents($material);
+            if (false === $contents) {
+                self::userWarning('openssl_pkey_get_private(): Unable to read key file', $frame);
+
+                return false;
+            }
+            $material = $contents;
+        }
+
+        $pem = VmOpensslPkeyNative::normalizePrivateKeyPem($material, $passphrase);
+        if (false === $pem) {
+            self::userWarning('openssl_pkey_get_private(): Unable to load key', $frame);
+
+            return false;
+        }
+
+        return VmOpensslObjects::wrapKey($ctx, $pem);
+    }
+
+    /**
+     * openssl_pkey_export() — export OpenSSLAsymmetricKey to PEM (php-src ext/openssl/xp.c; #6295).
+     *
+     * @return string|false
+     */
+    public static function pkeyExportPem(Variable $keyArg, ?Variable $configVar, ?Frame $frame = null): string|false
+    {
+        if (!VmOpensslPkeyNative::available()) {
+            self::userWarning('openssl_pkey_export(): OpenSSL is unavailable in this compiler build', $frame);
+
+            return false;
+        }
+
+        $pem = self::coercePkeyPem($keyArg, 'openssl_pkey_export', 0, 'key');
+        $passphrase = null;
+        if (null !== $configVar) {
+            $configVar = $configVar->resolveIndirect();
+            if (Variable::TYPE_ARRAY === $configVar->type) {
+                foreach ($configVar->toArray()->iterateKeyed(true) as [$keyVar, $valueVar]) {
+                    if (Variable::TYPE_STRING !== $keyVar->type) {
+                        continue;
+                    }
+                    if ('passphrase' === $keyVar->toString()
+                        && Variable::TYPE_STRING === $valueVar->resolveIndirect()->type) {
+                        $passphrase = $valueVar->resolveIndirect()->toString();
+                    }
+                }
+            }
+        }
+
+        $exported = VmOpensslPkeyNative::exportPrivateKeyPem($pem, $passphrase);
+        if (false === $exported) {
+            self::userWarning('openssl_pkey_export(): Cannot export key', $frame);
+
+            return false;
+        }
+
+        return $exported;
     }
 
     public static function coercePkeyPem(Variable $var, string $function, int $argIndex, string $paramName): string

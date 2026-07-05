@@ -402,6 +402,10 @@ class JITTest extends BaseTest {
                 && str_contains($name, 'dateexception_reference_profile')) {
                 continue;
             }
+            if (CompilerVersion::advertisesDateExceptionHierarchy()
+                && str_contains($name, 'date_interval_malformed_exception_class_reference_profile')) {
+                continue;
+            }
             if (!CompilerVersion::advertisesRequestParseBodyExceptionClass()
                 && str_contains($name, 'request_parse_body_exception')
                 && !str_contains($name, 'reference_profile')) {
@@ -536,7 +540,9 @@ class JITTest extends BaseTest {
                 && (str_contains($name, 'private_set_reference_profile')
                     || str_contains($name, 'asymmetric_double_modifier_reference_profile')
                     || str_contains($name, 'asymmetric_visibility_reference_profile')
-                    || str_contains($name, 'asymmetric_visibility_public_protected_set_compile_error'))) {
+                    || str_contains($name, 'asymmetric_visibility_public_protected_set_compile_error')
+                    || str_contains($name, 'asymmetric_visibility_promoted_public_protected_set_compile_error')
+                    || str_contains($name, 'asymmetric_visibility_promoted_public_private_set_compile_error'))) {
                 continue;
             }
             if (CompilerVersion::supportsParenthesizedAsymmetricSetModifier()
@@ -637,6 +643,26 @@ class JITTest extends BaseTest {
             }
             if (!CompilerVersion::supportsReadonlyAnonymousClass()
                 && str_contains($name, 'readonly_anonymous_defaults')) {
+                continue;
+            }
+            // 8.3-target reject gate; skipped when typed function-local static enabled (#16512, #9998).
+            if (CompilerVersion::supportsTypedFunctionStatic()
+                && str_contains($name, 'typed_function_static_reference_profile')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsTypedFunctionStatic()
+                && str_contains($name, 'typed_function_static')
+                && !str_contains($name, 'typed_function_static_reference_profile')) {
+                continue;
+            }
+            // 8.3-target reject gate; skipped when class const brace deref enabled (#16597).
+            if (CompilerVersion::supportsClassConstBraceDeref()
+                && str_contains($name, 'class_const_brace_deref')
+                && !str_contains($name, '_forward')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsClassConstBraceDeref()
+                && str_contains($name, 'class_const_brace_deref_forward')) {
                 continue;
             }
             // 8.4-target reject gate; skipped when parenthesized DNF intersection types enabled (#14904).

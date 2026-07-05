@@ -22,6 +22,12 @@ final class OpensslConstants
     public const OPENSSL_ALGO_SHA512 = 9;
     public const OPENSSL_ALGO_RMD160 = 10;
 
+    /** php-src ext/openssl/xp.c — asymmetric key types. */
+    public const OPENSSL_KEYTYPE_RSA = 0;
+    public const OPENSSL_KEYTYPE_DSA = 1;
+    public const OPENSSL_KEYTYPE_DH = 2;
+    public const OPENSSL_KEYTYPE_EC = 3;
+
     /**
      * @return array<string, int>
      */
@@ -36,6 +42,10 @@ final class OpensslConstants
             'OPENSSL_ALGO_SHA384' => self::OPENSSL_ALGO_SHA384,
             'OPENSSL_ALGO_SHA512' => self::OPENSSL_ALGO_SHA512,
             'OPENSSL_ALGO_RMD160' => self::OPENSSL_ALGO_RMD160,
+            'OPENSSL_KEYTYPE_RSA' => self::OPENSSL_KEYTYPE_RSA,
+            'OPENSSL_KEYTYPE_DSA' => self::OPENSSL_KEYTYPE_DSA,
+            'OPENSSL_KEYTYPE_DH' => self::OPENSSL_KEYTYPE_DH,
+            'OPENSSL_KEYTYPE_EC' => self::OPENSSL_KEYTYPE_EC,
         ];
     }
 }

@@ -33,7 +33,7 @@ final class vsprintf extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $format = VmString::requireStringBuiltinArg($frame->calledArgs[0], 'vsprintf', 0, 'format');
+        $format = VmString::stringBuiltinArgForFrame($frame, 0, 'vsprintf', 0, 'format');
         $argsVar = $frame->calledArgs[1]->resolveIndirect();
         $frame->returnVar->string(VmVprintf::formatString($format, $argsVar, $frame, 'vsprintf'));
     }

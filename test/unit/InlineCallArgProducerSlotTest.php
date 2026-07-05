@@ -1650,6 +1650,125 @@ PHP;
         self::assertSame("array (\n  0 => \E::A,\n  1 => \E::B,\n)\n", ob_get_clean());
     }
 
+    /** Issue #16041 — extract([...], EXTR_PREFIX_ALL, Prefix::A) wires Array_ + ConstFetch + ClassConstFetch. */
+    public function testExtractInlineArrayFlagsAndEnumPrefixArgSlots(): void
+    {
+        $code = <<<'PHP'
+<?php
+enum Prefix { case A; }
+extract(['a' => 2], EXTR_PREFIX_ALL, Prefix::A);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'extract_enum_prefix.php');
+
+        $initArraySlots = [];
+        $constFetchSlots = [];
+        $classConstSlots = [];
+        $sendSlots = [];
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_INIT_ARRAY === $op->type && null !== $op->arg1) {
+                $initArraySlots[] = $op->arg1;
+            }
+            if (OpCode::TYPE_CONST_FETCH === $op->type && null !== $op->arg1) {
+                $constFetchSlots[] = $op->arg1;
+            }
+            if (OpCode::TYPE_CLASS_CONST_FETCH === $op->type && null !== $op->arg1) {
+                $classConstSlots[] = $op->arg1;
+            }
+            if (OpCode::TYPE_ARG_SEND === $op->type) {
+                $sendSlots[] = $op->arg1;
+            }
+        }
+
+        self::assertNotSame([], $sendSlots, 'expected ARG_SEND opcodes');
+        self::assertSame($initArraySlots[0] ?? null, $sendSlots[0] ?? null, 'array arg');
+        self::assertSame($constFetchSlots[0] ?? null, $sendSlots[1] ?? null, 'flags arg');
+        self::assertSame($classConstSlots[0] ?? null, $sendSlots[2] ?? null, 'prefix arg');
+    }
+
+    /** Issue #16041 — extract enum prefix throws TypeError on argument #3 at runtime. */
+    public function testExtractInlineEnumPrefixRuntimeTypeError(): void
+    {
+        $code = file_get_contents(__DIR__.'/../repro/maintainer_gap_extract_enum_prefix.php');
+        self::assertIsString($code);
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'extract_enum_prefix.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame(
+            "TypeError: extract(): Argument #3 (\$prefix) must be of type string, Prefix given\n",
+            ob_get_clean()
+        );
+    }
+
+    /** Issue #8883 — array_pad([E::A], N, E::B) wires inline enum haystack + pad-value ConstFetch. */
+    public function testArrayPadInlineEnumHaystackAndPadValueRuntime(): void
+    {
+        $code = <<<'PHP'
+<?php
+enum E: int { case A = 1; case B = 2; }
+var_export(array_pad([E::A], 3, E::B));
+echo "\n";
+foreach (array_pad([E::A], 3, E::B) as $v) {
+    echo get_debug_type($v), "\n";
+}
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'array_pad_inline_enum.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame(
+            "array (\n  0 => \n  \\E::A,\n  1 => \n  \\E::B,\n  2 => \n  \\E::B,\n)\nE\nE\nE\n",
+            ob_get_clean()
+        );
+    }
+
+    /** Issue #16560 — array_pad([1], Len::Two, 0) must wire enum length to arg #2, not pad value. */
+    public function testArrayPadEnumLengthArgNotMisboundToPadValue(): void
+    {
+        $code = <<<'PHP'
+<?php
+enum Len: int { case Two = 2; }
+try {
+    array_pad([1], Len::Two, 0);
+    echo "uncaught\n";
+} catch (TypeError $e) {
+    echo $e->getMessage(), "\n";
+}
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'array_pad_enum_length.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame(
+            "array_pad(): Argument #2 (\$length) must be of type int, Len given\n",
+            ob_get_clean()
+        );
+    }
+
+    /** Issue #9971 / #16560 — array_chunk([1,2,3], Len::Two) wires haystack Array_ + length ClassConstFetch. */
+    public function testArrayChunkInlineArrayEnumLengthTypeErrorRuntime(): void
+    {
+        $code = <<<'PHP'
+<?php
+enum Len: int { case Two = 2; }
+try {
+    array_chunk([1, 2, 3], Len::Two);
+    echo "uncaught\n";
+} catch (TypeError $e) {
+    echo $e->getMessage(), "\n";
+}
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'array_chunk_enum_length.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame(
+            "array_chunk(): Argument #2 (\$length) must be of type int, Len given\n",
+            ob_get_clean()
+        );
+    }
+
     /** Issue #16316 / #8886 — inline [int, enum] haystack must keep scalar before enum case. */
     public function testArraySearchStrictMixedHaystackInlineLiteralRuntime(): void
     {
@@ -5529,6 +5648,60 @@ PHP;
         self::assertSame("array (\n  1 => array (\n    'x' => 1,\n    'y' => 2,\n  ),\n)\n", ob_get_clean());
     }
 
+    /** Issue #16539 — extract([...], flags: EXTR_SKIP) must ARG_SEND array + named flags, not double ConstFetch. */
+    public function testExtractNamedFlagsArgSendUsesArrayNotHoistedConst(): void
+    {
+        $code = <<<'PHP'
+<?php
+declare(strict_types=1);
+$a = 1;
+$n = extract(['a' => 99, 'b' => 2], flags: EXTR_SKIP);
+echo "n={$n}\n";
+echo "a={$a}\n";
+echo isset($b) ? "b={$b}\n" : "b=unset\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'extract_flags_named.php');
+
+        $constSlots = [];
+        $initArraySlots = [];
+        $extractSends = [];
+        $inExtract = false;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_CONST_FETCH === $op->type) {
+                $constSlots[] = $op->arg1;
+            }
+            if (OpCode::TYPE_INIT_ARRAY === $op->type) {
+                $initArraySlots[] = $op->arg1;
+            }
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type
+                && 'extract' === $block->constants[$op->arg1]->toString()) {
+                $inExtract = true;
+                continue;
+            }
+            if ($inExtract && OpCode::TYPE_ARG_SEND === $op->type) {
+                $extractSends[] = $op->arg1;
+                if (\count($extractSends) >= 2) {
+                    $inExtract = false;
+                }
+            }
+            if ($inExtract && OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
+                $inExtract = false;
+            }
+        }
+
+        self::assertNotEmpty($initArraySlots, 'inline array must compile');
+        self::assertNotEmpty($constSlots, 'EXTR_SKIP ConstFetch must compile');
+        self::assertCount(2, $extractSends, 'extract arg sends='.json_encode($extractSends));
+        self::assertSame($initArraySlots[0], $extractSends[0], 'array INIT_ARRAY must feed extract arg #0');
+        self::assertSame($constSlots[0], $extractSends[1], 'EXTR_SKIP must feed named flags arg');
+        self::assertNotSame($extractSends[0], $extractSends[1], 'array and flags must use distinct slots');
+
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("n=1\na=1\nb=2\n", ob_get_clean());
+    }
+
     /** Issue #13800 — extract(inline array) then var_export($local) must not re-compile extract for var_export arg. */
     public function testExtractInlineArrayThenVarExportNamedLocal(): void
     {
@@ -6045,6 +6218,23 @@ PHP;
         );
     }
 
+    /** Issue #16481 — mb_substr/mb_strcut($s, -N, null[, $enc]) wires UnaryMinus offset + null length. */
+    public function testMbstringNegativeOffsetNullLengthRuntime(): void
+    {
+        $code = <<<'PHP'
+<?php
+declare(strict_types=1);
+
+echo mb_substr('αβγ', -2, null, 'UTF-8'), "\n";
+echo mb_strcut('日本語テスト', -3, null, 'UTF-8'), "\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'mb_substr_neg_null_len.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("βγ\nト\n", ob_get_clean());
+    }
+
     /** Issue #9292 — && merge phi must not clobber nested stream_set_blocking var_dump arg. */
     public function testStreamSetBlockingAfterLogicalAndUsesNestedCallSlot(): void
     {
@@ -6378,5 +6568,67 @@ PHP;
                 putenv('PHP_COMPILER_PROFILE='.$prev);
             }
         }
+    }
+
+    /** Issue #10177 — sequential setlocale(LC_ALL, …) must not steal prior EXEC_RETURN for LC_ALL prelude. */
+    public function testSequentialSetlocaleQueryNullKeepsHoistedLcAllPreludeSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+declare(strict_types=1);
+$q1 = setlocale(LC_ALL, null);
+setlocale(LC_ALL, 'C');
+$q2 = setlocale(LC_ALL, null);
+echo $q1, ':', $q2, "\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'setlocale_query_null_chain.php');
+
+        $returnSlots = [];
+        $thirdCallSends = [];
+        $fcallOrdinal = 0;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                ++$fcallOrdinal;
+                if (3 === $fcallOrdinal) {
+                    $thirdCallSends = [];
+                }
+            }
+            if (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
+                $returnSlots[] = $op->arg1;
+            }
+            if (3 === $fcallOrdinal && OpCode::TYPE_ARG_SEND === $op->type) {
+                $thirdCallSends[] = $op->arg1;
+            }
+        }
+
+        self::assertCount(2, $thirdCallSends);
+        self::assertNotContains(
+            $thirdCallSends[0],
+            $returnSlots,
+            'third setlocale category must not use prior EXEC_RETURN; sends='.json_encode($thirdCallSends)
+                .' returns='.json_encode($returnSlots)
+        );
+
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertMatchesRegularExpression('/^[^:]+:.*\n$/', $out);
+        [$first, $second] = explode(':', trim($out));
+        self::assertSame($first, $second);
+    }
+
+    /** Issue #10174 — new ArrayObject([...], C::FLAGS) must not wire ClassConst prelude to array arg #0. */
+    public function testArrayObjectConstructClassConstFlagsArgRuntime(): void
+    {
+        $code = file_get_contents(__DIR__.'/../repro/maintainer_gap_arrayobject_array_as_props.php');
+        self::assertNotFalse($code);
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'maintainer_gap_arrayobject_array_as_props.php');
+
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertSame("q\nq\nv\n", $out);
     }
 }

@@ -18,7 +18,8 @@ final class ArrayPadRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('ArrayPadJitHelper', $runtime);
         $this->assertStringContainsString('padCopyLegacy', $runtime);
         $this->assertStringContainsString('padCopyTyped', $runtime);
-        $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);
+        $this->assertStringContainsString('LOAD_TYPE_STANDALONE', $runtime);
+        $this->assertStringContainsString('ArrayBuiltinHelper::pad', $runtime);
 
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/array_pad.php');
         $this->assertStringContainsString('ArrayPadRuntime::pad', $builtin);

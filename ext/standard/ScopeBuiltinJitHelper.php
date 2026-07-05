@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\JIT\Variable as JitVariable;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
+use PHPCompiler\VM\VariableFunctionCall;
 
 /**
  * compact() / extract() / get_defined_vars() helpers for compiled JIT/AOT modules (#10184, #14499, #14507, php-in-PHP).
@@ -16,6 +17,21 @@ use PHPCompiler\VM\Variable;
  */
 final class ScopeBuiltinJitHelper
 {
+    /**
+     * @param string $namesTable NUL-delimited scope variable names (compile-time)
+     *
+     * @return int variable index, or -1 when none match (LLVM i32 ABI)
+     */
+    public static function matchNamedVariableIndex(string $name, string $namesTable): int
+    {
+        $names = \array_values(\array_filter(
+            \explode("\0", $namesTable),
+            static fn (string $part): bool => '' !== $part
+        ));
+
+        return VariableFunctionCall::matchCandidateIndex($name, $names);
+    }
+
     public static function compactUndefinedVariableMessage(string $name): string
     {
         return "compact(): Undefined variable \${$name}";

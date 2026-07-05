@@ -31,7 +31,7 @@ final class AsymmetricVisibilityRewriter
     /** php-src: Zend/zend_language_scanner.l — invalid set/read modifier ordering on reference profile (#15446). */
     public const BARE_SET_WITHOUT_READ_MESSAGE = 'syntax error, unexpected token ")", expecting variable';
 
-    /** php-src: Zend/zend_language_parser.y — parenthesized `(private(set))` invalid on promoted params (#16436). */
+    /** php-src: Zend/zend_language_parser.y — parenthesized `(private(set))` on promoted params gated to 8.4+ (#16495). */
     public const PROMOTED_PARENTHESIZED_SET_MESSAGE = 'syntax error, unexpected token "%s"';
 
     /**
@@ -396,13 +396,17 @@ final class AsymmetricVisibilityRewriter
     }
 
     /**
-     * Promoted constructor parameters reject parenthesized asymmetric set modifiers (#16436).
+     * Promoted constructor parameters reject parenthesized asymmetric set modifiers on reference profile.
      *
-     * php-src: Zend/zend_language_parser.y — `(private(set))` is property syntax only; promotion uses
-     * `public private(set)` without inner parens (RFC asymmetric-visibility-v2).
+     * php-src: Zend/zend_language_parser.y — 8.4+ accepts `public (private(set))` on promoted params (#16495);
+     * reference profile still rejects like Zend 8.2 (#16436).
      */
     private static function rejectPromotedParamParenthesizedAsymmetricSet(string $source): void
     {
+        if (CompilerVersion::supportsParenthesizedAsymmetricSetModifier()) {
+            return;
+        }
+
         if (!preg_match('/\b__construct\b/i', $source) || !preg_match('/\(\s*set\s*\)/i', $source)) {
             return;
         }
@@ -480,11 +484,10 @@ final class AsymmetricVisibilityRewriter
 
     private static function lineViolatesMultipleSetModifierRules(string $line): bool
     {
-        // php-src: Zend/zend_compile.c — duplicate PPP / PPP_SET and explicit read before set (#16142, #16195).
-        // Valid asymmetric forms use set-first / parenthesized set, e.g. `(private(set)) public`.
-        // Weaker-than-set pairs are rejected later by AsymmetricVisibilityCompileCheck.
-        return self::lineViolatesDuplicateSetModifierRules($line)
-            || self::lineHasExplicitReadPlusSetModifier($line);
+        // php-src 8.4: `public protected(set)` / `public private(set)` are valid asymmetric visibility.
+        // Duplicate modifiers (public public(set)) remain fatal here; weaker-than-set is CompileCheck.
+        // Reference profile rejects explicit read+set via lineViolatesMultipleSetModifierRulesForReferenceProfile().
+        return self::lineViolatesDuplicateSetModifierRules($line);
     }
 
     /**

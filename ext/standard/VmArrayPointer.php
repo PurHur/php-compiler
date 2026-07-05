@@ -64,6 +64,15 @@ final class VmArrayPointer
 
             return;
         }
+        // reset/next/end/prev/current/pos return element/property values; copyFrom is safe because
+        // object propertyValueAt() already stages a copy (#16556). indirect() on a typed property
+        // slot leaves var_export reading bool(true) instead of the value.
+        if ($valueMode) {
+            $dest->copyFrom($value);
+
+            return;
+        }
+        // key() returns a fresh string key — copyFrom would clobber typed property storage (#11787).
         $staging = new Variable();
         $staging->copyFrom($value);
         if (Variable::TYPE_INDIRECT === $dest->type) {

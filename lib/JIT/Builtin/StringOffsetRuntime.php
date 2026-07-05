@@ -83,6 +83,13 @@ final class StringOffsetRuntime
         ErrorRaise::emitRaise($context, StringOffsetJitHelper::incDecErrorMessage());
     }
 
+    public static function emitEmptyAssignError(Context $context): void
+    {
+        ErrorRaise::registerDeclarations($context);
+        ErrorRaise::ensureLinked($context);
+        ErrorRaise::emitRaise($context, StringOffsetJitHelper::emptyAssignErrorMessage());
+    }
+
     public static function dimFetch(Context $context, Value $strSlot, JitVariable $dim): Value
     {
         self::ensureLinked($context);
@@ -115,6 +122,11 @@ final class StringOffsetRuntime
 
     public static function dimAssign(Context $context, Value $charPtr, JitVariable $value): void
     {
+        if (self::assignRhsIsEmptyAtCompileTime($value)) {
+            self::emitEmptyAssignError($context);
+
+            return;
+        }
         $byte = self::assignByte($context, $value);
         $context->builder->store($byte, $charPtr);
     }
@@ -132,6 +144,15 @@ final class StringOffsetRuntime
             $context->getTypeFromString('int64')->constInt(1, false),
             $bufChar
         );
+    }
+
+    private static function assignRhsIsEmptyAtCompileTime(JitVariable $value): bool
+    {
+        if (JitVariable::TYPE_NULL === $value->type || $value->isNullConstant) {
+            return true;
+        }
+
+        return '' === ($value->compileTimeString ?? null);
     }
 
     private static function assignByte(Context $context, JitVariable $value): Value

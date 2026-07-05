@@ -65,6 +65,35 @@ PHP;
 
         self::assertGreaterThanOrEqual(6, \count($execReturns), 'expected ftell + fgetc EXEC_RETURN after first pair');
 
+        $ftellReturn = null;
+        $fgetcReturn = null;
+        foreach ($block->opCodes as $i => $op) {
+            if (OpCode::TYPE_FUNCCALL_INIT !== $op->type) {
+                continue;
+            }
+            $name = $block->constants[$op->arg1]->toString();
+            if ('ftell' === $name) {
+                $next = $block->opCodes[$i + 1] ?? null;
+                while ($next instanceof OpCode && OpCode::TYPE_ARG_SEND === $next->type) {
+                    $next = $block->opCodes[++$i + 1] ?? null;
+                }
+                if ($next instanceof OpCode && OpCode::TYPE_FUNCCALL_EXEC_RETURN === $next->type) {
+                    $ftellReturn = $next->arg1;
+                }
+            }
+            if ('fgetc' === $name) {
+                $next = $block->opCodes[$i + 1] ?? null;
+                while ($next instanceof OpCode && OpCode::TYPE_ARG_SEND === $next->type) {
+                    $next = $block->opCodes[++$i + 1] ?? null;
+                }
+                if ($next instanceof OpCode && OpCode::TYPE_FUNCCALL_EXEC_RETURN === $next->type) {
+                    $fgetcReturn = $next->arg1;
+                }
+            }
+        }
+        self::assertNotNull($ftellReturn, 'expected ftell EXEC_RETURN');
+        self::assertNotNull($fgetcReturn, 'expected fgetc EXEC_RETURN');
+
         $varDumpSends = [];
         for ($i = \count($block->opCodes) - 1; $i >= 0; --$i) {
             $op = $block->opCodes[$i];
@@ -82,8 +111,6 @@ PHP;
             }
         }
 
-        $ftellReturn = $execReturns[4];
-        $fgetcReturn = $execReturns[5];
         self::assertCount(2, $varDumpSends, 'second var_dump ARG_SEND count');
         self::assertNotSame($varDumpSends[0], $varDumpSends[1], 'second var_dump args must use distinct slots');
         self::assertSame($ftellReturn, $varDumpSends[0], 'second var_dump arg #1 must be ftell EXEC_RETURN');

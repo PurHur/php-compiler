@@ -153,7 +153,7 @@ final class StrGetcsvBuiltinTest extends TestCase
         $this->assertSame([VMVariable::TYPE_NULL], $vals);
     }
 
-    public function testNullSeparatorTypeError(): void
+    public function testNullSeparatorUsesDefault(): void
     {
         $runtime = new Runtime();
         $fn = new str_getcsv();
@@ -165,12 +165,15 @@ final class StrGetcsvBuiltinTest extends TestCase
         $frame = $fn->getFrame($runtime->vmContext);
         $frame->calledArgs = [$input, $separator];
         $frame->returnVar = new VMVariable();
-        $this->expectException(\TypeError::class);
-        $this->expectExceptionMessage('str_getcsv(): Argument #2 ($separator) must be of type string, null given');
         $fn->execute($frame);
+        $vals = [];
+        foreach ($frame->returnVar->toArray()->iterate(true) as $v) {
+            $vals[] = $v->resolveIndirect()->toString();
+        }
+        $this->assertSame(['a', 'b'], $vals);
     }
 
-    public function testNullEnclosureTypeError(): void
+    public function testNullEnclosureUsesDefault(): void
     {
         $runtime = new Runtime();
         $fn = new str_getcsv();
@@ -184,12 +187,15 @@ final class StrGetcsvBuiltinTest extends TestCase
         $frame = $fn->getFrame($runtime->vmContext);
         $frame->calledArgs = [$input, $sep, $enclosure];
         $frame->returnVar = new VMVariable();
-        $this->expectException(\TypeError::class);
-        $this->expectExceptionMessage('str_getcsv(): Argument #3 ($enclosure) must be of type string, null given');
         $fn->execute($frame);
+        $vals = [];
+        foreach ($frame->returnVar->toArray()->iterate(true) as $v) {
+            $vals[] = $v->resolveIndirect()->toString();
+        }
+        $this->assertSame(['a', 'b'], $vals);
     }
 
-    public function testNullEscapeTypeError(): void
+    public function testNullEscapeUsesDefault(): void
     {
         $runtime = new Runtime();
         $fn = new str_getcsv();
@@ -205,9 +211,12 @@ final class StrGetcsvBuiltinTest extends TestCase
         $frame = $fn->getFrame($runtime->vmContext);
         $frame->calledArgs = [$input, $sep, $enc, $escape];
         $frame->returnVar = new VMVariable();
-        $this->expectException(\TypeError::class);
-        $this->expectExceptionMessage('str_getcsv(): Argument #4 ($escape) must be of type string, null given');
         $fn->execute($frame);
+        $vals = [];
+        foreach ($frame->returnVar->toArray()->iterate(true) as $v) {
+            $vals[] = $v->resolveIndirect()->toString();
+        }
+        $this->assertSame(['a', 'b'], $vals);
     }
 
     /** @dataProvider newlineOnlyProvider */

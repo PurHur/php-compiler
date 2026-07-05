@@ -335,6 +335,12 @@ final class BuiltinParamNames
             case 'debug_backtrace':
             case 'get_debug_backtrace':
                 return ['options', 'limit'];
+            case 'pathinfo':
+                return ['path', 'flags'];
+            case 'dirname':
+                return ['path', 'levels'];
+            case 'extract':
+                return ['array', 'flags', 'prefix'];
             case 'file':
                 return ['filename', 'flags'];
             case 'substr_compare':

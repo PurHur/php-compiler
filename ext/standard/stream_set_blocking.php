@@ -7,9 +7,11 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\JitBoolArg;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPLLVM\Value;
 
 /**
@@ -34,12 +36,16 @@ final class stream_set_blocking extends Internal
             'stream_set_blocking',
             1
         );
-        $mode = VmMath::parseBoolBuiltinArg(
-            $frame->calledArgs[1]->resolveIndirect(),
-            'stream_set_blocking',
-            2,
-            'mode'
-        );
+        if (InternalStrictArg::isCallerStrict($frame)) {
+            $mode = InternalStrictArg::requireBool($frame, 1, 'stream_set_blocking', 'mode')->toBool();
+        } else {
+            $mode = VmMath::parseBoolBuiltinArg(
+                $frame->calledArgs[1]->resolveIndirect(),
+                'stream_set_blocking',
+                2,
+                'mode'
+            );
+        }
         if (null === $frame->returnVar) {
             return;
         }
@@ -52,8 +58,9 @@ final class stream_set_blocking extends Internal
             throw new \LogicException('stream_set_blocking() requires exactly two arguments in this compiler build');
         }
         $i64 = $context->getTypeFromString('int64');
+        JitInternalStrictArg::requireBool($context, $args[1], 'stream_set_blocking', 'mode', 2);
         $mode = $context->builder->zExt(
-            JitBoolArg::lower($context, $args[1], 'stream_set_blocking() mode'),
+            JitBoolArg::lower($context, $args[1], 'stream_set_blocking(): Argument #2 ($mode)'),
             $i64
         );
 

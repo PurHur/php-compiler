@@ -1853,6 +1853,15 @@ class JIT {
         $cfgParamCount = null !== $block->func ? count($block->func->params) : 0;
         foreach ($args as $idx => $arg) {
             $varType = Variable::getTypeFromType($rawTypes[$idx]);
+            if (
+                JIT\NestedJitCompileScope::isActive()
+                && $idx < $cfgParamCount
+                && $this->isCfgVmVariableParamType(
+                    $this->declaredTypeFromCfgParam($block->func->params[$idx])
+                )
+            ) {
+                $varType = Variable::TYPE_VALUE;
+            }
             if ($idx < $cfgParamCount && $block->func->params[$idx]->variadic) {
                 $varType = Variable::TYPE_HASHTABLE;
             }
@@ -1918,6 +1927,10 @@ class JIT {
         $sanitized = preg_replace('/[^a-zA-Z0-9_]/', '_', $name) ?? $name;
         if (isset(self::LLVM_RESERVED_FUNCTION_NAMES[$sanitized])) {
             return 'php_user_'.$sanitized;
+        }
+        // Nested JIT: LLVM C API LLVMDumpValue collides with …dumpvalue symbols (#16565).
+        if (preg_match('/(?:^|_)dumpvalue$/i', $sanitized)) {
+            return preg_replace('/dumpvalue$/i', 'emit_dump_value', $sanitized);
         }
 
         return $sanitized;
@@ -3424,6 +3437,19 @@ class JIT {
         return str_contains($name, 'operand') || str_contains($name, '\\op\\');
     }
 
+    /** VM Variable handles use boxed __value__* ABI in nested php-in-PHP JIT helpers (#16565). */
+    private function isCfgVmVariableParamType(?Type $type): bool
+    {
+        if (null === $type || Type::TYPE_OBJECT !== $type->type) {
+            return false;
+        }
+        $name = strtolower(ltrim($type->userType ?? '', '\\'));
+
+        return 'phpcompiler\\vm\\variable' === $name
+            || str_ends_with($name, '\\vm\\variable')
+            || 'variable' === $name;
+    }
+
     private function isCfgOperandDeclaredName(string $name): bool
     {
         $lc = strtolower(ltrim($name, '\\'));
@@ -3504,10 +3530,22 @@ class JIT {
             return $this->context->getTypeFromString('__object__*');
         }
         $declared = $this->declaredTypeFromCfgParam($param);
+        if (
+            JIT\NestedJitCompileScope::isActive()
+            && $this->isCfgVmVariableParamType($declared)
+        ) {
+            return $this->context->getTypeFromString('__value__*');
+        }
         if (null !== $declared && $this->isCfgObjectIdentityParamType($declared)) {
             return $this->context->getTypeFromString('__object__*');
         }
         $rawType = $this->rawTypeFromCfgParam($param);
+        if (
+            JIT\NestedJitCompileScope::isActive()
+            && $this->isCfgVmVariableParamType($rawType)
+        ) {
+            return $this->context->getTypeFromString('__value__*');
+        }
         if ($this->isCfgObjectIdentityParamType($rawType)) {
             return $this->context->getTypeFromString('__object__*');
         }
@@ -13434,7 +13472,9 @@ class JIT {
             );
         }
         if (JIT\Variable::TYPE_NULL === $read->type || ($read->isNullConstant ?? false)) {
-            return $readPtr->typeOf()->constInt(0, false);
+            // int64 like __value__readLong — $readPtr->typeOf() is the value-box
+            // POINTER type and mistypes every consumer (verifier phi mismatch).
+            return $this->context->getTypeFromString('int64')->constInt(0, false);
         }
         if (!JIT\JitValueBox::isValueOperand($read)) {
             return $this->context->builder->call(
@@ -13443,7 +13483,7 @@ class JIT {
             );
         }
         $isNull = JIT\JitValueCompare::valueBoxIsNull($this->context, $read);
-        $zero = $readPtr->typeOf()->constInt(0, false);
+        $zero = $this->context->getTypeFromString('int64')->constInt(0, false);
         $readLong = $this->context->builder->call(
             $this->context->lookupFunction('__value__readLong'),
             $readPtr
@@ -15720,6 +15760,17 @@ class JIT {
             return $const->toString();
         }
         foreach ($block->opCodes as $prior) {
+            if (OpCode::TYPE_CLASS_CONST_FETCH === $prior->type && $prior->arg1 === $slot) {
+                $classOp = $block->getOperand($prior->arg2);
+                $nameOp = $block->getOperand($prior->arg3);
+                if (
+                    $classOp instanceof Operand\Literal
+                    && $nameOp instanceof Operand\Literal
+                    && 'class' === strtolower($nameOp->value)
+                ) {
+                    return $this->resolveClassNameForPseudoConst($block, $classOp);
+                }
+            }
             if (OpCode::TYPE_CONCAT === $prior->type && $prior->arg1 === $slot) {
                 $left = $this->resolveJitCompileTimeStringSlot($block, (int) $prior->arg2, $visited);
                 $right = $this->resolveJitCompileTimeStringSlot($block, (int) $prior->arg3, $visited);

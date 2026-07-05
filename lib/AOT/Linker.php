@@ -29,8 +29,10 @@ final class Linker
     /** libz.so symlink is often absent without zlib1g-dev; link the versioned .so directly. */
     private const RUNTIME_LINK_LIBS = '-lpcre2-8 -lcrypt -l:libz.so.1 -l:libbz2.so.1.0';
 
-    /** Appended when OpensslSignJitHelper FFI is available at link time (#16454). */
-    private const OPENSSL_LINK_LIB = '-lcrypto';
+    /** Appended when OpensslSignJitHelper FFI is available at link time (#16454).
+     * libcrypto.so symlink is absent without libssl-dev (same trap as libz
+     * above); link the versioned .so directly — 22.04 pinned env ships OpenSSL 3. */
+    private const OPENSSL_LINK_LIB = '-l:libcrypto.so.3';
 
     /** Host multiarch lib dir for bundled LLVM ld (libz.so.1 lives here, not in LLVM sysroot). */
     private const HOST_LIB_SEARCH = '-L/usr/lib/x86_64-linux-gnu';

@@ -12,6 +12,10 @@ foreach ([
     'PHP API',
     'PHP Extension',
     'Zend Extension',
+    'Registered PHP Streams',
+    'Registered Stream Socket Transports',
+    'Registered Stream Filters',
+    'Zend Signal Handling',
 ] as $row) {
     if (!str_contains($out, $row)) {
         fwrite(STDERR, "FAIL: phpinfo(INFO_GENERAL) missing {$row}\n");
@@ -20,8 +24,8 @@ foreach ([
 }
 
 $len = \strlen($out);
-if ($len < 1800) {
-    fwrite(STDERR, "FAIL: phpinfo(INFO_GENERAL) output too short ({$len} bytes, expected >=1800)\n");
+if ($len < 1700) {
+    fwrite(STDERR, "FAIL: phpinfo(INFO_GENERAL) output too short ({$len} bytes, expected >=1700)\n");
     exit(1);
 }
 

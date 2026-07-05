@@ -99,6 +99,21 @@ final class VmOpensslObjects
         return $var;
     }
 
+    public static function wrapKey(Context $ctx, string $pem): Variable
+    {
+        $class = $ctx->classes[self::KEY_LC] ?? null;
+        if (null === $class) {
+            throw new \LogicException('OpenSSLAsymmetricKey is not registered in this compiler build');
+        }
+        $entry = new ObjectEntry($class);
+        $entry->constructed = true;
+        self::$keyStore[$entry->id] = $pem;
+        $var = new Variable(Variable::TYPE_OBJECT);
+        $var->object($entry);
+
+        return $var;
+    }
+
     public static function keyPem(\PHPCompiler\VM\ObjectEntry $entry): string
     {
         return self::$keyStore[$entry->id] ?? '';

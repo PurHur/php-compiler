@@ -147,6 +147,31 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.3+ class constant brace dereference (`C::{'NAME'}`, `C::{"NAME"}`).
+     *
+     * Rejected on the 8.4.0-dev reference profile (matches Zend 8.2 parse error). Enable via stable
+     * 8.4.0+ or explicit `PHP_COMPILER_PROFILE=8.3` / `8.4` forward profile (#16597).
+     * php-src: Zend/zend_language_parser.y class_constant; Zend/zend_compile.c.
+     */
+    public static function supportsClassConstBraceDeref(): bool
+    {
+        if (version_compare(self::VERSION, '8.3', '<')) {
+            return false;
+        }
+
+        if (version_compare(self::VERSION, '8.4.0', '>=')) {
+            return true;
+        }
+
+        $raw = getenv('PHP_COMPILER_PROFILE');
+        if (!\is_string($raw) || '' === trim($raw)) {
+            return false;
+        }
+
+        return version_compare(self::languageProfileVersion(), '8.3.0', '>=');
+    }
+
+    /**
      * PHP 8.3+ `new readonly class` anonymous readonly modifier (#6991, #16255, #16348, #16379).
      *
      * Withheld on 8.4.0-dev reference profile (matches Zend 8.2 parse error). Enable via stable
@@ -177,10 +202,28 @@ final class CompilerVersion
         return version_compare(self::VERSION, '8.3', '>=');
     }
 
-    /** PHP 8.3+ typed function-local static variables (Zend/zend_compile.c, issue #9998). */
+    /**
+     * PHP 8.3+ typed function-local static variables (Zend/zend_compile.c, issue #9998, #16512).
+     *
+     * Withheld on 8.4.0-dev reference profile (matches Zend 8.2 parse error). Enable via stable
+     * 8.4.0+ or explicit `PHP_COMPILER_PROFILE=8.3` / `8.4` forward profile.
+     */
     public static function supportsTypedFunctionStatic(): bool
     {
-        return version_compare(self::VERSION, '8.3', '>=');
+        if (version_compare(self::VERSION, '8.3', '<')) {
+            return false;
+        }
+
+        if (version_compare(self::VERSION, '8.4.0', '>=')) {
+            return true;
+        }
+
+        $raw = getenv('PHP_COMPILER_PROFILE');
+        if (!\is_string($raw) || '' === trim($raw)) {
+            return false;
+        }
+
+        return version_compare(self::languageProfileVersion(), '8.3.0', '>=');
     }
 
     /**
@@ -283,7 +326,12 @@ final class CompilerVersion
             return false;
         }
 
-        return version_compare(self::languageProfileVersion(), '8.3.0', '>=');
+        $profile = self::languageProfileVersion();
+        if (version_compare($profile, '8.4.0', '>=')) {
+            return false;
+        }
+
+        return version_compare($profile, '8.3.0', '>=');
     }
 
     /**
@@ -885,11 +933,15 @@ final class CompilerVersion
 
     /**
      * http_get_last_response_headers()/get_last_response_headers()/http_clear_last_response_headers()
-     * visible to function_exists() — stable runtime only (#16346).
+     * visible to function_exists() — stable runtime or forward 8.4+ profile (#16346, #16494).
      */
     public static function advertisesHttpLastResponseHeaders(): bool
     {
-        return version_compare(self::VERSION, '8.4.0', '>=');
+        if (version_compare(self::VERSION, '8.4.0', '>=')) {
+            return true;
+        }
+
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
     }
 
     /**
@@ -902,10 +954,14 @@ final class CompilerVersion
         return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
     }
 
-    /** stream_context_set_options() visible to function_exists() — stable runtime only (#16346). */
+    /** stream_context_set_options() visible to function_exists() — stable runtime or forward 8.4+ profile (#16346, #16494). */
     public static function advertisesStreamContextSetOptions(): bool
     {
-        return version_compare(self::VERSION, '8.4.0', '>=');
+        if (version_compare(self::VERSION, '8.4.0', '>=')) {
+            return true;
+        }
+
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
     }
 
     /**
@@ -1070,13 +1126,25 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.3+ DateException / DateError hierarchy (ext/date/php_date.h, #7276, #7277, #13118, #15382).
+     * PHP 8.3+ DateException / DateError hierarchy (ext/date/php_date.h, #7276, #7277, #13118, #15382, #16490).
      *
-     * Forward profile on 8.4.0-dev — advertisesBuiltinSince treats -dev as 8.4.0 (#7129 interval/period exceptions).
+     * Withheld on 8.4.0-dev reference profile (matches Zend 8.2 Exception on malformed DateInterval).
+     * Enable via stable 8.4.0+ or explicit `PHP_COMPILER_PROFILE=8.3` / `8.4` forward profile.
      */
     public static function advertisesDateExceptionHierarchy(): bool
     {
-        return self::advertisesBuiltinSince('8.3.0');
+        if (version_compare(self::VERSION, '8.3', '<')) {
+            return false;
+        }
+        if (version_compare(self::VERSION, '8.4.0', '>=')) {
+            return true;
+        }
+        $raw = getenv('PHP_COMPILER_PROFILE');
+        if (!\is_string($raw) || '' === trim($raw)) {
+            return false;
+        }
+
+        return version_compare(self::languageProfileVersion(), '8.3.0', '>=');
     }
 
     /**

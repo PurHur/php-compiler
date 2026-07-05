@@ -83,21 +83,21 @@ final class ForwardProfilePhantomIntrospectionTest extends TestCase
         }
     }
 
-    public function testHttpLastResponseHeadersCallableButNotAdvertisedOnForwardProfile(): void
+    public function testHttpLastResponseHeadersAdvertisedOnForwardProfile84(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE=8.4');
         try {
             $this->assertTrue(CompilerVersion::supportsHttpLastResponseHeaders());
-            $this->assertFalse(CompilerVersion::advertisesHttpLastResponseHeaders());
+            $this->assertTrue(CompilerVersion::advertisesHttpLastResponseHeaders());
             foreach (['http_get_last_response_headers', 'get_last_response_headers', 'http_clear_last_response_headers'] as $fn) {
-                $this->assertFalse(BuiltinIntrospectionPolicy::functionIsAdvertised($fn));
+                $this->assertTrue(BuiltinIntrospectionPolicy::functionIsAdvertised($fn));
             }
 
             $runtime = new Runtime();
             $ctx = $runtime->vmContext;
             $this->assertTrue(isset($ctx->functions['http_get_last_response_headers']));
-            $this->assertFalse(
+            $this->assertTrue(
                 \PHPCompiler\ext\standard\VmReflection::functionExists($ctx, 'http_get_last_response_headers')
             );
         } finally {
@@ -109,19 +109,19 @@ final class ForwardProfilePhantomIntrospectionTest extends TestCase
         }
     }
 
-    public function testStreamContextSetOptionsCallableButNotAdvertisedOnForwardProfile(): void
+    public function testStreamContextSetOptionsAdvertisedOnForwardProfile84(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE=8.4');
         try {
             $this->assertTrue(CompilerVersion::supportsStreamContextSetOptions());
-            $this->assertFalse(CompilerVersion::advertisesStreamContextSetOptions());
-            $this->assertFalse(BuiltinIntrospectionPolicy::functionIsAdvertised('stream_context_set_options'));
+            $this->assertTrue(CompilerVersion::advertisesStreamContextSetOptions());
+            $this->assertTrue(BuiltinIntrospectionPolicy::functionIsAdvertised('stream_context_set_options'));
 
             $runtime = new Runtime();
             $ctx = $runtime->vmContext;
             $this->assertTrue(isset($ctx->functions['stream_context_set_options']));
-            $this->assertFalse(
+            $this->assertTrue(
                 \PHPCompiler\ext\standard\VmReflection::functionExists($ctx, 'stream_context_set_options')
             );
         } finally {
@@ -172,6 +172,35 @@ final class ForwardProfilePhantomIntrospectionTest extends TestCase
             $this->assertFalse(
                 \PHPCompiler\ext\standard\VmReflection::functionExists($ctx, 'readonly')
             );
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testStrIncrementCallableButNotAdvertisedOnForwardProfile84(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertTrue(CompilerVersion::supportsStrIncrement());
+            $this->assertFalse(CompilerVersion::advertisesStrIncrement());
+            $this->assertFalse(BuiltinIntrospectionPolicy::functionIsAdvertised('str_increment'));
+
+            $runtime = new Runtime();
+            $ctx = $runtime->vmContext;
+            $this->assertTrue(isset($ctx->functions['str_increment']));
+            $this->assertFalse(
+                \PHPCompiler\ext\standard\VmReflection::functionExists($ctx, 'str_increment')
+            );
+
+            $internal = \PHPCompiler\ext\standard\VmReflection::internalFunctionNameList();
+            $this->assertNotContains('str_increment', $internal);
+            $this->assertNotContains('str_decrement', $internal);
+            $this->assertNotContains('fpow', $internal);
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');

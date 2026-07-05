@@ -23,6 +23,8 @@ build/full-main-copy*
 build/helloworld-compile-bin-aot
 build/selfhost-*
 build/bootstrap-driver-smoke-*
+# Per-file lint result cache (bin/lint.php --bootstrap-inventory, #16077)
+build/lint-cache
 build/.m3_*
 build/.last-jit-*
 build/.bootstrap-*

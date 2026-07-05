@@ -382,6 +382,7 @@ class Runtime {
         ReadonlyAnonymousClassSyntaxRejector::reject($code, $filename);
         DnfParenIntersectionSyntaxRejector::reject($code, $filename);
         ExitFunctionSyntaxRejector::reject($code, $filename);
+        TypedFunctionStaticSyntaxRejector::reject($code, $filename);
         PropertyHookSyntaxRejector::reject($code, $filename);
         TryCatchElseSyntaxRejector::reject($code, $filename);
         TryCatchElseSupport::beginCompilationUnit();
@@ -402,6 +403,7 @@ class Runtime {
             $this->vmContext->propertyHookRegistry = $newRegistry;
         }
         CurlyBraceOffsetRejector::reject($code, $filename);
+        ClassConstBraceDerefRejector::reject($code, $filename);
         EncapsedCoalesceRejector::reject($code, $filename);
         ReadonlyMethodModifierRejector::reject($code, $filename);
         ReadonlyFunctionRejector::reject($code, $filename);

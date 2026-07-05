@@ -196,14 +196,52 @@ final class VmInfo
 
     public static function phpinfo(int $flags = self::INFO_ALL): bool
     {
-        OutputBuffer::append(self::renderPhpinfoHtml($flags));
+        OutputBuffer::append(self::renderPhpinfo($flags));
 
         return true;
+    }
+
+    /** php-src sapi_module.phpinfo_as_text — CLI emits plain-text rows (#16489). */
+    public static function phpinfoUsesTextFormat(): bool
+    {
+        return 'cli' === strtolower(self::php_sapi_name());
+    }
+
+    /** Shared phpinfo() output for VM + JIT ({@see PhpinfoJitHelper}, issue #9256, #16489). */
+    public static function renderPhpinfo(int $flags): string
+    {
+        return self::phpinfoUsesTextFormat()
+            ? self::renderPhpinfoText($flags)
+            : self::renderPhpinfoHtml($flags);
     }
 
     public static function phpcredits(int $flags = self::CREDITS_ALL): void
     {
         OutputBuffer::append(self::renderPhpcreditsText($flags));
+    }
+
+    /** php-src php_print_info() text layout for CLI SAPI (ext/standard/info.c, #16489). */
+    public static function renderPhpinfoText(int $flags): string
+    {
+        $text = "phpinfo()\n";
+        if (self::infoFlagSelected($flags, self::INFO_GENERAL)) {
+            $text .= self::generalSectionText();
+        }
+        if (self::infoFlagSelected($flags, self::INFO_MODULES)) {
+            $text .= self::modulesSectionText();
+        }
+        if (self::infoFlagSelected($flags, self::INFO_CONFIGURATION)) {
+            $text .= self::configurationSectionText();
+        }
+        if (self::infoFlagSelected($flags, self::INFO_LICENSE)) {
+            $text .= self::licenseSectionText();
+        }
+        if (self::infoFlagSelected($flags, self::INFO_CREDITS)) {
+            $text .= self::phpinfoCreditsIntroText();
+            $text .= self::creditsSectionText(self::PHPINFO_CREDITS_FLAGS, true);
+        }
+
+        return $text;
     }
 
     /** Shared phpinfo() HTML for VM + JIT ({@see PhpinfoJitHelper}, issue #9256). */
@@ -505,6 +543,10 @@ final class VmInfo
         $html .= '<tr><td class="e">System </td><td class="v">'.$system.' '.$host.' '.$release.' '.$versionStr.' '.$machine.' </td></tr>';
         $html .= '<tr><td class="e">Build Date </td><td class="v">'.CompilerVersion::BUILD_DATE.' </td></tr>';
         $html .= '<tr><td class="e">Build System </td><td class="v">'.$system.' '.$machine.' </td></tr>';
+        $buildProvider = VmIniIntrospection::phpinfoGeneralRow('Build Provider');
+        if ('' !== $buildProvider) {
+            $html .= '<tr><td class="e">Build Provider </td><td class="v">'.$buildProvider.' </td></tr>';
+        }
         $html .= '<tr><td class="e">Server API </td><td class="v">'.$sapi.' </td></tr>';
         foreach (self::PHPINFO_GENERAL_EXTRA_ROWS as $label) {
             $value = VmIniIntrospection::phpinfoGeneralRow($label);
@@ -513,6 +555,7 @@ final class VmInfo
             }
             $html .= '<tr><td class="e">'.$label.' </td><td class="v">'.$value.' </td></tr>';
         }
+        $html .= self::generalSectionRuntimeTailHtml();
         $html .= '<tr><td class="e">PHP Version </td><td class="v">'.$version.' </td></tr>';
         $html .= '<tr><td class="e">Zend Engine Version </td><td class="v">'.CompilerVersion::zendVersion().' </td></tr>';
         $html .= '</table><br />';
@@ -520,7 +563,106 @@ final class VmInfo
         return $html;
     }
 
-    /** php-src phpinfo(INFO_GENERAL) rows after Server API (ext/standard/info.c, #14283). */
+    private static function phpinfoRowText(string $label, string $value): string
+    {
+        return $label.' => '.$value."\n";
+    }
+
+    private static function phpinfoCreditsIntroText(): string
+    {
+        return "\n\n ".str_repeat('_', 71)."\n\nPHP Credits\n";
+    }
+
+    /** php-src sapi_module.name long label in phpinfo text mode (main/SAPI.c, #14283). */
+    private static function phpinfoServerApiLabel(): string
+    {
+        return match (strtolower(self::php_sapi_name())) {
+            'cli' => 'Command Line Interface',
+            'cli-server' => 'Development Server',
+            'cgi-fcgi', 'cgi' => 'CGI/FastCGI',
+            default => self::php_sapi_name(),
+        };
+    }
+
+    private static function generalSectionText(): string
+    {
+        $version = CompilerVersion::reportedPhpVersion();
+        $system = self::php_uname('s');
+        $host = self::php_uname('n');
+        $release = self::php_uname('r');
+        $versionStr = self::php_uname('v');
+        $machine = self::php_uname('m');
+        $buildDate = VmIniIntrospection::phpinfoGeneralRow('Build Date', CompilerVersion::BUILD_DATE);
+        $text = self::phpinfoRowText('PHP Version', $version)."\n";
+        $text .= self::phpinfoRowText('System', trim($system.' '.$host.' '.$release.' '.$versionStr.' '.$machine));
+        $text .= self::phpinfoRowText('Build Date', $buildDate);
+        $text .= self::phpinfoRowText('Build System', $system);
+        $buildProvider = VmIniIntrospection::phpinfoGeneralRow('Build Provider');
+        if ('' !== $buildProvider) {
+            $text .= self::phpinfoRowText('Build Provider', $buildProvider);
+        }
+        $text .= self::phpinfoRowText('Server API', self::phpinfoServerApiLabel());
+        foreach (self::PHPINFO_GENERAL_EXTRA_ROWS as $label) {
+            $value = VmIniIntrospection::phpinfoGeneralRow($label);
+            if ('Additional .ini files parsed' === $label) {
+                $value = self::formatPhpinfoAdditionalIniFilesText($value);
+            }
+            $text .= self::phpinfoRowText($label, $value);
+        }
+        $text .= self::generalSectionRuntimeTailText();
+        $text .= self::phpinfoRowText('PHP Version', $version);
+        $text .= self::phpinfoRowText('Zend Engine Version', CompilerVersion::zendVersion());
+        $text .= "\n";
+
+        return $text;
+    }
+
+    private static function formatPhpinfoAdditionalIniFilesText(string $value): string
+    {
+        if ('(none)' === $value || '' === $value) {
+            return $value;
+        }
+        $parts = preg_split('/,\s*\n?/', $value) ?: [];
+        $parts = array_values(array_filter(array_map('trim', $parts), static fn (string $part): bool => '' !== $part));
+        if ([] === $parts) {
+            return $value;
+        }
+
+        return implode(",\n", $parts);
+    }
+
+    private static function modulesSectionText(): string
+    {
+        $extensions = ModuleRegistry::getLoadedExtensions();
+        sort($extensions, SORT_STRING);
+        $text = "\nPHP Modules\n\n";
+        $text .= self::phpinfoRowText('Module Name', 'Enabled');
+        foreach ($extensions as $name) {
+            $text .= self::phpinfoRowText($name, 'enabled');
+        }
+        $text .= "\n";
+
+        return $text;
+    }
+
+    private static function configurationSectionText(): string
+    {
+        $text = "\nConfiguration\n\n";
+        $text .= self::phpinfoRowText('Compiler', 'PurHur/php-compiler');
+        $text .= "\n";
+
+        return $text;
+    }
+
+    private static function licenseSectionText(): string
+    {
+        $text = "\nPHP License\n\n";
+        $text .= "This program is free software; you can redistribute it and/or modify it under the terms of the PHP License.\n\n";
+
+        return $text;
+    }
+
+    /** php-src phpinfo(INFO_GENERAL) rows after Thread Safety (ext/standard/info.c, #14283). */
     private const PHPINFO_GENERAL_EXTRA_ROWS = [
         'Virtual Directory Support',
         'Configuration File (php.ini) Path',
@@ -534,7 +676,123 @@ final class VmInfo
         'PHP Extension Build',
         'Debug Build',
         'Thread Safety',
+        'Zend Signal Handling',
+        'Zend Memory Manager',
+        'Zend Multibyte Support',
+        'Zend Max Execution Timers',
+        'IPv6 Support',
+        'DTrace Support',
+        'Registered PHP Streams',
+        'Registered Stream Socket Transports',
+        'Registered Stream Filters',
     ];
+
+    /** php-src phpinfo(INFO_GENERAL) runtime rows before stream registry tail (#16551). */
+    private const PHPINFO_GENERAL_RUNTIME_ROWS = [
+        'Zend Signal Handling',
+        'Zend Memory Manager',
+        'Zend Multibyte Support',
+        'Zend Max Execution Timers',
+        'IPv6 Support',
+        'DTrace Support',
+    ];
+
+    /** @var array<string, string> */
+    private const PHPINFO_GENERAL_RUNTIME_DEFAULTS = [
+        'Zend Signal Handling' => 'enabled',
+        'Zend Memory Manager' => 'enabled',
+        'Zend Multibyte Support' => 'disabled',
+        'Zend Max Execution Timers' => 'disabled',
+        'IPv6 Support' => 'enabled',
+        'DTrace Support' => 'available, disabled',
+    ];
+
+    private static function generalSectionRuntimeTailText(): string
+    {
+        $text = '';
+        foreach (self::PHPINFO_GENERAL_RUNTIME_ROWS as $label) {
+            $text .= self::phpinfoRowText($label, self::phpinfoGeneralRuntimeRowValue($label));
+        }
+        $text .= self::phpinfoRowText('Registered PHP Streams', self::phpinfoRegisteredStreamsValue());
+        $text .= self::phpinfoRowText('Registered Stream Socket Transports', self::phpinfoRegisteredTransportsValue());
+        $text .= self::phpinfoRowText('Registered Stream Filters', self::phpinfoRegisteredStreamFiltersValue());
+        $text .= self::generalSectionCreditFooterText();
+
+        return $text;
+    }
+
+    private static function generalSectionRuntimeTailHtml(): string
+    {
+        $html = '';
+        foreach (self::PHPINFO_GENERAL_RUNTIME_ROWS as $label) {
+            $value = self::phpinfoGeneralRuntimeRowValue($label);
+            $html .= '<tr><td class="e">'.$label.' </td><td class="v">'.$value.' </td></tr>';
+        }
+        $html .= '<tr><td class="e">Registered PHP Streams </td><td class="v">'.self::phpinfoRegisteredStreamsValue().' </td></tr>';
+        $html .= '<tr><td class="e">Registered Stream Socket Transports </td><td class="v">'.self::phpinfoRegisteredTransportsValue().' </td></tr>';
+        $html .= '<tr><td class="e">Registered Stream Filters </td><td class="v">'.self::phpinfoRegisteredStreamFiltersValue().' </td></tr>';
+
+        return $html;
+    }
+
+    private static function phpinfoGeneralRuntimeRowValue(string $label): string
+    {
+        if ('Zend Multibyte Support' === $label) {
+            $mirrored = VmIniIntrospection::phpinfoGeneralRow($label, '');
+            if ('' !== $mirrored) {
+                return $mirrored;
+            }
+
+            return ModuleRegistry::extensionLoaded('mbstring') ? 'provided by mbstring' : 'disabled';
+        }
+
+        return VmIniIntrospection::phpinfoGeneralRow(
+            $label,
+            self::PHPINFO_GENERAL_RUNTIME_DEFAULTS[$label] ?? ''
+        );
+    }
+
+    private static function phpinfoRegisteredStreamsValue(): string
+    {
+        $mirrored = VmIniIntrospection::phpinfoGeneralRow('Registered PHP Streams', '');
+        if ('' !== $mirrored) {
+            return $mirrored;
+        }
+
+        return \implode(', ', VmStreamWrapperRegistry::getWrappers());
+    }
+
+    private static function phpinfoRegisteredTransportsValue(): string
+    {
+        $mirrored = VmIniIntrospection::phpinfoGeneralRow('Registered Stream Socket Transports', '');
+        if ('' !== $mirrored) {
+            return $mirrored;
+        }
+
+        return \implode(', ', VmStreamTransports::getRegistrationOrderTransports());
+    }
+
+    private static function phpinfoRegisteredStreamFiltersValue(): string
+    {
+        $mirrored = VmIniIntrospection::phpinfoGeneralRow('Registered Stream Filters', '');
+        if ('' !== $mirrored) {
+            return $mirrored;
+        }
+
+        return \implode(', ', VmStreamFilters::allFilterNames());
+    }
+
+    private static function generalSectionCreditFooterText(): string
+    {
+        $footer = VmIniIntrospection::phpinfoCreditFooter();
+        if ('' !== $footer) {
+            return "\n".$footer."\n";
+        }
+        $zendVer = CompilerVersion::zendVersion();
+
+        return "\nThis program makes use of the Zend Scripting Language Engine:\n"
+            .'Zend Engine v'.$zendVer.', Copyright (c) Zend Technologies'."\n";
+    }
 
     private static function formatPhpinfoAdditionalIniFilesHtml(string $value): string
     {
@@ -620,7 +878,7 @@ final class VmInfo
     }
 
     /** php-src php_print_credits() text layout (ext/standard/info.c php_info_print_table_*). */
-    private static function creditsSectionText(int $flags): string
+    private static function creditsSectionText(int $flags, bool $fullModuleCreditsTable = false): string
     {
         $sections = '';
         if (self::creditsFlagSelected($flags, self::CREDITS_GROUP)) {
@@ -635,7 +893,7 @@ final class VmInfo
         if (self::creditsFlagSelected($flags, self::CREDITS_MODULES)) {
             // php-src php_print_credits(CREDITS_ALL): full credits_modules[] table;
             // CREDITS_MODULES alone lists loaded extensions only (#14799, #16338).
-            $sections .= self::creditsModulesSectionText(self::isCreditsAll($flags));
+            $sections .= self::creditsModulesSectionText($fullModuleCreditsTable || self::isCreditsAll($flags));
         }
         if (self::creditsFlagSelected($flags, self::CREDITS_DOCS)) {
             $sections .= self::creditsDocsSectionText();

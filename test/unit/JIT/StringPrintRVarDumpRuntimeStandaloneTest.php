@@ -7,7 +7,7 @@ namespace PHPCompiler\JIT;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Issue #9195 / #9190 / #13240 / #13241: AOT standalone var_dump/print_r via PHP JitHelpers.
+ * Issue #9195 / #9190 / #13240 / #13241 / #16565: AOT var_dump/print_r paths.
  *
  * @group aot-lint
  */
@@ -17,14 +17,12 @@ final class StringPrintRVarDumpRuntimeStandaloneTest extends TestCase
     {
         $this->assertFileDoesNotExist(__DIR__.'/../../../lib/AOT/runtime/phpc_print_r.c');
         $this->assertFileDoesNotExist(__DIR__.'/../../../lib/AOT/runtime/phpc_var_dump.c');
-        $this->assertFileDoesNotExist(__DIR__.'/../../../lib/JIT/Builtin/StringPrintRJit.php');
-        $this->assertFileDoesNotExist(__DIR__.'/../../../lib/JIT/Builtin/StringVarDumpJit.php');
         $printRBridge = (string) file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/StringPrintR.php');
         $varDumpBridge = (string) file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/StringVarDump.php');
         $this->assertStringContainsString('PrintRJitHelper', $printRBridge);
-        $this->assertStringNotContainsString('StringPrintRJit', $printRBridge);
         $this->assertStringContainsString('VarDumpJitHelper', $varDumpBridge);
-        $this->assertStringNotContainsString('StringVarDumpJit', $varDumpBridge);
+        $this->assertFileExists(__DIR__.'/../../../lib/JIT/Builtin/StringPrintRJit.php');
+        $this->assertFileExists(__DIR__.'/../../../lib/JIT/Builtin/StringVarDumpJit.php');
         $this->assertStringNotContainsString(
             'is not implemented for JIT',
             (string) file_get_contents(__DIR__.'/../../../ext/standard/print_r.php')
@@ -35,11 +33,12 @@ final class StringPrintRVarDumpRuntimeStandaloneTest extends TestCase
         );
     }
 
-    public function testStandaloneUsesPhpBridgesNotLlvmMonoliths(): void
+    public function testStandaloneUsesLlvmMonolithNotNestedPhpHelper(): void
     {
         foreach (['StringPrintR.php', 'StringVarDump.php'] as $bridge) {
             $source = (string) file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/'.$bridge);
-            $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $source, $bridge);
+            $this->assertStringContainsString('LOAD_TYPE_STANDALONE', $source, $bridge);
+            $this->assertStringContainsString('::ensureLinked', $source, $bridge);
         }
     }
 }

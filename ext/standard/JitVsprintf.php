@@ -24,7 +24,7 @@ final class JitVsprintf
         }
         JitVsprintfArrayArg::requireValues($context, $args[1], 'vsprintf');
         StringFormat::ensureLinked($context);
-        $fmt = JitStringBuiltinArg::lowerRequiredString($context, $args[0], 'vsprintf', 0, 'format');
+        $fmt = JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'vsprintf', 0, 'format');
         $ht = ArrayBuiltinHelper::loadHashTable($context, $args[1]);
         $num = ArrayBuiltinHelper::getNumElements($context, $ht);
         $map = $context->structFieldMap['__hashtable__'];

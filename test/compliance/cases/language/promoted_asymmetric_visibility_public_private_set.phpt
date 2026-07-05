@@ -1,10 +1,10 @@
 --TEST--
-PHP 8.4 asymmetric visibility: promoted public (private(set)) rejected at compile (#16436, zend_compile.c)
+PHP 8.4 asymmetric visibility: promoted public (private(set)) compiles (#16495, zend_compile.c)
 --FILE--
 <?php
 class D {
     public function __construct(public (private(set)) int $x = 1) {}
 }
-echo "should not run\n";
---EXPECT_EXIT--
-255
+echo (new D(42))->x, "\n";
+--EXPECT--
+42
