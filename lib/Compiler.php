@@ -23673,8 +23673,12 @@ class Compiler {
                     && $deadInlineArgCount === \count($consumer->args ?? [])
                 ) {
                     ++$funcProducersSeen;
-                    if ($funcProducersSeen > $deadInlineArgCount) {
+                    if (
+                        $funcProducersSeen > $deadInlineArgCount
+                        && !$this->hasContiguousHoistedFuncCallProducersFrom(0, $consumerIndex, $cfgChildren)
+                    ) {
                         // var_dump(ftell(), fgetc()) after fseek/fwrite — only trailing N producers (#16254).
+                        // array_intersect(f(g()), f(g())) — full scan when outer producers match args (#16427, re-#16050).
                         break;
                     }
                 }
