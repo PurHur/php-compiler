@@ -32,6 +32,7 @@ final class IniJitHelper
         'zend.enable_gc',
         'max_execution_time',
         'default_charset',
+        'date.timezone',
         'cfg_file_path',
         'user_agent',
         'pcre.backtrack_limit',
@@ -261,6 +262,9 @@ final class IniJitHelper
         if ('default_charset' === $key) {
             return self::$defaultCharset;
         }
+        if ('date.timezone' === $key) {
+            return VmDate::defaultTimezoneGet();
+        }
         if ('user_agent' === $key) {
             return self::$userAgent;
         }
@@ -326,6 +330,9 @@ final class IniJitHelper
         }
         if ('default_charset' === $key) {
             return self::setDefaultCharset($newValue);
+        }
+        if ('date.timezone' === $key) {
+            return self::setDateTimezone($newValue);
         }
         if ('user_agent' === $key) {
             return self::setUserAgent($newValue);
@@ -593,6 +600,17 @@ final class IniJitHelper
     {
         $old = self::$defaultCharset;
         self::$defaultCharset = $newValue;
+
+        return $old;
+    }
+
+    /** @return string|null null when timezone id is invalid */
+    private static function setDateTimezone(string $newValue): ?string
+    {
+        $old = VmDate::defaultTimezoneGet();
+        if (!VmDate::tryDefaultTimezoneSet($newValue)) {
+            return null;
+        }
 
         return $old;
     }

@@ -17,7 +17,6 @@ final class ArrayElemJitHelper
 {
     public static function firstArgv(HashTable $ht): Variable
     {
-        VmArray::requireNonEmptyFirstLastArray($ht, 'array_first');
         $value = VmArray::valueFirst($ht);
         $out = new Variable();
         if (null === $value) {
@@ -31,7 +30,6 @@ final class ArrayElemJitHelper
 
     public static function lastArgv(HashTable $ht): Variable
     {
-        VmArray::requireNonEmptyFirstLastArray($ht, 'array_last');
         $value = VmArray::valueLast($ht);
         $out = new Variable();
         if (null === $value) {

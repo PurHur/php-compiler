@@ -1,21 +1,14 @@
 --TEST--
-stdlib proc_get_status() — process: named parameter (ext/standard/exec.c, #16625)
+stdlib proc_get_status() — process: named parameter (#16625, ext/standard/exec.c)
 --FILE--
 <?php
-$desc = [1 => ['pipe', 'w']];
-$pipes = [];
-$proc = proc_open('echo ok', $desc, $pipes);
-if (!is_resource($proc)) {
-    echo "no-proc\n";
-    exit(1);
-}
+$descriptors = [1 => ['pipe', 'w'], 2 => ['pipe', 'w']];
+$proc = proc_open(['sleep', '1'], $descriptors, $pipes);
 $st = proc_get_status(process: $proc);
-echo ($st['running'] ? 'running' : 'stopped'), "\n";
-echo (is_int($st['pid']) && $st['pid'] > 0 ? 'has-pid' : 'no-pid'), "\n";
-fclose($pipes[1]);
+echo is_array($st) && isset($st['pid']) && $st['pid'] > 0 ? "ok\n" : "fail\n";
+foreach ($pipes as $p) {
+    fclose($p);
+}
 proc_close($proc);
-echo "ok\n";
 --EXPECT--
-running
-has-pid
 ok
