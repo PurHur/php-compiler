@@ -1,15 +1,25 @@
 --TEST--
-stdlib str_getcsv() — null $separator TypeError JIT (#16140, ext/standard/string.c)
+stdlib str_getcsv() — null optional delimiter args use Zend defaults JIT (#16492, ext/standard/string.c)
 --JIT--
 --FILE--
 <?php
 declare(strict_types=1);
 
-try {
-    str_getcsv('a,b', null);
-    echo "uncaught\n";
-} catch (TypeError $e) {
-    echo $e->getMessage(), "\n";
-}
+var_export(str_getcsv('a,b', null));
+echo "\n";
+var_export(str_getcsv('a,b', ',', null));
+echo "\n";
+var_export(str_getcsv('a,b', ',', '"', null));
 --EXPECT--
-str_getcsv(): Argument #2 ($separator) must be of type string, null given
+array (
+  0 => 'a',
+  1 => 'b',
+)
+array (
+  0 => 'a',
+  1 => 'b',
+)
+array (
+  0 => 'a',
+  1 => 'b',
+)
