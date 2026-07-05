@@ -10,7 +10,6 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitResourceArg;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /** flock() — VM via VmFs; JIT/AOT via __compiler_flock (issue #3141, php-src ext/standard/flock.c). */
@@ -27,10 +26,8 @@ final class flock extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        if (Variable::TYPE_INTEGER !== $operationVar->type) {
-            throw new \LogicException('flock() operation must be an integer in this compiler build');
-        }
-        $frame->returnVar->bool(VmFs::flock($handle, $operationVar->toInt()));
+        $operation = VmFlockOperation::parseOperation($operationVar);
+        $frame->returnVar->bool(VmFs::flock($handle, $operation));
     }
 
     public function call(Context $context, JITVariable ...$args): Value

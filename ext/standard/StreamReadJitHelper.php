@@ -15,6 +15,8 @@ final class StreamReadJitHelper
     /** @return 0|1 ABI for __compiler_flock */
     public static function flockArgv(int $handle, int $operation): int
     {
+        VmFlockOperation::assertValidOperation($operation);
+
         return VmFs::flock($handle, $operation) ? 1 : 0;
     }
 
