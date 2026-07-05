@@ -277,6 +277,13 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
     public function testReadonlyBuiltinWithheldOnReferenceProfileUntilStable84(): void
     {
         $this->assertFalse(CompilerVersion::supportsReadonlyBuiltin());
+        $this->assertFalse(CompilerVersion::advertisesReadonlyBuiltin());
+    }
+
+    public function testZendThreadIdAdvertisementWithheldOnReferenceProfileUntilStable84(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsZendThreadId());
+        $this->assertFalse(CompilerVersion::advertisesZendThreadId());
     }
 
     public function testStreamSupportsWithheldOnReferenceProfile(): void

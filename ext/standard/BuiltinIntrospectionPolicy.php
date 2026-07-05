@@ -30,6 +30,12 @@ final class BuiltinIntrospectionPolicy
         if (\in_array($lc, ['str_increment', 'str_decrement'], true)) {
             return CompilerVersion::advertisesStrIncrement();
         }
+        if ('zend_thread_id' === $lc) {
+            return CompilerVersion::advertisesZendThreadId();
+        }
+        if ('readonly' === $lc) {
+            return CompilerVersion::advertisesReadonlyBuiltin();
+        }
         if (str_starts_with($lc, 'bc')) {
             return CompilerVersion::advertisesBcmath();
         }
