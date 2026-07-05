@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 4068 |
-| Phase A inventory files (M2 ratio SSOT) | 4068 |
+| PHP files on vm.php path | 4071 |
+| Phase A inventory files (M2 ratio SSOT) | 4071 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 10966 |
+| Source constructs flagged (warnings) | 10977 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -370,15 +370,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/openssl/JitOpensslCipherIvLength.php` | 0 | 1 |
 | `ext/openssl/JitOpensslCipherKeyLength.php` | 0 | 1 |
 | `ext/openssl/JitOpensslSign.php` | 0 | 1 |
-| `ext/openssl/Module.php` | 0 | 15 |
+| `ext/openssl/Module.php` | 0 | 17 |
 | `ext/openssl/OpensslCipherRegistry.php` | 0 | 1 |
 | `ext/openssl/OpensslConstants.php` | 0 | 1 |
 | `ext/openssl/OpensslExtensionPolicy.php` | 0 | 1 |
 | `ext/openssl/OpensslFunction.php` | 0 | 1 |
 | `ext/openssl/OpensslSignJitHelper.php` | 0 | 1 |
 | `ext/openssl/VmOpenssl.php` | 0 | 3 |
-| `ext/openssl/VmOpensslObjects.php` | 0 | 6 |
+| `ext/openssl/VmOpensslObjects.php` | 0 | 8 |
 | `ext/openssl/VmOpensslPkeyDeriveNative.php` | 0 | 1 |
+| `ext/openssl/VmOpensslPkeyNative.php` | 0 | 1 |
 | `ext/openssl/VmOpensslSignNative.php` | 0 | 1 |
 | `ext/openssl/VmOpensslX509Native.php` | 0 | 1 |
 | `ext/openssl/openssl_cipher_iv_length.php` | 0 | 2 |
@@ -388,6 +389,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/openssl/openssl_get_cipher_methods.php` | 0 | 2 |
 | `ext/openssl/openssl_get_md_methods.php` | 0 | 2 |
 | `ext/openssl/openssl_pkey_derive.php` | 0 | 2 |
+| `ext/openssl/openssl_pkey_export.php` | 0 | 2 |
+| `ext/openssl/openssl_pkey_get_private.php` | 0 | 2 |
+| `ext/openssl/openssl_pkey_new.php` | 0 | 2 |
 | `ext/openssl/openssl_sign.php` | 0 | 3 |
 | `ext/openssl/openssl_verify.php` | 0 | 3 |
 | `ext/openssl/openssl_x509_read.php` | 0 | 2 |
@@ -6390,12 +6394,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new openssl_get_cipher_methods (line 40)
 - new openssl_get_md_methods (line 41)
 - new openssl_pkey_new (line 42)
-- new openssl_pkey_derive (line 43)
-- new openssl_cipher_iv_length (line 44)
-- new openssl_cipher_key_length (line 45)
-- new openssl_digest (line 46)
-- new openssl_x509_read (line 47)
-- new openssl_free_key (line 48)
+- new openssl_pkey_get_private (line 43)
+- new openssl_pkey_export (line 44)
+- new openssl_pkey_derive (line 45)
+- new openssl_cipher_iv_length (line 46)
+- new openssl_cipher_key_length (line 47)
+- new openssl_digest (line 48)
+- new openssl_x509_read (line 49)
+- new openssl_free_key (line 50)
 - 2 class method(s)
 
 ### `ext/openssl/OpensslCipherRegistry.php`
@@ -6426,9 +6432,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/openssl/VmOpenssl.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 261)
-- new Variable (line 263)
-- 14 class method(s)
+- new HashTable (line 405)
+- new Variable (line 407)
+- 17 class method(s)
 
 ### `ext/openssl/VmOpensslObjects.php`
 
@@ -6437,13 +6443,20 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 78)
 - new ObjectEntry (line 93)
 - new Variable (line 96)
-- new ClassEntry (line 137)
-- 10 class method(s)
+- new ObjectEntry (line 108)
+- new Variable (line 111)
+- new ClassEntry (line 152)
+- 11 class method(s)
 
 ### `ext/openssl/VmOpensslPkeyDeriveNative.php`
 
 **Warnings** (review for bootstrap subset):
 - 6 class method(s)
+
+### `ext/openssl/VmOpensslPkeyNative.php`
+
+**Warnings** (review for bootstrap subset):
+- 8 class method(s)
 
 ### `ext/openssl/VmOpensslSignNative.php`
 
@@ -6496,6 +6509,24 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 27)
 - 3 class method(s)
+
+### `ext/openssl/openssl_pkey_export.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 27)
+- 2 class method(s)
+
+### `ext/openssl/openssl_pkey_get_private.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 28)
+- 2 class method(s)
+
+### `ext/openssl/openssl_pkey_new.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 26)
+- 2 class method(s)
 
 ### `ext/openssl/openssl_sign.php`
 
