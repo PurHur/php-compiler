@@ -45,6 +45,10 @@ final class ArrayPadVMTest extends BaseTest
             __DIR__.'/cases/stdlib/array_pad_neg_after_udf_array.phpt',
             'array_pad_neg_after_udf_array.phpt'
         );
+        yield 'array_pad_enum_length_typeerror.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/array_pad_enum_length_typeerror.phpt',
+            'array_pad_enum_length_typeerror.phpt'
+        );
     }
 
     public function setUp(): void
