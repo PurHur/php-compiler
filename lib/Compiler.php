@@ -40569,8 +40569,24 @@ class Compiler {
         if (!$this->callArgIsDeadInlineTemporary($callArg)) {
             return null;
         }
+        if ($this->callArgOperandExpectsArrayProducer($callArg)) {
+            return null;
+        }
         $preludes = $this->hoistedPreludeProducersImmediatelyBeforeCall($callOp, $block);
         if ([] === $preludes) {
+            return null;
+        }
+        $deadInlineArgCount = 0;
+        foreach ($callOp->args as $deadArg) {
+            if ($this->isEmbeddedCallLiteralArg($deadArg)) {
+                continue;
+            }
+            if ($this->callArgIsDeadInlineTemporary($deadArg)) {
+                ++$deadInlineArgCount;
+            }
+        }
+        // in_array('x', g(), true) — hoisted FuncCall between trailing ConstFetch and consumer (#16540).
+        if ($deadInlineArgCount !== \count($preludes)) {
             return null;
         }
         $preludeOrdinal = 0;
