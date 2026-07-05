@@ -52,9 +52,14 @@ final class implode extends Internal
                 'array'
             );
         } else {
+            $first = $frame->calledArgs[0]->resolveIndirect();
+            if (Variable::TYPE_ARRAY === $first->type) {
+                self::rejectArrayFirstTwoArgForm($frame, $this->getName());
+
+                return;
+            }
             self::rejectNullSeparator($frame, $frame->calledArgs[0], $this->getName());
             self::rejectEnumSeparator($frame->calledArgs[0], $this->getName());
-            self::rejectArraySeparator($frame->calledArgs[0], $this->getName());
             $glue = VmString::coerceStringBuiltinArg(
                 $frame->calledArgs[0],
                 $this->getName(),
@@ -96,12 +101,13 @@ final class implode extends Internal
             );
             $haystack = $this->loadHaystack($context, $args[0], false);
         } else {
-            if (0 !== ($args[0]->type & JITVariable::IS_NATIVE_ARRAY)
-                || JITVariable::TYPE_HASHTABLE === $args[0]->type
-            ) {
-                self::emitSeparatorArrayTypeErrorAndAbort($context, $this->getName());
+            if (self::jitArgIsDefinitelyArray($args[0])) {
+                self::jitRejectArrayFirstTwoArgForm($context, $args[1], $this->getName());
 
                 return $context->getTypeFromString('__string__*')->constNull();
+            }
+            if (JITVariable::TYPE_VALUE === $args[0]->type) {
+                return $this->jitTwoArgBoxedFirstDispatch($context, $args[0], $args[1], $this->getName());
             }
             self::rejectNullSeparatorJit($context, $args[0], $this->getName());
             $glue = JitStringBuiltinArg::lower(
@@ -210,15 +216,90 @@ final class implode extends Internal
         }
     }
 
-    /** php-src php_implode — two-arg form separator must not be array (#4160, ext/standard/string.c). */
-    private static function rejectArraySeparator(Variable $var, string $function): void
+    /**
+     * php-src Z_PARAM_ARRAY_HT_OR_STR + Z_PARAM_ARRAY_HT_OR_NULL — array-first two-arg form (#16401).
+     *
+     * When argument #1 is an array, invalid glue is reported on argument #2 ($array).
+     */
+    private static function rejectArrayFirstTwoArgForm(Frame $frame, string $function): void
     {
-        if (Variable::TYPE_ARRAY === $var->resolveIndirect()->type) {
+        $second = $frame->calledArgs[1]->resolveIndirect();
+        if (Variable::TYPE_ARRAY === $second->type) {
             throw new \TypeError(sprintf(
                 '%s(): Argument #1 ($separator) must be of type string, array given',
                 $function
             ));
         }
+        VmArray::requireArrayParam(
+            $frame->calledArgs[1],
+            $function,
+            2,
+            'array',
+            '?array'
+        );
+    }
+
+    private static function jitArgIsDefinitelyArray(JITVariable $arg): bool
+    {
+        return JITVariable::TYPE_HASHTABLE === $arg->type
+            || 0 !== ($arg->type & JITVariable::IS_NATIVE_ARRAY);
+    }
+
+    private static function jitRejectArrayFirstTwoArgForm(
+        Context $context,
+        JITVariable $secondArg,
+        string $function
+    ): void {
+        if (self::jitArgIsDefinitelyArray($secondArg)) {
+            self::emitSeparatorArrayTypeErrorAndAbort($context, $function);
+
+            return;
+        }
+        JitArrayElem::requireArrayParam($context, $secondArg, $function, 2, 'array', '?array');
+    }
+
+    private function jitTwoArgBoxedFirstDispatch(
+        Context $context,
+        JITVariable $firstArg,
+        JITVariable $secondArg,
+        string $function
+    ): Value {
+        TypeErrorRaise::registerDeclarations($context);
+        TypeErrorRaise::ensureLinked($context);
+        $valuePtr = JitValueBox::valuePtrFromVariable($context, $firstArg);
+        $map = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($valuePtr, $map['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $arrayBlock = BasicBlockHelper::append($context, 'implode_two_arg_array_first');
+        $modernBlock = BasicBlockHelper::append($context, 'implode_two_arg_modern');
+        $context->builder->branchIf(
+            $context->builder->icmp(
+                Builder::INT_EQ,
+                $typeByte,
+                $i8->constInt(Variable::TYPE_ARRAY, false)
+            ),
+            $arrayBlock,
+            $modernBlock
+        );
+        $context->builder->positionAtEnd($arrayBlock);
+        self::jitRejectArrayFirstTwoArgForm($context, $secondArg, $function);
+        $context->builder->call($context->lookupFunction('abort'));
+        $context->builder->positionAtEnd($modernBlock);
+        self::rejectNullSeparatorJit($context, $firstArg, $function);
+        $glue = JitStringBuiltinArg::lower(
+            $context,
+            $firstArg,
+            $function,
+            0,
+            'separator',
+            'array|string',
+            'string'
+        );
+        $haystack = $this->loadHaystack($context, $secondArg, true);
+
+        return JitImplode::implode($context, $glue, $haystack);
     }
 
     private static function rejectNullSeparatorJit(Context $context, JITVariable $arg, string $function): void
