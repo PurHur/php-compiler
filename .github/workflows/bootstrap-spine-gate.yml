@@ -86,8 +86,8 @@ jobs:
               composer install --no-interaction --ignore-platform-reqs -q
               script/apply-patches.sh
 
-              echo "=== bootstrap-inventory --check ==="
-              php script/bootstrap-inventory.php --check
+              echo "=== bootstrap-inventory --check-spine ==="
+              php script/bootstrap-inventory.php --check-spine
 
               echo "=== spine coverage sync ==="
               php script/check-selfhost-spine-coverage-sync.php

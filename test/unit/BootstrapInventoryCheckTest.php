@@ -140,6 +140,86 @@ MD);
         $this->assertStringContainsString('+ lib/B.php', $text);
     }
 
+    public function testStructuralDiffIgnoresConstructFlagOnlyDrift(): void
+    {
+        self::loadBootstrapLib();
+
+        $committed = bootstrapParseInventoryMarkdown(<<<'MD'
+# Bootstrap inventory (vm.php path)
+
+## Summary
+
+| Metric | Count |
+|--------|------:|
+| PHP files on vm.php path | 2 |
+| Phase A inventory files (M2 ratio SSOT) | 2 |
+| Source constructs flagged (blockers) | 0 |
+| Source constructs flagged (warnings) | 1 |
+
+## Compiler CFG gaps (`lib/Compiler.php`)
+
+
+## Files
+
+| File | Blockers | Warnings |
+|------|----------|----------|
+| `lib/A.php` | 0 | 1 |
+
+## Per-file construct flags
+
+### `lib/A.php`
+
+**Warnings** (review for bootstrap subset):
+- foo (line 10)
+
+MD);
+
+        $live = [
+            'totals' => ['files' => 2, 'blockers' => 0, 'warnings' => 1],
+            'phase_a' => ['phase_a_inventory_files' => 2],
+            'compiler_blockers' => [],
+            'files' => [
+                'lib/A.php' => [
+                    'blockers' => [],
+                    'warnings' => ['bar (line 20)'],
+                ],
+            ],
+        ];
+
+        $structural = bootstrapStructuralDiffLines($committed, $live);
+        $this->assertSame([], $structural);
+        $full = bootstrapDiffInventoryReport($committed, $live);
+        $this->assertNotSame([], $full, 'full diff should mention construct flags');
+    }
+
+    public function testCheckSpinePassesOnConstructFlagOnlyDrift(): void
+    {
+        $root = dirname(__DIR__, 2);
+        $doc = $root.'/docs/bootstrap-inventory.md';
+        $this->assertFileExists($doc);
+        $original = (string) file_get_contents($doc);
+        $stale = preg_replace(
+            '/\*\*Warnings\*\* \(review for bootstrap subset\):\n- closure\(s\)/',
+            "**Warnings** (review for bootstrap subset):\n- class method(s) (line 999)\n- closure(s)",
+            $original,
+            1,
+            $count
+        );
+        if (1 !== $count) {
+            $this->markTestSkipped('no closure warning row to perturb in bootstrap-inventory.md');
+        }
+        file_put_contents($doc, $stale);
+        try {
+            $cmd = escapeshellarg(PHP_BINARY).' '.escapeshellarg($root.'/script/bootstrap-inventory.php').' --check-spine 2>&1';
+            exec($cmd, $out, $code);
+            $text = implode("\n", $out);
+            $this->assertSame(0, $code, $text);
+            $this->assertStringContainsString('OK spine', $text);
+        } finally {
+            file_put_contents($doc, $original);
+        }
+    }
+
     public function testCheckExitOneWithDiffSectionsOnStaleDoc(): void
     {
         $root = dirname(__DIR__, 2);

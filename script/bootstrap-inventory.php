@@ -12,6 +12,7 @@ declare(strict_types=1);
  * Usage:
  *   php script/bootstrap-inventory.php          # write docs/bootstrap-inventory.md
  *   php script/bootstrap-inventory.php --check  # exit 1 if committed doc is stale
+ *   php script/bootstrap-inventory.php --check-spine  # CI spine gate: file-list/summary only
  *   php script/bootstrap-inventory.php --json   # machine-readable report on stdout
  */
 
@@ -47,11 +48,12 @@ if (is_file($root.'/vendor/autoload.php')) {
 require __DIR__.'/bootstrap-lib.php';
 
 $check = in_array('--check', $argv, true);
+$checkSpine = in_array('--check-spine', $argv, true);
 $jsonOut = in_array('--json', $argv, true);
 $outFile = $root.'/docs/bootstrap-inventory.md';
 
 if (!class_exists(\PhpParser\ParserFactory::class)) {
-    if ($check) {
+    if ($check || $checkSpine) {
         fwrite(STDERR, "bootstrap-inventory: nikic/php-parser missing (vendor/ absent); --check requires composer install (#10531)\n");
         exit(1);
     }
@@ -68,7 +70,7 @@ if ($jsonOut) {
 }
 
 $markdown = bootstrapRenderMarkdown($report);
-if ($check) {
+if ($check || $checkSpine) {
     if (!is_file($outFile)) {
         fwrite(STDERR, "Missing {$outFile}; run: php script/bootstrap-inventory.php\n");
         exit(1);
@@ -76,10 +78,25 @@ if ($check) {
     $committed = bootstrapStripInventoryProbeSection((string) file_get_contents($outFile));
     $committedNorm = bootstrapNormalizeInventoryLineNumbers($committed);
     $markdownNorm = bootstrapNormalizeInventoryLineNumbers($markdown);
+    $parsed = bootstrapParseInventoryMarkdown($committedNorm);
+    $structural = bootstrapStructuralDiffLines($parsed, $report);
+    if ($checkSpine) {
+        if ($structural !== []) {
+            fwrite(STDERR, "Stale {$outFile} (structural drift); regenerate with:\n");
+            fwrite(STDERR, "  php script/bootstrap-inventory.php\n");
+            fwrite(STDERR, "\nDiff:\n");
+            foreach ($structural as $line) {
+                fwrite(STDERR, $line."\n");
+            }
+            exit(1);
+        }
+        $phaseA = (int) ($report['phase_a']['phase_a_inventory_files'] ?? 0);
+        fwrite(STDOUT, "OK spine {$phaseA}/{$phaseA}\n");
+        exit(0);
+    }
     if ($committedNorm !== $markdownNorm) {
         fwrite(STDERR, "Stale {$outFile}; regenerate with:\n");
         fwrite(STDERR, "  php script/bootstrap-inventory.php\n");
-        $parsed = bootstrapParseInventoryMarkdown($committedNorm);
         $diffLines = bootstrapDiffInventoryReport($parsed, $report);
         if ($diffLines !== []) {
             fwrite(STDERR, "\nDiff:\n");

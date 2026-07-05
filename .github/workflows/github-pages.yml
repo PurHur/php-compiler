@@ -1,6 +1,7 @@
-# Publish docs/pages/ to GitHub Pages (Settings → Pages → /docs/pages, or Actions source).
+# Publish docs/pages/ to GitHub Pages (Jekyll site under docs/pages/).
 #
-# DISABLED: moved to workflows-disabled/ — not executed by GitHub Actions until restored.
+# Replaces legacy "build from /" on every master push — that caused noisy failures
+# when automations merge frequently. Only runs when site content changes.
 name: GitHub Pages
 
 on:
@@ -18,11 +19,12 @@ permissions:
 
 concurrency:
   group: pages
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

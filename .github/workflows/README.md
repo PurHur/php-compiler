@@ -4,7 +4,8 @@
 
 | Workflow | Trigger | Purpose |
 |----------|---------|---------|
-| [**bootstrap-spine-gate.yml**](bootstrap-spine-gate.yml) | PR/push on spine, gen-0, inventory paths; manual | Fast bootstrap PR gate: inventory, spine coverage, **sidecar stamp sync**, `north-star5-verify-fast` |
+| [**bootstrap-spine-gate.yml**](bootstrap-spine-gate.yml) | PR/push on spine, gen-0, inventory paths; manual | Fast bootstrap PR gate: inventory (`--check-spine`), spine coverage, **sidecar stamp sync**, `north-star5-verify-fast` |
+| [**github-pages.yml**](github-pages.yml) | Push when `docs/pages/**` changes; manual | Jekyll site at `docs/pages` (not every master merge) |
 | | `workflow_dispatch` + `run_bootstrap_loop=true` | Optional `bootstrap-loop-probe` (~9 min) |
 
 Contributor guide: [docs/bootstrap-dev-workflow.md](../docs/bootstrap-dev-workflow.md).
@@ -18,7 +19,8 @@ Moved to [workflows-disabled/](../workflows-disabled/) while broader CI is pause
 | Workflow | Location |
 |----------|----------|
 | Bootstrap self-host (legacy) | [bootstrap-selfhost.yml](../workflows-disabled/bootstrap-selfhost.yml) |
-| GitHub Pages | [github-pages.yml](../workflows-disabled/github-pages.yml) |
+
+**GitHub Pages** uses [github-pages.yml](github-pages.yml) (workflow deploy, `docs/pages/` only). Repo Settings → Pages must use **GitHub Actions** as the source (not legacy `/` root).
 
 ## Local verification (same gates)
 
