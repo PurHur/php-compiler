@@ -2729,6 +2729,7 @@
         "lib/Doctor.php",
         "lib/EncapsedCoalesceRejector.php",
         "lib/EnumCaseListRewriter.php",
+        "lib/EnumCaseListSyntaxRejector.php",
         "lib/ExitFunctionSyntaxRejector.php",
         "lib/Frame.php",
         "lib/Func.php",
@@ -4327,9 +4328,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 4093,
+        "inventory_files": 4094,
         "excluded": 0,
-        "eligible": 4093,
+        "eligible": 4094,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1

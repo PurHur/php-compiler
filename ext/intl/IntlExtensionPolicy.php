@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\intl;
 
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\ext\standard\ModuleRegistry;
 
 /**
@@ -26,5 +27,41 @@ final class IntlExtensionPolicy
     public static function advertisesBuiltins(): bool
     {
         return ModuleRegistry::extensionLoaded('intl');
+    }
+
+    /**
+     * PHP 8.4 profile grapheme builtins registered without full ext/intl (#16667, #7128, #9793).
+     *
+     * @return list<\PHPCompiler\Internal>
+     */
+    public static function profileGraphemeFunctions(): array
+    {
+        $functions = [];
+        if (CompilerVersion::supportsGraphemeStrContains()) {
+            $functions[] = new grapheme_str_contains();
+        }
+        if (CompilerVersion::supportsGraphemeStrimwidth()) {
+            $functions[] = new grapheme_strimwidth();
+        }
+
+        return $functions;
+    }
+
+    /** Run grapheme compliance when ext/intl is loaded or a profile gate matches (#16667). */
+    public static function runsGraphemeCompliance(string $testFileName): bool
+    {
+        if (self::advertisesBuiltins()) {
+            return true;
+        }
+        if (str_contains($testFileName, 'grapheme_str_contains')
+            && CompilerVersion::supportsGraphemeStrContains()) {
+            return true;
+        }
+        if (str_contains($testFileName, 'grapheme_strimwidth')
+            && CompilerVersion::supportsGraphemeStrimwidth()) {
+            return true;
+        }
+
+        return false;
     }
 }

@@ -52,7 +52,10 @@ class Module extends ModuleAbstract
             $functions[] = new locale_set_default();
         }
         if (!IntlExtensionPolicy::advertisesBuiltins()) {
-            return $functions;
+            return [
+                ...$functions,
+                ...IntlExtensionPolicy::profileGraphemeFunctions(),
+            ];
         }
 
         return [

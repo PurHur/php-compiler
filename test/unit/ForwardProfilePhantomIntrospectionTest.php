@@ -209,4 +209,41 @@ final class ForwardProfilePhantomIntrospectionTest extends TestCase
             }
         }
     }
+
+    public function testGraphemeProfile84BuiltinsAdvertisedWithoutIntl(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertTrue(CompilerVersion::supportsGraphemeStrContains());
+            $this->assertTrue(CompilerVersion::advertisesGraphemeStrContains());
+            $this->assertTrue(CompilerVersion::supportsGraphemeStrimwidth());
+            $this->assertTrue(CompilerVersion::advertisesGraphemeStrimwidth());
+            $this->assertTrue(BuiltinIntrospectionPolicy::functionIsAdvertised('grapheme_str_contains'));
+            $this->assertTrue(BuiltinIntrospectionPolicy::functionIsAdvertised('grapheme_strimwidth'));
+            $this->assertFalse(
+                \PHPCompiler\ext\standard\ModuleRegistry::extensionLoaded('intl')
+            );
+
+            $runtime = new Runtime();
+            $ctx = $runtime->vmContext;
+            $this->assertTrue(isset($ctx->functions['grapheme_str_contains']));
+            $this->assertTrue(isset($ctx->functions['grapheme_strimwidth']));
+            $this->assertTrue(
+                \PHPCompiler\ext\standard\VmReflection::functionExists($ctx, 'grapheme_str_contains')
+            );
+            $this->assertTrue(
+                \PHPCompiler\ext\standard\VmReflection::functionExists($ctx, 'grapheme_strimwidth')
+            );
+            $this->assertFalse(
+                \PHPCompiler\ext\standard\VmReflection::functionExists($ctx, 'grapheme_strlen')
+            );
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
 }

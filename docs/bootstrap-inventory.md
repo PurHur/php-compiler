@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 4093 |
-| Phase A inventory files (M2 ratio SSOT) | 4093 |
+| PHP files on vm.php path | 4094 |
+| Phase A inventory files (M2 ratio SSOT) | 4094 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 11045 |
+| Source constructs flagged (warnings) | 11049 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -268,7 +268,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/CollatorCreate.php` | 0 | 1 |
 | `ext/intl/IntlClassMethod.php` | 0 | 3 |
 | `ext/intl/IntlDateFormatterCreate.php` | 0 | 1 |
-| `ext/intl/IntlExtensionPolicy.php` | 0 | 1 |
+| `ext/intl/IntlExtensionPolicy.php` | 0 | 3 |
 | `ext/intl/JitGrapheme.php` | 0 | 2 |
 | `ext/intl/LocaleGetDefault.php` | 0 | 2 |
 | `ext/intl/LocaleSetDefault.php` | 0 | 2 |
@@ -2671,6 +2671,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/Doctor.php` | 0 | 1 |
 | `lib/EncapsedCoalesceRejector.php` | 0 | 2 |
 | `lib/EnumCaseListRewriter.php` | 0 | 1 |
+| `lib/EnumCaseListSyntaxRejector.php` | 0 | 2 |
 | `lib/ExitFunctionSyntaxRejector.php` | 0 | 2 |
 | `lib/Frame.php` | 0 | 1 |
 | `lib/Func.php` | 0 | 1 |
@@ -5730,7 +5731,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/intl/IntlExtensionPolicy.php`
 
 **Warnings** (review for bootstrap subset):
-- 2 class method(s)
+- new grapheme_str_contains (line 41)
+- new grapheme_strimwidth (line 44)
+- 4 class method(s)
 
 ### `ext/intl/JitGrapheme.php`
 
@@ -5756,19 +5759,19 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new VM\Variable (line 41)
 - new locale_get_default (line 51)
 - new locale_set_default (line 52)
-- new grapheme_strlen (line 60)
-- new grapheme_substr (line 61)
-- new grapheme_strpos (line 62)
-- new grapheme_str_contains (line 63)
-- new grapheme_strstr (line 64)
-- new grapheme_stristr (line 65)
-- new grapheme_stripos (line 66)
-- new grapheme_strrpos (line 67)
-- new grapheme_extract (line 68)
-- new grapheme_levenshtein (line 69)
-- new grapheme_str_split (line 70)
-- new grapheme_strimwidth (line 71)
-- new intl_get_error_code (line 72)
+- new grapheme_strlen (line 63)
+- new grapheme_substr (line 64)
+- new grapheme_strpos (line 65)
+- new grapheme_str_contains (line 66)
+- new grapheme_strstr (line 67)
+- new grapheme_stristr (line 68)
+- new grapheme_stripos (line 69)
+- new grapheme_strrpos (line 70)
+- new grapheme_extract (line 71)
+- new grapheme_levenshtein (line 72)
+- new grapheme_str_split (line 73)
+- new grapheme_strimwidth (line 74)
+- new intl_get_error_code (line 75)
 - 3 class method(s)
 
 ### `ext/intl/UnicodeCanonical.php`
@@ -21724,7 +21727,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/CompilerVersion.php`
 
 **Warnings** (review for bootstrap subset):
-- 108 class method(s)
+- 112 class method(s)
 
 ### `lib/CurlyBraceOffsetRejector.php`
 
@@ -21758,7 +21761,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/EnumCaseListRewriter.php`
 
 **Warnings** (review for bootstrap subset):
-- 3 class method(s)
+- 6 class method(s)
+
+### `lib/EnumCaseListSyntaxRejector.php`
+
+**Warnings** (review for bootstrap subset):
+- new CompileFatal (line 27)
+- 1 class method(s)
 
 ### `lib/ExitFunctionSyntaxRejector.php`
 
@@ -27028,11 +27037,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new SealedClassPreprocessor (line 392)
 - new StaticClassPreprocessor (line 395)
 - new SourcePreprocessor\PropertyHooks (line 398)
-- new State (line 522)
-- new ReflectionProperty (line 549)
-- new ReflectionProperty (line 552)
-- new LintCompiler (line 943)
-- new Variable (line 1070)
+- new State (line 523)
+- new ReflectionProperty (line 550)
+- new ReflectionProperty (line 553)
+- new LintCompiler (line 944)
+- new Variable (line 1071)
 - 53 class method(s)
 
 ### `lib/RuntimeStrictness.php`
