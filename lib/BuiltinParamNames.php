@@ -264,6 +264,8 @@ final class BuiltinParamNames
                 return ['filename', 'data', 'flags', 'context'];
             case 'fopen':
                 return ['filename', 'mode', 'use_include_path', 'context'];
+            case 'stream_get_contents':
+                return ['stream', 'length', 'offset'];
             case 'fgets':
             case 'fgetss':
                 return ['stream', 'length'];
