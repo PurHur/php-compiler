@@ -20,7 +20,7 @@ final class diskfreespace extends Internal
 
     public function execute(Frame $frame): void
     {
-        (new disk_free_space())->execute($frame);
+        (new disk_free_space('diskfreespace'))->execute($frame);
     }
 
     public function call(Context $context, JITVariable ...$args): Value

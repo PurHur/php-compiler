@@ -15,16 +15,17 @@ use PHPLLVM\Value;
 /** disk_free_space() — VM via VmFsDiskNative (statvfs FFI or VmFsDiskPure); JIT/AOT via JitStat (php-src filestat.c, #8989). */
 final class disk_free_space extends Internal
 {
-    public function __construct()
+    public function __construct(string $name = 'disk_free_space')
     {
-        parent::__construct('disk_free_space');
+        parent::__construct($name);
     }
 
     public function execute(Frame $frame): void
     {
+        $fn = $this->getName();
         $argc = \count($frame->calledArgs);
         if ($argc > 1) {
-            throw new \LogicException('disk_free_space() accepts at most one argument in this compiler build');
+            throw new \LogicException($fn.'() accepts at most one argument in this compiler build');
         }
         $path = null;
         if ($argc >= 1) {
@@ -32,7 +33,7 @@ final class disk_free_space extends Internal
             if (Variable::TYPE_NULL === $resolved->type) {
                 if (InternalStrictArg::isCallerStrict($frame)) {
                     throw new \TypeError(
-                        'disk_free_space(): Argument #1 ($directory) must be of type string, null given'
+                        $fn.'(): Argument #1 ($directory) must be of type string, null given'
                     );
                 }
                 if (null === $frame->returnVar) {
@@ -43,14 +44,14 @@ final class disk_free_space extends Internal
 
                 return;
             }
-            $path = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'disk_free_space', 0, 'directory');
+            $path = VmString::coerceStringBuiltinArg($frame->calledArgs[0], $fn, 0, 'directory');
         }
         $result = VmFs::diskFreeSpace($path);
         if (null === $frame->returnVar) {
             return;
         }
         if (false === $result) {
-            VmFilestatFailure::warnNoSuchFile($frame, 'disk_free_space');
+            VmFilestatFailure::warnNoSuchFile($frame, $fn);
             $frame->returnVar->bool(false);
         } else {
             $frame->returnVar->float($result);

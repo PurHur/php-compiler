@@ -20,7 +20,7 @@ final class disktotalspace extends Internal
 
     public function execute(Frame $frame): void
     {
-        (new disk_total_space())->execute($frame);
+        (new disk_total_space('disktotalspace'))->execute($frame);
     }
 
     public function call(Context $context, JITVariable ...$args): Value
