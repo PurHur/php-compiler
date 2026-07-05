@@ -535,9 +535,7 @@ class JITTest extends BaseTest {
                 && (str_contains($name, 'private_set_reference_profile')
                     || str_contains($name, 'asymmetric_double_modifier_reference_profile')
                     || str_contains($name, 'asymmetric_visibility_reference_profile')
-                    || str_contains($name, 'asymmetric_visibility_bare_set_reject')
-                    || str_contains($name, 'asymmetric_visibility_public_protected_set_compile_error')
-                    || 'language/static_asymmetric_visibility' === $name)) {
+                    || str_contains($name, 'asymmetric_visibility_public_protected_set_compile_error'))) {
                 continue;
             }
             if (!CompilerVersion::supportsAsymmetricVisibility()

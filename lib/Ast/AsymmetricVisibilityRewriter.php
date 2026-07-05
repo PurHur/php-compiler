@@ -200,6 +200,7 @@ final class AsymmetricVisibilityRewriter
         self::rejectExplicitPublicAfterSetModifier($source);
         self::rejectPromotedParamMultipleAccessModifiers($source);
         self::rejectAsymmetricSetOnStaticProperty($source);
+        self::rejectBareSetModifierWithoutRead($source);
 
         $source = (string) preg_replace_callback(
             '/(?P<prefix>(?:\/\*(?:[^*]|\*(?!\/))*\*\/\s*)*)(?P<attrs>(?:#\[[^\]]*\]\s*)*)'
@@ -342,6 +343,19 @@ final class AsymmetricVisibilityRewriter
         }
 
         return false;
+    }
+
+    /**
+     * Bare `private(set)` / `protected(set)` without explicit read visibility is a parse error (#16313).
+     *
+     * php-src: Zend/zend_language_parser.y — property modifier grammar; Zend/zend_compile.c.
+     */
+    private static function rejectBareSetModifierWithoutRead(string $source): void
+    {
+        $line = self::findBareSetModifierLine($source);
+        if ($line > 0) {
+            throw new \CompileError(self::BARE_SET_WITHOUT_READ_MESSAGE);
+        }
     }
 
     /** Promoted constructor parameters reject duplicate set modifiers (#10237, #11656, #12088). */

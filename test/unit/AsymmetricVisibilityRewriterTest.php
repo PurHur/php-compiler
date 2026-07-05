@@ -109,18 +109,20 @@ PHP;
         );
     }
 
-    public function testBarePrivateSetWithoutReadRewritesWithImplicitPublicRead(): void
+    public function testBarePrivateSetWithoutReadRejects(): void
     {
         $source = 'private(set) string $x;';
-        $rewritten = AsymmetricVisibilityRewriter::rewrite($source);
-        self::assertStringContainsString('/*phpc-asymmetric-set:private*/ public string $x', preg_replace('/\s+/', ' ', $rewritten));
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage(AsymmetricVisibilityRewriter::BARE_SET_WITHOUT_READ_MESSAGE);
+        AsymmetricVisibilityRewriter::rewrite($source);
     }
 
-    public function testBareProtectedSetWithoutReadRewritesWithImplicitPublicRead(): void
+    public function testBareProtectedSetWithoutReadRejects(): void
     {
         $source = 'protected(set) string $x;';
-        $rewritten = AsymmetricVisibilityRewriter::rewrite($source);
-        self::assertStringContainsString('/*phpc-asymmetric-set:protected*/ public string $x', preg_replace('/\s+/', ' ', $rewritten));
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage(AsymmetricVisibilityRewriter::BARE_SET_WITHOUT_READ_MESSAGE);
+        AsymmetricVisibilityRewriter::rewrite($source);
     }
 
     public function testRewritePrivateGet(): void
