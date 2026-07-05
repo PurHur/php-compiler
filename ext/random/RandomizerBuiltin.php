@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\random;
 
+use PHPCompiler\ext\standard\VmArray;
 use PHPCompiler\ext\standard\VmJson;
 use PHPCompiler\ext\standard\VmMath;
 use PHPCompiler\ext\standard\VmString;
@@ -659,29 +660,17 @@ final class RandomizerShuffleArray extends VmClassMethod
                 .(\count($frame->calledArgs) - 1).' given'
             );
         }
-        if (null === $frame->returnVar) {
-            return;
-        }
-        $arrayArg = $frame->calledArgs[1]->resolveIndirect();
-        if (Variable::TYPE_ARRAY !== $arrayArg->type) {
-            throw new \TypeError(
-                'Random\\Randomizer::shuffleArray(): Argument #1 ($array) must be of type array, '
-                .EnumCaseSupport::typeNameForVariable($arrayArg).' given'
-            );
-        }
-        $arr = $arrayArg->toArray();
-        $keys = \array_keys($arr);
-        $count = \count($keys);
+        $arrayVar = $frame->calledArgs[1];
+        $arrayVar->separateArrayForWrite();
+        $ht = VmArray::requireArrayParam($arrayVar, 'Random\\Randomizer::shuffleArray', 1, 'array');
         $engine = RandomEngineStorage::engineObject($object);
-        for ($i = $count - 1; $i > 0; --$i) {
-            $j = RandomEngineStorage::range($engine, 0, $i);
-            [$keys[$i], $keys[$j]] = [$keys[$j], $keys[$i]];
+        VmArray::shufflePackedWithPicker(
+            $ht,
+            static fn (int $upper): int => RandomEngineStorage::range($engine, 0, $upper - 1)
+        );
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->null();
         }
-        $out = [];
-        foreach ($keys as $key) {
-            $out[$key] = $arr[$key];
-        }
-        $frame->returnVar->array($out);
     }
 }
 
