@@ -30,7 +30,7 @@ final class chmod_ extends Internal
             return;
         }
         $ok = VmFs::chmod($path, $mode);
-        if (!$ok) {
+        if (!$ok && !VmStreamWrapperRegistry::isCustomProtocol($path)) {
             VmFilestatFailure::warnChmodFailed($frame, $path);
         }
         $frame->returnVar->bool($ok);

@@ -305,6 +305,21 @@ final class VmFs
 
     public static function chmod(string $path, int $permissions): bool
     {
+        $modeVar = new Variable();
+        $modeVar->int($permissions);
+        $wrapperOk = VmStreamWrapperMetadata::tryInvoke(
+            $path,
+            VmStreamSupports::STREAM_META_ACCESS,
+            $modeVar
+        );
+        if (null !== $wrapperOk) {
+            if ($wrapperOk) {
+                VmStatCache::invalidatePath($path);
+            }
+
+            return $wrapperOk;
+        }
+
         $ok = VmFsDirNative::chmod($path, $permissions);
         if ($ok) {
             VmStatCache::invalidatePath($path);
@@ -349,9 +364,30 @@ final class VmFs
 
     public static function chown(string $path, Variable $user): bool
     {
+        $user = $user->resolveIndirect();
+        if (Variable::TYPE_STRING === $user->type) {
+            $wrapperOk = VmStreamWrapperMetadata::tryInvoke(
+                $path,
+                VmStreamSupports::STREAM_META_OWNER_NAME,
+                $user
+            );
+            if (null !== $wrapperOk) {
+                return $wrapperOk;
+            }
+        }
         $uid = self::resolveUserUid($user);
         if (null === $uid) {
             return false;
+        }
+        $uidVar = new Variable();
+        $uidVar->int($uid);
+        $wrapperOk = VmStreamWrapperMetadata::tryInvoke(
+            $path,
+            VmStreamSupports::STREAM_META_OWNER,
+            $uidVar
+        );
+        if (null !== $wrapperOk) {
+            return $wrapperOk;
         }
 
         return VmFsDirNative::chown($path, $uid);
@@ -369,9 +405,30 @@ final class VmFs
 
     public static function chgrp(string $path, Variable $group): bool
     {
+        $group = $group->resolveIndirect();
+        if (Variable::TYPE_STRING === $group->type) {
+            $wrapperOk = VmStreamWrapperMetadata::tryInvoke(
+                $path,
+                VmStreamSupports::STREAM_META_GROUP_NAME,
+                $group
+            );
+            if (null !== $wrapperOk) {
+                return $wrapperOk;
+            }
+        }
         $gid = self::resolveGroupGid($group);
         if (null === $gid) {
             return false;
+        }
+        $gidVar = new Variable();
+        $gidVar->int($gid);
+        $wrapperOk = VmStreamWrapperMetadata::tryInvoke(
+            $path,
+            VmStreamSupports::STREAM_META_GROUP,
+            $gidVar
+        );
+        if (null !== $wrapperOk) {
+            return $wrapperOk;
         }
 
         return VmFsDirNative::chgrp($path, $gid);
@@ -514,6 +571,19 @@ final class VmFs
 
     public static function touch(string $path, ?int $mtime = null, ?int $atime = null): bool
     {
+        $wrapperOk = VmStreamWrapperMetadata::tryInvoke(
+            $path,
+            VmStreamSupports::STREAM_META_TOUCH,
+            VmStreamWrapperMetadata::touchValue($mtime, $atime)
+        );
+        if (null !== $wrapperOk) {
+            if ($wrapperOk) {
+                VmStatCache::invalidatePath($path);
+            }
+
+            return $wrapperOk;
+        }
+
         $ok = VmFsTouchNative::touch($path, $mtime, $atime);
         if ($ok) {
             VmStatCache::invalidatePath($path);

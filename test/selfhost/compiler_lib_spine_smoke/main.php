@@ -1721,6 +1721,7 @@ require_once __DIR__.'/../../../ext/standard/VmUnserializeFormat.php';
 require_once __DIR__.'/../../../ext/standard/VmUrlRewriterOb.php';
 require_once __DIR__.'/../../../ext/standard/VmUserCall.php';
 require_once __DIR__.'/../../../ext/standard/VmUserStream.php';
+require_once __DIR__.'/../../../ext/standard/VmStreamWrapperMetadata.php';
 require_once __DIR__.'/../../../ext/standard/VmVarDump.php';
 require_once __DIR__.'/../../../ext/standard/VmVarExport.php';
 require_once __DIR__.'/../../../ext/standard/VmVarExportFloat.php';
