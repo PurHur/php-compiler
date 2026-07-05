@@ -15,6 +15,11 @@ namespace PHPCompiler\ext\standard;
  */
 final class VmProcNicePure
 {
+    /** Linux nice(2) clamp range — matches libc before autogroup write (#16366). */
+    private const NICE_MIN = -20;
+
+    private const NICE_MAX = 19;
+
     private const AUTOGROUP = '/proc/self/autogroup';
 
     public static function available(): bool
@@ -33,12 +38,24 @@ final class VmProcNicePure
             return false;
         }
 
-        $target = $current + $priority;
+        $target = self::clampNice($current + $priority);
         if ($target === $current) {
             return true;
         }
 
         return self::writeAutogroupNice($target);
+    }
+
+    private static function clampNice(int $nice): int
+    {
+        if ($nice < self::NICE_MIN) {
+            return self::NICE_MIN;
+        }
+        if ($nice > self::NICE_MAX) {
+            return self::NICE_MAX;
+        }
+
+        return $nice;
     }
 
     private static function readAutogroupNice(): ?int
