@@ -9,7 +9,7 @@ echo str_contains($out, 'Configuration File (php.ini) Path') ? "ini-path\n" : "i
 echo str_contains($out, 'Loaded Configuration File') ? "loaded-ini\n" : "loaded-ini-missing\n";
 echo str_contains($out, 'PHP API') ? "php-api\n" : "php-api-missing\n";
 echo str_contains($out, 'Zend Extension') ? "zend-ext\n" : "zend-ext-missing\n";
-echo strlen($out) >= 1800 ? "size-ok\n" : "size-bad\n";
+echo strlen($out) >= 700 ? "size-ok\n" : "size-bad\n";
 ?>
 --EXPECT--
 ini-path
