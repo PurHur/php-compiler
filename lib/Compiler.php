@@ -15618,7 +15618,20 @@ class Compiler {
                         $callIndex
                     )
                 ) {
-                    return $immediate;
+                    $callbackArgIndex = $this->inlineClosureArrayPairCallbackArgIndex($inlineFuncName);
+                    $leadingCallback = $this->leadingCallbackFirstInlineProducerBeforeCfgCall($cfgCallOp, $block);
+                    if (
+                        $callbackArgIndex >= 0
+                        && 2 === \count($callArgs)
+                        && $argIndex === $callbackArgIndex
+                        && ($leadingCallback instanceof Op\Expr\ArrowFunction
+                            || $leadingCallback instanceof Op\Expr\Closure
+                            || $leadingCallback instanceof Op\Expr\FirstClassCallable)
+                    ) {
+                        // array_map(intval(...), str_split(...)) — haystack sibling must not bind callback (#15487, #16279).
+                    } else {
+                        return $immediate;
+                    }
                 }
             }
         }
@@ -34341,7 +34354,27 @@ class Compiler {
                         $block,
                         $cfgCallOp
                     );
-                    if (null !== $producerOrdinal && $producerOrdinal < $chainProducerCount) {
+                    $consumerName = $this->resolveCfgFuncCallName($cfgCallOp) ?? $calleeName;
+                    $callbackArgIndex = $this->inlineClosureArrayPairCallbackArgIndex($consumerName);
+                    $leadingCallback = $this->leadingCallbackFirstInlineProducerBeforeCfgCall($cfgCallOp, $block);
+                    if (
+                        $callbackArgIndex >= 0
+                        && 2 === \count($cfgCallOp->args ?? [])
+                        && (int) $argIndex === $callbackArgIndex
+                        && ($leadingCallback instanceof Op\Expr\ArrowFunction
+                            || $leadingCallback instanceof Op\Expr\Closure
+                            || $leadingCallback instanceof Op\Expr\FirstClassCallable)
+                    ) {
+                        // array_map(intval(...), str_split(str_repeat(...))) — ordinal ExecReturn must not steal FCC callback (#15487, #16279).
+                        if ($leadingCallback instanceof Op\Expr\FirstClassCallable) {
+                            $callbackSlot = $this->slotForInlineFirstClassCallableProducer($leadingCallback, $block);
+                        } else {
+                            $callbackSlot = $this->slotForInlineClosureProducer($leadingCallback, $block);
+                        }
+                        if (null !== $callbackSlot) {
+                            $valueSlot = (string) $callbackSlot;
+                        }
+                    } elseif (null !== $producerOrdinal && $producerOrdinal < $chainProducerCount) {
                         $execReturnCount = 0;
                         foreach ($block->opCodes as $op) {
                             if (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type && null !== $op->arg1) {
@@ -36622,6 +36655,21 @@ class Compiler {
                 }
             }
             if (!\is_int($producerIndex)) {
+                ++$argIndex;
+                continue;
+            }
+            $consumerName = $this->resolveCfgFuncCallName($cfgCallOp);
+            $callbackArgIndex = $this->inlineClosureArrayPairCallbackArgIndex($consumerName);
+            $leadingCallback = $this->leadingCallbackFirstInlineProducerBeforeCfgCall($cfgCallOp, $block);
+            if (
+                $callbackArgIndex >= 0
+                && 2 === \count($cfgCallOp->args ?? [])
+                && $argIndex === $callbackArgIndex
+                && ($leadingCallback instanceof Op\Expr\ArrowFunction
+                    || $leadingCallback instanceof Op\Expr\Closure
+                    || $leadingCallback instanceof Op\Expr\FirstClassCallable)
+            ) {
+                // array_map(intval(...), str_split(...)) — keep FCC/closure send slot (#15487, #16279).
                 ++$argIndex;
                 continue;
             }
