@@ -23214,6 +23214,13 @@ class Compiler {
         if (\count($hoistedArgs) < 2 || !$this->callArgsAreDistinctInlineTemporaries($hoistedArgs)) {
             return false;
         }
+        $outerProducerCount = \count(
+            $this->outerSiblingInlineFuncCallProducers($fromIndex, $consumerIndex, $cfgChildren)
+        );
+        // array_intersect(f(g()), f(g())) — outer f() producers match hoisted arg temps (#15488, #16050, #16427).
+        if ($outerProducerCount >= 2 && $outerProducerCount === \count($hoistedArgs)) {
+            return true;
+        }
         $arrayPreludeChain = $this->siblingFuncCallChainHasArrayPrelude(
             $fromIndex,
             $consumerIndex,
@@ -25847,6 +25854,28 @@ class Compiler {
                 } finally {
                     $this->forceDeferredSiblingCallReturnSlot = $prevForce;
                 }
+            }
+        }
+        $operandSlot = $block->slotForOperand($outerProducer->result);
+        if (null !== $operandSlot) {
+            $outerProducerIndexForOperand = array_search($outerProducer, $block->orig->children, true);
+            $prevProducer = is_int($outerProducerIndexForOperand) && $outerProducerIndexForOperand > 0
+                ? ($block->orig->children[$outerProducerIndexForOperand - 1] ?? null)
+                : null;
+            // array_intersect(f(g()), f(g())) — operand slot beats ordinal EXEC_RETURN when emission order drifts (#16427).
+            if (
+                ($outerProducer instanceof Op\Expr\FuncCall || $outerProducer instanceof Op\Expr\NsFuncCall)
+                && !$this->funcCallExprLiteralCalleeAllowedAsHoistedProducer($outerProducer)
+                && ($prevProducer instanceof Op\Expr\FuncCall || $prevProducer instanceof Op\Expr\NsFuncCall)
+                && is_int($outerProducerIndexForOperand)
+                && $this->isAdjacentNestedFuncCallProducer(
+                    $prevProducer,
+                    $outerProducer,
+                    $outerProducerIndexForOperand - 1,
+                    $outerProducerIndexForOperand
+                )
+            ) {
+                return (string) $operandSlot;
             }
         }
         $outerProducerIndex = array_search($outerProducer, $block->orig->children, true);
