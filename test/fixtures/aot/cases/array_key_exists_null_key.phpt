@@ -4,7 +4,8 @@ AOT: array_key_exists() null key coerces to empty string
 <?php
 $a = array();
 $a[''] = 42;
-echo array_key_exists(null, $a) ? "yes\n" : "no\n";
+$null = null;
+echo array_key_exists($null, $a) ? "yes\n" : "no\n";
 $key = null;
 $b = array();
 $b[''] = 7;

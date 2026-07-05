@@ -7,32 +7,22 @@ namespace PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
+use PHPCompiler\JIT\HashTableReadLlvm;
 use PHPCompiler\JIT\JitLongArg;
+use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitValueBox;
-use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\Variable as VmVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * JIT/AOT link for array_key_exists()/key_exists() via ArrayKeyExistsJitHelper PHP (#13735, #14545).
+ * JIT/AOT lowering for array_key_exists()/key_exists() (#13735, #14545, #9331).
  *
- * Standalone + embed compile {@see ArrayKeyExistsJitHelper} via JitVmHelperLink; native literal arrays keep LLVM in {@see nativeArrayKeyExists()}.
- * php-src: ext/standard/array.c — PHP_FUNCTION(array_key_exists)
+ * Hashtable + native arrays lower in LLVM; php-src: ext/standard/array.c — PHP_FUNCTION(array_key_exists).
  */
 final class ArrayKeyExistsRuntime
 {
-    private const ABI_KEY_EXISTS = '__array_key_exists__has_key';
-
-    private const HELPER_PATH = '/ext/standard/ArrayKeyExistsJitHelper.php';
-
-    private const KEY_EXISTS_HELPER = 'PHPCompiler\\ext\\standard\\ArrayKeyExistsJitHelper::keyExists';
-
-    /** @var list<string> */
-    private const COMPILED_HELPERS = [
-        self::KEY_EXISTS_HELPER,
-    ];
-
     public static function keyExists(
         Context $context,
         JITVariable $key,
@@ -48,65 +38,76 @@ final class ArrayKeyExistsRuntime
             return $context->constantFromInteger(0, 'int1');
         }
 
-        self::ensureLinked($context);
-        $keyPtr = JitValueBox::valuePtrFromVariable($context, $key);
         $ht = JITVariable::TYPE_HASHTABLE === $array->type
             ? $context->helper->loadValue($array)
             : ArrayBuiltinHelper::loadHashTable($context, $array);
 
-        return $context->builder->call(
-            $context->lookupFunction(self::ABI_KEY_EXISTS),
-            $keyPtr,
-            $ht
+        if (JITVariable::TYPE_NULL === $key->type || ($key->isNullConstant ?? false)) {
+            if (JITVariable::TYPE_VALUE === $key->type) {
+                return self::hashtableKeyExistsValueBoxKey($context, $ht, $key);
+            }
+
+            return self::hashtableKeyExistsStringKey(
+                $context,
+                $ht,
+                $context->builder->load($context->constantStringFromString(''))
+            );
+        }
+        if (JITVariable::TYPE_STRING === $key->type) {
+            return self::hashtableKeyExistsStringKey(
+                $context,
+                $ht,
+                JitStringArg::lower($context, $key, $function.'() key')
+            );
+        }
+        if (JITVariable::TYPE_NATIVE_LONG === $key->type) {
+            $index = $context->builder->truncOrBitCast(
+                $context->helper->loadValue($key),
+                $context->getTypeFromString('size_t')
+            );
+
+            return self::hashtableKeyExistsIndex($context, $ht, $index);
+        }
+        if (JITVariable::TYPE_NATIVE_DOUBLE === $key->type) {
+            $index = $context->builder->truncOrBitCast(
+                $context->builder->call(
+                    $context->lookupFunction('__value__doubleToLong'),
+                    $context->helper->loadValue($key)
+                ),
+                $context->getTypeFromString('size_t')
+            );
+
+            return self::hashtableKeyExistsIndex($context, $ht, $index);
+        }
+        if (JITVariable::TYPE_NATIVE_BOOL === $key->type) {
+            $index = $context->builder->zExt(
+                $context->helper->loadValue($key),
+                $context->getTypeFromString('size_t')
+            );
+
+            return self::hashtableKeyExistsIndex($context, $ht, $index);
+        }
+        if (JITVariable::TYPE_VALUE === $key->type) {
+            return self::hashtableKeyExistsValueBoxKey($context, $ht, $key);
+        }
+
+        throw new \LogicException(
+            $function.'() key type not supported in this compiler build: '
+            .JITVariable::getStringType($key->type)
         );
     }
 
     public static function ensureLinked(Context $context): void
     {
-        self::implement($context);
+        // LLVM lowering only — no nested PHP helper bridge (#9331).
     }
 
     public static function ensureStandaloneBodies(Context $context): void
     {
-        self::implement($context);
     }
 
     public static function implement(Context $context): void
     {
-        $probe = $context->module->getNamedFunction(self::ABI_KEY_EXISTS);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            self::registerLinkedRuntime($context);
-
-            return;
-        }
-
-        $savedBlock = null;
-        try {
-            $savedBlock = $context->builder->getInsertBlock();
-        } catch (\Throwable) {
-        }
-
-        $valuePtr = $context->getTypeFromString('__value__*');
-        $htPtr = $context->getTypeFromString('__hashtable__*');
-        $i1 = $context->getTypeFromString('int1');
-        JitVmHelperLink::ensureBridge(
-            $context,
-            self::ABI_KEY_EXISTS,
-            'array_key_exists_bridge_entry',
-            [$valuePtr, $htPtr],
-            $i1,
-            self::KEY_EXISTS_HELPER,
-            self::HELPER_PATH,
-            self::COMPILED_HELPERS,
-            '#14545'
-        );
-        self::registerLinkedRuntime($context);
-
-        if (null !== $savedBlock) {
-            $context->builder->positionAtEnd($savedBlock);
-        } else {
-            $context->builder->clearInsertionPosition();
-        }
     }
 
     private static function nativeArrayKeyExists(
@@ -134,12 +135,155 @@ final class ArrayKeyExistsRuntime
         return $context->builder->and($inRange, $nonNeg);
     }
 
-    private static function registerLinkedRuntime(Context $context): void
+    private static function hashtableKeyExistsStringKey(Context $context, Value $ht, Value $keyStr): Value
     {
-        $fn = $context->module->getNamedFunction(self::ABI_KEY_EXISTS);
-        if (null === $fn || 0 === $fn->countBasicBlocks()) {
-            throw new \LogicException(self::ABI_KEY_EXISTS.' missing after ArrayKeyExistsRuntime bridge (#14545)');
-        }
-        $context->registerFunction(self::ABI_KEY_EXISTS, $fn);
+        $valPtr = $context->builder->call(
+            $context->lookupFunction('__hashtable__peekStringKeyValue'),
+            $ht,
+            $keyStr
+        );
+
+        return $context->builder->icmp(
+            Builder::INT_NE,
+            $valPtr,
+            $valPtr->typeOf()->constNull()
+        );
+    }
+
+    private static function hashtableKeyExistsIndex(Context $context, Value $ht, Value $index): Value
+    {
+        $map = $context->structFieldMap['__hashtable__'];
+        $valueMap = $context->structFieldMap['__value__'];
+        $i1 = $context->getTypeFromString('int1');
+        $i8 = $context->getTypeFromString('int8');
+        $nextFree = $context->builder->load(
+            $context->builder->structGep($ht, $map['nextFreeElement'])
+        );
+        $inRange = $context->builder->icmp(Builder::INT_ULT, $index, $nextFree);
+        $fn = $context->builder->getInsertBlock()->getParent();
+        $ok = $fn->appendBasicBlock('ake_idx_ok');
+        $no = $fn->appendBasicBlock('ake_idx_no');
+        $merge = $fn->appendBasicBlock('ake_idx_merge');
+        $context->builder->branchIf($inRange, $ok, $no);
+        $context->builder->positionAtEnd($no);
+        $context->builder->branch($merge);
+        $context->builder->positionAtEnd($ok);
+        $values = $context->builder->load($context->builder->structGep($ht, $map['values']));
+        $entry = $context->builder->inBoundsGep($values, $index);
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($entry, $valueMap['type'])
+        );
+        $exists = $context->builder->icmp(
+            Builder::INT_NE,
+            $typeByte,
+            $i8->constInt(VmVariable::TYPE_UNDEFINED, false)
+        );
+        $context->builder->branch($merge);
+        $context->builder->positionAtEnd($merge);
+        $phi = $context->builder->phi($i1);
+        $phi->addIncoming($exists, $ok);
+        $phi->addIncoming($i1->constInt(0, false), $no);
+
+        return $phi;
+    }
+
+    private static function hashtableKeyExistsValueBoxKey(
+        Context $context,
+        Value $ht,
+        JITVariable $dim
+    ): Value {
+        $valPtr = HashTableReadLlvm::valuePtrFromDim($context, $dim);
+        $valueMap = $context->structFieldMap['__value__'];
+        $i8 = $context->getTypeFromString('int8');
+        $i1 = $context->getTypeFromString('int1');
+        $sizeT = $context->getTypeFromString('size_t');
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($valPtr, $valueMap['type'])
+        );
+        $fn = $context->builder->getInsertBlock()->getParent();
+        $nullBlock = $fn->appendBasicBlock('ake_vk_null');
+        $stringBlock = $fn->appendBasicBlock('ake_vk_str');
+        $longBlock = $fn->appendBasicBlock('ake_vk_long');
+        $objectBlock = $fn->appendBasicBlock('ake_vk_obj');
+        $falseBlock = $fn->appendBasicBlock('ake_vk_false');
+        $merge = $fn->appendBasicBlock('ake_vk_merge');
+        $afterNull = $fn->appendBasicBlock('ake_vk_after_null');
+        $context->builder->branchIf(
+            $context->builder->icmp(
+                Builder::INT_EQ,
+                $typeByte,
+                $i8->constInt(JITVariable::TYPE_NULL, false)
+            ),
+            $nullBlock,
+            $afterNull
+        );
+        $context->builder->positionAtEnd($nullBlock);
+        $nullResult = self::hashtableKeyExistsStringKey(
+            $context,
+            $ht,
+            $context->builder->load($context->constantStringFromString(''))
+        );
+        $context->builder->branch($merge);
+        $context->builder->positionAtEnd($afterNull);
+        $afterString = $fn->appendBasicBlock('ake_vk_after_str');
+        $context->builder->branchIf(
+            $context->builder->icmp(
+                Builder::INT_EQ,
+                $typeByte,
+                $i8->constInt(JITVariable::TYPE_STRING, false)
+            ),
+            $stringBlock,
+            $afterString
+        );
+        $context->builder->positionAtEnd($stringBlock);
+        $keyStr = $context->builder->call($context->lookupFunction('__value__readString'), $valPtr);
+        $strResult = self::hashtableKeyExistsStringKey($context, $ht, $keyStr);
+        $context->builder->branch($merge);
+        $context->builder->positionAtEnd($afterString);
+        $afterLong = $fn->appendBasicBlock('ake_vk_after_long');
+        $context->builder->branchIf(
+            $context->builder->icmp(
+                Builder::INT_EQ,
+                $typeByte,
+                $i8->constInt(JITVariable::TYPE_NATIVE_LONG, false)
+            ),
+            $longBlock,
+            $afterLong
+        );
+        $context->builder->positionAtEnd($longBlock);
+        $index = $context->builder->truncOrBitCast(
+            $context->builder->call($context->lookupFunction('__value__readLong'), $valPtr),
+            $sizeT
+        );
+        $longResult = self::hashtableKeyExistsIndex($context, $ht, $index);
+        $afterLongIdx = $fn->appendBasicBlock('ake_vk_after_long_idx');
+        $context->builder->branch($afterLongIdx);
+        $context->builder->positionAtEnd($afterLongIdx);
+        $context->builder->branch($merge);
+        $context->builder->positionAtEnd($afterLong);
+        $context->builder->branchIf(
+            $context->builder->icmp(
+                Builder::INT_EQ,
+                $typeByte,
+                $i8->constInt(JITVariable::TYPE_OBJECT, false)
+            ),
+            $objectBlock,
+            $falseBlock
+        );
+        $context->builder->positionAtEnd($objectBlock);
+        HashTableHelper::emitIllegalOffsetType($context, 'Illegal offset type');
+        $objResult = $i1->constInt(0, false);
+        $context->builder->branch($merge);
+        $context->builder->positionAtEnd($falseBlock);
+        $context->builder->branch($merge);
+        $context->builder->positionAtEnd($merge);
+        $phi = $context->builder->phi($i1);
+        $phi->addIncoming($nullResult, $nullBlock);
+        $phi->addIncoming($strResult, $stringBlock);
+        $phi->addIncoming($longResult, $afterLongIdx);
+        $phi->addIncoming($objResult, $objectBlock);
+        $phi->addIncoming($i1->constInt(0, false), $falseBlock);
+
+        return $phi;
     }
 }
