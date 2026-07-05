@@ -37,6 +37,15 @@ final class AsymmetricVisibilityRejector
             );
         }
 
+        // php-src: Zend/zend_compile.c — parenthesized `(private(set))` gated to 8.4+ (#16450).
+        if (null !== $parenSet && !CompilerVersion::supportsParenthesizedAsymmetricSetModifier()) {
+            throw new CompileFatal(
+                $filename,
+                $parenSet['line'],
+                self::parenthesizedSetModifierMessage($parenSet['token'])
+            );
+        }
+
         if (CompilerVersion::supportsAsymmetricVisibility()) {
             return $code;
         }

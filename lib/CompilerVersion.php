@@ -1210,6 +1210,18 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.4+ parenthesized asymmetric set modifier `public (private(set))` on properties.
+     *
+     * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev reference profile
+     * rejects like Zend 8.2 (#16450); forward profile enables rewriter (#11546).
+     * php-src: Zend/zend_compile.c asymmetric visibility scope parsing.
+     */
+    public static function supportsParenthesizedAsymmetricSetModifier(): bool
+    {
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+    }
+
+    /**
      * PHP 8.3+ parenthesized DNF intersection-only types `(I1&I2) $param` / `(): (I1&I2)`.
      *
      * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev reference profile

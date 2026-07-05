@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 4047 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 10910 |
+| Source constructs flagged (warnings) | 10913 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -2578,7 +2578,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/Ast/TryCatchElseSupport.php` | 0 | 1 |
 | `lib/Ast/TypedFunctionStaticRewriter.php` | 0 | 1 |
 | `lib/Ast/VoidCastDesugar.php` | 0 | 2 |
-| `lib/AsymmetricVisibilityRejector.php` | 0 | 3 |
+| `lib/AsymmetricVisibilityRejector.php` | 0 | 6 |
 | `lib/BareThrowSyntaxRejector.php` | 0 | 2 |
 | `lib/Block.php` | 0 | 16 |
 | `lib/BuiltinByRefParams.php` | 0 | 1 |
@@ -20484,16 +20484,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Ast/AsymmetricVisibilityRewriter.php`
 
 **Warnings** (review for bootstrap subset):
-- new CompileError (line 263)
-- new CompileError (line 273)
-- new CompileError (line 361)
-- new CompileError (line 386)
-- new CompileError (line 439)
-- new CompileError (line 557)
-- new CompileError (line 634)
-- new CompileError (line 640)
-- new CompileError (line 652)
-- 42 class method(s)
+- new CompileError (line 296)
+- new CompileError (line 306)
+- new CompileError (line 394)
+- new CompileError (line 419)
+- new CompileError (line 472)
+- new CompileError (line 590)
+- new CompileError (line 667)
+- new CompileError (line 673)
+- new CompileError (line 685)
+- 43 class method(s)
 - 8 closure(s)
 
 ### `lib/Ast/CloneWithDesugar.php`
@@ -20645,8 +20645,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new CompileFatal (line 33)
-- new CompileFatal (line 37)
-- 2 class method(s)
+- new CompileFatal (line 42)
+- new CompileFatal (line 55)
+- new CompileFatal (line 59)
+- new CompileFatal (line 67)
+- 3 class method(s)
 
 ### `lib/BareThrowSyntaxRejector.php`
 
@@ -21479,7 +21482,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/CompilerVersion.php`
 
 **Warnings** (review for bootstrap subset):
-- 105 class method(s)
+- 106 class method(s)
 
 ### `lib/CurlyBraceOffsetRejector.php`
 
