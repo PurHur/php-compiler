@@ -29,5 +29,15 @@ PHP;
         $rewritten = LazyPropertyRewriter::rewrite($source);
         self::assertStringNotContainsString(' lazy ', $rewritten);
         self::assertStringContainsString('phpc-lazy-property', $rewritten);
+        self::assertStringContainsString(
+            '/*phpc-lazy-property*/ public string $x',
+            preg_replace('/\s+/', ' ', $rewritten)
+        );
+
+        $parser = (new \PhpParser\ParserFactory())->create(\PhpParser\ParserFactory::ONLY_PHP7);
+        $ast = $parser->parse($rewritten);
+        self::assertNotNull($ast);
+        $prop = $ast[0]->stmts[0];
+        self::assertTrue(LazyPropertyRewriter::isLazyFromAttributes($prop->getAttributes()));
     }
 }
