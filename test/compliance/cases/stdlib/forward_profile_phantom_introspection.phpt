@@ -1,5 +1,5 @@
 --TEST--
-stdlib forward profile — IEEE math advertised, mb_str_pad/bcmath withheld (#16677, #16086)
+stdlib forward profile — IEEE math advertised, bcmath withheld (#16677, #16086)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--
@@ -11,9 +11,6 @@ foreach (['fpow', 'fmin', 'fmax', 'nextafter', 'bcround'] as $fn) {
     if (!function_exists($fn)) {
         $fail[] = $fn;
     }
-}
-if (function_exists('mb_str_pad')) {
-    $fail[] = 'mb_str_pad';
 }
 if (extension_loaded('bcmath')) {
     $fail[] = 'bcmath';

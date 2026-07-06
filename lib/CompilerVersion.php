@@ -1419,7 +1419,43 @@ final class CompilerVersion
      */
     public static function supportsMbTrimFunctions(): bool
     {
+        if (version_compare(self::VERSION, '8.4', '<')) {
+            return false;
+        }
+
+        if (version_compare(self::VERSION, '8.4.0', '>=')) {
+            return true;
+        }
+
+        $raw = getenv('PHP_COMPILER_PROFILE');
+        if (!\is_string($raw) || '' === trim($raw)) {
+            return false;
+        }
+
         return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+    }
+
+    /**
+     * mb_trim/ltrim/rtrim visible to function_exists() — stable runtime or forward profile (#16998, #12797).
+     *
+     * Callable under forward profile via {@see supportsMbTrimFunctions()}; withheld on 8.4.0-dev reference harness.
+     */
+    public static function advertisesMbTrimFunctions(): bool
+    {
+        if (version_compare(self::VERSION, '8.4.0', '>=')) {
+            return true;
+        }
+
+        if (!self::supportsMbTrimFunctions()) {
+            return false;
+        }
+
+        $raw = getenv('PHP_COMPILER_PROFILE');
+        if (!\is_string($raw) || '' === trim($raw)) {
+            return false;
+        }
+
+        return true;
     }
 
     /**
