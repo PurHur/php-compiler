@@ -4,20 +4,17 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\curl;
 
-use PHPCompiler\ext\standard\ModuleRegistry;
-
 /**
- * ext/curl advertisement — php-src ext/curl/interface.c (#12117, #13588).
+ * ext/curl advertisement — php-src ext/curl/interface.c (#12117, #13588, #16659).
  *
- * Handle CEs and curl_escape/curl_unescape register only when
- * {@see ModuleRegistry::extensionLoaded}('curl') is true (libcurl client #3325).
- * CURLFile may still register under standard.
+ * Phase 2 introspection ({@see VmCurlCore}) registers curl_version/curl_strerror and
+ * CURLStringFile without libcurl HTTP I/O (#3325). Handle CEs register with the same gate.
  */
 final class CurlExtensionPolicy
 {
     public static function advertisesBuiltins(): bool
     {
-        return ModuleRegistry::extensionLoaded('curl');
+        return VmCurlCore::available();
     }
 
     public static function advertisesHandleClasses(): bool

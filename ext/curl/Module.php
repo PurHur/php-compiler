@@ -9,19 +9,33 @@ use PHPCompiler\Runtime;
 use PHPCompiler\VM;
 
 /**
- * curl extension module entry (php-src ext/curl/interface.c; issue #6999).
+ * curl extension module entry (php-src ext/curl/interface.c; issue #6999, #16659).
  *
  * libcurl HTTP client parity tracked in #3325; curl_multi in #3721.
- * Register under {@see standard} so extension_loaded('curl') stays false until #3325 (#11627).
- * {@see CurlExtensionPolicy} withholds Curl* handle CEs from class_exists() until then (#12117).
- * curl_escape/curl_unescape are withheld until #3325 so function_exists() agrees
- * with extension_loaded('curl') (#13588). Other CurlFunction stubs stay withheld (#11654).
+ * Phase 2 registers introspection builtins + CURLStringFile via {@see VmCurlCore}.
  */
 class Module extends ModuleAbstract
 {
     public function getExtensionName(): string
     {
         return 'standard';
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function getAdditionalExtensionNames(): array
+    {
+        if (!VmCurlCore::available()) {
+            return [];
+        }
+
+        return ['curl'];
+    }
+
+    public function getExtensionVersion(): string
+    {
+        return VmCurlCore::LIBCURL_VERSION;
     }
 
     public function init(Runtime $runtime): void
@@ -33,6 +47,8 @@ class Module extends ModuleAbstract
             'CURLOPT_RETURNTRANSFER' => CurlConstants::CURLOPT_RETURNTRANSFER,
             'CURLOPT_POST' => CurlConstants::CURLOPT_POST,
             'CURLOPT_HTTPHEADER' => CurlConstants::CURLOPT_HTTPHEADER,
+            'CURLE_OK' => CurlConstants::CURLE_OK,
+            'CURLM_OK' => CurlConstants::CURLM_OK,
         ] as $name => $value) {
             $var = new VM\Variable();
             $var->int($value);
@@ -49,6 +65,10 @@ class Module extends ModuleAbstract
         return [
             new curl_escape(),
             new curl_unescape(),
+            new curl_version(),
+            new curl_strerror(),
+            new curl_multi_strerror(),
+            new curl_upkeep(),
         ];
     }
 }
