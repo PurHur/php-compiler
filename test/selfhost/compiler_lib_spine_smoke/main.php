@@ -4216,4 +4216,14 @@ require_once __DIR__.'/../../../ext/standard/JitDatePeriodCreateFromISO8601Strin
 require_once __DIR__.'/../../../lib/JIT/Call/DatePeriodCreateFromISO8601String.php';
 require_once __DIR__.'/../../../lib/JIT/Call/DatePeriodIteratorMethod.php';
 require_once __DIR__.'/../../../lib/VM/DatePeriodIteratorJitHelper.php';
+require_once __DIR__.'/../../../ext/dom/DomTokenListPropertySupport.php';
+require_once __DIR__.'/../../../ext/dom/TokenListAdd.php';
+require_once __DIR__.'/../../../ext/dom/TokenListContains.php';
+require_once __DIR__.'/../../../ext/dom/TokenListCount.php';
+require_once __DIR__.'/../../../ext/dom/TokenListItem.php';
+require_once __DIR__.'/../../../ext/dom/TokenListRemove.php';
+require_once __DIR__.'/../../../ext/dom/TokenListReplace.php';
+require_once __DIR__.'/../../../ext/dom/TokenListSupports.php';
+require_once __DIR__.'/../../../ext/dom/TokenListToggle.php';
+require_once __DIR__.'/../../../ext/dom/VmDomTokenList.php';
 echo "compiler_lib_spine_smoke bundle OK\n";

@@ -99,7 +99,9 @@ if [[ "$OLD_SPINE" != "$NEW_SPINE" || "$OLD_INV" != "$NEW_INV" ]]; then
     -e "s/${OLD_SPINE} \/ ${OLD_INV}/${NEW_SPINE} \/ ${NEW_INV}/g" \
     -e "s/${OLD_SPINE}\/${OLD_INV}/${NEW_SPINE}\/${NEW_INV}/g" \
     "${FOOTNOTE_FILES[@]}"
-  sed -i "s/assertSame(${OLD_SPINE}, \$count/assertSame(${NEW_SPINE}, \$count/" \
+  sed -i \
+    -e "s/assertSame(${OLD_SPINE}, \$count/assertSame(${NEW_SPINE}, \$count/" \
+    -e "s|Spine ratio ${OLD_SPINE}/${OLD_INV}|Spine ratio ${NEW_SPINE}/${NEW_INV}|" \
     test/unit/BootstrapSelfhostBundleTest.php
 fi
 
