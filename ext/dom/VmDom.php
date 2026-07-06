@@ -188,6 +188,8 @@ final class VmDom
         }
         $node->methods['append'] = new NodeAppend();
         $node->methodVisibility['append'] = $pub;
+        $node->methods['replacechildren'] = new NodeReplaceChildren();
+        $node->methodVisibility['replacechildren'] = $pub;
         $node->methods['prepend'] = new NodePrepend();
         $node->methodVisibility['prepend'] = $pub;
         $node->methods['before'] = new NodeBefore();
@@ -2365,6 +2367,37 @@ final class VmDom
             self::appendLiveStandardChild($ctx, $parent, $child);
         }
         self::syncSubtree($ctx, $parent);
+    }
+
+    /**
+     * @param list<\PHPCompiler\VM\Variable> $args
+     */
+    public static function replaceChildrenLiveStandardNodes(Context $ctx, ObjectEntry $parent, array $args): void
+    {
+        self::assertMutationParent($parent);
+        self::removeAllLiveStandardChildren($ctx, $parent);
+        foreach ($args as $arg) {
+            $child = self::resolveLiveStandardAppendArg($ctx, $parent, $arg, 'DOMNode::replaceChildren()');
+            self::appendLiveStandardChild($ctx, $parent, $child);
+        }
+        self::syncSubtree($ctx, $parent);
+    }
+
+    private static function removeAllLiveStandardChildren(Context $ctx, ObjectEntry $parent): void
+    {
+        $parentState = DomRegistry::state($parent);
+        $existingIds = $parentState->childIds;
+        $parentState->childIds = [];
+        if (self::isDocument($parent)) {
+            $parent->getProperty(self::PROP_DOCUMENT_ELEMENT)->null();
+            $parentState->documentElementName = null;
+        }
+        foreach ($existingIds as $childId) {
+            $child = DomRegistry::entry($childId);
+            if (null !== $child) {
+                self::linkChildToParent($child, null);
+            }
+        }
     }
 
     /**
