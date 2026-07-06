@@ -247,11 +247,14 @@ class JITTest extends BaseTest {
             }
             if (!CompilerVersion::supportsClosureGetCurrent()
                 && str_contains($name, 'closure_get_current')
-                && !str_contains($name, 'closure_get_current_phantom')) {
+                && !str_contains($name, 'closure_get_current_phantom')
+                && !str_contains($name, 'closure_get_current_profile')
+                && !str_contains($name, 'closure_get_current_forward_84')) {
                 continue;
             }
             if (CompilerVersion::supportsClosureGetCurrent()
-                && str_contains($name, 'closure_get_current_phantom')) {
+                && (str_contains($name, 'closure_get_current_phantom')
+                    || str_contains($name, 'closure_get_current_profile'))) {
                 continue;
             }
             if (!CompilerVersion::supportsClosureFromStatic()
@@ -281,8 +284,9 @@ class JITTest extends BaseTest {
                 && str_contains($name, 'reflection_parameter_is_sensitive_parameter_phantom')) {
                 continue;
             }
-            // JIT: method_exists(Closure::class, …) segfaults; phantom is VM-only (#14504).
-            if (str_contains($name, 'closure_get_current_phantom')) {
+            // JIT: method_exists(Closure::class, …) segfaults; phantom/profile introspection is VM-only (#14504, #16989).
+            if (str_contains($name, 'closure_get_current_phantom')
+                || str_contains($name, 'closure_get_current_profile')) {
                 continue;
             }
             // JIT: method_exists(ReflectionParameter::class, …) segfaults; phantom is VM-only (#16130).

@@ -2951,6 +2951,13 @@ class Object_ extends Type {
             $this->defineProperty($id, FiberHelper::TARGET_PROPERTY, Variable::TYPE_STRING);
             $this->defineProperty($id, \PHPCompiler\JIT\ClosureBindHelper::BOUND_THIS_PROPERTY, Variable::TYPE_VALUE);
             $this->defineProperty($id, \PHPCompiler\JIT\ClosureBindHelper::BOUND_SCOPE_PROPERTY, Variable::TYPE_STRING);
+            if (\PHPCompiler\CompilerVersion::supportsClosureGetCurrent()) {
+                $this->defineMethodVisibility(
+                    $id,
+                    'getcurrent',
+                    \PHPCfg\Func::FLAG_PUBLIC | \PHPCfg\Func::FLAG_STATIC
+                );
+            }
         }
         if ('fiber' === $lcname) {
             $this->defineProperty($id, FiberHelper::TARGET_PROPERTY, Variable::TYPE_STRING);

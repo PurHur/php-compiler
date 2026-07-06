@@ -244,11 +244,14 @@ class VMTest extends BaseTest {
             }
             if (!CompilerVersion::supportsClosureGetCurrent()
                 && str_contains($name, 'closure_get_current')
-                && !str_contains($name, 'closure_get_current_phantom')) {
+                && !str_contains($name, 'closure_get_current_phantom')
+                && !str_contains($name, 'closure_get_current_profile')
+                && !str_contains($name, 'closure_get_current_forward_84')) {
                 continue;
             }
             if (CompilerVersion::supportsClosureGetCurrent()
-                && str_contains($name, 'closure_get_current_phantom')) {
+                && (str_contains($name, 'closure_get_current_phantom')
+                    || str_contains($name, 'closure_get_current_profile'))) {
                 continue;
             }
             if (!CompilerVersion::supportsClosureFromStatic()
