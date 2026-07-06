@@ -1,5 +1,5 @@
 --TEST--
-Language: isset()/empty() on get+set property hooks — isset probes backing; empty invokes get (#11262, #13055, zend_object_handlers.c)
+Language: isset()/empty() on get+set property hooks — same-name backing probes storage only (#11467, zend_property_hooks.c)
 --FILE--
 <?php
 class D {
@@ -24,6 +24,5 @@ $e = new E();
 var_export(isset($e->x));
 echo "\n";
 --EXPECT--
-GET
 true
 true
