@@ -1,5 +1,7 @@
 --TEST--
-ReflectionConstant class exists on forward profile (#12385, ext/reflection/php_reflection.c)
+ReflectionConstant class exists on forward profile (#12385, #16837, ext/reflection/php_reflection.c)
+--ENV--
+PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
 var_export(class_exists('ReflectionConstant', false));
