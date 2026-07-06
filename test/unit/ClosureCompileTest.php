@@ -98,4 +98,21 @@ PHP;
         $rt->run($block);
         $this->assertSame("1\n1\n", ob_get_clean());
     }
+
+    /** Regression: Closure::bind(inline closure, enum case, Enum::class) — arg #0 closure not scope (#16722). */
+    public function testVmClosureBindStaticEnumCase(): void
+    {
+        $code = <<<'PHP'
+<?php
+declare(strict_types=1);
+enum E: int { case A = 1; public function m(): int { return $this->value; } }
+$c = Closure::bind(function (): int { return $this->value; }, E::A, E::class);
+echo $c(), "\n";
+PHP;
+        $rt = new PHPCompiler\Runtime();
+        $block = $rt->parseAndCompile($code, 'test.php');
+        ob_start();
+        $rt->run($block);
+        $this->assertSame("1\n", ob_get_clean());
+    }
 }
