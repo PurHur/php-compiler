@@ -741,6 +741,7 @@
         "ext/standard/ChownJitHelper.php",
         "ext/standard/ChunkSplitJitHelper.php",
         "ext/standard/ClassExistsJitHelper.php",
+        "ext/standard/ClassImplementsJitHelper.php",
         "ext/standard/ClassParentsJitHelper.php",
         "ext/standard/ClassUsesJitHelper.php",
         "ext/standard/ClassUsesRecursiveJitHelper.php",
@@ -3173,6 +3174,7 @@
         "lib/JIT/Builtin/StringChmod.php",
         "lib/JIT/Builtin/StringChunkSplit.php",
         "lib/JIT/Builtin/StringClassExists.php",
+        "lib/JIT/Builtin/StringClassImplements.php",
         "lib/JIT/Builtin/StringClassParents.php",
         "lib/JIT/Builtin/StringClassUses.php",
         "lib/JIT/Builtin/StringClassUsesRecursive.php",
@@ -4416,9 +4418,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 4182,
+        "inventory_files": 4184,
         "excluded": 0,
-        "eligible": 4182,
+        "eligible": 4184,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1

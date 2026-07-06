@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 4182 |
-| Phase A inventory files (M2 ratio SSOT) | 4182 |
+| PHP files on vm.php path | 4184 |
+| Phase A inventory files (M2 ratio SSOT) | 4184 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 11294 |
+| Source constructs flagged (warnings) | 11297 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -698,6 +698,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/ChownJitHelper.php` | 0 | 1 |
 | `ext/standard/ChunkSplitJitHelper.php` | 0 | 1 |
 | `ext/standard/ClassExistsJitHelper.php` | 0 | 1 |
+| `ext/standard/ClassImplementsJitHelper.php` | 0 | 2 |
 | `ext/standard/ClassParentsJitHelper.php` | 0 | 2 |
 | `ext/standard/ClassUsesJitHelper.php` | 0 | 2 |
 | `ext/standard/ClassUsesRecursiveJitHelper.php` | 0 | 2 |
@@ -3113,6 +3114,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringChmod.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringChunkSplit.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringClassExists.php` | 0 | 1 |
+| `lib/JIT/Builtin/StringClassImplements.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringClassParents.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringClassUses.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringClassUsesRecursive.php` | 0 | 1 |
@@ -9026,6 +9028,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `ext/standard/ClassImplementsJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- new Variable (line 29)
+- 1 class method(s)
+
 ### `ext/standard/ClassParentsJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
@@ -9787,9 +9795,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitClassImplements.php`
 
 **Warnings** (review for bootstrap subset):
-- new JITVariable (line 46)
-- new JITVariable (line 198)
-- 6 class method(s)
+- new JITVariable (line 57)
+- new JITVariable (line 241)
+- 8 class method(s)
 
 ### `ext/standard/JitClassParents.php`
 
@@ -21215,7 +21223,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/AOT/HelperRuntimeCache.php`
 
 **Warnings** (review for bootstrap subset):
-- 20 class method(s)
+- 22 class method(s)
 
 ### `lib/AOT/Linker.php`
 
@@ -22257,9 +22265,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Compiler/TraitClassConstConflictCheck.php`
 
 **Warnings** (review for bootstrap subset):
-- new self (line 43)
-- new CompileFatal (line 305)
-- new CompileFatal (line 321)
+- new self (line 44)
+- new CompileFatal (line 309)
+- new CompileFatal (line 325)
 - 13 class method(s)
 
 ### `lib/Compiler/TraitCollisionCheck.php`
@@ -23916,7 +23924,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/PackArgvSerialize.php`
 
 **Warnings** (review for bootstrap subset):
-- 8 class method(s)
+- 9 class method(s)
 
 ### `lib/JIT/Builtin/PackJitRuntime.php`
 
@@ -24690,6 +24698,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 4 class method(s)
 
+### `lib/JIT/Builtin/StringClassImplements.php`
+
+**Warnings** (review for bootstrap subset):
+- 4 class method(s)
+
 ### `lib/JIT/Builtin/StringClassParents.php`
 
 **Warnings** (review for bootstrap subset):
@@ -24848,8 +24861,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringFormat.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 275)
-- 11 class method(s)
+- new JIT (line 328)
+- 12 class method(s)
 - 2 closure(s)
 
 ### `lib/JIT/Builtin/StringFormatInventoryStubs.php`
