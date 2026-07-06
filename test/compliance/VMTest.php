@@ -819,6 +819,15 @@ class VMTest extends BaseTest {
                 && str_contains($name, 'toggle_attribute_phantom')) {
                 continue;
             }
+            if (!CompilerVersion::supportsDomElementGetAttributeNames()
+                && str_contains($name, 'dom_element_get_attribute_names')
+                && !str_contains($name, 'get_attribute_names_phantom')) {
+                continue;
+            }
+            if (CompilerVersion::supportsDomElementGetAttributeNames()
+                && str_contains($name, 'get_attribute_names_phantom')) {
+                continue;
+            }
             if (!CompilerVersion::supportsClassHasFunctions()
                 && str_contains($name, 'class_has_')
                 && !str_contains($name, 'class_has_lazy_object')

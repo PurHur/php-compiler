@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\dom;
 use PHPCfg\Func as CfgFunc;
 use PHPCompiler\CompilerVersion;
 use PHPCompiler\VM\ErrorReporter;
+use PHPCompiler\ext\standard\VmFs;
 use PHPCompiler\ext\libxml\LibxmlConstants;
 use PHPCompiler\ext\libxml\VmLibxml;
 use PHPCompiler\ext\xml\VmXml;
@@ -15,6 +16,7 @@ use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\ClassProperty;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\EnumCaseSupport;
+use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\InterfaceCheck;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\Variable;
@@ -188,6 +190,8 @@ final class VmDom
         }
         $node->methods['append'] = new NodeAppend();
         $node->methodVisibility['append'] = $pub;
+        $node->methods['replacechildren'] = new NodeReplaceChildren();
+        $node->methodVisibility['replacechildren'] = $pub;
         $node->methods['prepend'] = new NodePrepend();
         $node->methodVisibility['prepend'] = $pub;
         $node->methods['before'] = new NodeBefore();
@@ -475,6 +479,11 @@ final class VmDom
         $element->methods['getelementsbytagnamens'] = new ElementGetElementsByTagNameNS();
         $element->methodVisibility['getelementsbytagnamens'] = $pub;
         $element->methodNames['getelementsbytagnamens'] = 'getElementsByTagNameNS';
+        if (CompilerVersion::supportsDomElementGetAttributeNames()) {
+            $element->methods['getattributenames'] = new ElementGetAttributeNames();
+            $element->methodVisibility['getattributenames'] = $pub;
+            $element->methodNames['getattributenames'] = 'getAttributeNames';
+        }
         if (CompilerVersion::supportsDomElementInsertAdjacentHtml()) {
             $element->methods['insertadjacenthtml'] = new ElementInsertAdjacentHTML();
             $element->methodVisibility['insertadjacenthtml'] = $pub;
@@ -987,6 +996,19 @@ final class VmDom
         }
 
         return false;
+    }
+
+    /**
+     * DOMElement::getAttributeNames() — attribute qNames in document order (php-src ext/dom/element.c; #16823).
+     */
+    public static function getAttributeNames(ObjectEntry $element): HashTable
+    {
+        if (!self::isElement($element)) {
+            throw new \DOMException('Not an element node');
+        }
+        $state = DomRegistry::state($element);
+
+        return VmFs::stringListToArray(array_keys($state->attributes));
     }
 
     public static function setAttributeNS(
@@ -2403,6 +2425,37 @@ final class VmDom
             self::appendLiveStandardChild($ctx, $parent, $child);
         }
         self::syncSubtree($ctx, $parent);
+    }
+
+    /**
+     * @param list<\PHPCompiler\VM\Variable> $args
+     */
+    public static function replaceChildrenLiveStandardNodes(Context $ctx, ObjectEntry $parent, array $args): void
+    {
+        self::assertMutationParent($parent);
+        self::removeAllLiveStandardChildren($ctx, $parent);
+        foreach ($args as $arg) {
+            $child = self::resolveLiveStandardAppendArg($ctx, $parent, $arg, 'DOMNode::replaceChildren()');
+            self::appendLiveStandardChild($ctx, $parent, $child);
+        }
+        self::syncSubtree($ctx, $parent);
+    }
+
+    private static function removeAllLiveStandardChildren(Context $ctx, ObjectEntry $parent): void
+    {
+        $parentState = DomRegistry::state($parent);
+        $existingIds = $parentState->childIds;
+        $parentState->childIds = [];
+        if (self::isDocument($parent)) {
+            $parent->getProperty(self::PROP_DOCUMENT_ELEMENT)->null();
+            $parentState->documentElementName = null;
+        }
+        foreach ($existingIds as $childId) {
+            $child = DomRegistry::entry($childId);
+            if (null !== $child) {
+                self::linkChildToParent($child, null);
+            }
+        }
     }
 
     /**
