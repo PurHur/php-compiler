@@ -12867,6 +12867,15 @@ class JIT {
         }
         $dest = $this->context->getVariableFromOp($result);
         if ($dest->kind !== Variable::KIND_VARIABLE) {
+            if (Variable::KIND_VALUE === $dest->kind) {
+                // The temp was pre-bound as a folded value (defined()/class_exists()
+                // spine-guard folding registers NATIVE_BOOL KIND_VALUE bindings) and
+                // the real producer emits afterwards. assignOperand() rebinds these;
+                // mirror that here instead of dying mid-bundle (#16828).
+                $this->context->makeVariableFromValueOp($value, $result);
+
+                return;
+            }
             throw new \LogicException('Cannot assign to a value');
         }
         $valueTy = $this->context->getStringFromType($value->typeOf());
