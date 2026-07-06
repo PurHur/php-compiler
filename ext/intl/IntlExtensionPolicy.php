@@ -60,6 +60,11 @@ final class IntlExtensionPolicy
         if (self::advertisesBuiltins()) {
             return true;
         }
+        if (str_contains($testFileName, 'grapheme_phantom')
+            || str_contains($testFileName, 'grapheme_forward_profile')
+            || str_contains($testFileName, 'grapheme_profile_84')) {
+            return true;
+        }
         if (str_contains($testFileName, 'grapheme_str_contains')
             && CompilerVersion::supportsGraphemeStrContains()) {
             return true;

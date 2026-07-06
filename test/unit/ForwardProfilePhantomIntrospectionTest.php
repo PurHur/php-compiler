@@ -257,42 +257,45 @@ final class ForwardProfilePhantomIntrospectionTest extends TestCase
         }
     }
 
-    public function testGraphemeProfile84BuiltinsAdvertisedWithoutIntl(): void
+    public function testGraphemeProfile84BuiltinsCallableButNotAdvertisedWithoutIntl(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE=8.4');
         try {
             $this->assertTrue(CompilerVersion::supportsGraphemeStrContains());
-            $this->assertTrue(CompilerVersion::advertisesGraphemeStrContains());
             $this->assertTrue(CompilerVersion::supportsGraphemeStrimwidth());
-            $this->assertTrue(CompilerVersion::advertisesGraphemeStrimwidth());
             $this->assertTrue(CompilerVersion::supportsGraphemeForwardProfileCore());
-            $this->assertTrue(CompilerVersion::advertisesGraphemeForwardProfileCore());
-            $this->assertTrue(BuiltinIntrospectionPolicy::functionIsAdvertised('grapheme_str_contains'));
-            $this->assertTrue(BuiltinIntrospectionPolicy::functionIsAdvertised('grapheme_strimwidth'));
-            $this->assertTrue(BuiltinIntrospectionPolicy::functionIsAdvertised('grapheme_strlen'));
             $this->assertFalse(
                 \PHPCompiler\ext\standard\ModuleRegistry::extensionLoaded('intl')
             );
+            foreach ([
+                'grapheme_str_contains',
+                'grapheme_strimwidth',
+                'grapheme_strlen',
+                'grapheme_substr',
+                'grapheme_strpos',
+                'grapheme_extract',
+                'grapheme_str_split',
+            ] as $fn) {
+                $this->assertFalse(BuiltinIntrospectionPolicy::functionIsAdvertised($fn));
+            }
 
             $runtime = new Runtime();
             $ctx = $runtime->vmContext;
-            $this->assertTrue(isset($ctx->functions['grapheme_str_contains']));
-            $this->assertTrue(isset($ctx->functions['grapheme_strimwidth']));
-            $this->assertTrue(isset($ctx->functions['grapheme_strlen']));
-            $this->assertTrue(isset($ctx->functions['grapheme_substr']));
-            $this->assertTrue(isset($ctx->functions['grapheme_strpos']));
-            $this->assertTrue(isset($ctx->functions['grapheme_extract']));
-            $this->assertTrue(isset($ctx->functions['grapheme_str_split']));
-            $this->assertTrue(
-                \PHPCompiler\ext\standard\VmReflection::functionExists($ctx, 'grapheme_str_contains')
-            );
-            $this->assertTrue(
-                \PHPCompiler\ext\standard\VmReflection::functionExists($ctx, 'grapheme_strimwidth')
-            );
-            $this->assertTrue(
-                \PHPCompiler\ext\standard\VmReflection::functionExists($ctx, 'grapheme_strlen')
-            );
+            foreach ([
+                'grapheme_str_contains',
+                'grapheme_strimwidth',
+                'grapheme_strlen',
+                'grapheme_substr',
+                'grapheme_strpos',
+                'grapheme_extract',
+                'grapheme_str_split',
+            ] as $fn) {
+                $this->assertTrue(isset($ctx->functions[$fn]));
+                $this->assertFalse(
+                    \PHPCompiler\ext\standard\VmReflection::functionExists($ctx, $fn)
+                );
+            }
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');
