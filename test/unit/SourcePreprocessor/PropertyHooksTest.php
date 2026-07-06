@@ -813,4 +813,39 @@ PHP;
         self::assertSame($src, $out);
     }
 
+    public function testStripsFinalModifierOnHookedProperty(): void
+    {
+        $src = <<<'PHP'
+<?php
+class C {
+    public final string $label {
+        get => 'ok';
+    }
+}
+PHP;
+        [$out, $registry] = (new PropertyHooks())->process($src);
+        self::assertStringNotContainsString('final string $label', $out);
+        self::assertStringContainsString('public string $label;', $out);
+        self::assertTrue($registry['c']['label']['finalProperty'] ?? false);
+        self::assertSame('__phpc_property_get_label', $registry['c']['label']['get'] ?? null);
+    }
+
+    public function testLowersFinalSetHookModifier(): void
+    {
+        $src = <<<'PHP'
+<?php
+class C {
+    public string $x {
+        final set => strtolower($value);
+        get => $this->x ?? '';
+    }
+}
+PHP;
+        [$out, $registry] = (new PropertyHooks())->process($src);
+        self::assertStringContainsString('function __phpc_property_set_x', $out);
+        self::assertStringContainsString('strtolower($value)', $out);
+        self::assertTrue($registry['c']['x']['finalSet'] ?? false);
+        self::assertFalse($registry['c']['x']['finalGet'] ?? false);
+    }
+
 }
