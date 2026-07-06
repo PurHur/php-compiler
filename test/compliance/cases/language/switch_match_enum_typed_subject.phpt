@@ -20,8 +20,8 @@ enum Color: string {
     case Blue = 'b';
     public function label(): string {
         return match ($this) {
-            Red => 'red',
-            Blue => 'blue',
+            self::Red => 'red',
+            self::Blue => 'blue',
         };
     }
 }

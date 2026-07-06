@@ -129,7 +129,7 @@ class Runtime {
         $astTraverser = new NodeTraverser;
         $astTraverser->addVisitor(new MultiBlockNameResolver());
         $astTraverser->addVisitor(new Ast\EnumCaseImportRewriter());
-        $astTraverser->addVisitor(new Ast\EnumCaseMatchSwitchRewriter());
+        // Bare enum case names in match/switch are not in scope outside qualified fetch (#16720, re-#6947).
         $astTraverser->addVisitor(new GroupUseStripper());
         $this->abstractEnumMarker = new Ast\AbstractEnumMarker();
         $astTraverser->addVisitor($this->abstractEnumMarker);
