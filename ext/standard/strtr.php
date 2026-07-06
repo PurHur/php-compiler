@@ -11,6 +11,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\BuiltinExecute;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -29,18 +30,7 @@ final class strtr extends Internal
             );
             $pairs = $frame->calledArgs[1]->resolveIndirect();
             if (Variable::TYPE_ARRAY !== $pairs->type) {
-                throw new \TypeError(\sprintf(
-                    'strtr(): Argument #2 ($replace_pairs) must be of type array, %s given',
-                    match ($pairs->type) {
-                        Variable::TYPE_NULL => 'null',
-                        Variable::TYPE_BOOLEAN => 'bool',
-                        Variable::TYPE_INTEGER => 'int',
-                        Variable::TYPE_FLOAT => 'float',
-                        Variable::TYPE_STRING => 'string',
-                        Variable::TYPE_OBJECT => 'object',
-                        default => 'mixed',
-                    }
-                ));
+                throw self::twoArgSecondTypeError($frame, $pairs);
             }
             $replacePairs = [];
             foreach ($pairs->toArray()->iterateKeyed(true) as [$keyVar, $valueVar]) {
@@ -103,6 +93,29 @@ final class strtr extends Internal
         }
 
         throw new \LogicException('strtr() expects 2 or 3 arguments, '.\count($args).' given');
+    }
+
+    /**
+     * php-src ext/standard/string.c — two-arg strtr() expects array replace_pairs; Zend
+     * labels arg #2 $from and reports coercible scalars as "string given" (#16772).
+     */
+    private static function twoArgSecondTypeError(Frame $frame, Variable $value): \TypeError
+    {
+        $value = $value->resolveIndirect();
+        if (Variable::TYPE_OBJECT === $value->type) {
+            return new \TypeError(\sprintf(
+                'strtr(): Argument #2 ($from) must be of type array|string, %s given',
+                $value->toObject()->class->name
+            ));
+        }
+        if (InternalStrictArg::isCallerStrict($frame)) {
+            return new \TypeError(\sprintf(
+                'strtr(): Argument #2 ($from) must be of type array|string, %s given',
+                VmParseStr::zendTypeLabel($value)
+            ));
+        }
+
+        return new \TypeError('strtr(): Argument #2 ($from) must be of type array, string given');
     }
 
     private static function isReplacePairsArg(JITVariable $arg): bool
