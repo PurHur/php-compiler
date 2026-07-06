@@ -18,6 +18,8 @@ foreach ([
     'grapheme_stristr',
     'grapheme_strrpos',
     'grapheme_strlen',
+    'grapheme_str_contains',
+    'grapheme_strimwidth',
     'intl_get_error_code',
 ] as $fn) {
     if (\function_exists($fn)) {

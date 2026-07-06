@@ -13,8 +13,8 @@ echo "\n";
 var_export(curl_unescape('caf%C3%A9'));
 echo "\n";
 --EXPECT--
-escape_exists
-unescape_exists
+escape_missing
+unescape_missing
 'foo%40bar%2Fbaz'
 'foo@bar/baz'
 'caf%E9'

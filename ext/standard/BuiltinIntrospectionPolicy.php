@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\CompilerVersion;
+use PHPCompiler\ext\curl\CurlExtensionPolicy;
+use PHPCompiler\ext\intl\IntlExtensionPolicy;
 
 /**
  * function_exists() / extension_loaded() advertisement vs forward-profile callability (#16086).
@@ -53,16 +55,21 @@ final class BuiltinIntrospectionPolicy
             return CompilerVersion::advertisesStreamContextSetOptions();
         }
         if ('grapheme_str_contains' === $lc) {
-            return CompilerVersion::advertisesGraphemeStrContains();
+            return CompilerVersion::advertisesGraphemeStrContains()
+                && IntlExtensionPolicy::advertisesBuiltins();
         }
         if ('grapheme_strimwidth' === $lc) {
-            return CompilerVersion::advertisesGraphemeStrimwidth();
+            return CompilerVersion::advertisesGraphemeStrimwidth()
+                && IntlExtensionPolicy::advertisesBuiltins();
         }
-        if (\in_array($lc, ['class_has_method', 'class_has_property', 'class_has_constant'], true)) {
-            return CompilerVersion::supportsClassHasFunctions();
+        if (\in_array($lc, ['curl_escape', 'curl_unescape'], true)) {
+            return CurlExtensionPolicy::advertisesExtension();
         }
         if ('fastcgi_finish_request' === $lc) {
             return VmFastCgi::registersFinishRequestFunction();
+        }
+        if (\in_array($lc, ['class_has_method', 'class_has_property', 'class_has_constant'], true)) {
+            return CompilerVersion::supportsClassHasFunctions();
         }
 
         return true;
