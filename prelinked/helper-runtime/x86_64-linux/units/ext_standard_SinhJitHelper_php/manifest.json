@@ -1,1 +1,1 @@
-{"fingerprint":"55b4a691f3a82a7f403f","unit":"/ext/standard/SinhJitHelper.php","helpers":{"phpcompiler\\ext\\standard\\sinhjithelper::sinhargv":"phpcompiler_ext_standard_sinhjithelper__sinhargv"}}
+{"fingerprint":"e93967f867070b28250e","unit":"/ext/standard/SinhJitHelper.php","helpers":{"phpcompiler\\ext\\standard\\sinhjithelper::sinhargv":"phpcompiler_ext_standard_sinhjithelper__sinhargv"},"init_symbol":"__init__unit_ext_standard_SinhJitHelper_php","shutdown_symbol":"__shutdown__unit_ext_standard_SinhJitHelper_php"}

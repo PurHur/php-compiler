@@ -27,8 +27,13 @@ final class JitSprintf
         // User-standalone init skips StringFormat::ensureLinked (#13571) —
         // without a body the ABI symbols die at link with undefined
         // __compiler_sprintf (#15642). Link on first call-site lowering,
-        // mid-compile like every other nested helper.
-        \PHPCompiler\JIT\Builtin\StringFormat::implementIfDeclared($context, true);
+        // mid-compile like every other nested helper. NOT during helper-unit
+        // emission: the unit only needs the declaration (the consuming script
+        // provides the body), and the emitter guards the cache off, so the
+        // hook would drag a full nested corpus compile into every unit.
+        if ('1' !== getenv('PHP_COMPILER_HELPER_RUNTIME_EMITTING')) {
+            \PHPCompiler\JIT\Builtin\StringFormat::implementIfDeclared($context, true);
+        }
         $argc = \count($args);
         if ($argc < 1) {
             throw new \LogicException('sprintf() requires at least one argument');

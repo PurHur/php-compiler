@@ -1,1 +1,1 @@
-{"fingerprint":"6c407b4631d7ca83da98","unit":"/VM/InstanceOfJitHelper.php","helpers":{"phpcompiler\\vm\\instanceofjithelper::valueboxrhskind":"phpcompiler_vm_instanceofjithelper__valueboxrhskind"}}
+{"fingerprint":"ae2e2a6570ad6997fa37","unit":"/VM/InstanceOfJitHelper.php","helpers":{"phpcompiler\\vm\\instanceofjithelper::valueboxrhskind":"phpcompiler_vm_instanceofjithelper__valueboxrhskind"},"init_symbol":"__init__unit_VM_InstanceOfJitHelper_php","shutdown_symbol":"__shutdown__unit_VM_InstanceOfJitHelper_php","runtime_safe":true}

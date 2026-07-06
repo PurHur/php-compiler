@@ -1,1 +1,1 @@
-{"fingerprint":"12d0f2531c9677e58352","unit":"/ext/standard/InArrayJitHelper.php","helpers":{"phpcompiler\\ext\\standard\\inarrayjithelper::contains":"phpcompiler_ext_standard_inarrayjithelper__contains"}}
+{"fingerprint":"8a273b89870398389a93","unit":"/ext/standard/InArrayJitHelper.php","helpers":{"phpcompiler\\ext\\standard\\inarrayjithelper::contains":"phpcompiler_ext_standard_inarrayjithelper__contains"},"init_symbol":"__init__unit_ext_standard_InArrayJitHelper_php","shutdown_symbol":"__shutdown__unit_ext_standard_InArrayJitHelper_php","runtime_safe":true}

@@ -1,1 +1,1 @@
-{"fingerprint":"ea9aacddab56eac38c40","unit":"/ext/standard/TanhJitHelper.php","helpers":{"phpcompiler\\ext\\standard\\tanhjithelper::tanhargv":"phpcompiler_ext_standard_tanhjithelper__tanhargv"}}
+{"fingerprint":"133fa0ecdb10e1770615","unit":"/ext/standard/TanhJitHelper.php","helpers":{"phpcompiler\\ext\\standard\\tanhjithelper::tanhargv":"phpcompiler_ext_standard_tanhjithelper__tanhargv"},"init_symbol":"__init__unit_ext_standard_TanhJitHelper_php","shutdown_symbol":"__shutdown__unit_ext_standard_TanhJitHelper_php"}

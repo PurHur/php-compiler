@@ -108,6 +108,14 @@ if (null !== $unitPath) {
         exit(1);
     }
 
+    // Unique per-unit init/shutdown symbols: the colliding __init__ was
+    // muldefs-discarded at link and unit module state never initialized;
+    // consumers call __init__unit_<slug> explicitly (#16075 step 4).
+    $initSuffix = 'unit_'.HelperRuntimeCache::slugFor($unitPath);
+    putenv('PHP_COMPILER_INIT_SYMBOL_SUFFIX='.$initSuffix);
+    $_ENV['PHP_COMPILER_INIT_SYMBOL_SUFFIX'] = $initSuffix;
+    $_SERVER['PHP_COMPILER_INIT_SYMBOL_SUFFIX'] = $initSuffix;
+
     $runtime = new Runtime(Runtime::MODE_AOT);
     $context = $runtime->loadJitContext();
     foreach ($argv as $arg) {
@@ -173,10 +181,20 @@ if (null !== $unitPath) {
         $decls->addFunction($symbol, $context->llvm->factory->type($context->context, $fnType));
     }
     $decls->writeBitcodeToFile($dir.'/unit.bc');
+    // Units that construct VM objects bake class ids from THIS process's
+    // registry; the consuming script numbers classes differently and the
+    // helper segfaults at runtime — blocked from consumption until class-id
+    // unification lands (#16075 step 5, gdb data on #15642).
+    $runtimeUnsafe = [
+        '/ext/standard/SprintfJitHelper.php' => true,
+    ];
     file_put_contents($dir.'/manifest.json', json_encode([
         'fingerprint' => HelperRuntimeCache::unitFingerprint($sourceAbs),
         'unit' => $unitPath,
         'helpers' => $helpers,
+        'init_symbol' => '__init__'.$initSuffix,
+        'shutdown_symbol' => '__shutdown__'.$initSuffix,
+        'runtime_safe' => !isset($runtimeUnsafe[$unitPath]),
     ], JSON_UNESCAPED_SLASHES)."\n");
     @unlink($dir.'/failed.json');
     exit(0);

@@ -1232,14 +1232,20 @@ class Context {
             $this->context->voidType(),
             false
         );
-        $this->initFunc = $this->module->addFunction('__init__', $signature);
+        // Split-compilation unit emission suffixes these per unit (env) so the
+        // unit's init/shutdown survive the -z muldefs merge and the consuming
+        // script's __init__ can call them explicitly — colliding symbols were
+        // silently discarded and unit module state never initialized
+        // (#15889 / #16075 step 4).
+        $suffix = (string) getenv('PHP_COMPILER_INIT_SYMBOL_SUFFIX');
+        $this->initFunc = $this->module->addFunction('__init__'.$suffix, $signature);
         $this->initBlock = $this->initFunc->appendBasicBlock('main');
         $this->initLinearBlock = $this->initBlock;
 
-        $this->shutdownFunc = $this->module->addFunction('__shutdown__', $signature);
+        $this->shutdownFunc = $this->module->addFunction('__shutdown__'.$suffix, $signature);
         $this->shutdownBlock = $this->shutdownFunc->appendBasicBlock('main');
 
-        $this->headerPreFlushFunc = $this->module->addFunction('__header_pre_flush__', $signature);
+        $this->headerPreFlushFunc = $this->module->addFunction('__header_pre_flush__'.$suffix, $signature);
         $this->headerPreFlushBlock = $this->headerPreFlushFunc->appendBasicBlock('main');
 
         $this->initShutdownBlocksReady = true;

@@ -1,1 +1,1 @@
-{"fingerprint":"9deece27f087f8274041","unit":"/ext/standard/AtanhJitHelper.php","helpers":{"phpcompiler\\ext\\standard\\atanhjithelper::atanhargv":"phpcompiler_ext_standard_atanhjithelper__atanhargv"}}
+{"fingerprint":"dc70b304b6cf2b105977","unit":"/ext/standard/AtanhJitHelper.php","helpers":{"phpcompiler\\ext\\standard\\atanhjithelper::atanhargv":"phpcompiler_ext_standard_atanhjithelper__atanhargv"},"init_symbol":"__init__unit_ext_standard_AtanhJitHelper_php","shutdown_symbol":"__shutdown__unit_ext_standard_AtanhJitHelper_php","runtime_safe":true}

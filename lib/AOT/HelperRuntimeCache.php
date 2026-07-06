@@ -262,11 +262,22 @@ final class HelperRuntimeCache
                 if (!is_file($unitDir.'/unit.o') || !is_file($unitDir.'/unit.bc')) {
                     continue;
                 }
+                if (!isset($manifest['init_symbol']) || '' === (string) $manifest['init_symbol']) {
+                    continue; // pre-init-era unit: its module state never runs — unusable (#16075 step 4)
+                }
+                if (isset($manifest['runtime_safe']) && false === $manifest['runtime_safe']) {
+                    continue; // known cross-module ABI hazard (baked class ids) — see emitter blocklist
+                }
                 foreach ($manifest['helpers'] as $logical => $symbol) {
                     if (isset($index[$logical])) {
                         continue; // build cache outranks prelinked
                     }
-                    $index[$logical] = ['symbol' => (string) $symbol, 'dir' => $unitDir];
+                    $index[$logical] = [
+                        'symbol' => (string) $symbol,
+                        'dir' => $unitDir,
+                        'init' => (string) $manifest['init_symbol'],
+                        'shutdown' => isset($manifest['shutdown_symbol']) ? (string) $manifest['shutdown_symbol'] : null,
+                    ];
                 }
             }
         }
@@ -310,6 +321,7 @@ final class HelperRuntimeCache
             $existing = $context->module->getNamedFunction($symbol);
             if (null !== $existing) {
                 $context->functions[$lc] = $existing;
+                self::wireUnitLifecycle($context, $index[$lc]);
                 self::$usedUnits[$unitDir] = true;
                 ++$bound;
 
@@ -335,6 +347,7 @@ final class HelperRuntimeCache
             $type = self::localizedFunctionType($context, $source, $fnType)
                 ?? $context->llvm->factory->type($context->context, $fnType);
             $context->functions[$lc] = $context->module->addFunction($symbol, $type);
+            self::wireUnitLifecycle($context, $index[$lc]);
             self::$usedUnits[$unitDir] = true;
             ++$bound;
         }
@@ -415,6 +428,48 @@ final class HelperRuntimeCache
         }
 
         return $context->llvm->factory->type($context->context, $rawTy);
+    }
+
+    /** @var array<string, true> unit dir → lifecycle calls already wired */
+    private static array $wiredLifecycles = [];
+
+    /**
+     * First use of a unit: the consuming script's __init__/__shutdown__ call
+     * the unit's uniquely-named init/shutdown (the colliding __init__ symbols
+     * were muldefs-discarded and unit module state never ran, #16075 step 4).
+     * Units emitted before init symbols existed have no manifest entry and
+     * keep the old (uninitialized) behavior.
+     *
+     * @param array{symbol: string, dir: string, init: ?string, shutdown: ?string} $entry
+     */
+    private static function wireUnitLifecycle(Context $context, array $entry): void
+    {
+        $unitDir = $entry['dir'];
+        if (isset(self::$wiredLifecycles[$unitDir])) {
+            return;
+        }
+        self::$wiredLifecycles[$unitDir] = true;
+        $voidFn = static function (string $name) use ($context): object {
+            $fn = $context->module->getNamedFunction($name);
+            if (null !== $fn) {
+                return $fn;
+            }
+
+            return $context->module->addFunction(
+                $name,
+                $context->context->functionType($context->context->voidType(), false)
+            );
+        };
+        if (null !== $entry['init'] && '' !== $entry['init']) {
+            $initFn = $voidFn($entry['init']);
+            $context->emitInInit(static function (Context $ctx) use ($initFn): void {
+                $ctx->builder->call($initFn);
+            });
+        }
+        // Deliberately NOT wiring the unit's __shutdown__: after -z muldefs
+        // symbol unification the unit's globals partially alias the script's,
+        // and running both shutdowns double-frees (SIGABRT at exit). Leaking
+        // at process end matches the previous behavior and is safe.
     }
 
     private static function parsedUnit(Context $context, string $unitDir): ?object

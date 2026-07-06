@@ -1,1 +1,1 @@
-{"fingerprint":"40265b100ebb17d0c41f","unit":"/VM/CoalesceJitHelper.php","helpers":{"phpcompiler\\vm\\coalescejithelper::takeleftbranchfromtypebyte":"phpcompiler_vm_coalescejithelper__takeleftbranchfromtypebyte"}}
+{"fingerprint":"18be9ee58dd66d93b9af","unit":"/VM/CoalesceJitHelper.php","helpers":{"phpcompiler\\vm\\coalescejithelper::takeleftbranchfromtypebyte":"phpcompiler_vm_coalescejithelper__takeleftbranchfromtypebyte"},"init_symbol":"__init__unit_VM_CoalesceJitHelper_php","shutdown_symbol":"__shutdown__unit_VM_CoalesceJitHelper_php","runtime_safe":true}

@@ -1,1 +1,1 @@
-{"fingerprint":"44fdb3be4cc8f0f5c21c","unit":"/ext/standard/UniqidJitHelper.php","helpers":{"phpcompiler\\ext\\standard\\uniqidjithelper::uniqidargv":"phpcompiler_ext_standard_uniqidjithelper__uniqidargv"}}
+{"fingerprint":"da3ee604081586fac388","unit":"/ext/standard/UniqidJitHelper.php","helpers":{"phpcompiler\\ext\\standard\\uniqidjithelper::uniqidargv":"phpcompiler_ext_standard_uniqidjithelper__uniqidargv"},"init_symbol":"__init__unit_ext_standard_UniqidJitHelper_php","shutdown_symbol":"__shutdown__unit_ext_standard_UniqidJitHelper_php"}

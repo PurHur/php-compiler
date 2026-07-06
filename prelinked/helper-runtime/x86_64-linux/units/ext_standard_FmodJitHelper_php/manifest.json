@@ -1,1 +1,1 @@
-{"fingerprint":"e2575d0b5fbcd4fe5ac3","unit":"/ext/standard/FmodJitHelper.php","helpers":{"phpcompiler\\ext\\standard\\fmodjithelper::fmodargv":"phpcompiler_ext_standard_fmodjithelper__fmodargv"}}
+{"fingerprint":"1429445c167030d704b6","unit":"/ext/standard/FmodJitHelper.php","helpers":{"phpcompiler\\ext\\standard\\fmodjithelper::fmodargv":"phpcompiler_ext_standard_fmodjithelper__fmodargv"},"init_symbol":"__init__unit_ext_standard_FmodJitHelper_php","shutdown_symbol":"__shutdown__unit_ext_standard_FmodJitHelper_php","runtime_safe":true}
