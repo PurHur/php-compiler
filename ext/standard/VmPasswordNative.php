@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\JIT\NestedJitCompileScope;
+
 /**
  * VM password_hash()/password_verify()/crypt() — bcrypt via {@see VmPasswordPure}, Argon2 via libargon2 FFI (#4794, #6906, #8731, #14182).
  *
@@ -380,7 +382,11 @@ final class VmPasswordNative
     /** @throws \RuntimeException when CSPRNG fails */
     private static function secureRandomBytes(int $length): string
     {
-        $bytes = __compiler_password_random_bytes($length);
+        if (NestedJitCompileScope::isActive()) {
+            $bytes = __compiler_password_random_bytes($length);
+        } else {
+            $bytes = \random_bytes($length);
+        }
         if (!\is_string($bytes) || \strlen($bytes) !== $length) {
             throw new \RuntimeException('password random bytes failed');
         }

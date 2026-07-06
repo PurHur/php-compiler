@@ -11931,6 +11931,7 @@ class JIT {
                 $var->compileTimeConstantName = $value->compileTimeConstantName;
                 $var->compileTimeEnumCase = $value->compileTimeEnumCase;
                 $var->compileTimeFloat = $value->compileTimeFloat;
+                $this->syncCompileTimeString($var, $value, false);
 
                 return;
             }

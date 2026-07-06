@@ -128,7 +128,10 @@ final class LibcryptThinRuntime
     {
         $map = $context->structFieldMap['__string__'];
 
-        return $context->builder->structGep($strPtr, $map['value']);
+        return $context->builder->pointerCast(
+            $context->builder->structGep($strPtr, $map['value']),
+            $context->getTypeFromString('int8*')
+        );
     }
 
     private static function libcryptDecl(Context $context): LlvmFunction
