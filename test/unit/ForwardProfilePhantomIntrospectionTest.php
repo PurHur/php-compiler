@@ -274,11 +274,10 @@ final class ForwardProfilePhantomIntrospectionTest extends TestCase
                 'grapheme_strpos',
                 'grapheme_extract',
                 'grapheme_str_split',
+                'grapheme_str_contains',
+                'grapheme_strimwidth',
             ] as $fn) {
                 $this->assertFalse(BuiltinIntrospectionPolicy::functionIsAdvertised($fn));
-            }
-            foreach (['grapheme_str_contains', 'grapheme_strimwidth'] as $fn) {
-                $this->assertTrue(BuiltinIntrospectionPolicy::functionIsAdvertised($fn));
             }
 
             $runtime = new Runtime();
@@ -289,15 +288,11 @@ final class ForwardProfilePhantomIntrospectionTest extends TestCase
                 'grapheme_strpos',
                 'grapheme_extract',
                 'grapheme_str_split',
+                'grapheme_str_contains',
+                'grapheme_strimwidth',
             ] as $fn) {
                 $this->assertTrue(isset($ctx->functions[$fn]));
                 $this->assertFalse(
-                    \PHPCompiler\ext\standard\VmReflection::functionExists($ctx, $fn)
-                );
-            }
-            foreach (['grapheme_str_contains', 'grapheme_strimwidth'] as $fn) {
-                $this->assertTrue(isset($ctx->functions[$fn]));
-                $this->assertTrue(
                     \PHPCompiler\ext\standard\VmReflection::functionExists($ctx, $fn)
                 );
             }
