@@ -1,1 +1,1 @@
-{"fingerprint":"84ff88b673b871ec944e","unit":"/VM/CoalesceJitHelper.php","helpers":{"phpcompiler\\vm\\coalescejithelper::takeleftbranchfromtypebyte":"phpcompiler_vm_coalescejithelper__takeleftbranchfromtypebyte"}}
+{"fingerprint":"40265b100ebb17d0c41f","unit":"/VM/CoalesceJitHelper.php","helpers":{"phpcompiler\\vm\\coalescejithelper::takeleftbranchfromtypebyte":"phpcompiler_vm_coalescejithelper__takeleftbranchfromtypebyte"}}

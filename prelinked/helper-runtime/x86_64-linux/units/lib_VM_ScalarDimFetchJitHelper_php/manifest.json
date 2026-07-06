@@ -1,1 +1,1 @@
-{"fingerprint":"4478be41c1cb2e3f729c","unit":"/lib/VM/ScalarDimFetchJitHelper.php","helpers":{"phpcompiler\\vm\\scalardimfetchjithelper::emitwarningforjittype":"phpcompiler_vm_scalardimfetchjithelper__emitwarningforjittype"}}
+{"fingerprint":"9c53d87310f73e355a42","unit":"/lib/VM/ScalarDimFetchJitHelper.php","helpers":{"phpcompiler\\vm\\scalardimfetchjithelper::emitwarningforjittype":"phpcompiler_vm_scalardimfetchjithelper__emitwarningforjittype"}}

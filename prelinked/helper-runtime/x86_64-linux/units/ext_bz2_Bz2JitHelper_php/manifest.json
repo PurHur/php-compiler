@@ -1,0 +1,1 @@
+{"fingerprint":"1798c9280184d4257107","unit":"/ext/bz2/Bz2JitHelper.php","helpers":{"phpcompiler\\ext\\bz2\\bz2jithelper::compressargv":"phpcompiler_ext_bz2_bz2jithelper__compressargv","phpcompiler\\ext\\bz2\\bz2jithelper::decompressargv":"phpcompiler_ext_bz2_bz2jithelper__decompressargv"}}

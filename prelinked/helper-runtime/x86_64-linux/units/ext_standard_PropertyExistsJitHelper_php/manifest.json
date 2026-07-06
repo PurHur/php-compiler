@@ -1,1 +1,1 @@
-{"fingerprint":"9a05d1dab9d53b81c247","unit":"/ext/standard/PropertyExistsJitHelper.php","helpers":{"phpcompiler\\ext\\standard\\propertyexistsjithelper::existsargv":"phpcompiler_ext_standard_propertyexistsjithelper__existsargv"}}
+{"fingerprint":"b495497aaa831d712525","unit":"/ext/standard/PropertyExistsJitHelper.php","helpers":{"phpcompiler\\ext\\standard\\propertyexistsjithelper::existsargv":"phpcompiler_ext_standard_propertyexistsjithelper__existsargv"}}
