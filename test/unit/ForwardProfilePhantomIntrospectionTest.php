@@ -10,20 +10,25 @@ use PHPUnit\Framework\TestCase;
 /** Forward-profile callability vs reference introspection gates (#16086). */
 final class ForwardProfilePhantomIntrospectionTest extends TestCase
 {
-    public function testFpowCallableButNotAdvertisedOnForwardProfile(): void
+    public function testFpowCallableAndAdvertisedOnForwardProfile(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE=8.4');
         try {
             $this->assertTrue(CompilerVersion::supportsFpow());
-            $this->assertFalse(CompilerVersion::advertisesFpow());
-            $this->assertFalse(BuiltinIntrospectionPolicy::functionIsAdvertised('fpow'));
+            $this->assertTrue(CompilerVersion::advertisesFpow());
+            $this->assertTrue(CompilerVersion::advertisesNextafter());
+            $this->assertTrue(BuiltinIntrospectionPolicy::functionIsAdvertised('fpow'));
+            $this->assertTrue(BuiltinIntrospectionPolicy::functionIsAdvertised('nextafter'));
 
             $runtime = new Runtime();
             $ctx = $runtime->vmContext;
             $this->assertTrue(isset($ctx->functions['fpow']));
-            $this->assertFalse(
+            $this->assertTrue(
                 \PHPCompiler\ext\standard\VmReflection::functionExists($ctx, 'fpow')
+            );
+            $this->assertTrue(
+                \PHPCompiler\ext\standard\VmReflection::functionExists($ctx, 'nextafter')
             );
         } finally {
             if (false === $prev) {
@@ -200,7 +205,8 @@ final class ForwardProfilePhantomIntrospectionTest extends TestCase
             $internal = \PHPCompiler\ext\standard\VmReflection::internalFunctionNameList();
             $this->assertNotContains('str_increment', $internal);
             $this->assertNotContains('str_decrement', $internal);
-            $this->assertNotContains('fpow', $internal);
+            $this->assertContains('fpow', $internal);
+            $this->assertContains('nextafter', $internal);
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');

@@ -1,5 +1,5 @@
 --TEST--
-stdlib forward profile — fpow/mb_str_pad/bcmath withheld from introspection (#16086)
+stdlib forward profile — IEEE math advertised, mb_str_pad/bcmath withheld (#16677, #16086)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--
@@ -7,8 +7,10 @@ PHP_COMPILER_PROFILE=8.4
 declare(strict_types=1);
 
 $fail = [];
-if (function_exists('fpow')) {
-    $fail[] = 'fpow';
+foreach (['fpow', 'fmin', 'fmax', 'nextafter'] as $fn) {
+    if (!function_exists($fn)) {
+        $fail[] = $fn;
+    }
 }
 if (function_exists('mb_str_pad')) {
     $fail[] = 'mb_str_pad';
