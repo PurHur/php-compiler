@@ -38,7 +38,7 @@ final class putenv_ extends Internal
         }
         return JitEnv::putenv(
             $context,
-            JitStringBuiltinArg::lower($context, $args[0], 'putenv', 0, 'assignment')
+            JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'putenv', 0, 'assignment')
         );
     }
 }
