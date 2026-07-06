@@ -50,8 +50,11 @@ PHP;
     {
         $runtime = new Runtime();
         $ctx = $runtime->vmContext;
-        foreach (['curl_version', 'curl_strerror', 'curl_multi_strerror', 'curl_upkeep', 'curl_escape', 'curl_unescape'] as $fn) {
+        foreach (['curl_version', 'curl_strerror', 'curl_multi_strerror', 'curl_upkeep'] as $fn) {
             self::assertTrue(VmReflection::functionExists($ctx, $fn), $fn);
+        }
+        foreach (['curl_escape', 'curl_unescape'] as $fn) {
+            self::assertFalse(VmReflection::functionExists($ctx, $fn), $fn);
         }
         self::assertTrue(VmReflection::classExists($ctx, 'CURLStringFile'));
     }
