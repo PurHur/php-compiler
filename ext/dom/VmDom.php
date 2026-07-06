@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\dom;
 use PHPCfg\Func as CfgFunc;
 use PHPCompiler\CompilerVersion;
 use PHPCompiler\VM\ErrorReporter;
+use PHPCompiler\ext\standard\VmFs;
 use PHPCompiler\ext\libxml\LibxmlConstants;
 use PHPCompiler\ext\libxml\VmLibxml;
 use PHPCompiler\ext\xml\VmXml;
@@ -15,6 +16,7 @@ use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\ClassProperty;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\EnumCaseSupport;
+use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\InterfaceCheck;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\Variable;
@@ -477,6 +479,11 @@ final class VmDom
         $element->methods['getelementsbytagnamens'] = new ElementGetElementsByTagNameNS();
         $element->methodVisibility['getelementsbytagnamens'] = $pub;
         $element->methodNames['getelementsbytagnamens'] = 'getElementsByTagNameNS';
+        if (CompilerVersion::supportsDomElementGetAttributeNames()) {
+            $element->methods['getattributenames'] = new ElementGetAttributeNames();
+            $element->methodVisibility['getattributenames'] = $pub;
+            $element->methodNames['getattributenames'] = 'getAttributeNames';
+        }
         if (CompilerVersion::supportsDomElementInsertAdjacentHtml()) {
             $element->methods['insertadjacenthtml'] = new ElementInsertAdjacentHTML();
             $element->methodVisibility['insertadjacenthtml'] = $pub;
@@ -984,6 +991,19 @@ final class VmDom
         }
 
         return false;
+    }
+
+    /**
+     * DOMElement::getAttributeNames() — attribute qNames in document order (php-src ext/dom/element.c; #16823).
+     */
+    public static function getAttributeNames(ObjectEntry $element): HashTable
+    {
+        if (!self::isElement($element)) {
+            throw new \DOMException('Not an element node');
+        }
+        $state = DomRegistry::state($element);
+
+        return VmFs::stringListToArray(array_keys($state->attributes));
     }
 
     public static function setAttributeNS(
