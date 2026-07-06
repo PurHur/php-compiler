@@ -81,7 +81,7 @@ final class wordwrap extends Internal
         if (null !== $literal) {
             $width = self::compileTimeWidth($args, $argc);
             $break = self::compileTimeBreak($args, $argc);
-            $cut = self::compileTimeCut($args, $argc);
+            $cut = self::compileTimeCut($context, $args, $argc);
             if (null !== $width && null !== $break) {
                 return $context->builder->load(
                     $context->constantStringFromString(VmString::wordwrap($literal, $width, $break, $cut))
@@ -137,20 +137,20 @@ final class wordwrap extends Internal
         return JitStringArg::compileTimeLiteral($args[2]);
     }
 
-    private static function compileTimeCut(array $args, int $argc): bool
+    private static function compileTimeCut(Context $context, array $args, int $argc): bool
     {
         if ($argc < 4) {
             return false;
         }
-        if (JITVariable::TYPE_NATIVE_BOOL !== $args[3]->type) {
+        if (JITVariable::TYPE_NATIVE_BOOL !== $args[3]->type || JITVariable::KIND_VALUE !== $args[3]->kind) {
             return false;
         }
-        $const = $args[3]->value ?? null;
-        if ($const instanceof Value && $const->isConstant()) {
-            return 0 !== (int) $const->constInt();
+        $raw = $args[3]->value->value ?? null;
+        if (null === $raw) {
+            return false;
         }
 
-        return false;
+        return 0 !== (int) $context->llvm->lib->LLVMConstIntGetZExtValue($raw);
     }
 
     private static function compileTimeInt(JITVariable $arg, ?int $default): ?int

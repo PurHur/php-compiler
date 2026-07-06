@@ -30,7 +30,7 @@ final class WordwrapRuntimeShrinkTest extends TestCase
 
         $this->assertSame(
             "hello\nworld",
-            WordwrapJitHelper::wordwrapArgv('hello world', 5, "\n", false)
+            WordwrapJitHelper::wordwrapArgv('hello world', 5, "\n", 0)
         );
         $this->assertSame(
             "hello\nworld",
