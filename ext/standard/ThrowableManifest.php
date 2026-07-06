@@ -142,6 +142,7 @@ final class ThrowableManifest
         'JsonException' => 'Exception',
         'DOMException' => 'Exception',
         'SodiumException' => 'Exception',
+        'SQLite3Exception' => 'Exception',
     ];
 
     /** @var array<string, class-string> */
@@ -177,6 +178,7 @@ final class ThrowableManifest
         'JsonException' => \JsonException::class,
         'DOMException' => \DOMException::class,
         'SodiumException' => \SodiumException::class,
+        'SQLite3Exception' => \SQLite3Exception::class,
     ];
 
     /** @return list<string> */

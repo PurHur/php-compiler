@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 4156 |
-| Phase A inventory files (M2 ratio SSOT) | 4156 |
+| PHP files on vm.php path | 4159 |
+| Phase A inventory files (M2 ratio SSOT) | 4159 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 11205 |
+| Source constructs flagged (warnings) | 11209 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -609,6 +609,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/spl/VmSplObserver.php` | 0 | 3 |
 | `ext/spl/VmSplRegistry.php` | 0 | 4 |
 | `ext/spl/spl_classes.php` | 0 | 2 |
+| `ext/sqlite3/BuiltinClasses.php` | 0 | 2 |
+| `ext/sqlite3/Module.php` | 0 | 1 |
 | `ext/standard/AbsJitHelper.php` | 0 | 1 |
 | `ext/standard/AcosJitHelper.php` | 0 | 1 |
 | `ext/standard/AcoshJitHelper.php` | 0 | 1 |
@@ -3557,7 +3559,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/ReadonlyAnonymousClassSyntaxRejector.php` | 0 | 2 |
 | `lib/ReadonlyFunctionRejector.php` | 0 | 2 |
 | `lib/ReadonlyMethodModifierRejector.php` | 0 | 2 |
-| `lib/Runtime.php` | 0 | 69 |
+| `lib/Runtime.php` | 0 | 70 |
 | `lib/RuntimeStrictness.php` | 0 | 1 |
 | `lib/SourceBareThrowRewriter.php` | 0 | 1 |
 | `lib/SourcePreprocessor/PropertyHooks.php` | 0 | 4 |
@@ -8418,6 +8420,17 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 30)
 - 2 class method(s)
+
+### `ext/sqlite3/BuiltinClasses.php`
+
+**Warnings** (review for bootstrap subset):
+- new ClassEntry (line 32)
+- 2 class method(s)
+
+### `ext/sqlite3/Module.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
 
 ### `ext/standard/AbsJitHelper.php`
 
@@ -21300,7 +21313,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinParamNames.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 433)
+- new ArgumentCountError (line 439)
 - 9 class method(s)
 
 ### `lib/BuiltinTypeClassConstant.php`
@@ -27471,17 +27484,18 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ext\lzf\Module (line 245)
 - new ext\bz2\Module (line 246)
 - new ext\sodium\Module (line 247)
-- new ext\standard\Module (line 248)
-- new JIT (line 324)
-- new JITContext (line 338)
-- new SealedClassPreprocessor (line 394)
-- new StaticClassPreprocessor (line 397)
-- new SourcePreprocessor\PropertyHooks (line 400)
-- new State (line 526)
-- new ReflectionProperty (line 553)
-- new ReflectionProperty (line 556)
-- new LintCompiler (line 947)
-- new Variable (line 1074)
+- new ext\sqlite3\Module (line 248)
+- new ext\standard\Module (line 249)
+- new JIT (line 325)
+- new JITContext (line 339)
+- new SealedClassPreprocessor (line 395)
+- new StaticClassPreprocessor (line 398)
+- new SourcePreprocessor\PropertyHooks (line 401)
+- new State (line 527)
+- new ReflectionProperty (line 554)
+- new ReflectionProperty (line 557)
+- new LintCompiler (line 948)
+- new Variable (line 1075)
 - 53 class method(s)
 
 ### `lib/RuntimeStrictness.php`
