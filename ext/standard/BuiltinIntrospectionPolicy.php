@@ -61,6 +61,9 @@ final class BuiltinIntrospectionPolicy
         if (\in_array($lc, ['class_has_method', 'class_has_property', 'class_has_constant'], true)) {
             return CompilerVersion::supportsClassHasFunctions();
         }
+        if ('fastcgi_finish_request' === $lc) {
+            return VmFastCgi::registersFinishRequestFunction();
+        }
 
         return true;
     }

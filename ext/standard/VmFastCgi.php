@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\VM\OutputBuffer;
 use PHPCompiler\Web\ResponseContext;
 
@@ -15,6 +16,27 @@ use PHPCompiler\Web\ResponseContext;
 final class VmFastCgi
 {
     private const FCGI_ACTIVE_ENV = 'PHP_COMPILER_FCGI_ACTIVE';
+
+    /** @var list<string> */
+    private const FASTCGI_SAPIS = [
+        'fpm-fcgi',
+        'cgi-fcgi',
+        'fpm',
+    ];
+
+    /**
+     * Register fastcgi_finish_request() only for FastCGI/FPM SAPIs (#16757).
+     *
+     * php-src: ext/standard/basic_functions.c — PHP_FALIAS only when PHP_FASTCGI.
+     */
+    public static function registersFinishRequestFunction(): bool
+    {
+        if (self::isFastCgiActive()) {
+            return true;
+        }
+
+        return \in_array(CompilerVersion::SAPI, self::FASTCGI_SAPIS, true);
+    }
 
     public static function isFastCgiActive(): bool
     {
