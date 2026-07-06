@@ -29,5 +29,6 @@ PHP;
         $rewritten = LazyPropertyRewriter::rewrite($source);
         self::assertStringNotContainsString(' lazy ', $rewritten);
         self::assertStringContainsString('phpc-lazy-property', $rewritten);
+        self::assertStringContainsString('/*phpc-lazy-property*/ public string', $rewritten);
     }
 }

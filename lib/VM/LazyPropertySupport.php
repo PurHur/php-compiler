@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\VM;
 
-use PHPCompiler\TypeCheck;
+use PHPCompiler\VM\TypeCheck;
 use PHPCompiler\VM;
 
 /**

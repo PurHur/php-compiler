@@ -5555,7 +5555,8 @@ class Compiler {
                         $declare->propertyReadonly = (property_exists($child, 'readonly') && $child->readonly)
                             || (property_exists($child, 'propertyFlags') && $this->isReadonlyPropertyFlags($child->propertyFlags))
                             || $this->isReadonlyPropertyFlags($child->visibility);
-                        $declare->propertyLazy = LazyPropertyRewriter::isLazyFromAttributes($child->getAttributes());
+                        $declare->propertyLazy = (property_exists($child, 'propertyLazy') && $child->propertyLazy)
+                            || LazyPropertyRewriter::isLazyFromAttributes($child->getAttributes());
                     }
                     $this->assignAttributeMetadata($declare, $child);
                     AttributeTargetValidator::assertEntriesForTarget(
