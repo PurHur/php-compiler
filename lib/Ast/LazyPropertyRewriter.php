@@ -37,7 +37,7 @@ final class LazyPropertyRewriter
 
     return (string) preg_replace_callback(
       '/\b(public|protected|private)\s+((?:(?:static|readonly|final)\s+)*)lazy\s+((?:(?:static|readonly|final)\s+)*)/i',
-      static fn (array $m): string => $m[1].' '.$m[2].$m[3].'/*'.self::MARKER.'*/ ',
+      static fn (array $m): string => '/*'.self::MARKER.'*/ '.$m[1].' '.$m[2].$m[3],
       $source
     );
   }

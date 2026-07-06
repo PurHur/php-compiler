@@ -13,7 +13,8 @@ class LazyHolder {
 }
 
 $c = new LazyHolder();
-echo $c->x, "\n";
 $ref = new ReflectionProperty(LazyHolder::class, 'x');
 echo $ref->isLazy($c) ? "lazy\n" : "not-lazy\n";
+echo $c->x, "\n";
+echo $ref->isLazy($c) ? "lazy-after\n" : "initialized\n";
 echo "ok\n";

@@ -285,6 +285,10 @@ patch_already_applied() {
       grep -q 'public int \$setVisibility' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/Property.php" 2>/dev/null \
         && grep -q 'promotionSetVisibility' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Param.php" 2>/dev/null
       ;;
+    php-cfg-lazy-property.patch)
+      grep -q 'public bool \$propertyLazy' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/Property.php" 2>/dev/null \
+        && grep -q 'function extractLazyPropertyFromAttributes' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null
+      ;;
     php-cfg-assertion-expr-property.patch)
       grep -q 'public \\$expr;' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Assertion.php" 2>/dev/null
       ;;
@@ -1207,6 +1211,64 @@ PY
     return 1
   fi
   echo "Applied php-cfg asymmetric get-visibility Parser overlay (#5059)"
+}
+
+apply_php_cfg_lazy_property_overlay() {
+  local property="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/Property.php"
+  local parser="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php"
+  local overlay="$PATCH_DIR/overlays/php-cfg/lazy-property-parser-methods.php"
+  if [[ ! -f "$property" || ! -f "$parser" || ! -f "$overlay" ]]; then
+    return 0
+  fi
+  if ! grep -q 'public bool $propertyLazy' "$property" 2>/dev/null; then
+    python3 - "$property" <<'PY'
+import sys
+from pathlib import Path
+path = Path(sys.argv[1])
+text = path.read_text()
+needle = "    public int $propertyFlags = 0;\n"
+insert = needle + "\n    /** PHP 8.4 lazy property modifier recovered from phpc-lazy-property marker (#16813). */\n    public bool $propertyLazy = false;\n"
+if needle not in text:
+    sys.stderr.write("php-cfg-lazy-property: Property.php propertyFlags anchor missing\n")
+    raise SystemExit(1)
+path.write_text(text.replace(needle, insert, 1))
+PY
+    echo "Applied php-cfg-lazy-property.patch (Property overlay #16813)"
+  fi
+  if ! grep -q 'function extractLazyPropertyFromAttributes' "$parser" 2>/dev/null; then
+    python3 - "$parser" "$overlay" <<'PY'
+import sys
+from pathlib import Path
+parser_path = Path(sys.argv[1])
+method_path = Path(sys.argv[2])
+text = parser_path.read_text()
+anchor = """    /**
+     * Recover phpc-asymmetric-set:* marker from comment attributes (#3165, #4690).
+     */"""
+if anchor not in text:
+    sys.stderr.write("php-cfg-lazy-property: asymmetric-set anchor not found in Parser.php\n")
+    raise SystemExit(1)
+insert = method_path.read_text().rstrip("\n") + "\n\n"
+parser_path.write_text(text.replace(anchor, insert + anchor, 1))
+PY
+    echo "Applied php-cfg-lazy-property.patch (Parser method overlay #16813)"
+  fi
+  if ! grep -q 'propertyLazy = $this->extractLazyPropertyFromAttributes' "$parser" 2>/dev/null; then
+    python3 - "$parser" <<'PY'
+import sys
+from pathlib import Path
+path = Path(sys.argv[1])
+text = path.read_text()
+needle = "            $prop->getVisibility = $this->extractAsymmetricGetVisibilityFromAttributes($prop->getAttributes());\n"
+insert = needle + "            $prop->propertyLazy = $this->extractLazyPropertyFromAttributes($prop->getAttributes());\n"
+if needle not in text:
+    sys.stderr.write("php-cfg-lazy-property: Parser getVisibility anchor missing\n")
+    raise SystemExit(1)
+path.write_text(text.replace(needle, insert, 1))
+PY
+    echo "Applied php-cfg-lazy-property.patch (Parser propertyLazy wire #16813)"
+  fi
+  return 0
 }
 
 apply_php_cfg_incdec_expr_overlay() {
@@ -5987,6 +6049,10 @@ PY
     apply_php_cfg_asymmetric_visibility_overlay
     return $?
   fi
+  if [[ "$(basename "$patch")" == "php-cfg-lazy-property.patch" ]]; then
+    apply_php_cfg_lazy_property_overlay
+    return $?
+  fi
   if apply_patch_file_direct "$patch"; then
     return 0
   fi
@@ -6134,6 +6200,7 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-cfg" ]]; then
   apply_patch "$PATCH_DIR/php-cfg-property-readonly.patch"
   apply_php_cfg_asymmetric_set_visibility_parser_overlay
   apply_php_cfg_asymmetric_get_visibility_parser_overlay
+  apply_php_cfg_lazy_property_overlay
   apply_php_cfg_global_typed_const_overlay
   apply_php_cfg_global_deprecated_const_overlay
   apply_php_cfg_typed_function_static_overlay
@@ -6320,6 +6387,9 @@ verify_critical_language_patches() {
   fi
   if ! grep -q 'function extractAsymmetricGetVisibilityFromAttributes' "$parser" 2>/dev/null; then
     missing+=("php-cfg-asymmetric-get-visibility-Parser")
+  fi
+  if ! grep -q 'function extractLazyPropertyFromAttributes' "$parser" 2>/dev/null; then
+    missing+=("php-cfg-lazy-property-Parser")
   fi
   if ! grep -q "case 'Expr_YieldFrom':" "$recon" 2>/dev/null; then
     missing+=("php-types-yield-from")
