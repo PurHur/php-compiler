@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\VM\Builtin;
 
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\ext\standard\VmReflection;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\ReflectionSupport;
@@ -23,6 +24,11 @@ final class ReflectionFunctionIsDeprecated extends VmClassMethod
             return;
         }
         if (ReflectionSupport::isReflectionInternalFunction($receiver)) {
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        if (!CompilerVersion::supportsReflectionFunctionIsDeprecated()) {
             $frame->returnVar->bool(false);
 
             return;

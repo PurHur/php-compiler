@@ -753,10 +753,10 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.4+ ReflectionFunction::isDeprecated() (ext/reflection/php_reflection.c, #9760).
+     * PHP 8.4+ ReflectionFunction::isDeprecated() reports #[\Deprecated] metadata (ext/reflection/php_reflection.c, #9760).
      *
-     * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev reference profile matches Zend 8.2
-     * (method absent). Enable forward profile on dev via `PHP_COMPILER_PROFILE=8.4`.
+     * On 8.2 reference profile the method exists but always returns false (php-src #80400 guard). Enable
+     * forward semantics via `PHP_COMPILER_PROFILE=8.4` or stable 8.4.0+.
      */
     public static function supportsReflectionFunctionIsDeprecated(): bool
     {

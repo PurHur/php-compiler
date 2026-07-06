@@ -860,10 +860,8 @@ final class BuiltinClasses
             $rf->methods['createfromfunction'] = new ReflectionFunctionCreateFromFunction();
             $rf->methodVisibility['createfromfunction'] = $pubStatic;
         }
-        if (CompilerVersion::supportsReflectionFunctionIsDeprecated()) {
-            $rf->methods['isdeprecated'] = new ReflectionFunctionIsDeprecated();
-            $rf->methodVisibility['isdeprecated'] = $pub;
-        }
+        $rf->methods['isdeprecated'] = new ReflectionFunctionIsDeprecated();
+        $rf->methodVisibility['isdeprecated'] = $pub;
         $ctx->classes[ReflectionSupport::REFLECTION_FUNCTION] = $rf;
 
         if (CompilerVersion::advertisesReflectionConstantClass()) {
