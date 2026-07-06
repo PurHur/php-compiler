@@ -46,6 +46,8 @@ final class spl_autoload_register extends Internal
             $callback = $callbackArg->resolveIndirect();
             if (Variable::TYPE_NULL === $callback->type) {
                 $callback = null;
+            } elseif (SplAutoloadCallbackPolicy::isPhpSrcInvalidCallbackType($callback->type)) {
+                throw new \TypeError(SplAutoloadCallbackPolicy::invalidCallbackTypeError());
             } elseif (!SplAutoloadCallbackPolicy::isVmSupportedType($callback->type)) {
                 throw new \LogicException(SplAutoloadCallbackPolicy::vmRejectionMessage());
             }
@@ -93,6 +95,9 @@ final class spl_autoload_register extends Internal
             );
         }
         if (null !== JitOperandTypeLabel::compileTimeEnumClassName($context, $args[0])) {
+            throw new \TypeError(SplAutoloadCallbackPolicy::invalidCallbackTypeError());
+        }
+        if (SplAutoloadCallbackPolicy::isJitPhpSrcInvalidCallbackType($args[0])) {
             throw new \TypeError(SplAutoloadCallbackPolicy::invalidCallbackTypeError());
         }
         if (!SplAutoloadCallbackPolicy::isJitLowerable($args[0])) {

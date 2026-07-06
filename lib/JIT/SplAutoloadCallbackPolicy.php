@@ -20,6 +20,30 @@ final class SplAutoloadCallbackPolicy
             || VMVariable::TYPE_OBJECT === $type;
     }
 
+    /** Scalar types Zend rejects before callable dispatch (#16692). */
+    public static function isPhpSrcInvalidCallbackType(int $type): bool
+    {
+        return \in_array($type, [
+            VMVariable::TYPE_INTEGER,
+            VMVariable::TYPE_BOOLEAN,
+            VMVariable::TYPE_FLOAT,
+        ], true);
+    }
+
+    /** Compile-time scalars that must TypeError, not defer (#16692). */
+    public static function isJitPhpSrcInvalidCallbackType(Variable $callback): bool
+    {
+        if (null !== $callback->closureCall) {
+            return false;
+        }
+
+        return \in_array($callback->type, [
+            Variable::TYPE_NATIVE_LONG,
+            Variable::TYPE_NATIVE_DOUBLE,
+            Variable::TYPE_NATIVE_BOOL,
+        ], true);
+    }
+
     public static function vmRejectionMessage(): string
     {
         return 'spl_autoload_register() callback must be a valid callable in this compiler build; '

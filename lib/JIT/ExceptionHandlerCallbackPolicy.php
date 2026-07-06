@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT;
 
 use PHPCompiler\JIT\Variable;
+use PHPCompiler\VM\Variable as VMVariable;
 
 /**
  * set_exception_handler() callback validation (issue #6243, basic_functions.c).
@@ -12,6 +13,35 @@ use PHPCompiler\JIT\Variable;
 final class ExceptionHandlerCallbackPolicy
 {
     public const DEFERRED_KINDS = 'closures, array callables, and invokable objects';
+
+    /** Scalar/container types Zend rejects before callable dispatch (#16693). */
+    public static function isPhpSrcInvalidCallbackType(int $type): bool
+    {
+        return \in_array($type, [
+            VMVariable::TYPE_INTEGER,
+            VMVariable::TYPE_BOOLEAN,
+            VMVariable::TYPE_FLOAT,
+            VMVariable::TYPE_ARRAY,
+            VMVariable::TYPE_OBJECT,
+        ], true);
+    }
+
+    /** Compile-time scalars/containers that must TypeError, not defer (#16693). */
+    public static function isJitPhpSrcInvalidCallbackType(Variable $callback): bool
+    {
+        if (null !== $callback->closureCall) {
+            return false;
+        }
+        $type = $callback->type;
+
+        return \in_array($type, [
+            Variable::TYPE_NATIVE_LONG,
+            Variable::TYPE_NATIVE_DOUBLE,
+            Variable::TYPE_NATIVE_BOOL,
+            Variable::TYPE_HASHTABLE,
+            Variable::TYPE_OBJECT,
+        ], true) || 0 !== ($type & Variable::IS_NATIVE_ARRAY);
+    }
 
     /**
      * Zend set_exception_handler() invalid callback TypeError (#6243).
