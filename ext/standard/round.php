@@ -47,12 +47,12 @@ final class round extends Internal
         }
 
         $precision = 0;
-        if ($argc >= 2) {
+        if (isset($frame->calledArgs[1])) {
             $precision = self::vmPrecisionArg($frame);
         }
 
         $mode = StdlibConstants::PHP_ROUND_HALF_UP;
-        if (3 === $argc) {
+        if (isset($frame->calledArgs[2])) {
             $mode = VmRoundMode::resolveRoundModeArg(
                 $frame->calledArgs[2]->resolveIndirect(),
                 'round'
