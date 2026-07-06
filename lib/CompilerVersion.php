@@ -764,6 +764,17 @@ final class CompilerVersion
     }
 
     /**
+     * php-src credits_modules forward rows (DOM Nora Dossche, ext/uri row; ext/standard/credits.c, #16740).
+     *
+     * Withheld on 8.4.0-dev reference profile so CREDITS_ALL matches Zend 8.2. Enable via
+     * `PHP_COMPILER_PROFILE=8.4` or stable 8.4.0+.
+     */
+    public static function supportsForwardProfileCreditsModuleAuthors(): bool
+    {
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+    }
+
+    /**
      * PHP 8.4+ ReflectionFunction::createFromCallable()/createFromFunction() and
      * ReflectionMethod::createFromClosure()/createFromMethodName() (ext/reflection/php_reflection.c; #6994, #7039, #16724).
      *

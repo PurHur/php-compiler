@@ -322,6 +322,14 @@ class VMTest extends BaseTest {
                 && str_contains($name, 'reflection_function_is_deprecated_profile')) {
                 continue;
             }
+            if (!CompilerVersion::supportsForwardProfileCreditsModuleAuthors()
+                && str_contains($name, 'phpcredits_dom_authors_forward_profile')) {
+                continue;
+            }
+            if (CompilerVersion::supportsForwardProfileCreditsModuleAuthors()
+                && str_contains($name, 'phpcredits_dom_authors_reference_profile')) {
+                continue;
+            }
             if (!CompilerVersion::supportsReflectionCreateFromFactories()
                 && (str_contains($name, 'reflection_create_from_callable_forward_profile')
                     || str_contains($name, 'reflection_function_create_from_forward_profile'))) {
