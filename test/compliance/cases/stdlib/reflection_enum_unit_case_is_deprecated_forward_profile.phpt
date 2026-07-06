@@ -1,5 +1,7 @@
 --TEST--
-stdlib ReflectionEnumUnitCase::isDeprecated() — PHP 8.4 enum case #[\Deprecated] (#9864, #15767, ext/reflection/php_reflection.c)
+stdlib ReflectionEnumUnitCase::isDeprecated() — PHP 8.4 enum case #[\Deprecated] (#9864, #15767, #16821, ext/reflection/php_reflection.c)
+--ENV--
+PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
 enum E: int {
@@ -17,6 +19,6 @@ $rBacked = new ReflectionEnumBackedCase(E::class, 'A');
 var_export($rBacked->isDeprecated());
 echo "\n";
 --EXPECT--
+true
 false
-false
-false
+true
