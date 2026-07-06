@@ -4236,12 +4236,15 @@ class Object_ extends Type {
         return $this->lookup($classOp->value);
     }
 
-    public function classConstFetch(int $classId, string $constName, ?Block $block = null): Variable
+    public function classConstFetch(int $classId, string $constName, ?Block $block = null, ?string $classNameHint = null): Variable
     {
         $this->emitDirectTraitConstAccessErrorIfNeeded($classId, $constName, $block);
         $key = strtolower($constName);
         if (!isset($this->classConstants[$classId][$key])) {
-            $native = $this->tryJitNativeClassConstant($this->classNameForId($classId), $constName);
+            // The registry name is lowercased; PSR-4 autoload in the native
+            // fallback is case-sensitive, so prefer the caller's original-case
+            // literal when available (#15889 isolated unit emission).
+            $native = $this->tryJitNativeClassConstant($classNameHint ?? $this->classNameForId($classId), $constName);
             if (null !== $native) {
                 return $native;
             }
@@ -4259,7 +4262,12 @@ class Object_ extends Type {
     private function tryJitNativeClassConstant(string $className, string $constName): ?Variable
     {
         $fqcn = ltrim($className, '\\');
-        if ('' === $fqcn || !class_exists($fqcn, false)) {
+        // Autoload like Zend's class-const fetch does: this fallback only runs
+        // when the class is not part of the compiled program, so a host-side
+        // (composer) definition is the right source for the value — isolated
+        // helper-unit emission hits this for sibling helper classes that are
+        // autoloadable but not yet loaded (#15889).
+        if ('' === $fqcn || !class_exists($fqcn)) {
             return null;
         }
         try {

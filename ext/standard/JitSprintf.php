@@ -90,6 +90,30 @@ final class JitSprintf
     public static function writeArg(Context $context, Value $slot, JITVariable $arg): void
     {
         $ptr = JitValueBox::pointer($context, $slot);
+        // Inference can declare a native type while the storage is a boxed
+        // __value__* slot; loadValue then yields the %__value__ struct and the
+        // scalar writes below hand it to i64/double/i8 parameters (module
+        // verify failure / #16565-class StructGEP crash). Copy the box instead.
+        if (null === $arg->valueBoxAliasPtr
+            && \in_array($arg->type, [
+                JITVariable::TYPE_NATIVE_LONG,
+                JITVariable::TYPE_NATIVE_DOUBLE,
+                JITVariable::TYPE_NATIVE_BOOL,
+                JITVariable::TYPE_STRING,
+            ], true)
+            && \in_array(
+                $context->getStringFromType($arg->value->typeOf()),
+                ['__value__*', '__value__value*'],
+                true
+            )) {
+            JitValueBox::copyFromPointer(
+                $context,
+                $slot,
+                JitValueBox::normalizeValuePtr($context, $arg->value)
+            );
+
+            return;
+        }
         switch ($arg->type) {
             case JITVariable::TYPE_NULL:
                 $context->builder->call($context->lookupFunction('__value__writeNull'), $ptr);
@@ -120,10 +144,13 @@ final class JitSprintf
                 );
                 return;
             case JITVariable::TYPE_VALUE:
+                // valuePtrFromVariable, not loadValue: loadValue can yield the
+                // __value__ struct BY VALUE (kind-dependent) and StructGEP on a
+                // non-pointer receiver segfaults LLVM 9 (#16565 class).
                 JitValueBox::copyFromPointer(
                     $context,
                     $slot,
-                    $context->helper->loadValue($arg)
+                    JitValueBox::valuePtrFromVariable($context, $arg)
                 );
                 return;
             case JITVariable::TYPE_OBJECT:

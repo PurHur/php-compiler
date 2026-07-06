@@ -28,3 +28,16 @@
          return $this->llvm->factory->value($this->context, $this->llvm->lib->LLVMBuildStructGEP($this->builder, $struct->value, $index, ''));
      }
  
+@@ -323,6 +340,12 @@
+     }
+ 
+     public function zExt(CoreValue $value, CoreType $type): CoreValue {
++        if ('1' === \getenv('PHP_COMPILER_LLVM_ASSERT')) {
++            $kind = $this->llvm->lib->LLVMGetTypeKind($this->llvm->lib->LLVMTypeOf($value->value));
++            if (\llvm\llvm::LLVMIntegerTypeKind !== $kind) {
++                throw new \RuntimeException('zExt: operand is not an integer (kind='.$kind.')');
++            }
++        }
+         return $this->llvm->factory->value($this->context, $this->llvm->lib->LLVMBuildZExt($this->builder, $value->value, $type->type, ''));
+     }
+ 
