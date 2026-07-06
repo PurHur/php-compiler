@@ -62,6 +62,27 @@ PHP;
         $this->assertSame('111', ob_get_clean());
     }
 
+    public function testVmClassUsesRecursiveRejectsIntOperand(): void
+    {
+        if (!CompilerVersion::supportsClassUsesRecursive()) {
+            $this->markTestSkipped('class_uses_recursive() requires forward profile');
+        }
+        $code = <<<'PHP'
+<?php
+try {
+    class_uses_recursive(123);
+    echo 'fail';
+} catch (TypeError $e) {
+    echo 'ok';
+}
+PHP;
+        $rt = new Runtime();
+        $block = $rt->parseAndCompile($code, 'class_uses_recursive_int.php');
+        ob_start();
+        $rt->run($block);
+        $this->assertSame('ok', ob_get_clean());
+    }
+
     public function testVmClassUsesEnumCaseEmptyArray(): void
     {
         $code = <<<'PHP'
