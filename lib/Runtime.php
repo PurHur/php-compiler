@@ -26,6 +26,7 @@ use PHPCompiler\VM\ObjectRegistry;
 use PHPCompiler\VM\HashTableRegistry;
 use PHPCompiler\JIT\Context as JITContext;
 use PHPCompiler\Ast\AsymmetricVisibilityRewriter;
+use PHPCompiler\Ast\LazyPropertyRewriter;
 use PHPCompiler\Ast\DnfParenTypeRewriter;
 use PHPCompiler\Ast\GlobalDeprecatedConstRewriter;
 use PHPCompiler\Ast\GlobalTypedConstRewriter;
@@ -381,6 +382,7 @@ class Runtime {
     public function preprocessSourceForParse(string $code, string $filename = 'unknown'): array
     {
         AsymmetricVisibilityRejector::reject($code, $filename);
+        LazyPropertyRejector::reject($code, $filename);
         CloneWithSyntaxRejector::reject($code, $filename);
         ReadonlyAnonymousClassSyntaxRejector::reject($code, $filename);
         DnfParenIntersectionSyntaxRejector::reject($code, $filename);
@@ -497,6 +499,7 @@ class Runtime {
         $code = GlobalDeprecatedConstRewriter::rewrite($code);
         $code = DnfParenTypeRewriter::rewrite($code);
         $code = AsymmetricVisibilityRewriter::rewrite($code);
+        $code = LazyPropertyRewriter::rewrite($code);
         $code = TypedFunctionStaticRewriter::rewrite($code);
         $code = HexFloatLiteralDesugar::desugar($code);
         $code = NewDereferenceableDesugar::desugar($code);

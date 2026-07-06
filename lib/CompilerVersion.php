@@ -732,6 +732,17 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.4+ `lazy` property modifier — deferred default initializer (#16813).
+     *
+     * Gated on {@see languageProfileVersion()} so 8.4.0-dev reference profile rejects like Zend 8.2.
+     * php-src: Zend/zend_compile.c ZEND_ACC_LAZY; zend_lazy_objects.c.
+     */
+    public static function supportsLazyPropertyModifier(): bool
+    {
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+    }
+
+    /**
      * PHP 8.4+ try/catch/else — else runs when no exception was thrown (#15817).
      *
      * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev reference profile matches Zend 8.2

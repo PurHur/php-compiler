@@ -329,6 +329,9 @@ final class LazyObjectSupport
      */
     public static function isPropertyLazy(ObjectEntry $object, string $propertyName): bool
     {
+        if (LazyPropertySupport::isDeclarativeLazyProperty($object, $propertyName)) {
+            return true;
+        }
         if (isset($object->lazyRawInitializedProperties[$propertyName])) {
             return false;
         }

@@ -36,6 +36,7 @@ use PHPCompiler\VM\Variable;
 use PHPCompiler\VM\ClassReadonly;
 use PHPCompiler\JIT\OperandName;
 use PHPCompiler\Ast\AsymmetricVisibilityRewriter;
+use PHPCompiler\Ast\LazyPropertyRewriter;
 use PHPCompiler\Ast\GeneratorYieldSourceMarker;
 use PHPCompiler\Compiler\AbstractMethodVisibilityCheck;
 use PHPCompiler\Compiler\InterfaceConstVisibilityCheck;
@@ -5554,6 +5555,7 @@ class Compiler {
                         $declare->propertyReadonly = (property_exists($child, 'readonly') && $child->readonly)
                             || (property_exists($child, 'propertyFlags') && $this->isReadonlyPropertyFlags($child->propertyFlags))
                             || $this->isReadonlyPropertyFlags($child->visibility);
+                        $declare->propertyLazy = LazyPropertyRewriter::isLazyFromAttributes($child->getAttributes());
                     }
                     $this->assignAttributeMetadata($declare, $child);
                     AttributeTargetValidator::assertEntriesForTarget(
