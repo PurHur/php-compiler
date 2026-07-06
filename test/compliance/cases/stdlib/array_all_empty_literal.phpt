@@ -1,11 +1,16 @@
 --TEST--
-stdlib array_all()/array_any()/array_find() inline [] literal vacuous results (#10827, ext/standard/array.c)
+stdlib array_all()/array_any() inline [] literal vacuous results; array_find() empty ValueError (#10827, #12519, ext/standard/array.c)
 --FILE--
 <?php
 echo array_all([], fn ($v) => (bool) $v) ? 'all' : 'notall', "\n";
 echo array_any([], fn ($v) => (bool) $v) ? 'any' : 'notany', "\n";
-echo array_find([], fn ($v) => (bool) $v) === null ? 'null' : 'bad', "\n";
+try {
+    array_find([], fn ($v) => (bool) $v);
+    echo "find uncaught\n";
+} catch (ValueError $e) {
+    echo 'find: ', $e->getMessage(), "\n";
+}
 --EXPECT--
 all
 notany
-null
+find: array_find(): Argument #1 ($array) must not be empty
