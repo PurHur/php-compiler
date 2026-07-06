@@ -98,7 +98,8 @@ class VMTest extends BaseTest {
             }
             if (!CompilerVersion::supportsZendThreadId()
                 && str_contains($name, 'zend_thread_id')
-                && !str_contains($name, 'zend_thread_id_phantom')) {
+                && !str_contains($name, 'zend_thread_id_phantom')
+                && !str_contains($name, 'zend_thread_id_function_exists_forward_profile')) {
                 continue;
             }
             if (CompilerVersion::supportsZendThreadId()
