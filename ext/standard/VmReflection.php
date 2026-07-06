@@ -2268,6 +2268,17 @@ final class VmReflection
         return self::propertyMatchesReflectionFilter($cfgVisibility, false, $filter);
     }
 
+    /** ReflectionClass::getMethods() filter — include static/final/abstract from method flags (#4480). */
+    public static function methodMatchesReflectionFilter(int $cfgFlags, int $filter): bool
+    {
+        if (0 === $filter) {
+            return true;
+        }
+        $flags = self::cfgMethodFlagsToReflectionModifiers($cfgFlags);
+
+        return ($flags & $filter) !== 0;
+    }
+
     public static function propertyMatchesReflectionFilter(int $cfgVisibility, bool $isStatic, int $filter): bool
     {
         if (0 === $filter) {
@@ -2398,7 +2409,7 @@ final class VmReflection
             }
             foreach ($methodLcs as $methodLc) {
                 $vis = $class->methodVisibility[$methodLc] ?? \PHPCfg\Func::FLAG_PUBLIC;
-                if (!self::matchesReflectionVisibilityFilter($vis, $filter)) {
+                if (!self::methodMatchesReflectionFilter($vis, $filter)) {
                     continue;
                 }
                 // php-src add_reflection_method_sub: parent-private methods hidden on child (#7191).
