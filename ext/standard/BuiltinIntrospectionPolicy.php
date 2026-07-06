@@ -51,6 +51,9 @@ final class BuiltinIntrospectionPolicy
         ], true)) {
             return CompilerVersion::advertisesHttpLastResponseHeaders();
         }
+        if ('request_parse_body' === $lc) {
+            return CompilerVersion::advertisesRequestParseBody();
+        }
         if ('stream_context_set_options' === $lc) {
             return CompilerVersion::advertisesStreamContextSetOptions();
         }

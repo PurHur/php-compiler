@@ -550,6 +550,7 @@ class Module extends ModuleAbstract
             new urlencode(),
             new rawurlencode(),
             new http_build_query(),
+            ...(CompilerVersion::supportsRequestParseBody() ? [new request_parse_body()] : []),
             new parse_str(),
             new urldecode(),
             new rawurldecode(),
