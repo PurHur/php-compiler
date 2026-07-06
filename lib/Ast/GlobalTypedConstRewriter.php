@@ -46,6 +46,11 @@ final class GlobalTypedConstRewriter
             if (\is_array($tok)) {
                 if (\in_array($tok[0], [T_CLASS, T_INTERFACE, T_TRAIT, T_ENUM], true)) {
                     $pendingClassLike = true;
+                } elseif (T_FINAL === $tok[0] && 0 === $classLikeDepth) {
+                    $finalConst = self::detectFinalGlobalConstSyntaxError($tokens, $i + 1);
+                    if (null !== $finalConst) {
+                        return $finalConst;
+                    }
                 } elseif (T_CONST === $tok[0] && 0 === $classLikeDepth) {
                     $typed = self::tryParseTypedConst($tokens, $i + 1);
                     if (null !== $typed) {
@@ -365,16 +370,34 @@ final class GlobalTypedConstRewriter
 
     /**
      * @param list<array{0: int, 1: string, 2: int}|string> $tokens
+     *
+     * @return array{line: int, message: string}|null
      */
-    private static function rejectFinalGlobalConstIfPresent(array $tokens, int $start): void
+    private static function detectFinalGlobalConstSyntaxError(array $tokens, int $start): ?array
     {
         $j = self::skipIgnorable($tokens, $start, \count($tokens));
         if ($j >= \count($tokens) || !\is_array($tokens[$j]) || T_CONST !== $tokens[$j][0]) {
+            return null;
+        }
+
+        return [
+            'line' => $tokens[$j][2] ?? 1,
+            'message' => self::FINAL_GLOBAL_CONST_REJECT_MESSAGE,
+        ];
+    }
+
+    /**
+     * @param list<array{0: int, 1: string, 2: int}|string> $tokens
+     */
+    private static function rejectFinalGlobalConstIfPresent(array $tokens, int $start): void
+    {
+        $error = self::detectFinalGlobalConstSyntaxError($tokens, $start);
+        if (null === $error) {
             return;
         }
         throw new ParserError(
-            self::FINAL_GLOBAL_CONST_REJECT_MESSAGE,
-            ['startLine' => $tokens[$j][2] ?? 1, 'endLine' => $tokens[$j][2] ?? 1]
+            $error['message'],
+            ['startLine' => $error['line'], 'endLine' => $error['line']]
         );
     }
 

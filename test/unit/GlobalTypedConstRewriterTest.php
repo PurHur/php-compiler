@@ -120,4 +120,16 @@ class C { public const string X = 'a'; }
 PHP;
         self::assertNull(GlobalTypedConstRewriter::referenceProfileSyntaxError($src));
     }
+
+    public function testReferenceProfileSyntaxErrorFinalGlobalTypedConst(): void
+    {
+        $src = <<<'PHP'
+<?php
+final const string APP_NAME = 'alpha';
+PHP;
+        $error = GlobalTypedConstRewriter::referenceProfileSyntaxError($src);
+        self::assertNotNull($error);
+        self::assertSame(GlobalTypedConstRewriter::FINAL_GLOBAL_CONST_REJECT_MESSAGE, $error['message']);
+        self::assertSame(2, $error['line']);
+    }
 }
