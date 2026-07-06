@@ -96,6 +96,30 @@ PHP;
         self::assertStringContainsString('openssl_x509_read(): Argument #1 ($certificate)', $out);
     }
 
+    public function test_openssl_x509_parse_subject_issuer(): void
+    {
+        if (!\PHPCompiler\ext\openssl\VmOpensslX509Native::available()) {
+            self::markTestSkipped('libcrypto FFI unavailable for openssl_x509_parse() test');
+        }
+
+        $runtime = new Runtime();
+        $pem = var_export(self::TEST_CERT, true);
+        $code = <<<PHP
+<?php
+\$pem = {$pem};
+\$info = openssl_x509_parse(\$pem);
+var_export(is_array(\$info));
+echo "\n";
+var_export(\$info['subject']['CN'] ?? null);
+echo "\n";
+var_export(\$info['issuer']['CN'] ?? null);
+echo "\n";
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'openssl_x509_parse.php'));
+        self::assertSame("true\n'test'\n'test'\n", ob_get_clean());
+    }
+
     public function test_openssl_free_key_deprecated_noop(): void
     {
         $runtime = new Runtime();

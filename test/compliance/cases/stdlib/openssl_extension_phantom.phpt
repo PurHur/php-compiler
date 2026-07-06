@@ -7,6 +7,6 @@ echo extension_loaded('openssl') ? "loaded\n" : "withheld\n";
 echo function_exists('openssl_x509_parse') ? "parse_yes\n" : "parse_no\n";
 echo function_exists('openssl_encrypt') ? "encrypt_yes\n" : "encrypt_no\n";
 --EXPECT--
-withheld
-parse_no
+loaded
+parse_yes
 encrypt_yes

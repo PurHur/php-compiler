@@ -47,6 +47,7 @@ class Module extends ModuleAbstract
             new openssl_cipher_key_length(),
             new openssl_digest(),
             new openssl_x509_read(),
+            new openssl_x509_parse(),
             new openssl_free_key(),
             new openssl_spki_new(),
             new openssl_spki_verify(),
