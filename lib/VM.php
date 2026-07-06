@@ -4519,6 +4519,10 @@ restart:
 
                         return self::EXCEPTION;
                     }
+                    $constName = null !== $op->arg3
+                        ? $frame->scope[$op->arg3]->toString()
+                        : $frame->scope[$op->arg2]->toString();
+                    $this->emitGlobalConstFetchDeprecation($constName, $frame);
                     $frame->scope[$op->arg1]->copyFrom($value);
                     $this->markScopeSlotInitialized($frame, (int) $op->arg1);
                     break;
@@ -5986,6 +5990,9 @@ restart:
                             $frame,
                             $line > 0 ? $line : 0
                         );
+                    }
+                    if (null !== $op->deprecatedMetadata) {
+                        $this->context->globalConstDeprecated[strtolower($name)] = $op->deprecatedMetadata;
                     }
                     break;
                 case OpCode::TYPE_DECLARE_ENUM:
@@ -15649,6 +15656,15 @@ restart:
             return;
         }
         $this->emitDeprecatedNotice($class->classDeprecated->formatClass($class->name), $frame);
+    }
+
+    private function emitGlobalConstFetchDeprecation(string $constName, Frame $frame): void
+    {
+        $meta = $this->context->globalConstDeprecated[strtolower($constName)] ?? null;
+        if (null === $meta || !$meta->emitsRuntimeNotice()) {
+            return;
+        }
+        $this->emitDeprecatedNotice($meta->formatGlobalConstant($constName), $frame);
     }
 
     private function emitClassConstFetchDeprecation(

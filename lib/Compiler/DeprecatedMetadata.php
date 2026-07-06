@@ -21,6 +21,12 @@ final class DeprecatedMetadata
 
     public static function fromOp(Op $op): ?self
     {
+        if ($op->hasAttribute('phpcGlobalDeprecatedMetadata')) {
+            $meta = $op->getAttribute('phpcGlobalDeprecatedMetadata');
+            if ($meta instanceof self) {
+                return $meta;
+            }
+        }
         if (!$op->hasAttribute('attrGroups')) {
             return null;
         }
@@ -104,6 +110,11 @@ final class DeprecatedMetadata
     public function formatConstant(string $class, string $constant): string
     {
         return 'Constant '.$class.'::'.$constant.' is deprecated'.$this->suffix();
+    }
+
+    public function formatGlobalConstant(string $constant): string
+    {
+        return 'Constant '.$constant.' is deprecated'.$this->suffix();
     }
 
     public function formatClass(string $name): string

@@ -27,6 +27,7 @@ use PHPCompiler\VM\HashTableRegistry;
 use PHPCompiler\JIT\Context as JITContext;
 use PHPCompiler\Ast\AsymmetricVisibilityRewriter;
 use PHPCompiler\Ast\DnfParenTypeRewriter;
+use PHPCompiler\Ast\GlobalDeprecatedConstRewriter;
 use PHPCompiler\Ast\GlobalTypedConstRewriter;
 use PHPCompiler\Ast\TypedFunctionStaticRewriter;
 use PHPCompiler\Ast\GroupUseStripper;
@@ -385,6 +386,7 @@ class Runtime {
         ExitFunctionSyntaxRejector::reject($code, $filename);
         TypedFunctionStaticSyntaxRejector::reject($code, $filename);
         GlobalTypedConstSyntaxRejector::reject($code, $filename);
+        GlobalDeprecatedConstSyntaxRejector::reject($code, $filename);
         PropertyHookSyntaxRejector::reject($code, $filename);
         TryCatchElseSyntaxRejector::reject($code, $filename);
         TryCatchElseSupport::beginCompilationUnit();
@@ -491,6 +493,7 @@ class Runtime {
     public function rewriteSourceBeforeParser(string $code): string
     {
         $code = GlobalTypedConstRewriter::rewrite($code);
+        $code = GlobalDeprecatedConstRewriter::rewrite($code);
         $code = DnfParenTypeRewriter::rewrite($code);
         $code = AsymmetricVisibilityRewriter::rewrite($code);
         $code = TypedFunctionStaticRewriter::rewrite($code);

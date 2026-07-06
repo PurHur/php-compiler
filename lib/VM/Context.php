@@ -38,6 +38,9 @@ class Context {
     private ?RunStackEntry $runStack = null;
     public array $constants = [];
 
+    /** @var array<string, \PHPCompiler\Compiler\DeprecatedMetadata> */
+    public array $globalConstDeprecated = [];
+
     /** @var array<string, Variable> */
     private array $superglobalVars = [];
 

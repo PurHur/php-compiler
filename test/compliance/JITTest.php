@@ -725,6 +725,15 @@ class JITTest extends BaseTest {
                 && !str_contains($name, 'typed_top_level_const_82')) {
                 continue;
             }
+            if (!CompilerVersion::supportsGlobalDeprecatedConstAttributes()
+                && str_contains($name, 'global_deprecated_const')
+                && !str_contains($name, 'reference_profile')) {
+                continue;
+            }
+            if (CompilerVersion::supportsGlobalDeprecatedConstAttributes()
+                && str_contains($name, 'global_deprecated_const_reference_profile')) {
+                continue;
+            }
             // 8.3-target reject gate; skipped when class const brace deref enabled (#16597).
             if (CompilerVersion::supportsClassConstBraceDeref()
                 && str_contains($name, 'class_const_brace_deref')
