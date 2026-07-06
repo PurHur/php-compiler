@@ -11,6 +11,7 @@ namespace PHPCompiler\VM;
 
 use php\MaskedArray;
 use PHPCompiler\ext\standard\StdlibConstants;
+use PHPCompiler\ext\standard\VmMath;
 
 final class HashTable {
     const OKAY                     = 0b0000000;
@@ -499,6 +500,13 @@ final class HashTable {
         if (Variable::TYPE_BOOLEAN === $index->type) {
             $intKey = new Variable();
             $intKey->int($index->toBool() ? 1 : 0);
+
+            return $intKey;
+        }
+        if (Variable::TYPE_FLOAT === $index->type) {
+            // Zend zend_hash: float offsets coerce to int keys without deprecation (#5123, #16739).
+            $intKey = new Variable();
+            $intKey->int(VmMath::floatToZendLong($index->toFloat()));
 
             return $intKey;
         }
