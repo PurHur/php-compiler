@@ -21,8 +21,8 @@ final class StringPrintRVarDumpRuntimeStandaloneTest extends TestCase
         $varDumpBridge = (string) file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/StringVarDump.php');
         $this->assertStringContainsString('PrintRJitHelper', $printRBridge);
         $this->assertStringContainsString('VarDumpJitHelper', $varDumpBridge);
-        $this->assertFileExists(__DIR__.'/../../../lib/JIT/Builtin/StringPrintRJit.php');
-        $this->assertFileExists(__DIR__.'/../../../lib/JIT/Builtin/StringVarDumpJit.php');
+        $this->assertFileDoesNotExist(__DIR__.'/../../../lib/JIT/Builtin/StringPrintRJit.php');
+        $this->assertFileDoesNotExist(__DIR__.'/../../../lib/JIT/Builtin/StringVarDumpJit.php');
         $this->assertStringNotContainsString(
             'is not implemented for JIT',
             (string) file_get_contents(__DIR__.'/../../../ext/standard/print_r.php')
@@ -33,12 +33,13 @@ final class StringPrintRVarDumpRuntimeStandaloneTest extends TestCase
         );
     }
 
-    public function testStandaloneUsesLlvmMonolithNotNestedPhpHelper(): void
+    public function testStandaloneUsesSamePhpBridgeAsEmbed(): void
     {
         foreach (['StringPrintR.php', 'StringVarDump.php'] as $bridge) {
             $source = (string) file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/'.$bridge);
-            $this->assertStringContainsString('LOAD_TYPE_STANDALONE', $source, $bridge);
-            $this->assertStringContainsString('::ensureLinked', $source, $bridge);
+            $this->assertStringContainsString('ensureStandaloneBodies', $source, $bridge);
+            $this->assertStringContainsString('NestedJitCompileScope::isActive', $source, $bridge);
+            $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $source, $bridge);
         }
     }
 }

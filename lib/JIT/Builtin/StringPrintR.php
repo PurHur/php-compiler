@@ -11,10 +11,9 @@ use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_print_r (#9190, #13240, #16565).
+ * JIT/AOT link for __compiler_print_r via PrintRJitHelper PHP (#9190, #13240, #16565).
  *
- * Embed/self-host: PrintRJitHelper PHP via nested JIT (php-in-PHP).
- * Standalone user AOT: StringPrintRJit LLVM — nested compile of VmPrintR SIGSEGVs LLVM 9.
+ * Embed and standalone AOT compile the same PHP bridge; no print_r LLVM monolith.
  * php-src: ext/standard/var.c — php_print_r_ex
  */
 final class StringPrintR
@@ -45,6 +44,10 @@ final class StringPrintR
 
     public static function implement(Context $context): void
     {
+        if (NestedJitCompileScope::isActive()) {
+            return;
+        }
+
         $probe = $context->module->getNamedFunction('__compiler_print_r');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);
@@ -52,21 +55,15 @@ final class StringPrintR
             return;
         }
 
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            $restoreBlock = BasicBlockHelper::tryGetInsertBlock($context);
-            StringPrintRJit::ensureLinked($context);
-            self::registerLinkedRuntime($context);
-            if (null !== $restoreBlock) {
-                BasicBlockHelper::restoreInsertBlock($context, $restoreBlock);
-            }
-
-            return;
-        }
-
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
         self::ensureJitHelperCompiled($context);
         self::implementBridge($context);
         self::registerLinkedRuntime($context);
-        $context->builder->clearInsertionPosition();
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
     }
 
     private static function implementBridge(Context $context): void

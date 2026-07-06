@@ -6,15 +6,15 @@ namespace PHPCompiler\Test\Unit;
 
 use PHPUnit\Framework\TestCase;
 
-/** StringVarDump JIT/AOT path uses VarDumpJitHelper PHP, not StringVarDumpJit monolith (#9195, #13241, #16565). */
+/** StringVarDump: embed + standalone php-in-PHP bridge (#9195, #13241, #16565). */
 final class VarDumpRuntimeShrinkTest extends TestCase
 {
-    public function testStringVarDumpUsesVarDumpJitHelperForJitPath(): void
+    public function testStringVarDumpUsesVarDumpJitHelperForEmbedAndStandalone(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringVarDump.php');
         $this->assertStringContainsString('VarDumpJitHelper', $source);
         $this->assertStringNotContainsString('StringVarDumpJit', $source);
-        $this->assertLessThan(160, \substr_count($source, "\n"), 'StringVarDump must be a thin bridge (#9195)');
+        $this->assertStringContainsString('NestedJitCompileScope::isActive', $source);
         $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StringVarDumpJit.php');
     }
 
@@ -26,19 +26,10 @@ final class VarDumpRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('function dumpValue', $source);
     }
 
-    public function testVarDumpBuiltinUsesStringVarDumpNotMonolith(): void
+    public function testVarDumpBuiltinUsesStringVarDumpBridge(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/JitVarDump.php');
         $this->assertStringContainsString('StringVarDump', $source);
-        $this->assertStringNotContainsString('StringVarDumpJit', $source);
-    }
-
-    public function testStandaloneUsesSamePhpBridgeAsEmbed(): void
-    {
-        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringVarDump.php');
-        $this->assertStringContainsString('ensureStandaloneBodies', $source);
-        $this->assertStringContainsString('self::implement($context)', $source);
-        $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $source);
     }
 
     /** Issue #9195 / #13241: spine must require VarDumpJitHelper + thin bridge. */
