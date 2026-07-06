@@ -1394,6 +1394,8 @@
         "ext/standard/RealpathJitHelper.php",
         "ext/standard/RenameJitHelper.php",
         "ext/standard/RequestMethodEnumData.php",
+        "ext/standard/RequestParseBodyEngine.php",
+        "ext/standard/RequestParseBodyJitHelper.php",
         "ext/standard/ResolveSidecarJitHelper.php",
         "ext/standard/ReturnPendingJitHelper.php",
         "ext/standard/RmdirJitHelper.php",
@@ -2413,6 +2415,7 @@
         "ext/standard/realpath_cache_size.php",
         "ext/standard/register_shutdown_function.php",
         "ext/standard/rename_.php",
+        "ext/standard/request_parse_body.php",
         "ext/standard/reset_.php",
         "ext/standard/restore_error_handler_.php",
         "ext/standard/restore_exception_handler.php",
@@ -3076,6 +3079,7 @@
         "lib/JIT/Builtin/ReflectionNative.php",
         "lib/JIT/Builtin/ReflectionRuntime.php",
         "lib/JIT/Builtin/ReflectionSetup.php",
+        "lib/JIT/Builtin/RequestParseBodyRuntime.php",
         "lib/JIT/Builtin/ResolveSidecarRuntime.php",
         "lib/JIT/Builtin/ReturnPendingRuntime.php",
         "lib/JIT/Builtin/RewriteVarsRuntime.php",
@@ -4409,9 +4413,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 4175,
+        "inventory_files": 4179,
         "excluded": 0,
-        "eligible": 4175,
+        "eligible": 4179,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
