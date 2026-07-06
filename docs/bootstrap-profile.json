@@ -3080,7 +3080,6 @@
         "lib/JIT/Builtin/StatCacheRuntime.php",
         "lib/JIT/Builtin/StatPath.php",
         "lib/JIT/Builtin/StatPathRuntime.php",
-        "lib/JIT/Builtin/StatPathRuntimeLibc.php",
         "lib/JIT/Builtin/Stats.php",
         "lib/JIT/Builtin/StatsJit.php",
         "lib/JIT/Builtin/StreamBucket.php",
@@ -3151,7 +3150,6 @@
         "lib/JIT/Builtin/StringExplode.php",
         "lib/JIT/Builtin/StringFgetcsvJit.php",
         "lib/JIT/Builtin/StringFileGetContents.php",
-        "lib/JIT/Builtin/StringFileGetContentsLibc.php",
         "lib/JIT/Builtin/StringFilePutContents.php",
         "lib/JIT/Builtin/StringFilePutContentsLibc.php",
         "lib/JIT/Builtin/StringFilterBoolean.php",
@@ -4371,9 +4369,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 4137,
+        "inventory_files": 4135,
         "excluded": 0,
-        "eligible": 4137,
+        "eligible": 4135,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
