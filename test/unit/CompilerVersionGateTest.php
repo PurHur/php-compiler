@@ -280,6 +280,22 @@ final class CompilerVersionGateTest extends TestCase
         putenv('PHP_COMPILER_PROFILE=8.3');
         try {
             $this->assertTrue(CompilerVersion::supportsStreamSupports());
+            $this->assertFalse(CompilerVersion::supportsStreamSupportReadWriteConstants());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testSupportsStreamSupportReadWriteConstantsTrueOnForwardProfile84(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertTrue(CompilerVersion::supportsStreamSupportReadWriteConstants());
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');

@@ -415,6 +415,11 @@ class VMTest extends BaseTest {
                 && str_contains($name, 'stream_supports_phantom')) {
                 continue;
             }
+            // STREAM_SUPPORT_READ/WRITE PHP 8.4 constants; forward profile only (#16846).
+            if (!CompilerVersion::supportsStreamSupportReadWriteConstants()
+                && str_contains($name, 'stream_support_read_write_constants')) {
+                continue;
+            }
             if (!CompilerVersion::supportsClockGettime()
                 && (str_contains($name, 'clock_gettime')
                     || str_contains($name, 'hrtime_nsec_precision'))

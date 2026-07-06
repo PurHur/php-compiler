@@ -180,6 +180,11 @@ class AotTest extends BaseTest
                 && !str_contains($name, 'stream_supports_lock')) {
                 continue;
             }
+            // STREAM_SUPPORT_READ/WRITE PHP 8.4 constants; forward profile only (#16846).
+            if (!CompilerVersion::supportsStreamSupportReadWriteConstants()
+                && str_contains($name, 'stream_support_read_write_constants')) {
+                continue;
+            }
             if (!CompilerVersion::supportsConvertCyrString()
                 && str_contains($name, 'convert_cyr_string')) {
                 continue;
