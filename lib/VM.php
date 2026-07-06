@@ -8553,6 +8553,8 @@ restart:
             return $this->dispatchVmBadMethodCallException($e, $callerFrame);
         } catch (\OutOfBoundsException $e) {
             return $this->dispatchVmOutOfBoundsException($e, $callerFrame);
+        } catch (\InvalidArgumentException $e) {
+            return $this->dispatchVmInvalidArgumentException($e, $callerFrame);
         } catch (\LogicException $e) {
             return $this->dispatchVmLogicException($e, $callerFrame);
         } catch (VM\MagicMethodInvocationAborted) {
@@ -8633,6 +8635,20 @@ restart:
     {
         [$file, $line] = VM\ExceptionSupport::userFatalSite($frame);
         $thrown = VM\BuiltinExceptionSupport::materializeLogicException(
+            $this->context,
+            $error->getMessage(),
+            $file,
+            $line
+        );
+
+        return $this->dispatchBuiltinThrowable($frame, $thrown);
+    }
+
+    /** Bridge InvalidArgumentException from SPL builtins (#16917, ext/spl/spl_iterators.c). */
+    private function dispatchVmInvalidArgumentException(\InvalidArgumentException $error, Frame $frame): ?Frame
+    {
+        [$file, $line] = VM\ExceptionSupport::userFatalSite($frame);
+        $thrown = VM\BuiltinExceptionSupport::materializeInvalidArgumentException(
             $this->context,
             $error->getMessage(),
             $file,
