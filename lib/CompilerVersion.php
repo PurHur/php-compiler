@@ -1091,13 +1091,26 @@ final class CompilerVersion
     }
 
     /**
-     * mb_str_pad() visible to function_exists() — stable runtime only (#16086).
+     * mb_str_pad() visible to function_exists() — stable runtime or forward profile (#16086, #16776).
      *
-     * Callable under forward profile via {@see supportsMbStrPad()}.
+     * Callable under forward profile via {@see supportsMbStrPad()}; withheld on 8.4.0-dev reference harness.
      */
     public static function advertisesMbStrPad(): bool
     {
-        return version_compare(self::VERSION, '8.4.0', '>=');
+        if (version_compare(self::VERSION, '8.4.0', '>=')) {
+            return true;
+        }
+
+        if (!self::supportsMbStrPad()) {
+            return false;
+        }
+
+        $raw = getenv('PHP_COMPILER_PROFILE');
+        if (!\is_string($raw) || '' === trim($raw)) {
+            return false;
+        }
+
+        return true;
     }
 
     /**
