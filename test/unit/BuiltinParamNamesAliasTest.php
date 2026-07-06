@@ -613,6 +613,15 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(['trait', 'autoload'], BuiltinParamNames::forFunction('trait_exists'));
         self::assertSame(['enum', 'autoload'], BuiltinParamNames::forFunction('enum_exists'));
 
+        foreach (['class_parents', 'class_implements', 'class_uses', 'class_uses_recursive'] as $fn) {
+            self::assertSame(['object_or_class', 'autoload'], BuiltinParamNames::forFunction($fn));
+            self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex(
+                BuiltinParamNames::forFunction($fn),
+                'autoload',
+                $fn
+            ));
+        }
+
         $isSubclass = BuiltinParamNames::forFunction('is_subclass_of');
         self::assertSame(['object_or_class', 'class', 'allow_string'], $isSubclass);
         self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($isSubclass, 'allow_string', 'is_subclass_of'));
