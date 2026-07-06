@@ -34595,8 +34595,14 @@ class Compiler {
                     true
                 )
             ) {
+                $countFamilyCallArg = $cfgCallOp->args[0] ?? $arg;
                 $callIndex = array_search($cfgCallOp, $block->orig->children, true);
-                if (\is_int($callIndex) && $callIndex > 0) {
+                if (
+                    \is_int($callIndex)
+                    && $callIndex > 0
+                    && $countFamilyCallArg instanceof Operand
+                    && $this->callArgIsDeadInlineTemporary($countFamilyCallArg)
+                ) {
                     $immediateProducer = $block->orig->children[$callIndex - 1] ?? null;
                     if (
                         $immediateProducer instanceof Op\Expr\FuncCall
