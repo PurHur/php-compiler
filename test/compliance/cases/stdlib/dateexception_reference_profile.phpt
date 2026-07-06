@@ -8,6 +8,10 @@ var_export(class_exists('DateError', false));
 echo "\n";
 var_export(class_exists('DateInvalidTimeZoneException', false));
 echo "\n";
+var_export(class_exists('DateMalformedIntervalException', false));
+echo "\n";
+var_export(class_exists('DateMalformedPeriodException', false));
+echo "\n";
 try {
     new DateTimeZone('Not/A/Timezone');
     echo "no throw\n";
@@ -15,6 +19,8 @@ try {
     echo $e->getMessage(), "\n";
 }
 --EXPECT--
+false
+false
 false
 false
 false
