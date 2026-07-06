@@ -402,6 +402,21 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsDateTimeMicrosecond());
     }
 
+    public function testDateTimeMicrosecondTrueWhenProfile84(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertTrue(CompilerVersion::supportsDateTimeMicrosecond());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     public function testConvertCyrStringNotAdvertisedOnReferenceProfile(): void
     {
         $this->assertFalse(CompilerVersion::supportsConvertCyrString());
