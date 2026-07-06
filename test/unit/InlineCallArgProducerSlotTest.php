@@ -5934,6 +5934,47 @@ PHP;
         self::assertSame("'c'", $out);
     }
 
+    /** Issue #16738 — var_export($b[false]) must wire dim-fetch NULL, not hoisted false dim index. */
+    public function testVarExportArrayBoolDimFetchUsesFetchResultSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+declare(strict_types=1);
+$b = ['a' => 1];
+var_export($b[false]);
+echo "\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'array_bool_dim_var_export.php');
+
+        $dimFetchResultSlot = null;
+        $varExportSends = [];
+        $fcallOrdinal = 0;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_ARRAY_DIM_FETCH === $op->type) {
+                $dimFetchResultSlot = $op->arg1;
+            }
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                ++$fcallOrdinal;
+                if (1 === $fcallOrdinal) {
+                    $varExportSends = [];
+                }
+            }
+            if (1 === $fcallOrdinal && OpCode::TYPE_ARG_SEND === $op->type) {
+                $varExportSends[] = $op->arg1;
+            }
+        }
+
+        self::assertNotNull($dimFetchResultSlot);
+        self::assertCount(1, $varExportSends);
+        self::assertSame($dimFetchResultSlot, $varExportSends[0], 'arg sends='.json_encode($varExportSends));
+
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertSame("NULL\n", $out);
+    }
+
     /** Issue #14828 — DateTimeZone::getTransitions(strtotime(), strtotime()) distinct arg slots. */
     public function testDateTimeZoneGetTransitionsDualInlineStrtotimeUsesDistinctArgSlots(): void
     {
