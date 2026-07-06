@@ -52,6 +52,10 @@ final class array_all_key extends Internal
         if ($argc < 2 || $argc > 3) {
             throw new \LogicException('array_all_key() requires two or three arguments in this compiler build');
         }
+        $vacuous = ArrayFindHelper::vacuousAnyAllIfCompileTimeEmpty($context, $args[0], true);
+        if (null !== $vacuous) {
+            return $vacuous;
+        }
         if (3 === $argc) {
             if (!ArrayFindCallbackPolicy::isJitLowerable($args[1])) {
                 throw new \LogicException(ArrayFindCallbackPolicy::jitRejectionMessage());

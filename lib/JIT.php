@@ -7481,6 +7481,7 @@ class JIT {
                 case OpCode::TYPE_INIT_ARRAY:
                     $result = $this->context->getVariableFromOp($block->getOperand($op->arg1));
                     JIT\HashTableHelper::initArray($this->context, $result);
+                    $result->compileTimeEmptyArrayLiteral = null === $op->arg2;
                     if (null !== $op->arg2) {
                         $element = $this->context->getVariableFromOp($block->getOperand($op->arg2));
                         $key = $this->jitArrayElementKeyVariable($block, $op->arg3);

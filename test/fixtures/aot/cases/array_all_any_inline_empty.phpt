@@ -1,10 +1,13 @@
 --TEST--
 AOT: array_all()/array_any() inline [] haystack (issue #11729)
+--ENV--
+PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
-echo array_all([], fn ($v) => (bool) $v) ? 'all' : 'notall', "\n";
-echo array_any([], fn ($v) => (bool) $v) ? 'any' : 'notany', "\n";
-?>
+$cb = fn ($v) => (bool) $v;
+echo array_all([], $cb) === true ? "all\n" : "notall\n";
+echo array_any([], $cb) === false ? "notany\n" : "any\n";
+
 --EXPECT--
 all
 notany

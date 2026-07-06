@@ -1068,6 +1068,7 @@ final class HashTableHelper
         Variable $element,
         ?Variable $key = null
     ): void {
+        $array->compileTimeEmptyArrayLiteral = false;
         if ($array->type & Variable::IS_NATIVE_ARRAY) {
             if (self::nativeArrayNeedsHashtablePromotion($array, $element)) {
                 self::promoteNativeArrayVariableToHashtable($context, $array);
@@ -1695,6 +1696,7 @@ final class HashTableHelper
      */
     public static function spreadInto(Context $context, Variable $dest, Variable $source): void
     {
+        $dest->compileTimeEmptyArrayLiteral = false;
         if (self::needsTraversableMaterialization($context, $source)) {
             $srcPtr = \PHPCompiler\ext\standard\JitIteratorToArray::materializeHashtable(
                 $context,
