@@ -1,5 +1,5 @@
 --TEST--
-ReflectionFunction::createFromFunction() static factory (#6994)
+ReflectionFunction::createFromFunction() static factory forward profile (#6994)
 --FILE--
 <?php
 declare(strict_types=1);

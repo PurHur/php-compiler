@@ -106,6 +106,11 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsPhp84ReflectionProbeBuiltins());
     }
 
+    public function testReflectionCreateFromFactoriesWithheldOnReferenceProfile(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsReflectionCreateFromFactories());
+    }
+
     public function testClassUsesRecursiveWithheldOnReferenceProfile(): void
     {
         $this->assertFalse(CompilerVersion::supportsClassUsesRecursive());

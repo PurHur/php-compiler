@@ -764,6 +764,18 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.4+ ReflectionFunction::createFromCallable()/createFromFunction() and
+     * ReflectionMethod::createFromClosure()/createFromMethodName() (ext/reflection/php_reflection.c; #6994, #7039, #16724).
+     *
+     * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev reference profile matches Zend 8.2
+     * (methods absent). Enable forward profile on dev via `PHP_COMPILER_PROFILE=8.4`.
+     */
+    public static function supportsReflectionCreateFromFactories(): bool
+    {
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+    }
+
+    /**
      * PHP 8.4+ ReflectionProperty/ReflectionParameter::isDeprecated() (ext/reflection/php_reflection.c, #9768).
      *
      * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev reference profile matches Zend 8.2
