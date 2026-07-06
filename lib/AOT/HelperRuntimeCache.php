@@ -328,7 +328,12 @@ final class HelperRuntimeCache
             if (null === $fnType) {
                 continue;
             }
-            $type = $context->llvm->factory->type($context->context, $fnType);
+            // Parsing unit bitcode into a context that already defines the
+            // named structs re-suffixes them (__string__ -> __string__.12);
+            // declarations bound with suffixed types fail module verify at the
+            // call sites. Rebuild the type against the LOCAL named structs.
+            $type = self::localizedFunctionType($context, $source, $fnType)
+                ?? $context->llvm->factory->type($context->context, $fnType);
             $context->functions[$lc] = $context->module->addFunction($symbol, $type);
             self::$usedUnits[$unitDir] = true;
             ++$bound;
@@ -349,6 +354,67 @@ final class HelperRuntimeCache
         }
 
         return $bound > 0;
+    }
+
+    /**
+     * Function type rebuilt from the local context's named structs, or null
+     * when any component type is unknown locally (caller falls back to the
+     * parsed type verbatim).
+     */
+    /**
+     * Function type rebuilt from the local context's named structs, or null
+     * when any component type is unknown locally (caller falls back to the
+     * parsed type verbatim).
+     */
+    private static function localizedFunctionType(Context $context, object $source, object $fnType): ?object
+    {
+        $lib = $context->llvm->lib;
+        try {
+            $params = [];
+            for ($i = 0, $n = $source->countParams(); $i < $n; ++$i) {
+                $params[] = self::localizedType($context, $lib->LLVMTypeOf($source->getParam($i)->value));
+            }
+            $ret = self::localizedType($context, $lib->LLVMGetReturnType($fnType));
+            if (null === $ret || \in_array(null, $params, true)) {
+                return null;
+            }
+
+            return $context->context->functionType($ret, false, ...$params);
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    /**
+     * Localize one raw FFI type: named structs (possibly context-suffixed,
+     * __string__.12) map to the local struct of the base name at the same
+     * pointer depth; everything else wraps verbatim.
+     */
+    private static function localizedType(Context $context, object $rawTy): ?object
+    {
+        $lib = $context->llvm->lib;
+        $depth = 0;
+        $t = $rawTy;
+        while (\llvm\llvm::LLVMPointerTypeKind === $lib->LLVMGetTypeKind($t)) {
+            $t = $lib->LLVMGetElementType($t);
+            ++$depth;
+        }
+        if (\llvm\llvm::LLVMStructTypeKind === $lib->LLVMGetTypeKind($t)) {
+            $name = $lib->LLVMGetStructName($t);
+            $name = \is_object($name) ? $name->toString() : (string) $name;
+            if ('' === $name) {
+                return null; // anonymous struct — no local identity to map to
+            }
+            $base = (string) preg_replace('/\\.\\d+$/', '', $name);
+
+            try {
+                return $context->getTypeFromString($base.str_repeat('*', $depth));
+            } catch (\Throwable) {
+                return null;
+            }
+        }
+
+        return $context->llvm->factory->type($context->context, $rawTy);
     }
 
     private static function parsedUnit(Context $context, string $unitDir): ?object

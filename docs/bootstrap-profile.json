@@ -2714,6 +2714,7 @@
         "lib/Ast/GroupUseStripper.php",
         "lib/Ast/HexFloatLiteralDesugar.php",
         "lib/Ast/InOperatorDesugar.php",
+        "lib/Ast/LazyPropertyRewriter.php",
         "lib/Ast/MultiBlockNameContext.php",
         "lib/Ast/MultiBlockNameResolver.php",
         "lib/Ast/NewDereferenceableDesugar.php",
@@ -3622,6 +3623,7 @@
         "lib/JIT/VmSpineSmokeNative.php",
         "lib/JIT/VmUnitProbeExecuteNative.php",
         "lib/JitMcjitEmbed.php",
+        "lib/LazyPropertyRejector.php",
         "lib/Lint/Issue.php",
         "lib/Lint/LintCompiler.php",
         "lib/Lint/Linter.php",
@@ -4049,6 +4051,7 @@
         "lib/VM/LateStaticJitHelper.php",
         "lib/VM/LazyGhostTraitSupport.php",
         "lib/VM/LazyObjectSupport.php",
+        "lib/VM/LazyPropertySupport.php",
         "lib/VM/ListUnpackJitHelper.php",
         "lib/VM/MagicMethodInvocationAborted.php",
         "lib/VM/MagicMethodJitHelper.php",
@@ -4413,9 +4416,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 4179,
+        "inventory_files": 4182,
         "excluded": 0,
-        "eligible": 4179,
+        "eligible": 4182,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
