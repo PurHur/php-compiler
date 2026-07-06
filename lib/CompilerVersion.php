@@ -376,6 +376,18 @@ final class CompilerVersion
     }
 
     /**
+     * class_uses_recursive() visible to function_exists() — stable runtime or forward 8.4+ (#17007).
+     */
+    public static function advertisesClassUsesRecursive(): bool
+    {
+        if (version_compare(self::VERSION, '8.4.0', '>=')) {
+            return true;
+        }
+
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+    }
+
+    /**
      * PHP 8.3+ #[\Override] compile-time validation (Zend/zend_compile.c, #6303, #11559, #12201, #15801).
      *
      * Withheld on 8.4.0-dev reference profile (matches Zend 8.2 — Override is a normal attribute).
@@ -966,6 +978,23 @@ final class CompilerVersion
     }
 
     /**
+     * stream_supports() visible to function_exists() — stable runtime or forward 8.3+ (#17007).
+     */
+    public static function advertisesStreamSupports(): bool
+    {
+        if (version_compare(self::VERSION, '8.4.0', '>=')) {
+            return true;
+        }
+
+        $raw = getenv('PHP_COMPILER_PROFILE');
+        if (!\is_string($raw) || '' === trim($raw)) {
+            return false;
+        }
+
+        return version_compare(self::languageProfileVersion(), '8.3.0', '>=');
+    }
+
+    /**
      * PHP 8.4+ STREAM_SUPPORT_READ/WRITE constants (ext/standard/streams.c, issue #16846).
      *
      * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev reference profile
@@ -988,6 +1017,23 @@ final class CompilerVersion
             return false;
         }
 
+        if (version_compare(self::VERSION, '8.4.0', '>=')) {
+            return true;
+        }
+
+        $raw = getenv('PHP_COMPILER_PROFILE');
+        if (!\is_string($raw) || '' === trim($raw)) {
+            return false;
+        }
+
+        return version_compare(self::languageProfileVersion(), '8.3.0', '>=');
+    }
+
+    /**
+     * json_validate() visible to function_exists() — stable runtime or forward 8.3+ (#17007).
+     */
+    public static function advertisesJsonValidate(): bool
+    {
         if (version_compare(self::VERSION, '8.4.0', '>=')) {
             return true;
         }
@@ -1310,6 +1356,18 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.4 array_all/any/find/first/last family visible to function_exists() (#17007).
+     */
+    public static function advertisesPhp84ArraySearchFunctions(): bool
+    {
+        if (version_compare(self::VERSION, '8.4.0', '>=')) {
+            return true;
+        }
+
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+    }
+
+    /**
      * PHP 8.4+ generator_to_array() (ext/standard/array.c, issue #6025, #16723).
      *
      * Withheld on 8.4.0-dev reference profile (matches Zend 8.2 function_exists gate). Enable via
@@ -1318,6 +1376,12 @@ final class CompilerVersion
     public static function supportsGeneratorToArray(): bool
     {
         return self::supportsPhp84ArraySearchFunctions();
+    }
+
+    /** generator_to_array() visible to function_exists() — same gate as array_any family (#17007). */
+    public static function advertisesGeneratorToArray(): bool
+    {
+        return self::advertisesPhp84ArraySearchFunctions();
     }
 
     /**
