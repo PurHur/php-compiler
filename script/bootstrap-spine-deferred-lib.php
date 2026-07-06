@@ -13,7 +13,12 @@ declare(strict_types=1);
  */
 function bootstrap_spine_native_link_deferred(): array
 {
-    return [];
+    return [
+        // Huge nested array literal breaks the AOT lowering (compile error at
+        // bundle scale, standalone binary segfault) — VM coverage unaffected.
+        // Un-defer when #16866 lands.
+        'ext/standard/TimezoneAbbreviationsData.php',
+    ];
 }
 
 /** Inventory paths covered by spine shims without a 1:1 literal require_once (issue #2543, #2868). */
