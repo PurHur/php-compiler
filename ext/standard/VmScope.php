@@ -410,11 +410,40 @@ final class VmScope
             $result->add($name, $copy);
         }
 
+        self::appendCallerDynamicLocals($caller, $result);
+
         if ($caller->block->isMainScript()) {
             self::appendFileScopeAutoGlobals($frame->vmContext, $result);
         }
 
         return $result;
+    }
+
+    /**
+     * extract() / variable-variables may allocate runtime-only locals (#4517, #4826).
+     *
+     * @see php/php-src Zend/zend_builtin_functions.c — zend_get_defined_vars symbol table
+     */
+    private static function appendCallerDynamicLocals(Frame $caller, HashTable $result): void
+    {
+        if ([] === $caller->dynamicLocals) {
+            return;
+        }
+        $present = [];
+        foreach ($result->iterateKeyed(true) as [$keyVar]) {
+            $present[$keyVar->resolveIndirect()->toString()] = true;
+        }
+        foreach ($caller->dynamicLocals as $name => $var) {
+            if ('this' === $name || isset($present[$name])) {
+                continue;
+            }
+            if (!self::callerVarIsSet($var)) {
+                continue;
+            }
+            $copy = new Variable();
+            $copy->copyFrom($var->resolveIndirect());
+            $result->add($name, $copy);
+        }
     }
 
     /**
@@ -480,6 +509,19 @@ final class VmScope
                 continue;
             }
             if (!self::callerVarIsSet($caller->scope[$slot])) {
+                continue;
+            }
+            $entry = new Variable();
+            $entry->string($name);
+            $result->addIndex($index, $entry);
+            ++$index;
+        }
+
+        foreach ($caller->dynamicLocals as $name => $var) {
+            if ('this' === $name || Superglobals::isSuperglobalName($name)) {
+                continue;
+            }
+            if (!self::callerVarIsSet($var)) {
                 continue;
             }
             $entry = new Variable();
