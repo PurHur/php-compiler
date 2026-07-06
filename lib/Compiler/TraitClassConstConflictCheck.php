@@ -7,6 +7,7 @@ namespace PHPCompiler\Compiler;
 use PHPCfg\Op;
 use PHPCfg\Operand;
 use PHPCfg\Script;
+use PHPCompiler\VM\LazyGhostTraitSupport;
 use PHPCompiler\VM\Variable;
 
 /**
@@ -173,6 +174,9 @@ final class TraitClassConstConflictCheck
                 $this->throwTraitNotFound($traitUse['display'], $traitUse['file'], $traitUse['line']);
             }
             if (!isset($this->traits[$traitLc])) {
+                if (LazyGhostTraitSupport::isLazyGhostTrait($traitUse['display'])) {
+                    continue;
+                }
                 $this->throwTraitNotFound($traitUse['display'], $traitUse['file'], $traitUse['line']);
             }
             foreach ($this->effectiveTraitConstants($traitLc) as $constLc => $traitConst) {
