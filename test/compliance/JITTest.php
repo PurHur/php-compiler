@@ -649,11 +649,17 @@ class JITTest extends BaseTest {
                 continue;
             }
             if (!CompilerVersion::supportsDatePeriodCreateFromISO8601String()
-                && str_contains($name, 'date_period_create_from_iso8601')) {
+                && str_contains($name, 'date_period_create_from_iso8601')
+                && !str_contains($name, 'date_period_create_from_iso8601_phantom')) {
                 continue;
             }
-            // VM-only DatePeriod static factory until MCJIT lowering lands (#7296).
-            if (str_contains($name, 'date_period_create_from_iso8601')) {
+            if (CompilerVersion::supportsDatePeriodCreateFromISO8601String()
+                && str_contains($name, 'date_period_create_from_iso8601_phantom')) {
+                continue;
+            }
+            // JIT/AOT runtime object dispatch for materialized DatePeriod still segfaults (#16796).
+            if (str_contains($name, 'date_period_create_from_iso8601')
+                && !str_contains($name, 'date_period_create_from_iso8601_phantom')) {
                 continue;
             }
             if (!CompilerVersion::supportsDomElementInsertAdjacentHtml()
