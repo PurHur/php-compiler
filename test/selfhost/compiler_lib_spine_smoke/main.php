@@ -4205,4 +4205,8 @@ require_once __DIR__.'/../../../lib/VM/NativeDateMalformedPeriodStringException.
 require_once __DIR__.'/../../../ext/dom/CharacterDataSubstringData.php';
 require_once __DIR__.'/../../../ext/dom/DocumentCreateComment.php';
 require_once __DIR__.'/../../../ext/dom/DocumentCreateTextNode.php';
+require_once __DIR__.'/../../../ext/standard/JitDatePeriodCreateFromISO8601String.php';
+require_once __DIR__.'/../../../lib/JIT/Call/DatePeriodCreateFromISO8601String.php';
+require_once __DIR__.'/../../../lib/JIT/Call/DatePeriodIteratorMethod.php';
+require_once __DIR__.'/../../../lib/VM/DatePeriodIteratorJitHelper.php';
 echo "compiler_lib_spine_smoke bundle OK\n";
