@@ -2668,11 +2668,14 @@ final class VmString
     {
         $quoteBoth = ENT_QUOTES === ($flags & ENT_QUOTES);
         $quoteDouble = !$quoteBoth && (0 !== ($flags & ENT_COMPAT));
+        $entHtml5 = 0 !== ($flags & ENT_HTML5);
         $entries = HtmlEntityTable::entitiesEntQuotes();
         if (!$quoteBoth && !$quoteDouble) {
             unset($entries['"']);
         }
-        if (!$quoteBoth) {
+        if ($quoteBoth) {
+            $entries["'"] = $entHtml5 ? '&apos;' : '&#039;';
+        } else {
             unset($entries["'"]);
         }
 
