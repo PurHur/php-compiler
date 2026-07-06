@@ -25,6 +25,8 @@ class ClassProperty {
     public bool $propertyHookVirtual = false;
     /** Individual readonly property (issue #3149, promoted readonly #3432). */
     public bool $readonly = false;
+    /** PHP 8.4 lazy modifier — default initializer runs on first read (#16813). */
+    public bool $lazy = false;
     /** Constructor promotion (#7383, ext/reflection/php_reflection.c reflection_property_is_promoted). */
     public bool $fromConstructorPromotion = false;
     /** Per-instance `new` default initializer (issue #3391). */
@@ -50,12 +52,14 @@ class ClassProperty {
         string $declaringClassLc = '',
         int $setVisibility = 0,
         int $getVisibility = 0,
-        bool $asymmetricExplicitRead = false
+        bool $asymmetricExplicitRead = false,
+        bool $lazy = false
     ) {
         $this->name = $name;
         $this->default = $default;
         $this->prototype = $prototype;
         $this->readonly = $readonly;
+        $this->lazy = $lazy;
         $this->visibility = $visibility;
         $this->declaringClassLc = $declaringClassLc;
         $this->setVisibility = $setVisibility;
@@ -73,6 +77,7 @@ class ClassProperty {
         if (
             !is_null($this->default)
             && !$this->hasRuntimeDefaultInit()
+            && !$this->lazy
             && !($this->readonly && $this->fromConstructorPromotion)
         ) {
             $var->copyFrom($this->default);

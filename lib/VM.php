@@ -6351,6 +6351,13 @@ restart:
                     }
                     if ($propertyObject->hasProperty($name) && !$magicGetForRead) {
                         if (!$forWrite) {
+                            VM\LazyPropertySupport::ensureDeclarativeLazyPropertyInitialized(
+                                $this,
+                                $propertyObject,
+                                $name
+                            );
+                        }
+                        if (!$forWrite) {
                             $this->emitInstancePropertyAccessDeprecation($propertyObject, $name, $frame);
                         }
                         if ($forWrite) {
@@ -14508,7 +14515,8 @@ restart:
                         strtolower($entry->name),
                         (int) ($op->propertySetVisibility ?? 0),
                         (int) ($op->propertyGetVisibility ?? 0),
-                        (bool) ($op->propertyAsymmetricExplicitRead ?? false)
+                        (bool) ($op->propertyAsymmetricExplicitRead ?? false),
+                        (bool) ($op->propertyLazy ?? false)
                     );
                     $prop->fromConstructorPromotion = $op->propertyFromConstructorPromotion;
                     // readonly-class promoted props are readonly even without `readonly` on the param (#15409).
@@ -15080,7 +15088,13 @@ restart:
             $frame->scope[$declareOp->arg1]->toString(),
             null,
             $frame->scope[$declareOp->arg3],
-            $declareOp->propertyReadonly
+            $declareOp->propertyReadonly,
+            MethodVisibility::mask($declareOp->propertyVisibility),
+            strtolower($entry->name),
+            (int) ($declareOp->propertySetVisibility ?? 0),
+            (int) ($declareOp->propertyGetVisibility ?? 0),
+            (bool) ($declareOp->propertyAsymmetricExplicitRead ?? false),
+            (bool) ($declareOp->propertyLazy ?? false)
         );
         $property->defaultInitBlock = $block->fragmentForOpcodes($pendingNewDefaultOps);
         $property->defaultInitResultSlot = $resultSlot;
@@ -15090,6 +15104,9 @@ restart:
     public function initInstancePropertyDefaults(ObjectEntry $object): void
     {
         foreach ($object->class->properties as $property) {
+            if ($property->lazy) {
+                continue;
+            }
             if (!$property->hasRuntimeDefaultInit()) {
                 continue;
             }
