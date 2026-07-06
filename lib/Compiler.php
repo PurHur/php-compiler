@@ -20989,6 +20989,18 @@ class Compiler {
                 ) {
                     continue;
                 }
+                // var_export($b[false]) — hoisted bool/null dim is not a separate call arg (#16738, #5275).
+                if (
+                    ($child instanceof Op\Expr\ConstFetch || $child instanceof Op\Expr\ClassConstFetch)
+                    && $next instanceof Op\Expr\ArrayDimFetch
+                    && null !== $next->dim
+                    && (
+                        $next->dim === $child->result
+                        || $this->operandsReferToSameVariable($next->dim, $child->result)
+                    )
+                ) {
+                    continue;
+                }
                 // ConstFetch chain before sibling BitwiseOr — hoisted operands, not call args (#11407).
                 for ($j = $i + 1; $j < $callIndex; ++$j) {
                     $scan = $cfgChildren[$j];
@@ -38033,6 +38045,15 @@ class Compiler {
                                     $valueSlot = (string) $mergeFinalSlot;
                                 }
                             } else {
+                            $dimFetchFinalSlot = $this->resolvePrecedingArrayDimFetchCallArgSlot(
+                                $finalArgProbe,
+                                $block,
+                                $cfgCallOp,
+                                (int) $argIndex
+                            );
+                            if (null !== $dimFetchFinalSlot) {
+                                $valueSlot = $dimFetchFinalSlot;
+                            } else {
                             $trailingConst = $this->matchNestedArrayTrailingConstFetchCallArgProducer(
                                 $finalProducers,
                                 $cfgCallOp->args ?? [],
@@ -38067,6 +38088,7 @@ class Compiler {
                                         $valueSlot = (string) $finalProducerSlot;
                                     }
                                 }
+                            }
                             }
                             }
                         }
