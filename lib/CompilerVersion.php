@@ -1429,7 +1429,27 @@ final class CompilerVersion
      */
     public static function advertisesRequestParseBodyExceptionClass(): bool
     {
-        return version_compare(self::VERSION, '8.4.0', '>=');
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+    }
+
+    /**
+     * PHP 8.4+ request_parse_body() (ext/standard/http.c, issue #16927).
+     *
+     * Gated on stable 8.4.0 / PHP_COMPILER_PROFILE=8.4 so 8.4.0-dev reference profile matches Zend 8.2 phantom gate.
+     */
+    public static function supportsRequestParseBody(): bool
+    {
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+    }
+
+    /** request_parse_body() visible to function_exists() — stable runtime or forward 8.4+ profile. */
+    public static function advertisesRequestParseBody(): bool
+    {
+        if (version_compare(self::VERSION, '8.4.0', '>=')) {
+            return true;
+        }
+
+        return self::supportsRequestParseBody();
     }
 
     /**
