@@ -20,7 +20,7 @@ final class JitErrorReporting
         $newLevel = $i64->constInt(0, false);
         if (null !== $levelArg && JITVariable::TYPE_NULL !== $levelArg->type) {
             $hasLevel = $i32->constInt(1, false);
-            $newLevel = JitIntdiv::lowerNullableIntBuiltinArg(
+            $newLevel = JitIntdiv::lowerNullableIntBuiltinArgForCaller(
                 $context,
                 $levelArg,
                 'error_reporting',
