@@ -93,6 +93,16 @@ final class StringFilePutContentsLibc
         $dataLen = $context->builder->load(
             $context->builder->structGep($data, $strMap['length'])
         );
+        $zeroLen = $context->builder->icmp(Builder::INT_EQ, $dataLen, $i64->constInt(0, false));
+        $emptyBlock = $fn->appendBasicBlock('fpc_libc_empty_data');
+        $writeBlock = $fn->appendBasicBlock('fpc_libc_write_data');
+        $context->builder->branchIf($zeroLen, $emptyBlock, $writeBlock);
+
+        $context->builder->positionAtEnd($emptyBlock);
+        $context->builder->call($context->lookupFunction('fclose'), $stream);
+        $context->builder->returnValue($i64->constInt(0, false));
+
+        $context->builder->positionAtEnd($writeBlock);
         $dataPtr = $context->builder->pointerCast(
             $context->builder->structGep($data, $strMap['value']),
             $i8p
