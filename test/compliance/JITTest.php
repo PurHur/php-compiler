@@ -106,10 +106,6 @@ class JITTest extends BaseTest {
                 && str_contains($name, 'get_defined_functions_exclude_disabled_reference_profile')) {
                 continue;
             }
-            if (!CompilerVersion::supportsGetDefinedFunctionsExcludeDeprecatedInternals()
-                && str_contains($name, 'get_defined_functions_exclude_disabled_forward_profile')) {
-                continue;
-            }
             if ((CompilerVersion::supportsStrIncrement() || CompilerVersion::supportsFpow() || CompilerVersion::supportsNextafter())
                 && str_contains($name, 'php84_math_string_builtins_phantom')) {
                 continue;
