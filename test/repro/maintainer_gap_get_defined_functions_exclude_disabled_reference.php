@@ -17,8 +17,8 @@ if (count($all['internal']) < count($filtered['internal'])) {
 }
 
 if (in_array('utf8_encode', $all['internal'], true)
-    && in_array('utf8_encode', $filtered['internal'], true)) {
-    echo "fail: utf8_encode not filtered\n";
+    && !in_array('utf8_encode', $filtered['internal'], true)) {
+    echo "fail: utf8_encode wrongly filtered from exclude_disabled list\n";
     exit(1);
 }
 

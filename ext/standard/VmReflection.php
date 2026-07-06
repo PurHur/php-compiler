@@ -396,7 +396,7 @@ final class VmReflection
             }
             self::$internalFunctionNames = self::orderInternalFunctionNamesForIntrospection($names);
         }
-        if (!$excludeDisabled) {
+        if (!$excludeDisabled || !\PHPCompiler\CompilerVersion::supportsGetDefinedFunctionsExcludeDeprecatedInternals()) {
             return self::$internalFunctionNames;
         }
 
