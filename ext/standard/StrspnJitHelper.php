@@ -12,14 +12,16 @@ namespace PHPCompiler\ext\standard;
  */
 final class StrspnJitHelper
 {
-    public static function strspnArgv(string $str, string $mask, int $offset = 0, ?int $length = null): int
+    /** Two-arg JIT bridge — offset/length use {@see extendedArgvInt}. */
+    public static function strspnArgv(string $str, string $mask): int
     {
-        return VmString::strspn($str, $mask, $offset, $length);
+        return VmString::strspn($str, $mask);
     }
 
-    public static function strcspnArgv(string $str, string $mask, int $offset = 0, ?int $length = null): int
+    /** Two-arg JIT bridge — offset/length use {@see extendedArgvInt}. */
+    public static function strcspnArgv(string $str, string $mask): int
     {
-        return VmString::strcspn($str, $mask, $offset, $length);
+        return VmString::strcspn($str, $mask);
     }
 
     public static function extendedArgv(
