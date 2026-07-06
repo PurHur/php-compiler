@@ -874,8 +874,8 @@ final class CompilerVersion
     /**
      * PHP 8.3+ stream_supports() / STREAM_SUPPORT_* (ext/standard/streams.c, issue #11819, #13238, #15692, #16741).
      *
-     * Withheld on 8.4.0-dev reference profile (matches Zend 8.2 — stream_supports absent).
-     * Enable via stable 8.4.0+ or explicit `PHP_COMPILER_PROFILE=8.3` / `8.4` forward profile.
+     * Withheld on 8.4.0-dev reference profile (matches Zend 8.2 — stream_supports absent). Enable via
+     * stable 8.4.0+ or explicit `PHP_COMPILER_PROFILE=8.3` / `8.4` forward profile.
      */
     public static function supportsStreamSupports(): bool
     {
