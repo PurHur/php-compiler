@@ -489,7 +489,11 @@ final class ErrorReporter
 
     private function writeCliStderr(int $level, string $message, ?string $file, int $line): void
     {
-        self::writeCliStderrLine($level, $message, $file, $line);
+        $formatted = self::formatCliErrorLine($level, $message, $file, $line);
+        fwrite(STDERR, $formatted);
+        if ($this->displayErrors) {
+            echo $formatted;
+        }
     }
 
     /**
