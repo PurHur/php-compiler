@@ -64,6 +64,17 @@ final class BuiltinIntrospectionPolicy
                 && (IntlExtensionPolicy::advertisesBuiltins()
                     || CompilerVersion::supportsGraphemeStrimwidth());
         }
+        if (\in_array($lc, [
+            'grapheme_strlen',
+            'grapheme_substr',
+            'grapheme_strpos',
+            'grapheme_extract',
+            'grapheme_str_split',
+        ], true)) {
+            return CompilerVersion::advertisesGraphemeForwardProfileCore()
+                && (IntlExtensionPolicy::advertisesBuiltins()
+                    || CompilerVersion::supportsGraphemeForwardProfileCore());
+        }
         if (\in_array($lc, ['curl_escape', 'curl_unescape'], true)) {
             return CurlExtensionPolicy::advertisesExtension();
         }

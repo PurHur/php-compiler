@@ -37,6 +37,13 @@ final class IntlExtensionPolicy
     public static function profileGraphemeFunctions(): array
     {
         $functions = [];
+        if (CompilerVersion::supportsGraphemeForwardProfileCore()) {
+            $functions[] = new grapheme_strlen();
+            $functions[] = new grapheme_substr();
+            $functions[] = new grapheme_strpos();
+            $functions[] = new grapheme_extract();
+            $functions[] = new grapheme_str_split();
+        }
         if (CompilerVersion::supportsGraphemeStrContains()) {
             $functions[] = new grapheme_str_contains();
         }
@@ -60,6 +67,19 @@ final class IntlExtensionPolicy
         if (str_contains($testFileName, 'grapheme_strimwidth')
             && CompilerVersion::supportsGraphemeStrimwidth()) {
             return true;
+        }
+        if (CompilerVersion::supportsGraphemeForwardProfileCore()) {
+            foreach ([
+                'grapheme_strlen',
+                'grapheme_substr',
+                'grapheme_strpos',
+                'grapheme_extract',
+                'grapheme_str_split',
+            ] as $basename) {
+                if (str_contains($testFileName, $basename)) {
+                    return true;
+                }
+            }
         }
 
         return false;

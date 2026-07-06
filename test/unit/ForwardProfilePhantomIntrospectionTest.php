@@ -266,8 +266,11 @@ final class ForwardProfilePhantomIntrospectionTest extends TestCase
             $this->assertTrue(CompilerVersion::advertisesGraphemeStrContains());
             $this->assertTrue(CompilerVersion::supportsGraphemeStrimwidth());
             $this->assertTrue(CompilerVersion::advertisesGraphemeStrimwidth());
+            $this->assertTrue(CompilerVersion::supportsGraphemeForwardProfileCore());
+            $this->assertTrue(CompilerVersion::advertisesGraphemeForwardProfileCore());
             $this->assertTrue(BuiltinIntrospectionPolicy::functionIsAdvertised('grapheme_str_contains'));
             $this->assertTrue(BuiltinIntrospectionPolicy::functionIsAdvertised('grapheme_strimwidth'));
+            $this->assertTrue(BuiltinIntrospectionPolicy::functionIsAdvertised('grapheme_strlen'));
             $this->assertFalse(
                 \PHPCompiler\ext\standard\ModuleRegistry::extensionLoaded('intl')
             );
@@ -276,13 +279,18 @@ final class ForwardProfilePhantomIntrospectionTest extends TestCase
             $ctx = $runtime->vmContext;
             $this->assertTrue(isset($ctx->functions['grapheme_str_contains']));
             $this->assertTrue(isset($ctx->functions['grapheme_strimwidth']));
+            $this->assertTrue(isset($ctx->functions['grapheme_strlen']));
+            $this->assertTrue(isset($ctx->functions['grapheme_substr']));
+            $this->assertTrue(isset($ctx->functions['grapheme_strpos']));
+            $this->assertTrue(isset($ctx->functions['grapheme_extract']));
+            $this->assertTrue(isset($ctx->functions['grapheme_str_split']));
             $this->assertTrue(
                 \PHPCompiler\ext\standard\VmReflection::functionExists($ctx, 'grapheme_str_contains')
             );
             $this->assertTrue(
                 \PHPCompiler\ext\standard\VmReflection::functionExists($ctx, 'grapheme_strimwidth')
             );
-            $this->assertFalse(
+            $this->assertTrue(
                 \PHPCompiler\ext\standard\VmReflection::functionExists($ctx, 'grapheme_strlen')
             );
         } finally {
