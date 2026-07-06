@@ -8986,7 +8986,7 @@ restart:
     ): ?Frame
     {
         [$file, $line] = VM\ExceptionSupport::userFatalSite($frame);
-        $thrown = VM\BuiltinExceptionSupport::materializeException(
+        $thrown = VM\BuiltinExceptionSupport::materializeDateMalformedStringException(
             $this->context,
             $error->getMessage(),
             $file,

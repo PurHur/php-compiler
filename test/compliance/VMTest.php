@@ -579,6 +579,10 @@ class VMTest extends BaseTest {
                 continue;
             }
             if (CompilerVersion::advertisesDateExceptionHierarchy()
+                && str_contains($name, 'datetime_bad_spec_reference_profile')) {
+                continue;
+            }
+            if (CompilerVersion::advertisesDateExceptionHierarchy()
                 && str_contains($name, 'date_malformed_exceptions_phantom_reference_profile')) {
                 continue;
             }

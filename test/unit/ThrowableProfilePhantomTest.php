@@ -24,6 +24,7 @@ final class ThrowableProfilePhantomTest extends TestCase
         $this->assertFalse(ThrowableManifest::isAdvertised('DateError'));
         $this->assertFalse(ThrowableManifest::isAdvertised('DateInvalidTimeZoneException'));
         $this->assertFalse(ThrowableManifest::isAdvertised('DateMalformedIntervalException'));
+        $this->assertFalse(ThrowableManifest::isAdvertised('DateMalformedString'));
         $this->assertFalse(ThrowableManifest::isAdvertised('DateMalformedPeriodException'));
         $this->assertTrue(ThrowableManifest::isAdvertised('Exception'));
         $this->assertFalse(ThrowableManifest::isAdvertised('RequestParseBodyException'));
@@ -37,6 +38,7 @@ final class ThrowableProfilePhantomTest extends TestCase
         $this->assertFalse(isset($ctx->classes['dateerror']));
         $this->assertFalse(isset($ctx->classes['dateinvalidtimezoneexception']));
         $this->assertFalse(isset($ctx->classes['datemalformedintervalexception']));
+        $this->assertFalse(isset($ctx->classes['datemalformedstring']));
         $this->assertFalse(isset($ctx->classes['datemalformedperiodexception']));
         $this->assertFalse(isset($ctx->classes['requestparsebodyexception']));
         $this->assertTrue(isset($ctx->classes['exception']));
