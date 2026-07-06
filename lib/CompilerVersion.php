@@ -852,14 +852,15 @@ final class CompilerVersion
     }
 
     /**
-     * zend_thread_id() visible to function_exists() — stable runtime only (#16357, re-#16292).
-     *
-     * Callable under forward profile via {@see supportsZendThreadId()}; withheld from introspection on 8.4.0-dev
-     * reference harness like Zend 8.2.
+     * zend_thread_id() visible to function_exists() — stable runtime or forward 8.4+ profile (#16357, #16851).
      */
     public static function advertisesZendThreadId(): bool
     {
-        return version_compare(self::VERSION, '8.4.0', '>=');
+        if (version_compare(self::VERSION, '8.4.0', '>=')) {
+            return true;
+        }
+
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
     }
 
     /**
