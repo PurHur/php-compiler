@@ -35,6 +35,9 @@ final class ReflectionFunctionIsDeprecated extends VmClassMethod
         }
         $ctx = VmReflection::requireContext($frame);
         $func = ReflectionSupport::resolveFunctionFromReflection($ctx, $receiver);
-        $frame->returnVar->bool(null !== $func->deprecated);
+        $deprecated = $func->deprecated;
+        $frame->returnVar->bool(
+            null !== $deprecated && $deprecated->isDeprecatedForReflection()
+        );
     }
 }

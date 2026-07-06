@@ -68,6 +68,18 @@ final class DeprecatedAttributeTest extends TestCase
         $this->assertTrue($meta->emitsRuntimeNotice());
     }
 
+    public function testIsDeprecatedForReflectionGatesSinceAgainstReportedVersion(): void
+    {
+        $meta = new DeprecatedMetadata('old fn', '8.4');
+        $this->assertFalse($meta->isDeprecatedForReflection());
+
+        $meta = new DeprecatedMetadata('old fn', '8.2');
+        $this->assertTrue($meta->isDeprecatedForReflection());
+
+        $meta = new DeprecatedMetadata(null, null);
+        $this->assertTrue($meta->isDeprecatedForReflection());
+    }
+
     public function testBareDeprecatedMethodCallIsSilent(): void
     {
         $runtime = new Runtime();

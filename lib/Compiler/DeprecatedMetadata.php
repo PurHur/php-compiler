@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\Compiler;
 
 use PHPCfg\Op;
+use PHPCompiler\CompilerVersion;
 use PhpParser\Node;
 
 /**
@@ -47,6 +48,47 @@ final class DeprecatedMetadata
         }
 
         return null;
+    }
+
+    /**
+     * @param list<array{name: ?string, value: mixed}> $args
+     */
+    public static function fromAttributeArgs(array $args): self
+    {
+        $message = null;
+        $since = null;
+        $positional = 0;
+        foreach ($args as $arg) {
+            $name = $arg['name'] ?? null;
+            $value = $arg['value'];
+            $str = \is_string($value) || \is_int($value) || \is_float($value) ? (string) $value : null;
+            if (null === $name) {
+                if (0 === $positional) {
+                    $message = $str;
+                } elseif (1 === $positional) {
+                    $since = $str;
+                }
+                ++$positional;
+                continue;
+            }
+            $param = strtolower((string) $name);
+            if ('message' === $param) {
+                $message = $str;
+            } elseif ('since' === $param) {
+                $since = $str;
+            }
+        }
+
+        return new self($message, $since);
+    }
+
+    public static function fromAttributeEntry(AttributeEntry $entry): ?self
+    {
+        if (!self::isDeprecatedAttributeName($entry->name)) {
+            return null;
+        }
+
+        return self::fromAttributeArgs($entry->args);
     }
 
     public function formatFunction(string $name): string
@@ -92,6 +134,25 @@ final class DeprecatedMetadata
         return null !== $this->message || null !== $this->since;
     }
 
+    /**
+     * Whether #[\Deprecated] is active for Reflection*::isDeprecated() (ext/reflection/php_reflection.c, #9760, #16800).
+     *
+     * php-src sets ZEND_ACC_DEPRECATED at compile time only on PHP 8.4+; on 8.2 the flag is absent so isDeprecated()
+     * is false even when since: '8.4' is present. Match that by gating since against {@see CompilerVersion::reportedPhpVersion()}.
+     */
+    public function isDeprecatedForReflection(): bool
+    {
+        if (null !== $this->since) {
+            return version_compare(
+                CompilerVersion::reportedPhpVersion(),
+                self::normalizeSinceVersion($this->since),
+                '>='
+            );
+        }
+
+        return true;
+    }
+
     private function suffix(): string
     {
         if (null !== $this->since && null !== $this->message) {
@@ -109,7 +170,12 @@ final class DeprecatedMetadata
 
     private static function isDeprecatedAttribute(Node\Attribute $attr): bool
     {
-        $name = ltrim($attr->name->toString(), '\\');
+        return self::isDeprecatedAttributeName($attr->name->toString());
+    }
+
+    private static function isDeprecatedAttributeName(string $name): bool
+    {
+        $name = ltrim($name, '\\');
 
         return 'Deprecated' === $name || str_ends_with($name, '\\Deprecated');
     }
@@ -153,5 +219,17 @@ final class DeprecatedMetadata
         }
 
         return null;
+    }
+
+    private static function normalizeSinceVersion(string $since): string
+    {
+        if (preg_match('/^\d+\.\d+$/', $since)) {
+            return $since.'.0';
+        }
+        if (preg_match('/^\d+\.\d+\.\d+/', $since, $m)) {
+            return $m[0];
+        }
+
+        return $since;
     }
 }

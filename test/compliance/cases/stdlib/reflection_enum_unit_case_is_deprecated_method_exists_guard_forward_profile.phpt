@@ -19,5 +19,5 @@ if (method_exists($rA, 'isDeprecated')) {
 }
 --EXPECT--
 true
-true
+false
 false
