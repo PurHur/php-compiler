@@ -83,6 +83,9 @@ final class BuiltinByRefParams
             case 'openssl_sign':
             case 'openssl_pkey_export':
                 return [1];
+            case 'stream_context_set_options':
+            case 'stream_context_set_params':
+                return [0];
             case 'exec':
                 return [1, 2];
             case 'passthru':
