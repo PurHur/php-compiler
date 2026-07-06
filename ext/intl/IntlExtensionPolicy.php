@@ -61,6 +61,7 @@ final class IntlExtensionPolicy
             return true;
         }
         if (str_contains($testFileName, 'grapheme_phantom')
+            || str_contains($testFileName, 'grapheme_stripos_intl_gated')
             || str_contains($testFileName, 'grapheme_forward_profile')
             || str_contains($testFileName, 'grapheme_profile_84')) {
             return true;
