@@ -7986,7 +7986,12 @@ class JIT {
                                     $classId
                                 );
                             }
-                            $value = $this->context->type->object->classConstFetch($classId, $nameOp->value, $block);
+                            $value = $this->context->type->object->classConstFetch(
+                                $classId,
+                                $nameOp->value,
+                                $block,
+                                $classOp instanceof Operand\Literal && \is_string($classOp->value) ? $classOp->value : null
+                            );
                             $resultOp = $block->getOperand($op->arg1);
                             if ($this->context->type->object->isEnumClassId($classId)
                                 && $classOp instanceof Operand\Literal) {

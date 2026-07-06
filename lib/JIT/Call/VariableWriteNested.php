@@ -36,55 +36,53 @@ final class VariableWriteNested implements Call
                 if (count($args) < 2) {
                     throw new \LogicException('int() requires an integer value');
                 }
-                $long = $context->helper->loadValue($args[1]);
                 $context->builder->call(
                     $context->lookupFunction('__value__writeLong'),
                     $destPtr,
-                    $context->builder->zExt($long, $context->getTypeFromString('int64'))
+                    self::nativeScalar($context, $args[1], '__value__readLong', 'int64')
                 );
                 break;
             case 'bool':
                 if (count($args) < 2) {
                     throw new \LogicException('bool() requires a boolean value');
                 }
-                $boolVal = $context->helper->loadValue($args[1]);
-                $context->builder->call(
-                    $context->lookupFunction('__value__writeBool'),
+                // Direct field stores: the __value__writeBool runtime symbol is
+                // declared with an i32 flag param in some modules and i8 in
+                // others; JitValueBox::writeBool sidesteps the signature drift.
+                JitValueBox::writeBool(
+                    $context,
                     $destPtr,
-                    $context->builder->zExt($boolVal, $context->getTypeFromString('int8'))
+                    self::nativeScalar($context, $args[1], '__value__readLong', 'int8')
                 );
                 break;
             case 'string':
                 if (count($args) < 2) {
                     throw new \LogicException('string() requires a string value');
                 }
-                $strPtr = $context->helper->loadValue($args[1]);
                 $context->builder->call(
                     $context->lookupFunction('__value__writeString'),
                     $destPtr,
-                    $strPtr
+                    self::nativePointer($context, $args[1], '__value__readString', '__string__*')
                 );
                 break;
             case 'float':
                 if (count($args) < 2) {
                     throw new \LogicException('float() requires a float value');
                 }
-                $double = $context->helper->loadValue($args[1]);
                 $context->builder->call(
                     $context->lookupFunction('__value__writeDouble'),
                     $destPtr,
-                    $double
+                    self::nativeScalar($context, $args[1], '__value__readDouble', 'double')
                 );
                 break;
             case 'array':
                 if (count($args) < 2) {
                     throw new \LogicException('array() requires a HashTable value');
                 }
-                $htPtr = $context->helper->loadValue($args[1]);
                 $context->builder->call(
                     $context->lookupFunction('__value__writeHashtable'),
                     $destPtr,
-                    $htPtr
+                    self::nativePointer($context, $args[1], '__value__readHashtable', '__hashtable__*')
                 );
                 break;
             default:
@@ -92,6 +90,65 @@ final class VariableWriteNested implements Call
         }
 
         return self::voidResult($context);
+    }
+
+    /**
+     * Shape-aware scalar arg: box-backed args (TYPE_VALUE or __value__ storage)
+     * read through the runtime accessor; native args width-adjust. Blind
+     * zExt(loadValue(...)) handed %__value__ structs to i64/i8 parameters
+     * (module verify failure, #16565 class).
+     */
+    private static function nativeScalar(Context $context, Variable $arg, string $reader, string $destTyStr): Value
+    {
+        $destTy = $context->getTypeFromString($destTyStr);
+        if (self::isBoxBacked($context, $arg)) {
+            $read = $context->builder->call(
+                $context->lookupFunction($reader),
+                JitValueBox::valuePtrFromVariable($context, $arg)
+            );
+
+            return 'double' === $destTyStr
+                ? $read
+                : $context->builder->truncOrBitCast($read, $destTy);
+        }
+        $loaded = $context->helper->loadValue($arg);
+        $srcTyStr = $context->getStringFromType($loaded->typeOf());
+        if ($srcTyStr === $destTyStr) {
+            return $loaded;
+        }
+        if ('double' === $destTyStr) {
+            return $context->builder->siToFp($loaded, $destTy);
+        }
+
+        return $context->builder->intCast($loaded, $destTy);
+    }
+
+    private static function nativePointer(Context $context, Variable $arg, string $reader, string $destTyStr): Value
+    {
+        if (self::isBoxBacked($context, $arg)) {
+            return $context->builder->call(
+                $context->lookupFunction($reader),
+                JitValueBox::valuePtrFromVariable($context, $arg)
+            );
+        }
+
+        return $context->builder->pointerCast(
+            $context->helper->loadValue($arg),
+            $context->getTypeFromString($destTyStr)
+        );
+    }
+
+    private static function isBoxBacked(Context $context, Variable $arg): bool
+    {
+        if (Variable::TYPE_VALUE === $arg->type || null !== $arg->valueBoxAliasPtr) {
+            return true;
+        }
+
+        return \in_array(
+            $context->getStringFromType($arg->value->typeOf()),
+            ['__value__', '__value__*', '__value__value*'],
+            true
+        );
     }
 
     private static function voidResult(Context $context): Value
