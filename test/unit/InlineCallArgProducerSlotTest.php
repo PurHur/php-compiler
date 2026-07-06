@@ -6691,4 +6691,78 @@ PHP;
         $out = ob_get_clean();
         self::assertSame("q\nq\nv\n", $out);
     }
+
+    /** Issue #10474 — is_array(file(..., FILE_* | FILE_*)) must wire file() result, not bitmask OR slot. */
+    public function testIsArrayFileConstFlagsArgSendUsesFuncCallExecReturn(): void
+    {
+        $repro = __DIR__.'/../repro/maintainer_file_named_flags.php';
+        $code = file_get_contents($repro);
+        self::assertNotFalse($code);
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, $repro);
+
+        $bitwiseOrSlots = [];
+        $consumerPairs = [];
+        $seen = new \SplObjectStorage();
+        $walk = function (Block $compileBlock) use (&$walk, &$seen, &$bitwiseOrSlots, &$consumerPairs): void {
+            if ($seen->contains($compileBlock)) {
+                return;
+            }
+            $seen[$compileBlock] = true;
+            foreach ($compileBlock->opCodes as $op) {
+                if (OpCode::TYPE_BITWISE_OR === $op->type) {
+                    $bitwiseOrSlots[] = $op->arg1;
+                }
+            }
+            foreach ($compileBlock->opCodes as $i => $op) {
+                if (OpCode::TYPE_FUNCCALL_INIT !== $op->type) {
+                    continue;
+                }
+                $name = $compileBlock->constants[$op->arg1]->toString();
+                if (!\in_array($name, ['is_array', 'count'], true)) {
+                    continue;
+                }
+                $fileExec = null;
+                for ($j = $i - 1; $j >= 0; --$j) {
+                    $prior = $compileBlock->opCodes[$j];
+                    if (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $prior->type) {
+                        $fileExec = $prior->arg1;
+                        break;
+                    }
+                }
+                if (null === $fileExec) {
+                    continue;
+                }
+                $sendSlot = $compileBlock->opCodes[$i + 1]->arg1 ?? null;
+                if (OpCode::TYPE_ARG_SEND === ($compileBlock->opCodes[$i + 1]->type ?? null)) {
+                    $consumerPairs[$name][] = [$fileExec, $sendSlot];
+                }
+            }
+            foreach ($compileBlock->opCodes as $op) {
+                if (null !== $op->block1) {
+                    $walk($op->block1);
+                }
+                if (null !== $op->block2) {
+                    $walk($op->block2);
+                }
+            }
+        };
+        $walk($block);
+
+        self::assertNotEmpty($bitwiseOrSlots, 'expected FILE_* | FILE_* bitwise OR slot');
+        foreach ($consumerPairs['is_array'] ?? [] as $pair) {
+            self::assertSame($pair[0], $pair[1], 'is_array must use adjacent file() exec return');
+            self::assertNotContains($pair[1], $bitwiseOrSlots, 'is_array must not use bitmask OR slot');
+        }
+        foreach ($consumerPairs['count'] ?? [] as $pair) {
+            self::assertSame($pair[0], $pair[1], 'count must use adjacent file() exec return');
+            self::assertNotContains($pair[1], $bitwiseOrSlots, 'count must not use bitmask OR slot');
+        }
+
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertStringContainsString('const=array', $out);
+        self::assertStringContainsString('ternary=10', $out);
+    }
 }
