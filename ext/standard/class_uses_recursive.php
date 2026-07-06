@@ -33,6 +33,7 @@ final class class_uses_recursive extends Internal
             return;
         }
         $ctx = VmReflection::requireContext($frame);
+        VmClassHas::requireObjectOrClass($frame->calledArgs[0], 'class_uses_recursive', 'object_or_class');
         $autoload = true;
         if ($argc >= 2) {
             $flag = $frame->calledArgs[1]->resolveIndirect();
