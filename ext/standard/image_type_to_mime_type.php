@@ -31,8 +31,9 @@ final class image_type_to_mime_type extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $imageType = VmMath::parseIntBuiltinArg(
-            $frame->calledArgs[0]->resolveIndirect(),
+        $imageType = VmMath::parseIntBuiltinArgForFrame(
+            $frame,
+            0,
             'image_type_to_mime_type',
             1,
             'image_type'

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Builder;
@@ -39,6 +40,13 @@ final class JitImageTypeToMimeType
 
     public static function invoke(Context $context, JITVariable $imageTypeArg): Value
     {
+        JitInternalStrictArg::requireInt(
+            $context,
+            $imageTypeArg,
+            'image_type_to_mime_type',
+            'image_type',
+            1
+        );
         $imageType = JitImageTypeArg::lowerImageType(
             $context,
             $imageTypeArg,
