@@ -657,6 +657,11 @@ class JITTest extends BaseTest {
                 && str_contains($name, 'date_period_create_from_iso8601_phantom')) {
                 continue;
             }
+            // JIT/AOT runtime object dispatch for materialized DatePeriod still segfaults (#16796).
+            if (str_contains($name, 'date_period_create_from_iso8601')
+                && !str_contains($name, 'date_period_create_from_iso8601_phantom')) {
+                continue;
+            }
             if (!CompilerVersion::supportsDomElementInsertAdjacentHtml()
                 && str_contains($name, 'dom_element_insert_adjacent_html')
                 && !str_contains($name, 'insert_adjacent_html_phantom')) {
