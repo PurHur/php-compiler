@@ -708,6 +708,8 @@ class Module extends ModuleAbstract
             new phpc_gc_native_child_at(),
             new phpc_gc_native_object_refcount(),
             new phpc_gc_native_free_object(),
+            new phpc_destruct_try_invoke_native(),
+            new phpc_object_release_storage_native(),
             new phpc_weakref_null_slot(),
             new phpc_weakref_unset_map_key(),
             new phpc_native_ht_alloc(),

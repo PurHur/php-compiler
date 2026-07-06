@@ -74,6 +74,28 @@ final class GcCollectCyclesNativeOpsJit
         );
     }
 
+    public static function destructTryInvoke(Context $context, JITVariable $objPtr): void
+    {
+        GcCollectCyclesRuntime::ensureLinked($context);
+
+        $i8p = $context->getTypeFromString('int8*');
+        $context->builder->call(
+            $context->lookupFunction('phpc_destruct_try_invoke'),
+            $context->builder->pointerCast($objPtr->getValue(), $i8p)
+        );
+    }
+
+    public static function releaseObjectStorage(Context $context, JITVariable $objPtr): void
+    {
+        GcCollectCyclesRuntime::ensureLinked($context);
+
+        $i8p = $context->getTypeFromString('int8*');
+        $context->builder->call(
+            $context->lookupFunction('phpc_object_release_storage'),
+            $context->builder->pointerCast($objPtr->getValue(), $i8p)
+        );
+    }
+
     private static function objectHeaderSizeConst(Context $context): Value
     {
         $objTy = $context->getTypeFromString('__object__');

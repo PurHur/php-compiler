@@ -57,14 +57,23 @@ final class GcCollectCyclesRuntime
 
     private const DESTRUCT_HELPER_PATH = '/ext/standard/GcDestructAllowDelrefJitHelper.php';
 
+    private const SHUTDOWN_HELPER_PATH = '/ext/standard/GcDestructShutdownJitHelper.php';
+
     private const SET_ALLOW_DELREF = 'PHPCompiler\\ext\\standard\\GcDestructAllowDelrefJitHelper::setAllowDelref';
 
     private const DELREF_ALLOWED = 'PHPCompiler\\ext\\standard\\GcDestructAllowDelrefJitHelper::delrefAllowed';
+
+    private const RUN_SHUTDOWN_DESTRUCTORS = 'PHPCompiler\\ext\\standard\\GcDestructShutdownJitHelper::runShutdownDestructors';
 
     /** @var list<string> */
     private const DESTRUCT_COMPILED_HELPERS = [
         self::SET_ALLOW_DELREF,
         self::DELREF_ALLOWED,
+    ];
+
+    /** @var list<string> */
+    private const SHUTDOWN_COMPILED_HELPERS = [
+        self::RUN_SHUTDOWN_DESTRUCTORS,
     ];
 
     private const REG_APPEND = 'PHPCompiler\\ext\\standard\\GcCollectCyclesRegistryJitHelper::appendObject';
@@ -166,6 +175,7 @@ final class GcCollectCyclesRuntime
         GcToggleRuntime::ensureLinked($context);
         if (self::usesPhpRegistry($context)) {
             self::ensureRegistryJitHelperCompiled($context);
+            self::ensureShutdownJitHelperCompiled($context);
         }
         self::ensureDestructAllowDelrefJitHelperCompiled($context);
         self::ensureGlobals($context);
@@ -407,6 +417,12 @@ final class GcCollectCyclesRuntime
 
     private static function implementRunShutdownDestructors(Context $context): void
     {
+        if (self::usesPhpRegistry($context)) {
+            self::implementRunShutdownDestructorsPhpBridge($context);
+
+            return;
+        }
+
         $voidTy = $context->getTypeFromString('void');
         $i32 = $context->getTypeFromString('int32');
         $i8p = $context->getTypeFromString('int8*');
@@ -1393,6 +1409,49 @@ final class GcCollectCyclesRuntime
         return $fn;
     }
 
+    private static function ensureShutdownJitHelperCompiled(Context $context): void
+    {
+        $missing = false;
+        foreach (self::SHUTDOWN_COMPILED_HELPERS as $logical) {
+            if (!isset($context->functions[\strtolower($logical)])) {
+                $missing = true;
+                break;
+            }
+        }
+        if (!$missing) {
+            return;
+        }
+
+        $runtime = $context->runtime;
+        $path = \dirname(__DIR__, 3).self::SHUTDOWN_HELPER_PATH;
+        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
+            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'GcDestructShutdownJitHelper.php');
+            if (null === $block) {
+                throw new \LogicException('GcDestructShutdownJitHelper.php parseAndCompile failed (#15852)');
+            }
+            $jit = new JIT($context);
+            $jit->compile($block);
+        });
+        foreach (self::SHUTDOWN_COMPILED_HELPERS as $logical) {
+            $lc = \strtolower($logical);
+            if (!isset($context->functions[$lc])) {
+                throw new \LogicException($lc.' was not compiled for JIT GC shutdown walk (#15852)');
+            }
+        }
+    }
+
+    private static function shutdownHelperFunction(Context $context, string $logical): LlvmFunction
+    {
+        self::ensureShutdownJitHelperCompiled($context);
+        $lc = \strtolower($logical);
+        $fn = $context->functions[$lc] ?? null;
+        if (null === $fn) {
+            throw new \LogicException($logical.' missing after GcDestructShutdownJitHelper compile (#15852)');
+        }
+
+        return $fn;
+    }
+
     private static function ensureRegistryJitHelperCompiled(Context $context): void
     {
         $missing = false;
@@ -1649,6 +1708,24 @@ final class GcCollectCyclesRuntime
         $collected = $context->builder->call($collectEmbed);
         $context->builder->returnValue($collected);
         $context->builder->clearInsertionPosition();
+    }
+
+    private static function implementRunShutdownDestructorsPhpBridge(Context $context): void
+    {
+        $voidTy = $context->getTypeFromString('void');
+        $ft = $context->context->functionType($voidTy, false);
+        $fn = self::functionOrCreate($context, 'phpc_gc_run_shutdown_destructors', $ft);
+        if ($fn->countBasicBlocks() > 0) {
+            return;
+        }
+        $entry = $fn->appendBasicBlock('shutdown_php_entry');
+        $context->builder->positionAtEnd($entry);
+        $context->builder->call(
+            self::shutdownHelperFunction($context, self::RUN_SHUTDOWN_DESTRUCTORS)
+        );
+        $context->builder->returnVoid();
+        $context->builder->clearInsertionPosition();
+        $context->registerFunction('phpc_gc_run_shutdown_destructors', $fn);
     }
 
     private static function collectEmbedHelperFunction(Context $context): LlvmFunction
