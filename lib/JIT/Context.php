@@ -1520,7 +1520,6 @@ class Context {
                 return $name;
             }
         }
-        var_dump($type->getKind());
         return 'unknown';
     }
 

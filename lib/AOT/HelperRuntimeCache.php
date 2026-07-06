@@ -40,6 +40,9 @@ final class HelperRuntimeCache
     /** Guard so the emitter itself never consumes the cache. */
     private const ENV_EMITTING = 'PHP_COMPILER_HELPER_RUNTIME_EMITTING';
 
+    /** Marker for a warmed cache at a given core fingerprint (#15889). */
+    private const CORE_MARKER_PREFIX = 'core-';
+
     /** @var array<string, array{symbol: string, dir: string}>|null logical(lower) → binding */
     private static ?array $helperIndex = null;
 
@@ -48,6 +51,8 @@ final class HelperRuntimeCache
 
     /** @var array<string, true> unit dir → merged at link time */
     private static array $usedUnits = [];
+
+    private static bool $loggedHit = false;
 
     public static function enabled(): bool
     {
@@ -67,6 +72,63 @@ final class HelperRuntimeCache
         }
 
         return \dirname(__DIR__, 2).'/build/helper-runtime-cache';
+    }
+
+    private static function coreMarkerPath(): string
+    {
+        return self::cacheDir().'/'.self::CORE_MARKER_PREFIX.self::coreFingerprint().'.ok';
+    }
+
+    /**
+     * Best-effort warmup for user-script AOT builds (#15889).
+     *
+     * When the cache is enabled but cold, run the incremental helper-unit emitter once per core
+     * fingerprint. Subsequent builds should be cache hits with no nested helper lowering.
+     */
+    public static function warmForUserAotBuild(): void
+    {
+        if (!self::enabled()) {
+            return;
+        }
+        // Only for user-script AOT builds; bootstrap/self-host pipelines own their own emit ladders.
+        $user = getenv('PHP_COMPILER_AOT_USER_SCRIPT');
+        if ('1' !== $user && 'true' !== strtolower((string) $user)) {
+            return;
+        }
+        $marker = self::coreMarkerPath();
+        if (is_file($marker)) {
+            return;
+        }
+
+        $root = \dirname(__DIR__, 2);
+        $script = $root.'/script/emit-helper-runtime-object.php';
+        if (!is_file($script)) {
+            return;
+        }
+        $cmd = escapeshellarg(PHP_BINARY).' '.escapeshellarg($script);
+        $rc = self::runWarmupCommand($cmd);
+        if (0 === $rc) {
+            @mkdir(\dirname($marker), 0755, true);
+            @file_put_contents($marker, 'ok '.gmdate('c')."\n");
+            // Any new units should be visible immediately.
+            self::$helperIndex = null;
+        }
+    }
+
+    private static function runWarmupCommand(string $command): int
+    {
+        // Prefer the in-repo polyfill when available (self-host safe).
+        if (\function_exists('phpc_run_command')) {
+            $out = \phpc_run_command($command);
+            if (\is_array($out)) {
+                return (int) ($out['code'] ?? 127);
+            }
+        }
+        $ignored = [];
+        $rc = 127;
+        @exec($command.' 2>/dev/null', $ignored, $rc);
+
+        return (int) $rc;
     }
 
     public static function unitsDir(): string
@@ -270,6 +332,20 @@ final class HelperRuntimeCache
             $context->functions[$lc] = $context->module->addFunction($symbol, $type);
             self::$usedUnits[$unitDir] = true;
             ++$bound;
+        }
+
+        if ($bound > 0 && !self::$loggedHit) {
+            $user = getenv('PHP_COMPILER_AOT_USER_SCRIPT');
+            if ('1' === $user || 'true' === strtolower((string) $user)) {
+                if (\defined('STDERR') && \is_resource(STDERR)) {
+                    fwrite(STDERR, sprintf(
+                        "phpc build: helper-runtime cache hit (%d helpers, core=%s) (#15889)\n",
+                        $bound,
+                        self::coreFingerprint()
+                    ));
+                }
+                self::$loggedHit = true;
+            }
         }
 
         return $bound > 0;

@@ -338,26 +338,23 @@ function run(string $filename, string $code, array $options): void
         $scriptFilename
     );
     $prevUserScriptAot = getenv('PHP_COMPILER_AOT_USER_SCRIPT');
+    $prevHelperRuntimeO = getenv('PHP_COMPILER_HELPER_RUNTIME_O');
     $setUserScriptAot = phpc_compile_is_user_script_aot($normalized);
     if ($setUserScriptAot && \function_exists('putenv')) {
         putenv('PHP_COMPILER_AOT_USER_SCRIPT=1');
         $_ENV['PHP_COMPILER_AOT_USER_SCRIPT'] = '1';
         $_SERVER['PHP_COMPILER_AOT_USER_SCRIPT'] = '1';
-    }
-    try {
-        $block = $runtime->parseAndCompile($code, $filename);
-    } finally {
-        if ($setUserScriptAot && \function_exists('putenv')) {
-            if (false === $prevUserScriptAot || null === $prevUserScriptAot) {
-                putenv('PHP_COMPILER_AOT_USER_SCRIPT=');
-                unset($_ENV['PHP_COMPILER_AOT_USER_SCRIPT'], $_SERVER['PHP_COMPILER_AOT_USER_SCRIPT']);
-            } else {
-                putenv('PHP_COMPILER_AOT_USER_SCRIPT='.$prevUserScriptAot);
-                $_ENV['PHP_COMPILER_AOT_USER_SCRIPT'] = $prevUserScriptAot;
-                $_SERVER['PHP_COMPILER_AOT_USER_SCRIPT'] = $prevUserScriptAot;
-            }
+        // Default-on helper-runtime split compilation for user scripts (#15889).
+        $helperCache = getenv('PHP_COMPILER_HELPER_RUNTIME_O');
+        if (false === $helperCache || '' === (string) $helperCache) {
+            putenv('PHP_COMPILER_HELPER_RUNTIME_O=1');
+            $_ENV['PHP_COMPILER_HELPER_RUNTIME_O'] = '1';
+            $_SERVER['PHP_COMPILER_HELPER_RUNTIME_O'] = '1';
         }
     }
+    // Warm helper-unit cache once per core fingerprint so subsequent builds skip nested helper lowering (#15889).
+    \PHPCompiler\AOT\HelperRuntimeCache::warmForUserAotBuild();
+    $block = $runtime->parseAndCompile($code, $filename);
     if (null === $block) {
         if (! isset($options['-l'])) {
             $diag = \PHPCompiler\Runtime::getLastParseFailure();
@@ -471,6 +468,24 @@ function run(string $filename, string $code, array $options): void
             $bundleLintCacheFile,
             $normalized."\nlinted-ok " . date('c') . "\n"
         );
+    }
+    if ($setUserScriptAot && \function_exists('putenv')) {
+        if (false === $prevUserScriptAot || null === $prevUserScriptAot) {
+            putenv('PHP_COMPILER_AOT_USER_SCRIPT=');
+            unset($_ENV['PHP_COMPILER_AOT_USER_SCRIPT'], $_SERVER['PHP_COMPILER_AOT_USER_SCRIPT']);
+        } else {
+            putenv('PHP_COMPILER_AOT_USER_SCRIPT='.$prevUserScriptAot);
+            $_ENV['PHP_COMPILER_AOT_USER_SCRIPT'] = $prevUserScriptAot;
+            $_SERVER['PHP_COMPILER_AOT_USER_SCRIPT'] = $prevUserScriptAot;
+        }
+        if (false === $prevHelperRuntimeO || null === $prevHelperRuntimeO) {
+            putenv('PHP_COMPILER_HELPER_RUNTIME_O=');
+            unset($_ENV['PHP_COMPILER_HELPER_RUNTIME_O'], $_SERVER['PHP_COMPILER_HELPER_RUNTIME_O']);
+        } else {
+            putenv('PHP_COMPILER_HELPER_RUNTIME_O='.$prevHelperRuntimeO);
+            $_ENV['PHP_COMPILER_HELPER_RUNTIME_O'] = $prevHelperRuntimeO;
+            $_SERVER['PHP_COMPILER_HELPER_RUNTIME_O'] = $prevHelperRuntimeO;
+        }
     }
 }
 
