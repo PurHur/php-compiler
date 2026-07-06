@@ -1297,7 +1297,7 @@ function withheldBuiltinGateDefinitions(): array
         [
             'names' => ['stream_supports'],
             'gate' => [PHPCompiler\CompilerVersion::class, 'supportsStreamSupports'],
-            'since' => '8.4.0',
+            'since' => '8.3.0',
             'module' => 'standard',
             'relPath' => 'ext/standard/stream_supports.php',
         ],
