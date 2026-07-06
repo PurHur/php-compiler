@@ -84,7 +84,7 @@ final class PasswordBuiltinTest extends TestCase
         $hashFn->execute($hashFrame);
     }
 
-    public function testHashNullPasswordThrowsTypeError(): void
+    public function testHashNullPasswordCoercesToEmptyString(): void
     {
         $runtime = new Runtime();
         $pass = new VMVariable();
@@ -96,10 +96,12 @@ final class PasswordBuiltinTest extends TestCase
         $hashFrame = $hashFn->getFrame($runtime->vmContext);
         $hashFrame->calledArgs = [$pass, $algo];
         $hashFrame->returnVar = new VMVariable();
-
-        $this->expectException(\TypeError::class);
-        $this->expectExceptionMessage('password_hash(): Argument #1 ($password) must be of type string, null given');
         $hashFn->execute($hashFrame);
+
+        $hash = $hashFrame->returnVar->resolveIndirect();
+        $this->assertSame(VMVariable::TYPE_STRING, $hash->type);
+        $this->assertNotSame('', $hash->toString());
+        $this->assertTrue(password_verify('', $hash->toString()));
     }
 
     public function testCryptBcryptAndInvalidSalt(): void
