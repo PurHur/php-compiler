@@ -112,6 +112,40 @@ final class WeakRefSupport
         throw new \TypeError('WeakMap key must be an object');
     }
 
+    /**
+     * Stable hash-table storage key for enum case array offsets, or null when not an enum case (#9871).
+     */
+    public static function objectKeyIfEnumCase(Variable $key): ?string
+    {
+        $key = $key->resolveIndirect();
+        if (EnumCaseSupport::isEnumCaseVariable($key)) {
+            return self::objectKey($key);
+        }
+        if (Variable::TYPE_OBJECT === $key->type && EnumCaseSupport::isEnumCase($key->toObject())) {
+            return self::objectKey($key);
+        }
+
+        return null;
+    }
+
+    /** Materialize int/string/enum-case keys from hash-table storage (#9871, zend_hash.c). */
+    public static function materializeArrayKey(Variable $key): Variable
+    {
+        if (Variable::TYPE_STRING === $key->type) {
+            $resolved = self::resolveMapKeyVariable($key->toString());
+            if (null !== $resolved) {
+                $out = new Variable();
+                $out->copyFrom($resolved);
+
+                return $out;
+            }
+        }
+        $out = new Variable();
+        $out->copyFrom($key);
+
+        return $out;
+    }
+
     public static function objectKey(Variable $key): string
     {
         $key = $key->resolveIndirect();
