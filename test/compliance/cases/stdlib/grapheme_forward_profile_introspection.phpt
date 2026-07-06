@@ -10,9 +10,7 @@ $phantom = function_exists('grapheme_strlen')
     || function_exists('grapheme_substr')
     || function_exists('grapheme_strpos')
     || function_exists('grapheme_extract')
-    || function_exists('grapheme_str_split')
-    || function_exists('grapheme_str_contains')
-    || function_exists('grapheme_strimwidth');
+    || function_exists('grapheme_str_split');
 echo $phantom ? "fail\n" : "ok\n";
 --EXPECT--
 ok

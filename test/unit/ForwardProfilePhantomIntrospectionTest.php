@@ -269,8 +269,6 @@ final class ForwardProfilePhantomIntrospectionTest extends TestCase
                 \PHPCompiler\ext\standard\ModuleRegistry::extensionLoaded('intl')
             );
             foreach ([
-                'grapheme_str_contains',
-                'grapheme_strimwidth',
                 'grapheme_strlen',
                 'grapheme_substr',
                 'grapheme_strpos',
@@ -279,12 +277,13 @@ final class ForwardProfilePhantomIntrospectionTest extends TestCase
             ] as $fn) {
                 $this->assertFalse(BuiltinIntrospectionPolicy::functionIsAdvertised($fn));
             }
+            foreach (['grapheme_str_contains', 'grapheme_strimwidth'] as $fn) {
+                $this->assertTrue(BuiltinIntrospectionPolicy::functionIsAdvertised($fn));
+            }
 
             $runtime = new Runtime();
             $ctx = $runtime->vmContext;
             foreach ([
-                'grapheme_str_contains',
-                'grapheme_strimwidth',
                 'grapheme_strlen',
                 'grapheme_substr',
                 'grapheme_strpos',
@@ -293,6 +292,12 @@ final class ForwardProfilePhantomIntrospectionTest extends TestCase
             ] as $fn) {
                 $this->assertTrue(isset($ctx->functions[$fn]));
                 $this->assertFalse(
+                    \PHPCompiler\ext\standard\VmReflection::functionExists($ctx, $fn)
+                );
+            }
+            foreach (['grapheme_str_contains', 'grapheme_strimwidth'] as $fn) {
+                $this->assertTrue(isset($ctx->functions[$fn]));
+                $this->assertTrue(
                     \PHPCompiler\ext\standard\VmReflection::functionExists($ctx, $fn)
                 );
             }
