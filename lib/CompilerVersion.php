@@ -1431,10 +1431,15 @@ final class CompilerVersion
         return false;
     }
 
-    /** ext/bz2 via pure PHP {@see \PHPCompiler\ext\bz2\VmBz2Core} — withheld on reference profile (#11992, #14219). */
+    /**
+     * ext/bz2 via pure PHP {@see \PHPCompiler\ext\bz2\VmBz2Core} — withheld on reference profile (#11992, #14219, #16853).
+     *
+     * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev reference profile matches Zend 8.2
+     * phantom gate (host ext-bz2 often unloaded). Enable forward profile via `PHP_COMPILER_PROFILE=8.4`.
+     */
     public static function supportsBz2(): bool
     {
-        return false;
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
     }
 
     /**
