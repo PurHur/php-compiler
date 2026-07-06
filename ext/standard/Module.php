@@ -495,6 +495,7 @@ class Module extends ModuleAbstract
             new header_(),
             new headers_sent(),
             new connection_status(),
+            new fastcgi_finish_request(),
             new header_register_callback(),
             new register_shutdown_function(),
             ...(CompilerVersion::supportsReadonlyBuiltin() ? [new readonly_()] : []),
