@@ -747,6 +747,23 @@ class Compiler {
     /**
      * @param list<Op\Expr\Param> $params
      */
+    protected function assertVariadicParamIsLast(array $params): void
+    {
+        $seenVariadic = false;
+        foreach ($params as $param) {
+            if ($param->variadic) {
+                $seenVariadic = true;
+                continue;
+            }
+            if ($seenVariadic) {
+                $this->throwCompileError('Only the last parameter can be variadic');
+            }
+        }
+    }
+
+    /**
+     * @param list<Op\Expr\Param> $params
+     */
     protected function assertNoDuplicateParameterAttributes(array $params): void
     {
         foreach ($params as $param) {
@@ -798,6 +815,7 @@ class Compiler {
                 $this->assertNoDuplicateParameterNames($params);
                 $this->assertNoDuplicateParameterAttributes($params);
                 $this->assertReadonlyParamOnlyInConstructor($params, $func);
+                $this->assertVariadicParamIsLast($params);
             }
             $paramIdx = 0;
             foreach ($params as $param) {
@@ -841,6 +859,7 @@ class Compiler {
             $this->assertNoDuplicateParameterNames($params);
             $this->assertNoDuplicateParameterAttributes($params);
             $this->assertReadonlyParamOnlyInConstructor($params, $func);
+            $this->assertVariadicParamIsLast($params);
         }
         $paramIdx = 0;
         foreach ($params as $param) {
