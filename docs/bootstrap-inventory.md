@@ -17569,9 +17569,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/file_put_contents.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 24)
-- new ArgumentCountError (line 64)
-- 5 class method(s)
+- new ArgumentCountError (line 25)
+- new ArgumentCountError (line 65)
+- 6 class method(s)
 
 ### `ext/standard/fileatime.php`
 
