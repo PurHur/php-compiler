@@ -155,6 +155,7 @@ use PHPCompiler\VM\Builtin\ReflectionEnumBackedCaseConstruct;
 use PHPCompiler\VM\Builtin\ReflectionEnumBackedCaseGetBackingValue;
 use PHPCompiler\VM\Builtin\ReflectionEnumBackedCaseIsBacked;
 use PHPCompiler\VM\Builtin\ReflectionEnumConstruct;
+use PHPCompiler\VM\Builtin\ReflectionEnumFromName;
 use PHPCompiler\VM\Builtin\ReflectionEnumGetBackingType;
 use PHPCompiler\VM\Builtin\ReflectionEnumGetCase;
 use PHPCompiler\VM\Builtin\ReflectionEnumGetCases;
@@ -950,6 +951,9 @@ final class BuiltinClasses
         $renum->methodVisibility['getcase'] = $pub;
         $renum->methods['hascase'] = new ReflectionEnumHasCase();
         $renum->methodVisibility['hascase'] = $pub;
+        $renum->methods['fromname'] = new ReflectionEnumFromName();
+        $renum->methodVisibility['fromname'] = $pubStatic;
+        $renum->methodNames['fromname'] = 'fromName';
         $renum->methods['gettraitnames'] = new ReflectionClassGetTraitNames();
         $renum->methods['getinterfacenames'] = new ReflectionClassGetInterfaceNames();
         $renum->methodVisibility['gettraitnames'] = $pub;
