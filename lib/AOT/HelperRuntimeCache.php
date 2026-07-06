@@ -40,13 +40,13 @@ final class HelperRuntimeCache
     /** Guard so the emitter itself never consumes the cache. */
     private const ENV_EMITTING = 'PHP_COMPILER_HELPER_RUNTIME_EMITTING';
 
-    /** @var array<string, array{symbol: string, unit: string}>|null logical(lower) → binding */
+    /** @var array<string, array{symbol: string, dir: string}>|null logical(lower) → binding */
     private static ?array $helperIndex = null;
 
-    /** @var array<string, object> unit slug → parsed bitcode module (kept alive: types are shared) */
+    /** @var array<string, object> unit dir → parsed bitcode module (kept alive: types are shared) */
     private static array $parsedUnits = [];
 
-    /** @var array<string, true> unit slug → merged at link time */
+    /** @var array<string, true> unit dir → merged at link time */
     private static array $usedUnits = [];
 
     public static function enabled(): bool
@@ -87,6 +87,11 @@ final class HelperRuntimeCache
     /**
      * Lowering-machinery fingerprint: deliberately narrow so single-helper
      * edits do not invalidate the whole cache (#15889 incrementality).
+     *
+     * Content hashes, not mtime:size — fingerprints must agree across clones
+     * and architectures so committed prelinked units are shareable (#15889).
+     * patches/ is included: vendor patches change lowering behaviour but
+     * composer.lock cannot see them.
      */
     public static function coreFingerprint(): string
     {
@@ -102,11 +107,29 @@ final class HelperRuntimeCache
             $root.'/lib/JIT/Context.php',
             $root.'/lib/Runtime.php',
             $root.'/lib/JIT/JitVmHelperLink.php',
+            $root.'/script/apply-patches.sh',
         ] as $file) {
-            $parts[] = $file.':'.@filemtime($file).':'.@filesize($file);
+            $parts[] = substr($file, \strlen($root)).':'.@hash_file('sha256', $file);
+        }
+        $patchFiles = glob($root.'/patches/*.patch') ?: [];
+        sort($patchFiles, SORT_STRING);
+        foreach ($patchFiles as $patch) {
+            $parts[] = substr($patch, \strlen($root)).':'.@hash_file('sha256', $patch);
         }
 
         return $core = substr(hash('sha256', implode("\n", $parts)), 0, 20);
+    }
+
+    /** Architecture key for shareable prelinked unit objects, e.g. "x86_64-linux". */
+    public static function archKey(): string
+    {
+        return php_uname('m').'-'.strtolower(php_uname('s'));
+    }
+
+    /** Committed per-arch unit cache: prelinked/helper-runtime/<arch>/units. */
+    public static function prelinkedUnitsDir(): string
+    {
+        return \dirname(__DIR__, 2).'/prelinked/helper-runtime/'.self::archKey().'/units';
     }
 
     /** Per-unit fingerprint: core + the helper source content. */
@@ -118,9 +141,9 @@ final class HelperRuntimeCache
     }
 
     /** @return array{fingerprint: string, unit: string, helpers: array<string,string>}|null */
-    public static function unitManifest(string $slug): ?array
+    public static function unitManifest(string $slug, ?string $unitDir = null): ?array
     {
-        $path = self::unitDir($slug).'/manifest.json';
+        $path = ($unitDir ?? self::unitDir($slug)).'/manifest.json';
         if (!is_readable($path)) {
             return null;
         }
@@ -145,10 +168,15 @@ final class HelperRuntimeCache
     }
 
     /**
-     * logical(lower) → {symbol, unit} across all FRESH unit manifests.
+     * logical(lower) → {symbol, dir} across all FRESH unit manifests.
      * Built lazily once per process; adding a unit invalidates nothing else.
      *
-     * @return array<string, array{symbol: string, unit: string}>
+     * The local build cache is scanned first and wins; the committed per-arch
+     * prelinked cache (a fresh clone's warm start) fills the gaps. Stale
+     * entries in either tier are skipped per unit — a stale committed cache
+     * can only make a build slower, never wrong.
+     *
+     * @return array<string, array{symbol: string, dir: string}>
      */
     private static function helperIndex(): array
     {
@@ -157,21 +185,27 @@ final class HelperRuntimeCache
         }
         $index = [];
         $root = \dirname(__DIR__, 2);
-        foreach (glob(self::unitsDir().'/*/manifest.json') ?: [] as $manifestPath) {
-            $slug = basename(\dirname($manifestPath));
-            $manifest = self::unitManifest($slug);
-            if (null === $manifest) {
-                continue;
-            }
-            $sourceAbs = self::resolveUnitSource($root, (string) $manifest['unit']);
-            if (null === $sourceAbs || self::unitFingerprint($sourceAbs) !== $manifest['fingerprint']) {
-                continue; // stale — emitter will refresh it
-            }
-            if (!is_file(self::unitDir($slug).'/unit.o') || !is_file(self::unitDir($slug).'/unit.bc')) {
-                continue;
-            }
-            foreach ($manifest['helpers'] as $logical => $symbol) {
-                $index[$logical] = ['symbol' => (string) $symbol, 'unit' => $slug];
+        foreach ([self::unitsDir(), self::prelinkedUnitsDir()] as $unitsRoot) {
+            foreach (glob($unitsRoot.'/*/manifest.json') ?: [] as $manifestPath) {
+                $unitDir = \dirname($manifestPath);
+                $slug = basename($unitDir);
+                $manifest = self::unitManifest($slug, $unitDir);
+                if (null === $manifest) {
+                    continue;
+                }
+                $sourceAbs = self::resolveUnitSource($root, (string) $manifest['unit']);
+                if (null === $sourceAbs || self::unitFingerprint($sourceAbs) !== $manifest['fingerprint']) {
+                    continue; // stale — emitter will refresh it
+                }
+                if (!is_file($unitDir.'/unit.o') || !is_file($unitDir.'/unit.bc')) {
+                    continue;
+                }
+                foreach ($manifest['helpers'] as $logical => $symbol) {
+                    if (isset($index[$logical])) {
+                        continue; // build cache outranks prelinked
+                    }
+                    $index[$logical] = ['symbol' => (string) $symbol, 'dir' => $unitDir];
+                }
             }
         }
 
@@ -209,18 +243,18 @@ final class HelperRuntimeCache
                 continue;
             }
             $symbol = $index[$lc]['symbol'];
-            $slug = $index[$lc]['unit'];
+            $unitDir = $index[$lc]['dir'];
 
             $existing = $context->module->getNamedFunction($symbol);
             if (null !== $existing) {
                 $context->functions[$lc] = $existing;
-                self::$usedUnits[$slug] = true;
+                self::$usedUnits[$unitDir] = true;
                 ++$bound;
 
                 continue;
             }
 
-            $parsed = self::parsedUnit($context, $slug);
+            $parsed = self::parsedUnit($context, $unitDir);
             if (null === $parsed) {
                 continue;
             }
@@ -234,31 +268,31 @@ final class HelperRuntimeCache
             }
             $type = $context->llvm->factory->type($context->context, $fnType);
             $context->functions[$lc] = $context->module->addFunction($symbol, $type);
-            self::$usedUnits[$slug] = true;
+            self::$usedUnits[$unitDir] = true;
             ++$bound;
         }
 
         return $bound > 0;
     }
 
-    private static function parsedUnit(Context $context, string $slug): ?object
+    private static function parsedUnit(Context $context, string $unitDir): ?object
     {
-        if (isset(self::$parsedUnits[$slug])) {
-            return self::$parsedUnits[$slug];
+        if (isset(self::$parsedUnits[$unitDir])) {
+            return self::$parsedUnits[$unitDir];
         }
-        $path = self::unitDir($slug).'/unit.bc';
+        $path = $unitDir.'/unit.bc';
         $data = is_file($path) ? (string) file_get_contents($path) : '';
         if ('' === $data) {
             return null;
         }
         // createMemoryBufferWithString instead of ...WithFile: the vendored
         // ...WithFile references an unimported FFI class (latent php-llvm bug).
-        $buffer = $context->llvm->createMemoryBufferWithString($data, $slug.'.bc');
+        $buffer = $context->llvm->createMemoryBufferWithString($data, basename($unitDir).'.bc');
 
         try {
             // Kept referenced for the process lifetime — declaration types
             // point into the shared LLVMContext.
-            return self::$parsedUnits[$slug] = $buffer->parseBitcode($context->context);
+            return self::$parsedUnits[$unitDir] = $buffer->parseBitcode($context->context);
         } catch (\Throwable $e) {
             return null;
         }
@@ -275,8 +309,8 @@ final class HelperRuntimeCache
             return [];
         }
         $objects = [];
-        foreach (array_keys(self::$usedUnits) as $slug) {
-            $object = self::unitDir($slug).'/unit.o';
+        foreach (array_keys(self::$usedUnits) as $unitDir) {
+            $object = $unitDir.'/unit.o';
             if (is_file($object)) {
                 $objects[] = $object;
             }

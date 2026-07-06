@@ -1,0 +1,1 @@
+{"fingerprint":"84dd605a036b53cf480d","unit":"/VM/SensitiveParamJitHelper.php","helpers":{"phpcompiler\\vm\\sensitiveparamjithelper::shouldignorebacktraceargs":"phpcompiler_vm_sensitiveparamjithelper__shouldignorebacktraceargs","phpcompiler\\vm\\sensitiveparamjithelper::shouldprovidebacktraceobject":"phpcompiler_vm_sensitiveparamjithelper__shouldprovidebacktraceobject"}}

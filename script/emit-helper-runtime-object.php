@@ -19,8 +19,14 @@ declare(strict_types=1);
  * So a crash resumes at the breaking unit, and a helper edit re-emits ONE
  * unit. --force re-attempts everything (including failure markers).
  *
+ * --prelink additionally publishes every fresh unit into the committed
+ * per-arch cache prelinked/helper-runtime/<arch>/units/ (fingerprints are
+ * content-based, so any clone on the same arch consumes them cold) and
+ * rewrites that arch's manifest.json. Commit the result when intentional.
+ *
  * Usage (pinned env, LLVM 9 required):
  *   ./script/docker-exec.sh -- bash -lc 'php script/emit-helper-runtime-object.php'
+ *   ./script/docker-exec.sh -- bash -lc 'php script/emit-helper-runtime-object.php --prelink'
  */
 
 use PHPCompiler\AOT\HelperRuntimeCache;
@@ -136,7 +142,26 @@ if (null !== $unitPath) {
     $context->compileToFile($dir.'/unit.o');
     // Bitcode AFTER compileToFile: compileCommon finalizes lazy builtins and
     // verifies — a pre-finalization snapshot parses back as invalid bitcode.
-    $context->module->writeBitcodeToFile($dir.'/unit.bc');
+    //
+    // Declarations-only module instead of the full unit bitcode: consumers
+    // (HelperRuntimeCache::tryProvide) only read the helpers' function types
+    // from it, and the full module bitcode roughly doubled the committed
+    // per-arch cache. Same LLVMContext, so named struct types match the ones
+    // the object file was lowered with.
+    $lib = $context->llvm->lib;
+    $decls = $context->context->moduleCreateWithName(HelperRuntimeCache::slugFor($unitPath).'_decls');
+    foreach ($helpers as $lc => $symbol) {
+        $fn = $context->module->getNamedFunction($symbol);
+        if (null === $fn) {
+            continue;
+        }
+        $fnType = $lib->LLVMGetElementType($lib->LLVMTypeOf($fn->value));
+        if (null === $fnType) {
+            continue;
+        }
+        $decls->addFunction($symbol, $context->llvm->factory->type($context->context, $fnType));
+    }
+    $decls->writeBitcodeToFile($dir.'/unit.bc');
     file_put_contents($dir.'/manifest.json', json_encode([
         'fingerprint' => HelperRuntimeCache::unitFingerprint($sourceAbs),
         'unit' => $unitPath,
@@ -207,4 +232,68 @@ fwrite(STDOUT, sprintf(
     $knownBroken,
     $failedNow
 ));
+
+if (in_array('--prelink', $argv, true)) {
+    $arch = HelperRuntimeCache::archKey();
+    $prelinkUnits = HelperRuntimeCache::prelinkedUnitsDir();
+    $archDir = \dirname($prelinkUnits);
+    if (!is_dir($prelinkUnits) && !mkdir($prelinkUnits, 0755, true) && !is_dir($prelinkUnits)) {
+        fwrite(STDERR, "helper-runtime-prelink: cannot create {$prelinkUnits}\n");
+        exit(1);
+    }
+    $published = 0;
+    $totalBytes = 0;
+    $publishedSlugs = [];
+    foreach ($sites as $path => $names) {
+        $slug = HelperRuntimeCache::slugFor($path);
+        $buildDir = HelperRuntimeCache::unitDir($slug);
+        $sourceAbs = HelperRuntimeCache::resolveUnitSource($root, $path);
+        $manifest = HelperRuntimeCache::unitManifest($slug);
+        if (null === $sourceAbs || null === $manifest
+            || $manifest['fingerprint'] !== HelperRuntimeCache::unitFingerprint($sourceAbs)
+            || !is_file($buildDir.'/unit.o') || !is_file($buildDir.'/unit.bc')) {
+            continue; // only fresh, complete units are published
+        }
+        $dest = $prelinkUnits.'/'.$slug;
+        if (!is_dir($dest) && !mkdir($dest, 0755, true) && !is_dir($dest)) {
+            continue;
+        }
+        foreach (['unit.o', 'unit.bc', 'manifest.json'] as $name) {
+            copy($buildDir.'/'.$name, $dest.'/'.$name);
+            $totalBytes += (int) @filesize($dest.'/'.$name);
+        }
+        @unlink($dest.'/failed.json'); // never commit crash markers — env-specific
+        $publishedSlugs[$slug] = true;
+        ++$published;
+    }
+    // Drop committed units whose helper site no longer exists (or was renamed).
+    $removed = 0;
+    foreach (glob($prelinkUnits.'/*', GLOB_ONLYDIR) ?: [] as $dir) {
+        if (isset($publishedSlugs[basename($dir)])) {
+            continue;
+        }
+        foreach (glob($dir.'/*') ?: [] as $file) {
+            @unlink($file);
+        }
+        @rmdir($dir);
+        ++$removed;
+    }
+    file_put_contents($archDir.'/manifest.json', json_encode([
+        'version' => 1,
+        'generated_at' => gmdate('c'),
+        'arch' => $arch,
+        'role' => 'committed per-arch split-compilation helper units (#15889) — consumed via PHP_COMPILER_HELPER_RUNTIME_O=1; stale units are skipped per fingerprint and recompiled locally',
+        'core_fingerprint' => HelperRuntimeCache::coreFingerprint(),
+        'unit_count' => $published,
+        'total_bytes' => $totalBytes,
+        'refresh' => 'php script/emit-helper-runtime-object.php --prelink (pinned env)',
+    ], JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT)."\n");
+    fwrite(STDOUT, sprintf(
+        "helper-runtime-prelink: %s — %d units published (%.1f MB), %d removed — commit prelinked/helper-runtime when intentional\n",
+        $arch,
+        $published,
+        $totalBytes / 1048576,
+        $removed
+    ));
+}
 exit($emitted + $fresh > 0 ? 0 : 1);
