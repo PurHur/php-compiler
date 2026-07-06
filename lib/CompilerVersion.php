@@ -601,7 +601,7 @@ final class CompilerVersion
      */
     public static function supportsGetDeclaredExcludeDeprecated(): bool
     {
-        return version_compare(self::VERSION, '8.4.0', '>=');
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
     }
 
     /**
