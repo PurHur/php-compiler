@@ -8,7 +8,6 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\ResourceSupport;
 use PHPLLVM\Value;
 
 /** stream_filter_remove() — detach a filter from a stream (#6040, ext/standard/streams.c). */
@@ -30,13 +29,8 @@ final class stream_filter_remove extends Internal
             return;
         }
         $v = $frame->calledArgs[0]->resolveIndirect();
-        VmStreamArg::rejectEnumCaseOperand($v, 'stream_filter_remove', 1, 'stream_filter');
-        $filterId = ResourceSupport::resolveHandle($v);
-        if (
-            null === $filterId
-            || !ResourceSupport::isStreamFilterResource($v)
-            || !VmStreamFilterChain::isValidFilter($filterId)
-        ) {
+        $filterId = VmStreamFilterArg::resolveRemoveFilterId($v, 'stream_filter_remove');
+        if (null === $filterId) {
             $frame->returnVar->bool(false);
 
             return;
