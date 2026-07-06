@@ -37,6 +37,14 @@ final class glob_ extends Internal
             }
             $flags = $flagsVar->toInt();
         }
+        if (!VmFsGlobFailure::hasValidFlags($flags)) {
+            VmFsGlobFailure::warnInvalidFlags($frame);
+            if (null !== $frame->returnVar) {
+                $frame->returnVar->bool(false);
+            }
+
+            return;
+        }
         if (null === $frame->returnVar) {
             return;
         }
