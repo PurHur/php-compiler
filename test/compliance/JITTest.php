@@ -974,6 +974,11 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'reflection_function_is_deprecated')) {
                 continue;
             }
+            // Reflection createFrom* factory profile gates: VM-only (#16724).
+            if (str_contains($name, 'reflection_create_from_callable')
+                || str_contains($name, 'reflection_function_create_from')) {
+                continue;
+            }
             // Reflection docblock/source getters are VM-only (#7358).
             if (str_contains($name, 'reflection_docblock_source')) {
                 continue;

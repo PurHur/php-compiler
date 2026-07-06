@@ -592,10 +592,12 @@ final class BuiltinClasses
         $rm->methodVisibility['getclosurescopeclass'] = $pub;
         $rm->methods['getclosurethis'] = new ReflectionMethodGetClosureThis();
         $rm->methodVisibility['getclosurethis'] = $pub;
-        $rm->methods['createfromclosure'] = new ReflectionMethodCreateFromClosure();
-        $rm->methodVisibility['createfromclosure'] = $pubStatic;
-        $rm->methods['createfrommethodname'] = new ReflectionMethodCreateFromMethodName();
-        $rm->methodVisibility['createfrommethodname'] = $pubStatic;
+        if (CompilerVersion::supportsReflectionCreateFromFactories()) {
+            $rm->methods['createfromclosure'] = new ReflectionMethodCreateFromClosure();
+            $rm->methodVisibility['createfromclosure'] = $pubStatic;
+            $rm->methods['createfrommethodname'] = new ReflectionMethodCreateFromMethodName();
+            $rm->methodVisibility['createfrommethodname'] = $pubStatic;
+        }
         $rm->methods['isstatic'] = new ReflectionMethodIsStatic();
         $rm->methodVisibility['isstatic'] = $pub;
         $rm->methods['ispublic'] = new ReflectionMethodIsPublic();
@@ -852,10 +854,12 @@ final class BuiltinClasses
             $rf->methods[$name] = $method;
             $rf->methodVisibility[$name] = $pub;
         }
-        $rf->methods['createfromcallable'] = new ReflectionFunctionCreateFromCallable();
-        $rf->methodVisibility['createfromcallable'] = $pubStatic;
-        $rf->methods['createfromfunction'] = new ReflectionFunctionCreateFromFunction();
-        $rf->methodVisibility['createfromfunction'] = $pubStatic;
+        if (CompilerVersion::supportsReflectionCreateFromFactories()) {
+            $rf->methods['createfromcallable'] = new ReflectionFunctionCreateFromCallable();
+            $rf->methodVisibility['createfromcallable'] = $pubStatic;
+            $rf->methods['createfromfunction'] = new ReflectionFunctionCreateFromFunction();
+            $rf->methodVisibility['createfromfunction'] = $pubStatic;
+        }
         if (CompilerVersion::supportsReflectionFunctionIsDeprecated()) {
             $rf->methods['isdeprecated'] = new ReflectionFunctionIsDeprecated();
             $rf->methodVisibility['isdeprecated'] = $pub;

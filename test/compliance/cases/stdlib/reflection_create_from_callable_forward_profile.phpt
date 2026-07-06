@@ -1,5 +1,5 @@
 --TEST--
-ReflectionFunction::createFromCallable() / ReflectionMethod::createFromClosure() (#7039, php_reflection.c)
+ReflectionFunction::createFromCallable() / ReflectionMethod::createFromClosure() forward profile (#7039, php_reflection.c)
 --FILE--
 <?php
 echo 'createFromCallable=', var_export(method_exists('ReflectionFunction', 'createFromCallable'), true), "\n";
