@@ -360,6 +360,10 @@ final class BuiltinParamNames
             case 'debug_backtrace':
             case 'get_debug_backtrace':
                 return ['options', 'limit'];
+            case 'openssl_cipher_iv_length':
+            case 'openssl_cipher_key_length':
+                // php-src openssl.stub.php public name cipher_algo (internal arginfo: method).
+                return ['cipher_algo'];
             case 'pathinfo':
                 return ['path', 'flags'];
             case 'dirname':

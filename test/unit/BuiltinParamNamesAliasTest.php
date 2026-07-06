@@ -96,6 +96,17 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'limit', 'debug_backtrace'));
     }
 
+    /** @covers issue #16887 */
+    public function testOpensslCipherLengthNamedCipherAlgoParamResolves(): void
+    {
+        foreach (['openssl_cipher_iv_length', 'openssl_cipher_key_length'] as $fn) {
+            $names = BuiltinParamNames::forFunction($fn);
+            self::assertSame(['cipher_algo'], $names, $fn);
+            self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'cipher_algo', $fn));
+            self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'method', $fn));
+        }
+    }
+
     /** @covers issue #10320 */
     public function testSubstrCompareNamedParamsResolve(): void
     {
