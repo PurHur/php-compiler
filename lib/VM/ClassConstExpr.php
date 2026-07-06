@@ -166,6 +166,15 @@ final class ClassConstExpr
             }
         }
         if (!isset($context->classes[$lcClass])) {
+            if ('class' === $constName
+                && !\in_array(strtolower($className), ['self', 'static', 'parent'], true)) {
+                // X::class is a pure name literal — Zend resolves it without the
+                // class existing. Native 8.3+ names (DateException, …) reach here
+                // on the 8.2 reference profile before/without any declaration (#16828).
+                $frame->scope[$op->arg1]->string(ltrim($className, '\\'));
+
+                return;
+            }
             foreach (self::classNameCandidatesForConstFetch($className, $entry) as $candidate) {
                 if (self::tryFetchNativePhpClassConstant($candidate, $constNameRaw, $frame->scope[$op->arg1])) {
                     return;

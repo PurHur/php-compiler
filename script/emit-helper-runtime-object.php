@@ -110,6 +110,17 @@ if (null !== $unitPath) {
 
     $runtime = new Runtime(Runtime::MODE_AOT);
     $context = $runtime->loadJitContext();
+    foreach ($argv as $arg) {
+        if (str_starts_with($arg, '--preload=')) { // TEMP experiment #16565/#15889
+            foreach (explode(',', substr($arg, 10)) as $preload) {
+                $abs = $root.'/'.ltrim($preload, '/');
+                $block = $runtime->parseAndCompile((string) file_get_contents($abs), basename($abs));
+                if (null !== $block) {
+                    (new \PHPCompiler\JIT($context))->compile($block);
+                }
+            }
+        }
+    }
     JitVmHelperLink::ensureCompiled($context, $unitPath, $names, 'helper-runtime-emit');
 
     // A stub main drives the same pending-bridge completion a real script

@@ -4718,6 +4718,12 @@ restart:
                                 $frame->scope[$op->arg1]->string($builtinFn);
                                 break;
                             }
+                            if ('self' !== strtolower($className) && 'static' !== strtolower($className)) {
+                                // Foo::class is a pure name literal — Zend resolves it
+                                // without the class being declared (#16828).
+                                $frame->scope[$op->arg1]->string(ltrim($className, '\\'));
+                                break;
+                            }
                         }
 
                         return $this->raise("Unknown class for constant fetch: {$className}", $frame);
