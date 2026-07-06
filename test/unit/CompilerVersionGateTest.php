@@ -1595,6 +1595,44 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
+    public function testSupportsDomElementInsertAdjacentTextOnForwardProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertTrue(CompilerVersion::supportsDomElementInsertAdjacentText());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testSupportsDomElementInsertAdjacentTextFalseOnReferenceProfile(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsDomElementInsertAdjacentText());
+    }
+
+    public function testVmRegistersDomElementInsertAdjacentTextOnForwardProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $runtime = new Runtime();
+            $element = $runtime->vmContext->classes['domelement'] ?? null;
+            $this->assertNotNull($element);
+            $this->assertTrue(isset($element->methods['insertadjacenttext']));
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     public function testSupportsDomElementToggleAttributeOnForwardProfile(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');

@@ -523,6 +523,11 @@ final class VmDom
             $element->methodVisibility['insertadjacentelement'] = $pub;
             $element->methodNames['insertadjacentelement'] = 'insertAdjacentElement';
         }
+        if (CompilerVersion::supportsDomElementInsertAdjacentText()) {
+            $element->methods['insertadjacenttext'] = new ElementInsertAdjacentText();
+            $element->methodVisibility['insertadjacenttext'] = $pub;
+            $element->methodNames['insertadjacenttext'] = 'insertAdjacentText';
+        }
         if (CompilerVersion::supportsDomElementToggleAttribute()) {
             $element->methods['toggleattribute'] = new ElementToggleAttribute();
             $element->methodVisibility['toggleattribute'] = $pub;
@@ -2616,6 +2621,34 @@ final class VmDom
         };
 
         return $nodeElement;
+    }
+
+    /**
+     * DOMElement::insertAdjacentText() — insert text node by position (php-src ext/dom/element.c; #16914).
+     */
+    public static function insertAdjacentText(
+        Context $ctx,
+        ObjectEntry $element,
+        string $position,
+        string $data
+    ): void {
+        if (!self::isElement($element)) {
+            throw new \LogicException('insertAdjacentText() expects a DOMElement in this compiler build');
+        }
+        $pos = strtolower($position);
+        if (!\in_array($pos, ['beforebegin', 'afterbegin', 'beforeend', 'afterend'], true)) {
+            throw new \ValueError(
+                'DOMElement::insertAdjacentText(): Argument #1 ($where) must be a valid adjacency insertion position'
+            );
+        }
+        $ownerDocument = self::ownerDocumentEntry($element);
+        $textNode = self::createTextNode($ctx, $data, $ownerDocument);
+        match ($pos) {
+            'beforebegin' => self::insertAdjacentElementBeforeBegin($ctx, $element, $textNode),
+            'afterbegin' => self::insertAdjacentElementAfterBegin($ctx, $element, $textNode),
+            'beforeend' => self::insertAdjacentElementBeforeEnd($ctx, $element, $textNode),
+            'afterend' => self::insertAdjacentElementAfterEnd($ctx, $element, $textNode),
+        };
     }
 
     private static function insertAdjacentElementBeforeBegin(
