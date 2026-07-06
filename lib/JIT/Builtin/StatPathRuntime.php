@@ -7,6 +7,7 @@ namespace PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPCompiler\JIT\UserScriptAotDeferNestedJit;
 use PHPLLVM\Builder;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
@@ -103,6 +104,12 @@ final class StatPathRuntime
 
     public static function implement(Context $context): void
     {
+        if (UserScriptAotDeferNestedJit::shouldDefer($context)) {
+            StatPathRuntimeLibc::ensureLinked($context);
+
+            return;
+        }
+
         $probe = $context->module->getNamedFunction(self::FN_EXISTS);
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);

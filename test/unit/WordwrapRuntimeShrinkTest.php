@@ -8,19 +8,18 @@ use PHPCompiler\ext\standard\WordwrapJitHelper;
 use PHPCompiler\ext\standard\VmString;
 use PHPUnit\Framework\TestCase;
 
-/** wordwrap() JIT routes through WordwrapJitHelper PHP not JitWordwrap LLVM (#14565). */
+/** wordwrap() user-script AOT defers nested JIT; full builds use WordwrapJitHelper (#14565, #16734). */
 final class WordwrapRuntimeShrinkTest extends TestCase
 {
     public function testStringWordwrapUsesJitHelperNotLlvmMonolith(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringWordwrap.php');
         $this->assertStringContainsString('WordwrapJitHelper', $source);
-        $this->assertFileDoesNotExist(__DIR__.'/../../ext/standard/JitWordwrap.php');
+        $this->assertFileExists(__DIR__.'/../../ext/standard/JitWordwrap.php');
 
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/wordwrap.php');
-        $this->assertStringContainsString('StringWordwrap::ensureLinked', $builtin);
-        $this->assertStringContainsString('__compiler_wordwrap', $builtin);
-        $this->assertStringNotContainsString('JitWordwrap', $builtin);
+        $this->assertStringContainsString('JitWordwrap::wrap', $builtin);
+        $this->assertStringContainsString('shouldDeferNestedHelper', $builtin);
     }
 
     public function testWordwrapJitHelperDelegatesToVmString(): void

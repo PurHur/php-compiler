@@ -77,7 +77,7 @@ final class wordwrap extends Internal
             throw new \LogicException('wordwrap() requires one to four arguments in this compiler build');
         }
         JitInternalStrictArg::rejectNullString($context, $args[0], 'wordwrap', 'string', 1);
-        $literal = JitStringArg::compileTimeLiteral($args[0]);
+        $literal = $args[0]->compileTimeString ?? JitStringArg::compileTimeLiteral($args[0]);
         if (null !== $literal) {
             $width = self::compileTimeWidth($args, $argc);
             $break = self::compileTimeBreak($args, $argc);
@@ -108,11 +108,26 @@ final class wordwrap extends Internal
             $cutI8 = $context->builder->zExt($context->helper->loadValue($args[3]), $i8);
         }
 
+        $text = JitStringBuiltinArg::lower($context, $args[0], 'wordwrap', 0, 'string');
+        if (StringWordwrap::shouldDeferNestedHelper($context)) {
+            return JitWordwrap::wrap(
+                $context,
+                $text,
+                $width,
+                $break,
+                $cutI8,
+                $args[0],
+                $args[1] ?? null,
+                $args[2] ?? null,
+                $args[3] ?? null
+            );
+        }
+
         StringWordwrap::ensureLinked($context);
 
         return $context->builder->call(
             $context->lookupFunction('__compiler_wordwrap'),
-            JitStringBuiltinArg::lower($context, $args[0], 'wordwrap', 0, 'string'),
+            $text,
             $width,
             $break,
             $cutI8

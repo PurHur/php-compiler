@@ -7,6 +7,7 @@ namespace PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPCompiler\JIT\UserScriptAotDeferNestedJit;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
@@ -44,6 +45,12 @@ final class StringBin2hex
 
     public static function implement(Context $context): void
     {
+        if (UserScriptAotDeferNestedJit::shouldDefer($context)) {
+            StringBin2hexLlvm::implement($context);
+
+            return;
+        }
+
         $probe = $context->module->getNamedFunction('__compiler_bin2hex');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);
