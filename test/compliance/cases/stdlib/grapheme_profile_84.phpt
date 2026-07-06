@@ -30,9 +30,9 @@ echo "\n";
 echo count(grapheme_str_split($s)), "\n";
 ?>
 --EXPECT--
-false
 true
-false
+true
+true
 hello
 false
 2
