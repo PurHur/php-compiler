@@ -64,7 +64,9 @@ final class array_any_key extends Internal
                 $this->jitString($context, $args[1], 'array_any_key() callback');
             }
 
-            return ArrayFindHelper::buildAnyArray($context, $args[0], $args[1], $args[2]);
+            $strictI1 = $this->jitBool($context, $args[2], 'array_any_key() strict');
+
+            return ArrayFindHelper::buildAnyArray($context, $args[0], $args[1], null, $strictI1);
         }
         if (!ArrayFindCallbackPolicy::isJitLowerable($args[1])) {
             throw new \LogicException(ArrayFindCallbackPolicy::jitRejectionMessage());

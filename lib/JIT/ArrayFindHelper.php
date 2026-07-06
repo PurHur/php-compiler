@@ -57,14 +57,17 @@ final class ArrayFindHelper
         Context $context,
         Variable $array,
         Variable $callback,
-        ?Variable $strictArg = null
+        ?Variable $strictArg = null,
+        ?Value $strictI1Override = null
     ): Value {
+        $strictI1 = $strictI1Override ?? self::resolveStrictI1($context, $strictArg);
+
         return self::buildFromArray(
             $context,
             $array,
             $callback,
             self::MODE_ANY,
-            self::resolveStrictI1($context, $strictArg)
+            $strictI1
         );
     }
 
@@ -72,14 +75,17 @@ final class ArrayFindHelper
         Context $context,
         Variable $array,
         Variable $callback,
-        ?Variable $strictArg = null
+        ?Variable $strictArg = null,
+        ?Value $strictI1Override = null
     ): Value {
+        $strictI1 = $strictI1Override ?? self::resolveStrictI1($context, $strictArg);
+
         return self::buildFromArray(
             $context,
             $array,
             $callback,
             self::MODE_ALL,
-            self::resolveStrictI1($context, $strictArg)
+            $strictI1
         );
     }
 
@@ -533,7 +539,8 @@ final class ArrayFindHelper
         $false = $i1->constInt(0, false);
         $ty = $context->getStringFromType($result->typeOf());
         if ('int1' === $ty) {
-            return $result;
+            // Native int1 is not a boxed boolean; integer 0/1 ternaries mis-lower to int1 in standalone AOT (#15704).
+            return $false;
         }
         if ('int64' === $ty || 'double' === $ty) {
             return $false;
