@@ -114,6 +114,11 @@ final class JitStringArg
      */
     public static function lowerDominating(Context $context, Variable $arg, string $contextLabel = 'argument'): Value
     {
+        // Slot-backed locals may receive different ?: arm values; compileTimeString from the
+        // first arm must not fold into a shared merge echo (standalone AOT — #15704).
+        if (Variable::KIND_VARIABLE === $arg->kind && Variable::TYPE_STRING === $arg->type) {
+            return self::materializeStringSlot($context, $context->helper->loadValue($arg));
+        }
         $literal = self::compileTimeLiteral($arg);
         if (null !== $literal) {
             return $context->builder->load($context->constantStringFromString($literal));

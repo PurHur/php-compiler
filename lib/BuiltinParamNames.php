@@ -51,9 +51,11 @@ final class BuiltinParamNames
                 return ['format', 'timestamp'];
             case 'array_all':
             case 'array_any':
+            case 'array_all_key':
+            case 'array_any_key':
             case 'array_find':
             case 'array_find_key':
-                return ['array', 'callback'];
+                return ['array', 'callback', 'strict'];
             case 'str_pad':
                 return ['string', 'length', 'pad_string', 'pad_type'];
             case 'str_replace':

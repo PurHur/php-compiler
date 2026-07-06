@@ -2969,6 +2969,43 @@ class Object_ extends Type {
             $this->ensureTraversableBuiltinInterfaces();
             $this->setClassInterfaces($displayName, ['Iterator']);
         }
+        if ('dateinterval' === $lcname) {
+            foreach (['y', 'm', 'd', 'h', 'i', 's', 'invert'] as $prop) {
+                $this->defineProperty($id, $prop, Variable::TYPE_NATIVE_LONG);
+            }
+            $this->defineProperty($id, 'f', Variable::TYPE_VALUE);
+            $this->defineProperty($id, 'days', Variable::TYPE_NATIVE_BOOL);
+        }
+        if ('datetimeimmutable' === $lcname || 'datetime' === $lcname) {
+            $this->defineProperty($id, \PHPCompiler\VM\DateTimeSupport::TS_PROPERTY, Variable::TYPE_NATIVE_LONG);
+            $this->defineProperty($id, \PHPCompiler\VM\DateTimeSupport::MICROSECOND_PROPERTY, Variable::TYPE_NATIVE_LONG);
+            $this->defineProperty($id, \PHPCompiler\VM\DateTimeSupport::TZ_PROPERTY, Variable::TYPE_STRING);
+        }
+        if ('dateperiod' === $lcname) {
+            $this->ensureTraversableBuiltinInterfaces();
+            $this->setClassInterfaces($displayName, ['Iterator']);
+            foreach (['start', 'current', 'end', 'interval'] as $prop) {
+                $this->defineProperty($id, $prop, Variable::TYPE_OBJECT);
+            }
+            foreach (['recurrences'] as $prop) {
+                $this->defineProperty($id, $prop, Variable::TYPE_NATIVE_LONG);
+            }
+            foreach (['include_start_date', 'include_end_date'] as $prop) {
+                $this->defineProperty($id, $prop, Variable::TYPE_NATIVE_BOOL);
+            }
+            foreach (['__dp_iter_key'] as $prop) {
+                $this->defineProperty($id, $prop, Variable::TYPE_NATIVE_LONG);
+            }
+            $this->defineProperty($id, '__dp_iter_started', Variable::TYPE_NATIVE_BOOL);
+            $pubStatic = \PHPCfg\Func::FLAG_PUBLIC | \PHPCfg\Func::FLAG_STATIC;
+            if (\PHPCompiler\CompilerVersion::supportsDatePeriodCreateFromISO8601String()) {
+                $this->defineMethodVisibility($id, 'createfromiso8601string', $pubStatic);
+            }
+            $pub = \PHPCfg\Func::FLAG_PUBLIC;
+            foreach (['rewind', 'valid', 'current', 'key', 'next', 'getstartdate', 'getdateinterval', 'getrecurrences'] as $method) {
+                $this->defineMethodVisibility($id, $method, $pub);
+            }
+        }
         if ('splobjectstorage' === $lcname) {
             $this->splObjectStorageClassId = $id;
             $this->defineProperty($id, '__spl_ht', Variable::TYPE_HASHTABLE);

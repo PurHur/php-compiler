@@ -59,7 +59,9 @@ final class array_find extends Internal
             $this->jitString($context, $args[1], 'array_find() callback');
         }
         if (3 === $argc) {
-            return ArrayFindHelper::buildFindArray($context, $args[0], $args[1], $args[2]);
+            $strictI1 = $this->jitBool($context, $args[2], 'array_find() strict');
+
+            return ArrayFindHelper::buildFindArray($context, $args[0], $args[1], null, $strictI1);
         }
 
         return ArrayFindHelper::buildFindArray($context, $args[0], $args[1]);

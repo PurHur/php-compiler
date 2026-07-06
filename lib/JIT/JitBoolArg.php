@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT;
 
+use PHPCompiler\ext\standard\boolval;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\VM\Variable as VmVariable;
 use PHPLLVM\Builder;
@@ -188,11 +189,7 @@ final class JitBoolArg
         $boolBlock = BasicBlockHelper::append($context, 'jit_bool_vbox_bool');
         $longBlock = BasicBlockHelper::append($context, 'jit_bool_vbox_long');
         $mergeBlock = BasicBlockHelper::append($context, 'jit_bool_vbox_merge');
-        $isBool = $context->builder->icmp(
-            Builder::INT_EQ,
-            $typeByte,
-            $i8->constInt(Variable::TYPE_NATIVE_BOOL, false)
-        );
+        $isBool = boolval::isBoxedBoolTypeTag($context, $typeByte);
         $context->builder->branchIf($isBool, $boolBlock, $longBlock);
 
         $context->builder->positionAtEnd($boolBlock);

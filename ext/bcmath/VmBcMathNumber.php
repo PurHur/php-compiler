@@ -36,6 +36,7 @@ final class VmBcMathNumber
         $strProto = new Variable(Variable::TYPE_STRING);
         $intProto = new Variable(Variable::TYPE_INTEGER);
         $pub = CfgFunc::FLAG_PUBLIC;
+        $pubStatic = $pub | CfgFunc::FLAG_STATIC;
 
         $entry = new ClassEntry('BcMath\\Number');
         $entry->isInternal = true;
@@ -46,6 +47,9 @@ final class VmBcMathNumber
         $entry->constructor = new NumberConstruct();
         $entry->methods['__construct'] = $entry->constructor;
         $entry->methodVisibility['__construct'] = $pub;
+
+        $entry->methods['from'] = new NumberFrom();
+        $entry->methodVisibility['from'] = $pubStatic;
 
         $methods = [
             'add' => new NumberAdd(),

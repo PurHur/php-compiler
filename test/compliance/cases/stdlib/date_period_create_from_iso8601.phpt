@@ -1,5 +1,5 @@
 --TEST--
-stdlib DatePeriod::createFromISO8601String() — ISO8601 period factory (issue #7296, ext/date/php_date.c)
+stdlib DatePeriod::createFromISO8601String() — ISO8601 period factory (issues #7296, #16796, ext/date/php_date.c)
 --FILE--
 <?php
 var_export(method_exists(DatePeriod::class, 'createFromISO8601String'));

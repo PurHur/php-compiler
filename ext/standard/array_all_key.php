@@ -54,7 +54,7 @@ final class array_all_key extends Internal
         }
         $vacuous = ArrayFindHelper::vacuousAnyAllIfCompileTimeEmpty($context, $args[0], true);
         if (null !== $vacuous) {
-            return $vacuous;
+            return $this->boxStandaloneBoolJitResult($context, $vacuous);
         }
         if (3 === $argc) {
             if (!ArrayFindCallbackPolicy::isJitLowerable($args[1])) {
@@ -63,8 +63,12 @@ final class array_all_key extends Internal
             if (JITVariable::TYPE_STRING === $args[1]->type || JITVariable::TYPE_VALUE === $args[1]->type) {
                 $this->jitString($context, $args[1], 'array_all_key() callback');
             }
+            $strictI1 = $this->jitBool($context, $args[2], 'array_all_key() strict');
 
-            return ArrayFindHelper::buildAllArray($context, $args[0], $args[1], $args[2]);
+            return $this->boxStandaloneBoolJitResult(
+                $context,
+                ArrayFindHelper::buildAllArray($context, $args[0], $args[1], null, $strictI1)
+            );
         }
         if (!ArrayFindCallbackPolicy::isJitLowerable($args[1])) {
             throw new \LogicException(ArrayFindCallbackPolicy::jitRejectionMessage());
@@ -73,6 +77,9 @@ final class array_all_key extends Internal
             $this->jitString($context, $args[1], 'array_all_key() callback');
         }
 
-        return ArrayFindHelper::buildAllArray($context, $args[0], $args[1]);
+        return $this->boxStandaloneBoolJitResult(
+            $context,
+            ArrayFindHelper::buildAllArray($context, $args[0], $args[1])
+        );
     }
 }

@@ -62,7 +62,9 @@ final class array_any extends Internal
             $this->jitString($context, $args[1], 'array_any() callback');
         }
         if (3 === $argc) {
-            return ArrayFindHelper::buildAnyArray($context, $args[0], $args[1], $args[2]);
+            $strictI1 = $this->jitBool($context, $args[2], 'array_any() strict');
+
+            return ArrayFindHelper::buildAnyArray($context, $args[0], $args[1], null, $strictI1);
         }
 
         return ArrayFindHelper::buildAnyArray($context, $args[0], $args[1]);

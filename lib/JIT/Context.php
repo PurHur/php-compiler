@@ -857,6 +857,12 @@ class Context {
         FiberHelper::registerJitMethods($this);
         GeneratorHelper::registerJitMethods($this);
         ClosureBindHelper::registerJitMethods($this);
+        if (CompilerVersion::supportsDatePeriodCreateFromISO8601String()) {
+            $this->functionProxies['dateperiod::createfromiso8601string'] = new Call\DatePeriodCreateFromISO8601String();
+            foreach (['rewind', 'valid', 'current', 'key', 'next'] as $dpIterMethod) {
+                $this->functionProxies['dateperiod::'.$dpIterMethod] = new Call\DatePeriodIteratorMethod($dpIterMethod);
+            }
+        }
     }
 
     /** User examples or bootstrap-aot-link: thin standalone main without session/header reset LLVM (#13571, #14459). */
@@ -1437,10 +1443,7 @@ class Context {
                     $ptr = $slot;
                 }
 
-                return (new \PHPCompiler\ext\standard\boolval())->call(
-                    $this,
-                    new Variable($this, Variable::TYPE_VALUE, Variable::KIND_VALUE, $ptr)
-                );
+                return \PHPCompiler\ext\standard\boolval::boxedTruthyScalar($this, $ptr);
             case '__string__':
                 $slot = BasicBlockHelper::entryAlloca($this, $type);
                 $this->builder->store($value, $slot);

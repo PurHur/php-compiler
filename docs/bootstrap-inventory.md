@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 4146 |
-| Phase A inventory files (M2 ratio SSOT) | 4146 |
+| PHP files on vm.php path | 4145 |
+| Phase A inventory files (M2 ratio SSOT) | 4145 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 11175 |
+| Source constructs flagged (warnings) | 11170 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -2612,7 +2612,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/zstd/zstd_decompress.php` | 0 | 1 |
 | `ext/zstd/zstd_uncompress.php` | 0 | 1 |
 | `lib/AOT/AutoloadDiscovery.php` | 0 | 2 |
-| `lib/AOT/HelperRuntimeCache.php` | 0 | 1 |
 | `lib/AOT/Linker.php` | 0 | 2 |
 | `lib/AOT/LinkerProcessPolyfill.php` | 0 | 1 |
 | `lib/AOT/ProjectGraph.php` | 0 | 3 |
@@ -2731,7 +2730,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/ArrayBuiltinHelper.php` | 0 | 75 |
 | `lib/JIT/ArrayFilterCallbackPolicy.php` | 0 | 1 |
 | `lib/JIT/ArrayFindCallbackPolicy.php` | 0 | 1 |
-| `lib/JIT/ArrayFindHelper.php` | 0 | 10 |
+| `lib/JIT/ArrayFindHelper.php` | 0 | 6 |
 | `lib/JIT/ArrayMapCallbackPolicy.php` | 0 | 1 |
 | `lib/JIT/ArrayReduceCallbackPolicy.php` | 0 | 1 |
 | `lib/JIT/AsymmetricVisibilityGuard.php` | 0 | 2 |
@@ -16612,7 +16611,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/boolval.php`
 
 **Warnings** (review for bootstrap subset):
-- 4 class method(s)
+- 5 class method(s)
 
 ### `ext/standard/call_user_func.php`
 
@@ -20991,15 +20990,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 9 class method(s)
 - 1 closure(s)
 
-### `lib/AOT/HelperRuntimeCache.php`
-
-**Warnings** (review for bootstrap subset):
-- 17 class method(s)
-
 ### `lib/AOT/Linker.php`
 
 **Warnings** (review for bootstrap subset):
-- 26 class method(s)
+- 25 class method(s)
 - 1 closure(s)
 
 ### `lib/AOT/LinkerProcessPolyfill.php`
@@ -21244,7 +21238,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinParamNames.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 431)
+- new ArgumentCountError (line 433)
 - 9 class method(s)
 
 ### `lib/BuiltinTypeClassConstant.php`
@@ -22384,16 +22378,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/ArrayFindHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 177)
-- new Variable (line 179)
-- new Variable (line 412)
-- new Variable (line 576)
-- new Variable (line 589)
-- new Variable (line 611)
-- new boolval (line 618)
+- new Variable (line 188)
+- new Variable (line 190)
+- new Variable (line 423)
 - new Variable (line 621)
-- new boolval (line 623)
-- 24 class method(s)
+- new Variable (line 634)
+- 26 class method(s)
 
 ### `lib/JIT/ArrayMapCallbackPolicy.php`
 

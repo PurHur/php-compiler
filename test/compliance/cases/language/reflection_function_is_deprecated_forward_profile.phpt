@@ -1,5 +1,7 @@
 --TEST--
-Language: ReflectionFunction::isDeprecated() — PHP 8.4 #[\Deprecated] function (#9760, ext/reflection/php_reflection.c)
+Language: ReflectionFunction::isDeprecated() — PHP 8.4 #[\Deprecated] function (#9760, #16821, ext/reflection/php_reflection.c)
+--ENV--
+PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
 #[\Deprecated(message: 'old fn', since: '8.4')]
@@ -14,5 +16,5 @@ $rc = new ReflectionFunction('control');
 var_export($rc->isDeprecated());
 echo "\n";
 --EXPECT--
-false
+true
 false
