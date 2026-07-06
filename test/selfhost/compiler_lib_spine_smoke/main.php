@@ -160,6 +160,7 @@ require_once __DIR__.'/../../../ext/dom/DomNodeState.php';
 require_once __DIR__.'/../../../ext/dom/DomRegistry.php';
 require_once __DIR__.'/../../../ext/dom/ElementAppendChild.php';
 require_once __DIR__.'/../../../ext/dom/ElementGetAttribute.php';
+require_once __DIR__.'/../../../ext/dom/ElementGetAttributeNames.php';
 require_once __DIR__.'/../../../ext/dom/ElementGetAttributeNS.php';
 require_once __DIR__.'/../../../ext/dom/ElementGetAttributeNode.php';
 require_once __DIR__.'/../../../ext/dom/ElementGetElementsByTagName.php';

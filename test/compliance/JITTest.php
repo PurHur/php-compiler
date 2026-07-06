@@ -671,6 +671,20 @@ class JITTest extends BaseTest {
                 && str_contains($name, 'insert_adjacent_html_phantom')) {
                 continue;
             }
+            if (!CompilerVersion::supportsDomElementGetAttributeNames()
+                && str_contains($name, 'dom_element_get_attribute_names')
+                && !str_contains($name, 'get_attribute_names_phantom')) {
+                continue;
+            }
+            if (CompilerVersion::supportsDomElementGetAttributeNames()
+                && str_contains($name, 'get_attribute_names_phantom')) {
+                continue;
+            }
+            // DOMElement::getAttributeNames() multi-element array return segfaults under JIT (#16823); VM-only for now.
+            if (str_contains($name, 'dom_element_get_attribute_names')
+                && !str_contains($name, 'get_attribute_names_phantom')) {
+                continue;
+            }
             // 8.4-target reject gate; skipped when encapsed ?? interpolation enabled (#14063).
             if (CompilerVersion::supportsEncapsedCoalesce()
                 && str_contains($name, 'encapsed_coalesce_parse_error')) {
