@@ -29,6 +29,9 @@ final class BuiltinIntrospectionPolicy
         if ('mb_str_pad' === $lc) {
             return CompilerVersion::advertisesMbStrPad();
         }
+        if (\in_array($lc, ['mb_trim', 'mb_ltrim', 'mb_rtrim'], true)) {
+            return CompilerVersion::advertisesMbTrimFunctions();
+        }
         if (\in_array($lc, ['str_increment', 'str_decrement'], true)) {
             return CompilerVersion::advertisesStrIncrement();
         }
