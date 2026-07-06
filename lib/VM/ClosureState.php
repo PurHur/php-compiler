@@ -275,9 +275,11 @@ final class ClosureState
         $entry->methods['__debuginfo'] = new Builtin\ClosureDebugInfo();
         $entry->methodVisibility['__debuginfo'] = \PHPCfg\Func::FLAG_PUBLIC;
         $entry->methodNames['__debuginfo'] = '__debugInfo';
-        $entry->methods['getusedvariables'] = new Builtin\ClosureGetUsedVariables();
-        $entry->methodVisibility['getusedvariables'] = \PHPCfg\Func::FLAG_PUBLIC;
-        $entry->methodNames['getusedvariables'] = 'getUsedVariables';
+        if (CompilerVersion::supportsClosureGetUsedVariables()) {
+            $entry->methods['getusedvariables'] = new Builtin\ClosureGetUsedVariables();
+            $entry->methodVisibility['getusedvariables'] = \PHPCfg\Func::FLAG_PUBLIC;
+            $entry->methodNames['getusedvariables'] = 'getUsedVariables';
+        }
         if (CompilerVersion::supportsClosureGetCurrent()) {
             $entry->methods['getcurrent'] = new Builtin\ClosureGetCurrent();
             $entry->methodVisibility['getcurrent'] = $pubStatic;

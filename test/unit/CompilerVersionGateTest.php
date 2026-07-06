@@ -1083,6 +1083,34 @@ final class CompilerVersionGateTest extends TestCase
         $this->assertFalse(isset($closure->methods['fromstatic']));
     }
 
+    public function testSupportsClosureGetUsedVariablesFalseOnReferenceProfile(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsClosureGetUsedVariables());
+    }
+
+    public function testSupportsClosureGetUsedVariablesTrueOnForwardProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertTrue(CompilerVersion::supportsClosureGetUsedVariables());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testVmDoesNotRegisterClosureGetUsedVariablesOnReferenceProfile(): void
+    {
+        $runtime = new Runtime();
+        $closure = $runtime->vmContext->classes['closure'] ?? null;
+        $this->assertNotNull($closure);
+        $this->assertFalse(isset($closure->methods['getusedvariables']));
+    }
+
     public function testSupportsBareRethrowFalseOnReferenceProfile(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
