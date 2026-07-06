@@ -24,6 +24,8 @@ final class ModuleRegistryTest extends TestCase
         $this->assertTrue(VmInfo::extension_loaded('date'));
         $this->assertTrue(VmInfo::extension_loaded('pcre'));
         $this->assertTrue(VmInfo::extension_loaded('zlib'));
+        $this->assertTrue(VmInfo::extension_loaded('openssl'));
+        $this->assertFalse(VmInfo::extension_loaded('curl'));
         $this->assertFalse(VmInfo::extension_loaded('nonexistent_xyz'));
 
         $this->assertNotFalse(VmInfo::phpversion('zip'));
