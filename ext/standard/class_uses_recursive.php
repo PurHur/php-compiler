@@ -36,13 +36,13 @@ final class class_uses_recursive extends Internal
         VmClassHas::requireObjectOrClass($frame->calledArgs[0], 'class_uses_recursive', 'object_or_class');
         $autoload = true;
         if ($argc >= 2) {
-            $flag = $frame->calledArgs[1]->resolveIndirect();
-            if (Variable::TYPE_BOOLEAN !== $flag->type) {
-                throw new \LogicException('class_uses_recursive() autoload flag must be a boolean in this compiler build');
-            }
-            $autoload = $flag->toBool();
+            $autoload = VmMath::parseBoolBuiltinArg(
+                $frame->calledArgs[1],
+                'class_uses_recursive',
+                2,
+                'autoload'
+            );
         }
-        VmClassHas::requireObjectOrClass($frame->calledArgs[0], 'class_uses_recursive', 'object_or_class');
         $entry = VmReflection::resolveClassForClassUses($ctx, $frame->calledArgs[0], $autoload);
         if (null === $entry) {
             $frame->returnVar->bool(false);

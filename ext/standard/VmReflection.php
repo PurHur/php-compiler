@@ -100,21 +100,6 @@ final class VmReflection
         return $frame->calledArgs[0]->resolveIndirect()->toBool();
     }
 
-    /**
-     * php-src zend_API.c — ZEND_ACC_DEPRECATED on internal function registration.
-     *
-     * @var list<string> lowercase names
-     */
-    private const DEPRECATED_INTERNAL_FUNCTIONS = [
-        'utf8_decode',
-        'utf8_encode',
-    ];
-
-    public static function isDeprecatedInternalFunction(string $functionName): bool
-    {
-        return \in_array(strtolower($functionName), self::DEPRECATED_INTERNAL_FUNCTIONS, true);
-    }
-
     public static function isDeprecatedClassEntry(ClassEntry $entry): bool
     {
         return null !== $entry->classDeprecated;
@@ -396,14 +381,10 @@ final class VmReflection
             }
             self::$internalFunctionNames = self::orderInternalFunctionNamesForIntrospection($names);
         }
-        if (!$excludeDisabled) {
-            return self::$internalFunctionNames;
-        }
 
-        return array_values(array_filter(
-            self::$internalFunctionNames,
-            static fn (string $name): bool => !self::isDeprecatedInternalFunction($name)
-        ));
+        // php-src exclude_disabled omits ini-disabled functions only — deprecated builtins
+        // such as utf8_encode remain listed (basic_functions.c, #16969, #16978).
+        return self::$internalFunctionNames;
     }
 
     /** Zend internal bucket starts with engine introspection builtins (php-src zend_builtin_functions). */

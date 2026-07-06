@@ -57,11 +57,8 @@ final class BuiltinIntrospectionPolicy
         if ('stream_context_set_options' === $lc) {
             return CompilerVersion::advertisesStreamContextSetOptions();
         }
-        if ('grapheme_str_contains' === $lc) {
-            return CompilerVersion::advertisesGraphemeStrContains();
-        }
-        if ('grapheme_strimwidth' === $lc) {
-            return CompilerVersion::advertisesGraphemeStrimwidth();
+        if ('grapheme_str_contains' === $lc || 'grapheme_strimwidth' === $lc) {
+            return IntlExtensionPolicy::advertisesBuiltins();
         }
         if (\in_array($lc, [
             'grapheme_strlen',

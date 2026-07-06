@@ -904,10 +904,19 @@ final class Variable {
                     );
                 }
                 if (self::TYPE_OBJECT === $dim->type) {
-                    $keyObj = $this->context->helper->loadValue($dim);
                     if ($forWrite) {
-                        return HashTableHelper::writableObjectKeyValueBox($this->context, $ht, $keyObj);
+                        HashTableHelper::emitIllegalOffsetType($this->context);
+                        $this->context->builder->call($this->context->lookupFunction('abort'));
+                        $this->context->builder->clearInsertionPosition();
+
+                        return new Variable(
+                            $this->context,
+                            self::TYPE_NULL,
+                            self::KIND_VALUE,
+                            $this->context->getTypeFromString('__value__*')->constNull()
+                        );
                     }
+                    $keyObj = $this->context->helper->loadValue($dim);
 
                     return HashTableHelper::readObjectKeyToValueBox($this->context, $ht, $keyObj);
                 }

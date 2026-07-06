@@ -1,5 +1,5 @@
 --TEST--
-stdlib proc_get_status() after proc_close() — running=false on closed handle (ext/standard/proc_open.c, #16863)
+stdlib proc_get_status() after proc_close() — TypeError (ext/standard/proc_open.c, #16967)
 --FILE--
 <?php
 $desc = [1 => ['pipe', 'w'], 2 => ['pipe', 'w']];
@@ -15,9 +15,15 @@ while ('' !== (string) stream_get_contents($pipes[1]) || '' !== (string) stream_
 fclose($pipes[1]);
 fclose($pipes[2]);
 $code = proc_close($proc);
-$st = proc_get_status($proc);
+try {
+    proc_get_status($proc);
+    echo "no-throw\n";
+} catch (TypeError $e) {
+    echo get_class($e), "\n";
+    echo $e->getMessage(), "\n";
+}
 echo 'closed=', $code, "\n";
-echo ($st['running'] ? 'running' : 'stopped'), "\n";
 --EXPECT--
+TypeError
+proc_get_status(): supplied resource is not a valid process resource
 closed=0
-stopped

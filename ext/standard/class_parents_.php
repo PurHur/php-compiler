@@ -37,11 +37,12 @@ final class class_parents_ extends Internal
         VmClassHas::requireObjectOrClass($frame->calledArgs[0], 'class_parents', 'object_or_class');
         $autoload = true;
         if ($argc >= 2) {
-            $flag = $frame->calledArgs[1]->resolveIndirect();
-            if (Variable::TYPE_BOOLEAN !== $flag->type) {
-                throw new \LogicException('class_parents() autoload flag must be a boolean in this compiler build');
-            }
-            $autoload = $flag->toBool();
+            $autoload = VmMath::parseBoolBuiltinArg(
+                $frame->calledArgs[1],
+                'class_parents',
+                2,
+                'autoload'
+            );
         }
         $arg = $frame->calledArgs[0]->resolveIndirect();
         if (Variable::TYPE_ENUM_CASE === $arg->type) {

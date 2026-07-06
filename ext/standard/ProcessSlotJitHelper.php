@@ -60,7 +60,7 @@ final class ProcessSlotJitHelper
         self::$slots[$slot] = $entry;
 
         if ($entry['statusKnown']) {
-            return self::exitCodeFromStatus($entry['status']);
+            return -1;
         }
 
         try {
@@ -93,7 +93,7 @@ final class ProcessSlotJitHelper
             return false;
         }
         if (!$entry['active']) {
-            return VmProcessProcOpenNative::statusFromClosedSlotForEmbed($entry);
+            return false;
         }
 
         $ffi = self::ffi();

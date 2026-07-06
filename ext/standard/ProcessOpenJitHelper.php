@@ -80,11 +80,11 @@ final class ProcessOpenJitHelper
     public static function procGetStatusArgv(int $handle): ?HashTable
     {
         $status = false;
-        if (VmProcessProcOpenNative::hasHandle($handle)) {
+        if (VmProcessProcOpenNative::isValidHandle($handle)) {
             $status = VmProcessProcOpenNative::getStatus($handle);
         } else {
             $slot = self::slotFromHandle($handle);
-            if (null !== $slot) {
+            if (null !== $slot && ProcessSlotJitHelper::isActive($slot)) {
                 $status = ProcessSlotJitHelper::getStatus($slot);
             }
         }

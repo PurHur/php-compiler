@@ -1,9 +1,9 @@
 --TEST--
-Stdlib: get_defined_functions() optional exclude_disabled on reference profile (#4942, #16969, basic_functions.c)
+Stdlib: get_defined_functions() exclude_disabled on forward 8.4 profile (#4942, #16978)
 --FILE--
 <?php
 $all = get_defined_functions();
-$filtered = get_defined_functions(true);
+$filtered = get_defined_functions(exclude_disabled: true);
 $allInternal = $all['internal'];
 $filteredInternal = $filtered['internal'];
 echo count($allInternal) === count($filteredInternal) ? "count-equal\n" : "count-diff\n";
