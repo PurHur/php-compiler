@@ -7,7 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitStringArg;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -26,7 +26,7 @@ final class password_hash extends Internal
         if ($argc < 2 || $argc > 3) {
             throw new \LogicException('password_hash() requires two or three arguments in this compiler build');
         }
-        $password = VmString::coerceTypedStringBuiltinArg($frame->calledArgs[0], 'password_hash', 0, 'password');
+        $password = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'password_hash', 0, 'password');
         $algo = VmPassword::resolveAlgo($frame->calledArgs[1], 'password_hash', 1, 'algo');
         $options = [];
         if (3 === $argc) {
@@ -65,7 +65,7 @@ final class password_hash extends Internal
 
         return JitPassword::hash(
             $context,
-            JitStringArg::lowerDominating($context, $args[0], 'password_hash() password'),
+            JitStringBuiltinArg::lower($context, $args[0], 'password_hash', 0, 'password'),
             JitPasswordAlgo::lower($context, $args[1], 'password_hash', 1, 'algo'),
             $options
         );
