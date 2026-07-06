@@ -34,10 +34,10 @@ foreach ($d as $v) {
 A
 B
 C
-A
 B
 A
-B
 A
 B
 C
+A
+B

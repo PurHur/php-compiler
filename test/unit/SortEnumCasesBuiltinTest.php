@@ -40,7 +40,7 @@ echo implode(',', array_map(fn($v) => $v->name.':'.(int) ($v instanceof EUnit), 
 PHP, 'sort_unit_enum.php'));
         $output = ob_get_clean();
 
-        $this->assertSame('A:1,B:1', $output);
+        $this->assertSame('B:1,A:1', $output);
         $this->assertStringNotContainsString(':0', $output);
     }
 

@@ -324,6 +324,10 @@ final class EnumCaseSupport
         if ($leftName === $rightName) {
             return 0;
         }
+        // Unit enums: incomparable cases — stable sort preserves input order (php-src array.c, #16905).
+        if (null === $leftClass->backedType) {
+            return 0;
+        }
 
         return self::objectIdForEnumSort($left) <=> self::objectIdForEnumSort($right);
     }
