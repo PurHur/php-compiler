@@ -270,7 +270,8 @@ class VMTest extends BaseTest {
             }
             if (!CompilerVersion::supportsMbStrPad()
                 && str_contains($name, 'mb_str_pad')
-                && !str_contains($name, 'mb_str_pad_phantom')) {
+                && !str_contains($name, 'mb_str_pad_phantom')
+                && !str_contains($name, 'mb_str_pad_function_exists_forward_84')) {
                 continue;
             }
             if (CompilerVersion::supportsMbStrPad()

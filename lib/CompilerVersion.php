@@ -1091,13 +1091,23 @@ final class CompilerVersion
     }
 
     /**
-     * mb_str_pad() visible to function_exists() — stable runtime only (#16086).
+     * mb_str_pad() visible to function_exists() — stable runtime or forward 8.3+ (#16086, re-#16776).
      *
-     * Callable under forward profile via {@see supportsMbStrPad()}.
+     * Callable under forward profile via {@see supportsMbStrPad()}; withheld from introspection on
+     * 8.4.0-dev reference harness like Zend 8.2.
      */
     public static function advertisesMbStrPad(): bool
     {
-        return version_compare(self::VERSION, '8.4.0', '>=');
+        if (version_compare(self::VERSION, '8.4.0', '>=')) {
+            return true;
+        }
+
+        $raw = getenv('PHP_COMPILER_PROFILE');
+        if (!\is_string($raw) || '' === trim($raw)) {
+            return false;
+        }
+
+        return version_compare(self::languageProfileVersion(), '8.3.0', '>=');
     }
 
     /**
