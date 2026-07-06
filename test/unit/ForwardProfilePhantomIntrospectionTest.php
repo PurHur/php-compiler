@@ -257,6 +257,49 @@ final class ForwardProfilePhantomIntrospectionTest extends TestCase
         }
     }
 
+    public function testReferenceProfilePhantomFunctionExistsForForwardBuiltins(): void
+    {
+        $prevProfile = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE');
+        try {
+            foreach ([
+                'json_validate',
+                'array_any',
+                'generator_to_array',
+                'fpow',
+                'stream_supports',
+                'class_uses_recursive',
+            ] as $fn) {
+                $this->assertFalse(
+                    BuiltinIntrospectionPolicy::functionIsAdvertised($fn),
+                    $fn.' must not be advertised on 8.4.0-dev reference profile'
+                );
+            }
+
+            $runtime = new Runtime();
+            $ctx = $runtime->vmContext;
+            foreach ([
+                'json_validate',
+                'array_any',
+                'generator_to_array',
+                'fpow',
+                'stream_supports',
+                'class_uses_recursive',
+            ] as $fn) {
+                $this->assertFalse(
+                    \PHPCompiler\ext\standard\VmReflection::functionExists($ctx, $fn),
+                    $fn.' function_exists must be false on reference profile'
+                );
+            }
+        } finally {
+            if (false === $prevProfile) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prevProfile);
+            }
+        }
+    }
+
     public function testGraphemeProfile84BuiltinsCallableButNotAdvertisedWithoutIntl(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');

@@ -23,6 +23,30 @@ final class BuiltinIntrospectionPolicy
         if (\in_array($lc, ['fpow', 'fmin', 'fmax'], true)) {
             return CompilerVersion::advertisesFpow();
         }
+        if ('json_validate' === $lc) {
+            return CompilerVersion::advertisesJsonValidate();
+        }
+        if (\in_array($lc, [
+            'array_any',
+            'array_all',
+            'array_any_key',
+            'array_all_key',
+            'array_find',
+            'array_find_key',
+            'array_first',
+            'array_last',
+        ], true)) {
+            return CompilerVersion::advertisesPhp84ArraySearchFunctions();
+        }
+        if ('generator_to_array' === $lc) {
+            return CompilerVersion::advertisesGeneratorToArray();
+        }
+        if ('class_uses_recursive' === $lc) {
+            return CompilerVersion::advertisesClassUsesRecursive();
+        }
+        if ('stream_supports' === $lc) {
+            return CompilerVersion::advertisesStreamSupports();
+        }
         if ('nextafter' === $lc) {
             return CompilerVersion::advertisesNextafter();
         }
