@@ -39250,10 +39250,44 @@ class Compiler {
             ) {
                 $arrayBuiltinArg = $cfgCallOp->args[0] ?? $arg;
                 if ($arrayBuiltinArg instanceof Operand && $this->callArgIsDeadInlineTemporary($arrayBuiltinArg)) {
-                    $nestedFileSlot = $this->slotForLastInlineFuncCallExecReturn($block, $sends)
-                        ?? $this->resolveAdjacentNestedFuncCallArgSlot($block, $cfgCallOp, (int) $argIndex);
-                    if (null !== $nestedFileSlot) {
-                        $valueSlot = (string) $nestedFileSlot;
+                    $namedLocalSlot = $this->namedLocalCallArgSlotIfBound(
+                        $arrayBuiltinArg,
+                        $block,
+                        $cfgCallOp,
+                        (int) $argIndex
+                    ) ?? $this->slotForNamedLocalFromAssignVarOperand($arrayBuiltinArg, $block);
+                    if (null !== $namedLocalSlot) {
+                        $valueSlot = (string) $this->finalizeOperandSlotForAccess($block, (int) $namedLocalSlot, true);
+                    } else {
+                        $nestedFileSlot = null;
+                        $callIndex = $this->cfgCallOpIndex($block, $cfgCallOp);
+                        if (\is_int($callIndex) && $callIndex > 0 && null !== $block->orig) {
+                            $immediate = $block->orig->children[$callIndex - 1] ?? null;
+                            if (
+                                ($immediate instanceof Op\Expr\FuncCall || $immediate instanceof Op\Expr\NsFuncCall)
+                                && $this->isNestedCallArgProducerForConsumer(
+                                    $immediate,
+                                    $cfgCallOp,
+                                    $callIndex - 1,
+                                    $callIndex,
+                                    $block->orig->children
+                                )
+                            ) {
+                                $nestedFileSlot = $this->slotForInlineFuncCallProducerExecReturnByCfgIndex(
+                                    $block,
+                                    $callIndex - 1,
+                                    $block->orig->children
+                                );
+                            }
+                        }
+                        $nestedFileSlot ??= $this->resolveAdjacentNestedFuncCallArgSlot(
+                            $block,
+                            $cfgCallOp,
+                            (int) $argIndex
+                        );
+                        if (null !== $nestedFileSlot) {
+                            $valueSlot = (string) $nestedFileSlot;
+                        }
                     }
                 }
             }
