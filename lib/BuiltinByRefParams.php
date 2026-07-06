@@ -93,6 +93,8 @@ final class BuiltinByRefParams
                 return [1];
             case 'proc_open':
                 return [2];
+            case 'grapheme_extract':
+                return [4];
             case 'sodium_crypto_secretstream_xchacha20poly1305_push':
             case 'sodium_crypto_secretstream_xchacha20poly1305_pull':
             case 'sodium_crypto_secretstream_xchacha20poly1305_rekey':
