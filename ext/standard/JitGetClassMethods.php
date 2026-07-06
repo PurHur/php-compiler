@@ -4,20 +4,24 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
-use PHPCompiler\JIT\Builtin\StringCaseCompare;
-use PHPCompiler\JIT\Builtin\Type\Object_ as ObjectBuiltin;
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\StringGetClassMethods;
+use PHPCompiler\JIT\Builtin\Type\Object_ as ObjectBuiltin;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** LLVM lowering for get_class_methods() (issue #3118, runtime class name #4752). */
+/**
+ * JIT/AOT helper for get_class_methods() via GetClassMethodsJitHelper PHP (#3118, #16729).
+ *
+ * Compile-time literal class names keep registry fast path; runtime operands route through PHP.
+ * php-src: ext/standard/basic_functions.c — PHP_FUNCTION(get_class_methods)
+ */
 final class JitGetClassMethods
 {
     private const TYPE_ERROR =
@@ -39,25 +43,19 @@ final class JitGetClassMethods
                 );
             }
         }
-        if (JITVariable::TYPE_OBJECT === $classArg->type) {
-            return self::invokeForObject($context, $classArg, $filter);
-        }
 
         $literal = JitStringArg::compileTimeLiteral($classArg);
         if (null !== $literal) {
             return self::invokeForClassName($context, $literal, $filter);
         }
 
-        if (JITVariable::TYPE_VALUE === $classArg->type) {
-            return self::invokeFromValueBox($context, $classArg, $filter);
+        if (JITVariable::TYPE_OBJECT === $classArg->type) {
+            return self::invokeForObject($context, $classArg, $filter);
         }
 
-        if (JITVariable::TYPE_STRING === $classArg->type) {
-            return self::invokeForRuntimeClassNameString(
-                $context,
-                $context->helper->loadValue($classArg),
-                $filter
-            );
+        if (JITVariable::TYPE_STRING === $classArg->type
+            || JITVariable::TYPE_VALUE === $classArg->type) {
+            return self::routeThroughPhpHelper($context, $classArg);
         }
 
         self::emitTypeErrorAndAbort($context, self::scalarTypeError($classArg->type));
@@ -65,219 +63,25 @@ final class JitGetClassMethods
         return self::returnFalse($context);
     }
 
-    private static function invokeFromValueBox(
-        Context $context,
-        JITVariable $classArg,
-        int $filter
-    ): Value {
-        $valuePtr = JitValueBox::valuePtrFromVariable($context, $classArg);
-        $typeField = $context->structFieldMap['__value__']['type'];
-        $typeByte = $context->builder->load(
-            $context->builder->structGep($valuePtr, $typeField)
-        );
-        $i8 = $context->getTypeFromString('int8');
-        $isNull = $context->builder->icmp(
-            Builder::INT_EQ,
-            $typeByte,
-            $i8->constInt(Variable::TYPE_NULL, false)
-        );
-        $isEnumCase = $context->builder->icmp(
-            Builder::INT_EQ,
-            $typeByte,
-            $i8->constInt(Variable::TYPE_ENUM_CASE, false)
-        );
-        $isObject = $context->builder->icmp(
-            Builder::INT_EQ,
-            $typeByte,
-            $i8->constInt(Variable::TYPE_OBJECT, false)
-        );
-        $isString = $context->builder->icmp(
-            Builder::INT_EQ,
-            $typeByte,
-            $i8->constInt(Variable::TYPE_STRING, false)
-        );
-
-        $nullBlock = BasicBlockHelper::append($context, 'gcm_null');
-        $notNull = BasicBlockHelper::append($context, 'gcm_not_null');
-        $enumBlock = BasicBlockHelper::append($context, 'gcm_enum');
-        $objectCheck = BasicBlockHelper::append($context, 'gcm_obj_check');
-        $objectBlock = BasicBlockHelper::append($context, 'gcm_obj');
-        $notObject = BasicBlockHelper::append($context, 'gcm_not_obj');
-        $stringBlock = BasicBlockHelper::append($context, 'gcm_str');
-        $errBlock = BasicBlockHelper::append($context, 'gcm_err');
-        $mergeBlock = BasicBlockHelper::append($context, 'gcm_merge');
-
-        $context->builder->branchIf($isNull, $nullBlock, $notNull);
-
-        $context->builder->positionAtEnd($nullBlock);
-        self::emitTypeErrorAndAbort($context, \sprintf(self::TYPE_ERROR, 'null'));
-
-        $context->builder->positionAtEnd($notNull);
-        $context->builder->branchIf($isEnumCase, $enumBlock, $objectCheck);
-
-        $context->builder->positionAtEnd($enumBlock);
-        $enumResult = self::invokeForEnumCaseValueBox($context, $valuePtr, $filter);
-        $enumEnd = $context->builder->getInsertBlock();
-        $context->builder->branch($mergeBlock);
-
-        $context->builder->positionAtEnd($objectCheck);
-        $context->builder->branchIf($isObject, $objectBlock, $notObject);
-
-        $context->builder->positionAtEnd($objectBlock);
-        $obj = $context->builder->call(
-            $context->lookupFunction('__value__readObject'),
-            $valuePtr
-        );
-        $objVar = new JITVariable(
-            $context,
-            JITVariable::TYPE_OBJECT,
-            JITVariable::KIND_VALUE,
-            $obj
-        );
-        $objResult = self::invokeForObject($context, $objVar, $filter);
-        $objEnd = $context->builder->getInsertBlock();
-        $context->builder->branch($mergeBlock);
-
-        $context->builder->positionAtEnd($notObject);
-        $context->builder->branchIf($isString, $stringBlock, $errBlock);
-
-        $context->builder->positionAtEnd($stringBlock);
-        $strVal = $context->builder->call(
-            $context->lookupFunction('__value__readString'),
-            $valuePtr
-        );
-        $strResult = self::invokeForRuntimeClassNameString($context, $strVal, $filter);
-        $strEnd = $context->builder->getInsertBlock();
-        $context->builder->branch($mergeBlock);
-
-        $context->builder->positionAtEnd($errBlock);
-        self::emitTypeErrorAndAbort($context, \sprintf(self::TYPE_ERROR, 'mixed'));
-
-        $context->builder->positionAtEnd($mergeBlock);
-        $valuePtrTy = $context->getTypeFromString('__value__*');
-        $phi = $context->builder->phi($valuePtrTy);
-        $phi->addIncoming($enumResult, $enumEnd);
-        $phi->addIncoming($objResult, $objEnd);
-        $phi->addIncoming($strResult, $strEnd);
-
-        return $phi;
-    }
-
-    private static function invokeForEnumCaseValueBox(Context $context, Value $enumCasePtr, int $filter): Value
+    private static function routeThroughPhpHelper(Context $context, JITVariable $classArg): Value
     {
-        $object = $context->type->object;
-        if (!$object instanceof ObjectBuiltin) {
-            return self::returnFalse($context);
-        }
-        $enumMap = $context->structFieldMap['__enum_case__'] ?? null;
-        if (null === $enumMap || !isset($enumMap['class_id'])) {
-            return self::returnFalse($context);
-        }
-        $classIdVal = $context->builder->load(
-            $context->builder->structGep($enumCasePtr, $enumMap['class_id'])
-        );
-        if (!method_exists($classIdVal, 'isConstant') || !$classIdVal->isConstant()) {
-            return self::returnFalse($context);
-        }
-
-        return self::invokeForClassName(
-            $context,
-            $object->classNameForId((int) $classIdVal->getConstantValue()),
-            $filter
-        );
+        return StringGetClassMethods::invoke($context, self::operandToValueBox($context, $classArg));
     }
 
-    private static function invokeForRuntimeClassNameString(
-        Context $context,
-        Value $nameStr,
-        int $filter
-    ): Value {
-        $object = $context->type->object;
-        /** @var list<string> $candidates */
-        $candidates = array_values($object->allClassNamesById());
-        $vm = $context->runtime->vmContext;
-        if (null !== $vm) {
-            foreach ($vm->classes as $entry) {
-                if (!\in_array($entry->name, $candidates, true)) {
-                    $candidates[] = $entry->name;
-                }
-            }
-        }
-        if ([] === $candidates) {
-            return self::returnFalse($context);
-        }
-
-        $tag = 'gcm_rt_'.(string) ++self::$seq;
-        $done = BasicBlockHelper::append($context, $tag.'_done');
-        $falseBlock = BasicBlockHelper::append($context, $tag.'_false');
-        $valuePtrTy = $context->getTypeFromString('__value__*');
-        /** @var list<array{0: \PHPLLVM\BasicBlock, 1: Value}> $incoming */
-        $incoming = [];
-
-        StringCaseCompare::ensureStrcasecmpLinked($context);
-        $nameData = JitClassExists::stringDataPtr($context, $nameStr);
-        $strcasecmpFn = $context->lookupFunction('strcasecmp');
-        $i32 = $context->getTypeFromString('int32');
-
-        $lastIdx = \count($candidates) - 1;
-        foreach ($candidates as $idx => $className) {
-            $lc = strtolower(ltrim($className, '\\'));
-            $candidate = $context->builder->load($context->constantStringFromString($lc));
-            $candidateData = JitClassExists::stringDataPtr($context, $candidate);
-            $cmp = $context->builder->call($strcasecmpFn, $nameData, $candidateData);
-            $isMatch = $context->builder->icmp(
-                Builder::INT_EQ,
-                $cmp,
-                $i32->constInt(0, false)
-            );
-            $matchBlock = BasicBlockHelper::append($context, $tag.'_match_'.$idx);
-            $nextBlock = $lastIdx === $idx
-                ? $falseBlock
-                : BasicBlockHelper::append($context, $tag.'_next_'.$idx);
-            $context->builder->branchIf($isMatch, $matchBlock, $nextBlock);
-            $context->builder->positionAtEnd($matchBlock);
-            $ptr = self::invokeForClassName($context, $className, $filter);
-            $incoming[] = [$context->builder->getInsertBlock(), $ptr];
-            $context->builder->branch($done);
-            $context->builder->positionAtEnd($nextBlock);
-        }
-
-        $context->builder->positionAtEnd($falseBlock);
-        $falsePtr = self::returnFalse($context);
-        $incoming[] = [$falseBlock, $falsePtr];
-        $context->builder->branch($done);
-
-        $context->builder->positionAtEnd($done);
-        $result = $context->builder->phi($valuePtrTy);
-        foreach ($incoming as [$block, $ptr]) {
-            $result->addIncoming($ptr, $block);
-        }
-
-        return $result;
-    }
-
-    private static function emitTypeErrorAndAbort(Context $context, string $message): void
+    private static function operandToValueBox(Context $context, JITVariable $classArg): Value
     {
-        TypeErrorRaise::registerDeclarations($context);
-        TypeErrorRaise::ensureLinked($context);
-        TypeErrorRaise::emitRaise($context, $message);
-        $context->builder->call($context->lookupFunction('abort'));
-    }
-
-    private static function scalarTypeError(int $type): string
-    {
-        switch ($type) {
-            case JITVariable::TYPE_NATIVE_LONG:
-                return \sprintf(self::TYPE_ERROR, 'int');
-            case JITVariable::TYPE_NATIVE_DOUBLE:
-                return \sprintf(self::TYPE_ERROR, 'float');
-            case JITVariable::TYPE_NATIVE_BOOL:
-                return \sprintf(self::TYPE_ERROR, 'bool');
-            case JITVariable::TYPE_NULL:
-                return \sprintf(self::TYPE_ERROR, 'null');
-            default:
-                return \sprintf(self::TYPE_ERROR, 'mixed');
+        if (JITVariable::TYPE_VALUE === $classArg->type) {
+            return JitValueBox::valuePtrFromVariable($context, $classArg);
         }
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeString'),
+            $ptr,
+            $context->helper->loadValue($classArg)
+        );
+
+        return $ptr;
     }
 
     private static function invokeForObject(
@@ -340,12 +144,31 @@ final class JitGetClassMethods
         return $result;
     }
 
-    private static function invokeForClassName(Context $context, string $className, int $filter): Value
+    private static function emitTypeErrorAndAbort(Context $context, string $message): void
     {
-        return self::invokeCompileTimeForClassName($context, $className, $filter);
+        TypeErrorRaise::registerDeclarations($context);
+        TypeErrorRaise::ensureLinked($context);
+        TypeErrorRaise::emitRaise($context, $message);
+        $context->builder->call($context->lookupFunction('abort'));
     }
 
-    private static function invokeCompileTimeForClassName(Context $context, string $className, int $filter): Value
+    private static function scalarTypeError(int $type): string
+    {
+        switch ($type) {
+            case JITVariable::TYPE_NATIVE_LONG:
+                return \sprintf(self::TYPE_ERROR, 'int');
+            case JITVariable::TYPE_NATIVE_DOUBLE:
+                return \sprintf(self::TYPE_ERROR, 'float');
+            case JITVariable::TYPE_NATIVE_BOOL:
+                return \sprintf(self::TYPE_ERROR, 'bool');
+            case JITVariable::TYPE_NULL:
+                return \sprintf(self::TYPE_ERROR, 'null');
+            default:
+                return \sprintf(self::TYPE_ERROR, 'mixed');
+        }
+    }
+
+    private static function invokeForClassName(Context $context, string $className, int $filter): Value
     {
         $lc = strtolower(ltrim($className, '\\'));
         $object = $context->type->object;
