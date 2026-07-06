@@ -47,7 +47,7 @@ final class BootstrapInventoryTriageTest extends TestCase
 
     public function testTriageRowsFromFixtureReport(): void
     {
-        require dirname(__DIR__, 2).'/script/bootstrap-inventory-lint-sync-lib.php';
+        require_once dirname(__DIR__, 2).'/script/bootstrap-inventory-lint-sync-lib.php';
         $report = [
             'files' => [
                 'lib/A.php' => ['Unknown Stmt Type: Stmt\\Foo', 'Terminal_StaticVar'],
