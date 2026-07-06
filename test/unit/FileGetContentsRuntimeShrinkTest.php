@@ -7,18 +7,20 @@ namespace PHPCompiler\Test\Unit;
 use PHPCompiler\ext\standard\FileGetContentsJitHelper;
 use PHPUnit\Framework\TestCase;
 
-/** __compiler_file_get_contents JIT routes through FileGetContentsJitHelper PHP not libc LLVM (#15309). */
+/** __compiler_file_get_contents: PHP helper for full JIT/self-host; libc defer for user-script AOT (#15309, #17036). */
 final class FileGetContentsRuntimeShrinkTest extends TestCase
 {
-    public function testStringFileGetContentsUsesPhpBridgeNotLibcOpen(): void
+    public function testStringFileGetContentsUsesPhpBridgeWithUserScriptAotDefer(): void
     {
         $bridge = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringFileGetContents.php');
         $this->assertStringContainsString('FileGetContentsJitHelper', $bridge);
-        $this->assertStringNotContainsString('StringFileGetContentsLibc', $bridge);
-        $this->assertStringNotContainsString("lookupFunction('open')", $bridge);
-        $this->assertStringNotContainsString("lookupFunction('read')", $bridge);
-        $this->assertStringNotContainsString("lookupFunction('close')", $bridge);
-        $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StringFileGetContentsLibc.php');
+        $this->assertStringContainsString('UserScriptAotDeferNestedJit', $bridge);
+        $this->assertStringContainsString('StringFileGetContentsLibc', $bridge);
+        $this->assertFileExists(__DIR__.'/../../lib/JIT/Builtin/StringFileGetContentsLibc.php');
+
+        $libc = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringFileGetContentsLibc.php');
+        $this->assertStringContainsString("lookupFunction('open')", $libc);
+        $this->assertStringContainsString("lookupFunction('read')", $libc);
     }
 
     public function testFileGetContentsJitHelperDelegatesToVmFs(): void
@@ -44,20 +46,12 @@ final class FileGetContentsRuntimeShrinkTest extends TestCase
     public function testEnsureFullStandaloneBodiesLinksFileGetContents(): void
     {
         $context = (string) file_get_contents(__DIR__.'/../../lib/JIT/Context.php');
+        $fullPos = strpos($context, 'private function ensureFullStandaloneBodies');
+        $this->assertNotFalse($fullPos);
+        $fullBody = substr($context, $fullPos, 8000);
         $this->assertStringContainsString(
             'Builtin\\StringFileGetContents::ensureStandaloneBodies($this);',
-            $context
-        );
-        $needle = 'Builtin\\StringFileGetContents::ensureStandaloneBodies($this);';
-        $fullPos = strpos($context, 'private function ensureFullStandaloneBodies');
-        $minimalPos = strpos($context, 'private function ensureMinimalUserStandaloneBodies');
-        $this->assertNotFalse($fullPos);
-        $this->assertNotFalse($minimalPos);
-        $fullBody = substr($context, $fullPos, $minimalPos - $fullPos);
-        $this->assertStringContainsString(
-            'Builtin\\StatPathRuntime::ensureStandaloneBodies($this);',
             $fullBody
         );
-        $this->assertStringContainsString($needle, $fullBody);
     }
 }

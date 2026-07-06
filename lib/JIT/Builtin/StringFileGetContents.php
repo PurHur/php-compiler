@@ -7,6 +7,7 @@ namespace PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitVmHelperLink;
+use PHPCompiler\JIT\UserScriptAotDeferNestedJit;
 use PHPLLVM\Builder;
 
 /**
@@ -44,6 +45,12 @@ final class StringFileGetContents
         $probe = $context->module->getNamedFunction(self::ABI);
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             $context->registerFunction(self::ABI, $probe);
+
+            return;
+        }
+
+        if (UserScriptAotDeferNestedJit::shouldDefer($context)) {
+            StringFileGetContentsLibc::implement($context);
 
             return;
         }
