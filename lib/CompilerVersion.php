@@ -1575,6 +1575,14 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.4+ DOMElement::$classList / DOMTokenList (ext/dom/token_list.c; #16876).
+     */
+    public static function supportsDomTokenList(): bool
+    {
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+    }
+
+    /**
      * PHP 8.4+ parenthesized asymmetric set modifier `public (private(set))` on properties.
      *
      * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev reference profile

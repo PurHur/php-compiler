@@ -181,6 +181,9 @@ class ObjectEntry {
         if (\PHPCompiler\ext\dom\DomDocumentPropertySupport::isManagedProperty($this, $name)) {
             return true;
         }
+        if (\PHPCompiler\ext\dom\DomTokenListPropertySupport::isManagedProperty($this, $name)) {
+            return true;
+        }
 
         return isset($this->properties[$name]);
     }
@@ -204,6 +207,9 @@ class ObjectEntry {
         }
         if (\PHPCompiler\ext\dom\DomDocumentPropertySupport::isManagedProperty($this, $name)) {
             return \PHPCompiler\ext\dom\DomDocumentPropertySupport::getProperty($this, $name);
+        }
+        if (\PHPCompiler\ext\dom\DomTokenListPropertySupport::isManagedProperty($this, $name)) {
+            return \PHPCompiler\ext\dom\DomTokenListPropertySupport::getProperty($this, $name);
         }
         if (!isset($this->properties[$name])) {
             throw new \LogicException('Undefined property access');

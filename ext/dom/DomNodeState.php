@@ -84,6 +84,22 @@ final class DomNodeState
     /** Persistent attributes map object id for element nodes (php-src ext/dom/namednodemap.c). */
     public ?int $attributesListId = null;
 
+    /** Persistent DOMTokenList object id for element nodes (php-src ext/dom/token_list.c; #16876). */
+    public ?int $classListId = null;
+
+    /** Owning element object id for {@see DomConstants::XML_TOKENLIST} handles (#16876). */
+    public ?int $tokenListElementId = null;
+
+    /**
+     * Ordered unique tokens for {@see DomConstants::XML_TOKENLIST} (#16876).
+     *
+     * @var list<string>
+     */
+    public array $tokenListTokens = [];
+
+    /** Cached `class` attribute for token-list staleness detection (#16876). */
+    public ?string $tokenListCachedClassValue = null;
+
     /** @var array<string, string> */
     public array $attributes = [];
 
