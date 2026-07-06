@@ -229,12 +229,12 @@ abstract class BaseTest extends TestCase {
             if (isset($sections['EXPECT_EXIT']) && '' !== $stdoutTrim && str_contains($stderrTrim, 'PHP Fatal error:')) {
                 // PHPT --EXPECT-- is stdout; uncaught fatals after partial output land on stderr (#7468).
                 $merged = $stdoutTrim;
-            } elseif ('' === $stderrTrim) {
-                $merged = $stdoutTrim;
-            } elseif ('' === $stdoutTrim) {
+            } elseif ('' === $stdoutTrim && '' !== $stderrTrim) {
+                // Stderr-only scripts (no user echo output).
                 $merged = $stderrTrim;
             } else {
-                $merged = $stderrTrim . "\n" . $stdoutTrim;
+                // php-src PHPT compares stdout; CLI notices/warnings stay on stderr (#13486, #16702).
+                $merged = $stdoutTrim;
             }
             $this->assertExpect($merged, $sections);
         }
