@@ -250,6 +250,15 @@ class VMTest extends BaseTest {
                 && str_contains($name, 'closure_from_static_profile')) {
                 continue;
             }
+            if (!CompilerVersion::supportsClosureGetUsedVariables()
+                && str_contains($name, 'closure_get_used_variables')
+                && !str_contains($name, 'closure_get_used_variables_phantom')) {
+                continue;
+            }
+            if (CompilerVersion::supportsClosureGetUsedVariables()
+                && str_contains($name, 'closure_get_used_variables_phantom')) {
+                continue;
+            }
             if (!CompilerVersion::supportsReflectionParameterIsSensitiveParameter()
                 && str_contains($name, 'reflection_parameter_is_sensitive_parameter')
                 && !str_contains($name, 'reflection_parameter_is_sensitive_parameter_phantom')) {

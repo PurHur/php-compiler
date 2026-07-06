@@ -1236,6 +1236,16 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.4+ Closure::getUsedVariables() (Zend/zend_closures.c zif_closure_get_used_vars, #6067, #16735).
+     *
+     * Gated on stable 8.4.0 / PHP_COMPILER_PROFILE=8.4 so 8.4.0-dev reference profile matches Zend 8.2 phantom gate.
+     */
+    public static function supportsClosureGetUsedVariables(): bool
+    {
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+    }
+
+    /**
      * PHP 8.4+ bare `throw;` catch rethrow on the forward profile (Zend/zend_compile.c, #3508, #15299, #15630).
      *
      * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev reference profile matches
