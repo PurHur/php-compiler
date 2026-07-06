@@ -343,6 +343,13 @@ final class BuiltinParamNames
                 return ['string', 'characters', 'mode'];
             case 'mb_strlen':
                 return ['string', 'encoding'];
+            case 'mb_substr':
+            case 'mb_strcut':
+                return ['string', 'start', 'length', 'encoding'];
+            case 'mb_stripos':
+                return ['haystack', 'needle', 'offset', 'encoding'];
+            case 'mb_strimwidth':
+                return ['string', 'start', 'width', 'trimmarker', 'encoding'];
             case 'mb_convert_encoding':
                 return ['string', 'to_encoding', 'from_encoding'];
             case 'mb_trim':
