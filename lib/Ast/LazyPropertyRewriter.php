@@ -35,6 +35,8 @@ final class LazyPropertyRewriter
       return $source;
     }
 
+    // Marker must precede the visibility keyword so php-parser attaches it to Stmt\Property
+    // (inline comments after `public` are dropped from node attributes; #16954).
     return (string) preg_replace_callback(
       '/\b(public|protected|private)\s+((?:(?:static|readonly|final)\s+)*)lazy\s+((?:(?:static|readonly|final)\s+)*)/i',
       static fn (array $m): string => '/*'.self::MARKER.'*/ '.$m[1].' '.$m[2].$m[3],
