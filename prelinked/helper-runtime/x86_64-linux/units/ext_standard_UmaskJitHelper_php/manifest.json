@@ -1,0 +1,1 @@
+{"fingerprint":"16e08b60e90282d485f8","unit":"/ext/standard/UmaskJitHelper.php","helpers":{"phpcompiler\\ext\\standard\\umaskjithelper::getargv":"phpcompiler_ext_standard_umaskjithelper__getargv","phpcompiler\\ext\\standard\\umaskjithelper::setargv":"phpcompiler_ext_standard_umaskjithelper__setargv"}}

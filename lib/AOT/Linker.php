@@ -71,6 +71,13 @@ final class Linker
     {
         $runtimeObjects = self::compileRuntimeObjects($objectFile);
         $vendorObjects = self::resolvePrelinkedVendorObjects();
+        // Split compilation (#15889): merge the cached helper-runtime TU. It
+        // carries duplicate ABI definitions by design; the script object is
+        // listed first and -z muldefs keeps the first definition, so runtime
+        // state stays single-copy while helper bodies resolve from the cache.
+        foreach (HelperRuntimeCache::linkObjects() as $helperObject) {
+            $vendorObjects[] = $helperObject;
+        }
         $llvmDir = getenv('PHP_COMPILER_LLVM_PATH');
         if (false === $llvmDir || '' === $llvmDir) {
             self::linkWithSystemCompiler($objectFile, $executable, $runtimeObjects, $vendorObjects);
@@ -103,6 +110,7 @@ final class Linker
             $cmd = implode(' ', [
                 escapeshellarg($ld),
                 AotDebugSymbols::linkFlag(),
+                self::helperMuldefsFlag('-z muldefs'),
                 '-dynamic-linker /lib64/ld-linux-x86-64.so.2',
                 escapeshellarg('/usr/lib/x86_64-linux-gnu/crt1.o'),
                 escapeshellarg($crtbegin),
@@ -138,7 +146,7 @@ final class Linker
             // When linking with the bundled clang, ensure we can still resolve host libraries
             // (libpcre2-8, libcrypt, ...). Some bootstrap envs only ship the runtime .so/.a under
             // /usr/lib/x86_64-linux-gnu without a full sysroot lib tree.
-            $cmd = escapeshellarg($clang).' '.AotDebugSymbols::linkFlag().$objects.' '.self::HOST_LIB_SEARCH.' -lm '.self::runtimeLinkLibs().' -o '.escapeshellarg($executable);
+            $cmd = escapeshellarg($clang).' '.AotDebugSymbols::linkFlag().self::helperMuldefsFlag(' -Wl,-z,muldefs').$objects.' '.self::HOST_LIB_SEARCH.' -lm '.self::runtimeLinkLibs().' -o '.escapeshellarg($executable);
             self::run($cmd, $env);
             self::unlinkIfTemp($runtimeObjects);
 
@@ -146,6 +154,12 @@ final class Linker
         }
 
         self::linkWithSystemCompiler($objectFile, $executable, $runtimeObjects, $vendorObjects);
+    }
+
+    /** -z muldefs is only injected while helper-runtime TUs are merged (#15889). */
+    private static function helperMuldefsFlag(string $flag): string
+    {
+        return [] !== HelperRuntimeCache::linkObjects() ? ' '.$flag.' ' : '';
     }
 
     /**
@@ -476,7 +490,7 @@ final class Linker
                 continue;
             }
             $cmd = escapeshellarg($path) . ' '
-                . AotDebugSymbols::linkFlag() . $objects . ' '.self::HOST_LIB_SEARCH.' -lm '.self::RUNTIME_LINK_LIBS.' -o ' . escapeshellarg($executable);
+                . AotDebugSymbols::linkFlag() . self::helperMuldefsFlag(' -Wl,-z,muldefs') . $objects . ' '.self::HOST_LIB_SEARCH.' -lm '.self::RUNTIME_LINK_LIBS.' -o ' . escapeshellarg($executable);
             $captured = self::runCaptured($cmd, null);
             if (0 === $captured['code']) {
                 self::unlinkIfTemp($runtimeObjects);

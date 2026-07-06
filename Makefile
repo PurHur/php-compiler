@@ -347,6 +347,10 @@ bootstrap-selfhost-lib-spine-smoke:
 	./script/bootstrap-selfhost-lib-spine-smoke-link.sh
 bootstrap-gen0-refresh-sidecar:
 	./script/bootstrap-refresh-gen0-sidecar.sh
+helper-runtime-prelink-refresh:
+	php script/emit-helper-runtime-object.php --prelink
+helper-runtime-prelink-check:
+	php script/check-helper-runtime-prelink.php
 bootstrap-init:
 	./script/bootstrap-init.sh
 bootstrap-sdk-pack:

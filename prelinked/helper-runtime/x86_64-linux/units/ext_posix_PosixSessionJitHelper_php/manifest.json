@@ -1,0 +1,1 @@
+{"fingerprint":"181bec96cd7e396d6f49","unit":"/ext/posix/PosixSessionJitHelper.php","helpers":{"phpcompiler\\ext\\posix\\posixsessionjithelper::getsid":"phpcompiler_ext_posix_posixsessionjithelper__getsid","phpcompiler\\ext\\posix\\posixsessionjithelper::getpgid":"phpcompiler_ext_posix_posixsessionjithelper__getpgid"}}

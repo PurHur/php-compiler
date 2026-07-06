@@ -4200,4 +4200,13 @@ unset($__spineMimeSample, $__spineMimeEnc, $__spineMimeDec);
 // M2 spine unit: setcookie options array parser Vm inventory (#8698).
 \PHPCompiler\ext\standard\SetcookieOptions::spineSmokeParse();
 
+require_once __DIR__.'/../../../lib/AOT/HelperRuntimeCache.php';
+require_once __DIR__.'/../../../lib/VM/NativeDateMalformedPeriodStringException.php';
+require_once __DIR__.'/../../../ext/dom/CharacterDataSubstringData.php';
+require_once __DIR__.'/../../../ext/dom/DocumentCreateComment.php';
+require_once __DIR__.'/../../../ext/dom/DocumentCreateTextNode.php';
+require_once __DIR__.'/../../../ext/standard/JitDatePeriodCreateFromISO8601String.php';
+require_once __DIR__.'/../../../lib/JIT/Call/DatePeriodCreateFromISO8601String.php';
+require_once __DIR__.'/../../../lib/JIT/Call/DatePeriodIteratorMethod.php';
+require_once __DIR__.'/../../../lib/VM/DatePeriodIteratorJitHelper.php';
 echo "compiler_lib_spine_smoke bundle OK\n";
