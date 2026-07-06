@@ -1343,6 +1343,13 @@ function withheldBuiltinGateDefinitions(): array
             'module' => 'mbstring',
             'relPath' => 'ext/mbstring/mb_trim.php',
         ],
+        [
+            'names' => ['generator_to_array'],
+            'gate' => [PHPCompiler\CompilerVersion::class, 'supportsGeneratorToArray'],
+            'since' => '8.4.0',
+            'module' => 'standard',
+            'relPath' => 'ext/standard/generator_to_array.php',
+        ],
     ];
 }
 

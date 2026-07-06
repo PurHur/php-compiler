@@ -326,6 +326,11 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsPhp84ArraySearchFunctions());
     }
 
+    public function testGeneratorToArrayWithheldOnReferenceProfile(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsGeneratorToArray());
+    }
+
     public function testPhp83ArrayKeyFunctionsTrueWhenProfile83(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
@@ -349,6 +354,7 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         try {
             $this->assertTrue(CompilerVersion::supportsPhp83ArrayKeyFunctions());
             $this->assertTrue(CompilerVersion::supportsPhp84ArraySearchFunctions());
+            $this->assertTrue(CompilerVersion::supportsGeneratorToArray());
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');
@@ -481,6 +487,12 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         foreach (['array_find', 'array_find_key', 'array_any', 'array_any_key', 'array_all', 'array_all_key', 'array_first', 'array_last', 'array_first_key', 'array_last_key'] as $fn) {
             $this->assertFalse(isset($ctx->functions[$fn]), $fn);
         }
+    }
+
+    public function testVmDoesNotRegisterGeneratorToArrayOnReferenceProfile(): void
+    {
+        $runtime = new Runtime();
+        $this->assertFalse(isset($runtime->vmContext->functions['generator_to_array']));
     }
 
     public function testVmDoesNotRegisterDateTimeMicrosecondOnReferenceProfile(): void

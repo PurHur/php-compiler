@@ -417,7 +417,7 @@ class Module extends ModuleAbstract
             new array_uintersect_assoc(),
             new array_uintersect_uassoc(),
             new iterator_to_array(),
-            new generator_to_array(),
+            ...(CompilerVersion::supportsGeneratorToArray() ? [new generator_to_array()] : []),
             new iterator_count(),
             new iterator_apply(),
             new array_replace(),

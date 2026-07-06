@@ -1185,6 +1185,17 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.4+ generator_to_array() (ext/standard/array.c, issue #6025, #16723).
+     *
+     * Withheld on 8.4.0-dev reference profile (matches Zend 8.2 function_exists gate). Enable via
+     * stable 8.4.0+ or explicit `PHP_COMPILER_PROFILE=8.4` forward profile.
+     */
+    public static function supportsGeneratorToArray(): bool
+    {
+        return self::supportsPhp84ArraySearchFunctions();
+    }
+
+    /**
      * PHP 8.4+ proc_get_status() pending_signals array (ext/standard/proc_open.c, #16707).
      *
      * Gated on stable 8.4.0 / PHP_COMPILER_PROFILE=8.4 so 8.4.0-dev reference profile matches Zend 8.2 phantom gate.
