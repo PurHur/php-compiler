@@ -49,7 +49,7 @@ PHP;
         $block = $runtime->parseAndCompile($code, 'curl_module.php');
         ob_start();
         $runtime->run($block);
-        self::assertSame('0000111111111000210', ob_get_clean());
+        self::assertSame('0000111111011000210', ob_get_clean());
     }
 
     public function test_curl_init_stub_class_throws_logic_exception(): void

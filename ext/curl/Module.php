@@ -26,7 +26,7 @@ class Module extends ModuleAbstract
      */
     public function getAdditionalExtensionNames(): array
     {
-        if (!VmCurlCore::available()) {
+        if (!CurlExtensionPolicy::advertisesExtension()) {
             return [];
         }
 

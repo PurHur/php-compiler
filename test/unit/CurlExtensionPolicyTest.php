@@ -15,10 +15,11 @@ final class CurlExtensionPolicyTest extends TestCase
     public function testCurlPhase2BuiltinsAdvertised(): void
     {
         self::assertTrue(CurlExtensionPolicy::advertisesBuiltins());
-        self::assertTrue(CurlExtensionPolicy::advertisesHandleClasses());
+        self::assertFalse(CurlExtensionPolicy::advertisesExtension());
+        self::assertFalse(CurlExtensionPolicy::advertisesHandleClasses());
     }
 
-    public function testCurlHandleClassesRegisteredWhenAdvertised(): void
+    public function testCurlHandleClassesWithheldUntilExtensionAdvertised(): void
     {
         $runtime = new Runtime();
         $code = <<<'PHP'
@@ -33,7 +34,7 @@ var_export(class_exists('CURLStringFile', false));
 PHP;
         ob_start();
         $runtime->run($runtime->parseAndCompile($code, 'curl_handle_classes.php'));
-        self::assertSame("true\ntrue\ntrue\ntrue", ob_get_clean());
+        self::assertSame("false\nfalse\nfalse\ntrue", ob_get_clean());
     }
 
     public function testCurlVersionCore(): void

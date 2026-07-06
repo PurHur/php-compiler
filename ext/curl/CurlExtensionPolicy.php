@@ -17,8 +17,16 @@ final class CurlExtensionPolicy
         return VmCurlCore::available();
     }
 
+    /**
+     * extension_loaded('curl') / CREDITS_MODULES — false until curl_init() ships (#11627, #16748, #3325).
+     */
+    public static function advertisesExtension(): bool
+    {
+        return false;
+    }
+
     public static function advertisesHandleClasses(): bool
     {
-        return self::advertisesBuiltins();
+        return self::advertisesExtension();
     }
 }

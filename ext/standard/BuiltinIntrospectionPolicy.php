@@ -67,8 +67,12 @@ final class BuiltinIntrospectionPolicy
 
     public static function extensionIsAdvertised(string $extension): bool
     {
-        if ('bcmath' === strtolower($extension)) {
+        $ext = strtolower($extension);
+        if ('bcmath' === $ext) {
             return CompilerVersion::advertisesBcmath();
+        }
+        if ('curl' === $ext) {
+            return \PHPCompiler\ext\curl\CurlExtensionPolicy::advertisesExtension();
         }
 
         return true;
