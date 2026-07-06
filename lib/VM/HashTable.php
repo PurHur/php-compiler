@@ -139,10 +139,11 @@ final class HashTable {
             $out->ensureHashSlotCapacity($maxIntKey);
         }
         foreach ($this->iterateKeyed(false) as [$key, $value]) {
-            if (Variable::TYPE_INTEGER === $key->type) {
-                $out->insertDuplicatedIndex($key->toInt(), $value);
+            $storageKey = self::normalizeIndexKey($key);
+            if (Variable::TYPE_INTEGER === $storageKey->type) {
+                $out->insertDuplicatedIndex($storageKey->toInt(), $value);
             } else {
-                $out->insertDuplicatedKey($key->toString(), $value);
+                $out->insertDuplicatedKey($storageKey->toString(), $value);
             }
         }
         $out->internalPointer = $this->internalPointer;
@@ -228,12 +229,7 @@ final class HashTable {
             if ($bucket->value->isUndefined()) {
                 continue;
             }
-            $keyVar = new Variable();
-            if (null !== $bucket->key) {
-                $keyVar->string($bucket->key);
-            } else {
-                $keyVar->int($bucket->hash);
-            }
+            $keyVar = $this->bucketKeyToVariable($bucket);
             $value = $bucket->value;
             if ($resolveIndirect) {
                 $value = $value->resolveIndirect();
@@ -260,12 +256,7 @@ final class HashTable {
             if ($bucket->value->isUndefined()) {
                 continue;
             }
-            $keyVar = new Variable();
-            if (null !== $bucket->key) {
-                $keyVar->string($bucket->key);
-            } else {
-                $keyVar->int($bucket->hash);
-            }
+            $keyVar = $this->bucketKeyToVariable($bucket);
             $value = $bucket->value;
             if ($resolveIndirect) {
                 $value = $value->resolveIndirect();
@@ -295,14 +286,8 @@ final class HashTable {
     public function iterCurrentKey(): Variable
     {
         $bucket = $this->buckets->read($this->internalPointer);
-        $keyVar = new Variable();
-        if (null !== $bucket->key) {
-            $keyVar->string($bucket->key);
-        } else {
-            $keyVar->int($bucket->hash);
-        }
 
-        return $keyVar;
+        return $this->bucketKeyToVariable($bucket);
     }
 
     public function iterCurrentValue(bool $byRef = false): Variable
@@ -489,6 +474,13 @@ final class HashTable {
     {
         if (Variable::TYPE_INDIRECT === $index->type) {
             $index = $index->resolveIndirect();
+        }
+        $enumStorage = WeakRefSupport::objectKeyIfEnumCase($index);
+        if (null !== $enumStorage) {
+            $storage = new Variable();
+            $storage->string($enumStorage);
+
+            return $storage;
         }
         EnumCaseSupport::rejectIllegalArrayOffset($index, $illegalOffsetMessage);
         if (Variable::TYPE_NULL === $index->type) {
@@ -852,16 +844,23 @@ final class HashTable {
             if ($bucket->value->isUndefined()) {
                 continue;
             }
-            $keyVar = new Variable();
-            if (null !== $bucket->key) {
-                $keyVar->string($bucket->key);
-            } else {
-                $keyVar->int($bucket->hash);
-            }
-            $out->append($keyVar);
+            $out->append($this->bucketKeyToVariable($bucket));
         }
 
         return $out;
+    }
+
+    private function bucketKeyToVariable(object $bucket): Variable
+    {
+        $keyVar = new Variable();
+        if (null !== $bucket->key) {
+            $keyVar->string($bucket->key);
+
+            return WeakRefSupport::materializeArrayKey($keyVar);
+        }
+        $keyVar->int($bucket->hash);
+
+        return $keyVar;
     }
 
     /**
@@ -1173,10 +1172,11 @@ final class HashTable {
         foreach ($this->iterateKeyed(true) as [$key, $value]) {
             $copy = new Variable();
             $copy->copyFrom($value);
-            if (Variable::TYPE_INTEGER === $key->type) {
-                $out->addIndex($key->toInt(), $copy);
+            $storageKey = self::normalizeIndexKey($key);
+            if (Variable::TYPE_INTEGER === $storageKey->type) {
+                $out->addIndex($storageKey->toInt(), $copy);
             } else {
-                $out->add($key->toString(), $copy);
+                $out->add($storageKey->toString(), $copy);
             }
         }
         $out->unionInPlace($other);
@@ -1192,6 +1192,9 @@ final class HashTable {
         $this->assertConsistent();
         $this->assertSeparatedForWrite();
         foreach ($other->iterateKeyed(true) as [$key, $value]) {
+            if (null !== WeakRefSupport::objectKeyIfEnumCase($key)) {
+                throw new \TypeError('Illegal offset type');
+            }
             EnumCaseSupport::rejectIllegalArrayOffset($key);
             if (Variable::TYPE_INTEGER === $key->type) {
                 if (null !== $this->findIndex($key->toInt())) {
@@ -1985,6 +1988,9 @@ final class HashTable {
     public static function spreadMergeKey(HashTable $dest, Variable $key, Variable $value): void
     {
         $key = $key->resolveIndirect();
+        if (Variable::TYPE_STRING === $key->type && str_starts_with($key->toString(), 'e:')) {
+            throw new \TypeError('Illegal offset type');
+        }
         EnumCaseSupport::rejectIllegalArrayOffset($key);
         if ($key->is(Variable::TYPE_INTEGER)) {
             $dest->append($value);
@@ -2005,10 +2011,20 @@ final class HashTable {
      */
     public function spreadFrom(HashTable $source): void
     {
-        foreach ($source->iterateKeyed(true) as [$key, $value]) {
+        for ($i = 0; $i < $source->numUsed; ++$i) {
+            $bucket = $source->buckets->read($i);
+            if ($bucket->value->isUndefined()) {
+                continue;
+            }
+            $keyVar = new Variable();
+            if (null !== $bucket->key) {
+                $keyVar->string($bucket->key);
+            } else {
+                $keyVar->int($bucket->hash);
+            }
             $copy = new Variable();
-            $copy->copyFrom($value);
-            self::spreadMergeKey($this, $key, $copy);
+            $copy->copyFrom($bucket->value->resolveIndirect());
+            self::spreadMergeKey($this, $keyVar, $copy);
         }
     }
 

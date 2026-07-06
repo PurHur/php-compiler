@@ -6527,6 +6527,11 @@ restart:
                         $value = $this->materializeArrayElementForStorage(
                             $this->resolveOutgoingCallArgValue($frame, $op->arg2)
                         );
+                        $enumStorage = VM\WeakRefSupport::objectKeyIfEnumCase($key);
+                        if (null !== $enumStorage) {
+                            $ht->update($enumStorage, $value);
+                            break;
+                        }
                         if ($key->is(Variable::TYPE_OBJECT) || $key->is(Variable::TYPE_ARRAY)) {
                             throw new \TypeError('Illegal offset type');
                         }
@@ -6551,15 +6556,23 @@ restart:
                     }
                     break;
                 case OpCode::TYPE_ARRAY_SPREAD:
-                    $result = $frame->scope[$op->arg1];
-                    $source = $frame->scope[$op->arg2];
-                    VM\ArraySpread::spreadInto(
-                        $this,
-                        $frame,
-                        $result->toArray(),
-                        $source,
-                        (int) ($op->arg3 ?? 0)
-                    );
+                    try {
+                        $result = $frame->scope[$op->arg1];
+                        $source = $frame->scope[$op->arg2];
+                        VM\ArraySpread::spreadInto(
+                            $this,
+                            $frame,
+                            $result->toArray(),
+                            $source,
+                            (int) ($op->arg3 ?? 0)
+                        );
+                    } catch (\TypeError $e) {
+                        $catchFrame = $this->dispatchVmTypeError($e, $frame);
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
+                    }
                     break;
                 case OpCode::TYPE_CLONE:
                     $result = $frame->scope[$op->arg1];
@@ -15408,6 +15421,14 @@ restart:
                 }
                 $key = $this->resolveOutgoingCallArgValue($frame, $op->arg3)->resolveIndirect();
                 $value = $this->resolveOutgoingCallArgValue($frame, $op->arg2);
+                $enumStorage = VM\WeakRefSupport::objectKeyIfEnumCase($key);
+                if (null !== $enumStorage) {
+                    $storeIndirect = $value->isIndirect();
+                    $storeIndirect
+                        ? $ht->updateIndirect($enumStorage, $value)
+                        : $ht->update($enumStorage, $value);
+                    break;
+                }
                 if ($key->is(Variable::TYPE_OBJECT) || $key->is(Variable::TYPE_ARRAY)) {
                     throw new \TypeError('Illegal offset type');
                 }
