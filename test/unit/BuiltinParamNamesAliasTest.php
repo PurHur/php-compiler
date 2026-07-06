@@ -177,6 +177,16 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'from_encoding', 'mb_convert_encoding'));
     }
 
+    /** @covers issue #16885 */
+    public function testMbSearchEncodingNamedParamsResolve(): void
+    {
+        foreach (['mb_stripos', 'mb_strpos', 'mb_strrpos'] as $fn) {
+            $names = BuiltinParamNames::forFunction($fn);
+            self::assertSame(['haystack', 'needle', 'offset', 'encoding'], $names, $fn);
+            self::assertSame(3, BuiltinParamNames::lookupNamedParamIndex($names, 'encoding', $fn), $fn);
+        }
+    }
+
     /** @covers issue #10027 */
     public function testTrimCharactersNamedParamResolves(): void
     {

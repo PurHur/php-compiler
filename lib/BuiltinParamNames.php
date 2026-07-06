@@ -347,6 +347,8 @@ final class BuiltinParamNames
             case 'mb_strcut':
                 return ['string', 'start', 'length', 'encoding'];
             case 'mb_stripos':
+            case 'mb_strpos':
+            case 'mb_strrpos':
                 return ['haystack', 'needle', 'offset', 'encoding'];
             case 'mb_strimwidth':
                 return ['string', 'start', 'width', 'trimmarker', 'encoding'];

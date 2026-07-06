@@ -25,11 +25,16 @@ final class mb_strpos extends Internal
 
     public function execute(Frame $frame): void
     {
-        $argc = \count($frame->calledArgs);
-        if ($argc < 2 || $argc > 4) {
+        if (!isset($frame->calledArgs[0]) || !isset($frame->calledArgs[1])) {
             throw new \ArgumentCountError(sprintf(
                 'mb_strpos() expects at least 2 arguments, %d given',
-                $argc
+                \count($frame->calledArgs)
+            ));
+        }
+        if (isset($frame->calledArgs[4])) {
+            throw new \ArgumentCountError(sprintf(
+                'mb_strpos() expects at most 4 arguments, %d given',
+                max(\array_keys($frame->calledArgs)) + 1
             ));
         }
         $haystack = VmString::coerceStringBuiltinArg(
@@ -47,10 +52,10 @@ final class mb_strpos extends Internal
             1,
             'needle'
         );
-        $offset = $argc >= 3
+        $offset = isset($frame->calledArgs[2])
             ? VmMbstring::coerceOffsetArg($frame, 'mb_strpos', 2)
             : 0;
-        $encoding = $argc >= 4
+        $encoding = isset($frame->calledArgs[3])
             ? VmMbstring::coerceEncodingArg($frame->calledArgs[3], 'mb_strpos', 3)
             : 'UTF-8';
         $result = VmMbstring::strpos($haystack, $needle, $offset, $encoding);
