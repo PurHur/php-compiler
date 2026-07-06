@@ -612,18 +612,35 @@ PHP;
         self::assertSame('__phpc_property_set_x', $registry['c']['x']['set'] ?? null);
     }
 
-    /** @covers issue #12995 — default initializer + hook block rejected on every profile */
-    public function testDefaultInitializerWithPropertyHooksRejected(): void
+    /** @covers issue #16861 — virtual default + hook block rejected with Zend compile error on forward profile */
+    public function testDefaultInitializerWithVirtualPropertyHooksRejectedOnForwardProfile(): void
     {
+        $this->skipUnlessPropertyHooksEnabled();
         $src = <<<'PHP'
 <?php
 class C {
     public string $label = 'default' {
-        get => $this->label;
+        get => 'virtual';
     }
 }
-trait T {
-    public string $label = 'from-trait' {
+PHP;
+        $this->expectException(\PHPCompiler\Compiler\CompileFatal::class);
+        $this->expectExceptionMessage(
+            PropertyHooks::virtualHookedDefaultCompileError('C', 'label')
+        );
+        PropertyHookSyntaxRejector::reject($src, 'virtual_default_initializer.php');
+    }
+
+    /** @covers issue #12574 — default initializer + hook block rejected on reference profile */
+    public function testDefaultInitializerWithPropertyHooksRejectedOnReferenceProfile(): void
+    {
+        if (CompilerVersion::supportsPropertyHooks()) {
+            $this->markTestSkipped('reference-profile parse error only when property hooks disabled');
+        }
+        $src = <<<'PHP'
+<?php
+class C {
+    public string $label = 'default' {
         get => $this->label;
     }
 }
@@ -633,8 +650,8 @@ PHP;
         PropertyHookSyntaxRejector::reject($src, 'default_initializer.php');
     }
 
-    /** @covers issue #12995 — end-to-end via Runtime preprocess */
-    public function testDefaultInitializerWithPropertyHooksRejectedByRuntime(): void
+    /** @covers issue #16861 — backed default + hook block allowed on forward profile (#11594) */
+    public function testDefaultInitializerWithBackedPropertyHooksAllowedOnForwardProfile(): void
     {
         $this->skipUnlessPropertyHooksEnabled();
         $src = <<<'PHP'
@@ -647,10 +664,10 @@ class C {
 $c = new C();
 echo $c->label;
 PHP;
+        PropertyHookSyntaxRejector::reject($src, 'backed_default_initializer.php');
         $runtime = new Runtime();
-        $this->expectException(\PHPCompiler\Compiler\CompileFatal::class);
-        $this->expectExceptionMessage(PropertyHooks::REFERENCE_PROFILE_UNEXPECTED_ARROW);
-        $runtime->parseAndCompile($src, 'property_hook_default_initializer.php');
+        $runtime->parseAndCompile($src, 'backed_default_initializer.php');
+        $this->addToAssertionCount(1);
     }
 
     /** @covers issue #9729 — promoted ctor defaults must not match property-hook `{` scanner */

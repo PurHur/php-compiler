@@ -10,6 +10,7 @@ use PHPCompiler\SourcePreprocessor\PropertyHooks;
 /**
  * Reject PHP 8.4 property-hook syntax on the Zend 8.2 reference profile (#12574).
  *
+ * Rejects virtual hooked properties with explicit defaults on the forward profile (#16861).
  * Must run before {@see SourcePreprocessor\PropertyHooks} so hook blocks are not lowered.
  * php-src: Zend/zend_language_parser.y / Zend/zend_compile.c (PHP 8.4+).
  */

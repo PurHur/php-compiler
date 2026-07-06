@@ -294,6 +294,9 @@ class Context {
     /** @var array<string, true> */
     public array $foreachByRefLocalNames = [];
 
+    /** @var array<string, true> `global $name` imports in the active LLVM function (#16828). */
+    public array $jitImportedGlobalNames = [];
+
     /** CFG entry block for the function currently being lowered (foreach local scan). */
     public ?Block $jitFunctionRootBlock = null;
 

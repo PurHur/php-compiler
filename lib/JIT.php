@@ -329,6 +329,7 @@ class JIT {
             $this->context->namedVariableBindings = [];
             $this->context->refAliasNames = [];
             $this->context->foreachByRefLocalNames = [];
+            $this->context->jitImportedGlobalNames = [];
             $llvmFunc = $run[0];
             $cfgBlock = $run[1] ?? null;
             if ($cfgBlock instanceof Block && null !== $cfgBlock->func) {
@@ -6828,6 +6829,7 @@ class JIT {
         }
         if (null !== $block->func && $block->orig === $block->func->cfg) {
             $this->context->jitFunctionRootBlock = $block;
+            $this->prescanFunctionImportedGlobals($block->func);
             $this->emitJitDestructAllowDelref($block);
         }
         if ([] !== $args) {
@@ -6997,7 +6999,7 @@ class JIT {
                     $coalesceTarget = null;
                     if ($this->context->coalesceAssignTargets->contains($destOp)) {
                         $coalesceTarget = $destOp;
-                    } elseif ($this->context->coalesceAssignTargets->contains($aliasOp)) {
+                    } elseif (null !== $aliasOp && $this->context->coalesceAssignTargets->contains($aliasOp)) {
                         $coalesceTarget = $aliasOp;
                     }
                     $forceCoalesce = null !== $coalesceTarget;
@@ -7058,8 +7060,9 @@ class JIT {
                     }
                     $forceAssign = $forceCoalesce
                         || $this->assignOperandsUsedByLiteralInclude($block, $op);
-                    $aliasName = JIT\OperandName::resolve($aliasOp);
-                    $needsNamedStorageAssign = $op->arg1 !== $op->arg2
+                    $aliasName = null !== $aliasOp ? JIT\OperandName::resolve($aliasOp) : null;
+                    $needsNamedStorageAssign = null !== $aliasOp
+                        && $op->arg1 !== $op->arg2
                         && null !== $aliasName
                         && '' !== $aliasName
                         && null === JIT\OperandName::resolve($destOp);
@@ -7067,7 +7070,8 @@ class JIT {
                         $this->context->makeVariableFromOp($func, $basicBlock, $block, $destOp);
                     }
                     if (
-                        $this->context->hasVariableOp($aliasOp)
+                        null !== $aliasOp
+                        && $this->context->hasVariableOp($aliasOp)
                         && $this->context->hasVariableOp($block->getOperand($rhsSlot))
                     ) {
                         $aliasVar = $this->context->getVariableFromOp($aliasOp);
@@ -7086,7 +7090,9 @@ class JIT {
                         $this->assignOperand($aliasOp, $value, true);
                         $this->recordListUnpackAssignSlot($aliasOp, $this->context->getVariableFromOp($aliasOp));
                     } else {
-                        $this->assignOperand($aliasOp, $value, $forceAssign);
+                        if (null !== $aliasOp) {
+                            $this->assignOperand($aliasOp, $value, $forceAssign);
+                        }
                         $destUsed = [] !== $destOp->usages;
                         if ($destUsed || $forceAssign) {
                             $this->assignOperand($destOp, $value, $destUsed || $forceAssign);
@@ -7104,12 +7110,14 @@ class JIT {
                     ) {
                         $this->jitClearAssignTempOperand($destOp);
                     }
-                    $this->maybeBindNamedVariable($aliasOp);
+                    if (null !== $aliasOp) {
+                        $this->maybeBindNamedVariable($aliasOp);
+                    }
                     if ($op->arg1 === $op->arg2) {
                         $this->maybeBindNamedVariable($destOp);
                     }
-                    foreach ([$block->getOperand($op->arg2), $destOp] as $destOperand) {
-                        if (!$this->context->hasVariableOp($destOperand)) {
+                    foreach ([$aliasOp, $destOp] as $destOperand) {
+                        if (null === $destOperand || !$this->context->hasVariableOp($destOperand)) {
                             continue;
                         }
                         $destVar = $this->context->getVariableFromOp($destOperand);
@@ -7184,6 +7192,7 @@ class JIT {
                     }
                     $globalName = $block->constants[$op->arg2]->toString();
                     $globalVar = $this->ensureJitGlobal($globalName);
+                    $this->context->jitImportedGlobalNames[$globalName] = true;
                     $this->context->bindVariableByName($globalName, $globalVar);
                     $destOp = $block->getOperand($op->arg1);
                     $this->context->setVariableOp($destOp, $globalVar);
@@ -7825,11 +7834,33 @@ class JIT {
                     if (null === $op->arg2 || null === $op->arg3) {
                         break;
                     }
-                    if (!$this->context->hasVariableOp($block->getOperand($op->arg1))) {
+                    $destOp = $block->getOperand($op->arg1);
+                    if (null === $destOp || !$this->context->hasVariableOp($destOp)) {
                         // don't bother with constant operations
                         break;
                     }
-                    $result = $this->context->getVariableFromOp($block->getOperand($op->arg1));
+                    $result = $this->context->getVariableFromOp($destOp);
+                    if (Variable::TYPE_STRING === $result->type && Variable::KIND_VALUE === $result->kind) {
+                        $destOp = $block->getOperand($op->arg1);
+                        $slot = JIT\BasicBlockHelper::entryAllocaForFunction(
+                            $this->context,
+                            $func,
+                            $this->context->getTypeFromString('__string__*')
+                        );
+                        $promoted = new Variable(
+                            $this->context,
+                            Variable::TYPE_STRING,
+                            Variable::KIND_VARIABLE,
+                            $slot
+                        );
+                        $promoted->initialize();
+                        if (null !== $result->value) {
+                            $this->context->builder->store($result->value, $slot);
+                            $promoted->addref();
+                        }
+                        $this->context->setVariableOp($destOp, $promoted);
+                        $result = $promoted;
+                    }
                     $left = $this->context->getVariableFromOp($block->getOperand($op->arg2));
                     $right = $this->context->getVariableFromOp($block->getOperand($op->arg3));
                     if (null !== $result->objectPropertySlot) {
@@ -11678,22 +11709,46 @@ class JIT {
     }
 
     /**
-     * First assignment to a {main} script global must populate the heap box (#1492 bootstrap-aot).
+     * First assignment to a script global must populate the heap box (#1492 bootstrap-aot).
      *
      * Without this, makeVariableFromValueOp keeps an SSA rvalue while a later VAR_FETCH rebinds
      * the name to an empty script-global wrapper — SplObjectStorage::contains() then reads null.
+     *
+     * Also covers `global $name` imports after foreach/try phi merges drop the slot binding (#16828).
      */
     private function tryAssignScriptGlobalFirstBinding(Operand $resultOp, JIT\Variable $value): bool
     {
         $block = $this->context->jitEnclosingBlock;
-        if (null === $block || !$block->isMainScript()) {
+        if (null === $block) {
             return false;
         }
         $name = JIT\OperandName::resolve($resultOp);
+        if (null === $name || '' === $name) {
+            $slot = $block->slotForOperand($resultOp);
+            if (null !== $slot) {
+                foreach ($block->scopedOperands() as $scopeOp) {
+                    if ($block->slotForOperand($scopeOp) !== $slot) {
+                        continue;
+                    }
+                    $scopeName = JIT\OperandName::resolve($scopeOp);
+                    if (null !== $scopeName && '' !== $scopeName) {
+                        $name = $scopeName;
+                        break;
+                    }
+                }
+            }
+        }
         if (null === $name || '' === $name || \PHPCompiler\Web\Superglobals::isSuperglobalName($name)) {
             return false;
         }
-        if ($this->context->isForeachByRefLocalName($name, $block)) {
+        $mainScriptGlobal = $block->isMainScript() && !$this->context->isForeachByRefLocalName($name, $block);
+        $resolved = $this->context->resolveRefAliasName($name);
+        $importedGlobal = isset($this->context->jitImportedGlobalNames[$name])
+            || (
+                isset($this->context->namedVariableBindings[$resolved])
+                && $this->context->namedVariableBindings[$resolved]->functionStaticGlobal
+            );
+        if (!$mainScriptGlobal && !$importedGlobal) {
             return false;
         }
         $globalVar = $this->context->ensureScriptGlobal($name);
@@ -11710,6 +11765,9 @@ class JIT {
 
     /**
      * Prefer active foreach by-ref lvalues over {main} script-global slots (#4364).
+     *
+     * Foreach/try phi merges can drop {@see JIT\Variable::$functionStaticGlobal} on `global $name`
+     * lvalues after an early return (src/llvm-env.php, issue #16828).
      */
     private function resolveAssignLvalue(Operand $resultOp): JIT\Variable
     {
@@ -11718,7 +11776,52 @@ class JIT {
             return $result;
         }
         $name = JIT\OperandName::resolve($resultOp);
+        if (null !== $name && '' !== $name) {
+            $resolved = $this->context->resolveRefAliasName($name);
+            if (isset($this->context->namedVariableBindings[$resolved])) {
+                $bound = $this->context->namedVariableBindings[$resolved];
+                if ($bound->functionStaticGlobal) {
+                    $this->context->scope->variables[$resultOp] = $bound;
+
+                    return $bound;
+                }
+                if (null !== $bound->foreachByRefPackedArm || $bound->borrowedValueEntry) {
+                    $this->context->scope->variables[$resultOp] = $bound;
+
+                    return $bound;
+                }
+            }
+            $block = $this->context->jitEnclosingBlock;
+            if (null !== $block) {
+                $resolvedBinding = $this->context->resolveRefAliasName($name);
+                if (
+                    isset($this->context->namedVariableBindings[$resolvedBinding])
+                    && $this->context->namedVariableBindings[$resolvedBinding]->functionStaticGlobal
+                ) {
+                    $global = $this->context->namedVariableBindings[$resolvedBinding];
+                    $this->context->scope->variables[$resultOp] = $global;
+
+                    return $global;
+                }
+            }
+            $block = $this->context->jitEnclosingBlock;
+            if (null !== $block && (
+                $block->declaresGlobalName($name)
+                || isset($this->context->jitImportedGlobalNames[$name])
+            )) {
+                $global = $this->context->ensureScriptGlobal($name);
+                $this->context->bindVariableByName($name, $global);
+                $this->context->scope->variables[$resultOp] = $global;
+
+                return $global;
+            }
+        }
         if (null === $name || '' === $name || !$result->functionStaticGlobal) {
+            $recovered = $this->recoverScriptGlobalAssignLvalueBySlot($resultOp, $result);
+            if (null !== $recovered) {
+                return $recovered;
+            }
+
             return $result;
         }
         $resolved = $this->context->resolveRefAliasName($name);
@@ -11747,6 +11850,102 @@ class JIT {
         }
 
         return $result;
+    }
+
+    /**
+     * Foreach/try phi operands may lose the variable name while keeping the global slot (#16828).
+     */
+    private function recoverScriptGlobalAssignLvalueBySlot(Operand $resultOp, JIT\Variable $result): ?JIT\Variable
+    {
+        $block = $this->context->jitEnclosingBlock;
+        if (null === $block) {
+            return null;
+        }
+        $slot = $block->slotForOperand($resultOp);
+        if (null === $slot) {
+            return null;
+        }
+        foreach ($block->scopedOperands() as $scopeOp) {
+            if ($block->slotForOperand($scopeOp) !== $slot) {
+                continue;
+            }
+            if ($this->context->scope->variables->contains($scopeOp)) {
+                $scopeVar = $this->context->scope->variables[$scopeOp];
+                if ($scopeVar->functionStaticGlobal) {
+                    $this->context->scope->variables[$resultOp] = $scopeVar;
+
+                    return $scopeVar;
+                }
+            }
+            $scopeName = JIT\OperandName::resolve($scopeOp);
+            if (null === $scopeName || '' === $scopeName) {
+                continue;
+            }
+            if (
+                !$block->declaresGlobalName($scopeName)
+                && !isset($this->context->jitImportedGlobalNames[$scopeName])
+            ) {
+                continue;
+            }
+            $global = $this->context->ensureScriptGlobal($scopeName);
+            $this->context->bindVariableByName($scopeName, $global);
+            $this->context->scope->variables[$resultOp] = $global;
+
+            return $global;
+        }
+
+        return null;
+    }
+
+    private function resolveScriptGlobalAssignTarget(Operand $resultOp, JIT\Variable $result): ?JIT\Variable
+    {
+        if ($result->functionStaticGlobal) {
+            return $result;
+        }
+        $name = JIT\OperandName::resolve($resultOp);
+        if (null === $name || '' === $name) {
+            $block = $this->context->jitEnclosingBlock;
+            if (null !== $block) {
+                $slot = $block->slotForOperand($resultOp);
+                if (null !== $slot) {
+                    foreach ($block->scopedOperands() as $scopeOp) {
+                        if ($block->slotForOperand($scopeOp) !== $slot) {
+                            continue;
+                        }
+                        $scopeName = JIT\OperandName::resolve($scopeOp);
+                        if (null !== $scopeName && '' !== $scopeName) {
+                            $name = $scopeName;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        if (null === $name || '' === $name || \PHPCompiler\Web\Superglobals::isSuperglobalName($name)) {
+            return null;
+        }
+        $resolved = $this->context->resolveRefAliasName($name);
+        if (
+            isset($this->context->namedVariableBindings[$resolved])
+            && $this->context->namedVariableBindings[$resolved]->functionStaticGlobal
+        ) {
+            return $this->context->namedVariableBindings[$resolved];
+        }
+        $root = $this->context->jitFunctionRootBlock ?? $this->context->jitEnclosingBlock;
+        if (isset($this->context->jitImportedGlobalNames[$name])) {
+            $global = $this->context->ensureScriptGlobal($name);
+            $this->context->bindVariableByName($name, $global);
+
+            return $global;
+        }
+        if (null !== $root && $root->declaresGlobalName($name)) {
+            $global = $this->context->ensureScriptGlobal($name);
+            $this->context->bindVariableByName($name, $global);
+
+            return $global;
+        }
+
+        return null;
     }
 
     /** Both ?: arms jump to a shared RETURN/THROW merge block (#4280, #8555). */
@@ -11938,6 +12137,24 @@ class JIT {
             }
         }
         $result = $this->resolveAssignLvalue($resultOp);
+        $globalTarget = $this->resolveScriptGlobalAssignTarget($resultOp, $result);
+        if (null !== $globalTarget) {
+            JIT\JitValueBox::assignToPointer(
+                $this->context,
+                JIT\JitValueBox::valuePtrFromVariable($this->context, $globalTarget),
+                $value
+            );
+            $this->context->setVariableOp($resultOp, $globalTarget);
+            $globalName = JIT\OperandName::resolve($resultOp);
+            if (null !== $globalName && '' !== $globalName) {
+                $this->context->bindVariableByName(
+                    $this->context->resolveRefAliasName($globalName),
+                    $globalTarget
+                );
+            }
+
+            return;
+        }
         if ($result === $value) {
             return;
         }
@@ -12222,7 +12439,76 @@ class JIT {
             return;
         }
         if ($result->kind !== Variable::KIND_VARIABLE) {
-            throw new \LogicException('Cannot assign to a value');
+            if ($this->tryAssignScriptGlobalFirstBinding($resultOp, $value)) {
+                return;
+            }
+            $globalTarget = $this->resolveScriptGlobalAssignTarget($resultOp, $result);
+            if (null !== $globalTarget) {
+                JIT\JitValueBox::assignToPointer(
+                    $this->context,
+                    JIT\JitValueBox::valuePtrFromVariable($this->context, $globalTarget),
+                    $value
+                );
+                $this->context->setVariableOp($resultOp, $globalTarget);
+                $globalName = JIT\OperandName::resolve($resultOp);
+                if (null !== $globalName && '' !== $globalName) {
+                    $this->context->bindVariableByName(
+                        $this->context->resolveRefAliasName($globalName),
+                        $globalTarget
+                    );
+                }
+
+                return;
+            }
+            if (Variable::TYPE_STRING === $result->type && Variable::KIND_VALUE === $result->kind) {
+                $llvmFunc = $this->context->builder->getInsertBlock()->getParent();
+                $slot = JIT\BasicBlockHelper::entryAllocaForFunction(
+                    $this->context,
+                    $llvmFunc,
+                    $this->context->getTypeFromString('__string__*')
+                );
+                $promoted = new Variable(
+                    $this->context,
+                    Variable::TYPE_STRING,
+                    Variable::KIND_VARIABLE,
+                    $slot
+                );
+                $promoted->initialize();
+                if (null !== $result->value) {
+                    $this->context->builder->store($result->value, $slot);
+                    $promoted->addref();
+                }
+                $this->context->setVariableOp($resultOp, $promoted);
+                $result = $promoted;
+            } elseif (
+                Variable::KIND_VALUE === $result->kind
+                && in_array($result->type, [
+                    Variable::TYPE_NATIVE_BOOL,
+                    Variable::TYPE_NATIVE_LONG,
+                    Variable::TYPE_NATIVE_DOUBLE,
+                ], true)
+            ) {
+                $llvmFunc = $this->context->builder->getInsertBlock()->getParent();
+                $slot = JIT\BasicBlockHelper::entryAllocaForFunction(
+                    $this->context,
+                    $llvmFunc,
+                    $this->context->getTypeFromString(Variable::getStringType($result->type))
+                );
+                $promoted = new Variable(
+                    $this->context,
+                    $result->type,
+                    Variable::KIND_VARIABLE,
+                    $slot
+                );
+                if (null !== $result->value) {
+                    $this->context->builder->store($result->value, $slot);
+                    $promoted->addref();
+                }
+                $this->context->setVariableOp($resultOp, $promoted);
+                $result = $promoted;
+            } else {
+                throw new \LogicException('Cannot assign to a value');
+            }
         }
         if (
             $branchMergeTarget
@@ -12867,16 +13153,54 @@ class JIT {
         }
         $dest = $this->context->getVariableFromOp($result);
         if ($dest->kind !== Variable::KIND_VARIABLE) {
+            if ($dest->functionStaticGlobal) {
+                $source = new Variable(
+                    $this->context,
+                    Variable::TYPE_VALUE,
+                    Variable::KIND_VALUE,
+                    $value
+                );
+                $this->assignOperand($result, $source);
+
+                return;
+            }
+            $name = JIT\OperandName::resolve($result);
+            if (null === $name || '' === $name) {
+                $block = $this->context->jitEnclosingBlock;
+                if (null !== $block) {
+                    $slot = $block->slotForOperand($result);
+                    if (null !== $slot) {
+                        foreach ($block->scopedOperands() as $scopeOp) {
+                            if ($block->slotForOperand($scopeOp) !== $slot) {
+                                continue;
+                            }
+                            $scopeName = JIT\OperandName::resolve($scopeOp);
+                            if (null !== $scopeName && '' !== $scopeName) {
+                                $name = $scopeName;
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+            if (null !== $name && '' !== $name && isset($this->context->jitImportedGlobalNames[$name])) {
+                $source = new Variable(
+                    $this->context,
+                    Variable::TYPE_VALUE,
+                    Variable::KIND_VALUE,
+                    $value
+                );
+                $this->assignOperand($result, $source);
+
+                return;
+            }
             if (Variable::KIND_VALUE === $dest->kind) {
-                // The temp was pre-bound as a folded value (defined()/class_exists()
-                // spine-guard folding registers NATIVE_BOOL KIND_VALUE bindings) and
-                // the real producer emits afterwards. assignOperand() rebinds these;
-                // mirror that here instead of dying mid-bundle (#16828).
+                // Folded spine-guard bindings and foreach/try phi temps (#16828).
                 $this->context->makeVariableFromValueOp($value, $result);
 
                 return;
             }
-            throw new \LogicException('Cannot assign to a value');
+            throw new \LogicException('Cannot assignOperandValue to a value');
         }
         $valueTy = $this->context->getStringFromType($value->typeOf());
         $destTy = $this->context->getStringFromType($dest->value->typeOf());
@@ -12893,6 +13217,15 @@ class JIT {
                 return;
             }
             if ('int1' === $valueTy || 'bool' === $valueTy) {
+                if (Variable::KIND_VALUE === $dest->kind) {
+                    $dest->free();
+                    $this->context->setVariableOp(
+                        $result,
+                        Variable::fromValueOp($this->context, $value, $result)
+                    );
+
+                    return;
+                }
                 $dest->free();
                 $this->context->builder->store($value, $dest->value);
                 $dest->addref();
@@ -16046,6 +16379,35 @@ class JIT {
         }
 
         throw new \LogicException('No JIT variable for slot '.$slot);
+    }
+
+    /**
+     * Collect `global $name` imports before lowering any block — try bodies may compile first (#16828).
+     */
+    private function prescanFunctionImportedGlobals(\PHPCfg\Func $func): void
+    {
+        if (null === $func->cfg) {
+            return;
+        }
+        $seen = [];
+        $queue = [$func->cfg];
+        while ([] !== $queue) {
+            $scan = array_shift($queue);
+            $id = spl_object_id($scan);
+            if (isset($seen[$id])) {
+                continue;
+            }
+            $seen[$id] = true;
+            foreach ($scan->children as $op) {
+                if ($op instanceof \PHPCfg\Op\Terminal\GlobalVar) {
+                    $name = JIT\OperandName::resolve($op->var);
+                    if (null !== $name && '' !== $name) {
+                        $this->context->jitImportedGlobalNames[$name] = true;
+                    }
+                }
+                Cfg\OpSubBlockAccess::enqueueSubBlocks($op, $queue);
+            }
+        }
     }
 
     private function ensureJitGlobal(string $name): Variable

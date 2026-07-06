@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\SourcePreprocessor;
 
 use PHPCompiler\Compiler\CompileFatal;
+use PHPCompiler\CompilerVersion;
 
 /**
  * Strip PHP 8.4 property-hook blocks for nikic/php-parser v4 and inject hook methods.
@@ -24,6 +25,9 @@ final class PropertyHooks
 
     /** Zend 8.2 reference profile — hook block after property name (#12574). */
     public const REFERENCE_PROFILE_UNEXPECTED_BRACE = 'syntax error, unexpected token "{", expecting "," or ";"';
+
+    /** php-src: zend_verify_hooked_property — virtual hooked property + explicit default (#16861, #12995). */
+    public const VIRTUAL_HOOKED_DEFAULT_COMPILE_ERROR = 'Cannot specify default value for virtual hooked property %s::$%s';
 
     private const SET_METHOD_PREFIX = '__phpc_property_set_';
     private const GET_METHOD_PREFIX = '__phpc_property_get_';
@@ -88,13 +92,18 @@ final class PropertyHooks
     }
 
     /**
-     * Default initializer + hook block is invalid on every profile (#12995, Zend/zend_compile.c).
+     * Default initializer + virtual hook block on forward profile; reference-profile parse errors (#12995, #16861).
      *
      * @return array{line: int, message: string}|null
      */
     public static function defaultInitializerWithHookBlockSyntaxError(string $code): ?array
     {
         return (new self())->locateDefaultInitializerWithHookBlockSyntaxError($code);
+    }
+
+    public static function virtualHookedDefaultCompileError(string $className, string $propName): string
+    {
+        return sprintf(self::VIRTUAL_HOOKED_DEFAULT_COMPILE_ERROR, $className, $propName);
     }
 
     private function locateReferenceProfileHookSyntaxError(string $code): ?array
@@ -137,7 +146,7 @@ final class PropertyHooks
             if (null === $decl) {
                 break;
             }
-            [$declPos, , ] = $decl;
+            [$declPos, , $declName] = $decl;
             $braceOpen = strpos($code, '{', $declPos);
             if (false === $braceOpen) {
                 break;
@@ -149,7 +158,7 @@ final class PropertyHooks
             }
             [$bodyStart, $bodyEnd] = $span;
             $body = substr($code, $bodyStart + 1, $bodyEnd - $bodyStart - 1);
-            $error = $this->locateHookSyntaxErrorInBody($code, $bodyStart + 1, $body, true);
+            $error = $this->locateHookSyntaxErrorInBody($code, $bodyStart + 1, $body, true, $declName);
             if (null !== $error) {
                 return $error;
             }
@@ -166,7 +175,8 @@ final class PropertyHooks
         string $fullCode,
         int $bodyOffsetInFull,
         string $body,
-        bool $defaultInitializerOnly = false
+        bool $defaultInitializerOnly = false,
+        string $declName = ''
     ): ?array {
         $offset = 0;
         $len = strlen($body);
@@ -194,8 +204,22 @@ final class PropertyHooks
                     ];
                 }
                 [$open, $close] = $hookSpan;
-                $hookBody = substr($body, $open + 1, $close - $open - 1);
-                $arrowRel = $this->findFirstFatArrowOffset($hookBody);
+                $hookSource = substr($body, $open + 1, $close - $open - 1);
+                if ($defaultInitializerOnly && CompilerVersion::supportsPropertyHooks()) {
+                    $declPrefix = substr($body, max(0, $varStart - 200), $varStart - max(0, $varStart - 200));
+                    $isStatic = (bool) preg_match('/\bstatic\b/', $declPrefix);
+                    [, $usesBacking] = $this->lowerHooks($hookSource, $prop, 'c', $isStatic, true);
+                    if ($usesBacking) {
+                        $offset = $close + 1;
+                        continue;
+                    }
+
+                    return [
+                        'line' => self::lineAtOffset($fullCode, $absHookOpen),
+                        'message' => self::virtualHookedDefaultCompileError($declName, $prop),
+                    ];
+                }
+                $arrowRel = $this->findFirstFatArrowOffset($hookSource);
                 if (null !== $arrowRel) {
                     $absArrow = $bodyOffsetInFull + $open + 1 + $arrowRel;
 

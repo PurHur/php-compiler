@@ -241,6 +241,45 @@ PHP;
         );
     }
 
+    /** Issue #16828: global assign inside foreach/try after early return must AOT-compile (llvm-env pattern). */
+    public function testGlobalForeachTryAfterEarlyReturnCompiles(): void
+    {
+        $this->skipUnlessLlvmReady();
+        $repoRoot = dirname(__DIR__, 2);
+        $sourcePath = $repoRoot.'/test/fixtures/aot/compile-only/global_foreach_try_after_early_return.php';
+        $outfile = tempnam(sys_get_temp_dir(), 'bootstrap_aot_global_foreach_try_');
+        $this->assertNotFalse($outfile);
+        unlink($outfile);
+
+        $env = [];
+        foreach (array_merge($_ENV, $_SERVER) as $key => $value) {
+            if (is_string($value)) {
+                $env[$key] = $value;
+            }
+        }
+        LlvmToolchain::applyProcessEnv($env, $repoRoot);
+
+        $compileArgv = array_merge(
+            LlvmToolchain::envPrefix($repoRoot),
+            [PHP_BINARY, $repoRoot.'/bin/compile.php', '-o', $outfile, $sourcePath]
+        );
+        $descriptorSpec = [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']];
+        $compile = proc_open($compileArgv, $descriptorSpec, $pipes, $repoRoot, $env);
+        $this->assertIsResource($compile);
+        fclose($pipes[0]);
+        fclose($pipes[1]);
+        $stderr = stream_get_contents($pipes[2]);
+        fclose($pipes[2]);
+        $exitCode = proc_close($compile);
+        $stderr = trim($stderr !== false ? $stderr : '');
+        if (is_file($outfile)) {
+            @unlink($outfile);
+        }
+        $this->assertSame(0, $exitCode, 'global foreach/try AOT compile: '.$stderr);
+        $this->assertStringNotContainsString('Cannot assignOperandValue to a value', $stderr);
+        $this->assertStringNotContainsString('Cannot assign to a value', $stderr);
+    }
+
     /** bin/vm.php {main} guard — defined()&&const phi must not throw assignOperand (#1492). */
     public function testBinVmTopLevelSpineGuardAssignOperandCompiles(): void
     {

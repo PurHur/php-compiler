@@ -11,19 +11,19 @@ use PHPCompiler\JIT\ReflectionBuiltinHelper;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** LLVM lowering for attribute_exists() (#6468). */
+/** LLVM lowering for attribute_exists() (#6468, #16844). */
 final class JitAttributeExists
 {
-    public static function invoke(Context $context, JITVariable $classArg, JITVariable $attributeArg): Value
+    public static function invoke(Context $context, JITVariable $attributeArg, JITVariable $objectArg): Value
     {
-        $classLit = JitStringArg::compileTimeLiteral($classArg);
         $attrLit = JitStringArg::compileTimeLiteral($attributeArg);
-        if (null !== $classLit && null !== $attrLit) {
+        $classLit = JitStringArg::compileTimeLiteral($objectArg);
+        if (null !== $attrLit && null !== $classLit) {
             return ReflectionBuiltinHelper::attributeExistsLiteral($context, $classLit, $attrLit);
         }
 
-        JitStringBuiltinArg::lower($context, $classArg, 'attribute_exists', 0, 'class');
-        JitStringBuiltinArg::lower($context, $attributeArg, 'attribute_exists', 1, 'attribute');
+        JitStringBuiltinArg::lower($context, $attributeArg, 'attribute_exists', 0, 'attribute');
+        JitStringBuiltinArg::lower($context, $objectArg, 'attribute_exists', 1, 'object');
         throw new \LogicException(
             'attribute_exists() requires compile-time string arguments in this compiler build'
         );

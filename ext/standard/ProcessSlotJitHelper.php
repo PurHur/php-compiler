@@ -60,20 +60,22 @@ final class ProcessSlotJitHelper
         self::$slots[$slot] = $entry;
 
         if ($entry['statusKnown']) {
-            unset(self::$slots[$slot]);
-
-            return -1;
+            return self::exitCodeFromStatus($entry['status']);
         }
 
         try {
             $status = $ffi->new('int');
             $waitRc = (int) $ffi->waitpid($entry['pid'], \FFI::addr($status), 0);
-            unset(self::$slots[$slot]);
             if (-1 === $waitRc) {
+                unset(self::$slots[$slot]);
+
                 return -1;
             }
+            $entry['statusKnown'] = true;
+            $entry['status'] = (int) $status->cdata;
+            self::$slots[$slot] = $entry;
 
-            return self::exitCodeFromStatus((int) $status->cdata);
+            return self::exitCodeFromStatus($entry['status']);
         } catch (\Throwable) {
             unset(self::$slots[$slot]);
 
@@ -87,8 +89,11 @@ final class ProcessSlotJitHelper
     public static function getStatus(int $slot): array|false
     {
         $entry = self::$slots[$slot] ?? null;
-        if (null === $entry || !$entry['active']) {
+        if (null === $entry) {
             return false;
+        }
+        if (!$entry['active']) {
+            return VmProcessProcOpenNative::statusFromClosedSlotForEmbed($entry);
         }
 
         $ffi = self::ffi();

@@ -900,9 +900,24 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
-    public function testSupportsFinalGlobalTypedConstantsAlwaysFalse(): void
+    public function testSupportsFinalGlobalTypedConstantsWithheldOnReferenceProfile(): void
     {
         $this->assertFalse(CompilerVersion::supportsFinalGlobalTypedConstants());
+    }
+
+    public function testSupportsFinalGlobalTypedConstantsOnForwardProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertTrue(CompilerVersion::supportsFinalGlobalTypedConstants());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
     }
 
     public function testSupportsGlobalTypedConstantsWithheldOnReferenceProfile(): void

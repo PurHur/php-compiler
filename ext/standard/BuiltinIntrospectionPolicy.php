@@ -56,11 +56,13 @@ final class BuiltinIntrospectionPolicy
         }
         if ('grapheme_str_contains' === $lc) {
             return CompilerVersion::advertisesGraphemeStrContains()
-                && IntlExtensionPolicy::advertisesBuiltins();
+                && (IntlExtensionPolicy::advertisesBuiltins()
+                    || CompilerVersion::supportsGraphemeStrContains());
         }
         if ('grapheme_strimwidth' === $lc) {
             return CompilerVersion::advertisesGraphemeStrimwidth()
-                && IntlExtensionPolicy::advertisesBuiltins();
+                && (IntlExtensionPolicy::advertisesBuiltins()
+                    || CompilerVersion::supportsGraphemeStrimwidth());
         }
         if (\in_array($lc, ['curl_escape', 'curl_unescape'], true)) {
             return CurlExtensionPolicy::advertisesExtension();

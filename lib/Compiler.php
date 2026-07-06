@@ -32084,11 +32084,14 @@ class Compiler {
     }
 
     /**
-     * Zend/php-src rejects `final const` at compile-unit scope at all versions (#10324, #15185).
+     * Zend/php-src rejects file-scope `final const` below PHP 8.4 (#10324, #15185, #16859).
      */
     protected function rejectFinalGlobalTypedConstantIfUnsupported(Op\Terminal\Const_ $const): void
     {
         if (0 === ($const->flags & \PhpParser\Node\Stmt\Class_::MODIFIER_FINAL)) {
+            return;
+        }
+        if (\PHPCompiler\CompilerVersion::supportsFinalGlobalTypedConstants()) {
             return;
         }
         $this->throwCompileError(\PHPCompiler\Ast\GlobalTypedConstRewriter::FINAL_GLOBAL_CONST_REJECT_MESSAGE);

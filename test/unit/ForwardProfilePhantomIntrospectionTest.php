@@ -179,19 +179,19 @@ final class ForwardProfilePhantomIntrospectionTest extends TestCase
         }
     }
 
-    public function testZendThreadIdCallableButNotAdvertisedOnForwardProfile(): void
+    public function testZendThreadIdAdvertisedOnForwardProfile84(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE=8.4');
         try {
             $this->assertTrue(CompilerVersion::supportsZendThreadId());
-            $this->assertFalse(CompilerVersion::advertisesZendThreadId());
-            $this->assertFalse(BuiltinIntrospectionPolicy::functionIsAdvertised('zend_thread_id'));
+            $this->assertTrue(CompilerVersion::advertisesZendThreadId());
+            $this->assertTrue(BuiltinIntrospectionPolicy::functionIsAdvertised('zend_thread_id'));
 
             $runtime = new Runtime();
             $ctx = $runtime->vmContext;
             $this->assertTrue(isset($ctx->functions['zend_thread_id']));
-            $this->assertFalse(
+            $this->assertTrue(
                 \PHPCompiler\ext\standard\VmReflection::functionExists($ctx, 'zend_thread_id')
             );
         } finally {
@@ -257,7 +257,7 @@ final class ForwardProfilePhantomIntrospectionTest extends TestCase
         }
     }
 
-    public function testGraphemeProfile84BuiltinsCallableButNotAdvertisedWithoutIntl(): void
+    public function testGraphemeProfile84BuiltinsAdvertisedWithoutIntl(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE=8.4');
@@ -266,8 +266,8 @@ final class ForwardProfilePhantomIntrospectionTest extends TestCase
             $this->assertTrue(CompilerVersion::advertisesGraphemeStrContains());
             $this->assertTrue(CompilerVersion::supportsGraphemeStrimwidth());
             $this->assertTrue(CompilerVersion::advertisesGraphemeStrimwidth());
-            $this->assertFalse(BuiltinIntrospectionPolicy::functionIsAdvertised('grapheme_str_contains'));
-            $this->assertFalse(BuiltinIntrospectionPolicy::functionIsAdvertised('grapheme_strimwidth'));
+            $this->assertTrue(BuiltinIntrospectionPolicy::functionIsAdvertised('grapheme_str_contains'));
+            $this->assertTrue(BuiltinIntrospectionPolicy::functionIsAdvertised('grapheme_strimwidth'));
             $this->assertFalse(
                 \PHPCompiler\ext\standard\ModuleRegistry::extensionLoaded('intl')
             );
@@ -276,10 +276,10 @@ final class ForwardProfilePhantomIntrospectionTest extends TestCase
             $ctx = $runtime->vmContext;
             $this->assertTrue(isset($ctx->functions['grapheme_str_contains']));
             $this->assertTrue(isset($ctx->functions['grapheme_strimwidth']));
-            $this->assertFalse(
+            $this->assertTrue(
                 \PHPCompiler\ext\standard\VmReflection::functionExists($ctx, 'grapheme_str_contains')
             );
-            $this->assertFalse(
+            $this->assertTrue(
                 \PHPCompiler\ext\standard\VmReflection::functionExists($ctx, 'grapheme_strimwidth')
             );
             $this->assertFalse(
