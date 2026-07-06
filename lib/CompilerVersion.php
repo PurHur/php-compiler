@@ -1267,11 +1267,11 @@ final class CompilerVersion
     /**
      * PHP 8.4+ DateTime::getMicrosecond() / setMicrosecond() (ext/date/php_date.c, #7082, #14503).
      *
-     * Gated on stable 8.4.0 so 8.4.0-dev reference profile matches Zend 8.2 phantom gate.
+     * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev reference profile matches Zend 8.2 phantom gate.
      */
     public static function supportsDateTimeMicrosecond(): bool
     {
-        return version_compare(self::VERSION, '8.4.0', '>=');
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
     }
 
     /**
