@@ -147,7 +147,7 @@ final class HashTableHelper
      */
     public static function asDetachedHashtable(Context $context, Variable $container): Variable
     {
-        if (null === $container->objectPropertySlot) {
+        if (null === $container->objectPropertySlot || Variable::TYPE_STRING === $container->type) {
             return $container;
         }
 

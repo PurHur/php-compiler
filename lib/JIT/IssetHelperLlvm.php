@@ -272,6 +272,9 @@ final class IssetHelperLlvm
         ?Operand $containerOp
     ): Value {
         $container = HashTableHelper::asDetachedHashtable($context, $container);
+        if (Variable::TYPE_STRING === $container->type) {
+            return self::compileStringOffsetIsSet($context, $container, $dim);
+        }
         if (
             Builtin::LOAD_TYPE_STANDALONE === $context->loadType
             && Variable::TYPE_HASHTABLE === $container->type

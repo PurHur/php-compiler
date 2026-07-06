@@ -619,6 +619,14 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.4+ get_defined_functions() optional $exclude_disabled (ext/standard/basic_functions.c, #4942).
+     */
+    public static function supportsGetDefinedFunctionsExcludeDisabled(): bool
+    {
+        return self::supportsGetDeclaredExcludeDeprecated();
+    }
+
+    /**
      * PHP 8.4+ exit()/die() as proper functions — FCC, named args, two-arg (#6975, #12413, #12414, #12435, #13650, #13885, #13973).
      *
      * Gated on stable 8.4.0 so 8.4.0-dev reference profile rejects named/two-arg/FCC forms like Zend 8.2.

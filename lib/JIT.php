@@ -7362,10 +7362,7 @@ class JIT {
                         }
                         break;
                     }
-                    if (
-                        $value->type === Variable::TYPE_STRING
-                        && !$this->context->listUnpackSkipAssignPath
-                    ) {
+                    if ($value->type === Variable::TYPE_STRING) {
                         $charPtr = JIT\StringOffsetHelper::dimFetch(
                             $this->context,
                             $value->value,
@@ -7426,7 +7423,6 @@ class JIT {
                             || Variable::TYPE_NATIVE_BOOL === $value->type
                             || Variable::TYPE_NATIVE_LONG === $value->type
                             || Variable::TYPE_NATIVE_DOUBLE === $value->type
-                            || Variable::TYPE_STRING === $value->type
                         )
                     ) {
                         // Guarded list destruct compiles dim fetches on non-array RHS (#4325, #4308); unreachable at run time.
@@ -13191,6 +13187,25 @@ class JIT {
                     $value
                 );
                 $this->assignOperand($result, $source);
+
+                return;
+            }
+            $valueTyEarly = $this->context->getStringFromType($value->typeOf());
+            if (
+                Variable::KIND_VALUE === $dest->kind
+                && Variable::TYPE_STRING === $dest->type
+                && ('int1' === $valueTyEarly || 'bool' === $valueTyEarly)
+            ) {
+                // && short-circuit / boolean-not can target a phi slot still typed string (#1492, #16828).
+                $this->context->setVariableOp(
+                    $result,
+                    new Variable(
+                        $this->context,
+                        Variable::TYPE_NATIVE_BOOL,
+                        Variable::KIND_VALUE,
+                        $value
+                    )
+                );
 
                 return;
             }

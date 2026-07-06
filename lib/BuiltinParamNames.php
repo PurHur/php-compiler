@@ -196,6 +196,10 @@ final class BuiltinParamNames
                 return \PHPCompiler\CompilerVersion::supportsGetDeclaredExcludeDeprecated()
                     ? ['exclude_deprecated']
                     : [];
+            case 'get_defined_functions':
+                return \PHPCompiler\CompilerVersion::supportsGetDefinedFunctionsExcludeDisabled()
+                    ? ['exclude_disabled']
+                    : [];
             case 'fdiv':
                 return \PHPCompiler\CompilerVersion::supportsRoundingModeEnum()
                     ? ['num1', 'num2', 'rounding_mode']

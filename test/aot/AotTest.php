@@ -163,6 +163,15 @@ class AotTest extends BaseTest
                 && str_contains($name, 'get_declared_exclude_deprecated_reference_profile')) {
                 continue;
             }
+            if (!CompilerVersion::supportsGetDefinedFunctionsExcludeDisabled()
+                && str_contains($name, 'get_defined_functions_exclude_disabled')
+                && !str_contains($name, 'get_defined_functions_exclude_disabled_reference_profile')) {
+                continue;
+            }
+            if (CompilerVersion::supportsGetDefinedFunctionsExcludeDisabled()
+                && str_contains($name, 'get_defined_functions_exclude_disabled_reference_profile')) {
+                continue;
+            }
             if (!CompilerVersion::supportsZendThreadId() && str_contains($name, 'zend_thread_id')) {
                 continue;
             }

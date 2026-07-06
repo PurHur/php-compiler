@@ -169,6 +169,9 @@ final class EmptyDimensionLlvm
         ?Operand $containerOp
     ): Value {
         $container = HashTableHelper::asDetachedHashtable($context, $container);
+        if (Variable::TYPE_STRING === $container->type) {
+            return self::compileStringOffsetIsEmpty($context, $container, $dim);
+        }
         $superglobalName = VmIsset::superglobalName($container, $containerOp, VmIsset::isSelfHostAot());
         $ht = HashTableHelper::loadHashtablePointer($context, $container);
         $read = HashTableHelper::readDimToValueBox($context, $ht, $dim, $superglobalName);

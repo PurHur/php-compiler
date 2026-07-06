@@ -56,8 +56,34 @@ final class VmReflection
      */
     public static function parseExcludeDeprecatedArg(Frame $frame, string $function): bool
     {
+        return self::parseOptionalBoolBuiltinArg(
+            $frame,
+            $function,
+            CompilerVersion::supportsGetDeclaredExcludeDeprecated(...)
+        );
+    }
+
+    /**
+     * Optional $exclude_disabled for get_defined_functions() (PHP 8.4, #4942).
+     *
+     * php-src: ext/standard/basic_functions.c — Z_PARAM_OPTIONAL Z_PARAM_BOOL
+     */
+    public static function parseExcludeDisabledArg(Frame $frame, string $function): bool
+    {
+        return self::parseOptionalBoolBuiltinArg(
+            $frame,
+            $function,
+            CompilerVersion::supportsGetDefinedFunctionsExcludeDisabled(...)
+        );
+    }
+
+    /**
+     * @param callable(): bool $supportsOptionalArg
+     */
+    private static function parseOptionalBoolBuiltinArg(Frame $frame, string $function, callable $supportsOptionalArg): bool
+    {
         $argc = \count($frame->calledArgs);
-        if (!CompilerVersion::supportsGetDeclaredExcludeDeprecated()) {
+        if (!$supportsOptionalArg()) {
             if ($argc > 0) {
                 throw new \ArgumentCountError("{$function}() expects exactly 0 arguments, {$argc} given");
             }
@@ -72,6 +98,21 @@ final class VmReflection
         }
 
         return $frame->calledArgs[0]->resolveIndirect()->toBool();
+    }
+
+    /**
+     * php-src zend_API.c — ZEND_ACC_DEPRECATED on internal function registration.
+     *
+     * @var list<string> lowercase names
+     */
+    private const DEPRECATED_INTERNAL_FUNCTIONS = [
+        'utf8_decode',
+        'utf8_encode',
+    ];
+
+    public static function isDeprecatedInternalFunction(string $functionName): bool
+    {
+        return \in_array(strtolower($functionName), self::DEPRECATED_INTERNAL_FUNCTIONS, true);
     }
 
     public static function isDeprecatedClassEntry(ClassEntry $entry): bool
@@ -334,30 +375,35 @@ final class VmReflection
      *
      * @return list<string>
      */
-    public static function internalFunctionNameList(): array
+    public static function internalFunctionNameList(bool $excludeDisabled = false): array
     {
-        if (null !== self::$internalFunctionNames) {
+        if (null === self::$internalFunctionNames) {
+            $names = [];
+            $seen = [];
+            foreach ([new Module(), new \PHPCompiler\ext\types\Module()] as $module) {
+                foreach ($module->getFunctions() as $func) {
+                    $name = $func->getName();
+                    $lc = strtolower($name);
+                    if (isset($seen[$lc]) || !self::isVisibleToFunctionExists($name)) {
+                        continue;
+                    }
+                    if (!BuiltinIntrospectionPolicy::functionIsAdvertised($lc)) {
+                        continue;
+                    }
+                    $seen[$lc] = true;
+                    $names[] = $name;
+                }
+            }
+            self::$internalFunctionNames = self::orderInternalFunctionNamesForIntrospection($names);
+        }
+        if (!$excludeDisabled) {
             return self::$internalFunctionNames;
         }
-        $names = [];
-        $seen = [];
-        foreach ([new Module(), new \PHPCompiler\ext\types\Module()] as $module) {
-            foreach ($module->getFunctions() as $func) {
-                $name = $func->getName();
-                $lc = strtolower($name);
-                if (isset($seen[$lc]) || !self::isVisibleToFunctionExists($name)) {
-                    continue;
-                }
-                if (!BuiltinIntrospectionPolicy::functionIsAdvertised($lc)) {
-                    continue;
-                }
-                $seen[$lc] = true;
-                $names[] = $name;
-            }
-        }
-        self::$internalFunctionNames = self::orderInternalFunctionNamesForIntrospection($names);
 
-        return self::$internalFunctionNames;
+        return array_values(array_filter(
+            self::$internalFunctionNames,
+            static fn (string $name): bool => !self::isDeprecatedInternalFunction($name)
+        ));
     }
 
     /** Zend internal bucket starts with engine introspection builtins (php-src zend_builtin_functions). */
@@ -408,14 +454,14 @@ final class VmReflection
      *
      * php-src: ext/standard/basic_functions.c — PHP_FUNCTION(get_defined_functions)
      */
-    public static function definedFunctionsTable(Context $ctx): \PHPCompiler\VM\HashTable
+    public static function definedFunctionsTable(Context $ctx, bool $excludeDisabled = false): \PHPCompiler\VM\HashTable
     {
         $result = new \PHPCompiler\VM\HashTable();
 
         $internalVar = new Variable();
         $internalVar->newArray();
         $internalHt = $internalVar->toArray();
-        foreach (self::internalFunctionNameList() as $name) {
+        foreach (self::internalFunctionNameList($excludeDisabled) as $name) {
             $value = new Variable();
             $value->string($name);
             $internalHt->append($value);
