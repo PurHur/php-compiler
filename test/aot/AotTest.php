@@ -203,6 +203,10 @@ class AotTest extends BaseTest
                 && !str_contains($name, 'curl_escape_phantom')) {
                 continue;
             }
+            if (\PHPCompiler\ext\curl\CurlExtensionPolicy::advertisesBuiltins()
+                && str_contains($name, 'curl_escape_phantom')) {
+                continue;
+            }
             if (!CompilerVersion::supportsArrayReplaceKey()
                 && str_contains($name, 'array_replace_key')
                 && !str_contains($name, 'array_replace_key_phantom')) {

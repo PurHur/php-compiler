@@ -18,4 +18,6 @@ final class CurlConstants
     public const CURLOPT_HTTPHEADER = 10023;
     public const CURLINFO_HTTP_CODE = 2097154;
     public const CURLINFO_EFFECTIVE_URL = 1048577;
+    public const CURLE_OK = 0;
+    public const CURLM_OK = 0;
 }

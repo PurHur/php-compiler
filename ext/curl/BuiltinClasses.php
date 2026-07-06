@@ -19,6 +19,9 @@ final class BuiltinClasses
     {
         $before = array_keys($ctx->classes);
         self::registerCurlFile($ctx);
+        if (CurlExtensionPolicy::advertisesBuiltins()) {
+            CurlStringFileBuiltin::register($ctx);
+        }
         if (CurlExtensionPolicy::advertisesHandleClasses()) {
             self::registerCurlHandle($ctx);
             self::registerCurlMultiHandle($ctx);
