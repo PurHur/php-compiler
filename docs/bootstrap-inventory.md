@@ -8,8 +8,8 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 4111 |
-| Phase A inventory files (M2 ratio SSOT) | 4111 |
+| PHP files on vm.php path | 4114 |
+| Phase A inventory files (M2 ratio SSOT) | 4114 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
 | Source constructs flagged (warnings) | 11090 |
@@ -717,6 +717,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/GcToggleJitHelper.php` | 0 | 1 |
 | `ext/standard/GetBrowserJitHelper.php` | 0 | 1 |
 | `ext/standard/GetClassJitHelper.php` | 0 | 1 |
+| `ext/standard/GetClassVarsJitHelper.php` | 0 | 1 |
 | `ext/standard/GetDeclaredExcludeDeprecatedJit.php` | 0 | 1 |
 | `ext/standard/GetHeadersJitHelper.php` | 0 | 1 |
 | `ext/standard/GetObjectVarsJitHelper.php` | 0 | 1 |
@@ -908,7 +909,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitGetCalledClass.php` | 0 | 1 |
 | `ext/standard/JitGetClass.php` | 0 | 1 |
 | `ext/standard/JitGetClassMethods.php` | 0 | 3 |
-| `ext/standard/JitGetClassVars.php` | 0 | 9 |
+| `ext/standard/JitGetClassVars.php` | 0 | 1 |
 | `ext/standard/JitGetCurrentUser.php` | 0 | 1 |
 | `ext/standard/JitGetDeclaredAttributes.php` | 0 | 2 |
 | `ext/standard/JitGetDeclaredClasses.php` | 0 | 2 |
@@ -1287,7 +1288,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/ProcessExecCaptureNativeJitHelper.php` | 0 | 1 |
 | `ext/standard/ProcessIdentityJitHelper.php` | 0 | 1 |
 | `ext/standard/ProcessJitHelper.php` | 0 | 1 |
-| `ext/standard/ProcessOpenJitHelper.php` | 0 | 4 |
+| `ext/standard/ProcessOpenJitHelper.php` | 0 | 6 |
 | `ext/standard/ProcessPhpcRunCommandJitHelper.php` | 0 | 5 |
 | `ext/standard/ProcessSlotJitHelper.php` | 0 | 1 |
 | `ext/standard/ProgressJitHelper.php` | 0 | 1 |
@@ -1631,7 +1632,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VmProcessIdentity.php` | 0 | 1 |
 | `ext/standard/VmProcessIdentityNative.php` | 0 | 1 |
 | `ext/standard/VmProcessIdentityPure.php` | 0 | 1 |
-| `ext/standard/VmProcessProcOpenNative.php` | 0 | 1 |
+| `ext/standard/VmProcessProcOpenNative.php` | 0 | 2 |
 | `ext/standard/VmRandom.php` | 0 | 2 |
 | `ext/standard/VmRandomNative.php` | 0 | 1 |
 | `ext/standard/VmRandomPure.php` | 0 | 2 |
@@ -2275,7 +2276,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/print_r.php` | 0 | 1 |
 | `ext/standard/printf_.php` | 0 | 1 |
 | `ext/standard/proc_close.php` | 0 | 2 |
-| `ext/standard/proc_get_status.php` | 0 | 3 |
+| `ext/standard/proc_get_status.php` | 0 | 5 |
 | `ext/standard/proc_nice.php` | 0 | 2 |
 | `ext/standard/proc_open.php` | 0 | 4 |
 | `ext/standard/proc_terminate.php` | 0 | 3 |
@@ -3074,6 +3075,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringExplode.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringFgetcsvJit.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringFileGetContents.php` | 0 | 1 |
+| `lib/JIT/Builtin/StringFileGetContentsLibc.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringFilePutContents.php` | 0 | 2 |
 | `lib/JIT/Builtin/StringFilterBoolean.php` | 0 | 2 |
 | `lib/JIT/Builtin/StringFilterEmail.php` | 0 | 2 |
@@ -3089,6 +3091,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringFsGlob.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringFsGlobVecJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringFunctionExists.php` | 0 | 1 |
+| `lib/JIT/Builtin/StringGetClassVars.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringGetObjectVars.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringGetdate.php` | 0 | 2 |
 | `lib/JIT/Builtin/StringGetenv.php` | 0 | 3 |
@@ -8979,6 +8982,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 3 class method(s)
 
+### `ext/standard/GetClassVarsJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `ext/standard/GetDeclaredExcludeDeprecatedJit.php`
 
 **Warnings** (review for bootstrap subset):
@@ -9994,15 +10002,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitGetClassVars.php`
 
 **Warnings** (review for bootstrap subset):
-- new JITVariable (line 141)
-- new JITVariable (line 151)
-- new JITVariable (line 161)
-- new JITVariable (line 171)
-- new JITVariable (line 194)
-- new JITVariable (line 204)
-- new JITVariable (line 214)
-- new JITVariable (line 224)
-- 9 class method(s)
+- 3 class method(s)
 
 ### `ext/standard/JitGetCurrentUser.php`
 
@@ -12811,6 +12811,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 43)
 - new HashTable (line 95)
 - new Variable (line 97)
+- new HashTable (line 105)
+- new Variable (line 107)
 - 8 class method(s)
 
 ### `ext/standard/ProcessPhpcRunCommandJitHelper.php`
@@ -15036,7 +15038,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmProcessProcOpenNative.php`
 
 **Warnings** (review for bootstrap subset):
-- 27 class method(s)
+- 28 class method(s)
+- 1 closure(s)
 
 ### `ext/standard/VmRandom.php`
 
@@ -18970,6 +18973,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new HashTable (line 43)
 - new Variable (line 45)
+- new HashTable (line 79)
+- new Variable (line 81)
 - 3 class method(s)
 
 ### `ext/standard/proc_nice.php`
@@ -21845,7 +21850,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/CompilerVersion.php`
 
 **Warnings** (review for bootstrap subset):
-- 113 class method(s)
+- 115 class method(s)
 
 ### `lib/CurlyBraceOffsetRejector.php`
 
@@ -24315,6 +24320,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringFileGetContents.php`
 
 **Warnings** (review for bootstrap subset):
+- 4 class method(s)
+
+### `lib/JIT/Builtin/StringFileGetContentsLibc.php`
+
+**Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
 ### `lib/JIT/Builtin/StringFilePutContents.php`
@@ -24400,6 +24410,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 5 class method(s)
+
+### `lib/JIT/Builtin/StringGetClassVars.php`
+
+**Warnings** (review for bootstrap subset):
+- 4 class method(s)
 
 ### `lib/JIT/Builtin/StringGetObjectVars.php`
 
@@ -24802,7 +24817,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringReadfile.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 95)
+- new JIT (line 105)
 - 5 class method(s)
 
 ### `lib/JIT/Builtin/StringReadlink.php`
@@ -26076,19 +26091,19 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Call\ReflectionEnumUnitCaseGetName (line 853)
 - new Call\ReflectionEnumUnitCaseGetName (line 854)
 - new Call\ExceptionGetMessage (line 855)
-- new Result (line 1139)
-- new Result (line 1160)
-- new Variable (line 1433)
-- new Variable (line 1753)
-- new Variable (line 1890)
-- new Variable (line 2088)
-- new VMVariable (line 2246)
-- new VMVariable (line 2262)
-- new VMVariable (line 2268)
-- new VMVariable (line 2274)
-- new VMVariable (line 2285)
-- new Variable (line 2315)
-- new Variable (line 2355)
+- new Result (line 1141)
+- new Result (line 1162)
+- new Variable (line 1435)
+- new Variable (line 1755)
+- new Variable (line 1892)
+- new Variable (line 2090)
+- new VMVariable (line 2248)
+- new VMVariable (line 2264)
+- new VMVariable (line 2270)
+- new VMVariable (line 2276)
+- new VMVariable (line 2287)
+- new Variable (line 2317)
+- new Variable (line 2357)
 - 98 class method(s)
 - 28 closure(s)
 
