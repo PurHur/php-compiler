@@ -323,6 +323,11 @@ final class BuiltinParamNames
                 return ['trait', 'autoload'];
             case 'enum_exists':
                 return ['enum', 'autoload'];
+            case 'class_parents':
+            case 'class_implements':
+            case 'class_uses':
+            case 'class_uses_recursive':
+                return ['object_or_class', 'autoload'];
             case 'is_subclass_of':
             case 'is_a':
                 return ['object_or_class', 'class', 'allow_string'];

@@ -36,11 +36,12 @@ final class class_implements_ extends Internal
         VmClassHas::requireObjectOrClass($frame->calledArgs[0], 'class_implements', 'object_or_class');
         $autoload = true;
         if ($argc >= 2) {
-            $flag = $frame->calledArgs[1]->resolveIndirect();
-            if (Variable::TYPE_BOOLEAN !== $flag->type) {
-                throw new \LogicException('class_implements() autoload flag must be a boolean in this compiler build');
-            }
-            $autoload = $flag->toBool();
+            $autoload = VmMath::parseBoolBuiltinArg(
+                $frame->calledArgs[1],
+                'class_implements',
+                2,
+                'autoload'
+            );
         }
         $entry = VmReflection::resolveClassForClassImplements($ctx, $frame->calledArgs[0], $autoload);
         if (null === $entry) {
