@@ -1,1 +1,1 @@
-{"fingerprint":"f1fba09fa530fa67f186","unit":"/ext/hash/HashAlgosJitHelper.php","helpers":{"phpcompiler\\ext\\hash\\hashalgosjithelper::algosargv":"phpcompiler_ext_hash_hashalgosjithelper__algosargv"}}
+{"fingerprint":"6dbc16735281e16391f5","unit":"/ext/hash/HashAlgosJitHelper.php","helpers":{"phpcompiler\\ext\\hash\\hashalgosjithelper::algosargv":"phpcompiler_ext_hash_hashalgosjithelper__algosargv"},"init_symbol":"__init__unit_ext_hash_HashAlgosJitHelper_php","shutdown_symbol":"__shutdown__unit_ext_hash_HashAlgosJitHelper_php","runtime_safe":true}

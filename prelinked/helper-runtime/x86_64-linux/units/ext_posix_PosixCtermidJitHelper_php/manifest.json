@@ -1,1 +1,1 @@
-{"fingerprint":"d7b5e9700e48f8fad421","unit":"/ext/posix/PosixCtermidJitHelper.php","helpers":{"phpcompiler\\ext\\posix\\posixctermidjithelper::path":"phpcompiler_ext_posix_posixctermidjithelper__path"}}
+{"fingerprint":"e21de16b7cfab630da5b","unit":"/ext/posix/PosixCtermidJitHelper.php","helpers":{"phpcompiler\\ext\\posix\\posixctermidjithelper::path":"phpcompiler_ext_posix_posixctermidjithelper__path"},"init_symbol":"__init__unit_ext_posix_PosixCtermidJitHelper_php","shutdown_symbol":"__shutdown__unit_ext_posix_PosixCtermidJitHelper_php","runtime_safe":true}

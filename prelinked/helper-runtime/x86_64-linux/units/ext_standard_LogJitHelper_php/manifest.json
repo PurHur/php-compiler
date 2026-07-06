@@ -1,1 +1,1 @@
-{"fingerprint":"49308c3464c30f1e8a83","unit":"/ext/standard/LogJitHelper.php","helpers":{"phpcompiler\\ext\\standard\\logjithelper::logargv":"phpcompiler_ext_standard_logjithelper__logargv"}}
+{"fingerprint":"bcf72b0df3fcc413af60","unit":"/ext/standard/LogJitHelper.php","helpers":{"phpcompiler\\ext\\standard\\logjithelper::logargv":"phpcompiler_ext_standard_logjithelper__logargv"},"init_symbol":"__init__unit_ext_standard_LogJitHelper_php","shutdown_symbol":"__shutdown__unit_ext_standard_LogJitHelper_php","runtime_safe":true}

@@ -1,1 +1,1 @@
-{"fingerprint":"8ea152a4e26988a3f79a","unit":"/ext/standard/StrPadJitHelper.php","helpers":{"phpcompiler\\ext\\standard\\strpadjithelper::padargv":"phpcompiler_ext_standard_strpadjithelper__padargv"}}
+{"fingerprint":"45880ee06044a082bcaf","unit":"/ext/standard/StrPadJitHelper.php","helpers":{"phpcompiler\\ext\\standard\\strpadjithelper::padargv":"phpcompiler_ext_standard_strpadjithelper__padargv"},"init_symbol":"__init__unit_ext_standard_StrPadJitHelper_php","shutdown_symbol":"__shutdown__unit_ext_standard_StrPadJitHelper_php"}

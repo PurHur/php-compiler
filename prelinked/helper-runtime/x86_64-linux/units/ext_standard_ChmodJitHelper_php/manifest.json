@@ -1,1 +1,1 @@
-{"fingerprint":"11005bb60dd1960ba747","unit":"/ext/standard/ChmodJitHelper.php","helpers":{"phpcompiler\\ext\\standard\\chmodjithelper::invokeargv":"phpcompiler_ext_standard_chmodjithelper__invokeargv"}}
+{"fingerprint":"7129c96a99762c55e9ff","unit":"/ext/standard/ChmodJitHelper.php","helpers":{"phpcompiler\\ext\\standard\\chmodjithelper::invokeargv":"phpcompiler_ext_standard_chmodjithelper__invokeargv"},"init_symbol":"__init__unit_ext_standard_ChmodJitHelper_php","shutdown_symbol":"__shutdown__unit_ext_standard_ChmodJitHelper_php","runtime_safe":true}

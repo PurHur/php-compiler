@@ -1,1 +1,1 @@
-{"fingerprint":"97d426637c51c1925ac3","unit":"/ext/standard/ExpJitHelper.php","helpers":{"phpcompiler\\ext\\standard\\expjithelper::expargv":"phpcompiler_ext_standard_expjithelper__expargv"}}
+{"fingerprint":"4197ae5c23d955d2351e","unit":"/ext/standard/ExpJitHelper.php","helpers":{"phpcompiler\\ext\\standard\\expjithelper::expargv":"phpcompiler_ext_standard_expjithelper__expargv"},"init_symbol":"__init__unit_ext_standard_ExpJitHelper_php","shutdown_symbol":"__shutdown__unit_ext_standard_ExpJitHelper_php","runtime_safe":true}

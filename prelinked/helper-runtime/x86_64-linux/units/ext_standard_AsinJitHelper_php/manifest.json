@@ -1,1 +1,1 @@
-{"fingerprint":"971644e4202a71e68a80","unit":"/ext/standard/AsinJitHelper.php","helpers":{"phpcompiler\\ext\\standard\\asinjithelper::asinargv":"phpcompiler_ext_standard_asinjithelper__asinargv"}}
+{"fingerprint":"e74a38a2102f11ac41c8","unit":"/ext/standard/AsinJitHelper.php","helpers":{"phpcompiler\\ext\\standard\\asinjithelper::asinargv":"phpcompiler_ext_standard_asinjithelper__asinargv"},"init_symbol":"__init__unit_ext_standard_AsinJitHelper_php","shutdown_symbol":"__shutdown__unit_ext_standard_AsinJitHelper_php","runtime_safe":true}

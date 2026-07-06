@@ -1,1 +1,1 @@
-{"fingerprint":"27b6c04c0bda10015612","unit":"/ext/standard/RealpathJitHelper.php","helpers":{"phpcompiler\\ext\\standard\\realpathjithelper::resolveargv":"phpcompiler_ext_standard_realpathjithelper__resolveargv"}}
+{"fingerprint":"00ba520d70974a967909","unit":"/ext/standard/RealpathJitHelper.php","helpers":{"phpcompiler\\ext\\standard\\realpathjithelper::resolveargv":"phpcompiler_ext_standard_realpathjithelper__resolveargv"},"init_symbol":"__init__unit_ext_standard_RealpathJitHelper_php","shutdown_symbol":"__shutdown__unit_ext_standard_RealpathJitHelper_php"}
