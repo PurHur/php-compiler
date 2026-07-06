@@ -568,8 +568,8 @@ PHP;
         self::assertSame('__phpc_property_set_name', $registry['evaled']['name']['set'] ?? null);
     }
 
-    /** @covers issue #10393 — detached same-name backing field is duplicate property, not merged */
-    public function testDetachedSameNameBackingFieldIsDuplicateProperty(): void
+    /** @covers issue #16936 — detached same-name backing field merges when sibling property sits between hook and backing */
+    public function testDetachedSameNameBackingFieldMergesWithSiblingProperty(): void
     {
         $this->skipUnlessPropertyHooksEnabled();
         $src = <<<'PHP'
@@ -582,16 +582,44 @@ class C {
     public string $y = 'a';
     private int $x = 1;
 }
+$c = new C();
+echo 'compile-ok x=' . $c->x . ' y=' . $c->y . "\n";
+PHP;
+        [$out, $registry] = (new PropertyHooks())->process($src);
+        self::assertStringContainsString('public int $x = 1;', $out);
+        self::assertStringContainsString("public string \$y = 'a';", $out);
+        self::assertStringNotContainsString('private int $x', $out);
+        self::assertSame('__phpc_property_set_x', $registry['c']['x']['set'] ?? null);
+
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($src, 'property_hook_multi_property_redeclare.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("compile-ok x=1 y=a\n", ob_get_clean());
+    }
+
+    /** @covers issue #10393 — true duplicate same-name field without hook backing use still fails compile */
+    public function testDetachedSameNameBackingFieldIsDuplicateProperty(): void
+    {
+        $this->skipUnlessPropertyHooksEnabled();
+        $src = <<<'PHP'
+<?php
+class C {
+    public int $x {
+        get => 1;
+    }
+    public string $y = 'a';
+    private int $x = 1;
+}
 PHP;
         [$out, $registry] = (new PropertyHooks())->process($src);
         self::assertStringContainsString('public int $x;', $out);
         self::assertStringContainsString('private int $x = 1;', $out);
-        self::assertSame('__phpc_property_set_x', $registry['c']['x']['set'] ?? null);
 
         $runtime = new Runtime();
         $this->expectException(\CompileError::class);
         $this->expectExceptionMessage('Cannot redeclare C::$x');
-        $runtime->parseAndCompile($src, 'property_hook_multi_property_redeclare.php');
+        $runtime->parseAndCompile($src, 'property_hook_virtual_duplicate_name.php');
     }
 
     /** @covers issue #9835 — readonly hooked property compiles; runtime enforces post-construct writes */

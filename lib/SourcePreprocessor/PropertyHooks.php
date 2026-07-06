@@ -992,7 +992,7 @@ final class PropertyHooks
             }
             [$open, $close] = $span;
             $hookSource = substr($body, $open + 1, $close - $open - 1);
-            $declPrefix = substr($body, $offset, $declStart - $offset);
+            $declPrefix = $this->copyBodySegment($body, $offset, $declStart, $removeSpans);
             $propDeclHead = rtrim(substr($body, $declStart, $hookOpen - $declStart));
             $isAbstractHook = (bool) preg_match('/\babstract\b/', $declPrefix.$propDeclHead);
             $isFinalProperty = (bool) preg_match('/\bfinal\b/', $declPrefix.$propDeclHead);
@@ -1058,9 +1058,13 @@ final class PropertyHooks
                     $backingDecl = $this->consumeSameNameBackingFieldDecl($body, $nextOffset, $prop);
                     if (null !== $backingDecl) {
                         [$nextOffset, $initializer] = $backingDecl;
+                    } else {
+                        $detachedBacking = $this->findDetachedSameNameBackingFieldDecl($body, $nextOffset, $prop);
+                        if (null !== $detachedBacking) {
+                            [$detachedStart, $detachedEnd, $initializer] = $detachedBacking;
+                            $removeSpans[] = [$detachedStart, $detachedEnd];
+                        }
                     }
-                    // Detached same-name fields are duplicate declarations — only adjacent
-                    // backing merges (#7031). Non-adjacent must fail compile (#10393, zend_compile.c).
                 }
                 $mergedDecl = rtrim($propDeclHead);
                 if ('' !== $initializer) {
@@ -1414,7 +1418,7 @@ final class PropertyHooks
 
     /**
      * When hooks read/write `$this->prop`, merge only the immediately following same-name
-     * field decl (#7031). Detached duplicates fail at compile (#10393, zend_compile.c).
+     * field decl (#7031).
      *
      * @return array{0: int, 1: string}|null [offset after decl, initializer including `=`]
      */
@@ -1434,6 +1438,32 @@ final class PropertyHooks
         $initializer = isset($m[1]) ? trim($m[1]) : '';
 
         return [$offset + strlen($m[0]), $initializer];
+    }
+
+    /**
+     * Same-name backing field separated by other class members — merge like adjacent (#16936, re-#9673).
+     *
+     * @return array{0: int, 1: int, 2: string}|null [span start, span end, initializer including `=`]
+     */
+    private function findDetachedSameNameBackingFieldDecl(string $body, int $searchStart, string $prop): ?array
+    {
+        $remainder = substr($body, $searchStart);
+        if (!preg_match(
+            '/(?:(?:public|protected|private|static|readonly)\s+)+'
+            .'(?:[\w\\\\|]+(?:\s*\[\s*\])?\s+)+'
+            .'\$'.preg_quote($prop, '/').'\s*(=\s*[^;]+)?;/',
+            $remainder,
+            $m,
+            PREG_OFFSET_CAPTURE
+        )) {
+            return null;
+        }
+
+        $matchStart = $searchStart + $m[0][1];
+        $matchEnd = $matchStart + strlen($m[0][0]);
+        $initializer = isset($m[1]) ? trim($m[1][0]) : '';
+
+        return [$matchStart, $matchEnd, $initializer];
     }
 
     /**
