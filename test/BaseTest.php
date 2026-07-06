@@ -342,6 +342,8 @@ abstract class BaseTest extends TestCase {
         $maxKb = $maxMb * 1024;
         $peakKb = 0;
         $lastExitCode = 0;
+        /** @var array<int, bool> */
+        $sigcontSent = [];
 
         while (true) {
             $status = proc_get_status($proc);
@@ -359,6 +361,9 @@ abstract class BaseTest extends TestCase {
                         (int) ceil($peakKb / 1024)
                     ));
                 }
+            }
+            if (isset($status['pid'])) {
+                self::ensureNoStoppedChildren((int) $status['pid'], $testName, $sigcontSent);
             }
             if (!$status['running']) {
                 $lastExitCode = (int) ($status['exitcode'] ?? 0);
@@ -437,6 +442,58 @@ abstract class BaseTest extends TestCase {
         }
 
         return $pids;
+    }
+
+    /**
+     * PHPUnit occasionally hangs when a vm child is stopped (issue #16657).
+     * If we detect a stopped process in the VM pid tree, send SIGCONT and emit
+     * a single diagnostic line (per pid per test) so the battery can complete.
+     *
+     * @param array<int, bool> $sigcontSent
+     */
+    private static function ensureNoStoppedChildren(int $rootPid, string $testName, array &$sigcontSent): void
+    {
+        foreach (self::processTreePids($rootPid) as $pid) {
+            if (isset($sigcontSent[$pid])) {
+                continue;
+            }
+            if (!self::isProcessStopped($pid)) {
+                continue;
+            }
+            self::sendSigcont($pid);
+            $sigcontSent[$pid] = true;
+            fwrite(STDERR, sprintf("vm-sigcont: test=%s pid=%d\n", $testName, $pid));
+        }
+    }
+
+    private static function isProcessStopped(int $pid): bool
+    {
+        $statFile = "/proc/{$pid}/stat";
+        $stat = @file_get_contents($statFile);
+        if (false === $stat || '' === $stat) {
+            return false;
+        }
+        // /proc/<pid>/stat: "pid (comm) state ..."
+        $close = strrpos($stat, ')');
+        if (false === $close) {
+            return false;
+        }
+        $rest = substr($stat, $close + 2);
+        if (false === $rest || '' === $rest) {
+            return false;
+        }
+        $state = $rest[0] ?? '';
+        return $state === 'T' || $state === 't';
+    }
+
+    private static function sendSigcont(int $pid): void
+    {
+        if (function_exists('posix_kill')) {
+            @posix_kill($pid, SIGCONT);
+            return;
+        }
+        // Best-effort fallback (posix may be unavailable in some envs).
+        @exec('kill -CONT ' . (int) $pid . ' 2>/dev/null');
     }
 
 }
