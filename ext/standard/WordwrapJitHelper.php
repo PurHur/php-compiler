@@ -12,8 +12,8 @@ namespace PHPCompiler\ext\standard;
  */
 final class WordwrapJitHelper
 {
-    public static function wordwrapArgv(string $text, int $width, string $break, bool $cut): string
+    public static function wordwrapArgv(string $text, int $width, string $break, int $cut): string
     {
-        return VmString::wordwrap($text, $width, $break, $cut);
+        return VmString::wordwrap($text, $width, $break, 0 !== $cut);
     }
 }
