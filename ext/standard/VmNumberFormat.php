@@ -104,8 +104,15 @@ final class VmNumberFormat
             return 'inf';
         }
 
-        // php-src < 8.3: negative $decimals ignored (ext/standard/number_format.c, #15917).
-        if ($decimals < 0 && !CompilerVersion::supportsNumberFormatNegativeDecimals()) {
+        // php-src ext/standard/math.c _php_math_number_format_ex (#15917):
+        // negative $decimals round to integer (0 places), not round($num, $decimals).
+        // Pre-8.3 ignores negative like 0 — same effective rounding/display precision.
+        $roundPlaces = $decimals;
+        if ($decimals < 0) {
+            if (!CompilerVersion::supportsNumberFormatNegativeDecimals()) {
+                $decimals = 0;
+            }
+            $roundPlaces = 0;
             $decimals = 0;
         }
 
@@ -114,10 +121,7 @@ final class VmNumberFormat
             $number = -$number;
         }
 
-        $rounded = VmRound::mathRound($number, $decimals, $roundingMode);
-        if ($decimals < 0) {
-            $decimals = 0;
-        }
+        $rounded = VmRound::mathRound($number, $roundPlaces, $roundingMode);
 
         $pow = 1;
         for ($i = 0; $i < $decimals; ++$i) {
