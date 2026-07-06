@@ -61,7 +61,7 @@ final class proc_close extends Internal
     public static function requireProcessHandle(\PHPCompiler\VM\Variable $v, string $functionName): int
     {
         $v = $v->resolveIndirect();
-        if (!$v->isProcessResource()) {
+        if (!ResourceSupport::isProcessResourceRepresentation($v)) {
             throw new \TypeError(\sprintf(
                 '%s(): Argument #1 ($process) must be of type resource, %s given',
                 $functionName,
@@ -81,22 +81,6 @@ final class proc_close extends Internal
 
     public static function requireProcessHandleForGetStatus(\PHPCompiler\VM\Variable $v, string $functionName): int
     {
-        $v = $v->resolveIndirect();
-        if (!ResourceSupport::isProcessResourceRepresentation($v)) {
-            throw new \TypeError(\sprintf(
-                '%s(): Argument #1 ($process) must be of type resource, %s given',
-                $functionName,
-                VmStreamArg::debugTypeName($v) ?? 'unknown'
-            ));
-        }
-        $handle = ResourceSupport::resolveHandle($v);
-        if (null === $handle || !VmProcess::hasProcessHandle($handle)) {
-            throw new \TypeError(\sprintf(
-                '%s(): supplied resource is not a valid process resource',
-                $functionName
-            ));
-        }
-
-        return $handle;
+        return self::requireProcessHandle($v, $functionName);
     }
 }
