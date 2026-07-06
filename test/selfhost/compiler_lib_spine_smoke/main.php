@@ -437,6 +437,7 @@ require_once __DIR__.'/../../../ext/openssl/openssl_spki_new.php';
 require_once __DIR__.'/../../../ext/openssl/openssl_spki_verify.php';
 require_once __DIR__.'/../../../ext/openssl/openssl_verify.php';
 require_once __DIR__.'/../../../ext/openssl/openssl_x509_read.php';
+require_once __DIR__.'/../../../ext/openssl/openssl_x509_parse.php';
 require_once __DIR__.'/../../../ext/posix/JitPosix.php';
 require_once __DIR__.'/../../../ext/posix/JitPosixTimes.php';
 require_once __DIR__.'/../../../ext/posix/Module.php';
