@@ -1111,7 +1111,6 @@ final class HashTableHelper
             return;
         }
         if (Variable::TYPE_OBJECT === $key->type
-            || Variable::TYPE_ENUM_CASE === $key->type
             || Variable::TYPE_HASHTABLE === $key->type) {
             self::emitIllegalOffsetType($context);
 
