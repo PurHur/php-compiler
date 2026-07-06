@@ -21,10 +21,6 @@ final class VmFsGlobPure
      */
     public static function glob(string $pattern, int $flags = 0)
     {
-        if (!VmFsGlobFailure::hasValidFlags($flags)) {
-            return false;
-        }
-
         if ('.' === $pattern) {
             return ['.'];
         }

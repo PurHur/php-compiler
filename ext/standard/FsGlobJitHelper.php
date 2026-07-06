@@ -17,12 +17,6 @@ final class FsGlobJitHelper
     /** @return HashTable|null null when glob() fails (Zend false) */
     public static function globArgv(string $pattern, int $flags): ?HashTable
     {
-        if (!VmFsGlobFailure::hasValidFlags($flags)) {
-            compiler_language_warning(VmFsGlobFailure::INVALID_FLAGS_MESSAGE);
-
-            return null;
-        }
-
         $result = VmFsGlob::glob($pattern, $flags);
         if (false === $result) {
             return null;

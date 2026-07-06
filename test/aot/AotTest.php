@@ -172,10 +172,6 @@ class AotTest extends BaseTest
                 && str_contains($name, 'get_defined_functions_exclude_disabled_reference_profile')) {
                 continue;
             }
-            if (!CompilerVersion::supportsGetDefinedFunctionsExcludeDeprecatedInternals()
-                && str_contains($name, 'get_defined_functions_exclude_disabled_forward_profile')) {
-                continue;
-            }
             if (!CompilerVersion::supportsZendThreadId() && str_contains($name, 'zend_thread_id')) {
                 continue;
             }

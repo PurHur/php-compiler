@@ -630,14 +630,14 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.4+ get_defined_functions() $exclude_disabled omits deprecated internals (#4942, #16969).
+     * get_defined_functions() $exclude_disabled deprecated-internal stripping (#4942, #16969, #16978).
      *
-     * Zend 8.2 reference profile accepts the parameter but does not strip deprecated builtins
-     * such as utf8_encode — only forward 8.4+ matches php-src deprecated filtering.
+     * php-src omits disabled functions only — deprecated-yet-enabled builtins such as utf8_encode
+     * stay in the internal list on every profile. Prior forward-profile filtering was incorrect.
      */
     public static function supportsGetDefinedFunctionsExcludeDeprecatedInternals(): bool
     {
-        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+        return false;
     }
 
     /**
@@ -1663,24 +1663,16 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.3+ DOMElement::getAttributeNames() (ext/dom/element.c, #16823).
+     * PHP 8.3+ DOMElement::getAttributeNames() (ext/dom/element.c, #16823, #16975).
      *
-     * Withheld on 8.4.0-dev reference profile (matches Zend 8.2 method_exists gate). Enable via
-     * stable 8.4.0+ or explicit `PHP_COMPILER_PROFILE=8.3` / `8.4` forward profile.
+     * Advertised on the 8.4 development line via {@see builtinAdvertisementVersion()} — `VERSION`
+     * `8.4.0-dev` is below stable `8.4.0` for {@see version_compare()}. On 8.3.x builds, enable
+     * with `PHP_COMPILER_PROFILE=8.3` / `8.4`.
      */
     public static function supportsDomElementGetAttributeNames(): bool
     {
-        if (version_compare(self::VERSION, '8.3', '<')) {
-            return false;
-        }
-
-        if (version_compare(self::VERSION, '8.4.0', '>=')) {
+        if (version_compare(self::builtinAdvertisementVersion(), '8.3.0', '>=')) {
             return true;
-        }
-
-        $raw = getenv('PHP_COMPILER_PROFILE');
-        if (!\is_string($raw) || '' === trim($raw)) {
-            return false;
         }
 
         return version_compare(self::languageProfileVersion(), '8.3.0', '>=');

@@ -11,4 +11,4 @@ set_error_handler(static function () use (&$count): bool {
 $result = @glob('*', 99999);
 
 echo 'warnings: ', $count, "\n";
-echo 'is_false: ', var_export(false === $result, true), "\n";
+echo $result === false ? "ok\n" : "fail\n";

@@ -142,8 +142,8 @@ final class VmFsGlobTest extends TestCase
     /** Issue #16970 — invalid flag bits emit warning and return false (php-src dir.c). */
     public function testVmFsGlobInvalidFlagsRejected(): void
     {
-        $this->assertFalse(\PHPCompiler\ext\standard\VmFsGlobFailure::hasValidFlags(99999));
-        $this->assertTrue(\PHPCompiler\ext\standard\VmFsGlobFailure::hasValidFlags(\GLOB_MARK));
+        $this->assertTrue(\PHPCompiler\ext\standard\VmFsGlob::hasInvalidFlags(99999));
+        $this->assertFalse(\PHPCompiler\ext\standard\VmFsGlob::hasInvalidFlags(\GLOB_MARK));
         $result = \PHPCompiler\ext\standard\VmFsGlob::glob('*', 99999);
         $this->assertFalse($result);
     }
