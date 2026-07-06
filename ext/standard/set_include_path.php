@@ -28,11 +28,11 @@ final class set_include_path extends Internal
                 'set_include_path() expects exactly 1 argument, '.\count($frame->calledArgs).' given'
             );
         }
-        $newPath = VmString::coerceStringBuiltinArg(
+        $newPath = VmString::coercePathBuiltinArg(
             $frame->calledArgs[0],
             'set_include_path',
             0,
-            'new_include_path'
+            'include_path'
         );
         $old = VmIncludePath::push($newPath);
         BuiltinExecute::writeReturn($frame, static function ($ret) use ($old): void {
@@ -52,12 +52,16 @@ final class set_include_path extends Internal
                 'set_include_path() expects exactly 1 argument, '.\count($args).' given'
             );
         }
-        $newPath = JitStringBuiltinArg::lower(
+        $lit = JitStringBuiltinArg::compileTimeLiteral($args[0]);
+        if (null !== $lit) {
+            VmString::rejectNullByteBuiltinStringArg($lit, 'set_include_path', 0, 'include_path');
+        }
+        $newPath = JitStringBuiltinArg::lowerPath(
             $context,
             $args[0],
             'set_include_path',
             0,
-            'new_include_path'
+            'include_path'
         );
 
         return JitIncludePath::setValidated($context, $newPath);

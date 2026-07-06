@@ -53,6 +53,7 @@ final class IncludePathJitHelper
      */
     public static function push(string $newPath): string|false
     {
+        VmString::rejectNullByteBuiltinStringArg($newPath, 'set_include_path', 0, 'include_path');
         if ('' === $newPath) {
             return false;
         }
