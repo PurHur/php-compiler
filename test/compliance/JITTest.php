@@ -648,6 +648,14 @@ class JITTest extends BaseTest {
                 && str_contains($name, 'gc_status_reference_profile')) {
                 continue;
             }
+            if (!CompilerVersion::supportsDatePeriodCreateFromISO8601String()
+                && str_contains($name, 'date_period_create_from_iso8601')) {
+                continue;
+            }
+            // VM-only DatePeriod static factory until MCJIT lowering lands (#7296).
+            if (str_contains($name, 'date_period_create_from_iso8601')) {
+                continue;
+            }
             if (!CompilerVersion::supportsDomElementInsertAdjacentHtml()
                 && str_contains($name, 'dom_element_insert_adjacent_html')
                 && !str_contains($name, 'insert_adjacent_html_phantom')) {

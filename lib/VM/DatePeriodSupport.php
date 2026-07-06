@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\VM;
 
+use PHPCompiler\ext\standard\VmDateInterval;
 use PHPCompiler\Frame;
 
 /**
@@ -240,6 +241,138 @@ final class DatePeriodSupport
         }
 
         return $recurrences - 1;
+    }
+
+    /**
+     * DatePeriod::createFromISO8601String() — php-src date_period_init_iso8601_string (#7296).
+     */
+    public static function createFromISO8601String(Context $ctx, string $spec, int $options = 0): ObjectEntry
+    {
+        $label = 'DatePeriod::createFromISO8601String()';
+        $parsed = self::parseISO8601PeriodSpec($spec, $label);
+        $class = $ctx->classes[self::CLASS_DATEPERIOD] ?? null;
+        if (null === $class) {
+            throw new \LogicException('DatePeriod is not registered in this compiler build');
+        }
+
+        $period = new ObjectEntry($class);
+        $start = self::parsePeriodDateTimeImmutable($ctx, $parsed['start'], $label, $spec);
+        $interval = self::parsePeriodInterval($ctx, $parsed['interval'], $label, $spec);
+
+        if (null !== $parsed['end']) {
+            $end = self::parsePeriodDateTimeImmutable($ctx, $parsed['end'], $label, $spec);
+            self::initFromEndDate($period, $start, $interval, $end, $options, $ctx);
+        } else {
+            self::initFromRecurrenceCount($period, $start, $interval, $parsed['recurrences'], $options, $ctx);
+        }
+
+        return $period;
+    }
+
+    /**
+     * @return array{start: string, end: ?string, interval: string, recurrences: int}
+     *
+     * @throws NativeDateMalformedPeriodStringException
+     */
+    public static function parseISO8601PeriodSpec(string $spec, string $label): array
+    {
+        $parts = explode('/', $spec);
+        $recurrences = 0;
+        $offset = 0;
+        if (isset($parts[0]) && preg_match('/^R(\d*)$/', $parts[0], $matches)) {
+            $recurrences = '' === $matches[1] ? 0 : (int) $matches[1];
+            $offset = 1;
+        }
+
+        $body = \array_slice($parts, $offset);
+        if (\count($body) < 2) {
+            self::throwMalformedPeriodString($label, $spec, 'ISO interval must contain a start date');
+        }
+
+        $intervalSpec = array_pop($body);
+        if (!\is_string($intervalSpec) || !str_starts_with($intervalSpec, 'P')) {
+            self::throwMalformedPeriodString($label, $spec, 'ISO interval must contain an interval');
+        }
+
+        if (1 === \count($body)) {
+            $start = $body[0];
+            $end = null;
+        } elseif (2 === \count($body)) {
+            $start = $body[0];
+            $end = $body[1];
+        } else {
+            self::throwMalformedPeriodString($label, $spec, 'ISO interval must contain a start date');
+        }
+
+        if (!\is_string($start) || '' === $start) {
+            self::throwMalformedPeriodString($label, $spec, 'ISO interval must contain a start date');
+        }
+        if (null === $end && 0 === $recurrences) {
+            self::throwMalformedPeriodString(
+                $label,
+                $spec,
+                'ISO interval must contain an end date or a recurrence count'
+            );
+        }
+
+        return [
+            'start' => $start,
+            'end' => $end,
+            'interval' => $intervalSpec,
+            'recurrences' => $recurrences,
+        ];
+    }
+
+    /**
+     * @throws NativeDateMalformedPeriodStringException
+     */
+    private static function parsePeriodDateTimeImmutable(
+        Context $ctx,
+        string $time,
+        string $label,
+        string $spec
+    ): ObjectEntry {
+        $var = DateTimeSupport::tryNewDateTimeImmutableVariable($ctx, $time, null);
+        if (null === $var) {
+            self::throwMalformedPeriodString($label, $spec, 'ISO interval must contain a start date');
+        }
+
+        return $var->toObject();
+    }
+
+    /**
+     * @throws NativeDateMalformedPeriodStringException
+     */
+    private static function parsePeriodInterval(
+        Context $ctx,
+        string $intervalSpec,
+        string $label,
+        string $spec
+    ): ObjectEntry {
+        try {
+            VmDateInterval::parseSpec($intervalSpec);
+        } catch (\Throwable) {
+            self::throwMalformedPeriodString($label, $spec, 'ISO interval must contain an interval');
+        }
+
+        $class = $ctx->classes[DateIntervalSupport::CLASS_DATEINTERVAL] ?? null;
+        if (null === $class) {
+            throw new \LogicException('DateInterval is not registered in this compiler build');
+        }
+        $interval = new ObjectEntry($class);
+        DateIntervalSupport::initDateInterval($interval, $intervalSpec);
+
+        return $interval;
+    }
+
+    /**
+     * @throws NativeDateMalformedPeriodStringException
+     */
+    private static function throwMalformedPeriodString(string $label, string $spec, string $reason): void
+    {
+        throw new NativeDateMalformedPeriodStringException(
+            \sprintf('%s: %s, "%s" given', $label, $reason, $spec)
+        );
     }
 
     private static function cloneIntervalForStorage(ObjectEntry $interval, ?Context $ctx): ObjectEntry

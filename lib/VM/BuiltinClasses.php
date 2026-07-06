@@ -7,6 +7,7 @@ namespace PHPCompiler\VM;
 use PHPCompiler\CompilerVersion;
 use PHPCfg\Func as CfgFunc;
 use PHPCompiler\VM\Builtin\DatePeriodConstruct;
+use PHPCompiler\VM\Builtin\DatePeriodCreateFromISO8601String;
 use PHPCompiler\VM\Builtin\DatePeriodCurrent;
 use PHPCompiler\VM\Builtin\DatePeriodGetDateInterval;
 use PHPCompiler\VM\Builtin\DatePeriodGetRecurrences;
@@ -1239,6 +1240,10 @@ final class BuiltinClasses
         $dp->methodVisibility['getdateinterval'] = $pub;
         $dp->methods['getrecurrences'] = new DatePeriodGetRecurrences();
         $dp->methodVisibility['getrecurrences'] = $pub;
+        if (CompilerVersion::supportsDatePeriodCreateFromISO8601String()) {
+            $dp->methods['createfromiso8601string'] = new DatePeriodCreateFromISO8601String();
+            $dp->methodVisibility['createfromiso8601string'] = $pubStatic;
+        }
         $ctx->classes[DatePeriodSupport::CLASS_DATEPERIOD] = $dp;
     }
 

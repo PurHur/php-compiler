@@ -8512,6 +8512,8 @@ restart:
             return $this->dispatchVmDateMalformedStringException($e, $callerFrame);
         } catch (VM\NativeDateMalformedIntervalException $e) {
             return $this->dispatchVmDateMalformedIntervalException($e, $callerFrame);
+        } catch (VM\NativeDateMalformedPeriodStringException $e) {
+            return $this->dispatchVmDateMalformedPeriodStringException($e, $callerFrame);
         } catch (VM\NativeDateMalformedPeriodException $e) {
             return $this->dispatchVmDateMalformedPeriodException($e, $callerFrame);
         } catch (VM\NativeDateRangeError $e) {
@@ -8982,6 +8984,23 @@ restart:
     {
         [$file, $line] = VM\ExceptionSupport::userFatalSite($frame);
         $thrown = VM\BuiltinExceptionSupport::materializeDateMalformedPeriodException(
+            $this->context,
+            $error->getMessage(),
+            $file,
+            $line
+        );
+
+        return $this->dispatchBuiltinThrowable($frame, $thrown);
+    }
+
+    /** Bridge malformed DatePeriod ISO8601 specs from date builtins into user catch handlers (#7296). */
+    private function dispatchVmDateMalformedPeriodStringException(
+        VM\NativeDateMalformedPeriodStringException $error,
+        Frame $frame
+    ): ?Frame
+    {
+        [$file, $line] = VM\ExceptionSupport::userFatalSite($frame);
+        $thrown = VM\BuiltinExceptionSupport::materializeDateMalformedPeriodStringException(
             $this->context,
             $error->getMessage(),
             $file,
