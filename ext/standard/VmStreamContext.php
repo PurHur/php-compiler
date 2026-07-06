@@ -53,6 +53,7 @@ final class VmStreamContext
 
     private static function registerActive(int $id, HashTable $ht): void
     {
+        $ht->addRef();
         self::$activeById[$id] = $ht;
     }
 
@@ -293,7 +294,6 @@ final class VmStreamContext
     public static function setOptions(Variable $context, Variable $options): bool
     {
         $context = self::requireRepresentation($context, 'stream_context_set_options');
-        $context->separateArrayForWrite();
         $options = self::requireOptionsArray($options, 'stream_context_set_options');
         VmStreamContextOptions::validateOptionsVariable($options, 'stream_context_set_options');
 
@@ -305,6 +305,7 @@ final class VmStreamContext
             );
         }
 
+        $context->separateArrayForWrite();
         VmParseStr::mergeInto($context->toArray(), $exported);
 
         return true;

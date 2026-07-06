@@ -145,6 +145,9 @@ final class HashTable {
             }
         }
         $out->internalPointer = $this->internalPointer;
+        if ($this->flags & self::FLAG_ALLOW_COW_VIOLATION) {
+            $out->markResourceLikeHandle();
+        }
 
         return $out;
     }

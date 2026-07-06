@@ -38015,28 +38015,26 @@ class Compiler {
                     $valueSlot = $procOpenSlot;
                 }
             }
-            if (
-                null !== $cfgCallOp
-                && 0 === (int) $argIndex
-                && \in_array(
-                    $this->resolveCfgFuncCallName($cfgCallOp),
-                    [
-                        'stream_context_create',
-                        'stream_context_set_options',
-                        'stream_context_set_default',
-                        'stream_context_get_default',
-                    ],
-                    true
-                )
-            ) {
-                $contextOptionsArg = $cfgCallOp->args[0] ?? $arg;
+            if (null !== $cfgCallOp) {
+                $streamContextCall = $this->resolveCfgFuncCallName($cfgCallOp);
+                $streamContextOptionsArgIndex = match ($streamContextCall) {
+                    'stream_context_set_options' => 1,
+                    'stream_context_create', 'stream_context_set_default', 'stream_context_get_default' => 0,
+                    default => null,
+                };
                 if (
-                    $this->callArgIsDeadInlineTemporary($contextOptionsArg)
-                    && $this->callArgOperandExpectsArrayProducer($contextOptionsArg)
+                    null !== $streamContextOptionsArgIndex
+                    && (int) $argIndex === $streamContextOptionsArgIndex
                 ) {
-                    $outerSlot = $this->resolveOutermostInitArraySlotBeforePendingFuncCall($block, $sends);
-                    if (null !== $outerSlot) {
-                        $valueSlot = $outerSlot;
+                    $contextOptionsArg = $cfgCallOp->args[$streamContextOptionsArgIndex] ?? $arg;
+                    if (
+                        $this->callArgIsDeadInlineTemporary($contextOptionsArg)
+                        && $this->callArgOperandExpectsArrayProducer($contextOptionsArg)
+                    ) {
+                        $outerSlot = $this->resolveOutermostInitArraySlotBeforePendingFuncCall($block, $sends);
+                        if (null !== $outerSlot) {
+                            $valueSlot = $outerSlot;
+                        }
                     }
                 }
             }
