@@ -25,11 +25,16 @@ final class mb_substr extends Internal
 
     public function execute(Frame $frame): void
     {
-        $argc = \count($frame->calledArgs);
-        if ($argc < 2 || $argc > 4) {
+        if (!isset($frame->calledArgs[0]) || !isset($frame->calledArgs[1])) {
             throw new \ArgumentCountError(sprintf(
                 'mb_substr() expects at least 2 arguments, %d given',
-                $argc
+                \count($frame->calledArgs)
+            ));
+        }
+        if (isset($frame->calledArgs[4])) {
+            throw new \ArgumentCountError(sprintf(
+                'mb_substr() expects at most 4 arguments, %d given',
+                max(\array_keys($frame->calledArgs)) + 1
             ));
         }
         $string = VmString::coerceStringBuiltinArg(
@@ -43,10 +48,10 @@ final class mb_substr extends Internal
         }
         $start = VmMbstring::coerceStartArg($frame, 'mb_substr', 1);
         $length = null;
-        if ($argc >= 3) {
+        if (isset($frame->calledArgs[2])) {
             $length = VmMbstring::coerceOptionalLengthArg($frame, 'mb_substr', 2);
         }
-        $encoding = $argc >= 4
+        $encoding = isset($frame->calledArgs[3])
             ? VmMbstring::coerceEncodingArg($frame->calledArgs[3], 'mb_substr', 3)
             : 'UTF-8';
         BuiltinExecute::writeReturn(
