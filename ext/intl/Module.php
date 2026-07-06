@@ -73,6 +73,8 @@ class Module extends ModuleAbstract
             new grapheme_str_split(),
             ...(CompilerVersion::supportsGraphemeStrimwidth() ? [new grapheme_strimwidth()] : []),
             new intl_get_error_code(),
+            new intl_get_error_message(),
+            new intl_is_failure(),
         ];
     }
 }

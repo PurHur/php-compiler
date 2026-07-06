@@ -21,6 +21,8 @@ foreach ([
     'grapheme_str_contains',
     'grapheme_strimwidth',
     'intl_get_error_code',
+    'intl_get_error_message',
+    'intl_is_failure',
 ] as $fn) {
     if (\function_exists($fn)) {
         $phantoms[] = $fn;
