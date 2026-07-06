@@ -853,7 +853,8 @@ final class VmInfo
             $sections .= self::creditsSapiSectionHtml();
         }
         if (self::creditsFlagSelected($flags, self::CREDITS_MODULES)) {
-            $sections .= self::creditsModulesSectionHtml($fullModuleCreditsTable);
+            // php-src credits_ext.h — full static module table (#16338, ext/standard/credits.c).
+            $sections .= self::creditsModulesSectionHtml(true);
         }
         if (self::creditsFlagSelected($flags, self::CREDITS_DOCS)) {
             $sections .= self::creditsDocsSectionHtml();
@@ -891,9 +892,8 @@ final class VmInfo
             $sections .= self::creditsSapiSectionText();
         }
         if (self::creditsFlagSelected($flags, self::CREDITS_MODULES)) {
-            // php-src php_print_credits(CREDITS_ALL): full credits_modules[] table;
-            // CREDITS_MODULES alone lists loaded extensions only (#14799, #16338).
-            $sections .= self::creditsModulesSectionText($fullModuleCreditsTable || self::isCreditsAll($flags));
+            // php-src credits_ext.h — CREDITS_MODULES uses the full static table (#16338).
+            $sections .= self::creditsModulesSectionText(true);
         }
         if (self::creditsFlagSelected($flags, self::CREDITS_DOCS)) {
             $sections .= self::creditsDocsSectionText();
