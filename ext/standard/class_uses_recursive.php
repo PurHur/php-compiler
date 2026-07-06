@@ -41,6 +41,7 @@ final class class_uses_recursive extends Internal
             }
             $autoload = $flag->toBool();
         }
+        VmClassHas::requireObjectOrClass($frame->calledArgs[0], 'class_uses_recursive', 'object_or_class');
         $entry = VmReflection::resolveClassForClassUses($ctx, $frame->calledArgs[0], $autoload);
         if (null === $entry) {
             $frame->returnVar->bool(false);
