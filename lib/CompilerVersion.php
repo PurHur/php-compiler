@@ -1352,6 +1352,21 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.4+ bcround() (ext/bcmath/bcmath.c; #5935, #16709).
+     *
+     * Callable under forward profile via {@see supportsBcmath()}; advertised on stable 8.4+ or
+     * {@code PHP_COMPILER_PROFILE=8.4} like fpow/nextafter (#16677).
+     */
+    public static function advertisesBcround(): bool
+    {
+        if (version_compare(self::VERSION, '8.4.0', '>=')) {
+            return true;
+        }
+
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+    }
+
+    /**
      * PHP 8.4+ DOMNode::contains() (ext/dom/node.c, #14447, #14535, #14723, #15613).
      *
      * Gated on stable 8.4.0 / PHP_COMPILER_PROFILE=8.4 so 8.4.0-dev reference profile

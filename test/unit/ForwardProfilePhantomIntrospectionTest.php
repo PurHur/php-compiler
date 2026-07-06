@@ -46,15 +46,22 @@ final class ForwardProfilePhantomIntrospectionTest extends TestCase
         try {
             $this->assertTrue(CompilerVersion::supportsBcmath());
             $this->assertFalse(CompilerVersion::advertisesBcmath());
+            $this->assertTrue(CompilerVersion::advertisesBcround());
             $this->assertFalse(
                 \PHPCompiler\ext\standard\ModuleRegistry::extensionLoaded('bcmath')
             );
 
             $runtime = new Runtime();
             $this->assertTrue(isset($runtime->vmContext->functions['bcadd']));
+            $this->assertTrue(isset($runtime->vmContext->functions['bcround']));
             $this->assertFalse(
                 \PHPCompiler\ext\standard\VmReflection::functionExists($runtime->vmContext, 'bcadd')
             );
+            $this->assertTrue(
+                \PHPCompiler\ext\standard\VmReflection::functionExists($runtime->vmContext, 'bcround')
+            );
+            $this->assertTrue(BuiltinIntrospectionPolicy::functionIsAdvertised('bcround'));
+            $this->assertFalse(BuiltinIntrospectionPolicy::functionIsAdvertised('bcadd'));
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');
