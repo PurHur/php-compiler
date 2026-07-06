@@ -10,6 +10,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitOperandTypeLabel;
 use PHPCompiler\JIT\JitStringArg;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -83,7 +84,7 @@ final class file_put_contents extends Internal
         return JitFilePutContents::invoke(
             $context,
             JitFilestatArg::lowerFilename($context, $args[0], 'file_put_contents'),
-            $context->helper->loadValue($args[1]),
+            self::lowerDataJitArg($context, $args[1]),
             $flags
         );
     }
@@ -127,9 +128,23 @@ final class file_put_contents extends Internal
     /**
      * @return string|list<string>
      */
+    private static function lowerDataJitArg(Context $context, JITVariable $arg): Value
+    {
+        if (JITVariable::TYPE_HASHTABLE === $arg->type || 0 !== ($arg->type & JITVariable::IS_NATIVE_ARRAY)) {
+            return $context->helper->loadValue($arg);
+        }
+
+        return JitStringBuiltinArg::lower($context, $arg, 'file_put_contents', 1, 'data');
+    }
+
     private static function coerceData(Variable $var)
     {
         $var = $var->resolveIndirect();
+        if (Variable::TYPE_NULL === $var->type) {
+            VmNullStringParamDeprecation::emit(null, 'file_put_contents', 1, 'data');
+
+            return '';
+        }
         if (Variable::TYPE_STRING === $var->type) {
             return $var->toString();
         }
