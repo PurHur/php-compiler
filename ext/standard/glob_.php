@@ -41,7 +41,7 @@ final class glob_ extends Internal
             return;
         }
 
-        $result = VmFsGlob::glob($pattern, $flags);
+        $result = VmFsGlob::glob($pattern, $flags, $frame);
         if (false === $result) {
             $frame->returnVar->bool(false);
 

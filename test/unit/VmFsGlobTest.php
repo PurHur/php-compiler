@@ -152,4 +152,11 @@ final class VmFsGlobTest extends TestCase
         $this->assertSame($tmp, $matches[0]);
         $this->assertStringNotContainsString('//', $matches[0]);
     }
+
+    /** Issue #16970 — invalid GLOB_* bits must fail like php-src ext/standard/dir.c. */
+    public function testVmFsGlobRejectsInvalidFlagBitmask(): void
+    {
+        $this->assertTrue(\PHPCompiler\ext\standard\VmFsGlob::hasInvalidFlags(99999));
+        $this->assertFalse(\PHPCompiler\ext\standard\VmFsGlob::hasInvalidFlags(\GLOB_NOSORT));
+    }
 }
