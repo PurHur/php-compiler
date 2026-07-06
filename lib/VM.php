@@ -1477,7 +1477,7 @@ class VM {
     }
 
     /**
-     * empty($obj->hooked) — same-name / detached backing probes storage; separate-backing + virtual get-only invoke get (#11467, #10392).
+     * empty($obj->hooked) — uninitialized backing probes storage; initialized same-name invokes get hook (#11467, #13055, #16935).
      */
     private function emptyHookedProperty(ObjectEntry $object, string $propName, Frame $frame, Variable $dst): bool
     {
@@ -1519,7 +1519,7 @@ class VM {
     }
 
     /**
-     * empty() on hooked properties with real same-name backing — never invoke get hook (#11467, zend_property_hooks.c).
+     * empty() on hooked properties — probe uninitialized backing only; initialized slots defer to get hook (#11262, #13055, #16935).
      */
     private function emptyHookedPropertyProbesBackingOnly(ObjectEntry $object, string $propName, Variable $dst): bool
     {
@@ -1537,9 +1537,8 @@ class VM {
 
             return true;
         }
-        $dst->bool(!ext\standard\boolval::isTruthy($backing));
 
-        return true;
+        return false;
     }
 
     private function invokeInstancePropertyUnsetHook(ObjectEntry $object, string $propName, Frame $frame): bool
