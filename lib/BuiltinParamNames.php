@@ -190,6 +190,12 @@ final class BuiltinParamNames
                 return \PHPCompiler\CompilerVersion::supportsGetDefinedConstantsCategory()
                     ? ['categorize', 'category']
                     : ['categorize'];
+            case 'get_declared_classes':
+            case 'get_declared_interfaces':
+            case 'get_declared_traits':
+                return \PHPCompiler\CompilerVersion::supportsGetDeclaredExcludeDeprecated()
+                    ? ['exclude_deprecated']
+                    : [];
             case 'fdiv':
                 return \PHPCompiler\CompilerVersion::supportsRoundingModeEnum()
                     ? ['num1', 'num2', 'rounding_mode']
