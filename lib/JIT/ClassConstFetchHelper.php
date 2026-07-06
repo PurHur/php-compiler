@@ -200,7 +200,12 @@ final class ClassConstFetchHelper
                 }
             }
 
-            return $objectType->classConstFetch($classId, $literal, $block);
+            return $objectType->classConstFetch(
+                $classId,
+                $literal,
+                $block,
+                $classOp instanceof Operand\Literal && \is_string($classOp->value) ? $classOp->value : null
+            );
         }
 
         $context = $objectType->jitContext();
