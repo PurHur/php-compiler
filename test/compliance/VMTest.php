@@ -191,8 +191,9 @@ class VMTest extends BaseTest {
                 continue;
             }
             if (!CompilerVersion::supportsPhp83ArrayKeyFunctions()
-                && (str_contains($name, 'array_first_key') || str_contains($name, 'array_last_key'))
-                && !str_contains($name, 'array_first_last_key_phantom')) {
+                && (str_contains($name, 'array_first_key') || str_contains($name, 'array_last_key') || str_contains($name, 'array_first_last_key'))
+                && !str_contains($name, 'array_first_last_key_phantom')
+                && !str_contains($name, 'array_first_last_key_forward_84')) {
                 continue;
             }
             if (CompilerVersion::supportsPhp83ArrayKeyFunctions()
@@ -203,8 +204,8 @@ class VMTest extends BaseTest {
                 && (str_contains($name, 'array_find')
                     || str_contains($name, 'array_any')
                     || str_contains($name, 'array_all')
-                    || (str_contains($name, 'array_first') && !str_contains($name, 'array_first_key'))
-                    || (str_contains($name, 'array_last') && !str_contains($name, 'array_last_key')))
+                    || (str_contains($name, 'array_first') && !str_contains($name, 'array_first_key') && !str_contains($name, 'array_first_last_key'))
+                    || (str_contains($name, 'array_last') && !str_contains($name, 'array_last_key') && !str_contains($name, 'array_first_last_key')))
                 && !str_contains($name, 'php84_array_search_phantom')
                 && !str_contains($name, 'array_any_key_forward_84')) {
                 continue;

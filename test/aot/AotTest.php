@@ -67,7 +67,8 @@ class AotTest extends BaseTest
             }
             if (!CompilerVersion::supportsPhp83ArrayKeyFunctions()
                 && str_contains($name, 'array_first_last_key')
-                && !str_contains($name, 'array_first_last_key_phantom')) {
+                && !str_contains($name, 'array_first_last_key_phantom')
+                && !str_contains($name, 'array_first_last_key_forward_84')) {
                 continue;
             }
             if (CompilerVersion::supportsPhp83ArrayKeyFunctions()
