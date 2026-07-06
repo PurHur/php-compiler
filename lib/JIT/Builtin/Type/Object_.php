@@ -3148,6 +3148,7 @@ class Object_ extends Type {
         }
         if ('roundingmode' === $lcname) {
             $this->enums[$lcname] = true;
+            $this->setEnumBackedType($id, 'int');
             foreach ([
                 'HalfAwayFromZero',
                 'HalfTowardsZero',
@@ -3159,7 +3160,7 @@ class Object_ extends Type {
                 'PositiveInfinity',
             ] as $caseName) {
                 $backing = new VMVariable();
-                $backing->null();
+                $backing->int(\PHPCompiler\ext\standard\VmRoundMode::roundModeIntFromCaseName($caseName));
                 $this->defineEnumCaseConst($id, $caseName, $backing);
             }
         }
