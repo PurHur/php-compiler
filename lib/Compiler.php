@@ -14982,6 +14982,84 @@ class Compiler {
         return $this->slotForInlineNewProducer($block, $newExpr);
     }
 
+    /**
+     * Closure::bind(inline closure, …) — hoisted Enum::class prelude must not wire to arg #0 (#3673, #16722).
+     */
+    private function slotForStaticClosureBindInlineClosureArg(
+        Block $block,
+        Op\Expr\StaticCall $callOp,
+        int $argIndex
+    ): ?string {
+        if (0 !== $argIndex || null === $block->orig) {
+            return null;
+        }
+        $className = $this->staticNameFromOperand($callOp->class);
+        $method = $this->staticNameFromOperand($callOp->name);
+        if (null === $className || null === $method) {
+            return null;
+        }
+        if ('closure' !== strtolower(ltrim($className, '\\'))) {
+            return null;
+        }
+        if (!\in_array(strtolower($method), ['bind', 'fromcallable'], true)) {
+            return null;
+        }
+        $callArg = $callOp->args[0] ?? null;
+        if (null === $callArg) {
+            return null;
+        }
+        $producer = null;
+        foreach ($block->orig->children as $child) {
+            if (
+                ($child instanceof Op\Expr\Closure || $child instanceof Op\Expr\ArrowFunction)
+                && null !== $child->result
+                && $this->operandsReferToSameVariable($child->result, $callArg)
+            ) {
+                $producer = $child;
+                break;
+            }
+        }
+        if (null === $producer) {
+            foreach ($this->precedingInlineCallArgProducersBeforeCfgOp($block->orig->children, $callOp) as $candidate) {
+                if (
+                    ($candidate instanceof Op\Expr\Closure || $candidate instanceof Op\Expr\ArrowFunction)
+                    && null !== $candidate->result
+                    && $this->operandsReferToSameVariable($candidate->result, $callArg)
+                ) {
+                    $producer = $candidate;
+                    break;
+                }
+            }
+        }
+        if (null === $producer) {
+            $callIndex = $this->cfgCallOpIndex($block, $callOp);
+            if (\is_int($callIndex)) {
+                for ($i = $callIndex - 1; $i >= 0; --$i) {
+                    $child = $block->orig->children[$i];
+                    if ($child instanceof Op\Expr\ConstFetch || $child instanceof Op\Expr\ClassConstFetch) {
+                        continue;
+                    }
+                    if ($child instanceof Op\Expr\Closure || $child instanceof Op\Expr\ArrowFunction) {
+                        $producer = $child;
+                    }
+                    break;
+                }
+            }
+        }
+        if (!$producer instanceof Op\Expr\Closure && !$producer instanceof Op\Expr\ArrowFunction) {
+            return null;
+        }
+        $slot = $this->slotForInlineClosureProducer($producer, $block);
+        if (null === $slot) {
+            foreach ($this->compileExpr($producer, $block) as $op) {
+                $block->addOpCode($op);
+            }
+            $slot = $block->slotForOperand($producer->result);
+        }
+
+        return null !== $slot ? (string) $slot : null;
+    }
+
     private function slotForInlineNewMethodCallEnumCaseArg(
         Block $block,
         Op\Expr\MethodCall $callOp,
@@ -34338,6 +34416,26 @@ class Compiler {
                     continue;
                 }
             }
+            if (
+                null !== $cfgCallOp
+                && $cfgCallOp instanceof Op\Expr\StaticCall
+                && null !== $block->orig
+            ) {
+                $staticBindClosureSlot = $this->slotForStaticClosureBindInlineClosureArg(
+                    $block,
+                    $cfgCallOp,
+                    (int) $argIndex
+                );
+                if (null !== $staticBindClosureSlot) {
+                    $sends[] = new OpCode(
+                        OpCode::TYPE_ARG_SEND,
+                        $staticBindClosureSlot,
+                        $nameSlot,
+                        $unpackFlag
+                    );
+                    continue;
+                }
+            }
             if (null !== $cfgCallOp && null !== $block->orig) {
                 $deadInlinePrelude = $this->hoistedDeadInlinePreludeProducerForCallArgIndex(
                     $cfgCallOp,
@@ -36076,7 +36174,7 @@ class Compiler {
                 ) {
                     for ($i = \count($block->opCodes) - 1; $i >= 0; --$i) {
                         $scanOp = $block->opCodes[$i];
-                        if (OpCode::TYPE_STATICCALL_INIT === $scanOp->type) {
+                        if (OpCode::TYPE_FUNCCALL_INIT === $scanOp->type) {
                             break;
                         }
                         if (OpCode::TYPE_FROM_CALLABLE === $scanOp->type) {
