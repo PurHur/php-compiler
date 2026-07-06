@@ -165,6 +165,8 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
             $this->assertTrue(CompilerVersion::supportsFpow());
             $this->assertTrue(CompilerVersion::advertisesFpow());
             $this->assertTrue(CompilerVersion::advertisesNextafter());
+            $this->assertTrue(CompilerVersion::supportsBcmath());
+            $this->assertTrue(CompilerVersion::advertisesBcround());
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');
