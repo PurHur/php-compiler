@@ -11,6 +11,8 @@ final class DomConstants
 
     public const XML_TEXT_NODE = 3;
 
+    public const XML_COMMENT_NODE = 8;
+
     public const XML_ATTRIBUTE_NODE = 2;
 
     public const XML_ENTITY_REF_NODE = 5;
