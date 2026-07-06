@@ -2,13 +2,11 @@
 
 declare(strict_types=1);
 
-namespace PHPCompiler;
+namespace PHPCompiler\Test\Unit;
 
 use PHPUnit\Framework\TestCase;
 
-require_once __DIR__.'/../LlvmToolchain.php';
-
-/** get_class_methods() C runtime shrink (#6339). */
+/** get_class_methods() JIT routes through GetClassMethodsJitHelper PHP not inline LLVM (#16729). */
 final class GetClassMethodsRuntimeShrinkTest extends TestCase
 {
     private string $repoRoot;
@@ -27,34 +25,36 @@ final class GetClassMethodsRuntimeShrinkTest extends TestCase
         $this->assertFileDoesNotExist($this->repoRoot.'/lib/JIT/Builtin/MethodRegistry.php');
     }
 
-    public function testJitLoweringUsesPhpCompileTimePathOnly(): void
+    public function testJitGetClassMethodsDelegatesToStringGetClassMethodsBridge(): void
     {
-        $source = file_get_contents($this->repoRoot.'/ext/standard/JitGetClassMethods.php');
-        $this->assertIsString($source);
-        $this->assertStringNotContainsString('phpc_get_class_methods', $source);
-        $this->assertStringNotContainsString('MethodRegistry', $source);
-        $this->assertStringNotContainsString('invokeNativeForClassName', $source);
-        $this->assertStringContainsString('invokeCompileTimeForClassName', $source);
-        $this->assertStringContainsString('invokeForRuntimeClassNameString', $source);
-        $this->assertStringContainsString('invokeForEnumCaseValueBox', $source);
+        $source = (string) file_get_contents($this->repoRoot.'/ext/standard/JitGetClassMethods.php');
+        $this->assertStringContainsString('StringGetClassMethods::invoke', $source);
+        $this->assertStringNotContainsString('invokeForRuntimeClassNameString', $source);
+        $this->assertStringNotContainsString('invokeForEnumCaseValueBox', $source);
+        $this->assertStringNotContainsString('invokeFromValueBox', $source);
+        $this->assertStringNotContainsString('strcasecmp', $source);
+        $this->assertLessThan(260, \substr_count($source, "\n") + 1);
     }
 
-    /**
-     * @group llvm
-     */
-    public function testEnumCaseOperandLoweringCompiles(): void
+    public function testStringGetClassMethodsUsesJitHelperNotInlineLlvm(): void
     {
-        if (!LlvmToolchain::isReady($this->repoRoot)) {
-            $reason = LlvmToolchain::readyFailureReason() ?? 'LLVM 9 toolchain not available';
-            $this->markTestSkipped($reason.' — get_class_methods enum-case JIT compile test needs LLVM');
-        }
-        $target = $this->repoRoot.'/test/fixtures/aot/compile-only/get_class_methods_enum_case.php';
-        $this->assertFileExists($target);
-        $code = (string) file_get_contents($target);
-        $runtime = new Runtime();
-        $block = $runtime->parseAndCompile($code, 'get_class_methods_enum_case_jit_compile.php');
-        $runtime->jitCompileBlock($block);
+        $source = (string) file_get_contents($this->repoRoot.'/lib/JIT/Builtin/StringGetClassMethods.php');
+        $this->assertStringContainsString('GetClassMethodsJitHelper', $source);
+        $this->assertStringContainsString('JitVmHelperLink', $source);
+    }
 
-        $this->addToAssertionCount(1);
+    public function testGetClassMethodsJitHelperDelegatesToVmReflection(): void
+    {
+        $source = (string) file_get_contents($this->repoRoot.'/ext/standard/GetClassMethodsJitHelper.php');
+        $this->assertStringContainsString('VmReflection::resolveClassForGetClassMethods', $source);
+        $this->assertStringContainsString('VmReflection::classMethodsArray', $source);
+        $this->assertStringContainsString('Superglobals::getActiveContext', $source);
+    }
+
+    public function testSpineBundleIncludesGetClassMethodsJitHelper(): void
+    {
+        $spine = (string) file_get_contents($this->repoRoot.'/test/selfhost/compiler_lib_spine_smoke/main.php');
+        $this->assertStringContainsString('GetClassMethodsJitHelper.php', $spine);
+        $this->assertStringContainsString('StringGetClassMethods.php', $spine);
     }
 }
