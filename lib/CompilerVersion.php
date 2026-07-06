@@ -475,13 +475,26 @@ final class CompilerVersion
     /**
      * Whether class constants may use `new Class(...)` initializers.
      *
-     * php-src: Zend/zend_compile.c — zend_compile_const_expr() rejects all `new` in class
-     * constant context ("New expressions are not supported in this context") on 8.2–8.4
-     * (#15766, re-#15608). Forward profile must not enable this until php-src does (#12940).
+     * PHP 8.3+ forward profile: `public const X = new DateTime(...)` materializes once per class
+     * (#12940, #16878, Zend/zend_compile.c zend_const_expr_to_zval allow_dynamic). Withheld on the
+     * 8.4.0-dev reference profile (matches Zend 8.2 rejection). Property defaults still reject `new`.
      */
     public static function supportsClassConstObjectExpressions(): bool
     {
-        return false;
+        if (version_compare(self::VERSION, '8.3', '<')) {
+            return false;
+        }
+
+        if (version_compare(self::VERSION, '8.4.0', '>=')) {
+            return true;
+        }
+
+        $raw = getenv('PHP_COMPILER_PROFILE');
+        if (!\is_string($raw) || '' === trim($raw)) {
+            return false;
+        }
+
+        return version_compare(self::languageProfileVersion(), '8.3.0', '>=');
     }
 
     /** PHP 8.4+ hexadecimal floating-point literals (Zend/zend_language_scanner.l, issue #7041). */
