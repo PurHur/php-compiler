@@ -1477,7 +1477,7 @@ class VM {
     }
 
     /**
-     * empty($obj->hooked) — set-only probes backing; get hook always runs when present (#11262, #13055).
+     * empty($obj->hooked) — same-name / detached backing probes storage; separate-backing + virtual get-only invoke get (#11467, #10392).
      */
     private function emptyHookedProperty(ObjectEntry $object, string $propName, Frame $frame, Variable $dst): bool
     {
@@ -1499,6 +1499,9 @@ class VM {
 
             return true;
         }
+        if ($this->emptyHookedPropertyProbesBackingOnly($object, $propName, $dst)) {
+            return true;
+        }
         $hookValue = $this->fetchPropertyWithHooks($object, $propName, $frame);
         if (null === $hookValue) {
             $backing = $this->hookedPropertyBackingValue($object, $propName);
@@ -1511,6 +1514,30 @@ class VM {
         }
         $value = $hookValue->resolveIndirect();
         $dst->bool(!ext\standard\boolval::isTruthy($value));
+
+        return true;
+    }
+
+    /**
+     * empty() on hooked properties with real same-name backing — never invoke get hook (#11467, zend_property_hooks.c).
+     */
+    private function emptyHookedPropertyProbesBackingOnly(ObjectEntry $object, string $propName, Variable $dst): bool
+    {
+        if (!$this->hookedPropertyHasRealSameNameBacking($object, $propName)
+            && !$this->hookedPropertyIssetProbesUninitializedBackingOnly($object, $propName)
+            && !$this->hookedPropertyDistinctBackingUnsetForIssetEmpty($object, $propName)) {
+            return false;
+        }
+        $backing = $this->hookedPropertyBackingValue($object, $propName);
+        if (false === $backing) {
+            return false;
+        }
+        if ($backing->isUndefined() || VM\TypedPropertyCheck::isUninitialized($backing)) {
+            $dst->bool(true);
+
+            return true;
+        }
+        $dst->bool(!ext\standard\boolval::isTruthy($backing));
 
         return true;
     }
