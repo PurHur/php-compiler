@@ -40455,6 +40455,7 @@ class Compiler {
     ): array {
         $argSends = $this->compileCallArgSends($args, $block, null, $cfgCallOp);
         [$nestedProducerOps, $outerArgSends] = $this->partitionNestedInlineCallArgProducerOps($argSends);
+        $this->rewireInlineArithmeticBranchCallArgSendSlots($outerArgSends, $nestedProducerOps, $block, $cfgCallOp);
         $return = [];
         foreach ($outerArgSends as $send) {
             if (OpCode::TYPE_ASSIGN === $send->type) {
@@ -41116,7 +41117,7 @@ class Compiler {
         Block $block,
         ?Op $cfgCallOp
     ): void {
-        if (!$block->inheritUndefinedLocals || null === $cfgCallOp) {
+        if ((!$block->inheritUndefinedLocals && !$block->arrowAutoCapture) || null === $cfgCallOp) {
             return;
         }
         $callArg = $cfgCallOp->args[0] ?? null;
