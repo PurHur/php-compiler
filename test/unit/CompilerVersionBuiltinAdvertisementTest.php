@@ -147,6 +147,7 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         putenv('PHP_COMPILER_PROFILE=8.4');
         try {
             $this->assertTrue(CompilerVersion::supportsNextafter());
+            $this->assertTrue(CompilerVersion::advertisesNextafter());
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');
@@ -162,6 +163,8 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         putenv('PHP_COMPILER_PROFILE=8.4');
         try {
             $this->assertTrue(CompilerVersion::supportsFpow());
+            $this->assertTrue(CompilerVersion::advertisesFpow());
+            $this->assertTrue(CompilerVersion::advertisesNextafter());
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');

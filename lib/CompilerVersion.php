@@ -506,14 +506,18 @@ final class CompilerVersion
     }
 
     /**
-     * fpow()/fmin()/fmax() visible to function_exists() — stable runtime only (#16086).
+     * fpow()/fmin()/fmax() visible to function_exists() — stable runtime or forward 8.4+ (#16677).
      *
      * Callable under forward profile via {@see supportsFpow()}; withheld from introspection on 8.4.0-dev
      * reference harness like Zend 8.2.
      */
     public static function advertisesFpow(): bool
     {
-        return version_compare(self::VERSION, '8.4.0', '>=');
+        if (version_compare(self::VERSION, '8.4.0', '>=')) {
+            return true;
+        }
+
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
     }
 
     /**
@@ -526,10 +530,14 @@ final class CompilerVersion
         return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
     }
 
-    /** nextafter() visible to function_exists() — stable runtime only (#16086). */
+    /** nextafter() visible to function_exists() — stable runtime or forward 8.4+ (#16677). */
     public static function advertisesNextafter(): bool
     {
-        return version_compare(self::VERSION, '8.4.0', '>=');
+        if (version_compare(self::VERSION, '8.4.0', '>=')) {
+            return true;
+        }
+
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
     }
 
     /**
