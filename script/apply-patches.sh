@@ -4826,11 +4826,17 @@ apply_php_cfg_compiler_halt_offset_overlay() {
   local msc="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/MagicScriptConst.php"
   local halt="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/HaltCompiler.php"
   local overlay="$PATCH_DIR/overlays/php-cfg"
+  if grep -q 'strlen($this->sourceCode) - strlen($node->remaining)' "$parser" 2>/dev/null \
+    && grep -q 'KIND_HALT_OFFSET' "$msc" 2>/dev/null \
+    && grep -q 'haltOffset' "$halt" 2>/dev/null; then
+    echo "Skip php-cfg-compiler-halt-offset overlay (already applied)"
+    return 0
+  fi
   if grep -q 'protected string $parseSourceCode' "$parser" 2>/dev/null \
     && grep -q 'parseSourceCode = $code' "$parser" 2>/dev/null \
     && grep -q 'KIND_HALT_OFFSET' "$msc" 2>/dev/null \
     && grep -q 'haltOffset' "$halt" 2>/dev/null; then
-    echo "Skip php-cfg-compiler-halt-offset overlay (already applied)"
+    echo "Skip php-cfg-compiler-halt-offset overlay (legacy parseSourceCode already applied)"
     return 0
   fi
   if [[ ! -f "$overlay/Op/Expr/MagicScriptConst.php" \
@@ -4851,7 +4857,7 @@ method_path = Path(sys.argv[2])
 property_path = Path(sys.argv[3])
 text = parser_path.read_text()
 prop = property_path.read_text().rstrip("\n")
-if "protected string $parseSourceCode" not in text:
+if "protected string $parseSourceCode" not in text and "protected $sourceCode" not in text:
     anchor = "    protected $anonId = 0;\n"
     if anchor not in text:
         sys.stderr.write("php-cfg-compiler-halt-offset: Parser anonId anchor not found\n")
@@ -4869,7 +4875,7 @@ new_parse = """    public function parse($code, $fileName)
     }"""
 if old_parse in text:
     text = text.replace(old_parse, new_parse, 1)
-elif "parseSourceCode = $code" not in text:
+elif "parseSourceCode = $code" not in text and "sourceCode = $code" not in text:
     sys.stderr.write("php-cfg-compiler-halt-offset: Parser::parse anchor not found\n")
     raise SystemExit(1)
 old_halt = """    protected function parseStmt_HaltCompiler(Stmt\\HaltCompiler $node)
@@ -4888,6 +4894,8 @@ if old_halt in text:
 elif new_halt not in text:
     sys.stderr.write("php-cfg-compiler-halt-offset: parseStmt_HaltCompiler anchor not found\n")
     raise SystemExit(1)
+# Upgrade: #6549 sourceCode field replaced legacy parseSourceCode (#16790).
+text = text.replace("$this->parseSourceCode", "$this->sourceCode")
 const_anchor = """    protected function parseExpr_ConstFetch(Expr\\ConstFetch $expr)
     {
         if ($expr->name->isUnqualified()) {"""
