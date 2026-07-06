@@ -21,6 +21,9 @@ if (extension_loaded('bcmath')) {
 if (function_exists('bcadd')) {
     $fail[] = 'bcadd';
 }
+if (!function_exists('bcround')) {
+    $fail[] = 'bcround';
+}
 foreach (['http_get_last_response_headers', 'get_last_response_headers', 'http_clear_last_response_headers'] as $fn) {
     if (!function_exists($fn)) {
         $fail[] = $fn;

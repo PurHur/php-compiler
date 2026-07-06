@@ -486,13 +486,21 @@ class JITTest extends BaseTest {
                     || str_contains($name, 'bcsqrt')
                     || str_contains($name, 'bcscale')
                     || str_contains($name, 'bccomp')
-                    || str_contains($name, 'bcround')
                     || str_contains($name, 'bcceil')
                     || str_contains($name, 'bcfloor')
                     || str_contains($name, 'bcpowmod')
                     || str_contains($name, 'bcdivmod')
                     || str_contains($name, 'bcmath_number'))
                 && !str_contains($name, 'bcmath_phantom')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsBcmath()
+                && str_contains($name, 'bcround')
+                && !str_contains($name, 'bcround_phantom')) {
+                continue;
+            }
+            if (CompilerVersion::supportsBcmath()
+                && str_contains($name, 'bcround_phantom')) {
                 continue;
             }
             if (!CompilerVersion::supportsConvertCyrString()

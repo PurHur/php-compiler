@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler;
 
+use PHPCompiler\ext\standard\BuiltinIntrospectionPolicy;
 use PHPUnit\Framework\TestCase;
 
 /** Builtin advertisement profile gates (#11842, #12327, #12328). */
@@ -127,6 +128,41 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         putenv('PHP_COMPILER_PROFILE=8.4');
         try {
             $this->assertTrue(CompilerVersion::supportsBcmath());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testBcroundWithheldOnReferenceProfile(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsBcmath());
+        $this->assertFalse(CompilerVersion::advertisesBcround());
+    }
+
+    public function testBcroundAdvertisedOnForwardProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertTrue(CompilerVersion::supportsBcmath());
+            $this->assertTrue(CompilerVersion::advertisesBcround());
+            $this->assertFalse(CompilerVersion::advertisesBcmath());
+            $this->assertTrue(BuiltinIntrospectionPolicy::functionIsAdvertised('bcround'));
+            $this->assertFalse(BuiltinIntrospectionPolicy::functionIsAdvertised('bcadd'));
+
+            $runtime = new Runtime();
+            $ctx = $runtime->vmContext;
+            $this->assertTrue(isset($ctx->functions['bcround']));
+            $this->assertTrue(
+                \PHPCompiler\ext\standard\VmReflection::functionExists($ctx, 'bcround')
+            );
+            $this->assertFalse(
+                \PHPCompiler\ext\standard\VmReflection::functionExists($ctx, 'bcadd')
+            );
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');

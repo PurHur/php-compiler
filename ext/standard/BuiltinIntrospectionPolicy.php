@@ -36,6 +36,9 @@ final class BuiltinIntrospectionPolicy
         if ('readonly' === $lc) {
             return CompilerVersion::advertisesReadonlyBuiltin();
         }
+        if ('bcround' === $lc) {
+            return CompilerVersion::advertisesBcround();
+        }
         if (str_starts_with($lc, 'bc')) {
             return CompilerVersion::advertisesBcmath();
         }

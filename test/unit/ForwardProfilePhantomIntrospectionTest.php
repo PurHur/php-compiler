@@ -55,6 +55,9 @@ final class ForwardProfilePhantomIntrospectionTest extends TestCase
             $this->assertFalse(
                 \PHPCompiler\ext\standard\VmReflection::functionExists($runtime->vmContext, 'bcadd')
             );
+            $this->assertTrue(
+                \PHPCompiler\ext\standard\VmReflection::functionExists($runtime->vmContext, 'bcround')
+            );
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');
