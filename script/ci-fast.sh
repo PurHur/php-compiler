@@ -28,12 +28,16 @@ ci_cd_repo
 ci_prepare_test_runtime
 ci_install_deps
 ci_jit_preflight_gate
-ci_run_inventory_checks
-ci_run_bootstrap_vendor_hygiene
-ci_run_bootstrap_test_subset
+# Hard correctness gates FIRST: the doc/footnote hygiene layers below rot at
+# fleet velocity and self-heal — when they used to run first, their reds masked
+# the AOT smoke and three AOT-breaking merges shipped past a gate that never
+# executed (#16010, #16828 post-mortem).
 ci_report_llvm_status
 echo 'AOT build smoke (AOT_BUILD_SMOKE_GATE=1, #16010)...'
 ./script/check-aot-build-smoke.sh
+ci_run_inventory_checks
+ci_run_bootstrap_vendor_hygiene
+ci_run_bootstrap_test_subset
 ci_configure_serve_tests
 
 echo "PHPUnit (fast): VM, compliance, real-world — excluding @group llvm,serve,cgi..."
