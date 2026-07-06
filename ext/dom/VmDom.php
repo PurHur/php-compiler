@@ -42,6 +42,10 @@ final class VmDom
 
     public const CLASS_TEXT = 'domtext';
 
+    public const CLASS_CHARACTER_DATA = 'domcharacterdata';
+
+    public const CLASS_COMMENT = 'domcomment';
+
     public const CLASS_ATTR = 'domattr';
 
     public const CLASS_ENTITY_REFERENCE = 'domentityreference';
@@ -122,6 +126,8 @@ final class VmDom
 
     public const PROP_VALUE = 'value';
 
+    public const PROP_DATA = 'data';
+
     public const PROP_OWNER_ELEMENT = 'ownerElement';
 
     public const PROP_PUBLIC_ID = 'publicId';
@@ -129,8 +135,6 @@ final class VmDom
     public const PROP_SYSTEM_ID = 'systemId';
 
     public const PROP_TARGET = 'target';
-
-    public const PROP_DATA = 'data';
 
     public static function registerClasses(Context $ctx): void
     {
@@ -232,9 +236,24 @@ final class VmDom
 
         $text = new ClassEntry('DOMText');
         $text->isInternal = true;
-        $text->parentLc = self::CLASS_NODE;
+        $text->parentLc = self::CLASS_CHARACTER_DATA;
         $text->properties[] = new ClassProperty(self::PROP_NODE_NAME, null, $strProto);
         $ctx->classes[self::CLASS_TEXT] = $text;
+
+        $characterData = new ClassEntry('DOMCharacterData');
+        $characterData->isInternal = true;
+        $characterData->parentLc = self::CLASS_NODE;
+        $characterData->properties[] = new ClassProperty(self::PROP_DATA, null, $strProto);
+        $characterData->methods['substringdata'] = new CharacterDataSubstringData();
+        $characterData->methodVisibility['substringdata'] = $pub;
+        $characterData->methodNames['substringdata'] = 'substringData';
+        $ctx->classes[self::CLASS_CHARACTER_DATA] = $characterData;
+
+        $comment = new ClassEntry('DOMComment');
+        $comment->isInternal = true;
+        $comment->parentLc = self::CLASS_CHARACTER_DATA;
+        $comment->properties[] = new ClassProperty(self::PROP_NODE_NAME, null, $strProto);
+        $ctx->classes[self::CLASS_COMMENT] = $comment;
 
         $entityRef = new ClassEntry('DOMEntityReference');
         $entityRef->isInternal = true;
@@ -375,6 +394,12 @@ final class VmDom
         $document->methods['createentityreference'] = new DocumentCreateEntityReference();
         $document->methodVisibility['createentityreference'] = $pub;
         $document->methodNames['createentityreference'] = 'createEntityReference';
+        $document->methods['createtextnode'] = new DocumentCreateTextNode();
+        $document->methodVisibility['createtextnode'] = $pub;
+        $document->methodNames['createtextnode'] = 'createTextNode';
+        $document->methods['createcomment'] = new DocumentCreateComment();
+        $document->methodVisibility['createcomment'] = $pub;
+        $document->methodNames['createcomment'] = 'createComment';
         $document->methods['appendchild'] = new DocumentAppendChild();
         $document->methodVisibility['appendchild'] = $pub;
         $document->methods['savexml'] = new DocumentSaveXML();
@@ -1453,6 +1478,41 @@ final class VmDom
         DomRegistry::attach($entry, $state);
 
         return $entry;
+    }
+
+    public static function createComment(Context $ctx, string $data, ?ObjectEntry $ownerDocument = null): ObjectEntry
+    {
+        $class = self::resolveNodeClass($ctx, $ownerDocument, self::CLASS_COMMENT);
+
+        $entry = new ObjectEntry($class);
+        $entry->constructed = true;
+        $entry->getProperty(self::PROP_NODE_NAME)->string('#comment');
+        self::initNodePropertySlots($entry);
+
+        $state = new DomNodeState();
+        $state->nodeType = DomConstants::XML_COMMENT_NODE;
+        $state->nodeName = '#comment';
+        $state->textContent = $data;
+        if (null !== $ownerDocument && self::isDocument($ownerDocument)) {
+            $state->documentId = $ownerDocument->id;
+        }
+        DomRegistry::attach($entry, $state);
+
+        return $entry;
+    }
+
+    public static function characterDataSubstringData(ObjectEntry $node, int $offset, int $count): string
+    {
+        if (!self::isCharacterData($node)) {
+            throw new \LogicException('characterDataSubstringData() called on non-character-data node');
+        }
+        $data = DomRegistry::state($node)->textContent ?? '';
+        $len = \strlen($data);
+        if ($offset < 0 || $count < 0 || $offset > $len) {
+            throw new \DOMException('Index size error', DomExceptionConstants::INDEX_SIZE_ERR);
+        }
+
+        return substr($data, $offset, $count);
     }
 
     public static function createEntityReference(
@@ -4602,6 +4662,17 @@ final class VmDom
     {
         return DomRegistry::has($entry)
             && DomConstants::XML_TEXT_NODE === DomRegistry::state($entry)->nodeType;
+    }
+
+    public static function isCommentNode(ObjectEntry $entry): bool
+    {
+        return DomRegistry::has($entry)
+            && DomConstants::XML_COMMENT_NODE === DomRegistry::state($entry)->nodeType;
+    }
+
+    public static function isCharacterData(ObjectEntry $entry): bool
+    {
+        return self::isTextNode($entry) || self::isCommentNode($entry);
     }
 
     public static function isEntityReference(ObjectEntry $entry): bool

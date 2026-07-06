@@ -164,6 +164,10 @@ final class DomDocumentVMTest extends BaseTest
             __DIR__.'/cases/stdlib/dom_namednodemap.phpt',
             'dom_namednodemap.phpt'
         );
+        yield 'dom_text_nodes.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/dom_text_nodes.phpt',
+            'dom_text_nodes.phpt'
+        );
     }
 
     public function setUp(): void
