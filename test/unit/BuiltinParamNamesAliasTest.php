@@ -167,6 +167,16 @@ final class BuiltinParamNamesAliasTest extends TestCase
         }
     }
 
+    /** @covers issue #16886 */
+    public function testMbConvertEncodingNamedParamsResolve(): void
+    {
+        $names = BuiltinParamNames::forFunction('mb_convert_encoding');
+        self::assertSame(['string', 'to_encoding', 'from_encoding'], $names);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'string', 'mb_convert_encoding'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'to_encoding', 'mb_convert_encoding'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'from_encoding', 'mb_convert_encoding'));
+    }
+
     /** @covers issue #10027 */
     public function testTrimCharactersNamedParamResolves(): void
     {
