@@ -6,7 +6,9 @@ declare(strict_types=1);
 
 $phantom = function_exists('grapheme_strlen')
     || function_exists('grapheme_str_split')
-    || function_exists('intl_get_error_code');
+    || function_exists('intl_get_error_code')
+    || function_exists('intl_get_error_message')
+    || function_exists('intl_is_failure');
 echo $phantom ? "fail\n" : "ok\n";
 --EXPECT--
 ok

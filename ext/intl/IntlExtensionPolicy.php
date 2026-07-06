@@ -23,7 +23,7 @@ final class IntlExtensionPolicy
         return ModuleRegistry::extensionLoaded('intl');
     }
 
-    /** grapheme_* / intl_get_error_code / skeleton OOP — withheld until full ext/intl (#11472). */
+    /** grapheme_* / intl_get_error_* — withheld until full ext/intl (#11472, #5156). */
     public static function advertisesBuiltins(): bool
     {
         return ModuleRegistry::extensionLoaded('intl');
