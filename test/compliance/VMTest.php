@@ -241,6 +241,15 @@ class VMTest extends BaseTest {
                 && str_contains($name, 'closure_get_current_phantom')) {
                 continue;
             }
+            if (!CompilerVersion::supportsClosureGetUsedVariables()
+                && str_contains($name, 'closure_get_used_variables')
+                && !str_contains($name, 'closure_get_used_variables_phantom')) {
+                continue;
+            }
+            if (CompilerVersion::supportsClosureGetUsedVariables()
+                && str_contains($name, 'closure_get_used_variables_phantom')) {
+                continue;
+            }
             if (!CompilerVersion::supportsClosureFromStatic()
                 && str_contains($name, 'closure_from_static')
                 && !str_contains($name, 'closure_from_static_profile')) {

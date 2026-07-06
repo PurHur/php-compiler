@@ -1055,6 +1055,26 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
+    public function testSupportsClosureGetUsedVariablesFalseOnReferenceProfile(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsClosureGetUsedVariables());
+    }
+
+    public function testSupportsClosureGetUsedVariablesTrueOnForwardProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertTrue(CompilerVersion::supportsClosureGetUsedVariables());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     public function testSupportsClosureFromStaticFalseOnReferenceProfile(): void
     {
         $this->assertFalse(CompilerVersion::supportsClosureFromStatic());

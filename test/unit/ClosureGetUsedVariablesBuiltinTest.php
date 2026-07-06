@@ -11,6 +11,10 @@ final class ClosureGetUsedVariablesBuiltinTest extends TestCase
 {
     public function testClosureGetUsedVariablesReturnsCaptureMap(): void
     {
+        if (!CompilerVersion::supportsClosureGetUsedVariables()) {
+            $this->markTestSkipped('Closure::getUsedVariables() is 8.4+ only');
+        }
+
         $rt = new Runtime();
         $code = <<<'PHP'
 <?php

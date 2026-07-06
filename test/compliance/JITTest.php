@@ -244,6 +244,15 @@ class JITTest extends BaseTest {
                 && str_contains($name, 'closure_get_current_phantom')) {
                 continue;
             }
+            if (!CompilerVersion::supportsClosureGetUsedVariables()
+                && str_contains($name, 'closure_get_used_variables')
+                && !str_contains($name, 'closure_get_used_variables_phantom')) {
+                continue;
+            }
+            if (CompilerVersion::supportsClosureGetUsedVariables()
+                && str_contains($name, 'closure_get_used_variables_phantom')) {
+                continue;
+            }
             if (!CompilerVersion::supportsClosureFromStatic()
                 && str_contains($name, 'closure_from_static')
                 && !str_contains($name, 'closure_from_static_profile')) {
@@ -264,6 +273,10 @@ class JITTest extends BaseTest {
             }
             // JIT: method_exists(Closure::class, …) segfaults; phantom is VM-only (#14504).
             if (str_contains($name, 'closure_get_current_phantom')) {
+                continue;
+            }
+            // JIT: method_exists on closure instance for phantom getUsedVariables is VM-only (#16735).
+            if (str_contains($name, 'closure_get_used_variables_phantom')) {
                 continue;
             }
             // JIT: method_exists(ReflectionParameter::class, …) segfaults; phantom is VM-only (#16130).
