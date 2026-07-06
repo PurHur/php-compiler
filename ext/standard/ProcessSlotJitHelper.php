@@ -18,7 +18,7 @@ final class ProcessSlotJitHelper
 
     private const WNOHANG = 1;
 
-    /** @var array<int, array{pid: int, command: string, statusKnown: bool, status: int, active: bool}> */
+    /** @var array<int, array{pid: int, command: string, statusKnown: bool, status: int, active: bool, pendingSignals?: list<int>}> */
     private static array $slots = [];
 
     private static ?\FFI $ffi = null;
@@ -122,6 +122,13 @@ final class ProcessSlotJitHelper
         $stopped = 0x7f === $lowByte;
         $signaled = $lowByte > 0 && !$stopped;
         $signals = VmProcessProcOpenNative::termsigStopsigFromWaitStatus($statusVal);
+        $pendingSignals = VmProcessProcOpenNative::resolvePendingSignals(
+            $entry,
+            $signaled,
+            $stopped,
+            $signals['termsig'],
+        );
+        self::$slots[$slot] = $entry;
 
         return VmProcessProcOpenNative::buildProcStatusArray(
             $entry['command'],
@@ -132,6 +139,7 @@ final class ProcessSlotJitHelper
             $running ? -1 : ($exited ? (($statusVal >> 8) & 0xff) : -1),
             $signals['termsig'],
             $signals['stopsig'],
+            $pendingSignals,
         );
     }
 
