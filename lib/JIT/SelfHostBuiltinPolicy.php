@@ -264,7 +264,7 @@ final class SelfHostBuiltinPolicy
         'get_included_files' => 'array', 'get_required_files' => 'array',
         'get_loaded_extensions' => 'array',
         'class_exists' => 'array', 'interface_exists' => 'array', 'trait_exists' => 'array',
-        'enum_exists' => 'array', 'unitenum_exists' => 'array', 'function_exists' => 'array', 'method_exists' => 'array', 'class_meth_exists' => 'array',
+        'enum_exists' => 'array', 'unitenum_exists' => 'array', 'function_exists' => 'array', 'method_exists' => 'array', 'class_meth_exists' => 'array', 'attribute_exists' => 'array',
         'class_has_method' => 'array', 'class_has_property' => 'array', 'class_has_constant' => 'array',
         'property_exists' => 'array',
         'get_object_vars' => 'array',
