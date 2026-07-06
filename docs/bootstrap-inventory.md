@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 4127 |
-| Phase A inventory files (M2 ratio SSOT) | 4127 |
+| PHP files on vm.php path | 4130 |
+| Phase A inventory files (M2 ratio SSOT) | 4130 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 11112 |
+| Source constructs flagged (warnings) | 11117 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -273,11 +273,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/CollatorCreate.php` | 0 | 1 |
 | `ext/intl/IntlClassMethod.php` | 0 | 3 |
 | `ext/intl/IntlDateFormatterCreate.php` | 0 | 1 |
+| `ext/intl/IntlError.php` | 0 | 1 |
 | `ext/intl/IntlExtensionPolicy.php` | 0 | 3 |
 | `ext/intl/JitGrapheme.php` | 0 | 2 |
 | `ext/intl/LocaleGetDefault.php` | 0 | 2 |
 | `ext/intl/LocaleSetDefault.php` | 0 | 2 |
-| `ext/intl/Module.php` | 0 | 17 |
+| `ext/intl/Module.php` | 0 | 19 |
 | `ext/intl/UnicodeCanonical.php` | 0 | 1 |
 | `ext/intl/VmGrapheme.php` | 0 | 1 |
 | `ext/intl/VmLocale.php` | 0 | 1 |
@@ -294,6 +295,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/grapheme_strstr.php` | 0 | 4 |
 | `ext/intl/grapheme_substr.php` | 0 | 4 |
 | `ext/intl/intl_get_error_code.php` | 0 | 1 |
+| `ext/intl/intl_get_error_message.php` | 0 | 1 |
+| `ext/intl/intl_is_failure.php` | 0 | 1 |
 | `ext/intl/locale_get_default.php` | 0 | 2 |
 | `ext/intl/locale_set_default.php` | 0 | 2 |
 | `ext/libxml/BuiltinClasses.php` | 0 | 1 |
@@ -5801,6 +5804,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
 
+### `ext/intl/IntlError.php`
+
+**Warnings** (review for bootstrap subset):
+- 5 class method(s)
+
 ### `ext/intl/IntlExtensionPolicy.php`
 
 **Warnings** (review for bootstrap subset):
@@ -5845,6 +5853,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new grapheme_str_split (line 73)
 - new grapheme_strimwidth (line 74)
 - new intl_get_error_code (line 75)
+- new intl_get_error_message (line 76)
+- new intl_is_failure (line 77)
 - 3 class method(s)
 
 ### `ext/intl/UnicodeCanonical.php`
@@ -5951,6 +5961,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 1 closure(s)
 
 ### `ext/intl/intl_get_error_code.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
+### `ext/intl/intl_get_error_message.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
+### `ext/intl/intl_is_failure.php`
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
@@ -6549,7 +6569,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/openssl/OpensslExtensionPolicy.php`
 
 **Warnings** (review for bootstrap subset):
-- 2 class method(s)
+- 3 class method(s)
 
 ### `ext/openssl/OpensslFunction.php`
 
@@ -6571,18 +6591,18 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/openssl/VmOpensslObjects.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 49)
-- new Variable (line 79)
-- new ObjectEntry (line 94)
-- new Variable (line 97)
-- new ObjectEntry (line 109)
-- new Variable (line 112)
-- new Variable (line 155)
-- new Variable (line 162)
+- new Variable (line 72)
+- new Variable (line 102)
+- new ObjectEntry (line 117)
+- new Variable (line 120)
+- new ObjectEntry (line 132)
+- new Variable (line 135)
 - new Variable (line 178)
-- new HashTable (line 180)
-- new ClassEntry (line 253)
-- 14 class method(s)
+- new Variable (line 185)
+- new Variable (line 201)
+- new HashTable (line 203)
+- new ClassEntry (line 276)
+- 16 class method(s)
 
 ### `ext/openssl/VmOpensslPkeyDeriveNative.php`
 
@@ -15157,80 +15177,80 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 62)
 - new ArgumentCountError (line 68)
-- new Variable (line 182)
-- new Variable (line 213)
-- new Variable (line 230)
-- new Variable (line 261)
-- new Variable (line 297)
-- new Variable (line 320)
-- new Module (line 343)
-- new Variable (line 414)
-- new Variable (line 418)
-- new Variable (line 424)
-- new Variable (line 431)
-- new Variable (line 1160)
-- new Variable (line 1164)
-- new Variable (line 1182)
-- new Variable (line 1186)
-- new Variable (line 1283)
-- new Variable (line 1287)
-- new Variable (line 1379)
-- new Variable (line 1383)
-- new Variable (line 1393)
-- new Variable (line 1397)
-- new Variable (line 1436)
-- new Variable (line 1440)
-- new Variable (line 1485)
-- new Variable (line 1496)
-- new Variable (line 1500)
-- new Variable (line 1515)
-- new Variable (line 1522)
-- new Variable (line 1546)
-- new Variable (line 1615)
-- new Variable (line 1632)
-- new Variable (line 1641)
-- new Variable (line 1678)
-- new Variable (line 1780)
-- new Variable (line 1784)
-- new Variable (line 1904)
-- new Variable (line 1920)
-- new Variable (line 1939)
-- new Variable (line 1952)
-- new Variable (line 1971)
-- new Variable (line 1987)
-- new Variable (line 2141)
-- new Variable (line 2145)
-- new Error (line 2162)
-- new Error (line 2168)
-- new Error (line 2191)
-- new Error (line 2194)
-- new Variable (line 2212)
-- new Variable (line 2229)
-- new Variable (line 2376)
-- new ClassProperty (line 2378)
-- new Variable (line 2532)
-- new Variable (line 2536)
-- new Variable (line 2556)
-- new Variable (line 2564)
-- new Variable (line 2585)
-- new Variable (line 2597)
-- new Variable (line 2612)
-- new Variable (line 2626)
-- new Variable (line 2724)
-- new Variable (line 2732)
-- new Variable (line 2852)
-- new Variable (line 2857)
-- new Error (line 2877)
-- new Error (line 2881)
-- new Variable (line 2943)
-- new Variable (line 2949)
-- new Variable (line 2955)
-- new Variable (line 2995)
-- new Variable (line 3000)
-- new Variable (line 3029)
-- new Variable (line 3039)
-- new Variable (line 3045)
-- new Variable (line 3067)
+- new Variable (line 183)
+- new Variable (line 214)
+- new Variable (line 231)
+- new Variable (line 262)
+- new Variable (line 298)
+- new Variable (line 321)
+- new Module (line 344)
+- new Variable (line 415)
+- new Variable (line 419)
+- new Variable (line 425)
+- new Variable (line 432)
+- new Variable (line 1161)
+- new Variable (line 1165)
+- new Variable (line 1183)
+- new Variable (line 1187)
+- new Variable (line 1284)
+- new Variable (line 1288)
+- new Variable (line 1380)
+- new Variable (line 1384)
+- new Variable (line 1394)
+- new Variable (line 1398)
+- new Variable (line 1437)
+- new Variable (line 1441)
+- new Variable (line 1486)
+- new Variable (line 1497)
+- new Variable (line 1501)
+- new Variable (line 1516)
+- new Variable (line 1523)
+- new Variable (line 1547)
+- new Variable (line 1616)
+- new Variable (line 1633)
+- new Variable (line 1642)
+- new Variable (line 1679)
+- new Variable (line 1781)
+- new Variable (line 1785)
+- new Variable (line 1905)
+- new Variable (line 1921)
+- new Variable (line 1940)
+- new Variable (line 1953)
+- new Variable (line 1972)
+- new Variable (line 1988)
+- new Variable (line 2142)
+- new Variable (line 2146)
+- new Error (line 2163)
+- new Error (line 2169)
+- new Error (line 2192)
+- new Error (line 2195)
+- new Variable (line 2213)
+- new Variable (line 2230)
+- new Variable (line 2377)
+- new ClassProperty (line 2379)
+- new Variable (line 2533)
+- new Variable (line 2537)
+- new Variable (line 2557)
+- new Variable (line 2565)
+- new Variable (line 2586)
+- new Variable (line 2598)
+- new Variable (line 2613)
+- new Variable (line 2627)
+- new Variable (line 2725)
+- new Variable (line 2733)
+- new Variable (line 2853)
+- new Variable (line 2858)
+- new Error (line 2878)
+- new Error (line 2882)
+- new Variable (line 2944)
+- new Variable (line 2950)
+- new Variable (line 2956)
+- new Variable (line 2996)
+- new Variable (line 3001)
+- new Variable (line 3030)
+- new Variable (line 3040)
+- new Variable (line 3046)
+- new Variable (line 3068)
 - 145 class method(s)
 - 1 closure(s)
 
