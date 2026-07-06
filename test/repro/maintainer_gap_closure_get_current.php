@@ -12,14 +12,9 @@ $ok = (function (): string {
 })();
 echo $ok, "\n";
 
-function maintainer_gap_closure_get_current_fail(): void
-{
-    Closure::getCurrent();
+$outside = Closure::getCurrent();
+if (null !== $outside) {
+    echo "fail: top-level expected null\n";
+    exit(1);
 }
-
-try {
-    maintainer_gap_closure_get_current_fail();
-    echo "fail: no exception\n";
-} catch (\Error $e) {
-    echo $e->getMessage(), "\n";
-}
+echo "ok outside=null\n";

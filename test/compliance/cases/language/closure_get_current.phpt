@@ -14,15 +14,12 @@ $c = function (int $p) use (&$seen) {
 $c(0);
 var_export($seen);
 echo "\n";
-function closure_get_current_outside(): void
+function closure_get_current_outside(): mixed
 {
-    Closure::getCurrent();
+    return Closure::getCurrent();
 }
-try {
-    closure_get_current_outside();
-} catch (Error $e) {
-    echo $e->getMessage(), "\n";
-}
+var_export(closure_get_current_outside());
+echo "\n";
 --EXPECT--
 true
-No active Closure instance to get
+NULL

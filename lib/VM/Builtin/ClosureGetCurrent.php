@@ -22,20 +22,34 @@ final class ClosureGetCurrent extends VmClassMethod
         if (null === $frame->returnVar) {
             return;
         }
-        $caller = $frame->parent;
-        if (null === $caller) {
-            throw new \Error('No active Closure instance to get');
-        }
-        $state = $caller->closureCall;
-        if (null === $state) {
-            throw new \Error('No active Closure instance to get');
-        }
-        $owner = $state->ownerObject;
+        $owner = self::resolveExecutingClosureObject($frame);
         if (null === $owner) {
-            throw new \Error('No active Closure instance to get');
+            $frame->returnVar->null();
+
+            return;
         }
         $ret = new Variable(Variable::TYPE_OBJECT);
         $ret->object($owner);
         $frame->returnVar->copyFrom($ret);
+    }
+
+    /**
+     * Zend zend_closures.c Closure::getCurrent — immediate caller must be a closure body (#16775).
+     */
+    private static function resolveExecutingClosureObject(Frame $handlerFrame): ?\PHPCompiler\VM\ObjectEntry
+    {
+        $caller = $handlerFrame->parent;
+        if (null === $caller || null === $caller->block?->func) {
+            return null;
+        }
+        if ((($caller->block->func->flags ?? 0) & \PHPCfg\Func::FLAG_CLOSURE) === 0) {
+            return null;
+        }
+        $state = $caller->closureCall;
+        if (null === $state) {
+            return null;
+        }
+
+        return $state->ownerObject;
     }
 }
