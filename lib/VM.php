@@ -6527,11 +6527,6 @@ restart:
                         $value = $this->materializeArrayElementForStorage(
                             $this->resolveOutgoingCallArgValue($frame, $op->arg2)
                         );
-                        $enumStorage = VM\WeakRefSupport::objectKeyIfEnumCase($key);
-                        if (null !== $enumStorage) {
-                            $ht->update($enumStorage, $value);
-                            break;
-                        }
                         if ($key->is(Variable::TYPE_OBJECT) || $key->is(Variable::TYPE_ARRAY)) {
                             throw new \TypeError('Illegal offset type');
                         }
@@ -15421,14 +15416,6 @@ restart:
                 }
                 $key = $this->resolveOutgoingCallArgValue($frame, $op->arg3)->resolveIndirect();
                 $value = $this->resolveOutgoingCallArgValue($frame, $op->arg2);
-                $enumStorage = VM\WeakRefSupport::objectKeyIfEnumCase($key);
-                if (null !== $enumStorage) {
-                    $storeIndirect = $value->isIndirect();
-                    $storeIndirect
-                        ? $ht->updateIndirect($enumStorage, $value)
-                        : $ht->update($enumStorage, $value);
-                    break;
-                }
                 if ($key->is(Variable::TYPE_OBJECT) || $key->is(Variable::TYPE_ARRAY)) {
                     throw new \TypeError('Illegal offset type');
                 }

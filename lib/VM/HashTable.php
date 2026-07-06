@@ -475,13 +475,6 @@ final class HashTable {
         if (Variable::TYPE_INDIRECT === $index->type) {
             $index = $index->resolveIndirect();
         }
-        $enumStorage = WeakRefSupport::objectKeyIfEnumCase($index);
-        if (null !== $enumStorage) {
-            $storage = new Variable();
-            $storage->string($enumStorage);
-
-            return $storage;
-        }
         EnumCaseSupport::rejectIllegalArrayOffset($index, $illegalOffsetMessage);
         if (Variable::TYPE_NULL === $index->type) {
             $empty = new Variable();

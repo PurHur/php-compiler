@@ -1110,7 +1110,9 @@ final class HashTableHelper
 
             return;
         }
-        if (Variable::TYPE_OBJECT === $key->type || Variable::TYPE_HASHTABLE === $key->type) {
+        if (Variable::TYPE_OBJECT === $key->type
+            || Variable::TYPE_ENUM_CASE === $key->type
+            || Variable::TYPE_HASHTABLE === $key->type) {
             self::emitIllegalOffsetType($context);
 
             return;
@@ -1301,7 +1303,6 @@ final class HashTableHelper
         $fn = $context->builder->getInsertBlock()->getParent();
         $stringBlock = $fn->appendBasicBlock('ht_set_vk_str');
         $longBlock = $fn->appendBasicBlock('ht_set_vk_long');
-        $objectBlock = $fn->appendBasicBlock('ht_set_vk_obj');
         $done = $fn->appendBasicBlock('ht_set_vk_done');
         $afterString = $fn->appendBasicBlock('ht_set_vk_after_str');
         $context->builder->branchIf(
@@ -1336,18 +1337,34 @@ final class HashTableHelper
         self::setAtIndex($context, $ht, $index, $element);
         $context->builder->branch($done);
         $context->builder->positionAtEnd($afterLong);
+        $illegalBlock = $fn->appendBasicBlock('ht_set_vk_illegal');
+        $afterObject = $fn->appendBasicBlock('ht_set_vk_after_obj');
         $context->builder->branchIf(
             $context->builder->icmp(
                 Builder::INT_EQ,
                 $typeByte,
                 $i8->constInt(Variable::TYPE_OBJECT, false)
             ),
-            $objectBlock,
-            $done
+            $illegalBlock,
+            $afterObject
         );
-        $context->builder->positionAtEnd($objectBlock);
-        $keyObj = $context->builder->call($context->lookupFunction('__value__readObject'), $valPtr);
-        self::setAtObjectKey($context, $ht, $keyObj, $element);
+        $context->builder->positionAtEnd($afterObject);
+        $isEnumCase = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(\PHPCompiler\VM\Variable::TYPE_ENUM_CASE, false)
+        );
+        $afterEnumCase = $fn->appendBasicBlock('ht_set_vk_after_enum');
+        $context->builder->branchIf($isEnumCase, $illegalBlock, $afterEnumCase);
+        $context->builder->positionAtEnd($afterEnumCase);
+        $isArray = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_HASHTABLE, false)
+        );
+        $context->builder->branchIf($isArray, $illegalBlock, $done);
+        $context->builder->positionAtEnd($illegalBlock);
+        self::emitIllegalOffsetType($context);
         $context->builder->branch($done);
         $context->builder->positionAtEnd($done);
     }
