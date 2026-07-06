@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 4136 |
-| Phase A inventory files (M2 ratio SSOT) | 4136 |
+| PHP files on vm.php path | 4134 |
+| Phase A inventory files (M2 ratio SSOT) | 4134 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 11140 |
+| Source constructs flagged (warnings) | 11139 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -2663,7 +2663,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/Compiler/ClassConstDuplicateCheck.php` | 0 | 3 |
 | `lib/Compiler/ClassConstValueFold.php` | 0 | 6 |
 | `lib/Compiler/CompileFatal.php` | 0 | 1 |
-| `lib/Compiler/DeprecatedMetadata.php` | 0 | 2 |
+| `lib/Compiler/DeprecatedMetadata.php` | 0 | 3 |
 | `lib/Compiler/EnumAbstractMethodCompileCheck.php` | 0 | 4 |
 | `lib/Compiler/EnumBackedCaseCheck.php` | 0 | 4 |
 | `lib/Compiler/EnumMagicMethodCheck.php` | 0 | 3 |
@@ -3020,7 +3020,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StatCacheRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/StatPath.php` | 0 | 1 |
 | `lib/JIT/Builtin/StatPathRuntime.php` | 0 | 3 |
-| `lib/JIT/Builtin/StatPathRuntimeLibc.php` | 0 | 1 |
 | `lib/JIT/Builtin/Stats.php` | 0 | 1 |
 | `lib/JIT/Builtin/StatsJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/StreamBucket.php` | 0 | 1 |
@@ -3091,7 +3090,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringExplode.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringFgetcsvJit.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringFileGetContents.php` | 0 | 1 |
-| `lib/JIT/Builtin/StringFileGetContentsLibc.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringFilePutContents.php` | 0 | 2 |
 | `lib/JIT/Builtin/StringFilePutContentsLibc.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringFilterBoolean.php` | 0 | 2 |
@@ -21587,37 +21585,37 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Operand\Temporary (line 37924)
 - new Operand\Temporary (line 38046)
 - new OpCode (line 38048)
-- new OpCode (line 39260)
-- new Operand\Temporary (line 39718)
-- new OpCode (line 40242)
-- new Operand\Literal (line 40541)
-- new Variable (line 40543)
-- new OpCode (line 40589)
-- new OpCode (line 40804)
-- new OpCode (line 40814)
-- new OpCode (line 40817)
-- new Operand\Temporary (line 40855)
-- new OpCode (line 40857)
-- new OpCode (line 40868)
-- new Operand\Temporary (line 40871)
-- new OpCode (line 40873)
-- new OpCode (line 40881)
-- new OpCode (line 40888)
-- new OpCode (line 40896)
-- new OpCode (line 40899)
-- new OpCode (line 40927)
-- new OpCode (line 40950)
-- new OpCode (line 40967)
-- new OpCode (line 40974)
-- new Operand\Literal (line 41653)
-- new OpCode (line 42439)
-- new Literal (line 42471)
-- new OpCode (line 42570)
-- new Variable (line 42577)
-- new Temporary (line 42579)
-- new OpCode (line 42582)
-- new CompileFatal (line 42895)
-- new CompileFatal (line 43150)
+- new OpCode (line 39294)
+- new Operand\Temporary (line 39752)
+- new OpCode (line 40276)
+- new Operand\Literal (line 40575)
+- new Variable (line 40577)
+- new OpCode (line 40623)
+- new OpCode (line 40838)
+- new OpCode (line 40848)
+- new OpCode (line 40851)
+- new Operand\Temporary (line 40889)
+- new OpCode (line 40891)
+- new OpCode (line 40902)
+- new Operand\Temporary (line 40905)
+- new OpCode (line 40907)
+- new OpCode (line 40915)
+- new OpCode (line 40922)
+- new OpCode (line 40930)
+- new OpCode (line 40933)
+- new OpCode (line 40961)
+- new OpCode (line 40984)
+- new OpCode (line 41001)
+- new OpCode (line 41008)
+- new Operand\Literal (line 41687)
+- new OpCode (line 42473)
+- new Literal (line 42505)
+- new OpCode (line 42604)
+- new Variable (line 42611)
+- new Temporary (line 42613)
+- new OpCode (line 42616)
+- new CompileFatal (line 42929)
+- new CompileFatal (line 43184)
 - 917 class method(s)
 - 45 closure(s)
 
@@ -21710,8 +21708,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Compiler/DeprecatedMetadata.php`
 
 **Warnings** (review for bootstrap subset):
-- new self (line 140)
-- 14 class method(s)
+- new self (line 82)
+- new self (line 206)
+- 19 class method(s)
 
 ### `lib/Compiler/EnumAbstractMethodCompileCheck.php`
 
@@ -24034,14 +24033,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StatPathRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 319)
-- 9 class method(s)
+- new JIT (line 317)
+- 10 class method(s)
 - 1 closure(s)
-
-### `lib/JIT/Builtin/StatPathRuntimeLibc.php`
-
-**Warnings** (review for bootstrap subset):
-- 2 class method(s)
 
 ### `lib/JIT/Builtin/Stats.php`
 
@@ -24448,12 +24442,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringFileGetContents.php`
 
 **Warnings** (review for bootstrap subset):
-- 4 class method(s)
-
-### `lib/JIT/Builtin/StringFileGetContentsLibc.php`
-
-**Warnings** (review for bootstrap subset):
-- 1 class method(s)
+- 3 class method(s)
 
 ### `lib/JIT/Builtin/StringFilePutContents.php`
 
@@ -26232,19 +26221,19 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Call\ReflectionEnumUnitCaseGetName (line 853)
 - new Call\ReflectionEnumUnitCaseGetName (line 854)
 - new Call\ExceptionGetMessage (line 855)
-- new Result (line 1147)
-- new Result (line 1168)
-- new Variable (line 1441)
-- new Variable (line 1761)
-- new Variable (line 1898)
-- new Variable (line 2096)
-- new VMVariable (line 2254)
-- new VMVariable (line 2270)
-- new VMVariable (line 2276)
-- new VMVariable (line 2282)
-- new VMVariable (line 2293)
-- new Variable (line 2323)
-- new Variable (line 2363)
+- new Result (line 1148)
+- new Result (line 1169)
+- new Variable (line 1442)
+- new Variable (line 1762)
+- new Variable (line 1899)
+- new Variable (line 2097)
+- new VMVariable (line 2255)
+- new VMVariable (line 2271)
+- new VMVariable (line 2277)
+- new VMVariable (line 2283)
+- new VMVariable (line 2294)
+- new Variable (line 2324)
+- new Variable (line 2364)
 - 98 class method(s)
 - 28 closure(s)
 
@@ -30698,36 +30687,36 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/ReflectionSupport.php`
 
 **Warnings** (review for bootstrap subset):
-- new ReflectionException (line 166)
-- new AttributeEntry (line 176)
-- new Variable (line 195)
-- new ObjectEntry (line 202)
-- new Variable (line 207)
-- new Variable (line 220)
-- new Variable (line 224)
-- new Variable (line 227)
-- new Variable (line 248)
-- new Variable (line 284)
-- new Variable (line 295)
-- new Error (line 321)
-- new Error (line 325)
-- new ObjectEntry (line 327)
-- new Variable (line 328)
-- new Variable (line 339)
-- new Error (line 357)
-- new Error (line 361)
-- new Variable (line 365)
-- new Error (line 371)
-- new Variable (line 453)
-- new AttributeEntry (line 1204)
-- new Variable (line 1508)
-- new ObjectEntry (line 1623)
-- new ObjectEntry (line 1715)
-- new ObjectEntry (line 1728)
-- new Variable (line 1808)
-- new ObjectEntry (line 1913)
-- new Variable (line 1990)
-- new Variable (line 2175)
+- new ReflectionException (line 167)
+- new AttributeEntry (line 177)
+- new Variable (line 196)
+- new ObjectEntry (line 203)
+- new Variable (line 208)
+- new Variable (line 221)
+- new Variable (line 225)
+- new Variable (line 228)
+- new Variable (line 249)
+- new Variable (line 285)
+- new Variable (line 296)
+- new Error (line 322)
+- new Error (line 326)
+- new ObjectEntry (line 328)
+- new Variable (line 329)
+- new Variable (line 340)
+- new Error (line 358)
+- new Error (line 362)
+- new Variable (line 366)
+- new Error (line 372)
+- new Variable (line 454)
+- new AttributeEntry (line 1205)
+- new Variable (line 1509)
+- new ObjectEntry (line 1624)
+- new ObjectEntry (line 1716)
+- new ObjectEntry (line 1729)
+- new Variable (line 1809)
+- new ObjectEntry (line 1914)
+- new Variable (line 1991)
+- new Variable (line 2176)
 - 122 class method(s)
 
 ### `lib/VM/ReflectionTypeSupport.php`
