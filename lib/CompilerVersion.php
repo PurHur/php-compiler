@@ -256,13 +256,14 @@ final class CompilerVersion
     }
 
     /**
-     * `final const` at compile-unit scope — never valid in php-src (Zend/zend_compile.c, #10324, #15185).
+     * PHP 8.4+ `final const` at compile-unit scope (Zend/zend_compile.c, #15165, #16859).
      *
-     * Class-scoped `final const` remains valid via Stmt\ClassConst; only file/namespace scope is rejected.
+     * Rejected on reference profile and PHP 8.3 forward profile (#10324, #15185). Class-scoped
+     * `final const` remains valid via Stmt\ClassConst at all versions.
      */
     public static function supportsFinalGlobalTypedConstants(): bool
     {
-        return false;
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
     }
 
     /**

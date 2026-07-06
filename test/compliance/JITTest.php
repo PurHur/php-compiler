@@ -751,7 +751,8 @@ class JITTest extends BaseTest {
             }
             if (!CompilerVersion::supportsGlobalTypedConstants()
                 && str_contains($name, 'global_typed_const')
-                && !str_contains($name, 'typed_top_level_const_82')) {
+                && !str_contains($name, 'typed_top_level_const_82')
+                && !str_contains($name, 'final_global_typed_constant_reject')) {
                 continue;
             }
             if (!CompilerVersion::supportsGlobalDeprecatedConstAttributes()
@@ -761,6 +762,15 @@ class JITTest extends BaseTest {
             }
             if (CompilerVersion::supportsGlobalDeprecatedConstAttributes()
                 && str_contains($name, 'global_deprecated_const_reference_profile')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsFinalGlobalTypedConstants()
+                && str_contains($name, 'final_global_typed_const')
+                && !str_contains($name, 'final_global_typed_constant_reject')) {
+                continue;
+            }
+            if (CompilerVersion::supportsFinalGlobalTypedConstants()
+                && str_contains($name, 'final_global_typed_constant_reject')) {
                 continue;
             }
             // 8.3-target reject gate; skipped when class const brace deref enabled (#16597).

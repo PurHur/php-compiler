@@ -66,6 +66,54 @@ PHP;
         self::assertSame(['int', false], GlobalTypedConstRewriter::parseMarkerPayload('int'));
     }
 
+    public function testRewritesFinalGlobalTypedConstOn84Profile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $src = <<<'PHP'
+<?php
+final const string APP_NAME = 'alpha';
+PHP;
+            $out = GlobalTypedConstRewriter::rewrite($src);
+            self::assertStringContainsString(
+                '/*phpc-global-typed-const:final:string*/ const APP_NAME',
+                preg_replace('/\s+/', ' ', $out)
+            );
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testRewritesFinalNamespaceTypedConstOn84Profile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $src = <<<'PHP'
+<?php
+namespace N {
+    final const string NS_NAME = 'beta';
+}
+PHP;
+            $out = GlobalTypedConstRewriter::rewrite($src);
+            self::assertStringContainsString(
+                '/*phpc-global-typed-const:final:string*/ const NS_NAME',
+                preg_replace('/\s+/', ' ', $out)
+            );
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     public function testRejectsFinalGlobalTypedConst(): void
     {
         $src = <<<'PHP'
