@@ -57,6 +57,8 @@ final class ThrowableManifest
 
     public const LC_DATE_MALFORMED_INTERVAL_EXCEPTION = 'datemalformedintervalexception';
 
+    public const LC_DATE_MALFORMED_STRING = 'datemalformedstring';
+
     public const LC_DATE_MALFORMED_PERIOD_EXCEPTION = 'datemalformedperiodexception';
 
     public const LC_DATE_ERROR = 'dateerror';
@@ -121,6 +123,7 @@ final class ThrowableManifest
         'RequestParseBodyException' => 'Exception',
         'DateException' => 'Exception',
         'DateInvalidTimeZoneException' => 'DateException',
+        'DateMalformedString' => 'DateException',
         'DateMalformedIntervalException' => 'DateException',
         'DateMalformedPeriodException' => 'DateException',
         'DateMalformedPeriodStringException' => 'DateException',
@@ -194,6 +197,7 @@ final class ThrowableManifest
         return match ($className) {
             'DateException',
             'DateInvalidTimeZoneException',
+            'DateMalformedString',
             'DateMalformedIntervalException',
             'DateMalformedPeriodException',
             'DateMalformedPeriodStringException',
