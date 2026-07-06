@@ -10,6 +10,7 @@ namespace PHPCompiler\JIT;
 
 use PHPCompiler\ext\standard\string_trim;
 use PHPCompiler\JIT\Builtin\CallUnpackRuntime;
+use PHPCompiler\JIT\Builtin\ErrorRaise;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -210,6 +211,16 @@ final class HashTableHelper
 
     public static function loadHashtablePointer(Context $context, Variable $array): Value
     {
+        if (Variable::TYPE_STRING === $array->type) {
+            ErrorRaise::registerDeclarations($context);
+            ErrorRaise::ensureLinked($context);
+            ErrorRaise::emitRaise(
+                $context,
+                \PHPCompiler\VM\TypeCheck::SCALAR_USED_AS_ARRAY_MESSAGE
+            );
+
+            return $context->getTypeFromString('__hashtable__*')->constNull();
+        }
         if (null !== $array->objectPropertySlot) {
             if (Variable::TYPE_HASHTABLE === ($array->objectPropertyType ?? null)) {
                 return $context->builder->pointerCast(
@@ -969,6 +980,18 @@ final class HashTableHelper
         $result->nextFreeElement = 0;
         if ($result->type & Variable::IS_NATIVE_ARRAY) {
             return;
+        }
+        if (Variable::TYPE_STRING === $result->type) {
+            // Inline include may bind array-literal temps to inherited string slots (#16866).
+            $slot = BasicBlockHelper::entryAlloca(
+                $context,
+                $context->getTypeFromString('__hashtable__*')
+            );
+            $result->free();
+            $result->type = Variable::TYPE_HASHTABLE;
+            $result->kind = Variable::KIND_VARIABLE;
+            $result->value = $slot;
+            $result->initialize();
         }
         $ht = self::alloc($context);
         if (Variable::TYPE_VALUE === $result->type) {

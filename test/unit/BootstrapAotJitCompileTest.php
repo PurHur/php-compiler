@@ -298,6 +298,25 @@ PHP;
         $this->assertStringNotContainsString('Cannot assign to a value', $stderr);
     }
 
+    /** TimezoneAbbreviationsData nested array literal via require — compile (#16866). */
+    public function testTimezoneAbbreviationsDataRequireCompiles(): void
+    {
+        $this->skipUnlessLlvmReady();
+        $repoRoot = dirname(__DIR__, 2);
+        $dataPath = $repoRoot.'/ext/standard/TimezoneAbbreviationsData.php';
+        $source = '<?php
+declare(strict_types=1);
+$tz = require '.var_export($dataPath, true).';
+echo count($tz), "\n";
+';
+        $stderr = $this->compileSourceAllowFailure($source, 'timezone abbreviations require');
+        $this->assertStringNotContainsString(
+            'Array offset access requires hashtable or boxed array',
+            $stderr
+        );
+        $this->assertStringNotContainsString('loadHashtablePointer on native string', $stderr);
+    }
+
     /** Self-host AOT: `new Runtime()` must not segfault LLVM 9 (#2600). */
     public function testSelfHostAotNewRuntimeCompiles(): void
     {
