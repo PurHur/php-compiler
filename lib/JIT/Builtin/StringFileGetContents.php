@@ -29,6 +29,16 @@ final class StringFileGetContents
         self::READ_HELPER,
     ];
 
+    public static function ensureLinked(Context $context): void
+    {
+        self::implement($context);
+    }
+
+    public static function ensureStandaloneBodies(Context $context): void
+    {
+        self::implement($context);
+    }
+
     public static function implement(Context $context): void
     {
         $probe = $context->module->getNamedFunction(self::ABI);
@@ -36,6 +46,18 @@ final class StringFileGetContents
             $context->registerFunction(self::ABI, $probe);
 
             return;
+        }
+
+        if (self::shouldUseLibcBridge($context)) {
+            StringFileGetContentsLibc::implement($context);
+
+            return;
+        }
+
+        $savedBlock = null;
+        try {
+            $savedBlock = $context->builder->getInsertBlock();
+        } catch (\Throwable) {
         }
 
         JitVmHelperLink::ensureCompiled($context, self::HELPER_PATH, self::COMPILED_HELPERS, '#15309');
@@ -73,6 +95,27 @@ final class StringFileGetContents
         $context->builder->returnValue($strPtr->constNull());
 
         $context->registerFunction(self::ABI, $fn);
-        $context->builder->clearInsertionPosition();
+        if (null !== $savedBlock) {
+            $context->builder->positionAtEnd($savedBlock);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
+    }
+
+    private static function shouldUseLibcBridge(Context $context): bool
+    {
+        if (\PHPCompiler\JIT\Builtin::LOAD_TYPE_STANDALONE !== $context->loadType) {
+            return false;
+        }
+        $userScript = getenv('PHP_COMPILER_AOT_USER_SCRIPT');
+        if ('1' === $userScript || 'true' === strtolower((string) $userScript)) {
+            return true;
+        }
+        $bootstrapLink = getenv('PHP_COMPILER_BOOTSTRAP_AOT_LINK');
+        if ('1' === $bootstrapLink || 'true' === strtolower((string) $bootstrapLink)) {
+            return true;
+        }
+
+        return false;
     }
 }
