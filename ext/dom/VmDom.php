@@ -480,6 +480,11 @@ final class VmDom
             $element->methodVisibility['insertadjacenthtml'] = $pub;
             $element->methodNames['insertadjacenthtml'] = 'insertAdjacentHTML';
         }
+        if (CompilerVersion::supportsDomElementToggleAttribute()) {
+            $element->methods['toggleattribute'] = new ElementToggleAttribute();
+            $element->methodVisibility['toggleattribute'] = $pub;
+            $element->methodNames['toggleattribute'] = 'toggleAttribute';
+        }
         $ctx->classes[self::CLASS_ELEMENT] = $element;
 
         $fragment = new ClassEntry('DOMDocumentFragment');
@@ -1053,6 +1058,39 @@ final class VmDom
             $state->idAttributeName = null;
         }
         self::syncElementAttributes($ctx, $element);
+
+        return true;
+    }
+
+    /**
+     * DOMElement::toggleAttribute() — boolean attribute toggle (php-src ext/dom/element.c; #16824).
+     */
+    public static function toggleAttribute(
+        Context $ctx,
+        ObjectEntry $element,
+        string $qualifiedName,
+        ?bool $force
+    ): bool {
+        if (!self::isElement($element)) {
+            throw new \DOMException('Not an element node');
+        }
+        self::assertValidXmlName($qualifiedName);
+        $qualifiedName = self::normalizeToggleAttributeQName($element, $qualifiedName);
+        $has = self::hasAttributeByQName($element, $qualifiedName);
+        if (!$has) {
+            if (null === $force || $force) {
+                self::setAttributeNS($ctx, $element, null, $qualifiedName, '');
+
+                return true;
+            }
+
+            return false;
+        }
+        if (null === $force || !$force) {
+            self::removeAttributeByQName($ctx, $element, $qualifiedName);
+
+            return false;
+        }
 
         return true;
     }
@@ -4894,6 +4932,62 @@ final class VmDom
         if ('' === $name || !preg_match('/^[A-Za-z_][\w.-]*$/', $name)) {
             throw new \DOMException('Invalid Character Error');
         }
+    }
+
+    /** @throws \DOMException when $name is not a valid XML Name (php-src xmlValidateName). */
+    private static function assertValidXmlName(string $name): void
+    {
+        if ('' === $name || !preg_match('/^[A-Za-z_:][\w.:-]*$/', $name)) {
+            throw new \DOMException('Invalid Character Error', DomExceptionConstants::INVALID_CHARACTER_ERR);
+        }
+    }
+
+    private static function normalizeToggleAttributeQName(ObjectEntry $element, string $qualifiedName): string
+    {
+        $document = self::ownerDocumentEntry($element);
+        if (null === $document) {
+            return $qualifiedName;
+        }
+        $docState = DomRegistry::state($document);
+        if (!$docState->isHtmlDocument) {
+            return $qualifiedName;
+        }
+
+        return strtolower($qualifiedName);
+    }
+
+    private static function hasAttributeByQName(ObjectEntry $element, string $qualifiedName): bool
+    {
+        if (self::isXmlnsAttributeName($qualifiedName)) {
+            return false;
+        }
+        $state = DomRegistry::state($element);
+
+        return \array_key_exists($qualifiedName, $state->attributes);
+    }
+
+    private static function removeAttributeByQName(Context $ctx, ObjectEntry $element, string $qualifiedName): void
+    {
+        $state = DomRegistry::state($element);
+        if (!\array_key_exists($qualifiedName, $state->attributes)) {
+            return;
+        }
+        if (isset($state->attributeNodeIds[$qualifiedName])) {
+            $cached = DomRegistry::entry($state->attributeNodeIds[$qualifiedName]);
+            if (null !== $cached && self::isAttr($cached)) {
+                self::detachAttributeNode($cached);
+            }
+            unset($state->attributeNodeIds[$qualifiedName]);
+        }
+        unset($state->attributes[$qualifiedName], $state->attributeNamespaces[$qualifiedName]);
+        if (null !== $state->idAttributeName && $qualifiedName === $state->idAttributeName) {
+            $document = self::ownerDocumentEntry($element);
+            if (null !== $document) {
+                self::unregisterElementId($document, $element);
+            }
+            $state->idAttributeName = null;
+        }
+        self::syncElementAttributes($ctx, $element);
     }
 
     public static function registerNodeClass(

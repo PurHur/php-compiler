@@ -167,6 +167,7 @@ require_once __DIR__.'/../../../ext/dom/ElementGetElementsByTagNameNS.php';
 require_once __DIR__.'/../../../ext/dom/ElementHasAttribute.php';
 require_once __DIR__.'/../../../ext/dom/ElementHasAttributeNS.php';
 require_once __DIR__.'/../../../ext/dom/ElementInsertAdjacentHTML.php';
+require_once __DIR__.'/../../../ext/dom/ElementToggleAttribute.php';
 require_once __DIR__.'/../../../ext/dom/ElementRemoveAttribute.php';
 require_once __DIR__.'/../../../ext/dom/ElementRemoveAttributeNS.php';
 require_once __DIR__.'/../../../ext/dom/ElementRemoveAttributeNode.php';
