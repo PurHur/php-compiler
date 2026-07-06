@@ -24,7 +24,7 @@ final class putenv_ extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('putenv() requires exactly one argument');
         }
-        $assignment = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'putenv', 0, 'assignment');
+        $assignment = VmString::stringBuiltinArgForFrame($frame, 0, 'putenv', 0, 'assignment');
         $ok = VmEnv::putenv($assignment);
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool($ok);
