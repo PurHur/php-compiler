@@ -25630,7 +25630,14 @@ class Compiler {
                 $block->orig->children
             );
         }
-        if (null === $execReturnSlot && null !== $block->orig) {
+        if (
+            null === $execReturnSlot
+            && null !== $block->orig
+            && (
+                $producer instanceof Op\Expr\FuncCall
+                || $producer instanceof Op\Expr\NsFuncCall
+            )
+        ) {
             $execReturnSlot = $this->slotForSiblingInlineCallProducerExecReturnByExpr(
                 $block,
                 $producer,
@@ -25638,13 +25645,32 @@ class Compiler {
                 $block->orig->children
             );
         }
+        // var_export($o->m(), true) — MethodCall EXEC_RETURN ordinal drifts past ctor NEW (#10778, #16794).
+        if (
+            $producer instanceof Op\Expr\MethodCall
+            || $producer instanceof Op\Expr\StaticCall
+        ) {
+            if (null === $block->slotForOperand($producer->result)) {
+                $prevForce = $this->forceDeferredSiblingCallReturnSlot;
+                $this->forceDeferredSiblingCallReturnSlot = true;
+                try {
+                    foreach ($this->compileExpr($producer, $block) as $op) {
+                        $emitOps[] = $op;
+                    }
+                } finally {
+                    $this->forceDeferredSiblingCallReturnSlot = $prevForce;
+                }
+            }
+            $operandSlot = $block->slotForOperand($producer->result);
+            if (null !== $operandSlot) {
+                return (int) $operandSlot;
+            }
+        }
         if (
             null === $execReturnSlot
             && (
                 $producer instanceof Op\Expr\FuncCall
                 || $producer instanceof Op\Expr\NsFuncCall
-                || $producer instanceof Op\Expr\MethodCall
-                || $producer instanceof Op\Expr\StaticCall
             )
         ) {
             $prevForce = $this->forceDeferredSiblingCallReturnSlot;
