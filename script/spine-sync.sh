@@ -37,6 +37,7 @@ echo "==> spine-sync 1/6: discover missing inventory files"
 MISSING_LIST=/tmp/spine-sync-missing.txt
 "$PHP_BIN" -r '
 require "script/bootstrap-lib.php";
+require "script/bootstrap-spine-deferred-lib.php";
 $root = getcwd();
 $report = bootstrapCollectInventoryReport($root);
 $inv = array_keys($report["files"] ?? []);
@@ -45,6 +46,11 @@ foreach (file($root."/'"$SPINE"'", FILE_IGNORE_NEW_LINES) as $line) {
     if (preg_match("#require_once __DIR__\\.\x27/\\.\\./\\.\\./\\.\\./([^\x27]+)\x27;#", $line, $m)) {
         $paths[$m[1]] = true;
     }
+}
+// Deferred paths (SSOT bootstrap-spine-deferred-lib.php) are covered by the
+// deferred footnote, not a bundle require — do not re-add them.
+foreach (bootstrap_spine_native_link_deferred() as $rel) {
+    $paths[$rel] = true;
 }
 foreach ($inv as $rel) {
     if (!isset($paths[$rel])) {
