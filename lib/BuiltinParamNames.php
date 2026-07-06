@@ -343,6 +343,8 @@ final class BuiltinParamNames
                 return ['string', 'characters', 'mode'];
             case 'mb_strlen':
                 return ['string', 'encoding'];
+            case 'mb_convert_encoding':
+                return ['string', 'to_encoding', 'from_encoding'];
             case 'mb_trim':
             case 'mb_ltrim':
             case 'mb_rtrim':
