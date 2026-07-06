@@ -14,9 +14,11 @@ final class FileGetContentsRuntimeShrinkTest extends TestCase
     {
         $bridge = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringFileGetContents.php');
         $this->assertStringContainsString('FileGetContentsJitHelper', $bridge);
+        $this->assertStringNotContainsString('StringFileGetContentsLibc', $bridge);
         $this->assertStringNotContainsString("lookupFunction('open')", $bridge);
         $this->assertStringNotContainsString("lookupFunction('read')", $bridge);
         $this->assertStringNotContainsString("lookupFunction('close')", $bridge);
+        $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StringFileGetContentsLibc.php');
     }
 
     public function testFileGetContentsJitHelperDelegatesToVmFs(): void
@@ -52,6 +54,10 @@ final class FileGetContentsRuntimeShrinkTest extends TestCase
         $this->assertNotFalse($fullPos);
         $this->assertNotFalse($minimalPos);
         $fullBody = substr($context, $fullPos, $minimalPos - $fullPos);
+        $this->assertStringContainsString(
+            'Builtin\\StatPathRuntime::ensureStandaloneBodies($this);',
+            $fullBody
+        );
         $this->assertStringContainsString($needle, $fullBody);
     }
 }

@@ -48,12 +48,6 @@ final class StringFileGetContents
             return;
         }
 
-        if (self::shouldUseLibcBridge($context)) {
-            StringFileGetContentsLibc::implement($context);
-
-            return;
-        }
-
         $savedBlock = null;
         try {
             $savedBlock = $context->builder->getInsertBlock();
@@ -102,20 +96,4 @@ final class StringFileGetContents
         }
     }
 
-    private static function shouldUseLibcBridge(Context $context): bool
-    {
-        if (\PHPCompiler\JIT\Builtin::LOAD_TYPE_STANDALONE !== $context->loadType) {
-            return false;
-        }
-        $userScript = getenv('PHP_COMPILER_AOT_USER_SCRIPT');
-        if ('1' === $userScript || 'true' === strtolower((string) $userScript)) {
-            return true;
-        }
-        $bootstrapLink = getenv('PHP_COMPILER_BOOTSTRAP_AOT_LINK');
-        if ('1' === $bootstrapLink || 'true' === strtolower((string) $bootstrapLink)) {
-            return true;
-        }
-
-        return false;
-    }
 }
