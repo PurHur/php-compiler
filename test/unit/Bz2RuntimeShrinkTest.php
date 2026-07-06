@@ -36,6 +36,22 @@ final class Bz2RuntimeShrinkTest extends TestCase
         $this->assertFalse(\PHPCompiler\ext\bz2\Bz2ExtensionPolicy::advertisesExtension());
     }
 
+    public function testSupportsBz2TrueOnForwardProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertTrue(CompilerVersion::supportsBz2());
+            $this->assertTrue(\PHPCompiler\ext\bz2\Bz2ExtensionPolicy::advertisesExtension());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     public function testBz2JitHelperDelegatesToVmBz2Native(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/bz2/Bz2JitHelper.php');
