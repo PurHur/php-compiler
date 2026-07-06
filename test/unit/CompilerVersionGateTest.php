@@ -1557,6 +1557,44 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
+    public function testSupportsDomElementInsertAdjacentElementOnForwardProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertTrue(CompilerVersion::supportsDomElementInsertAdjacentElement());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testSupportsDomElementInsertAdjacentElementFalseOnReferenceProfile(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsDomElementInsertAdjacentElement());
+    }
+
+    public function testVmRegistersDomElementInsertAdjacentElementOnForwardProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $runtime = new Runtime();
+            $element = $runtime->vmContext->classes['domelement'] ?? null;
+            $this->assertNotNull($element);
+            $this->assertTrue(isset($element->methods['insertadjacentelement']));
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     public function testSupportsDomElementToggleAttributeOnForwardProfile(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');

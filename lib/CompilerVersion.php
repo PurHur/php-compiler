@@ -1553,6 +1553,14 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.4+ DOMElement::insertAdjacentElement() (ext/dom/php_dom.c, #16865).
+     */
+    public static function supportsDomElementInsertAdjacentElement(): bool
+    {
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+    }
+
+    /**
      * PHP 8.3+ DOMElement::toggleAttribute() (ext/dom/element.c, #16824).
      *
      * Withheld on 8.4.0-dev reference profile (matches Zend 8.2 method_exists gate). Enable via
