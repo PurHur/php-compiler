@@ -22,6 +22,9 @@ php_cfg_enum_implements_parser_applied() {
 patch_already_applied() {
   local patch="$1"
   case "$(basename "$patch")" in
+    php-llvm-structgep-assert.patch)
+      grep -q 'PHP_COMPILER_LLVM_ASSERT' "$ROOT/vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Builder.php" 2>/dev/null
+      ;;
     php-llvm-chooser.patch)
       grep -q 'PHP_COMPILER_LLVM_PATH' "$ROOT/vendor/ircmaxell/php-llvm/lib/Chooser.php" 2>/dev/null
       ;;
@@ -6025,6 +6028,7 @@ apply_patch "$PATCH_DIR/php-llvm-value-addincoming.patch"
 apply_patch "$PATCH_DIR/php-llvm-llvmabstract-value-addincoming.patch"
 apply_patch "$PATCH_DIR/php-llvm-builder-and-or.patch"
 apply_patch "$PATCH_DIR/php-llvm-builder-xor.patch"
+apply_patch "$PATCH_DIR/php-llvm-structgep-assert.patch"
 apply_patch "$PATCH_DIR/php-llvm-pass-registry-interface.patch"
 apply_patch "$PATCH_DIR/php-llvm-pass-manager-builder-semicolon.patch"
 apply_patch "$PATCH_DIR/php-llvm-pass-manager-builder-typed-prop.patch"

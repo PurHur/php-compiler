@@ -1,0 +1,30 @@
+--- vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Builder.php
++++ vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Builder.php
+@@ -307,6 +303,27 @@
+     }
+ 
+     public function structGep(CoreValue $struct, int $index): CoreValue {
++        if ('1' === \getenv('PHP_COMPILER_LLVM_ASSERT')) {
++            // LLVM 9 release builds do not bounds-check StructGEP: a non-struct
++            // receiver or out-of-range field index reads a garbage Type* and
++            // segfaults later in PointerType::get (fixed-offset crash, #16565).
++            $lib = $this->llvm->lib;
++            $ty = $lib->LLVMTypeOf($struct->value);
++            $tyKind = $lib->LLVMGetTypeKind($ty);
++            if (\llvm\llvm::LLVMPointerTypeKind !== $tyKind) {
++                throw new \RuntimeException('structGep: receiver is not a pointer (kind='.$tyKind.')');
++            }
++            $elem = $lib->LLVMGetElementType($ty);
++            if (\llvm\llvm::LLVMStructTypeKind !== $lib->LLVMGetTypeKind($elem)) {
++                throw new \RuntimeException('structGep: receiver does not point to a struct');
++            }
++            $count = $lib->LLVMCountStructElementTypes($elem);
++            if ($index < 0 || $index >= $count) {
++                $name = $lib->LLVMGetStructName($elem);
++                throw new \RuntimeException('structGep: index '.$index.' out of range for struct '
++                    .(\is_object($name) ? $name->toString() : (string) $name).' with '.$count.' fields');
++            }
++        }
+         return $this->llvm->factory->value($this->context, $this->llvm->lib->LLVMBuildStructGEP($this->builder, $struct->value, $index, ''));
+     }
+ 
