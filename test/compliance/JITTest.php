@@ -694,6 +694,15 @@ class JITTest extends BaseTest {
                 && str_contains($name, 'insert_adjacent_html_phantom')) {
                 continue;
             }
+            if (!CompilerVersion::supportsDomElementInsertAdjacentElement()
+                && str_contains($name, 'dom_element_insert_adjacent_element')
+                && !str_contains($name, 'insert_adjacent_element_phantom')) {
+                continue;
+            }
+            if (CompilerVersion::supportsDomElementInsertAdjacentElement()
+                && str_contains($name, 'insert_adjacent_element_phantom')) {
+                continue;
+            }
             if (!CompilerVersion::supportsDomElementToggleAttribute()
                 && str_contains($name, 'dom_element_toggle_attribute')
                 && !str_contains($name, 'toggle_attribute_phantom')) {

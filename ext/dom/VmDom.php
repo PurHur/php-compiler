@@ -518,6 +518,11 @@ final class VmDom
             $element->methodVisibility['insertadjacenthtml'] = $pub;
             $element->methodNames['insertadjacenthtml'] = 'insertAdjacentHTML';
         }
+        if (CompilerVersion::supportsDomElementInsertAdjacentElement()) {
+            $element->methods['insertadjacentelement'] = new ElementInsertAdjacentElement();
+            $element->methodVisibility['insertadjacentelement'] = $pub;
+            $element->methodNames['insertadjacentelement'] = 'insertAdjacentElement';
+        }
         if (CompilerVersion::supportsDomElementToggleAttribute()) {
             $element->methods['toggleattribute'] = new ElementToggleAttribute();
             $element->methodVisibility['toggleattribute'] = $pub;
@@ -2574,6 +2579,81 @@ final class VmDom
             'beforeend' => self::insertAdjacentHtmlBeforeEnd($ctx, $element, $fragment),
             'afterend' => self::insertAdjacentHtmlAfterEnd($ctx, $element, $fragment),
         };
+    }
+
+    /**
+     * DOMElement::insertAdjacentElement() — insert element by position (php-src ext/dom/php_dom.c; #16865).
+     */
+    public static function insertAdjacentElement(
+        Context $ctx,
+        ObjectEntry $element,
+        string $position,
+        ?ObjectEntry $nodeElement
+    ): ?ObjectEntry {
+        if (null === $nodeElement) {
+            return null;
+        }
+        if (!self::isElement($element)) {
+            throw new \LogicException('insertAdjacentElement() expects a DOMElement in this compiler build');
+        }
+        if (!self::isElement($nodeElement)) {
+            throw new \TypeError(
+                'DOMElement::insertAdjacentElement(): Argument #2 ($element) must be of type ?DOMElement, '
+                .$nodeElement->class->name.' given'
+            );
+        }
+        $pos = strtolower($position);
+        if (!\in_array($pos, ['beforebegin', 'afterbegin', 'beforeend', 'afterend'], true)) {
+            throw new \ValueError(
+                'DOMElement::insertAdjacentElement(): Argument #1 ($where) must be a valid adjacency insertion position'
+            );
+        }
+        match ($pos) {
+            'beforebegin' => self::insertAdjacentElementBeforeBegin($ctx, $element, $nodeElement),
+            'afterbegin' => self::insertAdjacentElementAfterBegin($ctx, $element, $nodeElement),
+            'beforeend' => self::insertAdjacentElementBeforeEnd($ctx, $element, $nodeElement),
+            'afterend' => self::insertAdjacentElementAfterEnd($ctx, $element, $nodeElement),
+        };
+
+        return $nodeElement;
+    }
+
+    private static function insertAdjacentElementBeforeBegin(
+        Context $ctx,
+        ObjectEntry $element,
+        ObjectEntry $nodeElement
+    ): void {
+        $parent = self::parentEntryForSiblingMutation($element);
+        self::insertBeforeSibling($ctx, $parent, $nodeElement, $element);
+        self::syncSubtree($ctx, $parent);
+    }
+
+    private static function insertAdjacentElementAfterBegin(
+        Context $ctx,
+        ObjectEntry $element,
+        ObjectEntry $nodeElement
+    ): void {
+        self::prependLiveStandardChild($ctx, $element, $nodeElement);
+        self::syncSubtree($ctx, $element);
+    }
+
+    private static function insertAdjacentElementBeforeEnd(
+        Context $ctx,
+        ObjectEntry $element,
+        ObjectEntry $nodeElement
+    ): void {
+        self::appendLiveStandardChild($ctx, $element, $nodeElement);
+        self::syncSubtree($ctx, $element);
+    }
+
+    private static function insertAdjacentElementAfterEnd(
+        Context $ctx,
+        ObjectEntry $element,
+        ObjectEntry $nodeElement
+    ): void {
+        $parent = self::parentEntryForSiblingMutation($element);
+        self::insertAfterSibling($ctx, $parent, $nodeElement, $element);
+        self::syncSubtree($ctx, $parent);
     }
 
     private static function insertAdjacentHtmlBeforeBegin(
