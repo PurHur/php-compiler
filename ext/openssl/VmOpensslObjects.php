@@ -39,6 +39,29 @@ final class VmOpensslObjects
         self::registerInternalClass($ctx, self::CSR_LC, 'OpenSSLCertificateSigningRequest');
     }
 
+    /**
+     * Withhold openssl object classes from class_exists() until extension_loaded('openssl') (#11859, #16765).
+     */
+    public static function isHiddenClassEntry(ClassEntry $entry): bool
+    {
+        if (OpensslExtensionPolicy::advertisesExtension()) {
+            return false;
+        }
+        $lc = strtolower(ltrim($entry->name, '\\'));
+
+        return \in_array($lc, [self::CERT_LC, self::KEY_LC, self::CSR_LC], true);
+    }
+
+    public static function isHiddenClassLc(string $classLc): bool
+    {
+        if (OpensslExtensionPolicy::advertisesExtension()) {
+            return false;
+        }
+        $lc = strtolower(ltrim($classLc, '\\'));
+
+        return \in_array($lc, [self::CERT_LC, self::KEY_LC, self::CSR_LC], true);
+    }
+
     public static function readCertificate(Context $ctx, Variable $arg): Variable
     {
         $arg = $arg->resolveIndirect();
