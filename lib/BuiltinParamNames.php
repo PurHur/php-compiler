@@ -234,6 +234,9 @@ final class BuiltinParamNames
                     : ['string'];
             case 'unpack':
                 return ['format', 'string', 'offset'];
+            case 'openssl_cipher_iv_length':
+            case 'openssl_cipher_key_length':
+                return ['cipher_algo'];
             case 'hash':
                 return ['algo', 'data', 'binary'];
             case 'hash_hmac':
