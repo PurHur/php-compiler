@@ -394,7 +394,7 @@ final class ErrorReporter
             || [] !== $this->handlerStack) {
             if ($this->dispatchUserHandler($context, $frame, $level, $message, $file, $line)) {
                 if (self::E_USER_ERROR === $level) {
-                    throw new \LogicException("Fatal error: {$message}");
+                    $this->abortUserFatal($level, $message, $file, $line);
                 }
 
                 return;
@@ -403,7 +403,7 @@ final class ErrorReporter
         $this->recordLastError($level, $message, $file, $line);
         if (!$this->shouldWriteCliStderr($level)) {
             if (self::E_USER_ERROR === $level) {
-                throw new \LogicException(rtrim($this->formatCliError($level, $message, $file, $line)));
+                $this->abortUserFatal($level, $message, $file, $line);
             }
 
             return;
@@ -411,8 +411,21 @@ final class ErrorReporter
         $formatted = $this->formatCliError($level, $message, $file, $line);
         $this->writeCliStderr($level, $message, $file, $line);
         if (self::E_USER_ERROR === $level) {
-            throw new \LogicException(rtrim($formatted));
+            $this->abortUserFatal($level, $message, $file, $line);
         }
+    }
+
+    /**
+     * Zend E_USER_ERROR — non-recoverable user fatal; must not surface as catchable LogicException (#16747).
+     *
+     * @return never
+     */
+    private function abortUserFatal(int $level, string $message, ?string $file, int $line): void
+    {
+        if (!$this->shouldWriteCliStderr($level)) {
+            self::writeCliStderrLine($level, $message, $file, $line);
+        }
+        throw new ScriptExit(255);
     }
 
     /**
