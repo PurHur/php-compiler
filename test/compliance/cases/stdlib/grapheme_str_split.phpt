@@ -23,7 +23,7 @@ try {
     echo $e->getMessage(), "\n";
 }
 --EXPECT--
-1
+0
 array (
   0 => 'é',
 )
