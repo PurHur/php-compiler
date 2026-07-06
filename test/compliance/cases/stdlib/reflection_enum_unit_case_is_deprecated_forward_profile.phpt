@@ -19,6 +19,6 @@ $rBacked = new ReflectionEnumBackedCase(E::class, 'A');
 var_export($rBacked->isDeprecated());
 echo "\n";
 --EXPECT--
+true
 false
-false
-false
+true
