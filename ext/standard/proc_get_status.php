@@ -33,7 +33,7 @@ final class proc_get_status extends Internal
             return;
         }
         $procVar = $frame->calledArgs[0]->resolveIndirect();
-        $handle = proc_close::requireProcessHandle($procVar, 'proc_get_status');
+        $handle = proc_close::requireProcessHandleForGetStatus($procVar, 'proc_get_status');
         $status = VmProcess::procGetStatus($handle);
         if (false === $status) {
             $frame->returnVar->bool(false);

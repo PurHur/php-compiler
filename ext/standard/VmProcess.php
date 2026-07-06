@@ -52,6 +52,15 @@ final class VmProcess
         return isset(self::$legacyHostHandles[$handle]);
     }
 
+    public static function hasProcessHandle(int $handle): bool
+    {
+        if (VmProcessProcOpenNative::hasHandle($handle)) {
+            return true;
+        }
+
+        return isset(self::$legacyHostHandles[$handle]);
+    }
+
     /** @return resource|null */
     public static function lookupProcess(int $handle): mixed
     {
@@ -111,7 +120,7 @@ final class VmProcess
      */
     public static function procGetStatus(int $handle): array|false
     {
-        if (VmProcessProcOpenNative::isValidHandle($handle)) {
+        if (VmProcessProcOpenNative::hasHandle($handle)) {
             return VmProcessProcOpenNative::getStatus($handle);
         }
 

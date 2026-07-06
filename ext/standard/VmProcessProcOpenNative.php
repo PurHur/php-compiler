@@ -50,6 +50,11 @@ final class VmProcessProcOpenNative
         return isset(self::$slots[$handle]) && self::$slots[$handle]['active'];
     }
 
+    public static function hasHandle(int $handle): bool
+    {
+        return isset(self::$slots[$handle]);
+    }
+
     /**
      * @param list<string> $argv
      * @param array<int, array{0: string, 1?: string}> $descriptorSpec
@@ -333,24 +338,27 @@ final class VmProcessProcOpenNative
         $slot['active'] = false;
         self::closeRemainingPipeHandles($slot);
         self::resumeChildIfPaused($ffi, $slot);
-        self::$slots[$handle] = $slot;
 
         if ($slot['statusKnown']) {
-            // php-src: proc_get_status() may reap via WNOHANG; blocking waitpid in proc_close then fails (#15661).
-            self::releaseSlot($handle);
+            // php-src: proc_get_status() after proc_close() still returns running=false (#16863).
+            self::$slots[$handle] = $slot;
 
-            return -1;
+            return self::exitCodeFromStatus($slot['status']);
         }
 
         try {
             $status = $ffi->new('int');
             $waitRc = (int) $ffi->waitpid($slot['pid'], \FFI::addr($status), 0);
-            self::releaseSlot($handle);
             if (-1 === $waitRc) {
+                self::releaseSlot($handle);
+
                 return -1;
             }
+            $slot['statusKnown'] = true;
+            $slot['status'] = (int) $status->cdata;
+            self::$slots[$handle] = $slot;
 
-            return self::exitCodeFromStatus((int) $status->cdata);
+            return self::exitCodeFromStatus($slot['status']);
         } catch (\Throwable) {
             self::releaseSlot($handle);
 
@@ -364,8 +372,11 @@ final class VmProcessProcOpenNative
     public static function getStatus(int $handle): array|false
     {
         $slot = self::$slots[$handle] ?? null;
-        if (null === $slot || !$slot['active']) {
+        if (null === $slot) {
             return false;
+        }
+        if (!$slot['active']) {
+            return self::statusFromClosedSlot($slot);
         }
 
         $ffi = self::ffi();
@@ -411,6 +422,50 @@ final class VmProcessProcOpenNative
             $signaled,
             $stopped,
             $running ? -1 : ($exited ? (($statusVal >> 8) & 0xff) : -1),
+            $signals['termsig'],
+            $signals['stopsig'],
+            $pendingSignals,
+        );
+    }
+
+    /**
+     * @param array{pid: int, command: string, statusKnown: bool, status: int, active: bool, pipeHandles?: list<int>, childPaused?: bool, pendingSignals?: list<int>} $slot
+     *
+     * @return array<string, mixed>|false
+     */
+    public static function statusFromClosedSlotForEmbed(array $slot): array|false
+    {
+        return self::statusFromClosedSlot($slot);
+    }
+
+    /**
+     * php-src: proc_get_status() on proc_close()d handle — cached exit snapshot, running=false (#16863).
+     *
+     * @param array{pid: int, command: string, statusKnown: bool, status: int, active: bool, pipeHandles?: list<int>, childPaused?: bool, pendingSignals?: list<int>} $slot
+     *
+     * @return array<string, mixed>|false
+     */
+    private static function statusFromClosedSlot(array $slot): array|false
+    {
+        if (!$slot['statusKnown']) {
+            return false;
+        }
+
+        $statusVal = $slot['status'];
+        $lowByte = $statusVal & 0xff;
+        $exited = 0 === $lowByte;
+        $stopped = 0x7f === $lowByte;
+        $signaled = $lowByte > 0 && !$stopped;
+        $signals = self::termsigStopsigFromWaitStatus($statusVal);
+        $pendingSignals = self::resolvePendingSignals($slot, $signaled, $stopped, $signals['termsig']);
+
+        return self::buildProcStatusArray(
+            $slot['command'],
+            $slot['pid'],
+            false,
+            $signaled,
+            $stopped,
+            $exited ? (($statusVal >> 8) & 0xff) : -1,
             $signals['termsig'],
             $signals['stopsig'],
             $pendingSignals,
