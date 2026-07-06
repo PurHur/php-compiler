@@ -630,6 +630,17 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.4+ get_defined_functions() $exclude_disabled omits deprecated internals (#4942, #16969).
+     *
+     * Zend 8.2 reference profile accepts the parameter but does not strip deprecated builtins
+     * such as utf8_encode — only forward 8.4+ matches php-src deprecated filtering.
+     */
+    public static function supportsGetDefinedFunctionsExcludeDeprecatedInternals(): bool
+    {
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+    }
+
+    /**
      * PHP 8.4+ exit()/die() as proper functions — FCC, named args, two-arg (#6975, #12413, #12414, #12435, #13650, #13885, #13973).
      *
      * Gated on stable 8.4.0 so 8.4.0-dev reference profile rejects named/two-arg/FCC forms like Zend 8.2.
