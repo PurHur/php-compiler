@@ -20772,10 +20772,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Ast/GlobalTypedConstRewriter.php`
 
 **Warnings** (review for bootstrap subset):
-- new ParserError (line 375)
-- new ParserError (line 386)
-- new ParserError (line 396)
-- 16 class method(s)
+- new ParserError (line 398)
+- new ParserError (line 409)
+- new ParserError (line 419)
+- 17 class method(s)
 
 ### `lib/Ast/GroupUseStripper.php`
 
