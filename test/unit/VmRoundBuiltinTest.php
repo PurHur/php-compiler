@@ -16,6 +16,9 @@ final class VmRoundBuiltinTest extends TestCase
     public function testMathRoundHalfUpAndPrecision(): void
     {
         $this->assertSame(3.0, VmRound::mathRound(2.5, 0, StdlibConstants::PHP_ROUND_HALF_UP));
+        $this->assertSame(-1.0, VmRound::mathRound(-0.5, 0, StdlibConstants::PHP_ROUND_HALF_UP));
+        $this->assertSame(-2.0, VmRound::mathRound(-1.5, 0, StdlibConstants::PHP_ROUND_HALF_UP));
+        $this->assertSame(1.0, VmRound::mathRound(0.5, 0, StdlibConstants::PHP_ROUND_HALF_UP));
         $this->assertSame(1.5, VmRound::mathRound(1.5, 2, StdlibConstants::PHP_ROUND_HALF_UP));
         $this->assertSame(2.0, VmRound::mathRound(2.5, 0, StdlibConstants::PHP_ROUND_HALF_DOWN));
         $this->assertSame(2.0, VmRound::mathRound(2.5, 0, StdlibConstants::PHP_ROUND_HALF_EVEN));
