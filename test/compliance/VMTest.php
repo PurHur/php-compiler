@@ -699,7 +699,8 @@ class VMTest extends BaseTest {
                     || str_contains($name, 'promoted_private_set'))
                 && !str_contains($name, 'private_set_reference_profile')
                 && !str_contains($name, 'asymmetric_double_modifier_reference_profile')
-                && !str_contains($name, 'asymmetric_visibility_reference_profile')) {
+                && !str_contains($name, 'asymmetric_visibility_reference_profile')
+                && !str_contains($name, 'asymmetric_visibility_forward_84')) {
                 continue;
             }
             // 8.4-target reject gate; skipped when property hooks enabled (#12574, #14432).
