@@ -15132,9 +15132,23 @@ class JIT {
         if (Variable::TYPE_OBJECT !== $receiver->type) {
             return;
         }
+        // Respect the Variable kind: a KIND_VARIABLE receiver is an
+        // __object__** slot — StructGEP on it reads a garbage field type and
+        // LLVM 9 segfaults later in PointerType::get (#16565).
+        $obj = $this->context->helper->loadValue($receiver);
+        $objTy = $this->context->getStringFromType($obj->typeOf());
+        if ('__object__*' !== $objTy) {
+            if (!str_ends_with($objTy, '*')) {
+                return; // not a pointer at all — leave the runtime class id untouched
+            }
+            $obj = $this->context->builder->pointerCast(
+                $obj,
+                $this->context->getTypeFromString('__object__*')
+            );
+        }
         $objMap = $this->context->structFieldMap['__object__'];
         $classId = $this->context->builder->load(
-            $this->context->builder->structGep($receiver->value, $objMap['class_id'])
+            $this->context->builder->structGep($obj, $objMap['class_id'])
         );
         JIT\LateStaticBindingHelper::emitStoreClassId($this->context, $classId);
     }
