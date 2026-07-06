@@ -11,6 +11,8 @@ final class DomConstants
 
     public const XML_TEXT_NODE = 3;
 
+    public const XML_COMMENT_NODE = 8;
+
     public const XML_ATTRIBUTE_NODE = 2;
 
     public const XML_ENTITY_REF_NODE = 5;
@@ -25,6 +27,9 @@ final class DomConstants
 
     /** Internal marker for {@see VmDom::createNodeList()} handles. */
     public const XML_NODELIST = -1;
+
+    /** Internal marker for {@see VmDom::createNamedNodeMap()} handles. */
+    public const XML_NAMEDNODEMAP = -2;
 
     /** DOMNode::compareDocumentPosition() flags (php-src ext/dom/node.c; #14448). */
     public const DOCUMENT_POSITION_DISCONNECTED = 0x01;

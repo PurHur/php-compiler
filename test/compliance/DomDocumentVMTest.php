@@ -21,6 +21,10 @@ final class DomDocumentVMTest extends BaseTest
             __DIR__.'/cases/stdlib/dom_get_elements_by_tag_name.phpt',
             'dom_get_elements_by_tag_name.phpt'
         );
+        yield 'dom_get_elements_by_tag_name_live.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/dom_get_elements_by_tag_name_live.phpt',
+            'dom_get_elements_by_tag_name_live.phpt'
+        );
         yield 'dom_get_elements_by_tag_name_local.phpt' => self::parsePHPT(
             __DIR__.'/cases/stdlib/dom_get_elements_by_tag_name_local.phpt',
             'dom_get_elements_by_tag_name_local.phpt'
@@ -155,6 +159,14 @@ final class DomDocumentVMTest extends BaseTest
         yield 'dom_loadxml_invalid_warning.phpt' => self::parsePHPT(
             __DIR__.'/cases/stdlib/dom_loadxml_invalid_warning.phpt',
             'dom_loadxml_invalid_warning.phpt'
+        );
+        yield 'dom_namednodemap.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/dom_namednodemap.phpt',
+            'dom_namednodemap.phpt'
+        );
+        yield 'dom_text_nodes.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/dom_text_nodes.phpt',
+            'dom_text_nodes.phpt'
         );
     }
 
