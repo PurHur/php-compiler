@@ -13669,6 +13669,18 @@ class Compiler {
             && $this->shouldUseArrayProducerCallArgResolution($cfgCallOp, $argIndex, $calleeName);
     }
 
+    /** Haystack-family dead inline temp — prefer dim-fetch / array producer slots over echo concat (#17000). */
+    private function callArgIsDeadInlineHaystackFamilySlot(
+        ?Op $cfgCallOp,
+        int $argIndex,
+        ?string $calleeName,
+        Operand $arg
+    ): bool {
+        return null !== $cfgCallOp
+            && $this->shouldUseArrayProducerCallArgResolution($cfgCallOp, $argIndex, $calleeName)
+            && $this->callArgIsDeadInlineTemporary($arg);
+    }
+
     /**
      * Stmt-level ?? must not supply slots for literal / hoisted scalar call args (#9225, #10380).
      */
@@ -32840,13 +32852,15 @@ class Compiler {
     /**
      * Operand slot map can lag TYPE_ARRAY_DIM_FETCH when php-cfg reuses result temps (#10401).
      *
+     * @param list<OpCode> $opcodes
+     *
      * @return int|null VM slot from the Nth dim-fetch opcode before the pending FUNCCALL_INIT
      */
-    private function compiledArrayDimFetchResultSlotBeforePendingFuncCall(Block $block, int $dimIndex = 0): ?int
+    private function compiledArrayDimFetchResultSlotBeforePendingFuncCallFromOpcodes(array $opcodes, int $dimIndex = 0): ?int
     {
         $dimFetchOpcodes = [];
-        for ($i = \count($block->opCodes) - 1; $i >= 0; --$i) {
-            $op = $block->opCodes[$i];
+        for ($i = \count($opcodes) - 1; $i >= 0; --$i) {
+            $op = $opcodes[$i];
             if (OpCode::TYPE_FUNCCALL_INIT === $op->type || OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
                 break;
             }
@@ -32863,6 +32877,31 @@ class Compiler {
         }
 
         return $dimFetchOpcodes[$dimIndex]->arg1;
+    }
+
+    /**
+     * @return int|null VM slot from the Nth dim-fetch opcode before the pending FUNCCALL_INIT
+     */
+    private function compiledArrayDimFetchResultSlotBeforePendingFuncCall(Block $block, int $dimIndex = 0): ?int
+    {
+        return $this->compiledArrayDimFetchResultSlotBeforePendingFuncCallFromOpcodes($block->opCodes, $dimIndex);
+    }
+
+    /**
+     * Pending call-arg opcodes may hold the haystack dim-fetch before FUNCCALL_INIT lands on the block (#17000).
+     *
+     * @param list<OpCode> $pendingOps
+     */
+    private function pendingCallArgArrayDimFetchSlot(Block $block, array $pendingOps, int $dimIndex = 0): ?int
+    {
+        if ([] === $pendingOps) {
+            return $this->compiledArrayDimFetchResultSlotBeforePendingFuncCall($block, $dimIndex);
+        }
+
+        return $this->compiledArrayDimFetchResultSlotBeforePendingFuncCallFromOpcodes(
+            array_merge($block->opCodes, $pendingOps),
+            $dimIndex
+        );
     }
 
     /**
@@ -35974,7 +36013,18 @@ class Compiler {
                 if (null === $valueSlot) {
                     $valueSlot = $this->tryResolveEncapsedConcatListCallArgSlot($arg, $block, $sends, $cfgCallOp, (int) $argIndex);
                 }
-                if (null === $valueSlot) {
+                if (
+                    null === $valueSlot
+                    && !(
+                        null !== $cfgCallOp
+                        && $this->callArgIsDeadInlineHaystackFamilySlot(
+                            $cfgCallOp,
+                            (int) $argIndex,
+                            $calleeName,
+                            $arg
+                        )
+                    )
+                ) {
                     $valueSlot = $this->tryResolveChainedConcatCallArgSlot($arg, $block, $sends, $cfgCallOp, (int) $argIndex);
                 }
                 if (null === $valueSlot) {
@@ -36015,7 +36065,21 @@ class Compiler {
                 if (null === $valueSlot) {
                     $valueSlot = $this->resolveInlineFirstClassCallableCallArgSlot($arg, $block, $cfgCallOp, (int) $argIndex);
                 }
-                if (null === $valueSlot && $this->isCallArgDirectArrayDimFetch($arg)) {
+                if (
+                    null === $valueSlot
+                    && (
+                        $this->isCallArgDirectArrayDimFetch($arg)
+                        || (
+                            null !== $cfgCallOp
+                            && $this->callArgIsDeadInlineHaystackFamilySlot(
+                                $cfgCallOp,
+                                (int) $argIndex,
+                                $calleeName,
+                                $arg
+                            )
+                        )
+                    )
+                ) {
                     $valueSlot = $this->resolvePrecedingArrayDimFetchCallArgSlot(
                         $arg,
                         $block,
@@ -39296,6 +39360,20 @@ class Compiler {
                             $valueSlot = (string) $nestedFileSlot;
                         }
                     }
+                }
+            }
+            if (
+                null !== $cfgCallOp
+                && $this->callArgIsDeadInlineHaystackFamilySlot(
+                    $cfgCallOp,
+                    (int) $argIndex,
+                    $calleeName,
+                    $arg
+                )
+            ) {
+                $dimFetchSlot = $this->pendingCallArgArrayDimFetchSlot($block, $sends, 0);
+                if (null !== $dimFetchSlot) {
+                    $valueSlot = (string) $dimFetchSlot;
                 }
             }
             $sends[] = new OpCode(OpCode::TYPE_ARG_SEND, $valueSlot, $nameSlot, $unpackFlag);

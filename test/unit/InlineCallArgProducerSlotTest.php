@@ -6455,6 +6455,22 @@ PHP;
         self::assertStringContainsString('array_search_strict: false', $out);
     }
 
+    /** Issue #17000 — in_array dim-fetch haystack after echo ternary chain must not reuse concat slot. */
+    public function testInArrayDimFetchHaystackAfterEchoTernaryChain(): void
+    {
+        $code = file_get_contents(
+            __DIR__.'/../repro/maintainer_gap_get_defined_functions_in_array_haystack.php'
+        );
+        self::assertNotFalse($code);
+
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'get_defined_functions_in_array_haystack.php');
+
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("11110\n", ob_get_clean());
+    }
+
     /** Issue #10303 — tempnam(sys_get_temp_dir(), E::A) wires enum case fetch to arg #1. */
     public function testTempnamNestedFuncCallEnumPrefixUsesClassConstFetchSlot(): void
     {
