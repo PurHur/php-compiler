@@ -6765,4 +6765,26 @@ PHP;
         self::assertStringContainsString('const=array', $out);
         self::assertStringContainsString('ternary=10', $out);
     }
+
+    /** Issue #16802 — count($proc) === count($all) must not reuse prior echo count() EXEC_RETURN. */
+    public function testCountIdenticalAfterStaticListIdentifiersUsesNamedLocals(): void
+    {
+        $code = <<<'PHP'
+<?php
+declare(strict_types=1);
+$all = DateTimeZone::listIdentifiers();
+$us = DateTimeZone::listIdentifiers(DateTimeZone::PER_COUNTRY, 'US');
+echo count($us), "\n";
+$proc = timezone_identifiers_list();
+echo count($proc) === count($all) ? "proc_sync\n" : "proc_mismatch\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'timezone_count_identical.php');
+
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertStringContainsString("29\n", $out);
+        self::assertStringContainsString('proc_sync', $out);
+    }
 }
