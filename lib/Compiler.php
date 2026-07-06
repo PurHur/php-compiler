@@ -14187,12 +14187,27 @@ class Compiler {
                         && null !== $callIndex
                         && $this->isAdjacentNestedFuncCallProducer($matched, $callOp, $producerIndex, $callIndex)
                     ) {
-                        $slot = $block->slotForOperand($matched->result);
+                        $slot = $this->slotForNestedFuncCallArrayConsumerProducer(
+                            $block,
+                            $matched,
+                            $callOp,
+                            $producerIndex,
+                            $argIndex
+                        );
+                        if (null === $slot) {
+                            $slot = $block->slotForOperand($matched->result);
+                        }
                         if (null === $slot) {
                             foreach ($this->compileExpr($matched, $block) as $op) {
                                 $block->addOpCode($op);
                             }
-                            $slot = $block->slotForOperand($matched->result);
+                            $slot = $this->slotForNestedFuncCallArrayConsumerProducer(
+                                $block,
+                                $matched,
+                                $callOp,
+                                $producerIndex,
+                                $argIndex
+                            ) ?? $block->slotForOperand($matched->result);
                         }
                         if (null !== $slot) {
                             return (string) $slot;
@@ -14369,6 +14384,35 @@ class Compiler {
 
             return $this->slotForMatchResultDeadCallArg($arg, $block, $cfgCallOp);
         }
+        if (
+            ($producer instanceof Op\Expr\FuncCall || $producer instanceof Op\Expr\NsFuncCall)
+            && null !== $block->orig
+        ) {
+            $nestedProducerIndex = array_search($producer, $block->orig->children, true);
+            if (\is_int($nestedProducerIndex)) {
+                $callArgProbe = $callOp->args[$argIndex] ?? null;
+                if (
+                    $callArgProbe instanceof Operand
+                    && $this->callArgOperandExpectsArrayProducer($callArgProbe)
+                ) {
+                    if (null === $block->slotForOperand($producer->result)) {
+                        foreach ($this->compileExpr($producer, $block) as $op) {
+                            $block->addOpCode($op);
+                        }
+                    }
+                    $nestedArrayConsumerSlot = $this->slotForNestedFuncCallArrayConsumerProducer(
+                        $block,
+                        $producer,
+                        $callOp,
+                        $nestedProducerIndex,
+                        $argIndex
+                    );
+                    if (null !== $nestedArrayConsumerSlot) {
+                        return $nestedArrayConsumerSlot;
+                    }
+                }
+            }
+        }
         if ($producer instanceof Op\Expr\PropertyFetch) {
             $coalesceSlot = $this->resolvePropertyFetchCoalesceCallArgSlot(
                 $producer,
@@ -14507,7 +14551,19 @@ class Compiler {
                 foreach ($this->compileExpr($producer, $block) as $op) {
                     $block->addOpCode($op);
                 }
-                $producerSlot = $block->slotForOperand($producer->result);
+                $producerSlot = null;
+                if (null !== $producerIndex) {
+                    $producerSlot = $this->slotForNestedFuncCallArrayConsumerProducer(
+                        $block,
+                        $producer,
+                        $callOp,
+                        $producerIndex,
+                        $argIndex
+                    );
+                }
+                if (null === $producerSlot) {
+                    $producerSlot = $block->slotForOperand($producer->result);
+                }
             }
         }
         if (null === $producerSlot) {
@@ -16104,6 +16160,19 @@ class Compiler {
                 }
             }
         }
+        // is_array(file(..., FLAGS)) — dead temp may alias bitmask OR, not file() result (#10474).
+        if (
+            0 === $argIndex
+            && null !== $callArg
+            && $this->callArgIsDeadInlineTemporary($callArg)
+            && $this->callArgOperandExpectsArrayProducer($callArg)
+        ) {
+            foreach (array_reverse($producers) as $producer) {
+                if ($producer instanceof Op\Expr\FuncCall || $producer instanceof Op\Expr\NsFuncCall) {
+                    return $producer;
+                }
+            }
+        }
         $hoistedScalar = $this->matchHoistedScalarConstFetchInlineCallArgProducer($producers, $callArg);
         if (null !== $hoistedScalar) {
             return $hoistedScalar;
@@ -17029,6 +17098,17 @@ class Compiler {
                         || $last instanceof Op\Expr\BinaryOp\BitwiseAnd
                         || $last instanceof Op\Expr\BinaryOp\BitwiseXor
                     ) {
+                        if (
+                            null !== ($callArgs[0] ?? null)
+                            && $this->callArgOperandExpectsArrayProducer($callArgs[0])
+                        ) {
+                            foreach (array_reverse($producers) as $producer) {
+                                if ($producer instanceof Op\Expr\FuncCall || $producer instanceof Op\Expr\NsFuncCall) {
+                                    return $producer;
+                                }
+                            }
+                        }
+
                         return $last;
                     }
                     // var_export([true, $dt->format('Y-m-d')]) — trailing Array_ is arg #0, not hoisted element call (#10733, #16067).
@@ -18992,7 +19072,11 @@ class Compiler {
                 || $producer instanceof Op\Expr\BinaryOp\BitwiseAnd
                 || $producer instanceof Op\Expr\BinaryOp\BitwiseXor
             ) {
-                return $producer;
+                // Array builtins must not bind to int bitmask OR (#10474, is_array(file(..., FLAGS))).
+                if (!$this->callArgOperandExpectsArrayProducer($callArg)) {
+                    return $producer;
+                }
+                continue;
             }
             if (
                 $producer instanceof Op\Expr\Array_
@@ -26106,6 +26190,72 @@ class Compiler {
      *
      * @param list<Op> $cfgChildren
      */
+    /**
+     * is_array(file(..., FILE_* | FILE_*)) — dead arg temp may alias bitmask OR, not file() result (#10474).
+     */
+    private function slotForNestedFuncCallArrayConsumerProducer(
+        Block $block,
+        Op\Expr $producer,
+        Op $consumer,
+        int $producerIndex,
+        int $argIndex
+    ): ?string {
+        if (
+            !($producer instanceof Op\Expr\FuncCall || $producer instanceof Op\Expr\NsFuncCall)
+            || !property_exists($consumer, 'args')
+            || !\is_array($consumer->args)
+        ) {
+            return null;
+        }
+        $callArg = $consumer->args[$argIndex] ?? null;
+        if (
+            !$callArg instanceof Operand
+            || !$this->callArgOperandExpectsArrayProducer($callArg)
+        ) {
+            return null;
+        }
+        if (null === $block->orig) {
+            return null;
+        }
+        $execReturn = $this->slotForSiblingInlineCallProducerExecReturnByExpr(
+            $block,
+            $producer,
+            $consumer,
+            $block->orig->children
+        );
+        if (null !== $execReturn) {
+            return (string) $execReturn;
+        }
+        $execReturn = $this->slotForInlineFuncCallProducerExecReturnByCfgIndex(
+            $block,
+            $producerIndex,
+            $block->orig->children
+        );
+        if (null !== $execReturn) {
+            return (string) $execReturn;
+        }
+        if (
+            $this->isAdjacentNestedFuncCallProducer(
+                $producer,
+                $consumer,
+                $producerIndex,
+                array_search($consumer, $block->orig->children, true) ?: -1
+            )
+        ) {
+            $recent = $this->slotForLastEmittedInlineCallResultBeforePendingFuncCall($block);
+            if (null !== $recent) {
+                return (string) $recent;
+            }
+        }
+
+        return $this->slotForInlineCallArgProducerResult(
+            $block,
+            $producer,
+            $consumer,
+            $block->orig->children
+        );
+    }
+
     private function slotForInlineCallArgProducerResult(
         Block $block,
         Op\Expr $producer,
@@ -32716,6 +32866,28 @@ class Compiler {
     }
 
     /**
+     * Last FUNCCALL_EXEC_RETURN on block plus pending call-arg opcodes (#10474, is_array(file(..., FLAGS))).
+     *
+     * @param list<OpCode> $pendingOps
+     */
+    private function slotForLastInlineFuncCallExecReturn(Block $block, array $pendingOps = []): ?int
+    {
+        $last = null;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type && null !== $op->arg1) {
+                $last = (int) $op->arg1;
+            }
+        }
+        foreach ($pendingOps as $op) {
+            if (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type && null !== $op->arg1) {
+                $last = (int) $op->arg1;
+            }
+        }
+
+        return $last;
+    }
+
+    /**
      * php-cfg dead call-arg temp for inline eval() — TYPE_EVAL producer slot (#10661, zif_eval).
      */
     private function resolvePrecedingEvalCallArgSlot(
@@ -34413,6 +34585,54 @@ class Compiler {
             $nameSlot = $this->callArgNameSlot($arg, $block);
             // Early inline-array ARG_SEND paths continue before the main send site — unpack must be known up front (#16151).
             $unpackFlag = $this->callArgUnpack($arg) ? 1 : null;
+            if (
+                null !== $cfgCallOp
+                && null !== $block->orig
+                && 0 === (int) $argIndex
+                && \in_array(
+                    strtolower($calleeName ?? $this->resolveCfgFuncCallName($cfgCallOp) ?? ''),
+                    ['is_array', 'count'],
+                    true
+                )
+            ) {
+                $callIndex = array_search($cfgCallOp, $block->orig->children, true);
+                if (\is_int($callIndex) && $callIndex > 0) {
+                    $immediateProducer = $block->orig->children[$callIndex - 1] ?? null;
+                    if (
+                        $immediateProducer instanceof Op\Expr\FuncCall
+                        || $immediateProducer instanceof Op\Expr\NsFuncCall
+                    ) {
+                        $producerIndex = $callIndex - 1;
+                        $hoistedArrayCallSlot = $this->slotForInlineFuncCallProducerExecReturnByCfgIndex(
+                            $block,
+                            $producerIndex,
+                            $block->orig->children
+                        );
+                        if (null === $hoistedArrayCallSlot) {
+                            $hoistedArrayCallSlot = $this->resolveAdjacentNestedFuncCallArgSlot(
+                                $block,
+                                $cfgCallOp,
+                                0
+                            );
+                        }
+                        if (null === $hoistedArrayCallSlot) {
+                            $hoistedArrayCallSlot = $this->slotForLastInlineFuncCallExecReturn($block, $sends);
+                            if (null !== $hoistedArrayCallSlot) {
+                                $hoistedArrayCallSlot = (string) $hoistedArrayCallSlot;
+                            }
+                        }
+                        if (null !== $hoistedArrayCallSlot) {
+                            $sends[] = new OpCode(
+                                OpCode::TYPE_ARG_SEND,
+                                $hoistedArrayCallSlot,
+                                $nameSlot,
+                                $unpackFlag
+                            );
+                            continue;
+                        }
+                    }
+                }
+            }
             if (
                 null !== $cfgCallOp
                 && 'array_splice' === strtolower($this->resolveCfgFuncCallName($cfgCallOp) ?? '')
@@ -36296,7 +36516,49 @@ class Compiler {
                             }
                         }
                         if (null === $valueSlot) {
-                            $valueSlot = $this->compileOperand($arg, $block, true);
+                            if (
+                                null !== $cfgCallOp
+                                && null !== $block->orig
+                                && $this->callArgIsDeadInlineTemporary($arg)
+                                && $this->callArgOperandExpectsArrayProducer($arg)
+                            ) {
+                                $arrayFuncSlot = $this->resolveAdjacentNestedFuncCallArgSlot(
+                                    $block,
+                                    $cfgCallOp,
+                                    (int) $argIndex
+                                );
+                                if (null === $arrayFuncSlot) {
+                                    $arrayProducers = $this->precedingInlineCallArgProducersBeforeCfgOp(
+                                        $block->orig->children,
+                                        $cfgCallOp
+                                    );
+                                    $arrayMatched = $this->matchInlineCallArgProducer(
+                                        $arrayProducers,
+                                        $cfgCallOp->args ?? [],
+                                        (int) $argIndex,
+                                        $cfgCallOp,
+                                        $block,
+                                        $calleeName
+                                    );
+                                    if (
+                                        $arrayMatched instanceof Op\Expr\FuncCall
+                                        || $arrayMatched instanceof Op\Expr\NsFuncCall
+                                    ) {
+                                        $arrayFuncSlot = $this->slotForInlineCallArgProducerResult(
+                                            $block,
+                                            $arrayMatched,
+                                            $cfgCallOp,
+                                            $block->orig->children
+                                        );
+                                    }
+                                }
+                                if (null !== $arrayFuncSlot) {
+                                    $valueSlot = $arrayFuncSlot;
+                                }
+                            }
+                            if (null === $valueSlot) {
+                                $valueSlot = $this->compileOperand($arg, $block, true);
+                            }
                         }
                     }
                 }
@@ -36374,12 +36636,22 @@ class Compiler {
                                         $matched = $stmtBeforeArray;
                                     }
                                 }
-                                $matchedSlot = $block->slotForOperand($matched->result);
+                                $matchedSlot = $this->slotForInlineCallArgProducerResult(
+                                    $block,
+                                    $matched,
+                                    $cfgCallOp,
+                                    $block->orig->children
+                                ) ?? $block->slotForOperand($matched->result);
                                 if (null === $matchedSlot) {
                                     foreach ($this->compileExpr($matched, $block) as $op) {
                                         $block->addOpCode($op);
                                     }
-                                    $matchedSlot = $block->slotForOperand($matched->result);
+                                    $matchedSlot = $this->slotForInlineCallArgProducerResult(
+                                        $block,
+                                        $matched,
+                                        $cfgCallOp,
+                                        $block->orig->children
+                                    ) ?? $block->slotForOperand($matched->result);
                                 }
                                 if (null !== $matchedSlot) {
                                     $valueSlot = $matchedSlot;
@@ -38933,6 +39205,24 @@ class Compiler {
                 );
                 if (null !== $unaryTailSlot) {
                     $valueSlot = $unaryTailSlot;
+                }
+            }
+            if (
+                null !== $cfgCallOp
+                && 0 === (int) $argIndex
+                && \in_array(
+                    strtolower($this->resolveCfgFuncCallName($cfgCallOp) ?? ''),
+                    ['is_array', 'count'],
+                    true
+                )
+            ) {
+                $arrayBuiltinArg = $cfgCallOp->args[0] ?? $arg;
+                if ($arrayBuiltinArg instanceof Operand && $this->callArgIsDeadInlineTemporary($arrayBuiltinArg)) {
+                    $nestedFileSlot = $this->slotForLastInlineFuncCallExecReturn($block, $sends)
+                        ?? $this->resolveAdjacentNestedFuncCallArgSlot($block, $cfgCallOp, (int) $argIndex);
+                    if (null !== $nestedFileSlot) {
+                        $valueSlot = (string) $nestedFileSlot;
+                    }
                 }
             }
             $sends[] = new OpCode(OpCode::TYPE_ARG_SEND, $valueSlot, $nameSlot, $unpackFlag);
@@ -41933,6 +42223,74 @@ class Compiler {
         unset($send);
     }
 
+    /**
+     * is_array(file(..., FILE_* | FILE_*)) / count(file(...)) — arg #0 must use adjacent FUNCCALL_EXEC_RETURN,
+     * not the hoisted bitmask OR slot (#10474).
+     *
+     * @param list<OpCode> $outerArgSends
+     * @param list<OpCode> $nestedProducerOps
+     */
+    private function rewireArrayBuiltinAdjacentFuncCallArgSendSlots(
+        array &$outerArgSends,
+        array $nestedProducerOps,
+        Block $block,
+        ?Op $cfgCallOp,
+        ?string $calleeName = null
+    ): void {
+        $callee = strtolower($calleeName ?? $this->resolveCfgFuncCallName($cfgCallOp) ?? '');
+        if (!\in_array($callee, ['is_array', 'count'], true) || null === $cfgCallOp || null === $block->orig) {
+            return;
+        }
+        if (!\is_array($cfgCallOp->args ?? null) || 1 !== \count($cfgCallOp->args)) {
+            return;
+        }
+        $callArg = $cfgCallOp->args[0] ?? null;
+        if (!$callArg instanceof Operand || !$this->callArgIsDeadInlineTemporary($callArg)) {
+            return;
+        }
+        $callIndex = array_search($cfgCallOp, $block->orig->children, true);
+        if (!\is_int($callIndex) || $callIndex < 1) {
+            return;
+        }
+        $adjacentIndex = $callIndex - 1;
+        while ($adjacentIndex >= 0) {
+            $skip = $block->orig->children[$adjacentIndex] ?? null;
+            if ($skip instanceof Op\Expr\ConstFetch || $skip instanceof Op\Expr\ClassConstFetch) {
+                --$adjacentIndex;
+                continue;
+            }
+            if ($this->isUnaryInlineSiblingCallArgExpr($skip)) {
+                --$adjacentIndex;
+                continue;
+            }
+            break;
+        }
+        $adjacent = $block->orig->children[$adjacentIndex] ?? null;
+        if (!($adjacent instanceof Op\Expr\FuncCall || $adjacent instanceof Op\Expr\NsFuncCall)) {
+            return;
+        }
+        $execSlot = $this->slotForSiblingInlineCallProducerExecReturnByExpr(
+            $block,
+            $adjacent,
+            $cfgCallOp,
+            $block->orig->children
+        );
+        if (null === $execSlot) {
+            $execSlot = $this->slotForLastPendingInlineCallResultBeforeFuncCallInit($nestedProducerOps)
+                ?? $this->slotForLastEmittedInlineCallResultBeforePendingFuncCall($block);
+        }
+        if (null === $execSlot) {
+            return;
+        }
+        foreach ($outerArgSends as &$send) {
+            if (OpCode::TYPE_ARG_SEND === $send->type) {
+                $send->arg1 = (string) $execSlot;
+                break;
+            }
+        }
+        unset($send);
+    }
+
     private function isInlineCallArgProducerInitOpcode(OpCode $op): bool
     {
         return OpCode::TYPE_FUNCCALL_INIT === $op->type
@@ -41944,6 +42302,54 @@ class Compiler {
     {
         return OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type
             || OpCode::TYPE_FUNCCALL_EXEC_NORETURN === $op->type;
+    }
+
+    /**
+     * is_array(file(...)) / count(file(...)) — ARG_SEND must use nested file() EXEC_RETURN, not bitmask OR (#10474).
+     *
+     * @param list<OpCode> $outerArgSends
+     * @param list<OpCode> $nestedProducerOps
+     */
+    private function rewireIsArrayNestedFileCallArgSendSlots(
+        array &$outerArgSends,
+        array $nestedProducerOps,
+        Block $block,
+        ?Op $cfgCallOp,
+        ?string $calleeName = null
+    ): void {
+        $callee = strtolower($calleeName ?? $this->resolveCfgFuncCallName($cfgCallOp) ?? '');
+        if (!\in_array($callee, ['is_array', 'count'], true) || null === $cfgCallOp || null === $block->orig) {
+            return;
+        }
+        $callArg = $cfgCallOp->args[0] ?? null;
+        if (!$callArg instanceof Operand || !$this->callArgIsDeadInlineTemporary($callArg)) {
+            return;
+        }
+        $callIndex = $this->cfgCallOpIndex($block, $cfgCallOp);
+        if (!\is_int($callIndex) || $callIndex < 1) {
+            return;
+        }
+        $immediate = $block->orig->children[$callIndex - 1] ?? null;
+        if (!$immediate instanceof Op\Expr\FuncCall && !$immediate instanceof Op\Expr\NsFuncCall) {
+            return;
+        }
+        if ('file' !== strtolower($this->resolveCfgFuncCallName($immediate) ?? '')) {
+            return;
+        }
+        $execSlot = $this->slotForLastInlineFuncCallExecReturn($block, $nestedProducerOps);
+        if (null === $execSlot) {
+            return;
+        }
+        foreach ($outerArgSends as &$send) {
+            if (OpCode::TYPE_ARG_SEND !== $send->type) {
+                continue;
+            }
+            if ((string) $send->arg1 !== (string) $execSlot) {
+                $send->arg1 = $execSlot;
+            }
+            break;
+        }
+        unset($send);
     }
 
     protected function compileFuncCall(
@@ -41968,6 +42374,13 @@ class Compiler {
 
         $argSends = $this->compileCallArgSends($args, $block, $calleeName, $cfgCallOp);
         [$nestedProducerOps, $outerArgSends] = $this->partitionNestedInlineCallArgProducerOps($argSends);
+        $this->rewireArrayBuiltinAdjacentFuncCallArgSendSlots(
+            $outerArgSends,
+            $nestedProducerOps,
+            $block,
+            $cfgCallOp,
+            $calleeName
+        );
         $this->rewireInlineArithmeticBranchCallArgSendSlots($outerArgSends, $nestedProducerOps, $block, $cfgCallOp);
         $this->rewireSiblingMultiArgInlineCallArgSendSlots($outerArgSends, $block, $cfgCallOp, $nestedProducerOps);
         $this->rewireHoistedClassConstPreludeCallArgSendSlots($outerArgSends, $block, $cfgCallOp, $nestedProducerOps);
@@ -41981,6 +42394,7 @@ class Compiler {
         );
         $this->rewireArrayCombineInlineArgSendSlots($outerArgSends, $block, $argSends, $calleeName, $cfgCallOp);
         $this->rewireVarExportNestedInlineCallArgSendSlots($outerArgSends, $nestedProducerOps, $block, $cfgCallOp, $calleeName);
+        $this->rewireIsArrayNestedFileCallArgSendSlots($outerArgSends, $nestedProducerOps, $block, $cfgCallOp, $calleeName);
         $return = [];
         foreach ($outerArgSends as $send) {
             if (OpCode::TYPE_ASSIGN === $send->type) {
