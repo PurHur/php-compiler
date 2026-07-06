@@ -172,6 +172,9 @@ final class EmptyObjectPropertyLlvm
         if (!method_exists($typeByte, 'isConstant') || !$typeByte->isConstant()) {
             return null;
         }
+        if (!method_exists($typeByte, 'getConstantValue')) {
+            return null;
+        }
         if ((int) $typeByte->getConstantValue() !== VmVariable::TYPE_ENUM_CASE) {
             return null;
         }

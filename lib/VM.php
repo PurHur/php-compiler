@@ -1519,12 +1519,12 @@ class VM {
     }
 
     /**
-     * empty() on hooked properties with real same-name backing — never invoke get hook (#11467, zend_property_hooks.c).
+     * empty() on hooked properties — probe backing only for uninitialized typed slots or unset-cleared distinct backing;
+     * otherwise route through get-hook dispatch to match Zend/php-src (#16935, zend_property_hooks.c).
      */
     private function emptyHookedPropertyProbesBackingOnly(ObjectEntry $object, string $propName, Variable $dst): bool
     {
-        if (!$this->hookedPropertyHasRealSameNameBacking($object, $propName)
-            && !$this->hookedPropertyIssetProbesUninitializedBackingOnly($object, $propName)
+        if (!$this->hookedPropertyIssetProbesUninitializedBackingOnly($object, $propName)
             && !$this->hookedPropertyDistinctBackingUnsetForIssetEmpty($object, $propName)) {
             return false;
         }
