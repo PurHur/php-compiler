@@ -37,4 +37,21 @@ final class FileGetContentsRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('FileGetContentsJitHelper.php', $spine);
         $this->assertStringContainsString('StringFileGetContents.php', $spine);
     }
+
+    /** Inventory argv Zend helloworld link calls __compiler_file_get_contents from ensureFullStandaloneBodies (#15604). */
+    public function testEnsureFullStandaloneBodiesLinksFileGetContents(): void
+    {
+        $context = (string) file_get_contents(__DIR__.'/../../lib/JIT/Context.php');
+        $this->assertStringContainsString(
+            'Builtin\\StringFileGetContents::ensureStandaloneBodies($this);',
+            $context
+        );
+        $needle = 'Builtin\\StringFileGetContents::ensureStandaloneBodies($this);';
+        $fullPos = strpos($context, 'private function ensureFullStandaloneBodies');
+        $minimalPos = strpos($context, 'private function ensureMinimalUserStandaloneBodies');
+        $this->assertNotFalse($fullPos);
+        $this->assertNotFalse($minimalPos);
+        $fullBody = substr($context, $fullPos, $minimalPos - $fullPos);
+        $this->assertStringContainsString($needle, $fullBody);
+    }
 }
