@@ -76,17 +76,20 @@ PHP;
         );
     }
 
-    public function testRewriteUnparenthesizedPublicProtectedSetRejects(): void
+    public function testRewriteUnparenthesizedPublicProtectedSet(): void
     {
+        $this->requireParenthesizedAsymmetricSetModifier();
         $source = <<<'PHP'
 <?php
 class Demo {
     public protected(set) string $name = 'x';
 }
 PHP;
-        $this->expectException(\CompileError::class);
-        $this->expectExceptionMessage(AsymmetricVisibilityRewriter::MULTIPLE_MODIFIERS_MESSAGE);
-        AsymmetricVisibilityRewriter::rewrite($source);
+        $rewritten = AsymmetricVisibilityRewriter::rewrite($source);
+        self::assertStringContainsString(
+            '/*phpc-asymmetric-set:protected*/ /*phpc-asymmetric-explicit-read*/ public string $name',
+            preg_replace('/\s+/', ' ', $rewritten)
+        );
     }
 
     public function testRewriteProtectedPrivateSet(): void
@@ -191,8 +194,9 @@ PHP;
         );
     }
 
-    public function testPromotedPublicPrivateSetRejectsParenthesizedForm(): void
+    public function testPromotedPublicPrivateSetParenthesizedFormRewrites(): void
     {
+        $this->requireParenthesizedAsymmetricSetModifier();
         $source = <<<'PHP'
 <?php
 class User {
@@ -201,67 +205,75 @@ class User {
     ) {}
 }
 PHP;
-        $this->expectException(\CompileError::class);
-        $this->expectExceptionMessage('syntax error, unexpected token "private"');
-        AsymmetricVisibilityRewriter::rewrite($source);
+        $rewritten = AsymmetricVisibilityRewriter::rewrite($source);
+        self::assertStringContainsString(
+            '/*phpc-asymmetric-set:private*/ /*phpc-asymmetric-explicit-read*/ public string $name',
+            preg_replace('/\s+/', ' ', $rewritten)
+        );
     }
 
-    public function testPromotedSingleLinePublicPrivateSetRejectsParenthesizedForm(): void
+    public function testPromotedSingleLinePublicPrivateSetParenthesizedFormRewrites(): void
     {
+        $this->requireParenthesizedAsymmetricSetModifier();
         $source = <<<'PHP'
 <?php
 class D {
     public function __construct(public (private(set)) int $x = 1) {}
 }
 PHP;
-        $this->expectException(\CompileError::class);
-        $this->expectExceptionMessage('syntax error, unexpected token "private"');
-        AsymmetricVisibilityRewriter::rewrite($source);
+        $rewritten = AsymmetricVisibilityRewriter::rewrite($source);
+        self::assertStringContainsString(
+            '/*phpc-asymmetric-set:private*/ /*phpc-asymmetric-explicit-read*/ public int $x',
+            preg_replace('/\s+/', ' ', $rewritten)
+        );
     }
 
-    public function testExplicitReadBeforePrivateSetRejects(): void
+    public function testRewriteUnparenthesizedPublicPrivateSet(): void
     {
+        $this->requireParenthesizedAsymmetricSetModifier();
         $source = <<<'PHP'
 <?php
 class Demo {
     public private(set) string $name = 'x';
 }
 PHP;
-        $this->expectException(\CompileError::class);
-        $this->expectExceptionMessage(AsymmetricVisibilityRewriter::MULTIPLE_MODIFIERS_MESSAGE);
-        AsymmetricVisibilityRewriter::rewrite($source);
+        $rewritten = AsymmetricVisibilityRewriter::rewrite($source);
+        self::assertStringContainsString(
+            '/*phpc-asymmetric-set:private*/ /*phpc-asymmetric-explicit-read*/ public string $name',
+            preg_replace('/\s+/', ' ', $rewritten)
+        );
     }
 
-    public function testPromotedExplicitReadBeforePrivateSetRejects(): void
+    public function testPromotedExplicitReadBeforePrivateSetRewrites(): void
     {
-        if (!CompilerVersion::supportsAsymmetricVisibility()) {
-            $this->markTestSkipped('asymmetric visibility requires PHP 8.4.0+ forward profile');
-        }
+        $this->requireParenthesizedAsymmetricSetModifier();
         $source = <<<'PHP'
 <?php
 class D {
     public function __construct(public private(set) int $x = 1) {}
 }
 PHP;
-        $this->expectException(\CompileError::class);
-        $this->expectExceptionMessage(AsymmetricVisibilityRewriter::MULTIPLE_MODIFIERS_MESSAGE);
-        AsymmetricVisibilityRewriter::rewrite($source);
+        $rewritten = AsymmetricVisibilityRewriter::rewrite($source);
+        self::assertStringContainsString(
+            '/*phpc-asymmetric-set:private*/ /*phpc-asymmetric-explicit-read*/ public int $x',
+            preg_replace('/\s+/', ' ', $rewritten)
+        );
     }
 
-    public function testPromotedExplicitReadBeforeProtectedSetRejects(): void
+    public function testPromotedExplicitReadBeforeProtectedSetRewrites(): void
     {
-        if (!CompilerVersion::supportsAsymmetricVisibility()) {
-            $this->markTestSkipped('asymmetric visibility requires PHP 8.4.0+ forward profile');
-        }
+        $this->requireParenthesizedAsymmetricSetModifier();
         $source = <<<'PHP'
 <?php
 class D {
     public function __construct(public protected(set) string $n = 'ok') {}
 }
 PHP;
-        $this->expectException(\CompileError::class);
-        $this->expectExceptionMessage(AsymmetricVisibilityRewriter::MULTIPLE_MODIFIERS_MESSAGE);
-        AsymmetricVisibilityRewriter::rewrite($source);
+        $rewritten = AsymmetricVisibilityRewriter::rewrite($source);
+        self::assertStringContainsString(
+            '/*phpc-asymmetric-set:protected*/ /*phpc-asymmetric-explicit-read*/ public string $n',
+            preg_replace('/\s+/', ' ', $rewritten)
+        );
     }
 
     public function testParenthesizedPrivateSetWithExplicitReadRewrites(): void
@@ -344,8 +356,9 @@ PHP;
         );
     }
 
-    public function testPromotedParenthesizedPrivateSetRejects(): void
+    public function testPromotedParenthesizedPrivateSetRewrites(): void
     {
+        $this->requireParenthesizedAsymmetricSetModifier();
         $source = <<<'PHP'
 <?php
 class User {
@@ -354,9 +367,11 @@ class User {
     ) {}
 }
 PHP;
-        $this->expectException(\CompileError::class);
-        $this->expectExceptionMessage('syntax error, unexpected token "private"');
-        AsymmetricVisibilityRewriter::rewrite($source);
+        $rewritten = AsymmetricVisibilityRewriter::rewrite($source);
+        self::assertStringContainsString(
+            '/*phpc-asymmetric-set:private*/ /*phpc-asymmetric-explicit-read*/ public string $name',
+            preg_replace('/\s+/', ' ', $rewritten)
+        );
     }
 
     public function testPublicParenthesizedPublicSetCompileErrors(): void
