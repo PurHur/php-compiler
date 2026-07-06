@@ -298,6 +298,35 @@ PHP;
         $this->assertStringNotContainsString('Cannot assign to a value', $stderr);
     }
 
+    /** SodiumJitHelper memcmp guard — bool phi + string offset in nested JIT (#16828). */
+    public function testSodiumMemcmpGuardAssignOperandValueCompiles(): void
+    {
+        $this->skipUnlessLlvmReady();
+        $source = <<<'PHP'
+<?php
+declare(strict_types=1);
+function sodium_memcmp_guard(string $string1, string $string2): int {
+    if (\strlen($string1) !== \strlen($string2)) {
+        return -1;
+    }
+    if (\function_exists('sodium_memcmp')) {
+        return \sodium_memcmp($string1, $string2);
+    }
+    $sum = 0;
+    for ($i = 0; $i < \strlen($string1); ++$i) {
+        $sum += \ord($string1[$i]);
+    }
+    return $sum;
+}
+PHP;
+        $stderr = $this->compileSourceAllowFailure($source, 'sodium memcmp guard bool phi');
+        $this->assertStringNotContainsString('Cannot assign to a value', $stderr);
+        $this->assertStringNotContainsString(
+            'Array offset access requires hashtable or boxed array',
+            $stderr
+        );
+    }
+
     /** TimezoneAbbreviationsData nested array literal via require — compile (#16866). */
     public function testTimezoneAbbreviationsDataRequireCompiles(): void
     {

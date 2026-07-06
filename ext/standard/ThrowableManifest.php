@@ -164,7 +164,8 @@ final class ThrowableManifest
         'ErrorException' => \ErrorException::class,
         'ReflectionException' => \ReflectionException::class,
         'ClosedGeneratorException' => \ClosedGeneratorException::class,
-        'DateException' => \DateException::class,
+        // Literal FQCN — DateException absent on PHP 8.2 compile hosts (#16828).
+        'DateException' => 'DateException',
         'Error' => \Error::class,
         'TypeError' => \TypeError::class,
         'ValueError' => \ValueError::class,
