@@ -835,6 +835,8 @@ class Module extends ModuleAbstract
             new eval_(),
             new phpc_deploy_path(),
             new compiler_is_superglobal_name(),
+            new __compiler_libcrypt(),
+            new __compiler_password_random_bytes(),
             new phpc_match_unhandled_operand_is_object(),
             new phpc_clone_with_begin(),
             new phpc_clone_with_end(),

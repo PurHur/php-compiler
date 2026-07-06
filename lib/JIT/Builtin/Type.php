@@ -744,6 +744,15 @@ class Type extends Builtin {
             $fntypeTimeSleepUntil
         );
         $this->context->registerFunction('__compiler_time_sleep_until', $fnTimeSleepUntil);
+        $fntypePasswordRandomBytes = $this->context->context->functionType($strPtr, false, $i64);
+        $fnPasswordRandomBytes = $this->context->module->addFunction(
+            '__compiler_password_random_bytes',
+            $fntypePasswordRandomBytes
+        );
+        $this->context->registerFunction('__compiler_password_random_bytes', $fnPasswordRandomBytes);
+        $fntypeLibcrypt = $this->context->context->functionType($strPtr, false, $strPtr, $strPtr);
+        $fnLibcrypt = $this->context->module->addFunction('__compiler_libcrypt', $fntypeLibcrypt);
+        $this->context->registerFunction('__compiler_libcrypt', $fnLibcrypt);
         $fntypePasswordHash = $this->context->context->functionType($strPtr, false, $strPtr, $i64, $i64);
         $fnPasswordHash = $this->context->module->addFunction('__compiler_password_hash', $fntypePasswordHash);
         $this->context->registerFunction('__compiler_password_hash', $fnPasswordHash);

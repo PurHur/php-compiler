@@ -7,7 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitStringBuiltinArg;
+use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -65,7 +65,7 @@ final class password_hash extends Internal
 
         return JitPassword::hash(
             $context,
-            JitStringBuiltinArg::lowerTypedString($context, $args[0], 'password_hash', 0, 'password'),
+            JitStringArg::lowerDominating($context, $args[0], 'password_hash() password'),
             JitPasswordAlgo::lower($context, $args[1], 'password_hash', 1, 'algo'),
             $options
         );

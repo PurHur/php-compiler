@@ -2340,8 +2340,9 @@ class Context {
                     $this->constants[$name] = [Variable::TYPE_NATIVE_BOOL, $global];
                     break;
                 case VMVariable::TYPE_STRING:
-                    $global = $this->constantStringFromString($phpVar->toString());
-                    $this->constants[$name] = [Variable::TYPE_STRING, $global];
+                    $compileTimeStr = $phpVar->toString();
+                    $global = $this->constantStringFromString($compileTimeStr);
+                    $this->constants[$name] = [Variable::TYPE_STRING, $global, $compileTimeStr];
                     break;
                 case VMVariable::TYPE_ARRAY:
                     $global = $this->constantArrayFromVmHashTable($name, $phpVar->toArray());
@@ -2358,6 +2359,9 @@ class Context {
             $this->builder->load($this->constants[$name][1])
         );
         $var->compileTimeConstantName = $name;
+        if (Variable::TYPE_STRING === $this->constants[$name][0] && isset($this->constants[$name][2])) {
+            $var->compileTimeString = $this->constants[$name][2];
+        }
 
         return $var;
     }

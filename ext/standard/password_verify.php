@@ -7,7 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitStringBuiltinArg;
+use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -42,8 +42,8 @@ final class password_verify extends Internal
 
         return JitPassword::verify(
             $context,
-            JitStringBuiltinArg::lower($context, $args[0], 'password_verify', 0, 'password'),
-            JitStringBuiltinArg::lower($context, $args[1], 'password_verify', 1, 'hash')
+            JitStringArg::lowerDominating($context, $args[0], 'password_verify() password'),
+            JitStringArg::lowerDominating($context, $args[1], 'password_verify() hash')
         );
     }
 }

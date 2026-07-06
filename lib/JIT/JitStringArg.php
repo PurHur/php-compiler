@@ -134,6 +134,12 @@ final class JitStringArg
     }
 
     /** @return Value owning {@see __string__*} in an entry alloca */
+    public static function materializeStringDominating(Context $context, Value $sourceStr): Value
+    {
+        return self::materializeStringSlot($context, $sourceStr);
+    }
+
+    /** @return Value owning {@see __string__*} in an entry alloca */
     private static function materializeStringSlot(Context $context, Value $sourceStr): Value
     {
         $slot = BasicBlockHelper::entryAlloca($context, $context->getTypeFromString('__string__*'));
