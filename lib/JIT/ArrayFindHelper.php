@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT;
 
+use PHPCompiler\ext\standard\boolval;
 use PHPCompiler\ext\standard\JitArrayElem;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
@@ -531,24 +532,8 @@ final class ArrayFindHelper
     private static function normalizeUserPredicateResult(Context $context, Value $result): Value
     {
         $ty = $context->getStringFromType($result->typeOf());
-        if ('__value__' === $ty || '__value__*' === $ty) {
+        if ('__value__' === $ty || '__value__*' === $ty || 'int1' === $ty || 'bool' === $ty || 'int64' === $ty || 'long long' === $ty) {
             return $result;
-        }
-        $slot = JitValueBox::alloc($context);
-        if ('int64' === $ty || 'long long' === $ty) {
-            JitValueBox::writeLong($context, $slot, $result);
-
-            return $context->builder->load($slot);
-        }
-        if ('int1' === $ty || 'bool' === $ty) {
-            $i64 = $context->getTypeFromString('int64');
-            JitValueBox::writeLong(
-                $context,
-                $slot,
-                $context->builder->zext($result, $i64)
-            );
-
-            return $context->builder->load($slot);
         }
 
         return $result;
@@ -597,11 +582,7 @@ final class ArrayFindHelper
         $i64 = $context->getTypeFromString('int64');
         $zero = $i64->constInt(0, false);
         $typeByte = $context->builder->load($context->builder->structGep($valuePtr, $valueMap['type']));
-        $isBool = $context->builder->icmp(
-            Builder::INT_EQ,
-            $typeByte,
-            $i8->constInt(VmVariable::TYPE_BOOLEAN, false)
-        );
+        $isBool = boolval::isBoxedBoolTypeTag($context, $typeByte);
         $longVal = $context->builder->call($context->lookupFunction('__value__readLong'), $valuePtr);
         $isTrue = $context->builder->icmp(Builder::INT_NE, $longVal, $zero);
 
@@ -652,11 +633,7 @@ final class ArrayFindHelper
             $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(VmVariable::TYPE_UNDEFINED, false))
         );
 
-        $isBool = $context->builder->icmp(
-            Builder::INT_EQ,
-            $typeByte,
-            $i8->constInt(VmVariable::TYPE_BOOLEAN, false)
-        );
+        $isBool = boolval::isBoxedBoolTypeTag($context, $typeByte);
         $valueField = $context->builder->structGep($valuePtr, $map['value']);
         $firstByte = $context->builder->inBoundsGEP(
             $valueField,

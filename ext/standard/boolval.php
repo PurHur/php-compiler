@@ -134,7 +134,17 @@ final class boolval extends Internal
     /**
      * Boxed scalar truthiness for boolval()/castToBool (standalone AOT literals; #15704).
      */
-    private static function boxedTruthyScalar(Context $context, Value $valuePtr): Value
+    public static function isBoxedBoolTypeTag(Context $context, Value $typeByte): Value
+    {
+        $i8 = $context->getTypeFromString('int8');
+
+        return $context->builder->or(
+            $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(Variable::TYPE_BOOLEAN, false)),
+            $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(JITVariable::TYPE_NATIVE_BOOL, false))
+        );
+    }
+
+    public static function boxedTruthyScalar(Context $context, Value $valuePtr): Value
     {
         $map = $context->structFieldMap['__value__'];
         $typeByte = $context->builder->load(
@@ -147,11 +157,7 @@ final class boolval extends Internal
             $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(Variable::TYPE_UNDEFINED, false))
         );
 
-        $isBool = $context->builder->icmp(
-            Builder::INT_EQ,
-            $typeByte,
-            $i8->constInt(JITVariable::TYPE_NATIVE_BOOL, false)
-        );
+        $isBool = self::isBoxedBoolTypeTag($context, $typeByte);
         $valueField = $context->builder->structGep($valuePtr, $map['value']);
         $firstByte = $context->builder->inBoundsGEP(
             $valueField,

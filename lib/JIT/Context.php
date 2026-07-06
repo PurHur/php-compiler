@@ -1443,10 +1443,7 @@ class Context {
                     $ptr = $slot;
                 }
 
-                return (new \PHPCompiler\ext\standard\boolval())->call(
-                    $this,
-                    new Variable($this, Variable::TYPE_VALUE, Variable::KIND_VALUE, $ptr)
-                );
+                return \PHPCompiler\ext\standard\boolval::boxedTruthyScalar($this, $ptr);
             case '__string__':
                 $slot = BasicBlockHelper::entryAlloca($this, $type);
                 $this->builder->store($value, $slot);
