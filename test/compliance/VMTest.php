@@ -92,6 +92,15 @@ class VMTest extends BaseTest {
                 && str_contains($name, 'get_declared_exclude_deprecated_reference_profile')) {
                 continue;
             }
+            if (!CompilerVersion::supportsGetDefinedFunctionsExcludeDisabled()
+                && str_contains($name, 'get_defined_functions_exclude_disabled')
+                && !str_contains($name, 'get_defined_functions_exclude_disabled_reference_profile')) {
+                continue;
+            }
+            if (CompilerVersion::supportsGetDefinedFunctionsExcludeDisabled()
+                && str_contains($name, 'get_defined_functions_exclude_disabled_reference_profile')) {
+                continue;
+            }
             if ((CompilerVersion::supportsStrIncrement() || CompilerVersion::supportsFpow() || CompilerVersion::supportsNextafter())
                 && str_contains($name, 'php84_math_string_builtins_phantom')) {
                 continue;

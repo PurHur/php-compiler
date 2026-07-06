@@ -14,9 +14,12 @@ use PHPLLVM\Value;
 /** LLVM lowering for get_defined_functions() / get_declared_functions() (issue #3128). */
 final class JitGetDefinedFunctions
 {
-    public static function invoke(Context $context): Value
+    public static function invoke(Context $context, bool $excludeDisabled = false): Value
     {
-        $internalHt = self::emitFunctionNames($context, VmReflection::internalFunctionNameList());
+        $internalHt = self::emitFunctionNames(
+            $context,
+            VmReflection::internalFunctionNameList($excludeDisabled)
+        );
         $userHt = self::emitFunctionNames($context, self::collectUserFunctionNames($context));
 
         $rootHt = HashTableHelper::alloc($context);
