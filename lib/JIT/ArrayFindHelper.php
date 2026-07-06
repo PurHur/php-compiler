@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT;
 
-use PHPCompiler\ext\standard\boolval;
 use PHPCompiler\ext\standard\JitArrayElem;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
@@ -27,14 +26,17 @@ final class ArrayFindHelper
         Context $context,
         Variable $array,
         Variable $callback,
-        ?Variable $strictArg = null
+        ?Variable $strictArg = null,
+        ?Value $strictI1Override = null
     ): Value {
+        $strictI1 = $strictI1Override ?? self::resolveStrictI1($context, $strictArg);
+
         return self::buildFromArray(
             $context,
             $array,
             $callback,
             self::MODE_FIND,
-            self::resolveStrictI1($context, $strictArg)
+            $strictI1
         );
     }
 
@@ -42,14 +44,17 @@ final class ArrayFindHelper
         Context $context,
         Variable $array,
         Variable $callback,
-        ?Variable $strictArg = null
+        ?Variable $strictArg = null,
+        ?Value $strictI1Override = null
     ): Value {
+        $strictI1 = $strictI1Override ?? self::resolveStrictI1($context, $strictArg);
+
         return self::buildFromArray(
             $context,
             $array,
             $callback,
             self::MODE_FIND_KEY,
-            self::resolveStrictI1($context, $strictArg)
+            $strictI1
         );
     }
 
@@ -57,14 +62,17 @@ final class ArrayFindHelper
         Context $context,
         Variable $array,
         Variable $callback,
-        ?Variable $strictArg = null
+        ?Variable $strictArg = null,
+        ?Value $strictI1Override = null
     ): Value {
+        $strictI1 = $strictI1Override ?? self::resolveStrictI1($context, $strictArg);
+
         return self::buildFromArray(
             $context,
             $array,
             $callback,
             self::MODE_ANY,
-            self::resolveStrictI1($context, $strictArg)
+            $strictI1
         );
     }
 
@@ -72,14 +80,17 @@ final class ArrayFindHelper
         Context $context,
         Variable $array,
         Variable $callback,
-        ?Variable $strictArg = null
+        ?Variable $strictArg = null,
+        ?Value $strictI1Override = null
     ): Value {
+        $strictI1 = $strictI1Override ?? self::resolveStrictI1($context, $strictArg);
+
         return self::buildFromArray(
             $context,
             $array,
             $callback,
             self::MODE_ALL,
-            self::resolveStrictI1($context, $strictArg)
+            $strictI1
         );
     }
 
@@ -507,7 +518,40 @@ final class ArrayFindHelper
         /** @var Call $target */
         $result = $target->call($context, $elem, $key);
 
-        return self::jitCallResultMatch($context, $result, $strictI1);
+        return self::jitCallResultMatch(
+            $context,
+            self::normalizeUserPredicateResult($context, $result),
+            $strictI1
+        );
+    }
+
+    /**
+     * Standalone AOT may return native int1/int64 for int-backed user callbacks; box for strict (#15704).
+     */
+    private static function normalizeUserPredicateResult(Context $context, Value $result): Value
+    {
+        $ty = $context->getStringFromType($result->typeOf());
+        if ('__value__' === $ty || '__value__*' === $ty) {
+            return $result;
+        }
+        $slot = JitValueBox::alloc($context);
+        if ('int64' === $ty || 'long long' === $ty) {
+            JitValueBox::writeLong($context, $slot, $result);
+
+            return $context->builder->load($slot);
+        }
+        if ('int1' === $ty || 'bool' === $ty) {
+            $i64 = $context->getTypeFromString('int64');
+            JitValueBox::writeLong(
+                $context,
+                $slot,
+                $context->builder->zext($result, $i64)
+            );
+
+            return $context->builder->load($slot);
+        }
+
+        return $result;
     }
 
     private static function resolveStrictI1(Context $context, ?Variable $strictArg): Value
@@ -533,9 +577,10 @@ final class ArrayFindHelper
         $false = $i1->constInt(0, false);
         $ty = $context->getStringFromType($result->typeOf());
         if ('int1' === $ty) {
-            return $result;
+            // Native int1 is not a boxed boolean; int 0/1 ternaries mis-lower to int1 in standalone AOT (#15704).
+            return $false;
         }
-        if ('int64' === $ty || 'double' === $ty) {
+        if ('int64' === $ty || 'long long' === $ty || 'double' === $ty) {
             return $false;
         }
         if ('__value__' === $ty) {
@@ -589,13 +634,83 @@ final class ArrayFindHelper
         return new Variable($context, Variable::TYPE_VALUE, Variable::KIND_VARIABLE, $slot);
     }
 
+    /**
+     * Predicate truthiness for boxed callback results (standalone AOT mixed returns; #15704).
+     *
+     * Avoids boolval() JIT which treats any non-null boxed type as true in user-script AOT.
+     */
+    private static function jitBoxedPredicateTruthy(Context $context, Value $valuePtr): Value
+    {
+        $map = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($valuePtr, $map['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $false = $context->constantFromBool(false);
+        $falsy = $context->builder->or(
+            $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(VmVariable::TYPE_NULL, false)),
+            $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(VmVariable::TYPE_UNDEFINED, false))
+        );
+
+        $isBool = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(VmVariable::TYPE_BOOLEAN, false)
+        );
+        $valueField = $context->builder->structGep($valuePtr, $map['value']);
+        $firstByte = $context->builder->inBoundsGEP(
+            $valueField,
+            $context->getTypeFromString('int32')->constInt(0, false),
+            $context->getTypeFromString('int64')->constInt(0, false)
+        );
+        $boolTruthy = $context->builder->icmp(
+            Builder::INT_NE,
+            $context->builder->load($firstByte),
+            $i8->constInt(0, false)
+        );
+
+        $isInt = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(VmVariable::TYPE_INTEGER, false)
+        );
+        $zeroI64 = $context->getTypeFromString('int64')->constInt(0, false);
+        $longVal = $context->builder->call($context->lookupFunction('__value__readLong'), $valuePtr);
+        $intTruthy = $context->builder->icmp(Builder::INT_NE, $longVal, $zeroI64);
+
+        $isFloat = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(VmVariable::TYPE_FLOAT, false)
+        );
+        $doubleVal = $context->builder->call($context->lookupFunction('__value__readDouble'), $valuePtr);
+        $floatTruthy = $context->builder->fcmp(
+            Builder::REAL_ONE,
+            $doubleVal,
+            $doubleVal->typeOf()->constReal(0.0)
+        );
+
+        $defaultTruthy = $context->constantFromBool(true);
+        $typedTruthy = $context->builder->select(
+            $isBool,
+            $boolTruthy,
+            $context->builder->select(
+                $isInt,
+                $intTruthy,
+                $context->builder->select($isFloat, $floatTruthy, $defaultTruthy)
+            )
+        );
+
+        return $context->builder->select($falsy, $false, $typedTruthy);
+    }
+
     private static function jitCallResultTruthy(Context $context, Value $result): Value
     {
         $ty = $context->getStringFromType($result->typeOf());
         if ('int1' === $ty) {
             return $result;
         }
-        if ('int64' === $ty) {
+        if ('int64' === $ty || 'long long' === $ty) {
             $zero = $result->typeOf()->constInt(0, false);
 
             return $context->builder->icmp(Builder::INT_NE, $result, $zero);
@@ -608,19 +723,11 @@ final class ArrayFindHelper
         if ('__value__' === $ty) {
             $slot = BasicBlockHelper::entryAlloca($context, $result->typeOf());
             $context->builder->store($result, $slot);
-            $boxed = new Variable(
-                $context,
-                Variable::TYPE_VALUE,
-                Variable::KIND_VARIABLE,
-                JitValueBox::pointer($context, $slot)
-            );
 
-            return (new boolval())->call($context, $boxed);
+            return self::jitBoxedPredicateTruthy($context, JitValueBox::pointer($context, $slot));
         }
         if ('__value__*' === $ty) {
-            $boxed = new Variable($context, Variable::TYPE_VALUE, Variable::KIND_VARIABLE, $result);
-
-            return (new boolval())->call($context, $boxed);
+            return self::jitBoxedPredicateTruthy($context, $result);
         }
 
         throw new \LogicException(

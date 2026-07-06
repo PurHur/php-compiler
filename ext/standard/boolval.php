@@ -79,33 +79,8 @@ final class boolval extends Internal
                         $context->getTypeFromString('__value__*')
                     );
                 }
-                $map = $context->structFieldMap['__value__'];
-                $typeByte = $context->builder->load(
-                    $context->builder->structGep($loaded, $map['type'])
-                );
-                $i8 = $context->getTypeFromString('int8');
-                $undefType = $i8->constInt(Variable::TYPE_UNDEFINED, false);
-                $isUndef = $context->builder->icmp(Builder::INT_EQ, $typeByte, $undefType);
-                $nullType = $i8->constInt(Variable::TYPE_NULL, false);
-                $boolType = $i8->constInt(JITVariable::TYPE_NATIVE_BOOL, false);
-                $isNull = $context->builder->icmp(Builder::INT_EQ, $typeByte, $nullType);
-                $isBool = $context->builder->icmp(Builder::INT_EQ, $typeByte, $boolType);
-                $valueField = $context->builder->structGep($loaded, $map['value']);
-                $firstByte = $context->builder->inBoundsGEP(
-                    $valueField,
-                    $context->getTypeFromString('int32')->constInt(0, false),
-                    $context->getTypeFromString('int64')->constInt(0, false)
-                );
-                $boolByte = $context->builder->load($firstByte);
-                $boolTruthy = $context->builder->icmp(Builder::INT_NE, $boolByte, $i8->constInt(0, false));
-                $nonNull = $context->builder->icmp(Builder::INT_NE, $typeByte, $nullType);
-                $falsy = $context->builder->or($isNull, $isUndef);
 
-                return $context->builder->select(
-                    $falsy,
-                    $context->constantFromBool(false),
-                    $context->builder->select($isBool, $boolTruthy, $nonNull)
-                );
+                return self::boxedTruthyScalar($context, $loaded);
             case JITVariable::TYPE_HASHTABLE:
                 $ht = $context->helper->loadValue($args[0]);
                 $num = $context->builder->call(
@@ -154,6 +129,57 @@ final class boolval extends Internal
             default:
                 throw new \LogicException('boolval() does not support this value type in this compiler build');
         }
+    }
+
+    /**
+     * Boxed scalar truthiness for boolval()/castToBool (standalone AOT literals; #15704).
+     */
+    private static function boxedTruthyScalar(Context $context, Value $valuePtr): Value
+    {
+        $map = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($valuePtr, $map['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $false = $context->constantFromBool(false);
+        $falsy = $context->builder->or(
+            $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(Variable::TYPE_NULL, false)),
+            $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(Variable::TYPE_UNDEFINED, false))
+        );
+
+        $isBool = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(JITVariable::TYPE_NATIVE_BOOL, false)
+        );
+        $valueField = $context->builder->structGep($valuePtr, $map['value']);
+        $firstByte = $context->builder->inBoundsGEP(
+            $valueField,
+            $context->getTypeFromString('int32')->constInt(0, false),
+            $context->getTypeFromString('int64')->constInt(0, false)
+        );
+        $boolTruthy = $context->builder->icmp(
+            Builder::INT_NE,
+            $context->builder->load($firstByte),
+            $i8->constInt(0, false)
+        );
+
+        $isInt = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_INTEGER, false)
+        );
+        $zeroI64 = $context->getTypeFromString('int64')->constInt(0, false);
+        $longVal = $context->builder->call($context->lookupFunction('__value__readLong'), $valuePtr);
+        $intTruthy = $context->builder->icmp(Builder::INT_NE, $longVal, $zeroI64);
+
+        $typedTruthy = $context->builder->select(
+            $isBool,
+            $boolTruthy,
+            $context->builder->select($isInt, $intTruthy, $false)
+        );
+
+        return $context->builder->select($falsy, $false, $typedTruthy);
     }
 
     public static function stringTruthy(Context $context, Value $strPtr): Value
