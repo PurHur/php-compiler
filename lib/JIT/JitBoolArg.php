@@ -37,8 +37,8 @@ final class JitBoolArg
         if (Variable::TYPE_VALUE === $arg->type) {
             return self::lowerBoxed($context, $arg, $contextLabel);
         }
-        if (Variable::TYPE_NULL === $arg->type) {
-            self::emitTypeErrorAndAbort($context, $contextLabel, 'null');
+        if (Variable::TYPE_NULL === $arg->type || $arg->isNullConstant) {
+            return $context->constantFromBool(false);
         }
         if (Variable::TYPE_HASHTABLE === $arg->type || ($arg->type & Variable::IS_NATIVE_ARRAY)) {
             self::emitTypeErrorAndAbort($context, $contextLabel, 'array');
@@ -152,11 +152,25 @@ final class JitBoolArg
         $i8 = $context->getTypeFromString('int8');
         $i1 = $context->getTypeFromString('int1');
 
+        $nullBlock = BasicBlockHelper::append($context, 'jit_bool_vbox_null');
+        $afterNull = BasicBlockHelper::append($context, 'jit_bool_vbox_after_null');
+        $isNull = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(VmVariable::TYPE_NULL, false)
+        );
+        $context->builder->branchIf($isNull, $nullBlock, $afterNull);
+        $context->builder->positionAtEnd($nullBlock);
+        $nullFalse = $context->constantFromBool(false);
+        $nullEnd = $context->builder->getInsertBlock();
+        $mergeBlock = BasicBlockHelper::append($context, 'jit_bool_vbox_merge');
+        $context->builder->branch($mergeBlock);
+        $context->builder->positionAtEnd($afterNull);
+
         foreach (
             [
                 [VmVariable::TYPE_ARRAY, 'array'],
                 [VmVariable::TYPE_OBJECT, 'object'],
-                [VmVariable::TYPE_NULL, 'null'],
                 [VmVariable::TYPE_STRING, 'string'],
             ] as [$vmType, $label]
         ) {
@@ -188,7 +202,6 @@ final class JitBoolArg
 
         $boolBlock = BasicBlockHelper::append($context, 'jit_bool_vbox_bool');
         $longBlock = BasicBlockHelper::append($context, 'jit_bool_vbox_long');
-        $mergeBlock = BasicBlockHelper::append($context, 'jit_bool_vbox_merge');
         $isBool = boolval::isBoxedBoolTypeTag($context, $typeByte);
         $context->builder->branchIf($isBool, $boolBlock, $longBlock);
 
@@ -215,6 +228,7 @@ final class JitBoolArg
 
         $context->builder->positionAtEnd($mergeBlock);
         $phi = $context->builder->phi($i1);
+        $phi->addIncoming($nullFalse, $nullEnd);
         $phi->addIncoming($boolVal, $boolEnd);
         $phi->addIncoming($longVal, $longEnd);
 

@@ -7,7 +7,6 @@ $cases = [
     'gmdate(null)' => static fn () => gmdate(null),
     'strtotime(null)' => static fn () => strtotime(null),
     'checkdate(null, 1, 2024)' => static fn () => checkdate(null, 1, 2024),
-    'microtime(null)' => static fn () => microtime(null),
     'timezone_open(null)' => static fn () => timezone_open(null),
 ];
 
@@ -20,3 +19,10 @@ foreach ($cases as $label => $call) {
         echo "$label: ok\n";
     }
 }
+
+$s = microtime(null);
+if (!\is_string($s) || !preg_match('/^\d+\.\d+ \d+$/', $s)) {
+    fwrite(STDERR, "microtime(null): expected string timestamp\n");
+    exit(1);
+}
+echo "microtime(null): ok\n";
