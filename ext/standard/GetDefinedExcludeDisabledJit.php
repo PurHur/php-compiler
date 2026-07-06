@@ -47,13 +47,9 @@ final class GetDefinedExcludeDisabledJit
         }
 
         $arg = $args[0];
-        if (JITVariable::TYPE_NATIVE_BOOL === $arg->type) {
-            $llvm = $arg->value;
-            if (null !== $llvm && method_exists($llvm, 'isConstant') && $llvm->isConstant()) {
-                return (bool) $llvm->getConstantValue();
-            }
-
-            return null;
+        $literalBool = self::compileTimeBool($context, $arg);
+        if (null !== $literalBool) {
+            return $literalBool;
         }
         $literal = JitStringArg::compileTimeLiteral($arg);
         if (null !== $literal) {
@@ -63,6 +59,23 @@ final class GetDefinedExcludeDisabledJit
             }
             if (\in_array($lower, ['0', 'false', 'off', 'no', ''], true)) {
                 return false;
+            }
+        }
+
+        return null;
+    }
+
+    private static function compileTimeBool(Context $context, JITVariable $var): ?bool
+    {
+        if (JITVariable::TYPE_NATIVE_BOOL === $var->type
+            && JITVariable::KIND_VALUE === $var->kind) {
+            $raw = $var->value->value ?? null;
+            if (null === $raw) {
+                return null;
+            }
+            $lib = $context->llvm->lib;
+            if (null !== $lib->LLVMIsAConstantInt($raw)) {
+                return 0 !== (int) $lib->LLVMConstIntGetZExtValue($raw);
             }
         }
 
