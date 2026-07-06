@@ -2,8 +2,6 @@
 
 declare(strict_types=1);
 
-$expected = ['command', 'pid', 'running', 'signaled', 'stopped', 'exitcode', 'termsig', 'stopsig'];
-
 $desc = [1 => ['pipe', 'w']];
 $proc = proc_open('echo ok', $desc, $pipes);
 if (!\is_resource($proc)) {
@@ -11,7 +9,12 @@ if (!\is_resource($proc)) {
     exit(1);
 }
 
-$keys = \array_keys(proc_get_status($proc));
+$status = proc_get_status($proc);
+$expected = ['command', 'pid', 'running', 'signaled', 'stopped', 'exitcode', 'termsig', 'stopsig'];
+if (\array_key_exists('pending_signals', $status)) {
+    $expected[] = 'pending_signals';
+}
+$keys = \array_keys($status);
 if ($keys !== $expected) {
     echo 'fail: key order ', \implode(',', $keys), ' expected ', \implode(',', $expected), "\n";
     \fclose($pipes[1]);
