@@ -138,6 +138,10 @@ PHP;
 
     public function testBarePrivateSetWithoutReadRejects(): void
     {
+        if (CompilerVersion::supportsParenthesizedAsymmetricSetModifier()) {
+            $this->markTestSkipped('bare private(set) shorthand accepted on PHP 8.4.0+ forward profile (#16924)');
+        }
+
         $source = 'private(set) string $x;';
         $this->expectException(\CompileError::class);
         $this->expectExceptionMessage(AsymmetricVisibilityRewriter::BARE_SET_WITHOUT_READ_MESSAGE);
@@ -146,10 +150,36 @@ PHP;
 
     public function testBareProtectedSetWithoutReadRejects(): void
     {
+        if (CompilerVersion::supportsParenthesizedAsymmetricSetModifier()) {
+            $this->markTestSkipped('bare protected(set) shorthand accepted on PHP 8.4.0+ forward profile (#16924)');
+        }
+
         $source = 'protected(set) string $x;';
         $this->expectException(\CompileError::class);
         $this->expectExceptionMessage(AsymmetricVisibilityRewriter::BARE_SET_WITHOUT_READ_MESSAGE);
         AsymmetricVisibilityRewriter::rewrite($source);
+    }
+
+    public function testBarePrivateSetWithoutReadRewritesOnForwardProfile(): void
+    {
+        $this->requireParenthesizedAsymmetricSetModifier();
+        $source = 'private(set) string $x = "a";';
+        $rewritten = AsymmetricVisibilityRewriter::rewrite($source);
+        self::assertStringContainsString(
+            '/*phpc-asymmetric-set:private*/ public string $x',
+            preg_replace('/\s+/', ' ', $rewritten)
+        );
+    }
+
+    public function testBareProtectedSetWithoutReadRewritesOnForwardProfile(): void
+    {
+        $this->requireParenthesizedAsymmetricSetModifier();
+        $source = 'protected(set) string $x = "a";';
+        $rewritten = AsymmetricVisibilityRewriter::rewrite($source);
+        self::assertStringContainsString(
+            '/*phpc-asymmetric-set:protected*/ protected string $x',
+            preg_replace('/\s+/', ' ', $rewritten)
+        );
     }
 
     public function testRewritePrivateGet(): void
