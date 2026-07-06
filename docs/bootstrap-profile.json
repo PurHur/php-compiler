@@ -151,6 +151,7 @@
         "ext/dom/ElementAppendChild.php",
         "ext/dom/ElementGetAttribute.php",
         "ext/dom/ElementGetAttributeNS.php",
+        "ext/dom/ElementGetAttributeNames.php",
         "ext/dom/ElementGetAttributeNode.php",
         "ext/dom/ElementGetElementsByTagName.php",
         "ext/dom/ElementGetElementsByTagNameNS.php",
@@ -213,6 +214,7 @@
         "ext/dom/NodeRemove.php",
         "ext/dom/NodeRemoveChild.php",
         "ext/dom/NodeReplaceChild.php",
+        "ext/dom/NodeReplaceChildren.php",
         "ext/dom/NodeReplaceWith.php",
         "ext/dom/VmDom.php",
         "ext/filter/BuiltinEnums.php",
@@ -649,6 +651,9 @@
         "ext/spl/VmSplObserver.php",
         "ext/spl/VmSplRegistry.php",
         "ext/spl/spl_classes.php",
+        "ext/sqlite3/BuiltinClasses.php",
+        "ext/sqlite3/Module.php",
+        "ext/sqlite3/bootstrap_sqlite3exception.php",
         "ext/standard/AbsJitHelper.php",
         "ext/standard/AcosJitHelper.php",
         "ext/standard/AcoshJitHelper.php",
@@ -4388,9 +4393,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 4154,
+        "inventory_files": 4159,
         "excluded": 0,
-        "eligible": 4154,
+        "eligible": 4159,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
