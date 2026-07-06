@@ -419,7 +419,7 @@ final class CompilerVersion
     public static function advertisesNoDiscardAttributeClass(): bool
     {
         // Stable 8.4.0+ only — 8.4.0-dev reference profile matches Zend 8.2 phantom gate (#13706).
-        return version_compare(self::VERSION, '8.4.0', '>=');
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
     }
 
     /**
