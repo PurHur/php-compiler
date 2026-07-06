@@ -24,12 +24,15 @@ final class ResponseContext
     /** When false (CLI), header() does not queue lines for headers_list() — php-src head.c SAPI gate (#4037). */
     private static bool $headerQueueEnabled = false;
 
+    private static bool $fastCgiRequestFinished = false;
+
     public static function reset(): void
     {
         self::$status = 0;
         self::$headers = [];
         OutputRewriteVarsJitHelper::reset();
         self::$headerQueueEnabled = false;
+        self::$fastCgiRequestFinished = false;
     }
 
     /** Enable pending-header tracking for CGI/dev-server requests (issue #4037). */
@@ -207,5 +210,16 @@ final class ResponseContext
     public static function listRewriteVars(): array
     {
         return VmOutputRewriteVars::list();
+    }
+
+    /** fastcgi_finish_request() flushed the response to the client (#3466). */
+    public static function markFastCgiRequestFinished(): void
+    {
+        self::$fastCgiRequestFinished = true;
+    }
+
+    public static function isFastCgiRequestFinished(): bool
+    {
+        return self::$fastCgiRequestFinished;
     }
 }
