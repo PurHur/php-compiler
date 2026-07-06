@@ -688,7 +688,8 @@ class VMTest extends BaseTest {
                 continue;
             }
             if (!CompilerVersion::supportsPropertyHooks()
-                && str_contains($name, 'property_hook')
+                && (str_contains($name, 'property_hook')
+                    || str_contains($name, 'property_magic_const'))
                 && !str_contains($name, 'reference_profile')) {
                 continue;
             }
