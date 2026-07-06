@@ -619,11 +619,14 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.4+ get_defined_functions() optional $exclude_disabled (ext/standard/basic_functions.c, #4942).
+     * PHP 8.2+ get_defined_functions() optional $exclude_disabled (ext/standard/basic_functions.c, #4942).
+     *
+     * Unlike {@see supportsGetDeclaredExcludeDeprecated()} (PHP 8.4-only), Zend exposes this on the
+     * reference profile — BuiltinParamNames must register exclude_disabled without forward gating.
      */
     public static function supportsGetDefinedFunctionsExcludeDisabled(): bool
     {
-        return self::supportsGetDeclaredExcludeDeprecated();
+        return version_compare(self::REFERENCE_PHP_VERSION, '8.2.0', '>=');
     }
 
     /**

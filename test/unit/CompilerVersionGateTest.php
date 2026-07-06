@@ -740,9 +740,9 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
-    public function testSupportsGetDefinedFunctionsExcludeDisabledFalseOnReferenceProfile(): void
+    public function testSupportsGetDefinedFunctionsExcludeDisabledTrueOnReferenceProfile(): void
     {
-        $this->assertFalse(CompilerVersion::supportsGetDefinedFunctionsExcludeDisabled());
+        $this->assertTrue(CompilerVersion::supportsGetDefinedFunctionsExcludeDisabled());
     }
 
     public function testSupportsGetDefinedFunctionsExcludeDisabledTrueOnForwardProfile(): void
