@@ -413,13 +413,33 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.4+ forward-profile builtin attribute classes on 8.4.0-dev reference builds (#13706, #16977).
+     *
+     * Withheld when {@see PHP_COMPILER_PROFILE} is unset (matches Zend 8.2 phantom gate even if the
+     * harness exports a forward profile). Enable via stable 8.4.0+ or explicit profile opt-in.
+     */
+    private static function advertisesForwardProfile84BuiltinAttributeClass(): bool
+    {
+        if (version_compare(self::VERSION, '8.4.0', '>=')) {
+            return true;
+        }
+
+        $raw = getenv('PHP_COMPILER_PROFILE');
+        if (!\is_string($raw) || '' === trim($raw)) {
+            return false;
+        }
+
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+    }
+
+    /**
      * PHP 8.3+ #[\Override] builtin attribute class advertisement (Zend/zend_attributes.c, #11902, #12387, #16825).
      *
-     * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev reference profile matches Zend 8.2 phantom gate.
+     * Gated on stable 8.4.0 / explicit forward profile so 8.4.0-dev reference matches Zend 8.2 phantom gate.
      */
     public static function advertisesOverrideAttributeClass(): bool
     {
-        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+        return self::advertisesForwardProfile84BuiltinAttributeClass();
     }
 
     /** PHP 8.4+ #[\Deprecated] builtin attribute class advertisement (Zend/zend_attributes.c, #11902). */
@@ -442,8 +462,7 @@ final class CompilerVersion
     /** PHP 8.4+ #[\NoDiscard] builtin attribute class advertisement (Zend/zend_attributes.c, #11902). */
     public static function advertisesNoDiscardAttributeClass(): bool
     {
-        // Stable 8.4.0+ only — 8.4.0-dev reference profile matches Zend 8.2 phantom gate (#13706).
-        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+        return self::advertisesForwardProfile84BuiltinAttributeClass();
     }
 
     /**
@@ -459,8 +478,7 @@ final class CompilerVersion
     /** PHP 8.4+ #[\EnumCases] builtin attribute class advertisement (Zend/zend_attributes.c, #13057). */
     public static function advertisesEnumCasesAttributeClass(): bool
     {
-        // Stable 8.4.0+ only — 8.4.0-dev reference profile matches Zend 8.2 phantom gate (#13706).
-        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+        return self::advertisesForwardProfile84BuiltinAttributeClass();
     }
 
     /** PHP 8.3+ ReflectionConstant class advertisement (ext/reflection/php_reflection.c, #12385, #13497, #16837). */
@@ -473,15 +491,13 @@ final class CompilerVersion
     /** PHP 8.4+ #[\DelayedTargetValidation] builtin attribute class advertisement (#11902). */
     public static function advertisesDelayedTargetValidationAttributeClass(): bool
     {
-        // Stable 8.4.0+ only — 8.4.0-dev reference profile matches Zend 8.2 phantom gate (#12598).
-        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+        return self::advertisesForwardProfile84BuiltinAttributeClass();
     }
 
     /** PHP 8.4+ #[\CompileTime] builtin attribute class advertisement (#11902). */
     public static function advertisesCompileTimeAttributeClass(): bool
     {
-        // Stable 8.4.0+ only — 8.4.0-dev reference profile matches Zend 8.2 phantom gate (#12598).
-        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+        return self::advertisesForwardProfile84BuiltinAttributeClass();
     }
 
     /**

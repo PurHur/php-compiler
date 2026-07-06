@@ -11,6 +11,11 @@ use PHPUnit\Framework\TestCase;
 /** @covers issue #11902, #12328 */
 final class BuiltinAttributePhantomTest extends TestCase
 {
+    protected function setUp(): void
+    {
+        putenv('PHP_COMPILER_PROFILE');
+    }
+
     public function testForwardCompatAttributeClassesAdvertisedOn84DevProfile(): void
     {
         $this->assertFalse(CompilerVersion::advertisesOverrideAttributeClass());
