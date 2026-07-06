@@ -109,6 +109,10 @@ final class VmStreamSupports
             $constants['STREAM_SUPPORT_SEEK'] = self::STREAM_SUPPORT_SEEK;
             $constants['STREAM_SUPPORT_TELL'] = self::STREAM_SUPPORT_TELL;
         }
+        if (CompilerVersion::supportsStreamSupportReadWriteConstants()) {
+            $constants['STREAM_SUPPORT_READ'] = self::STREAM_SUPPORT_READ;
+            $constants['STREAM_SUPPORT_WRITE'] = self::STREAM_SUPPORT_WRITE;
+        }
 
         return $constants;
     }

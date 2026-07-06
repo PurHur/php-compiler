@@ -918,6 +918,17 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.4+ STREAM_SUPPORT_READ/WRITE constants (ext/standard/streams.c, issue #16846).
+     *
+     * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev reference profile
+     * matches Zend 8.2/8.3 phantom gate. Enable forward profile via `PHP_COMPILER_PROFILE=8.4`.
+     */
+    public static function supportsStreamSupportReadWriteConstants(): bool
+    {
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+    }
+
+    /**
      * PHP 8.3+ json_validate() (ext/json/php_json.c, issue #3101, #11826, #12363, #13365, #14518, #14708, #14972, #15026, #15196, #15241, #16091).
      *
      * Withheld on 8.4.0-dev reference profile (matches Zend 8.2 — json_validate absent).
