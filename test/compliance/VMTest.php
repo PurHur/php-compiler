@@ -773,6 +773,10 @@ class VMTest extends BaseTest {
                 && str_contains($name, 'readonly_anonymous_defaults')) {
                 continue;
             }
+            if (!CompilerVersion::supportsReadonlyAnonymousClass()
+                && str_contains($name, 'anonymous_readonly_class_forward_84')) {
+                continue;
+            }
             // 8.3-target reject gate; skipped when typed function-local static enabled (#16512, #9998).
             if (CompilerVersion::supportsTypedFunctionStatic()
                 && str_contains($name, 'typed_function_static_reference_profile')) {
