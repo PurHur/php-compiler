@@ -128,7 +128,7 @@ final class StringFileGetContentsLibc
             $context->lookupFunction('__mm__free'),
             $context->builder->load($dataBufSlot)
         );
-        $context->builder->call($context->lookupFunction('free'), $chunkBuf);
+        $context->builder->call($context->lookupFunction('__mm__free'), $chunkBuf);
         $context->builder->returnValue($nullStr);
 
         $context->builder->positionAtEnd($readOkBlock);
@@ -164,7 +164,7 @@ final class StringFileGetContentsLibc
             $context->lookupFunction('__mm__free'),
             $context->builder->load($dataBufSlot)
         );
-        $context->builder->call($context->lookupFunction('free'), $chunkBuf);
+        $context->builder->call($context->lookupFunction('__mm__free'), $chunkBuf);
         $context->builder->returnValue($nullStr);
 
         $context->builder->positionAtEnd($reallocOkBlock);
@@ -186,7 +186,7 @@ final class StringFileGetContentsLibc
 
         $context->builder->positionAtEnd($loopDone);
         $context->builder->call($context->lookupFunction('close'), $fd);
-        $context->builder->call($context->lookupFunction('free'), $chunkBuf);
+        $context->builder->call($context->lookupFunction('__mm__free'), $chunkBuf);
 
         $finalSize = $context->builder->load($sizeSlot);
         $dataPtr = $context->builder->pointerCast($context->builder->load($dataBufSlot), $i8p);
