@@ -34,6 +34,12 @@ final class BuiltinClasses
 
     private static function registerCurlFile(Context $ctx): void
     {
+        if (CurlExtensionPolicy::advertisesBuiltins()) {
+            CurlFileBuiltin::register($ctx);
+
+            return;
+        }
+
         if (isset($ctx->classes['curlfile'])) {
             return;
         }

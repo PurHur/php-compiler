@@ -69,6 +69,7 @@ class Module extends ModuleAbstract
             new curl_strerror(),
             new curl_multi_strerror(),
             new curl_upkeep(),
+            new curl_file_create(),
         ];
     }
 }
