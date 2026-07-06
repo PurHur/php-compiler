@@ -52,6 +52,8 @@ final class VmDom
 
     public const CLASS_NODE_LIST = 'domnodelist';
 
+    public const CLASS_NAMED_NODE_MAP = 'domnamednodemap';
+
     public const PROP_FORMAT_OUTPUT = 'formatOutput';
 
     public const PROP_IMPLEMENTATION = 'implementation';
@@ -107,6 +109,8 @@ final class VmDom
     public const PROP_LAST_CHILD = 'lastChild';
 
     public const PROP_CHILD_NODES = 'childNodes';
+
+    public const PROP_ATTRIBUTES = 'attributes';
 
     public const PROP_NEXT_SIBLING = 'nextSibling';
 
@@ -273,6 +277,35 @@ final class VmDom
         $nodeList->methodVisibility['next'] = $pub;
         $ctx->classes[self::CLASS_NODE_LIST] = $nodeList;
 
+        $namedNodeMap = new ClassEntry('DOMNamedNodeMap');
+        $namedNodeMap->isInternal = true;
+        $namedNodeMap->interfaces[] = 'countable';
+        if (isset($ctx->classes['iterator'])) {
+            $namedNodeMap->interfaces[] = 'iterator';
+        }
+        if (isset($ctx->classes['traversable'])) {
+            $namedNodeMap->interfaces[] = 'traversable';
+        }
+        $namedNodeMap->properties[] = new ClassProperty(self::PROP_LENGTH, null, $intProto);
+        $namedNodeMap->methods['item'] = new NamedNodeMapItem();
+        $namedNodeMap->methodVisibility['item'] = $pub;
+        $namedNodeMap->methods['getnameditem'] = new NamedNodeMapGetNamedItem();
+        $namedNodeMap->methodVisibility['getnameditem'] = $pub;
+        $namedNodeMap->methodNames['getnameditem'] = 'getNamedItem';
+        $namedNodeMap->methods['count'] = new NamedNodeMapCount();
+        $namedNodeMap->methodVisibility['count'] = $pub;
+        $namedNodeMap->methods['rewind'] = new NamedNodeMapRewind();
+        $namedNodeMap->methodVisibility['rewind'] = $pub;
+        $namedNodeMap->methods['valid'] = new NamedNodeMapValid();
+        $namedNodeMap->methodVisibility['valid'] = $pub;
+        $namedNodeMap->methods['current'] = new NamedNodeMapCurrent();
+        $namedNodeMap->methodVisibility['current'] = $pub;
+        $namedNodeMap->methods['key'] = new NamedNodeMapKey();
+        $namedNodeMap->methodVisibility['key'] = $pub;
+        $namedNodeMap->methods['next'] = new NamedNodeMapNext();
+        $namedNodeMap->methodVisibility['next'] = $pub;
+        $ctx->classes[self::CLASS_NAMED_NODE_MAP] = $namedNodeMap;
+
         $impl = new ClassEntry('DOMImplementation');
         $impl->isInternal = true;
         $impl->methods['createdocument'] = new ImplementationCreateDocument();
@@ -381,6 +414,7 @@ final class VmDom
         $element->isInternal = true;
         $element->parentLc = self::CLASS_NODE;
         $element->properties[] = new ClassProperty(self::PROP_NODE_NAME, null, $strProto);
+        $element->properties[] = new ClassProperty(self::PROP_ATTRIBUTES, $nullProto, $objProto);
         $element->methods['appendchild'] = new ElementAppendChild();
         $element->methodVisibility['appendchild'] = $pub;
         $element->methods['getattribute'] = new ElementGetAttribute();
@@ -743,7 +777,7 @@ final class VmDom
         return $var;
     }
 
-    public static function setAttributeNode(ObjectEntry $element, ObjectEntry $attr): Variable
+    public static function setAttributeNode(Context $ctx, ObjectEntry $element, ObjectEntry $attr): Variable
     {
         if (!self::isElement($element)) {
             throw new \DOMException('Not an element node');
@@ -774,6 +808,7 @@ final class VmDom
         if (null !== $elementState->idAttributeName && $name === $elementState->idAttributeName) {
             self::syncElementIdRegistration($element);
         }
+        self::syncElementAttributes($ctx, $element);
         $var = new Variable();
         if (null === $replaced) {
             $var->null();
@@ -784,7 +819,7 @@ final class VmDom
         return $var;
     }
 
-    public static function removeAttributeNode(ObjectEntry $element, ObjectEntry $attr): Variable
+    public static function removeAttributeNode(Context $ctx, ObjectEntry $element, ObjectEntry $attr): Variable
     {
         if (!self::isElement($element)) {
             throw new \DOMException('Not an element node');
@@ -811,6 +846,7 @@ final class VmDom
             }
             $elementState->idAttributeName = null;
         }
+        self::syncElementAttributes($ctx, $element);
         $var = new Variable(Variable::TYPE_OBJECT);
         $var->object($attr);
 
@@ -924,6 +960,7 @@ final class VmDom
     }
 
     public static function setAttributeNS(
+        Context $ctx,
         ObjectEntry $element,
         ?string $namespace,
         string $qualifiedName,
@@ -947,9 +984,10 @@ final class VmDom
         if (null !== $state->idAttributeName && $qualifiedName === $state->idAttributeName) {
             self::syncElementIdRegistration($element);
         }
+        self::syncElementAttributes($ctx, $element);
     }
 
-    public static function removeAttributeNS(ObjectEntry $element, ?string $namespace, string $localName): bool
+    public static function removeAttributeNS(Context $ctx, ObjectEntry $element, ?string $namespace, string $localName): bool
     {
         if (!self::isElement($element)) {
             throw new \DOMException('Not an element node');
@@ -989,6 +1027,7 @@ final class VmDom
             }
             $state->idAttributeName = null;
         }
+        self::syncElementAttributes($ctx, $element);
 
         return true;
     }
@@ -3464,7 +3503,7 @@ final class VmDom
             throw new \DOMException('Not an element node');
         }
 
-        return self::createNodeList($ctx, self::collectElementsByTagName($node, $tagName));
+        return self::createLiveTagNameNodeList($ctx, $node, $tagName);
     }
 
     /**
@@ -3506,7 +3545,7 @@ final class VmDom
             throw new \DOMException('Not an element node');
         }
 
-        return self::createNodeList($ctx, self::collectElementsByTagNameNS($node, $namespaceUri, $localName));
+        return self::createLiveTagNameNSNodeList($ctx, $node, $namespaceUri, $localName);
     }
 
     public static function nodeListItem(ObjectEntry $nodeList, int $index): ?ObjectEntry
@@ -3514,12 +3553,9 @@ final class VmDom
         if (!self::isNodeList($nodeList)) {
             throw new \LogicException('DOMNodeList::item() called on non-nodelist in this compiler build');
         }
-        $ids = DomRegistry::state($nodeList)->listNodeIds;
-        if (!isset($ids[$index])) {
-            return null;
-        }
+        self::refreshNodeListIfLive($nodeList);
 
-        return DomRegistry::entry($ids[$index]);
+        return self::collectionItem($nodeList, $index);
     }
 
     public static function nodeListRewind(ObjectEntry $nodeList): void
@@ -3535,6 +3571,7 @@ final class VmDom
         if (!self::isNodeList($nodeList)) {
             throw new \LogicException('DOMNodeList::valid() called on non-nodelist in this compiler build');
         }
+        self::refreshNodeListIfLive($nodeList);
         $state = DomRegistry::state($nodeList);
 
         return $state->listIterIndex < \count($state->listNodeIds);
@@ -3560,6 +3597,16 @@ final class VmDom
         }
 
         return DomRegistry::state($nodeList)->listIterIndex;
+    }
+
+    public static function nodeListCount(ObjectEntry $nodeList): int
+    {
+        if (!self::isNodeList($nodeList)) {
+            throw new \LogicException('DOMNodeList::count() called on non-nodelist in this compiler build');
+        }
+        self::refreshNodeListIfLive($nodeList);
+
+        return \count(DomRegistry::state($nodeList)->listNodeIds);
     }
 
     public static function nodeListNext(ObjectEntry $nodeList): void
@@ -3597,11 +3644,191 @@ final class VmDom
         return $var;
     }
 
+    public static function createLiveTagNameNodeList(
+        Context $ctx,
+        ObjectEntry $root,
+        string $tagName
+    ): Variable {
+        $var = self::createNodeList($ctx, self::collectElementsByTagName($root, $tagName));
+        $state = DomRegistry::state($var->toObject());
+        $state->listQueryRootId = $root->id;
+        $state->listQueryTagName = $tagName;
+
+        return $var;
+    }
+
+    public static function createLiveTagNameNSNodeList(
+        Context $ctx,
+        ObjectEntry $root,
+        string $namespaceUri,
+        string $localName
+    ): Variable {
+        $var = self::createNodeList(
+            $ctx,
+            self::collectElementsByTagNameNS($root, $namespaceUri, $localName)
+        );
+        $state = DomRegistry::state($var->toObject());
+        $state->listQueryRootId = $root->id;
+        $state->listQueryNamespaceUri = $namespaceUri;
+        $state->listQueryLocalName = $localName;
+
+        return $var;
+    }
+
+    public static function refreshNodeListIfLive(ObjectEntry $nodeList): void
+    {
+        if (!self::isNodeList($nodeList)) {
+            return;
+        }
+        $state = DomRegistry::state($nodeList);
+        if (null === $state->listQueryRootId) {
+            return;
+        }
+        $root = DomRegistry::entry($state->listQueryRootId);
+        if (null === $root) {
+            self::updateNodeListMembers($nodeList, []);
+
+            return;
+        }
+        if (null !== $state->listQueryTagName) {
+            $ids = self::collectElementsByTagName($root, $state->listQueryTagName);
+        } elseif (null !== $state->listQueryLocalName) {
+            $ids = self::collectElementsByTagNameNS(
+                $root,
+                $state->listQueryNamespaceUri ?? '',
+                $state->listQueryLocalName
+            );
+        } else {
+            return;
+        }
+        self::updateNodeListMembers($nodeList, $ids);
+    }
+
     public static function isNodeList(ObjectEntry $entry): bool
     {
         return self::CLASS_NODE_LIST === strtolower($entry->class->name)
             && DomRegistry::has($entry)
             && DomConstants::XML_NODELIST === DomRegistry::state($entry)->nodeType;
+    }
+
+    public static function namedNodeMapItem(ObjectEntry $namedNodeMap, int $index): ?ObjectEntry
+    {
+        if (!self::isNamedNodeMap($namedNodeMap)) {
+            throw new \LogicException('DOMNamedNodeMap::item() called on non-namednodemap in this compiler build');
+        }
+
+        return self::collectionItem($namedNodeMap, $index);
+    }
+
+    public static function namedNodeMapGetNamedItem(ObjectEntry $namedNodeMap, string $name): ?ObjectEntry
+    {
+        if (!self::isNamedNodeMap($namedNodeMap)) {
+            throw new \LogicException('DOMNamedNodeMap::getNamedItem() called on non-namednodemap in this compiler build');
+        }
+        $state = DomRegistry::state($namedNodeMap);
+        foreach ($state->listNodeIds as $nodeId) {
+            $node = DomRegistry::entry($nodeId);
+            if (null === $node || !self::isAttr($node)) {
+                continue;
+            }
+            if (DomRegistry::state($node)->nodeName === $name) {
+                return $node;
+            }
+        }
+
+        return null;
+    }
+
+    public static function namedNodeMapRewind(ObjectEntry $namedNodeMap): void
+    {
+        if (!self::isNamedNodeMap($namedNodeMap)) {
+            throw new \LogicException('DOMNamedNodeMap::rewind() called on non-namednodemap in this compiler build');
+        }
+        DomRegistry::state($namedNodeMap)->listIterIndex = 0;
+    }
+
+    public static function namedNodeMapValid(ObjectEntry $namedNodeMap): bool
+    {
+        if (!self::isNamedNodeMap($namedNodeMap)) {
+            throw new \LogicException('DOMNamedNodeMap::valid() called on non-namednodemap in this compiler build');
+        }
+        $state = DomRegistry::state($namedNodeMap);
+
+        return $state->listIterIndex < \count($state->listNodeIds);
+    }
+
+    public static function namedNodeMapCurrent(ObjectEntry $namedNodeMap): ?ObjectEntry
+    {
+        if (!self::isNamedNodeMap($namedNodeMap)) {
+            throw new \LogicException('DOMNamedNodeMap::current() called on non-namednodemap in this compiler build');
+        }
+        $state = DomRegistry::state($namedNodeMap);
+        if ($state->listIterIndex < 0 || $state->listIterIndex >= \count($state->listNodeIds)) {
+            return null;
+        }
+
+        return self::namedNodeMapItem($namedNodeMap, $state->listIterIndex);
+    }
+
+    public static function namedNodeMapKey(ObjectEntry $namedNodeMap): int
+    {
+        if (!self::isNamedNodeMap($namedNodeMap)) {
+            throw new \LogicException('DOMNamedNodeMap::key() called on non-namednodemap in this compiler build');
+        }
+
+        return DomRegistry::state($namedNodeMap)->listIterIndex;
+    }
+
+    public static function namedNodeMapNext(ObjectEntry $namedNodeMap): void
+    {
+        if (!self::isNamedNodeMap($namedNodeMap)) {
+            throw new \LogicException('DOMNamedNodeMap::next() called on non-namednodemap in this compiler build');
+        }
+        ++DomRegistry::state($namedNodeMap)->listIterIndex;
+    }
+
+    /**
+     * @param list<int> $nodeIds
+     */
+    public static function createNamedNodeMap(Context $ctx, array $nodeIds): Variable
+    {
+        $class = $ctx->classes[self::CLASS_NAMED_NODE_MAP] ?? null;
+        if (null === $class) {
+            throw new \LogicException('DOMNamedNodeMap is not registered in this compiler build');
+        }
+
+        $entry = new ObjectEntry($class);
+        $entry->constructed = true;
+        $entry->getProperty(self::PROP_LENGTH)->int(\count($nodeIds));
+
+        $state = new DomNodeState();
+        $state->nodeType = DomConstants::XML_NAMEDNODEMAP;
+        $state->nodeName = '#namednodemap';
+        $state->listNodeIds = $nodeIds;
+        $state->listIterIndex = 0;
+        DomRegistry::attach($entry, $state);
+
+        $var = new Variable(Variable::TYPE_OBJECT);
+        $var->object($entry);
+
+        return $var;
+    }
+
+    public static function isNamedNodeMap(ObjectEntry $entry): bool
+    {
+        return self::CLASS_NAMED_NODE_MAP === strtolower($entry->class->name)
+            && DomRegistry::has($entry)
+            && DomConstants::XML_NAMEDNODEMAP === DomRegistry::state($entry)->nodeType;
+    }
+
+    private static function collectionItem(ObjectEntry $collection, int $index): ?ObjectEntry
+    {
+        $ids = DomRegistry::state($collection)->listNodeIds;
+        if (!isset($ids[$index])) {
+            return null;
+        }
+
+        return DomRegistry::entry($ids[$index]);
     }
 
     private static function initDocumentTypePropertySlots(
@@ -3637,6 +3864,86 @@ final class VmDom
         if (!$entry->hasProperty(self::PROP_CHILD_NODES)) {
             $entry->allocateProperty(self::PROP_CHILD_NODES)->null();
         }
+    }
+
+    private static function initElementPropertySlots(ObjectEntry $entry): void
+    {
+        self::initNodePropertySlots($entry);
+        if (!$entry->hasProperty(self::PROP_ATTRIBUTES)) {
+            $entry->allocateProperty(self::PROP_ATTRIBUTES)->null();
+        }
+    }
+
+    /**
+     * @return list<int>
+     */
+    private static function collectAttributeNodeIds(Context $ctx, ObjectEntry $element): array
+    {
+        $state = DomRegistry::state($element);
+        $ids = [];
+        foreach ($state->attributes as $name => $value) {
+            $cachedId = $state->attributeNodeIds[$name] ?? null;
+            if (null !== $cachedId) {
+                $cached = DomRegistry::entry($cachedId);
+                if (null !== $cached && self::isAttr($cached)) {
+                    self::syncAttributeNodeValue($cached, $value);
+                    $ids[] = $cachedId;
+
+                    continue;
+                }
+            }
+            $attr = self::attributeNodeForElement($ctx, $element, $name, $value);
+            $ids[] = $attr->id;
+        }
+
+        return $ids;
+    }
+
+    private static function syncElementAttributes(Context $ctx, ObjectEntry $element): void
+    {
+        if (!self::isElement($element)) {
+            return;
+        }
+        self::initElementPropertySlots($element);
+        $state = DomRegistry::state($element);
+        $attrIds = self::collectAttributeNodeIds($ctx, $element);
+
+        $attrsVar = $element->getProperty(self::PROP_ATTRIBUTES);
+        if (null !== $state->attributesListId) {
+            $map = DomRegistry::entry($state->attributesListId);
+            if (null !== $map) {
+                self::updateNamedNodeMapMembers($map, $attrIds);
+                $attrsVar->object($map);
+
+                return;
+            }
+        }
+        if (null === $state->attributesListId && Variable::TYPE_OBJECT === $attrsVar->resolveIndirect()->type) {
+            $existing = $attrsVar->resolveIndirect()->toObject();
+            if (self::isNamedNodeMap($existing)) {
+                $state->attributesListId = $existing->id;
+                self::updateNamedNodeMapMembers($existing, $attrIds);
+                $attrsVar->object($existing);
+
+                return;
+            }
+        }
+        $mapVar = self::createNamedNodeMap($ctx, $attrIds);
+        $map = $mapVar->toObject();
+        $state->attributesListId = $map->id;
+        $attrsVar->copyFrom($mapVar);
+    }
+
+    /** @param list<int> $nodeIds */
+    private static function updateNamedNodeMapMembers(ObjectEntry $namedNodeMap, array $nodeIds): void
+    {
+        if (!self::isNamedNodeMap($namedNodeMap)) {
+            return;
+        }
+        $state = DomRegistry::state($namedNodeMap);
+        $state->listNodeIds = $nodeIds;
+        $state->listIterIndex = 0;
+        $namedNodeMap->getProperty(self::PROP_LENGTH)->int(\count($nodeIds));
     }
 
     private static function linkChildToParent(ObjectEntry $child, ?ObjectEntry $parent): void
@@ -3803,6 +4110,9 @@ final class VmDom
             if (null !== $list) {
                 self::updateNodeListMembers($list, $state->childIds);
                 $childNodesVar->object($list);
+                if (self::isElement($node)) {
+                    self::syncElementAttributes($ctx, $node);
+                }
 
                 return;
             }
@@ -3813,6 +4123,9 @@ final class VmDom
                 $state->childNodesListId = $existing->id;
                 self::updateNodeListMembers($existing, $state->childIds);
                 $childNodesVar->object($existing);
+                if (self::isElement($node)) {
+                    self::syncElementAttributes($ctx, $node);
+                }
 
                 return;
             }
@@ -3860,6 +4173,10 @@ final class VmDom
                 $siblingVar->null();
             }
         }
+
+        if (self::isElement($node)) {
+            self::syncElementAttributes($ctx, $node);
+        }
     }
 
     /** @param list<int> $nodeIds */
@@ -3871,7 +4188,9 @@ final class VmDom
         $state = DomRegistry::state($nodeList);
         $state->listNodeIds = $nodeIds;
         $state->listIterIndex = 0;
-        $nodeList->getProperty(self::PROP_LENGTH)->int(\count($nodeIds));
+        if (isset($nodeList->properties[self::PROP_LENGTH])) {
+            $nodeList->properties[self::PROP_LENGTH]->int(\count($nodeIds));
+        }
     }
 
     /**

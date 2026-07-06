@@ -20,7 +20,6 @@ final class NodeListCount extends DomClassMethod
         if (null === $frame->returnVar) {
             return;
         }
-        $length = $receiver->getProperty(VmDom::PROP_LENGTH)->resolveIndirect()->toInt();
-        $frame->returnVar->int($length);
+        $frame->returnVar->int(VmDom::nodeListCount($receiver));
     }
 }

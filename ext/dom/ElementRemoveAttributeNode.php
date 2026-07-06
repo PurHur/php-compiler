@@ -30,10 +30,10 @@ final class ElementRemoveAttributeNode extends DomClassMethod
             throw new \TypeError('DOMElement::removeAttributeNode(): Argument #1 ($attr) must be of type DOMAttr');
         }
         if (null === $frame->returnVar) {
-            VmDom::removeAttributeNode($element, $attr);
+            VmDom::removeAttributeNode($frame->vmContext, $element, $attr);
 
             return;
         }
-        $frame->returnVar->copyFrom(VmDom::removeAttributeNode($element, $attr));
+        $frame->returnVar->copyFrom(VmDom::removeAttributeNode($frame->vmContext, $element, $attr));
     }
 }

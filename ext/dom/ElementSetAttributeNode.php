@@ -30,10 +30,10 @@ final class ElementSetAttributeNode extends DomClassMethod
             throw new \TypeError('DOMElement::setAttributeNode(): Argument #1 ($attr) must be of type DOMAttr');
         }
         if (null === $frame->returnVar) {
-            VmDom::setAttributeNode($element, $attr);
+            VmDom::setAttributeNode($frame->vmContext, $element, $attr);
 
             return;
         }
-        $frame->returnVar->copyFrom(VmDom::setAttributeNode($element, $attr));
+        $frame->returnVar->copyFrom(VmDom::setAttributeNode($frame->vmContext, $element, $attr));
     }
 }

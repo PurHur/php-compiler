@@ -22,6 +22,6 @@ final class ElementSetAttribute extends DomClassMethod
         }
         $name = $this->stringArg($frame->calledArgs[1], 'DOMElement::setAttribute()', 0);
         $value = $this->stringArg($frame->calledArgs[2], 'DOMElement::setAttribute()', 1);
-        VmDom::setAttributeNS($element, null, $name, $value);
+        VmDom::setAttributeNS($frame->vmContext, $element, null, $name, $value);
     }
 }
