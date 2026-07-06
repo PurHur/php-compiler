@@ -2555,16 +2555,16 @@ final class VmReflection
         if ($entry->isInterface || $entry->isTrait || $entry->isEnum) {
             return [];
         }
-        if (!\PHPCompiler\VM\LazyGhostTraitSupport::classUsesLazyGhostTrait($entry, $ctx)) {
-            return [];
-        }
+        $usesLazyGhostTrait = \PHPCompiler\VM\LazyGhostTraitSupport::classUsesLazyGhostTrait($entry, $ctx);
         $byLc = [];
         foreach (array_reverse(self::classHierarchyChain($entry, $ctx)) as $class) {
             foreach ($class->properties as $prop) {
                 if ($prop->propertyHookVirtual) {
                     continue;
                 }
-                $byLc[strtolower($prop->name)] = $prop->name;
+                if ($usesLazyGhostTrait || $prop->lazy) {
+                    $byLc[strtolower($prop->name)] = $prop->name;
+                }
             }
         }
 
