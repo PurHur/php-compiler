@@ -247,7 +247,7 @@ final class AsymmetricVisibilityRewriter
                         $readPrefix = $readBefore.' ';
                         $explicitReadMarker = '/*'.self::MARKER_PREFIX_EXPLICIT_READ.'*/ ';
                     } else {
-                        $readPrefix = 'public ';
+                        $readPrefix = self::implicitReadPrefixForBareSetModifier($set);
                     }
 
                     return $m['prefix'].$m['attrs'].'/*'.self::MARKER_PREFIX_SET.$set.'*/ '.$explicitReadMarker.$readPrefix.$m['static'];
@@ -277,7 +277,7 @@ final class AsymmetricVisibilityRewriter
                     $readPrefix = $readBefore.' ';
                     $explicitReadMarker = '/*'.self::MARKER_PREFIX_EXPLICIT_READ.'*/ ';
                 } else {
-                    $readPrefix = 'public ';
+                    $readPrefix = self::implicitReadPrefixForBareSetModifier($set);
                 }
 
                 return $m['prefix'].$m['attrs'].'/*'.self::MARKER_PREFIX_SET.$set.'*/ '.$explicitReadMarker.$readPrefix;
@@ -383,16 +383,27 @@ final class AsymmetricVisibilityRewriter
     }
 
     /**
-     * Bare `private(set)` / `protected(set)` without explicit read visibility is a parse error (#16313).
+     * Bare `private(set)` / `protected(set)` without explicit read visibility is a parse error on reference profile (#16313).
      *
+     * PHP 8.4+ treats bare set modifiers as shorthand (private(set) ≡ public private(set); #16924).
      * php-src: Zend/zend_language_parser.y — property modifier grammar; Zend/zend_compile.c.
      */
     private static function rejectBareSetModifierWithoutRead(string $source): void
     {
+        if (CompilerVersion::supportsParenthesizedAsymmetricSetModifier()) {
+            return;
+        }
+
         $line = self::findBareSetModifierLine($source);
         if ($line > 0) {
             throw new \CompileError(self::BARE_SET_WITHOUT_READ_MESSAGE);
         }
+    }
+
+    /** Default read visibility when a bare `(set)` modifier omits an explicit read modifier (#16924). */
+    private static function implicitReadPrefixForBareSetModifier(string $set): string
+    {
+        return 'protected' === strtolower($set) ? 'protected ' : 'public ';
     }
 
     /**
