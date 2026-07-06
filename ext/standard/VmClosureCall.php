@@ -79,6 +79,57 @@ final class VmClosureCall
         return self::coerceUserSortCallbackResult($result);
     }
 
+    /**
+     * php-src php_array_user_compare_unstable / php_array_user_key_compare_unstable (#11219).
+     */
+    public static function invokeTwoForUserCompare(
+        Context $context,
+        ClosureState $closure,
+        Variable $a,
+        Variable $b
+    ): int {
+        $copyA = new Variable();
+        $copyA->duplicateFrom($a);
+        $copyB = new Variable();
+        $copyB->duplicateFrom($b);
+        $result = self::invoke($context, $closure, $copyA, $copyB);
+        $result = $result->resolveIndirect();
+        if (Variable::TYPE_BOOLEAN === $result->type) {
+            if (!$result->toBool()) {
+                $swapA = new Variable();
+                $swapA->duplicateFrom($b);
+                $swapB = new Variable();
+                $swapB->duplicateFrom($a);
+                $retry = self::invoke($context, $closure, $swapA, $swapB);
+
+                return -self::normalizeCompareSign(self::compareCallbackScalar($retry));
+            }
+        }
+
+        return self::normalizeCompareSign(self::compareCallbackScalar($result));
+    }
+
+    private static function compareCallbackScalar(Variable $result): int
+    {
+        $result = $result->resolveIndirect();
+        if (Variable::TYPE_BOOLEAN === $result->type) {
+            return $result->toBool() ? 1 : 0;
+        }
+        if (Variable::TYPE_INTEGER === $result->type) {
+            return $result->toInt();
+        }
+        if (Variable::TYPE_FLOAT === $result->type) {
+            return (int) $result->toFloat();
+        }
+
+        return $result->toInt();
+    }
+
+    private static function normalizeCompareSign(int $value): int
+    {
+        return $value > 0 ? 1 : ($value < 0 ? -1 : 0);
+    }
+
     /** php-src php_usort_compare — bool true→1, false→-1; int/float sign-normalized (#13029). */
     public static function coerceUserSortCallbackResult(Variable $result): int
     {
