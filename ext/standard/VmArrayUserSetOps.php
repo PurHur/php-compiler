@@ -322,7 +322,7 @@ final class VmArrayUserSetOps
             $closure = VmClosureCall::resolve($callback);
             $ctx = $frame->vmContext;
 
-            return static fn (Variable $a, Variable $b): int => VmClosureCall::invokeTwo($ctx, $closure, $a, $b);
+            return static fn (Variable $a, Variable $b): int => VmClosureCall::invokeTwoForUserCompare($ctx, $closure, $a, $b);
         }
         if (Variable::TYPE_STRING === $callback->type) {
             $name = $callback->toString();
@@ -359,7 +359,7 @@ final class VmArrayUserSetOps
         $needle = $needle->resolveIndirect();
         foreach ($others as $haystack) {
             foreach ($haystack->iterate(true) as $value) {
-                if (0 === $compare($needle, $value->resolveIndirect())) {
+                if (self::compareResultIsZero($compare($needle, $value->resolveIndirect()))) {
                     return true;
                 }
             }
@@ -397,11 +397,11 @@ final class VmArrayUserSetOps
     ): bool {
         foreach ($others as $haystack) {
             foreach ($haystack->iterateKeyed(true) as [$otherKey, $otherValue]) {
-                if (0 !== $keyCompare($key, $otherKey)) {
+                if (self::compareResultNonZero($keyCompare($key, $otherKey))) {
                     continue;
                 }
                 if (null !== $dataCompare) {
-                    if (0 === $dataCompare($value, $otherValue)) {
+                    if (self::compareResultIsZero($dataCompare($value, $otherValue))) {
                         return true;
                     }
                     continue;
@@ -451,7 +451,7 @@ final class VmArrayUserSetOps
             if (null === $otherValue) {
                 continue;
             }
-            if (0 === $dataCompare($value, $otherValue)) {
+            if (self::compareResultIsZero($dataCompare($value, $otherValue))) {
                 return true;
             }
         }
@@ -474,7 +474,7 @@ final class VmArrayUserSetOps
             if (null === $otherValue) {
                 return false;
             }
-            if (0 !== $dataCompare($value, $otherValue)) {
+            if (self::compareResultNonZero($dataCompare($value, $otherValue))) {
                 return false;
             }
         }
@@ -490,7 +490,7 @@ final class VmArrayUserSetOps
     {
         foreach ($others as $haystack) {
             foreach ($haystack->iterateKeyed(true) as [$otherKey, $_]) {
-                if (0 === $keyCompare($key, $otherKey)) {
+                if (self::compareResultIsZero($keyCompare($key, $otherKey))) {
                     return true;
                 }
             }
@@ -540,6 +540,19 @@ final class VmArrayUserSetOps
         } else {
             $out->add($key->toString(), $stored);
         }
+    }
+
+    /**
+     * php-src compare_function treats bool callback results like loose int coercion (#11219).
+     */
+    private static function compareResultIsZero(mixed $result): bool
+    {
+        return 0 == $result;
+    }
+
+    private static function compareResultNonZero(mixed $result): bool
+    {
+        return !self::compareResultIsZero($result);
     }
 
     /**
