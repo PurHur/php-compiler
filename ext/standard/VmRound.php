@@ -90,25 +90,25 @@ final class VmRound
         int $mode
     ): float {
         $valueAbs = \abs($value);
-        $edgeCase = self::getBasicEdgeCase($integral, $exponent, $places);
+        $edgeCase = self::getBasicEdgeCase($integral, $exponent, $places, $value);
         $zeroEdgeCase = self::getZeroEdgeCase($integral, $exponent, $places);
 
         switch ($mode) {
             case StdlibConstants::PHP_ROUND_HALF_DOWN:
                 if ($valueAbs > $edgeCase) {
-                    return $integral + self::copySign(1.0, $integral);
+                    return $integral + self::copySign(1.0, $value);
                 }
 
                 return $integral;
 
             case StdlibConstants::PHP_ROUND_HALF_EVEN:
                 if ($valueAbs > $edgeCase) {
-                    return $integral + self::copySign(1.0, $integral);
+                    return $integral + self::copySign(1.0, $value);
                 }
                 if ($valueAbs === $edgeCase) {
                     $even = 0.0 === \fmod($integral, 2.0);
                     if (!$even) {
-                        return $integral + self::copySign(1.0, $integral);
+                        return $integral + self::copySign(1.0, $value);
                     }
                 }
 
@@ -116,12 +116,12 @@ final class VmRound
 
             case StdlibConstants::PHP_ROUND_HALF_ODD:
                 if ($valueAbs > $edgeCase) {
-                    return $integral + self::copySign(1.0, $integral);
+                    return $integral + self::copySign(1.0, $value);
                 }
                 if ($valueAbs === $edgeCase) {
                     $even = 0.0 === \fmod($integral, 2.0);
                     if ($even) {
-                        return $integral + self::copySign(1.0, $integral);
+                        return $integral + self::copySign(1.0, $value);
                     }
                 }
 
@@ -146,7 +146,7 @@ final class VmRound
 
             case StdlibConstants::PHP_ROUND_AWAY_FROM_ZERO:
                 if ($valueAbs > $zeroEdgeCase) {
-                    return $integral + self::copySign(1.0, $integral);
+                    return $integral + self::copySign(1.0, $value);
                 }
 
                 return $integral;
@@ -155,20 +155,20 @@ final class VmRound
             default:
                 // php-src 8.2 ext/standard/math.c — unknown int modes use HALF_UP.
                 if ($valueAbs >= $edgeCase) {
-                    return $integral + self::copySign(1.0, $integral);
+                    return $integral + self::copySign(1.0, $value);
                 }
 
                 return $integral;
         }
     }
 
-    private static function getBasicEdgeCase(float $integral, float $exponent, int $places): float
+    private static function getBasicEdgeCase(float $integral, float $exponent, int $places, float $value): float
     {
         if ($places > 0) {
-            return \abs(($integral + self::copySign(0.5, $integral)) / $exponent);
+            return \abs(($integral + self::copySign(0.5, $value)) / $exponent);
         }
 
-        return \abs(($integral + self::copySign(0.5, $integral)) * $exponent);
+        return \abs(($integral + self::copySign(0.5, $value)) * $exponent);
     }
 
     private static function getZeroEdgeCase(float $integral, float $exponent, int $places): float
