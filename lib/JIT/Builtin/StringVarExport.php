@@ -43,6 +43,11 @@ final class StringVarExport
 
     public static function implement(Context $context): void
     {
+        $savedInsert = null;
+        try {
+            $savedInsert = $context->builder->getInsertBlock();
+        } catch (\Throwable) {
+        }
         $probe = $context->module->getNamedFunction('__compiler_var_export');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);
@@ -53,7 +58,11 @@ final class StringVarExport
         self::ensureJitHelperCompiled($context);
         self::implementBridge($context);
         self::registerLinkedRuntime($context);
-        $context->builder->clearInsertionPosition();
+        if (null !== $savedInsert) {
+            $context->builder->positionAtEnd($savedInsert);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
     }
 
     private static function implementBridge(Context $context): void
