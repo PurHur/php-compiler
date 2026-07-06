@@ -810,6 +810,15 @@ class VMTest extends BaseTest {
                 && str_contains($name, 'insert_adjacent_html_phantom')) {
                 continue;
             }
+            if (!CompilerVersion::supportsDomElementToggleAttribute()
+                && str_contains($name, 'dom_element_toggle_attribute')
+                && !str_contains($name, 'toggle_attribute_phantom')) {
+                continue;
+            }
+            if (CompilerVersion::supportsDomElementToggleAttribute()
+                && str_contains($name, 'toggle_attribute_phantom')) {
+                continue;
+            }
             if (!CompilerVersion::supportsDomElementGetAttributeNames()
                 && str_contains($name, 'dom_element_get_attribute_names')
                 && !str_contains($name, 'get_attribute_names_phantom')) {
