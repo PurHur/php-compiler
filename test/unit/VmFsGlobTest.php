@@ -139,6 +139,15 @@ final class VmFsGlobTest extends TestCase
         $this->assertSame([$dir], $matches);
     }
 
+    /** Issue #16970 — invalid flag bits emit warning and return false (php-src dir.c). */
+    public function testVmFsGlobInvalidFlagsRejected(): void
+    {
+        $this->assertTrue(\PHPCompiler\ext\standard\VmFsGlob::hasInvalidFlags(99999));
+        $this->assertFalse(\PHPCompiler\ext\standard\VmFsGlob::hasInvalidFlags(\GLOB_MARK));
+        $result = \PHPCompiler\ext\standard\VmFsGlob::glob('*', 99999);
+        $this->assertFalse($result);
+    }
+
     /** Issue #14881 — absolute directory path without double leading slash. */
     public function testVmFsGlobAbsoluteDirNormalizesLeadingSlash(): void
     {
@@ -151,12 +160,5 @@ final class VmFsGlobTest extends TestCase
         $this->assertCount(1, $matches);
         $this->assertSame($tmp, $matches[0]);
         $this->assertStringNotContainsString('//', $matches[0]);
-    }
-
-    /** Issue #16970 — invalid GLOB_* bits must fail like php-src ext/standard/dir.c. */
-    public function testVmFsGlobRejectsInvalidFlagBitmask(): void
-    {
-        $this->assertTrue(\PHPCompiler\ext\standard\VmFsGlob::hasInvalidFlags(99999));
-        $this->assertFalse(\PHPCompiler\ext\standard\VmFsGlob::hasInvalidFlags(\GLOB_NOSORT));
     }
 }

@@ -1,5 +1,5 @@
 --TEST--
-stdlib glob() — invalid flag bitmask E_WARNING + false (#16970, ext/standard/dir.c)
+JIT: glob() — invalid flag bitmask E_WARNING + false (#16970)
 --FILE--
 <?php
 error_reporting(E_ALL);

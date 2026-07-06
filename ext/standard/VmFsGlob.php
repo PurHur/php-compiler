@@ -50,7 +50,8 @@ final class VmFsGlob
                 ErrorReporter::E_WARNING,
                 '' !== $frame->scriptPath ? $frame->scriptPath : null,
                 $frame->vmContext,
-                $frame
+                $frame,
+                $frame->callSiteLine
             );
 
             return;
