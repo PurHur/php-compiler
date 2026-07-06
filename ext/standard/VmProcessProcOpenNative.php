@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\CompilerVersion;
+
 /**
  * VM proc_open()/proc_close()/proc_get_status()/proc_terminate() — libc FFI, no host proc_* (#8652, #8889).
  *
@@ -23,7 +25,7 @@ final class VmProcessProcOpenNative
 
     private const SIGSTOP = 19;
 
-    /** @var array<int, array{pid: int, command: string, statusKnown: bool, status: int, active: bool, pipeHandles: list<int>, childPaused: bool}> */
+    /** @var array<int, array{pid: int, command: string, statusKnown: bool, status: int, active: bool, pipeHandles: list<int>, childPaused: bool, pendingSignals?: list<int>}> */
     private static array $slots = [];
 
     private static int $nextHandleId = 0;
@@ -399,6 +401,9 @@ final class VmProcessProcOpenNative
         $signaled = $lowByte > 0 && !$stopped;
         $signals = self::termsigStopsigFromWaitStatus($statusVal);
 
+        $pendingSignals = self::resolvePendingSignals($slot, $signaled, $stopped, $signals['termsig']);
+        self::$slots[$handle] = $slot;
+
         return self::buildProcStatusArray(
             $slot['command'],
             $slot['pid'],
@@ -408,11 +413,14 @@ final class VmProcessProcOpenNative
             $running ? -1 : ($exited ? (($statusVal >> 8) & 0xff) : -1),
             $signals['termsig'],
             $signals['stopsig'],
+            $pendingSignals,
         );
     }
 
     /**
-     * php-src ext/standard/exec.c — PHP_FUNCTION(proc_get_status) array insertion order (#13210).
+     * php-src ext/standard/exec.c — PHP_FUNCTION(proc_get_status) array insertion order (#13210, #16707).
+     *
+     * @param list<int> $pendingSignals
      *
      * @return array<string, mixed>
      */
@@ -425,8 +433,9 @@ final class VmProcessProcOpenNative
         int $exitcode,
         int $termsig,
         int $stopsig,
+        array $pendingSignals = [],
     ): array {
-        return [
+        $status = [
             'command' => $command,
             'pid' => $pid,
             'running' => $running,
@@ -436,6 +445,39 @@ final class VmProcessProcOpenNative
             'termsig' => $termsig,
             'stopsig' => $stopsig,
         ];
+        if (CompilerVersion::supportsProcGetStatusPendingSignals()) {
+            $status['pending_signals'] = $pendingSignals;
+        }
+
+        return $status;
+    }
+
+    /**
+     * Signals sent via proc_terminate() but not yet delivered to the child (php-src proc_open.c, #16707).
+     *
+     * @param array{pid: int, command: string, statusKnown: bool, status: int, active: bool, pipeHandles?: list<int>, childPaused?: bool, pendingSignals?: list<int>} $slot
+     *
+     * @return list<int>
+     */
+    public static function resolvePendingSignals(array &$slot, bool $signaled, bool $stopped, int $termsig): array
+    {
+        if (!CompilerVersion::supportsProcGetStatusPendingSignals()) {
+            return [];
+        }
+
+        $pending = $slot['pendingSignals'] ?? [];
+        if ($signaled && $termsig > 0) {
+            $pending = array_values(array_filter(
+                $pending,
+                static fn (int $signal): bool => $signal !== $termsig,
+            ));
+        }
+        if (!$stopped && !$signaled) {
+            $pending = [];
+        }
+        $slot['pendingSignals'] = $pending;
+
+        return $pending;
     }
 
     /**

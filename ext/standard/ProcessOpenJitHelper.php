@@ -101,6 +101,18 @@ final class ProcessOpenJitHelper
                 $slot->int($value);
             } elseif (\is_string($value)) {
                 $slot->string($value);
+            } elseif (\is_array($value)) {
+                $listHt = new HashTable();
+                foreach ($value as $index => $elem) {
+                    $elemSlot = new Variable();
+                    if (\is_int($elem)) {
+                        $elemSlot->int($elem);
+                    } else {
+                        $elemSlot->null();
+                    }
+                    $listHt->add((string) $index, $elemSlot);
+                }
+                $slot->array($listHt);
             } else {
                 $slot->null();
             }

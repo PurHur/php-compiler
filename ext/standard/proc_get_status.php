@@ -75,6 +75,21 @@ final class proc_get_status extends Internal
 
             return;
         }
+        if (\is_array($value)) {
+            $ht = new HashTable();
+            foreach ($value as $index => $elem) {
+                $elemSlot = new Variable();
+                if (\is_int($elem)) {
+                    $elemSlot->int($elem);
+                } else {
+                    $elemSlot->null();
+                }
+                $ht->add((string) $index, $elemSlot);
+            }
+            $slot->array($ht);
+
+            return;
+        }
         $slot->null();
     }
 }
