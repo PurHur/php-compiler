@@ -6,6 +6,7 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\UserScriptAotDeferNestedJit;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
@@ -40,6 +41,12 @@ final class StringReadfile
         $probe = $context->module->getNamedFunction('__compiler_readfile');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             $context->registerFunction('__compiler_readfile', $probe);
+
+            return;
+        }
+
+        if (UserScriptAotDeferNestedJit::shouldDefer($context)) {
+            StringReadfileLibc::implement($context);
 
             return;
         }
