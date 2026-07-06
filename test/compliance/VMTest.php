@@ -566,7 +566,8 @@ class VMTest extends BaseTest {
                 && (str_contains($name, 'dateexception')
                     || str_contains($name, 'dateerror')
                     || str_contains($name, 'date_malformed')
-                    || str_contains($name, 'datetimezone_invalid'))) {
+                    || str_contains($name, 'datetimezone_invalid'))
+                && !str_contains($name, 'reference_profile')) {
                 continue;
             }
             if (CompilerVersion::advertisesDateExceptionHierarchy()
@@ -575,6 +576,10 @@ class VMTest extends BaseTest {
             }
             if (CompilerVersion::advertisesDateExceptionHierarchy()
                 && str_contains($name, 'date_interval_malformed_exception_class_reference_profile')) {
+                continue;
+            }
+            if (CompilerVersion::advertisesDateExceptionHierarchy()
+                && str_contains($name, 'date_malformed_exceptions_phantom_reference_profile')) {
                 continue;
             }
             if (!CompilerVersion::advertisesRequestParseBodyExceptionClass()
