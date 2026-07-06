@@ -1,1 +1,1 @@
-{"fingerprint":"102c61cf1b63e4aa3fa9","unit":"/ext/standard/SymlinkJitHelper.php","helpers":{"phpcompiler\\ext\\standard\\symlinkjithelper::invokeargv":"phpcompiler_ext_standard_symlinkjithelper__invokeargv"}}
+{"fingerprint":"84f159403a8633a75c67","unit":"/ext/standard/SymlinkJitHelper.php","helpers":{"phpcompiler\\ext\\standard\\symlinkjithelper::invokeargv":"phpcompiler_ext_standard_symlinkjithelper__invokeargv"}}

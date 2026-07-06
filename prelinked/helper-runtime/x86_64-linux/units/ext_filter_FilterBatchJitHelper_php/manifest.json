@@ -1,0 +1,1 @@
+{"fingerprint":"8d000889b1da54896f37","unit":"/ext/filter/FilterBatchJitHelper.php","helpers":{"phpcompiler\\ext\\filter\\filterbatchjithelper::filtervararray":"phpcompiler_ext_filter_filterbatchjithelper__filtervararray","phpcompiler\\ext\\filter\\filterbatchjithelper::filterinputarray":"phpcompiler_ext_filter_filterbatchjithelper__filterinputarray"}}
