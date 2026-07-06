@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 4135 |
-| Phase A inventory files (M2 ratio SSOT) | 4135 |
+| PHP files on vm.php path | 4146 |
+| Phase A inventory files (M2 ratio SSOT) | 4146 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 11140 |
+| Source constructs flagged (warnings) | 11175 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -108,14 +108,17 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/curl/curl_unescape.php` | 0 | 3 |
 | `ext/curl/curl_version.php` | 0 | 2 |
 | `ext/dom/BuiltinClasses.php` | 0 | 1 |
+| `ext/dom/CharacterDataSubstringData.php` | 0 | 1 |
 | `ext/dom/DocumentAppendChild.php` | 0 | 1 |
 | `ext/dom/DocumentConstruct.php` | 0 | 1 |
 | `ext/dom/DocumentCreateAttribute.php` | 0 | 1 |
 | `ext/dom/DocumentCreateAttributeNS.php` | 0 | 1 |
+| `ext/dom/DocumentCreateComment.php` | 0 | 1 |
 | `ext/dom/DocumentCreateDocumentFragment.php` | 0 | 1 |
 | `ext/dom/DocumentCreateElement.php` | 0 | 1 |
 | `ext/dom/DocumentCreateElementNS.php` | 0 | 1 |
 | `ext/dom/DocumentCreateEntityReference.php` | 0 | 1 |
+| `ext/dom/DocumentCreateTextNode.php` | 0 | 1 |
 | `ext/dom/DocumentGetElementById.php` | 0 | 1 |
 | `ext/dom/DocumentGetElementsByTagName.php` | 0 | 1 |
 | `ext/dom/DocumentGetElementsByTagNameNS.php` | 0 | 1 |
@@ -161,6 +164,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/dom/ImplementationGetFeature.php` | 0 | 2 |
 | `ext/dom/ImplementationHasFeature.php` | 0 | 1 |
 | `ext/dom/Module.php` | 0 | 1 |
+| `ext/dom/NamedNodeMapCount.php` | 0 | 1 |
+| `ext/dom/NamedNodeMapCurrent.php` | 0 | 1 |
+| `ext/dom/NamedNodeMapGetNamedItem.php` | 0 | 1 |
+| `ext/dom/NamedNodeMapItem.php` | 0 | 1 |
+| `ext/dom/NamedNodeMapKey.php` | 0 | 1 |
+| `ext/dom/NamedNodeMapNext.php` | 0 | 1 |
+| `ext/dom/NamedNodeMapRewind.php` | 0 | 1 |
+| `ext/dom/NamedNodeMapValid.php` | 0 | 1 |
 | `ext/dom/NodeAfter.php` | 0 | 1 |
 | `ext/dom/NodeAppend.php` | 0 | 1 |
 | `ext/dom/NodeBefore.php` | 0 | 1 |
@@ -194,7 +205,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/dom/NodeRemoveChild.php` | 0 | 1 |
 | `ext/dom/NodeReplaceChild.php` | 0 | 1 |
 | `ext/dom/NodeReplaceWith.php` | 0 | 1 |
-| `ext/dom/VmDom.php` | 0 | 216 |
+| `ext/dom/VmDom.php` | 0 | 240 |
 | `ext/filter/BuiltinEnums.php` | 0 | 3 |
 | `ext/filter/FilterBatchJitHelper.php` | 0 | 6 |
 | `ext/filter/FilterBooleanJitHelper.php` | 0 | 1 |
@@ -4629,6 +4640,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
 
+### `ext/dom/CharacterDataSubstringData.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `ext/dom/DocumentAppendChild.php`
 
 **Warnings** (review for bootstrap subset):
@@ -4649,6 +4665,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `ext/dom/DocumentCreateComment.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `ext/dom/DocumentCreateDocumentFragment.php`
 
 **Warnings** (review for bootstrap subset):
@@ -4665,6 +4686,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 1 class method(s)
 
 ### `ext/dom/DocumentCreateEntityReference.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/dom/DocumentCreateTextNode.php`
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
@@ -4774,7 +4800,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/DomNodePropertySupport.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 42)
+- new Variable (line 44)
 - 3 class method(s)
 
 ### `ext/dom/DomRegistry.php`
@@ -4902,6 +4928,46 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
+
+### `ext/dom/NamedNodeMapCount.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/dom/NamedNodeMapCurrent.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/dom/NamedNodeMapGetNamedItem.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/dom/NamedNodeMapItem.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/dom/NamedNodeMapKey.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/dom/NamedNodeMapNext.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/dom/NamedNodeMapRewind.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/dom/NamedNodeMapValid.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
 
 ### `ext/dom/NodeAfter.php`
 
@@ -5072,221 +5138,245 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/VmDom.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 137)
-- new Variable (line 138)
-- new Variable (line 139)
-- new Variable (line 140)
-- new Variable (line 141)
-- new ClassEntry (line 144)
-- new ClassProperty (line 146)
-- new ClassProperty (line 147)
-- new ClassProperty (line 148)
-- new ClassProperty (line 149)
-- new ClassProperty (line 150)
-- new ClassProperty (line 151)
-- new ClassProperty (line 152)
-- new ClassProperty (line 153)
+- new Variable (line 145)
+- new Variable (line 146)
+- new Variable (line 147)
+- new Variable (line 148)
+- new Variable (line 149)
+- new ClassEntry (line 152)
 - new ClassProperty (line 154)
 - new ClassProperty (line 155)
 - new ClassProperty (line 156)
-- new NodeCloneNode (line 157)
-- new NodeReplaceChild (line 159)
-- new NodeInsertBefore (line 161)
-- new NodeRemoveChild (line 163)
-- new NodeIsSameNode (line 165)
-- new NodeIsEqualNode (line 168)
-- new NodeHasChildNodes (line 171)
-- new NodeContains (line 174)
-- new NodeGetRootNode (line 178)
-- new NodeAppend (line 181)
-- new NodePrepend (line 183)
-- new NodeBefore (line 185)
-- new NodeAfter (line 187)
-- new NodeReplaceWith (line 189)
-- new NodeRemove (line 191)
-- new NodeLookupPrefix (line 193)
-- new NodeLookupNamespaceURI (line 195)
-- new NodeGetLineNo (line 197)
-- new NodeGetNodePath (line 199)
-- new NodeHasAttributes (line 201)
-- new NodeIsDefaultNamespace (line 203)
-- new NodeIsSupported (line 205)
-- new NodeCompareDocumentPosition (line 208)
-- new NodeNormalize (line 219)
-- new NodeC14N (line 221)
-- new NodeC14NFile (line 224)
-- new ClassEntry (line 229)
-- new ClassProperty (line 232)
-- new ClassEntry (line 235)
-- new ClassProperty (line 238)
-- new ClassEntry (line 241)
-- new ClassProperty (line 244)
-- new ClassProperty (line 245)
+- new ClassProperty (line 157)
+- new ClassProperty (line 158)
+- new ClassProperty (line 159)
+- new ClassProperty (line 160)
+- new ClassProperty (line 161)
+- new ClassProperty (line 162)
+- new ClassProperty (line 163)
+- new ClassProperty (line 164)
+- new NodeCloneNode (line 165)
+- new NodeReplaceChild (line 167)
+- new NodeInsertBefore (line 169)
+- new NodeRemoveChild (line 171)
+- new NodeIsSameNode (line 173)
+- new NodeIsEqualNode (line 176)
+- new NodeHasChildNodes (line 179)
+- new NodeContains (line 182)
+- new NodeGetRootNode (line 186)
+- new NodeAppend (line 189)
+- new NodePrepend (line 191)
+- new NodeBefore (line 193)
+- new NodeAfter (line 195)
+- new NodeReplaceWith (line 197)
+- new NodeRemove (line 199)
+- new NodeLookupPrefix (line 201)
+- new NodeLookupNamespaceURI (line 203)
+- new NodeGetLineNo (line 205)
+- new NodeGetNodePath (line 207)
+- new NodeHasAttributes (line 209)
+- new NodeIsDefaultNamespace (line 211)
+- new NodeIsSupported (line 213)
+- new NodeCompareDocumentPosition (line 216)
+- new NodeNormalize (line 227)
+- new NodeC14N (line 229)
+- new NodeC14NFile (line 232)
+- new ClassEntry (line 237)
+- new ClassProperty (line 240)
+- new ClassEntry (line 243)
 - new ClassProperty (line 246)
-- new ClassProperty (line 247)
-- new ClassEntry (line 250)
-- new ClassProperty (line 259)
-- new NodeListItem (line 260)
-- new NodeListCount (line 262)
-- new NodeListRewind (line 264)
-- new NodeListValid (line 266)
-- new NodeListCurrent (line 268)
-- new NodeListKey (line 270)
-- new NodeListNext (line 272)
-- new ClassEntry (line 276)
-- new ImplementationCreateDocument (line 278)
-- new ImplementationCreateDocumentType (line 280)
-- new ImplementationGetFeature (line 282)
-- new ImplementationHasFeature (line 284)
-- new ClassEntry (line 289)
-- new ClassProperty (line 292)
-- new ClassProperty (line 293)
-- new ClassProperty (line 294)
-- new ClassProperty (line 295)
-- new ClassEntry (line 298)
-- new ClassProperty (line 301)
-- new ClassProperty (line 302)
-- new ClassProperty (line 303)
-- new ClassProperty (line 304)
-- new ClassEntry (line 307)
-- new DocumentConstruct (line 310)
-- new ClassProperty (line 314)
-- new ClassProperty (line 315)
-- new ClassProperty (line 316)
-- new ClassProperty (line 317)
-- new ClassProperty (line 318)
-- new ClassProperty (line 319)
-- new ClassProperty (line 320)
-- new ClassProperty (line 321)
-- new ClassProperty (line 322)
-- new ClassProperty (line 323)
-- new ClassProperty (line 324)
-- new DocumentLoadXML (line 325)
-- new DocumentLoad (line 327)
-- new DocumentLoadHTML (line 329)
-- new DocumentCreateElement (line 332)
-- new DocumentCreateElementNS (line 334)
-- new DocumentCreateAttributeNS (line 336)
-- new DocumentCreateAttribute (line 338)
-- new DocumentCreateDocumentFragment (line 340)
-- new DocumentCreateEntityReference (line 342)
-- new DocumentAppendChild (line 345)
-- new DocumentSaveXML (line 347)
-- new DocumentSaveHTML (line 349)
-- new DocumentSaveHTMLFile (line 352)
-- new DocumentGetElementsByTagName (line 355)
-- new DocumentGetElementsByTagNameNS (line 357)
-- new DocumentGetElementById (line 360)
-- new DocumentImportNode (line 362)
-- new DocumentRegisterNodeClass (line 364)
-- new DocumentNormalizeDocument (line 367)
-- new DocumentXInclude (line 370)
-- new DocumentSchemaValidate (line 372)
-- new DocumentRelaxNGValidate (line 375)
-- new ClassEntry (line 380)
-- new ClassProperty (line 383)
-- new ElementAppendChild (line 384)
-- new ElementGetAttribute (line 386)
-- new ElementGetAttributeNode (line 388)
-- new ElementGetAttributeNS (line 390)
-- new ElementHasAttribute (line 392)
-- new ElementHasAttributeNS (line 394)
-- new ElementRemoveAttribute (line 396)
-- new ElementRemoveAttributeNode (line 398)
-- new ElementSetAttribute (line 400)
-- new ElementSetAttributeNode (line 402)
-- new ElementSetAttributeNS (line 404)
-- new ElementRemoveAttributeNS (line 406)
-- new ElementSetIdAttribute (line 408)
-- new ElementSetIdAttributeNS (line 411)
-- new ElementGetElementsByTagName (line 414)
-- new ElementGetElementsByTagNameNS (line 416)
-- new ElementInsertAdjacentHTML (line 420)
-- new ClassEntry (line 426)
-- new ClassProperty (line 429)
-- new FragmentAppendChild (line 430)
-- new FragmentAppendXML (line 432)
-- new ObjectEntry (line 446)
-- new DomNodeState (line 448)
-- new Variable (line 456)
-- new ObjectEntry (line 479)
-- new DomNodeState (line 484)
-- new Variable (line 509)
-- new ObjectEntry (line 537)
-- new DomNodeState (line 558)
-- new DomNodeState (line 608)
-- new ObjectEntry (line 625)
-- new DomNodeState (line 630)
-- new Variable (line 643)
-- new ObjectEntry (line 659)
-- new DomNodeState (line 664)
-- new Variable (line 678)
-- new ObjectEntry (line 693)
-- new DomNodeState (line 701)
-- new Variable (line 713)
-- new DOMException (line 730)
-- new Variable (line 734)
-- new Variable (line 740)
-- new DOMException (line 749)
-- new Variable (line 777)
-- new DOMException (line 790)
-- new DOMException (line 803)
-- new Variable (line 814)
-- new DOMException (line 880)
-- new DOMException (line 933)
-- new DOMException (line 955)
-- new DOMException (line 1000)
-- new DOMException (line 1004)
-- new DOMException (line 1017)
-- new DOMException (line 1021)
-- new DOMException (line 1031)
-- new ObjectEntry (line 1402)
-- new DomNodeState (line 1407)
-- new ObjectEntry (line 1428)
-- new DomNodeState (line 1433)
-- new Variable (line 1442)
-- new ObjectEntry (line 1452)
-- new DomNodeState (line 1457)
-- new Variable (line 1462)
-- new ObjectEntry (line 1936)
-- new DomNodeState (line 1938)
-- new DOMException (line 2085)
-- new DOMException (line 2111)
-- new DOMException (line 2129)
-- new DOMException (line 2132)
-- new DOMException (line 2140)
-- new DOMException (line 2166)
-- new DOMException (line 2179)
-- new DOMException (line 2334)
-- new DOMException (line 2428)
-- new DOMException (line 2432)
-- new DOMException (line 2521)
-- new DOMException (line 2525)
-- new DOMException (line 2583)
-- new DOMException (line 2600)
-- new DOMException (line 2629)
-- new DOMException (line 2670)
-- new DOMException (line 2695)
-- new DOMException (line 3169)
-- new Variable (line 3193)
-- new DOMException (line 3383)
-- new DOMException (line 3464)
-- new DOMException (line 3506)
-- new ObjectEntry (line 3583)
-- new DomNodeState (line 3587)
-- new Variable (line 3594)
-- new DOMException (line 3659)
-- new DOMException (line 3666)
-- new DOMException (line 3673)
-- new DOMException (line 3677)
-- new DOMException (line 3680)
-- new DOMException (line 3689)
-- new Variable (line 4337)
-- new Variable (line 4350)
-- new DOMException (line 4428)
-- new DOMException (line 4439)
-- new DOMException (line 4505)
-- 217 class method(s)
+- new CharacterDataSubstringData (line 247)
+- new ClassEntry (line 252)
+- new ClassProperty (line 255)
+- new ClassEntry (line 258)
+- new ClassProperty (line 261)
+- new ClassEntry (line 264)
+- new ClassProperty (line 267)
+- new ClassProperty (line 268)
+- new ClassProperty (line 269)
+- new ClassProperty (line 270)
+- new ClassEntry (line 273)
+- new ClassProperty (line 282)
+- new NodeListItem (line 283)
+- new NodeListCount (line 285)
+- new NodeListRewind (line 287)
+- new NodeListValid (line 289)
+- new NodeListCurrent (line 291)
+- new NodeListKey (line 293)
+- new NodeListNext (line 295)
+- new ClassEntry (line 299)
+- new ClassProperty (line 308)
+- new NamedNodeMapItem (line 309)
+- new NamedNodeMapGetNamedItem (line 311)
+- new NamedNodeMapCount (line 314)
+- new NamedNodeMapRewind (line 316)
+- new NamedNodeMapValid (line 318)
+- new NamedNodeMapCurrent (line 320)
+- new NamedNodeMapKey (line 322)
+- new NamedNodeMapNext (line 324)
+- new ClassEntry (line 328)
+- new ImplementationCreateDocument (line 330)
+- new ImplementationCreateDocumentType (line 332)
+- new ImplementationGetFeature (line 334)
+- new ImplementationHasFeature (line 336)
+- new ClassEntry (line 341)
+- new ClassProperty (line 344)
+- new ClassProperty (line 345)
+- new ClassProperty (line 346)
+- new ClassProperty (line 347)
+- new ClassEntry (line 350)
+- new ClassProperty (line 353)
+- new ClassProperty (line 354)
+- new ClassProperty (line 355)
+- new ClassProperty (line 356)
+- new ClassEntry (line 359)
+- new DocumentConstruct (line 362)
+- new ClassProperty (line 366)
+- new ClassProperty (line 367)
+- new ClassProperty (line 368)
+- new ClassProperty (line 369)
+- new ClassProperty (line 370)
+- new ClassProperty (line 371)
+- new ClassProperty (line 372)
+- new ClassProperty (line 373)
+- new ClassProperty (line 374)
+- new ClassProperty (line 375)
+- new ClassProperty (line 376)
+- new DocumentLoadXML (line 377)
+- new DocumentLoad (line 379)
+- new DocumentLoadHTML (line 381)
+- new DocumentCreateElement (line 384)
+- new DocumentCreateElementNS (line 386)
+- new DocumentCreateAttributeNS (line 388)
+- new DocumentCreateAttribute (line 390)
+- new DocumentCreateDocumentFragment (line 392)
+- new DocumentCreateEntityReference (line 394)
+- new DocumentCreateTextNode (line 397)
+- new DocumentCreateComment (line 400)
+- new DocumentAppendChild (line 403)
+- new DocumentSaveXML (line 405)
+- new DocumentSaveHTML (line 407)
+- new DocumentSaveHTMLFile (line 410)
+- new DocumentGetElementsByTagName (line 413)
+- new DocumentGetElementsByTagNameNS (line 415)
+- new DocumentGetElementById (line 418)
+- new DocumentImportNode (line 420)
+- new DocumentRegisterNodeClass (line 422)
+- new DocumentNormalizeDocument (line 425)
+- new DocumentXInclude (line 428)
+- new DocumentSchemaValidate (line 430)
+- new DocumentRelaxNGValidate (line 433)
+- new ClassEntry (line 438)
+- new ClassProperty (line 441)
+- new ClassProperty (line 442)
+- new ElementAppendChild (line 443)
+- new ElementGetAttribute (line 445)
+- new ElementGetAttributeNode (line 447)
+- new ElementGetAttributeNS (line 449)
+- new ElementHasAttribute (line 451)
+- new ElementHasAttributeNS (line 453)
+- new ElementRemoveAttribute (line 455)
+- new ElementRemoveAttributeNode (line 457)
+- new ElementSetAttribute (line 459)
+- new ElementSetAttributeNode (line 461)
+- new ElementSetAttributeNS (line 463)
+- new ElementRemoveAttributeNS (line 465)
+- new ElementSetIdAttribute (line 467)
+- new ElementSetIdAttributeNS (line 470)
+- new ElementGetElementsByTagName (line 473)
+- new ElementGetElementsByTagNameNS (line 475)
+- new ElementInsertAdjacentHTML (line 479)
+- new ClassEntry (line 485)
+- new ClassProperty (line 488)
+- new FragmentAppendChild (line 489)
+- new FragmentAppendXML (line 491)
+- new ObjectEntry (line 505)
+- new DomNodeState (line 507)
+- new Variable (line 515)
+- new ObjectEntry (line 538)
+- new DomNodeState (line 543)
+- new Variable (line 568)
+- new ObjectEntry (line 596)
+- new DomNodeState (line 617)
+- new DomNodeState (line 667)
+- new ObjectEntry (line 684)
+- new DomNodeState (line 689)
+- new Variable (line 702)
+- new ObjectEntry (line 718)
+- new DomNodeState (line 723)
+- new Variable (line 737)
+- new ObjectEntry (line 752)
+- new DomNodeState (line 760)
+- new Variable (line 772)
+- new DOMException (line 789)
+- new Variable (line 793)
+- new Variable (line 799)
+- new DOMException (line 808)
+- new Variable (line 837)
+- new DOMException (line 850)
+- new DOMException (line 863)
+- new Variable (line 875)
+- new DOMException (line 941)
+- new DOMException (line 995)
+- new DOMException (line 1018)
+- new DOMException (line 1064)
+- new DOMException (line 1068)
+- new DOMException (line 1081)
+- new DOMException (line 1085)
+- new DOMException (line 1095)
+- new ObjectEntry (line 1466)
+- new DomNodeState (line 1471)
+- new ObjectEntry (line 1487)
+- new DomNodeState (line 1492)
+- new DOMException (line 1512)
+- new ObjectEntry (line 1527)
+- new DomNodeState (line 1532)
+- new Variable (line 1541)
+- new ObjectEntry (line 1551)
+- new DomNodeState (line 1556)
+- new Variable (line 1561)
+- new ObjectEntry (line 2035)
+- new DomNodeState (line 2037)
+- new DOMException (line 2184)
+- new DOMException (line 2210)
+- new DOMException (line 2228)
+- new DOMException (line 2231)
+- new DOMException (line 2239)
+- new DOMException (line 2265)
+- new DOMException (line 2278)
+- new DOMException (line 2433)
+- new DOMException (line 2527)
+- new DOMException (line 2531)
+- new DOMException (line 2620)
+- new DOMException (line 2624)
+- new DOMException (line 2682)
+- new DOMException (line 2699)
+- new DOMException (line 2728)
+- new DOMException (line 2769)
+- new DOMException (line 2794)
+- new DOMException (line 3268)
+- new Variable (line 3292)
+- new DOMException (line 3482)
+- new DOMException (line 3563)
+- new DOMException (line 3605)
+- new ObjectEntry (line 3690)
+- new DomNodeState (line 3694)
+- new Variable (line 3701)
+- new ObjectEntry (line 3860)
+- new DomNodeState (line 3864)
+- new Variable (line 3871)
+- new DOMException (line 4026)
+- new DOMException (line 4033)
+- new DOMException (line 4040)
+- new DOMException (line 4044)
+- new DOMException (line 4047)
+- new DOMException (line 4056)
+- new Variable (line 4727)
+- new Variable (line 4740)
+- new DOMException (line 4818)
+- new DOMException (line 4829)
+- new DOMException (line 4895)
+- 239 class method(s)
 - 2 closure(s)
 
 ### `ext/filter/BuiltinEnums.php`
