@@ -83,6 +83,21 @@ final class ArrayFindHelper
         );
     }
 
+    /**
+     * array_all()/array_any() on compile-time empty inline [] — vacuous true/false without callback (#11729).
+     */
+    public static function vacuousAnyAllIfCompileTimeEmpty(Context $context, Variable $array, bool $all): ?Value
+    {
+        if (ArrayBuiltinHelper::isNativeArray($array->type) && 0 === $array->nextFreeElement) {
+            return $context->constantFromBool($all);
+        }
+        if ($array->compileTimeEmptyArrayLiteral) {
+            return $context->constantFromBool($all);
+        }
+
+        return null;
+    }
+
     private static function buildFromArray(
         Context $context,
         Variable $array,
@@ -92,6 +107,12 @@ final class ArrayFindHelper
     ): Value {
         $strictI1 ??= $context->constantFromBool(false);
         JitArrayElem::requireArrayArg($context, $array, self::functionNameForMode($mode));
+        if (self::MODE_ANY === $mode || self::MODE_ALL === $mode) {
+            $vacuous = self::vacuousAnyAllIfCompileTimeEmpty($context, $array, self::MODE_ALL === $mode);
+            if (null !== $vacuous) {
+                return $vacuous;
+            }
+        }
         if (self::MODE_FIND === $mode || self::MODE_FIND_KEY === $mode) {
             self::requireNonEmptyFindArray($context, $array, self::functionNameForMode($mode));
         }

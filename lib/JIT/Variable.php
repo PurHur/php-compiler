@@ -197,6 +197,9 @@ final class Variable {
     /** Top-level script / $GLOBALS symbol slot — skip valueDelref on scope exit (#4423). */
     public bool $scriptGlobalSlot = false;
 
+    /** Inline `[]` literal with no elements yet at JIT emit time (#11729). */
+    public bool $compileTimeEmptyArrayLiteral = false;
+
     private static int $lvalueCounter = 0;
     public int $nextFreeElement = 0;
 
