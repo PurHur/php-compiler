@@ -274,7 +274,10 @@ final class VmInfo
     /** php-src phpcredits() plain-text credits (ext/standard/credits.c, sapi_module.phpinfo_as_text). */
     public static function renderPhpcreditsText(int $flags): string
     {
-        return 'PHP Credits'."\n".self::creditsSectionText($flags);
+        // CREDITS_ALL → full credits_modules[] table; CREDITS_MODULES alone → loaded extensions (#16338).
+        $fullModuleTable = self::isCreditsAll($flags);
+
+        return 'PHP Credits'."\n".self::creditsSectionText($flags, $fullModuleTable);
     }
 
     /** @deprecated Alias for {@see renderPhpcreditsText()}. */
@@ -853,8 +856,7 @@ final class VmInfo
             $sections .= self::creditsSapiSectionHtml();
         }
         if (self::creditsFlagSelected($flags, self::CREDITS_MODULES)) {
-            // php-src credits_ext.h — full static module table (#16338, ext/standard/credits.c).
-            $sections .= self::creditsModulesSectionHtml(true);
+            $sections .= self::creditsModulesSectionHtml($fullModuleCreditsTable);
         }
         if (self::creditsFlagSelected($flags, self::CREDITS_DOCS)) {
             $sections .= self::creditsDocsSectionHtml();
@@ -892,8 +894,7 @@ final class VmInfo
             $sections .= self::creditsSapiSectionText();
         }
         if (self::creditsFlagSelected($flags, self::CREDITS_MODULES)) {
-            // php-src credits_ext.h — CREDITS_MODULES uses the full static table (#16338).
-            $sections .= self::creditsModulesSectionText(true);
+            $sections .= self::creditsModulesSectionText($fullModuleCreditsTable);
         }
         if (self::creditsFlagSelected($flags, self::CREDITS_DOCS)) {
             $sections .= self::creditsDocsSectionText();
