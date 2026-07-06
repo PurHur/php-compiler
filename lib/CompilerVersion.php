@@ -1679,10 +1679,18 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.4+ DOMElement::$classList / DOMTokenList (ext/dom/token_list.c; #16876).
+     * PHP 8.4+ DOMElement::$classList / DOMTokenList (ext/dom/token_list.c; #16876, #16974).
+     *
+     * Advertised on the 8.4 development line via {@see builtinAdvertisementVersion()} — `VERSION`
+     * `8.4.0-dev` is below stable `8.4.0` for {@see version_compare()}. Enable explicitly with
+     * `PHP_COMPILER_PROFILE=8.4` on older compiler builds.
      */
     public static function supportsDomTokenList(): bool
     {
+        if (version_compare(self::builtinAdvertisementVersion(), '8.4.0', '>=')) {
+            return true;
+        }
+
         return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
     }
 
