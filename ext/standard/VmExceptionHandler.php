@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\JIT\ExceptionHandlerCallbackPolicy;
 use PHPCompiler\VM\ClosureState;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\EnumCaseSupport;
@@ -93,6 +94,9 @@ final class VmExceptionHandler
         }
         if (Variable::TYPE_STRING === $callback->type) {
             return;
+        }
+        if (ExceptionHandlerCallbackPolicy::isPhpSrcInvalidCallbackType($callback->type)) {
+            throw new \TypeError(ExceptionHandlerCallbackPolicy::invalidCallbackTypeError());
         }
 
         throw new \LogicException(
