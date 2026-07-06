@@ -5,11 +5,13 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitResourceArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPLLVM\Builder;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -23,6 +25,26 @@ final class JitProcGetStatus
             JitLongArg::lower($context, $procArg, 'proc_get_status() process'),
             $context->getTypeFromString('int64')
         );
+        $i32 = $context->getTypeFromString('int32');
+        $zeroI32 = $i32->constInt(0, false);
+        $isProcess = $context->builder->call(
+            $context->lookupFunction('__compiler_is_process_resource'),
+            $context->builder->trunc($handle, $i32)
+        );
+        $isActive = $context->builder->icmp(Builder::INT_NE, $isProcess, $zeroI32);
+        $validBlock = BasicBlockHelper::append($context, 'proc_get_status_valid');
+        $invalidBlock = BasicBlockHelper::append($context, 'proc_get_status_invalid');
+        $context->builder->branchIf($isActive, $validBlock, $invalidBlock);
+
+        $context->builder->positionAtEnd($invalidBlock);
+        TypeErrorRaise::ensureLinked($context);
+        TypeErrorRaise::emitRaise(
+            $context,
+            'proc_get_status(): supplied resource is not a valid process resource'
+        );
+        $context->builder->call($context->lookupFunction('abort'));
+
+        $context->builder->positionAtEnd($validBlock);
         $raw = $context->builder->call(
             $context->lookupFunction('__compiler_proc_get_status'),
             $handle

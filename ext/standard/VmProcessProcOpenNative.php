@@ -340,10 +340,10 @@ final class VmProcessProcOpenNative
         self::resumeChildIfPaused($ffi, $slot);
 
         if ($slot['statusKnown']) {
-            // php-src: proc_get_status() after proc_close() still returns running=false (#16863).
+            // php-src: proc_close() after proc_get_status() already reaped child — return -1 (#16968).
             self::$slots[$handle] = $slot;
 
-            return self::exitCodeFromStatus($slot['status']);
+            return -1;
         }
 
         try {
@@ -376,7 +376,7 @@ final class VmProcessProcOpenNative
             return false;
         }
         if (!$slot['active']) {
-            return self::statusFromClosedSlot($slot);
+            return false;
         }
 
         $ffi = self::ffi();

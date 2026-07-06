@@ -120,7 +120,7 @@ final class VmProcess
      */
     public static function procGetStatus(int $handle): array|false
     {
-        if (VmProcessProcOpenNative::hasHandle($handle)) {
+        if (VmProcessProcOpenNative::isValidHandle($handle)) {
             return VmProcessProcOpenNative::getStatus($handle);
         }
 

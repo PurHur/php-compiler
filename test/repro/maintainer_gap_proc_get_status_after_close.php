@@ -21,12 +21,13 @@ fclose($pipes[1]);
 fclose($pipes[2]);
 
 $code = proc_close($proc);
-$st = proc_get_status($proc);
-$running = $st['running'] ?? null;
+try {
+    proc_get_status($proc);
+    echo "fail: expected TypeError after proc_close\n";
+    exit(1);
+} catch (TypeError $e) {
+    echo get_class($e), "\n";
+}
 
 echo 'closed=', $code, "\n";
-echo 'running=', var_export($running, true), "\n";
-
-$ok = false === $running;
-echo $ok ? "running_false\n" : "fail\n";
-exit($ok ? 0 : 1);
+echo "ok\n";

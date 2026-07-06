@@ -138,7 +138,7 @@ final class ResourceSupport
         return $var->streamFilterResource && Variable::TYPE_INTEGER === $var->type;
     }
 
-    /** Process handle zval shape — active or closed (php-src proc_get_status after proc_close, #16863). */
+    /** Process handle zval shape — closed handles fail isValidHandle (php-src proc_get_status after proc_close, #16967). */
     public static function isProcessResourceRepresentation(Variable $var): bool
     {
         $state = self::stateFromVariable($var);
