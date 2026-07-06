@@ -989,6 +989,9 @@ class Context {
             Builtin\SuperglobalRefreshRuntime::ensureStandaloneBodies($this);
             Builtin\SuperglobalNameRuntime::ensureLinked($this);
             Builtin\StringStrspn::ensureStandaloneBodies($this);
+            // BootstrapCompileSmokeM3Emit / inventory argv {main} calls __compiler_file_get_contents (#15604).
+            Builtin\StringFileGetContents::ensureStandaloneBodies($this);
+            Builtin\StringReadfile::ensureStandaloneBodies($this);
             Builtin\TokenGetAll::ensureStandaloneBodies($this);
             Builtin\Highlight::ensureStandaloneBodies($this);
             Builtin\Hebrev::ensureStandaloneBodies($this);
