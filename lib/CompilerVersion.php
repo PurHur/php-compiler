@@ -962,13 +962,13 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.4+ createLazyGhost()/createLazyProxy() and ReflectionClass lazy factories (#6708, #12375).
+     * PHP 8.4+ createLazyGhost()/createLazyProxy() and ReflectionClass lazy factories (#6708, #12375, #16812).
      *
-     * Gated on stable 8.4.0 so 8.4.0-dev reference profile matches Zend 8.2 phantom gate.
+     * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev reference profile matches Zend 8.2 phantom gate.
      */
     public static function supportsLazyObjectFactories(): bool
     {
-        return version_compare(self::VERSION, '8.4.0', '>=');
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
     }
 
     /**

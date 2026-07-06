@@ -184,6 +184,26 @@ final class CompilerVersionGateTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsFpow());
     }
 
+    public function testSupportsLazyObjectFactoriesFalseOnReferenceProfile(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsLazyObjectFactories());
+    }
+
+    public function testSupportsLazyObjectFactoriesTrueOnForwardProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertTrue(CompilerVersion::supportsLazyObjectFactories());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     public function testSupportsBcmathFalseOnReferenceProfile(): void
     {
         $this->assertFalse(CompilerVersion::supportsBcmath());
