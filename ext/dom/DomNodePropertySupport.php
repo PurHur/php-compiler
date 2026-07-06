@@ -33,7 +33,8 @@ final class DomNodePropertySupport
             || strtolower(VmDom::PROP_LOCAL_NAME) === $lc
             || strtolower(VmDom::PROP_PREFIX) === $lc
             || (VmDom::isAttr($object) && strtolower(VmDom::PROP_VALUE) === $lc)
-            || (VmDom::isAttr($object) && strtolower(VmDom::PROP_OWNER_ELEMENT) === $lc);
+            || (VmDom::isAttr($object) && strtolower(VmDom::PROP_OWNER_ELEMENT) === $lc)
+            || (VmDom::isNodeList($object) && strtolower(VmDom::PROP_LENGTH) === $lc);
     }
 
     public static function getProperty(ObjectEntry $object, string $name, ?Context $ctx = null): Variable
@@ -122,6 +123,12 @@ final class DomNodePropertySupport
                     $var->object($owner);
                 }
             }
+
+            return $var;
+        }
+        if (VmDom::isNodeList($object) && strtolower(VmDom::PROP_LENGTH) === $lc) {
+            VmDom::refreshNodeListIfLive($object);
+            $var->int(\count(DomRegistry::state($object)->listNodeIds));
 
             return $var;
         }

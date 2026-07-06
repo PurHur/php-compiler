@@ -3503,7 +3503,7 @@ final class VmDom
             throw new \DOMException('Not an element node');
         }
 
-        return self::createNodeList($ctx, self::collectElementsByTagName($node, $tagName));
+        return self::createLiveTagNameNodeList($ctx, $node, $tagName);
     }
 
     /**
@@ -3545,7 +3545,7 @@ final class VmDom
             throw new \DOMException('Not an element node');
         }
 
-        return self::createNodeList($ctx, self::collectElementsByTagNameNS($node, $namespaceUri, $localName));
+        return self::createLiveTagNameNSNodeList($ctx, $node, $namespaceUri, $localName);
     }
 
     public static function nodeListItem(ObjectEntry $nodeList, int $index): ?ObjectEntry
@@ -3553,6 +3553,7 @@ final class VmDom
         if (!self::isNodeList($nodeList)) {
             throw new \LogicException('DOMNodeList::item() called on non-nodelist in this compiler build');
         }
+        self::refreshNodeListIfLive($nodeList);
 
         return self::collectionItem($nodeList, $index);
     }
@@ -3570,6 +3571,7 @@ final class VmDom
         if (!self::isNodeList($nodeList)) {
             throw new \LogicException('DOMNodeList::valid() called on non-nodelist in this compiler build');
         }
+        self::refreshNodeListIfLive($nodeList);
         $state = DomRegistry::state($nodeList);
 
         return $state->listIterIndex < \count($state->listNodeIds);
@@ -3595,6 +3597,16 @@ final class VmDom
         }
 
         return DomRegistry::state($nodeList)->listIterIndex;
+    }
+
+    public static function nodeListCount(ObjectEntry $nodeList): int
+    {
+        if (!self::isNodeList($nodeList)) {
+            throw new \LogicException('DOMNodeList::count() called on non-nodelist in this compiler build');
+        }
+        self::refreshNodeListIfLive($nodeList);
+
+        return \count(DomRegistry::state($nodeList)->listNodeIds);
     }
 
     public static function nodeListNext(ObjectEntry $nodeList): void
@@ -3630,6 +3642,66 @@ final class VmDom
         $var->object($entry);
 
         return $var;
+    }
+
+    public static function createLiveTagNameNodeList(
+        Context $ctx,
+        ObjectEntry $root,
+        string $tagName
+    ): Variable {
+        $var = self::createNodeList($ctx, self::collectElementsByTagName($root, $tagName));
+        $state = DomRegistry::state($var->toObject());
+        $state->listQueryRootId = $root->id;
+        $state->listQueryTagName = $tagName;
+
+        return $var;
+    }
+
+    public static function createLiveTagNameNSNodeList(
+        Context $ctx,
+        ObjectEntry $root,
+        string $namespaceUri,
+        string $localName
+    ): Variable {
+        $var = self::createNodeList(
+            $ctx,
+            self::collectElementsByTagNameNS($root, $namespaceUri, $localName)
+        );
+        $state = DomRegistry::state($var->toObject());
+        $state->listQueryRootId = $root->id;
+        $state->listQueryNamespaceUri = $namespaceUri;
+        $state->listQueryLocalName = $localName;
+
+        return $var;
+    }
+
+    public static function refreshNodeListIfLive(ObjectEntry $nodeList): void
+    {
+        if (!self::isNodeList($nodeList)) {
+            return;
+        }
+        $state = DomRegistry::state($nodeList);
+        if (null === $state->listQueryRootId) {
+            return;
+        }
+        $root = DomRegistry::entry($state->listQueryRootId);
+        if (null === $root) {
+            self::updateNodeListMembers($nodeList, []);
+
+            return;
+        }
+        if (null !== $state->listQueryTagName) {
+            $ids = self::collectElementsByTagName($root, $state->listQueryTagName);
+        } elseif (null !== $state->listQueryLocalName) {
+            $ids = self::collectElementsByTagNameNS(
+                $root,
+                $state->listQueryNamespaceUri ?? '',
+                $state->listQueryLocalName
+            );
+        } else {
+            return;
+        }
+        self::updateNodeListMembers($nodeList, $ids);
     }
 
     public static function isNodeList(ObjectEntry $entry): bool
@@ -4116,7 +4188,9 @@ final class VmDom
         $state = DomRegistry::state($nodeList);
         $state->listNodeIds = $nodeIds;
         $state->listIterIndex = 0;
-        $nodeList->getProperty(self::PROP_LENGTH)->int(\count($nodeIds));
+        if (isset($nodeList->properties[self::PROP_LENGTH])) {
+            $nodeList->properties[self::PROP_LENGTH]->int(\count($nodeIds));
+        }
     }
 
     /**

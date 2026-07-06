@@ -67,6 +67,17 @@ final class DomNodeState
     /** Iterator walk position for {@see DomConstants::XML_NODELIST} (php-src ext/dom/nodelist.c). */
     public int $listIterIndex = 0;
 
+    /**
+     * Live {@see DOMNodeList} query root for getElementsByTagName* (php-src ext/dom/nodelist.c).
+     */
+    public ?int $listQueryRootId = null;
+
+    public ?string $listQueryTagName = null;
+
+    public ?string $listQueryNamespaceUri = null;
+
+    public ?string $listQueryLocalName = null;
+
     /** Persistent childNodes list object id for element/document nodes. */
     public ?int $childNodesListId = null;
 
