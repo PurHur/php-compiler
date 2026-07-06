@@ -221,6 +221,17 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.4+ #[\Deprecated] on file/namespace constants (Zend/zend_compile.c, issue #16819).
+     *
+     * Withheld on 8.4.0-dev reference profile (matches Zend 8.2 parse error). Enable via stable
+     * 8.4.0+ or explicit `PHP_COMPILER_PROFILE=8.4` forward profile.
+     */
+    public static function supportsGlobalDeprecatedConstAttributes(): bool
+    {
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+    }
+
+    /**
      * PHP 8.3+ typed function-local static variables (Zend/zend_compile.c, issue #9998, #16512).
      *
      * Withheld on 8.4.0-dev reference profile (matches Zend 8.2 parse error). Enable via stable

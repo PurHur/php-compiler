@@ -4085,6 +4085,50 @@ PY
   echo "Applied php-cfg-global-typed-const overlay (#7081, #9909)"
 }
 
+apply_php_cfg_global_deprecated_const_overlay() {
+  local parser="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php"
+  local overlay="$PATCH_DIR/overlays/php-cfg/global-deprecated-const-parser-methods.php"
+  if [[ ! -f "$parser" || ! -f "$overlay" ]]; then
+    return 0
+  fi
+  if grep -q 'function applyGlobalDeprecatedConstMarkerAttributes' "$parser" 2>/dev/null; then
+    return 0
+  fi
+  python3 - "$parser" "$overlay" <<'PY'
+import sys
+from pathlib import Path
+
+parser_path = Path(sys.argv[1])
+method_path = Path(sys.argv[2])
+text = parser_path.read_text()
+if 'function applyGlobalDeprecatedConstMarkerAttributes' in text:
+    raise SystemExit(0)
+
+anchor = """            $this->applyGlobalTypedConstMarkerAttributes($constOp, $node->getAttributes());
+            $this->block->children[] = $constOp;"""
+if anchor not in text:
+    sys.stderr.write("php-cfg-global-deprecated-const: parseStmt_Const anchor missing\n")
+    raise SystemExit(1)
+
+insert = method_path.read_text().rstrip("\n") + "\n\n"
+yield_anchor = """    protected function parseExpr_Yield(Expr\\Yield_ $expr)
+    {"""
+if yield_anchor not in text:
+    sys.stderr.write("php-cfg-global-deprecated-const: parseExpr_Yield anchor not found in Parser.php\n")
+    raise SystemExit(1)
+text = text.replace(yield_anchor, insert + yield_anchor, 1)
+text = text.replace(
+    anchor,
+    """            $this->applyGlobalTypedConstMarkerAttributes($constOp, $node->getAttributes());
+            $this->applyGlobalDeprecatedConstMarkerAttributes($constOp, $node->getAttributes());
+            $this->block->children[] = $constOp;""",
+    1,
+)
+parser_path.write_text(text)
+PY
+  echo "Applied php-cfg-global-deprecated-const overlay (#16819)"
+}
+
 apply_php_cfg_typed_function_static_overlay() {
   local parser="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php"
   local overlay="$PATCH_DIR/overlays/php-cfg/typed-function-static-parser-methods.php"
@@ -6084,6 +6128,7 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-cfg" ]]; then
   apply_php_cfg_asymmetric_set_visibility_parser_overlay
   apply_php_cfg_asymmetric_get_visibility_parser_overlay
   apply_php_cfg_global_typed_const_overlay
+  apply_php_cfg_global_deprecated_const_overlay
   apply_php_cfg_typed_function_static_overlay
   apply_patch "$PATCH_DIR/php-cfg-typed-function-static.patch"
   apply_patch "$PATCH_DIR/php-cfg-attribute-groups.patch"

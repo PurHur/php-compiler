@@ -32128,6 +32128,7 @@ class Compiler {
             $valueSlot
         );
         $opcode->globalConstStartLine = max(0, $const->getLine());
+        $opcode->deprecatedMetadata = DeprecatedMetadata::fromOp($const);
         $this->assignAttributeMetadata($opcode, $const);
         AttributeNames::assertCompileTimeConstTargetOnly($opcode->attributeNames, 'constant');
         AttributeNames::assertSensitiveParameterParamTargetOnly($opcode->attributeNames, 'constant');
