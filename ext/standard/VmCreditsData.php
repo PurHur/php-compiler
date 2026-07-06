@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\CompilerVersion;
+
 /**
  * php-src credit tables for phpcredits() (ext/standard/info.c, #3359, #13618).
  *
@@ -289,7 +291,25 @@ final class VmCreditsData
      */
     public static function allModuleAuthors(): array
     {
-        return self::CREDITS_MODULE_AUTHORS;
+        return self::creditsModuleAuthors();
+    }
+
+    /**
+     * Profile-aware credits_modules[] (ext/standard/credits.c, #16740).
+     *
+     * @return array<string, string>
+     */
+    public static function creditsModuleAuthors(): array
+    {
+        if (CompilerVersion::supportsForwardProfileCreditsModuleAuthors()) {
+            return self::CREDITS_MODULE_AUTHORS;
+        }
+
+        $rows = self::CREDITS_MODULE_AUTHORS;
+        $rows['DOM'] = 'Christian Stocker, Rob Richards, Marcus Boerger';
+        unset($rows['uri']);
+
+        return $rows;
     }
 
     /**
@@ -299,7 +319,7 @@ final class VmCreditsData
      */
     public static function creditsModuleAuthorsForPhpinfo(): array
     {
-        $rows = self::CREDITS_MODULE_AUTHORS;
+        $rows = self::creditsModuleAuthors();
         ksort($rows, SORT_STRING);
 
         return $rows;
@@ -323,7 +343,7 @@ final class VmCreditsData
             if (null === $label || isset($seenLabels[$label])) {
                 continue;
             }
-            $authors = self::CREDITS_MODULE_AUTHORS[$label] ?? null;
+            $authors = self::creditsModuleAuthors()[$label] ?? null;
             if (null === $authors) {
                 continue;
             }
