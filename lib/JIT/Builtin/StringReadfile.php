@@ -44,6 +44,12 @@ final class StringReadfile
             return;
         }
 
+        $savedBlock = null;
+        try {
+            $savedBlock = $context->builder->getInsertBlock();
+        } catch (\Throwable) {
+        }
+
         $fn = null !== $probe
             ? $probe
             : $context->lookupFunction('__compiler_readfile');
@@ -58,7 +64,11 @@ final class StringReadfile
         );
         $context->builder->returnValue($result);
         $context->registerFunction('__compiler_readfile', $fn);
-        $context->builder->clearInsertionPosition();
+        if (null !== $savedBlock) {
+            $context->builder->positionAtEnd($savedBlock);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
     }
 
     private static function helperFunction(Context $context): LlvmFunction

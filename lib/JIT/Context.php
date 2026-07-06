@@ -907,6 +907,8 @@ class Context {
         Builtin\RewriteVarsRuntime::ensureStandaloneBodies($this);
         Builtin\DefineRuntime::ensureStandaloneBodies($this);
         Builtin\StringStrContains::ensureStandaloneBodies($this);
+        Builtin\StringFileGetContents::ensureStandaloneBodies($this);
+        Builtin\StringReadfile::ensureStandaloneBodies($this);
         Builtin\SuperglobalNameRuntime::ensureLinked($this);
     }
 
