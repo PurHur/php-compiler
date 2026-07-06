@@ -77,7 +77,7 @@ final class JitVmHelperLink
         string $issueTag
     ): void {
         $probe = $context->module->getNamedFunction($abiName);
-        if (self::bridgeEntryComplete($probe)) {
+        if (self::hasNamedBridgeEntry($probe, $entryBlockName)) {
             $context->registerFunction($abiName, $probe);
 
             return;
@@ -134,6 +134,23 @@ final class JitVmHelperLink
         return \dirname(__DIR__).$relativeHelperPath;
     }
 
+    public static function hasNamedBridgeEntry(?LlvmFunction $probe, string $entryBlockName): bool
+    {
+        if (null === $probe || '' === $entryBlockName) {
+            return false;
+        }
+        try {
+            foreach ($probe->getBasicBlocks() as $block) {
+                if ($block->getName() === $entryBlockName && null !== $block->getTerminator()) {
+                    return true;
+                }
+            }
+        } catch (\Throwable) {
+        }
+
+        return false;
+    }
+
     private static function bridgeEntryComplete(?LlvmFunction $probe): bool
     {
         if (null === $probe || 0 === $probe->countBasicBlocks()) {
@@ -152,6 +169,11 @@ final class JitVmHelperLink
     private static function bridgeEntryForEmit(LlvmFunction $fn, string $entryBlockName): \PHPLLVM\BasicBlock
     {
         try {
+            foreach ($fn->getBasicBlocks() as $block) {
+                if ($block->getName() === $entryBlockName) {
+                    return $block;
+                }
+            }
             $blocks = $fn->getBasicBlocks();
             $entry = $blocks[0] ?? null;
             if (null !== $entry && null === $entry->getTerminator()) {

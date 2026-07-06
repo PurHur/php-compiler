@@ -5,14 +5,12 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitNestedHelperCoerce;
-use PHPCompiler\JIT\JitVmHelperLink;
+use PHPCompiler\JIT\UserScriptAotDeferNestedJit;
 use PHPLLVM\Value;
 
 /**
- * JIT/AOT link for rename() via RenameJitHelper PHP (#15533).
+ * JIT/AOT link for rename() via RenameJitHelper PHP or libc for user-script AOT (#16734).
  *
- * Replaces libc rename(2) LLVM in ext/standard/JitRename.php.
  * SSOT: {@see \PHPCompiler\ext\standard\VmFs::rename()}.
  * php-src: ext/standard/filestat.c — php_rename
  */
@@ -29,8 +27,13 @@ final class StringRename
         self::INVOKE_HELPER,
     ];
 
+    private const BRIDGE_ENTRY = 'rename_bridge_entry';
+
     public static function ensureLinked(Context $context): void
     {
+        if (UserScriptAotDeferNestedJit::shouldDefer($context)) {
+            return;
+        }
         self::implement($context);
     }
 
@@ -49,7 +52,7 @@ final class StringRename
     private static function implement(Context $context): void
     {
         $probe = $context->module->getNamedFunction(self::ABI);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+        if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::BRIDGE_ENTRY)) {
             $context->registerFunction(self::ABI, $probe);
 
             return;
@@ -66,14 +69,14 @@ final class StringRename
                 $context->context->functionType($i1, false, $strPtr, $strPtr)
             );
 
-        $entry = $fn->appendBasicBlock('rename_bridge_entry');
+        $entry = $fn->appendBasicBlock(self::BRIDGE_ENTRY);
         $context->builder->positionAtEnd($entry);
 
         $helperFn = JitVmHelperLink::lookupCompiled($context, self::INVOKE_HELPER, '#15533');
         $raw = JitNestedHelperCoerce::callHelper($context, $helperFn, [$fn->getParam(0), $fn->getParam(1)]);
-        $bool = JitNestedHelperCoerce::coerceHelperScalarResult($context, $raw, $i1);
-        $context->builder->returnValue($bool);
-
+        $context->builder->returnValue(
+            JitNestedHelperCoerce::coerceHelperScalarResult($context, $raw, $i1)
+        );
         $context->registerFunction(self::ABI, $fn);
         $context->builder->clearInsertionPosition();
     }

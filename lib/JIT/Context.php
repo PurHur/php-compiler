@@ -909,6 +909,9 @@ class Context {
         Builtin\StringStrContains::ensureStandaloneBodies($this);
         Builtin\StringFileGetContents::ensureStandaloneBodies($this);
         Builtin\StringReadfile::ensureStandaloneBodies($this);
+        Builtin\StringAddslashes::ensureStandaloneBodies($this);
+        Builtin\StringStripslashes::ensureStandaloneBodies($this);
+        Builtin\StringFilePutContents::ensureStandaloneBodies($this);
         Builtin\SuperglobalNameRuntime::ensureLinked($this);
     }
 

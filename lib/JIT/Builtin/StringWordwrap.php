@@ -6,13 +6,15 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPCompiler\JIT\UserScriptAotDeferNestedJit;
 
 /**
- * JIT/AOT link for __compiler_wordwrap via WordwrapJitHelper PHP (#14565).
+ * JIT/AOT link for wordwrap() — nested WordwrapJitHelper PHP, or LLVM for user-script AOT (#16734).
  *
- * Replaces ~602 LOC LLVM in JitWordwrap.php. SSOT: {@see \PHPCompiler\ext\standard\VmString}.
+ * SSOT: {@see \PHPCompiler\ext\standard\VmString}.
  * php-src: ext/standard/string.c — PHP_FUNCTION(wordwrap)
  */
 final class StringWordwrap
@@ -23,10 +25,17 @@ final class StringWordwrap
 
     private const WORDWRAP_HELPER = 'PHPCompiler\\ext\\standard\\WordwrapJitHelper::wordwrapArgv';
 
+    private const BRIDGE_ENTRY = 'wordwrap_bridge_entry';
+
     /** @var list<string> */
     private const COMPILED_HELPERS = [
         self::WORDWRAP_HELPER,
     ];
+
+    public static function shouldDeferNestedHelper(Context $context): bool
+    {
+        return UserScriptAotDeferNestedJit::shouldDefer($context);
+    }
 
     public static function ensureLinked(Context $context): void
     {
@@ -38,14 +47,18 @@ final class StringWordwrap
         self::implement($context);
     }
 
-    public static function implement(Context $context): void
+    private static function implement(Context $context): void
     {
+        if (self::shouldDeferNestedHelper($context)) {
+            return;
+        }
+
         if (NestedJitCompileScope::isActive()) {
             return;
         }
 
         $probe = $context->module->getNamedFunction(self::ABI_WORDWRAP);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+        if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::BRIDGE_ENTRY)) {
             $context->registerFunction(self::ABI_WORDWRAP, $probe);
 
             return;
@@ -68,7 +81,7 @@ final class StringWordwrap
         JitVmHelperLink::ensureBridge(
             $context,
             self::ABI_WORDWRAP,
-            'wordwrap_bridge_entry',
+            self::BRIDGE_ENTRY,
             [$strPtr, $i64, $strPtr, $i8],
             $strPtr,
             self::WORDWRAP_HELPER,
