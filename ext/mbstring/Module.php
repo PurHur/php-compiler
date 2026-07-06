@@ -48,6 +48,7 @@ class Module extends ModuleAbstract
             new mb_strtoupper(),
             new mb_convert_case(),
             new mb_convert_encoding(),
+            new mb_convert_variables(),
             new mb_stripos(),
             new mb_strrpos(),
             new mb_strrichr(),
