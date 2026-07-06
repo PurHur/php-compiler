@@ -60,6 +60,8 @@ final class VmDom
 
     public const CLASS_NAMED_NODE_MAP = 'domnamednodemap';
 
+    public const CLASS_TOKEN_LIST = 'domtokenlist';
+
     public const PROP_FORMAT_OUTPUT = 'formatOutput';
 
     public const PROP_IMPLEMENTATION = 'implementation';
@@ -117,6 +119,8 @@ final class VmDom
     public const PROP_CHILD_NODES = 'childNodes';
 
     public const PROP_ATTRIBUTES = 'attributes';
+
+    public const PROP_CLASS_LIST = 'classList';
 
     public const PROP_NEXT_SIBLING = 'nextSibling';
 
@@ -329,6 +333,31 @@ final class VmDom
         $namedNodeMap->methodVisibility['next'] = $pub;
         $ctx->classes[self::CLASS_NAMED_NODE_MAP] = $namedNodeMap;
 
+        if (CompilerVersion::supportsDomTokenList()) {
+            $tokenList = new ClassEntry('DOMTokenList');
+            $tokenList->isInternal = true;
+            $tokenList->interfaces[] = 'countable';
+            $tokenList->properties[] = new ClassProperty(self::PROP_LENGTH, null, $intProto);
+            $tokenList->properties[] = new ClassProperty(self::PROP_VALUE, null, $strProto);
+            $tokenList->methods['add'] = new TokenListAdd();
+            $tokenList->methodVisibility['add'] = $pub;
+            $tokenList->methods['remove'] = new TokenListRemove();
+            $tokenList->methodVisibility['remove'] = $pub;
+            $tokenList->methods['contains'] = new TokenListContains();
+            $tokenList->methodVisibility['contains'] = $pub;
+            $tokenList->methods['toggle'] = new TokenListToggle();
+            $tokenList->methodVisibility['toggle'] = $pub;
+            $tokenList->methods['item'] = new TokenListItem();
+            $tokenList->methodVisibility['item'] = $pub;
+            $tokenList->methods['replace'] = new TokenListReplace();
+            $tokenList->methodVisibility['replace'] = $pub;
+            $tokenList->methods['supports'] = new TokenListSupports();
+            $tokenList->methodVisibility['supports'] = $pub;
+            $tokenList->methods['count'] = new TokenListCount();
+            $tokenList->methodVisibility['count'] = $pub;
+            $ctx->classes[self::CLASS_TOKEN_LIST] = $tokenList;
+        }
+
         $impl = new ClassEntry('DOMImplementation');
         $impl->isInternal = true;
         $impl->methods['createdocument'] = new ImplementationCreateDocument();
@@ -493,6 +522,9 @@ final class VmDom
             $element->methods['toggleattribute'] = new ElementToggleAttribute();
             $element->methodVisibility['toggleattribute'] = $pub;
             $element->methodNames['toggleattribute'] = 'toggleAttribute';
+        }
+        if (CompilerVersion::supportsDomTokenList()) {
+            $element->properties[] = new ClassProperty(self::PROP_CLASS_LIST, $nullProto, $objProto);
         }
         $ctx->classes[self::CLASS_ELEMENT] = $element;
 
@@ -712,6 +744,9 @@ final class VmDom
         if ('' !== $value) {
             self::writeTextContent($ctx, $entry, $value);
         }
+        if (CompilerVersion::supportsDomTokenList()) {
+            self::syncElementClassList($ctx, $entry);
+        }
 
         $var = new Variable(Variable::TYPE_OBJECT);
         $var->object($entry);
@@ -746,6 +781,9 @@ final class VmDom
         DomRegistry::attach($entry, $state);
         if ('' !== $value) {
             self::writeTextContent($ctx, $entry, $value);
+        }
+        if (CompilerVersion::supportsDomTokenList()) {
+            self::syncElementClassList($ctx, $entry);
         }
 
         $var = new Variable(Variable::TYPE_OBJECT);
@@ -1036,6 +1074,9 @@ final class VmDom
         if (null !== $state->idAttributeName && $qualifiedName === $state->idAttributeName) {
             self::syncElementIdRegistration($element);
         }
+        if (CompilerVersion::supportsDomTokenList() && 'class' === $qualifiedName) {
+            VmDomTokenList::invalidateForElement($element);
+        }
         self::syncElementAttributes($ctx, $element);
     }
 
@@ -1078,6 +1119,9 @@ final class VmDom
                 self::unregisterElementId($document, $element);
             }
             $state->idAttributeName = null;
+        }
+        if (CompilerVersion::supportsDomTokenList() && 'class' === $removedQName) {
+            VmDomTokenList::invalidateForElement($element);
         }
         self::syncElementAttributes($ctx, $element);
 
@@ -3972,6 +4016,71 @@ final class VmDom
             && DomConstants::XML_NAMEDNODEMAP === DomRegistry::state($entry)->nodeType;
     }
 
+    public static function createTokenList(Context $ctx, ObjectEntry $element): Variable
+    {
+        $class = $ctx->classes[self::CLASS_TOKEN_LIST] ?? null;
+        if (null === $class) {
+            throw new \LogicException('DOMTokenList is not registered in this compiler build');
+        }
+
+        $entry = new ObjectEntry($class);
+        $entry->constructed = true;
+
+        $state = new DomNodeState();
+        $state->nodeType = DomConstants::XML_TOKENLIST;
+        $state->nodeName = '#tokenlist';
+        $state->tokenListElementId = $element->id;
+        $state->tokenListTokens = VmDomTokenList::parseTokens(VmDomTokenList::elementClassValue($element));
+        $state->tokenListCachedClassValue = VmDomTokenList::elementClassValue($element);
+        DomRegistry::attach($entry, $state);
+
+        $var = new Variable(Variable::TYPE_OBJECT);
+        $var->object($entry);
+
+        return $var;
+    }
+
+    public static function isTokenList(ObjectEntry $entry): bool
+    {
+        return self::CLASS_TOKEN_LIST === strtolower($entry->class->name)
+            && DomRegistry::has($entry)
+            && DomConstants::XML_TOKENLIST === DomRegistry::state($entry)->nodeType;
+    }
+
+    public static function syncElementClassList(Context $ctx, ObjectEntry $element): void
+    {
+        if (!CompilerVersion::supportsDomTokenList() || !self::isElement($element)) {
+            return;
+        }
+        self::initElementPropertySlots($element);
+        $state = DomRegistry::state($element);
+        $classListVar = $element->getProperty(self::PROP_CLASS_LIST);
+        if (null !== $state->classListId) {
+            $tokenList = DomRegistry::entry($state->classListId);
+            if (null !== $tokenList && self::isTokenList($tokenList)) {
+                VmDomTokenList::invalidateForElement($element);
+                $classListVar->object($tokenList);
+
+                return;
+            }
+        }
+        if (null === $state->classListId && Variable::TYPE_OBJECT === $classListVar->resolveIndirect()->type) {
+            $existing = $classListVar->resolveIndirect()->toObject();
+            if (self::isTokenList($existing)) {
+                $state->classListId = $existing->id;
+                DomRegistry::state($existing)->tokenListElementId = $element->id;
+                VmDomTokenList::invalidateForElement($element);
+                $classListVar->object($existing);
+
+                return;
+            }
+        }
+        $listVar = self::createTokenList($ctx, $element);
+        $list = $listVar->toObject();
+        $state->classListId = $list->id;
+        $classListVar->copyFrom($listVar);
+    }
+
     private static function collectionItem(ObjectEntry $collection, int $index): ?ObjectEntry
     {
         $ids = DomRegistry::state($collection)->listNodeIds;
@@ -4022,6 +4131,9 @@ final class VmDom
         self::initNodePropertySlots($entry);
         if (!$entry->hasProperty(self::PROP_ATTRIBUTES)) {
             $entry->allocateProperty(self::PROP_ATTRIBUTES)->null();
+        }
+        if (CompilerVersion::supportsDomTokenList() && !$entry->hasProperty(self::PROP_CLASS_LIST)) {
+            $entry->allocateProperty(self::PROP_CLASS_LIST)->null();
         }
     }
 

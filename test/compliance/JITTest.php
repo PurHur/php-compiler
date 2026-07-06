@@ -700,6 +700,10 @@ class JITTest extends BaseTest {
                 && !str_contains($name, 'get_attribute_names_phantom')) {
                 continue;
             }
+            // DOMTokenList / DOMElement::$classList — VM ext/dom method dispatch; JIT VM-only (#16876).
+            if (str_contains($name, 'dom_token_list')) {
+                continue;
+            }
             // 8.4-target reject gate; skipped when encapsed ?? interpolation enabled (#14063).
             if (CompilerVersion::supportsEncapsedCoalesce()
                 && str_contains($name, 'encapsed_coalesce_parse_error')) {
