@@ -2932,6 +2932,7 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/FunctionStaticRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/GcCollectCyclesCollectRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/GcCollectCyclesNativeOpsJit.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/GcCollectCyclesRuntime.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/GcCollectCyclesStandaloneLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/GcStatusRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/GcToggleRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/GetBrowserRuntime.php';
