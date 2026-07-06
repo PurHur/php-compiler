@@ -14,5 +14,5 @@ $rB = new ReflectionEnumUnitCase(E::class, 'B');
 echo $rA->isDeprecated() ? 'deprecated' : 'not_deprecated', "\n";
 echo $rB->isDeprecated() ? 'deprecated' : 'not_deprecated', "\n";
 --EXPECT--
-not_deprecated
+deprecated
 not_deprecated

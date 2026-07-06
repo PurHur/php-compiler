@@ -16,5 +16,5 @@ $rc = new ReflectionFunction('control');
 var_export($rc->isDeprecated());
 echo "\n";
 --EXPECT--
-false
+true
 false

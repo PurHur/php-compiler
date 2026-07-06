@@ -146,17 +146,17 @@ final class DeprecatedMetadata
     }
 
     /**
-     * Whether #[\Deprecated] is active for Reflection*::isDeprecated() (ext/reflection/php_reflection.c, #9760, #16800, #16845).
+     * Whether #[\Deprecated] is active for Reflection*::isDeprecated() (ext/reflection/php_reflection.c, #9760, #16821, #16867).
      *
-     * php-src compares the `since` attribute against the runtime PHP version, not the compile-time language profile.
-     * Forward profile (PHP_COMPILER_PROFILE=8.4) must not report deprecated while
-     * {@see CompilerVersion::reportedPhpVersion()} is still below `since`.
+     * php-src compares `since` against the effective language profile version so
+     * `PHP_COMPILER_PROFILE=8.4` matches Zend 8.4 reflection while the 8.4.0-dev
+     * reference profile (no forward gate) stays below `since: '8.4'`.
      */
     public function isDeprecatedForReflection(): bool
     {
         if (null !== $this->since) {
             return version_compare(
-                CompilerVersion::reportedPhpVersion(),
+                CompilerVersion::languageProfileVersion(),
                 self::normalizeSinceVersion($this->since),
                 '>='
             );
