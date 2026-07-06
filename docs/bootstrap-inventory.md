@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 4184 |
-| Phase A inventory files (M2 ratio SSOT) | 4184 |
+| PHP files on vm.php path | 4185 |
+| Phase A inventory files (M2 ratio SSOT) | 4185 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 11301 |
+| Source constructs flagged (warnings) | 11306 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1489,7 +1489,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VmCliProcessTitleNative.php` | 0 | 1 |
 | `ext/standard/VmCliProcessTitlePure.php` | 0 | 1 |
 | `ext/standard/VmClockGettime.php` | 0 | 4 |
-| `ext/standard/VmClosureCall.php` | 0 | 5 |
+| `ext/standard/VmClosureCall.php` | 0 | 9 |
 | `ext/standard/VmCombinedLcg.php` | 0 | 1 |
 | `ext/standard/VmConnection.php` | 0 | 2 |
 | `ext/standard/VmConstants.php` | 0 | 21 |
@@ -2876,6 +2876,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/GcCollectCyclesCollectRuntime.php` | 0 | 2 |
 | `lib/JIT/Builtin/GcCollectCyclesNativeOpsJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/GcCollectCyclesRuntime.php` | 0 | 5 |
+| `lib/JIT/Builtin/GcCollectCyclesStandaloneLlvm.php` | 0 | 1 |
 | `lib/JIT/Builtin/GcStatusRuntime.php` | 0 | 2 |
 | `lib/JIT/Builtin/GcToggleRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/GetBrowserRuntime.php` | 0 | 3 |
@@ -14021,7 +14022,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 282)
 - new HashTable (line 297)
 - new Variable (line 535)
-- 29 class method(s)
+- 31 class method(s)
 - 2 closure(s)
 
 ### `ext/standard/VmArrayValueCallback.php`
@@ -14159,7 +14160,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 48)
 - new Variable (line 73)
 - new Variable (line 75)
-- 10 class method(s)
+- new Variable (line 91)
+- new Variable (line 93)
+- new Variable (line 99)
+- new Variable (line 101)
+- 13 class method(s)
 - 3 closure(s)
 
 ### `ext/standard/VmCombinedLcg.php`
@@ -22303,7 +22308,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/CompilerVersion.php`
 
 **Warnings** (review for bootstrap subset):
-- 141 class method(s)
+- 142 class method(s)
 
 ### `lib/CurlyBraceOffsetRejector.php`
 
@@ -23309,11 +23314,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/GcCollectCyclesRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 1389)
-- new JIT (line 1432)
-- new JIT (line 1475)
-- 53 class method(s)
+- new JIT (line 923)
+- new JIT (line 966)
+- new JIT (line 1009)
+- 56 class method(s)
 - 3 closure(s)
+
+### `lib/JIT/Builtin/GcCollectCyclesStandaloneLlvm.php`
+
+**Warnings** (review for bootstrap subset):
+- 6 class method(s)
 
 ### `lib/JIT/Builtin/GcStatusRuntime.php`
 
