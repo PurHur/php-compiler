@@ -52,6 +52,44 @@ final class StringFormat
         self::implement($context);
     }
 
+    /**
+     * User-standalone builds skip ensureLinked at initialize (no nested-JIT
+     * stdlib during init, #13571), but printf()/sprintf()/number_format()
+     * call sites still declare the ABI symbols — the binary then dies at link
+     * with undefined __compiler_sprintf (#15642). Define the bodies on demand
+     * at finalize when any ABI symbol is declared but bodyless.
+     */
+    public static function implementIfDeclared(Context $context, bool $force = false): void
+    {
+        if ($force) {
+            $probe = $context->module->getNamedFunction('__compiler_sprintf');
+            if (null !== $probe && $probe->countBasicBlocks() > 0) {
+                return;
+            }
+            // Mid-lowering call site: implement() repositions the builder and
+            // clears the insertion point — save and restore the caller's block.
+            $savedBlock = null;
+            try {
+                $savedBlock = $context->builder->getInsertBlock();
+            } catch (\Throwable) {
+            }
+            self::implement($context);
+            if (null !== $savedBlock) {
+                $context->builder->positionAtEnd($savedBlock);
+            }
+
+            return;
+        }
+        foreach (self::ABI_FUNCTIONS as $abi) {
+            $fn = $context->module->getNamedFunction($abi);
+            if (null !== $fn && 0 === $fn->countBasicBlocks()) {
+                self::implement($context);
+
+                return;
+            }
+        }
+    }
+
     public static function ensureStandaloneBodies(Context $context): void
     {
         self::implement($context);
@@ -266,6 +304,21 @@ final class StringFormat
         }
         if (!$missing) {
             return;
+        }
+        // Cache first: with PHP_COMPILER_HELPER_RUNTIME_O=1 the sprintf unit
+        // binds as extern declarations + a prebuilt unit.o — no nested corpus
+        // compile (which OOMs a default-memory user build, #15642).
+        if (\PHPCompiler\AOT\HelperRuntimeCache::tryProvide($context, self::COMPILED_HELPERS)) {
+            $missing = false;
+            foreach (self::COMPILED_HELPERS as $logical) {
+                if (!isset($context->functions[\strtolower($logical)])) {
+                    $missing = true;
+                    break;
+                }
+            }
+            if (!$missing) {
+                return;
+            }
         }
 
         $runtime = $context->runtime;

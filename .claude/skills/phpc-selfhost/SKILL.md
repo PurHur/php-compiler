@@ -45,8 +45,29 @@ git add prelinked/bootstrap-gen0/     # stamp + manifest (+ blobs when changed)
 
 Master moves fast — re-check `php script/check-selfhost-spine-sidecar-sync.php` right before committing; the SSOT may have moved again while you linked.
 
+## spine-sync.sh — the one-command chain
+
+`./script/spine-sync.sh` does discovery → bundle inserts → inventory/profile regen → footnote rewrite (6 docs + bundle-test assertion + deferred-ratio comment) → sync checks → sidecar refresh. Flags:
+
+- `--no-link` — everything except the sidecar relink (stamp-only / doc PRs)
+- `--footnotes-only` — recount + rewrite pairs only (what ci-fast auto-heal runs)
+
+Discovery is **deferred-SSOT-aware** (won't re-add deferred paths). After ANY merge that unioned spine edits from two branches, check for duplicate requires: `grep -oE "require_once.*';" test/selfhost/compiler_lib_spine_smoke/main.php | sort | uniq -d` — duplicates skew the M2 ratio and every footnote downstream (the count-sync gate now catches this).
+
+## Deferring a file the AOT lowering cannot compile yet
+
+When one inventory file breaks the native spine emit (e.g. #16866's huge array literal), defer it honestly instead of blocking every sidecar refresh:
+
+1. Add the repo-relative path to `bootstrap_spine_native_link_deferred()` in `script/bootstrap-spine-deferred-lib.php` with the tracking-issue reference.
+2. Remove its `require_once` from the spine bundle.
+3. `./script/spine-sync.sh --no-link` — footnotes become `N-1/N`; then add the `(1 deferred: #NNNN)` annotation to the SIX tracked docs, name the path in at least one doc (`docs/bootstrap-selfhost.md`), and keep the `// Spine ratio N-1/N — 1 deferred (...)` comment next to the bundle-test assertion (spine-sync keeps the numbers fresh).
+4. Sidecar refresh + commit everything together. Un-defer when the lowering issue lands.
+
+VM coverage is unaffected — deferral only skips the native-link smoke.
+
 ## Critical semantics
 
 - **Gen-0 blobs embed the compiler at the commit that built them.** After fixing a codegen bug in `lib/`/`ext/`, gen binaries keep emitting the OLD lowering until the sidecar is refreshed — behavioral staleness the fast gate does NOT catch (only `--strict` `bootstrap-loop-probe` does).
-- New files on the `bin/vm.php` require path must land in the Phase A inventory AND the spine: `php script/bootstrap-inventory.php`, then update spine main.php, then refresh sidecar.
+- New files on the `bin/vm.php` require path must land in the Phase A inventory AND the spine — run `./script/spine-sync.sh`, don't hand-edit.
 - Driver preference: `build/bin-compile-aot-inventory` (argv) > `build/bin-compile-aot` > Zend fallback (logged `(gen-0 Zend)`; forbidden under `BOOTSTRAP_M5_NO_ZEND=1`).
+- At fleet velocity master grows the inventory every ~20–30 min: sync locally in the same worktree you run gates in and push+merge in one sequence, or you lose the race via the GitHub round-trip.

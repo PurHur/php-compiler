@@ -4238,4 +4238,7 @@ require_once __DIR__.'/../../../ext/dom/TokenListReplace.php';
 require_once __DIR__.'/../../../ext/dom/TokenListSupports.php';
 require_once __DIR__.'/../../../ext/dom/TokenListToggle.php';
 require_once __DIR__.'/../../../ext/dom/VmDomTokenList.php';
+require_once __DIR__.'/../../../lib/Ast/LazyPropertyRewriter.php';
+require_once __DIR__.'/../../../lib/LazyPropertyRejector.php';
+require_once __DIR__.'/../../../lib/VM/LazyPropertySupport.php';
 echo "compiler_lib_spine_smoke bundle OK\n";

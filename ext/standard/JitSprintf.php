@@ -24,6 +24,11 @@ final class JitSprintf
 
     public static function format(Context $context, JITVariable ...$args): Value
     {
+        // User-standalone init skips StringFormat::ensureLinked (#13571) —
+        // without a body the ABI symbols die at link with undefined
+        // __compiler_sprintf (#15642). Link on first call-site lowering,
+        // mid-compile like every other nested helper.
+        \PHPCompiler\JIT\Builtin\StringFormat::implementIfDeclared($context, true);
         $argc = \count($args);
         if ($argc < 1) {
             throw new \LogicException('sprintf() requires at least one argument');
