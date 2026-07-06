@@ -1221,6 +1221,16 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.4+ DatePeriod::createFromISO8601String() (ext/date/php_date.c, #7296).
+     *
+     * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev reference profile matches Zend 8.2 phantom gate.
+     */
+    public static function supportsDatePeriodCreateFromISO8601String(): bool
+    {
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+    }
+
+    /**
      * PHP 8.4+ proc_get_status() pending_signals array (ext/standard/proc_open.c, #16707).
      *
      * Gated on stable 8.4.0 / PHP_COMPILER_PROFILE=8.4 so 8.4.0-dev reference profile matches Zend 8.2 phantom gate.
