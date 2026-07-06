@@ -192,11 +192,14 @@ final class SplDualIteratorStorage
 
     public static function initRecursive(ObjectEntry $object, ObjectEntry $inner, int $mode): void
     {
+        // php-src spl_recursive_it_it_construct — inner iterator on stack at RS_START (#16904).
         self::$store[$object->id] = [
             'inner' => $inner,
             'recursive' => true,
             'mode' => $mode,
-            'stack' => [],
+            'stack' => [
+                ['iterator' => $inner, 'state' => self::RS_START],
+            ],
             'maxDepth' => -1,
             'rewound' => false,
             'noRewind' => false,
