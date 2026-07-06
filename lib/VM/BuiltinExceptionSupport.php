@@ -28,6 +28,7 @@ final class BuiltinExceptionSupport
     public const CLASS_SODIUM_EXCEPTION = 'sodiumexception';
     public const CLASS_EXCEPTION = 'exception';
     public const CLASS_LOGIC_EXCEPTION = 'logicexception';
+    public const CLASS_INVALID_ARGUMENT_EXCEPTION = 'invalidargumentexception';
     public const CLASS_BAD_METHOD_CALL_EXCEPTION = 'badmethodcallexception';
     public const CLASS_OUT_OF_BOUNDS_EXCEPTION = 'outofboundsexception';
     public const CLASS_DATE_INVALID_TIME_ZONE_EXCEPTION = 'dateinvalidtimezoneexception';
@@ -279,6 +280,19 @@ final class BuiltinExceptionSupport
         int $line = 0
     ): Variable {
         return self::materializeThrowable($ctx, self::CLASS_LOGIC_EXCEPTION, $message, $file, $line);
+    }
+
+    public static function materializeInvalidArgumentException(
+        Context $ctx,
+        string $message,
+        string $file = '',
+        int $line = 0
+    ): Variable {
+        if (!isset($ctx->classes[self::CLASS_INVALID_ARGUMENT_EXCEPTION])) {
+            return self::materializeLogicException($ctx, $message, $file, $line);
+        }
+
+        return self::materializeThrowable($ctx, self::CLASS_INVALID_ARGUMENT_EXCEPTION, $message, $file, $line);
     }
 
     public static function materializeBadMethodCallException(
