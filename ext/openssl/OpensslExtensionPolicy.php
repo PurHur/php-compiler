@@ -5,20 +5,20 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\openssl;
 
 /**
- * ext/openssl surface advertisement — php-src ext/openssl/openssl.c (#11859).
+ * ext/openssl surface advertisement — php-src ext/openssl/openssl.c (#11859, #16750).
  *
- * Withhold extension_loaded('openssl') until core entrypoints like
- * openssl_x509_parse() are registered (partial surface stays callable via function_exists).
+ * extension_loaded('openssl') tracks the in-tree openssl module once core crypto
+ * entrypoints register (php-src module_registry), not a single optional helper.
  */
 final class OpensslExtensionPolicy
 {
     public static function advertisesExtension(): bool
     {
-        return self::hasX509Parse();
+        return self::hasCoreSurface();
     }
 
-    private static function hasX509Parse(): bool
+    private static function hasCoreSurface(): bool
     {
-        return \class_exists(openssl_x509_parse::class);
+        return \class_exists(openssl_encrypt::class);
     }
 }

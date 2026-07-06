@@ -74,6 +74,9 @@ final class BuiltinIntrospectionPolicy
         if ('curl' === $ext) {
             return \PHPCompiler\ext\curl\CurlExtensionPolicy::advertisesExtension();
         }
+        if ('openssl' === $ext) {
+            return \PHPCompiler\ext\openssl\OpensslExtensionPolicy::advertisesExtension();
+        }
 
         return true;
     }
