@@ -28,12 +28,13 @@ final class ArrayMergeRecursiveRuntimeShrinkTest extends TestCase
         $this->assertFileDoesNotExist($this->repoRoot.'/lib/JIT/Builtin/phpc_array_merge_recursive.c');
     }
 
-    public function testJitLoweringUsesArrayBuiltinHelperOverlay(): void
+    public function testJitLoweringUsesPhpHelperNotArrayBuiltinHelperLlvm(): void
     {
         $runtime = file_get_contents($this->repoRoot.'/lib/JIT/Builtin/ArrayMergeRecursiveRuntime.php');
         $this->assertIsString($runtime);
         $this->assertStringContainsString('ArrayMergeRecursiveJitHelper', $runtime);
         $this->assertStringNotContainsString('ArrayBuiltinHelper::mergeRecursive', $runtime);
+        $this->assertStringNotContainsString('ArrayBuiltinHelper::mergeRecursiveOverlay', $runtime);
         $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);
 
         $builtin = file_get_contents($this->repoRoot.'/ext/standard/array_merge_recursive.php');
@@ -42,9 +43,13 @@ final class ArrayMergeRecursiveRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('ArrayBuiltinHelper::mergeRecursive', $builtin);
         $this->assertStringContainsString('mergeRecursiveCopy', $builtin);
 
-        $jit = file_get_contents($this->repoRoot.'/ext/standard/JitArrayMergeRecursive.php');
-        $this->assertIsString($jit);
-        $this->assertStringContainsString('mergeRecursiveOverlay', $jit);
+        $this->assertFileDoesNotExist($this->repoRoot.'/ext/standard/JitArrayMergeRecursive.php');
+
+        $monolith = file_get_contents($this->repoRoot.'/lib/JIT/ArrayBuiltinHelper.php');
+        $this->assertIsString($monolith);
+        $this->assertStringNotContainsString('function mergeRecursive(', $monolith);
+        $this->assertStringNotContainsString('function mergeRecursiveOverlay(', $monolith);
+        $this->assertStringNotContainsString('public static function merge(', $monolith);
     }
 
     public function testArrayMergeRecursiveJitHelperMatchesHashTableSemantics(): void
