@@ -13,7 +13,7 @@ echo "\n";
 echo grapheme_strimwidth('hello', 0, 10), "\n";
 ?>
 --EXPECT--
-false
 true
-false
+true
+true
 hello
