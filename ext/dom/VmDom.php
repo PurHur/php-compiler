@@ -533,6 +533,14 @@ final class VmDom
             $element->methodVisibility['toggleattribute'] = $pub;
             $element->methodNames['toggleattribute'] = 'toggleAttribute';
         }
+        if (CompilerVersion::supportsDomElementInnerOuterHtml()) {
+            $element->methods['getinnerhtml'] = new ElementGetInnerHTML();
+            $element->methodVisibility['getinnerhtml'] = $pub;
+            $element->methodNames['getinnerhtml'] = 'getInnerHTML';
+            $element->methods['getouterhtml'] = new ElementGetOuterHTML();
+            $element->methodVisibility['getouterhtml'] = $pub;
+            $element->methodNames['getouterhtml'] = 'getOuterHTML';
+        }
         if (CompilerVersion::supportsDomTokenList()) {
             $element->properties[] = new ClassProperty(self::PROP_CLASS_LIST, $nullProto, $objProto);
         }
@@ -1057,6 +1065,41 @@ final class VmDom
         $state = DomRegistry::state($element);
 
         return VmFs::stringListToArray(array_keys($state->attributes));
+    }
+
+    /**
+     * DOMElement::getInnerHTML() — serialize child nodes (php-src ext/dom/inner_html_mixin.c; #16916).
+     */
+    public static function getInnerHTML(ObjectEntry $element): string
+    {
+        if (!self::isElement($element)) {
+            throw new \DOMException('Not an element node');
+        }
+        $state = DomRegistry::state($element);
+        if ([] === $state->childIds) {
+            return '';
+        }
+        $parts = [];
+        foreach ($state->childIds as $childId) {
+            $child = DomRegistry::entry($childId);
+            if (null !== $child) {
+                $parts[] = self::serializeHtmlNode($child);
+            }
+        }
+
+        return implode('', $parts);
+    }
+
+    /**
+     * DOMElement::getOuterHTML() — serialize element and descendants (php-src ext/dom/inner_html_mixin.c; #16916).
+     */
+    public static function getOuterHTML(ObjectEntry $element): string
+    {
+        if (!self::isElement($element)) {
+            throw new \DOMException('Not an element node');
+        }
+
+        return self::serializeHtmlElement($element);
     }
 
     public static function setAttributeNS(
