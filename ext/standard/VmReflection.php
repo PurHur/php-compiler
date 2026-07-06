@@ -2846,6 +2846,51 @@ final class VmReflection
     }
 
     /**
+     * attribute_exists() operand dispatch — php-src attribute first, object|string second (#16844).
+     */
+    public static function attributeExistsForObjectOrClass(
+        Context $ctx,
+        Variable $objectOrClass,
+        string $attributeName
+    ): bool {
+        $objectOrClass = $objectOrClass->resolveIndirect();
+        if (Variable::TYPE_STRING === $objectOrClass->type) {
+            return self::attributeExists($ctx, $objectOrClass->toString(), $attributeName);
+        }
+        if (Variable::TYPE_OBJECT === $objectOrClass->type) {
+            $object = $objectOrClass->toObject();
+            if (EnumCaseSupport::isEnumCase($object)) {
+                $class = EnumSupport::resolveRuntimeEnumClass($ctx, $object->class);
+
+                return self::attributeExistsOnClassEntry($ctx, $class, $attributeName);
+            }
+
+            return self::attributeExistsOnClassEntry($ctx, $object->class, $attributeName);
+        }
+        if (Variable::TYPE_ENUM_CASE === $objectOrClass->type) {
+            $class = EnumSupport::resolveRuntimeEnumClass($ctx, $objectOrClass->toEnumCase()->enumClass);
+
+            return self::attributeExistsOnClassEntry($ctx, $class, $attributeName);
+        }
+        throw new \TypeError(\sprintf(
+            'attribute_exists(): Argument #2 ($object) must be of type object|string, %s given',
+            VmClassHas::vmTypeName($objectOrClass->type)
+        ));
+    }
+
+    private static function attributeExistsOnClassEntry(
+        Context $ctx,
+        ClassEntry $entry,
+        string $attributeName
+    ): bool {
+        if ([] !== ReflectionSupport::filterEntriesByName($ctx, $entry->attributeEntries, $attributeName)) {
+            return true;
+        }
+
+        return [] !== ReflectionSupport::filterByName($ctx, $entry->attributeNames, $attributeName);
+    }
+
+    /**
      * ReflectionEnum::getCases() result array (#4121).
      */
     public static function reflectionEnumCasesArray(Context $ctx, ClassEntry $enumEntry): Variable

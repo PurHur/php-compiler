@@ -7,15 +7,15 @@ class Demo {}
 
 var_export(function_exists('attribute_exists'));
 echo "\n";
-var_export(attribute_exists(Demo::class, AllowDynamicProperties::class));
+var_export(attribute_exists(AllowDynamicProperties::class, Demo::class));
 echo "\n";
-var_export(attribute_exists(Demo::class, 'AllowDynamicProperties'));
+var_export(attribute_exists('AllowDynamicProperties', Demo::class));
 echo "\n";
-var_export(attribute_exists(Demo::class, '\\AllowDynamicProperties'));
+var_export(attribute_exists('\\AllowDynamicProperties', Demo::class));
 echo "\n";
-var_export(attribute_exists(Demo::class, 'NoSuchAttribute'));
+var_export(attribute_exists('NoSuchAttribute', Demo::class));
 echo "\n";
-var_export(attribute_exists('NoSuchClass', AllowDynamicProperties::class));
+var_export(attribute_exists(AllowDynamicProperties::class, 'NoSuchClass'));
 echo "\n";
 --EXPECT--
 true

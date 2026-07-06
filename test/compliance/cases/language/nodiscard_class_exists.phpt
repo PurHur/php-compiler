@@ -8,7 +8,7 @@ var_export(class_exists('Attribute', false));
 echo "\n";
 var_export((new ReflectionClass('NoDiscard'))->isInternal());
 echo "\n";
-var_export(attribute_exists(NoDiscard::class, Attribute::class));
+var_export(attribute_exists(Attribute::class, NoDiscard::class));
 echo "\n";
 #[\NoDiscard]
 function f(): int {
