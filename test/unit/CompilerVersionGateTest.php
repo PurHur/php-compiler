@@ -329,6 +329,66 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
+    public function testAdvertisesEnumCasesAttributeClassFalseOnReferenceProfile(): void
+    {
+        $this->assertFalse(CompilerVersion::advertisesEnumCasesAttributeClass());
+    }
+
+    public function testAdvertisesEnumCasesAttributeClassTrueWhenProfile84(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertTrue(CompilerVersion::advertisesEnumCasesAttributeClass());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testAdvertisesDelayedTargetValidationAttributeClassFalseOnReferenceProfile(): void
+    {
+        $this->assertFalse(CompilerVersion::advertisesDelayedTargetValidationAttributeClass());
+    }
+
+    public function testAdvertisesDelayedTargetValidationAttributeClassTrueWhenProfile84(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertTrue(CompilerVersion::advertisesDelayedTargetValidationAttributeClass());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testAdvertisesCompileTimeAttributeClassFalseOnReferenceProfile(): void
+    {
+        $this->assertFalse(CompilerVersion::advertisesCompileTimeAttributeClass());
+    }
+
+    public function testAdvertisesCompileTimeAttributeClassTrueWhenProfile84(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertTrue(CompilerVersion::advertisesCompileTimeAttributeClass());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     public function testSupportsClockGettimeFalseOnReferenceProfile(): void
     {
         $this->assertFalse(CompilerVersion::supportsClockGettime());

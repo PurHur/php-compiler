@@ -447,7 +447,7 @@ final class CompilerVersion
     public static function advertisesEnumCasesAttributeClass(): bool
     {
         // Stable 8.4.0+ only — 8.4.0-dev reference profile matches Zend 8.2 phantom gate (#13706).
-        return version_compare(self::VERSION, '8.4.0', '>=');
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
     }
 
     /** PHP 8.3+ ReflectionConstant class advertisement (ext/reflection/php_reflection.c, #12385, #13497, #16837). */
@@ -461,14 +461,14 @@ final class CompilerVersion
     public static function advertisesDelayedTargetValidationAttributeClass(): bool
     {
         // Stable 8.4.0+ only — 8.4.0-dev reference profile matches Zend 8.2 phantom gate (#12598).
-        return version_compare(self::VERSION, '8.4.0', '>=');
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
     }
 
     /** PHP 8.4+ #[\CompileTime] builtin attribute class advertisement (#11902). */
     public static function advertisesCompileTimeAttributeClass(): bool
     {
         // Stable 8.4.0+ only — 8.4.0-dev reference profile matches Zend 8.2 phantom gate (#12598).
-        return version_compare(self::VERSION, '8.4.0', '>=');
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
     }
 
     /**
