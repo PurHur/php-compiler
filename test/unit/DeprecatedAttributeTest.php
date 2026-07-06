@@ -68,10 +68,17 @@ final class DeprecatedAttributeTest extends TestCase
         $this->assertTrue($meta->emitsRuntimeNotice());
     }
 
-    public function testIsDeprecatedForReflectionGatesSinceAgainstReportedVersion(): void
+    public function testIsDeprecatedForReflectionGatesSinceAgainstLanguageProfileVersion(): void
     {
         $meta = new DeprecatedMetadata('old fn', '8.4');
         $this->assertFalse($meta->isDeprecatedForReflection());
+
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertTrue($meta->isDeprecatedForReflection());
+        } finally {
+            putenv('PHP_COMPILER_PROFILE');
+        }
 
         $meta = new DeprecatedMetadata('old fn', '8.2');
         $this->assertTrue($meta->isDeprecatedForReflection());

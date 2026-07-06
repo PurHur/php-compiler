@@ -1,5 +1,7 @@
 --TEST--
-ReflectionEnumUnitCase::isDeprecated() after method_exists guard — property metadata survives (#16331, ext/reflection/php_reflection.c)
+ReflectionEnumUnitCase::isDeprecated() after method_exists guard — property metadata survives (#16331, #16821, ext/reflection/php_reflection.c)
+--ENV--
+PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
 enum E: int {
@@ -19,5 +21,5 @@ if (method_exists($rA, 'isDeprecated')) {
 }
 --EXPECT--
 true
-false
+true
 false

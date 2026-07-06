@@ -138,13 +138,14 @@ final class DeprecatedMetadata
      * Whether #[\Deprecated] is active for Reflection*::isDeprecated() (ext/reflection/php_reflection.c, #9760, #16800).
      *
      * php-src sets ZEND_ACC_DEPRECATED at compile time only on PHP 8.4+; on 8.2 the flag is absent so isDeprecated()
-     * is false even when since: '8.4' is present. Match that by gating since against {@see CompilerVersion::reportedPhpVersion()}.
+     * is false even when since: '8.4' is present. Match that by gating since against
+     * {@see CompilerVersion::languageProfileVersion()} (not reportedPhpVersion — 8.4.0-dev is < 8.4.0 for version_compare).
      */
     public function isDeprecatedForReflection(): bool
     {
         if (null !== $this->since) {
             return version_compare(
-                CompilerVersion::reportedPhpVersion(),
+                CompilerVersion::languageProfileVersion(),
                 self::normalizeSinceVersion($this->since),
                 '>='
             );

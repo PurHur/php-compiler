@@ -13,4 +13,5 @@ var_dump(method_exists($rA, 'isDeprecated'));
 if (method_exists($rA, 'isDeprecated')) {
     var_dump($rA->isDeprecated());
     var_dump($rB->isDeprecated());
+    echo $rA->isDeprecated() ? 'deprecated' : 'not_deprecated', "\n";
 }
