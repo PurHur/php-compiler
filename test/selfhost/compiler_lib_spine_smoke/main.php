@@ -35,6 +35,7 @@ require_once __DIR__.'/../../../ext/bcmath/Module.php';
 require_once __DIR__.'/../../../ext/bcmath/NumberAdd.php';
 require_once __DIR__.'/../../../ext/bcmath/NumberCompare.php';
 require_once __DIR__.'/../../../ext/bcmath/NumberConstruct.php';
+require_once __DIR__.'/../../../ext/bcmath/NumberFrom.php';
 require_once __DIR__.'/../../../ext/bcmath/NumberDiv.php';
 require_once __DIR__.'/../../../ext/bcmath/NumberMul.php';
 require_once __DIR__.'/../../../ext/bcmath/NumberSub.php';
