@@ -9,6 +9,9 @@ $profile = getenv('PHP_COMPILER_PROFILE');
 if (!is_string($profile) || '8.4' !== trim($profile)) {
     die('skip requires PHP_COMPILER_PROFILE=8.4');
 }
+if (PHPCompiler\CompilerVersion::supportsClassConstObjectExpressions()) {
+    die('skip class const object expressions enabled on 8.4 forward profile');
+}
 ?>
 --FILE--
 <?php

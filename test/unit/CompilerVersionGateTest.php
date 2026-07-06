@@ -855,7 +855,22 @@ final class CompilerVersionGateTest extends TestCase
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE=8.4');
         try {
-            $this->assertFalse(CompilerVersion::supportsClassConstObjectExpressions());
+            $this->assertTrue(CompilerVersion::supportsClassConstObjectExpressions());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testSupportsClassConstObjectExpressionsTrueWhenProfile83(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.3');
+        try {
+            $this->assertTrue(CompilerVersion::supportsClassConstObjectExpressions());
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');
