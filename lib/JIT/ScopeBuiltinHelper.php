@@ -127,6 +127,13 @@ final class ScopeBuiltinHelper
             $map[$name] = $var;
         }
 
+        foreach (self::namedVariablesInScope($context) as $name => $var) {
+            if (isset($map[$name]) || 0 !== ($var->type & Variable::IS_NATIVE_ARRAY)) {
+                continue;
+            }
+            $map[$name] = $var;
+        }
+
         if ($block->isMainScript()) {
             foreach (VmScope::FILE_SCOPE_DEFINED_VAR_AUTO_NAMES as $name) {
                 if (isset($map[$name])) {

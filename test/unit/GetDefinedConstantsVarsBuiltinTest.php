@@ -21,6 +21,8 @@ final class GetDefinedConstantsVarsBuiltinTest extends BaseTest
         foreach ([
             'get_defined_constants_vars.phpt',
             'get_defined_constants_vars_jit.phpt',
+            'get_defined_vars_extract.phpt',
+            'get_defined_vars_extract_jit.phpt',
         ] as $file) {
             $path = __DIR__.'/../compliance/cases/stdlib/'.$file;
             yield $file => self::parsePHPT($path, $file);
@@ -52,5 +54,24 @@ PHP;
             "_COOKIE,_FILES,_GET,_POST,_SERVER,a,argc,argv\n1\ninner_ok",
             ob_get_clean()
         );
+    }
+
+    /** @covers issue #4517 */
+    public function testGetDefinedVarsIncludesExtractImports(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+function probe(): void {
+    extract(['a' => 1, 'b' => 2]);
+    $vars = get_defined_vars();
+    ksort($vars);
+    echo json_encode($vars), "\n";
+}
+probe();
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'gdv_extract.php'));
+        $this->assertSame('{"a":1,"b":2}' . "\n", ob_get_clean());
     }
 }
