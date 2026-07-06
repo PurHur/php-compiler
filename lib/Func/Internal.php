@@ -10,6 +10,8 @@ use PHPCompiler\Handler;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Context as JITContext;
 use PHPCompiler\JIT\ExceptionBridge;
+use PHPCompiler\JIT\Builtin;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\JitBoolArg;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitStringArg;
@@ -46,6 +48,24 @@ abstract class Internal extends Func implements Handler, Call
     protected function jitBool(JITContext $context, JITVariable $arg, string $contextLabel = 'argument'): Value
     {
         return JitBoolArg::lower($context, $arg, $contextLabel);
+    }
+
+    /**
+     * Standalone AOT: bare int1 bool returns mis-lower in ?: / if (issue #15704).
+     */
+    protected function boxStandaloneBoolJitResult(JITContext $context, Value $result): Value
+    {
+        if (Builtin::LOAD_TYPE_STANDALONE !== $context->loadType) {
+            return $result;
+        }
+        $ty = $context->getStringFromType($result->typeOf());
+        if ('int1' !== $ty && 'bool' !== $ty) {
+            return $result;
+        }
+        $slot = JitValueBox::alloc($context);
+        JitValueBox::writeBool($context, $slot, $result);
+
+        return $context->builder->load($slot);
     }
 
     protected function requireStringArgs(JITContext $context, array $args, int $n, string $contextLabel = 'argument'): void
