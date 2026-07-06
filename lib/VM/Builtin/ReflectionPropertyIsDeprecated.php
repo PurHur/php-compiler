@@ -28,7 +28,10 @@ final class ReflectionPropertyIsDeprecated extends VmClassMethod
         $property = ReflectionSupport::propertyNameFromReflection($receiver);
         $propLc = strtolower($property);
         if (null !== $frame->returnVar) {
-            $frame->returnVar->bool(isset($entry->propDeprecated[$propLc]));
+            $meta = $entry->propDeprecated[$propLc] ?? null;
+            $frame->returnVar->bool(
+                null !== $meta && $meta->isDeprecatedForReflection()
+            );
         }
     }
 }

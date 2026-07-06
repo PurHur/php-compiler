@@ -7,6 +7,7 @@ namespace PHPCompiler\VM;
 use PHPCompiler\Block;
 use PHPCompiler\Compiler\AttributeEntry;
 use PHPCompiler\Compiler\AttributeNames;
+use PHPCompiler\Compiler\DeprecatedMetadata;
 use PHPCompiler\Compiler\CompileTimeEnumCase;
 use PHPCompiler\Compiler\CompileTimeNew;
 use PHPCompiler\Compiler\SourceLocation;
@@ -1218,8 +1219,8 @@ final class ReflectionSupport
     public static function parameterIsDeprecated(Context $ctx, ObjectEntry $reflection): bool
     {
         foreach (self::parameterAttributeEntries($ctx, $reflection) as $entry) {
-            $name = ltrim($entry->name, '\\');
-            if ('Deprecated' === $name || str_ends_with($name, '\\Deprecated')) {
+            $meta = DeprecatedMetadata::fromAttributeEntry($entry);
+            if (null !== $meta && $meta->isDeprecatedForReflection()) {
                 return true;
             }
         }

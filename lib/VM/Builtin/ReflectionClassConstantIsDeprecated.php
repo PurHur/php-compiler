@@ -33,7 +33,10 @@ final class ReflectionClassConstantIsDeprecated extends VmClassMethod
             );
         }
         if (null !== $frame->returnVar) {
-            $frame->returnVar->bool(isset($entry->constDeprecated[$key]));
+            $meta = $entry->constDeprecated[$key] ?? null;
+            $frame->returnVar->bool(
+                null !== $meta && $meta->isDeprecatedForReflection()
+            );
         }
     }
 }

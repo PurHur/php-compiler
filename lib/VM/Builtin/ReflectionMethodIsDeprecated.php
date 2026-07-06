@@ -28,7 +28,10 @@ final class ReflectionMethodIsDeprecated extends VmClassMethod
         }
         $methodLc = strtolower($methodName);
         if (null !== $frame->returnVar) {
-            $frame->returnVar->bool(isset($entry->methodDeprecated[$methodLc]));
+            $meta = $entry->methodDeprecated[$methodLc] ?? null;
+            $frame->returnVar->bool(
+                null !== $meta && $meta->isDeprecatedForReflection()
+            );
         }
     }
 }

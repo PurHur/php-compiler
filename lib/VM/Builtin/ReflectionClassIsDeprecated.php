@@ -26,7 +26,9 @@ final class ReflectionClassIsDeprecated extends VmClassMethod
             throw new \LogicException('ReflectionClass refers to unknown class in this compiler build');
         }
         if (null !== $frame->returnVar) {
-            $frame->returnVar->bool(null !== $entry->classDeprecated);
+            $frame->returnVar->bool(
+                null !== $entry->classDeprecated && $entry->classDeprecated->isDeprecatedForReflection()
+            );
         }
     }
 }
