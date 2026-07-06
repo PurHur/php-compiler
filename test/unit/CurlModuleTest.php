@@ -22,7 +22,7 @@ final class CurlModuleTest extends TestCase
         foreach (['curl_init', 'curl_setopt', 'curl_exec', 'curl_close'] as $fn) {
             self::assertFalse(VmReflection::functionExists($ctx, $fn), $fn);
         }
-        foreach (['curl_version', 'curl_strerror', 'curl_multi_strerror', 'curl_upkeep'] as $fn) {
+        foreach (['curl_version', 'curl_strerror', 'curl_multi_strerror', 'curl_upkeep', 'curl_file_create'] as $fn) {
             self::assertTrue(VmReflection::functionExists($ctx, $fn), $fn);
         }
         foreach (['curl_escape', 'curl_unescape'] as $fn) {
@@ -41,6 +41,7 @@ echo (int) function_exists('curl_version');
 echo (int) function_exists('curl_strerror');
 echo (int) function_exists('curl_escape');
 echo (int) function_exists('curl_unescape');
+echo (int) function_exists('curl_file_create');
 echo (int) class_exists('CURLFile', false);
 echo (int) class_exists('CURLStringFile', false);
 echo (int) extension_loaded('curl');
@@ -52,7 +53,7 @@ PHP;
         $block = $runtime->parseAndCompile($code, 'curl_module.php');
         ob_start();
         $runtime->run($block);
-        self::assertSame('0000110011011000210', ob_get_clean());
+        self::assertSame('00001100111011000210', ob_get_clean());
     }
 
     public function test_curl_init_stub_class_throws_logic_exception(): void
