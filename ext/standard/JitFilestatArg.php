@@ -27,12 +27,6 @@ final class JitFilestatArg
         int $argIndex = 0,
         string $paramName = 'filename'
     ): Value {
-        if (JITVariable::TYPE_NULL === $arg->type || $arg->isNullConstant) {
-            \PHPCompiler\JIT\JitNativeString::ensureInsertBlock($context);
-
-            return $context->builder->load($context->constantStringFromString(''));
-        }
-
         return JitStringBuiltinArg::lowerPath($context, $arg, $function, $argIndex, $paramName);
     }
 

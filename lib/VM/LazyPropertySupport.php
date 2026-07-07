@@ -23,6 +23,10 @@ final class LazyPropertySupport
     if (null === $meta || !$meta->lazy) {
       return;
     }
+    // Lazy + get hook: initializer is the hook return, not default/prototype (#17263).
+    if (null !== $meta->getHookMethodLc) {
+      return;
+    }
     if (isset($object->lazyRawInitializedProperties[$propertyName])) {
       return;
     }
@@ -43,6 +47,29 @@ final class LazyPropertySupport
     } else {
       $slot->copyFrom($meta->prototype);
     }
+    TypeCheck::coercePropertyWrite($slot, false);
+    $object->lazyRawInitializedProperties[$propertyName] = true;
+  }
+
+  /**
+   * Store first get-hook result for lazy hooked properties (#17263, zend_lazy_objects.c).
+   */
+  public static function cacheLazyGetHookResult(
+    ObjectEntry $object,
+    string $propertyName,
+    ClassProperty $meta,
+    Variable $value
+  ): void {
+    if (!$meta->lazy || null === $meta->getHookMethodLc) {
+      return;
+    }
+    if (isset($object->lazyRawInitializedProperties[$propertyName])) {
+      return;
+    }
+    $slot = $object->getProperty($propertyName);
+    $slot->objectPropertyOwner = $object;
+    $slot->objectPropertyName = $propertyName;
+    $slot->copyFrom($value);
     TypeCheck::coercePropertyWrite($slot, false);
     $object->lazyRawInitializedProperties[$propertyName] = true;
   }

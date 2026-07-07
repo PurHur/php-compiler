@@ -27,7 +27,7 @@ try {
 }
 --EXPECT--
 'AB'
-W:Input string must be hexadecimal string
+W:hex2bin(): Input string must be hexadecimal string
 false
 strict ok:Input string must be hexadecimal string
 odd strict:Hexadecimal input string must have an even length

@@ -74,12 +74,12 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
-    public function testSupportsPhp84ReflectionProbeBuiltinsTrueOnDefaultDevProfile(): void
+    public function testSupportsPhp84ReflectionProbeBuiltinsFalseOnReferenceProfile(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE');
         try {
-            $this->assertTrue(CompilerVersion::supportsPhp84ReflectionProbeBuiltins());
+            $this->assertFalse(CompilerVersion::supportsPhp84ReflectionProbeBuiltins());
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');
@@ -705,9 +705,9 @@ final class CompilerVersionGateTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsEnumCaseList());
     }
 
-    public function testSupportsAsymmetricVisibilityTrueOn84DevLine(): void
+    public function testSupportsAsymmetricVisibilityFalseOn84DevReferenceProfile(): void
     {
-        $this->assertTrue(CompilerVersion::supportsAsymmetricVisibility());
+        $this->assertFalse(CompilerVersion::supportsAsymmetricVisibility());
     }
 
     public function testSupportsAsymmetricVisibilityFalseWhenProfile82(): void
@@ -1214,13 +1214,13 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
-    public function testSupportsMbTrimFunctionsEnabledOnDefaultDevProfile(): void
+    public function testSupportsMbTrimFunctionsWithheldOnReferenceProfile(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE');
         try {
-            $this->assertTrue(CompilerVersion::supportsMbTrimFunctions());
-            $this->assertTrue(CompilerVersion::advertisesMbTrimFunctions());
+            $this->assertFalse(CompilerVersion::supportsMbTrimFunctions());
+            $this->assertFalse(CompilerVersion::advertisesMbTrimFunctions());
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');
@@ -1246,7 +1246,7 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
-    public function testVmRegistersMbTrimOnDefaultDevProfile(): void
+    public function testVmDoesNotRegisterMbTrimOnReferenceProfile(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE');
@@ -1254,7 +1254,7 @@ final class CompilerVersionGateTest extends TestCase
             $runtime = new Runtime();
             $ctx = $runtime->vmContext;
             foreach (['mb_trim', 'mb_ltrim', 'mb_rtrim'] as $fn) {
-                $this->assertTrue(isset($ctx->functions[$fn]), $fn);
+                $this->assertFalse(isset($ctx->functions[$fn]), $fn);
             }
         } finally {
             if (false === $prev) {

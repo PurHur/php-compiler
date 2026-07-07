@@ -164,7 +164,13 @@ final class InternalStrictArg
         if (Variable::TYPE_NULL === $arg->type || $arg->isNullConstant) {
             self::raiseTypeErrorAndAbort(
                 $context,
-                self::message($context, $function, $argNumber, $paramName, 'string', $arg)
+                sprintf(
+                    '%s(): Argument #%d ($%s) must be of type %s, null given',
+                    $function,
+                    $argNumber,
+                    $paramName,
+                    'string'
+                )
             );
 
             return;
@@ -194,7 +200,13 @@ final class InternalStrictArg
         $context->builder->positionAtEnd($failBlock);
         self::raiseTypeErrorAndAbort(
             $context,
-            self::message($context, $function, $argNumber, $paramName, 'string', $arg)
+            sprintf(
+                '%s(): Argument #%d ($%s) must be of type %s, null given',
+                $function,
+                $argNumber,
+                $paramName,
+                'string'
+            )
         );
         $context->builder->positionAtEnd($okBlock);
     }

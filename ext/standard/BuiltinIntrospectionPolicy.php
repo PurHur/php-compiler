@@ -26,6 +26,12 @@ final class BuiltinIntrospectionPolicy
         if ('json_validate' === $lc) {
             return CompilerVersion::advertisesJsonValidate();
         }
+        if ('crc32c' === $lc) {
+            return CompilerVersion::advertisesCrc32c();
+        }
+        if ('hebrevc' === $lc) {
+            return CompilerVersion::advertisesHebrevc();
+        }
         if (\in_array($lc, [
             'array_any',
             'array_all',

@@ -78,6 +78,37 @@ final class JitFilter
         return $ptr;
     }
 
+    /** FILTER_VALIDATE_BOOLEAN failure: null when FILTER_NULL_ON_FAILURE, else false. */
+    private static function booleanFailureBox(Context $context, ?Value $nullOnFailure): Value
+    {
+        if (null === $nullOnFailure) {
+            return self::boxedFalse($context);
+        }
+
+        $id = (string) (++self::$blockSerial);
+        $nullBlock = BasicBlockHelper::append($context, 'fvb_fail_null_'.$id);
+        $falseBlock = BasicBlockHelper::append($context, 'fvb_fail_false_'.$id);
+        $doneBlock = BasicBlockHelper::append($context, 'fvb_fail_done_'.$id);
+        $context->builder->branchIf($nullOnFailure, $nullBlock, $falseBlock);
+
+        $context->builder->positionAtEnd($nullBlock);
+        $nullResult = self::boxedNull($context);
+        $nullTail = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($falseBlock);
+        $falseResult = self::boxedFalse($context);
+        $falseTail = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+        $phi = $context->builder->phi($nullResult->typeOf());
+        $phi->addIncoming($nullResult, $nullTail);
+        $phi->addIncoming($falseResult, $falseTail);
+
+        return $phi;
+    }
+
     public static function loadNullOnFailureFlag(Context $context, ?JITVariable $options): Value
     {
         if (null === $options || JITVariable::TYPE_NULL === $options->type) {
@@ -157,10 +188,10 @@ final class JitFilter
         return $phi;
     }
 
-    public static function validateBoolean(Context $context, JITVariable $value): Value
+    public static function validateBoolean(Context $context, JITVariable $value, ?Value $nullOnFailure = null): Value
     {
         if (JITVariable::TYPE_VALUE === $value->type) {
-            return self::boxValueValidateBoolean($context, $value);
+            return self::boxValueValidateBoolean($context, $value, $nullOnFailure);
         }
 
         $slot = JitValueBox::alloc($context);
@@ -174,19 +205,22 @@ final class JitFilter
             return $ptr;
         }
         if (JITVariable::TYPE_NATIVE_LONG === $value->type) {
-            return self::longToBooleanBox($context, $context->helper->loadValue($value));
+            return self::longToBooleanBox($context, $context->helper->loadValue($value), $nullOnFailure);
         }
         if (JITVariable::TYPE_NATIVE_DOUBLE === $value->type) {
-            return self::doubleToBooleanBox($context, $context->helper->loadValue($value));
+            return self::doubleToBooleanBox($context, $context->helper->loadValue($value), $nullOnFailure);
         }
-        if (JITVariable::TYPE_NULL === $value->type
-            || JITVariable::TYPE_STRING !== $value->type) {
+        if (JITVariable::TYPE_NULL === $value->type) {
+            // php-src coerces null to "" before boolean validation (#17238).
             JitValueBox::writeBool($context, $slot, $falseVal);
 
             return $ptr;
         }
+        if (JITVariable::TYPE_STRING !== $value->type) {
+            return self::booleanFailureBox($context, $nullOnFailure);
+        }
 
-        return self::stringToBooleanBox($context, $context->helper->loadValue($value));
+        return self::stringToBooleanBox($context, $context->helper->loadValue($value), $nullOnFailure);
     }
 
     public static function validateFloat(Context $context, JITVariable $value): Value
@@ -713,7 +747,7 @@ final class JitFilter
         return $context->builder->sExt($parsed, $i64);
     }
 
-    private static function longToBooleanBox(Context $context, Value $longVal): Value
+    private static function longToBooleanBox(Context $context, Value $longVal, ?Value $nullOnFailure = null): Value
     {
         $slot = JitValueBox::alloc($context);
         $ptr = JitValueBox::pointer($context, $slot);
@@ -722,17 +756,39 @@ final class JitFilter
         $one = $i64->constInt(1, false);
         $isZero = $context->builder->icmp(Builder::INT_EQ, $longVal, $zero);
         $isOne = $context->builder->icmp(Builder::INT_EQ, $longVal, $one);
+        $isValid = $context->builder->or($isZero, $isOne);
+
+        $id = (string) (++self::$blockSerial);
+        $validBlock = BasicBlockHelper::append($context, 'fvb_long_valid_'.$id);
+        $failBlock = BasicBlockHelper::append($context, 'fvb_long_fail_'.$id);
+        $doneBlock = BasicBlockHelper::append($context, 'fvb_long_done_'.$id);
+        $context->builder->branchIf($isValid, $validBlock, $failBlock);
+
+        $context->builder->positionAtEnd($validBlock);
         $boolVal = $context->builder->select(
             $isZero,
             $context->constantFromBool(false),
-            $context->builder->select($isOne, $context->constantFromBool(true), $context->constantFromBool(false))
+            $context->constantFromBool(true)
         );
         JitValueBox::writeBool($context, $slot, $boolVal);
+        $validResult = $ptr;
+        $validTail = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
 
-        return $ptr;
+        $context->builder->positionAtEnd($failBlock);
+        $failResult = self::booleanFailureBox($context, $nullOnFailure);
+        $failTail = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+        $phi = $context->builder->phi($validResult->typeOf());
+        $phi->addIncoming($validResult, $validTail);
+        $phi->addIncoming($failResult, $failTail);
+
+        return $phi;
     }
 
-    private static function doubleToBooleanBox(Context $context, Value $doubleVal): Value
+    private static function doubleToBooleanBox(Context $context, Value $doubleVal, ?Value $nullOnFailure = null): Value
     {
         $slot = JitValueBox::alloc($context);
         $ptr = JitValueBox::pointer($context, $slot);
@@ -752,6 +808,7 @@ final class JitFilter
 
         $context->builder->positionAtEnd($zeroBlock);
         JitValueBox::writeBool($context, $slot, $context->constantFromBool(false));
+        $zeroResult = $ptr;
         $zeroTail = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);
 
@@ -760,24 +817,25 @@ final class JitFilter
 
         $context->builder->positionAtEnd($trueBlock);
         JitValueBox::writeBool($context, $slot, $context->constantFromBool(true));
+        $trueResult = $ptr;
         $trueTail = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($failBlock);
-        JitValueBox::writeBool($context, $slot, $context->constantFromBool(false));
+        $failResult = self::booleanFailureBox($context, $nullOnFailure);
         $failTail = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($doneBlock);
-        $phi = $context->builder->phi($ptr->typeOf());
-        $phi->addIncoming($ptr, $zeroTail);
-        $phi->addIncoming($ptr, $trueTail);
-        $phi->addIncoming($ptr, $failTail);
+        $phi = $context->builder->phi($zeroResult->typeOf());
+        $phi->addIncoming($zeroResult, $zeroTail);
+        $phi->addIncoming($trueResult, $trueTail);
+        $phi->addIncoming($failResult, $failTail);
 
         return $phi;
     }
 
-    private static function stringToBooleanBox(Context $context, Value $strPtr): Value
+    private static function stringToBooleanBox(Context $context, Value $strPtr, ?Value $nullOnFailure = null): Value
     {
         StringFilterBoolean::ensureLinked($context);
         $slot = JitValueBox::alloc($context);
@@ -799,17 +857,34 @@ final class JitFilter
             $tokenResult,
             $i32->constInt(0, false)
         );
+
+        $id = (string) (++self::$blockSerial);
+        $unknownBlock = BasicBlockHelper::append($context, 'fvb_str_unknown_'.$id);
+        $knownBlock = BasicBlockHelper::append($context, 'fvb_str_known_'.$id);
+        $doneBlock = BasicBlockHelper::append($context, 'fvb_str_done_'.$id);
+        $context->builder->branchIf($isUnknown, $unknownBlock, $knownBlock);
+
+        $context->builder->positionAtEnd($unknownBlock);
+        $unknownResult = self::booleanFailureBox($context, $nullOnFailure);
+        $unknownTail = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($knownBlock);
         JitValueBox::writeBool(
             $context,
             $slot,
-            $context->builder->select(
-                $isUnknown,
-                $falseVal,
-                $context->builder->select($isTrue, $trueVal, $falseVal)
-            )
+            $context->builder->select($isTrue, $trueVal, $falseVal)
         );
+        $knownResult = $ptr;
+        $knownTail = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
 
-        return $ptr;
+        $context->builder->positionAtEnd($doneBlock);
+        $phi = $context->builder->phi($unknownResult->typeOf());
+        $phi->addIncoming($unknownResult, $unknownTail);
+        $phi->addIncoming($knownResult, $knownTail);
+
+        return $phi;
     }
 
     private static function stringToFloatBox(Context $context, Value $strPtr): Value
@@ -884,35 +959,62 @@ final class JitFilter
         return $context->builder->call($context->lookupFunction('strtod'), $charPtr, $endPtr);
     }
 
-    private static function boxValueValidateBoolean(Context $context, JITVariable $arg): Value
+    private static function boxValueValidateBoolean(Context $context, JITVariable $arg, ?Value $nullOnFailure = null): Value
     {
         $valuePtr = JitValueBox::valuePtrFromVariable($context, $arg);
+        $map = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($valuePtr, $map['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $nullTag = $i8->constInt(JITVariable::TYPE_NULL, false);
+        $isNull = $context->builder->icmp(Builder::INT_EQ, $typeByte, $nullTag);
+
+        $id = (string) (++self::$blockSerial);
+        $nullBlock = BasicBlockHelper::append($context, 'fvb_box_null_'.$id);
+        $nonNullBlock = BasicBlockHelper::append($context, 'fvb_box_nonnull_'.$id);
+        $doneBlock = BasicBlockHelper::append($context, 'fvb_box_done_'.$id);
+        $context->builder->branchIf($isNull, $nullBlock, $nonNullBlock);
+
+        $context->builder->positionAtEnd($nullBlock);
+        $nullResult = self::boxedFalse($context);
+        $nullTail = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($nonNullBlock);
         $strVal = $context->builder->call($context->lookupFunction('__value__readString'), $valuePtr);
         $strPtrTy = $context->getTypeFromString('__string__*');
         $hasString = $context->builder->icmp(Builder::INT_NE, $strVal, $strPtrTy->constNull());
 
-        $id = (string) (++self::$blockSerial);
-        $stringBlock = BasicBlockHelper::append($context, 'fvb_box_string_'.$id);
-        $longBlock = BasicBlockHelper::append($context, 'fvb_box_long_'.$id);
-        $doneBlock = BasicBlockHelper::append($context, 'fvb_box_done_'.$id);
+        $id2 = (string) (++self::$blockSerial);
+        $stringBlock = BasicBlockHelper::append($context, 'fvb_box_string_'.$id2);
+        $longBlock = BasicBlockHelper::append($context, 'fvb_box_long_'.$id2);
+        $innerDoneBlock = BasicBlockHelper::append($context, 'fvb_box_inner_done_'.$id2);
         $context->builder->branchIf($hasString, $stringBlock, $longBlock);
 
         $context->builder->positionAtEnd($stringBlock);
-        $strVar = new JITVariable($context, JITVariable::TYPE_STRING, JITVariable::KIND_VALUE, $strVal);
-        $stringResult = self::validateBoolean($context, $strVar);
+        $stringResult = self::stringToBooleanBox($context, $strVal, $nullOnFailure);
         $stringTail = $context->builder->getInsertBlock();
-        $context->builder->branch($doneBlock);
+        $context->builder->branch($innerDoneBlock);
 
         $context->builder->positionAtEnd($longBlock);
         $longVal = $context->builder->call($context->lookupFunction('__value__readLong'), $valuePtr);
-        $longResult = self::longToBooleanBox($context, $longVal);
+        $longResult = self::longToBooleanBox($context, $longVal, $nullOnFailure);
         $longTail = $context->builder->getInsertBlock();
+        $context->builder->branch($innerDoneBlock);
+
+        $context->builder->positionAtEnd($innerDoneBlock);
+        $innerPhi = $context->builder->phi($longResult->typeOf());
+        $innerPhi->addIncoming($stringResult, $stringTail);
+        $innerPhi->addIncoming($longResult, $longTail);
+        $nonNullResult = $innerPhi;
+        $nonNullTail = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($doneBlock);
-        $phi = $context->builder->phi($longResult->typeOf());
-        $phi->addIncoming($stringResult, $stringTail);
-        $phi->addIncoming($longResult, $longTail);
+        $phi = $context->builder->phi($nullResult->typeOf());
+        $phi->addIncoming($nullResult, $nullTail);
+        $phi->addIncoming($nonNullResult, $nonNullTail);
 
         return $phi;
     }

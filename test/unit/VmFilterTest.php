@@ -124,6 +124,27 @@ final class VmFilterTest extends TestCase
         $this->assertSame(Variable::TYPE_NULL, $out->type);
     }
 
+    public function testValidateBoolNullOperandReturnsFalseWithNullOnFailure(): void
+    {
+        $v = new Variable();
+        $v->null();
+        $flag = new Variable();
+        $flag->int(VmFilter::FILTER_NULL_ON_FAILURE);
+        $out = VmFilter::filterVar($v, VmFilter::FILTER_VALIDATE_BOOLEAN, $flag);
+        $this->assertSame(Variable::TYPE_BOOLEAN, $out->type);
+        $this->assertFalse($out->toBool());
+    }
+
+    public function testValidateBoolInvalidStringReturnsNullWithNullOnFailure(): void
+    {
+        $v = new Variable();
+        $v->string('not-bool');
+        $flag = new Variable();
+        $flag->int(VmFilter::FILTER_NULL_ON_FAILURE);
+        $out = VmFilter::filterVar($v, VmFilter::FILTER_VALIDATE_BOOLEAN, $flag);
+        $this->assertSame(Variable::TYPE_NULL, $out->type);
+    }
+
     public function testValidateIpReturnsStringForValidIpv4(): void
     {
         $v = new Variable();

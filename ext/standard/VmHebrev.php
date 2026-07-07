@@ -142,6 +142,19 @@ final class VmHebrev
         return $result;
     }
 
+    /**
+     * hebrevc() — visual Hebrew with newline conversion (php-src string.c convert_newlines=1, #17183).
+     */
+    public static function convertWithNewlines(string $str, int $maxCharsPerLine = 0): string
+    {
+        $visual = self::convert($str, $maxCharsPerLine);
+        if ('' === $visual) {
+            return '';
+        }
+
+        return \str_replace("\n", " \n", $visual);
+    }
+
     private static function isHeb(int $c): bool
     {
         return $c >= 224 && $c <= 250;

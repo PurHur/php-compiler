@@ -76,12 +76,23 @@ final class ReadonlyAnonymousClassSyntaxReferenceProfileTest extends TestCase
         $this->assertNull(ReadonlyAnonymousClassSyntax::referenceProfileSyntaxError($huge));
     }
 
-    public function testDetectsNewReadonlyClassWithCommentsBetweenTokens(): void
+    public function testScanSurvivesMultiMegabyteLibFileWithoutTokenizing(): void
     {
-        $code = '<?php $o = new /*x*/ readonly //y
-class { public int $x = 1; };';
+        $compilerPath = dirname(__DIR__, 2).'/lib/Compiler.php';
+        $code = (string) file_get_contents($compilerPath);
+        $this->assertGreaterThan(1_000_000, \strlen($code));
+        $before = memory_get_usage(true);
+        $error = ReadonlyAnonymousClassSyntax::referenceProfileSyntaxError($code);
+        $this->assertNull($error);
+        $this->assertLessThan(32 * 1024 * 1024, memory_get_usage(true) - $before);
+    }
+
+    public function testDetectsNewReadonlyClassWithInterveningComments(): void
+    {
+        $code = "<?php\n\$o = new /* pad */ readonly // x\n class { public int \$x = 1; };\n";
         $error = ReadonlyAnonymousClassSyntax::referenceProfileSyntaxError($code);
         $this->assertNotNull($error);
         $this->assertSame(ReadonlyAnonymousClassSyntax::REFERENCE_PROFILE_UNEXPECTED_READONLY, $error['message']);
+        $this->assertSame(2, $error['line']);
     }
 }

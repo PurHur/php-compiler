@@ -27,8 +27,8 @@ final class ReflectionPropertyGetHooks extends VmClassMethod
         $hooks = ReflectionPropertyHookSupport::getHooks($entry, $meta, $property, $ctx);
         $frame->returnVar->newArray();
         $ht = $frame->returnVar->toArray();
-        foreach ($hooks as $backing => $closureVar) {
-            $ht->addIndex((int) $backing, $closureVar);
+        foreach ($hooks as $hookKind => $closureVar) {
+            $ht->add($hookKind, $closureVar);
         }
     }
 }

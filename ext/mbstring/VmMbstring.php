@@ -291,7 +291,9 @@ final class VmMbstring
         string $string,
         int $start,
         ?int $length = null,
-        string $encoding = 'UTF-8'
+        string $encoding = 'UTF-8',
+        bool $warnOnClip = false,
+        ?\PHPCompiler\Frame $frame = null,
     ): string {
         self::assertSubstrCountEncoding($encoding, 'mb_substr');
         $charLen = VmString::utf8CharLength($string);
@@ -314,6 +316,17 @@ final class VmMbstring
         }
         if ($length <= 0) {
             return '';
+        }
+        if ($warnOnClip && $start + $length > $charLen) {
+            if (null !== $frame?->vmContext) {
+                $frame->vmContext->errors->triggerError(
+                    'mb_substr(): String is truncated',
+                    \PHPCompiler\VM\ErrorReporter::E_WARNING,
+                    '' !== $frame->scriptPath ? $frame->scriptPath : null,
+                    $frame->vmContext,
+                    $frame
+                );
+            }
         }
 
         return VmString::utf8CharSubstr($string, $start, $length);

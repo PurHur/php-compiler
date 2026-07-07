@@ -79,6 +79,14 @@ class JITTest extends BaseTest {
                 && 'round_invalid_mode.phpt' === $name) {
                 continue;
             }
+            if (!CompilerVersion::supportsNumberFormatNegativeDecimals()
+                && str_contains($name, 'number_format_negative_decimals_84')) {
+                continue;
+            }
+            if (CompilerVersion::supportsNumberFormatNegativeDecimals()
+                && 'number_format_negative_decimals.phpt' === $name) {
+                continue;
+            }
             if (!CompilerVersion::supportsRandomIntervalBoundary()
                 && str_contains($name, 'random_interval_boundary')
                 && !str_contains($name, 'random_interval_boundary_reference_profile')) {
@@ -149,6 +157,15 @@ class JITTest extends BaseTest {
             if (!CompilerVersion::supportsCrc32c()
                 && str_contains($name, 'crc32c')
                 && !str_contains($name, 'crc32c_phantom')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsHebrevc()
+                && str_contains($name, 'hebrevc')
+                && !str_contains($name, 'hebrevc_phantom')) {
+                continue;
+            }
+            if (CompilerVersion::supportsHebrevc()
+                && str_contains($name, 'hebrevc_phantom')) {
                 continue;
             }
             if (!CompilerVersion::supportsMbStrPad()
@@ -247,7 +264,8 @@ class JITTest extends BaseTest {
                 && str_contains($name, 'closure_get_current')
                 && !str_contains($name, 'closure_get_current_phantom')
                 && !str_contains($name, 'closure_get_current_profile')
-                && !str_contains($name, 'closure_get_current_forward_84')) {
+                && !str_contains($name, 'closure_get_current_forward_84')
+                && !str_contains($name, 'closure_get_current_nested_84')) {
                 continue;
             }
             if (CompilerVersion::supportsClosureGetCurrent()
@@ -986,7 +1004,7 @@ class JITTest extends BaseTest {
                 continue;
             }
             // gc_collect_cycles() MCJIT execute unstable (#3160); compile: GcCollectCyclesJitCompileTest.
-            if (str_contains($name, 'gc_collect_cycles')) {
+            if (str_contains($name, 'gc_collect_cycles') && !str_contains($name, 'argcount')) {
                 continue;
             }
             // set_exception_handler() / restore_exception_handler() VM-only (#3146).

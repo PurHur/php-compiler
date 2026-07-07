@@ -74,6 +74,18 @@ class VMTest extends BaseTest {
                 && 'round_invalid_mode.phpt' === $name) {
                 continue;
             }
+            if (!CompilerVersion::supportsNumberFormatNegativeDecimals()
+                && str_contains($name, 'number_format_negative_decimals_84')) {
+                continue;
+            }
+            if (CompilerVersion::supportsNumberFormatNegativeDecimals()
+                && 'number_format_negative_decimals.phpt' === $name) {
+                continue;
+            }
+            if (!CompilerVersion::supportsArrayPadTypeEnum()
+                && str_contains($name, 'array_pad_type_enum')) {
+                continue;
+            }
             if (!CompilerVersion::supportsRandomIntervalBoundary()
                 && str_contains($name, 'random_interval_boundary')
                 && !str_contains($name, 'random_interval_boundary_reference_profile')) {
@@ -144,6 +156,15 @@ class VMTest extends BaseTest {
             if (!CompilerVersion::supportsCrc32c()
                 && str_contains($name, 'crc32c')
                 && !str_contains($name, 'crc32c_phantom')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsHebrevc()
+                && str_contains($name, 'hebrevc')
+                && !str_contains($name, 'hebrevc_phantom')) {
+                continue;
+            }
+            if (CompilerVersion::supportsHebrevc()
+                && str_contains($name, 'hebrevc_phantom')) {
                 continue;
             }
             if (!CompilerVersion::supportsJsonValidate()
@@ -244,7 +265,8 @@ class VMTest extends BaseTest {
                 && str_contains($name, 'closure_get_current')
                 && !str_contains($name, 'closure_get_current_phantom')
                 && !str_contains($name, 'closure_get_current_profile')
-                && !str_contains($name, 'closure_get_current_forward_84')) {
+                && !str_contains($name, 'closure_get_current_forward_84')
+                && !str_contains($name, 'closure_get_current_nested_84')) {
                 continue;
             }
             if (CompilerVersion::supportsClosureGetCurrent()
@@ -770,6 +792,19 @@ class VMTest extends BaseTest {
                 && str_contains($name, 'clone_with')
                 && !str_contains($name, 'clone_with_reference_profile')
                 && !str_contains($name, 'clone_with_forward_profile')) {
+                continue;
+            }
+            // 8.4-target reject gate; skipped when list spread assign enabled (#17182).
+            if (CompilerVersion::supportsListDestructuringSpreadAssign()
+                && str_contains($name, 'list_destructuring_spread_reference_profile')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsListDestructuringSpreadAssign()
+                && (str_contains($name, 'list_destructuring_spread')
+                    || str_contains($name, 'list_destructuring_keyed_spread'))
+                && !str_contains($name, 'reference_profile')
+                && !str_contains($name, 'forward_profile')
+                && !str_contains($name, 'lone_list_spread_assign_fatal')) {
                 continue;
             }
             // 8.3-target reject gate; skipped when new readonly class enabled (#16255).

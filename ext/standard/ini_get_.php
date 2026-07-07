@@ -7,10 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
-use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\InternalStrictArg;
 use PHPLLVM\Value;
 
 /** ini_get() — VM + JIT subset matching ini_set() keys (issue #1374, #1492). */
@@ -29,8 +26,7 @@ final class ini_get_ extends Internal
         if (null === $frame->vmContext) {
             return;
         }
-        InternalStrictArg::rejectNullString($frame->calledArgs[0], 'ini_get', 'option', 0, $frame);
-        $option = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'ini_get', 0, 'option');
+        $option = IniOptionArg::vmOption($frame, 'ini_get');
         if (null === $frame->returnVar) {
             return;
         }
@@ -47,8 +43,7 @@ final class ini_get_ extends Internal
         if (1 !== \count($args)) {
             throw new \LogicException('ini_get() requires exactly one argument');
         }
-        JitInternalStrictArg::rejectNullString($context, $args[0], 'ini_get', 'option', 1);
-        $optionStr = JitStringBuiltinArg::lower($context, $args[0], 'ini_get', 0, 'option');
+        $optionStr = IniOptionArg::jitOption($context, $args[0], 'ini_get');
 
         return JitIni::get($context, $optionStr);
     }

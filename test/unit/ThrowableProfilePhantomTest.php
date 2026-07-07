@@ -45,4 +45,26 @@ final class ThrowableProfilePhantomTest extends TestCase
         $this->assertFalse(isset($ctx->classes['sqlite3exception']));
         $this->assertTrue(isset($ctx->classes['exception']));
     }
+
+    public function testSqlite3ExceptionAdvertisedOnForwardProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertTrue(CompilerVersion::supportsSqlite3());
+            $this->assertTrue(\PHPCompiler\ext\sqlite3\Sqlite3ExtensionPolicy::advertisesExceptionClass());
+            $this->assertTrue(ThrowableManifest::isAdvertised('SQLite3Exception'));
+
+            $runtime = new Runtime();
+            $ctx = $runtime->vmContext;
+            $this->assertTrue(isset($ctx->classes['sqlite3exception']));
+            $this->assertSame('exception', $ctx->classes['sqlite3exception']->parentLc);
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
 }

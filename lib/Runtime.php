@@ -385,16 +385,16 @@ class Runtime {
 
     public function preprocessSourceForParse(string $code, string $filename = 'unknown'): array
     {
-        if (\PHPCompiler\JIT\NestedJitCompileScope::isActive()) {
+        if (\PHPCompiler\JIT\NestedJitCompileScope::isActive() || null !== $this->jitContext) {
             // Nested JIT parses multi-megabyte lib/ units — skip reference-profile token scans (#17150).
             TryCatchElseSupport::beginCompilationUnit();
 
             return [$code, []];
         }
-
         AsymmetricVisibilityRejector::reject($code, $filename);
         LazyPropertyRejector::reject($code, $filename);
         CloneWithSyntaxRejector::reject($code, $filename);
+        ListSpreadAssignSyntaxRejector::reject($code, $filename);
         ReadonlyAnonymousClassSyntaxRejector::reject($code, $filename);
         DnfParenIntersectionSyntaxRejector::reject($code, $filename);
         ExitFunctionSyntaxRejector::reject($code, $filename);
@@ -506,10 +506,12 @@ class Runtime {
      */
     public function rewriteSourceBeforeParser(string $code, string $filename = 'unknown'): string
     {
-        if (\PHPCompiler\JIT\NestedJitCompileScope::isActive()) {
+        if (\PHPCompiler\JIT\NestedJitCompileScope::isActive() || null !== $this->jitContext) {
             return $code;
         }
-
+        if (ReferenceProfileTokenScan::shouldSkipReferenceProfileReject($code, $filename)) {
+            return $code;
+        }
         $code = GlobalTypedConstRewriter::rewrite($code);
         $code = GlobalDeprecatedConstRewriter::rewrite($code);
         $code = DnfParenTypeRewriter::rewrite($code);
@@ -590,7 +592,10 @@ class Runtime {
 
     private function detectFileStrictTypes(string $code, string $filename = 'unknown'): bool
     {
-        if (\PHPCompiler\JIT\NestedJitCompileScope::isActive()) {
+        if (\PHPCompiler\JIT\NestedJitCompileScope::isActive() || null !== $this->jitContext) {
+            return false;
+        }
+        if (ReferenceProfileTokenScan::exceedsTokenScanBudget($code)) {
             return false;
         }
         if (!\function_exists('token_get_all')) {

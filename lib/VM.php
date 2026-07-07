@@ -1477,7 +1477,8 @@ class VM {
     }
 
     /**
-     * empty($obj->hooked) — same-name / detached backing probes storage; separate-backing + virtual get-only invoke get (#11467, #10392).
+     * empty($obj->hooked) — uninitialized / unset distinct backing probes storage only;
+     * initialized get-hook paths invoke get (#16935, #17260, zend_property_hooks.c).
      */
     private function emptyHookedProperty(ObjectEntry $object, string $propName, Frame $frame, Variable $dst): bool
     {
@@ -1520,7 +1521,7 @@ class VM {
 
     /**
      * empty() on hooked properties — probe backing only for uninitialized typed slots or unset-cleared distinct backing;
-     * otherwise route through get-hook dispatch to match Zend/php-src (#16935, zend_property_hooks.c).
+     * otherwise invoke get hook to match Zend/php-src (#16935, #17260, zend_property_hooks.c).
      */
     private function emptyHookedPropertyProbesBackingOnly(ObjectEntry $object, string $propName, Variable $dst): bool
     {
@@ -3642,6 +3643,9 @@ restart:
                     }
                     break;
                 case OpCode::TYPE_LIST_SPREAD_ASSIGN:
+                    if (!CompilerVersion::supportsListDestructuringSpreadAssign()) {
+                        throw new \Error('Spread operator is not supported in assignments');
+                    }
                     $dest = $frame->scope[$op->arg1];
                     $src = $frame->scope[$op->arg2]->resolveIndirect();
                     if (Variable::TYPE_ARRAY !== $src->type) {
@@ -10530,6 +10534,17 @@ restart:
             return null;
         }
         $meta = $this->classPropertyMeta($object, $name);
+        if (
+            null !== $meta
+            && $meta->lazy
+            && null !== $meta->getHookMethodLc
+            && isset($object->lazyRawInitializedProperties[$name])
+        ) {
+            $cached = new Variable();
+            $cached->copyFrom($object->getProperty($name)->resolveIndirect());
+
+            return $cached;
+        }
         $getLc = $meta?->getHookMethodLc
             ?? strtolower(SourcePreprocessor\PropertyHooks::getHookMethodName($name));
         if (!isset($object->class->methods[$getLc])) {
@@ -10546,6 +10561,9 @@ restart:
         $catchFrame = $this->enforcePropertyHookGetReturn($object, $name, $meta, $result, $frame);
         if (null !== $catchFrame) {
             throw new VM\PropertyHookRefWriteSignal($catchFrame);
+        }
+        if (null !== $meta) {
+            VM\LazyPropertySupport::cacheLazyGetHookResult($object, $name, $meta, $result);
         }
 
         return $result;
@@ -12875,7 +12893,13 @@ restart:
             return;
         }
         $frame->call = $state->func;
-        $frame->closureCall = $state;
+        if (
+            null === $frame->closureCall
+            || null === $frame->block?->func
+            || (($frame->block->func->flags ?? 0) & \PHPCfg\Func::FLAG_CLOSURE) === 0
+        ) {
+            $frame->closureCall = $state;
+        }
         $frame->pendingClosureInvoke = $state;
         $frame->callArgs = [];
         $frame->callArgEntries = [];
@@ -13932,6 +13956,11 @@ restart:
                     }
                     $classLc = strtolower($entry->name);
                     if ($existing->declaringClassLc === $classLc) {
+                        if ($trait->isTrait
+                            && VM\AbstractPropertyHookCheck::isAbstractHookProperty($trait, $property, $this->context)) {
+                            $this->mergeTraitAbstractPropertyHookOverride($entry, $trait, $property, $existing);
+                            continue 2;
+                        }
                         throw new \LogicException(TraitCompositionConflictMessage::incompatibleClassTraitProperty(
                             $entry->name,
                             $traitName,
@@ -13964,6 +13993,29 @@ restart:
                 $entry->propertySourceLocations[$propLc] = $trait->propertySourceLocations[$propLc];
             }
         }
+    }
+
+    /**
+     * Class concrete hooks satisfy trait semicolon hook stubs — keep class property (#7316).
+     */
+    protected function mergeTraitAbstractPropertyHookOverride(
+        ClassEntry $entry,
+        ClassEntry $trait,
+        VM\ClassProperty $traitProp,
+        VM\ClassProperty $classProp
+    ): void {
+        $traitLc = strtolower($trait->name);
+        $childLc = strtolower($entry->name);
+        $prop = $traitProp->name;
+        $meta = $this->context->propertyHookRegistry[$traitLc][$prop]
+            ?? $this->context->propertyHookRegistry[$traitLc][strtolower($prop)]
+            ?? null;
+        if (!is_array($meta)) {
+            return;
+        }
+        $mergeMeta = $this->propertyHookMetaForInheritedBackingField($entry, $classProp, $meta, $childLc, $prop);
+        $this->context->propertyHookRegistry[$childLc][$prop] = $mergeMeta;
+        $this->linkPropertyHooks($entry, $classProp);
     }
 
     private function cloneClassPropertyForEntry(VM\ClassProperty $property, ClassEntry $entry): VM\ClassProperty
@@ -14571,12 +14623,26 @@ restart:
                     $default = $this->resolveCompileTimePropertyDefaultSlot($frame, $block, $op->arg2);
                     $propLc = strtolower($name->toString());
                     $classLc = strtolower($entry->name);
-                    foreach ($entry->properties as $existing) {
+                    $traitAbstractHookOverride = null;
+                    foreach ($entry->properties as $idx => $existing) {
                         if (strtolower($existing->name) !== $propLc) {
                             continue;
                         }
                         $declaringLc = $existing->declaringClassLc;
                         if ($declaringLc !== $classLc) {
+                            $traitEntry = $this->context->classes[$declaringLc] ?? null;
+                            if (null !== $traitEntry
+                                && $traitEntry->isTrait
+                                && VM\AbstractPropertyHookCheck::isAbstractHookProperty(
+                                    $traitEntry,
+                                    $existing,
+                                    $this->context
+                                )) {
+                                $traitAbstractHookOverride = [$traitEntry, $existing];
+                                unset($entry->properties[$idx]);
+                                $entry->properties = array_values($entry->properties);
+                                break;
+                            }
                             $traitName = isset($this->context->classes[$declaringLc])
                                 ? $this->context->classes[$declaringLc]->name
                                 : $declaringLc;
@@ -14616,6 +14682,14 @@ restart:
                     }
                     if (null !== $op->sourceLocation) {
                         $entry->propertySourceLocations[$propLc] = $op->sourceLocation;
+                    }
+                    if (null !== $traitAbstractHookOverride) {
+                        $this->mergeTraitAbstractPropertyHookOverride(
+                            $entry,
+                            $traitAbstractHookOverride[0],
+                            $traitAbstractHookOverride[1],
+                            $prop
+                        );
                     }
                     break;
                 case OpCode::TYPE_DECLARE_STATIC_PROPERTY:

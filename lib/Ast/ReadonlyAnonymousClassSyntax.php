@@ -19,168 +19,176 @@ final class ReadonlyAnonymousClassSyntax
      */
     public static function referenceProfileSyntaxError(string $code): ?array
     {
-        // JIT/AOT bundles can be megabytes with thousands of `new` — never token_get_all the whole
-        // prelude (#17150). Require all three keywords before scanning.
-        if (
-            !preg_match('/\bnew\b/i', $code)
-            || !preg_match('/\breadonly\b/i', $code)
-            || !preg_match('/\bclass\b/i', $code)
-        ) {
+        if (!preg_match('/\bnew\b/i', $code)) {
+            return null;
+        }
+        if (false === stripos($code, 'readonly')) {
             return null;
         }
 
-        return self::scanForNewReadonlyAnonymousClass($code);
-    }
-
-    /**
-     * Bounded scan for `new readonly class` without token_get_all on huge sources (#17150).
-     *
-     * @return array{line: int, message: string}|null
-     */
-    private static function scanForNewReadonlyAnonymousClass(string $code): ?array
-    {
-        $offset = 0;
         $len = \strlen($code);
-        while ($offset < $len) {
-            if (!preg_match('/\bnew\b/i', $code, $match, PREG_OFFSET_CAPTURE, $offset)) {
+        $i = 0;
+        $line = 1;
+        while ($i < $len) {
+            $i = self::skipInsignificantAt($code, $i, $len, $line);
+            if ($i >= $len) {
                 break;
             }
-            $newOffset = (int) $match[0][1];
-            $afterNew = self::skipInsignificantSource($code, $newOffset + \strlen((string) $match[0][0]));
-            $readonlyOffset = self::matchReadonlyAt($code, $afterNew);
-            if (null === $readonlyOffset) {
-                $offset = $newOffset + 1;
-
+            if (!self::matchKeywordAt($code, $i, $len, 'new')) {
+                ++$i;
+                if ("\n" === $code[$i - 1]) {
+                    ++$line;
+                }
                 continue;
             }
-            $afterReadonly = self::skipInsignificantSource($code, $readonlyOffset + 8);
-            if (!self::matchClassAt($code, $afterReadonly)) {
-                $offset = $newOffset + 1;
-
+            $j = self::skipInsignificantAt($code, $i + 3, $len, $line);
+            if ($j >= $len || !self::matchKeywordAt($code, $j, $len, 'readonly')) {
+                $i += 3;
                 continue;
             }
-
-            return [
-                'line' => self::lineAtOffset($code, $readonlyOffset),
-                'message' => self::REFERENCE_PROFILE_UNEXPECTED_READONLY,
-            ];
+            $readonlyLine = $line;
+            $k = self::skipInsignificantAt($code, $j + 8, $len, $line);
+            if ($k < $len && self::matchKeywordAt($code, $k, $len, 'class')) {
+                return [
+                    'line' => $readonlyLine,
+                    'message' => self::REFERENCE_PROFILE_UNEXPECTED_READONLY,
+                ];
+            }
+            $i += 3;
         }
 
         return null;
     }
 
-    private static function skipInsignificantSource(string $code, int $offset): int
+    private static function matchKeywordAt(string $code, int $pos, int $len, string $keyword): bool
     {
-        $len = \strlen($code);
-        while ($offset < $len) {
-            $ch = $code[$offset];
-            if (' ' === $ch || "\t" === $ch || "\n" === $ch || "\r" === $ch || "\f" === $ch) {
-                ++$offset;
+        $klen = \strlen($keyword);
+        if ($pos + $klen > $len) {
+            return false;
+        }
+        if (0 !== strcasecmp(substr($code, $pos, $klen), $keyword)) {
+            return false;
+        }
+        if ($pos > 0 && self::isIdentifierChar($code[$pos - 1])) {
+            return false;
+        }
+        if ($pos + $klen < $len && self::isIdentifierChar($code[$pos + $klen])) {
+            return false;
+        }
 
+        return true;
+    }
+
+    private static function isIdentifierChar(string $ch): bool
+    {
+        return ctype_alnum($ch) || '_' === $ch;
+    }
+
+    private static function skipInsignificantAt(string $code, int $pos, int $len, int &$line): int
+    {
+        while ($pos < $len) {
+            $ch = $code[$pos];
+            if (ctype_space($ch)) {
+                if ("\n" === $ch) {
+                    ++$line;
+                }
+                ++$pos;
                 continue;
             }
             if ('#' === $ch) {
-                $offset = self::skipToLineEnd($code, $offset + 1);
-
+                $pos = self::skipLineComment($code, $pos + 1, $len, $line);
                 continue;
             }
-            if ('/' === $ch && isset($code[$offset + 1])) {
-                if ('/' === $code[$offset + 1]) {
-                    $offset = self::skipToLineEnd($code, $offset + 2);
-
+            if ($pos + 1 < $len && '/' === $ch) {
+                if ('/' === $code[$pos + 1]) {
+                    $pos = self::skipLineComment($code, $pos + 2, $len, $line);
                     continue;
                 }
-                if ('*' === $code[$offset + 1]) {
-                    $end = \strpos($code, '*/', $offset + 2);
-                    $offset = false === $end ? $len : $end + 2;
-
+                if ('*' === $code[$pos + 1]) {
+                    $pos = self::skipBlockComment($code, $pos + 2, $len, $line);
                     continue;
                 }
             }
-            if ("'" === $ch || '"' === $ch) {
-                $offset = self::skipQuotedString($code, $offset);
-
+            if ("'" === $ch) {
+                $pos = self::skipSingleQuotedString($code, $pos + 1, $len, $line);
                 continue;
             }
-            if ('<' === $ch && str_starts_with($code, '<<', $offset)) {
-                $offset = self::skipHeredoc($code, $offset);
-
+            if ('"' === $ch) {
+                $pos = self::skipDoubleQuotedString($code, $pos + 1, $len, $line);
                 continue;
             }
 
-            break;
+            return $pos;
         }
 
-        return $offset;
+        return $pos;
     }
 
-    private static function skipToLineEnd(string $code, int $offset): int
+    private static function skipLineComment(string $code, int $pos, int $len, int &$line): int
     {
-        $len = \strlen($code);
-        while ($offset < $len) {
-            $ch = $code[$offset];
-            if ("\n" === $ch || "\r" === $ch) {
-                return $offset + 1;
+        while ($pos < $len) {
+            if ("\n" === $code[$pos]) {
+                ++$line;
+                return $pos + 1;
             }
-            ++$offset;
+            ++$pos;
+        }
+
+        return $pos;
+    }
+
+    private static function skipBlockComment(string $code, int $pos, int $len, int &$line): int
+    {
+        while ($pos + 1 < $len) {
+            if ("\n" === $code[$pos]) {
+                ++$line;
+            }
+            if ('*' === $code[$pos] && '/' === $code[$pos + 1]) {
+                return $pos + 2;
+            }
+            ++$pos;
         }
 
         return $len;
     }
 
-    private static function skipQuotedString(string $code, int $offset): int
+    private static function skipSingleQuotedString(string $code, int $pos, int $len, int &$line): int
     {
-        $quote = $code[$offset];
-        $len = \strlen($code);
-        ++$offset;
-        while ($offset < $len) {
-            $ch = $code[$offset];
-            if ('\\' === $ch) {
-                $offset += 2;
-
+        while ($pos < $len) {
+            $ch = $code[$pos];
+            if ("\n" === $ch) {
+                ++$line;
+            }
+            if ("'" === $ch) {
+                return $pos + 1;
+            }
+            if ('\\' === $ch && $pos + 1 < $len) {
+                $pos += 2;
                 continue;
             }
-            if ($quote === $ch) {
-                return $offset + 1;
+            ++$pos;
+        }
+
+        return $pos;
+    }
+
+    private static function skipDoubleQuotedString(string $code, int $pos, int $len, int &$line): int
+    {
+        while ($pos < $len) {
+            $ch = $code[$pos];
+            if ("\n" === $ch) {
+                ++$line;
             }
-            ++$offset;
+            if ('"' === $ch) {
+                return $pos + 1;
+            }
+            if ('\\' === $ch && $pos + 1 < $len) {
+                $pos += 2;
+                continue;
+            }
+            ++$pos;
         }
 
-        return $len;
-    }
-
-    private static function skipHeredoc(string $code, int $offset): int
-    {
-        if (!preg_match('/\G<<<\s*([\'"]?)([A-Za-z_][A-Za-z0-9_]*)\1/m', $code, $match, 0, $offset)) {
-            return $offset + 1;
-        }
-        $label = $match[2];
-        $bodyStart = $offset + \strlen($match[0]);
-        $endMarker = "\n".$label;
-        $end = \strpos($code, $endMarker, $bodyStart);
-        if (false === $end) {
-            return \strlen($code);
-        }
-
-        return $end + \strlen($endMarker);
-    }
-
-    private static function matchReadonlyAt(string $code, int $offset): ?int
-    {
-        if (!preg_match('/\Greadonly\b/i', $code, $match, 0, $offset)) {
-            return null;
-        }
-
-        return $offset;
-    }
-
-    private static function matchClassAt(string $code, int $offset): bool
-    {
-        return 1 === preg_match('/\Gclass\b/i', $code, $m, 0, $offset);
-    }
-
-    private static function lineAtOffset(string $code, int $offset): int
-    {
-        return 1 + substr_count(substr($code, 0, $offset), "\n");
+        return $pos;
     }
 }

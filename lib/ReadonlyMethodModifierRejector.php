@@ -28,6 +28,9 @@ final class ReadonlyMethodModifierRejector
 
     public static function reject(string $code, string $filename = 'unknown'): string
     {
+        if (ReferenceProfileTokenScan::shouldSkipReferenceProfileReject($code, $filename)) {
+            return $code;
+        }
         if (!str_contains($code, 'readonly') || !str_contains($code, 'function')) {
             return $code;
         }
