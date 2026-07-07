@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 4220 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 11373 |
+| Source constructs flagged (warnings) | 11375 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -2053,8 +2053,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/func_num_args.php` | 0 | 1 |
 | `ext/standard/function_exists.php` | 0 | 1 |
 | `ext/standard/fwrite.php` | 0 | 1 |
-| `ext/standard/gc_collect_cycles.php` | 0 | 1 |
-| `ext/standard/gc_disable.php` | 0 | 1 |
+| `ext/standard/gc_collect_cycles.php` | 0 | 2 |
+| `ext/standard/gc_disable.php` | 0 | 2 |
 | `ext/standard/gc_enable.php` | 0 | 2 |
 | `ext/standard/gc_enabled.php` | 0 | 1 |
 | `ext/standard/gc_mem_caches.php` | 0 | 2 |
@@ -17913,11 +17913,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/gc_collect_cycles.php`
 
 **Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 32)
 - 2 class method(s)
 
 ### `ext/standard/gc_disable.php`
 
 **Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 30)
 - 2 class method(s)
 
 ### `ext/standard/gc_enable.php`
@@ -22091,9 +22093,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 42982)
 - new Temporary (line 42984)
 - new OpCode (line 42987)
-- new CompileFatal (line 43300)
-- new CompileFatal (line 43555)
-- 924 class method(s)
+- new CompileFatal (line 43326)
+- new CompileFatal (line 43581)
+- 926 class method(s)
 - 45 closure(s)
 
 ### `lib/Compiler/AbstractMethodVisibilityCheck.php`
@@ -22440,7 +22442,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/CompilerVersion.php`
 
 **Warnings** (review for bootstrap subset):
-- 150 class method(s)
+- 151 class method(s)
 
 ### `lib/CurlyBraceOffsetRejector.php`
 
