@@ -25,6 +25,10 @@ final class hex2bin extends Internal
 
     private const MSG_INVALID_HEX = 'Input string must be hexadecimal string';
 
+    private const WARN_ODD_LENGTH = 'hex2bin(): '.self::MSG_ODD_LENGTH;
+
+    private const WARN_INVALID_HEX = 'hex2bin(): '.self::MSG_INVALID_HEX;
+
     public function execute(Frame $frame): void
     {
         $argc = \count($frame->calledArgs);
@@ -52,7 +56,7 @@ final class hex2bin extends Internal
             }
             if (null !== $frame->vmContext) {
                 $frame->vmContext->errors->triggerError(
-                    self::MSG_ODD_LENGTH,
+                    self::WARN_ODD_LENGTH,
                     ErrorReporter::E_WARNING,
                     '' !== $frame->scriptPath ? $frame->scriptPath : null,
                     $frame->vmContext,
@@ -72,7 +76,7 @@ final class hex2bin extends Internal
             }
             if ($len > 0 && null !== $frame->vmContext) {
                 $frame->vmContext->errors->triggerError(
-                    self::MSG_INVALID_HEX,
+                    self::WARN_INVALID_HEX,
                     ErrorReporter::E_WARNING,
                     '' !== $frame->scriptPath ? $frame->scriptPath : null,
                     $frame->vmContext,
