@@ -194,6 +194,16 @@ final class JitNestedHelperCoerce
             if (('int1' === $haveStr || 'bool' === $haveStr) && ('int32' === $wantStr || 'int64' === $wantStr || 'long long' === $wantStr)) {
                 return $context->builder->zext($arg, $wantTy);
             }
+            if (('int32' === $haveStr || 'int64' === $haveStr || 'long long' === $haveStr) && ('int1' === $wantStr || 'bool' === $wantStr)) {
+                $i32 = $context->getTypeFromString('int32');
+                $cmpArg = 'int32' === $haveStr ? $arg : $context->builder->trunc($arg, $i32);
+
+                return $context->builder->icmp(
+                    Builder::INT_NE,
+                    $cmpArg,
+                    $i32->constInt(0, false)
+                );
+            }
         }
         if (Type::KIND_POINTER === $wantTy->getKind() && Type::KIND_POINTER === $haveTy->getKind()) {
             return $context->builder->bitcast($arg, $wantTy);
