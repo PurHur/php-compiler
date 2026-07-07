@@ -38,10 +38,10 @@ final class parse_ini_file extends Internal
         VmString::rejectEmptyBuiltinStringArg($filename, 'parse_ini_file', 0, 'filename');
         $processSections = false;
         $scannerMode = ParseIniEngine::SCANNER_NORMAL;
-        if ($argc >= 2) {
+        if (isset($frame->calledArgs[1])) {
             $processSections = VmParseIni::resolveProcessSections($frame->calledArgs[1], 'parse_ini_file');
         }
-        if (3 === $argc) {
+        if (isset($frame->calledArgs[2])) {
             $scannerMode = VmParseIni::resolveScannerMode($frame->calledArgs[2], 'parse_ini_file');
         }
         VmParseIni::assignParsedResult(

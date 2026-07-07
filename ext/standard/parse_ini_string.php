@@ -37,10 +37,10 @@ final class parse_ini_string extends Internal
         $ini = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'parse_ini_string', 0, 'ini_string');
         $processSections = false;
         $scannerMode = ParseIniEngine::SCANNER_NORMAL;
-        if ($argc >= 2) {
+        if (isset($frame->calledArgs[1])) {
             $processSections = VmParseIni::resolveProcessSections($frame->calledArgs[1], 'parse_ini_string');
         }
-        if (3 === $argc) {
+        if (isset($frame->calledArgs[2])) {
             $scannerMode = VmParseIni::resolveScannerMode($frame->calledArgs[2], 'parse_ini_string');
         }
         VmParseIni::assignParsedResult(
@@ -60,7 +60,7 @@ final class parse_ini_string extends Internal
             throw new \LogicException('parse_ini_string() requires compile-time ini_string in this compiler build');
         }
         $processSections = false;
-        if ($argc >= 2) {
+        if (isset($args[1])) {
             $sections = self::compileTimeBool($context, $args[1]);
             if (null === $sections) {
                 throw new \LogicException('parse_ini_string() requires compile-time process_sections in this compiler build');
@@ -68,7 +68,7 @@ final class parse_ini_string extends Internal
             $processSections = $sections;
         }
         $scannerMode = ParseIniEngine::SCANNER_NORMAL;
-        if (3 === $argc) {
+        if (isset($args[2])) {
             $mode = self::compileTimeInt($context, $args[2]);
             if (null === $mode) {
                 throw new \LogicException('parse_ini_string() requires compile-time scanner_mode in this compiler build');
