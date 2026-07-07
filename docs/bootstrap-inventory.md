@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 4185 |
-| Phase A inventory files (M2 ratio SSOT) | 4185 |
+| PHP files on vm.php path | 4187 |
+| Phase A inventory files (M2 ratio SSOT) | 4187 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 11306 |
+| Source constructs flagged (warnings) | 11308 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -3134,6 +3134,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringExplode.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringFgetcsvJit.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringFileGetContents.php` | 0 | 1 |
+| `lib/JIT/Builtin/StringFileGetContentsLibc.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringFilePutContents.php` | 0 | 2 |
 | `lib/JIT/Builtin/StringFilePutContentsLibc.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringFilterBoolean.php` | 0 | 2 |
@@ -3219,6 +3220,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringQuotemeta.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringRandomBytes.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringReadfile.php` | 0 | 2 |
+| `lib/JIT/Builtin/StringReadfileLibc.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringReadlink.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringRealpath.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringRename.php` | 0 | 1 |
@@ -14362,8 +14364,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new HashTable (line 369)
 - new Variable (line 371)
 - new HashTable (line 547)
-- new Variable (line 564)
-- new Variable (line 571)
+- new Variable (line 570)
+- new Variable (line 577)
 - 42 class method(s)
 - 2 closure(s)
 
@@ -15061,7 +15063,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmMath.php`
 
 **Warnings** (review for bootstrap subset):
-- 75 class method(s)
+- 76 class method(s)
 
 ### `ext/standard/VmMemory.php`
 
@@ -15589,16 +15591,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 2930)
 - new Error (line 2950)
 - new Error (line 2954)
-- new Variable (line 3016)
-- new Variable (line 3022)
-- new Variable (line 3028)
-- new Variable (line 3068)
-- new Variable (line 3073)
-- new Variable (line 3102)
-- new Variable (line 3112)
-- new Variable (line 3118)
-- new Variable (line 3140)
-- 149 class method(s)
+- new Variable (line 3039)
+- new Variable (line 3045)
+- new Variable (line 3051)
+- new Variable (line 3091)
+- new Variable (line 3096)
+- new Variable (line 3125)
+- new Variable (line 3135)
+- new Variable (line 3141)
+- new Variable (line 3163)
+- 150 class method(s)
 - 1 closure(s)
 
 ### `ext/standard/VmRound.php`
@@ -16041,8 +16043,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new Error (line 1501)
 - new Error (line 1512)
-- new Error (line 3570)
-- new Error (line 3679)
+- new Error (line 3573)
+- new Error (line 3682)
 - 206 class method(s)
 
 ### `ext/standard/VmStripWhitespace.php`
@@ -18379,9 +18381,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/hrtime.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 53)
-- new Variable (line 54)
-- new Variable (line 57)
+- new HashTable (line 48)
+- new Variable (line 49)
+- new Variable (line 52)
 - 2 class method(s)
 
 ### `ext/standard/html_entity_decode.php`
@@ -24819,6 +24821,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 3 class method(s)
 
+### `lib/JIT/Builtin/StringFileGetContentsLibc.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `lib/JIT/Builtin/StringFilePutContents.php`
 
 **Warnings** (review for bootstrap subset):
@@ -25319,8 +25326,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringReadfile.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 105)
+- new JIT (line 112)
 - 5 class method(s)
+
+### `lib/JIT/Builtin/StringReadfileLibc.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
 
 ### `lib/JIT/Builtin/StringReadlink.php`
 
@@ -26934,7 +26946,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/JitBoolArg.php`
 
 **Warnings** (review for bootstrap subset):
-- 8 class method(s)
+- 9 class method(s)
 
 ### `lib/JIT/JitClockGettimeArg.php`
 
@@ -27979,38 +27991,38 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new VM\PropertyIsInitializedHandler (line 12989)
 - new Error (line 13050)
 - new VM\EnumFromHandler (line 13075)
-- new CompileError (line 13802)
-- new VM\ClassProperty (line 13913)
-- new Variable (line 14207)
-- new Variable (line 14390)
-- new Variable (line 14392)
-- new VM\ClassProperty (line 14517)
-- new Func\PHP (line 14645)
-- new Variable (line 14721)
-- new Variable (line 14728)
-- new Variable (line 14734)
-- new Variable (line 14771)
-- new Variable (line 14800)
-- new Variable (line 14984)
-- new Variable (line 15030)
-- new VM\ClassProperty (line 15095)
-- new Error (line 15141)
-- new Error (line 15173)
-- new Error (line 15176)
-- new Error (line 15179)
-- new Error (line 15198)
-- new ObjectEntry (line 15202)
-- new Variable (line 15204)
-- new Variable (line 15218)
-- new Error (line 15343)
-- new Error (line 15348)
-- new VM\ObjectEntry (line 15352)
-- new Variable (line 15492)
-- new Variable (line 15510)
-- new NoDiscardMetadata (line 15675)
-- new Variable (line 15844)
-- new Variable (line 15846)
-- new Variable (line 15938)
+- new CompileError (line 13804)
+- new VM\ClassProperty (line 13915)
+- new Variable (line 14214)
+- new Variable (line 14402)
+- new Variable (line 14404)
+- new VM\ClassProperty (line 14529)
+- new Func\PHP (line 14657)
+- new Variable (line 14733)
+- new Variable (line 14740)
+- new Variable (line 14746)
+- new Variable (line 14783)
+- new Variable (line 14812)
+- new Variable (line 14997)
+- new Variable (line 15043)
+- new VM\ClassProperty (line 15108)
+- new Error (line 15154)
+- new Error (line 15186)
+- new Error (line 15189)
+- new Error (line 15192)
+- new Error (line 15211)
+- new ObjectEntry (line 15215)
+- new Variable (line 15217)
+- new Variable (line 15231)
+- new Error (line 15356)
+- new Error (line 15361)
+- new VM\ObjectEntry (line 15365)
+- new Variable (line 15505)
+- new Variable (line 15523)
+- new NoDiscardMetadata (line 15688)
+- new Variable (line 15857)
+- new Variable (line 15859)
+- new Variable (line 15951)
 - 461 class method(s)
 - 15 closure(s)
 

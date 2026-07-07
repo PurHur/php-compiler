@@ -13602,6 +13602,8 @@ restart:
                 if (isset($trait->constNames[$name])) {
                     $entry->constNames[$name] = $trait->constNames[$name];
                 }
+                $entry->constDeclaringClassLc[$name] = $trait->constDeclaringClassLc[$name]
+                    ?? strtolower(ltrim($trait->name, '\\'));
                 if (isset($trait->constVisibility[$name])) {
                     $entry->constVisibility[$name] = $trait->constVisibility[$name];
                 }
@@ -13956,6 +13958,11 @@ restart:
             foreach ($iface->constants as $name => $value) {
                 if (!isset($entry->constants[$name])) {
                     $entry->constants[$name] = $value;
+                    if (isset($iface->constNames[$name])) {
+                        $entry->constNames[$name] = $iface->constNames[$name];
+                    }
+                    $entry->constDeclaringClassLc[$name] = $iface->constDeclaringClassLc[$name]
+                        ?? strtolower(ltrim($iface->name, '\\'));
                     if (isset($iface->constVisibility[$name])) {
                         $entry->constVisibility[$name] = $iface->constVisibility[$name];
                     }
@@ -14277,6 +14284,11 @@ restart:
         foreach ($parent->constants as $name => $value) {
             if (!isset($entry->constants[$name])) {
                 $entry->constants[$name] = $value;
+                if (isset($parent->constNames[$name])) {
+                    $entry->constNames[$name] = $parent->constNames[$name];
+                }
+                $entry->constDeclaringClassLc[$name] = $parent->constDeclaringClassLc[$name]
+                    ?? strtolower(ltrim($parent->name, '\\'));
                 if (isset($parent->constVisibility[$name])) {
                     $entry->constVisibility[$name] = $parent->constVisibility[$name];
                 }
@@ -14805,6 +14817,7 @@ restart:
         $this->rejectIncompatibleTraitClassConstOverride($entry, $name, $canonical, $value);
         $entry->constants[$name] = $value;
         $entry->constNames[$name] = $canonical;
+        $entry->constDeclaringClassLc[$name] = strtolower(ltrim($entry->name, '\\'));
         $entry->constVisibility[$name] = ClassConstVisibility::mask($op->classConstVisibilityFlags);
         unset($entry->traitConstSources[$name]);
         if ([] !== $op->attributeNames) {

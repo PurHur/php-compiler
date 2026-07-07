@@ -58,6 +58,8 @@ class ClassEntry {
     public array $constants = [];
     /** @var array<string, string> constant name (lowercase) => declared casing (#5385) */
     public array $constNames = [];
+    /** @var array<string, string> constant name (lowercase) => declaring class lc (#4479) */
+    public array $constDeclaringClassLc = [];
     /** @var array<string, int> constant name (lowercase) => PHPCfg visibility flags (#4651) */
     public array $constVisibility = [];
     /** @var array<string, string> constant name (lowercase) => trait FQCN when imported via use Trait */
