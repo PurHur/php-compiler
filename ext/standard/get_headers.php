@@ -36,7 +36,7 @@ final class get_headers extends Internal
             return;
         }
 
-        $url = VmStreamPath::coerceNonEmptyPathArg($frame->calledArgs[0], 'get_headers', 0, 'url');
+        $url = VmStreamPath::coerceNonEmptyPathArgForFrame($frame, 0, 'get_headers', 'url');
         $associative = false;
         if ($argc >= 2) {
             $associative = VmMath::parseBoolBuiltinArg(

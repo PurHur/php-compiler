@@ -8,7 +8,6 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\InternalStrictArg;
 use PHPLLVM\Value;
 
 /**
@@ -34,17 +33,10 @@ final class php_strip_whitespace extends Internal
             return;
         }
 
-        InternalStrictArg::rejectNullString(
-            $frame->calledArgs[0],
-            'php_strip_whitespace',
-            'filename',
+        $path = VmStreamPath::coerceNonEmptyPathArgForFrame(
+            $frame,
             0,
-            $frame
-        );
-        $path = VmStreamPath::coerceNonEmptyPathArg(
-            $frame->calledArgs[0],
             'php_strip_whitespace',
-            0,
             'filename'
         );
         $contents = VmFs::fileGetContents($path);
