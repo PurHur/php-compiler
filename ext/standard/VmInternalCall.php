@@ -35,6 +35,39 @@ final class VmInternalCall
     }
 
     /**
+     * Invoke internal predicate for array_find family (#17300, php-src ext/standard/array.c).
+     *
+     * Zend passes up to two (value, key) args but unary internals (is_int, strlen, …)
+     * receive only the value — or only the key for array_all_key/array_any_key.
+     */
+    public static function invokeArrayFindPredicate(
+        Internal $fn,
+        Variable $value,
+        Variable $key,
+        bool $keyOperand,
+    ): Variable {
+        if (self::maxAcceptedArgsForFindPredicate($fn) >= 2) {
+            return self::invoke($fn, $value, $key);
+        }
+
+        return self::invoke($fn, $keyOperand ? $key : $value);
+    }
+
+    /**
+     * array_all_key / array_any_key unary internals inspect keys; others inspect values.
+     */
+    public static function usesKeyOperandForFindFamily(string $function): bool
+    {
+        return 'array_all_key' === $function || 'array_any_key' === $function;
+    }
+
+    private static function maxAcceptedArgsForFindPredicate(Internal $fn): int
+    {
+        // String builtins used as array_find predicates are unary in php-src.
+        return 1;
+    }
+
+    /**
      * @param Variable[] $args
      */
     public static function invoke(Internal $fn, Variable ...$args): Variable

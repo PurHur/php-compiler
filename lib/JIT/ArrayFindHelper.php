@@ -64,7 +64,8 @@ final class ArrayFindHelper
         Variable $array,
         Variable $callback,
         ?Variable $strictArg = null,
-        ?Value $strictI1Override = null
+        ?Value $strictI1Override = null,
+        bool $keyOperandInternal = false,
     ): Value {
         $strictI1 = $strictI1Override ?? self::resolveStrictI1($context, $strictArg);
 
@@ -73,7 +74,8 @@ final class ArrayFindHelper
             $array,
             $callback,
             self::MODE_ANY,
-            $strictI1
+            $strictI1,
+            $keyOperandInternal,
         );
     }
 
@@ -82,7 +84,8 @@ final class ArrayFindHelper
         Variable $array,
         Variable $callback,
         ?Variable $strictArg = null,
-        ?Value $strictI1Override = null
+        ?Value $strictI1Override = null,
+        bool $keyOperandInternal = false,
     ): Value {
         $strictI1 = $strictI1Override ?? self::resolveStrictI1($context, $strictArg);
 
@@ -91,7 +94,8 @@ final class ArrayFindHelper
             $array,
             $callback,
             self::MODE_ALL,
-            $strictI1
+            $strictI1,
+            $keyOperandInternal,
         );
     }
 
@@ -115,7 +119,8 @@ final class ArrayFindHelper
         Variable $array,
         Variable $callback,
         int $mode,
-        ?Value $strictI1 = null
+        ?Value $strictI1 = null,
+        bool $keyOperandInternal = false,
     ): Value {
         $strictI1 ??= $context->constantFromBool(false);
         JitArrayElem::requireArrayArg($context, $array, self::functionNameForMode($mode));
@@ -136,7 +141,7 @@ final class ArrayFindHelper
             throw new \LogicException(ArrayFindCallbackPolicy::jitRejectionMessage());
         }
         if (ArrayBuiltinHelper::isNativeArray($array->type)) {
-            return self::buildFromNativeArray($context, $array, $callback, $mode, $strictI1);
+            return self::buildFromNativeArray($context, $array, $callback, $mode, $strictI1, $keyOperandInternal);
         }
 
         return self::buildFromHashTable(
@@ -144,7 +149,8 @@ final class ArrayFindHelper
             ArrayBuiltinHelper::loadHashTable($context, $array),
             $callback,
             $mode,
-            $strictI1
+            $strictI1,
+            $keyOperandInternal,
         );
     }
 
@@ -153,7 +159,8 @@ final class ArrayFindHelper
         Variable $array,
         Variable $callback,
         int $mode,
-        Value $strictI1
+        Value $strictI1,
+        bool $keyOperandInternal = false,
     ): Value {
         $handler = self::resolvePredicateHandler($context, $callback);
         $elemType = $array->type & ~Variable::IS_NATIVE_ARRAY;
@@ -200,7 +207,7 @@ final class ArrayFindHelper
             );
         }
         $keyVar = self::indexToKeyVariable($context, $idx);
-        $truthy = self::invokePredicateMatch($context, $handler, $elem, $keyVar, $strictI1);
+        $truthy = self::invokePredicateMatch($context, $handler, $elem, $keyVar, $strictI1, $keyOperandInternal);
         $shouldStop = self::stopOnPredicate($context, $truthy, $mode);
         $context->builder->branchIf($shouldStop, $match, $advance);
 
@@ -235,7 +242,8 @@ final class ArrayFindHelper
         Value $ht,
         Variable $callback,
         int $mode,
-        Value $strictI1
+        Value $strictI1,
+        bool $keyOperandInternal = false,
     ): Value {
         $handler = self::resolvePredicateHandler($context, $callback);
         $map = $context->structFieldMap['__hashtable__'];
@@ -284,7 +292,7 @@ final class ArrayFindHelper
         $context->builder->positionAtEnd($packedCheck);
         $elem = HashTableHelper::readIndexedToValueBox($context, $ht, $idx);
         $keyVar = self::indexToKeyVariable($context, $idx);
-        $truthy = self::invokePredicateMatch($context, $handler, $elem, $keyVar, $strictI1);
+        $truthy = self::invokePredicateMatch($context, $handler, $elem, $keyVar, $strictI1, $keyOperandInternal);
         $shouldStop = self::stopOnPredicate($context, $truthy, $mode);
         $context->builder->branchIf($shouldStop, $packedMatch, $packedNext);
 
@@ -310,7 +318,7 @@ final class ArrayFindHelper
         $context->builder->branch($packedHead);
 
         $context->builder->positionAtEnd($packedDone);
-        self::buildStringKeyPredicateLoop($context, $ht, $handler, $mode, $resultSlot, $boolSlot, $done, $strictI1);
+        self::buildStringKeyPredicateLoop($context, $ht, $handler, $mode, $resultSlot, $boolSlot, $done, $strictI1, $keyOperandInternal);
 
         $context->builder->positionAtEnd($done);
         $retBlock = BasicBlockHelper::append($context, 'array_find_ht_return');
@@ -328,7 +336,8 @@ final class ArrayFindHelper
         ?Value $resultSlot,
         ?Value $boolSlot,
         BasicBlock $doneBlock,
-        Value $strictI1
+        Value $strictI1,
+        bool $keyOperandInternal = false,
     ): void {
         $map = $context->structFieldMap['__hashtable__'];
         $nodeMap = $context->structFieldMap['__strkey_node__'];
@@ -428,7 +437,7 @@ final class ArrayFindHelper
         $elem = new Variable($context, Variable::TYPE_VALUE, Variable::KIND_VARIABLE, $elemSlot);
         $keyStr = $context->builder->load($context->builder->structGep($node, $nodeMap['key']));
         $keyVar = self::separatedStringToKeyVariable($context, $keyStr);
-        $truthy = self::invokePredicateMatch($context, $handler, $elem, $keyVar, $strictI1);
+        $truthy = self::invokePredicateMatch($context, $handler, $elem, $keyVar, $strictI1, $keyOperandInternal);
         $shouldStop = self::stopOnPredicate($context, $truthy, $mode);
         $context->builder->branchIf($shouldStop, $strMatch, $strNext);
 
@@ -512,11 +521,14 @@ final class ArrayFindHelper
         Variable $elem,
         Variable $key,
         Value $strictI1,
+        bool $keyOperandInternal = false,
     ): Value {
         [$kind, $target] = $handler;
         if ('builtin' === $kind) {
             /** @var Internal $target */
-            $mapped = $target->call($context, $elem, $key);
+            $mapped = $keyOperandInternal
+                ? $target->call($context, $key)
+                : $target->call($context, $elem);
 
             return self::jitCallResultMatch($context, $mapped, $strictI1);
         }

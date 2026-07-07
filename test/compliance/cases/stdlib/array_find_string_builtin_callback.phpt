@@ -1,24 +1,19 @@
 --TEST--
-stdlib array_find family — string builtin callback ArgumentCountError (#13946, ext/standard/array.c)
+stdlib array_find family — string builtin callback unary arity (#17300, ext/standard/array.c)
+--ENV--
+PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
-foreach (
-    [
-        static fn () => array_any([1, 2, 3], 'strlen'),
-        static fn () => array_all([1, 2, 3], 'is_int'),
-        static fn () => array_find([1, 2, 3], 'is_int'),
-        static fn () => array_find_key([1, 2, 3], 'is_int'),
-    ] as $call
-) {
-    try {
-        $call();
-        echo "no error\n";
-    } catch (\ArgumentCountError $e) {
-        echo $e->getMessage(), "\n";
-    }
-}
+var_export(array_all([1, 2, 3], 'is_int'));
+echo "\n";
+var_export(array_all_key(['a' => 1], 'is_string'));
+echo "\n";
+var_export(array_find_key([1, 2, 3], 'is_int'));
+echo "\n";
+var_export(array_any(['a', 'bb'], 'strlen'));
+echo "\n";
 --EXPECT--
-strlen() expects exactly 1 argument, 2 given
-is_int() expects exactly 1 argument, 2 given
-is_int() expects exactly 1 argument, 2 given
-is_int() expects exactly 1 argument, 2 given
+true
+true
+0
+true

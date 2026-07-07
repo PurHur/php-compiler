@@ -78,7 +78,12 @@ final class VmArrayValueCallback
         try {
             $fn = VmInternalCall::resolveStringCallback($name);
 
-            return VmInternalCall::invoke($fn, $value, $key);
+            return VmInternalCall::invokeArrayFindPredicate(
+                $fn,
+                $value,
+                $key,
+                VmInternalCall::usesKeyOperandForFindFamily($function),
+            );
         } catch (\LogicException) {
             // Not a registered string builtin — try a user-defined function.
         }

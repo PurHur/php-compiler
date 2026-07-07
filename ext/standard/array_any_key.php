@@ -72,7 +72,7 @@ final class array_any_key extends Internal
 
             return $this->boxStandaloneBoolJitResult(
                 $context,
-                ArrayFindHelper::buildAnyArray($context, $args[0], $args[1], null, $strictI1)
+                ArrayFindHelper::buildAnyArray($context, $args[0], $args[1], null, $strictI1, true)
             );
         }
         if (!ArrayFindCallbackPolicy::isJitNullCallback($args[1])
@@ -85,7 +85,7 @@ final class array_any_key extends Internal
 
         return $this->boxStandaloneBoolJitResult(
             $context,
-            ArrayFindHelper::buildAnyArray($context, $args[0], $args[1])
+            ArrayFindHelper::buildAnyArray($context, $args[0], $args[1], null, null, true)
         );
     }
 }
