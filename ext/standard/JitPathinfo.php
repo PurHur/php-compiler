@@ -12,7 +12,6 @@ use PHPCompiler\Block;
 use PHPCompiler\JIT\Builtin\StringPathinfo;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
-use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\OpCode;
 use PHPCfg\Operand;
@@ -22,7 +21,7 @@ final class JitPathinfo
 {
     public static function invoke(Context $context, JITVariable $path, ?JITVariable $flags = null): Value
     {
-        $pathVal = JitStringBuiltinArg::lowerPath($context, $path, 'pathinfo', 0, 'path');
+        $pathVal = JitFilestatArg::lowerFilename($context, $path, 'pathinfo', 0, 'path');
         $maskConst = 15;
         if (null !== $flags) {
             $resolved = self::tryResolveFlags($context, $flags);

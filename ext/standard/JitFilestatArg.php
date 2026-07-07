@@ -23,9 +23,17 @@ final class JitFilestatArg
     public static function lowerFilename(
         Context $context,
         JITVariable $arg,
-        string $function
+        string $function,
+        int $argIndex = 0,
+        string $paramName = 'filename'
     ): Value {
-        return JitStringBuiltinArg::lowerPath($context, $arg, $function, 0, 'filename');
+        if (JITVariable::TYPE_NULL === $arg->type || $arg->isNullConstant) {
+            \PHPCompiler\JIT\JitNativeString::ensureInsertBlock($context);
+
+            return $context->builder->load($context->constantStringFromString(''));
+        }
+
+        return JitStringBuiltinArg::lowerPath($context, $arg, $function, $argIndex, $paramName);
     }
 
     /** Z_PARAM_PATH for touch() — null coerces to "" (#12878, php_touch). */
