@@ -467,6 +467,7 @@ final class BootstrapSelfhostBundleTest extends TestCase
         'ext/standard/VmCombinedLcg.php',
         'ext/standard/VmMt19937.php',
         'ext/standard/getrandmax.php',
+        'ext/standard/mt_getrandmax.php',
         'ext/standard/lcg_value.php',
         'ext/standard/mt_rand.php',
         'ext/standard/mt_srand.php',

@@ -475,6 +475,7 @@ class Module extends ModuleAbstract
             new mt_srand(),
             new srand(),
             new getrandmax(),
+            new mt_getrandmax(),
             new lcg_value(),
             new uniqid(),
             new str_pad(),

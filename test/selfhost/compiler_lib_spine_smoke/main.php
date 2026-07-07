@@ -2164,6 +2164,7 @@ require_once __DIR__.'/../../../ext/standard/getopt.php';
 require_once __DIR__.'/../../../ext/standard/getprotobyname.php';
 require_once __DIR__.'/../../../ext/standard/getprotobynumber.php';
 require_once __DIR__.'/../../../ext/standard/getrandmax.php';
+require_once __DIR__.'/../../../ext/standard/mt_getrandmax.php';
 require_once __DIR__.'/../../../ext/standard/getrusage.php';
 require_once __DIR__.'/../../../ext/standard/getservbyname.php';
 require_once __DIR__.'/../../../ext/standard/getservbyport.php';
