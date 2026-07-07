@@ -7550,6 +7550,9 @@ class JIT {
                     );
                     break;
                 case OpCode::TYPE_LIST_SPREAD_ASSIGN:
+                    if (!CompilerVersion::supportsListDestructuringSpreadAssign()) {
+                        throw new \Error('Spread operator is not supported in assignments');
+                    }
                     if ($this->context->listUnpackSkipAssignPath) {
                         break;
                     }

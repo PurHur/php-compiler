@@ -9039,6 +9039,7 @@ class Compiler {
                     $this->rejectGlobalConstInWriteContext($expr->var, $block);
                 }
                 if ($this->assignIsListSpread($expr)) {
+                    $this->rejectListSpreadAssignExpr($expr);
                     $fromIndex = new Operand\Literal($expr->listSpreadFromIndex);
                     $spreadOp = new OpCode(
                         OpCode::TYPE_LIST_SPREAD_ASSIGN,
@@ -43280,41 +43281,37 @@ class Compiler {
     }
 
     /**
-     * Zend zend_compile.c: list spread assign withheld on 8.4.0-dev reference profile (#17182, #9248).
+     * Zend zend_compile.c: list spread assign withheld on 8.4.0-dev reference profile (#6936, #17182).
      *
      * @param Op[] $ops
      */
     private function rejectListDestructuringSpreadAssignProfile(array $ops, int $start, ?Block $block = null): void
     {
-        if (!CompilerVersion::supportsListDestructuringSpreadAssign()) {
-            $end = $this->listDestructGroupEndIndex($ops, $start, $block);
-            for ($i = $start; $i <= $end; ++$i) {
-                if ($this->isListSpreadAssignOp($ops[$i])) {
-                    $this->throwListSpreadAssignUnsupportedFatal($ops[$i]);
-
-                    return;
-                }
+        $end = $this->listDestructGroupEndIndex($ops, $start, $block);
+        for ($i = $start; $i <= $end; ++$i) {
+            if (!$this->isListSpreadAssignOp($ops[$i])) {
+                continue;
             }
-
-            return;
+            if (!CompilerVersion::supportsListDestructuringSpreadAssign()) {
+                $this->throwListSpreadAssignUnsupportedFatal($ops[$i]);
+            }
+            if (!$this->isListDestructSpreadTail($ops, $i, $block)) {
+                $this->throwListSpreadAssignUnsupportedFatal($ops[$i]);
+            }
         }
-        $this->rejectLoneListSpreadAssign($ops, $start);
     }
 
-    /**
-     * Zend zend_compile.c: lone `[...$a] = $rhs` is a compile-time fatal (#6936).
-     *
-     * @param Op[] $ops
-     */
-    private function rejectLoneListSpreadAssign(array $ops, int $start): void
+    private function rejectListSpreadAssignExpr(Op\Expr\Assign $expr): void
     {
-        if (!$this->isListSpreadAssignOp($ops[$start]) || $this->isListDestructSpreadTail($ops, $start, null)) {
+        if (CompilerVersion::supportsListDestructuringSpreadAssign()) {
             return;
         }
-        $this->throwListSpreadAssignUnsupportedFatal($ops[$start]);
+        $this->throwListSpreadAssignUnsupportedFatal($expr);
     }
 
     /**
+     * @param Op\Expr\Assign $spread
+     *
      * @return never
      */
     private function throwListSpreadAssignUnsupportedFatal(Op\Expr\Assign $spread): void
