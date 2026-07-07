@@ -27,7 +27,7 @@ final class readfile extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('readfile() requires exactly one argument in this compiler build');
         }
-        $path = VmStreamPath::coerceNonEmptyPathArg($frame->calledArgs[0], 'readfile');
+        $path = VmStreamPath::coerceNonEmptyPathArgForFrame($frame, 0, 'readfile', 'filename');
         if (null === $frame->returnVar) {
             return;
         }
