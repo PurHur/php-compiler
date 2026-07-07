@@ -740,6 +740,8 @@
         "ext/standard/AtanhJitHelper.php",
         "ext/standard/AttributeRegistryArgsJitHelper.php",
         "ext/standard/AttributeRegistryJitHelper.php",
+        "ext/standard/Base64DecodeJitHelper.php",
+        "ext/standard/Base64EncodeJitHelper.php",
         "ext/standard/Bin2hexJitHelper.php",
         "ext/standard/BuiltinAttributes.php",
         "ext/standard/BuiltinClasses.php",
@@ -3191,6 +3193,10 @@
         "lib/JIT/Builtin/StreamSyncJit.php",
         "lib/JIT/Builtin/StringAddslashes.php",
         "lib/JIT/Builtin/StringAddslashesLlvm.php",
+        "lib/JIT/Builtin/StringBase64Decode.php",
+        "lib/JIT/Builtin/StringBase64DecodeLlvm.php",
+        "lib/JIT/Builtin/StringBase64Encode.php",
+        "lib/JIT/Builtin/StringBase64EncodeLlvm.php",
         "lib/JIT/Builtin/StringBin2hex.php",
         "lib/JIT/Builtin/StringBin2hexLlvm.php",
         "lib/JIT/Builtin/StringBitwiseNot.php",
@@ -4456,9 +4462,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 4222,
+        "inventory_files": 4228,
         "excluded": 0,
-        "eligible": 4222,
+        "eligible": 4228,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
