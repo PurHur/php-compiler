@@ -10533,6 +10533,17 @@ restart:
             return null;
         }
         $meta = $this->classPropertyMeta($object, $name);
+        if (
+            null !== $meta
+            && $meta->lazy
+            && null !== $meta->getHookMethodLc
+            && isset($object->lazyRawInitializedProperties[$name])
+        ) {
+            $cached = new Variable();
+            $cached->copyFrom($object->getProperty($name)->resolveIndirect());
+
+            return $cached;
+        }
         $getLc = $meta?->getHookMethodLc
             ?? strtolower(SourcePreprocessor\PropertyHooks::getHookMethodName($name));
         if (!isset($object->class->methods[$getLc])) {
@@ -10549,6 +10560,9 @@ restart:
         $catchFrame = $this->enforcePropertyHookGetReturn($object, $name, $meta, $result, $frame);
         if (null !== $catchFrame) {
             throw new VM\PropertyHookRefWriteSignal($catchFrame);
+        }
+        if (null !== $meta) {
+            VM\LazyPropertySupport::cacheLazyGetHookResult($object, $name, $meta, $result);
         }
 
         return $result;

@@ -1,13 +1,23 @@
 --TEST--
-stdlib var_export($it->current(), true) returns exported scalar after stmt-level next() (#17251, ext/standard/var.c)
+stdlib var_export($obj->method(), true) — MethodCall inline arg slot (#17251, ext/standard/var.c)
 --FILE--
 <?php
-$it = new ArrayIterator([1, 2]);
+declare(strict_types=1);
+
+$it = new ArrayIterator([1, 2, 3]);
 $it->next();
-echo var_export($it->current(), true), "\n";
-echo var_export((new ArrayIterator([1]))->current(), true), "\n";
+echo 'cur=', var_export($it->current(), true), "\n";
+
+$it->rewind();
+$it->next();
+echo 'key=', var_export($it->key(), true), "\n";
+
+function g() { yield 10; yield 20; yield 30; }
+$gen = g();
+$gen->next();
+$gen->next();
+echo 'val=', var_export($gen->current(), true), "\n";
 --EXPECT--
-2
-1
---EXPECT_EXIT--
-0
+cur=2
+key=1
+val=30
