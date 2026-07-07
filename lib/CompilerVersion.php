@@ -2024,6 +2024,14 @@ final class CompilerVersion
     }
 
     /**
+     * DOM Living Standard parentElement on DOMChildNode (PHP 8.4+, ext/dom/node.c).
+     */
+    public static function supportsDomParentElement(): bool
+    {
+        return self::supportsDomApiSince('8.4.0');
+    }
+
+    /**
      * PHP 8.4+ parenthesized asymmetric set modifier `public (private(set))` on properties.
      *
      * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev reference profile
