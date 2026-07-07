@@ -12893,7 +12893,13 @@ restart:
             return;
         }
         $frame->call = $state->func;
-        $frame->closureCall = $state;
+        if (
+            null === $frame->closureCall
+            || null === $frame->block?->func
+            || (($frame->block->func->flags ?? 0) & \PHPCfg\Func::FLAG_CLOSURE) === 0
+        ) {
+            $frame->closureCall = $state;
+        }
         $frame->pendingClosureInvoke = $state;
         $frame->callArgs = [];
         $frame->callArgEntries = [];

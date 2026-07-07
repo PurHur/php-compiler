@@ -33,6 +33,10 @@ final class ClosureGetCurrentVMTest extends BaseTest
             __DIR__.'/cases/language/closure_get_current_forward_84.phpt',
             'closure_get_current_forward_84.phpt'
         );
+        yield 'closure_get_current_nested_84.phpt' => self::parsePHPT(
+            __DIR__.'/cases/language/closure_get_current_nested_84.phpt',
+            'closure_get_current_nested_84.phpt'
+        );
     }
 
     public function setUp(): void
