@@ -12,7 +12,6 @@ use PHPCompiler\JIT\JitResourceArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Builder;
-use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /** LLVM lowering for proc_get_status() via __compiler_proc_get_status (#3740). */

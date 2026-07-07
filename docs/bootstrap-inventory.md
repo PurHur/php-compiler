@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 4239 |
-| Phase A inventory files (M2 ratio SSOT) | 4239 |
+| PHP files on vm.php path | 4252 |
+| Phase A inventory files (M2 ratio SSOT) | 4252 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 11425 |
+| Source constructs flagged (warnings) | 11444 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -64,12 +64,23 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/brotli/brotli_uncompress.php` | 0 | 1 |
 | `ext/bz2/Bz2ExtensionPolicy.php` | 0 | 1 |
 | `ext/bz2/Bz2JitHelper.php` | 0 | 1 |
+| `ext/bz2/Bz2StreamJitHelper.php` | 0 | 1 |
 | `ext/bz2/JitBz2.php` | 0 | 1 |
-| `ext/bz2/Module.php` | 0 | 3 |
+| `ext/bz2/JitBz2close.php` | 0 | 1 |
+| `ext/bz2/JitBz2open.php` | 0 | 1 |
+| `ext/bz2/JitBz2read.php` | 0 | 1 |
+| `ext/bz2/JitBz2write.php` | 0 | 1 |
+| `ext/bz2/Module.php` | 0 | 7 |
 | `ext/bz2/VmBz2Core.php` | 0 | 9 |
 | `ext/bz2/VmBz2Native.php` | 0 | 1 |
+| `ext/bz2/VmBz2Stream.php` | 0 | 1 |
+| `ext/bz2/VmBz2StreamPure.php` | 0 | 1 |
+| `ext/bz2/bzclose.php` | 0 | 1 |
 | `ext/bz2/bzcompress.php` | 0 | 1 |
 | `ext/bz2/bzdecompress.php` | 0 | 1 |
+| `ext/bz2/bzopen.php` | 0 | 1 |
+| `ext/bz2/bzread.php` | 0 | 1 |
+| `ext/bz2/bzwrite.php` | 0 | 1 |
 | `ext/calendar/CalendarArgs.php` | 0 | 1 |
 | `ext/calendar/CalendarConstants.php` | 0 | 1 |
 | `ext/calendar/CalendarFunction.php` | 0 | 1 |
@@ -2856,6 +2867,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/Bcmath.php` | 0 | 1 |
 | `lib/JIT/Builtin/BcmathJit.php` | 0 | 3 |
 | `lib/JIT/Builtin/Bz2Runtime.php` | 0 | 1 |
+| `lib/JIT/Builtin/Bz2StreamIo.php` | 0 | 1 |
+| `lib/JIT/Builtin/Bz2StreamRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/CallArgv.php` | 0 | 1 |
 | `lib/JIT/Builtin/CallUnpackRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/CastArrayRuntime.php` | 0 | 1 |
@@ -4406,16 +4419,45 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
 
+### `ext/bz2/Bz2StreamJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 4 class method(s)
+
 ### `ext/bz2/JitBz2.php`
 
 **Warnings** (review for bootstrap subset):
 - 3 class method(s)
 
+### `ext/bz2/JitBz2close.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/bz2/JitBz2open.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/bz2/JitBz2read.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/bz2/JitBz2write.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `ext/bz2/Module.php`
 
 **Warnings** (review for bootstrap subset):
-- new bzcompress (line 42)
-- new bzdecompress (line 43)
+- new bzcompress (line 43)
+- new bzdecompress (line 44)
+- new bzopen (line 45)
+- new bzread (line 46)
+- new bzwrite (line 47)
+- new bzclose (line 48)
 - 3 class method(s)
 
 ### `ext/bz2/VmBz2Core.php`
@@ -4436,12 +4478,42 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 3 class method(s)
 
+### `ext/bz2/VmBz2Stream.php`
+
+**Warnings** (review for bootstrap subset):
+- 5 class method(s)
+
+### `ext/bz2/VmBz2StreamPure.php`
+
+**Warnings** (review for bootstrap subset):
+- 10 class method(s)
+
+### `ext/bz2/bzclose.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
 ### `ext/bz2/bzcompress.php`
 
 **Warnings** (review for bootstrap subset):
 - 3 class method(s)
 
 ### `ext/bz2/bzdecompress.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
+### `ext/bz2/bzopen.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
+### `ext/bz2/bzread.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
+### `ext/bz2/bzwrite.php`
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
@@ -14724,25 +14796,25 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmFs.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 79)
-- new Variable (line 81)
-- new HashTable (line 96)
-- new Variable (line 98)
-- new HashTable (line 236)
-- new Variable (line 243)
-- new Variable (line 248)
-- new Variable (line 308)
-- new Variable (line 382)
-- new Variable (line 423)
-- new HashTable (line 1531)
-- new Variable (line 1533)
-- new HashTable (line 2357)
-- new Variable (line 2360)
-- new Variable (line 2366)
-- new Variable (line 2372)
-- new Variable (line 2378)
-- new Variable (line 2385)
-- 131 class method(s)
+- new HashTable (line 82)
+- new Variable (line 84)
+- new HashTable (line 99)
+- new Variable (line 101)
+- new HashTable (line 239)
+- new Variable (line 246)
+- new Variable (line 251)
+- new Variable (line 311)
+- new Variable (line 385)
+- new Variable (line 426)
+- new HashTable (line 1574)
+- new Variable (line 1576)
+- new HashTable (line 2403)
+- new Variable (line 2406)
+- new Variable (line 2412)
+- new Variable (line 2418)
+- new Variable (line 2424)
+- new Variable (line 2431)
+- 134 class method(s)
 
 ### `ext/standard/VmFsAccessNative.php`
 
@@ -23264,6 +23336,18 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 6 class method(s)
+
+### `lib/JIT/Builtin/Bz2StreamIo.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
+### `lib/JIT/Builtin/Bz2StreamRuntime.php`
+
+**Warnings** (review for bootstrap subset):
+- new JIT (line 276)
+- 11 class method(s)
+- 5 closure(s)
 
 ### `lib/JIT/Builtin/CallArgv.php`
 

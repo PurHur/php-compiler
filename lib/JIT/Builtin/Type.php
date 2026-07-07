@@ -1423,6 +1423,7 @@ class Type extends Builtin {
         StreamLifecycle::ensureLinked($this->context);
         StreamIo::ensureLinked($this->context);
         GzStreamIo::ensureLinked($this->context);
+        Bz2StreamIo::ensureLinked($this->context);
         StreamBuffer::ensureLinked($this->context);
         StreamMeta::ensureLinked($this->context);
         StreamRead::ensureLinked($this->context);
