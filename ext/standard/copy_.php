@@ -35,8 +35,8 @@ final class copy_ extends Internal
         if (isset($frame->calledArgs[2])) {
             VmStreamContext::validateOptionalContextArg($frame->calledArgs[2], 'copy', 3);
         }
-        $from = VmStreamPath::coerceNonEmptyPathArg($frame->calledArgs[0], 'copy', 0, 'from');
-        $to = VmStreamPath::coerceNonEmptyPathArg($frame->calledArgs[1], 'copy', 1, 'to');
+        $from = VmStreamPath::coerceNonEmptyPathArgForFrame($frame, 0, 'copy', 'from');
+        $to = VmStreamPath::coerceNonEmptyPathArgForFrame($frame, 1, 'copy', 'to');
         if (VmStatPath::isDir($from)) {
             VmCopyFailure::warnDirectorySource($frame);
             if (null !== $frame->returnVar) {
