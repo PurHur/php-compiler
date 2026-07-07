@@ -96,15 +96,25 @@ PHP;
             self::markTestSkipped('php-cfg-list-spread overlay not applied');
         }
 
-        $code = <<<'PHP'
+        $previous = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $code = <<<'PHP'
 <?php
 $a = [1, 2, 3];
 [$head, ...$tail] = $a;
 PHP;
 
-        $warnings = $this->compileAndCollectListSpreadRhsWarnings($code, 'list_spread.php');
+            $warnings = $this->compileAndCollectListSpreadRhsWarnings($code, 'list_spread.php');
 
-        self::assertSame([], $warnings, 'list spread compile must not warn on listSpreadRhs (#6069)');
+            self::assertSame([], $warnings, 'list spread compile must not warn on listSpreadRhs (#6069)');
+        } finally {
+            if (false === $previous) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$previous);
+            }
+        }
     }
 
     public function testSimpleAssignCompilesWithoutListSpreadRhsWarningsWhenOverlayMissing(): void

@@ -2819,7 +2819,7 @@ class Compiler {
      */
     private function compileListDestructGroup(array $ops, int $start, Block $block): array
     {
-        $this->rejectLoneListSpreadAssign($ops, $start);
+        $this->rejectListDestructuringSpreadAssignProfile($ops, $start, $block);
         $end = $this->listDestructGroupEndIndex($ops, $start, $block);
         $this->rejectListDestructNonWritableWriteTargets($ops, $start, $end, $block);
         $rhs = $this->listDestructRhsOperand($ops, $start);
@@ -43280,19 +43280,45 @@ class Compiler {
     }
 
     /**
+     * Zend zend_compile.c: list spread assign withheld on 8.4.0-dev reference profile (#17182, #9248).
+     *
+     * @param Op[] $ops
+     */
+    private function rejectListDestructuringSpreadAssignProfile(array $ops, int $start, ?Block $block = null): void
+    {
+        if (!CompilerVersion::supportsListDestructuringSpreadAssign()) {
+            $end = $this->listDestructGroupEndIndex($ops, $start, $block);
+            for ($i = $start; $i <= $end; ++$i) {
+                if ($this->isListSpreadAssignOp($ops[$i])) {
+                    $this->throwListSpreadAssignUnsupportedFatal($ops[$i]);
+
+                    return;
+                }
+            }
+
+            return;
+        }
+        $this->rejectLoneListSpreadAssign($ops, $start);
+    }
+
+    /**
      * Zend zend_compile.c: lone `[...$a] = $rhs` is a compile-time fatal (#6936).
      *
      * @param Op[] $ops
-     *
-     * @return never
      */
     private function rejectLoneListSpreadAssign(array $ops, int $start): void
     {
         if (!$this->isListSpreadAssignOp($ops[$start]) || $this->isListDestructSpreadTail($ops, $start, null)) {
             return;
         }
-        /** @var Op\Expr\Assign $spread */
-        $spread = $ops[$start];
+        $this->throwListSpreadAssignUnsupportedFatal($ops[$start]);
+    }
+
+    /**
+     * @return never
+     */
+    private function throwListSpreadAssignUnsupportedFatal(Op\Expr\Assign $spread): void
+    {
         $sourceFile = $spread->getFile() ?? '';
         if ('' === $sourceFile) {
             $sourceFile = 'unknown';
