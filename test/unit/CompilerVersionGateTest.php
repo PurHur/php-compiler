@@ -705,9 +705,9 @@ final class CompilerVersionGateTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsEnumCaseList());
     }
 
-    public function testSupportsAsymmetricVisibilityTrueOn84DevLine(): void
+    public function testSupportsAsymmetricVisibilityFalseOn84DevReferenceProfile(): void
     {
-        $this->assertTrue(CompilerVersion::supportsAsymmetricVisibility());
+        $this->assertFalse(CompilerVersion::supportsAsymmetricVisibility());
     }
 
     public function testSupportsAsymmetricVisibilityFalseWhenProfile82(): void

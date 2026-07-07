@@ -745,22 +745,13 @@ final class CompilerVersion
     /**
      * PHP 8.4+ asymmetric property visibility (private(set), protected(set), …).
      *
-     * Enabled on the 8.4 development line by default (#16068, #3165). Explicit
-     * `PHP_COMPILER_PROFILE=8.2` (or older) keeps Zend 8.2 reference rejection (#12508).
+     * Gated on {@see languageProfileVersion()} so 8.4.0-dev reference profile rejects like Zend 8.2 (#12508, #17197).
+     * Forward profile: `PHP_COMPILER_PROFILE=8.4` or stable 8.4.0+.
      * php-src: Zend/zend_language_parser.y T_PRIVATE_SET; Zend/zend_compile.c ZEND_ACC_*_SET.
      */
     public static function supportsAsymmetricVisibility(): bool
     {
-        if (version_compare(self::languageProfileVersion(), '8.4.0', '>=')) {
-            return true;
-        }
-        $raw = getenv('PHP_COMPILER_PROFILE');
-        if (\is_string($raw) && '' !== trim($raw)) {
-            return false;
-        }
-
-        return self::MAJOR_VERSION > 8
-            || (self::MAJOR_VERSION === 8 && self::MINOR_VERSION >= 4);
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
     }
 
     /**
