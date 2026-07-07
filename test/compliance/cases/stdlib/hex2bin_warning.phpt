@@ -15,8 +15,8 @@ $r = hex2bin('gh');
 var_dump($r);
 echo bin2hex(hex2bin('6162')), "\n";
 --EXPECT--
-W:Hexadecimal input string must have an even length
+W:hex2bin(): Hexadecimal input string must have an even length
 bool(false)
-W:Input string must be hexadecimal string
+W:hex2bin(): Input string must be hexadecimal string
 bool(false)
 6162
