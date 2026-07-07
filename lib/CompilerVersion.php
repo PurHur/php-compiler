@@ -839,6 +839,41 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.3+ ReflectionEnum::fromName() (ext/reflection/php_reflection.c, #16877, #17103).
+     *
+     * Withheld on 8.4.0-dev reference profile (matches Zend 8.2 — method absent). Enable via stable 8.4.0+
+     * or explicit `PHP_COMPILER_PROFILE=8.3` / `8.4` forward profile.
+     */
+    public static function supportsReflectionEnumFromName(): bool
+    {
+        if (version_compare(self::VERSION, '8.3', '<')) {
+            return false;
+        }
+
+        if (version_compare(self::VERSION, '8.4.0', '>=')) {
+            return true;
+        }
+
+        $raw = getenv('PHP_COMPILER_PROFILE');
+        if (!\is_string($raw) || '' === trim($raw)) {
+            return false;
+        }
+
+        return version_compare(self::languageProfileVersion(), '8.3.0', '>=');
+    }
+
+    /**
+     * PHP 8.4+ ReflectionClassConstant::isDeprecated() (ext/reflection/php_reflection.c, #16820, #17104).
+     *
+     * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev reference profile matches Zend 8.2
+     * (method absent). Enable forward profile on dev via `PHP_COMPILER_PROFILE=8.4`.
+     */
+    public static function supportsReflectionClassConstantIsDeprecated(): bool
+    {
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+    }
+
+    /**
      * PHP 8.4+ ReflectionFunction::isDeprecated() reports #[\Deprecated] metadata (ext/reflection/php_reflection.c, #9760).
      *
      * On 8.2 reference profile the method exists but always returns false (php-src #80400 guard). Enable
@@ -868,17 +903,6 @@ final class CompilerVersion
      * (methods absent). Enable forward profile on dev via `PHP_COMPILER_PROFILE=8.4`.
      */
     public static function supportsReflectionCreateFromFactories(): bool
-    {
-        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
-    }
-
-    /**
-     * PHP 8.4+ ReflectionEnum::fromName() static enum case factory (ext/reflection/php_reflection.c; #16877, #17103).
-     *
-     * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev reference profile matches Zend 8.2
-     * (method absent). Enable forward profile on dev via `PHP_COMPILER_PROFILE=8.4`.
-     */
-    public static function supportsReflectionEnumFromName(): bool
     {
         return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
     }

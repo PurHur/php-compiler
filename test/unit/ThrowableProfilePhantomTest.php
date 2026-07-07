@@ -28,6 +28,7 @@ final class ThrowableProfilePhantomTest extends TestCase
         $this->assertFalse(ThrowableManifest::isAdvertised('DateMalformedPeriodException'));
         $this->assertTrue(ThrowableManifest::isAdvertised('Exception'));
         $this->assertFalse(ThrowableManifest::isAdvertised('RequestParseBodyException'));
+        $this->assertFalse(ThrowableManifest::isAdvertised('SQLite3Exception'));
     }
 
     public function testVmOmitsDateHierarchyOnReferenceProfile(): void
@@ -41,6 +42,7 @@ final class ThrowableProfilePhantomTest extends TestCase
         $this->assertFalse(isset($ctx->classes['datemalformedstring']));
         $this->assertFalse(isset($ctx->classes['datemalformedperiodexception']));
         $this->assertFalse(isset($ctx->classes['requestparsebodyexception']));
+        $this->assertFalse(isset($ctx->classes['sqlite3exception']));
         $this->assertTrue(isset($ctx->classes['exception']));
     }
 }

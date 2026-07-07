@@ -881,8 +881,10 @@ final class BuiltinClasses
             $rconst->methodVisibility['getattributes'] = $pub;
             $rconst->methods['gettype'] = new ReflectionClassConstantGetType();
             $rconst->methodVisibility['gettype'] = $pub;
-            $rconst->methods['isdeprecated'] = new ReflectionClassConstantIsDeprecated();
-            $rconst->methodVisibility['isdeprecated'] = $pub;
+            if (CompilerVersion::supportsReflectionClassConstantIsDeprecated()) {
+                $rconst->methods['isdeprecated'] = new ReflectionClassConstantIsDeprecated();
+                $rconst->methodVisibility['isdeprecated'] = $pub;
+            }
             $rconst->methods['getdeprecatedmessage'] = new ReflectionClassConstantGetDeprecatedMessage();
             $rconst->methodVisibility['getdeprecatedmessage'] = $pub;
             $rconst->methods['getdeprecatedversion'] = new ReflectionClassConstantGetDeprecatedVersion();
@@ -914,8 +916,10 @@ final class BuiltinClasses
         $rcc->methodVisibility['getattributes'] = $pub;
         $rcc->methods['gettype'] = new ReflectionClassConstantGetType();
         $rcc->methodVisibility['gettype'] = $pub;
-        $rcc->methods['isdeprecated'] = new ReflectionClassConstantIsDeprecated();
-        $rcc->methodVisibility['isdeprecated'] = $pub;
+        if (CompilerVersion::supportsReflectionClassConstantIsDeprecated()) {
+            $rcc->methods['isdeprecated'] = new ReflectionClassConstantIsDeprecated();
+            $rcc->methodVisibility['isdeprecated'] = $pub;
+        }
         $rcc->methods['getdeprecatedmessage'] = new ReflectionClassConstantGetDeprecatedMessage();
         $rcc->methodVisibility['getdeprecatedmessage'] = $pub;
         $rcc->methods['getdeprecatedversion'] = new ReflectionClassConstantGetDeprecatedVersion();
