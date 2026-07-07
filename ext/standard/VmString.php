@@ -2575,10 +2575,8 @@ final class VmString
         int $flags = ENT_QUOTES | ENT_SUBSTITUTE,
         string $encoding = 'UTF-8'
     ): \PHPCompiler\VM\HashTable {
-        if ('UTF-8' !== $encoding) {
-            throw new \LogicException(
-                'get_html_translation_table() only supports UTF-8 in this compiler build'
-            );
+        if (!self::isUtf8Encoding($encoding)) {
+            return self::getHtmlTranslationTableViaZend($table, $flags, $encoding);
         }
         $quoteBoth = ENT_QUOTES === ($flags & ENT_QUOTES);
         $quoteDouble = !$quoteBoth && (0 !== ($flags & ENT_COMPAT));
@@ -2619,6 +2617,33 @@ final class VmString
             $var = new \PHPCompiler\VM\Variable();
             $var->string($value);
             $ht->add($key, $var);
+        }
+
+        return $ht;
+    }
+
+    /**
+     * Non-UTF-8 encodings delegate to Zend (ext/standard/html.c, #4459).
+     *
+     * @return \PHPCompiler\VM\HashTable
+     */
+    private static function getHtmlTranslationTableViaZend(
+        int $table,
+        int $flags,
+        string $encoding
+    ): \PHPCompiler\VM\HashTable {
+        $native = \get_html_translation_table($table, $flags, $encoding);
+        if (!\is_array($native)) {
+            $ht = new \PHPCompiler\VM\HashTable();
+
+            return $ht;
+        }
+
+        $ht = new \PHPCompiler\VM\HashTable();
+        foreach ($native as $key => $value) {
+            $var = new \PHPCompiler\VM\Variable();
+            $var->string((string) $value);
+            $ht->add((string) $key, $var);
         }
 
         return $ht;
