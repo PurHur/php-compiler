@@ -74,6 +74,14 @@ class VMTest extends BaseTest {
                 && 'round_invalid_mode.phpt' === $name) {
                 continue;
             }
+            if (!CompilerVersion::supportsNumberFormatNegativeDecimals()
+                && str_contains($name, 'number_format_negative_decimals_84')) {
+                continue;
+            }
+            if (CompilerVersion::supportsNumberFormatNegativeDecimals()
+                && 'number_format_negative_decimals.phpt' === $name) {
+                continue;
+            }
             if (!CompilerVersion::supportsArrayPadTypeEnum()
                 && str_contains($name, 'array_pad_type_enum')) {
                 continue;

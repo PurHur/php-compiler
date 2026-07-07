@@ -146,6 +146,14 @@ class AotTest extends BaseTest
                 && 'round_invalid_mode.phpt' === $name) {
                 continue;
             }
+            if (!CompilerVersion::supportsNumberFormatNegativeDecimals()
+                && str_contains($name, 'number_format_negative_decimals_84')) {
+                continue;
+            }
+            if (CompilerVersion::supportsNumberFormatNegativeDecimals()
+                && 'number_format_negative_decimals.phpt' === $name) {
+                continue;
+            }
             if (!CompilerVersion::supportsRandomIntervalBoundary()
                 && str_contains($name, 'random_interval_boundary')
                 && !str_contains($name, 'random_interval_boundary_reference_profile')) {
