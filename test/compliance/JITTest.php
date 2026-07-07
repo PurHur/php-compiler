@@ -502,12 +502,13 @@ class JITTest extends BaseTest {
                 continue;
             }
             if (!\PHPCompiler\ext\intl\IntlExtensionPolicy::advertisesLocale()
-                && str_contains($name, 'locale_get_default')
+                && (str_contains($name, 'locale_get_default')
+                    || str_contains($name, 'locale_get_parts'))
                 && !str_contains($name, 'locale_gated')) {
                 continue;
             }
-            // locale_get_default()/Locale: JIT lowering deferred when ext/intl loaded (#9576).
-            if (str_contains($name, 'locale_get_default')) {
+            // locale_get_default()/locale_get_*: JIT lowering deferred when ext/intl loaded (#9576, #5125).
+            if (str_contains($name, 'locale_get_default') || str_contains($name, 'locale_get_parts')) {
                 continue;
             }
             if (!\PHPCompiler\ext\curl\CurlExtensionPolicy::advertisesBuiltins()
