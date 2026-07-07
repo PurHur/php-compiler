@@ -16395,6 +16395,26 @@ class Compiler {
                     }
                 }
             }
+            // register_shutdown_function(fn(...), E::A) — php-cfg dead temps per arg (#5751).
+            if (
+                'register_shutdown_function' === $inlineFuncName
+                && 2 === \count($callArgs)
+                && $this->callArgIsDeadInlineTemporary($callArg)
+                && \count($producers) >= 2
+            ) {
+                $closureProducer = null;
+                $enumFetch = null;
+                foreach ($producers as $producer) {
+                    if ($producer instanceof Op\Expr\Closure || $producer instanceof Op\Expr\ArrowFunction) {
+                        $closureProducer = $producer;
+                    } elseif ($producer instanceof Op\Expr\ClassConstFetch) {
+                        $enumFetch = $producer;
+                    }
+                }
+                if (null !== $closureProducer && null !== $enumFetch) {
+                    return 0 === $argIndex ? $closureProducer : $enumFetch;
+                }
+            }
 
             return null;
         }
@@ -31125,6 +31145,7 @@ class Compiler {
         }
         if (in_array($funcName, [
             'array_map',
+            'register_shutdown_function',
         ], true)) {
             return 0;
         }
@@ -32140,6 +32161,18 @@ class Compiler {
         if (null !== $this->findInlineArrayProducerForCallArg($arg, $block, $cfgCallOp)) {
             return [];
         }
+        // register_shutdown_function(fn(...), E::A) — arg #0 is hoisted Closure, not enum prelude (#5751).
+        if (
+            null !== $cfgCallOp
+            && 0 === $argIndex
+            && 'register_shutdown_function' === $this->resolveCfgFuncCallName($cfgCallOp)
+        ) {
+            foreach ($this->precedingInlineCallArgProducersBeforeCfgOp($block->orig->children, $cfgCallOp) as $producer) {
+                if ($producer instanceof Op\Expr\Closure || $producer instanceof Op\Expr\ArrowFunction) {
+                    return [];
+                }
+            }
+        }
         $fetch = null;
         foreach ($block->orig->children as $child) {
             if ($child instanceof Op\Expr\ClassConstFetch
@@ -32742,6 +32775,16 @@ class Compiler {
         $callSite = $this->findCfgCallSiteForArg($block->orig->children, $operand);
         if (null !== $callSite) {
             [$callOp, $argIndex] = $callSite;
+            if (
+                0 === $argIndex
+                && 'register_shutdown_function' === $this->resolveCfgFuncCallName($callOp)
+            ) {
+                foreach ($this->precedingInlineCallArgProducersBeforeCfgOp($block->orig->children, $callOp) as $candidate) {
+                    if ($candidate instanceof Op\Expr\Closure || $candidate instanceof Op\Expr\ArrowFunction) {
+                        return true;
+                    }
+                }
+            }
             if (property_exists($callOp, 'args') && is_array($callOp->args)) {
                 $producers = $this->precedingInlineCallArgProducersBeforeCfgOp($block->orig->children, $callOp);
                 foreach ($producers as $candidate) {
@@ -42518,6 +42561,70 @@ class Compiler {
      * @param list<OpCode> $outerArgSends
      * @param list<OpCode> $pendingNestedProducerOps
      */
+    /**
+     * register_shutdown_function(fn(...), E::A) — Closure + enum case hoisted siblings (#5751).
+     *
+     * @param list<OpCode> $outerArgSends
+     * @param list<OpCode> $pendingNestedProducerOps
+     */
+    private function rewireRegisterShutdownFunctionClosureEnumCallArgSendSlots(
+        array &$outerArgSends,
+        Block $block,
+        ?Op $cfgCallOp,
+        array $pendingNestedProducerOps = []
+    ): void {
+        if (null === $cfgCallOp || null === $block->orig) {
+            return;
+        }
+        if ('register_shutdown_function' !== $this->resolveCfgFuncCallName($cfgCallOp)) {
+            return;
+        }
+        if (!\is_array($cfgCallOp->args ?? null) || 2 !== \count($cfgCallOp->args)) {
+            return;
+        }
+        $callIndex = $this->cfgCallOpIndex($block, $cfgCallOp);
+        if (!\is_int($callIndex) || $callIndex < 2) {
+            return;
+        }
+        $closureExpr = $block->orig->children[$callIndex - 2] ?? null;
+        $enumExpr = $block->orig->children[$callIndex - 1] ?? null;
+        if (!($closureExpr instanceof Op\Expr\Closure || $closureExpr instanceof Op\Expr\ArrowFunction)) {
+            return;
+        }
+        if (!$enumExpr instanceof Op\Expr\ClassConstFetch) {
+            return;
+        }
+        $closureSlot = $block->slotForOperand($closureExpr->result);
+        $enumSlot = $block->slotForOperand($enumExpr->result);
+        if (null === $closureSlot) {
+            foreach ($pendingNestedProducerOps as $op) {
+                if (OpCode::TYPE_CLOSURE === $op->type) {
+                    $closureSlot = (string) $op->arg1;
+                    break;
+                }
+            }
+        }
+        if (null === $enumSlot) {
+            foreach ($pendingNestedProducerOps as $op) {
+                if (OpCode::TYPE_CLASS_CONST_FETCH === $op->type) {
+                    $enumSlot = (string) $op->arg1;
+                    break;
+                }
+            }
+        }
+        if (null === $closureSlot || null === $enumSlot) {
+            return;
+        }
+        $argIndex = 0;
+        foreach ($outerArgSends as $send) {
+            if (OpCode::TYPE_ARG_SEND !== $send->type) {
+                continue;
+            }
+            $send->arg1 = 0 === $argIndex ? $closureSlot : $enumSlot;
+            ++$argIndex;
+        }
+    }
+
     private function rewireHoistedClassConstPreludeCallArgSendSlots(
         array &$outerArgSends,
         Block $block,
@@ -42952,6 +43059,12 @@ class Compiler {
         $this->rewireInlineArithmeticBranchCallArgSendSlots($outerArgSends, $nestedProducerOps, $block, $cfgCallOp);
         $this->rewireSiblingMultiArgInlineCallArgSendSlots($outerArgSends, $block, $cfgCallOp, $nestedProducerOps);
         $this->rewireHoistedClassConstPreludeCallArgSendSlots($outerArgSends, $block, $cfgCallOp, $nestedProducerOps);
+        $this->rewireRegisterShutdownFunctionClosureEnumCallArgSendSlots(
+            $outerArgSends,
+            $block,
+            $cfgCallOp,
+            $nestedProducerOps
+        );
         $this->rewireSubstrNestedSprintfArgSendSlots($outerArgSends, $block, $cfgCallOp, $calleeName);
         $this->rewireArrayKeysInlineInitArrayArgSendSlots(
             $outerArgSends,
