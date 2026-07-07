@@ -958,6 +958,8 @@ class Context {
                 Builtin\StringMetaphone::ensureStandaloneBodies($this);
                 Builtin\StringWordwrap::ensureStandaloneBodies($this);
                 Builtin\StringBin2hex::ensureStandaloneBodies($this);
+                Builtin\StringBase64Encode::ensureStandaloneBodies($this);
+                Builtin\StringBase64Decode::ensureStandaloneBodies($this);
                 Builtin\StringStrrev::ensureStandaloneBodies($this);
                 Builtin\StringStrRepeat::ensureStandaloneBodies($this);
                 Builtin\StringStrPad::ensureStandaloneBodies($this);
