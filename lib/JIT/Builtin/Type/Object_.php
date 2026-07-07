@@ -3339,6 +3339,11 @@ class Object_ extends Type {
             return Variable::TYPE_HASHTABLE;
         }
 
+        // HashContext incremental digest buffers (ext/hash/JitHashContext.php, #3357).
+        if ('hashcontext' === $lcClass && in_array($lcName, ['__hcalgo', '__hcdata', '__hclive'], true)) {
+            return Variable::TYPE_STRING;
+        }
+
         return Variable::TYPE_VALUE;
     }
 

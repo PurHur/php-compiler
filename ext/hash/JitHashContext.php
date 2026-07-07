@@ -33,7 +33,6 @@ final class JitHashContext
         if (1 !== \count($args)) {
             throw new \LogicException('hash_init() requires exactly one argument in this compiler build');
         }
-        HashContextRuntime::ensureLinked($context);
         $algoStr = JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'hash_init', 0, 'algo');
 
         $objectType = $context->type->object;
@@ -76,22 +75,7 @@ final class JitHashContext
         $dest->initialize();
         $context->type->string->concat($dest, $current, $chunkVar);
         $concatStr = $context->helper->loadValue($dest);
-        $slot = JitValueBox::alloc($context);
-        $owned = $context->builder->call(
-            $context->lookupFunction('__string__separate'),
-            $concatStr
-        );
-        $context->builder->call(
-            $context->lookupFunction('__value__writeString'),
-            JitValueBox::pointer($context, $slot),
-            $owned
-        );
-        $valueVar = new JITVariable($context, JITVariable::TYPE_VALUE, JITVariable::KIND_VALUE, $slot);
-        $context->type->object->propertyStore(
-            $objectType->propertySlotFor($obj, $className, HashContextJitSupport::PROP_DATA),
-            $valueVar,
-            JITVariable::TYPE_VALUE
-        );
+        self::storeStringPtrProperty($context, $obj, HashContextJitSupport::PROP_DATA, $concatStr);
 
         return self::returnTrue($context);
     }
@@ -102,6 +86,7 @@ final class JitHashContext
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('hash_final() requires one or two arguments in this compiler build');
         }
+        HashContextRuntime::ensureLinked($context);
         $obj = self::readContextObject($context, $args[0]);
 
         $objectType = $context->type->object;
@@ -142,16 +127,8 @@ final class JitHashContext
         $dst = $objectType->allocate($classId);
         $objectType->markObjectConstructed($dst);
 
-        $objectType->propertyStore(
-            $objectType->propertySlotFor($dst, $className, HashContextJitSupport::PROP_ALGO),
-            $algoVar,
-            JITVariable::TYPE_VALUE
-        );
-        $objectType->propertyStore(
-            $objectType->propertySlotFor($dst, $className, HashContextJitSupport::PROP_DATA),
-            $dataVar,
-            JITVariable::TYPE_VALUE
-        );
+        self::storeStringPtrProperty($context, $dst, HashContextJitSupport::PROP_ALGO, self::stringPtrFromVar($context, $algoVar));
+        self::storeStringPtrProperty($context, $dst, HashContextJitSupport::PROP_DATA, self::stringPtrFromVar($context, $dataVar));
         self::storeStringPtrProperty(
             $context,
             $dst,
@@ -187,17 +164,11 @@ final class JitHashContext
             $context->lookupFunction('__string__separate'),
             $strPtr
         );
-        $slot = JitValueBox::alloc($context);
-        $context->builder->call(
-            $context->lookupFunction('__value__writeString'),
-            JitValueBox::pointer($context, $slot),
-            $owned
-        );
-        $var = new JITVariable($context, JITVariable::TYPE_VALUE, JITVariable::KIND_VALUE, $slot);
+        $strVar = new JITVariable($context, JITVariable::TYPE_STRING, JITVariable::KIND_VALUE, $owned);
         $context->type->object->propertyStore(
             $context->type->object->propertySlotFor($obj, HashContextJitSupport::CLASS_NAME, $prop),
-            $var,
-            JITVariable::TYPE_VALUE
+            $strVar,
+            JITVariable::TYPE_STRING
         );
     }
 
