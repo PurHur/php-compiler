@@ -33,9 +33,10 @@ final class MultipartRuntimeShrinkTest extends TestCase
         $this->assertSame(0, $files->getNumElements());
     }
 
-    public function testStandaloneMultipartLlvmDeleted(): void
+    public function testStandaloneMultipartLlvmRestoredForUserScriptAot(): void
     {
-        $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StringMultipartStandaloneLlvm.php');
-        $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StringMultipart.php');
+        $this->assertFileExists(__DIR__.'/../../lib/JIT/Builtin/StringMultipartStandaloneLlvm.php');
+        $multipartRuntime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/MultipartRuntime.php');
+        $this->assertStringContainsString('StringMultipartStandaloneLlvm::ensureLinked', $multipartRuntime);
     }
 }

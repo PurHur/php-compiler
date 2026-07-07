@@ -404,8 +404,9 @@ function run(string $filename, string $code, array $options): void
             || '' === (string) $prevSelfHostAot
             || ($bootstrapAotFixture && '0' === (string) $prevSelfHostAot && !$isBootstrapAotLink)
         );
-        if ($setSelfHostAotForCompile) {
+        if ($setSelfHostAotForCompile && !$setUserScriptAot) {
             // Keep LLVM 9 stable during AOT compilation; some lowering paths are still sensitive (#2600).
+            // User-script AOT (examples/*) needs real refresh helpers — skip stubs (#15624).
             putenv('PHP_COMPILER_SELFHOST_AOT=1');
             $_ENV['PHP_COMPILER_SELFHOST_AOT'] = '1';
             $_SERVER['PHP_COMPILER_SELFHOST_AOT'] = '1';
@@ -414,6 +415,14 @@ function run(string $filename, string $code, array $options): void
             putenv('PHP_COMPILER_AOT_USER_SCRIPT=1');
             $_ENV['PHP_COMPILER_AOT_USER_SCRIPT'] = '1';
             $_SERVER['PHP_COMPILER_AOT_USER_SCRIPT'] = '1';
+            // Real CGI refresh helpers (multipart $_FILES) must not use self-host stubs (#15624).
+            putenv('PHP_COMPILER_SELFHOST_AOT=0');
+            $_ENV['PHP_COMPILER_SELFHOST_AOT'] = '0';
+            $_SERVER['PHP_COMPILER_SELFHOST_AOT'] = '0';
+            // Stale MCJIT cache can resurrect pre-#13031 superglobal refresh bodies (#15624).
+            putenv('PHP_COMPILER_CACHE=0');
+            $_ENV['PHP_COMPILER_CACHE'] = '0';
+            $_SERVER['PHP_COMPILER_CACHE'] = '0';
         }
         $prevBootstrapAotLink = getenv('PHP_COMPILER_BOOTSTRAP_AOT_LINK');
         $setBootstrapAotLink = $bootstrapAotFixture && !$isBootstrapAotLink && \function_exists('putenv');
