@@ -15,9 +15,12 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Builtin\StringStrpos;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\InternalStrictArg;
+use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
@@ -31,8 +34,10 @@ final class strpos extends Internal
         if ($argc < 2 || $argc > 3) {
             throw new \LogicException('strpos() requires two or three arguments');
         }
-        $haystackStr = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'strpos', 0, 'haystack');
-        $needleStr = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'strpos', 1, 'needle');
+        InternalStrictArg::rejectNullString($frame->calledArgs[0], 'strpos', 'haystack', 0, $frame);
+        InternalStrictArg::rejectNullString($frame->calledArgs[1], 'strpos', 'needle', 1, $frame);
+        $haystackStr = self::vmStringArg($frame, 0, 'haystack');
+        $needleStr = self::vmStringArg($frame, 1, 'needle');
         if (null === $frame->returnVar) {
             return;
         }
@@ -57,6 +62,8 @@ final class strpos extends Internal
         if ($argc < 2 || $argc > 3) {
             throw new \LogicException('strpos() requires two or three arguments');
         }
+        JitInternalStrictArg::rejectNullString($context, $args[0], 'strpos', 'haystack', 1);
+        JitInternalStrictArg::rejectNullString($context, $args[1], 'strpos', 'needle', 2);
         $hayLit = JitStringArg::compileTimeLiteral($args[0]);
         $needleLit = JitStringArg::compileTimeLiteral($args[1]);
         $offsetLit = 3 === $argc ? self::tryCompileTimeInt($context, $args[2]) : 0;
@@ -95,5 +102,19 @@ final class strpos extends Internal
         }
 
         return null;
+    }
+
+    private static function vmStringArg(Frame $frame, int $argIndex, string $paramName): string
+    {
+        if (InternalStrictArg::isCallerStrict($frame)) {
+            return InternalStrictArg::requireString($frame, $argIndex, 'strpos', $paramName)->toString();
+        }
+
+        return VmString::coerceStringBuiltinArg(
+            $frame->calledArgs[$argIndex],
+            'strpos',
+            $argIndex,
+            $paramName
+        );
     }
 }
