@@ -104,6 +104,24 @@ final class JitStringBuiltinArg
     }
 
     /**
+     * Z_PARAM_STR_OR_NULL — null passes through; enum case rejects with ?string TypeError (#17196, ext/standard/info.c).
+     */
+    public static function lowerNullableString(
+        Context $context,
+        Variable $arg,
+        string $function,
+        int $argIndex,
+        string $paramName
+    ): Value {
+        JitNativeString::ensureInsertBlock($context);
+        if (Variable::TYPE_NULL === $arg->type || $arg->isNullConstant) {
+            return $context->getTypeFromString('__string__*')->constNull();
+        }
+
+        return self::lower($context, $arg, $function, $argIndex, $paramName, '?string');
+    }
+
+    /**
      * Z_PARAM_PATH — null coerces to "" when caller is not strict; TypeError under strict_types (#13419).
      */
     public static function lowerPath(

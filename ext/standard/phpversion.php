@@ -8,7 +8,6 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /** phpversion() — runtime version string (ext/standard/info.c parity, issue #3174). */
@@ -30,13 +29,12 @@ final class phpversion extends Internal
         }
         $extension = null;
         if (1 === $argc) {
-            $arg = $frame->calledArgs[0]->resolveIndirect();
-            if (Variable::TYPE_NULL !== $arg->type) {
-                if (Variable::TYPE_STRING !== $arg->type) {
-                    throw new \LogicException('phpversion() extension must be a string or null in this compiler build');
-                }
-                $extension = $arg->toString();
-            }
+            $extension = VmString::coerceNullableStringBuiltinArg(
+                $frame->calledArgs[0],
+                'phpversion',
+                0,
+                'extension'
+            );
         }
         $result = VmInfo::phpversion($extension);
         if (false === $result) {

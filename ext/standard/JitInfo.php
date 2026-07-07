@@ -27,7 +27,13 @@ final class JitInfo
         $strPtr = $context->getTypeFromString('__string__*');
         $extArg = $strPtr->constNull();
         if (null !== $extension) {
-            $extArg = JitStringArg::lower($context, $extension, 'phpversion() extension');
+            $extArg = JitStringBuiltinArg::lowerNullableString(
+                $context,
+                $extension,
+                'phpversion',
+                0,
+                'extension'
+            );
         }
         $raw = $context->builder->call(
             $context->lookupFunction('__compiler_phpversion'),
