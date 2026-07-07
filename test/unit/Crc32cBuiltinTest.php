@@ -14,7 +14,7 @@ final class Crc32cBuiltinTest extends TestCase
     protected function setUp(): void
     {
         if (!CompilerVersion::supportsCrc32c()) {
-            $this->markTestSkipped('crc32c() not advertised on reference profile (#11920)');
+            $this->markTestSkipped('crc32c() not available on this compiler profile');
         }
     }
 

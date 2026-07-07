@@ -546,6 +546,7 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         putenv('PHP_COMPILER_PROFILE');
         try {
             $this->assertTrue(CompilerVersion::supportsCrc32c());
+            $this->assertTrue(CompilerVersion::advertisesCrc32c());
             $runtime = new Runtime();
             $this->assertTrue(isset($runtime->vmContext->functions['crc32c']));
         } finally {
@@ -563,6 +564,7 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         putenv('PHP_COMPILER_PROFILE=8.2');
         try {
             $this->assertFalse(CompilerVersion::supportsCrc32c());
+            $this->assertFalse(CompilerVersion::advertisesCrc32c());
             $runtime = new Runtime();
             $this->assertFalse(isset($runtime->vmContext->functions['crc32c']));
         } finally {
@@ -789,6 +791,22 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         $this->assertFalse(isset($runtime->vmContext->functions['disktotalspace']));
     }
 
+
+    public function testVmRegistersCrc32cOnForwardProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $runtime = new Runtime();
+            $this->assertTrue(isset($runtime->vmContext->functions['crc32c']));
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
 
     public function testMbTrimEnabledOnDefaultDevProfile(): void
     {

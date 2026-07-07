@@ -1713,6 +1713,14 @@ final class CompilerVersion
     }
 
     /**
+     * crc32c() visible to function_exists() — same gate as {@see supportsCrc32c()} (#17139).
+     */
+    public static function advertisesCrc32c(): bool
+    {
+        return self::supportsCrc32c();
+    }
+
+    /**
      * ext/bz2 via pure PHP {@see \PHPCompiler\ext\bz2\VmBz2Core} — withheld on reference profile (#11992, #14219, #16853).
      *
      * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev reference profile matches Zend 8.2
