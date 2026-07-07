@@ -11,10 +11,12 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Builder;
@@ -22,21 +24,26 @@ use PHPLLVM\Value;
 
 /**
  * substr() for strings with integer offset and optional length (subset of PHP).
+ *
+ * PHP 8.4+ optional $truncate silences Z_STR_TRUNCATED warnings (#17239, ext/standard/string.c).
  */
 final class substr extends Internal
 {
     public function execute(Frame $frame): void
     {
         $argc = count($frame->calledArgs);
+        $supportsTruncate = CompilerVersion::supportsSubstrTruncate();
+        $maxArgs = $supportsTruncate ? 4 : 3;
         if ($argc < 2) {
             throw new \ArgumentCountError(\sprintf(
                 'substr() expects at least 2 arguments, %d given',
                 $argc
             ));
         }
-        if ($argc > 3) {
+        if ($argc > $maxArgs) {
             throw new \ArgumentCountError(\sprintf(
-                'substr() expects at most 3 arguments, %d given',
+                'substr() expects at most %d arguments, %d given',
+                $maxArgs,
                 $argc
             ));
         }
@@ -46,19 +53,24 @@ final class substr extends Internal
             return;
         }
         $offsetInt = VmMath::parseIntBuiltinArgForFrame($frame, 1, 'substr', 2, 'offset');
+        $truncate = false;
+        if ($supportsTruncate && 4 === $argc) {
+            $truncate = VmMath::parseBoolBuiltinArgForFrame($frame, 3, 'substr', 4, 'truncate');
+        }
+        $warnOnClip = $supportsTruncate && !$truncate;
         if (3 === $argc) {
             $length = $frame->calledArgs[2]->resolveIndirect();
             if (Variable::TYPE_NULL === $length->type) {
-                $frame->returnVar->string(VmString::substr($string, $offsetInt));
+                $frame->returnVar->string(VmString::substr($string, $offsetInt, null, $warnOnClip, $frame));
 
                 return;
             }
             $lengthInt = VmMath::parseIntBuiltinArgForFrame($frame, 2, 'substr', 3, 'length');
-            $frame->returnVar->string(VmString::substr($string, $offsetInt, $lengthInt));
+            $frame->returnVar->string(VmString::substr($string, $offsetInt, $lengthInt, $warnOnClip, $frame));
 
             return;
         }
-        $frame->returnVar->string(VmString::substr($string, $offsetInt));
+        $frame->returnVar->string(VmString::substr($string, $offsetInt, null, $warnOnClip, $frame));
     }
 
     public Context $context;
@@ -67,18 +79,26 @@ final class substr extends Internal
     {
         $this->context = $context;
         $argc = count($args);
+        $supportsTruncate = CompilerVersion::supportsSubstrTruncate();
+        $maxArgs = $supportsTruncate ? 4 : 3;
         if ($argc < 2) {
             throw new \ArgumentCountError(\sprintf(
                 'substr() expects at least 2 arguments, %d given',
                 $argc
             ));
         }
-        if ($argc > 3) {
+        if ($argc > $maxArgs) {
             throw new \ArgumentCountError(\sprintf(
-                'substr() expects at most 3 arguments, %d given',
+                'substr() expects at most %d arguments, %d given',
+                $maxArgs,
                 $argc
             ));
         }
+        $truncate = false;
+        if ($supportsTruncate && 4 === $argc) {
+            $truncate = self::compileTimeBool($context, $args[3]) ?? false;
+        }
+        $warnOnClip = $supportsTruncate && !$truncate;
 
         $strLit = $args[0]->compileTimeString ?? null;
         if (null !== $strLit) {
@@ -87,15 +107,15 @@ final class substr extends Internal
                 $folded = null;
                 if (3 === $argc) {
                     if (JITVariable::TYPE_VALUE === $args[2]->type && ($args[2]->isNullConstant ?? false)) {
-                        $folded = VmString::substr($strLit, $offsetLit, null);
+                        $folded = VmString::substr($strLit, $offsetLit, null, $warnOnClip);
                     } else {
                         $lengthLit = self::compileTimeSignedLong($context, $args[2]);
                         if (null !== $lengthLit) {
-                            $folded = VmString::substr($strLit, $offsetLit, $lengthLit);
+                            $folded = VmString::substr($strLit, $offsetLit, $lengthLit, $warnOnClip);
                         }
                     }
                 } else {
-                    $folded = VmString::substr($strLit, $offsetLit);
+                    $folded = VmString::substr($strLit, $offsetLit, null, $warnOnClip);
                 }
                 if (null !== $folded) {
                     return $context->builder->load($context->constantStringFromString($folded));
@@ -133,6 +153,9 @@ final class substr extends Internal
                     JitStringIndex::max($context, $adjustedLen, $zero),
                     $remaining
                 );
+                if ($warnOnClip) {
+                    self::maybeEmitJitTruncationWarning($context, $adjustedLen, $remaining);
+                }
             }
         } else {
             $sliceLen = $context->builder->sub($len, $start);
@@ -140,6 +163,36 @@ final class substr extends Internal
         }
 
         return string_trim::jitCopySlice($context, $str, $charPtr, $start, $sliceLen);
+    }
+
+    private static function maybeEmitJitTruncationWarning(Context $context, Value $adjustedLen, Value $remaining): void
+    {
+        $zero = JitStringIndex::zero($context);
+        $positiveLen = $context->builder->icmp(Builder::INT_SGT, $adjustedLen, $zero);
+        $wouldClip = $context->builder->icmp(Builder::INT_SGT, $adjustedLen, $remaining);
+        $warnCond = $context->builder->and($positiveLen, $wouldClip);
+
+        $warnBb = BasicBlockHelper::append($context, 'substr_trunc_warn');
+        $contBb = BasicBlockHelper::append($context, 'substr_trunc_cont');
+        $context->builder->branchIf($warnCond, $warnBb, $contBb);
+
+        $context->builder->positionAtEnd($warnBb);
+        JitBuiltinWarning::emit($context, 'substr(): String is truncated');
+        $context->builder->branch($contBb);
+
+        $context->builder->positionAtEnd($contBb);
+    }
+
+    private static function compileTimeBool(Context $context, JITVariable $arg): ?bool
+    {
+        if (JITVariable::TYPE_NATIVE_LONG === $arg->type && JITVariable::KIND_VALUE === $arg->kind) {
+            $lib = $context->llvm->lib;
+            if (null !== $lib->LLVMIsAConstantInt($arg->value->value)) {
+                return 0 !== (int) $lib->LLVMConstIntGetZExtValue($arg->value->value);
+            }
+        }
+
+        return null;
     }
 
     private static function compileTimeSignedLong(Context $context, JITVariable $arg): ?int

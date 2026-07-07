@@ -44,7 +44,9 @@ final class BuiltinParamNames
             case 'bin2hex':
                 return ['string'];
             case 'substr':
-                return ['string', 'offset', 'length'];
+                return \PHPCompiler\CompilerVersion::supportsSubstrTruncate()
+                    ? ['string', 'offset', 'length', 'truncate']
+                    : ['string', 'offset', 'length'];
             case 'wordwrap':
                 return ['string', 'width', 'break', 'cut'];
             case 'date':
@@ -362,6 +364,9 @@ final class BuiltinParamNames
             case 'mb_strlen':
                 return ['string', 'encoding'];
             case 'mb_substr':
+                return \PHPCompiler\CompilerVersion::supportsSubstrTruncate()
+                    ? ['string', 'start', 'length', 'encoding', 'truncate']
+                    : ['string', 'start', 'length', 'encoding'];
             case 'mb_strcut':
                 return ['string', 'start', 'length', 'encoding'];
             case 'mb_stripos':

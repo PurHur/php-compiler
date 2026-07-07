@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\mbstring;
 
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
@@ -15,6 +16,8 @@ use PHPLLVM\Value;
 
 /**
  * mb_substr() — multibyte substring (php-src ext/mbstring/mbstring.c; #3239).
+ *
+ * PHP 8.4+ optional $truncate silences Z_STR_TRUNCATED warnings (#17239).
  */
 final class mb_substr extends Internal
 {
@@ -25,16 +28,20 @@ final class mb_substr extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (!isset($frame->calledArgs[0]) || !isset($frame->calledArgs[1])) {
-            throw new \ArgumentCountError(sprintf(
+        $argc = \count($frame->calledArgs);
+        $supportsTruncate = CompilerVersion::supportsSubstrTruncate();
+        $maxArgs = $supportsTruncate ? 5 : 4;
+        if ($argc < 2) {
+            throw new \ArgumentCountError(\sprintf(
                 'mb_substr() expects at least 2 arguments, %d given',
-                \count($frame->calledArgs)
+                $argc
             ));
         }
-        if (isset($frame->calledArgs[4])) {
-            throw new \ArgumentCountError(sprintf(
-                'mb_substr() expects at most 4 arguments, %d given',
-                max(\array_keys($frame->calledArgs)) + 1
+        if ($argc > $maxArgs) {
+            throw new \ArgumentCountError(\sprintf(
+                'mb_substr() expects at most %d arguments, %d given',
+                $maxArgs,
+                $argc
             ));
         }
         $string = VmString::coerceStringBuiltinArg(
@@ -54,10 +61,21 @@ final class mb_substr extends Internal
         $encoding = isset($frame->calledArgs[3])
             ? VmMbstring::coerceEncodingArg($frame->calledArgs[3], 'mb_substr', 3)
             : 'UTF-8';
+        $truncate = false;
+        if ($supportsTruncate && isset($frame->calledArgs[4])) {
+            $truncate = \PHPCompiler\ext\standard\VmMath::parseBoolBuiltinArgForFrame(
+                $frame,
+                4,
+                'mb_substr',
+                5,
+                'truncate'
+            );
+        }
+        $warnOnClip = $supportsTruncate && !$truncate;
         BuiltinExecute::writeReturn(
             $frame,
             static fn (Variable $ret) => $ret->string(
-                VmMbstring::substr($string, $start, $length, $encoding)
+                VmMbstring::substr($string, $start, $length, $encoding, $warnOnClip, $frame)
             )
         );
     }
