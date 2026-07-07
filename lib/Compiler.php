@@ -13654,7 +13654,8 @@ class Compiler {
         return $matched instanceof Op\Expr\Cast
             || $matched instanceof Op\Expr\Array_
             || $matched instanceof Op\Expr\BinaryOp\Plus
-            || $matched instanceof Op\Expr\BinaryOp\Concat;
+            || $matched instanceof Op\Expr\BinaryOp\Concat
+            || $this->isComparisonInlineCallArgProducer($matched);
     }
 
     /**
@@ -19677,15 +19678,18 @@ class Compiler {
      */
     private function matchBooleanBinaryOpInlineCallArgProducer(array $producers, Operand $callArg): ?Op\Expr
     {
-        foreach (array_reverse($producers) as $producer) {
-            if ($this->isComparisonInlineCallArgProducer($producer)) {
-                if ($this->operandsReferToSameVariable($producer->result, $callArg)) {
-                    return $producer;
-                }
-                if ($this->callArgIsDeadInlineTemporary($callArg)) {
-                    return $producer;
-                }
+        $comparisonProducers = [];
+        foreach ($producers as $producer) {
+            if (!$this->isComparisonInlineCallArgProducer($producer)) {
+                continue;
             }
+            if ($this->operandsReferToSameVariable($producer->result, $callArg)) {
+                return $producer;
+            }
+            $comparisonProducers[] = $producer;
+        }
+        if (1 === \count($comparisonProducers) && $this->callArgIsDeadInlineTemporary($callArg)) {
+            return $comparisonProducers[0];
         }
 
         return null;
@@ -21974,6 +21978,20 @@ class Compiler {
                     && 'var_export' === strtolower($this->resolveCfgFuncCallName($callOp) ?? '')
                 ) {
                     // var_export($x !== false, true) — comparison feeds arg #0, not trailing return flag (#17250).
+                    array_unshift($producers, $child);
+                    continue;
+                }
+                $hasDeadInlineCompareArg = false;
+                if (\is_array($callOp->args ?? null)) {
+                    foreach ($callOp->args as $compareCallArg) {
+                        if ($this->callArgIsDeadInlineTemporary($compareCallArg)) {
+                            $hasDeadInlineCompareArg = true;
+                            break;
+                        }
+                    }
+                }
+                if ($hasDeadInlineCompareArg) {
+                    // extendedArgvInt(..., 0 !== $a, 0 !== $b) — hoisted !== siblings (#17259).
                     array_unshift($producers, $child);
                     continue;
                 }
@@ -30176,6 +30194,49 @@ class Compiler {
     }
 
     /**
+     * Map dead inline bool-arg temps to hoisted !== prelude result slots (#17259).
+     */
+    private function slotForComparisonPreludeDeadInlineCallArg(
+        Block $block,
+        Op $cfgCallOp,
+        int $argIndex,
+        array $pendingOps = []
+    ): ?string {
+        if (!property_exists($cfgCallOp, 'args') || !\is_array($cfgCallOp->args)) {
+            return null;
+        }
+        $comparisonArg = $cfgCallOp->args[$argIndex] ?? null;
+        if (!$comparisonArg instanceof Operand || !$this->callArgIsDeadInlineTemporary($comparisonArg)) {
+            return null;
+        }
+        $compareOpcodes = [];
+        foreach (array_merge($block->opCodes, $pendingOps) as $op) {
+            if (OpCode::TYPE_NOT_IDENTICAL === $op->type) {
+                $compareOpcodes[] = $op;
+            }
+        }
+        if (\count($compareOpcodes) < 2) {
+            return null;
+        }
+        $deadOrdinal = 0;
+        foreach ($cfgCallOp->args as $i => $deadArg) {
+            if (!$this->callArgIsDeadInlineTemporary($deadArg)) {
+                continue;
+            }
+            if ($i === $argIndex) {
+                $target = $compareOpcodes[$deadOrdinal] ?? null;
+
+                return null !== $target && null !== $target->arg1
+                    ? (string) $target->arg1
+                    : null;
+            }
+            ++$deadOrdinal;
+        }
+
+        return null;
+    }
+
+    /**
      * Hoisted producer ordinal among dead inline call-arg temps (skip embedded literals, #10321).
      *
      * @param list<Operand> $callArgs
@@ -30418,8 +30479,13 @@ class Compiler {
                 }
             }
         }
-        $cfgProducerIndex = $callIndex - $producerCount + $producerSlotIndex;
-        if ($cfgProducerIndex < 0 || $cfgProducerIndex >= $callIndex) {
+        $cfgProducerIndex = $this->inlineCallArgProducerCfgChildIndex(
+            $callIndex,
+            $producerSlotIndex,
+            $producerCount,
+            $cfgChildren
+        );
+        if (null === $cfgProducerIndex) {
             return null;
         }
         $candidate = $cfgChildren[$cfgProducerIndex] ?? null;
@@ -30443,7 +30509,16 @@ class Compiler {
             }
             // ConstFetch + BitwiseOr call args with filtered operand ConstFetch preludes (#16152, #11804).
             if ($producerSlotIndex < $producerCount) {
-                $direct = $producers[$producerSlotIndex] ?? null;
+                $comparisonOnly = array_values(array_filter(
+                    $producers,
+                    fn (Op\Expr $producer): bool => $this->isComparisonInlineCallArgProducer($producer)
+                ));
+                if (\count($comparisonOnly) === $producerCount) {
+                    $chronological = array_reverse($comparisonOnly);
+                    $direct = $chronological[$producerSlotIndex] ?? null;
+                } else {
+                    $direct = $producers[$producerSlotIndex] ?? null;
+                }
                 if ($direct instanceof Op\Expr) {
                     return $direct;
                 }
@@ -31730,6 +31805,47 @@ class Compiler {
         }
 
         return null;
+    }
+
+    /**
+     * Map hoisted inline producer slot to cfg child index — skips Expr_Param and other non-producers (#17259).
+     *
+     * @param list<Op> $cfgChildren
+     */
+    private function inlineCallArgProducerCfgChildIndex(
+        int $callIndex,
+        int $producerSlotIndex,
+        int $producerCount,
+        array $cfgChildren
+    ): ?int {
+        if ($producerSlotIndex < 0 || $producerSlotIndex >= $producerCount || $callIndex < 1) {
+            return null;
+        }
+        $inlineIndices = [];
+        for ($i = $callIndex - 1; $i >= 0; --$i) {
+            $child = $cfgChildren[$i] ?? null;
+            if (!$child instanceof Op\Expr || !$this->isInlineExprCallArgProducer($child)) {
+                if ([] !== $inlineIndices) {
+                    break;
+                }
+                continue;
+            }
+            $inlineIndices[] = $i;
+            if (\count($inlineIndices) >= $producerCount) {
+                break;
+            }
+        }
+        if (\count($inlineIndices) < $producerCount) {
+            $fallback = $callIndex - $producerCount + $producerSlotIndex;
+            if ($fallback >= 0 && $fallback < $callIndex) {
+                return $fallback;
+            }
+
+            return null;
+        }
+        $chronological = array_reverse(\array_slice($inlineIndices, 0, $producerCount));
+
+        return $chronological[$producerSlotIndex] ?? null;
     }
 
     /**
@@ -40151,6 +40267,20 @@ class Compiler {
                 $dimFetchSlot = $this->pendingCallArgArrayDimFetchSlot($block, $sends, 0);
                 if (null !== $dimFetchSlot) {
                     $valueSlot = (string) $dimFetchSlot;
+                }
+            }
+            if (
+                null !== $cfgCallOp
+                && null !== $block->orig
+            ) {
+                $comparisonSlot = $this->slotForComparisonPreludeDeadInlineCallArg(
+                    $block,
+                    $cfgCallOp,
+                    (int) $argIndex,
+                    $sends
+                );
+                if (null !== $comparisonSlot) {
+                    $valueSlot = $comparisonSlot;
                 }
             }
             $sends[] = new OpCode(OpCode::TYPE_ARG_SEND, $valueSlot, $nameSlot, $unpackFlag);

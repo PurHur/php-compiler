@@ -1449,6 +1449,54 @@ PHP;
         self::assertStringContainsString('true', $out);
     }
 
+    /** Issue #17259 — static call with two hoisted !== preludes wires distinct comparison slots. */
+    public function testStaticCallDualComparisonPreludeArgsUseDistinctSlots(): void
+    {
+        $code = <<<'PHP'
+<?php
+final class ComparePreludeHelper
+{
+    public static function extendedArgv(
+        string $str,
+        string $mask,
+        int $offset,
+        int $length,
+        bool $lenIsNull,
+        bool $isStrspn
+    ): int {
+        return 0;
+    }
+}
+
+$lenIsNull = 0;
+$isStrspn = 1;
+ComparePreludeHelper::extendedArgv('a', 'b', 0, 1, 0 !== $lenIsNull, 0 !== $isStrspn);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'static_call_dual_comparison_prelude.php');
+
+        $notIdenticalSlots = [];
+        $staticCallSends = [];
+        $inStaticCall = false;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_NOT_IDENTICAL === $op->type) {
+                $notIdenticalSlots[] = $op->arg1;
+            }
+            if (OpCode::TYPE_STATICCALL_INIT === $op->type) {
+                $inStaticCall = true;
+                $staticCallSends = [];
+            }
+            if ($inStaticCall && OpCode::TYPE_ARG_SEND === $op->type) {
+                $staticCallSends[] = $op->arg1;
+            }
+        }
+
+        self::assertCount(2, $notIdenticalSlots, 'not identical slots');
+        self::assertCount(6, $staticCallSends, 'arg sends='.json_encode($staticCallSends));
+        self::assertSame($notIdenticalSlots[0], $staticCallSends[4], 'arg sends='.json_encode($staticCallSends));
+        self::assertSame($notIdenticalSlots[1], $staticCallSends[5], 'arg sends='.json_encode($staticCallSends));
+    }
+
     /** Issue #12824 — var_export([NAN, INF], true) wires Array_ producer, not hoisted ConstFetch temps. */
     public function testVarExportInlineNanInfArrayUsesArrayProducerSlot(): void
     {
