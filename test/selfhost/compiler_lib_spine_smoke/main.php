@@ -4287,4 +4287,5 @@ require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassIsAbstract.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassIsInstance.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassIsInstantiable.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassIsSubclassOf.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/ArrayPadTypeJit.php';
 echo "compiler_lib_spine_smoke bundle OK\n";
