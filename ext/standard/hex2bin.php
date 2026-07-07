@@ -21,9 +21,9 @@ use PHPLLVM\Value;
 /** hex2bin() for strings (subset of PHP; JIT/AOT via Hex2binJitHelper PHP). */
 final class hex2bin extends Internal
 {
-    private const MSG_ODD_LENGTH = 'hex2bin(): Hexadecimal input string must have an even length';
+    private const MSG_ODD_LENGTH = 'Hexadecimal input string must have an even length';
 
-    private const MSG_INVALID_HEX = 'hex2bin(): Input string must be hexadecimal string';
+    private const MSG_INVALID_HEX = 'Input string must be hexadecimal string';
 
     public function execute(Frame $frame): void
     {

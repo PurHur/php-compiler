@@ -23,9 +23,9 @@ final class Hex2binJitHelper
         $len = VmString::byteLength($data);
         if ($len > 0 && 0 !== ($len & 1)) {
             if ($strict) {
-                throw new \Error('hex2bin(): Hexadecimal input string must have an even length');
+                throw new \Error('Hexadecimal input string must have an even length');
             }
-            TriggerErrorJitHelper::warning('hex2bin(): Hexadecimal input string must have an even length');
+            TriggerErrorJitHelper::warning('Hexadecimal input string must have an even length');
 
             return self::TAG_FALSE;
         }
@@ -33,10 +33,10 @@ final class Hex2binJitHelper
         $result = VmString::hex2bin($data, $strict);
         if (false === $result) {
             if ($strict) {
-                throw new \Error('hex2bin(): Input string must be hexadecimal string');
+                throw new \Error('Input string must be hexadecimal string');
             }
             if ($len > 0) {
-                TriggerErrorJitHelper::warning('hex2bin(): Input string must be hexadecimal string');
+                TriggerErrorJitHelper::warning('Input string must be hexadecimal string');
             }
 
             return self::TAG_FALSE;
