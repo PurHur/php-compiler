@@ -7,7 +7,7 @@ settype($list, 'object');
 echo var_export($list, true);
 ?>
 --EXPECT--
-(object) array (
+(object) array(
   0 => 1,
   1 => 2,
   2 => 3,

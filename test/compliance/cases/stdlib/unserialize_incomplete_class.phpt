@@ -17,7 +17,7 @@ $other = unserialize($blob, ['allowed_classes' => ['Other']]);
 var_export($other instanceof __PHP_Incomplete_Class);
 echo "\n";
 --EXPECT--
-__PHP_Incomplete_Class::__set_state(array (
+\__PHP_Incomplete_Class::__set_state(array(
   '__PHP_Incomplete_Class_Name' => 'Secret',
   'secret' => 42,
 ))

@@ -11,9 +11,8 @@ var_export($o);
 echo "\n";
 ?>
 --EXPECT--
-(object) array (
-  'a' => 
-  array (
+(object) array(
+  'a' => array (
     'x' => 2,
   ),
 )
