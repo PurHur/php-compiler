@@ -365,10 +365,10 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.3+ class_uses_recursive() (ext/standard/basic_functions.c, issue #6469, #12816, #16708).
+     * PHP 8.3+ class_uses_recursive() (ext/standard/basic_functions.c, issue #6469, #12816, #16708, #17206).
      *
-     * Enabled by default on the 8.4.0-dev toolchain (runtime reports 8.4; php-src has the builtin since 8.3).
-     * `PHP_COMPILER_PROFILE=8.2` (or older) keeps the Zend 8.2 reference gate (function absent).
+     * Withheld on 8.4.0-dev reference profile (matches Zend 8.2 function_exists gate). Enable via
+     * stable 8.4.0+ or explicit `PHP_COMPILER_PROFILE=8.3` / `8.4` forward profile.
      */
     public static function supportsClassUsesRecursive(): bool
     {
@@ -376,12 +376,16 @@ final class CompilerVersion
             return false;
         }
 
-        $raw = getenv('PHP_COMPILER_PROFILE');
-        if (\is_string($raw) && '' !== trim($raw)) {
-            return version_compare(self::languageProfileVersion(), '8.3.0', '>=');
+        if (version_compare(self::VERSION, '8.4.0', '>=')) {
+            return true;
         }
 
-        return self::advertisesBuiltinSince('8.3.0');
+        $raw = getenv('PHP_COMPILER_PROFILE');
+        if (!\is_string($raw) || '' === trim($raw)) {
+            return false;
+        }
+
+        return version_compare(self::languageProfileVersion(), '8.3.0', '>=');
     }
 
     /**
@@ -959,10 +963,10 @@ final class CompilerVersion
 
     /**
      * PHP 8.4+ attribute_exists(), class_meth_exists(), unitenum_exists()
-     * (ext/reflection/php_reflection.c, ext/standard/basic_functions.c; #14995, #15692, #17138).
+     * (ext/reflection/php_reflection.c, ext/standard/basic_functions.c; #14995, #15692, #17138, #17206).
      *
-     * Default 8.4.0-dev toolchain registers the builtins; withheld when
-     * {@see languageProfileVersion()} is below 8.4.0 (e.g. `PHP_COMPILER_PROFILE=8.2`).
+     * Withheld on 8.4.0-dev reference profile (matches Zend 8.2 function_exists gate). Enable via
+     * stable 8.4.0+ or explicit `PHP_COMPILER_PROFILE=8.4` forward profile.
      */
     public static function supportsPhp84ReflectionProbeBuiltins(): bool
     {
@@ -970,12 +974,16 @@ final class CompilerVersion
             return false;
         }
 
-        $raw = getenv('PHP_COMPILER_PROFILE');
-        if (\is_string($raw) && '' !== trim($raw)) {
-            return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+        if (version_compare(self::VERSION, '8.4.0', '>=')) {
+            return true;
         }
 
-        return version_compare(self::builtinAdvertisementVersion(), '8.4.0', '>=');
+        $raw = getenv('PHP_COMPILER_PROFILE');
+        if (!\is_string($raw) || '' === trim($raw)) {
+            return false;
+        }
+
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
     }
 
     /** attribute_exists()/class_meth_exists()/unitenum_exists() visible to function_exists() — same gate as {@see supportsPhp84ReflectionProbeBuiltins()}. */
@@ -1591,10 +1599,10 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.4+ mb_trim/ltrim/rtrim (ext/mbstring/mbstring.c, issue #11901, #12797, #9977, #17120).
+     * PHP 8.4+ mb_trim/ltrim/rtrim (ext/mbstring/mbstring.c, issue #11901, #12797, #9977, #17120, #17206).
      *
-     * Default 8.4.0-dev toolchain registers the builtins; withheld when
-     * {@see languageProfileVersion()} is below 8.4.0 (e.g. `PHP_COMPILER_PROFILE=8.2`).
+     * Withheld on 8.4.0-dev reference profile (matches Zend 8.2 function_exists gate). Enable via
+     * stable 8.4.0+ or explicit `PHP_COMPILER_PROFILE=8.4` forward profile.
      */
     public static function supportsMbTrimFunctions(): bool
     {
@@ -1602,12 +1610,16 @@ final class CompilerVersion
             return false;
         }
 
-        $raw = getenv('PHP_COMPILER_PROFILE');
-        if (\is_string($raw) && '' !== trim($raw)) {
-            return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+        if (version_compare(self::VERSION, '8.4.0', '>=')) {
+            return true;
         }
 
-        return version_compare(self::builtinAdvertisementVersion(), '8.4.0', '>=');
+        $raw = getenv('PHP_COMPILER_PROFILE');
+        if (!\is_string($raw) || '' === trim($raw)) {
+            return false;
+        }
+
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
     }
 
     /**
@@ -1705,10 +1717,10 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.3+ crc32c() (ext/standard/crc32.c, issue #3270, #17139).
+     * PHP 8.3+ crc32c() (ext/standard/crc32.c, issue #3270, #17139, #17206).
      *
-     * Enabled by default on the 8.4.0-dev toolchain (runtime reports 8.4; php-src has the builtin since 8.3).
-     * `PHP_COMPILER_PROFILE=8.2` keeps the Zend 8.2 reference gate (function absent).
+     * Withheld on 8.4.0-dev reference profile (matches Zend 8.2 function_exists gate). Enable via
+     * stable 8.4.0+ or explicit `PHP_COMPILER_PROFILE=8.3` / `8.4` forward profile.
      */
     public static function supportsCrc32c(): bool
     {
@@ -1716,12 +1728,46 @@ final class CompilerVersion
             return false;
         }
 
-        $raw = getenv('PHP_COMPILER_PROFILE');
-        if (\is_string($raw) && '' !== trim($raw)) {
-            return version_compare(self::languageProfileVersion(), '8.3.0', '>=');
+        if (version_compare(self::VERSION, '8.4.0', '>=')) {
+            return true;
         }
 
-        return self::advertisesBuiltinSince('8.3.0');
+        $raw = getenv('PHP_COMPILER_PROFILE');
+        if (!\is_string($raw) || '' === trim($raw)) {
+            return false;
+        }
+
+        return version_compare(self::languageProfileVersion(), '8.3.0', '>=');
+    }
+
+    /**
+     * PHP 8.3+ hebrevc() (ext/standard/string.c, issue #17183, #17206).
+     *
+     * Withheld on 8.4.0-dev reference profile (matches Zend 8.2 function_exists gate). Enable via
+     * stable 8.4.0+ or explicit `PHP_COMPILER_PROFILE=8.3` / `8.4` forward profile.
+     */
+    public static function supportsHebrevc(): bool
+    {
+        if (version_compare(self::VERSION, '8.3', '<')) {
+            return false;
+        }
+
+        if (version_compare(self::VERSION, '8.4.0', '>=')) {
+            return true;
+        }
+
+        $raw = getenv('PHP_COMPILER_PROFILE');
+        if (!\is_string($raw) || '' === trim($raw)) {
+            return false;
+        }
+
+        return version_compare(self::languageProfileVersion(), '8.3.0', '>=');
+    }
+
+    /** hebrevc() visible to function_exists() — same gate as {@see supportsHebrevc()}. */
+    public static function advertisesHebrevc(): bool
+    {
+        return self::supportsHebrevc();
     }
 
     /**

@@ -1,5 +1,7 @@
 --TEST--
-stdlib crc32c()
+stdlib crc32c() (#17206 forward profile)
+--ENV--
+PHP_COMPILER_PROFILE=8.3
 --FILE--
 <?php
 echo crc32c('test'), "\n";

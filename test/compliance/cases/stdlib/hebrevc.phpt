@@ -1,5 +1,7 @@
 --TEST--
-stdlib hebrevc() visual Hebrew with newline conversion (#17183)
+stdlib hebrevc() visual Hebrew with newline conversion (#17183, #17206 forward profile)
+--ENV--
+PHP_COMPILER_PROFILE=8.3
 --FILE--
 <?php
 $shalomOlam = "\xf9\xec\xe5\xed\x20\xf2\xe5\xec\xed";

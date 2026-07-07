@@ -1,5 +1,7 @@
 --TEST--
-stdlib hebrevc() JIT (#17183)
+stdlib hebrevc() JIT (#17183, #17206 forward profile)
+--ENV--
+PHP_COMPILER_PROFILE=8.3
 --JIT--
 --FILE--
 <?php
