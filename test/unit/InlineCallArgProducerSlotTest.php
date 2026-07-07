@@ -1449,6 +1449,47 @@ PHP;
         self::assertStringContainsString('true', $out);
     }
 
+    /** Issue #17277 — var_export([1] !== false, true) after prior compare must not reuse stale comparison slots. */
+    public function testVarExportArrayLiteralNotIdenticalFalseReturnTrueUsesComparisonProducerSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+echo var_export(1 !== false, true);
+echo var_export([1] !== false, true);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'var_export_array_not_identical_false.php');
+
+        $notIdenticalSlots = [];
+        $varExportSendsByCall = [];
+        $fcallOrdinal = 0;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_NOT_IDENTICAL === $op->type) {
+                $notIdenticalSlots[] = $op->arg1;
+            }
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                ++$fcallOrdinal;
+                $varExportSendsByCall[$fcallOrdinal] = [];
+            }
+            if (OpCode::TYPE_ARG_SEND === $op->type && isset($varExportSendsByCall[$fcallOrdinal])) {
+                $varExportSendsByCall[$fcallOrdinal][] = $op->arg1;
+            }
+        }
+
+        self::assertCount(2, $notIdenticalSlots);
+        self::assertCount(2, $varExportSendsByCall[2] ?? []);
+        self::assertSame(
+            $notIdenticalSlots[1],
+            $varExportSendsByCall[2][0],
+            'second var_export arg0 must use its own !== slot'
+        );
+
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertStringContainsString('truetrue', str_replace("\n", '', $out));
+    }
+
     /** Issue #17259 — static call with two hoisted !== preludes wires distinct comparison slots. */
     public function testStaticCallDualComparisonPreludeArgsUseDistinctSlots(): void
     {
