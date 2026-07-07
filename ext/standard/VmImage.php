@@ -40,30 +40,6 @@ final class VmImage
     public const IMAGETYPE_HEIF = 20;
     public const IMAGETYPE_COUNT = 21;
 
-    /** @var array<int, string> MIME type per IMAGE_FILETYPE_* (php_image_type_to_mime_type) */
-    private const MIME_TYPES = [
-        self::IMAGETYPE_GIF => 'image/gif',
-        self::IMAGETYPE_JPEG => 'image/jpeg',
-        self::IMAGETYPE_PNG => 'image/png',
-        self::IMAGETYPE_SWF => 'application/x-shockwave-flash',
-        self::IMAGETYPE_SWC => 'application/x-shockwave-flash',
-        self::IMAGETYPE_PSD => 'image/psd',
-        self::IMAGETYPE_BMP => 'image/bmp',
-        self::IMAGETYPE_TIFF_II => 'image/tiff',
-        self::IMAGETYPE_TIFF_MM => 'image/tiff',
-        self::IMAGETYPE_IFF => 'image/iff',
-        self::IMAGETYPE_WBMP => 'image/vnd.wap.wbmp',
-        self::IMAGETYPE_JPC => 'application/octet-stream',
-        self::IMAGETYPE_JP2 => 'image/jp2',
-        self::IMAGETYPE_XBM => 'image/xbm',
-        self::IMAGETYPE_ICO => 'image/vnd.microsoft.icon',
-        self::IMAGETYPE_WEBP => 'image/webp',
-        self::IMAGETYPE_AVIF => 'image/avif',
-        self::IMAGETYPE_HEIF => 'image/heif',
-    ];
-
-    private const MIME_TYPE_UNKNOWN = 'application/octet-stream';
-
     /** @var array<int, string> dotted extension per IMAGE_FILETYPE_* */
     private const EXTENSIONS = [
         self::IMAGETYPE_GIF => '.gif',
@@ -139,7 +115,7 @@ final class VmImage
      */
     public static function imageTypeToMimeType(int $imageType): string
     {
-        return self::MIME_TYPES[$imageType] ?? self::MIME_TYPE_UNKNOWN;
+        return ImageTypeToMimeTypeJitHelper::mimeArgv($imageType);
     }
 
     /**

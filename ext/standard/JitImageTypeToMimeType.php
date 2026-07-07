@@ -11,7 +11,7 @@ use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** JIT/AOT helper for image_type_to_mime_type() via ImageTypeToMimeTypeJitHelper PHP. */
+/** JIT/AOT arg lowering for image_type_to_mime_type() via ImageTypeToMimeTypeJitHelper PHP (#17126). */
 final class JitImageTypeToMimeType
 {
     public static function invoke(Context $context, JITVariable $imageTypeArg): Value

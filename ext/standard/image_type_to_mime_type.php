@@ -13,6 +13,8 @@ use PHPLLVM\Value;
 /**
  * image_type_to_mime_type() — IMAGETYPE_* to MIME string (ext/standard/image.c, #6063).
  *
+ * VM: {@see VmImage::imageTypeToMimeType()}; JIT/AOT: {@see JitImageTypeToMimeType} + {@see ImageTypeToMimeTypeJitHelper}.
+ *
  * @see https://github.com/php/php-src/blob/master/ext/standard/image.c PHP_FUNCTION(image_type_to_mime_type)
  */
 final class image_type_to_mime_type extends Internal

@@ -6,14 +6,13 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
-use PHPCompiler\JIT\UserScriptAotDeferNestedJit;
 use PHPLLVM\Value;
 
 /**
- * JIT/AOT link for image_type_to_mime_type() via ImageTypeToMimeTypeJitHelper PHP.
+ * JIT/AOT link for image_type_to_mime_type() via ImageTypeToMimeTypeJitHelper PHP (#17126).
  *
- * Replaces inline LLVM select chain in ext/standard/JitImageTypeToMimeType.php.
- * SSOT: {@see \PHPCompiler\ext\standard\VmImage}.
+ * Replaces inline LLVM select chain formerly in ext/standard/JitImageTypeToMimeType.php.
+ * SSOT: {@see \PHPCompiler\ext\standard\ImageTypeToMimeTypeJitHelper}.
  * php-src: ext/standard/image.c — PHP_FUNCTION(image_type_to_mime_type)
  */
 final class ImageTypeToMimeType
@@ -51,12 +50,6 @@ final class ImageTypeToMimeType
 
     private static function implement(Context $context): void
     {
-        if (UserScriptAotDeferNestedJit::shouldDefer($context)) {
-            ImageTypeToMimeTypeLlvm::implement($context);
-
-            return;
-        }
-
         $probe = $context->module->getNamedFunction(self::ABI);
         if (null !== $probe && JitVmHelperLink::hasNamedBridgeEntry($probe, 'image_type_to_mime_type_bridge_entry')) {
             $context->registerFunction(self::ABI, $probe);
