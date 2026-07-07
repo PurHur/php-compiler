@@ -1721,6 +1721,13 @@ class Compiler {
         if ($this->isArrayDimWriteAssign($assign, $branch)) {
             return null;
         }
+        // Try/catch/finally branch assigns target existing CV slots, not ?: merge phi temps (#17158, #12040).
+        if (
+            null !== Block::resolveVariableName($assign->var)
+            && null !== $branch->slotForNamedAssignDest($assign->var)
+        ) {
+            return null;
+        }
         $mergeCfg = $this->branchJumpMergeTarget($branch->orig);
         if (null !== $mergeCfg && $this->mergeCfgBlockUsesLogicalShortCircuit($mergeCfg)) {
             $tail = $this->branchTailExprBeforeJump($branch->orig);
