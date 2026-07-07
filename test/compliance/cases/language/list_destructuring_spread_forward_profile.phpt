@@ -1,14 +1,17 @@
 --TEST--
-list destructuring with spread — [$a, ...$rest] = $arr
+Language: list destructuring spread forward profile gate (#17182, PHP_COMPILER_PROFILE=8.4)
 --SKIPIF--
 <?php
 if (!class_exists('PHPCompiler\\CompilerVersion')) {
     require __DIR__ . '/../../../../vendor/autoload.php';
 }
+putenv('PHP_COMPILER_PROFILE=8.4');
 if (!PHPCompiler\CompilerVersion::supportsListDestructuringSpreadAssign()) {
-    die('skip list spread assign disabled on reference profile');
+    die('skip requires PHP_COMPILER_PROFILE=8.4 list spread gate');
 }
 ?>
+--ENV--
+PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
 $src = [1, 2, 3, 4];

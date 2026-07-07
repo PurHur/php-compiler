@@ -28,6 +28,9 @@ final class ListSpreadAssignJitCompileTest extends TestCase
 
     public function testListSpreadAssignModuleVerify(): void
     {
+        if (!CompilerVersion::supportsListDestructuringSpreadAssign()) {
+            $this->markTestSkipped('list spread assign disabled on reference profile');
+        }
         $path = $this->repoRoot.'/test/compliance/cases/language/list_destructuring_spread.phpt';
         $code = file_get_contents($path);
         $this->assertNotFalse($code);
@@ -52,6 +55,9 @@ final class ListSpreadAssignJitCompileTest extends TestCase
 
     public function testKeyedListSpreadAssignModuleVerify(): void
     {
+        if (!CompilerVersion::supportsListDestructuringSpreadAssign()) {
+            $this->markTestSkipped('list spread assign disabled on reference profile');
+        }
         $path = $this->repoRoot.'/test/compliance/cases/language/list_destructuring_keyed_spread_jit.phpt';
         $code = file_get_contents($path);
         $this->assertNotFalse($code);
