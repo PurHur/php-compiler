@@ -796,7 +796,31 @@ class Compiler {
         }
     }
 
-    protected function compileCfgBlock(CfgBlock $block, array $params = [], ?CfgFunc $func = null): Block {
+    /**
+     * @param list<Operand\BoundVariable> $closureUseVars
+     */
+    protected function registerClosureUseCapturesOnBlock(Block $funcBlock, array $closureUseVars): void
+    {
+        foreach ($closureUseVars as $useVar) {
+            $name = $this->boundVariableName($useVar);
+            $slot = $funcBlock->getVarSlot($useVar, false);
+            $funcBlock->closureCaptureSlots[$slot] = true;
+            $funcBlock->closureCaptureSlotNames[$slot] = $name;
+            if ($useVar->byRef) {
+                $funcBlock->closureCaptureByRef[$slot] = true;
+            }
+        }
+    }
+
+    /**
+     * @param list<Operand\BoundVariable> $closureUseVars
+     */
+    protected function compileCfgBlock(
+        CfgBlock $block,
+        array $params = [],
+        ?CfgFunc $func = null,
+        array $closureUseVars = []
+    ): Block {
         if (null === $this->seen) {
             $this->seen = new SplObjectStorage;
         }
@@ -824,6 +848,9 @@ class Compiler {
             }
             if (null !== $func && '__construct' === $func->name && null !== $func->class) {
                 $this->compileCtorPromotionAssignments($new, $params);
+            }
+            if ([] !== $closureUseVars) {
+                $this->registerClosureUseCapturesOnBlock($new, $closureUseVars);
             }
             $this->compileBlock($new);
             foreach ($this->deferredArrayLiteralKeepSlots as $slot => $_) {
@@ -8867,6 +8894,9 @@ class Compiler {
             $resultSlot = $block->inheritUndefinedLocals
                 ? $block->forceFreshVarSlot($expr->result)
                 : $this->compileOperand($expr->result, $block, false);
+            if (!$block->closureCaptureSlotWritableForOperand($resultSlot, $expr->result)) {
+                $resultSlot = $block->forceFreshVarSlot($expr->result);
+            }
             $opcode = new OpCode(
                 $this->getOpCodeTypeFromBinaryOp($expr),
                 $resultSlot,
@@ -9567,8 +9597,16 @@ class Compiler {
         if ($expr instanceof Op\Expr\ArrowFunction) {
             $this->compilingArrowAutoCapture = true;
         }
+        $closureUseVars = [];
+        if ($expr instanceof Op\Expr\Closure) {
+            foreach ($expr->useVars as $useVar) {
+                if ($useVar instanceof Operand\BoundVariable) {
+                    $closureUseVars[] = $useVar;
+                }
+            }
+        }
         try {
-            $funcBlock = $this->compileCfgBlock($func->cfg, $func->params, $func);
+            $funcBlock = $this->compileCfgBlock($func->cfg, $func->params, $func, $closureUseVars);
             $funcBlock->parents[] = $block;
         } finally {
             $this->compilingArrowAutoCapture = $wasArrowAutoCapture;
@@ -9584,16 +9622,9 @@ class Compiler {
         AttributeNames::assertCompileTimeConstTargetOnly($op->attributeNames, 'function');
         AttributeNames::assertSensitiveParameterParamTargetOnly($op->attributeNames, 'function');
         if ($expr instanceof Op\Expr\Closure) {
-            foreach ($expr->useVars as $useVar) {
-                if (!$useVar instanceof Operand\BoundVariable) {
-                    continue;
-                }
+            foreach ($closureUseVars as $useVar) {
                 $name = $this->boundVariableName($useVar);
                 $slot = $funcBlock->getVarSlot($useVar, false);
-                $funcBlock->closureCaptureSlots[$slot] = true;
-                if ($useVar->byRef) {
-                    $funcBlock->closureCaptureByRef[$slot] = true;
-                }
                 $op->closureCaptures[] = [
                     'name' => $name,
                     'slot' => $slot,
@@ -9618,6 +9649,7 @@ class Compiler {
                 }
                 $seenCaptureSlots[$slot] = true;
                 $funcBlock->closureCaptureSlots[$slot] = true;
+                $funcBlock->closureCaptureSlotNames[$slot] = $name;
                 $op->closureCaptures[] = [
                     'name' => $name,
                     'slot' => $slot,

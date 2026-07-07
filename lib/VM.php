@@ -12633,12 +12633,12 @@ restart:
     {
         $captures = [];
         foreach ($captureSpecs as $spec) {
-            $src = Block::findVariableInParentFramesByName($spec['name'], $frame);
+            $src = $this->resolveClosureCaptureSource($spec['name'], $frame);
             $stored = new Variable();
             if (null === $src) {
                 $stored->null();
             } elseif ($spec['byRef']) {
-                $stored->indirect($src->resolveIndirect());
+                $stored->indirect($src->byRefTarget());
             } else {
                 $stored->copyFrom($src->resolveIndirect());
             }
@@ -12650,6 +12650,61 @@ restart:
         }
 
         return $captures;
+    }
+
+    /**
+     * Parent CV for closure `use` — include declared-but-unassigned slots for self-referential
+     * `use (&$fn)` on `$fn = function () use (&$fn)` (Zend/zend_closures.c, #17089).
+     */
+    protected function resolveClosureCaptureSource(string $name, Frame $frame): ?Variable
+    {
+        $src = Block::findVariableInParentFramesByName($name, $frame);
+        if (null !== $src) {
+            return $src;
+        }
+        $blockScriptGlobals = null !== $frame->block && $frame->block->blocksScriptGlobalInheritance();
+        for ($f = $frame; null !== $f; $f = $f->parent) {
+            if (
+                $blockScriptGlobals
+                && null !== $f->block
+                && $f->block->isMainScript()
+            ) {
+                break;
+            }
+            if (null === $f->block) {
+                continue;
+            }
+            $idx = $f->block->slotIndexForVariableName($name);
+            if (null === $idx) {
+                continue;
+            }
+            if (!isset($f->scope[$idx])) {
+                $f->scope[$idx] = new Variable();
+            }
+
+            return $f->scope[$idx];
+        }
+
+        return null;
+    }
+
+    /** True when $slot is a by-ref closure `use` capture in this frame (#17089). */
+    private function frameScopeSlotIsClosureByRefCapture(Frame $frame, int $slot): bool
+    {
+        if (isset($frame->block->closureCaptureByRef[$slot])) {
+            return true;
+        }
+        $state = $frame->closureCall;
+        if (null === $state) {
+            return false;
+        }
+        foreach ($state->captures as $capture) {
+            if ($capture['byRef'] && (int) $capture['slot'] === $slot) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     protected function resolvePendingClosureState(Frame $frame): ?ClosureState
@@ -12785,7 +12840,7 @@ restart:
             $slot = (int) $capture['slot'];
             $dest = $this->scopeSlot($callee, $slot);
             if ($capture['byRef']) {
-                $dest->indirect($capture['var']->resolveIndirect());
+                $dest->indirect($capture['var']->byRefTarget());
             } else {
                 $dest->copyFrom($capture['var']);
             }
@@ -15981,7 +16036,10 @@ restart:
 
     private function releaseFrameObjectRefs(Frame $frame): void
     {
-        foreach ($frame->scope as $slot) {
+        foreach ($frame->scope as $slotIndex => $slot) {
+            if ($this->frameScopeSlotIsClosureByRefCapture($frame, (int) $slotIndex)) {
+                continue;
+            }
             ObjectLifetime::releaseDirectObject($slot);
         }
         foreach ($frame->iterators as $iter) {

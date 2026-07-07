@@ -180,6 +180,9 @@ class Block {
     /** Closure `use (&$var)` slots that alias enclosing storage at call (issue #72). */
     public array $closureCaptureByRef = [];
 
+    /** @var array<int, string> Closure `use` slot => captured variable name (#17089). */
+    public array $closureCaptureSlotNames = [];
+
     /** Arrow function body: register outer lexical reads for auto-capture (#4944, #4952, #10304). */
     public bool $arrowAutoCapture = false;
 
@@ -395,6 +398,31 @@ class Block {
         return $this->slotIndexForVariableName($name);
     }
 
+    /**
+     * Closure capture CV slots are read-only for unrelated expression writes (#17089).
+     */
+    public function closureCaptureSlotWritableForOperand(int $slot, Operand $operand): bool
+    {
+        if (!isset($this->closureCaptureSlots[$slot])) {
+            return true;
+        }
+        $captureName = $this->closureCaptureSlotNames[$slot] ?? null;
+        if (null === $captureName || '' === $captureName) {
+            return false;
+        }
+        foreach ([$operand, self::cfgVarRoot($operand)] as $candidate) {
+            if (!$candidate instanceof Operand) {
+                continue;
+            }
+            $name = self::resolveVariableName($candidate);
+            if ($captureName === $name) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     public function getVarSlot(Operand $operand, bool $isRead): int {
         if ($isRead) {
             $name = self::resolveVariableName($operand);
@@ -425,14 +453,17 @@ class Block {
             }
         }
         if ($this->scope->contains($operand)) {
-            if ($isRead && $this->shouldRegisterInheritedArg($operand)) {
-                $this->args[$operand] = $this->scope[$operand];
-            }
-            if (!$isRead) {
-                $this->markLocallyWritten($operand);
-            }
+            $existing = $this->scope[$operand];
+            if ($isRead || $this->closureCaptureSlotWritableForOperand($existing, $operand)) {
+                if ($isRead && $this->shouldRegisterInheritedArg($operand)) {
+                    $this->args[$operand] = $existing;
+                }
+                if (!$isRead) {
+                    $this->markLocallyWritten($operand);
+                }
 
-            return $this->scope[$operand];
+                return $existing;
+            }
         }
         // php-cfg may wrap named locals in temporaries after while-assign conditions; bind by
         // variable name before call-site temp clone reuse (#10702, #8560).
@@ -441,7 +472,7 @@ class Block {
             $name = self::resolveVariableName($namedRoot);
             if (null !== $name) {
                 $existing = $this->slotIndexForVariableName($name);
-                if (null !== $existing) {
+                if (null !== $existing && ($isRead || $this->closureCaptureSlotWritableForOperand($existing, $operand))) {
                     $this->scope[$operand] = $existing;
                     if ($isRead && $this->shouldRegisterInheritedArg($operand)) {
                         $this->args[$operand] = $existing;
@@ -457,20 +488,22 @@ class Block {
         // Call-site arg clones wrap inline Expr temps; reuse the producer slot (#8560, #3553).
         if ($operand instanceof Temporary && null !== $operand->original && $this->scope->contains($operand->original)) {
             $existing = $this->scope[$operand->original];
-            $this->scope[$operand] = $existing;
-            if ($isRead && $this->shouldRegisterInheritedArg($operand)) {
-                $this->args[$operand] = $existing;
-            }
-            if (!$isRead) {
-                $this->markLocallyWritten($operand);
-            }
+            if ($isRead || $this->closureCaptureSlotWritableForOperand($existing, $operand)) {
+                $this->scope[$operand] = $existing;
+                if ($isRead && $this->shouldRegisterInheritedArg($operand)) {
+                    $this->args[$operand] = $existing;
+                }
+                if (!$isRead) {
+                    $this->markLocallyWritten($operand);
+                }
 
-            return $existing;
+                return $existing;
+            }
         }
         $name = self::resolveVariableName($operand);
         if (null !== $name) {
             $existing = $this->slotIndexForVariableName($name);
-            if (null !== $existing) {
+            if (null !== $existing && ($isRead || $this->closureCaptureSlotWritableForOperand($existing, $operand))) {
                 $this->scope[$operand] = $existing;
                 if ($isRead && $this->shouldRegisterInheritedArg($operand)) {
                     $this->args[$operand] = $existing;
@@ -487,6 +520,9 @@ class Block {
             foreach ($this->scope as $scopedOp) {
                 if (self::cfgVarRoot($scopedOp) === $cfgVar) {
                     $existing = $this->scope[$scopedOp];
+                    if (!$isRead && !$this->closureCaptureSlotWritableForOperand($existing, $operand)) {
+                        continue;
+                    }
                     $this->scope[$operand] = $existing;
                     if ($isRead && $this->shouldRegisterInheritedArg($operand)) {
                         $this->args[$operand] = $existing;
