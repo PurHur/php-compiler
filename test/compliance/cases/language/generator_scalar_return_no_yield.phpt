@@ -3,6 +3,9 @@ Generator scalar return without yield — getReturn() value (issue #17162, Zend/
 --FILE--
 <?php
 function g(): Generator {
+    if (false) {
+        yield 1;
+    }
     return 1;
 }
 $gen = g();
