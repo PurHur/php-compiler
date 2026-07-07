@@ -3642,6 +3642,9 @@ restart:
                     }
                     break;
                 case OpCode::TYPE_LIST_SPREAD_ASSIGN:
+                    if (!CompilerVersion::supportsListDestructuringSpreadAssign()) {
+                        throw new \Error('Spread operator is not supported in assignments');
+                    }
                     $dest = $frame->scope[$op->arg1];
                     $src = $frame->scope[$op->arg2]->resolveIndirect();
                     if (Variable::TYPE_ARRAY !== $src->type) {

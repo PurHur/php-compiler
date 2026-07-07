@@ -2819,7 +2819,7 @@ class Compiler {
      */
     private function compileListDestructGroup(array $ops, int $start, Block $block): array
     {
-        $this->rejectLoneListSpreadAssign($ops, $start);
+        $this->rejectListSpreadAssign($ops, $start);
         $end = $this->listDestructGroupEndIndex($ops, $start, $block);
         $this->rejectListDestructNonWritableWriteTargets($ops, $start, $end, $block);
         $rhs = $this->listDestructRhsOperand($ops, $start);
@@ -9039,6 +9039,7 @@ class Compiler {
                     $this->rejectGlobalConstInWriteContext($expr->var, $block);
                 }
                 if ($this->assignIsListSpread($expr)) {
+                    $this->rejectListSpreadAssignExpr($expr);
                     $fromIndex = new Operand\Literal($expr->listSpreadFromIndex);
                     $spreadOp = new OpCode(
                         OpCode::TYPE_LIST_SPREAD_ASSIGN,
@@ -43280,19 +43281,41 @@ class Compiler {
     }
 
     /**
-     * Zend zend_compile.c: lone `[...$a] = $rhs` is a compile-time fatal (#6936).
+     * Zend zend_compile.c: list spread assignment compile-time fatal (#6936, #17182).
      *
      * @param Op[] $ops
+     */
+    private function rejectListSpreadAssign(array $ops, int $start): void
+    {
+        $end = $this->listDestructGroupEndIndex($ops, $start, null);
+        for ($i = $start; $i <= $end; ++$i) {
+            if (!$this->isListSpreadAssignOp($ops[$i])) {
+                continue;
+            }
+            if (!CompilerVersion::supportsListDestructuringSpreadAssign()) {
+                $this->throwListSpreadAssignFatal($ops[$i]);
+            }
+            if (!$this->isListDestructSpreadTail($ops, $i, null)) {
+                $this->throwListSpreadAssignFatal($ops[$i]);
+            }
+        }
+    }
+
+    private function rejectListSpreadAssignExpr(Op\Expr\Assign $expr): void
+    {
+        if (CompilerVersion::supportsListDestructuringSpreadAssign()) {
+            return;
+        }
+        $this->throwListSpreadAssignFatal($expr);
+    }
+
+    /**
+     * @param Op\Expr\Assign $spread
      *
      * @return never
      */
-    private function rejectLoneListSpreadAssign(array $ops, int $start): void
+    private function throwListSpreadAssignFatal(Op\Expr\Assign $spread): void
     {
-        if (!$this->isListSpreadAssignOp($ops[$start]) || $this->isListDestructSpreadTail($ops, $start, null)) {
-            return;
-        }
-        /** @var Op\Expr\Assign $spread */
-        $spread = $ops[$start];
         $sourceFile = $spread->getFile() ?? '';
         if ('' === $sourceFile) {
             $sourceFile = 'unknown';

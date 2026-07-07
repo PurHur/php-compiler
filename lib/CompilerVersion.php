@@ -727,6 +727,27 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.4+ list/array destructuring spread assignment (`[$a, ...$rest] = $arr`).
+     *
+     * Gated on stable 8.4.0 so 8.4.0-dev reference profile rejects like Zend 8.2 (#17182).
+     * Forward profile via `PHP_COMPILER_PROFILE=8.4` enables spread-in-list assign (#9248).
+     * php-src: Zend/zend_compile.c list spread assign; ZEND_FE_FETCH_UNSET lowering.
+     */
+    public static function supportsListDestructuringSpreadAssign(): bool
+    {
+        if (version_compare(self::VERSION, '8.4.0', '>=')) {
+            return true;
+        }
+
+        $raw = getenv('PHP_COMPILER_PROFILE');
+        if (!\is_string($raw) || '' === trim($raw)) {
+            return false;
+        }
+
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+    }
+
+    /**
      * PHP 8.5+ comma-separated enum case declarations (`case A, B, C;`).
      *
      * Withheld on 8.4.0-dev reference profile (matches Zend 8.2 parse error). Enable via
