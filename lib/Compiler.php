@@ -19716,6 +19716,35 @@ class Compiler {
     }
 
     /**
+     * php-cfg hoists Array_/FuncCall operands before a sibling compare feeding var_export arg (#17277).
+     *
+     * @param list<Op> $cfgChildren
+     */
+    private function hoistedExprFeedsSiblingComparisonBeforeCall(
+        Op\Expr $expr,
+        int $exprIndex,
+        int $callIndex,
+        array $cfgChildren
+    ): bool {
+        for ($j = $exprIndex + 1; $j < $callIndex; ++$j) {
+            $scan = $cfgChildren[$j] ?? null;
+            if (
+                $this->isComparisonInlineCallArgProducer($scan)
+                && null !== $expr->result
+                && $this->cfgExprUsesOperand($scan, $expr->result)
+            ) {
+                return true;
+            }
+            if ($scan instanceof Op\Expr\ConstFetch || $scan instanceof Op\Expr\ClassConstFetch) {
+                continue;
+            }
+            break;
+        }
+
+        return false;
+    }
+
+    /**
      * php-cfg dead ClassConstFetch preludes before inline Array_/Concat call args (#5933, #4109).
      *
      * @param list<Op\Expr> $producers
@@ -21733,6 +21762,10 @@ class Compiler {
                     ) {
                         continue;
                     }
+                }
+                if ($this->hoistedExprFeedsSiblingComparisonBeforeCall($child, $i, $callIndex, $cfgChildren)) {
+                    // var_export([1] !== false, true) — Array_ feeds comparison LHS, not call arg (#17277).
+                    continue;
                 }
                 array_unshift($producers, $child);
                 $prev = $cfgChildren[$i - 1] ?? null;
@@ -43583,6 +43616,128 @@ class Compiler {
         unset($send);
     }
 
+    /**
+     * var_export($expr !== false, true) — arg #0 is compare result, arg #1 is return flag only (#17250, #17277).
+     *
+     * @param list<OpCode> $outerArgSends
+     * @param list<OpCode> $nestedProducerOps
+     */
+    private function rewireVarExportComparisonReturnFlagCallArgSendSlots(
+        array &$outerArgSends,
+        array $nestedProducerOps,
+        Block $block,
+        ?Op $cfgCallOp,
+        ?string $calleeName = null
+    ): void {
+        if ('var_export' !== strtolower($calleeName ?? $this->resolveCfgFuncCallName($cfgCallOp) ?? '')) {
+            return;
+        }
+        if (
+            null === $cfgCallOp
+            || null === $block->orig
+            || !\is_array($cfgCallOp->args ?? null)
+            || \count($cfgCallOp->args) < 2
+        ) {
+            return;
+        }
+        $callIndex = $this->cfgCallOpIndex($block, $cfgCallOp);
+        if (!\is_int($callIndex) || $callIndex < 2) {
+            return;
+        }
+        $returnFlagExpr = $block->orig->children[$callIndex - 1] ?? null;
+        if (!$this->isHoistedScalarConstFetchImmediatelyBeforeCall($returnFlagExpr)) {
+            return;
+        }
+        $comparisonExpr = $block->orig->children[$callIndex - 2] ?? null;
+        if (
+            !$this->isComparisonInlineCallArgProducer($comparisonExpr)
+            || !$comparisonExpr instanceof Op\Expr
+            || null === $comparisonExpr->result
+            || !$returnFlagExpr instanceof Op\Expr\ConstFetch
+            || null === $returnFlagExpr->result
+        ) {
+            return;
+        }
+        $comparisonSlot = $this->slotForInlineExprResultInProducerOps(
+            $comparisonExpr,
+            $block,
+            $nestedProducerOps
+        );
+        $returnSlot = $this->slotForInlineExprResultInProducerOps(
+            $returnFlagExpr,
+            $block,
+            $nestedProducerOps
+        );
+        if (null === $comparisonSlot || null === $returnSlot) {
+            return;
+        }
+        $sendOrdinal = 0;
+        foreach ($outerArgSends as &$send) {
+            if (OpCode::TYPE_ARG_SEND !== $send->type) {
+                continue;
+            }
+            $send->arg1 = 0 === $sendOrdinal ? $comparisonSlot : $returnSlot;
+            ++$sendOrdinal;
+            if ($sendOrdinal >= 2) {
+                break;
+            }
+        }
+        unset($send);
+    }
+
+    /**
+     * @param list<OpCode> $producerOps
+     */
+    private function slotForInlineExprResultInProducerOps(
+        Op\Expr $expr,
+        Block $block,
+        array $producerOps
+    ): ?string {
+        $mapped = $block->slotForOperand($expr->result);
+        if (null !== $mapped) {
+            return (string) $mapped;
+        }
+        $leftSlot = null;
+        $rightSlot = null;
+        if ($expr instanceof Op\Expr\BinaryOp) {
+            $leftSlot = null !== $expr->left ? $block->slotForOperand($expr->left) : null;
+            $rightSlot = null !== $expr->right ? $block->slotForOperand($expr->right) : null;
+        }
+        foreach ($producerOps as $op) {
+            if ($expr instanceof Op\Expr\ConstFetch && OpCode::TYPE_CONST_FETCH === $op->type) {
+                if ((string) $op->arg1 === (string) $block->slotForOperand($expr->result)) {
+                    return (string) $op->arg1;
+                }
+            }
+            if ($this->isComparisonInlineCallArgProducer($expr)) {
+                $compareTypes = [
+                    OpCode::TYPE_IDENTICAL,
+                    OpCode::TYPE_NOT_IDENTICAL,
+                    OpCode::TYPE_EQUAL,
+                    OpCode::TYPE_NOT_EQUAL,
+                    OpCode::TYPE_SPACESHIP,
+                    OpCode::TYPE_SMALLER,
+                    OpCode::TYPE_GREATER,
+                    OpCode::TYPE_SMALLER_OR_EQUAL,
+                    OpCode::TYPE_GREATER_OR_EQUAL,
+                ];
+                if (!\in_array($op->type, $compareTypes, true)) {
+                    continue;
+                }
+                if (null !== $leftSlot && (string) $op->arg2 !== (string) $leftSlot) {
+                    continue;
+                }
+                if (null !== $rightSlot && (string) $op->arg3 !== (string) $rightSlot) {
+                    continue;
+                }
+
+                return (string) $op->arg1;
+            }
+        }
+
+        return null;
+    }
+
     protected function compileFuncCall(
         ?int $name,
         array $args,
@@ -43632,6 +43787,13 @@ class Compiler {
         $this->rewireArrayCombineInlineArgSendSlots($outerArgSends, $block, $argSends, $calleeName, $cfgCallOp);
         $this->rewirePregReplaceCallbackArrayPatternMapArgSendSlots($outerArgSends, $block, $cfgCallOp, $argSends);
         $this->rewireVarExportNestedInlineCallArgSendSlots($outerArgSends, $nestedProducerOps, $block, $cfgCallOp, $calleeName);
+        $this->rewireVarExportComparisonReturnFlagCallArgSendSlots(
+            $outerArgSends,
+            $nestedProducerOps,
+            $block,
+            $cfgCallOp,
+            $calleeName
+        );
         $this->rewireIsArrayNestedFileCallArgSendSlots($outerArgSends, $nestedProducerOps, $block, $cfgCallOp, $calleeName);
         $return = [];
         foreach ($outerArgSends as $send) {
