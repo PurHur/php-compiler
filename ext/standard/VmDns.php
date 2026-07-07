@@ -547,8 +547,14 @@ final class VmDns
         $ht = new HashTable();
         self::addDnsStringField($ht, 'host', $hostname);
         self::addDnsStringField($ht, 'class', 'IN');
+        if (isset($fields['ttl']) && \is_int($fields['ttl'])) {
+            self::addDnsIntField($ht, 'ttl', $fields['ttl']);
+        }
         self::addDnsStringField($ht, 'type', $typeName);
         foreach ($fields as $key => $value) {
+            if ('ttl' === $key) {
+                continue;
+            }
             if (\is_int($value)) {
                 self::addDnsIntField($ht, $key, $value);
             } else {
