@@ -1686,15 +1686,21 @@ final class CompilerVersion
     }
 
     /**
-     * Forward DOM APIs on the 8.4 development line via {@see builtinAdvertisementVersion()}.
+     * Forward DOM APIs gated like gc_status / str_increment (#15613, #14535).
      *
-     * `VERSION` `8.4.0-dev` is below stable `8.4.0` for {@see version_compare()}; explicit
-     * `PHP_COMPILER_PROFILE` still opts in on older compiler builds.
+     * On `8.4.0-dev` reference profile (unset `PHP_COMPILER_PROFILE`), withhold PHP 8.3+/8.4+
+     * DOM methods so `method_exists()` matches Zend 8.2. Enable via stable `8.4.0+` or explicit
+     * `PHP_COMPILER_PROFILE=8.3` / `8.4`.
      */
     private static function supportsDomApiSince(string $since): bool
     {
-        if (version_compare(self::builtinAdvertisementVersion(), $since, '>=')) {
-            return true;
+        if (version_compare(self::VERSION, '8.4.0', '>=')) {
+            return version_compare(self::VERSION, $since, '>=');
+        }
+
+        $raw = getenv('PHP_COMPILER_PROFILE');
+        if (!\is_string($raw) || '' === trim($raw)) {
+            return false;
         }
 
         return version_compare(self::languageProfileVersion(), $since, '>=');
@@ -1776,36 +1782,16 @@ final class CompilerVersion
         return self::supportsDomApiSince('8.3.0');
     }
 
-    /**
-     * PHP 8.3+ DOMElement::getAttributeNames() (ext/dom/element.c, #16823, #16975).
-     *
-     * Advertised on the 8.4 development line via {@see builtinAdvertisementVersion()} — `VERSION`
-     * `8.4.0-dev` is below stable `8.4.0` for {@see version_compare()}. On 8.3.x builds, enable
-     * with `PHP_COMPILER_PROFILE=8.3` / `8.4`.
-     */
+    /** PHP 8.3+ DOMElement::getAttributeNames() (ext/dom/element.c, #16823, #16975). */
     public static function supportsDomElementGetAttributeNames(): bool
     {
-        if (version_compare(self::builtinAdvertisementVersion(), '8.3.0', '>=')) {
-            return true;
-        }
-
-        return version_compare(self::languageProfileVersion(), '8.3.0', '>=');
+        return self::supportsDomApiSince('8.3.0');
     }
 
-    /**
-     * PHP 8.4+ DOMElement::$classList / DOMTokenList (ext/dom/token_list.c; #16876, #16974).
-     *
-     * Advertised on the 8.4 development line via {@see builtinAdvertisementVersion()} — `VERSION`
-     * `8.4.0-dev` is below stable `8.4.0` for {@see version_compare()}. Enable explicitly with
-     * `PHP_COMPILER_PROFILE=8.4` on older compiler builds.
-     */
+    /** PHP 8.4+ DOMElement::$classList / DOMTokenList (ext/dom/token_list.c; #16876, #16974). */
     public static function supportsDomTokenList(): bool
     {
-        if (version_compare(self::builtinAdvertisementVersion(), '8.4.0', '>=')) {
-            return true;
-        }
-
-        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+        return self::supportsDomApiSince('8.4.0');
     }
 
     /**

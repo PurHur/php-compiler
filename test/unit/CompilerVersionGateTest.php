@@ -1433,14 +1433,9 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
-    public function testSupportsDomNodeContainsOnBuiltinAdvertisementLine(): void
+    public function testSupportsDomNodeContainsOnReferenceProfile(): void
     {
-        $this->assertTrue(CompilerVersion::supportsDomNodeContains());
-    }
-
-    public function testSupportsDomNodeIsEqualNodeOnBuiltinAdvertisementLine(): void
-    {
-        $this->assertTrue(CompilerVersion::supportsDomNodeIsEqualNode());
+        $this->assertFalse(CompilerVersion::supportsDomNodeContains());
     }
 
     public function testVmRegistersDomNodeContainsOnForwardProfile(): void
@@ -1476,9 +1471,9 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
-    public function testSupportsDomNodeCompareDocumentPositionOnBuiltinAdvertisementLine(): void
+    public function testSupportsDomNodeCompareDocumentPositionOnReferenceProfile(): void
     {
-        $this->assertTrue(CompilerVersion::supportsDomNodeCompareDocumentPosition());
+        $this->assertFalse(CompilerVersion::supportsDomNodeCompareDocumentPosition());
     }
 
     public function testSupportsDomNodeGetRootNodeOnForwardProfile(): void
@@ -1496,9 +1491,9 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
-    public function testSupportsDomNodeGetRootNodeOnBuiltinAdvertisementLine(): void
+    public function testSupportsDomNodeGetRootNodeOnReferenceProfile(): void
     {
-        $this->assertTrue(CompilerVersion::supportsDomNodeGetRootNode());
+        $this->assertFalse(CompilerVersion::supportsDomNodeGetRootNode());
     }
 
     public function testVmRegistersDomNodeGetRootNodeOnForwardProfile(): void
@@ -1534,9 +1529,14 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
-    public function testSupportsDomElementInsertAdjacentHtmlOnBuiltinAdvertisementLine(): void
+    public function testSupportsDomNodeIsEqualNodeOnReferenceProfile(): void
     {
-        $this->assertTrue(CompilerVersion::supportsDomElementInsertAdjacentHtml());
+        $this->assertFalse(CompilerVersion::supportsDomNodeIsEqualNode());
+    }
+
+    public function testSupportsDomElementInsertAdjacentHtmlOnReferenceProfile(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsDomElementInsertAdjacentHtml());
     }
 
     public function testVmRegistersDomElementInsertAdjacentHtmlOnForwardProfile(): void
@@ -1572,9 +1572,9 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
-    public function testSupportsDomElementInsertAdjacentElementOnBuiltinAdvertisementLine(): void
+    public function testSupportsDomElementInsertAdjacentElementOnReferenceProfile(): void
     {
-        $this->assertTrue(CompilerVersion::supportsDomElementInsertAdjacentElement());
+        $this->assertFalse(CompilerVersion::supportsDomElementInsertAdjacentElement());
     }
 
     public function testVmRegistersDomElementInsertAdjacentElementOnForwardProfile(): void
@@ -1610,9 +1610,9 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
-    public function testSupportsDomElementInsertAdjacentTextOnBuiltinAdvertisementLine(): void
+    public function testSupportsDomElementInsertAdjacentTextOnReferenceProfile(): void
     {
-        $this->assertTrue(CompilerVersion::supportsDomElementInsertAdjacentText());
+        $this->assertFalse(CompilerVersion::supportsDomElementInsertAdjacentText());
     }
 
     public function testVmRegistersDomElementInsertAdjacentTextOnForwardProfile(): void
@@ -1648,9 +1648,9 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
-    public function testSupportsDomElementToggleAttributeOnBuiltinAdvertisementLine(): void
+    public function testSupportsDomElementToggleAttributeOnReferenceProfile(): void
     {
-        $this->assertTrue(CompilerVersion::supportsDomElementToggleAttribute());
+        $this->assertFalse(CompilerVersion::supportsDomElementToggleAttribute());
     }
 
     public function testVmRegistersDomElementToggleAttributeOnForwardProfile(): void
