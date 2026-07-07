@@ -25,8 +25,9 @@ final class gc_disable extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (\count($frame->calledArgs) > 0) {
-            throw new \LogicException('gc_disable() takes no arguments');
+        $argc = \count($frame->calledArgs);
+        if ($argc > 0) {
+            throw new \ArgumentCountError('gc_disable() expects exactly 0 arguments, '.$argc.' given');
         }
         CycleCollector::disable();
     }

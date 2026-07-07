@@ -986,7 +986,7 @@ class JITTest extends BaseTest {
                 continue;
             }
             // gc_collect_cycles() MCJIT execute unstable (#3160); compile: GcCollectCyclesJitCompileTest.
-            if (str_contains($name, 'gc_collect_cycles')) {
+            if (str_contains($name, 'gc_collect_cycles') && !str_contains($name, 'argcount')) {
                 continue;
             }
             // set_exception_handler() / restore_exception_handler() VM-only (#3146).
