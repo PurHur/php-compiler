@@ -460,7 +460,12 @@ final class HelperRuntimeCache
                 $context->context->functionType($context->context->voidType(), false)
             );
         };
-        if (null !== $entry['init'] && '' !== $entry['init']) {
+        // User-script AOT: skip cached-unit __init__ until per-unit global_ctors
+        // isolation lands (#16075 step 4). Running unit inits here aliases module
+        // globals and breaks echo of short literals ("0"/"1") and count ternaries.
+        $userAot = getenv('PHP_COMPILER_AOT_USER_SCRIPT');
+        $skipInit = '1' === $userAot || 'true' === strtolower((string) $userAot);
+        if (!$skipInit && null !== $entry['init'] && '' !== $entry['init']) {
             $initFn = $voidFn($entry['init']);
             $context->emitInInit(static function (Context $ctx) use ($initFn): void {
                 $ctx->builder->call($initFn);
