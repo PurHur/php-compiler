@@ -42,7 +42,7 @@ final class GettextJitRuntimeShrinkTest extends TestCase
         $cFiles = glob($runtimeDir.'/*.c') ?: [];
         sort($cFiles);
         $this->assertSame(
-            [$runtimeDir.'/phpc_progress.c'],
+            [],
             $cFiles,
             'gettext JIT must not add C runtime TUs'
         );

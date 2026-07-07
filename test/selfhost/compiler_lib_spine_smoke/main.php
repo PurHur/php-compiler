@@ -287,6 +287,7 @@ require_once __DIR__.'/../../../ext/gettext/textdomain.php';
 require_once __DIR__.'/../../../ext/hash/BuiltinClasses.php';
 require_once __DIR__.'/../../../ext/hash/HashAlgosJitHelper.php';
 require_once __DIR__.'/../../../ext/hash/HashContextDebugInfo.php';
+require_once __DIR__.'/../../../ext/hash/HashContextJitSupport.php';
 require_once __DIR__.'/../../../ext/hash/HashFunction.php';
 require_once __DIR__.'/../../../ext/hash/JitHashAlgos.php';
 require_once __DIR__.'/../../../ext/hash/JitHashContext.php';

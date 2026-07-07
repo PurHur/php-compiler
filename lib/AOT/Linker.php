@@ -15,15 +15,12 @@ final class Linker
     /**
      * Bundled C runtime objects for AOT link.
      *
-     * phpc_progress.c is a frozen thin ABI only (#7146, #7360): async-signal-safe SIGSEGV handler
-     * that write(2)s phpc_last_progress globals filled by ProgressNoteRuntime.php.
-     * Do not add progress formatting or buffer writes in C — use lib/JIT/Builtin/ProgressNoteRuntime.php.
-     * Opt out via PHP_COMPILER_PROGRESS_ABI=0 (see runtimeCSources()).
+     * Runtime shrink target (#1492): keep this list empty. Any unavoidable ABI
+     * glue should be expressed as LLVM IR emitted from PHP lowering.
      *
      * @var list<string>
      */
     private const RUNTIME_C_SOURCES = [
-        __DIR__.'/runtime/phpc_progress.c',
     ];
 
     /** libz.so symlink is often absent without zlib1g-dev; link the versioned .so directly. */
@@ -39,7 +36,6 @@ final class Linker
 
     /** Runtime units that need host libc headers layered on the LLVM sysroot (incomplete headers). */
     private const RUNTIME_HOST_LIBC_BASENAMES = [
-        'phpc_progress.c',
     ];
 
     private static function which(string $binary): ?string
@@ -209,15 +205,7 @@ final class Linker
      */
     private static function runtimeCSources(): array
     {
-        $sources = self::RUNTIME_C_SOURCES;
-        if (!self::progressAbiEnabled()) {
-            $sources = array_values(array_filter(
-                $sources,
-                static fn (string $source): bool => !str_ends_with($source, 'phpc_progress.c')
-            ));
-        }
-
-        return $sources;
+        return self::RUNTIME_C_SOURCES;
     }
 
     private static function runtimeLinkLibs(): string
