@@ -276,6 +276,26 @@ final class ForwardProfilePhantomIntrospectionTest extends TestCase
         }
     }
 
+    public function testGeneratorToArrayWithheldOnPhp82Profile(): void
+    {
+        $prevProfile = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.2');
+        try {
+            $this->assertFalse(BuiltinIntrospectionPolicy::functionIsAdvertised('generator_to_array'));
+            $runtime = new Runtime();
+            $this->assertFalse(
+                \PHPCompiler\ext\standard\VmReflection::functionExists($runtime->vmContext, 'generator_to_array')
+            );
+            $this->assertFalse(isset($runtime->vmContext->functions['generator_to_array']));
+        } finally {
+            if (false === $prevProfile) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prevProfile);
+            }
+        }
+    }
+
     public function testReferenceProfilePhantomFunctionExistsForForwardBuiltins(): void
     {
         $prevProfile = getenv('PHP_COMPILER_PROFILE');
@@ -284,7 +304,6 @@ final class ForwardProfilePhantomIntrospectionTest extends TestCase
             foreach ([
                 'json_validate',
                 'array_any',
-                'generator_to_array',
                 'fpow',
                 'stream_supports',
                 'class_uses_recursive',
@@ -300,7 +319,6 @@ final class ForwardProfilePhantomIntrospectionTest extends TestCase
             foreach ([
                 'json_validate',
                 'array_any',
-                'generator_to_array',
                 'fpow',
                 'stream_supports',
                 'class_uses_recursive',

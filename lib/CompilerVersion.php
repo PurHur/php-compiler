@@ -1441,20 +1441,29 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.4+ generator_to_array() (ext/standard/array.c, issue #6025, #16723).
+     * PHP 8.4+ generator_to_array() (ext/standard/array.c, issue #6025, #16723, #17118).
      *
-     * Withheld on 8.4.0-dev reference profile (matches Zend 8.2 function_exists gate). Enable via
-     * stable 8.4.0+ or explicit `PHP_COMPILER_PROFILE=8.4` forward profile.
+     * Default 8.4.0-dev toolchain registers the builtin; withheld when
+     * {@see languageProfileVersion()} is below 8.4.0 (e.g. `PHP_COMPILER_PROFILE=8.2`).
      */
     public static function supportsGeneratorToArray(): bool
     {
-        return self::supportsPhp84ArraySearchFunctions();
+        if (version_compare(self::VERSION, '8.4', '<')) {
+            return false;
+        }
+
+        $raw = getenv('PHP_COMPILER_PROFILE');
+        if (\is_string($raw) && '' !== trim($raw)) {
+            return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+        }
+
+        return version_compare(self::builtinAdvertisementVersion(), '8.4.0', '>=');
     }
 
-    /** generator_to_array() visible to function_exists() — same gate as array_any family (#17007). */
+    /** generator_to_array() visible to function_exists() — same gate as {@see supportsGeneratorToArray()}. */
     public static function advertisesGeneratorToArray(): bool
     {
-        return self::advertisesPhp84ArraySearchFunctions();
+        return self::supportsGeneratorToArray();
     }
 
     /**

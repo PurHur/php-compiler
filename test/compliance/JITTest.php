@@ -226,10 +226,6 @@ class JITTest extends BaseTest {
                 && !str_contains($name, 'php84_generator_to_array_phantom')) {
                 continue;
             }
-            if (CompilerVersion::supportsGeneratorToArray()
-                && str_contains($name, 'php84_generator_to_array_phantom')) {
-                continue;
-            }
             if (!CompilerVersion::supportsDateTimeMicrosecond()
                 && (str_contains($name, 'datetime_microsecond')
                     || str_contains($name, 'datetime_create_from_interface')

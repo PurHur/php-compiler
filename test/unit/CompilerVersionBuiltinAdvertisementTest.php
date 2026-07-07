@@ -359,9 +359,36 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsPhp84ArraySearchFunctions());
     }
 
-    public function testGeneratorToArrayWithheldOnReferenceProfile(): void
+    public function testGeneratorToArrayEnabledOnDefaultDevProfile(): void
     {
-        $this->assertFalse(CompilerVersion::supportsGeneratorToArray());
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE');
+        try {
+            $this->assertTrue(CompilerVersion::supportsGeneratorToArray());
+            $this->assertTrue(CompilerVersion::advertisesGeneratorToArray());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testGeneratorToArrayWithheldOnPhp82Profile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.2');
+        try {
+            $this->assertFalse(CompilerVersion::supportsGeneratorToArray());
+            $this->assertFalse(CompilerVersion::advertisesGeneratorToArray());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
     }
 
     public function testPhp83ArrayKeyFunctionsTrueWhenProfile83(): void
@@ -553,10 +580,36 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         }
     }
 
-    public function testVmDoesNotRegisterGeneratorToArrayOnReferenceProfile(): void
+    public function testVmRegistersGeneratorToArrayOnDefaultDevProfile(): void
     {
-        $runtime = new Runtime();
-        $this->assertFalse(isset($runtime->vmContext->functions['generator_to_array']));
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE');
+        try {
+            $runtime = new Runtime();
+            $this->assertTrue(isset($runtime->vmContext->functions['generator_to_array']));
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testVmDoesNotRegisterGeneratorToArrayOnPhp82Profile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.2');
+        try {
+            $runtime = new Runtime();
+            $this->assertFalse(isset($runtime->vmContext->functions['generator_to_array']));
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
     }
 
     public function testVmDoesNotRegisterDateTimeMicrosecondOnReferenceProfile(): void

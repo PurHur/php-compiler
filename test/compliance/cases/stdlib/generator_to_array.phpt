@@ -27,4 +27,4 @@ array (
   'a' => 1,
   'b' => 2,
 )
-generator_to_array(): Argument #1 ($generator) must be of type Generator, object given
+generator_to_array(): Argument #1 ($generator) must be of type Generator, stdClass given
