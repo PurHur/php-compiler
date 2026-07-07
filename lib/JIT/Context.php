@@ -598,6 +598,33 @@ class Context {
         return null;
     }
 
+    /**
+     * Ensure a named local exists for closure `use (&$name)` before the assign completes (#17089).
+     */
+    public function ensureVariableForScopedName(string $name): Variable
+    {
+        $existing = $this->variableForScopedName($name);
+        if (null !== $existing) {
+            return $existing;
+        }
+        $resolved = $this->resolveRefAliasName($name);
+        if (isset($this->namedVariableBindings[$resolved])) {
+            return $this->namedVariableBindings[$resolved];
+        }
+        $slot = JitValueBox::alloc($this);
+        $var = new Variable(
+            $this,
+            Variable::TYPE_VALUE,
+            Variable::KIND_VARIABLE,
+            $slot
+        );
+        $var->addref();
+        $var->initialize();
+        $this->bindVariableByName($name, $var);
+
+        return $var;
+    }
+
     public function resolveFunctionProxy(string $proxyName): Call
     {
         $proxy = $this->lookupFunctionProxy($proxyName);

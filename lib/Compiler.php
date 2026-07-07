@@ -806,6 +806,7 @@ class Compiler {
             $slot = $funcBlock->getVarSlot($useVar, false);
             $funcBlock->closureCaptureSlots[$slot] = true;
             $funcBlock->closureCaptureSlotNames[$slot] = $name;
+            $funcBlock->closureCaptureNameToSlot[$name] = $slot;
             if ($useVar->byRef) {
                 $funcBlock->closureCaptureByRef[$slot] = true;
             }
@@ -960,6 +961,18 @@ class Compiler {
             $child->returnTypeStatic = $parent->returnTypeStatic;
             $child->returnDeclaredType = $parent->returnDeclaredType;
             $child->returnLiteralBoolType = $parent->returnLiteralBoolType;
+        }
+        foreach ($parent->closureCaptureSlots as $slot => $flag) {
+            $child->closureCaptureSlots[$slot] = $flag;
+        }
+        foreach ($parent->closureCaptureByRef as $slot => $flag) {
+            $child->closureCaptureByRef[$slot] = $flag;
+        }
+        foreach ($parent->closureCaptureSlotNames as $slot => $name) {
+            $child->closureCaptureSlotNames[$slot] = $name;
+        }
+        foreach ($parent->closureCaptureNameToSlot as $name => $slot) {
+            $child->closureCaptureNameToSlot[$name] = $slot;
         }
     }
 
@@ -9630,6 +9643,8 @@ class Compiler {
                     'slot' => $slot,
                     'byRef' => $useVar->byRef,
                 ];
+                $funcBlock->closureCaptureNameToSlot[$name] = $slot;
+                $funcBlock->closureCaptureSlotNames[$slot] = $name;
             }
         } elseif ($expr instanceof Op\Expr\ArrowFunction) {
             // Zend auto-captures outer locals/parameters (zend_compile.c); nested fn-in-fn needs
@@ -42720,6 +42735,8 @@ class Compiler {
             return $folded;
         }
 
+        [$name, $calleeMaterializeOps] = $this->materializeClosureCaptureCalleeBeforeArgs($name, $block);
+
         $callName = $this->tryFoldVariableFunctionName($name, $block) ?? $name;
         $calleeName = $this->resolveCompileTimeStringSlot($callName, $block)
             ?? ($name !== null ? $this->resolveCompileTimeStringSlot($name, $block) : null);
@@ -42751,6 +42768,9 @@ class Compiler {
         $this->rewireVarExportNestedInlineCallArgSendSlots($outerArgSends, $nestedProducerOps, $block, $cfgCallOp, $calleeName);
         $this->rewireIsArrayNestedFileCallArgSendSlots($outerArgSends, $nestedProducerOps, $block, $cfgCallOp, $calleeName);
         $return = [];
+        foreach ($calleeMaterializeOps as $materializeOp) {
+            $return[] = $materializeOp;
+        }
         foreach ($outerArgSends as $send) {
             if (OpCode::TYPE_ASSIGN === $send->type) {
                 $return[] = $send;
@@ -42775,6 +42795,27 @@ class Compiler {
         }
         $return[] = $this->compileFuncCallExecOpcode($result, $block, $startLine, $cfgCallOp);
         return $return;
+    }
+
+    /**
+     * Snapshot closure `use (&$fn)` callees before call-arg lowering (#17089).
+     *
+     * @return array{0: ?int, 1: list<OpCode>}
+     */
+    protected function materializeClosureCaptureCalleeBeforeArgs(?int $nameSlot, Block $block): array
+    {
+        if (null === $nameSlot || !$block->isClosureCaptureSlot($nameSlot)) {
+            return [$nameSlot, []];
+        }
+        $save = $block->forceFreshVarSlot(new Temporary());
+        $materialize = new OpCode(
+            OpCode::TYPE_ASSIGN,
+            $save,
+            $save,
+            $nameSlot
+        );
+
+        return [$save, [$materialize]];
     }
 
     /**

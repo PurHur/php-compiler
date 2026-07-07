@@ -179,6 +179,9 @@ final class VmClosure
                 continue;
             }
             $src = $context->variableForScopedName($spec['name']);
+            if (null === $src && $spec['byRef']) {
+                $src = $context->ensureVariableForScopedName($spec['name']);
+            }
             if (null === $src) {
                 $captures[] = self::nullCapture($context);
 

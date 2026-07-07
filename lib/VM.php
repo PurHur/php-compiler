@@ -5292,7 +5292,8 @@ restart:
                     $this->context->declareFunction($func);
                     break;
                 case OpCode::TYPE_FUNCCALL_INIT:
-                    $callee = $frame->scope[$op->arg1]->resolveIndirect();
+                    $calleeSlot = (int) $op->arg1;
+                    $callee = $this->readScopeOperandForRuntimeRead($frame, $calleeSlot)->resolveIndirect();
                     if (Variable::TYPE_NULL === $callee->type) {
                         $catchFrame = $this->dispatchVmError(
                             'Value of type null is not callable',
@@ -5307,9 +5308,15 @@ restart:
                     }
                     if (Variable::TYPE_OBJECT === $callee->type) {
                         $closureState = $callee->toObject()->closureState;
+                        if (
+                            null === $closureState
+                            && [] !== $frame->block->closureCaptureSlots
+                        ) {
+                            $closureState = $frame->closureCall ?? $frame->pendingClosureInvoke;
+                        }
                         if (null !== $closureState) {
                             $this->initClosureCall($frame, $closureState);
-                            $frame->closureCallableSlot = $op->arg1;
+                            $frame->closureCallableSlot = $calleeSlot;
                             break;
                         }
                         $catchFrame = $this->initMethodCall($frame, $callee, '__invoke');
@@ -12636,7 +12643,13 @@ restart:
             $src = $this->resolveClosureCaptureSource($spec['name'], $frame);
             $stored = new Variable();
             if (null === $src) {
-                $stored->null();
+                if ($spec['byRef']) {
+                    // Recursive `use (&$fn)` binds to the parent CV before the assign completes (#17089).
+                    $src = $frame->block->ensureVariableByRuntimeName($spec['name'], $frame);
+                    $stored->indirect($src->resolveIndirect());
+                } else {
+                    $stored->null();
+                }
             } elseif ($spec['byRef']) {
                 $stored->indirect($src->byRefTarget());
             } else {
@@ -16130,6 +16143,9 @@ restart:
                 continue;
             }
             if ($frame->block->isNamedVariableSlot($slot)) {
+                continue;
+            }
+            if ($frame->block->isClosureCaptureSlot($slot)) {
                 continue;
             }
             if (isset($frame->block->deferredArrayLiteralKeepSlots[$slot])) {

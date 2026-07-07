@@ -183,6 +183,9 @@ class Block {
     /** @var array<int, string> Closure `use` slot => captured variable name (#17089). */
     public array $closureCaptureSlotNames = [];
 
+    /** Closure `use ($name)` → scope slot for compile-time reads (#17089). */
+    public array $closureCaptureNameToSlot = [];
+
     /** Arrow function body: register outer lexical reads for auto-capture (#4944, #4952, #10304). */
     public bool $arrowAutoCapture = false;
 
@@ -427,6 +430,17 @@ class Block {
         if ($isRead) {
             $name = self::resolveVariableName($operand);
             if (null !== $name && '' !== $name) {
+                $captureSlot = $this->closureCaptureSlotForName($name);
+                if (null !== $captureSlot) {
+                    $this->scope[$operand] = $captureSlot;
+                    if ($this->shouldRegisterInheritedArg($operand)) {
+                        $this->args[$operand] = $captureSlot;
+                    }
+
+                    return $captureSlot;
+                }
+            }
+            if (null !== $name && '' !== $name) {
                 $paramSlot = $this->paramSlotForName($name);
                 if (null !== $paramSlot) {
                     $this->scope[$operand] = $paramSlot;
@@ -616,8 +630,53 @@ class Block {
         foreach ($this->scope as $op) {
             $next = max($next, $this->scope[$op] + 1);
         }
+        foreach (array_keys($this->closureCaptureSlots) as $captureSlot) {
+            $next = max($next, (int) $captureSlot + 1);
+        }
+        foreach ($this->parents as $parent) {
+            if (!$parent instanceof self) {
+                continue;
+            }
+            foreach (array_keys($parent->closureCaptureSlots) as $captureSlot) {
+                $next = max($next, (int) $captureSlot + 1);
+            }
+        }
 
         return $next;
+    }
+
+    /** True when $slot holds a closure use() capture in this block or an enclosing CFG parent (#17089). */
+    public function isClosureCaptureSlot(int $slot): bool
+    {
+        if (isset($this->closureCaptureSlots[$slot])) {
+            return true;
+        }
+        foreach ($this->parents as $parent) {
+            if ($parent instanceof self && $parent->isClosureCaptureSlot($slot)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /** Resolve `use ($name)` slot from this block or enclosing parents (#17089). */
+    public function closureCaptureSlotForName(string $name): ?int
+    {
+        if (isset($this->closureCaptureNameToSlot[$name])) {
+            return (int) $this->closureCaptureNameToSlot[$name];
+        }
+        foreach ($this->parents as $parent) {
+            if (!$parent instanceof self) {
+                continue;
+            }
+            $found = $parent->closureCaptureSlotForName($name);
+            if (null !== $found) {
+                return $found;
+            }
+        }
+
+        return null;
     }
 
     public function registerConstant(Operand $operand, Variable $const): int {
@@ -787,6 +846,18 @@ class Block {
                 $this->assignResultToLvalueSlot[$resultSlot] = $lvalueSlot;
             }
         }
+        foreach ($parent->closureCaptureSlots as $slot => $flag) {
+            $this->closureCaptureSlots[$slot] = $flag;
+        }
+        foreach ($parent->closureCaptureByRef as $slot => $flag) {
+            $this->closureCaptureByRef[$slot] = $flag;
+        }
+        foreach ($parent->closureCaptureSlotNames as $slot => $name) {
+            $this->closureCaptureSlotNames[$slot] = $name;
+        }
+        foreach ($parent->closureCaptureNameToSlot as $name => $slot) {
+            $this->closureCaptureNameToSlot[$name] = $slot;
+        }
         // literal/deploy include path tables are per-block; inheriting parent paths breaks
         // arg3 indices and can recurse into the wrong TU (layout vs partial, issue #784).
         if (null !== $parent->func) {
@@ -870,17 +941,25 @@ class Block {
     public function slotIndexForVariableName(string $name): ?int
     {
         $fallback = null;
+        $captureMatch = null;
         foreach ($this->scope as $operand) {
             if (self::resolveVariableName($operand) !== $name) {
                 continue;
             }
             $slot = $this->scope[$operand];
+            if ($this->isClosureCaptureSlot((int) $slot)) {
+                $captureMatch = $slot;
+                break;
+            }
             if (isset($this->namedAssignDestSlotIndexes[$slot])) {
                 return $slot;
             }
             if (null === $fallback) {
                 $fallback = $slot;
             }
+        }
+        if (null !== $captureMatch) {
+            return $captureMatch;
         }
 
         return $fallback;
@@ -1282,6 +1361,19 @@ class Block {
             if (isset($this->constants[$pos]) && !$this->args->contains($op)) {
                 $scope[$pos] = $this->scopeConstantVariable($pos);
             } elseif (isset($this->closureCaptureSlots[$pos])) {
+                if (null !== $frame) {
+                    $inherited = self::findVariableInParentFrames($op, $frame);
+                    if (null !== $inherited) {
+                        $bound = new Variable();
+                        if ($inherited->isIndirect()) {
+                            $bound->indirect($inherited->resolveIndirect());
+                        } else {
+                            $bound->copyFrom($inherited->resolveIndirect());
+                        }
+                        $scope[$pos] = $bound;
+                        continue;
+                    }
+                }
                 $scope[$pos] = self::initialVariableForOperand($op, $context, $pos, $this);
             } elseif ($this->isArgRecvParameterSlot($pos)) {
                 // Params are not in $args (compileOperand isRead=false); still need type metadata (#7057).
