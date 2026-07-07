@@ -971,6 +971,15 @@ class VMTest extends BaseTest {
                 && str_contains($name, 'is_equal_node_phantom')) {
                 continue;
             }
+            if (!CompilerVersion::supportsDomNodeReplaceChildren()
+                && str_contains($name, 'dom_node_replace_children')
+                && !str_contains($name, 'replace_children_phantom')) {
+                continue;
+            }
+            if (CompilerVersion::supportsDomNodeReplaceChildren()
+                && str_contains($name, 'replace_children_phantom')) {
+                continue;
+            }
             if (!CompilerVersion::supportsClassHasFunctions()
                 && str_contains($name, 'class_has_')
                 && !str_contains($name, 'class_has_lazy_object')

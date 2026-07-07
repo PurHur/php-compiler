@@ -1786,6 +1786,14 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.4+ DOMNode::replaceChildren() (ext/dom/parentnode.c, #16822).
+     */
+    public static function supportsDomNodeReplaceChildren(): bool
+    {
+        return self::supportsDomApiSince('8.4.0');
+    }
+
+    /**
      * PHP 8.4+ DOMElement::insertAdjacentHTML() (ext/dom/dom_element.c, #16128).
      */
     public static function supportsDomElementInsertAdjacentHtml(): bool

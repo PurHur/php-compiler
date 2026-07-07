@@ -194,8 +194,10 @@ final class VmDom
         }
         $node->methods['append'] = new NodeAppend();
         $node->methodVisibility['append'] = $pub;
-        $node->methods['replacechildren'] = new NodeReplaceChildren();
-        $node->methodVisibility['replacechildren'] = $pub;
+        if (CompilerVersion::supportsDomNodeReplaceChildren()) {
+            $node->methods['replacechildren'] = new NodeReplaceChildren();
+            $node->methodVisibility['replacechildren'] = $pub;
+        }
         $node->methods['prepend'] = new NodePrepend();
         $node->methodVisibility['prepend'] = $pub;
         $node->methods['before'] = new NodeBefore();

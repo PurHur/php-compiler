@@ -803,6 +803,15 @@ class JITTest extends BaseTest {
                 && str_contains($name, 'is_equal_node_phantom')) {
                 continue;
             }
+            if (!CompilerVersion::supportsDomNodeReplaceChildren()
+                && str_contains($name, 'dom_node_replace_children')
+                && !str_contains($name, 'replace_children_phantom')) {
+                continue;
+            }
+            if (CompilerVersion::supportsDomNodeReplaceChildren()
+                && str_contains($name, 'replace_children_phantom')) {
+                continue;
+            }
             // DOMElement::getAttributeNames() multi-element array return segfaults under JIT (#16823); VM-only for now.
             if (str_contains($name, 'dom_element_get_attribute_names')
                 && !str_contains($name, 'get_attribute_names_phantom')) {

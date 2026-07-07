@@ -1,5 +1,14 @@
 --TEST--
 stdlib DOMNode::replaceChildren() living-standard child replacement (#16822, ext/dom/parentnode.c)
+--SKIPIF--
+<?php
+if (!class_exists('PHPCompiler\\CompilerVersion')) {
+    require __DIR__ . '/../../../../vendor/autoload.php';
+}
+if (!PHPCompiler\CompilerVersion::supportsDomNodeReplaceChildren()) {
+    die('skip DOMNode::replaceChildren() not advertised on PHP 8.2 reference profile (#17119, ext/dom/parentnode.c)');
+}
+?>
 --FILE--
 <?php
 $doc = new DOMDocument();
