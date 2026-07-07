@@ -126,6 +126,8 @@ final class VmDom
 
     public const PROP_PARENT_NODE = 'parentNode';
 
+    public const PROP_PARENT_ELEMENT = 'parentElement';
+
     public const PROP_LENGTH = 'length';
 
     public const PROP_NAME = 'name';
@@ -168,6 +170,9 @@ final class VmDom
         $node->properties[] = new ClassProperty(self::PROP_PREVIOUS_SIBLING, $nullProto, $objProto);
         $node->properties[] = new ClassProperty(self::PROP_NEXT_SIBLING, $nullProto, $objProto);
         $node->properties[] = new ClassProperty(self::PROP_PARENT_NODE, $nullProto, $objProto);
+        if (CompilerVersion::supportsDomParentElement()) {
+            $node->properties[] = new ClassProperty(self::PROP_PARENT_ELEMENT, $nullProto, $objProto);
+        }
         $node->methods['clonenode'] = new NodeCloneNode();
         $node->methodVisibility['clonenode'] = $pub;
         $node->methods['replacechild'] = new NodeReplaceChild();
@@ -4279,6 +4284,9 @@ final class VmDom
         if (!$entry->hasProperty(self::PROP_PARENT_NODE)) {
             $entry->allocateProperty(self::PROP_PARENT_NODE)->null();
         }
+        if (CompilerVersion::supportsDomParentElement() && !$entry->hasProperty(self::PROP_PARENT_ELEMENT)) {
+            $entry->allocateProperty(self::PROP_PARENT_ELEMENT)->null();
+        }
         if (!$entry->hasProperty(self::PROP_CHILD_NODES)) {
             $entry->allocateProperty(self::PROP_CHILD_NODES)->null();
         }
@@ -4503,6 +4511,20 @@ final class VmDom
             }
         } else {
             $parentVar->null();
+        }
+
+        if (CompilerVersion::supportsDomParentElement()) {
+            $parentElementVar = $node->getProperty(self::PROP_PARENT_ELEMENT);
+            if (null !== $state->parentId) {
+                $parent = DomRegistry::entry($state->parentId);
+                if (null !== $parent && self::isElement($parent)) {
+                    $parentElementVar->object($parent);
+                } else {
+                    $parentElementVar->null();
+                }
+            } else {
+                $parentElementVar->null();
+            }
         }
 
         $firstVar = $node->getProperty(self::PROP_FIRST_CHILD);
