@@ -217,6 +217,11 @@ class AotTest extends BaseTest
                 && !str_contains($name, 'locale_gated')) {
                 continue;
             }
+            if (!\PHPCompiler\ext\intl\IntlExtensionPolicy::runsLocaleParserCompliance($name)
+                && str_contains($name, 'locale_get_parts')
+                && !str_contains($name, 'locale_gated')) {
+                continue;
+            }
             if (!\PHPCompiler\ext\curl\CurlExtensionPolicy::advertisesBuiltins()
                 && str_contains($name, 'curl_escape')
                 && !str_contains($name, 'curl_escape_phantom')) {

@@ -381,8 +381,12 @@ class VMTest extends BaseTest {
                 continue;
             }
             if (!\PHPCompiler\ext\intl\IntlExtensionPolicy::advertisesLocale()
-                && (str_contains($name, 'locale_get_default')
-                    || str_contains($name, 'locale_get_parts'))
+                && str_contains($name, 'locale_get_default')
+                && !str_contains($name, 'locale_gated')) {
+                continue;
+            }
+            if (!\PHPCompiler\ext\intl\IntlExtensionPolicy::runsLocaleParserCompliance($name)
+                && str_contains($name, 'locale_get_parts')
                 && !str_contains($name, 'locale_gated')) {
                 continue;
             }
