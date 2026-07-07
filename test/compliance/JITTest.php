@@ -304,10 +304,6 @@ class JITTest extends BaseTest {
                 && !str_contains($name, 'mb_trim_phantom')) {
                 continue;
             }
-            if (CompilerVersion::supportsMbTrimFunctions()
-                && str_contains($name, 'mb_trim_phantom')) {
-                continue;
-            }
             if (!CompilerVersion::supportsStreamSupports()
                 && (('stdlib/stream_supports' === $name)
                     || str_contains($name, 'stream_support_constants')

@@ -379,10 +379,6 @@ class VMTest extends BaseTest {
                 && !str_contains($name, 'mb_trim_phantom')) {
                 continue;
             }
-            if (CompilerVersion::supportsMbTrimFunctions()
-                && str_contains($name, 'mb_trim_phantom')) {
-                continue;
-            }
             if (!CompilerVersion::supportsConvertCyrString()
                 && str_contains($name, 'convert_cyr_string')) {
                 continue;
