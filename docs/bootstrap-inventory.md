@@ -30793,8 +30793,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Exception (line 101)
 - new DatePeriodIteratorState (line 137)
 - new ObjectEntry (line 258)
-- new ObjectEntry (line 362)
-- new NativeDateMalformedPeriodStringException (line 373)
+- new ObjectEntry (line 373)
+- new NativeDateMalformedPeriodStringException (line 384)
 - 32 class method(s)
 
 ### `lib/VM/DateTimeInterfaceSupport.php`
