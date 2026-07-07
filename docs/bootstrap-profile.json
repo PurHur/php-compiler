@@ -869,6 +869,7 @@
         "ext/standard/InfoJitHelper.php",
         "ext/standard/IniIntrospectionJitHelper.php",
         "ext/standard/IniJitHelper.php",
+        "ext/standard/IniOptionArg.php",
         "ext/standard/IniParseQuantityJitHelper.php",
         "ext/standard/InterfaceExistsJitHelper.php",
         "ext/standard/IsFiniteJitHelper.php",
@@ -1574,6 +1575,7 @@
         "ext/standard/VmDateSunNative.php",
         "ext/standard/VmDateTimeNative.php",
         "ext/standard/VmDebugBacktrace.php",
+        "ext/standard/VmDebugZval.php",
         "ext/standard/VmDir.php",
         "ext/standard/VmDirArg.php",
         "ext/standard/VmDirNative.php",
@@ -3975,6 +3977,7 @@
         "lib/VM/Builtin/ReflectionPropertyGetDeclaringClass.php",
         "lib/VM/Builtin/ReflectionPropertyGetDefaultValue.php",
         "lib/VM/Builtin/ReflectionPropertyGetDocComment.php",
+        "lib/VM/Builtin/ReflectionPropertyGetHook.php",
         "lib/VM/Builtin/ReflectionPropertyGetHooks.php",
         "lib/VM/Builtin/ReflectionPropertyGetMangledName.php",
         "lib/VM/Builtin/ReflectionPropertyGetName.php",
@@ -4464,9 +4467,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 4230,
+        "inventory_files": 4233,
         "excluded": 0,
-        "eligible": 4230,
+        "eligible": 4233,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
