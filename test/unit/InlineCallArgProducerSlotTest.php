@@ -1367,6 +1367,44 @@ PHP;
         self::assertSame([$castSlot], $sendSlots, 'arg sends='.json_encode($sendSlots));
     }
 
+    /** Issue #17210 — var_export(1.0+0.0, true) wires Plus producer, not hoisted true ConstFetch. */
+    public function testVarExportInlineArithmeticReturnTrueUsesPlusProducerSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+echo var_export(1.0 + 0.0, true);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'var_export_arithmetic_inline.php');
+
+        $plusSlot = null;
+        $varExportSends = [];
+        $fcallOrdinal = 0;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                ++$fcallOrdinal;
+                if (1 === $fcallOrdinal) {
+                    $varExportSends = [];
+                }
+            }
+            if (OpCode::TYPE_PLUS === $op->type) {
+                $plusSlot = $op->arg1;
+            }
+            if (1 === $fcallOrdinal && OpCode::TYPE_ARG_SEND === $op->type) {
+                $varExportSends[] = $op->arg1;
+            }
+        }
+
+        self::assertNotNull($plusSlot);
+        self::assertCount(2, $varExportSends);
+        self::assertSame($plusSlot, $varExportSends[0], 'arg sends='.json_encode($varExportSends));
+
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertStringContainsString('1.0', $out);
+    }
+
     /** Issue #12824 — var_export([NAN, INF], true) wires Array_ producer, not hoisted ConstFetch temps. */
     public function testVarExportInlineNanInfArrayUsesArrayProducerSlot(): void
     {

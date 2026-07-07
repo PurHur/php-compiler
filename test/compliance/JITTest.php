@@ -151,6 +151,15 @@ class JITTest extends BaseTest {
                 && !str_contains($name, 'crc32c_phantom')) {
                 continue;
             }
+            if (!CompilerVersion::supportsHebrevc()
+                && str_contains($name, 'hebrevc')
+                && !str_contains($name, 'hebrevc_phantom')) {
+                continue;
+            }
+            if (CompilerVersion::supportsHebrevc()
+                && str_contains($name, 'hebrevc_phantom')) {
+                continue;
+            }
             if (!CompilerVersion::supportsMbStrPad()
                 && str_contains($name, 'mb_str_pad')
                 && !str_contains($name, 'mb_str_pad_phantom')) {

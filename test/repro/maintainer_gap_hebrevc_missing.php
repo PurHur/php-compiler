@@ -5,7 +5,7 @@ declare(strict_types=1);
 /**
  * Maintainer repro: hebrevc() registration and newline conversion (#17183, #17206).
  *
- * Run: PHP_COMPILER_PROFILE=8.3 php bin/vm.php test/repro/maintainer_gap_hebrevc_missing.php
+ * Run with: PHP_COMPILER_PROFILE=8.3 php bin/vm.php test/repro/maintainer_gap_hebrevc_missing.php
  */
 
 if (!function_exists('hebrevc')) {

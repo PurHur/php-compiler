@@ -146,6 +146,15 @@ class VMTest extends BaseTest {
                 && !str_contains($name, 'crc32c_phantom')) {
                 continue;
             }
+            if (!CompilerVersion::supportsHebrevc()
+                && str_contains($name, 'hebrevc')
+                && !str_contains($name, 'hebrevc_phantom')) {
+                continue;
+            }
+            if (CompilerVersion::supportsHebrevc()
+                && str_contains($name, 'hebrevc_phantom')) {
+                continue;
+            }
             if (!CompilerVersion::supportsJsonValidate()
                 && str_contains($name, 'json_validate')
                 && !str_contains($name, 'json_validate_phantom')

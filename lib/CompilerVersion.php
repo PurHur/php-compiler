@@ -986,10 +986,19 @@ final class CompilerVersion
         return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
     }
 
-    /** attribute_exists()/class_meth_exists()/unitenum_exists() visible to function_exists() — same gate as {@see supportsPhp84ReflectionProbeBuiltins()}. */
+    /** attribute_exists()/class_meth_exists()/unitenum_exists() visible to function_exists() — stable runtime or forward 8.4+ (#17206). */
     public static function advertisesPhp84ReflectionProbeBuiltins(): bool
     {
-        return self::supportsPhp84ReflectionProbeBuiltins();
+        if (version_compare(self::VERSION, '8.4.0', '>=')) {
+            return true;
+        }
+
+        $raw = getenv('PHP_COMPILER_PROFILE');
+        if (!\is_string($raw) || '' === trim($raw)) {
+            return false;
+        }
+
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
     }
 
     /**
@@ -1623,11 +1632,20 @@ final class CompilerVersion
     }
 
     /**
-     * mb_trim/ltrim/rtrim visible to function_exists() — same gate as {@see supportsMbTrimFunctions()}.
+     * mb_trim/ltrim/rtrim visible to function_exists() — stable runtime or forward 8.4+ (#17206).
      */
     public static function advertisesMbTrimFunctions(): bool
     {
-        return self::supportsMbTrimFunctions();
+        if (version_compare(self::VERSION, '8.4.0', '>=')) {
+            return true;
+        }
+
+        $raw = getenv('PHP_COMPILER_PROFILE');
+        if (!\is_string($raw) || '' === trim($raw)) {
+            return false;
+        }
+
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
     }
 
     /**
@@ -1741,6 +1759,23 @@ final class CompilerVersion
     }
 
     /**
+     * crc32c() visible to function_exists() — stable runtime or forward 8.3+ (#17206).
+     */
+    public static function advertisesCrc32c(): bool
+    {
+        if (version_compare(self::VERSION, '8.4.0', '>=')) {
+            return true;
+        }
+
+        $raw = getenv('PHP_COMPILER_PROFILE');
+        if (!\is_string($raw) || '' === trim($raw)) {
+            return false;
+        }
+
+        return version_compare(self::languageProfileVersion(), '8.3.0', '>=');
+    }
+
+    /**
      * PHP 8.3+ hebrevc() (ext/standard/string.c, issue #17183, #17206).
      *
      * Withheld on 8.4.0-dev reference profile (matches Zend 8.2 function_exists gate). Enable via
@@ -1764,18 +1799,19 @@ final class CompilerVersion
         return version_compare(self::languageProfileVersion(), '8.3.0', '>=');
     }
 
-    /** hebrevc() visible to function_exists() — same gate as {@see supportsHebrevc()}. */
+    /** hebrevc() visible to function_exists() — stable runtime or forward 8.3+ (#17206). */
     public static function advertisesHebrevc(): bool
     {
-        return self::supportsHebrevc();
-    }
+        if (version_compare(self::VERSION, '8.4.0', '>=')) {
+            return true;
+        }
 
-    /**
-     * crc32c() visible to function_exists() — same gate as {@see supportsCrc32c()} (#17139).
-     */
-    public static function advertisesCrc32c(): bool
-    {
-        return self::supportsCrc32c();
+        $raw = getenv('PHP_COMPILER_PROFILE');
+        if (!\is_string($raw) || '' === trim($raw)) {
+            return false;
+        }
+
+        return version_compare(self::languageProfileVersion(), '8.3.0', '>=');
     }
 
     /**
