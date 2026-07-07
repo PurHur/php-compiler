@@ -22,6 +22,10 @@ final class IsUploadedFileJITTest extends BaseTest
             __DIR__.'/cases/stdlib/is_uploaded_file_jit.phpt',
             'is_uploaded_file_jit.phpt'
         );
+        yield 'is_uploaded_file_null_strict_jit.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/is_uploaded_file_null_strict_jit.phpt',
+            'is_uploaded_file_null_strict_jit.phpt'
+        );
     }
 
     public function setUp(): void

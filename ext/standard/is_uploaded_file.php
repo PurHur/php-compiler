@@ -7,7 +7,6 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -24,7 +23,7 @@ final class is_uploaded_file extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('is_uploaded_file() requires exactly one argument in this compiler build');
         }
-        $path = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'is_uploaded_file', 0, 'filename');
+        $path = VmFilestatArg::filenameArgForFrame($frame, 0, 'is_uploaded_file');
         if (null === $frame->returnVar) {
             return;
         }
@@ -36,7 +35,7 @@ final class is_uploaded_file extends Internal
         if (1 !== \count($args)) {
             throw new \LogicException('is_uploaded_file() requires exactly one argument in this compiler build');
         }
-        $path = JitStringBuiltinArg::lower($context, $args[0], 'is_uploaded_file', 0, 'filename');
+        $path = JitFilestatArg::lowerFilename($context, $args[0], 'is_uploaded_file');
 
         return JitIsUploadedFile::invoke($context, $path);
     }
