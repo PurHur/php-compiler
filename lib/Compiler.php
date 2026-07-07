@@ -19661,14 +19661,10 @@ class Compiler {
                 if ($this->operandsReferToSameVariable($producer->result, $callArg)) {
                     return $producer;
                 }
+                if ($this->callArgIsDeadInlineTemporary($callArg)) {
+                    return $producer;
+                }
             }
-        }
-        $last = $producers[\count($producers) - 1] ?? null;
-        if (
-            $this->isComparisonInlineCallArgProducer($last)
-            && $this->callArgIsDeadInlineTemporary($callArg)
-        ) {
-            return $last;
         }
 
         return null;
@@ -21422,6 +21418,15 @@ class Compiler {
                 ) {
                     continue;
                 }
+                // var_export($x !== false, true) — hoisted false feeds comparison RHS, not call arg (#17250, re-#13694).
+                if (
+                    ($child instanceof Op\Expr\ConstFetch || $child instanceof Op\Expr\ClassConstFetch)
+                    && $this->isComparisonInlineCallArgProducer($next)
+                    && null !== $child->result
+                    && $this->cfgExprUsesOperand($next, $child->result)
+                ) {
+                    continue;
+                }
                 // ConstFetch chain before sibling BitwiseOr — hoisted operands, not call args (#11407).
                 for ($j = $i + 1; $j < $callIndex; ++$j) {
                     $scan = $cfgChildren[$j];
@@ -21907,10 +21912,20 @@ class Compiler {
                     continue;
                 }
             }
-            if (
-                $this->isComparisonInlineCallArgProducer($child)
-                && !$this->inlineCallArgProducerFeedsConsumer($child, $callOp)
-            ) {
+            if ($this->isComparisonInlineCallArgProducer($child)) {
+                if ($this->inlineCallArgProducerFeedsConsumer($child, $callOp)) {
+                    array_unshift($producers, $child);
+                    continue;
+                }
+                if (
+                    $i === $callIndex - 2
+                    && $this->isHoistedScalarConstFetchImmediatelyBeforeCall($cfgChildren[$callIndex - 1] ?? null)
+                    && 'var_export' === strtolower($this->resolveCfgFuncCallName($callOp) ?? '')
+                ) {
+                    // var_export($x !== false, true) — comparison feeds arg #0, not trailing return flag (#17250).
+                    array_unshift($producers, $child);
+                    continue;
+                }
                 // explode(PATH_SEPARATOR, …) after `if (':' !== PATH_SEPARATOR || …)` — compare bool must not bind arg #0 (#15833).
                 continue;
             }
@@ -37966,11 +37981,17 @@ class Compiler {
                         $block->orig->children,
                         $cfgCallOp
                     );
-                    $trailingComparisonProducer = $trailingProducers[\count($trailingProducers) - 1] ?? null;
+                    foreach (array_reverse($trailingProducers) as $producer) {
+                        if ($this->isComparisonInlineCallArgProducer($producer)) {
+                            $trailingComparisonProducer = $producer;
+                            break;
+                        }
+                    }
                 }
                 $comparisonFeedsCallArg = $this->isComparisonInlineCallArgProducer($trailingComparisonProducer);
                 if (
-                    $comparisonFeedsCallArg
+                    0 === (int) $argIndex
+                    && $comparisonFeedsCallArg
                     && $this->callArgIsDeadInlineTemporary($arg)
                     && $trailingComparisonProducer instanceof Op\Expr
                     && null !== $trailingComparisonProducer->result
@@ -39068,7 +39089,7 @@ class Compiler {
                 $valueSlot = $filterInputSlot;
             }
             // var_dump(E::A <=> E::B) — immediate spaceship prelude wins over hoisted enum temps (#10203).
-            if (null !== $cfgCallOp && null !== $block->orig) {
+            if (null !== $cfgCallOp && null !== $block->orig && 0 === (int) $argIndex) {
                 $callArgProbe = $cfgCallOp->args[(int) $argIndex] ?? $arg;
                 if ($this->callArgIsDeadInlineTemporary($callArgProbe)) {
                     $cfgCallIndex = null;
@@ -39080,17 +39101,28 @@ class Compiler {
                     }
                     if (null !== $cfgCallIndex && $cfgCallIndex > 0) {
                         $immediatePrelude = $block->orig->children[$cfgCallIndex - 1] ?? null;
-                        if (
-                            $this->isComparisonInlineCallArgProducer($immediatePrelude)
-                            && $immediatePrelude instanceof Op\Expr
-                            && null !== $immediatePrelude->result
+                        $comparisonPrelude = null;
+                        if ($this->isComparisonInlineCallArgProducer($immediatePrelude)) {
+                            $comparisonPrelude = $immediatePrelude;
+                        } elseif (
+                            $cfgCallIndex > 1
+                            && $this->isHoistedScalarConstFetchImmediatelyBeforeCall($immediatePrelude)
                         ) {
-                            if (null === $block->slotForOperand($immediatePrelude->result)) {
-                                foreach ($this->compileExpr($immediatePrelude, $block) as $op) {
+                            $candidate = $block->orig->children[$cfgCallIndex - 2] ?? null;
+                            if ($this->isComparisonInlineCallArgProducer($candidate)) {
+                                $comparisonPrelude = $candidate;
+                            }
+                        }
+                        if (
+                            $comparisonPrelude instanceof Op\Expr
+                            && null !== $comparisonPrelude->result
+                        ) {
+                            if (null === $block->slotForOperand($comparisonPrelude->result)) {
+                                foreach ($this->compileExpr($comparisonPrelude, $block) as $op) {
                                     $sends[] = $op;
                                 }
                             }
-                            $comparisonSlot = $block->slotForOperand($immediatePrelude->result);
+                            $comparisonSlot = $block->slotForOperand($comparisonPrelude->result);
                             if (null !== $comparisonSlot) {
                                 $valueSlot = (string) $comparisonSlot;
                             }
