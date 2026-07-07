@@ -32,12 +32,7 @@ final class hrtime extends Internal
         }
         $asNumber = false;
         if (1 === $argc) {
-            $asNumber = VmMath::parseBoolBuiltinArg(
-                $frame->calledArgs[0],
-                'hrtime',
-                1,
-                'as_number'
-            );
+            $asNumber = VmMath::parseBoolBuiltinArgForFrame($frame, 0, 'hrtime', 1, 'as_number');
         }
         if ($asNumber) {
             $value = VmDate::hrtime(true);
@@ -67,7 +62,7 @@ final class hrtime extends Internal
         }
         $asNumber = $context->constantFromBool(false);
         if (isset($args[0])) {
-            $asNumber = JitBoolArg::lower($context, $args[0], 'hrtime(): Argument #1 ($as_number)');
+            $asNumber = JitBoolArg::lowerZParamBool($context, $args[0], 'hrtime', 'as_number', 1);
         }
 
         return JitDate::hrtime($context, $asNumber);

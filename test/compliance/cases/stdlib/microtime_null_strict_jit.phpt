@@ -1,5 +1,6 @@
 --TEST--
 stdlib microtime(null) under strict_types JIT throws TypeError (#17049)
+--JIT--
 --FILE--
 <?php
 declare(strict_types=1);
