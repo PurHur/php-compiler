@@ -9,6 +9,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\EnvLocalRuntime;
 use PHPCompiler\JIT\Builtin\StringGetenv;
 use PHPCompiler\JIT\Builtin\StringGetenvAll;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
@@ -56,6 +57,10 @@ final class JitEnv
     public static function putenv(Context $context, Value $assignmentStr): Value
     {
         StringGetenv::ensurePutenvLinked($context);
+        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
+            EnvLocalRuntime::ensureLinked($context);
+        }
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'putenv_emit_cont');
         self::emitPutenvSyntaxGuard($context, $assignmentStr);
 
         if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {

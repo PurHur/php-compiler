@@ -9,6 +9,7 @@ use PHPCompiler\ext\standard\phpc_native_ht_set_hashtable_at;
 use PHPCompiler\ext\standard\phpc_native_ht_set_string_at;
 use PHPCompiler\ext\standard\phpc_native_ht_set_string_key;
 use PHPCompiler\ext\standard\phpc_native_ht_set_string_key_ht;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitVmHelperLink;
@@ -44,16 +45,13 @@ final class RequestParseBodyRuntime
 
     public static function implement(Context $context): void
     {
+        $savedBlock = BasicBlockHelper::tryGetInsertBlock($context);
+
         if (self::allRuntimeFunctionsLinked($context)) {
             self::registerLinkedRuntime($context);
+            BasicBlockHelper::restoreInsertBlock($context, $savedBlock);
 
             return;
-        }
-
-        $savedBlock = null;
-        try {
-            $savedBlock = $context->builder->getInsertBlock();
-        } catch (\Throwable) {
         }
 
         self::ensureNativeHtInternalProxies($context);
@@ -73,12 +71,7 @@ final class RequestParseBodyRuntime
         );
 
         self::registerLinkedRuntime($context);
-
-        if (null !== $savedBlock) {
-            $context->builder->positionAtEnd($savedBlock);
-        } else {
-            $context->builder->clearInsertionPosition();
-        }
+        BasicBlockHelper::restoreInsertBlock($context, $savedBlock);
     }
 
     /**
@@ -86,9 +79,12 @@ final class RequestParseBodyRuntime
      */
     private static function implementIfMissing(Context $context, string $name, callable $emit): void
     {
+        $savedBlock = BasicBlockHelper::tryGetInsertBlock($context);
+
         $probe = $context->module->getNamedFunction($name);
         if (null !== $probe && 0 !== $probe->countBasicBlocks()) {
             $context->registerFunction($name, $probe);
+            BasicBlockHelper::restoreInsertBlock($context, $savedBlock);
 
             return;
         }
@@ -96,7 +92,7 @@ final class RequestParseBodyRuntime
         $fn = null !== $probe ? $probe : self::declareFunction($context, $name);
         $emit($context, $fn);
         $context->registerFunction($name, $fn);
-        $context->builder->clearInsertionPosition();
+        BasicBlockHelper::restoreInsertBlock($context, $savedBlock);
     }
 
     private static function declareFunction(Context $context, string $name): LlvmFunction

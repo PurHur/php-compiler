@@ -114,6 +114,8 @@ final class StringGetenv
             return;
         }
 
+        self::ensureNativeHtInternalProxies($context);
+
         $runtime = $context->runtime;
         $path = \dirname(__DIR__, 3).self::HELPER_PATH;
         NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
@@ -127,6 +129,20 @@ final class StringGetenv
         foreach (self::COMPILED_HELPERS as $logical) {
             if (!isset($context->functions[\strtolower($logical)])) {
                 throw new \LogicException($logical.' was not compiled for JIT (#9092)');
+            }
+        }
+    }
+
+    public static function ensureNativeHtInternalProxies(Context $context): void
+    {
+        $internals = [
+            new \PHPCompiler\ext\standard\phpc_native_ht_set_string_key(),
+        ];
+        foreach ($internals as $internal) {
+            $lc = strtolower($internal->getName());
+            $existing = $context->functionProxies[$lc] ?? null;
+            if (null === $existing || $existing instanceof \PHPCompiler\JIT\Call\ExternalMethod) {
+                $context->functionProxies[$lc] = $internal;
             }
         }
     }

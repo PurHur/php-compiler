@@ -172,6 +172,8 @@ final class StringGetenvAll
             return;
         }
 
+        StringGetenv::ensureNativeHtInternalProxies($context);
+
         $runtime = $context->runtime;
         $path = \dirname(__DIR__, 3).self::HELPER_PATH;
         NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
