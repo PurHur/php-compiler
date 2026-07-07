@@ -254,6 +254,7 @@ use PHPCompiler\VM\Builtin\ReflectionPropertyGetAttributes;
 use PHPCompiler\VM\Builtin\ReflectionPropertyGetDeclaringClass;
 use PHPCompiler\VM\Builtin\ReflectionPropertyGetDefaultValue;
 use PHPCompiler\VM\Builtin\ReflectionPropertyGetDocComment;
+use PHPCompiler\VM\Builtin\ReflectionPropertyGetHook;
 use PHPCompiler\VM\Builtin\ReflectionPropertyGetHooks;
 use PHPCompiler\VM\Builtin\ReflectionPropertyHasDefaultValue;
 use PHPCompiler\VM\Builtin\ReflectionPropertyIsDefaultValueAvailable;
@@ -806,6 +807,7 @@ final class BuiltinClasses
                 'isvirtual' => new ReflectionPropertyIsVirtual(),
                 'getmangledname' => new ReflectionPropertyGetMangledName(),
                 'hashook' => new ReflectionPropertyHasHook(),
+                'gethook' => new ReflectionPropertyGetHook(),
                 'gethooks' => new ReflectionPropertyGetHooks(),
                 'isreadonly' => new ReflectionPropertyIsReadOnly(),
                 'ispromoted' => new ReflectionPropertyIsPromoted(),
