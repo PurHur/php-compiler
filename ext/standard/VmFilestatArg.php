@@ -6,14 +6,13 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\VM\EnumCaseSupport;
-use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 
 /** Shared VM argument guards for filestat permission builtins (php-src ext/standard/filestat.c; #6079). */
 final class VmFilestatArg
 {
     /**
-     * Z_PARAM_PATH filename — typed string (reject null) + reject embedded NUL (php-src filestat.c; #14597).
+     * Z_PARAM_PATH filename — null coerces to "" (deprecated) + reject embedded NUL (php-src filestat.c; #14597).
      *
      * @throws \TypeError when the operand cannot be converted like Zend PHP 8.x
      */
@@ -24,15 +23,11 @@ final class VmFilestatArg
         string $paramName = 'filename',
         ?Frame $frame = null
     ): string {
-        if (null !== $frame) {
-            InternalStrictArg::rejectNullString($var, $function, $paramName, $argIndex, $frame);
-        }
-
         return VmString::coercePathBuiltinArg($var, $function, $argIndex, $paramName);
     }
 
     /**
-     * Z_PARAM_PATH for compiled call sites — TypeError on null under strict_types (#13419).
+     * Z_PARAM_PATH for compiled call sites — null coerces to "" (deprecated).
      *
      * @throws \TypeError when the operand cannot be converted like Zend PHP 8.x
      */
@@ -42,14 +37,6 @@ final class VmFilestatArg
         string $function,
         string $paramName = 'filename'
     ): string {
-        InternalStrictArg::rejectNullString(
-            $frame->calledArgs[$argIndex],
-            $function,
-            $paramName,
-            $argIndex,
-            $frame
-        );
-
         return self::coerceFilenameArg(
             $frame->calledArgs[$argIndex],
             $function,

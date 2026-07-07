@@ -42,7 +42,7 @@ final class dirname extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('dirname() expects 1 or 2 arguments');
         }
-        $path = JitStringBuiltinArg::lowerPath($context, $args[0], 'dirname', 0, 'path');
+        $path = JitFilestatArg::lowerFilename($context, $args[0], 'dirname', 0, 'path');
         if (1 === $argc) {
             return JitPath::dirname($context, $path);
         }

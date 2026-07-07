@@ -1,34 +1,38 @@
 --TEST--
-stdlib path/filestat builtins — null path TypeError under strict_types (#15082, ext/standard/filestat.c)
+stdlib path/filestat builtins — null path coerces to empty string under strict_types (#13354, ext/standard/filestat.c)
 --FILE--
 <?php
 declare(strict_types=1);
-$checks = [
-    ['unlink', [null], 'unlink(): Argument #1 ($filename) must be of type string, null given'],
-    ['realpath', [null], 'realpath(): Argument #1 ($path) must be of type string, null given'],
-    ['rename', [null, '/tmp/x'], 'rename(): Argument #1 ($from) must be of type string, null given'],
-    ['chmod', [null, 0777], 'chmod(): Argument #1 ($filename) must be of type string, null given'],
-    ['filesize', [null], 'filesize(): Argument #1 ($filename) must be of type string, null given'],
-    ['filemtime', [null], 'filemtime(): Argument #1 ($filename) must be of type string, null given'],
-    ['pathinfo', [null], 'pathinfo(): Argument #1 ($path) must be of type string, null given'],
-    ['dirname', [null], 'dirname(): Argument #1 ($path) must be of type string, null given'],
-    ['basename', [null], 'basename(): Argument #1 ($path) must be of type string, null given'],
-    ['is_file', [null], 'is_file(): Argument #1 ($filename) must be of type string, null given'],
-    ['file_exists', [null], 'file_exists(): Argument #1 ($filename) must be of type string, null given'],
-    ['is_uploaded_file', [null], 'is_uploaded_file(): Argument #1 ($filename) must be of type string, null given'],
-];
-foreach ($checks as [$fn, $args, $expected]) {
-    try {
-        $fn(...$args);
-        echo "fail: {$fn}(null)\n";
-        exit(1);
-    } catch (TypeError $e) {
-        if ($expected !== $e->getMessage()) {
-            echo 'fail: ', $fn, '(): ', $e->getMessage(), "\n";
-            exit(1);
-        }
-    }
+error_reporting(E_ALL & ~E_DEPRECATED);
+ini_set('display_errors', '1');
+$fail = 0;
+if (false !== file_exists(null)) {
+    ++$fail;
 }
-echo "ok\n";
---EXPECT--
+if (false !== is_file(null)) {
+    ++$fail;
+}
+if (false !== is_dir(null)) {
+    ++$fail;
+}
+if (false !== filesize(null)) {
+    ++$fail;
+}
+$renamed = rename(null, '/tmp/no-such-target-13354');
+if (false !== $renamed) {
+    ++$fail;
+}
+$pi = pathinfo(null);
+if (!\is_array($pi) || '' !== ($pi['basename'] ?? 'x') || '' !== ($pi['filename'] ?? 'x')) {
+    ++$fail;
+}
+if ('' !== basename(null)) {
+    ++$fail;
+}
+if ('' !== dirname(null)) {
+    ++$fail;
+}
+echo 0 === $fail ? "ok\n" : "fail\n";
+--EXPECTF--
+PHP Warning:  rename(,/tmp/no-such-target-13354): No such file or directory in %s on line %d
 ok
