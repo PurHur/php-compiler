@@ -24,18 +24,11 @@ final class glob_ extends Internal
 
     public function execute(Frame $frame): void
     {
-        $argc = \count($frame->calledArgs);
-        if ($argc < 1 || $argc > 2) {
-            throw new \LogicException('glob() requires one or two arguments in this compiler build');
-        }
-        $pattern = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'glob', 0, 'pattern');
+        $this->requireArgCountRange($frame, 'glob', 1, 2);
+        $pattern = VmString::stringBuiltinArgForFrame($frame, 0, 'glob', 0, 'pattern');
         $flags = 0;
-        if (2 === $argc) {
-            $flagsVar = $frame->calledArgs[1]->resolveIndirect();
-            if (Variable::TYPE_INTEGER !== $flagsVar->type) {
-                throw new \LogicException('glob() flags must be an integer in this compiler build');
-            }
-            $flags = $flagsVar->toInt();
+        if (isset($frame->calledArgs[1])) {
+            $flags = VmMath::parseIntBuiltinArgForFrame($frame, 1, 'glob', 2, 'flags');
         }
         if (null === $frame->returnVar) {
             return;
@@ -52,13 +45,12 @@ final class glob_ extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        $argc = \count($args);
-        if ($argc < 1 || $argc > 2) {
-            throw new \LogicException('glob() requires one or two arguments in this compiler build');
+        if (!$this->requireArgCountRangeJit($context, $args, 'glob', 1, 2)) {
+            return $context->getTypeFromString('__value__*')->constNull();
         }
         $i32 = $context->getTypeFromString('int32');
         $flags = $i32->constInt(0, false);
-        if (2 === $argc) {
+        if (isset($args[1])) {
             $flags = $context->builder->truncOrBitCast(
                 JitLongArg::lower($context, $args[1], 'glob() flags'),
                 $i32
