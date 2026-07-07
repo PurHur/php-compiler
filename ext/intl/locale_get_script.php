@@ -34,8 +34,12 @@ final class locale_get_script extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException(
-            'locale_get_script() JIT runtime lowering is deferred; use VM (#5125)'
-        );
+        if (1 !== \count($args)) {
+            throw new \ArgumentCountError(
+                'locale_get_script() expects exactly 1 argument, '.\count($args).' given'
+            );
+        }
+
+        return JitLocaleParser::script($context, $args[0]);
     }
 }

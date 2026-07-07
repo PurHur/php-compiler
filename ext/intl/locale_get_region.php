@@ -34,8 +34,12 @@ final class locale_get_region extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException(
-            'locale_get_region() JIT runtime lowering is deferred; use VM (#5125)'
-        );
+        if (1 !== \count($args)) {
+            throw new \ArgumentCountError(
+                'locale_get_region() expects exactly 1 argument, '.\count($args).' given'
+            );
+        }
+
+        return JitLocaleParser::region($context, $args[0]);
     }
 }
