@@ -141,10 +141,6 @@ class JITTest extends BaseTest {
                 && !str_contains($name, 'reflection_probe_builtins_phantom')) {
                 continue;
             }
-            if (CompilerVersion::supportsPhp84ReflectionProbeBuiltins()
-                && str_contains($name, 'reflection_probe_builtins_phantom')) {
-                continue;
-            }
             if (!CompilerVersion::supportsGetmygrgid()
                 && str_contains($name, 'getmygrgid')
                 && !str_contains($name, 'getmygrgid_phantom')) {

@@ -101,9 +101,36 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         }
     }
 
-    public function testPhp84ReflectionProbeBuiltinsWithheldOnReferenceProfile(): void
+    public function testPhp84ReflectionProbeBuiltinsEnabledOnDefaultDevProfile(): void
     {
-        $this->assertFalse(CompilerVersion::supportsPhp84ReflectionProbeBuiltins());
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE');
+        try {
+            $this->assertTrue(CompilerVersion::supportsPhp84ReflectionProbeBuiltins());
+            $this->assertTrue(CompilerVersion::advertisesPhp84ReflectionProbeBuiltins());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testPhp84ReflectionProbeBuiltinsWithheldOnPhp82Profile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.2');
+        try {
+            $this->assertFalse(CompilerVersion::supportsPhp84ReflectionProbeBuiltins());
+            $this->assertFalse(CompilerVersion::advertisesPhp84ReflectionProbeBuiltins());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
     }
 
     public function testReflectionCreateFromFactoriesWithheldOnReferenceProfile(): void
@@ -481,12 +508,41 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         $this->assertFalse(isset($runtime->vmContext->functions['class_uses_recursive']));
     }
 
-    public function testVmDoesNotRegisterPhp84ReflectionProbeBuiltinsOnReferenceProfile(): void
+    public function testVmRegistersPhp84ReflectionProbeBuiltinsOnDefaultDevProfile(): void
     {
-        $runtime = new Runtime();
-        $ctx = $runtime->vmContext;
-        foreach (['attribute_exists', 'class_meth_exists', 'unitenum_exists'] as $fn) {
-            $this->assertFalse(isset($ctx->functions[$fn]), $fn);
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE');
+        try {
+            $runtime = new Runtime();
+            $ctx = $runtime->vmContext;
+            foreach (['attribute_exists', 'class_meth_exists', 'unitenum_exists'] as $fn) {
+                $this->assertTrue(isset($ctx->functions[$fn]), $fn);
+            }
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testVmDoesNotRegisterPhp84ReflectionProbeBuiltinsOnPhp82Profile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.2');
+        try {
+            $runtime = new Runtime();
+            $ctx = $runtime->vmContext;
+            foreach (['attribute_exists', 'class_meth_exists', 'unitenum_exists'] as $fn) {
+                $this->assertFalse(isset($ctx->functions[$fn]), $fn);
+            }
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
         }
     }
 
