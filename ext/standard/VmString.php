@@ -632,8 +632,14 @@ final class VmString
         return self::byteSlice($string, $start, $bytePos - $start);
     }
 
-    public static function byteSlice(string $string, int $offset, ?int $length = null): string
-    {
+    public static function byteSlice(
+        string $string,
+        int $offset,
+        ?int $length = null,
+        bool $warnOnClip = false,
+        ?\PHPCompiler\Frame $frame = null,
+        string $function = 'substr',
+    ): string {
         $len = self::byteLength($string);
         if ($offset < 0) {
             $offset = $len + $offset;
@@ -651,6 +657,9 @@ final class VmString
             if ($length < 0) {
                 return '';
             }
+        }
+        if ($warnOnClip && $length > 0 && $offset + $length > $len) {
+            self::emitSubstrTruncatedWarning($frame, $function);
         }
         if ($offset + $length > $len) {
             $length = $len - $offset;
@@ -3395,9 +3404,53 @@ final class VmString
         return $result;
     }
 
-    public static function substr(string $string, int $offset, ?int $length = null): string
+    public static function substr(
+        string $string,
+        int $offset,
+        ?int $length = null,
+        bool $warnOnClip = false,
+        ?\PHPCompiler\Frame $frame = null,
+        string $function = 'substr',
+    ): string {
+        return self::byteSlice($string, $offset, $length, $warnOnClip, $frame, $function);
+    }
+
+    private const SUBSTR_TRUNCATED_WARNING = '%s(): String is truncated';
+
+    private static function emitSubstrTruncatedWarning(?\PHPCompiler\Frame $frame, string $function): void
     {
-        return self::byteSlice($string, $offset, $length);
+        if (null === $frame?->vmContext) {
+            return;
+        }
+        $frame->vmContext->errors->triggerError(
+            \sprintf(self::SUBSTR_TRUNCATED_WARNING, $function),
+            \PHPCompiler\VM\ErrorReporter::E_WARNING,
+            '' !== $frame->scriptPath ? $frame->scriptPath : null,
+            $frame->vmContext,
+            $frame
+        );
+    }
+
+    /**
+     * Whether a positive length would extend past the end of $string after $offset normalization.
+     */
+    public static function substrLengthWouldClip(string $string, int $offset, int $length): bool
+    {
+        if ($length <= 0) {
+            return false;
+        }
+        $len = self::byteLength($string);
+        if ($offset < 0) {
+            $offset = $len + $offset;
+            if ($offset < 0) {
+                $offset = 0;
+            }
+        }
+        if ($offset >= $len) {
+            return false;
+        }
+
+        return $offset + $length > $len;
     }
 
     /**

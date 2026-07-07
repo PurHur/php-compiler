@@ -6665,8 +6665,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/mbstring/VmMbstring.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 1053)
-- new ArgumentCountError (line 1061)
+- new ArgumentCountError (line 1066)
+- new ArgumentCountError (line 1074)
 - 103 class method(s)
 
 ### `ext/mbstring/mb_check_encoding.php`
@@ -6893,8 +6893,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/mbstring/mb_substr.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 29)
 - new ArgumentCountError (line 35)
+- new ArgumentCountError (line 41)
 - 2 class method(s)
 - 1 closure(s)
 
@@ -16185,11 +16185,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmString.php`
 
 **Warnings** (review for bootstrap subset):
-- new Error (line 1501)
-- new Error (line 1512)
-- new Error (line 3573)
-- new Error (line 3682)
-- 206 class method(s)
+- new Error (line 1510)
+- new Error (line 1521)
+- new Error (line 3651)
+- new Error (line 3760)
+- 209 class method(s)
 
 ### `ext/standard/VmStripWhitespace.php`
 
@@ -20655,11 +20655,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/substr.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 32)
 - new ArgumentCountError (line 38)
-- new ArgumentCountError (line 71)
-- new ArgumentCountError (line 77)
-- 3 class method(s)
+- new ArgumentCountError (line 44)
+- new ArgumentCountError (line 85)
+- new ArgumentCountError (line 91)
+- 5 class method(s)
 
 ### `ext/standard/substr_compare.php`
 
@@ -21657,7 +21657,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinParamNames.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 477)
+- new ArgumentCountError (line 482)
 - 9 class method(s)
 
 ### `lib/BuiltinTypeClassConstant.php`
@@ -22476,7 +22476,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/CompilerVersion.php`
 
 **Warnings** (review for bootstrap subset):
-- 154 class method(s)
+- 155 class method(s)
 
 ### `lib/CurlyBraceOffsetRejector.php`
 

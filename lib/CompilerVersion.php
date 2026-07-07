@@ -1608,6 +1608,16 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.4+ substr()/mb_substr() optional $truncate (ext/standard/string.c, ext/mbstring/mbstring.c, #17239).
+     *
+     * Forward profile on 8.4.0-dev — advertisesBuiltinSince treats -dev as 8.4.0 (#14983 reference gate).
+     */
+    public static function supportsSubstrTruncate(): bool
+    {
+        return self::advertisesBuiltinSince('8.4.0');
+    }
+
+    /**
      * PHP 8.4+ mb_trim/ltrim/rtrim (ext/mbstring/mbstring.c, issue #11901, #12797, #9977, #17120).
      *
      * Withheld on 8.4.0-dev reference profile (matches Zend 8.2 function_exists gate). Enable via
