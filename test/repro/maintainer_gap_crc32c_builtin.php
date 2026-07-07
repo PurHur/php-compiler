@@ -3,7 +3,9 @@
 declare(strict_types=1);
 
 /**
- * Maintainer repro: crc32c() enabled on default dev profile (#17139, ext/standard/crc32.c).
+ * Maintainer repro: crc32c() on forward profile (#17139, ext/standard/crc32.c).
+ *
+ * Run with: PHP_COMPILER_PROFILE=8.4 php bin/vm.php test/repro/maintainer_gap_crc32c_builtin.php
  */
 
 if (!function_exists('crc32c')) {

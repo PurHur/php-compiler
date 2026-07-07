@@ -1,5 +1,7 @@
 --TEST--
 stdlib hebrevc() JIT (#17183)
+--ENV--
+PHP_COMPILER_PROFILE=8.4
 --JIT--
 --FILE--
 <?php
