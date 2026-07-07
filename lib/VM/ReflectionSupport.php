@@ -751,6 +751,71 @@ final class ReflectionSupport
     }
 
     /**
+     * ReflectionClass::{isSubclassOf,implementsInterface} — string|ReflectionClass operand (#6302).
+     */
+    public static function classNameFromReflectionClassArg(
+        Variable $arg,
+        string $method,
+        string $param = 'class'
+    ): string {
+        $arg = $arg->resolveIndirect();
+        if (Variable::TYPE_STRING === $arg->type) {
+            return $arg->toString();
+        }
+        if (Variable::TYPE_OBJECT === $arg->type) {
+            $obj = $arg->toObject();
+            $lc = strtolower($obj->class->name);
+            if (self::REFLECTION_CLASS !== $lc && self::REFLECTION_ENUM !== $lc) {
+                throw new \TypeError(
+                    'ReflectionClass::'.$method.'(): Argument #1 ($'.$param.') must be of type string|ReflectionClass, '
+                    .$obj->class->name.' given'
+                );
+            }
+
+            return self::classNameFromReflection($obj);
+        }
+
+        throw new \TypeError(
+            'ReflectionClass::'.$method.'(): Argument #1 ($'.$param.') must be of type string|ReflectionClass, '
+            .self::valueTypeLabel($arg).' given'
+        );
+    }
+
+    /**
+     * @return array{0: ObjectEntry, 1: ClassEntry, 2: \PHPCompiler\VM\Context}
+     */
+    public static function requireReflectedClassEntry(Frame $frame, Variable $receiver): array
+    {
+        $obj = self::requireReflectionClass($frame, $receiver);
+        $ctx = VmReflection::requireContext($frame);
+        $className = self::classNameFromReflection($obj);
+        $entry = VmReflection::resolveClassEntry($ctx, $className);
+        if (null === $entry) {
+            throw new \LogicException('ReflectionClass refers to unknown class in this compiler build');
+        }
+
+        return [$obj, $entry, $ctx];
+    }
+
+    /** php-src zim_ReflectionClass_isInstantiable — abstract/interface/trait/enum/static/private ctor (#6302). */
+    public static function reflectionClassIsInstantiable(ClassEntry $entry): bool
+    {
+        if ($entry->isInterface || $entry->isTrait || $entry->isEnum || $entry->isAbstract || $entry->isStatic) {
+            return false;
+        }
+        if ([] !== $entry->abstractMethods) {
+            return false;
+        }
+        $ctorLc = '__construct';
+        if (!isset($entry->methods[$ctorLc])) {
+            return true;
+        }
+        $flags = $entry->methodVisibility[$ctorLc] ?? 0;
+
+        return 0 === ($flags & \PHPCfg\Func::FLAG_PRIVATE);
+    }
+
+    /**
      * ReflectionClass::newLazyGhost/Proxy — class name string or ReflectionClass receiver (#6399).
      */
     public static function classNameFromLazyFactoryArg(Variable $arg, string $method = 'newLazyGhost'): string
