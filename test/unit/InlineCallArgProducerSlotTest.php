@@ -1405,6 +1405,50 @@ PHP;
         self::assertStringContainsString('1.0', $out);
     }
 
+    /** Issue #17250 — var_export($x !== false, true) wires NotIdentical producer, not hoisted false ConstFetch. */
+    public function testVarExportNotIdenticalFalseReturnTrueUsesComparisonProducerSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+echo var_export(1 !== false, true);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'var_export_not_identical_false.php');
+
+        $notIdenticalSlot = null;
+        $constFetchSlots = [];
+        $varExportSends = [];
+        $fcallOrdinal = 0;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_NOT_IDENTICAL === $op->type) {
+                $notIdenticalSlot = $op->arg1;
+            }
+            if (OpCode::TYPE_CONST_FETCH === $op->type) {
+                $constFetchSlots[] = $op->arg1;
+            }
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                ++$fcallOrdinal;
+                if (1 === $fcallOrdinal) {
+                    $varExportSends = [];
+                }
+            }
+            if (1 === $fcallOrdinal && OpCode::TYPE_ARG_SEND === $op->type) {
+                $varExportSends[] = $op->arg1;
+            }
+        }
+
+        self::assertNotNull($notIdenticalSlot);
+        self::assertCount(2, $constFetchSlots);
+        self::assertCount(2, $varExportSends);
+        self::assertSame($notIdenticalSlot, $varExportSends[0], 'arg sends='.json_encode($varExportSends));
+        self::assertSame($constFetchSlots[1], $varExportSends[1], 'arg sends='.json_encode($varExportSends));
+
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertStringContainsString('true', $out);
+    }
+
     /** Issue #12824 — var_export([NAN, INF], true) wires Array_ producer, not hoisted ConstFetch temps. */
     public function testVarExportInlineNanInfArrayUsesArrayProducerSlot(): void
     {
