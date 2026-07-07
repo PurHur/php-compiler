@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 4190 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 11319 |
+| Source constructs flagged (warnings) | 11322 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -305,7 +305,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/IntlClassMethod.php` | 0 | 3 |
 | `ext/intl/IntlDateFormatterCreate.php` | 0 | 1 |
 | `ext/intl/IntlError.php` | 0 | 1 |
-| `ext/intl/IntlExtensionPolicy.php` | 0 | 8 |
+| `ext/intl/IntlExtensionPolicy.php` | 0 | 11 |
 | `ext/intl/JitGrapheme.php` | 0 | 2 |
 | `ext/intl/LocaleGetDefault.php` | 0 | 2 |
 | `ext/intl/LocaleSetDefault.php` | 0 | 2 |
@@ -6096,14 +6096,17 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/intl/IntlExtensionPolicy.php`
 
 **Warnings** (review for bootstrap subset):
-- new grapheme_strlen (line 41)
-- new grapheme_substr (line 42)
-- new grapheme_strpos (line 43)
-- new grapheme_extract (line 44)
-- new grapheme_str_split (line 45)
-- new grapheme_str_contains (line 48)
-- new grapheme_strimwidth (line 51)
-- 4 class method(s)
+- new grapheme_strlen (line 50)
+- new grapheme_substr (line 51)
+- new grapheme_strpos (line 52)
+- new grapheme_extract (line 53)
+- new grapheme_str_split (line 54)
+- new grapheme_str_contains (line 57)
+- new grapheme_strimwidth (line 60)
+- new locale_get_primary_language (line 78)
+- new locale_get_region (line 79)
+- new locale_get_script (line 80)
+- 7 class method(s)
 
 ### `ext/intl/JitGrapheme.php`
 
@@ -6132,21 +6135,21 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new locale_get_primary_language (line 53)
 - new locale_get_region (line 54)
 - new locale_get_script (line 55)
-- new grapheme_strlen (line 66)
-- new grapheme_substr (line 67)
-- new grapheme_strpos (line 68)
-- new grapheme_str_contains (line 69)
-- new grapheme_strstr (line 70)
-- new grapheme_stristr (line 71)
-- new grapheme_stripos (line 72)
-- new grapheme_strrpos (line 73)
-- new grapheme_extract (line 74)
-- new grapheme_levenshtein (line 75)
-- new grapheme_str_split (line 76)
-- new grapheme_strimwidth (line 77)
-- new intl_get_error_code (line 78)
-- new intl_get_error_message (line 79)
-- new intl_is_failure (line 80)
+- new grapheme_strlen (line 67)
+- new grapheme_substr (line 68)
+- new grapheme_strpos (line 69)
+- new grapheme_str_contains (line 70)
+- new grapheme_strstr (line 71)
+- new grapheme_stristr (line 72)
+- new grapheme_stripos (line 73)
+- new grapheme_strrpos (line 74)
+- new grapheme_extract (line 75)
+- new grapheme_levenshtein (line 76)
+- new grapheme_str_split (line 77)
+- new grapheme_strimwidth (line 78)
+- new intl_get_error_code (line 79)
+- new intl_get_error_message (line 80)
+- new intl_is_failure (line 81)
 - 3 class method(s)
 
 ### `ext/intl/UnicodeCanonical.php`
@@ -15959,7 +15962,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmStreamPath.php`
 
 **Warnings** (review for bootstrap subset):
-- 1 class method(s)
+- 2 class method(s)
 
 ### `ext/standard/VmStreamSelect.php`
 
@@ -22336,7 +22339,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/CompilerVersion.php`
 
 **Warnings** (review for bootstrap subset):
-- 142 class method(s)
+- 144 class method(s)
 
 ### `lib/CurlyBraceOffsetRejector.php`
 

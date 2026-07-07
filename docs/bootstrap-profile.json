@@ -342,6 +342,9 @@
         "ext/intl/intl_get_error_message.php",
         "ext/intl/intl_is_failure.php",
         "ext/intl/locale_get_default.php",
+        "ext/intl/locale_get_primary_language.php",
+        "ext/intl/locale_get_region.php",
+        "ext/intl/locale_get_script.php",
         "ext/intl/locale_set_default.php",
         "ext/libxml/BuiltinClasses.php",
         "ext/libxml/LibxmlConstants.php",
@@ -4421,9 +4424,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 4187,
+        "inventory_files": 4190,
         "excluded": 0,
-        "eligible": 4187,
+        "eligible": 4190,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
