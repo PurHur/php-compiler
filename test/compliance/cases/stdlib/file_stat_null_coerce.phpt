@@ -14,6 +14,9 @@ if (false !== is_file(null)) {
 if (false !== is_dir(null)) {
     ++$fail;
 }
+if (false !== is_uploaded_file(null)) {
+    ++$fail;
+}
 if (false !== filesize(null)) {
     ++$fail;
 }

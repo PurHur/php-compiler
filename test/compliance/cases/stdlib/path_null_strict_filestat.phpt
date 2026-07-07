@@ -15,6 +15,7 @@ $checks = [
     ['basename', [null], 'basename(): Argument #1 ($path) must be of type string, null given'],
     ['is_file', [null], 'is_file(): Argument #1 ($filename) must be of type string, null given'],
     ['file_exists', [null], 'file_exists(): Argument #1 ($filename) must be of type string, null given'],
+    ['is_uploaded_file', [null], 'is_uploaded_file(): Argument #1 ($filename) must be of type string, null given'],
 ];
 foreach ($checks as [$fn, $args, $expected]) {
     try {
