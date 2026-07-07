@@ -1,5 +1,7 @@
 --TEST--
 stdlib array_find family null callback — TypeError (#17133, ext/standard/array.c)
+--ENV--
+PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
 foreach (['array_find', 'array_find_key', 'array_all', 'array_any', 'array_all_key', 'array_any_key'] as $fn) {

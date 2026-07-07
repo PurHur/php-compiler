@@ -1353,11 +1353,21 @@ final class CompilerVersionGateTest extends TestCase
 
     public function testVmRegistersReflectionPropertyAccessProbesOnForwardProfile(): void
     {
-        $runtime = new Runtime();
-        $rp = $runtime->vmContext->classes['reflectionproperty'] ?? null;
-        $this->assertNotNull($rp);
-        $this->assertTrue(isset($rp->methods['isreadable']));
-        $this->assertTrue(isset($rp->methods['iswritable']));
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $runtime = new Runtime();
+            $rp = $runtime->vmContext->classes['reflectionproperty'] ?? null;
+            $this->assertNotNull($rp);
+            $this->assertTrue(isset($rp->methods['isreadable']));
+            $this->assertTrue(isset($rp->methods['iswritable']));
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
     }
 
     public function testVmDoesNotRegisterArrayReplaceKeyOnReferenceProfile(): void
