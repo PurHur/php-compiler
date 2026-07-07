@@ -1189,17 +1189,73 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
-    public function testSupportsMbTrimFunctionsFalseOnReferenceProfile(): void
+    public function testSupportsMbTrimFunctionsEnabledOnDefaultDevProfile(): void
     {
-        $this->assertFalse(CompilerVersion::supportsMbTrimFunctions());
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE');
+        try {
+            $this->assertTrue(CompilerVersion::supportsMbTrimFunctions());
+            $this->assertTrue(CompilerVersion::advertisesMbTrimFunctions());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
     }
 
-    public function testVmDoesNotRegisterMbTrimOnReferenceProfile(): void
+    public function testSupportsMbTrimFunctionsWithheldOnPhp82Profile(): void
     {
-        $runtime = new Runtime();
-        $ctx = $runtime->vmContext;
-        foreach (['mb_trim', 'mb_ltrim', 'mb_rtrim'] as $fn) {
-            $this->assertFalse(isset($ctx->functions[$fn]), $fn);
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.2');
+        try {
+            $this->assertFalse(CompilerVersion::supportsMbTrimFunctions());
+            $this->assertFalse(CompilerVersion::advertisesMbTrimFunctions());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testVmRegistersMbTrimOnDefaultDevProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE');
+        try {
+            $runtime = new Runtime();
+            $ctx = $runtime->vmContext;
+            foreach (['mb_trim', 'mb_ltrim', 'mb_rtrim'] as $fn) {
+                $this->assertTrue(isset($ctx->functions[$fn]), $fn);
+            }
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testVmDoesNotRegisterMbTrimOnPhp82Profile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.2');
+        try {
+            $runtime = new Runtime();
+            $ctx = $runtime->vmContext;
+            foreach (['mb_trim', 'mb_ltrim', 'mb_rtrim'] as $fn) {
+                $this->assertFalse(isset($ctx->functions[$fn]), $fn);
+            }
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
         }
     }
 
