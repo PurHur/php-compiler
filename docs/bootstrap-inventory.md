@@ -14118,7 +14118,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmArrayValueCallback.php`
 
 **Warnings** (review for bootstrap subset):
-- 4 class method(s)
+- 6 class method(s)
 
 ### `ext/standard/VmArrayWalk.php`
 
@@ -22400,7 +22400,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/CompilerVersion.php`
 
 **Warnings** (review for bootstrap subset):
-- 148 class method(s)
+- 149 class method(s)
 
 ### `lib/CurlyBraceOffsetRejector.php`
 
@@ -22735,16 +22735,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/ArrayFindCallbackPolicy.php`
 
 **Warnings** (review for bootstrap subset):
-- 5 class method(s)
+- 7 class method(s)
 
 ### `lib/JIT/ArrayFindHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 189)
-- new Variable (line 191)
-- new Variable (line 424)
-- new Variable (line 602)
-- new Variable (line 615)
+- new Variable (line 193)
+- new Variable (line 195)
+- new Variable (line 428)
+- new Variable (line 606)
+- new Variable (line 619)
 - 26 class method(s)
 
 ### `lib/JIT/ArrayMapCallbackPolicy.php`
