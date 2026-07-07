@@ -28392,6 +28392,95 @@ class Compiler {
     }
 
     /**
+     * array_pad([1], 4, 0, ArrayPadType::Positive) — inline Array_ + trailing pad_type ClassConstFetch (#17240).
+     *
+     * @param list<Operand|null> $args
+     *
+     * @return list<OpCode>|null
+     */
+    private function compileArrayPadInlinePadTypeEnumCallArgSends(
+        array $args,
+        Block $block,
+        Op $cfgCallOp
+    ): ?array {
+        if (null === $block->orig || !\is_array($cfgCallOp->args ?? null)) {
+            return null;
+        }
+        if ('array_pad' !== $this->resolveCfgFuncCallName($cfgCallOp)) {
+            return null;
+        }
+        if (4 !== \count($cfgCallOp->args)) {
+            return null;
+        }
+        $haystackArg = $cfgCallOp->args[0] ?? null;
+        $padTypeArg = $cfgCallOp->args[3] ?? null;
+        if (
+            !$this->callArgIsDeadInlineTemporary($haystackArg)
+            || !$this->callArgUsesHoistedEnumPreludeSlot($padTypeArg)
+        ) {
+            return null;
+        }
+        foreach ([1, 2] as $literalArgIndex) {
+            if ($this->callArgUsesHoistedEnumPreludeSlot($cfgCallOp->args[$literalArgIndex] ?? null)) {
+                return null;
+            }
+        }
+        $producers = $this->precedingInlineCallArgProducersBeforeCfgOp($block->orig->children, $cfgCallOp);
+        $arrayProducer = null;
+        $padTypeProducer = null;
+        foreach ($producers as $producer) {
+            if ($producer instanceof Op\Expr\Array_) {
+                $arrayProducer = $producer;
+            } elseif ($producer instanceof Op\Expr\ClassConstFetch) {
+                $padTypeProducer = $producer;
+            }
+        }
+        if (null === $arrayProducer || null === $padTypeProducer) {
+            return null;
+        }
+        $producerOps = [];
+        foreach ($this->compileArrayLiteral($arrayProducer, $block) as $op) {
+            $producerOps[] = $op;
+        }
+        $haystackSlot = $this->slotForInitArrayOrdinal($block, 0, $producerOps);
+        if (null === $haystackSlot) {
+            return null;
+        }
+        if (null === $block->slotForOperand($padTypeProducer->result)) {
+            foreach ($this->compileExpr($padTypeProducer, $block) as $op) {
+                $producerOps[] = $op;
+            }
+        }
+        $padTypeSlot = $block->slotForOperand($padTypeProducer->result);
+        if (null === $padTypeSlot) {
+            return null;
+        }
+        $sends = [];
+        foreach ($args as $argIndex => $arg) {
+            $valueSlot = match ((int) $argIndex) {
+                0 => (string) $haystackSlot,
+                3 => (string) $padTypeSlot,
+                default => null,
+            };
+            $literalProbe = $cfgCallOp->args[(int) $argIndex] ?? $arg;
+            if (null === $valueSlot && $this->isEmbeddedCallLiteralArg($literalProbe)) {
+                $valueSlot = (string) $this->freshLiteralConstantSlot($literalProbe, $block);
+            }
+            if (null === $valueSlot) {
+                $valueSlot = $this->compileOperand($arg, $block, true);
+            }
+            $sends[] = new OpCode(
+                OpCode::TYPE_ARG_SEND,
+                $valueSlot,
+                $this->callArgNameSlot($arg, $block),
+                $this->callArgUnpack($arg) ? 1 : null
+            );
+        }
+
+        return array_merge($producerOps, $sends);
+    }
+
+    /**
      * array_chunk([1, 2, 3], Len::Two) — inline Array_ haystack + ClassConstFetch length (#9971, #16560).
      *
      * @param list<Operand|null> $args
@@ -34962,6 +35051,10 @@ class Compiler {
             $arrayPadSends = $this->compileArrayPadInlineHaystackCallArgSends($args, $block, $cfgCallOp);
             if (null !== $arrayPadSends) {
                 return $arrayPadSends;
+            }
+            $arrayPadPadTypeSends = $this->compileArrayPadInlinePadTypeEnumCallArgSends($args, $block, $cfgCallOp);
+            if (null !== $arrayPadPadTypeSends) {
+                return $arrayPadPadTypeSends;
             }
             $arrayPadEnumLengthSends = $this->compileArrayPadInlineArrayClassConstLengthCallArgSends($args, $block, $cfgCallOp);
             if (null !== $arrayPadEnumLengthSends) {

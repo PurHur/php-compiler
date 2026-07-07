@@ -39,6 +39,9 @@ final class BuiltinEnums
         if (CompilerVersion::supportsRoundingModeEnum()) {
             self::registerRoundingMode($ctx);
         }
+        if (CompilerVersion::supportsArrayPadTypeEnum()) {
+            self::registerArrayPadType($ctx);
+        }
         foreach (array_diff(array_keys($ctx->classes), $before) as $lc) {
             $ctx->classes[$lc]->isInternal = true;
         }
@@ -304,6 +307,31 @@ final class BuiltinEnums
         EnumSupport::ensureBuiltinEnumInterfaces($entry);
 
         $lc = 'sortdirection';
+        $ctx->classes[$lc] = $entry;
+        $ctx->enums[$lc] = true;
+    }
+
+    /**
+     * PHP 8.4 ArrayPadType: pure enum for array_pad() 4th $pad_type (#17240, #14993).
+     *
+     * php-src forward profile: ext/standard/array.c — ArrayPadType (Positive / Negative)
+     */
+    private static function registerArrayPadType(Context $ctx): void
+    {
+        if (isset($ctx->classes['arraypadtype'])) {
+            return;
+        }
+
+        $entry = new ClassEntry('ArrayPadType');
+        $entry->isEnum = true;
+
+        self::registerPureEnumCase($entry, 'Positive');
+        self::registerPureEnumCase($entry, 'Negative');
+
+        EnumSupport::ensureBuiltinCasesMethod($entry);
+        EnumSupport::ensureBuiltinEnumInterfaces($entry);
+
+        $lc = 'arraypadtype';
         $ctx->classes[$lc] = $entry;
         $ctx->enums[$lc] = true;
     }
