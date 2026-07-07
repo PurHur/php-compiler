@@ -85,6 +85,17 @@ final class http_build_query extends Internal
         $legacyEncoding = false;
 
         if (!\array_key_exists(2, $args)) {
+            if (\array_key_exists(3, $args)) {
+                $var4 = $args[3]->resolveIndirect();
+                if (Variable::TYPE_INTEGER !== $var4->type) {
+                    throw new \LogicException(
+                        'http_build_query() argument #4 ($encoding_type) must be an integer in this compiler build'
+                    );
+                }
+
+                return [$separator, $var4->toInt(), $legacyEncoding];
+            }
+
             return [$separator, $encoding, $legacyEncoding];
         }
 
@@ -160,7 +171,7 @@ final class http_build_query extends Internal
         $defaultEncoding = $i64->constInt(VmHttpBuildQuery::ENCODING_RFC1738, false);
 
         if (!isset($args[2])) {
-            return [$defaultSeparator, $defaultEncoding];
+            return [$defaultSeparator, $this->optionalEncodingArg($context, $args, 3)];
         }
 
         $arg3 = $args[2];
