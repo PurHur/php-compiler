@@ -14770,7 +14770,20 @@ class Compiler {
                     );
                 }
                 if (null === $producerSlot) {
-                    $producerSlot = $block->slotForOperand($producer->result);
+                    if ($producer instanceof Op\Expr\MethodCall || $producer instanceof Op\Expr\StaticCall) {
+                        $methodExecSlot = $this->slotForSiblingMethodCallProducerExecReturn(
+                            $block,
+                            $producer,
+                            $callOp,
+                            $block->orig->children
+                        );
+                        if (null !== $methodExecSlot) {
+                            $producerSlot = (int) $methodExecSlot;
+                        }
+                    }
+                    if (null === $producerSlot) {
+                        $producerSlot = $block->slotForOperand($producer->result);
+                    }
                 }
             }
         }
@@ -16730,6 +16743,14 @@ class Compiler {
 
                         if (1 === \count($nonEmbeddedArgIndices)) {
                             return $funcProducer;
+                        }
+                        if (
+                            'var_export' === $inlineFuncName
+                            && null !== $funcProducer
+                            && null !== $constFetch
+                            && ($funcProducer instanceof Op\Expr\MethodCall || $funcProducer instanceof Op\Expr\StaticCall)
+                        ) {
+                            return 0 === $producerOrdinal ? $funcProducer : $constFetch;
                         }
 
                         return 0 === $producerOrdinal ? $constFetch : $funcProducer;
@@ -19998,7 +20019,7 @@ class Compiler {
         if ($callArg instanceof Operand && $this->callArgOperandExpectsArrayProducer($callArg)) {
             return null;
         }
-        // var_export(f(), true) — ConstFetch true sits between nested call and consumer; arg #0 is f() (#16556, #16557).
+        // var_export(f(), true) / var_export($o->m(), true) — ConstFetch true sits between nested call and consumer (#16556, #17251).
         if (0 === $argIndex && null !== $block->orig) {
             $callIndex = null;
             foreach ($block->orig->children as $i => $child) {
@@ -20013,14 +20034,21 @@ class Compiler {
                     if ($prev instanceof Op\Expr\ConstFetch || $prev instanceof Op\Expr\ClassConstFetch) {
                         continue;
                     }
-                    if ($prev instanceof Op\Expr\FuncCall || $prev instanceof Op\Expr\NsFuncCall) {
+                    if (
+                        $prev instanceof Op\Expr\FuncCall
+                        || $prev instanceof Op\Expr\NsFuncCall
+                        || $prev instanceof Op\Expr\MethodCall
+                        || $prev instanceof Op\Expr\StaticCall
+                    ) {
                         $consumerFn = strtolower($this->resolveCfgFuncCallName($callOp) ?? '');
                         if ('var_export' === $consumerFn) {
                             return null;
                         }
-                        $fn = $this->resolveCfgFuncCallName($prev);
-                        if (null !== $fn && ReferencableCheck::isArrayInternalPointerBuiltin($fn)) {
-                            return null;
+                        if ($prev instanceof Op\Expr\FuncCall || $prev instanceof Op\Expr\NsFuncCall) {
+                            $fn = $this->resolveCfgFuncCallName($prev);
+                            if (null !== $fn && ReferencableCheck::isArrayInternalPointerBuiltin($fn)) {
+                                return null;
+                            }
                         }
                     }
                     break;
@@ -21901,6 +21929,29 @@ class Compiler {
                 }
                 if (
                     $child instanceof Op\Expr\ConstFetch
+                    && $i === $callIndex - 1
+                    && 'var_export' === strtolower($this->resolveCfgFuncCallName($callOp) ?? '')
+                ) {
+                    $scalarName = $this->staticNameFromOperand($child->name);
+                    if (
+                        null !== $scalarName
+                        && \in_array(strtolower($scalarName), ['true', 'false', 'null'], true)
+                        && ($prevProducer instanceof Op\Expr\MethodCall || $prevProducer instanceof Op\Expr\StaticCall
+                            || $prevProducer instanceof Op\Expr\FuncCall || $prevProducer instanceof Op\Expr\NsFuncCall)
+                        && $this->isNestedCallArgProducerSeparatedByConsumerLiteralPreludes(
+                            $prevProducer,
+                            $callOp,
+                            $i - 1,
+                            $callIndex,
+                            $cfgChildren
+                        )
+                    ) {
+                        // var_export($it->current(), true) — trailing return flag, not a producer row (#13901, #17251).
+                        continue;
+                    }
+                }
+                if (
+                    $child instanceof Op\Expr\ConstFetch
                     && $this->hoistedConstFetchFeedsNestedSiblingFuncCallArg($child, $i, $callIndex, $cfgChildren)
                 ) {
                     // var_export(array_keys($a, null), true) — null feeds nested callee arg (#11272).
@@ -22695,7 +22746,7 @@ class Compiler {
             if (null === $firstSibling) {
                 $firstSibling = $this->nearestHoistedFuncCallProducerBeforeConsumer($consumerIndex, $cfgChildren);
             }
-            if (null === $firstSibling || $producerIndex !== $firstSibling) {
+            if (null === $firstSibling || $producerIndex < $firstSibling || $producerIndex >= $consumerIndex) {
                 return false;
             }
             $leadingEmbedded = 0;
@@ -22706,8 +22757,10 @@ class Compiler {
                 }
                 break;
             }
-            $ordinal = $producerIndex - $firstSibling;
-            if (($leadingEmbedded + $ordinal) !== $targetArgIndex) {
+            $ordinal = $this->siblingFuncCallChainHasArrayPrelude($firstSibling, $consumerIndex, $cfgChildren)
+                ? $this->siblingInlineFuncCallProducerOrdinal($producerIndex, $firstSibling, $cfgChildren)
+                : ($producerIndex - $firstSibling);
+            if ($ordinal < 0 || ($leadingEmbedded + $ordinal) !== $targetArgIndex) {
                 return false;
             }
         }
@@ -22953,9 +23006,13 @@ class Compiler {
         $count = 0;
         for ($j = $firstSibling; $j < $consumerIndex; ++$j) {
             $child = $cfgChildren[$j] ?? null;
-            if ($this->isSiblingInlineCallProducerExpr($child)) {
-                ++$count;
+            if (!$this->isSiblingInlineCallProducerExpr($child)) {
+                continue;
             }
+            if ($this->siblingInlineCallProducerSkipsHoistedArgChain($child, $cfgChildren[$j + 1] ?? null)) {
+                continue;
+            }
+            ++$count;
         }
 
         return $count;
@@ -23041,6 +23098,9 @@ class Compiler {
             if ($this->siblingInlineFuncCallSkipsExecReturnOrdinal($child, $j, $cfgChildren)) {
                 continue;
             }
+            if ($this->siblingInlineCallProducerSkipsHoistedArgChain($child, $cfgChildren[$j + 1] ?? null)) {
+                continue;
+            }
             ++$ordinal;
         }
 
@@ -23089,12 +23149,7 @@ class Compiler {
             ) {
                 continue;
             }
-            if (
-                ($child instanceof Op\Expr\FuncCall || $child instanceof Op\Expr\NsFuncCall)
-                && $this->isArrayInternalPointerMutatorFuncName($this->resolveCfgFuncCallName($child))
-                && ($next instanceof Op\Expr\FuncCall || $next instanceof Op\Expr\NsFuncCall)
-            ) {
-                // next($a); var_export(key($a), true) — pointer stmt, not outer arg producer (#13829).
+            if ($this->siblingInlineCallProducerSkipsHoistedArgChain($child, $next)) {
                 continue;
             }
             $producers[] = $child;
@@ -23647,6 +23702,15 @@ class Compiler {
         ) {
             return false;
         }
+        if ($this->isNestedCallArgProducerSeparatedByConsumerLiteralPreludes(
+            $producer,
+            $consumer,
+            $producerIndex,
+            $consumerIndex,
+            $cfgChildren
+        )) {
+            return true;
+        }
         // Prior array_udiff*(...) / array_uintersect*(...) stmts are not arg producers for a later u* call (#16045).
         if (
             ($producer instanceof Op\Expr\FuncCall || $producer instanceof Op\Expr\NsFuncCall)
@@ -24168,7 +24232,8 @@ class Compiler {
         ) {
             $producer = $cfgChildren[$producerIndex] ?? null;
             if (
-                ($producer instanceof Op\Expr\FuncCall || $producer instanceof Op\Expr\NsFuncCall)
+                ($producer instanceof Op\Expr\FuncCall || $producer instanceof Op\Expr\NsFuncCall
+                    || $producer instanceof Op\Expr\MethodCall || $producer instanceof Op\Expr\StaticCall)
                 && ($consumer instanceof Op\Expr\FuncCall || $consumer instanceof Op\Expr\NsFuncCall)
                 && property_exists($consumer, 'args')
                 && \is_array($consumer->args)
@@ -24250,9 +24315,14 @@ class Compiler {
             return null;
         }
 
-        $ordinal = $this->siblingFuncCallChainHasArrayPrelude($firstSibling, $consumerIndex, $cfgChildren)
-            ? $this->siblingInlineFuncCallProducerOrdinal($producerIndex, $firstSibling, $cfgChildren)
-            : ($producerIndex - $firstSibling);
+        $ordinal = $this->siblingInlineFuncCallProducerOrdinal(
+            $producerIndex,
+            $firstSibling,
+            $cfgChildren
+        );
+        if ($ordinal < 0) {
+            return null;
+        }
         $producer = $cfgChildren[$producerIndex] ?? null;
         if ($producer instanceof Op\Expr) {
             $outerOrdinal = $this->outerSiblingInlineFuncCallProducerOrdinal(
@@ -24943,6 +25013,10 @@ class Compiler {
         while ($i >= 0) {
             $child = $cfgChildren[$i] ?? null;
             if ($child instanceof Op\Expr\MethodCall) {
+                if ($this->methodCallHasStatementLevelSideEffects($child)) {
+                    --$i;
+                    continue;
+                }
                 $method = $this->staticNameFromOperand($child->name);
                 if (null !== $method && $this->methodCallIsKnownVoidReturn($method)) {
                     --$i;
@@ -26024,6 +26098,17 @@ class Compiler {
                     $this->forceDeferredSiblingCallReturnSlot = $prevForce;
                 }
             }
+            if (null !== $block->orig) {
+                $methodExecSlot = $this->slotForSiblingMethodCallProducerExecReturn(
+                    $block,
+                    $producer,
+                    $cfgCallOp,
+                    $block->orig->children
+                );
+                if (null !== $methodExecSlot) {
+                    return (int) $methodExecSlot;
+                }
+            }
             $operandSlot = $block->slotForOperand($producer->result);
             if (null !== $operandSlot) {
                 return (int) $operandSlot;
@@ -26397,6 +26482,9 @@ class Compiler {
                 || $child instanceof Op\Expr\NullsafeMethodCall
                 || $child instanceof Op\Expr\StaticCall
             ) {
+                if ($child instanceof Op\Expr\MethodCall && $this->methodCallHasStatementLevelSideEffects($child)) {
+                    continue;
+                }
                 $method = $this->staticNameFromOperand($child->name);
                 if (null === $method || !$this->methodCallIsKnownVoidReturn($method)) {
                     ++$base;
@@ -26567,6 +26655,16 @@ class Compiler {
         }
         if ($this->forceDeferredSiblingCallReturnSlot) {
             $execOrdinal = $execReturnCount;
+        } elseif (
+            $producer instanceof Op\Expr\MethodCall
+            || $producer instanceof Op\Expr\StaticCall
+        ) {
+            $legacyBase = $this->execReturnOrdinalBaseBeforeSiblingInlineFuncCallChain(
+                $firstSibling,
+                $cfgChildren,
+                $consumerIndex
+            );
+            $execOrdinal = $legacyBase + $producerOrdinal;
         } else {
             $execOrdinal = $execReturnCount - $chainProducerCount + $producerOrdinal;
         }
@@ -26651,6 +26749,21 @@ class Compiler {
         ?Op $consumer = null,
         ?array $cfgChildren = null
     ): ?string {
+        if (
+            null !== $consumer
+            && null !== $cfgChildren
+            && ($producer instanceof Op\Expr\MethodCall || $producer instanceof Op\Expr\StaticCall)
+        ) {
+            $methodSlot = $this->slotForSiblingMethodCallProducerExecReturn(
+                $block,
+                $producer,
+                $consumer,
+                $cfgChildren
+            );
+            if (null !== $methodSlot) {
+                return $methodSlot;
+            }
+        }
         if (null !== $consumer && null !== $cfgChildren) {
             $execReturn = $this->slotForSiblingInlineCallProducerExecReturnByExpr(
                 $block,
@@ -26665,6 +26778,50 @@ class Compiler {
         $operandSlot = $block->slotForOperand($producer->result);
 
         return null !== $operandSlot ? (string) $operandSlot : null;
+    }
+
+    /**
+     * var_export($it->current(), true) — MethodCall EXEC_RETURN ordinal uses legacy base (#13901, #17251).
+     *
+     * @param list<Op> $cfgChildren
+     */
+    private function slotForSiblingMethodCallProducerExecReturn(
+        Block $block,
+        Op\Expr $producer,
+        Op $consumer,
+        array $cfgChildren
+    ): ?string {
+        if (
+            !$producer instanceof Op\Expr\MethodCall
+            && !$producer instanceof Op\Expr\StaticCall
+        ) {
+            return null;
+        }
+        $producerIndex = array_search($producer, $cfgChildren, true);
+        $consumerIndex = array_search($consumer, $cfgChildren, true);
+        if (!is_int($producerIndex) || !is_int($consumerIndex)) {
+            return null;
+        }
+        $firstSibling = $this->firstSiblingInlineFuncCallProducerIndex($consumerIndex, $cfgChildren);
+        if (null === $firstSibling || $producerIndex < $firstSibling || $producerIndex >= $consumerIndex) {
+            return null;
+        }
+        $producerOrdinal = $this->siblingInlineFuncCallProducerOrdinal(
+            $producerIndex,
+            $firstSibling,
+            $cfgChildren
+        );
+        $legacyBase = $this->execReturnOrdinalBaseBeforeSiblingInlineFuncCallChain(
+            $firstSibling,
+            $cfgChildren,
+            $consumerIndex
+        );
+        $execSlot = $this->slotForSiblingInlineFuncCallProducerExecReturnOrdinal(
+            $block,
+            $legacyBase + $producerOrdinal
+        );
+
+        return null !== $execSlot ? (string) $execSlot : null;
     }
 
     /**
@@ -29066,6 +29223,30 @@ class Compiler {
             break;
         }
         $prev = $block->orig->children[$probeIndex] ?? null;
+        if ($prev instanceof Op\Expr\MethodCall || $prev instanceof Op\Expr\StaticCall) {
+            if (
+                !$this->isNestedCallArgProducerSeparatedByConsumerLiteralPreludes(
+                    $prev,
+                    $cfgCallOp,
+                    $probeIndex,
+                    $callIndex,
+                    $block->orig->children
+                )
+            ) {
+                return null;
+            }
+            $methodSlot = $this->slotForSiblingMethodCallProducerExecReturn(
+                $block,
+                $prev,
+                $cfgCallOp,
+                $block->orig->children
+            );
+            if (null !== $methodSlot) {
+                return $methodSlot;
+            }
+
+            return null;
+        }
         if (
             !($prev instanceof Op\Expr\FuncCall || $prev instanceof Op\Expr\NsFuncCall)
             || !$this->isNestedCallArgProducerForConsumer(
@@ -29618,6 +29799,37 @@ class Compiler {
             'rewind',
             'throw',
         ], true);
+    }
+
+    /**
+     * Iterator pointer stmts ($it->next()) before a hoisted sibling call-arg producer — not part of the chain (#13901, #17251).
+     */
+    private function siblingInlineCallProducerSkipsHoistedArgChain(Op $child, ?Op $nextChild = null): bool
+    {
+        if (
+            $child instanceof Op\Expr\MethodCall
+            && $this->methodCallHasStatementLevelSideEffects($child)
+            && (
+                $nextChild instanceof Op\Expr\FuncCall
+                || $nextChild instanceof Op\Expr\NsFuncCall
+                || $nextChild instanceof Op\Expr\MethodCall
+                || $nextChild instanceof Op\Expr\StaticCall
+            )
+        ) {
+            return true;
+        }
+        if (
+            ($child instanceof Op\Expr\FuncCall || $child instanceof Op\Expr\NsFuncCall)
+            && $this->isArrayInternalPointerMutatorFuncName($this->resolveCfgFuncCallName($child))
+            && (
+                $nextChild instanceof Op\Expr\FuncCall
+                || $nextChild instanceof Op\Expr\NsFuncCall
+            )
+        ) {
+            return true;
+        }
+
+        return false;
     }
 
     /**
@@ -34118,21 +34330,28 @@ class Compiler {
         if (null === $callIndex) {
             return null;
         }
-        // var_export(f(), true) — arg #0 is hoisted nested call, not ConstFetch true (#16556, #16557).
+        // var_export(f(), true) / var_export($o->m(), true) — arg #0 is hoisted producer, not ConstFetch true (#16556, #17251).
         if (0 === $argIndex) {
             for ($i = $callIndex - 1; $i >= 0; --$i) {
                 $prev = $children[$i] ?? null;
                 if ($prev instanceof Op\Expr\ConstFetch || $prev instanceof Op\Expr\ClassConstFetch) {
                     continue;
                 }
-                if ($prev instanceof Op\Expr\FuncCall || $prev instanceof Op\Expr\NsFuncCall) {
+                if (
+                    $prev instanceof Op\Expr\FuncCall
+                    || $prev instanceof Op\Expr\NsFuncCall
+                    || $prev instanceof Op\Expr\MethodCall
+                    || $prev instanceof Op\Expr\StaticCall
+                ) {
                     $consumerFn = strtolower($this->resolveCfgFuncCallName($cfgCallOp) ?? '');
                     if ('var_export' === $consumerFn) {
                         return null;
                     }
-                    $fn = $this->resolveCfgFuncCallName($prev);
-                    if (null !== $fn && ReferencableCheck::isArrayInternalPointerBuiltin($fn)) {
-                        return null;
+                    if ($prev instanceof Op\Expr\FuncCall || $prev instanceof Op\Expr\NsFuncCall) {
+                        $fn = $this->resolveCfgFuncCallName($prev);
+                        if (null !== $fn && ReferencableCheck::isArrayInternalPointerBuiltin($fn)) {
+                            return null;
+                        }
                     }
                 }
                 break;
@@ -39300,6 +39519,22 @@ class Compiler {
             if (
                 null !== $cfgCallOp
                 && 0 === (int) $argIndex
+                && 'var_export' === strtolower($this->resolveCfgFuncCallName($cfgCallOp) ?? '')
+                && $this->callArgIsDeadInlineTemporary($cfgCallOp->args[0] ?? null)
+                && null !== $block->orig
+            ) {
+                $varExportProducerSlot = $this->resolveAdjacentNestedFuncCallArgSlot(
+                    $block,
+                    $cfgCallOp,
+                    0
+                );
+                if (null !== $varExportProducerSlot) {
+                    $valueSlot = $varExportProducerSlot;
+                }
+            }
+            if (
+                null !== $cfgCallOp
+                && 0 === (int) $argIndex
                 && 'var_export' === $this->resolveCfgFuncCallName($cfgCallOp)
             ) {
                 $varExportArg = $cfgCallOp->args[0] ?? $arg;
@@ -42949,6 +43184,35 @@ class Compiler {
         }
         $execSlot = $this->slotForLastPendingInlineCallResultBeforeFuncCallInit($nestedProducerOps)
             ?? $this->slotForLastEmittedInlineCallResultBeforePendingFuncCall($block);
+        if (null === $execSlot && null !== $block->orig) {
+            $callIndex = array_search($cfgCallOp, $block->orig->children, true);
+            if (\is_int($callIndex) && $callIndex > 0) {
+                $probeIndex = $callIndex - 1;
+                while ($probeIndex >= 0) {
+                    $probe = $block->orig->children[$probeIndex] ?? null;
+                    if ($probe instanceof Op\Expr\ConstFetch || $probe instanceof Op\Expr\ClassConstFetch) {
+                        --$probeIndex;
+                        continue;
+                    }
+                    break;
+                }
+                $producer = $block->orig->children[$probeIndex] ?? null;
+                if ($producer instanceof Op\Expr\MethodCall || $producer instanceof Op\Expr\StaticCall) {
+                    $execSlot = $this->slotForSiblingMethodCallProducerExecReturn(
+                        $block,
+                        $producer,
+                        $cfgCallOp,
+                        $block->orig->children
+                    );
+                } elseif ($producer instanceof Op\Expr\FuncCall || $producer instanceof Op\Expr\NsFuncCall) {
+                    $execSlot = $this->slotForInlineFuncCallProducerExecReturnByCfgIndex(
+                        $block,
+                        $probeIndex,
+                        $block->orig->children
+                    );
+                }
+            }
+        }
         if (null === $execSlot) {
             return;
         }
@@ -42958,20 +43222,16 @@ class Compiler {
                 $initSlots[] = $op->arg1;
             }
         }
-        if ([] === $initSlots) {
-            return;
-        }
         $trueSlot = null;
-        for ($i = \count($block->opCodes) - 1; $i >= 0; --$i) {
-            $op = $block->opCodes[$i];
+        foreach (array_reverse(array_merge($block->opCodes, $nestedProducerOps)) as $op) {
             if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
                 break;
             }
             if (OpCode::TYPE_CONST_FETCH !== $op->type || null === $op->arg2) {
                 continue;
             }
-            $const = $block->constants[$op->arg2] ?? null;
-            if ($const instanceof Variable && Variable::TYPE_BOOLEAN === $const->type && $const->toBool()) {
+            $name = $this->resolveCompileTimeStringSlot((int) $op->arg2, $block);
+            if ('true' === strtolower($name ?? '')) {
                 $trueSlot = $op->arg1;
                 break;
             }
@@ -42981,8 +43241,13 @@ class Compiler {
             if (OpCode::TYPE_ARG_SEND !== $send->type) {
                 continue;
             }
-            if (0 === $sendOrdinal && \in_array($send->arg1, $initSlots, true)) {
-                $send->arg1 = $execSlot;
+            if (0 === $sendOrdinal) {
+                if ([] !== $initSlots && \in_array($send->arg1, $initSlots, true)) {
+                    $send->arg1 = $execSlot;
+                } elseif (null !== $trueSlot && (string) $send->arg1 === (string) $trueSlot) {
+                    // var_export($it->current(), true) / var_export(f(), true) — arg #0 is producer EXEC_RETURN (#17251).
+                    $send->arg1 = $execSlot;
+                }
             } elseif (1 === $sendOrdinal && null !== $trueSlot && (string) $send->arg1 === (string) $execSlot) {
                 $send->arg1 = $trueSlot;
             }
