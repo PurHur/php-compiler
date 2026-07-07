@@ -68,6 +68,9 @@ class Runtime {
     const MODE_NORMAL   = 0b0001;
     const MODE_AOT      = 0b0010;
 
+    /** @var array<string, Block> basename → CFG for nested JIT helper units (#17150) */
+    private static array $nestedJitParseAndCompileCache = [];
+
     public Compiler $compiler;
     public Parser $parser;
     public Traverser $preprocessor;
@@ -382,7 +385,8 @@ class Runtime {
 
     public function preprocessSourceForParse(string $code, string $filename = 'unknown'): array
     {
-        if (null !== $this->jitContext) {
+        if (\PHPCompiler\JIT\NestedJitCompileScope::isActive() || null !== $this->jitContext) {
+            // Nested JIT parses multi-megabyte lib/ units — skip reference-profile token scans (#17150).
             TryCatchElseSupport::beginCompilationUnit();
 
             return [$code, []];
@@ -502,7 +506,7 @@ class Runtime {
      */
     public function rewriteSourceBeforeParser(string $code, string $filename = 'unknown'): string
     {
-        if (null !== $this->jitContext) {
+        if (\PHPCompiler\JIT\NestedJitCompileScope::isActive() || null !== $this->jitContext) {
             return $code;
         }
         if (ReferenceProfileTokenScan::shouldSkipReferenceProfileReject($code, $filename)) {
@@ -530,7 +534,7 @@ class Runtime {
         if (method_exists($this->compiler, 'setBareRethrowLines')) {
             $this->compiler->setBareRethrowLines($bareRethrowLines);
         }
-        $fileStrictTypes = $this->detectFileStrictTypes($code);
+        $fileStrictTypes = $this->detectFileStrictTypes($code, $filename);
         $this->resetParserNameResolverState();
         try {
             $script = $this->parser->parse($code, $filename);
@@ -586,9 +590,9 @@ class Runtime {
         }
     }
 
-    private function detectFileStrictTypes(string $code): bool
+    private function detectFileStrictTypes(string $code, string $filename = 'unknown'): bool
     {
-        if (null !== $this->jitContext) {
+        if (\PHPCompiler\JIT\NestedJitCompileScope::isActive() || null !== $this->jitContext) {
             return false;
         }
         if (ReferenceProfileTokenScan::exceedsTokenScanBudget($code)) {
@@ -895,6 +899,12 @@ class Runtime {
         $this->compiler->setDebugLastPhaseInputFile($filename);
         \PHPCompiler\JIT\Progress::notePhase('runtime_parseandcompile_begin');
         \PHPCompiler\JIT\Progress::noteEntry($filename);
+        if (\PHPCompiler\JIT\NestedJitCompileScope::isActive()) {
+            $cacheKey = \basename($filename);
+            if (isset(self::$nestedJitParseAndCompileCache[$cacheKey])) {
+                return self::$nestedJitParseAndCompileCache[$cacheKey];
+            }
+        }
         try {
             $script = $this->parse($code, $filename);
             $this->compiler->setCompileSourceCode($code);
@@ -902,6 +912,9 @@ class Runtime {
             if (null !== $block) {
                 $block->setScriptPath($filename);
                 $block->setCompileSource($code);
+                if (\PHPCompiler\JIT\NestedJitCompileScope::isActive()) {
+                    self::$nestedJitParseAndCompileCache[\basename($filename)] = $block;
+                }
             }
 
             return $block;

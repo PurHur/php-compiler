@@ -70,6 +70,12 @@ final class ReadonlyAnonymousClassSyntaxReferenceProfileTest extends TestCase
         $this->assertSame('1', ob_get_clean());
     }
 
+    public function testBoundedScanDoesNotTokenizeHugeBundleWithUnrelatedNew(): void
+    {
+        $huge = '<?php '.str_repeat('$x = new stdClass(); ', 200_000);
+        $this->assertNull(ReadonlyAnonymousClassSyntax::referenceProfileSyntaxError($huge));
+    }
+
     public function testScanSurvivesMultiMegabyteLibFileWithoutTokenizing(): void
     {
         $compilerPath = dirname(__DIR__, 2).'/lib/Compiler.php';
