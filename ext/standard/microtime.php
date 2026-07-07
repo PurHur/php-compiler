@@ -30,8 +30,9 @@ final class microtime extends Internal
         }
         $asFloat = false;
         if (1 === $argc) {
-            $asFloat = VmMath::parseBoolBuiltinArg(
-                $frame->calledArgs[0],
+            $asFloat = VmMath::parseBoolBuiltinArgForFrame(
+                $frame,
+                0,
                 'microtime',
                 1,
                 'as_float'
@@ -52,7 +53,13 @@ final class microtime extends Internal
         }
         $asFloat = $context->constantFromBool(false);
         if (isset($args[0])) {
-            $asFloat = JitBoolArg::lower($context, $args[0], 'microtime(): Argument #1 ($as_float)');
+            $asFloat = JitBoolArg::lowerStrictOrCoercible(
+                $context,
+                $args[0],
+                'microtime',
+                0,
+                'as_float'
+            );
         }
 
         return JitDate::microtime($context, $asFloat);

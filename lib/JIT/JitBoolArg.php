@@ -53,6 +53,30 @@ final class JitBoolArg
     }
 
     /**
+     * Z_PARAM_BOOL with caller strict_types parity (#17049 microtime, ext/standard/microtime.c).
+     */
+    public static function lowerStrictOrCoercible(
+        Context $context,
+        Variable $arg,
+        string $function,
+        int $argIndex,
+        string $paramName
+    ): Value {
+        $contextLabel = sprintf('%s(): Argument #%d ($%s)', $function, $argIndex + 1, $paramName);
+        if (Variable::TYPE_NULL === $arg->type || $arg->isNullConstant) {
+            if ($context->callerStrictTypes) {
+                self::emitTypeErrorAndAbort($context, $contextLabel, 'null');
+
+                return $context->constantFromBool(false);
+            }
+
+            return $context->constantFromBool(false);
+        }
+
+        return self::lower($context, $arg, $contextLabel);
+    }
+
+    /**
      * Builtin typed bool — reject int/string coercion (php-src ZEND_ARG_INFO IS_BOOL; #12585, #12586).
      */
     public static function lowerBuiltinTyped(

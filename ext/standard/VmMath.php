@@ -87,6 +87,35 @@ final class VmMath
      *
      * @throws \TypeError when the operand cannot be converted like Zend PHP 8.x
      */
+    /**
+     * Z_PARAM_BOOL with caller strict_types parity (#17049 microtime, ext/standard/microtime.c).
+     *
+     * @throws \TypeError when caller strict_types rejects null operands
+     */
+    public static function parseBoolBuiltinArgForFrame(
+        Frame $frame,
+        int $argIndex,
+        string $function,
+        int $userArgIndex,
+        string $paramName
+    ): bool {
+        if (InternalStrictArg::isCallerStrict($frame)) {
+            InternalStrictArg::rejectNullBool(
+                $frame->calledArgs[$argIndex],
+                $function,
+                $paramName,
+                $argIndex
+            );
+        }
+
+        return self::parseBoolBuiltinArg(
+            $frame->calledArgs[$argIndex],
+            $function,
+            $userArgIndex,
+            $paramName
+        );
+    }
+
     public static function parseBoolBuiltinArg(
         Variable $var,
         string $function,

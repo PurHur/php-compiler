@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-// Maintainer gap #17050 — password_hash(null) under strict_types must TypeError (ext/standard/password.c).
+// Maintainer gap #17052 — date_create_from_format(null, …) under strict_types must TypeError.
 try {
-    password_hash(null, PASSWORD_DEFAULT);
+    date_create_from_format(null, '2024-01-15');
     fwrite(STDERR, "fail: expected TypeError\n");
     exit(1);
 } catch (TypeError $e) {
