@@ -43,6 +43,12 @@
         "ext/bcmath/bcscale.php",
         "ext/bcmath/bcsqrt.php",
         "ext/bcmath/bcsub.php",
+        "ext/brotli/BrotliJitHelper.php",
+        "ext/brotli/JitBrotli.php",
+        "ext/brotli/Module.php",
+        "ext/brotli/VmBrotliNative.php",
+        "ext/brotli/brotli_compress.php",
+        "ext/brotli/brotli_uncompress.php",
         "ext/bz2/Bz2ExtensionPolicy.php",
         "ext/bz2/Bz2JitHelper.php",
         "ext/bz2/JitBz2.php",
@@ -3173,6 +3179,7 @@
         "lib/JIT/Builtin/StringBin2hex.php",
         "lib/JIT/Builtin/StringBin2hexLlvm.php",
         "lib/JIT/Builtin/StringBitwiseNot.php",
+        "lib/JIT/Builtin/StringBrotli.php",
         "lib/JIT/Builtin/StringBz2.php",
         "lib/JIT/Builtin/StringCaseCompare.php",
         "lib/JIT/Builtin/StringChmod.php",
@@ -4424,9 +4431,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 4190,
+        "inventory_files": 4197,
         "excluded": 0,
-        "eligible": 4190,
+        "eligible": 4197,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
