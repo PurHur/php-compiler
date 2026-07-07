@@ -24,8 +24,8 @@ final class hash_equals extends Internal
         if (2 !== \count($frame->calledArgs)) {
             throw new \LogicException('hash_equals() requires exactly two arguments in this compiler build');
         }
-        $known = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'hash_equals', 0, 'known_string');
-        $user = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'hash_equals', 1, 'user_string');
+        $known = VmString::requireStringBuiltinArg($frame->calledArgs[0], 'hash_equals', 0, 'known_string');
+        $user = VmString::requireStringBuiltinArg($frame->calledArgs[1], 'hash_equals', 1, 'user_string');
         if (null === $frame->returnVar) {
             return;
         }
@@ -40,8 +40,8 @@ final class hash_equals extends Internal
 
         return JitHash::equals(
             $context,
-            JitStringBuiltinArg::lower($context, $args[0], 'hash_equals', 0, 'known_string'),
-            JitStringBuiltinArg::lower($context, $args[1], 'hash_equals', 1, 'user_string')
+            JitStringBuiltinArg::lowerRequiredString($context, $args[0], 'hash_equals', 0, 'known_string'),
+            JitStringBuiltinArg::lowerRequiredString($context, $args[1], 'hash_equals', 1, 'user_string')
         );
     }
 }

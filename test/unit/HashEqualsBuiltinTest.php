@@ -66,4 +66,24 @@ final class HashEqualsBuiltinTest extends TestCase
         );
         $fn->execute($frame);
     }
+
+    public function testIntOperandTypeError(): void
+    {
+        $runtime = new Runtime();
+        $fn = new hash_equals();
+
+        $frame = $fn->getFrame($runtime->vmContext);
+        $known = new VMVariable();
+        $known->int(1);
+        $user = new VMVariable();
+        $user->string('a');
+        $frame->calledArgs = [$known, $user];
+        $frame->returnVar = new VMVariable();
+
+        $this->expectException(\TypeError::class);
+        $this->expectExceptionMessage(
+            'hash_equals(): Argument #1 ($known_string) must be of type string, int given'
+        );
+        $fn->execute($frame);
+    }
 }
