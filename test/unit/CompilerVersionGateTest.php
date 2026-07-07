@@ -74,9 +74,34 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
-    public function testSupportsPhp84ReflectionProbeBuiltinsFalseOnReferenceProfile(): void
+    public function testSupportsPhp84ReflectionProbeBuiltinsTrueOnDefaultDevProfile(): void
     {
-        $this->assertFalse(CompilerVersion::supportsPhp84ReflectionProbeBuiltins());
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE');
+        try {
+            $this->assertTrue(CompilerVersion::supportsPhp84ReflectionProbeBuiltins());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testSupportsPhp84ReflectionProbeBuiltinsFalseOnPhp82Profile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.2');
+        try {
+            $this->assertFalse(CompilerVersion::supportsPhp84ReflectionProbeBuiltins());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
     }
 
     public function testSupportsClassUsesRecursiveFalseOnReferenceProfile(): void

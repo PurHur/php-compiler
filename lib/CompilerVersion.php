@@ -942,13 +942,29 @@ final class CompilerVersion
 
     /**
      * PHP 8.4+ attribute_exists(), class_meth_exists(), unitenum_exists()
-     * (ext/reflection/php_reflection.c, ext/standard/basic_functions.c; #14995, #15692).
+     * (ext/reflection/php_reflection.c, ext/standard/basic_functions.c; #14995, #15692, #17138).
      *
-     * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev reference profile matches Zend 8.2 phantom gate.
+     * Default 8.4.0-dev toolchain registers the builtins; withheld when
+     * {@see languageProfileVersion()} is below 8.4.0 (e.g. `PHP_COMPILER_PROFILE=8.2`).
      */
     public static function supportsPhp84ReflectionProbeBuiltins(): bool
     {
-        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+        if (version_compare(self::VERSION, '8.4', '<')) {
+            return false;
+        }
+
+        $raw = getenv('PHP_COMPILER_PROFILE');
+        if (\is_string($raw) && '' !== trim($raw)) {
+            return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+        }
+
+        return version_compare(self::builtinAdvertisementVersion(), '8.4.0', '>=');
+    }
+
+    /** attribute_exists()/class_meth_exists()/unitenum_exists() visible to function_exists() — same gate as {@see supportsPhp84ReflectionProbeBuiltins()}. */
+    public static function advertisesPhp84ReflectionProbeBuiltins(): bool
+    {
+        return self::supportsPhp84ReflectionProbeBuiltins();
     }
 
     /**
