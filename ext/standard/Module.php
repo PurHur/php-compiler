@@ -250,6 +250,7 @@ class Module extends ModuleAbstract
             new soundex(),
             new metaphone(),
             new hebrev(),
+            new hebrevc(),
             ...(CompilerVersion::supportsConvertCyrString() ? [new convert_cyr_string()] : []),
             new strnatcmp(),
             new strnatcasecmp(),
