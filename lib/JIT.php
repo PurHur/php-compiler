@@ -61,6 +61,8 @@ class JIT {
     private ?Block $m3EmitTuTrivialEchoBlock = null;
     private ?string $m3EmitTuTrivialEchoSource = null;
     private bool $m3EmitTuSidecarsCached = false;
+    /** Parsed lib/Compiler.php CFG — reuse across M3 emit spine method lowers (#17150). */
+    private ?\PHPCfg\Script $m3EmitTuCompilerPhpScript = null;
 
     public Context $context;
 
@@ -6058,11 +6060,17 @@ class JIT {
         if (!is_file($compilerPath)) {
             return;
         }
-        try {
-            $script = $this->context->runtime->parse((string) file_get_contents($compilerPath), $compilerPath);
-        } catch (\Throwable $e) {
-            return;
+        if (null === $this->m3EmitTuCompilerPhpScript) {
+            try {
+                $this->m3EmitTuCompilerPhpScript = $this->context->runtime->parse(
+                    (string) file_get_contents($compilerPath),
+                    $compilerPath
+                );
+            } catch (\Throwable $e) {
+                return;
+            }
         }
+        $script = $this->m3EmitTuCompilerPhpScript;
         foreach ($script->functions as $cfgFunc) {
             $funcLc = strtolower($cfgFunc->name);
             if ($funcLc !== $lc && $funcLc !== $methodLc && !str_ends_with($funcLc, '\\'.$methodLc)) {
