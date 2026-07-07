@@ -93,16 +93,12 @@ final class RuntimeShrinkCloseoutTest extends TestCase
         }
     }
 
-    public function testOnlyProgressAbiRemainsInAotRuntime(): void
+    public function testNoAotRuntimeCSourcesRemain(): void
     {
         $runtimeDir = $this->repoRoot.'/lib/AOT/runtime';
         $cFiles = glob($runtimeDir.'/*.c') ?: [];
         sort($cFiles);
-        $this->assertSame(
-            [$runtimeDir.'/phpc_progress.c'],
-            $cFiles,
-            'Only phpc_progress.c (frozen SIGSEGV ABI) may remain under lib/AOT/runtime/'
-        );
+        $this->assertSame([], $cFiles, 'No hand-written C runtime TUs may remain under lib/AOT/runtime/');
         $this->assertFileDoesNotExist($runtimeDir.'/openssl_ev.c', 'openssl_ev.c deleted — OpensslSignJitHelper PHP (#16454)');
         $this->assertFileDoesNotExist($this->repoRoot.'/lib/JIT/Builtin/runtime/openssl_ev.c');
     }

@@ -64,25 +64,15 @@ final class ProgressNoteRuntimeStandaloneTest extends TestCase
         }
     }
 
-    /** Issue #7146 / #7360: C progress TU must stay async-signal-safe handler only — no buffer writers. */
-    public function testProgressCRuntimeIsFrozenThinAbi(): void
+    /** Issue #7146 / #7360: SIGSEGV handler is emitted in LLVM IR (write+_exit only). */
+    public function testProgressSegvHandlerIsLinkedInLlvm(): void
     {
-        $source = file_get_contents(__DIR__.'/../../../lib/AOT/runtime/phpc_progress.c');
-        $this->assertIsString($source);
+        $runtime = new Runtime(Runtime::MODE_AOT);
+        $ctx = new Context($runtime, Builtin::LOAD_TYPE_STANDALONE);
+        ProgressNoteRuntime::ensureLinked($ctx);
 
-        $lines = substr_count($source, "\n") + 1;
-        $this->assertLessThanOrEqual(40, $lines, 'phpc_progress.c must remain a thin ABI (handler + extern decls)');
-
-        foreach (['sprintf', 'snprintf', 'strcpy', 'strncpy', 'memcpy', 'malloc', 'fopen', 'fprintf'] as $forbidden) {
-            $this->assertStringNotContainsString($forbidden.'(', $source, 'progress formatting belongs in ProgressJitHelper / ProgressNoteRuntime bridge');
-        }
-
-        $this->assertStringContainsString('phpc_segv_handler', $source);
-        $this->assertStringContainsString('extern char phpc_last_progress', $source);
-        $this->assertDoesNotMatchRegularExpression(
-            '/(?<!extern )char phpc_last_progress\s*\[/',
-            $source,
-            'buffer definition lives in LLVM globals, not C'
-        );
+        $handler = $ctx->module->getNamedFunction('phpc_segv_handler');
+        $this->assertNotNull($handler);
+        $this->assertGreaterThan(0, $handler->countBasicBlocks());
     }
 }
