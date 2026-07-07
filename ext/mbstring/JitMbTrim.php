@@ -20,7 +20,7 @@ final class JitMbTrim
      */
     public static function invoke(Context $context, int $mode, string $function, array $args): Value
     {
-        $folded = self::tryCompileTimeFold($context, $mode, $args);
+        $folded = self::tryCompileTimeFold($context, $mode, $function, $args);
         if (null !== $folded) {
             return $folded;
         }
@@ -33,10 +33,16 @@ final class JitMbTrim
     /**
      * @param JITVariable[] $args
      */
-    private static function tryCompileTimeFold(Context $context, int $mode, array $args): ?Value
+    private static function tryCompileTimeFold(Context $context, int $mode, string $function, array $args): ?Value
     {
         if (!isset($args[0])) {
             return null;
+        }
+        if (JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false)) {
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #1 ($string) must be of type string, null given',
+                $function
+            ));
         }
         $string = JitStringArg::compileTimeLiteral($args[0]) ?? $args[0]->compileTimeString ?? null;
         if (null === $string) {

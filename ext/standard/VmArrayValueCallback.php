@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
+use PHPCompiler\JIT\ArrayFindCallbackPolicy;
 use PHPCompiler\VM\Variable;
 
 /**
@@ -12,19 +13,38 @@ use PHPCompiler\VM\Variable;
  */
 final class VmArrayValueCallback
 {
-    /** array_find/all/any* null callback → TypeError (ext/standard/array.c; #17133). */
+    /** array_find family null callback → TypeError (ext/standard/array.c; #17133). */
+    public static function requirePredicateCallback(
+        Variable $callback,
+        string $function,
+        int $argNum = 2
+    ): void {
+        VmArraySortCallback::requireCallback($callback, $function, $argNum);
+    }
+
+    /**
+     * array_find-family callback validation before iteration (#17133, ext/standard/array.c).
+     */
     public static function requireCallback(
+        Frame $frame,
         Variable $callback,
         string $function,
         int $argNum = 2,
-        ?string $paramName = 'callback'
     ): void {
-        if (Variable::TYPE_NULL === $callback->resolveIndirect()->type) {
-            $paramPart = null !== $paramName ? ' ($'.$paramName.')' : '';
-            throw new \TypeError(
-                $function.'(): Argument #'.$argNum.$paramPart.' must be a valid callback, no array or string given'
-            );
+        $callback = $callback->resolveIndirect();
+        if (Variable::TYPE_NULL === $callback->type) {
+            throw new \TypeError(ArrayFindCallbackPolicy::invalidCallbackTypeError($function, $argNum));
         }
+        if (VmClosureCall::isClosure($callback)) {
+            return;
+        }
+        if (Variable::TYPE_STRING === $callback->type) {
+            self::requireStringCallback($frame, $callback, $function, $argNum);
+
+            return;
+        }
+
+        throw new \TypeError(ArrayFindCallbackPolicy::invalidCallbackTypeError($function, $argNum));
     }
 
     /**
@@ -35,7 +55,10 @@ final class VmArrayValueCallback
         Variable $callback,
         Variable $value,
         Variable $key,
+        string $function = 'array_find',
+        int $argNum = 2,
     ): Variable {
+        self::requireCallback($frame, $callback, $function, $argNum);
         $callback = $callback->resolveIndirect();
         if (VmClosureCall::isClosure($callback)) {
             if (null === $frame->vmContext) {
@@ -49,11 +72,6 @@ final class VmArrayValueCallback
                 VmClosureCall::resolve($callback),
                 $value,
                 $key,
-            );
-        }
-        if (Variable::TYPE_STRING !== $callback->type) {
-            throw new \LogicException(
-                'array callback must be a string builtin, user function, or closure in this compiler build'
             );
         }
         $name = $callback->toString();
@@ -72,6 +90,30 @@ final class VmArrayValueCallback
         $fn = VmUserCall::resolveStringCallback($frame->vmContext, $name);
 
         return VmUserCall::invokeTwo($frame->vmContext, $fn, $value, $key);
+    }
+
+    private static function requireStringCallback(
+        Frame $frame,
+        Variable $callback,
+        string $function,
+        int $argNum,
+    ): void {
+        $name = $callback->toString();
+        try {
+            VmInternalCall::resolveStringCallback($name);
+
+            return;
+        } catch (\LogicException) {
+            // Not a registered string builtin — try a user-defined function.
+        }
+        if (null === $frame->vmContext) {
+            throw new \LogicException($function.'() requires VM context in this compiler build');
+        }
+        if (!VmCallable::isCallable($frame->vmContext, $callback)) {
+            throw new \TypeError(
+                ArrayFindCallbackPolicy::invalidStringCallbackTypeError($function, $name, $argNum)
+            );
+        }
     }
 
     public static function isTruthy(Variable $result): bool

@@ -1065,7 +1065,7 @@ final class VmMbstring
                 ));
             }
         }
-        $source = VmString::coerceStringBuiltinArg(
+        $source = VmString::coerceTypedStringBuiltinArg(
             $frame->calledArgs[0],
             $function,
             0,

@@ -35,7 +35,7 @@ final class array_all_key extends Internal
         $callback = $frame->calledArgs[1];
         VmArrayValueCallback::requireCallback($callback, 'array_all_key');
         foreach ($ht->iterateKeyed(true) as [$key, $value]) {
-            $result = VmArrayValueCallback::invokePredicate($frame, $callback, $value, $key);
+            $result = VmArrayValueCallback::invokePredicate($frame, $callback, $value, $key, 'array_all_key');
             if (!VmArrayValueCallback::predicateMatches($result, $strict)) {
                 $frame->returnVar->bool(false);
 
@@ -57,8 +57,12 @@ final class array_all_key extends Internal
         if (null !== $vacuous) {
             return $this->boxStandaloneBoolJitResult($context, $vacuous);
         }
+        if ($args[1]->isNullConstant) {
+            throw new \TypeError(ArrayFindCallbackPolicy::invalidCallbackTypeError('array_all_key'));
+        }
         if (3 === $argc) {
-            if (!ArrayFindCallbackPolicy::isJitLowerable($args[1])) {
+            if (!ArrayFindCallbackPolicy::isJitNullCallback($args[1])
+                && !ArrayFindCallbackPolicy::isJitLowerable($args[1])) {
                 throw new \LogicException(ArrayFindCallbackPolicy::jitRejectionMessage());
             }
             if (JITVariable::TYPE_STRING === $args[1]->type || JITVariable::TYPE_VALUE === $args[1]->type) {
@@ -71,7 +75,8 @@ final class array_all_key extends Internal
                 ArrayFindHelper::buildAllArray($context, $args[0], $args[1], null, $strictI1)
             );
         }
-        if (!ArrayFindCallbackPolicy::isJitLowerable($args[1])) {
+        if (!ArrayFindCallbackPolicy::isJitNullCallback($args[1])
+            && !ArrayFindCallbackPolicy::isJitLowerable($args[1])) {
             throw new \LogicException(ArrayFindCallbackPolicy::jitRejectionMessage());
         }
         if (JITVariable::TYPE_STRING === $args[1]->type || JITVariable::TYPE_VALUE === $args[1]->type) {

@@ -35,7 +35,7 @@ final class array_find extends Internal
         $callback = $frame->calledArgs[1];
         VmArrayValueCallback::requireCallback($callback, 'array_find');
         foreach ($ht->iterateKeyed(true) as [$key, $value]) {
-            $result = VmArrayValueCallback::invokePredicate($frame, $callback, $value, $key);
+            $result = VmArrayValueCallback::invokePredicate($frame, $callback, $value, $key, 'array_find');
             if (VmArrayValueCallback::predicateMatches($result, $strict)) {
                 $frame->returnVar->copyFrom($value);
 
@@ -52,6 +52,9 @@ final class array_find extends Internal
         $argc = \count($args);
         if ($argc < 2 || $argc > 3) {
             throw new \LogicException('array_find() requires two or three arguments in this compiler build');
+        }
+        if ($args[1]->isNullConstant) {
+            throw new \TypeError(ArrayFindCallbackPolicy::invalidCallbackTypeError('array_find'));
         }
         if (!ArrayFindCallbackPolicy::isJitLowerable($args[1])) {
             throw new \LogicException(ArrayFindCallbackPolicy::jitRejectionMessage());

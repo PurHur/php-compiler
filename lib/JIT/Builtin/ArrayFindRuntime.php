@@ -39,7 +39,7 @@ final class ArrayFindRuntime
         int $mode
     ): Value {
         if ($callback->isNullConstant) {
-            throw new \LogicException(ArrayFindCallbackPolicy::jitRejectionMessage());
+            throw new \TypeError(ArrayFindCallbackPolicy::invalidCallbackTypeError('array_find'));
         }
         if (!self::isStringBuiltinCallback($callback)) {
             throw new \LogicException(ArrayFindCallbackPolicy::jitRejectionMessage());
