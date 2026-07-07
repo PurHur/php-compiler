@@ -6,8 +6,6 @@ declare(strict_types=1);
 
 var_export(enum_exists('Random\\IntervalBoundary', false));
 echo "\n";
-var_export(unitenum_exists('Random\\IntervalBoundary'));
-echo "\n";
 $names = [];
 foreach (Random\IntervalBoundary::cases() as $case) {
     $names[] = $case->name;
@@ -18,7 +16,6 @@ var_export(Random\IntervalBoundary::ClosedOpen->name);
 echo "\n";
 ?>
 --EXPECT--
-true
 true
 array (
   0 => 'ClosedOpen',

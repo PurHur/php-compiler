@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\random;
 
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\ext\standard\VmArray;
 use PHPCompiler\ext\standard\VmJson;
 use PHPCompiler\ext\standard\VmMath;
@@ -144,6 +145,59 @@ final class RandomEngineStorage
             'random\\engine\\mt19937' => self::mt19937($engineObject)->generateRaw() >> 1,
             default => self::generateUInt64($engineObject) >> 1,
         };
+    }
+
+    /** php-src random.c php_random_range64 — unbiased uint64 in [0, $umax]. */
+    public static function range64(ObjectEntry $engineObject, int $umax): int
+    {
+        if ($umax < 0) {
+            throw new \LogicException('range64 umax must be non-negative');
+        }
+
+        $result = self::generateRandomU64($engineObject);
+        if (0xFFFFFFFF === $umax) {
+            return $result->toInt();
+        }
+
+        $umaxPlusOne = $umax + 1;
+        if (($umaxPlusOne & $umax) === 0) {
+            $masked = RandomU64::and($result, RandomU64::fromParts(0, $umax));
+
+            return 0 === $masked->hi ? $masked->lo : RandomU64::modSmall($masked, $umaxPlusOne);
+        }
+
+        $limit = RandomU64::fromParts(
+            0xFFFFFFFF,
+            (0xFFFFFFFF - $umaxPlusOne) & 0xFFFFFFFF
+        );
+        $attempts = 0;
+        while (RandomU64::compare($result, $limit) > 0) {
+            if (++$attempts > 50) {
+                throw new \Random\BrokenRandomEngineError(
+                    'Failed to generate an acceptable random number in 50 attempts'
+                );
+            }
+            $result = self::generateRandomU64($engineObject);
+        }
+
+        return RandomU64::modSmall($result, $umaxPlusOne);
+    }
+
+    /** php-src randomizer.c Randomizer::nextFloat() — [0, 1) with 53-bit precision. */
+    public static function generateNextFloat(ObjectEntry $engineObject): float
+    {
+        return self::generateRandomU64($engineObject)->upper53UnitFloat();
+    }
+
+    public static function generateRandomU64(ObjectEntry $engineObject): RandomU64
+    {
+        $bytes = '';
+        while (\strlen($bytes) < 8) {
+            $bytes .= self::generate($engineObject);
+        }
+        $parts = \unpack('V2', \substr($bytes, 0, 8));
+
+        return RandomU64::fromParts($parts[2], $parts[1]);
     }
 
     private static function bytesToUInt32(string $bytes): int
@@ -304,6 +358,16 @@ final class RandomizerBuiltin
             $entry->methodVisibility[$lc] = $pub;
         }
 
+        if (CompilerVersion::supportsRandomIntervalBoundary()) {
+            foreach ([
+                'nextfloat' => RandomizerNextFloat::class,
+                'getfloat' => RandomizerGetFloat::class,
+            ] as $lc => $class) {
+                $entry->methods[$lc] = new $class();
+                $entry->methodVisibility[$lc] = $pub;
+            }
+        }
+
         $ctx->classes[self::RANDOMIZER_LC] = $entry;
     }
 
@@ -314,13 +378,21 @@ final class RandomizerBuiltin
 
     private static function randomizerIsComplete(ClassEntry $entry): bool
     {
-        return isset(
+        $base = isset(
             $entry->methods['getint'],
             $entry->methods['nextint'],
             $entry->methods['__construct'],
             $entry->methods['__serialize'],
             $entry->methods['__unserialize']
         );
+        if (!$base) {
+            return false;
+        }
+        if (CompilerVersion::supportsRandomIntervalBoundary()) {
+            return isset($entry->methods['getfloat'], $entry->methods['nextfloat']);
+        }
+
+        return true;
     }
 
     public static function receiverRandomizer(Frame $frame, string $method): ObjectEntry
@@ -833,5 +905,133 @@ final class RandomizerUnserialize extends VmClassMethod
 
         RandomizerStorage::setEngine($object, $engineVar);
         $object->constructed = true;
+    }
+}
+
+final class RandomizerNextFloat extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('nextFloat');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = RandomizerBuiltin::receiverRandomizer($frame, 'Random\\Randomizer::nextFloat()');
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $engine = RandomEngineStorage::engineObject($object);
+        $frame->returnVar->float(RandomEngineStorage::generateNextFloat($engine));
+    }
+}
+
+final class RandomizerGetFloat extends VmClassMethod
+{
+    private const INTERVAL_BOUNDARY_LC = 'random\\intervalboundary';
+
+    public function __construct()
+    {
+        parent::__construct('getFloat');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = RandomizerBuiltin::receiverRandomizer($frame, 'Random\\Randomizer::getFloat()');
+        if (\count($frame->calledArgs) < 3) {
+            throw new \ArgumentCountError(
+                'Random\\Randomizer::getFloat() expects at least 2 arguments, '
+                .(\count($frame->calledArgs) - 1).' given'
+            );
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+
+        $min = VmMath::parseDoubleBuiltinArg($frame->calledArgs[1], 'Random\\Randomizer::getFloat', 0, 'min');
+        $max = VmMath::parseDoubleBuiltinArg($frame->calledArgs[2], 'Random\\Randomizer::getFloat', 1, 'max');
+        if (!\is_finite($min)) {
+            throw new \ValueError('Random\\Randomizer::getFloat(): Argument #1 ($min) must be finite');
+        }
+        if (!\is_finite($max)) {
+            throw new \ValueError('Random\\Randomizer::getFloat(): Argument #2 ($max) must be finite');
+        }
+
+        $bounds = 'ClosedOpen';
+        if (isset($frame->calledArgs[3])) {
+            $bounds = self::parseIntervalBoundary($frame->calledArgs[3]);
+        }
+
+        $engine = RandomEngineStorage::engineObject($object);
+        $result = match ($bounds) {
+            'ClosedOpen' => self::closedOpen($engine, $min, $max),
+            'ClosedClosed' => self::closedClosed($engine, $min, $max),
+            'OpenClosed' => self::openClosed($engine, $min, $max),
+            'OpenOpen' => self::openOpen($engine, $min, $max),
+            default => throw new \LogicException('Unknown IntervalBoundary case'),
+        };
+        $frame->returnVar->float($result);
+    }
+
+    private static function closedOpen(ObjectEntry $engine, float $min, float $max): float
+    {
+        if ($max <= $min) {
+            throw new \ValueError('Random\\Randomizer::getFloat(): Argument #2 ($max) must be greater than argument #1 ($min)');
+        }
+
+        return GammaSection::closedOpen($engine, $min, $max);
+    }
+
+    private static function closedClosed(ObjectEntry $engine, float $min, float $max): float
+    {
+        if ($max < $min) {
+            throw new \ValueError('Random\\Randomizer::getFloat(): Argument #2 ($max) must be greater than or equal to argument #1 ($min)');
+        }
+
+        return GammaSection::closedClosed($engine, $min, $max);
+    }
+
+    private static function openClosed(ObjectEntry $engine, float $min, float $max): float
+    {
+        if ($max <= $min) {
+            throw new \ValueError('Random\\Randomizer::getFloat(): Argument #2 ($max) must be greater than argument #1 ($min)');
+        }
+
+        return GammaSection::openClosed($engine, $min, $max);
+    }
+
+    private static function openOpen(ObjectEntry $engine, float $min, float $max): float
+    {
+        if ($max <= $min) {
+            throw new \ValueError('Random\\Randomizer::getFloat(): Argument #2 ($max) must be greater than argument #1 ($min)');
+        }
+        $result = GammaSection::openOpen($engine, $min, $max);
+        if (\is_nan($result)) {
+            throw new \ValueError(
+                'The given interval is empty, there are no floats between argument #1 ($min) and argument #2 ($max)'
+            );
+        }
+
+        return $result;
+    }
+
+    private static function parseIntervalBoundary(Variable $var): string
+    {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $var->type || !EnumCaseSupport::isEnumCase($var->toObject())) {
+            throw new \TypeError(
+                'Random\\Randomizer::getFloat(): Argument #3 ($boundary) must be of type Random\\IntervalBoundary, '
+                .EnumCaseSupport::typeNameForVariable($var).' given'
+            );
+        }
+        $object = $var->toObject();
+        if (strtolower(ltrim($object->class->name, '\\')) !== self::INTERVAL_BOUNDARY_LC) {
+            throw new \TypeError(
+                'Random\\Randomizer::getFloat(): Argument #3 ($boundary) must be of type Random\\IntervalBoundary, '
+                .$object->class->name.' given'
+            );
+        }
+
+        return EnumCaseSupport::enumCaseNameForVariable($var);
     }
 }
