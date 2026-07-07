@@ -50,7 +50,7 @@ function run(string $filename, string $code, array $options): void
     }
     if (! isset($options['-l'])) {
         try {
-            $runtime->run($block);
+            $runtime->run($block, false);
         } catch (PHPCompiler\VM\ScriptExit $e) {
             exit($e->status);
         } catch (\LogicException $e) {
