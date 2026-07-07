@@ -23,18 +23,23 @@ final class ArrayFindJitHelper
 
     public const MODE_ALL = 3;
 
+    public const MODE_ALL_KEY = 4;
+
+    public const MODE_ANY_KEY = 5;
+
     public static function walkWithBuiltin(HashTable $ht, string $builtinName, int $mode): Variable
     {
         $fn = VmInternalCall::resolveStringCallback($builtinName);
+        $unaryUsesKey = self::MODE_ALL_KEY === $mode || self::MODE_ANY_KEY === $mode;
         $out = new Variable();
         foreach ($ht->iterateKeyed(true) as [$key, $value]) {
             $item = new Variable();
             $item->copyFrom($value);
             $keyVar = new Variable();
             $keyVar->copyFrom($key);
-            $result = VmInternalCall::invoke($fn, $item, $keyVar);
+            $result = VmArrayFindInternalInvoke::invoke($fn, $item, $keyVar, $unaryUsesKey);
             $truthy = VmArrayValueCallback::isTruthy($result);
-            if (self::MODE_ANY === $mode) {
+            if (self::MODE_ANY === $mode || self::MODE_ANY_KEY === $mode) {
                 if ($truthy) {
                     $out->bool(true);
 
@@ -43,7 +48,7 @@ final class ArrayFindJitHelper
 
                 continue;
             }
-            if (self::MODE_ALL === $mode) {
+            if (self::MODE_ALL === $mode || self::MODE_ALL_KEY === $mode) {
                 if (!$truthy) {
                     $out->bool(false);
 
@@ -62,9 +67,9 @@ final class ArrayFindJitHelper
                 return $out;
             }
         }
-        if (self::MODE_ANY === $mode) {
+        if (self::MODE_ANY === $mode || self::MODE_ANY_KEY === $mode) {
             $out->bool(false);
-        } elseif (self::MODE_ALL === $mode) {
+        } elseif (self::MODE_ALL === $mode || self::MODE_ALL_KEY === $mode) {
             $out->bool(true);
         } else {
             $out->null();

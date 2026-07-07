@@ -48,7 +48,8 @@ final class VmArrayValueCallback
     }
 
     /**
-     * Invoke array_find-family predicate with php-src (value, key) callback args (PHP 8.4 array.c).
+     * Invoke array_find-family predicate — closures/user fns get (value, key); internal builtins
+     * get arity-trimmed operands per php-src (ext/standard/array.c; #17300).
      */
     public static function invokePredicate(
         Frame $frame,
@@ -78,7 +79,12 @@ final class VmArrayValueCallback
         try {
             $fn = VmInternalCall::resolveStringCallback($name);
 
-            return VmInternalCall::invoke($fn, $value, $key);
+            return VmArrayFindInternalInvoke::invoke(
+                $fn,
+                $value,
+                $key,
+                self::unaryInternalUsesKey($function),
+            );
         } catch (\LogicException) {
             // Not a registered string builtin — try a user-defined function.
         }
@@ -90,6 +96,14 @@ final class VmArrayValueCallback
         $fn = VmUserCall::resolveStringCallback($frame->vmContext, $name);
 
         return VmUserCall::invokeTwo($frame->vmContext, $fn, $value, $key);
+    }
+
+    /**
+     * Forward-profile array_all_key/array_any_key unary internal predicates inspect keys (#17300).
+     */
+    private static function unaryInternalUsesKey(string $function): bool
+    {
+        return 'array_all_key' === $function || 'array_any_key' === $function;
     }
 
     private static function requireStringCallback(
