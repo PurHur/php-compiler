@@ -642,6 +642,24 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'result', 'parse_str'));
     }
 
+    /** @covers issue #17320 */
+    public function testParseStrSeparatorNamedParamOnForwardProfile(): void
+    {
+        $previous = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $names = BuiltinParamNames::forFunction('parse_str');
+            self::assertSame(['string', 'result', 'separator'], $names);
+            self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'separator', 'parse_str'));
+        } finally {
+            if (false === $previous) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$previous);
+            }
+        }
+    }
+
     /** @covers issue #17092 */
     public function testTimersAndHttpNamedParamsResolve(): void
     {
