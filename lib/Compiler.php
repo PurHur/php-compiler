@@ -24860,8 +24860,17 @@ class Compiler {
             $this->outerSiblingInlineFuncCallProducers($fromIndex, $consumerIndex, $cfgChildren)
         );
         // array_intersect(f(g()), f(g())) — outer f() producers match hoisted arg temps (#15488, #16050, #16427).
+        // in_array/array_search before var_dump — full scan for EXEC_RETURN ordinals (#9390, #17317).
         if ($outerProducerCount >= 2 && $outerProducerCount === \count($hoistedArgs)) {
-            return true;
+            $consumerName = strtolower($this->resolveInlineCallArgFuncName($consumer) ?? '');
+            if (!\in_array($consumerName, [
+                'in_array',
+                'array_search',
+                'array_key_exists',
+                'key_exists',
+            ], true)) {
+                return true;
+            }
         }
         $arrayPreludeChain = $this->siblingFuncCallChainHasArrayPrelude(
             $fromIndex,
@@ -28053,9 +28062,15 @@ class Compiler {
                 ? ($block->orig->children[$outerProducerIndexForOperand - 1] ?? null)
                 : null;
             // array_intersect(f(g()), f(g())) — operand slot beats ordinal EXEC_RETURN when emission order drifts (#16427).
+            // in_array/array_search before var_dump — EXEC_RETURN ordinals must win (#9390, #17317).
             if (
                 ($outerProducer instanceof Op\Expr\FuncCall || $outerProducer instanceof Op\Expr\NsFuncCall)
                 && !$this->funcCallExprLiteralCalleeAllowedAsHoistedProducer($outerProducer)
+                && !\in_array(
+                    strtolower($this->resolveCfgFuncCallName($outerProducer) ?? ''),
+                    ['in_array', 'array_search', 'array_key_exists', 'key_exists'],
+                    true
+                )
                 && ($prevProducer instanceof Op\Expr\FuncCall || $prevProducer instanceof Op\Expr\NsFuncCall)
                 && is_int($outerProducerIndexForOperand)
                 && $this->isAdjacentNestedFuncCallProducer(
