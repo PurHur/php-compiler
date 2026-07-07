@@ -33,6 +33,7 @@ final class array_any_key extends Internal
         }
         $ht = VmArray::requireArray($frame->calledArgs[0]->resolveIndirect(), 'array_any_key');
         $callback = $frame->calledArgs[1];
+        VmArrayValueCallback::requireCallback($callback, 'array_any_key');
         foreach ($ht->iterateKeyed(true) as [$key, $value]) {
             $result = VmArrayValueCallback::invokePredicate($frame, $callback, $value, $key);
             if (VmArrayValueCallback::predicateMatches($result, $strict)) {

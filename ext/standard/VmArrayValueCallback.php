@@ -12,6 +12,21 @@ use PHPCompiler\VM\Variable;
  */
 final class VmArrayValueCallback
 {
+    /** array_find/all/any* null callback → TypeError (ext/standard/array.c; #17133). */
+    public static function requireCallback(
+        Variable $callback,
+        string $function,
+        int $argNum = 2,
+        ?string $paramName = 'callback'
+    ): void {
+        if (Variable::TYPE_NULL === $callback->resolveIndirect()->type) {
+            $paramPart = null !== $paramName ? ' ($'.$paramName.')' : '';
+            throw new \TypeError(
+                $function.'(): Argument #'.$argNum.$paramPart.' must be a valid callback, no array or string given'
+            );
+        }
+    }
+
     /**
      * Invoke array_find-family predicate with php-src (value, key) callback args (PHP 8.4 array.c).
      */

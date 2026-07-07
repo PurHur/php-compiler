@@ -33,6 +33,7 @@ final class array_find_key extends Internal
         $ht = VmArray::requireArray($frame->calledArgs[0]->resolveIndirect(), 'array_find_key');
         VmArray::requireNonEmptyFindArray($ht, 'array_find_key');
         $callback = $frame->calledArgs[1];
+        VmArrayValueCallback::requireCallback($callback, 'array_find_key');
         foreach ($ht->iterateKeyed(true) as [$key, $value]) {
             $result = VmArrayValueCallback::invokePredicate($frame, $callback, $value, $key);
             if (VmArrayValueCallback::predicateMatches($result, $strict)) {
