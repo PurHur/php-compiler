@@ -1695,8 +1695,8 @@ final class CompilerVersion
     /**
      * PHP 8.3+ crc32c() (ext/standard/crc32.c, issue #3270, #17139).
      *
-     * Withheld on 8.4.0-dev reference profile (matches Zend 8.2 — crc32c absent).
-     * Enable via stable 8.4.0+ or explicit `PHP_COMPILER_PROFILE=8.3` / `8.4` forward profile.
+     * Enabled by default on the 8.4.0-dev toolchain (runtime reports 8.4; php-src has the builtin since 8.3).
+     * `PHP_COMPILER_PROFILE=8.2` keeps the Zend 8.2 reference gate (function absent).
      */
     public static function supportsCrc32c(): bool
     {
@@ -1704,33 +1704,20 @@ final class CompilerVersion
             return false;
         }
 
-        if (version_compare(self::VERSION, '8.4.0', '>=')) {
-            return true;
-        }
-
         $raw = getenv('PHP_COMPILER_PROFILE');
-        if (!\is_string($raw) || '' === trim($raw)) {
-            return false;
+        if (\is_string($raw) && '' !== trim($raw)) {
+            return version_compare(self::languageProfileVersion(), '8.3.0', '>=');
         }
 
-        return version_compare(self::languageProfileVersion(), '8.3.0', '>=');
+        return self::advertisesBuiltinSince('8.3.0');
     }
 
     /**
-     * crc32c() visible to function_exists() — stable runtime or forward 8.3+ (#17139).
+     * crc32c() visible to function_exists() — same gate as {@see supportsCrc32c()} (#17139).
      */
     public static function advertisesCrc32c(): bool
     {
-        if (version_compare(self::VERSION, '8.4.0', '>=')) {
-            return true;
-        }
-
-        $raw = getenv('PHP_COMPILER_PROFILE');
-        if (!\is_string($raw) || '' === trim($raw)) {
-            return false;
-        }
-
-        return version_compare(self::languageProfileVersion(), '8.3.0', '>=');
+        return self::supportsCrc32c();
     }
 
     /**

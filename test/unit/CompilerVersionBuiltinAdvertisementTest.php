@@ -540,19 +540,33 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsDisktotalspace());
     }
 
-    public function testCrc32cWithheldOnReferenceProfile(): void
-    {
-        $this->assertFalse(CompilerVersion::supportsCrc32c());
-        $this->assertFalse(CompilerVersion::advertisesCrc32c());
-    }
-
-    public function testCrc32cAdvertisedOnForwardProfile(): void
+    public function testCrc32cAdvertisedOnDefaultDevProfile(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
-        putenv('PHP_COMPILER_PROFILE=8.4');
+        putenv('PHP_COMPILER_PROFILE');
         try {
             $this->assertTrue(CompilerVersion::supportsCrc32c());
             $this->assertTrue(CompilerVersion::advertisesCrc32c());
+            $runtime = new Runtime();
+            $this->assertTrue(isset($runtime->vmContext->functions['crc32c']));
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testCrc32cWithheldOnPhp82Profile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.2');
+        try {
+            $this->assertFalse(CompilerVersion::supportsCrc32c());
+            $this->assertFalse(CompilerVersion::advertisesCrc32c());
+            $runtime = new Runtime();
+            $this->assertFalse(isset($runtime->vmContext->functions['crc32c']));
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');
@@ -777,11 +791,6 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         $this->assertFalse(isset($runtime->vmContext->functions['disktotalspace']));
     }
 
-    public function testVmDoesNotRegisterCrc32cOnReferenceProfile(): void
-    {
-        $runtime = new Runtime();
-        $this->assertFalse(isset($runtime->vmContext->functions['crc32c']));
-    }
 
     public function testVmRegistersCrc32cOnForwardProfile(): void
     {
