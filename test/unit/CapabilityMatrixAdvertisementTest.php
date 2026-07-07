@@ -44,7 +44,7 @@ final class CapabilityMatrixAdvertisementTest extends TestCase
             applyBuiltinAdvertisementParity(collectCapabilities($root), $root)
         );
 
-        foreach (['fpow', 'fmin', 'fmax'] as $fn) {
+        foreach (['fpow', 'fmin', 'fmax', 'fadd', 'fsub', 'fmul'] as $fn) {
             $this->assertArrayHasKey($fn, $capabilities);
             $this->assertFalse($capabilities[$fn]['vm'], $fn);
             $this->assertNotEmpty($capabilities[$fn]['notes']);

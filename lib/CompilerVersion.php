@@ -580,7 +580,7 @@ final class CompilerVersion
     }
 
     /**
-     * fpow()/fmin()/fmax() visible to function_exists() — stable runtime or forward 8.4+ (#16677).
+     * fpow()/fmin()/fmax()/fadd()/fsub()/fmul() visible to function_exists() — stable runtime or forward 8.4+ (#16677).
      *
      * Callable under forward profile via {@see supportsFpow()}; withheld from introspection on 8.4.0-dev
      * reference harness like Zend 8.2.

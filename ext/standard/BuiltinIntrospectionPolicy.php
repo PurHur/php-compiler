@@ -20,7 +20,7 @@ final class BuiltinIntrospectionPolicy
     public static function functionIsAdvertised(string $functionName): bool
     {
         $lc = strtolower($functionName);
-        if (\in_array($lc, ['fpow', 'fmin', 'fmax'], true)) {
+        if (\in_array($lc, ['fpow', 'fmin', 'fmax', 'fadd', 'fsub', 'fmul'], true)) {
             return CompilerVersion::advertisesFpow();
         }
         if ('json_validate' === $lc) {

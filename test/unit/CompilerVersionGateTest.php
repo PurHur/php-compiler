@@ -1176,7 +1176,7 @@ final class CompilerVersionGateTest extends TestCase
     {
         $runtime = new Runtime();
         $ctx = $runtime->vmContext;
-        foreach (['fpow', 'fmin', 'fmax'] as $fn) {
+        foreach (['fpow', 'fmin', 'fmax', 'fadd', 'fsub', 'fmul'] as $fn) {
             $this->assertFalse(isset($ctx->functions[$fn]), $fn);
         }
     }

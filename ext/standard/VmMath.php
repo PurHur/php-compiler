@@ -778,6 +778,36 @@ final class VmMath
         return \pow($num, $exponent);
     }
 
+    /** fadd() — IEEE-754 float addition (php-src ext/standard/math.c zend_fadd; #17290). */
+    public static function fadd(float $num1, float $num2): float
+    {
+        if (\function_exists('fadd')) {
+            return \fadd($num1, $num2);
+        }
+
+        return $num1 + $num2;
+    }
+
+    /** fsub() — IEEE-754 float subtraction (php-src ext/standard/math.c zend_fsub; #17290). */
+    public static function fsub(float $num1, float $num2): float
+    {
+        if (\function_exists('fsub')) {
+            return \fsub($num1, $num2);
+        }
+
+        return $num1 - $num2;
+    }
+
+    /** fmul() — IEEE-754 float multiplication (php-src ext/standard/math.c zend_fmul; #17290). */
+    public static function fmul(float $num1, float $num2): float
+    {
+        if (\function_exists('fmul')) {
+            return \fmul($num1, $num2);
+        }
+
+        return $num1 * $num2;
+    }
+
     /** fmod() — floating-point remainder (php-src ext/standard/math.c). */
     public static function fmod(float $num1, float $num2): float
     {

@@ -521,6 +521,7 @@
         "ext/random/AdditionalEnginesBuiltin.php",
         "ext/random/BuiltinClasses.php",
         "ext/random/BuiltinEnums.php",
+        "ext/random/GammaSection.php",
         "ext/random/Module.php",
         "ext/random/Mt19937Instance.php",
         "ext/random/PcgOneseq128XslRr64Instance.php",
@@ -2056,6 +2057,7 @@
         "ext/standard/expm1.php",
         "ext/standard/extension_loaded.php",
         "ext/standard/extract_.php",
+        "ext/standard/fadd.php",
         "ext/standard/fastcgi_finish_request.php",
         "ext/standard/fclose.php",
         "ext/standard/fdatasync_.php",
@@ -2085,6 +2087,7 @@
         "ext/standard/fmax.php",
         "ext/standard/fmin.php",
         "ext/standard/fmod.php",
+        "ext/standard/fmul.php",
         "ext/standard/fnmatch.php",
         "ext/standard/fopen.php",
         "ext/standard/forward_static_call.php",
@@ -2099,6 +2102,7 @@
         "ext/standard/fseek.php",
         "ext/standard/fsockopen.php",
         "ext/standard/fstat_.php",
+        "ext/standard/fsub.php",
         "ext/standard/fsync_.php",
         "ext/standard/ftell_.php",
         "ext/standard/ftok.php",
@@ -4467,9 +4471,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 4233,
+        "inventory_files": 4237,
         "excluded": 0,
-        "eligible": 4233,
+        "eligible": 4237,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
