@@ -101,13 +101,13 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         }
     }
 
-    public function testPhp84ReflectionProbeBuiltinsEnabledOnDefaultDevProfile(): void
+    public function testPhp84ReflectionProbeBuiltinsWithheldOnReferenceProfile(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE');
         try {
-            $this->assertTrue(CompilerVersion::supportsPhp84ReflectionProbeBuiltins());
-            $this->assertTrue(CompilerVersion::advertisesPhp84ReflectionProbeBuiltins());
+            $this->assertFalse(CompilerVersion::supportsPhp84ReflectionProbeBuiltins());
+            $this->assertFalse(CompilerVersion::advertisesPhp84ReflectionProbeBuiltins());
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');
@@ -143,10 +143,10 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE');
         try {
-            $this->assertTrue(CompilerVersion::supportsClassUsesRecursive());
-            $this->assertTrue(CompilerVersion::advertisesClassUsesRecursive());
+            $this->assertFalse(CompilerVersion::supportsClassUsesRecursive());
+            $this->assertFalse(CompilerVersion::advertisesClassUsesRecursive());
             $runtime = new Runtime();
-            $this->assertTrue(isset($runtime->vmContext->functions['class_uses_recursive']));
+            $this->assertFalse(isset($runtime->vmContext->functions['class_uses_recursive']));
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');
@@ -540,15 +540,15 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsDisktotalspace());
     }
 
-    public function testCrc32cAdvertisedOnDefaultDevProfile(): void
+    public function testCrc32cWithheldOnReferenceProfile(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE');
         try {
-            $this->assertTrue(CompilerVersion::supportsCrc32c());
-            $this->assertTrue(CompilerVersion::advertisesCrc32c());
+            $this->assertFalse(CompilerVersion::supportsCrc32c());
+            $this->assertFalse(CompilerVersion::advertisesCrc32c());
             $runtime = new Runtime();
-            $this->assertTrue(isset($runtime->vmContext->functions['crc32c']));
+            $this->assertFalse(isset($runtime->vmContext->functions['crc32c']));
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');
@@ -582,13 +582,13 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         $this->assertFalse(isset($runtime->vmContext->functions['zend_thread_id']));
     }
 
-    public function testVmRegistersClassUsesRecursiveOnDefaultDevProfile(): void
+    public function testVmDoesNotRegisterClassUsesRecursiveOnReferenceProfile(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE');
         $runtime = new Runtime();
         try {
-            $this->assertTrue(isset($runtime->vmContext->functions['class_uses_recursive']));
+            $this->assertFalse(isset($runtime->vmContext->functions['class_uses_recursive']));
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');
@@ -598,7 +598,7 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         }
     }
 
-    public function testVmRegistersPhp84ReflectionProbeBuiltinsOnDefaultDevProfile(): void
+    public function testVmDoesNotRegisterPhp84ReflectionProbeBuiltinsOnReferenceProfile(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE');
@@ -606,7 +606,7 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
             $runtime = new Runtime();
             $ctx = $runtime->vmContext;
             foreach (['attribute_exists', 'class_meth_exists', 'unitenum_exists'] as $fn) {
-                $this->assertTrue(isset($ctx->functions[$fn]), $fn);
+                $this->assertFalse(isset($ctx->functions[$fn]), $fn);
             }
         } finally {
             if (false === $prev) {
@@ -808,13 +808,13 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         }
     }
 
-    public function testMbTrimEnabledOnDefaultDevProfile(): void
+    public function testMbTrimWithheldOnReferenceProfile(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE');
         try {
-            $this->assertTrue(CompilerVersion::supportsMbTrimFunctions());
-            $this->assertTrue(CompilerVersion::advertisesMbTrimFunctions());
+            $this->assertFalse(CompilerVersion::supportsMbTrimFunctions());
+            $this->assertFalse(CompilerVersion::advertisesMbTrimFunctions());
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');
@@ -840,7 +840,7 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         }
     }
 
-    public function testVmRegistersMbTrimOnDefaultDevProfile(): void
+    public function testVmDoesNotRegisterMbTrimOnReferenceProfile(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE');
@@ -848,7 +848,7 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
             $runtime = new Runtime();
             $ctx = $runtime->vmContext;
             foreach (['mb_trim', 'mb_ltrim', 'mb_rtrim'] as $fn) {
-                $this->assertTrue(isset($ctx->functions[$fn]), $fn);
+                $this->assertFalse(isset($ctx->functions[$fn]), $fn);
             }
         } finally {
             if (false === $prev) {
