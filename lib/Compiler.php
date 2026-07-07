@@ -22264,9 +22264,14 @@ class Compiler {
             $producer = $producers[$i];
             if (
                 $producer instanceof Op\Expr\MethodCall
-                && property_exists($producer, 'result')
-                && empty($producer->result->usages)
-                && !$this->methodCallInlineProducerSuppliesCallArgValue($producer)
+                && (
+                    $this->methodCallIsStmtLevelDiscardPrelude($producer)
+                    || (
+                        property_exists($producer, 'result')
+                        && empty($producer->result->usages)
+                        && !$this->methodCallInlineProducerSuppliesCallArgValue($producer)
+                    )
+                )
                 && $i + 1 < $count
                 && $producers[$i + 1] instanceof Op\Expr\MethodCall
             ) {
@@ -23030,6 +23035,12 @@ class Compiler {
         for ($j = $firstSibling; $j <= $producerIndex; ++$j) {
             $child = $cfgChildren[$j] ?? null;
             if (!$this->isSiblingInlineCallProducerExpr($child)) {
+                continue;
+            }
+            if (
+                $child instanceof Op\Expr\MethodCall
+                && $this->methodCallIsStmtLevelDiscardPrelude($child)
+            ) {
                 continue;
             }
             if (
@@ -24948,6 +24959,10 @@ class Compiler {
                     --$i;
                     continue;
                 }
+                if ($this->methodCallIsStmtLevelDiscardPrelude($child)) {
+                    --$i;
+                    continue;
+                }
             }
             if ($this->isSiblingInlineCallProducerExpr($child)) {
                 if (
@@ -25078,6 +25093,10 @@ class Compiler {
             if ($skip instanceof Op\Expr\MethodCall) {
                 $method = $this->staticNameFromOperand($skip->name);
                 if (null !== $method && $this->methodCallIsKnownVoidReturn($method)) {
+                    ++$first;
+                    continue;
+                }
+                if ($this->methodCallIsStmtLevelDiscardPrelude($skip)) {
                     ++$first;
                     continue;
                 }
@@ -29618,6 +29637,23 @@ class Compiler {
             'rewind',
             'throw',
         ], true);
+    }
+
+    /**
+     * Stmt-level iterator/generator pointer advance before a sibling MethodCall inline arg (#17251, #13901).
+     *
+     * php-cfg: `$it->next(); var_export($it->current(), true)` hoists both MethodCalls; only current feeds arg #0.
+     */
+    private function methodCallIsStmtLevelDiscardPrelude(Op\Expr\MethodCall $call): bool
+    {
+        if (!$this->methodCallHasStatementLevelSideEffects($call)) {
+            return false;
+        }
+        if (!property_exists($call, 'result')) {
+            return false;
+        }
+
+        return empty($call->result->usages);
     }
 
     /**
