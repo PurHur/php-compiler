@@ -498,8 +498,8 @@ final class AsymmetricVisibilityRewriter
         if (self::lineViolatesDuplicateSetModifierRules($line)) {
             return true;
         }
-        // php-src 8.4+: unparenthesized `public private(set)` is valid asymmetric visibility (#16858).
-        if (CompilerVersion::supportsParenthesizedAsymmetricSetModifier()) {
+        // php-src 8.4+: unparenthesized `public private(set)` is valid when asymmetric visibility is enabled (#16858, #17114).
+        if (CompilerVersion::supportsAsymmetricVisibility()) {
             return false;
         }
 

@@ -78,7 +78,6 @@ PHP;
 
     public function testRewriteUnparenthesizedPublicProtectedSet(): void
     {
-        $this->requireParenthesizedAsymmetricSetModifier();
         $source = <<<'PHP'
 <?php
 class Demo {
@@ -88,6 +87,22 @@ PHP;
         $rewritten = AsymmetricVisibilityRewriter::rewrite($source);
         self::assertStringContainsString(
             '/*phpc-asymmetric-set:protected*/ /*phpc-asymmetric-explicit-read*/ public string $name',
+            preg_replace('/\s+/', ' ', $rewritten)
+        );
+    }
+
+    /** @covers issue #17114 — default 8.4.0-dev line without forward profile env */
+    public function testRewriteUnparenthesizedPublicPrivateSetWithoutForwardProfile(): void
+    {
+        $source = <<<'PHP'
+<?php
+class Demo {
+    public private(set) string $name = 'x';
+}
+PHP;
+        $rewritten = AsymmetricVisibilityRewriter::rewrite($source);
+        self::assertStringContainsString(
+            '/*phpc-asymmetric-set:private*/ /*phpc-asymmetric-explicit-read*/ public string $name',
             preg_replace('/\s+/', ' ', $rewritten)
         );
     }
