@@ -75,8 +75,10 @@ final class ModuleRegistry
         $primary = strtolower($module->getExtensionName());
         $withholdOpensslSurface = 'openssl' === $primary
             && !\PHPCompiler\ext\openssl\OpensslExtensionPolicy::advertisesExtension();
+        $withholdSqlite3Surface = 'sqlite3' === $primary
+            && !\PHPCompiler\ext\sqlite3\Sqlite3ExtensionPolicy::advertisesExtension();
 
-        if (!$withholdOpensslSurface) {
+        if (!$withholdOpensslSurface && !$withholdSqlite3Surface) {
             self::register($module->getExtensionName(), $moduleVersion);
         }
         $additional = $module->getAdditionalExtensionNames();
@@ -91,7 +93,7 @@ final class ModuleRegistry
                 continue;
             }
             $fnName = strtolower($func->getName());
-            if ($withholdOpensslSurface) {
+            if ($withholdOpensslSurface || $withholdSqlite3Surface) {
                 self::registerBuiltinLookup($fnName);
 
                 continue;

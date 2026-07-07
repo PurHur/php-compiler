@@ -137,6 +137,9 @@ final class BuiltinIntrospectionPolicy
         if ('openssl' === $ext) {
             return \PHPCompiler\ext\openssl\OpensslExtensionPolicy::advertisesExtension();
         }
+        if ('sqlite3' === $ext) {
+            return \PHPCompiler\ext\sqlite3\Sqlite3ExtensionPolicy::advertisesExtension();
+        }
 
         return true;
     }

@@ -182,7 +182,7 @@ final class ThrowableManifest
         'JsonException' => \JsonException::class,
         'DOMException' => \DOMException::class,
         'SodiumException' => \SodiumException::class,
-        'SQLite3Exception' => \SQLite3Exception::class,
+        'SQLite3Exception' => 'SQLite3Exception',
     ];
 
     /** @return list<string> */
@@ -205,6 +205,7 @@ final class ThrowableManifest
             'DateObjectError',
             'DateRangeError' => CompilerVersion::advertisesDateExceptionHierarchy(),
             'RequestParseBodyException' => CompilerVersion::advertisesRequestParseBodyExceptionClass(),
+            'SQLite3Exception' => \PHPCompiler\ext\sqlite3\Sqlite3ExtensionPolicy::advertisesExceptionClass(),
             default => true,
         };
     }
