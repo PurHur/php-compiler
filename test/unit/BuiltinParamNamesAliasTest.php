@@ -641,4 +641,20 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'string', 'parse_str'));
         self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'result', 'parse_str'));
     }
+
+    /** @covers issue #17090 */
+    public function testParseIniNamedParamsResolve(): void
+    {
+        $stringNames = BuiltinParamNames::forFunction('parse_ini_string');
+        self::assertSame(['ini_string', 'process_sections', 'scanner_mode'], $stringNames);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($stringNames, 'ini_string', 'parse_ini_string'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($stringNames, 'process_sections', 'parse_ini_string'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($stringNames, 'scanner_mode', 'parse_ini_string'));
+
+        $fileNames = BuiltinParamNames::forFunction('parse_ini_file');
+        self::assertSame(['filename', 'process_sections', 'scanner_mode'], $fileNames);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($fileNames, 'filename', 'parse_ini_file'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($fileNames, 'process_sections', 'parse_ini_file'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($fileNames, 'scanner_mode', 'parse_ini_file'));
+    }
 }

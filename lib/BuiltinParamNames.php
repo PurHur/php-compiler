@@ -298,6 +298,10 @@ final class BuiltinParamNames
                 return ['stream', 'length', 'separator', 'enclosure', 'escape'];
             case 'str_getcsv':
                 return ['string', 'separator', 'enclosure', 'escape'];
+            case 'parse_ini_string':
+                return ['ini_string', 'process_sections', 'scanner_mode'];
+            case 'parse_ini_file':
+                return ['filename', 'process_sections', 'scanner_mode'];
             case 'parse_url':
                 return ['url', 'component'];
             case 'proc_open':
