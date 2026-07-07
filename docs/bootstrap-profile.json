@@ -2303,6 +2303,7 @@
         "ext/standard/mktime.php",
         "ext/standard/modf.php",
         "ext/standard/move_uploaded_file.php",
+        "ext/standard/mt_getrandmax.php",
         "ext/standard/mt_rand.php",
         "ext/standard/mt_srand.php",
         "ext/standard/natcasesort_.php",
@@ -4456,9 +4457,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 4222,
+        "inventory_files": 4223,
         "excluded": 0,
-        "eligible": 4222,
+        "eligible": 4223,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1

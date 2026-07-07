@@ -2302,6 +2302,7 @@ require_once __DIR__.'/../../../ext/standard/mktime.php';
 require_once __DIR__.'/../../../ext/standard/modf.php';
 require_once __DIR__.'/../../../ext/standard/move_uploaded_file.php';
 require_once __DIR__.'/../../../ext/standard/mt_rand.php';
+require_once __DIR__.'/../../../ext/standard/mt_getrandmax.php';
 require_once __DIR__.'/../../../ext/standard/mt_srand.php';
 require_once __DIR__.'/../../../ext/standard/natcasesort_.php';
 require_once __DIR__.'/../../../ext/standard/natsort_.php';
