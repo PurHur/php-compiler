@@ -1,14 +1,15 @@
 --TEST--
-stdlib microtime(null) strict_types JIT throws TypeError
+stdlib microtime(null) under strict_types JIT throws TypeError (#17049)
 --JIT--
 --FILE--
 <?php
 declare(strict_types=1);
+
 try {
     microtime(null);
-    echo "no throw\n";
+    echo "uncaught\n";
 } catch (TypeError $e) {
-    echo "TypeError\n";
+    echo $e->getMessage(), "\n";
 }
 --EXPECT--
-TypeError
+microtime(): Argument #1 ($as_float) must be of type bool, null given

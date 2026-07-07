@@ -1,13 +1,14 @@
 --TEST--
-stdlib microtime(null) under strict_types throws TypeError (php-src Z_PARAM_BOOL; maintainer_gap_date_time_null_operands)
+stdlib microtime(null) under strict_types throws TypeError (#17049, ext/standard/microtime.c)
 --FILE--
 <?php
 declare(strict_types=1);
+
 try {
     microtime(null);
-    echo "no throw\n";
+    echo "uncaught\n";
 } catch (TypeError $e) {
-    echo "TypeError\n";
+    echo $e->getMessage(), "\n";
 }
 --EXPECT--
-TypeError
+microtime(): Argument #1 ($as_float) must be of type bool, null given

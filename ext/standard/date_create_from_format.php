@@ -38,8 +38,9 @@ final class date_create_from_format extends Internal
             return;
         }
 
-        $format = VmString::coerceStringBuiltinArg(
-            $frame->calledArgs[0],
+        $format = VmString::stringBuiltinArgForFrame(
+            $frame,
+            0,
             'date_create_from_format',
             0,
             'format'

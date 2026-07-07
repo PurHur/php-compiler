@@ -83,10 +83,29 @@ final class VmMath
     }
 
     /**
-     * Z_PARAM_BOOL-style coercion for bool-only builtins (php-src basic_functions.c; #6149 microtime/hrtime).
+     * Z_PARAM_BOOL with caller strict_types parity (php-src basic_functions.c microtime/hrtime; #17025).
      *
-     * @throws \TypeError when the operand cannot be converted like Zend PHP 8.x
+     * @throws \TypeError when strict_types rejects null/non-bool operands
      */
+    public static function parseBoolBuiltinArgForFrame(
+        Frame $frame,
+        int $argIndex,
+        string $function,
+        int $userArgIndex,
+        string $paramName
+    ): bool {
+        if (InternalStrictArg::isCallerStrict($frame)) {
+            return InternalStrictArg::requireBool($frame, $argIndex, $function, $paramName)->toBool();
+        }
+
+        return self::parseBoolBuiltinArg(
+            $frame->calledArgs[$argIndex],
+            $function,
+            $userArgIndex,
+            $paramName
+        );
+    }
+
     public static function parseBoolBuiltinArg(
         Variable $var,
         string $function,
@@ -127,30 +146,6 @@ final class VmMath
                     )
                 );
         }
-    }
-
-    /**
-     * Z_PARAM_BOOL with caller strict_types parity (php-src basic_functions.c microtime/hrtime; #17025).
-     *
-     * @throws \TypeError when strict_types rejects null/non-bool operands
-     */
-    public static function parseBoolBuiltinArgForFrame(
-        Frame $frame,
-        int $argIndex,
-        string $function,
-        int $userArgIndex,
-        string $paramName
-    ): bool {
-        if (InternalStrictArg::isCallerStrict($frame)) {
-            return InternalStrictArg::requireBool($frame, $argIndex, $function, $paramName)->toBool();
-        }
-
-        return self::parseBoolBuiltinArg(
-            $frame->calledArgs[$argIndex],
-            $function,
-            $userArgIndex,
-            $paramName
-        );
     }
 
     /**

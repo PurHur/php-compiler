@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-// Maintainer gap #17050 — password_hash(null) under strict_types must TypeError (ext/standard/password.c).
+// Maintainer gap #17049 — microtime(null) under strict_types must TypeError (ext/standard/microtime.c).
 try {
-    password_hash(null, PASSWORD_DEFAULT);
+    microtime(null);
     fwrite(STDERR, "fail: expected TypeError\n");
     exit(1);
 } catch (TypeError $e) {
