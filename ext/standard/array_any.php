@@ -32,6 +32,7 @@ final class array_any extends Internal
         }
         $ht = VmArray::requireArray($frame->calledArgs[0]->resolveIndirect(), 'array_any');
         $callback = $frame->calledArgs[1];
+        VmArrayValueCallback::requirePredicateCallback($callback, 'array_any');
         foreach ($ht->iterateKeyed(true) as [$key, $value]) {
             $result = VmArrayValueCallback::invokePredicate($frame, $callback, $value, $key);
             if (VmArrayValueCallback::predicateMatches($result, $strict)) {
@@ -55,7 +56,8 @@ final class array_any extends Internal
         if (null !== $vacuous) {
             return $vacuous;
         }
-        if (!ArrayFindCallbackPolicy::isJitLowerable($args[1])) {
+        if (!ArrayFindCallbackPolicy::isJitNullCallback($args[1])
+            && !ArrayFindCallbackPolicy::isJitLowerable($args[1])) {
             throw new \LogicException(ArrayFindCallbackPolicy::jitRejectionMessage());
         }
         if (JITVariable::TYPE_STRING === $args[1]->type || JITVariable::TYPE_VALUE === $args[1]->type) {

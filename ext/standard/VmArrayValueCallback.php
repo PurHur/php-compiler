@@ -12,6 +12,15 @@ use PHPCompiler\VM\Variable;
  */
 final class VmArrayValueCallback
 {
+    /** array_find family null callback → TypeError (ext/standard/array.c; #17133). */
+    public static function requirePredicateCallback(
+        Variable $callback,
+        string $function,
+        int $argNum = 2
+    ): void {
+        VmArraySortCallback::requireCallback($callback, $function, $argNum);
+    }
+
     /**
      * Invoke array_find-family predicate with php-src (value, key) callback args (PHP 8.4 array.c).
      */

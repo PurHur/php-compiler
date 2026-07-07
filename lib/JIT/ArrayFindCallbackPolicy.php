@@ -30,18 +30,27 @@ final class ArrayFindCallbackPolicy
 
     public static function isJitLowerable(JITVariable $callback): bool
     {
+        if (JITVariable::TYPE_NULL === $callback->type || $callback->isNullConstant) {
+            return false;
+        }
         if (self::isClosureJitLowerable($callback)) {
             return true;
         }
-        if (ArrayMapCallbackPolicy::isJitLowerableScalar(
-            $callback->type,
-            $callback->isNullConstant,
-            $callback->compileTimeString
-        )) {
+        if (JITVariable::TYPE_STRING === $callback->type && null !== $callback->compileTimeString) {
             return true;
         }
 
         return ArrayReduceCallbackPolicy::isJitLowerable($callback);
+    }
+
+    public static function isJitNullCallback(JITVariable $callback): bool
+    {
+        return JITVariable::TYPE_NULL === $callback->type || $callback->isNullConstant;
+    }
+
+    public static function invalidCallbackTypeError(string $function, int $argNum = 2): string
+    {
+        return $function.'(): Argument #'.$argNum.' ($callback) must be a valid callback, no array or string given';
     }
 
     public static function isVmSupportedType(int $type): bool

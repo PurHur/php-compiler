@@ -33,6 +33,7 @@ final class array_find extends Internal
         $ht = VmArray::requireArray($frame->calledArgs[0]->resolveIndirect(), 'array_find');
         VmArray::requireNonEmptyFindArray($ht, 'array_find');
         $callback = $frame->calledArgs[1];
+        VmArrayValueCallback::requirePredicateCallback($callback, 'array_find');
         foreach ($ht->iterateKeyed(true) as [$key, $value]) {
             $result = VmArrayValueCallback::invokePredicate($frame, $callback, $value, $key);
             if (VmArrayValueCallback::predicateMatches($result, $strict)) {
@@ -52,7 +53,8 @@ final class array_find extends Internal
         if ($argc < 2 || $argc > 3) {
             throw new \LogicException('array_find() requires two or three arguments in this compiler build');
         }
-        if (!ArrayFindCallbackPolicy::isJitLowerable($args[1])) {
+        if (!ArrayFindCallbackPolicy::isJitNullCallback($args[1])
+            && !ArrayFindCallbackPolicy::isJitLowerable($args[1])) {
             throw new \LogicException(ArrayFindCallbackPolicy::jitRejectionMessage());
         }
         if (JITVariable::TYPE_STRING === $args[1]->type || JITVariable::TYPE_VALUE === $args[1]->type) {
