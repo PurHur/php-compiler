@@ -22,7 +22,7 @@ final class phpversion extends Internal
     {
         $argc = \count($frame->calledArgs);
         if ($argc > 1) {
-            throw new \LogicException('phpversion() accepts at most one argument');
+            throw new \ArgumentCountError('phpversion() expects at most 1 argument, '.$argc.' given');
         }
         if (null === $frame->returnVar) {
             return;
@@ -47,7 +47,7 @@ final class phpversion extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         if (\count($args) > 1) {
-            throw new \LogicException('phpversion() accepts at most one argument');
+            throw new \ArgumentCountError('phpversion() expects at most 1 argument, '.\count($args).' given');
         }
 
         return JitInfo::phpversion($context, $args[0] ?? null);
