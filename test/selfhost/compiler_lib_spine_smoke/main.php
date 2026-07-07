@@ -289,6 +289,7 @@ require_once __DIR__.'/../../../ext/hash/HashAlgosJitHelper.php';
 require_once __DIR__.'/../../../ext/hash/HashContextDebugInfo.php';
 require_once __DIR__.'/../../../ext/hash/HashFunction.php';
 require_once __DIR__.'/../../../ext/hash/JitHashAlgos.php';
+require_once __DIR__.'/../../../ext/hash/JitHashContext.php';
 require_once __DIR__.'/../../../ext/hash/MhashRegistry.php';
 require_once __DIR__.'/../../../ext/hash/Module.php';
 require_once __DIR__.'/../../../ext/hash/VmHashContext.php';
@@ -2958,6 +2959,7 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/GlobalIntrospectionNameRuntime.p
 require_once __DIR__.'/../../../lib/JIT/Builtin/GzStreamIo.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/GzStreamRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/HashtableValueOutJitBridge.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/HashContextRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/Hebrev.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/Highlight.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/HtmlEntitiesJit.php';

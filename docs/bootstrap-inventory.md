@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 4199 |
-| Phase A inventory files (M2 ratio SSOT) | 4199 |
+| PHP files on vm.php path | 4203 |
+| Phase A inventory files (M2 ratio SSOT) | 4203 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 11337 |
+| Source constructs flagged (warnings) | 11342 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -278,8 +278,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/hash/BuiltinClasses.php` | 0 | 1 |
 | `ext/hash/HashAlgosJitHelper.php` | 0 | 1 |
 | `ext/hash/HashContextDebugInfo.php` | 0 | 3 |
-| `ext/hash/HashFunction.php` | 0 | 2 |
+| `ext/hash/HashFunction.php` | 0 | 1 |
 | `ext/hash/JitHashAlgos.php` | 0 | 1 |
+| `ext/hash/JitHashContext.php` | 0 | 4 |
 | `ext/hash/MhashRegistry.php` | 0 | 1 |
 | `ext/hash/Module.php` | 0 | 16 |
 | `ext/hash/VmHashContext.php` | 0 | 6 |
@@ -1025,6 +1026,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitHttpResponseCode.php` | 0 | 1 |
 | `ext/standard/JitIdate.php` | 0 | 1 |
 | `ext/standard/JitImageTypeArg.php` | 0 | 1 |
+| `ext/standard/JitImageTypeToMimeType.php` | 0 | 1 |
 | `ext/standard/JitImplode.php` | 0 | 1 |
 | `ext/standard/JitIncludePath.php` | 0 | 1 |
 | `ext/standard/JitInet.php` | 0 | 1 |
@@ -2900,6 +2902,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/GlobalIntrospectionNameRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/GzStreamIo.php` | 0 | 1 |
 | `lib/JIT/Builtin/GzStreamRuntime.php` | 0 | 3 |
+| `lib/JIT/Builtin/HashContextRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/HashtableValueOutJitBridge.php` | 0 | 1 |
 | `lib/JIT/Builtin/Hebrev.php` | 0 | 3 |
 | `lib/JIT/Builtin/Highlight.php` | 0 | 3 |
@@ -2910,6 +2913,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/HttpResponseRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/Iconv.php` | 0 | 1 |
 | `lib/JIT/Builtin/IconvRuntime.php` | 0 | 3 |
+| `lib/JIT/Builtin/ImageTypeToMimeType.php` | 0 | 1 |
 | `lib/JIT/Builtin/InArrayRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/IncludePathRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/InetRuntime.php` | 0 | 3 |
@@ -3190,7 +3194,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringHttpBuildQuery.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringIdate.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringImageTypeToExtension.php` | 0 | 3 |
-| `lib/JIT/Builtin/StringImageTypeToMimeType.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringInfo.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringInterfaceExists.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringJsonDecode.php` | 0 | 3 |
@@ -5919,13 +5922,20 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/hash/HashFunction.php`
 
 **Warnings** (review for bootstrap subset):
-- new Error (line 20)
 - 1 class method(s)
 
 ### `ext/hash/JitHashAlgos.php`
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
+
+### `ext/hash/JitHashContext.php`
+
+**Warnings** (review for bootstrap subset):
+- new JITVariable (line 74)
+- new JITVariable (line 167)
+- new JITVariable (line 177)
+- 11 class method(s)
 
 ### `ext/hash/MhashRegistry.php`
 
@@ -10792,6 +10802,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 10 class method(s)
 
+### `ext/standard/JitImageTypeToMimeType.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `ext/standard/JitImplode.php`
 
 **Warnings** (review for bootstrap subset):
@@ -14958,11 +14973,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmImage.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 231)
-- new Variable (line 233)
-- new HashTable (line 245)
-- new Variable (line 250)
-- new Variable (line 263)
+- new HashTable (line 207)
+- new Variable (line 209)
+- new HashTable (line 221)
+- new Variable (line 226)
+- new Variable (line 239)
 - 25 class method(s)
 
 ### `ext/standard/VmIncludePath.php`
@@ -23486,6 +23501,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 12 class method(s)
 - 12 closure(s)
 
+### `lib/JIT/Builtin/HashContextRuntime.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `lib/JIT/Builtin/HashtableValueOutJitBridge.php`
 
 **Warnings** (review for bootstrap subset):
@@ -23545,6 +23565,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new JIT (line 161)
 - 7 class method(s)
 - 1 closure(s)
+
+### `lib/JIT/Builtin/ImageTypeToMimeType.php`
+
+**Warnings** (review for bootstrap subset):
+- 4 class method(s)
 
 ### `lib/JIT/Builtin/InArrayRuntime.php`
 
@@ -25092,8 +25117,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringHashCryptoPhp.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 231)
-- 8 class method(s)
+- new JIT (line 222)
+- 9 class method(s)
 - 1 closure(s)
 
 ### `lib/JIT/Builtin/StringHashEquals.php`
@@ -25165,11 +25190,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new JIT (line 191)
 - 7 class method(s)
 - 1 closure(s)
-
-### `lib/JIT/Builtin/StringImageTypeToMimeType.php`
-
-**Warnings** (review for bootstrap subset):
-- 3 class method(s)
 
 ### `lib/JIT/Builtin/StringInfo.php`
 
@@ -26023,24 +26043,24 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new VMVariable (line 3151)
 - new VMVariable (line 3169)
 - new VMVariable (line 3187)
-- new ReflectionClassConstant (line 4281)
-- new Variable (line 4645)
-- new Variable (line 4658)
-- new Variable (line 4792)
-- new Variable (line 5059)
-- new Variable (line 5085)
-- new Variable (line 5093)
-- new Variable (line 5116)
-- new Variable (line 5142)
-- new Variable (line 5150)
-- new Variable (line 5224)
-- new Literal (line 5241)
+- new ReflectionClassConstant (line 4286)
+- new Variable (line 4650)
+- new Variable (line 4663)
+- new Variable (line 4797)
+- new Variable (line 5064)
+- new Variable (line 5090)
+- new Variable (line 5098)
+- new Variable (line 5121)
+- new Variable (line 5147)
+- new Variable (line 5155)
+- new Variable (line 5229)
 - new Literal (line 5246)
 - new Literal (line 5251)
-- new Variable (line 5262)
-- new Variable (line 5295)
-- new Variable (line 5318)
-- new Variable (line 5677)
+- new Literal (line 5256)
+- new Variable (line 5267)
+- new Variable (line 5300)
+- new Variable (line 5323)
+- new Variable (line 5682)
 - 256 class method(s)
 - 8 closure(s)
 

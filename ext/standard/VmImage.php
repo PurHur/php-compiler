@@ -115,7 +115,7 @@ final class VmImage
      */
     public static function imageTypeToMimeType(int $imageType): string
     {
-        return ImageTypeToMimeTypeJitHelper::lookupArgv($imageType);
+        return ImageTypeToMimeTypeJitHelper::mimeArgv($imageType);
     }
 
     /**
