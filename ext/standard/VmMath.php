@@ -130,6 +130,30 @@ final class VmMath
     }
 
     /**
+     * Z_PARAM_BOOL with caller strict_types parity (php-src basic_functions.c microtime/hrtime; #17025).
+     *
+     * @throws \TypeError when strict_types rejects null/non-bool operands
+     */
+    public static function parseBoolBuiltinArgForFrame(
+        Frame $frame,
+        int $argIndex,
+        string $function,
+        int $userArgIndex,
+        string $paramName
+    ): bool {
+        if (InternalStrictArg::isCallerStrict($frame)) {
+            return InternalStrictArg::requireBool($frame, $argIndex, $function, $paramName)->toBool();
+        }
+
+        return self::parseBoolBuiltinArg(
+            $frame->calledArgs[$argIndex],
+            $function,
+            $userArgIndex,
+            $paramName
+        );
+    }
+
+    /**
      * IS_BOOL internal params without coercion (php-src ZEND_ARG_INFO; #12585, #14763 array_slice preserve_keys).
      *
      * @throws \TypeError when operand is not boolean
