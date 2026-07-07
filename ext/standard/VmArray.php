@@ -809,18 +809,47 @@ final class VmArray
     }
 
     /**
+     * ArrayPadType pure enum → ARRAY_PAD_RIGHT / ARRAY_PAD_LEFT (#17240).
+     */
+    public static function tryArrayPadTypeInt(Variable $var): ?int
+    {
+        if (!EnumCaseSupport::isEnumCaseVariable($var)) {
+            return null;
+        }
+        $enumClass = EnumCaseSupport::enumClassForCaseVariable($var);
+        if (null === $enumClass || !self::isArrayPadTypeEnum($enumClass->name)) {
+            return null;
+        }
+        $entry = EnumCaseSupport::enumCaseEntryForVariable($var);
+        if (null === $entry) {
+            throw new \LogicException('ArrayPadType case missing');
+        }
+
+        return match ($entry->caseName) {
+            'Positive' => StdlibConstants::ARRAY_PAD_RIGHT,
+            'Negative' => StdlibConstants::ARRAY_PAD_LEFT,
+            default => throw new \ValueError('Invalid ArrayPadType enum value'),
+        };
+    }
+
+    private static function isArrayPadTypeEnum(string $className): bool
+    {
+        return 0 === strcasecmp(ltrim($className, '\\'), 'ArrayPadType');
+    }
+
+    /**
      * array_pad() 4th parameter pad type (PHP 8.4+, ext/standard/array.c, #14993).
      */
     public static function resolvePadTypeArg(Variable $var): int
     {
         $var = $var->resolveIndirect();
-        $padFromEnum = VmString::tryPadTypeInt($var);
+        $padFromEnum = self::tryArrayPadTypeInt($var);
         if (null !== $padFromEnum) {
             return $padFromEnum;
         }
         if (EnumCaseSupport::isEnumCaseVariable($var)) {
             throw new \TypeError(\sprintf(
-                'array_pad(): Argument #4 ($pad_type) must be of type PadType|int, %s given',
+                'array_pad(): Argument #4 ($pad_type) must be of type ArrayPadType|int, %s given',
                 EnumCaseSupport::typeNameForVariable($var)
             ));
         }

@@ -1598,6 +1598,16 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.4+ ArrayPadType builtin enum for array_pad() pad_type (#17240).
+     *
+     * Withheld on 8.4.0-dev reference profile — enable via PHP_COMPILER_PROFILE=8.4 forward profile.
+     */
+    public static function supportsArrayPadTypeEnum(): bool
+    {
+        return self::supportsRoundingModeEnum();
+    }
+
+    /**
      * PHP 8.4+ array_pad() optional $pad_type + ARRAY_PAD_* constants (ext/standard/array.c, #14993).
      *
      * Forward profile on 8.4.0-dev — advertisesBuiltinSince treats -dev as 8.4.0 (#14983 reference gate).

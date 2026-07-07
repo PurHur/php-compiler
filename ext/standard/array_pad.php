@@ -8,7 +8,7 @@ use PHPCompiler\CompilerVersion;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Builtin\ArrayPadRuntime;
-use PHPCompiler\JIT\Builtin\PadTypeJit;
+use PHPCompiler\JIT\Builtin\ArrayPadTypeJit;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
@@ -85,7 +85,7 @@ final class array_pad extends Internal
         }
         $length = JitIntdiv::lowerIntBuiltinArgForCaller($context, $args[1], 'array_pad', 2, 'length');
         if (4 === $argc) {
-            $padTypeLiteral = PadTypeJit::compileTimePadType($context, $args[3]);
+            $padTypeLiteral = ArrayPadTypeJit::compileTimePadType($context, $args[3]);
             if (null !== $padTypeLiteral) {
                 $padType = $context->getTypeFromString('int64')->constInt($padTypeLiteral, false);
             } else {
