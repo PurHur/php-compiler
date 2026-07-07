@@ -357,6 +357,7 @@ final class BootstrapCompileSmokeM3Emit
      */
     private static function emitPutenvM3CompileDriverMainForBootstrapSelfhost(Context $context, Value $sourceFile): void
     {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'csm3_putenv_m3main_entry');
         $charPtr = $context->getTypeFromString('char*');
         $i32 = $context->getTypeFromString('int32');
         $notFound = $i32->constInt(JitStringSearch::NOT_FOUND, true);
@@ -371,6 +372,8 @@ final class BootstrapCompileSmokeM3Emit
         $hasSelfhost = $context->builder->icmp(Builder::INT_NE, $foundSelfhost, $notFound);
         $isSpine = $context->builder->icmp(Builder::INT_NE, $foundSpine, $notFound);
         $shouldSet = $context->builder->and($hasSelfhost, $context->builder->not($isSpine));
+        // JitVmHelperLink::ensureBridge (via findOffsetI32) may clear the LLVM insert block (#15597).
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'csm3_putenv_m3main_before_branch');
         $setBb = BasicBlockHelper::append($context, 'csm3_putenv_m3main_set');
         $skipBb = BasicBlockHelper::append($context, 'csm3_putenv_m3main_skip');
         $doneBb = BasicBlockHelper::append($context, 'csm3_putenv_m3main_done');
