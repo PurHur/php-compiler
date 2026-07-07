@@ -29,10 +29,10 @@ final class file_get_contents extends Internal
                 'file_get_contents() expects at least 1 argument, '.\max(0, $argc - 1).' given'
             );
         }
-        $filename = VmStreamPath::coerceNonEmptyPathArg(
-            $frame->calledArgs[0],
-            'file_get_contents',
+        $filename = VmStreamPath::coerceNonEmptyPathArgForFrame(
+            $frame,
             0,
+            'file_get_contents',
             'filename'
         );
         if (null === $frame->returnVar) {

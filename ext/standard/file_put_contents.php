@@ -30,7 +30,7 @@ final class file_put_contents extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $path = VmFilestatArg::coerceFilenameArg($frame->calledArgs[0], 'file_put_contents');
+        $path = VmFilestatArg::filenameArgForFrame($frame, 0, 'file_put_contents');
         $flags = 0;
         if (isset($frame->calledArgs[2])) {
             $flags = VmMath::parseIntBuiltinArgForFrame(
