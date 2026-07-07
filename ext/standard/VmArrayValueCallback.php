@@ -13,6 +13,15 @@ use PHPCompiler\VM\Variable;
  */
 final class VmArrayValueCallback
 {
+    /** array_find family null callback → TypeError (ext/standard/array.c; #17133). */
+    public static function requirePredicateCallback(
+        Variable $callback,
+        string $function,
+        int $argNum = 2
+    ): void {
+        VmArraySortCallback::requireCallback($callback, $function, $argNum);
+    }
+
     /**
      * array_find-family callback validation before iteration (#17133, ext/standard/array.c).
      */

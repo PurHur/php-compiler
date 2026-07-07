@@ -30,35 +30,22 @@ final class ArrayFindCallbackPolicy
 
     public static function isJitLowerable(JITVariable $callback): bool
     {
+        if (JITVariable::TYPE_NULL === $callback->type || $callback->isNullConstant) {
+            return false;
+        }
         if (self::isClosureJitLowerable($callback)) {
             return true;
         }
-        if (ArrayMapCallbackPolicy::isJitLowerableScalar(
-            $callback->type,
-            $callback->isNullConstant,
-            $callback->compileTimeString
-        )) {
+        if (JITVariable::TYPE_STRING === $callback->type && null !== $callback->compileTimeString) {
             return true;
         }
 
         return ArrayReduceCallbackPolicy::isJitLowerable($callback);
     }
 
-    public static function isVmSupportedType(int $type): bool
+    public static function isJitNullCallback(JITVariable $callback): bool
     {
-        return VMVariable::TYPE_STRING === $type;
-    }
-
-    public static function jitRejectionMessage(): string
-    {
-        return 'array_find() callback must be '.self::JIT_SUBSET
-            .' for JIT/AOT in this compiler build; '.self::DEFERRED_KINDS.' are deferred (#3073)';
-    }
-
-    public static function vmRejectionMessage(): string
-    {
-        return 'array callback must be a string builtin, user function, or closure in this compiler build; '
-            .self::DEFERRED_KINDS.' are deferred';
+        return JITVariable::TYPE_NULL === $callback->type || $callback->isNullConstant;
     }
 
     /**
@@ -84,5 +71,22 @@ final class ArrayFindCallbackPolicy
             $argNum,
             $name
         );
+    }
+
+    public static function isVmSupportedType(int $type): bool
+    {
+        return VMVariable::TYPE_STRING === $type;
+    }
+
+    public static function jitRejectionMessage(): string
+    {
+        return 'array_find() callback must be '.self::JIT_SUBSET
+            .' for JIT/AOT in this compiler build; '.self::DEFERRED_KINDS.' are deferred (#3073)';
+    }
+
+    public static function vmRejectionMessage(): string
+    {
+        return 'array callback must be a string builtin, user function, or closure in this compiler build; '
+            .self::DEFERRED_KINDS.' are deferred';
     }
 }
