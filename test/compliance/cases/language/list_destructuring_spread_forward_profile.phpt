@@ -7,7 +7,7 @@ if (!class_exists('PHPCompiler\\CompilerVersion')) {
 }
 putenv('PHP_COMPILER_PROFILE=8.4');
 if (!PHPCompiler\CompilerVersion::supportsListDestructuringSpreadAssign()) {
-    die('skip requires PHP_COMPILER_PROFILE=8.4 list spread assign gate');
+    die('skip requires PHP_COMPILER_PROFILE=8.4 list spread gate');
 }
 ?>
 --ENV--

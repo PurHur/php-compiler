@@ -2819,7 +2819,7 @@ class Compiler {
      */
     private function compileListDestructGroup(array $ops, int $start, Block $block): array
     {
-        $this->rejectListSpreadAssign($ops, $start);
+        $this->rejectListDestructuringSpreadAssignProfile($ops, $start, $block);
         $end = $this->listDestructGroupEndIndex($ops, $start, $block);
         $this->rejectListDestructNonWritableWriteTargets($ops, $start, $end, $block);
         $rhs = $this->listDestructRhsOperand($ops, $start);
@@ -43281,22 +43281,22 @@ class Compiler {
     }
 
     /**
-     * Zend zend_compile.c: list spread assignment compile-time fatal (#6936, #17182).
+     * Zend zend_compile.c: list spread assign withheld on 8.4.0-dev reference profile (#6936, #17182).
      *
      * @param Op[] $ops
      */
-    private function rejectListSpreadAssign(array $ops, int $start): void
+    private function rejectListDestructuringSpreadAssignProfile(array $ops, int $start, ?Block $block = null): void
     {
-        $end = $this->listDestructGroupEndIndex($ops, $start, null);
+        $end = $this->listDestructGroupEndIndex($ops, $start, $block);
         for ($i = $start; $i <= $end; ++$i) {
             if (!$this->isListSpreadAssignOp($ops[$i])) {
                 continue;
             }
             if (!CompilerVersion::supportsListDestructuringSpreadAssign()) {
-                $this->throwListSpreadAssignFatal($ops[$i]);
+                $this->throwListSpreadAssignUnsupportedFatal($ops[$i]);
             }
-            if (!$this->isListDestructSpreadTail($ops, $i, null)) {
-                $this->throwListSpreadAssignFatal($ops[$i]);
+            if (!$this->isListDestructSpreadTail($ops, $i, $block)) {
+                $this->throwListSpreadAssignUnsupportedFatal($ops[$i]);
             }
         }
     }
@@ -43306,7 +43306,7 @@ class Compiler {
         if (CompilerVersion::supportsListDestructuringSpreadAssign()) {
             return;
         }
-        $this->throwListSpreadAssignFatal($expr);
+        $this->throwListSpreadAssignUnsupportedFatal($expr);
     }
 
     /**
@@ -43314,7 +43314,7 @@ class Compiler {
      *
      * @return never
      */
-    private function throwListSpreadAssignFatal(Op\Expr\Assign $spread): void
+    private function throwListSpreadAssignUnsupportedFatal(Op\Expr\Assign $spread): void
     {
         $sourceFile = $spread->getFile() ?? '';
         if ('' === $sourceFile) {

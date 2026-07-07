@@ -11,8 +11,9 @@ if (PHPCompiler\CompilerVersion::supportsListDestructuringSpreadAssign()) {
 ?>
 --FILE--
 <?php
-['a' => $v, ...$tail] = ['a' => 1, 'b' => 2];
-var_export([$v, $tail]);
+$src = ['a' => 1, 'b' => 2];
+['a' => $v, ...$tail] = $src;
+var_dump($v, $tail);
 --EXPECT_EXIT--
 255
 --EXPECTF--

@@ -727,11 +727,11 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.4+ list/array destructuring spread assignment (`[$a, ...$rest] = $arr`).
+     * PHP 8.4+ list destructuring spread assignment (`[$a, ...$rest] = $arr`, keyed `['k' => $v, ...$tail] = $arr`).
      *
-     * Gated on stable 8.4.0 so 8.4.0-dev reference profile rejects like Zend 8.2 (#17182).
-     * Forward profile via `PHP_COMPILER_PROFILE=8.4` enables spread-in-list assign (#9248).
-     * php-src: Zend/zend_compile.c list spread assign; ZEND_FE_FETCH_UNSET lowering.
+     * Gated on stable 8.4.0 so 8.4.0-dev reference profile rejects like Zend 8.2 parse fatal (#17182, #9248).
+     * Forward profile via {@see languageProfileVersion()} enables spread on 8.4.0-dev.
+     * php-src: Zend/zend_compile.c list spread assign.
      */
     public static function supportsListDestructuringSpreadAssign(): bool
     {
