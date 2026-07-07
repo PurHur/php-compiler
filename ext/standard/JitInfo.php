@@ -11,6 +11,7 @@ use PHPCompiler\JIT\Builtin\StringVersionCompare;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
+use PHPCompiler\JIT\JitOperandTypeLabel;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
@@ -27,7 +28,7 @@ final class JitInfo
         $strPtr = $context->getTypeFromString('__string__*');
         $extArg = $strPtr->constNull();
         if (null !== $extension) {
-            $extArg = JitStringArg::lower($context, $extension, 'phpversion() extension');
+            $extArg = self::lowerNullableExtensionArg($context, $extension);
         }
         $raw = $context->builder->call(
             $context->lookupFunction('__compiler_phpversion'),
@@ -35,6 +36,62 @@ final class JitInfo
         );
 
         return self::stringOrFalse($context, $raw, 'phpversion');
+    }
+
+    private static function lowerNullableExtensionArg(Context $context, JITVariable $extension): Value
+    {
+        $strPtr = $context->getTypeFromString('__string__*');
+        if (JITVariable::TYPE_NULL === $extension->type || $extension->isNullConstant) {
+            return $strPtr->constNull();
+        }
+        $compileTimeLabel = JitOperandTypeLabel::compileTimeEnumClassName($context, $extension);
+        if (null !== $compileTimeLabel) {
+            TypeErrorRaise::registerDeclarations($context);
+            TypeErrorRaise::ensureLinked($context);
+            TypeErrorRaise::emitRaise(
+                $context,
+                sprintf(
+                    'phpversion(): Argument #1 ($extension) must be of type ?string, %s given',
+                    $compileTimeLabel
+                )
+            );
+            $context->builder->call($context->lookupFunction('abort'));
+
+            return $strPtr->constNull();
+        }
+        if (JITVariable::TYPE_VALUE === $extension->type) {
+            self::emitNullableExtensionEnumCaseReject($context, $extension);
+        }
+
+        return JitStringBuiltinArg::lower($context, $extension, 'phpversion', 0, 'extension', '?string');
+    }
+
+    private static function emitNullableExtensionEnumCaseReject(Context $context, JITVariable $extension): void
+    {
+        TypeErrorRaise::registerDeclarations($context);
+        TypeErrorRaise::ensureLinked($context);
+        $valuePtr = JitValueBox::valuePtrFromVariable($context, $extension);
+        $map = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($valuePtr, $map['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $enumCaseTy = $i8->constInt(\PHPCompiler\VM\Variable::TYPE_ENUM_CASE, false);
+        $okBlock = BasicBlockHelper::append($context, 'phpversion_ext_enum_ok');
+        $errBlock = BasicBlockHelper::append($context, 'phpversion_ext_enum_err');
+        $isEnumCase = $context->builder->icmp(Builder::INT_EQ, $typeByte, $enumCaseTy);
+        $context->builder->branchIf($isEnumCase, $errBlock, $okBlock);
+        $context->builder->positionAtEnd($errBlock);
+        $given = JitOperandTypeLabel::compileTimeEnumClassName($context, $extension) ?? 'object';
+        TypeErrorRaise::emitRaise(
+            $context,
+            sprintf(
+                'phpversion(): Argument #1 ($extension) must be of type ?string, %s given',
+                $given
+            )
+        );
+        $context->builder->call($context->lookupFunction('abort'));
+        $context->builder->positionAtEnd($okBlock);
     }
 
     public static function php_sapi_name(Context $context): Value
