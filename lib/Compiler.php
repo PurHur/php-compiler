@@ -23080,6 +23080,21 @@ class Compiler {
             if (!$this->isSiblingInlineCallProducerExpr($child)) {
                 continue;
             }
+            if (
+                $child instanceof Op\Expr\MethodCall
+                && $this->methodCallIsStmtLevelDiscardPrelude($child)
+            ) {
+                continue;
+            }
+            if (
+                ($child instanceof Op\Expr\FuncCall || $child instanceof Op\Expr\NsFuncCall)
+                && $this->builtinUsesTrailingComparatorCallback($this->resolveCfgFuncCallName($child))
+            ) {
+                continue;
+            }
+            if ($this->siblingInlineFuncCallSkipsExecReturnOrdinal($child, $j, $cfgChildren)) {
+                continue;
+            }
             if ($this->siblingInlineCallProducerSkipsHoistedArgChain($child, $cfgChildren[$j + 1] ?? null)) {
                 continue;
             }
@@ -23206,6 +23221,9 @@ class Compiler {
                 ($child instanceof Op\Expr\FuncCall || $child instanceof Op\Expr\NsFuncCall)
                 && $this->builtinUsesTrailingComparatorCallback($this->resolveCfgFuncCallName($child))
             ) {
+                continue;
+            }
+            if ($this->siblingInlineFuncCallSkipsExecReturnOrdinal($child, $j, $cfgChildren)) {
                 continue;
             }
             $next = $cfgChildren[$j + 1] ?? null;
@@ -24814,6 +24832,16 @@ class Compiler {
         }
         if (\count($hoistedArgs) < 2 || !$this->callArgsAreDistinctInlineTemporaries($hoistedArgs)) {
             return false;
+        }
+        for ($k = $fromIndex; $k < $consumerIndex; ++$k) {
+            $stmt = $cfgChildren[$k] ?? null;
+            if (
+                ($stmt instanceof Op\Expr\FuncCall || $stmt instanceof Op\Expr\NsFuncCall)
+                && $this->siblingInlineFuncCallSkipsExecReturnOrdinal($stmt, $k, $cfgChildren)
+            ) {
+                // var_dump(in_array(...)) between stmt chains — not one multi-arg hoisted consumer (#9390, #17317).
+                return false;
+            }
         }
         // chmod(); substr(sprintf('%o', fileperms($path)), -N) — stmt-level callee is not chain start (#16451).
         if (
