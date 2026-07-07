@@ -1,8 +1,8 @@
 --TEST--
-stdlib class_uses_recursive() — registered on PHP_COMPILER_PROFILE=8.4 (#16708)
+stdlib class_uses_recursive() — registered on PHP_COMPILER_PROFILE=8.3+ (#16708)
 --SKIPIF--
 <?php
-if (getenv('PHP_COMPILER_PROFILE') !== '8.4') {
+if (!in_array(getenv('PHP_COMPILER_PROFILE'), ['8.3', '8.4'], true)) {
     echo 'skip forward profile only';
 }
 ?>
