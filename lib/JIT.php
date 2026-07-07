@@ -14650,6 +14650,15 @@ class JIT {
             if ($this->tryInitNestedVmHelperMethodCall($declaringClassLc, $methodLc, $receiverVar)) {
                 return;
             }
+            if (JIT\DomInstanceMethodJit::isDomInstanceMethodProxy($proxyName)) {
+                JIT\DomInstanceMethodJit::ensureProxy($this->context, $proxyName);
+                if ($this->context->functionIsRegistered($proxyName)) {
+                    $this->context->scope->toCall = $this->context->resolveFunctionProxy($proxyName);
+                    $this->context->scope->args = [$receiverVar];
+
+                    return;
+                }
+            }
             throw new \LogicException("Call to undefined method {$className}::{$methodLc}()");
         }
         $receiverUserType = $receiverOp->type?->userType;

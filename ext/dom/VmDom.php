@@ -2381,6 +2381,16 @@ final class VmDom
         return $child;
     }
 
+    /** JIT/AOT bridge return — mirrors createElement() Variable wrapping (#17130). */
+    public static function appendChildVariable(Context $ctx, ObjectEntry $parent, ObjectEntry $child): Variable
+    {
+        $entry = self::appendChild($ctx, $parent, $child);
+        $var = new Variable(Variable::TYPE_OBJECT);
+        $var->object($entry);
+
+        return $var;
+    }
+
     public static function replaceChild(
         Context $ctx,
         ObjectEntry $parent,
