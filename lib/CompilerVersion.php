@@ -1744,6 +1744,17 @@ final class CompilerVersion
     }
 
     /**
+     * ext/sqlite3 exception surface — withheld on reference profile (#17106, #17194).
+     *
+     * Forward profile ({@code PHP_COMPILER_PROFILE=8.4}) advertises extension_loaded('sqlite3')
+     * and SQLite3Exception for catch/class_exists parity before the SQLite3 API lands (#3434).
+     */
+    public static function supportsSqlite3(): bool
+    {
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+    }
+
+    /**
      * ext/bcmath + BcMath\Number OOP (ext/bcmath/bcmath.c; #7220, #12131, #15705).
      *
      * Withheld on 8.4.0-dev reference profile; enabled when {@see languageProfileVersion()} is
