@@ -2046,10 +2046,8 @@ final class VmReflection
         return $meta->declaringClassLc;
     }
 
-    /** Default visibility filter: public | protected | private (php-src get_class_methods). */
-    public const METHOD_FILTER_DEFAULT = \PHPCfg\Func::FLAG_PUBLIC
-        | \PHPCfg\Func::FLAG_PROTECTED
-        | \PHPCfg\Func::FLAG_PRIVATE;
+    /** Default visibility filter: public only (php-src get_class_methods, basic_functions.c #4756). */
+    public const METHOD_FILTER_DEFAULT = \PHPCfg\Func::FLAG_PUBLIC;
 
     /**
      * get_class_methods() operand — object or class name string (#3118).
