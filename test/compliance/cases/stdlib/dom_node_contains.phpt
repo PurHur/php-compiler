@@ -1,5 +1,14 @@
 --TEST--
 stdlib DOMNode::contains() descendant check (#14447, ext/dom/node.c)
+--SKIPIF--
+<?php
+if (!class_exists('PHPCompiler\\CompilerVersion')) {
+    require __DIR__ . '/../../../../vendor/autoload.php';
+}
+if (!PHPCompiler\CompilerVersion::supportsDomNodeContains()) {
+    die('skip DOMNode::contains() not advertised on PHP 8.2 reference profile (#14535, ext/dom/node.c)');
+}
+?>
 --FILE--
 <?php
 $doc = new DOMDocument();

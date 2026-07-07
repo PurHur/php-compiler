@@ -1,5 +1,14 @@
 --TEST--
 stdlib DOMNode::isEqualNode() structural equality (#15195, ext/dom/node.c)
+--SKIPIF--
+<?php
+if (!class_exists('PHPCompiler\\CompilerVersion')) {
+    require __DIR__ . '/../../../../vendor/autoload.php';
+}
+if (!PHPCompiler\CompilerVersion::supportsDomNodeIsEqualNode()) {
+    die('skip DOMNode::isEqualNode() not advertised on PHP 8.2 reference profile (#15195, ext/dom/node.c)');
+}
+?>
 --FILE--
 <?php
 $doc = new DOMDocument();

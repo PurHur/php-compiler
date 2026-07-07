@@ -1,5 +1,14 @@
 --TEST--
 stdlib DOMNode::getRootNode() (#14449, ext/dom/node.c)
+--SKIPIF--
+<?php
+if (!class_exists('PHPCompiler\\CompilerVersion')) {
+    require __DIR__ . '/../../../../vendor/autoload.php';
+}
+if (!PHPCompiler\CompilerVersion::supportsDomNodeGetRootNode()) {
+    die('skip DOMNode::getRootNode() not advertised on PHP 8.2 reference profile (#14599, ext/dom/node.c)');
+}
+?>
 --FILE--
 <?php
 $doc = new DOMDocument();
