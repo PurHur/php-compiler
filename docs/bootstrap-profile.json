@@ -2876,6 +2876,7 @@
         "lib/JIT/Builtin/ArrayMergeRecursiveRuntime.php",
         "lib/JIT/Builtin/ArrayMergeRuntime.php",
         "lib/JIT/Builtin/ArrayPadRuntime.php",
+        "lib/JIT/Builtin/ArrayPadTypeJit.php",
         "lib/JIT/Builtin/ArrayPointerRuntime.php",
         "lib/JIT/Builtin/ArrayPopRuntime.php",
         "lib/JIT/Builtin/ArrayProductRuntime.php",
@@ -4463,9 +4464,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 4229,
+        "inventory_files": 4230,
         "excluded": 0,
-        "eligible": 4229,
+        "eligible": 4230,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
