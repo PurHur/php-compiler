@@ -41,6 +41,10 @@ class Module extends ModuleAbstract
         return [
             new bzcompress(),
             new bzdecompress(),
+            new bzopen(),
+            new bzread(),
+            new bzwrite(),
+            new bzclose(),
         ];
     }
 }

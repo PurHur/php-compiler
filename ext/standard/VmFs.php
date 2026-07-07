@@ -41,6 +41,9 @@ final class VmFs
     /** @var array<int, true> gz* stream placeholders — I/O via VmGzStreamPure (#8936, #8220) */
     private static array $gzNativePlaceholders = [];
 
+    /** @var array<int, true> bz* stream placeholders — I/O via VmBz2StreamPure (#17301) */
+    private static array $bzNativePlaceholders = [];
+
     /** @var array<int, int> host stream identity => outstanding VM handle ids (#3384 pfsockopen persistent) */
     private static array $hostResourceRefcounts = [];
 
@@ -999,6 +1002,46 @@ final class VmFs
             return;
         }
         unset(self::$gzNativePlaceholders[$handle]);
+        if (VmPhpMemoryStream::isValidHandle($handle)) {
+            VmPhpMemoryStream::close($handle);
+            unset(self::$handlePaths[$handle], self::$handleModes[$handle], self::$handleBlocked[$handle]);
+
+            return;
+        }
+        $fp = self::detachStreamHandle($handle);
+        if (\is_resource($fp)) {
+            @fclose($fp);
+        }
+    }
+
+    /**
+     * Register a VM stream handle for bzip2 stream I/O (#17301).
+     *
+     * @return int|false
+     */
+    public static function adoptBz2NativePlaceholder(string $uri)
+    {
+        $id = VmPhpMemoryStream::open('php://memory', 'r+b');
+        if (false === $id) {
+            return false;
+        }
+        self::$handlePaths[$id] = $uri;
+        self::$bzNativePlaceholders[$id] = true;
+
+        return $id;
+    }
+
+    public static function isBz2NativePlaceholder(int $handle): bool
+    {
+        return isset(self::$bzNativePlaceholders[$handle]);
+    }
+
+    public static function releaseBz2NativePlaceholder(int $handle): void
+    {
+        if (!isset(self::$bzNativePlaceholders[$handle])) {
+            return;
+        }
+        unset(self::$bzNativePlaceholders[$handle]);
         if (VmPhpMemoryStream::isValidHandle($handle)) {
             VmPhpMemoryStream::close($handle);
             unset(self::$handlePaths[$handle], self::$handleModes[$handle], self::$handleBlocked[$handle]);
