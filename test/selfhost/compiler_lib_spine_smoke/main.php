@@ -1068,7 +1068,7 @@ require_once __DIR__.'/../../../ext/standard/JitHttpLastResponseHeaders.php';
 require_once __DIR__.'/../../../ext/standard/JitHttpResponseCode.php';
 require_once __DIR__.'/../../../ext/standard/JitIdate.php';
 require_once __DIR__.'/../../../ext/standard/JitImageTypeArg.php';
-require_once __DIR__.'/../../../ext/standard/JitImageTypeToMimeType.php';
+require_once __DIR__.'/../../../ext/standard/ImageTypeToMimeTypeJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/JitImplode.php';
 require_once __DIR__.'/../../../ext/standard/JitIncludePath.php';
 require_once __DIR__.'/../../../ext/standard/JitInet.php';
@@ -3246,6 +3246,7 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/StringHtmlspecialcharsUserScript
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringHttpBuildQuery.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringIdate.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringImageTypeToExtension.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/StringImageTypeToMimeType.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringInfo.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringInterfaceExists.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringJsonDecode.php';
