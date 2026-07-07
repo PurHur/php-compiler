@@ -13,9 +13,28 @@ use PHPCompiler\VM\SapiOutput;
  */
 final class VmSapiHeaderGuard
 {
+    public static function headerLineContainsNewline(string $line): bool
+    {
+        return (bool) preg_match('/[\r\n]/', $line);
+    }
+
     public static function headersAlreadySent(Frame $frame): bool
     {
         return SapiOutput::headersSent();
+    }
+
+    public static function warnHeaderNewline(Frame $frame): void
+    {
+        if (null === $frame->vmContext) {
+            return;
+        }
+        $frame->vmContext->errors->triggerError(
+            'Header may not contain more than a single header, new line detected',
+            ErrorReporter::E_WARNING,
+            '' !== $frame->scriptPath ? $frame->scriptPath : null,
+            $frame->vmContext,
+            $frame
+        );
     }
 
     public static function warnHeadersAlreadySent(Frame $frame): void
