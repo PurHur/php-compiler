@@ -665,6 +665,13 @@ class Context {
 
             return $internal;
         }
+        if (DomInstanceMethodJit::isDomInstanceMethodProxy($lc)) {
+            DomInstanceMethodJit::ensureProxy($this, $lc);
+            if (isset($this->functionProxies[$lc])
+                && !($this->functionProxies[$lc] instanceof Call\ExternalMethod)) {
+                return $this->functionProxies[$lc];
+            }
+        }
 
         return null;
     }
@@ -697,6 +704,9 @@ class Context {
     {
         $normalized = ltrim($name, '\\');
         $lc = strtolower($normalized);
+        if (DomInstanceMethodJit::isDomInstanceMethodProxy($lc)) {
+            DomInstanceMethodJit::ensureProxy($this, $lc);
+        }
         if ($this->functionProxyIsCallable($lc)) {
             return true;
         }
@@ -866,6 +876,9 @@ class Context {
                 $this->functionProxies['dateperiod::'.$dpIterMethod] = new Call\DatePeriodIteratorMethod($dpIterMethod);
             }
         }
+        if (CompilerVersion::supportsDomTokenList()) {
+            DomInstanceMethodJit::registerKnownProxies($this);
+        }
     }
 
     /** User examples or bootstrap-aot-link: thin standalone main without session/header reset LLVM (#13571, #14459). */
@@ -923,6 +936,9 @@ class Context {
         Builtin\StringStripslashes::ensureStandaloneBodies($this);
         Builtin\StringFilePutContents::ensureStandaloneBodies($this);
         Builtin\SuperglobalNameRuntime::ensureLinked($this);
+        if (CompilerVersion::supportsDomTokenList()) {
+            Builtin\DomInstanceMethodRuntime::ensureLinked($this);
+        }
     }
 
     /** bootstrap-aot-link fixtures: minimal init + CLI argv / superglobal refresh for standalone main (#14459). */
