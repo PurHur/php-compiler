@@ -505,7 +505,7 @@ final class BootstrapSelfhostBundleTest extends TestCase
         $this->assertFileExists($entry);
         $contents = (string) file_get_contents($entry);
         $count = bootstrap_spine_counts(self::$root)['spine'];
-        // Spine ratio 4196/4197 — 1 deferred (TimezoneAbbreviationsData, #16866).
+        // Spine ratio 4196/4198 — 1 deferred (TimezoneAbbreviationsData, #16866).
         $this->assertSame(4196, $count, 'M2 spine require_once units track Phase A inventory (#8559, #9234, #11629)');
         foreach (self::LIB_SPINE_SMOKE_NEW_UNITS as $unit) {
             $this->assertStringContainsString(

@@ -676,6 +676,7 @@
         "ext/spl/spl_classes.php",
         "ext/sqlite3/BuiltinClasses.php",
         "ext/sqlite3/Module.php",
+        "ext/sqlite3/Sqlite3ExtensionPolicy.php",
         "ext/sqlite3/bootstrap_sqlite3exception.php",
         "ext/standard/AbsJitHelper.php",
         "ext/standard/AcosJitHelper.php",
@@ -4431,9 +4432,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 4197,
+        "inventory_files": 4198,
         "excluded": 0,
-        "eligible": 4197,
+        "eligible": 4198,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1

@@ -675,6 +675,7 @@ require_once __DIR__.'/../../../ext/spl/VmSplObserver.php';
 require_once __DIR__.'/../../../ext/spl/VmSplRegistry.php';
 require_once __DIR__.'/../../../ext/spl/spl_classes.php';
 require_once __DIR__.'/../../../ext/sqlite3/BuiltinClasses.php';
+require_once __DIR__.'/../../../ext/sqlite3/Sqlite3ExtensionPolicy.php';
 require_once __DIR__.'/../../../ext/sqlite3/Module.php';
 require_once __DIR__.'/../../../ext/sqlite3/bootstrap_sqlite3exception.php';
 require_once __DIR__.'/../../../ext/standard/AbsJitHelper.php';
