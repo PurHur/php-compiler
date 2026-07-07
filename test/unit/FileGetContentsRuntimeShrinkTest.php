@@ -40,6 +40,8 @@ final class FileGetContentsRuntimeShrinkTest extends TestCase
         $spine = (string) file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
         $this->assertStringContainsString('FileGetContentsJitHelper.php', $spine);
         $this->assertStringContainsString('StringFileGetContents.php', $spine);
+        $this->assertStringContainsString('StringFileGetContentsLibc.php', $spine);
+        $this->assertStringContainsString('StringReadfileLibc.php', $spine);
     }
 
     /** Inventory argv Zend helloworld link calls __compiler_file_get_contents from ensureFullStandaloneBodies (#15604). */

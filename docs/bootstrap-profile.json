@@ -2936,6 +2936,7 @@
         "lib/JIT/Builtin/GcCollectCyclesCollectRuntime.php",
         "lib/JIT/Builtin/GcCollectCyclesNativeOpsJit.php",
         "lib/JIT/Builtin/GcCollectCyclesRuntime.php",
+        "lib/JIT/Builtin/GcCollectCyclesStandaloneLlvm.php",
         "lib/JIT/Builtin/GcStatusRuntime.php",
         "lib/JIT/Builtin/GcToggleRuntime.php",
         "lib/JIT/Builtin/GetBrowserRuntime.php",
@@ -3193,6 +3194,7 @@
         "lib/JIT/Builtin/StringExplode.php",
         "lib/JIT/Builtin/StringFgetcsvJit.php",
         "lib/JIT/Builtin/StringFileGetContents.php",
+        "lib/JIT/Builtin/StringFileGetContentsLibc.php",
         "lib/JIT/Builtin/StringFilePutContents.php",
         "lib/JIT/Builtin/StringFilePutContentsLibc.php",
         "lib/JIT/Builtin/StringFilterBoolean.php",
@@ -3278,6 +3280,7 @@
         "lib/JIT/Builtin/StringQuotemeta.php",
         "lib/JIT/Builtin/StringRandomBytes.php",
         "lib/JIT/Builtin/StringReadfile.php",
+        "lib/JIT/Builtin/StringReadfileLibc.php",
         "lib/JIT/Builtin/StringReadlink.php",
         "lib/JIT/Builtin/StringRealpath.php",
         "lib/JIT/Builtin/StringRename.php",
@@ -4418,9 +4421,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 4184,
+        "inventory_files": 4187,
         "excluded": 0,
-        "eligible": 4184,
+        "eligible": 4187,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1

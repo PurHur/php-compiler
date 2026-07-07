@@ -4242,4 +4242,6 @@ require_once __DIR__.'/../../../ext/dom/VmDomTokenList.php';
 require_once __DIR__.'/../../../lib/Ast/LazyPropertyRewriter.php';
 require_once __DIR__.'/../../../lib/LazyPropertyRejector.php';
 require_once __DIR__.'/../../../lib/VM/LazyPropertySupport.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/StringFileGetContentsLibc.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/StringReadfileLibc.php';
 echo "compiler_lib_spine_smoke bundle OK\n";
