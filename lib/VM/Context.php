@@ -87,6 +87,14 @@ class Context {
     public bool $isolatedPhpFunctionInvoke = false;
 
     /**
+     * When true, bubble uncaught user throwables as native \Throwable to the embedding host (PHPUnit,
+     * library API) instead of emitting a Zend-style fatal block and terminating the VM with ScriptExit.
+     *
+     * CLI entrypoints should leave this false and handle ScriptExit status codes.
+     */
+    public bool $bubbleUncaughtToNative = false;
+
+    /**
      * Isolated closure invoke from stdlib callbacks — defer user catch to outer runFrames (#14104).
      */
     public bool $deferBuiltinCallbackCatchToOuterRunFrames = false;

@@ -1014,14 +1014,17 @@ class Runtime {
         }
     }
 
-    public function run(?Block $block) {
+    public function run(?Block $block, bool $bubbleUncaught = true) {
         $this->ensureVm();
         MemoryAccounting::beginRequest();
         Superglobals::setActiveContext($this->vmContext);
         OutputBuffer::setActiveContext($this->vmContext);
+        $prevBubble = $this->vmContext->bubbleUncaughtToNative;
+        $this->vmContext->bubbleUncaughtToNative = $bubbleUncaught;
         try {
             return $this->vm->run($block);
         } finally {
+            $this->vmContext->bubbleUncaughtToNative = $prevBubble;
             ShutdownQueue::run($this->vmContext);
             OutputBuffer::endAllAtShutdown();
             OutputBuffer::setActiveContext(null);
