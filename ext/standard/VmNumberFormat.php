@@ -105,15 +105,16 @@ final class VmNumberFormat
         }
 
         // php-src ext/standard/math.c _php_math_number_format_ex (#15917):
-        // negative $decimals round to integer (0 places), not round($num, $decimals).
-        // Pre-8.3 ignores negative like 0 — same effective rounding/display precision.
+        // _php_math_round($d, $dec, …) then $dec = MAX(0, $dec) for display precision.
+        // Pre-8.3 ignores negative $decimals like 0.
         $roundPlaces = $decimals;
         if ($decimals < 0) {
             if (!CompilerVersion::supportsNumberFormatNegativeDecimals()) {
+                $roundPlaces = 0;
+                $decimals = 0;
+            } else {
                 $decimals = 0;
             }
-            $roundPlaces = 0;
-            $decimals = 0;
         }
 
         $negative = $number < 0.0;
