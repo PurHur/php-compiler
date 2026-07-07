@@ -345,7 +345,16 @@ final class BuiltinParamNames
             case 'memory_get_peak_usage':
                 return ['real_usage'];
             case 'microtime':
+            case 'gettimeofday':
                 return ['as_float'];
+            case 'sleep':
+                return ['seconds'];
+            case 'usleep':
+                return ['microseconds'];
+            case 'http_response_code':
+                return ['response_code'];
+            case 'setcookie':
+                return ['name', 'value', 'expires', 'path', 'domain', 'secure', 'httponly'];
             case 'trim':
             case 'ltrim':
             case 'rtrim':
