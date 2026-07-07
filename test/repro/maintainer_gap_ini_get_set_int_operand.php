@@ -1,5 +1,5 @@
 <?php
-// Issue #17268: ini_get()/ini_set() int $option must TypeError (ext/standard/ini.c Z_PARAM_STR).
+// Issue #17291: ini_get()/ini_set() int $option coerces on 8.2 reference profile (ext/standard/ini.c).
 
 function probe(string $label, callable $fn): void
 {
