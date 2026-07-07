@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\JIT\NestedJitCompileScope;
+
 /**
  * Output-buffer stack for compiled JIT/AOT modules (#9268, php-in-PHP).
  *
@@ -121,7 +123,7 @@ final class ObOutputJitHelper
         if ([] === self::$stack) {
             return 0;
         }
-        \array_pop(self::$stack);
+        self::popStackTop();
 
         return 1;
     }
@@ -131,7 +133,10 @@ final class ObOutputJitHelper
         if ([] === self::$stack) {
             return null;
         }
-        $level = \array_pop(self::$stack);
+        $level = self::popStackTop();
+        if (null === $level) {
+            return null;
+        }
 
         return $level['content'];
     }
@@ -207,6 +212,9 @@ final class ObOutputJitHelper
 
     public static function flushStdout(): void
     {
+        if (NestedJitCompileScope::isActive()) {
+            return;
+        }
         if (\defined('STDOUT') && \is_resource(\STDOUT)) {
             @\fflush(\STDOUT);
         }
@@ -222,7 +230,7 @@ final class ObOutputJitHelper
 
     private static function popWithHandler(): string
     {
-        $level = \array_pop(self::$stack);
+        $level = self::popStackTop();
         if (null === $level) {
             return '';
         }
@@ -233,6 +241,19 @@ final class ObOutputJitHelper
         }
 
         return self::applyHandler($content, $handler);
+    }
+
+    /** Manual list pop — nested JIT misroutes {@see array_pop()} to HashTable::popLast() (#10492). */
+    private static function popStackTop(): ?array
+    {
+        if ([] === self::$stack) {
+            return null;
+        }
+        $last = \count(self::$stack) - 1;
+        $level = self::$stack[$last];
+        unset(self::$stack[$last]);
+
+        return $level;
     }
 
     private static function applyHandler(string $content, string $handlerName): string
@@ -255,6 +276,11 @@ final class ObOutputJitHelper
     private static function writeStdout(string $chunk): void
     {
         if ('' === $chunk) {
+            return;
+        }
+        if (NestedJitCompileScope::isActive()) {
+            echo $chunk;
+
             return;
         }
         echo $chunk;
