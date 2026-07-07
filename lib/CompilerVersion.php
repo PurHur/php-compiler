@@ -1686,58 +1686,58 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.4+ DOMNode::contains() (ext/dom/node.c, #14447, #14535, #14723, #15613).
+     * Forward DOM APIs on the 8.4 development line via {@see builtinAdvertisementVersion()}.
      *
-     * Gated on stable 8.4.0 / PHP_COMPILER_PROFILE=8.4 so 8.4.0-dev reference profile
-     * matches Zend 8.2 phantom gate (#14599).
+     * `VERSION` `8.4.0-dev` is below stable `8.4.0` for {@see version_compare()}; explicit
+     * `PHP_COMPILER_PROFILE` still opts in on older compiler builds.
+     */
+    private static function supportsDomApiSince(string $since): bool
+    {
+        if (version_compare(self::builtinAdvertisementVersion(), $since, '>=')) {
+            return true;
+        }
+
+        return version_compare(self::languageProfileVersion(), $since, '>=');
+    }
+
+    /**
+     * PHP 8.4+ DOMNode::contains() (ext/dom/node.c, #14447, #14535, #14723, #15613).
      */
     public static function supportsDomNodeContains(): bool
     {
-        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+        return self::supportsDomApiSince('8.4.0');
     }
 
     /**
      * PHP 8.4+ DOMNode::compareDocumentPosition() (ext/dom/node.c, #14448, #15613).
-     *
-     * Gated on stable 8.4.0 / PHP_COMPILER_PROFILE=8.4 so 8.4.0-dev reference profile
-     * matches Zend 8.2 phantom gate.
      */
     public static function supportsDomNodeCompareDocumentPosition(): bool
     {
-        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+        return self::supportsDomApiSince('8.4.0');
     }
 
     /**
      * PHP 8.4+ DOMNode::getRootNode() (ext/dom/node.c, #14449, #14599).
-     *
-     * Gated on stable 8.4.0 / PHP_COMPILER_PROFILE=8.4 so 8.4.0-dev reference profile
-     * matches Zend 8.2 phantom gate.
      */
     public static function supportsDomNodeGetRootNode(): bool
     {
-        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+        return self::supportsDomApiSince('8.4.0');
     }
 
     /**
      * PHP 8.4+ DOMNode::isEqualNode() (ext/dom/node.c, #15195, #14599).
-     *
-     * Gated on stable 8.4.0 / PHP_COMPILER_PROFILE=8.4 so 8.4.0-dev reference profile
-     * matches Zend 8.2 phantom gate.
      */
     public static function supportsDomNodeIsEqualNode(): bool
     {
-        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+        return self::supportsDomApiSince('8.4.0');
     }
 
     /**
      * PHP 8.4+ DOMElement::insertAdjacentHTML() (ext/dom/dom_element.c, #16128).
-     *
-     * Gated on stable 8.4.0 / PHP_COMPILER_PROFILE=8.4 so 8.4.0-dev reference profile
-     * matches Zend 8.2 phantom gate.
      */
     public static function supportsDomElementInsertAdjacentHtml(): bool
     {
-        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+        return self::supportsDomApiSince('8.4.0');
     }
 
     /**
@@ -1745,7 +1745,7 @@ final class CompilerVersion
      */
     public static function supportsDomElementInsertAdjacentElement(): bool
     {
-        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+        return self::supportsDomApiSince('8.4.0');
     }
 
     /**
@@ -1753,7 +1753,7 @@ final class CompilerVersion
      */
     public static function supportsDomElementInsertAdjacentText(): bool
     {
-        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+        return self::supportsDomApiSince('8.4.0');
     }
 
     /**
@@ -1761,14 +1761,11 @@ final class CompilerVersion
      */
     public static function supportsDomElementInnerOuterHtml(): bool
     {
-        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+        return self::supportsDomApiSince('8.4.0');
     }
 
     /**
      * PHP 8.3+ DOMElement::toggleAttribute() (ext/dom/element.c, #16824).
-     *
-     * Withheld on 8.4.0-dev reference profile (matches Zend 8.2 method_exists gate). Enable via
-     * stable 8.4.0+ or explicit `PHP_COMPILER_PROFILE=8.3` / `8.4` forward profile.
      */
     public static function supportsDomElementToggleAttribute(): bool
     {
@@ -1776,16 +1773,7 @@ final class CompilerVersion
             return false;
         }
 
-        if (version_compare(self::VERSION, '8.4.0', '>=')) {
-            return true;
-        }
-
-        $raw = getenv('PHP_COMPILER_PROFILE');
-        if (!\is_string($raw) || '' === trim($raw)) {
-            return false;
-        }
-
-        return version_compare(self::languageProfileVersion(), '8.3.0', '>=');
+        return self::supportsDomApiSince('8.3.0');
     }
 
     /**

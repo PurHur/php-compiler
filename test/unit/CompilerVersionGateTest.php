@@ -1433,14 +1433,14 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
-    public function testSupportsDomNodeContainsFalseOnReferenceProfile(): void
+    public function testSupportsDomNodeContainsOnBuiltinAdvertisementLine(): void
     {
-        $this->assertFalse(CompilerVersion::supportsDomNodeContains());
+        $this->assertTrue(CompilerVersion::supportsDomNodeContains());
     }
 
-    public function testSupportsDomNodeIsEqualNodeFalseOnReferenceProfile(): void
+    public function testSupportsDomNodeIsEqualNodeOnBuiltinAdvertisementLine(): void
     {
-        $this->assertFalse(CompilerVersion::supportsDomNodeIsEqualNode());
+        $this->assertTrue(CompilerVersion::supportsDomNodeIsEqualNode());
     }
 
     public function testVmRegistersDomNodeContainsOnForwardProfile(): void
@@ -1476,9 +1476,9 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
-    public function testSupportsDomNodeCompareDocumentPositionFalseOnReferenceProfile(): void
+    public function testSupportsDomNodeCompareDocumentPositionOnBuiltinAdvertisementLine(): void
     {
-        $this->assertFalse(CompilerVersion::supportsDomNodeCompareDocumentPosition());
+        $this->assertTrue(CompilerVersion::supportsDomNodeCompareDocumentPosition());
     }
 
     public function testSupportsDomNodeGetRootNodeOnForwardProfile(): void
@@ -1496,9 +1496,9 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
-    public function testSupportsDomNodeGetRootNodeFalseOnReferenceProfile(): void
+    public function testSupportsDomNodeGetRootNodeOnBuiltinAdvertisementLine(): void
     {
-        $this->assertFalse(CompilerVersion::supportsDomNodeGetRootNode());
+        $this->assertTrue(CompilerVersion::supportsDomNodeGetRootNode());
     }
 
     public function testVmRegistersDomNodeGetRootNodeOnForwardProfile(): void
@@ -1534,9 +1534,9 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
-    public function testSupportsDomElementInsertAdjacentHtmlFalseOnReferenceProfile(): void
+    public function testSupportsDomElementInsertAdjacentHtmlOnBuiltinAdvertisementLine(): void
     {
-        $this->assertFalse(CompilerVersion::supportsDomElementInsertAdjacentHtml());
+        $this->assertTrue(CompilerVersion::supportsDomElementInsertAdjacentHtml());
     }
 
     public function testVmRegistersDomElementInsertAdjacentHtmlOnForwardProfile(): void
@@ -1572,9 +1572,9 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
-    public function testSupportsDomElementInsertAdjacentElementFalseOnReferenceProfile(): void
+    public function testSupportsDomElementInsertAdjacentElementOnBuiltinAdvertisementLine(): void
     {
-        $this->assertFalse(CompilerVersion::supportsDomElementInsertAdjacentElement());
+        $this->assertTrue(CompilerVersion::supportsDomElementInsertAdjacentElement());
     }
 
     public function testVmRegistersDomElementInsertAdjacentElementOnForwardProfile(): void
@@ -1610,9 +1610,9 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
-    public function testSupportsDomElementInsertAdjacentTextFalseOnReferenceProfile(): void
+    public function testSupportsDomElementInsertAdjacentTextOnBuiltinAdvertisementLine(): void
     {
-        $this->assertFalse(CompilerVersion::supportsDomElementInsertAdjacentText());
+        $this->assertTrue(CompilerVersion::supportsDomElementInsertAdjacentText());
     }
 
     public function testVmRegistersDomElementInsertAdjacentTextOnForwardProfile(): void
@@ -1648,9 +1648,9 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
-    public function testSupportsDomElementToggleAttributeFalseOnReferenceProfile(): void
+    public function testSupportsDomElementToggleAttributeOnBuiltinAdvertisementLine(): void
     {
-        $this->assertFalse(CompilerVersion::supportsDomElementToggleAttribute());
+        $this->assertTrue(CompilerVersion::supportsDomElementToggleAttribute());
     }
 
     public function testVmRegistersDomElementToggleAttributeOnForwardProfile(): void

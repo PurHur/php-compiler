@@ -767,6 +767,42 @@ class JITTest extends BaseTest {
                 && str_contains($name, 'get_attribute_names_phantom')) {
                 continue;
             }
+            if (!CompilerVersion::supportsDomNodeContains()
+                && str_contains($name, 'dom_node_contains')
+                && !str_contains($name, 'dom_node_contains_phantom')) {
+                continue;
+            }
+            if (CompilerVersion::supportsDomNodeContains()
+                && str_contains($name, 'dom_node_contains_phantom')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsDomNodeCompareDocumentPosition()
+                && str_contains($name, 'dom_node_compare_document_position')
+                && !str_contains($name, 'compare_document_position_phantom')) {
+                continue;
+            }
+            if (CompilerVersion::supportsDomNodeCompareDocumentPosition()
+                && str_contains($name, 'compare_document_position_phantom')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsDomNodeGetRootNode()
+                && str_contains($name, 'dom_node_get_root_node')
+                && !str_contains($name, 'get_root_node_phantom')) {
+                continue;
+            }
+            if (CompilerVersion::supportsDomNodeGetRootNode()
+                && str_contains($name, 'get_root_node_phantom')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsDomNodeIsEqualNode()
+                && str_contains($name, 'dom_node_is_equal_node')
+                && !str_contains($name, 'is_equal_node_phantom')) {
+                continue;
+            }
+            if (CompilerVersion::supportsDomNodeIsEqualNode()
+                && str_contains($name, 'is_equal_node_phantom')) {
+                continue;
+            }
             // DOMElement::getAttributeNames() multi-element array return segfaults under JIT (#16823); VM-only for now.
             if (str_contains($name, 'dom_element_get_attribute_names')
                 && !str_contains($name, 'get_attribute_names_phantom')) {
