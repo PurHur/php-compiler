@@ -34,6 +34,15 @@ final class ClassConstExpr
             OpCode::TYPE_BITWISE_NOT,
             OpCode::TYPE_BOOLEAN_NOT,
             OpCode::TYPE_CONCAT,
+            OpCode::TYPE_SMALLER,
+            OpCode::TYPE_GREATER,
+            OpCode::TYPE_SMALLER_OR_EQUAL,
+            OpCode::TYPE_GREATER_OR_EQUAL,
+            OpCode::TYPE_EQUAL,
+            OpCode::TYPE_NOT_EQUAL,
+            OpCode::TYPE_IDENTICAL,
+            OpCode::TYPE_NOT_IDENTICAL,
+            OpCode::TYPE_LOGICAL_XOR,
             OpCode::TYPE_CONST_FETCH,
             OpCode::TYPE_CLASS_CONST_FETCH,
             OpCode::TYPE_ARRAY_DIM_FETCH,
@@ -79,6 +88,41 @@ final class ClassConstExpr
                 $frame->scope[$op->arg1]->string(
                     $frame->scope[$op->arg2]->toString()
                     . $frame->scope[$op->arg3]->toString()
+                );
+                break;
+            case OpCode::TYPE_SMALLER:
+            case OpCode::TYPE_GREATER:
+            case OpCode::TYPE_SMALLER_OR_EQUAL:
+            case OpCode::TYPE_GREATER_OR_EQUAL:
+                $frame->scope[$op->arg1]->compareOp(
+                    $op->type,
+                    $frame->scope[$op->arg2],
+                    $frame->scope[$op->arg3]
+                );
+                break;
+            case OpCode::TYPE_IDENTICAL:
+                $frame->scope[$op->arg1]->bool(
+                    $frame->scope[$op->arg2]->identicalTo($frame->scope[$op->arg3])
+                );
+                break;
+            case OpCode::TYPE_NOT_IDENTICAL:
+                $frame->scope[$op->arg1]->bool(
+                    !$frame->scope[$op->arg2]->identicalTo($frame->scope[$op->arg3])
+                );
+                break;
+            case OpCode::TYPE_EQUAL:
+                $frame->scope[$op->arg1]->bool(
+                    $frame->scope[$op->arg2]->equals($frame->scope[$op->arg3])
+                );
+                break;
+            case OpCode::TYPE_NOT_EQUAL:
+                $frame->scope[$op->arg1]->bool(
+                    !$frame->scope[$op->arg2]->equals($frame->scope[$op->arg3])
+                );
+                break;
+            case OpCode::TYPE_LOGICAL_XOR:
+                $frame->scope[$op->arg1]->bool(
+                    $frame->scope[$op->arg2]->toBool() !== $frame->scope[$op->arg3]->toBool()
                 );
                 break;
             case OpCode::TYPE_CONST_FETCH:
