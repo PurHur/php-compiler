@@ -7,3 +7,10 @@ foreach ($p as $d) {
     echo $d->format('Y-m-d'), "\n";
     break;
 }
+
+$p2 = DatePeriod::createFromISO8601String('2020-01-01T00:00:00Z/P1D/2020-01-05T00:00:00Z');
+foreach ($p2 as $d) {
+    echo $d->format('Y-m-d'), "\n";
+    break;
+}
+echo "ok\n";

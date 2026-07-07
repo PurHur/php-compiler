@@ -289,24 +289,35 @@ final class DatePeriodSupport
             self::throwMalformedPeriodString($label, $spec, 'ISO interval must contain a start date');
         }
 
-        $intervalSpec = array_pop($body);
-        if (!\is_string($intervalSpec) || !str_starts_with($intervalSpec, 'P')) {
+        // php-src timelib_strtointerval — interval may be start/end/duration or start/duration/end (#17280).
+        $intervalIndex = null;
+        foreach ($body as $i => $part) {
+            if (\is_string($part) && str_starts_with($part, 'P')) {
+                $intervalIndex = $i;
+                break;
+            }
+        }
+        if (null === $intervalIndex) {
             self::throwMalformedPeriodString($label, $spec, 'ISO interval must contain an interval');
         }
+        $intervalSpec = $body[$intervalIndex];
 
-        if (1 === \count($body)) {
-            $start = $body[0];
-            $end = null;
-        } elseif (2 === \count($body)) {
-            $start = $body[0];
-            $end = $body[1];
-        } else {
+        $dates = [];
+        foreach ($body as $i => $part) {
+            if ($i === $intervalIndex) {
+                continue;
+            }
+            if (!\is_string($part) || '' === $part) {
+                self::throwMalformedPeriodString($label, $spec, 'ISO interval must contain a start date');
+            }
+            $dates[] = $part;
+        }
+        if (0 === \count($dates) || \count($dates) > 2) {
             self::throwMalformedPeriodString($label, $spec, 'ISO interval must contain a start date');
         }
 
-        if (!\is_string($start) || '' === $start) {
-            self::throwMalformedPeriodString($label, $spec, 'ISO interval must contain a start date');
-        }
+        $start = $dates[0];
+        $end = $dates[1] ?? null;
         if (null === $end && 0 === $recurrences) {
             self::throwMalformedPeriodString(
                 $label,
