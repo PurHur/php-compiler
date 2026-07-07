@@ -15,4 +15,9 @@ final class HebrevJitHelper
     {
         return VmHebrev::convert($str, $maxCharsPerLine);
     }
+
+    public static function convertWithNewlines(string $str, int $maxCharsPerLine = 0): string
+    {
+        return VmHebrev::convertWithNewlines($str, $maxCharsPerLine);
+    }
 }
