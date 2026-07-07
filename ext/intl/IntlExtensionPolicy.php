@@ -23,6 +23,15 @@ final class IntlExtensionPolicy
         return ModuleRegistry::extensionLoaded('intl');
     }
 
+    /**
+     * locale_get_primary_language/region/script — full ext/intl or forward 8.4 profile (#5125, #17072).
+     */
+    public static function advertisesLocaleParsers(): bool
+    {
+        return self::advertisesLocale()
+            || CompilerVersion::advertisesLocaleParserForwardProfile();
+    }
+
     /** grapheme_* / intl_get_error_* — withheld until full ext/intl (#11472, #5156). */
     public static function advertisesBuiltins(): bool
     {
@@ -52,6 +61,41 @@ final class IntlExtensionPolicy
         }
 
         return $functions;
+    }
+
+    /**
+     * PHP 8.4 profile locale BCP-47 parsers registered without full ext/intl (#17072, #5125).
+     *
+     * @return list<\PHPCompiler\Internal>
+     */
+    public static function profileLocaleParserFunctions(): array
+    {
+        if (!CompilerVersion::supportsLocaleParserForwardProfile()) {
+            return [];
+        }
+
+        return [
+            new locale_get_primary_language(),
+            new locale_get_region(),
+            new locale_get_script(),
+        ];
+    }
+
+    /** Run locale parser compliance when ext/intl is loaded or forward 8.4 profile matches (#17072). */
+    public static function runsLocaleParserCompliance(string $testFileName): bool
+    {
+        if (self::advertisesLocale()) {
+            return true;
+        }
+        if (!CompilerVersion::supportsLocaleParserForwardProfile()) {
+            return false;
+        }
+        if (str_contains($testFileName, 'locale_get_parts')
+            || str_contains($testFileName, 'locale_get_primary_language')) {
+            return true;
+        }
+
+        return false;
     }
 
     /** Run grapheme compliance when ext/intl is loaded or a profile gate matches (#16667). */

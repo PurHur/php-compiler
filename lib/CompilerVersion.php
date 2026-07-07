@@ -1321,6 +1321,23 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.4+ locale_get_primary_language/region/script (ext/intl/locale; #5125, #17072).
+     *
+     * BCP-47 parsers registered without full ext/intl when {@code PHP_COMPILER_PROFILE=8.4} — same
+     * gate as grapheme forward-profile builtins (#16667).
+     */
+    public static function supportsLocaleParserForwardProfile(): bool
+    {
+        return self::supportsGraphemeStrContains();
+    }
+
+    /** locale_get_primary_language/region/script visible to function_exists() — stable 8.4+ or forward profile (#17072). */
+    public static function advertisesLocaleParserForwardProfile(): bool
+    {
+        return self::advertisesGraphemeStrContains();
+    }
+
+    /**
      * PHP 8.3+ array_first_key()/array_last_key() (ext/standard/array.c, issue #15539, #15675).
      *
      * Withheld on 8.4.0-dev reference profile (matches Zend 8.2 function_exists gate). Enable via

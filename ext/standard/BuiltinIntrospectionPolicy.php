@@ -102,6 +102,16 @@ final class BuiltinIntrospectionPolicy
         ], true)) {
             return IntlExtensionPolicy::advertisesBuiltins();
         }
+        if (\in_array($lc, [
+            'locale_get_primary_language',
+            'locale_get_region',
+            'locale_get_script',
+        ], true)) {
+            return IntlExtensionPolicy::advertisesLocaleParsers();
+        }
+        if (\in_array($lc, ['locale_get_default', 'locale_set_default'], true)) {
+            return IntlExtensionPolicy::advertisesLocale();
+        }
         if (\in_array($lc, ['curl_escape', 'curl_unescape'], true)) {
             return CurlExtensionPolicy::advertisesExtension();
         }

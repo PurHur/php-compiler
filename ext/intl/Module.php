@@ -57,6 +57,7 @@ class Module extends ModuleAbstract
         if (!IntlExtensionPolicy::advertisesBuiltins()) {
             return [
                 ...$functions,
+                ...IntlExtensionPolicy::profileLocaleParserFunctions(),
                 ...IntlExtensionPolicy::profileGraphemeFunctions(),
             ];
         }
