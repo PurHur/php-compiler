@@ -9,10 +9,13 @@ foreach (['array_find', 'array_find_key', 'array_all', 'array_any', 'array_all_k
         } else {
             $fn([1], null);
         }
-    } catch (Throwable $e) {
+        echo $fn, ": uncaught\n";
+    } catch (TypeError $e) {
         echo $fn, ': ', get_class($e), "\n";
     }
 }
+var_export(array_find([1, 2, 3], static fn ($v) => 2 === $v));
+echo "\n";
 ?>
 --EXPECT--
 array_find: TypeError
@@ -21,3 +24,4 @@ array_all: TypeError
 array_any: TypeError
 array_all_key: TypeError
 array_any_key: TypeError
+2

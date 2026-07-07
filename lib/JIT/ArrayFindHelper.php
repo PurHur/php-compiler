@@ -128,6 +128,10 @@ final class ArrayFindHelper
         if (self::MODE_FIND === $mode || self::MODE_FIND_KEY === $mode) {
             self::requireNonEmptyFindArray($context, $array, self::functionNameForMode($mode));
         }
+        $function = self::functionNameForMode($mode);
+        if ($callback->isNullConstant) {
+            throw new \TypeError(ArrayFindCallbackPolicy::invalidCallbackTypeError($function));
+        }
         if (!ArrayFindCallbackPolicy::isJitLowerable($callback)) {
             throw new \LogicException(ArrayFindCallbackPolicy::jitRejectionMessage());
         }

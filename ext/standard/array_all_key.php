@@ -33,9 +33,8 @@ final class array_all_key extends Internal
         }
         $ht = VmArray::requireArray($frame->calledArgs[0]->resolveIndirect(), 'array_all_key');
         $callback = $frame->calledArgs[1];
-        VmArrayValueCallback::requirePredicateCallback($callback, 'array_all_key');
         foreach ($ht->iterateKeyed(true) as [$key, $value]) {
-            $result = VmArrayValueCallback::invokePredicate($frame, $callback, $value, $key);
+            $result = VmArrayValueCallback::invokePredicate($frame, $callback, $value, $key, 'array_all_key');
             if (!VmArrayValueCallback::predicateMatches($result, $strict)) {
                 $frame->returnVar->bool(false);
 
@@ -56,6 +55,9 @@ final class array_all_key extends Internal
         $vacuous = ArrayFindHelper::vacuousAnyAllIfCompileTimeEmpty($context, $args[0], true);
         if (null !== $vacuous) {
             return $this->boxStandaloneBoolJitResult($context, $vacuous);
+        }
+        if ($args[1]->isNullConstant) {
+            throw new \TypeError(ArrayFindCallbackPolicy::invalidCallbackTypeError('array_all_key'));
         }
         if (3 === $argc) {
             if (!ArrayFindCallbackPolicy::isJitNullCallback($args[1])

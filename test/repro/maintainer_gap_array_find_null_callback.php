@@ -18,13 +18,16 @@ foreach ($checks as $fn => $expected) {
         } else {
             $fn([1], null);
         }
-        echo "fail: {$fn}([..], null) expected TypeError\n";
+        fwrite(STDERR, $fn.": uncaught\n");
         exit(1);
     } catch (TypeError $e) {
         if ($expected !== $e->getMessage()) {
-            echo 'fail: ', $fn, '(): ', $e->getMessage(), "\n";
+            fwrite(STDERR, $fn.': '.$e->getMessage()."\n");
             exit(1);
         }
+    } catch (LogicException $e) {
+        fwrite(STDERR, $fn.': LogicException: '.$e->getMessage()."\n");
+        exit(1);
     }
 }
 

@@ -33,9 +33,8 @@ final class array_find_key extends Internal
         $ht = VmArray::requireArray($frame->calledArgs[0]->resolveIndirect(), 'array_find_key');
         VmArray::requireNonEmptyFindArray($ht, 'array_find_key');
         $callback = $frame->calledArgs[1];
-        VmArrayValueCallback::requirePredicateCallback($callback, 'array_find_key');
         foreach ($ht->iterateKeyed(true) as [$key, $value]) {
-            $result = VmArrayValueCallback::invokePredicate($frame, $callback, $value, $key);
+            $result = VmArrayValueCallback::invokePredicate($frame, $callback, $value, $key, 'array_find_key');
             if (VmArrayValueCallback::predicateMatches($result, $strict)) {
                 $frame->returnVar->copyFrom($key);
 
@@ -53,8 +52,10 @@ final class array_find_key extends Internal
         if ($argc < 2 || $argc > 3) {
             throw new \LogicException('array_find_key() requires two or three arguments in this compiler build');
         }
-        if (!ArrayFindCallbackPolicy::isJitNullCallback($args[1])
-            && !ArrayFindCallbackPolicy::isJitLowerable($args[1])) {
+        if ($args[1]->isNullConstant) {
+            throw new \TypeError(ArrayFindCallbackPolicy::invalidCallbackTypeError('array_find_key'));
+        }
+        if (!ArrayFindCallbackPolicy::isJitLowerable($args[1])) {
             throw new \LogicException(ArrayFindCallbackPolicy::jitRejectionMessage());
         }
         if (JITVariable::TYPE_STRING === $args[1]->type || JITVariable::TYPE_VALUE === $args[1]->type) {
