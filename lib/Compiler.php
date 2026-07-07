@@ -157,6 +157,9 @@ class Compiler {
     /** @var array<string, array<string, Variable>> compile-time class constants by lc name */
     private array $compileTimeClassConsts = [];
 
+    /** @var array<string, array<string, true>> class-body const declarations already emitted (#17173, #5953). */
+    private array $compileTimeClassConstEmitted = [];
+
     /** @var array<string, array<string, int>> compile-time class constant visibility flags by lc name (#6784) */
     private array $compileTimeClassConstVisibility = [];
 
@@ -5675,7 +5678,7 @@ class Compiler {
         $constName = $this->staticNameFromOperand($child->name);
         if (null !== $constName && null !== $this->compilingClassLc) {
             $lc = strtolower($constName);
-            if (isset($this->compileTimeClassConsts[$this->compilingClassLc][$lc])) {
+            if (isset($this->compileTimeClassConstEmitted[$this->compilingClassLc][$lc])) {
                 // Idempotent re-parse when a JIT helper was already inlined from require_once (#9753, #1492).
                 return;
             }
@@ -5729,6 +5732,9 @@ class Compiler {
         AttributeNames::assertCompileTimeConstTargetOnly($constOp->attributeNames, 'class constant');
         AttributeNames::assertSensitiveParameterParamTargetOnly($constOp->attributeNames, 'class constant');
         $result->addOpCode($constOp);
+        if (null !== $this->compilingClassLc && null !== $constName) {
+            $this->compileTimeClassConstEmitted[$this->compilingClassLc][strtolower($constName)] = true;
+        }
         if (null !== $this->compilingClassLc && isset($result->constants[$valueSlot])) {
             $constName = $this->staticNameFromOperand($child->name);
             if (null !== $constName) {
