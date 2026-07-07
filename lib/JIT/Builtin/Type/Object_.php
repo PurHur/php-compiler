@@ -2913,6 +2913,12 @@ class Object_ extends Type {
             $this->defineProperty($id, 'name', Variable::TYPE_STRING);
             $this->defineProperty($id, 'enumClass', Variable::TYPE_STRING);
         }
+        // HashContext JIT digest slots must exist before allocate() (ext/hash/JitHashContext.php, #3357).
+        if ('hashcontext' === $lcname) {
+            $this->defineProperty($id, '__hcAlgo', Variable::TYPE_STRING);
+            $this->defineProperty($id, '__hcData', Variable::TYPE_STRING);
+            $this->defineProperty($id, '__hcLive', Variable::TYPE_STRING);
+        }
         if ('phpcompiler\vm\context' === $lcname) {
             $this->defineProperty($id, 'runtime', Variable::TYPE_OBJECT);
             $this->defineProperty($id, 'errors', Variable::TYPE_OBJECT);
