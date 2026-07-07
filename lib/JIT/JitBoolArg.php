@@ -12,6 +12,23 @@ use PHPLLVM\Value;
 
 final class JitBoolArg
 {
+    /** Z_PARAM_BOOL with caller strict_types parity (php-src basic_functions.c microtime/hrtime; #17025). */
+    public static function lowerZParamBool(
+        Context $context,
+        Variable $arg,
+        string $function,
+        string $paramName,
+        int $argNumber
+    ): Value {
+        InternalStrictArg::requireBool($context, $arg, $function, $paramName, $argNumber);
+
+        return self::lower(
+            $context,
+            $arg,
+            sprintf('%s(): Argument #%d ($%s)', $function, $argNumber, $paramName)
+        );
+    }
+
     public static function lower(Context $context, Variable $arg, string $contextLabel = 'argument'): Value
     {
         $literal = JitStringArg::compileTimeLiteral($arg);
