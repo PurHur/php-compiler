@@ -4,7 +4,7 @@ stdlib is_* / file_exists filestat — null filename TypeError under strict_type
 <?php
 declare(strict_types=1);
 $errors = 0;
-foreach (['is_readable', 'is_writable', 'is_executable', 'is_dir', 'is_link', 'is_file', 'file_exists', 'filesize'] as $fn) {
+foreach (['is_readable', 'is_writable', 'is_executable', 'is_dir', 'is_link', 'is_file', 'file_exists', 'filesize', 'is_uploaded_file'] as $fn) {
     try {
         $fn(null);
         ++$errors;

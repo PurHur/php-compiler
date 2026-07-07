@@ -51,6 +51,37 @@ final class IsUploadedFileBuiltinTest extends TestCase
         $fn->execute($frame);
     }
 
+    public function testNullFilenameStrictTypeError(): void
+    {
+        $runtime = new Runtime();
+        $fn = new is_uploaded_file();
+        $strictBlock = new Block(null);
+        $strictBlock->strictTypes = true;
+        $parent = new Frame(null, $strictBlock, null);
+        $frame = $fn->getFrame($runtime->vmContext);
+        $frame->parent = $parent;
+        $null = new VMVariable();
+        $null->null();
+        $frame->calledArgs = [$null];
+        $frame->returnVar = new VMVariable();
+        $this->expectException(\TypeError::class);
+        $this->expectExceptionMessage('is_uploaded_file(): Argument #1 ($filename) must be of type string, null given');
+        $fn->execute($frame);
+    }
+
+    public function testNullFilenameNonStrictReturnsFalse(): void
+    {
+        $runtime = new Runtime();
+        $fn = new is_uploaded_file();
+        $frame = $fn->getFrame($runtime->vmContext);
+        $null = new VMVariable();
+        $null->null();
+        $frame->calledArgs = [$null];
+        $frame->returnVar = new VMVariable();
+        $fn->execute($frame);
+        $this->assertFalse($frame->returnVar->resolveIndirect()->toBool());
+    }
+
     public function testRejectsPlainTemp(): void
     {
         $tmp = tempnam(sys_get_temp_dir(), 'phpc_plain_');

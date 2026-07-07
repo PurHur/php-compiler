@@ -1,12 +1,12 @@
 --TEST--
-stdlib is_uploaded_file() JIT — null filename TypeError under strict_types (#17061, ext/standard/filestat.c)
+stdlib is_uploaded_file() null under strict_types JIT throws TypeError (#17061, ext/standard/filestat.c)
 --FILE--
 <?php
 declare(strict_types=1);
 
 try {
     is_uploaded_file(null);
-    echo "fail\n";
+    echo "uncaught\n";
 } catch (TypeError $e) {
     echo $e->getMessage(), "\n";
 }
