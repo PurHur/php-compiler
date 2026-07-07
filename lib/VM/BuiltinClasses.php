@@ -884,11 +884,11 @@ final class BuiltinClasses
             if (CompilerVersion::supportsReflectionClassConstantIsDeprecated()) {
                 $rconst->methods['isdeprecated'] = new ReflectionClassConstantIsDeprecated();
                 $rconst->methodVisibility['isdeprecated'] = $pub;
+                $rconst->methods['getdeprecatedmessage'] = new ReflectionClassConstantGetDeprecatedMessage();
+                $rconst->methodVisibility['getdeprecatedmessage'] = $pub;
+                $rconst->methods['getdeprecatedversion'] = new ReflectionClassConstantGetDeprecatedVersion();
+                $rconst->methodVisibility['getdeprecatedversion'] = $pub;
             }
-            $rconst->methods['getdeprecatedmessage'] = new ReflectionClassConstantGetDeprecatedMessage();
-            $rconst->methodVisibility['getdeprecatedmessage'] = $pub;
-            $rconst->methods['getdeprecatedversion'] = new ReflectionClassConstantGetDeprecatedVersion();
-            $rconst->methodVisibility['getdeprecatedversion'] = $pub;
             $rconst->methods['isfinal'] = new ReflectionClassConstantIsFinal();
             $rconst->methodVisibility['isfinal'] = $pub;
             $rconst->methods['isenumcase'] = new ReflectionClassConstantIsEnumCase();
@@ -919,11 +919,11 @@ final class BuiltinClasses
         if (CompilerVersion::supportsReflectionClassConstantIsDeprecated()) {
             $rcc->methods['isdeprecated'] = new ReflectionClassConstantIsDeprecated();
             $rcc->methodVisibility['isdeprecated'] = $pub;
+            $rcc->methods['getdeprecatedmessage'] = new ReflectionClassConstantGetDeprecatedMessage();
+            $rcc->methodVisibility['getdeprecatedmessage'] = $pub;
+            $rcc->methods['getdeprecatedversion'] = new ReflectionClassConstantGetDeprecatedVersion();
+            $rcc->methodVisibility['getdeprecatedversion'] = $pub;
         }
-        $rcc->methods['getdeprecatedmessage'] = new ReflectionClassConstantGetDeprecatedMessage();
-        $rcc->methodVisibility['getdeprecatedmessage'] = $pub;
-        $rcc->methods['getdeprecatedversion'] = new ReflectionClassConstantGetDeprecatedVersion();
-        $rcc->methodVisibility['getdeprecatedversion'] = $pub;
         $rcc->methods['isfinal'] = new ReflectionClassConstantIsFinal();
         $rcc->methodVisibility['isfinal'] = $pub;
         $rcc->methods['isenumcase'] = new ReflectionClassConstantIsEnumCase();

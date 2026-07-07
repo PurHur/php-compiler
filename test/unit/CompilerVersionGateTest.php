@@ -515,6 +515,26 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
+    public function testSupportsReflectionClassConstantIsDeprecatedFalseOnReferenceProfile(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsReflectionClassConstantIsDeprecated());
+    }
+
+    public function testSupportsReflectionClassConstantIsDeprecatedTrueWhenProfile84(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertTrue(CompilerVersion::supportsReflectionClassConstantIsDeprecated());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     public function testSupportsReflectionCreateFromFactoriesFalseOnReferenceProfile(): void
     {
         $this->assertFalse(CompilerVersion::supportsReflectionCreateFromFactories());
