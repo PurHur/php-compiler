@@ -642,6 +642,31 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'result', 'parse_str'));
     }
 
+    /** @covers issue #17092 */
+    public function testTimersAndHttpNamedParamsResolve(): void
+    {
+        $gettimeofday = BuiltinParamNames::forFunction('gettimeofday');
+        self::assertSame(['as_float'], $gettimeofday);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($gettimeofday, 'as_float', 'gettimeofday'));
+
+        $sleep = BuiltinParamNames::forFunction('sleep');
+        self::assertSame(['seconds'], $sleep);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($sleep, 'seconds', 'sleep'));
+
+        $usleep = BuiltinParamNames::forFunction('usleep');
+        self::assertSame(['microseconds'], $usleep);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($usleep, 'microseconds', 'usleep'));
+
+        $http = BuiltinParamNames::forFunction('http_response_code');
+        self::assertSame(['response_code'], $http);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($http, 'response_code', 'http_response_code'));
+
+        $cookie = BuiltinParamNames::forFunction('setcookie');
+        self::assertSame(['name', 'value', 'expires', 'path', 'domain', 'secure', 'httponly'], $cookie);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($cookie, 'name', 'setcookie'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($cookie, 'value', 'setcookie'));
+    }
+
     /** @covers issue #17090 */
     public function testParseIniNamedParamsResolve(): void
     {
