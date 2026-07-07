@@ -188,6 +188,13 @@ class Compiler {
      */
     private array $deferredArrayLiteralKeepSlots = [];
 
+    /**
+     * Closure `use` metadata registered before the body block compiles (#17089).
+     *
+     * @var list<array{name: string, useVar: Operand\BoundVariable, byRef: bool}>
+     */
+    private array $pendingClosureCaptureMetadata = [];
+
     /** CFG block owning a rematerialized Expr producer — inline call-arg lookup (#14134, #15848). */
     private ?CfgBlock $rematerializeInlineProducerCfgBlock = null;
 
@@ -822,6 +829,7 @@ class Compiler {
             foreach ($params as $param) {
                 $new->addOpCode($this->compileParam($param, $new, $paramIdx++));
             }
+            $this->applyPendingClosureCaptureMetadata($new);
             if (null !== $func && '__construct' === $func->name && null !== $func->class) {
                 $this->compileCtorPromotionAssignments($new, $params);
             }
@@ -872,6 +880,24 @@ class Compiler {
         $block->addOpCode(new OpCode(OpCode::TYPE_RETURN_VOID));
 
         return $block;
+    }
+
+    /**
+     * Register closure `use` slots before the body compiles so branch blocks inherit them (#17089).
+     */
+    protected function applyPendingClosureCaptureMetadata(Block $block): void
+    {
+        if ([] === $this->pendingClosureCaptureMetadata) {
+            return;
+        }
+        foreach ($this->pendingClosureCaptureMetadata as $spec) {
+            $slot = $block->getVarSlot($spec['useVar'], false);
+            $block->closureCaptureSlots[$slot] = true;
+            $block->closureCaptureNames[$spec['name']] = $slot;
+            if ($spec['byRef']) {
+                $block->closureCaptureByRef[$slot] = true;
+            }
+        }
     }
 
     /**
@@ -8867,6 +8893,9 @@ class Compiler {
             $resultSlot = $block->inheritUndefinedLocals
                 ? $block->forceFreshVarSlot($expr->result)
                 : $this->compileOperand($expr->result, $block, false);
+            if (isset($block->closureCaptureSlots[$resultSlot])) {
+                $resultSlot = $block->forceFreshVarSlot($expr->result);
+            }
             $opcode = new OpCode(
                 $this->getOpCodeTypeFromBinaryOp($expr),
                 $resultSlot,
@@ -9267,9 +9296,20 @@ class Compiler {
                 if ($this->parensNewCallSkippedWithoutInvoke($expr->name, $block)) {
                     return [];
                 }
+                $captureCalleeSlot = $this->closureCaptureCalleeSlotForOperand($expr->name, $block);
+                if (null !== $captureCalleeSlot) {
+                    return $this->compileFuncCall(
+                        $captureCalleeSlot,
+                        $expr->args,
+                        $expr->result,
+                        $block,
+                        max(0, $expr->getLine()),
+                        $expr
+                    );
+                }
                 if ($this->operandIsInvokableReceiver($expr->name, $block)) {
                     return $this->compileMethodCallOpcodes(
-                        $this->compileOperand($expr->name, $block, true),
+                        $this->compileCallableOperandSlot($expr->name, $block),
                         $this->compileOperand(new Operand\Literal('__invoke'), $block, true),
                         $expr->args,
                         $expr->result,
@@ -9280,7 +9320,7 @@ class Compiler {
                 }
 
                 return $this->compileFuncCall(
-                    $this->compileOperand($expr->name, $block, true),
+                    $this->compileCallableOperandSlot($expr->name, $block),
                     $expr->args,
                     $expr->result,
                     $block,
@@ -9567,11 +9607,28 @@ class Compiler {
         if ($expr instanceof Op\Expr\ArrowFunction) {
             $this->compilingArrowAutoCapture = true;
         }
+        $savedClosureCaptureMetadata = $this->pendingClosureCaptureMetadata;
+        $this->pendingClosureCaptureMetadata = [];
+        $closureUseMetadata = [];
+        if ($expr instanceof Op\Expr\Closure) {
+            foreach ($expr->useVars as $useVar) {
+                if (!$useVar instanceof Operand\BoundVariable) {
+                    continue;
+                }
+                $closureUseMetadata[] = [
+                    'name' => $this->boundVariableName($useVar),
+                    'useVar' => $useVar,
+                    'byRef' => $useVar->byRef,
+                ];
+                $this->pendingClosureCaptureMetadata[] = end($closureUseMetadata);
+            }
+        }
         try {
             $funcBlock = $this->compileCfgBlock($func->cfg, $func->params, $func);
             $funcBlock->parents[] = $block;
         } finally {
             $this->compilingArrowAutoCapture = $wasArrowAutoCapture;
+            $this->pendingClosureCaptureMetadata = $savedClosureCaptureMetadata;
         }
         $this->markGeneratorIfNeeded($expr, $funcBlock);
         $op = new OpCode(
@@ -9584,20 +9641,20 @@ class Compiler {
         AttributeNames::assertCompileTimeConstTargetOnly($op->attributeNames, 'function');
         AttributeNames::assertSensitiveParameterParamTargetOnly($op->attributeNames, 'function');
         if ($expr instanceof Op\Expr\Closure) {
-            foreach ($expr->useVars as $useVar) {
-                if (!$useVar instanceof Operand\BoundVariable) {
-                    continue;
-                }
-                $name = $this->boundVariableName($useVar);
-                $slot = $funcBlock->getVarSlot($useVar, false);
+            foreach ($closureUseMetadata as $spec) {
+                $useVar = $spec['useVar'];
+                $name = $spec['name'];
+                $slot = $funcBlock->closureCaptureNames[$name]
+                    ?? $funcBlock->getVarSlot($useVar, false);
                 $funcBlock->closureCaptureSlots[$slot] = true;
-                if ($useVar->byRef) {
+                $funcBlock->closureCaptureNames[$name] = $slot;
+                if ($spec['byRef']) {
                     $funcBlock->closureCaptureByRef[$slot] = true;
                 }
                 $op->closureCaptures[] = [
                     'name' => $name,
                     'slot' => $slot,
-                    'byRef' => $useVar->byRef,
+                    'byRef' => $spec['byRef'],
                 ];
             }
         } elseif ($expr instanceof Op\Expr\ArrowFunction) {
@@ -9618,6 +9675,7 @@ class Compiler {
                 }
                 $seenCaptureSlots[$slot] = true;
                 $funcBlock->closureCaptureSlots[$slot] = true;
+                $funcBlock->closureCaptureNames[$name] = $slot;
                 $op->closureCaptures[] = [
                     'name' => $name,
                     'slot' => $slot,
@@ -30741,12 +30799,41 @@ class Compiler {
         if (!$isRead) {
             return $slot;
         }
+        if (isset($block->closureCaptureSlots[$slot])) {
+            return $slot;
+        }
         $lvalue = $this->slotForAssignLvalueFromResultSlot($block, $slot);
         if (null !== $lvalue) {
             return $lvalue;
         }
 
         return $slot;
+    }
+
+    /**
+     * Callable variable for $fn(...) — bind closure use() captures to their capture slots (#17089).
+     */
+    protected function compileCallableOperandSlot(Operand $operand, Block $block): int
+    {
+        $captureSlot = $this->closureCaptureCalleeSlotForOperand($operand, $block);
+        if (null !== $captureSlot) {
+            return $captureSlot;
+        }
+
+        return $this->requireOperandSlot(
+            $this->compileOperand($operand, $block, true),
+            'callable operand'
+        );
+    }
+
+    protected function closureCaptureCalleeSlotForOperand(Operand $operand, Block $block): ?int
+    {
+        $name = Block::resolveVariableName($this->unwrapOperandChain($operand));
+        if (null === $name || '' === $name) {
+            return null;
+        }
+
+        return $block->closureCaptureNames[$name] ?? null;
     }
 
     private function isDynamicVariableOperand(Operand\Variable $operand): bool
@@ -32275,6 +32362,11 @@ class Compiler {
 
     protected function operandIsInvokableReceiver(Operand $operand, Block $block): bool
     {
+        $root = $this->unwrapOperandChain($operand);
+        $captureName = Block::resolveVariableName($root);
+        if (null !== $captureName && '' !== $captureName && isset($block->closureCaptureNames[$captureName])) {
+            return false;
+        }
         // First-class callables are Closure objects; use FUNC_CALL dispatch, not `$x->__invoke(...)`.
         if (null !== $block->orig) {
             $root = $this->unwrapOperandChain($operand);
@@ -42724,9 +42816,6 @@ class Compiler {
                 $return[] = $send;
             }
         }
-        foreach ($nestedProducerOps as $op) {
-            $return[] = $op;
-        }
         $init = new OpCode(
             OpCode::TYPE_FUNCCALL_INIT,
             $callName,
@@ -42735,7 +42824,20 @@ class Compiler {
         if (null !== $cfgCallOp) {
             $this->assignSourceMetadata($init, $cfgCallOp);
         }
-        $return[] = $init;
+        // Zend evaluates the callee before arguments; hoisted arg producers must not clobber
+        // closure use (&$fn) slots before FUNCCALL_INIT binds the callable (#17089).
+        $variableCallee = null === $calleeName
+            || isset($block->closureCaptureSlots[$callName])
+            || (null !== $name && isset($block->closureCaptureSlots[$name]));
+        if ($variableCallee) {
+            $return[] = $init;
+        }
+        foreach ($nestedProducerOps as $op) {
+            $return[] = $op;
+        }
+        if (!$variableCallee) {
+            $return[] = $init;
+        }
         foreach ($outerArgSends as $send) {
             if (OpCode::TYPE_ASSIGN !== $send->type) {
                 $return[] = $send;
@@ -42753,6 +42855,9 @@ class Compiler {
     protected function tryFoldVariableFunctionName(?int $nameSlot, Block $block): ?int
     {
         if (null === $nameSlot) {
+            return null;
+        }
+        if (isset($block->closureCaptureSlots[$nameSlot])) {
             return null;
         }
         $name = $this->resolveCompileTimeStringSlot($nameSlot, $block);

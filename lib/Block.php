@@ -180,6 +180,9 @@ class Block {
     /** Closure `use (&$var)` slots that alias enclosing storage at call (issue #72). */
     public array $closureCaptureByRef = [];
 
+    /** Closure `use ($name)` → scope slot for compile-time callee/variable binding (#17089). */
+    public array $closureCaptureNames = [];
+
     /** Arrow function body: register outer lexical reads for auto-capture (#4944, #4952, #10304). */
     public bool $arrowAutoCapture = false;
 
@@ -395,9 +398,34 @@ class Block {
         return $this->slotIndexForVariableName($name);
     }
 
+    private function writableVarSlot(int $slot, Operand $operand): int
+    {
+        if (isset($this->closureCaptureSlots[$slot])) {
+            $name = self::resolveVariableName($operand);
+            if (
+                null !== $name
+                && '' !== $name
+                && isset($this->closureCaptureNames[$name])
+                && $this->closureCaptureNames[$name] === $slot
+            ) {
+                return $slot;
+            }
+
+            return $this->forceFreshVarSlot($operand);
+        }
+
+        return $slot;
+    }
+
     public function getVarSlot(Operand $operand, bool $isRead): int {
         if ($isRead) {
             $name = self::resolveVariableName($operand);
+            if (null !== $name && '' !== $name && isset($this->closureCaptureNames[$name])) {
+                $captureSlot = $this->closureCaptureNames[$name];
+                $this->scope[$operand] = $captureSlot;
+
+                return $captureSlot;
+            }
             if (null !== $name && '' !== $name) {
                 $paramSlot = $this->paramSlotForName($name);
                 if (null !== $paramSlot) {
@@ -432,7 +460,7 @@ class Block {
                 $this->markLocallyWritten($operand);
             }
 
-            return $this->scope[$operand];
+            return $isRead ? $this->scope[$operand] : $this->writableVarSlot($this->scope[$operand], $operand);
         }
         // php-cfg may wrap named locals in temporaries after while-assign conditions; bind by
         // variable name before call-site temp clone reuse (#10702, #8560).
@@ -450,7 +478,7 @@ class Block {
                         $this->markLocallyWritten($operand);
                     }
 
-                    return $existing;
+                    return $isRead ? $existing : $this->writableVarSlot($existing, $operand);
                 }
             }
         }
@@ -465,7 +493,7 @@ class Block {
                 $this->markLocallyWritten($operand);
             }
 
-            return $existing;
+            return $isRead ? $existing : $this->writableVarSlot($existing, $operand);
         }
         $name = self::resolveVariableName($operand);
         if (null !== $name) {
@@ -479,7 +507,7 @@ class Block {
                     $this->markLocallyWritten($operand);
                 }
 
-                return $existing;
+                return $isRead ? $existing : $this->writableVarSlot($existing, $operand);
             }
         }
         $cfgVar = self::cfgVarRoot($operand);
@@ -495,7 +523,7 @@ class Block {
                         $this->markLocallyWritten($operand);
                     }
 
-                    return $existing;
+                    return $isRead ? $existing : $this->writableVarSlot($existing, $operand);
                 }
             }
         }
@@ -787,6 +815,15 @@ class Block {
             $this->noDiscardMessage = $parent->noDiscardMessage;
         }
         $this->arrowAutoCapture = $parent->arrowAutoCapture;
+        foreach ($parent->closureCaptureSlots as $slot => $_) {
+            $this->closureCaptureSlots[$slot] = true;
+        }
+        foreach ($parent->closureCaptureByRef as $slot => $_) {
+            $this->closureCaptureByRef[$slot] = true;
+        }
+        foreach ($parent->closureCaptureNames as $name => $slot) {
+            $this->closureCaptureNames[$name] = $slot;
+        }
     }
 
     public function addOpCode(OpCode ...$ops): void {
@@ -853,6 +890,9 @@ class Block {
     /** True when $slot holds a named local ($a), not a compiler temporary (#5340). */
     public function isNamedVariableSlot(int $slot): bool
     {
+        if (isset($this->closureCaptureSlots[$slot])) {
+            return true;
+        }
         if (isset($this->namedAssignDestSlotIndexes[$slot])) {
             return true;
         }
@@ -1181,7 +1221,12 @@ class Block {
                 continue;
             }
             $idx = $f->block->slotIndexForVariableName($name);
-            if (null !== $idx && isset($f->scope[$idx])) {
+            if (null !== $idx) {
+                if (!isset($f->scope[$idx])) {
+                    $f->scope[$idx] = new Variable();
+                    $f->scope[$idx]->null();
+                }
+
                 return $f->scope[$idx];
             }
             if (isset($f->dynamicLocals[$name])) {
@@ -1246,7 +1291,18 @@ class Block {
             if (isset($this->constants[$pos]) && !$this->args->contains($op)) {
                 $scope[$pos] = $this->scopeConstantVariable($pos);
             } elseif (isset($this->closureCaptureSlots[$pos])) {
-                $scope[$pos] = self::initialVariableForOperand($op, $context, $pos, $this);
+                if (null !== $frame && isset($frame->scope[$pos])) {
+                    $scope[$pos] = new Variable();
+                    $parentVar = $frame->scope[$pos];
+                    $indirectTarget = $parentVar->directIndirectTarget();
+                    if (null !== $indirectTarget) {
+                        $scope[$pos]->indirect($indirectTarget);
+                    } else {
+                        $scope[$pos]->copyFrom($parentVar);
+                    }
+                } else {
+                    $scope[$pos] = self::initialVariableForOperand($op, $context, $pos, $this);
+                }
             } elseif ($this->isArgRecvParameterSlot($pos)) {
                 // Params are not in $args (compileOperand isRead=false); still need type metadata (#7057).
                 $scope[$pos] = self::initialVariableForOperand($op, $context, $pos, $this);

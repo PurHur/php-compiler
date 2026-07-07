@@ -15981,7 +15981,11 @@ restart:
 
     private function releaseFrameObjectRefs(Frame $frame): void
     {
-        foreach ($frame->scope as $slot) {
+        foreach ($frame->scope as $slotIdx => $slot) {
+            if (isset($frame->block->closureCaptureSlots[$slotIdx])) {
+                // use (&$fn) shares the closure object with the caller; do not drop refcount (#17089).
+                continue;
+            }
             ObjectLifetime::releaseDirectObject($slot);
         }
         foreach ($frame->iterators as $iter) {
