@@ -1644,6 +1644,16 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.4+ parse_str() optional $separator (ext/standard/quot_print.c, #17320).
+     *
+     * Withheld on 8.4.0-dev reference profile — enable via PHP_COMPILER_PROFILE=8.4 forward profile.
+     */
+    public static function supportsParseStrSeparator(): bool
+    {
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+    }
+
+    /**
      * PHP 8.4+ mb_trim/ltrim/rtrim (ext/mbstring/mbstring.c, issue #11901, #12797, #9977, #17120).
      *
      * Withheld on 8.4.0-dev reference profile (matches Zend 8.2 function_exists gate). Enable via
