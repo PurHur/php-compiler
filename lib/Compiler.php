@@ -19716,8 +19716,34 @@ class Compiler {
     }
 
     /**
-     * php-cfg dead ClassConstFetch preludes before inline Array_/Concat call args (#5933, #4109).
+     * Hoisted expr between a comparison and var_export — feeds compare operands, not call args (#17277).
      *
+     * @param list<Op> $cfgChildren
+     */
+    private function cfgExprFeedsUpcomingComparisonOperand(
+        array $cfgChildren,
+        int $exprIndex,
+        int $callIndex,
+        Op\Expr $expr
+    ): bool {
+        if (null === $expr->result) {
+            return false;
+        }
+        for ($j = $exprIndex + 1; $j < $callIndex; ++$j) {
+            $scan = $cfgChildren[$j] ?? null;
+            if (!$scan instanceof Op\Expr || !$this->isComparisonInlineCallArgProducer($scan)) {
+                continue;
+            }
+            if ($this->cfgExprUsesOperand($scan, $expr->result)) {
+                return true;
+            }
+            break;
+        }
+
+        return false;
+    }
+
+    /**
      * @param list<Op\Expr> $producers
      *
      * @return list<Op\Expr>
@@ -21450,12 +21476,18 @@ class Compiler {
                 ) {
                     continue;
                 }
-                // var_export($x !== false, true) — hoisted false feeds comparison RHS, not call arg (#17250, re-#13694).
+                // var_export($x !== false, true) — hoisted operands feed comparison, not call args (#17250, #17277).
                 if (
-                    ($child instanceof Op\Expr\ConstFetch || $child instanceof Op\Expr\ClassConstFetch)
-                    && $this->isComparisonInlineCallArgProducer($next)
+                    $this->isComparisonInlineCallArgProducer($next)
                     && null !== $child->result
                     && $this->cfgExprUsesOperand($next, $child->result)
+                    && (
+                        $child instanceof Op\Expr\ConstFetch
+                        || $child instanceof Op\Expr\ClassConstFetch
+                        || $child instanceof Op\Expr\Array_
+                        || $child instanceof Op\Expr\FuncCall
+                        || $child instanceof Op\Expr\NsFuncCall
+                    )
                 ) {
                     continue;
                 }
@@ -21699,6 +21731,10 @@ class Compiler {
                 break;
             }
             if ($child instanceof Op\Expr\Array_) {
+                if ($this->cfgExprFeedsUpcomingComparisonOperand($cfgChildren, $i, $callIndex, $child)) {
+                    // var_export([1] !== false, true) — inline array feeds compare LHS, not call arg (#17277).
+                    continue;
+                }
                 $next = $cfgChildren[$i + 1] ?? null;
                 // (object)[...] / (array)[...] — inner Array_ feeds sibling Cast, not the consumer (#15207).
                 if (
@@ -21996,6 +22032,10 @@ class Compiler {
                     continue;
                 }
                 // explode(PATH_SEPARATOR, …) after `if (':' !== PATH_SEPARATOR || …)` — compare bool must not bind arg #0 (#15833).
+                continue;
+            }
+            if ($this->cfgExprFeedsUpcomingComparisonOperand($cfgChildren, $i, $callIndex, $child)) {
+                // var_export([1] !== false, true) / array_search(...) !== false — operand preludes (#17277).
                 continue;
             }
             array_unshift($producers, $child);
@@ -30209,6 +30249,34 @@ class Compiler {
         if (!$comparisonArg instanceof Operand || !$this->callArgIsDeadInlineTemporary($comparisonArg)) {
             return null;
         }
+        if ('var_export' === strtolower($this->resolveCfgFuncCallName($cfgCallOp) ?? '')) {
+            if (0 !== $argIndex || null === $block->orig) {
+                return null;
+            }
+            $callIndex = array_search($cfgCallOp, $block->orig->children, true);
+            if (!\is_int($callIndex)) {
+                return null;
+            }
+            $immediatePrelude = $block->orig->children[$callIndex - 1] ?? null;
+            $comparisonPrelude = null;
+            if ($this->isComparisonInlineCallArgProducer($immediatePrelude)) {
+                $comparisonPrelude = $immediatePrelude;
+            } elseif (
+                $callIndex > 1
+                && $this->isHoistedScalarConstFetchImmediatelyBeforeCall($immediatePrelude)
+            ) {
+                $candidate = $block->orig->children[$callIndex - 2] ?? null;
+                if ($this->isComparisonInlineCallArgProducer($candidate)) {
+                    $comparisonPrelude = $candidate;
+                }
+            }
+            if (null === $comparisonPrelude || null === $comparisonPrelude->result) {
+                return null;
+            }
+            $slot = $block->slotForOperand($comparisonPrelude->result);
+
+            return null !== $slot ? (string) $slot : null;
+        }
         $compareOpcodes = [];
         foreach (array_merge($block->opCodes, $pendingOps) as $op) {
             if (OpCode::TYPE_NOT_IDENTICAL === $op->type) {
@@ -36962,12 +37030,13 @@ class Compiler {
                     }
                 }
                 if (null === $valueSlot && null !== $cfgCallOp && null !== $block->orig) {
-                    if (
-                        !(
-                            $this->hasSiblingMultiArgInlineCallProducers($block, $cfgCallOp)
-                            && $this->callArgIsDeadInlineTemporary($cfgCallOp->args[(int) $argIndex] ?? $arg)
-                        )
-                    ) {
+                    $skipSiblingInlineProducerMatch = $this->hasSiblingMultiArgInlineCallProducers($block, $cfgCallOp)
+                        && $this->callArgIsDeadInlineTemporary($cfgCallOp->args[(int) $argIndex] ?? $arg);
+                    if ('var_export' === strtolower($this->resolveCfgFuncCallName($cfgCallOp) ?? '')) {
+                        // var_export($x !== false, true) — hoisted compare + return flag are both call args (#17277).
+                        $skipSiblingInlineProducerMatch = false;
+                    }
+                    if (!$skipSiblingInlineProducerMatch) {
                     $producers = $this->precedingInlineCallArgProducersBeforeCfgOp(
                         $block->orig->children,
                         $cfgCallOp
@@ -37047,6 +37116,11 @@ class Compiler {
                                 $this->isComparisonInlineCallArgProducer($matched)
                                 && null !== $callArgForMatch
                                 && !$this->operandsReferToSameVariable($matched->result, $callArgForMatch)
+                                && !(
+                                    0 === (int) $argIndex
+                                    && 'var_export' === strtolower($this->resolveCfgFuncCallName($cfgCallOp) ?? '')
+                                    && $this->callArgIsDeadInlineTemporary($callArgForMatch)
+                                )
                             ) {
                                 $matched = null;
                                 $constRoot = $this->unwrapOperandChain($callArgForMatch);

@@ -1449,6 +1449,24 @@ PHP;
         self::assertStringContainsString('true', $out);
     }
 
+    /** Issue #17277 — var_export([1] !== false, true) in multi-echo script uses per-call comparison slot. */
+    public function testVarExportArrayNotIdenticalFalseMultiStatementUsesComparisonSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+echo var_export(1 !== false, true), "\n";
+echo var_export([1] !== false, true), "\n";
+echo var_export(0 === false, true), "\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'var_export_array_not_identical_multi.php');
+
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertSame("true\ntrue\nfalse\n", $out);
+    }
+
     /** Issue #17259 — static call with two hoisted !== preludes wires distinct comparison slots. */
     public function testStaticCallDualComparisonPreludeArgsUseDistinctSlots(): void
     {
