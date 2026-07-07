@@ -12,7 +12,7 @@ namespace PHPCompiler\ext\standard;
  */
 final class ImageTypeToMimeTypeJitHelper
 {
-    public static function lookupArgv(int $imageType): string
+    public static function mimeArgv(int $imageType): string
     {
         switch ($imageType) {
             case 1:
