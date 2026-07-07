@@ -1620,11 +1620,11 @@ final class CompilerVersion
     /**
      * PHP 8.4+ substr()/mb_substr() optional $truncate (ext/standard/string.c, ext/mbstring/mbstring.c, #17239).
      *
-     * Forward profile on 8.4.0-dev — advertisesBuiltinSince treats -dev as 8.4.0 (#14983 reference gate).
+     * Withheld on 8.4.0-dev reference profile — enable via PHP_COMPILER_PROFILE=8.4 forward profile (#17252).
      */
     public static function supportsSubstrTruncate(): bool
     {
-        return self::advertisesBuiltinSince('8.4.0');
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
     }
 
     /**
