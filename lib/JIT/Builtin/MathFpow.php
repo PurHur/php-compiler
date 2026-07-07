@@ -6,6 +6,8 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
+use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPCompiler\JIT\UserScriptAotDeferNestedJit;
 use PHPLLVM\Value;
 
 /**
@@ -40,6 +42,12 @@ final class MathFpow
 
     public static function invoke(Context $context, Value $num, Value $exponent): Value
     {
+        // User-script AOT: nested php-in-PHP helpers truncate float params (#17279, #15407).
+        // Nested helper compile: FpowJitHelper → pow() → here; use libc leaf (#15189).
+        if (UserScriptAotDeferNestedJit::shouldDefer($context) || NestedJitCompileScope::isActive()) {
+            return self::invokeLibcPow($context, $num, $exponent);
+        }
+
         self::ensureLinked($context);
 
         return $context->builder->call(
@@ -49,8 +57,30 @@ final class MathFpow
         );
     }
 
+    private static function invokeLibcPow(Context $context, Value $num, Value $exponent): Value
+    {
+        $double = $context->getTypeFromString('double');
+        $abiName = 'pow';
+        $fn = $context->module->getNamedFunction($abiName);
+        if (null === $fn) {
+            try {
+                $fn = $context->lookupFunction($abiName);
+            } catch (\Throwable) {
+                $ft = $context->context->functionType($double, false, $double, $double);
+                $fn = $context->module->addFunction($abiName, $ft);
+                $context->registerFunction($abiName, $fn);
+            }
+        }
+
+        return $context->builder->call($fn, $num, $exponent);
+    }
+
     private static function implement(Context $context): void
     {
+        if (UserScriptAotDeferNestedJit::shouldDefer($context) || NestedJitCompileScope::isActive()) {
+            return;
+        }
+
         $double = $context->getTypeFromString('double');
         JitVmHelperLink::ensureBridge(
             $context,
