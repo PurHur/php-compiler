@@ -68,6 +68,9 @@ class Runtime {
     const MODE_NORMAL   = 0b0001;
     const MODE_AOT      = 0b0010;
 
+    /** @var array<string, Block> basename → CFG for nested JIT helper units (#17150) */
+    private static array $nestedJitParseAndCompileCache = [];
+
     public Compiler $compiler;
     public Parser $parser;
     public Traverser $preprocessor;
@@ -382,6 +385,13 @@ class Runtime {
 
     public function preprocessSourceForParse(string $code, string $filename = 'unknown'): array
     {
+        if (\PHPCompiler\JIT\NestedJitCompileScope::isActive()) {
+            // Nested JIT parses multi-megabyte lib/ units — skip reference-profile token scans (#17150).
+            TryCatchElseSupport::beginCompilationUnit();
+
+            return [$code, []];
+        }
+
         AsymmetricVisibilityRejector::reject($code, $filename);
         LazyPropertyRejector::reject($code, $filename);
         CloneWithSyntaxRejector::reject($code, $filename);
@@ -462,7 +472,7 @@ class Runtime {
     public function prepareSourceForParser(string $code, string $filename = 'unknown'): array
     {
         [$code, $bareRethrowLines] = $this->preprocessSourceForParse($code, $filename);
-        $code = $this->rewriteSourceBeforeParser($code);
+        $code = $this->rewriteSourceBeforeParser($code, $filename);
 
         return [$code, $bareRethrowLines];
     }
@@ -494,8 +504,12 @@ class Runtime {
      *
      * Must run on any path that calls Parser::parse() directly (AOT include discovery, etc.).
      */
-    public function rewriteSourceBeforeParser(string $code): string
+    public function rewriteSourceBeforeParser(string $code, string $filename = 'unknown'): string
     {
+        if (\PHPCompiler\JIT\NestedJitCompileScope::isActive()) {
+            return $code;
+        }
+
         $code = GlobalTypedConstRewriter::rewrite($code);
         $code = GlobalDeprecatedConstRewriter::rewrite($code);
         $code = DnfParenTypeRewriter::rewrite($code);
@@ -518,7 +532,7 @@ class Runtime {
         if (method_exists($this->compiler, 'setBareRethrowLines')) {
             $this->compiler->setBareRethrowLines($bareRethrowLines);
         }
-        $fileStrictTypes = $this->detectFileStrictTypes($code);
+        $fileStrictTypes = $this->detectFileStrictTypes($code, $filename);
         $this->resetParserNameResolverState();
         try {
             $script = $this->parser->parse($code, $filename);
@@ -574,8 +588,11 @@ class Runtime {
         }
     }
 
-    private function detectFileStrictTypes(string $code): bool
+    private function detectFileStrictTypes(string $code, string $filename = 'unknown'): bool
     {
+        if (\PHPCompiler\JIT\NestedJitCompileScope::isActive()) {
+            return false;
+        }
         if (!\function_exists('token_get_all')) {
             return false;
         }
@@ -877,6 +894,12 @@ class Runtime {
         $this->compiler->setDebugLastPhaseInputFile($filename);
         \PHPCompiler\JIT\Progress::notePhase('runtime_parseandcompile_begin');
         \PHPCompiler\JIT\Progress::noteEntry($filename);
+        if (\PHPCompiler\JIT\NestedJitCompileScope::isActive()) {
+            $cacheKey = \basename($filename);
+            if (isset(self::$nestedJitParseAndCompileCache[$cacheKey])) {
+                return self::$nestedJitParseAndCompileCache[$cacheKey];
+            }
+        }
         try {
             $script = $this->parse($code, $filename);
             $this->compiler->setCompileSourceCode($code);
@@ -884,6 +907,9 @@ class Runtime {
             if (null !== $block) {
                 $block->setScriptPath($filename);
                 $block->setCompileSource($code);
+                if (\PHPCompiler\JIT\NestedJitCompileScope::isActive()) {
+                    self::$nestedJitParseAndCompileCache[\basename($filename)] = $block;
+                }
             }
 
             return $block;

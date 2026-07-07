@@ -19,27 +19,49 @@ final class ReadonlyAnonymousClassSyntax
      */
     public static function referenceProfileSyntaxError(string $code): ?array
     {
-        if (!preg_match('/\bnew\b/i', $code)) {
+        // JIT/AOT bundles can be megabytes with thousands of `new` — never token_get_all the whole
+        // prelude (#17150). Require all three keywords before scanning.
+        if (
+            !preg_match('/\bnew\b/i', $code)
+            || !preg_match('/\breadonly\b/i', $code)
+            || !preg_match('/\bclass\b/i', $code)
+        ) {
             return null;
         }
 
-        $tokens = token_get_all($code);
-        $count = \count($tokens);
-        for ($i = 0; $i < $count; ++$i) {
-            if (!self::isNewToken($tokens[$i])) {
+        return self::scanForNewReadonlyAnonymousClass($code);
+    }
+
+    /**
+     * Bounded scan for `new readonly class` without token_get_all on huge sources (#17150).
+     *
+     * @return array{line: int, message: string}|null
+     */
+    private static function scanForNewReadonlyAnonymousClass(string $code): ?array
+    {
+        $offset = 0;
+        $len = \strlen($code);
+        while ($offset < $len) {
+            if (!preg_match('/\bnew\b/i', $code, $match, PREG_OFFSET_CAPTURE, $offset)) {
+                break;
+            }
+            $newOffset = (int) $match[0][1];
+            $afterNew = self::skipInsignificantSource($code, $newOffset + \strlen((string) $match[0][0]));
+            $readonlyOffset = self::matchReadonlyAt($code, $afterNew);
+            if (null === $readonlyOffset) {
+                $offset = $newOffset + 1;
+
                 continue;
             }
-            $j = self::skipInsignificant($tokens, $i + 1, $count);
-            if ($j >= $count || !self::isReadonlyToken($tokens[$j])) {
-                continue;
-            }
-            $k = self::skipInsignificant($tokens, $j + 1, $count);
-            if ($k >= $count || !self::isClassToken($tokens[$k])) {
+            $afterReadonly = self::skipInsignificantSource($code, $readonlyOffset + 8);
+            if (!self::matchClassAt($code, $afterReadonly)) {
+                $offset = $newOffset + 1;
+
                 continue;
             }
 
             return [
-                'line' => self::tokenLine($tokens[$j]),
+                'line' => self::lineAtOffset($code, $readonlyOffset),
                 'message' => self::REFERENCE_PROFILE_UNEXPECTED_READONLY,
             ];
         }
@@ -47,65 +69,118 @@ final class ReadonlyAnonymousClassSyntax
         return null;
     }
 
-    /**
-     * @param array<int|string, mixed> $token
-     */
-    private static function isNewToken(array|string $token): bool
+    private static function skipInsignificantSource(string $code, int $offset): int
     {
-        return \is_array($token) && T_NEW === $token[0];
-    }
+        $len = \strlen($code);
+        while ($offset < $len) {
+            $ch = $code[$offset];
+            if (' ' === $ch || "\t" === $ch || "\n" === $ch || "\r" === $ch || "\f" === $ch) {
+                ++$offset;
 
-    /**
-     * @param array<int|string, mixed> $token
-     */
-    private static function isReadonlyToken(array|string $token): bool
-    {
-        if (\is_array($token) && \defined('T_READONLY') && T_READONLY === $token[0]) {
-            return true;
-        }
-
-        return \is_array($token)
-            && T_STRING === $token[0]
-            && 'readonly' === strtolower((string) $token[1]);
-    }
-
-    /**
-     * @param array<int|string, mixed> $token
-     */
-    private static function isClassToken(array|string $token): bool
-    {
-        return \is_array($token) && T_CLASS === $token[0];
-    }
-
-    /**
-     * @param list<array<int|string, mixed>|string> $tokens
-     */
-    private static function skipInsignificant(array $tokens, int $start, int $count): int
-    {
-        for ($i = $start; $i < $count; ++$i) {
-            $token = $tokens[$i];
-            if (\is_string($token)) {
                 continue;
             }
-            if (\in_array($token[0], [T_WHITESPACE, T_COMMENT, T_DOC_COMMENT], true)) {
+            if ('#' === $ch) {
+                $offset = self::skipToLineEnd($code, $offset + 1);
+
+                continue;
+            }
+            if ('/' === $ch && isset($code[$offset + 1])) {
+                if ('/' === $code[$offset + 1]) {
+                    $offset = self::skipToLineEnd($code, $offset + 2);
+
+                    continue;
+                }
+                if ('*' === $code[$offset + 1]) {
+                    $end = \strpos($code, '*/', $offset + 2);
+                    $offset = false === $end ? $len : $end + 2;
+
+                    continue;
+                }
+            }
+            if ("'" === $ch || '"' === $ch) {
+                $offset = self::skipQuotedString($code, $offset);
+
+                continue;
+            }
+            if ('<' === $ch && str_starts_with($code, '<<', $offset)) {
+                $offset = self::skipHeredoc($code, $offset);
+
                 continue;
             }
 
-            return $i;
+            break;
         }
 
-        return $count;
+        return $offset;
     }
 
-    /**
-     * @param array<int|string, mixed>|string $token
-     */
-    private static function tokenLine(array|string $token): int
+    private static function skipToLineEnd(string $code, int $offset): int
     {
-        if (\is_array($token)) {
-            return (int) ($token[2] ?? 1);
+        $len = \strlen($code);
+        while ($offset < $len) {
+            $ch = $code[$offset];
+            if ("\n" === $ch || "\r" === $ch) {
+                return $offset + 1;
+            }
+            ++$offset;
         }
 
-        return 1;
+        return $len;
+    }
+
+    private static function skipQuotedString(string $code, int $offset): int
+    {
+        $quote = $code[$offset];
+        $len = \strlen($code);
+        ++$offset;
+        while ($offset < $len) {
+            $ch = $code[$offset];
+            if ('\\' === $ch) {
+                $offset += 2;
+
+                continue;
+            }
+            if ($quote === $ch) {
+                return $offset + 1;
+            }
+            ++$offset;
+        }
+
+        return $len;
+    }
+
+    private static function skipHeredoc(string $code, int $offset): int
+    {
+        if (!preg_match('/\G<<<\s*([\'"]?)([A-Za-z_][A-Za-z0-9_]*)\1/m', $code, $match, 0, $offset)) {
+            return $offset + 1;
+        }
+        $label = $match[2];
+        $bodyStart = $offset + \strlen($match[0]);
+        $endMarker = "\n".$label;
+        $end = \strpos($code, $endMarker, $bodyStart);
+        if (false === $end) {
+            return \strlen($code);
+        }
+
+        return $end + \strlen($endMarker);
+    }
+
+    private static function matchReadonlyAt(string $code, int $offset): ?int
+    {
+        if (!preg_match('/\Greadonly\b/i', $code, $match, 0, $offset)) {
+            return null;
+        }
+
+        return $offset;
+    }
+
+    private static function matchClassAt(string $code, int $offset): bool
+    {
+        return 1 === preg_match('/\Gclass\b/i', $code, $m, 0, $offset);
+    }
+
+    private static function lineAtOffset(string $code, int $offset): int
+    {
+        return 1 + substr_count(substr($code, 0, $offset), "\n");
     }
 }

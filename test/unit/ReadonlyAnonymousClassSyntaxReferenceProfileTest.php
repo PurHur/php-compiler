@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler;
 
+use PHPCompiler\Ast\ReadonlyAnonymousClassSyntax;
 use PHPUnit\Framework\TestCase;
 
 /** `new readonly class` withheld on 8.2 reference profile; forward via PHP_COMPILER_PROFILE (#16255, #16379). */
@@ -67,5 +68,20 @@ final class ReadonlyAnonymousClassSyntaxReferenceProfileTest extends TestCase
         ob_start();
         $runtime->run($block);
         $this->assertSame('1', ob_get_clean());
+    }
+
+    public function testBoundedScanDoesNotTokenizeHugeBundleWithUnrelatedNew(): void
+    {
+        $huge = '<?php '.str_repeat('$x = new stdClass(); ', 200_000);
+        $this->assertNull(ReadonlyAnonymousClassSyntax::referenceProfileSyntaxError($huge));
+    }
+
+    public function testDetectsNewReadonlyClassWithCommentsBetweenTokens(): void
+    {
+        $code = '<?php $o = new /*x*/ readonly //y
+class { public int $x = 1; };';
+        $error = ReadonlyAnonymousClassSyntax::referenceProfileSyntaxError($code);
+        $this->assertNotNull($error);
+        $this->assertSame(ReadonlyAnonymousClassSyntax::REFERENCE_PROFILE_UNEXPECTED_READONLY, $error['message']);
     }
 }
