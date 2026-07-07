@@ -1331,10 +1331,10 @@ final class CompilerVersion
         return self::supportsGraphemeStrContains();
     }
 
-    /** locale_get_primary_language/region/script visible to function_exists() — stable 8.4+ or forward profile (#17072). */
+    /** locale_get_primary_language/region/script visible to function_exists() — 8.4.0-dev line or forward profile (#17072, #17117). */
     public static function advertisesLocaleParserForwardProfile(): bool
     {
-        return self::advertisesGraphemeStrContains();
+        return self::supportsLocaleParserForwardProfile();
     }
 
     /**
