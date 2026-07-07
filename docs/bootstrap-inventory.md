@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 4206 |
-| Phase A inventory files (M2 ratio SSOT) | 4206 |
+| PHP files on vm.php path | 4210 |
+| Phase A inventory files (M2 ratio SSOT) | 4210 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 11344 |
+| Source constructs flagged (warnings) | 11351 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -314,7 +314,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/IntlError.php` | 0 | 1 |
 | `ext/intl/IntlExtensionPolicy.php` | 0 | 11 |
 | `ext/intl/JitGrapheme.php` | 0 | 2 |
+| `ext/intl/JitLocaleParser.php` | 0 | 1 |
 | `ext/intl/LocaleGetDefault.php` | 0 | 2 |
+| `ext/intl/LocaleParserJitHelper.php` | 0 | 1 |
 | `ext/intl/LocaleSetDefault.php` | 0 | 2 |
 | `ext/intl/Module.php` | 0 | 22 |
 | `ext/intl/UnicodeCanonical.php` | 0 | 1 |
@@ -336,9 +338,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/intl_get_error_message.php` | 0 | 1 |
 | `ext/intl/intl_is_failure.php` | 0 | 1 |
 | `ext/intl/locale_get_default.php` | 0 | 2 |
-| `ext/intl/locale_get_primary_language.php` | 0 | 2 |
-| `ext/intl/locale_get_region.php` | 0 | 2 |
-| `ext/intl/locale_get_script.php` | 0 | 2 |
+| `ext/intl/locale_get_primary_language.php` | 0 | 3 |
+| `ext/intl/locale_get_region.php` | 0 | 3 |
+| `ext/intl/locale_get_script.php` | 0 | 3 |
 | `ext/intl/locale_set_default.php` | 0 | 2 |
 | `ext/libxml/BuiltinClasses.php` | 0 | 1 |
 | `ext/libxml/LibxmlConstants.php` | 0 | 1 |
@@ -2934,6 +2936,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/Lcg.php` | 0 | 2 |
 | `lib/JIT/Builtin/LibcryptThinRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/ListUnpackRuntime.php` | 0 | 1 |
+| `lib/JIT/Builtin/LocaleParser.php` | 0 | 1 |
 | `lib/JIT/Builtin/MathAbs.php` | 0 | 1 |
 | `lib/JIT/Builtin/MathAcos.php` | 0 | 1 |
 | `lib/JIT/Builtin/MathAcosh.php` | 0 | 1 |
@@ -3603,6 +3606,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/ReadonlyAnonymousClassSyntaxRejector.php` | 0 | 2 |
 | `lib/ReadonlyFunctionRejector.php` | 0 | 2 |
 | `lib/ReadonlyMethodModifierRejector.php` | 0 | 2 |
+| `lib/ReferenceProfileTokenScan.php` | 0 | 1 |
 | `lib/Runtime.php` | 0 | 71 |
 | `lib/RuntimeStrictness.php` | 0 | 1 |
 | `lib/SourceBareThrowRewriter.php` | 0 | 1 |
@@ -6168,11 +6172,21 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 14 class method(s)
 - 3 closure(s)
 
+### `ext/intl/JitLocaleParser.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s)
+
 ### `ext/intl/LocaleGetDefault.php`
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 21)
 - 1 class method(s)
+
+### `ext/intl/LocaleParserJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s)
 
 ### `ext/intl/LocaleSetDefault.php`
 
@@ -6334,18 +6348,21 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 20)
+- new ArgumentCountError (line 38)
 - 2 class method(s)
 
 ### `ext/intl/locale_get_region.php`
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 20)
+- new ArgumentCountError (line 38)
 - 2 class method(s)
 
 ### `ext/intl/locale_get_script.php`
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 20)
+- new ArgumentCountError (line 38)
 - 2 class method(s)
 
 ### `ext/intl/locale_set_default.php`
@@ -10330,7 +10347,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitFilestatArg.php`
 
 **Warnings** (review for bootstrap subset):
-- new JITVariable (line 167)
+- new JITVariable (line 161)
 - 11 class method(s)
 
 ### `ext/standard/JitFiletype.php`
@@ -14573,7 +14590,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmFilestatArg.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 144)
+- new Variable (line 149)
 - 15 class method(s)
 
 ### `ext/standard/VmFilestatFailure.php`
@@ -21487,7 +21504,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Ast/ReadonlyAnonymousClassSyntax.php`
 
 **Warnings** (review for bootstrap subset):
-- 6 class method(s)
+- 8 class method(s)
 
 ### `lib/Ast/SealedClassAnnotator.php`
 
@@ -21533,17 +21550,17 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/AsymmetricVisibilityRejector.php`
 
 **Warnings** (review for bootstrap subset):
-- new CompileFatal (line 33)
-- new CompileFatal (line 42)
-- new CompileFatal (line 55)
-- new CompileFatal (line 59)
-- new CompileFatal (line 67)
+- new CompileFatal (line 36)
+- new CompileFatal (line 45)
+- new CompileFatal (line 58)
+- new CompileFatal (line 62)
+- new CompileFatal (line 70)
 - 3 class method(s)
 
 ### `lib/BareThrowSyntaxRejector.php`
 
 **Warnings** (review for bootstrap subset):
-- new CompileFatal (line 45)
+- new CompileFatal (line 48)
 - 2 class method(s)
 
 ### `lib/Block.php`
@@ -21639,7 +21656,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/CloneWithSyntaxRejector.php`
 
 **Warnings** (review for bootstrap subset):
-- new CompileFatal (line 28)
+- new CompileFatal (line 31)
 - 1 class method(s)
 
 ### `lib/Compiler.php`
@@ -22413,7 +22430,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/DnfParenIntersectionSyntaxRejector.php`
 
 **Warnings** (review for bootstrap subset):
-- new CompileFatal (line 28)
+- new CompileFatal (line 31)
 - 1 class method(s)
 
 ### `lib/DnfType.php`
@@ -22441,13 +22458,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/EnumCaseListSyntaxRejector.php`
 
 **Warnings** (review for bootstrap subset):
-- new CompileFatal (line 27)
+- new CompileFatal (line 30)
 - 1 class method(s)
 
 ### `lib/ExitFunctionSyntaxRejector.php`
 
 **Warnings** (review for bootstrap subset):
-- new CompileFatal (line 28)
+- new CompileFatal (line 31)
 - 1 class method(s)
 
 ### `lib/Frame.php`
@@ -22498,13 +22515,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/GlobalDeprecatedConstSyntaxRejector.php`
 
 **Warnings** (review for bootstrap subset):
-- new CompileFatal (line 25)
+- new CompileFatal (line 28)
 - 1 class method(s)
 
 ### `lib/GlobalTypedConstSyntaxRejector.php`
 
 **Warnings** (review for bootstrap subset):
-- new CompileFatal (line 27)
+- new CompileFatal (line 30)
 - 1 class method(s)
 
 ### `lib/Handler.php`
@@ -23686,6 +23703,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 6 class method(s)
 
 ### `lib/JIT/Builtin/ListUnpackRuntime.php`
+
+**Warnings** (review for bootstrap subset):
+- 8 class method(s)
+
+### `lib/JIT/Builtin/LocaleParser.php`
 
 **Warnings** (review for bootstrap subset):
 - 8 class method(s)
@@ -27657,7 +27679,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/LazyPropertyRejector.php`
 
 **Warnings** (review for bootstrap subset):
-- new CompileFatal (line 34)
+- new CompileFatal (line 37)
 - 2 class method(s)
 
 ### `lib/Lint/Issue.php`
@@ -27743,8 +27765,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/PropertyHookSyntaxRejector.php`
 
 **Warnings** (review for bootstrap subset):
-- new CompileFatal (line 23)
-- new CompileFatal (line 33)
+- new CompileFatal (line 26)
+- new CompileFatal (line 36)
 - 1 class method(s)
 
 ### `lib/PropertyVisibility.php`
@@ -27760,7 +27782,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/ReadonlyAnonymousClassSyntaxRejector.php`
 
 **Warnings** (review for bootstrap subset):
-- new CompileFatal (line 27)
+- new CompileFatal (line 30)
 - 1 class method(s)
 
 ### `lib/ReadonlyFunctionRejector.php`
@@ -27772,8 +27794,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/ReadonlyMethodModifierRejector.php`
 
 **Warnings** (review for bootstrap subset):
-- new CompileFatal (line 121)
+- new CompileFatal (line 124)
 - 4 class method(s)
+
+### `lib/ReferenceProfileTokenScan.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
 
 ### `lib/Runtime.php`
 
@@ -27840,14 +27867,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ext\standard\Module (line 251)
 - new JIT (line 327)
 - new JITContext (line 341)
-- new SealedClassPreprocessor (line 398)
-- new StaticClassPreprocessor (line 401)
-- new SourcePreprocessor\PropertyHooks (line 404)
-- new State (line 531)
-- new ReflectionProperty (line 558)
-- new ReflectionProperty (line 561)
-- new LintCompiler (line 952)
-- new Variable (line 1082)
+- new SealedClassPreprocessor (line 403)
+- new StaticClassPreprocessor (line 406)
+- new SourcePreprocessor\PropertyHooks (line 409)
+- new State (line 542)
+- new ReflectionProperty (line 569)
+- new ReflectionProperty (line 572)
+- new LintCompiler (line 969)
+- new Variable (line 1099)
 - 53 class method(s)
 
 ### `lib/RuntimeStrictness.php`
@@ -27884,13 +27911,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/TryCatchElseSyntaxRejector.php`
 
 **Warnings** (review for bootstrap subset):
-- new CompileFatal (line 25)
+- new CompileFatal (line 28)
 - 1 class method(s)
 
 ### `lib/TypedFunctionStaticSyntaxRejector.php`
 
 **Warnings** (review for bootstrap subset):
-- new CompileFatal (line 27)
+- new CompileFatal (line 30)
 - 1 class method(s)
 
 ### `lib/VM.php`
