@@ -10,7 +10,8 @@ use PHPCompiler\ModuleAbstract;
  * bz2 extension module (php-src ext/bz2/bz2.c; issue #3402, #11840, #11992).
  *
  * Register under {@see standard}; advertise logical {@code bz2} extension and
- * bzcompress()/bzdecompress() only when {@see Bz2ExtensionPolicy::advertisesExtension()}
+ * bzcompress()/bzdecompress() and bzopen/bzread/bzwrite/bzclose when
+ * {@see Bz2ExtensionPolicy::advertisesExtension()}
  * (pure PHP via {@see VmBz2Core}) — withheld on reference profile (#11992, #14219).
  */
 class Module extends ModuleAbstract
@@ -41,6 +42,10 @@ class Module extends ModuleAbstract
         return [
             new bzcompress(),
             new bzdecompress(),
+            new bzopen(),
+            new bzread(),
+            new bzwrite(),
+            new bzclose(),
         ];
     }
 }
