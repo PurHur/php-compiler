@@ -1,0 +1,213 @@
+<?php
+
+declare(strict_types=1);
+
+namespace PHPCompiler\ext\standard;
+
+use PHPCompiler\Frame;
+use PHPCompiler\VM;
+use PHPCompiler\VM\ClassEntry;
+use PHPCompiler\VM\EnumCaseSupport;
+use PHPCompiler\VM\OutputBuffer;
+use PHPCompiler\VM\TypedPropertyCheck;
+use PHPCompiler\VM\Variable;
+
+/**
+ * debug_zval_dump() formatting SSOT (ext/standard/php_debug.c parity, #4709).
+ *
+ * Shared by VM {@see debug_zval_dump} and future JIT refcount emitter.
+ */
+final class VmDebugZval
+{
+    public static function dumpVariable(
+        VM $vm,
+        Variable $var,
+        int $level = 0,
+        bool $showRefMarker = false,
+        ?Frame $frame = null
+    ): void {
+        TypedPropertyCheck::assertReadable($var);
+        if ($showRefMarker) {
+            if (Variable::TYPE_INDIRECT === $var->type) {
+                $target = $var->directIndirectTarget();
+                if (null === $target) {
+                    self::write(self::indent($level)."NULL\n");
+
+                    return;
+                }
+                $var = $target;
+            }
+            $aliasCount = self::countReferenceAliases($vm, $var);
+            if ($aliasCount > 0) {
+                $refcount = $aliasCount + 1;
+                self::write(self::indent($level).'reference refcount('.$refcount.") {\n");
+                self::dumpVariable($vm, $var, $level + 1, false, $frame);
+                self::write(self::indent($level)."}\n");
+
+                return;
+            }
+        }
+        if ($level > 0) {
+            self::write(self::indent($level));
+        }
+        if (Variable::TYPE_INTEGER === $var->type) {
+            self::write('int('.$var->toInt().")\n");
+
+            return;
+        }
+        if (Variable::TYPE_FLOAT === $var->type) {
+            self::write('float('.VmFloatDtoa::formatVarDump($var->toFloat()).")\n");
+
+            return;
+        }
+        if (Variable::TYPE_STRING === $var->type) {
+            self::write('string('.\strlen($var->toString()).') "'.$var->toString()."\"\n");
+
+            return;
+        }
+        if (Variable::TYPE_BOOLEAN === $var->type) {
+            self::write('bool('.($var->toBool() ? 'true' : 'false').")\n");
+
+            return;
+        }
+        if (Variable::TYPE_NULL === $var->type) {
+            self::write("NULL\n");
+
+            return;
+        }
+        if (Variable::TYPE_ARRAY === $var->type) {
+            self::dumpArray($vm, $var->toArray(), $level, $frame);
+
+            return;
+        }
+        if (Variable::TYPE_OBJECT === $var->type) {
+            self::dumpObject($vm, $var->toObject(), $level, $frame);
+
+            return;
+        }
+        if (Variable::TYPE_ENUM_CASE === $var->type) {
+            $case = $var->toEnumCase();
+            self::write('enum('.$case->enumClass->name.'::'.$case->caseName.")\n");
+
+            return;
+        }
+
+        self::write("unknown()\n");
+    }
+
+    /**
+     * Zend zend_debug_zval() reference refcount — count indirect wrappers sharing storage.
+     */
+    public static function countReferenceAliases(VM $vm, Variable $refCell): int
+    {
+        $targetId = \spl_object_id($refCell);
+        $count = 0;
+        $varSeen = [];
+        $containerSeen = [];
+
+        $walk = static function (Variable $var) use (&$walk, &$count, $targetId, &$varSeen, &$containerSeen): void {
+            $varId = \spl_object_id($var);
+            if (isset($varSeen[$varId])) {
+                return;
+            }
+            $varSeen[$varId] = true;
+
+            if (Variable::TYPE_INDIRECT === $var->type) {
+                $target = $var->directIndirectTarget();
+                if (null !== $target && \spl_object_id($target) === $targetId) {
+                    ++$count;
+                }
+
+                return;
+            }
+
+            if (Variable::TYPE_ARRAY === $var->type) {
+                $array = $var->toArray();
+                $arrayId = \spl_object_id($array);
+                if (isset($containerSeen['a'.$arrayId])) {
+                    return;
+                }
+                $containerSeen['a'.$arrayId] = true;
+                foreach ($array->iterate(false) as $element) {
+                    $walk($element);
+                }
+
+                return;
+            }
+
+            if (Variable::TYPE_OBJECT === $var->type) {
+                $object = $var->toObject();
+                $objId = $object->id;
+                if (isset($containerSeen['o'.$objId])) {
+                    return;
+                }
+                $containerSeen['o'.$objId] = true;
+                foreach ($object->propertiesWithNames() as $prop) {
+                    $walk($prop);
+                }
+            }
+        };
+
+        $vm->visitStrongRefRoots($walk);
+
+        return $count;
+    }
+
+    private static function dumpArray(VM $vm, VM\HashTable $table, int $level, ?Frame $frame = null): void
+    {
+        $count = 0;
+        foreach ($table->iterateKeyed(false) as $_) {
+            ++$count;
+        }
+        self::write('array('.$count.') refcount('.$table->getGcRefcount()."){\n");
+        foreach ($table->iterateKeyed(false) as [$key, $value]) {
+            self::write(self::indent($level + 1));
+            self::write(self::formatKey($key)."\n");
+            self::dumpVariable($vm, $value, $level + 1, true, $frame);
+        }
+        if ($level > 0) {
+            self::write(self::indent($level));
+        }
+        self::write("}\n");
+    }
+
+    private static function dumpObject(VM $vm, VM\ObjectEntry $object, int $level, ?Frame $frame = null): void
+    {
+        if (EnumCaseSupport::isEnumCase($object)) {
+            self::write('enum('.$object->class->name.'::'.($object->enumCaseName ?? '').")\n");
+
+            return;
+        }
+        $props = $object->getProperties(ClassEntry::PROP_PURPOSE_DEBUG, $vm, $frame);
+        $count = \count($props);
+        self::write('object('.$object->class->name.')#'.$object->id.' ('.$count.') refcount('.$object->refCount."){\n");
+        foreach ($props as $name => $value) {
+            self::write(self::indent($level + 1));
+            self::write('["'.$name."\"]=>\n");
+            self::dumpVariable($vm, $value, $level + 1, true, $frame);
+        }
+        if ($level > 0) {
+            self::write(self::indent($level));
+        }
+        self::write("}\n");
+    }
+
+    private static function formatKey(Variable $key): string
+    {
+        if (Variable::TYPE_INTEGER === $key->type) {
+            return '['.$key->toInt().']=>';
+        }
+
+        return '["'.$key->toString().'"]=>';
+    }
+
+    private static function indent(int $level): string
+    {
+        return $level > 0 ? \str_repeat(' ', $level * 2) : '';
+    }
+
+    private static function write(string $chunk): void
+    {
+        OutputBuffer::append($chunk);
+    }
+}
