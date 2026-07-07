@@ -24,6 +24,10 @@ final class VmFilestatArg
         string $paramName = 'filename',
         ?Frame $frame = null
     ): string {
+        if (null !== $frame) {
+            InternalStrictArg::rejectNullString($var, $function, $paramName, $argIndex, $frame);
+        }
+
         return VmString::coercePathBuiltinArg($var, $function, $argIndex, $paramName);
     }
 
@@ -42,7 +46,8 @@ final class VmFilestatArg
             $frame->calledArgs[$argIndex],
             $function,
             $argIndex,
-            $paramName
+            $paramName,
+            $frame
         );
     }
 
