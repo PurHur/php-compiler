@@ -29,10 +29,10 @@ final class highlight_file extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException($functionName.'() expects 1 or 2 arguments in this compiler build');
         }
-        $path = VmStreamPath::coerceNonEmptyPathArg(
-            $frame->calledArgs[0],
-            $functionName,
+        $path = VmStreamPath::coerceNonEmptyPathArgForFrame(
+            $frame,
             0,
+            $functionName,
             'filename'
         );
         $return = false;
