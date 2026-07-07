@@ -569,6 +569,17 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.4+ ini_get()/ini_set() $option strict Z_PARAM_STR — int operand TypeError (#17268).
+     *
+     * Reference 8.2 profile (unset PHP_COMPILER_PROFILE on 8.4.0-dev) coerces int like Zend 8.2 (#17291).
+     * php-src: ext/standard/ini.c ZEND_ARG_TYPE(1, IS_STRING).
+     */
+    public static function iniOptionRequiresStrictStringType(): bool
+    {
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+    }
+
+    /**
      * fpow()/fmin()/fmax() visible to function_exists() — stable runtime or forward 8.4+ (#16677).
      *
      * Callable under forward profile via {@see supportsFpow()}; withheld from introspection on 8.4.0-dev

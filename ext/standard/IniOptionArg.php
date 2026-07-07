@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\Frame;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
@@ -13,7 +14,7 @@ use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/** ini_get()/ini_set() $option — Z_PARAM_STR (null coerce, int TypeError; #17268, ext/standard/ini.c). */
+/** ini_get()/ini_set() $option — Z_PARAM_STR (null coerce; int coerce on 8.2, TypeError on 8.4+; #17268, #17291, ext/standard/ini.c). */
 final class IniOptionArg
 {
     public static function vmOption(Frame $frame, string $function): string
@@ -24,7 +25,11 @@ final class IniOptionArg
             return '';
         }
 
-        return VmString::requireStringBuiltinArg($frame->calledArgs[0], $function, 0, 'option');
+        if (CompilerVersion::iniOptionRequiresStrictStringType()) {
+            return VmString::requireStringBuiltinArg($frame->calledArgs[0], $function, 0, 'option');
+        }
+
+        return VmString::coerceStringBuiltinArg($frame->calledArgs[0], $function, 0, 'option');
     }
 
     public static function jitOption(Context $context, JITVariable $arg, string $function): Value
@@ -34,6 +39,10 @@ final class IniOptionArg
             return $context->builder->load($context->constantStringFromString(''));
         }
 
-        return JitStringBuiltinArg::lowerRequiredString($context, $arg, $function, 0, 'option');
+        if (CompilerVersion::iniOptionRequiresStrictStringType()) {
+            return JitStringBuiltinArg::lowerRequiredString($context, $arg, $function, 0, 'option');
+        }
+
+        return JitStringBuiltinArg::lower($context, $arg, $function, 0, 'option');
     }
 }

@@ -1,5 +1,7 @@
 --TEST--
-stdlib ini_get()/ini_set() — int option operand TypeError (#17268, ext/standard/ini.c)
+stdlib ini_get()/ini_set() — int option operand TypeError forward 8.4 profile (#17268, #17291, ext/standard/ini.c)
+--ENV--
+PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
 try {
