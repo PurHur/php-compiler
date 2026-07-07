@@ -1477,7 +1477,8 @@ class VM {
     }
 
     /**
-     * empty($obj->hooked) — same-name / detached backing probes storage; separate-backing + virtual get-only invoke get (#11467, #10392).
+     * empty($obj->hooked) — uninitialized / unset distinct backing probes storage only;
+     * initialized get-hook paths invoke get (#16935, #17260, zend_property_hooks.c).
      */
     private function emptyHookedProperty(ObjectEntry $object, string $propName, Frame $frame, Variable $dst): bool
     {
@@ -1520,7 +1521,7 @@ class VM {
 
     /**
      * empty() on hooked properties — probe backing only for uninitialized typed slots or unset-cleared distinct backing;
-     * otherwise route through get-hook dispatch to match Zend/php-src (#16935, zend_property_hooks.c).
+     * otherwise invoke get hook to match Zend/php-src (#16935, #17260, zend_property_hooks.c).
      */
     private function emptyHookedPropertyProbesBackingOnly(ObjectEntry $object, string $propName, Variable $dst): bool
     {
