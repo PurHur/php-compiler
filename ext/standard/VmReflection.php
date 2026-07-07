@@ -2979,16 +2979,39 @@ final class VmReflection
     }
 
     /**
-     * Class constants visible on $entry (child overrides parent), php-src ReflectionClass::getConstants (#6950).
+     * True when $constLc is declared on $class (not only inherited onto its merged constant table).
+     */
+    private static function isClassConstantDeclaredOnClass(ClassEntry $class, string $constLc): bool
+    {
+        if ($class->isEnum && isset($class->enumCaseCanonicalNames[$constLc])) {
+            return true;
+        }
+        $classLc = strtolower(ltrim($class->name, '\\'));
+        $declLc = $class->constDeclaringClassLc[$constLc] ?? $classLc;
+
+        return $declLc === $classLc;
+    }
+
+    /**
+     * Class constants visible on $entry (child overrides parent), php-src ReflectionClass::getConstants (#6950, #4479).
      *
      * @return list<array{name: string, declaring: ClassEntry, constLc: string}>
      */
     public static function collectClassConstantsForReflection(ClassEntry $entry, Context $ctx, int $filter): array
     {
+        $entryLc = strtolower(ltrim($entry->name, '\\'));
         $byLc = [];
-        foreach (array_reverse(self::classHierarchyChain($entry, $ctx)) as $class) {
+        foreach (self::classHierarchyChain($entry, $ctx) as $class) {
             foreach ($class->constants as $constLc => $_stored) {
+                if (!self::isClassConstantDeclaredOnClass($class, $constLc)) {
+                    continue;
+                }
                 $vis = $class->constVisibility[$constLc] ?? \PHPCfg\Func::FLAG_PUBLIC;
+                $declLc = $class->constDeclaringClassLc[$constLc]
+                    ?? strtolower(ltrim($class->name, '\\'));
+                if (($vis & \PHPCfg\Func::FLAG_PRIVATE) !== 0 && $declLc !== $entryLc) {
+                    continue;
+                }
                 if (!self::matchesReflectionVisibilityFilter($vis, $filter)) {
                     continue;
                 }
