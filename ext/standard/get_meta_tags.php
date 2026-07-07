@@ -82,10 +82,10 @@ final class get_meta_tags extends Internal
 
     private static function vmStringArg(Frame $frame, int $argIndex, string $paramName): string
     {
-        return VmStreamPath::coerceNonEmptyPathArg(
-            $frame->calledArgs[$argIndex],
-            'get_meta_tags',
+        return VmStreamPath::coerceNonEmptyPathArgForFrame(
+            $frame,
             $argIndex,
+            'get_meta_tags',
             $paramName
         );
     }
