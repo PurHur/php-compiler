@@ -2039,6 +2039,58 @@ class Compiler {
 
             if (!empty($slice)) {
                 $deferredNullsafePreludeOps[$child] = array_reverse($slice);
+            } elseif ($i > 0) {
+                // php-cfg may use a distinct arg temporary vs the immediately preceding
+                // inline producer (IIFE FuncCall) — defer that prelude slice (#17186, #4394).
+                $head = $ops[$i - 1] ?? null;
+                if (
+                    $head instanceof Op\Expr
+                    && !$head instanceof Op\Expr\Assign
+                    && property_exists($head, 'result')
+                    && $this->isNullsafeMethodCallArgPreludeProducer($head)
+                ) {
+                    $adjacentSlice = [$head];
+                    $deferredOpIndexes[$i - 1] = true;
+                    $pendingDeps = [];
+                    foreach ($this->nullsafePreludeOperandVars($head) as $dep) {
+                        if ($dep instanceof \PHPCfg\Operand\Temporary) {
+                            $pendingDeps[spl_object_id($dep)] = $dep;
+                        }
+                    }
+                    for ($j = $i - 2; $j >= 0 && [] !== $pendingDeps; --$j) {
+                        $candidate = $ops[$j] ?? null;
+                        if (
+                            !$candidate instanceof Op\Expr
+                            || $candidate instanceof Op\Expr\Assign
+                            || !property_exists($candidate, 'result')
+                            || !$candidate->result instanceof \PHPCfg\Operand\Temporary
+                        ) {
+                            break;
+                        }
+                        $resultVar = $candidate->result;
+                        $matchedDep = null;
+                        foreach ($pendingDeps as $depId => $dep) {
+                            if ($resultVar === $dep || $this->operandsReferToSameVariable($resultVar, $dep)) {
+                                $matchedDep = $depId;
+                                break;
+                            }
+                        }
+                        if (null === $matchedDep) {
+                            break;
+                        }
+                        unset($pendingDeps[$matchedDep]);
+                        array_unshift($adjacentSlice, $candidate);
+                        $deferredOpIndexes[$j] = true;
+                        foreach ($this->nullsafePreludeOperandVars($candidate) as $dep) {
+                            if ($dep instanceof \PHPCfg\Operand\Temporary) {
+                                $pendingDeps[spl_object_id($dep)] = $dep;
+                            }
+                        }
+                    }
+                    if ([] !== $adjacentSlice) {
+                        $deferredNullsafePreludeOps[$child] = $adjacentSlice;
+                    }
+                }
             }
         }
         for ($i = 0; $i < $opCount; ++$i) {
@@ -11169,7 +11221,7 @@ class Compiler {
             $this->compileOperand($expr->var, $fetchBlock, true),
             $this->compileOperand($expr->name, $fetchBlock, true)
         ));
-        foreach ($this->compileCallArgSends($expr->args, $fetchBlock) as $send) {
+        foreach ($this->compileCallArgSends($expr->args, $fetchBlock, null, $expr) as $send) {
             $fetchBlock->addOpCode($send);
         }
         $fetchBlock->addOpCode($this->compileFuncCallExecOpcode(
@@ -11205,8 +11257,19 @@ class Compiler {
         // Extend carefully; keep conservative (only single-use temporaries are eligible).
         return match (get_class($expr)) {
             Op\Expr\FuncCall::class => array_merge([$expr->name], $expr->args),
+            Op\Expr\Closure::class => [],
             default => [],
         };
+    }
+
+    private function isNullsafeMethodCallArgPreludeProducer(Op\Expr $expr): bool
+    {
+        return $expr instanceof Op\Expr\FuncCall
+            || $expr instanceof Op\Expr\NsFuncCall
+            || $expr instanceof Op\Expr\Closure
+            || $expr instanceof Op\Expr\New_
+            || $expr instanceof Op\Expr\MethodCall
+            || $expr instanceof Op\Expr\StaticCall;
     }
 
     protected function functionStaticStorageKey(\PHPCfg\Func $func, string $varName): string
