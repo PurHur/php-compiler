@@ -3043,6 +3043,7 @@
         "lib/JIT/Builtin/MemoryUsageJit.php",
         "lib/JIT/Builtin/MetaTagsRuntime.php",
         "lib/JIT/Builtin/MimeContentTypeRuntime.php",
+        "lib/JIT/Builtin/MultipartRuntime.php",
         "lib/JIT/Builtin/MultisortRuntime.php",
         "lib/JIT/Builtin/NaturalSortRuntime.php",
         "lib/JIT/Builtin/NonObjectPropertyFetchRuntime.php",
@@ -3066,6 +3067,7 @@
         "lib/JIT/Builtin/ParamSensitiveLowering.php",
         "lib/JIT/Builtin/ParseStrNativeOpsJit.php",
         "lib/JIT/Builtin/ParseStrRuntime.php",
+        "lib/JIT/Builtin/ParseStrUserScriptDelimitedJit.php",
         "lib/JIT/Builtin/ParseUrl.php",
         "lib/JIT/Builtin/ParseUrlComponentJit.php",
         "lib/JIT/Builtin/ParseUrlRuntime.php",
@@ -3271,6 +3273,7 @@
         "lib/JIT/Builtin/StringMicrotime.php",
         "lib/JIT/Builtin/StringMkdir.php",
         "lib/JIT/Builtin/StringMktime.php",
+        "lib/JIT/Builtin/StringMultipartStandaloneLlvm.php",
         "lib/JIT/Builtin/StringNCompare.php",
         "lib/JIT/Builtin/StringNaturalCompare.php",
         "lib/JIT/Builtin/StringNetInterfacesJit.php",
@@ -3663,6 +3666,7 @@
         "lib/ReadonlyAnonymousClassSyntaxRejector.php",
         "lib/ReadonlyFunctionRejector.php",
         "lib/ReadonlyMethodModifierRejector.php",
+        "lib/ReferenceProfileTokenScan.php",
         "lib/Runtime.php",
         "lib/RuntimeStrictness.php",
         "lib/SourceBareThrowRewriter.php",
@@ -4437,9 +4441,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 4203,
+        "inventory_files": 4207,
         "excluded": 0,
-        "eligible": 4203,
+        "eligible": 4207,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1

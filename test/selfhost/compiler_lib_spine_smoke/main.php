@@ -3656,6 +3656,7 @@ require_once __DIR__.'/../../../lib/Printer.php';
 require_once __DIR__.'/../../../lib/PropertyHookSyntaxRejector.php';
 require_once __DIR__.'/../../../lib/PropertyVisibility.php';
 require_once __DIR__.'/../../../lib/PseudoClassScope.php';
+require_once __DIR__.'/../../../lib/ReferenceProfileTokenScan.php';
 require_once __DIR__.'/../../../lib/ReadonlyAnonymousClassSyntaxRejector.php';
 require_once __DIR__.'/../../../lib/ReadonlyFunctionRejector.php';
 require_once __DIR__.'/../../../lib/ReadonlyMethodModifierRejector.php';
