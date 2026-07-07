@@ -391,6 +391,8 @@ final class BuiltinParamNames
                 return ['array', 'flags', 'prefix'];
             case 'file':
                 return ['filename', 'flags'];
+            case 'glob':
+                return ['pattern', 'flags'];
             case 'substr_compare':
                 return ['haystack', 'needle', 'offset', 'length', 'case_insensitive'];
             case 'file_exists':
