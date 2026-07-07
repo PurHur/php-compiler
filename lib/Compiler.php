@@ -14948,6 +14948,12 @@ class Compiler {
         Op $callOp,
         int $argIndex
     ): ?string {
+        if (
+            0 === $argIndex
+            && 'preg_replace_callback_array' === $this->resolveCfgFuncCallName($callOp)
+        ) {
+            return null;
+        }
         if (null === $block->orig) {
             return null;
         }
@@ -15268,6 +15274,30 @@ class Compiler {
             if (OpCode::TYPE_INIT_ARRAY === $op->type) {
                 return (string) $op->arg1;
             }
+        }
+
+        return null;
+    }
+
+    /**
+     * INIT_ARRAY slot after FUNCCALL_INIT / enum prelude opcodes for the active call (#5859).
+     */
+    private function slotForInitArrayBeforeCurrentFunccall(Block $block): ?string
+    {
+        for ($i = \count($block->opCodes) - 1; $i >= 0; --$i) {
+            $op = $block->opCodes[$i];
+            if (OpCode::TYPE_INIT_ARRAY === $op->type) {
+                return (string) $op->arg1;
+            }
+            if (
+                OpCode::TYPE_FUNCCALL_INIT === $op->type
+                || OpCode::TYPE_CLASS_CONST_FETCH === $op->type
+                || OpCode::TYPE_DECLARE_ENUM === $op->type
+            ) {
+                continue;
+            }
+
+            break;
         }
 
         return null;
@@ -16293,6 +16323,24 @@ class Compiler {
         }
         $producerCount = count($producers);
         $argCount = count($callArgs);
+        if (
+            'preg_replace_callback_array' === $inlineFuncName
+            && 2 === $argCount
+            && $producerCount >= 2
+        ) {
+            $arrayProducer = null;
+            $enumFetch = null;
+            foreach ($producers as $producer) {
+                if ($producer instanceof Op\Expr\Array_) {
+                    $arrayProducer = $producer;
+                } elseif ($producer instanceof Op\Expr\ClassConstFetch) {
+                    $enumFetch = $producer;
+                }
+            }
+            if (null !== $arrayProducer && null !== $enumFetch) {
+                return 0 === $argIndex ? $arrayProducer : $enumFetch;
+            }
+        }
         $filterInline = $this->matchFilterExtensionInlineCallArgProducer(
             $producers,
             $callArgs,
@@ -16370,6 +16418,20 @@ class Compiler {
             }
             if (null !== $funcProducer && null !== $enumFetch) {
                 return (0 === $argIndex) ? $funcProducer : $enumFetch;
+            }
+            $arrayProducer = null;
+            foreach ($producers as $producer) {
+                if ($producer instanceof Op\Expr\Array_) {
+                    $arrayProducer = $producer;
+                    break;
+                }
+            }
+            if (
+                'preg_replace_callback_array' === $inlineFuncName
+                && null !== $arrayProducer
+                && null !== $enumFetch
+            ) {
+                return 0 === $argIndex ? $arrayProducer : $enumFetch;
             }
             // explode(PATH_SEPARATOR, get_include_path()) — ConstFetch + sibling FuncCall (#15833).
             if (null !== $funcProducer && null !== $constFetch) {
@@ -19287,7 +19349,11 @@ class Compiler {
         }
         if (
             0 === $argIndex
-            && 'array_column' === $this->resolveCfgFuncCallName($cfgCallOp)
+            && \in_array(
+                strtolower($this->resolveCfgFuncCallName($cfgCallOp) ?? ''),
+                ['array_column', 'preg_replace_callback_array'],
+                true
+            )
         ) {
             return false;
         }
@@ -23184,6 +23250,22 @@ class Compiler {
      */
     private function inlineArrayLiteralForDeadCallArg(Op $callOp, int $argIndex, Block $block): ?Op\Expr\Array_
     {
+        if (
+            'preg_replace_callback_array' === $this->resolveCfgFuncCallName($callOp)
+            && 0 === $argIndex
+        ) {
+            $patternArg = $callOp->args[0] ?? null;
+            if ($patternArg instanceof Operand) {
+                $embedded = $this->unwrapArrayLiteralExpr($patternArg);
+                if ($embedded instanceof Op\Expr\Array_) {
+                    return $embedded;
+                }
+            }
+            $immediate = $this->inlineArrayProducerImmediatelyBeforeCfgCall($callOp, $block);
+            if ($immediate instanceof Op\Expr\Array_) {
+                return $immediate;
+            }
+        }
         if (
             'proc_open' === $this->resolveCfgFuncCallName($callOp)
             && \in_array($argIndex, [0, 1], true)
@@ -35150,6 +35232,11 @@ class Compiler {
                 && 0 === (int) $argIndex
             ) {
                 // preg_replace_callback_array(['/pat/' => fn(...)], $subj) — pattern map is arg #0, not hoisted closure (#9072).
+                $initArraySlot = $this->slotForInitArrayBeforeCurrentFunccall($block);
+                if (null !== $initArraySlot) {
+                    $sends[] = new OpCode(OpCode::TYPE_ARG_SEND, $initArraySlot, $nameSlot, $unpackFlag);
+                    continue;
+                }
                 $patternMapArray = $this->inlineArrayLiteralForDeadCallArg($cfgCallOp, 0, $block);
                 if ($patternMapArray instanceof Op\Expr\Array_) {
                     $patternMapSlot = $block->slotForOperand($patternMapArray->result);
@@ -35161,6 +35248,11 @@ class Compiler {
                     }
                     if (null !== $patternMapSlot) {
                         $sends[] = new OpCode(OpCode::TYPE_ARG_SEND, $patternMapSlot, $nameSlot, $unpackFlag);
+                        continue;
+                    }
+                    $initArraySlot = $this->slotForInitArrayBeforeCurrentFunccall($block);
+                    if (null !== $initArraySlot) {
+                        $sends[] = new OpCode(OpCode::TYPE_ARG_SEND, $initArraySlot, $nameSlot, $unpackFlag);
                         continue;
                     }
                 }
@@ -37433,7 +37525,7 @@ class Compiler {
                 && 0 === $argIndex
                 && 'preg_replace_callback_array' === $this->resolveCfgFuncCallName($cfgCallOp)
             ) {
-                $initArraySlot = $this->slotForRecentInitArrayCallArg($block);
+                $initArraySlot = $this->slotForInitArrayBeforeCurrentFunccall($block);
                 if (null !== $initArraySlot) {
                     $valueSlot = $initArraySlot;
                 }
@@ -42212,6 +42304,15 @@ class Compiler {
             && !$this->operandsReferToSameVariable($prelude->result, $callArg)
         ) {
             // array_pad([E::A], N, E::B) / extract([...], FLAGS, Prefix::A) — immediate ClassConstFetch is not arg #0 (#8883, #16041).
+            // preg_replace_callback_array([...], E::CASE) — enum prelude feeds arg #1 (#5859).
+            return;
+        }
+        if (
+            'preg_replace_callback_array' === $this->resolveCfgFuncCallName($cfgCallOp)
+            && \is_int($callIndex)
+            && $callIndex >= 2
+            && ($block->orig->children[$callIndex - 2] ?? null) instanceof Op\Expr\Array_
+        ) {
             return;
         }
         if (null === $block->slotForOperand($prelude->result)) {
@@ -42241,6 +42342,76 @@ class Compiler {
             }
             ++$argIndex;
         }
+    }
+
+    /**
+     * preg_replace_callback_array(['/pat/' => $cb], E::CASE) — pattern Array_ is arg #0, enum case arg #1 (#5859, #9072).
+     *
+     * @param list<OpCode> $outerArgSends
+     * @param list<OpCode> $allArgSends
+     */
+    private function rewirePregReplaceCallbackArrayPatternMapArgSendSlots(
+        array &$outerArgSends,
+        Block $block,
+        ?Op $cfgCallOp,
+        array $allArgSends = []
+    ): void {
+        if (null === $cfgCallOp || null === $block->orig) {
+            return;
+        }
+        if ('preg_replace_callback_array' !== $this->resolveCfgFuncCallName($cfgCallOp)) {
+            return;
+        }
+        if (2 !== \count($cfgCallOp->args ?? [])) {
+            return;
+        }
+        $callIndex = $this->cfgCallOpIndex($block, $cfgCallOp);
+        if (!\is_int($callIndex) || $callIndex < 2) {
+            return;
+        }
+        $patternMap = $block->orig->children[$callIndex - 2] ?? null;
+        $subjectPrelude = $block->orig->children[$callIndex - 1] ?? null;
+        if (!$patternMap instanceof Op\Expr\Array_) {
+            return;
+        }
+        if (!$subjectPrelude instanceof Op\Expr\ClassConstFetch) {
+            return;
+        }
+        $initSlot = null;
+        foreach (array_merge($block->opCodes, $allArgSends) as $op) {
+            if (OpCode::TYPE_INIT_ARRAY === $op->type && null !== $op->arg1) {
+                $initSlot = (string) $op->arg1;
+            }
+        }
+        if (null === $initSlot) {
+            $initSlot = $block->slotForOperand($patternMap->result);
+            if (null !== $initSlot) {
+                $initSlot = (string) $initSlot;
+            }
+        }
+        $enumSlot = $block->slotForOperand($subjectPrelude->result);
+        if (null === $enumSlot) {
+            foreach ($this->compileExpr($subjectPrelude, $block) as $op) {
+                $block->addOpCode($op);
+            }
+            $enumSlot = $block->slotForOperand($subjectPrelude->result);
+        }
+        if (null === $initSlot || null === $enumSlot) {
+            return;
+        }
+        $argIndex = 0;
+        foreach ($outerArgSends as &$send) {
+            if (OpCode::TYPE_ARG_SEND !== $send->type) {
+                continue;
+            }
+            if (0 === $argIndex) {
+                $send->arg1 = $initSlot;
+            } elseif (1 === $argIndex) {
+                $send->arg1 = (string) $enumSlot;
+            }
+            ++$argIndex;
+        }
+        unset($send);
     }
 
     /**
@@ -42544,6 +42715,7 @@ class Compiler {
             array_merge($nestedProducerOps, $outerArgSends)
         );
         $this->rewireArrayCombineInlineArgSendSlots($outerArgSends, $block, $argSends, $calleeName, $cfgCallOp);
+        $this->rewirePregReplaceCallbackArrayPatternMapArgSendSlots($outerArgSends, $block, $cfgCallOp, $argSends);
         $this->rewireVarExportNestedInlineCallArgSendSlots($outerArgSends, $nestedProducerOps, $block, $cfgCallOp, $calleeName);
         $this->rewireIsArrayNestedFileCallArgSendSlots($outerArgSends, $nestedProducerOps, $block, $cfgCallOp, $calleeName);
         $return = [];
