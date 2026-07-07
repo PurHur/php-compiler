@@ -7,8 +7,6 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
-use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\VM\InternalStrictArg;
@@ -32,8 +30,7 @@ final class ini_set_ extends Internal
         if (null === $frame->vmContext) {
             return;
         }
-        InternalStrictArg::rejectNullString($frame->calledArgs[0], $fn, 'option', 0, $frame);
-        $option = VmString::coerceStringBuiltinArg($frame->calledArgs[0], $fn, 0, 'option');
+        $option = IniOptionArg::vmOption($frame, $fn);
         $value = VmIniValue::coerceValueArg($frame->calledArgs[1], $fn);
         if (self::rejectSessionIniAfterHeadersSent($frame, $option)) {
             if (null !== $frame->returnVar) {
@@ -59,8 +56,7 @@ final class ini_set_ extends Internal
         if (2 !== \count($args)) {
             throw new \LogicException($fn.'() requires exactly two arguments');
         }
-        JitInternalStrictArg::rejectNullString($context, $args[0], $fn, 'option', 1);
-        $optionStr = JitStringBuiltinArg::lower($context, $args[0], $fn, 0, 'option');
+        $optionStr = IniOptionArg::jitOption($context, $args[0], $fn);
         $valueStr = JitIniValueArg::lower($context, $args[1], $fn);
 
         return JitIni::set($context, $optionStr, $valueStr);
