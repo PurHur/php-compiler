@@ -26,6 +26,19 @@ final class JitMcjitEmbed
 
     public static function prepareClassless(string $code): string
     {
+        if (!preg_match('/<\?php\b/i', $code, $openTag, PREG_OFFSET_CAPTURE)) {
+            return $code;
+        }
+        $phpOffset = (int) $openTag[0][1];
+        if ($phpOffset > 0) {
+            return substr($code, 0, $phpOffset).self::preparePhpSegment(substr($code, $phpOffset));
+        }
+
+        return self::preparePhpSegment($code);
+    }
+
+    private static function preparePhpSegment(string $code): string
+    {
         if (!preg_match('/^<\?php\s/', $code)) {
             return $code;
         }

@@ -52,6 +52,15 @@ PHP;
         $this->assertStringContainsString("} \n", $out);
     }
 
+    /** @covers issue #17150 */
+    public function testInjectsBootstrapAfterLeadingInlineHashComments(): void
+    {
+        $in = "#teste\n#teste2\n<?php\necho 1;\n";
+        $out = JitMcjitEmbed::prepareClassless($in);
+        $this->assertStringStartsWith("#teste\n#teste2\n", $out);
+        $this->assertStringContainsString('__phpc_mcjit_embed_bootstrap', $out);
+    }
+
     public function testBootstrapPrependPreservesUserLineNumbers(): void
     {
         $in = <<<'PHP'
