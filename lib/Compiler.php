@@ -5929,6 +5929,21 @@ class Compiler {
                     return $block->registerConstant(new Operand\Temporary(), $vm);
                 }
             }
+            foreach ($children as $child) {
+                if (!$child instanceof Op\Stmt\JumpIf) {
+                    continue;
+                }
+                $vm = $this->tryFoldCompileTimeTernaryDefault(
+                    $child,
+                    $terminal->value,
+                    $block,
+                    $children,
+                    true
+                );
+                if (null !== $vm) {
+                    return $block->registerConstant(new Operand\Temporary(), $vm);
+                }
+            }
             $vm = $this->tryFoldClassConstMatchValueBlock(
                 $terminal->valueBlock,
                 $terminal->value,
@@ -6780,11 +6795,6 @@ class Compiler {
         if (null === $ifMerge || $ifMerge !== $elseMerge) {
             return null;
         }
-        $ifExpr = $this->branchCfgAssignExprForResult($jumpIf->if, $result);
-        $elseExpr = $this->branchCfgAssignExprForResult($jumpIf->else, $result);
-        if (null === $ifExpr || null === $elseExpr) {
-            return null;
-        }
         $condVm = $this->tryFoldCompileTimeOperandDefault(
             $jumpIf->cond,
             $block,
@@ -6794,14 +6804,70 @@ class Compiler {
         if (null === $condVm) {
             return null;
         }
-        $chosenExpr = $condVm->toBool() ? $ifExpr : $elseExpr;
-
-        return $this->tryFoldCompileTimeOperandDefault(
-            $chosenExpr,
+        $ifVm = $this->foldBranchCfgResultValue(
+            $jumpIf->if,
+            $result,
             $block,
             $defaultBlockChildren,
             $materializeEnumCase
         );
+        $elseVm = $this->foldBranchCfgResultValue(
+            $jumpIf->else,
+            $result,
+            $block,
+            $defaultBlockChildren,
+            $materializeEnumCase
+        );
+        if (null === $ifVm || null === $elseVm) {
+            return null;
+        }
+
+        $chosen = $condVm->toBool() ? $ifVm : $elseVm;
+        $folded = new Variable();
+        $folded->copyFrom($chosen);
+
+        return $folded;
+    }
+
+    /**
+     * Fold a ternary / logical-short-circuit arm that assigns into the merge result (#17229).
+     *
+     * @param list<Op> $defaultBlockChildren
+     */
+    private function foldBranchCfgResultValue(
+        CfgBlock $branchCfg,
+        Operand $result,
+        Block $block,
+        array $defaultBlockChildren,
+        bool $materializeEnumCase
+    ): ?Variable {
+        $branchChildren = array_merge($defaultBlockChildren, $branchCfg->children);
+        foreach ($branchCfg->children as $child) {
+            if (!$child instanceof Op\Expr) {
+                continue;
+            }
+            if ($child instanceof Op\Expr\Assign && $this->operandsReferToSameVariable($child->var, $result)) {
+                return $this->tryFoldCompileTimeOperandDefault(
+                    $child->expr,
+                    $block,
+                    $branchChildren,
+                    $materializeEnumCase
+                );
+            }
+            if (
+                property_exists($child, 'result')
+                && $this->operandsReferToSameVariable($child->result, $result)
+            ) {
+                return $this->tryFoldCompileTimeExprDefault(
+                    $child,
+                    $block,
+                    $branchChildren,
+                    $materializeEnumCase
+                );
+            }
+        }
+
+        return null;
     }
 
     private function branchCfgAssignExprForResult(CfgBlock $branchCfg, Operand $result): ?Operand
@@ -7056,6 +7122,23 @@ class Compiler {
                 OpCode::TYPE_POW,
             ], true)) {
                 $result->numericOp($opCode, $left, $right);
+            } elseif (\in_array($opCode, [
+                OpCode::TYPE_SMALLER,
+                OpCode::TYPE_GREATER,
+                OpCode::TYPE_SMALLER_OR_EQUAL,
+                OpCode::TYPE_GREATER_OR_EQUAL,
+            ], true)) {
+                $result->compareOp($opCode, $left, $right);
+            } elseif (OpCode::TYPE_IDENTICAL === $opCode) {
+                $result->bool($left->identicalTo($right));
+            } elseif (OpCode::TYPE_NOT_IDENTICAL === $opCode) {
+                $result->bool(!$left->identicalTo($right));
+            } elseif (OpCode::TYPE_EQUAL === $opCode) {
+                $result->bool($left->equals($right));
+            } elseif (OpCode::TYPE_NOT_EQUAL === $opCode) {
+                $result->bool(!$left->equals($right));
+            } elseif (OpCode::TYPE_LOGICAL_XOR === $opCode) {
+                $result->bool($left->toBool() !== $right->toBool());
             } else {
                 $result->bitwiseOp($opCode, $left, $right);
             }
