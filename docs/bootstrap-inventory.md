@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 4190 |
-| Phase A inventory files (M2 ratio SSOT) | 4190 |
+| PHP files on vm.php path | 4197 |
+| Phase A inventory files (M2 ratio SSOT) | 4197 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 11322 |
+| Source constructs flagged (warnings) | 11334 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -56,6 +56,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/bcmath/bcscale.php` | 0 | 1 |
 | `ext/bcmath/bcsqrt.php` | 0 | 1 |
 | `ext/bcmath/bcsub.php` | 0 | 1 |
+| `ext/brotli/BrotliJitHelper.php` | 0 | 1 |
+| `ext/brotli/JitBrotli.php` | 0 | 1 |
+| `ext/brotli/Module.php` | 0 | 3 |
+| `ext/brotli/VmBrotliNative.php` | 0 | 1 |
+| `ext/brotli/brotli_compress.php` | 0 | 1 |
+| `ext/brotli/brotli_uncompress.php` | 0 | 1 |
 | `ext/bz2/Bz2ExtensionPolicy.php` | 0 | 1 |
 | `ext/bz2/Bz2JitHelper.php` | 0 | 1 |
 | `ext/bz2/JitBz2.php` | 0 | 1 |
@@ -3113,6 +3119,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringBin2hex.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringBin2hexLlvm.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringBitwiseNot.php` | 0 | 3 |
+| `lib/JIT/Builtin/StringBrotli.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringBz2.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringCaseCompare.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringChmod.php` | 0 | 1 |
@@ -3588,7 +3595,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/ReadonlyAnonymousClassSyntaxRejector.php` | 0 | 2 |
 | `lib/ReadonlyFunctionRejector.php` | 0 | 2 |
 | `lib/ReadonlyMethodModifierRejector.php` | 0 | 2 |
-| `lib/Runtime.php` | 0 | 70 |
+| `lib/Runtime.php` | 0 | 71 |
 | `lib/RuntimeStrictness.php` | 0 | 1 |
 | `lib/SourceBareThrowRewriter.php` | 0 | 1 |
 | `lib/SourcePreprocessor/PropertyHooks.php` | 0 | 4 |
@@ -4315,6 +4322,38 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
+
+### `ext/brotli/BrotliJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
+### `ext/brotli/JitBrotli.php`
+
+**Warnings** (review for bootstrap subset):
+- 5 class method(s)
+
+### `ext/brotli/Module.php`
+
+**Warnings** (review for bootstrap subset):
+- new brotli_compress (line 21)
+- new brotli_uncompress (line 22)
+- 1 class method(s)
+
+### `ext/brotli/VmBrotliNative.php`
+
+**Warnings** (review for bootstrap subset):
+- 7 class method(s)
+
+### `ext/brotli/brotli_compress.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s)
+
+### `ext/brotli/brotli_uncompress.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
 
 ### `ext/bz2/Bz2ExtensionPolicy.php`
 
@@ -22339,7 +22378,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/CompilerVersion.php`
 
 **Warnings** (review for bootstrap subset):
-- 144 class method(s)
+- 145 class method(s)
 
 ### `lib/CurlyBraceOffsetRejector.php`
 
@@ -24712,6 +24751,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new JIT (line 141)
 - 8 class method(s)
 - 1 closure(s)
+
+### `lib/JIT/Builtin/StringBrotli.php`
+
+**Warnings** (review for bootstrap subset):
+- new JIT (line 73)
+- new JIT (line 79)
+- 6 class method(s)
 
 ### `lib/JIT/Builtin/StringBz2.php`
 
@@ -27739,19 +27785,20 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ext\zstd\Module (line 245)
 - new ext\lzf\Module (line 246)
 - new ext\bz2\Module (line 247)
-- new ext\sodium\Module (line 248)
-- new ext\sqlite3\Module (line 249)
-- new ext\standard\Module (line 250)
-- new JIT (line 326)
-- new JITContext (line 340)
-- new SealedClassPreprocessor (line 397)
-- new StaticClassPreprocessor (line 400)
-- new SourcePreprocessor\PropertyHooks (line 403)
-- new State (line 530)
-- new ReflectionProperty (line 557)
-- new ReflectionProperty (line 560)
-- new LintCompiler (line 951)
-- new Variable (line 1078)
+- new ext\brotli\Module (line 248)
+- new ext\sodium\Module (line 249)
+- new ext\sqlite3\Module (line 250)
+- new ext\standard\Module (line 251)
+- new JIT (line 327)
+- new JITContext (line 341)
+- new SealedClassPreprocessor (line 398)
+- new StaticClassPreprocessor (line 401)
+- new SourcePreprocessor\PropertyHooks (line 404)
+- new State (line 531)
+- new ReflectionProperty (line 558)
+- new ReflectionProperty (line 561)
+- new LintCompiler (line 952)
+- new Variable (line 1079)
 - 53 class method(s)
 
 ### `lib/RuntimeStrictness.php`
