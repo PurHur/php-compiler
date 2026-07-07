@@ -6,11 +6,40 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\Frame;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\PathSupport;
 use PHPCompiler\VM\Variable;
 
 final class VmStreamPath
 {
+    /**
+     * Z_PARAM_PATH non-empty guard with caller strict_types null rejection (#17060, ext/standard/image.c).
+     *
+     * @throws \TypeError when caller strict_types rejects null before empty-path ValueError
+     */
+    public static function coerceNonEmptyPathArgForFrame(
+        Frame $frame,
+        int $argIndex,
+        string $function,
+        string $paramName = 'filename'
+    ): string {
+        InternalStrictArg::rejectNullString(
+            $frame->calledArgs[$argIndex],
+            $function,
+            $paramName,
+            $argIndex,
+            $frame
+        );
+
+        return self::coerceNonEmptyPathArg(
+            $frame->calledArgs[$argIndex],
+            $function,
+            $argIndex,
+            $paramName
+        );
+    }
+
     /**
      * Coerce a path operand and reject empty string after null→"" coercion (php-src Z_PARAM_PATH).
      *

@@ -28,7 +28,7 @@ final class sha1_file extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $path = VmFilestatArg::coerceFilenameArg($frame->calledArgs[0], 'sha1_file');
+        $path = VmFilestatArg::coerceFilenameArg($frame->calledArgs[0], 'sha1_file', 0, 'filename', $frame);
         $raw = false;
         if (2 === $argc) {
             $rawArg = $frame->calledArgs[1]->resolveIndirect();
