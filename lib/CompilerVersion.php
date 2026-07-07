@@ -1746,28 +1746,48 @@ final class CompilerVersion
         return version_compare(self::builtinAdvertisementVersion(), $removedIn, '<');
     }
 
-    /** PHP 8.0 removed strxfrm() (ext/standard/string.c, issue #11907). */
+    /**
+     * PHP 8.4+ strxfrm() (ext/standard/string.c, #11907, #17319).
+     *
+     * Withheld on 8.4.0-dev reference profile (matches Zend 8.2 function_exists gate). Enable via
+     * PHP_COMPILER_PROFILE=8.4 or stable 8.4.0+ runtime.
+     */
     public static function supportsStrxfrm(): bool
     {
-        return self::advertisesBuiltinRemovedIn('8.0.0');
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
     }
 
-    /** PHP 8.0 removed convert_cyr_string() (ext/standard/cyr_convert.c, issue #11907). */
+    /**
+     * PHP 8.4+ convert_cyr_string() (ext/standard/cyr_convert.c, #11907, #17319).
+     *
+     * Withheld on 8.4.0-dev reference profile (matches Zend 8.2 function_exists gate). Enable via
+     * PHP_COMPILER_PROFILE=8.4 or stable 8.4.0+ runtime.
+     */
     public static function supportsConvertCyrString(): bool
     {
-        return self::advertisesBuiltinRemovedIn('8.0.0');
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
     }
 
-    /** getmygrgid() never exported in php-src — use getmygid() / posix_getgrgid() (#11923). */
+    /**
+     * PHP 8.4+ getmygrgid() (ext/standard/basic_functions.c, #11923, #17319).
+     *
+     * Withheld on 8.4.0-dev reference profile (matches Zend 8.2 function_exists gate). Enable via
+     * PHP_COMPILER_PROFILE=8.4 or stable 8.4.0+ runtime.
+     */
     public static function supportsGetmygrgid(): bool
     {
-        return false;
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
     }
 
-    /** disktotalspace() legacy alias not in php-src 8.2 — use disk_total_space() (#11922). */
+    /**
+     * PHP 8.4+ disktotalspace() legacy alias (ext/standard/filestat.c, #11922, #17319).
+     *
+     * Withheld on 8.4.0-dev reference profile (matches Zend 8.2 function_exists gate). Enable via
+     * PHP_COMPILER_PROFILE=8.4 or stable 8.4.0+ runtime.
+     */
     public static function supportsDisktotalspace(): bool
     {
-        return false;
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
     }
 
     /**

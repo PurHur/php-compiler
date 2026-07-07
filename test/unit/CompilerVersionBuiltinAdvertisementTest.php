@@ -540,6 +540,28 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsDisktotalspace());
     }
 
+    public function testForwardGatedBuiltinsRegisteredOnProfile84(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertTrue(CompilerVersion::supportsStrxfrm());
+            $this->assertTrue(CompilerVersion::supportsConvertCyrString());
+            $this->assertTrue(CompilerVersion::supportsGetmygrgid());
+            $this->assertTrue(CompilerVersion::supportsDisktotalspace());
+            $runtime = new Runtime();
+            foreach (['strxfrm', 'convert_cyr_string', 'getmygrgid', 'disktotalspace'] as $fn) {
+                $this->assertTrue(isset($runtime->vmContext->functions[$fn]), $fn);
+            }
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     public function testCrc32cWithheldOnReferenceProfile(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
