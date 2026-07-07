@@ -57,4 +57,24 @@ final class ProcNiceBuiltinTest extends TestCase
         );
         $fn->execute($frame);
     }
+
+    public function testProcNiceNullPriorityStrictTypeError(): void
+    {
+        $runtime = new Runtime();
+        $fn = new proc_nice();
+        $strictBlock = new Block(null);
+        $strictBlock->strictTypes = true;
+        $parent = new Frame(null, $strictBlock, null);
+        $frame = $fn->getFrame($runtime->vmContext);
+        $frame->parent = $parent;
+        $null = new VMVariable();
+        $null->null();
+        $frame->calledArgs = [$null];
+        $frame->returnVar = new VMVariable();
+        $this->expectException(\TypeError::class);
+        $this->expectExceptionMessage(
+            'proc_nice(): Argument #1 ($priority) must be of type int, null given'
+        );
+        $fn->execute($frame);
+    }
 }
