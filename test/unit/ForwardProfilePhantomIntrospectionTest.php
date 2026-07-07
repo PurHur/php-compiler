@@ -319,6 +319,47 @@ final class ForwardProfilePhantomIntrospectionTest extends TestCase
         }
     }
 
+    public function testReferenceProfileGraphemeBuiltinsNotCallableWithoutIntl(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE');
+        try {
+            $this->assertFalse(CompilerVersion::supportsGraphemeStrContains());
+            $this->assertFalse(CompilerVersion::supportsGraphemeStrimwidth());
+            $this->assertFalse(CompilerVersion::supportsGraphemeForwardProfileCore());
+            $this->assertFalse(
+                \PHPCompiler\ext\standard\ModuleRegistry::extensionLoaded('intl')
+            );
+
+            $runtime = new Runtime();
+            $ctx = $runtime->vmContext;
+            foreach ([
+                'grapheme_strlen',
+                'grapheme_substr',
+                'grapheme_strpos',
+                'grapheme_extract',
+                'grapheme_str_split',
+                'grapheme_str_contains',
+                'grapheme_strimwidth',
+            ] as $fn) {
+                $this->assertFalse(
+                    BuiltinIntrospectionPolicy::functionIsAdvertised($fn),
+                    $fn.' must not be advertised on reference profile'
+                );
+                $this->assertFalse(
+                    isset($ctx->functions[$fn]),
+                    $fn.' must not be registered on reference profile'
+                );
+            }
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     public function testGraphemeProfile84BuiltinsCallableButNotAdvertisedWithoutIntl(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');

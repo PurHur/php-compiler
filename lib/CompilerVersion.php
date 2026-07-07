@@ -1248,8 +1248,9 @@ final class CompilerVersion
     /**
      * PHP 8.4+ grapheme_str_contains() (ext/intl/grapheme/grapheme.c, issue #7128, #16667, #17010).
      *
-     * Registered on the 8.4 development line via {@see builtinAdvertisementVersion()} — callable without
-     * ext/intl; function_exists() stays false until {@see IntlExtensionPolicy::advertisesBuiltins()}.
+     * Registered on stable 8.4.0+ or explicit forward profile — callable without ext/intl;
+     * function_exists() stays false until {@see IntlExtensionPolicy::advertisesBuiltins()}.
+     * Withheld on 8.4.0-dev reference profile (matches Zend 8.2 phantom gate, #17105).
      */
     public static function supportsGraphemeStrContains(): bool
     {
@@ -1257,8 +1258,13 @@ final class CompilerVersion
             return false;
         }
 
-        if (version_compare(self::builtinAdvertisementVersion(), '8.4.0', '>=')) {
+        if (version_compare(self::VERSION, '8.4.0', '>=')) {
             return true;
+        }
+
+        $raw = getenv('PHP_COMPILER_PROFILE');
+        if (!\is_string($raw) || '' === trim($raw)) {
+            return false;
         }
 
         return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
@@ -1277,8 +1283,9 @@ final class CompilerVersion
     /**
      * PHP 8.4+ grapheme_strimwidth() (ext/intl/grapheme/grapheme_string.c, issue #9793, #17010).
      *
-     * Registered on the 8.4 development line via {@see builtinAdvertisementVersion()} — callable without
-     * ext/intl; function_exists() stays false until {@see IntlExtensionPolicy::advertisesBuiltins()}.
+     * Registered on stable 8.4.0+ or explicit forward profile — callable without ext/intl;
+     * function_exists() stays false until {@see IntlExtensionPolicy::advertisesBuiltins()}.
+     * Withheld on 8.4.0-dev reference profile (matches Zend 8.2 phantom gate, #17105).
      */
     public static function supportsGraphemeStrimwidth(): bool
     {
@@ -1286,8 +1293,13 @@ final class CompilerVersion
             return false;
         }
 
-        if (version_compare(self::builtinAdvertisementVersion(), '8.4.0', '>=')) {
+        if (version_compare(self::VERSION, '8.4.0', '>=')) {
             return true;
+        }
+
+        $raw = getenv('PHP_COMPILER_PROFILE');
+        if (!\is_string($raw) || '' === trim($raw)) {
+            return false;
         }
 
         return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
