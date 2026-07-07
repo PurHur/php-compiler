@@ -22,11 +22,25 @@ final class TraitCollisionCheck
     /** @var array<string, array{display: string, extends: ?string, ownMethods: array<string, true>, ownProperties: array<string, true>, ownStaticProperties: array<string, true>, traitUses: list<list<string>>}> */
     private array $classes = [];
 
-    public static function validate(Script $script): void
+    /** @var array<string, array<string, array<string, mixed>>> lcClass => prop => meta */
+    private array $propertyHookRegistry;
+
+    /**
+     * @param array<string, array<string, array<string, mixed>>> $propertyHookRegistry
+     */
+    public static function validate(Script $script, array $propertyHookRegistry = []): void
     {
-        $check = new self();
+        $check = new self($propertyHookRegistry);
         $check->collect($script);
         $check->verify();
+    }
+
+    /**
+     * @param array<string, array<string, array<string, mixed>>> $propertyHookRegistry
+     */
+    private function __construct(array $propertyHookRegistry = [])
+    {
+        $this->propertyHookRegistry = $propertyHookRegistry;
     }
 
     private function collect(Script $script): void
@@ -196,17 +210,80 @@ final class TraitCollisionCheck
         return property_exists($param, 'promotionFlags') && 0 !== $param->promotionFlags;
     }
 
+    /**
+     * Class concrete property hooks may satisfy trait semicolon hook stubs (#7316, zend_compile.c).
+     *
+     * @param array{display: string, extends: ?string, ownMethods: array<string, true>, ownProperties: array<string, true>, ownStaticProperties: array<string, true>, traitUses: list<list<string>>} $class
+     */
+    private function classSatisfiesTraitAbstractPropertyHook(string $traitLc, string $propLc, string $classLc): bool
+    {
+        $traitMeta = $this->propertyHookRegistry[$traitLc][$propLc]
+            ?? $this->propertyHookRegistry[$traitLc][strtolower($propLc)]
+            ?? null;
+        if (!is_array($traitMeta)) {
+            return false;
+        }
+        $required = [];
+        if (!empty($traitMeta['requiresGet'])) {
+            $required[] = 'get';
+        }
+        if (!empty($traitMeta['requiresSet'])) {
+            $required[] = 'set';
+        }
+        if (!empty($traitMeta['requiresUnset'])) {
+            $required[] = 'unset';
+        }
+        if ([] === $required) {
+            return false;
+        }
+        $provided = $this->classProvidedPropertyHooks($classLc);
+        foreach ($required as $kind) {
+            if (empty($provided[$propLc][$kind])) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * @return array<string, array<string, true>> lcProp => hook kind => true
+     */
+    private function classProvidedPropertyHooks(string $classLc): array
+    {
+        $provided = [];
+        if (!isset($this->classes[$classLc])) {
+            return $provided;
+        }
+        foreach ($this->propertyHookRegistry[$classLc] ?? [] as $prop => $meta) {
+            if (!is_array($meta)) {
+                continue;
+            }
+            $propLc = strtolower($prop);
+            if (!isset($provided[$propLc])) {
+                $provided[$propLc] = [];
+            }
+            foreach (['get', 'set', 'unset'] as $kind) {
+                if (!empty($meta[$kind])) {
+                    $provided[$propLc][$kind] = true;
+                }
+            }
+        }
+
+        return $provided;
+    }
+
     private function verify(): void
     {
-        foreach ($this->classes as $class) {
-            $this->verifyClass($class);
+        foreach ($this->classes as $classLc => $class) {
+            $this->verifyClass($classLc, $class);
         }
     }
 
     /**
      * @param array{display: string, extends: ?string, ownMethods: array<string, true>, ownProperties: array<string, true>, ownStaticProperties: array<string, true>, traitUses: list<list<string>>} $class
      */
-    private function verifyClass(array $class): void
+    private function verifyClass(string $classLc, array $class): void
     {
         $excluded = $class['ownMethods'];
         $current = $class['extends'];
@@ -273,6 +350,9 @@ final class TraitCollisionCheck
                 }
                 foreach ($trait['instanceProperties'] as $propLc => $_) {
                     if (isset($class['ownProperties'][$propLc])) {
+                        if ($this->classSatisfiesTraitAbstractPropertyHook($traitLc, $propLc, $classLc)) {
+                            continue;
+                        }
                         throw new \CompileError(TraitCompositionConflictMessage::incompatibleClassTraitProperty(
                             $class['display'],
                             $trait['display'],

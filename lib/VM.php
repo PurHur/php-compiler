@@ -13935,6 +13935,11 @@ restart:
                     }
                     $classLc = strtolower($entry->name);
                     if ($existing->declaringClassLc === $classLc) {
+                        if ($trait->isTrait
+                            && VM\AbstractPropertyHookCheck::isAbstractHookProperty($trait, $property, $this->context)) {
+                            $this->mergeTraitAbstractPropertyHookOverride($entry, $trait, $property, $existing);
+                            continue 2;
+                        }
                         throw new \LogicException(TraitCompositionConflictMessage::incompatibleClassTraitProperty(
                             $entry->name,
                             $traitName,
@@ -13967,6 +13972,29 @@ restart:
                 $entry->propertySourceLocations[$propLc] = $trait->propertySourceLocations[$propLc];
             }
         }
+    }
+
+    /**
+     * Class concrete hooks satisfy trait semicolon hook stubs — keep class property (#7316).
+     */
+    protected function mergeTraitAbstractPropertyHookOverride(
+        ClassEntry $entry,
+        ClassEntry $trait,
+        VM\ClassProperty $traitProp,
+        VM\ClassProperty $classProp
+    ): void {
+        $traitLc = strtolower($trait->name);
+        $childLc = strtolower($entry->name);
+        $prop = $traitProp->name;
+        $meta = $this->context->propertyHookRegistry[$traitLc][$prop]
+            ?? $this->context->propertyHookRegistry[$traitLc][strtolower($prop)]
+            ?? null;
+        if (!is_array($meta)) {
+            return;
+        }
+        $mergeMeta = $this->propertyHookMetaForInheritedBackingField($entry, $classProp, $meta, $childLc, $prop);
+        $this->context->propertyHookRegistry[$childLc][$prop] = $mergeMeta;
+        $this->linkPropertyHooks($entry, $classProp);
     }
 
     private function cloneClassPropertyForEntry(VM\ClassProperty $property, ClassEntry $entry): VM\ClassProperty
@@ -14574,12 +14602,26 @@ restart:
                     $default = $this->resolveCompileTimePropertyDefaultSlot($frame, $block, $op->arg2);
                     $propLc = strtolower($name->toString());
                     $classLc = strtolower($entry->name);
-                    foreach ($entry->properties as $existing) {
+                    $traitAbstractHookOverride = null;
+                    foreach ($entry->properties as $idx => $existing) {
                         if (strtolower($existing->name) !== $propLc) {
                             continue;
                         }
                         $declaringLc = $existing->declaringClassLc;
                         if ($declaringLc !== $classLc) {
+                            $traitEntry = $this->context->classes[$declaringLc] ?? null;
+                            if (null !== $traitEntry
+                                && $traitEntry->isTrait
+                                && VM\AbstractPropertyHookCheck::isAbstractHookProperty(
+                                    $traitEntry,
+                                    $existing,
+                                    $this->context
+                                )) {
+                                $traitAbstractHookOverride = [$traitEntry, $existing];
+                                unset($entry->properties[$idx]);
+                                $entry->properties = array_values($entry->properties);
+                                break;
+                            }
                             $traitName = isset($this->context->classes[$declaringLc])
                                 ? $this->context->classes[$declaringLc]->name
                                 : $declaringLc;
@@ -14619,6 +14661,14 @@ restart:
                     }
                     if (null !== $op->sourceLocation) {
                         $entry->propertySourceLocations[$propLc] = $op->sourceLocation;
+                    }
+                    if (null !== $traitAbstractHookOverride) {
+                        $this->mergeTraitAbstractPropertyHookOverride(
+                            $entry,
+                            $traitAbstractHookOverride[0],
+                            $traitAbstractHookOverride[1],
+                            $prop
+                        );
                     }
                     break;
                 case OpCode::TYPE_DECLARE_STATIC_PROPERTY:
