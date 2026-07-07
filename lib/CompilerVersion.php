@@ -1692,10 +1692,45 @@ final class CompilerVersion
         return false;
     }
 
-    /** Standalone crc32c() not in php-src — use hash('crc32c') via ext/hash (#11920). */
+    /**
+     * PHP 8.3+ crc32c() (ext/standard/crc32.c, issue #3270, #17139).
+     *
+     * Withheld on 8.4.0-dev reference profile (matches Zend 8.2 — crc32c absent).
+     * Enable via stable 8.4.0+ or explicit `PHP_COMPILER_PROFILE=8.3` / `8.4` forward profile.
+     */
     public static function supportsCrc32c(): bool
     {
-        return false;
+        if (version_compare(self::VERSION, '8.3', '<')) {
+            return false;
+        }
+
+        if (version_compare(self::VERSION, '8.4.0', '>=')) {
+            return true;
+        }
+
+        $raw = getenv('PHP_COMPILER_PROFILE');
+        if (!\is_string($raw) || '' === trim($raw)) {
+            return false;
+        }
+
+        return version_compare(self::languageProfileVersion(), '8.3.0', '>=');
+    }
+
+    /**
+     * crc32c() visible to function_exists() — stable runtime or forward 8.3+ (#17139).
+     */
+    public static function advertisesCrc32c(): bool
+    {
+        if (version_compare(self::VERSION, '8.4.0', '>=')) {
+            return true;
+        }
+
+        $raw = getenv('PHP_COMPILER_PROFILE');
+        if (!\is_string($raw) || '' === trim($raw)) {
+            return false;
+        }
+
+        return version_compare(self::languageProfileVersion(), '8.3.0', '>=');
     }
 
     /**

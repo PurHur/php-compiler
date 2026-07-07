@@ -11,10 +11,24 @@ use PHPUnit\Framework\TestCase;
  */
 final class Crc32cBuiltinTest extends TestCase
 {
+    /** @var string|false */
+    private $prevProfile;
+
     protected function setUp(): void
     {
+        $this->prevProfile = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
         if (!CompilerVersion::supportsCrc32c()) {
-            $this->markTestSkipped('crc32c() not advertised on reference profile (#11920)');
+            $this->markTestSkipped('crc32c() not available on this compiler profile');
+        }
+    }
+
+    protected function tearDown(): void
+    {
+        if (false === $this->prevProfile) {
+            putenv('PHP_COMPILER_PROFILE');
+        } else {
+            putenv('PHP_COMPILER_PROFILE='.$this->prevProfile);
         }
     }
 
@@ -53,6 +67,7 @@ PHP;
         $this->assertNotFalse($tmp);
         file_put_contents($tmp, "<?php\n" . self::CODE);
         $env = $_ENV;
+        $env['PHP_COMPILER_PROFILE'] = '8.4';
         LlvmToolchain::applyProcessEnv($env, $repo);
         $compile = proc_open(
             ['php', $repo . '/bin/compile.php', '-o', $out, $tmp],
@@ -95,6 +110,7 @@ PHP;
         file_put_contents($tmp, "<?php\n" . self::CODE);
         $descriptor = [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']];
         $env = $_ENV;
+        $env['PHP_COMPILER_PROFILE'] = '8.4';
         LlvmToolchain::applyProcessEnv($env, $repo);
         $proc = proc_open(['php', $path, $tmp], $descriptor, $pipes, $repo, $env);
         $this->assertIsResource($proc);

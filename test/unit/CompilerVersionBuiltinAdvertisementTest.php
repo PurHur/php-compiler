@@ -540,9 +540,26 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsDisktotalspace());
     }
 
-    public function testCrc32cNotAdvertisedOnReferenceProfile(): void
+    public function testCrc32cWithheldOnReferenceProfile(): void
     {
         $this->assertFalse(CompilerVersion::supportsCrc32c());
+        $this->assertFalse(CompilerVersion::advertisesCrc32c());
+    }
+
+    public function testCrc32cAdvertisedOnForwardProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertTrue(CompilerVersion::supportsCrc32c());
+            $this->assertTrue(CompilerVersion::advertisesCrc32c());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
     }
 
     public function testVmDoesNotRegisterZendThreadIdOnReferenceProfile(): void
@@ -764,6 +781,22 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
     {
         $runtime = new Runtime();
         $this->assertFalse(isset($runtime->vmContext->functions['crc32c']));
+    }
+
+    public function testVmRegistersCrc32cOnForwardProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $runtime = new Runtime();
+            $this->assertTrue(isset($runtime->vmContext->functions['crc32c']));
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
     }
 
     public function testMbTrimEnabledOnDefaultDevProfile(): void

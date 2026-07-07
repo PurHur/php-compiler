@@ -303,6 +303,7 @@ final class ForwardProfilePhantomIntrospectionTest extends TestCase
         try {
             foreach ([
                 'json_validate',
+                'crc32c',
                 'array_any',
                 'fpow',
                 'stream_supports',
@@ -318,6 +319,7 @@ final class ForwardProfilePhantomIntrospectionTest extends TestCase
             $ctx = $runtime->vmContext;
             foreach ([
                 'json_validate',
+                'crc32c',
                 'array_any',
                 'fpow',
                 'stream_supports',
