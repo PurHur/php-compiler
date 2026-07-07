@@ -14242,6 +14242,7 @@ class Compiler {
                 || null !== $this->splitLeadingConstFetchWithArrayLiteralCallArg($producers)
                 || null !== $this->splitLeadingConstFetchWithFuncCallCallArg($producers)
                 || $this->producersAreSiblingCallWithHoistedScalarConstFetch($producers)
+                || $this->producersAreSiblingArithmeticWithHoistedScalarConstFetch($producers)
                 || $this->producersAreSiblingCallWithHoistedEnumConstFetch($producers)
                 || $this->producersIncludeUnaryOffsetWithConstWhence($producers)) {
                 $matched = null;
@@ -16303,23 +16304,27 @@ class Compiler {
     ): ?Op\Expr
     {
         $callArg = $callArgs[$argIndex] ?? null;
+        $inlineFuncName = $this->resolveInlineCallArgFuncName($cfgCallOp, $calleeName);
         // php-cfg distinct Var operands per name — never steal preceding Assign/New slots (#15658).
         if (null !== $callArg && null !== Block::resolveVariableName($callArg)) {
+            if (
+                0 === $argIndex
+                && 'var_export' === $inlineFuncName
+                && $this->producersAreSiblingArithmeticWithHoistedScalarConstFetch($producers)
+            ) {
+                foreach ($producers as $producer) {
+                    if ($this->isChainedArithmeticBinaryOpExpr($producer)) {
+                        return $producer;
+                    }
+                }
+            }
+
             return null;
         }
-        $inlineFuncName = $this->resolveInlineCallArgFuncName($cfgCallOp, $calleeName);
         $producers = $this->filterDeadClassConstFetchInlineProducers($producers);
         $producers = $this->filterNestedNewInlineCallArgProducers($producers, $cfgCallOp);
         $producers = $this->filterKnownVoidMethodCallPreludes($producers);
         $producers = $this->filterStmtLevelArrayPointerFuncPreludes($producers);
-        // var_export(f(), true) — arg #0 must bind hoisted nested call, not ConstFetch true (#16556, #16557).
-        if (0 === $argIndex && 'var_export' === $inlineFuncName) {
-            foreach ($producers as $producer) {
-                if ($producer instanceof Op\Expr\FuncCall || $producer instanceof Op\Expr\NsFuncCall) {
-                    return $producer;
-                }
-            }
-        }
         // is_array(file(..., FLAGS)) — dead temp may alias bitmask OR, not file() result (#10474).
         if (
             0 === $argIndex
@@ -20561,6 +20566,30 @@ class Compiler {
     /**
      * @param list<Op\Expr> $producers
      */
+    private function producersAreSiblingArithmeticWithHoistedScalarConstFetch(array $producers): bool
+    {
+        if (2 !== \count($producers)) {
+            return false;
+        }
+        $arith = null;
+        $scalarConst = null;
+        foreach ($producers as $producer) {
+            if ($this->isChainedArithmeticBinaryOpExpr($producer)) {
+                $arith = $producer;
+            } elseif ($producer instanceof Op\Expr\ConstFetch) {
+                $name = $this->staticNameFromOperand($producer->name);
+                if (null !== $name && \in_array(strtolower($name), ['true', 'false', 'null'], true)) {
+                    $scalarConst = $producer;
+                }
+            }
+        }
+
+        return null !== $arith && null !== $scalarConst;
+    }
+
+    /**
+     * @param list<Op\Expr> $producers
+     */
     private function producersAreSiblingCallWithHoistedEnumConstFetch(array $producers): bool
     {
         if (2 !== \count($producers)) {
@@ -21269,6 +21298,21 @@ class Compiler {
                 ) {
                     continue;
                 }
+                // var_export(INF*0, true) — scalar ConstFetch feeds sibling Mul, not call arg (#17210).
+                if (
+                    $child instanceof Op\Expr\ConstFetch
+                    && $this->isChainedArithmeticBinaryOpExpr($next)
+                    && null !== $child->result
+                    && (
+                        $next->left === $child->result
+                        || $next->right === $child->result
+                        || $this->operandsReferToSameVariable($next->left, $child->result)
+                        || $this->operandsReferToSameVariable($next->right, $child->result)
+                    )
+                    && 'var_export' === strtolower($this->resolveCfgFuncCallName($callOp) ?? '')
+                ) {
+                    continue;
+                }
                 // var_export($b[false]) — hoisted bool/null dim is not a separate call arg (#16738, #5275).
                 if (
                     ($child instanceof Op\Expr\ConstFetch || $child instanceof Op\Expr\ClassConstFetch)
@@ -21705,6 +21749,16 @@ class Compiler {
                     ) {
                         // get_html_translation_table(HTML_ENTITIES, ENT_QUOTES | ENT_HTML5) — lone hoisted bitmask (#16152, #11804).
                         // htmlspecialchars(..., ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8', false) — bitmask before trailing bool (#11407).
+                        array_unshift($producers, $child);
+                        continue;
+                    } elseif (
+                        $i === $callIndex - 2
+                        && $this->isHoistedScalarConstFetchImmediatelyBeforeCall(
+                            $cfgChildren[$callIndex - 1] ?? null
+                        )
+                        && 'var_export' === strtolower($this->resolveCfgFuncCallName($callOp) ?? '')
+                    ) {
+                        // var_export(1.0+0.0, true) — arithmetic feeds arg #0, not trailing return flag (#17210).
                         array_unshift($producers, $child);
                         continue;
                     }
