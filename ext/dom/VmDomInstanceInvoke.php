@@ -4,24 +4,66 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\dom;
 
+use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\Variable;
 use PHPCompiler\VM\VariableObject;
 
 /**
  * DOM instance method dispatch for JIT/AOT helpers (#17130).
  *
- * Keep this file to a single compiled entrypoint; bodies live in VmDomJitDispatch.
+ * Keep this file to per-arity entrypoints; bodies live in VmDomJitDispatch.
  */
 final class VmDomInstanceInvoke
 {
-    public static function invokeArgv(Variable $receiver, string $methodLc, Variable $argsTable): Variable
+    public static function invoke0Object(Variable $receiver, string $methodLc): Variable
     {
+        return self::dispatch($receiver, $methodLc);
+    }
+
+    public static function invoke1Object(Variable $receiver, string $methodLc, Variable $a1): Variable
+    {
+        return self::dispatch($receiver, $methodLc, $a1);
+    }
+
+    public static function invoke2Object(
+        Variable $receiver,
+        string $methodLc,
+        Variable $a1,
+        Variable $a2
+    ): Variable {
+        return self::dispatch($receiver, $methodLc, $a1, $a2);
+    }
+
+    public static function invoke3Object(
+        Variable $receiver,
+        string $methodLc,
+        Variable $a1,
+        Variable $a2,
+        Variable $a3
+    ): Variable {
+        return self::dispatch($receiver, $methodLc, $a1, $a2, $a3);
+    }
+
+    public static function invoke4Object(
+        Variable $receiver,
+        string $methodLc,
+        Variable $a1,
+        Variable $a2,
+        Variable $a3,
+        Variable $a4
+    ): Variable {
+        return self::dispatch($receiver, $methodLc, $a1, $a2, $a3, $a4);
+    }
+
+    private static function dispatch(Variable $receiver, string $methodLc, Variable ...$extra): Variable
+    {
+        $self = VariableObject::entry($receiver->resolveIndirect());
         $ctx = VmDomJitFrame::vmContext();
-        $extra = VmDomJitDispatch::unpackArgs($argsTable);
-        $self = VariableObject::entry($receiver);
         $methodLc = strtolower($methodLc);
 
         return match ($methodLc) {
+            'loadhtml' => VmDomJitDispatch::loadHTML($ctx, $self, $extra),
+            'getelementbyid' => VmDomJitDispatch::getElementById($self, $extra),
             'createelement' => VmDomJitDispatch::createElement($ctx, $self, $extra),
             'appendchild' => VmDomJitDispatch::appendChild($ctx, $self, $extra),
             'setattribute' => VmDomJitDispatch::setAttribute($ctx, $self, $extra),

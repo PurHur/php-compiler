@@ -8,20 +8,10 @@ use PHPCompiler\Frame;
 use PHPCompiler\VM\Context as VmContext;
 use PHPCompiler\Web\Superglobals;
 
-/** Active frame lookup for DOM JIT helpers — not nested-compiled (#17130). */
+/** Active VM context for DOM JIT/AOT helpers (#17130). */
 final class VmDomJitFrame
 {
     public static function vmContext(): VmContext
-    {
-        $ctx = self::executingFrame()->vmContext;
-        if (null === $ctx) {
-            throw new \LogicException('VmDomJitFrame requires VM context');
-        }
-
-        return $ctx;
-    }
-
-    public static function executingFrame(): Frame
     {
         $ctx = Superglobals::getActiveContext();
         if (null === $ctx) {
@@ -29,19 +19,21 @@ final class VmDomJitFrame
                 'VmDomJitFrame requires an active VM context in this compiler build'
             );
         }
+
+        return $ctx;
+    }
+
+    public static function executingFrame(): ?Frame
+    {
+        $ctx = Superglobals::getActiveContext();
+        if (null === $ctx) {
+            return null;
+        }
         $vm = $ctx->runtime->vm;
         if (null === $vm) {
-            throw new \LogicException(
-                'VmDomJitFrame requires an active VM in this compiler build'
-            );
-        }
-        $frame = $vm->currentExecutingFrame();
-        if (null === $frame) {
-            throw new \LogicException(
-                'VmDomJitFrame requires an active executing frame in this compiler build'
-            );
+            return null;
         }
 
-        return $frame;
+        return $vm->currentExecutingFrame();
     }
 }

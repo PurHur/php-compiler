@@ -12,6 +12,7 @@ final class NestedVmVariableMethodLlvm
     /** @var array<string, class-string<Call>> */
     private const METHOD_HANDLERS = [
         'resolveindirect' => Call\VariableResolveIndirect::class,
+        'toobject' => Call\VariableToObject::class,
         'tostring' => Call\VariableToString::class,
         'toint' => Call\VariableToInt::class,
         'tofloat' => Call\VariableToFloat::class,

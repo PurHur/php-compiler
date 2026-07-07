@@ -18,6 +18,44 @@ final class VmDomJitDispatch
     /**
      * @param list<Variable> $extra
      */
+    public static function loadHTML(VmContext $ctx, ObjectEntry $document, array $extra): Variable
+    {
+        $html = self::stringArg($extra[0] ?? self::missingArg('loadHTML', 0), 'loadHTML', 0);
+        $options = 0;
+        if (isset($extra[1])) {
+            $optionsVar = $extra[1]->resolveIndirect();
+            if (Variable::TYPE_INTEGER !== $optionsVar->type) {
+                throw new \TypeError('DOMDocument::loadHTML(): Argument #2 ($options) must be of type int');
+            }
+            $options = $optionsVar->toInt();
+        }
+        $ok = VmDom::loadHTML($ctx, $document, $html, $options, VmDomJitFrame::executingFrame());
+        $var = new Variable();
+        $var->bool($ok);
+
+        return $var;
+    }
+
+    /**
+     * @param list<Variable> $extra
+     */
+    public static function getElementById(ObjectEntry $document, array $extra): Variable
+    {
+        $id = self::stringArg($extra[0] ?? self::missingArg('getElementById', 0), 'getElementById', 0);
+        $found = VmDom::getElementById($document, $id);
+        $var = new Variable();
+        if (null === $found) {
+            $var->null();
+        } else {
+            $var->object($found);
+        }
+
+        return $var;
+    }
+
+    /**
+     * @param list<Variable> $extra
+     */
     public static function createElement(VmContext $ctx, ObjectEntry $document, array $extra): Variable
     {
         $name = self::stringArg($extra[0] ?? self::missingArg('createElement', 0), 'createElement', 0);

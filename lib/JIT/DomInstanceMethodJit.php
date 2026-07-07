@@ -45,7 +45,7 @@ final class DomInstanceMethodJit
 
     /** @var array<string, list<string>> */
     private const KNOWN_METHODS = [
-        'domdocument' => ['createelement', 'appendchild'],
+        'domdocument' => ['createelement', 'appendchild', 'loadhtml', 'getelementbyid'],
         'domnode' => ['appendchild'],
         'domelement' => ['setattribute'],
         'domtokenlist' => ['add', 'contains', 'item', 'toggle', 'remove'],
