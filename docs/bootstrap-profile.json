@@ -873,6 +873,7 @@
         "ext/standard/IniOptionArg.php",
         "ext/standard/IniParseQuantityJitHelper.php",
         "ext/standard/InterfaceExistsJitHelper.php",
+        "ext/standard/InternalArityPolicy.php",
         "ext/standard/IsFiniteJitHelper.php",
         "ext/standard/IsInfiniteJitHelper.php",
         "ext/standard/IsNanJitHelper.php",
@@ -1533,6 +1534,7 @@
         "ext/standard/VmArrayAssocSetOps.php",
         "ext/standard/VmArrayColumnArg.php",
         "ext/standard/VmArrayFilterCallback.php",
+        "ext/standard/VmArrayFindInternalInvoke.php",
         "ext/standard/VmArrayPointer.php",
         "ext/standard/VmArraySort.php",
         "ext/standard/VmArraySortCallback.php",
@@ -4471,9 +4473,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 4237,
+        "inventory_files": 4239,
         "excluded": 0,
-        "eligible": 4237,
+        "eligible": 4239,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
