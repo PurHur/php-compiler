@@ -27263,6 +27263,21 @@ class Compiler {
         }
         $stmtBefore = $block->orig->children[$callIndex - 1] ?? null;
         if (
+            $stmtBefore instanceof Op\Expr\BinaryOp\Plus
+            && 0 === $argIndex
+            && $this->callArgIsDeadInlineTemporary($callArg)
+        ) {
+            $plusSlot = $block->slotForOperand($stmtBefore->result);
+            if (null === $plusSlot) {
+                foreach ($this->compileExpr($stmtBefore, $block) as $op) {
+                    $emitOps[] = $op;
+                }
+                $plusSlot = $block->slotForOperand($stmtBefore->result);
+            }
+
+            return null !== $plusSlot ? (int) $plusSlot : null;
+        }
+        if (
             $stmtBefore instanceof Op\Expr\Array_
             && $this->callArgOperandExpectsArrayProducer($callArg)
             && $this->callArgIsDeadInlineTemporary($callArg)
@@ -30348,6 +30363,17 @@ class Compiler {
         );
         if (null !== $mappedMbstring) {
             return $mappedMbstring;
+        }
+        if ($this->producersIncludeInlineArrayUnionPlus($producers)) {
+            if (0 === $argIndex) {
+                foreach (array_reverse($producers) as $producer) {
+                    if ($producer instanceof Op\Expr\BinaryOp\Plus) {
+                        return $producer;
+                    }
+                }
+            }
+
+            return null;
         }
         $callIndex = null;
         foreach ($cfgChildren as $i => $child) {
@@ -34594,6 +34620,18 @@ class Compiler {
             break;
         }
         if ([] === $trailingConstFetches) {
+            if (
+                'var_export' === strtolower($this->resolveCfgFuncCallName($cfgCallOp) ?? '')
+                && 1 === $argIndex
+                && $callArg instanceof Operand
+                && $this->callArgIsDeadInlineTemporary($callArg)
+            ) {
+                $producers = $this->precedingInlineCallArgProducersBeforeCfgOp($children, $cfgCallOp);
+                if ($this->producersIncludeInlineArrayUnionPlus($producers)) {
+                    return $this->slotForBoolNullConstFetchBeforeLastFuncCallInit($block);
+                }
+            }
+
             return null;
         }
         if ('array_splice' === strtolower($this->resolveCfgFuncCallName($cfgCallOp) ?? '')) {
@@ -34810,6 +34848,30 @@ class Compiler {
         $vm = $this->tryFoldGlobalConstFetch($fetch);
         if (null !== $vm) {
             return $block->registerConstant($fetch->result ?? new Operand\Temporary(), $vm);
+        }
+
+        return null;
+    }
+
+    /**
+     * var_export([...] + [...], true) — true is emitted as TYPE_CONST_FETCH before FUNCCALL_INIT (#11511).
+     */
+    private function slotForBoolNullConstFetchBeforeLastFuncCallInit(Block $block): ?int
+    {
+        for ($i = \count($block->opCodes) - 1; $i >= 0; --$i) {
+            if (OpCode::TYPE_FUNCCALL_INIT !== $block->opCodes[$i]->type) {
+                continue;
+            }
+            for ($j = $i - 1; $j >= 0; --$j) {
+                $prev = $block->opCodes[$j];
+                if (OpCode::TYPE_CONST_FETCH === $prev->type && null !== $prev->arg1) {
+                    return (int) $prev->arg1;
+                }
+
+                break;
+            }
+
+            break;
         }
 
         return null;
@@ -36141,6 +36203,31 @@ class Compiler {
                         $block->orig->children,
                         $cfgCallOp
                     );
+                    if ($this->producersIncludeInlineArrayUnionPlus($arrayArgProducers)) {
+                        if (0 === (int) $argIndex) {
+                            foreach ($arrayArgProducers as $producer) {
+                                if (!$producer instanceof Op\Expr\BinaryOp\Plus || null === $producer->result) {
+                                    continue;
+                                }
+                                $plusSlot = $block->slotForOperand($producer->result);
+                                if (null === $plusSlot) {
+                                    foreach ($this->compileExpr($producer, $block) as $op) {
+                                        $sends[] = $op;
+                                    }
+                                    $plusSlot = $block->slotForOperand($producer->result);
+                                }
+                                if (null !== $plusSlot) {
+                                    $sends[] = new OpCode(
+                                        OpCode::TYPE_ARG_SEND,
+                                        (string) $plusSlot,
+                                        $nameSlot,
+                                        $unpackFlag
+                                    );
+                                    continue 2;
+                                }
+                            }
+                        }
+                    } else {
                     $siblingArrayProducers = array_values(array_filter(
                         $arrayArgProducers,
                         static fn (Op\Expr $producer): bool => $producer instanceof Op\Expr\Array_
@@ -36157,6 +36244,7 @@ class Compiler {
                             $cfgCallOp->args ?? [],
                             (int) $argIndex
                         );
+                    }
                     }
                 }
                 if (
@@ -39759,22 +39847,29 @@ class Compiler {
                     $varExportArg instanceof Operand
                     && $this->callArgIsDeadInlineTemporary($varExportArg)
                     && $this->callArgOperandExpectsArrayProducer($varExportArg)
+                    && null !== $block->orig
                 ) {
-                    $stmtBeforeArray = $this->inlineArrayProducerImmediatelyBeforeCfgCall($cfgCallOp, $block);
-                    if ($stmtBeforeArray instanceof Op\Expr\Array_) {
-                        $arrayArgSlot = $this->slotForRecentInitArrayCallArg($block);
-                        if (null === $arrayArgSlot) {
-                            $arrayArgSlot = $block->slotForOperand($stmtBeforeArray->result);
-                        }
-                        if (null === $arrayArgSlot) {
-                            foreach ($this->compileArrayLiteral($stmtBeforeArray, $block) as $op) {
-                                $sends[] = $op;
+                    $callIndex = array_search($cfgCallOp, $block->orig->children, true);
+                    $stmtBeforeVarExport = \is_int($callIndex)
+                        ? ($block->orig->children[$callIndex - 1] ?? null)
+                        : null;
+                    if (!$stmtBeforeVarExport instanceof Op\Expr\BinaryOp\Plus) {
+                        $stmtBeforeArray = $this->inlineArrayProducerImmediatelyBeforeCfgCall($cfgCallOp, $block);
+                        if ($stmtBeforeArray instanceof Op\Expr\Array_) {
+                            $arrayArgSlot = $this->slotForRecentInitArrayCallArg($block);
+                            if (null === $arrayArgSlot) {
+                                $arrayArgSlot = $block->slotForOperand($stmtBeforeArray->result);
                             }
-                            $arrayArgSlot = $this->slotForRecentInitArrayCallArg($block)
-                                ?? $block->slotForOperand($stmtBeforeArray->result);
-                        }
-                        if (null !== $arrayArgSlot) {
-                            $valueSlot = (string) $arrayArgSlot;
+                            if (null === $arrayArgSlot) {
+                                foreach ($this->compileArrayLiteral($stmtBeforeArray, $block) as $op) {
+                                    $sends[] = $op;
+                                }
+                                $arrayArgSlot = $this->slotForRecentInitArrayCallArg($block)
+                                    ?? $block->slotForOperand($stmtBeforeArray->result);
+                            }
+                            if (null !== $arrayArgSlot) {
+                                $valueSlot = (string) $arrayArgSlot;
+                            }
                         }
                     }
                 }
