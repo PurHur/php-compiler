@@ -367,24 +367,29 @@ final class CompilerVersion
     /**
      * PHP 8.3+ class_uses_recursive() (ext/standard/basic_functions.c, issue #6469, #12816, #16708).
      *
-     * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev reference profile
-     * matches Zend 8.2 phantom gate; enable forward profile via `PHP_COMPILER_PROFILE=8.4`.
+     * Enabled by default on the 8.4.0-dev toolchain (runtime reports 8.4; php-src has the builtin since 8.3).
+     * `PHP_COMPILER_PROFILE=8.2` (or older) keeps the Zend 8.2 reference gate (function absent).
      */
     public static function supportsClassUsesRecursive(): bool
     {
-        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+        if (version_compare(self::VERSION, '8.3', '<')) {
+            return false;
+        }
+
+        $raw = getenv('PHP_COMPILER_PROFILE');
+        if (\is_string($raw) && '' !== trim($raw)) {
+            return version_compare(self::languageProfileVersion(), '8.3.0', '>=');
+        }
+
+        return self::advertisesBuiltinSince('8.3.0');
     }
 
     /**
-     * class_uses_recursive() visible to function_exists() — stable runtime or forward 8.4+ (#17007).
+     * class_uses_recursive() visible to function_exists() — same gate as {@see supportsClassUsesRecursive()}.
      */
     public static function advertisesClassUsesRecursive(): bool
     {
-        if (version_compare(self::VERSION, '8.4.0', '>=')) {
-            return true;
-        }
-
-        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+        return self::supportsClassUsesRecursive();
     }
 
     /**

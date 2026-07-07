@@ -140,7 +140,56 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
 
     public function testClassUsesRecursiveWithheldOnReferenceProfile(): void
     {
-        $this->assertFalse(CompilerVersion::supportsClassUsesRecursive());
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE');
+        try {
+            $this->assertTrue(CompilerVersion::supportsClassUsesRecursive());
+            $this->assertTrue(CompilerVersion::advertisesClassUsesRecursive());
+            $runtime = new Runtime();
+            $this->assertTrue(isset($runtime->vmContext->functions['class_uses_recursive']));
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testClassUsesRecursiveAdvertisedOn83ForwardProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.3');
+        try {
+            $this->assertTrue(CompilerVersion::supportsClassUsesRecursive());
+            $this->assertTrue(CompilerVersion::advertisesClassUsesRecursive());
+            $runtime = new Runtime();
+            $this->assertTrue(isset($runtime->vmContext->functions['class_uses_recursive']));
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testClassUsesRecursiveWithheldOnPhp82Profile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.2');
+        try {
+            $this->assertFalse(CompilerVersion::supportsClassUsesRecursive());
+            $this->assertFalse(CompilerVersion::advertisesClassUsesRecursive());
+            $runtime = new Runtime();
+            $this->assertFalse(isset($runtime->vmContext->functions['class_uses_recursive']));
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
     }
 
     public function testFpowWithheldOnReferenceProfileUntilStable84(): void
@@ -502,10 +551,20 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         $this->assertFalse(isset($runtime->vmContext->functions['zend_thread_id']));
     }
 
-    public function testVmDoesNotRegisterClassUsesRecursiveOnReferenceProfile(): void
+    public function testVmRegistersClassUsesRecursiveOnDefaultDevProfile(): void
     {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE');
         $runtime = new Runtime();
-        $this->assertFalse(isset($runtime->vmContext->functions['class_uses_recursive']));
+        try {
+            $this->assertTrue(isset($runtime->vmContext->functions['class_uses_recursive']));
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
     }
 
     public function testVmRegistersPhp84ReflectionProbeBuiltinsOnDefaultDevProfile(): void
