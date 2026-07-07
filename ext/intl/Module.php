@@ -50,6 +50,9 @@ class Module extends ModuleAbstract
         if (IntlExtensionPolicy::advertisesLocale()) {
             $functions[] = new locale_get_default();
             $functions[] = new locale_set_default();
+            $functions[] = new locale_get_primary_language();
+            $functions[] = new locale_get_region();
+            $functions[] = new locale_get_script();
         }
         if (!IntlExtensionPolicy::advertisesBuiltins()) {
             return [
