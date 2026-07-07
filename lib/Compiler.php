@@ -9710,6 +9710,12 @@ class Compiler {
     {
         if (Block::containsGeneratorOpcodesInCallableBody($funcBlock) || $this->callableOpHasSourceYield($callable)) {
             $this->markFunctionGenerator($funcBlock);
+
+            return;
+        }
+        $func = $funcBlock->func;
+        if (null !== $func && $this->funcDeclReturnTypeIsGenerator($func)) {
+            $this->markFunctionGenerator($funcBlock);
         }
     }
 
