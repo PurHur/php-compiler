@@ -1192,6 +1192,24 @@ final class CompilerVersionGateTest extends TestCase
         $this->assertFalse(isset($runtime->vmContext->classes['random\\intervalboundary']));
     }
 
+    public function testVmRegistersRandomIntervalBoundaryOnForwardProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.3');
+        try {
+            $runtime = new Runtime();
+            $this->assertTrue(isset($runtime->vmContext->classes['random\\intervalboundary']));
+            $entry = $runtime->vmContext->classes['random\\randomizer'];
+            $this->assertTrue(isset($entry->methods['getfloat'], $entry->methods['nextfloat']));
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     public function testVmDoesNotRegisterJsonValidateOnReferenceProfile(): void
     {
         $runtime = new Runtime();

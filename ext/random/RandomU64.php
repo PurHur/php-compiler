@@ -59,6 +59,49 @@ final class RandomU64
         return new self($a->hi | $b->hi, $a->lo | $b->lo);
     }
 
+    public static function and(self $a, self $b): self
+    {
+        return new self($a->hi & $b->hi, $a->lo & $b->lo);
+    }
+
+    /** Unsigned compare: -1 if $a < $b, 0 if equal, 1 if $a > $b. */
+    public static function compare(self $a, self $b): int
+    {
+        if ($a->hi !== $b->hi) {
+            return $a->hi < $b->hi ? -1 : 1;
+        }
+        if ($a->lo === $b->lo) {
+            return 0;
+        }
+
+        return $a->lo < $b->lo ? -1 : 1;
+    }
+
+    /** $value mod $modulus for positive modulus fitting in int (php-src uint64_t %). */
+    public static function modSmall(self $value, int $modulus): int
+    {
+        if ($modulus <= 0) {
+            throw new \LogicException('modulus must be positive');
+        }
+        if (0 === $value->hi) {
+            return $value->lo % $modulus;
+        }
+        $two32mod = (int) (4294967296 % $modulus);
+
+        return (($value->hi % $modulus) * $two32mod + ($value->lo % $modulus)) % $modulus;
+    }
+
+    public function upper53UnitFloat(): float
+    {
+        $shifted = $this->shiftRight(11);
+        $divisor = 9007199254740992.0;
+        if (0 === $shifted->hi) {
+            return $shifted->lo / $divisor;
+        }
+
+        return ($shifted->hi * 4294967296.0 + $shifted->lo) / $divisor;
+    }
+
     public static function mul32(self $a, int $multiplier): self
     {
         return self::mul64($a, self::from32($multiplier & 0xFFFFFFFF));
@@ -142,16 +185,20 @@ final class RandomU64
     public function shiftRight(int $bits): self
     {
         $bits &= 63;
+        $hi = $this->hi & 0xFFFFFFFF;
+        $lo = $this->lo & 0xFFFFFFFF;
         if (0 === $bits) {
-            return new self($this->hi, $this->lo);
+            return new self($hi, $lo);
         }
         if ($bits >= 32) {
-            return new self(0, $this->hi >> ($bits - 32));
+            return new self(0, $hi >> ($bits - 32));
         }
 
+        $hiLowBits = $hi & ((1 << $bits) - 1);
+
         return new self(
-            $this->hi >> $bits,
-            (($this->lo >> $bits) | ($this->hi << (32 - $bits))) & 0xFFFFFFFF
+            $hi >> $bits,
+            (($lo >> $bits) | ($hiLowBits << (32 - $bits))) & 0xFFFFFFFF
         );
     }
 
