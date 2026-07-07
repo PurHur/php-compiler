@@ -518,7 +518,7 @@ class Compiler {
 
         NonEnumBuiltinInterfaceCompileCheck::validate($script);
         InterfaceImplementationCheck::validate($script, $this->propertyHookRegistry);
-        TraitCollisionCheck::validate($script);
+        TraitCollisionCheck::validate($script, $this->propertyHookRegistry);
         FinalClassExtensionCheck::validate($script);
         ImplementsHierarchyCompileCheck::validate($script);
         FinalMethodOverrideCheck::validate($script);

@@ -129,4 +129,34 @@ PHP;
         $runtime->run($block);
         $this->assertSame("1\n", ob_get_clean());
     }
+
+    public function testTraitAbstractPropertyHooksAllowClassConcreteOverride(): void
+    {
+        if (!\PHPCompiler\CompilerVersion::supportsPropertyHooks()) {
+            $this->markTestSkipped('property hooks require PHP_COMPILER_PROFILE=8.4');
+        }
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+trait T {
+    public string $x { get; set; }
+}
+class C {
+    use T;
+    public string $x {
+        get => $this->__x;
+        set(string $v) { $this->__x = $v; }
+    }
+    private string $__x = '';
+}
+$c = new C();
+$c->x = 'hi';
+echo $c->x, "\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'trait_abstract_property_hook_ok.php');
+        $this->assertNotNull($block);
+        ob_start();
+        $runtime->run($block);
+        $this->assertSame("hi\n", ob_get_clean());
+    }
 }
