@@ -11,7 +11,7 @@ if (!PHPCompiler\CompilerVersion::supportsStrIncrement()) {
 --FILE--
 <?php
 $internal = get_defined_functions()['internal'];
-foreach (['str_increment', 'str_decrement', 'fpow', 'fmin', 'fmax'] as $fn) {
+foreach (['str_increment', 'str_decrement', 'fpow', 'fmin', 'fmax', 'fadd', 'fsub', 'fmul'] as $fn) {
     echo $fn, '_fe=', function_exists($fn) ? '1' : '0', "\n";
     echo $fn, '_internal=', in_array($fn, $internal, true) ? '1' : '0', "\n";
 }
@@ -26,3 +26,9 @@ fmin_fe=0
 fmin_internal=0
 fmax_fe=0
 fmax_internal=0
+fadd_fe=0
+fadd_internal=0
+fsub_fe=0
+fsub_internal=0
+fmul_fe=0
+fmul_internal=0

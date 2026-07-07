@@ -342,7 +342,7 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         try {
             $runtime = new Runtime();
             $ctx = $runtime->vmContext;
-            foreach (['fpow', 'fmin', 'fmax', 'stream_supports', 'attribute_exists'] as $fn) {
+            foreach (['fpow', 'fmin', 'fmax', 'fadd', 'fsub', 'fmul', 'stream_supports', 'attribute_exists'] as $fn) {
                 $this->assertTrue(isset($ctx->functions[$fn]), $fn);
             }
             $this->assertTrue(isset($ctx->classes['roundingmode']));
@@ -392,7 +392,7 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
     {
         $runtime = new Runtime();
         $ctx = $runtime->vmContext;
-        foreach (['fpow', 'fmin', 'fmax'] as $fn) {
+        foreach (['fpow', 'fmin', 'fmax', 'fadd', 'fsub', 'fmul'] as $fn) {
             $this->assertFalse(isset($ctx->functions[$fn]), $fn);
         }
     }

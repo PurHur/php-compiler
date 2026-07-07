@@ -1246,7 +1246,7 @@ function withheldBuiltinGateDefinitions(): array
 {
     return [
         [
-            'names' => ['fpow', 'fmin', 'fmax'],
+            'names' => ['fpow', 'fmin', 'fmax', 'fadd', 'fsub', 'fmul'],
             'gate' => [PHPCompiler\CompilerVersion::class, 'supportsFpow'],
             'since' => '8.4.0',
             'module' => 'standard',

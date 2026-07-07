@@ -7,7 +7,7 @@ PHP_COMPILER_PROFILE=8.4
 declare(strict_types=1);
 
 $fail = [];
-foreach (['fpow', 'fmin', 'fmax', 'nextafter', 'bcround'] as $fn) {
+foreach (['fpow', 'fmin', 'fmax', 'fadd', 'fsub', 'fmul', 'nextafter', 'bcround'] as $fn) {
     if (!function_exists($fn)) {
         $fail[] = $fn;
     }

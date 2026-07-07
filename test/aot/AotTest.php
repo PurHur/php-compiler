@@ -122,7 +122,8 @@ class AotTest extends BaseTest
                 continue;
             }
             if (!CompilerVersion::supportsFpow()
-                && (str_contains($name, 'fpow') || str_contains($name, 'fmin') || str_contains($name, 'fmax'))) {
+                && (str_contains($name, 'fpow') || str_contains($name, 'fmin') || str_contains($name, 'fmax')
+                    || str_contains($name, 'fadd') || str_contains($name, 'fsub') || str_contains($name, 'fmul'))) {
                 continue;
             }
             if (!CompilerVersion::supportsNextafter()

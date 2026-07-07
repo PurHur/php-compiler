@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-$required = ['fpow', 'fmin', 'fmax', 'nextafter'];
+$required = ['fpow', 'fmin', 'fmax', 'fadd', 'fsub', 'fmul', 'nextafter'];
 foreach ($required as $fn) {
     if (!function_exists($fn)) {
         echo "fail: function_exists({$fn}) false under PHP_COMPILER_PROFILE=8.4\n";

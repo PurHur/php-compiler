@@ -34,7 +34,8 @@ class VMTest extends BaseTest {
                 continue;
             }
             if (!CompilerVersion::supportsFpow()
-                && (str_contains($name, 'fpow') || str_contains($name, 'fmin') || str_contains($name, 'fmax'))
+                && (str_contains($name, 'fpow') || str_contains($name, 'fmin') || str_contains($name, 'fmax')
+                    || str_contains($name, 'fadd') || str_contains($name, 'fsub') || str_contains($name, 'fmul'))
                 && !str_contains($name, 'php84_math_string_builtins_phantom')
                 && !str_contains($name, 'fpow_function_exists_forward_profile')) {
                 continue;
