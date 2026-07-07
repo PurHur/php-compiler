@@ -26,7 +26,7 @@ final class fopen extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $path = VmStreamPath::coerceNonEmptyPathArg($frame->calledArgs[0], 'fopen');
+        $path = VmStreamPath::coerceNonEmptyPathArgForFrame($frame, 0, 'fopen', 'filename');
         $mode = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'fopen', 1, 'mode');
 
         $useIncludePath = false;
@@ -74,7 +74,7 @@ final class fopen extends Internal
 
         return JitFopen::invoke(
             $context,
-            JitStreamPath::lowerNonEmptyPath($context, $args[0], 'fopen'),
+            JitStreamPath::lowerNonEmptyPath($context, $args[0], 'fopen', 0, 'filename'),
             JitStringBuiltinArg::lower($context, $args[1], 'fopen', 1, 'mode')
         );
     }
