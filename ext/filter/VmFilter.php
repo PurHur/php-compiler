@@ -565,7 +565,11 @@ final class VmFilter
     private static function validateBoolean(Variable $value, bool $nullOnFailure = false): Variable
     {
         if ($value->isUndefined() || Variable::TYPE_NULL === $value->type) {
-            return self::failureResult($nullOnFailure);
+            // php-src coerces null/undefined to "" before boolean validation (#17238).
+            $out = new Variable();
+            $out->bool(false);
+
+            return $out;
         }
         if (Variable::TYPE_BOOLEAN === $value->type) {
             $out = new Variable();

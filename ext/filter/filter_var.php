@@ -147,10 +147,7 @@ final class filter_var extends Internal
         $context->builder->branchIf($isBool, $boolBlock, $boolOtherBlock);
 
         $context->builder->positionAtEnd($boolBlock);
-        $boolResult = JitFilter::validateBoolean($context, $value);
-        if (null !== $optionsArg && JITVariable::TYPE_NULL !== $optionsArg->type) {
-            $boolResult = JitFilter::applyNullOnFailure($context, $boolResult, $nullOnFailure);
-        }
+        $boolResult = JitFilter::validateBoolean($context, $value, $nullOnFailure);
         $boolTail = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);
 
