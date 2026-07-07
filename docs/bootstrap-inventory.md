@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 4185 |
-| Phase A inventory files (M2 ratio SSOT) | 4185 |
+| PHP files on vm.php path | 4187 |
+| Phase A inventory files (M2 ratio SSOT) | 4187 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 11306 |
+| Source constructs flagged (warnings) | 11308 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -3134,6 +3134,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringExplode.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringFgetcsvJit.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringFileGetContents.php` | 0 | 1 |
+| `lib/JIT/Builtin/StringFileGetContentsLibc.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringFilePutContents.php` | 0 | 2 |
 | `lib/JIT/Builtin/StringFilePutContentsLibc.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringFilterBoolean.php` | 0 | 2 |
@@ -3219,6 +3220,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringQuotemeta.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringRandomBytes.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringReadfile.php` | 0 | 2 |
+| `lib/JIT/Builtin/StringReadfileLibc.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringReadlink.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringRealpath.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringRename.php` | 0 | 1 |
@@ -14362,8 +14364,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new HashTable (line 369)
 - new Variable (line 371)
 - new HashTable (line 547)
-- new Variable (line 564)
-- new Variable (line 571)
+- new Variable (line 570)
+- new Variable (line 577)
 - 42 class method(s)
 - 2 closure(s)
 
@@ -15061,7 +15063,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmMath.php`
 
 **Warnings** (review for bootstrap subset):
-- 75 class method(s)
+- 76 class method(s)
 
 ### `ext/standard/VmMemory.php`
 
@@ -16041,8 +16043,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new Error (line 1501)
 - new Error (line 1512)
-- new Error (line 3570)
-- new Error (line 3679)
+- new Error (line 3573)
+- new Error (line 3682)
 - 206 class method(s)
 
 ### `ext/standard/VmStripWhitespace.php`
@@ -18379,9 +18381,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/hrtime.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 53)
-- new Variable (line 54)
-- new Variable (line 57)
+- new HashTable (line 48)
+- new Variable (line 49)
+- new Variable (line 52)
 - 2 class method(s)
 
 ### `ext/standard/html_entity_decode.php`
@@ -24819,6 +24821,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 3 class method(s)
 
+### `lib/JIT/Builtin/StringFileGetContentsLibc.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `lib/JIT/Builtin/StringFilePutContents.php`
 
 **Warnings** (review for bootstrap subset):
@@ -25319,8 +25326,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringReadfile.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 105)
+- new JIT (line 112)
 - 5 class method(s)
+
+### `lib/JIT/Builtin/StringReadfileLibc.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
 
 ### `lib/JIT/Builtin/StringReadlink.php`
 
@@ -26934,7 +26946,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/JitBoolArg.php`
 
 **Warnings** (review for bootstrap subset):
-- 8 class method(s)
+- 9 class method(s)
 
 ### `lib/JIT/JitClockGettimeArg.php`
 
