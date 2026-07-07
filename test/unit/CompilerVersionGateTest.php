@@ -535,6 +535,26 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
+    public function testSupportsReflectionEnumFromNameFalseOnReferenceProfile(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsReflectionEnumFromName());
+    }
+
+    public function testSupportsReflectionEnumFromNameTrueWhenProfile84(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertTrue(CompilerVersion::supportsReflectionEnumFromName());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     public function testSupportsHrtimeAsNumberFloatFalseOnReferenceProfile(): void
     {
         $this->assertFalse(CompilerVersion::supportsHrtimeAsNumberFloat());

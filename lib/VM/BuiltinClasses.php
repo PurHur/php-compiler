@@ -951,9 +951,11 @@ final class BuiltinClasses
         $renum->methodVisibility['getcase'] = $pub;
         $renum->methods['hascase'] = new ReflectionEnumHasCase();
         $renum->methodVisibility['hascase'] = $pub;
-        $renum->methods['fromname'] = new ReflectionEnumFromName();
-        $renum->methodVisibility['fromname'] = $pubStatic;
-        $renum->methodNames['fromname'] = 'fromName';
+        if (CompilerVersion::supportsReflectionEnumFromName()) {
+            $renum->methods['fromname'] = new ReflectionEnumFromName();
+            $renum->methodVisibility['fromname'] = $pubStatic;
+            $renum->methodNames['fromname'] = 'fromName';
+        }
         $renum->methods['gettraitnames'] = new ReflectionClassGetTraitNames();
         $renum->methods['getinterfacenames'] = new ReflectionClassGetInterfaceNames();
         $renum->methodVisibility['gettraitnames'] = $pub;
