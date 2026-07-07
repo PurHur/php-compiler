@@ -40,6 +40,7 @@ final class SuperglobalRefreshUserScriptLlvm
     {
         LibcExtern::register($context);
         ParseStrRuntime::ensureUserScriptLinked($context);
+        MultipartRuntime::ensureUserScriptLinked($context);
         EnvironMirrorUserScriptLlvm::ensureLinked($context);
         self::ensureGlobals($context);
         self::ensureHeaderQueueExternal($context);
@@ -96,6 +97,7 @@ final class SuperglobalRefreshUserScriptLlvm
 
         $queryCstr = self::storeLibcGetenvInEntry($context, $entry, 'QUERY_STRING');
         $postBodyCstr = self::storeLibcGetenvInEntry($context, $entry, 'REQUEST_BODY');
+        $contentTypeCstr = self::storeLibcGetenvInEntry($context, $entry, 'CONTENT_TYPE');
         $methodCstr = self::storeLibcGetenvInEntry($context, $entry, 'REQUEST_METHOD');
         $scriptNameCstr = self::storeLibcGetenvOrDefaultInEntry($context, $entry, 'SCRIPT_NAME', self::DEFAULT_SCRIPT_NAME);
         $requestUriCstr = self::storeLibcGetenvInEntry($context, $entry, 'REQUEST_URI');
@@ -127,7 +129,7 @@ final class SuperglobalRefreshUserScriptLlvm
         $afterPostBb = $fn->appendBasicBlock('sg_user_refresh_after_post');
         $context->builder->branchIf($postBodyEmpty, $afterPostBb, $populatePostBb);
         $context->builder->positionAtEnd($populatePostBb);
-        self::parseFormEncodedFromCstrSlot($context, $postHt, $postBodyCstr);
+        self::populatePostBodyFromCstrSlot($context, $postHt, $filesHt, $contentTypeCstr, $postBodyCstr);
         $context->builder->branch($afterPostBb);
         $context->builder->positionAtEnd($afterPostBb);
 
@@ -320,6 +322,56 @@ final class SuperglobalRefreshUserScriptLlvm
     private static function parseFormEncodedFromCstrSlot(Context $context, Value $ht, Value $cstrSlot): void
     {
         self::parseFormEncoded($context, $ht, self::cstrToPhpcString($context, $cstrSlot));
+    }
+
+    private static function populatePostBodyFromCstrSlot(
+        Context $context,
+        Value $postHt,
+        Value $filesHt,
+        Value $contentTypeCstr,
+        Value $postBodyCstr
+    ): void {
+        $fn = $context->builder->getInsertBlock()->getParent();
+        $multipartBb = $fn->appendBasicBlock('sg_user_refresh_post_multipart');
+        $urlencodedBb = $fn->appendBasicBlock('sg_user_refresh_post_urlencoded');
+        $doneBb = $fn->appendBasicBlock('sg_user_refresh_post_done');
+
+        $contentType = $context->builder->load($contentTypeCstr);
+        $contentTypeEmpty = self::isCstrEmpty($context, $contentType);
+        $needle = self::literalCstr($context, 'multipart/form-data');
+        $sizeT = $context->getTypeFromString('size_t');
+        $cmp = $context->builder->call(
+            $context->lookupFunction('strncasecmp'),
+            $contentType,
+            $needle,
+            $sizeT->constInt(19, false)
+        );
+        $prefixMatch = $context->builder->icmp(
+            Builder::INT_EQ,
+            $cmp,
+            $context->getTypeFromString('int32')->constInt(0, false)
+        );
+        $isMultipart = $context->builder->and(
+            $context->builder->not($contentTypeEmpty),
+            $prefixMatch
+        );
+        $context->builder->branchIf($isMultipart, $multipartBb, $urlencodedBb);
+
+        $context->builder->positionAtEnd($multipartBb);
+        $context->builder->call(
+            $context->lookupFunction('__phpc_parse_multipart_post'),
+            $postHt,
+            $filesHt,
+            $contentType,
+            $context->builder->load($postBodyCstr)
+        );
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($urlencodedBb);
+        self::parseFormEncodedFromCstrSlot($context, $postHt, $postBodyCstr);
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($doneBb);
     }
 
     private static function parseCookieFromCstrSlot(Context $context, Value $ht, Value $cstrSlot): void

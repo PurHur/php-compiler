@@ -43,6 +43,11 @@ final class SuperglobalRefreshRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('StringGetenvAll::ensureLinked', $source);
         $this->assertStringNotContainsString('GetenvJitHelper::fillAllEnvironmentHashtable', $source);
         $this->assertStringNotContainsString('ParseStrNativeLlvm::ensureSubhelpers', $source);
-        $this->assertStringNotContainsString('ParseStrUserScriptDelimitedJit::ensureSubhelpers', $source);
+        $this->assertStringContainsString('ParseStrRuntime::ensureUserScriptLinked', $source);
+        $parseStrRuntime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ParseStrRuntime.php');
+        $this->assertStringContainsString('ParseStrUserScriptDelimitedJit::ensureSubhelpers', $parseStrRuntime);
+        $this->assertStringContainsString('MultipartRuntime::ensureUserScriptLinked', $source);
+        $this->assertStringContainsString('__phpc_parse_multipart_post', $source);
+        $this->assertStringContainsString('populatePostBodyFromCstrSlot', $source);
     }
 }
