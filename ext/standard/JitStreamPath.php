@@ -20,7 +20,7 @@ final class JitStreamPath
         int $argIndex = 0,
         string $paramName = 'filename'
     ): Value {
-        $path = JitStringBuiltinArg::lower($context, $arg, $function, $argIndex, $paramName);
+        $path = JitStringBuiltinArg::lowerPath($context, $arg, $function, $argIndex, $paramName);
         JitStringBuiltinArg::rejectEmpty($context, $arg, $path, PathSupport::EMPTY_PATH_VALUE_ERROR_MESSAGE);
 
         return $path;
