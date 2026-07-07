@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\Ast;
 
 use PHPCompiler\CompilerVersion;
+use PHPCompiler\ReferenceProfileTokenScan;
 
 /**
  * Unwrap parenthesized DNF type leaves for nikic/php-parser 4.x (#9733, #3094).
@@ -26,6 +27,9 @@ final class DnfParenTypeRewriter
      */
     public static function referenceProfileSyntaxError(string $source): ?array
     {
+        if (ReferenceProfileTokenScan::exceedsTokenScanBudget($source)) {
+            return null;
+        }
         if (!str_contains($source, '(')) {
             return null;
         }

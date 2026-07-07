@@ -382,6 +382,11 @@ class Runtime {
 
     public function preprocessSourceForParse(string $code, string $filename = 'unknown'): array
     {
+        if (null !== $this->jitContext) {
+            TryCatchElseSupport::beginCompilationUnit();
+
+            return [$code, []];
+        }
         AsymmetricVisibilityRejector::reject($code, $filename);
         LazyPropertyRejector::reject($code, $filename);
         CloneWithSyntaxRejector::reject($code, $filename);
@@ -462,7 +467,7 @@ class Runtime {
     public function prepareSourceForParser(string $code, string $filename = 'unknown'): array
     {
         [$code, $bareRethrowLines] = $this->preprocessSourceForParse($code, $filename);
-        $code = $this->rewriteSourceBeforeParser($code);
+        $code = $this->rewriteSourceBeforeParser($code, $filename);
 
         return [$code, $bareRethrowLines];
     }
@@ -494,8 +499,14 @@ class Runtime {
      *
      * Must run on any path that calls Parser::parse() directly (AOT include discovery, etc.).
      */
-    public function rewriteSourceBeforeParser(string $code): string
+    public function rewriteSourceBeforeParser(string $code, string $filename = 'unknown'): string
     {
+        if (null !== $this->jitContext) {
+            return $code;
+        }
+        if (ReferenceProfileTokenScan::shouldSkipReferenceProfileReject($code, $filename)) {
+            return $code;
+        }
         $code = GlobalTypedConstRewriter::rewrite($code);
         $code = GlobalDeprecatedConstRewriter::rewrite($code);
         $code = DnfParenTypeRewriter::rewrite($code);
@@ -576,6 +587,12 @@ class Runtime {
 
     private function detectFileStrictTypes(string $code): bool
     {
+        if (null !== $this->jitContext) {
+            return false;
+        }
+        if (ReferenceProfileTokenScan::exceedsTokenScanBudget($code)) {
+            return false;
+        }
         if (!\function_exists('token_get_all')) {
             return false;
         }

@@ -17,6 +17,9 @@ final class DnfParenIntersectionSyntaxRejector
 {
     public static function reject(string $code, string $filename = 'unknown'): string
     {
+        if (ReferenceProfileTokenScan::shouldSkipReferenceProfileReject($code, $filename)) {
+            return $code;
+        }
         if (CompilerVersion::supportsParenthesizedDnfIntersectionTypes()) {
             return $code;
         }

@@ -18,6 +18,9 @@ final class PropertyHookSyntaxRejector
 {
     public static function reject(string $code, string $filename = 'unknown'): string
     {
+        if (ReferenceProfileTokenScan::shouldSkipReferenceProfileReject($code, $filename)) {
+            return $code;
+        }
         $defaultWithHook = PropertyHooks::defaultInitializerWithHookBlockSyntaxError($code);
         if (null !== $defaultWithHook) {
             throw new CompileFatal($filename, $defaultWithHook['line'], $defaultWithHook['message']);
