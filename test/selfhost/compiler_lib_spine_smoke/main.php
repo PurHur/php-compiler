@@ -3820,7 +3820,9 @@ require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionAttributeIsRepeated.php
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionAttributeNewInstance.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassConstantGetDeprecatedMessage.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassConstantGetDeprecatedVersion.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassConstantGetModifiers.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassConstantGetType.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassConstantHasType.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassConstantIsDeprecated.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassConstantIsEnumCase.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassConstantIsFinal.php';

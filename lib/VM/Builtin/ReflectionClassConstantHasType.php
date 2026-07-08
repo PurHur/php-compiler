@@ -6,16 +6,14 @@ namespace PHPCompiler\VM\Builtin;
 
 use PHPCompiler\ext\standard\VmReflection;
 use PHPCompiler\Frame;
-use PHPCompiler\VM\EnumCaseSupport;
-use PHPCompiler\VM\EnumSupport;
 use PHPCompiler\VM\ReflectionSupport;
 
-/** ReflectionClassConstant::isEnumCase() — VM (#9824, ext/reflection/php_reflection.c). */
-final class ReflectionClassConstantIsEnumCase extends VmClassMethod
+/** ReflectionClassConstant::hasType() — VM (#17359, ext/reflection/php_reflection.c). */
+final class ReflectionClassConstantHasType extends VmClassMethod
 {
     public function __construct()
     {
-        parent::__construct('isEnumCase');
+        parent::__construct('hasType');
     }
 
     public function execute(Frame $frame): void
@@ -35,13 +33,7 @@ final class ReflectionClassConstantIsEnumCase extends VmClassMethod
             );
         }
         if (null !== $frame->returnVar) {
-            $stored = $entry->constants[$key]->resolveIndirect();
-            if (EnumCaseSupport::isEnumCaseVariable($stored)) {
-                $frame->returnVar->bool(true);
-
-                return;
-            }
-            $frame->returnVar->bool(null !== EnumSupport::enumCaseNameForConstantMember($entry, $key));
+            $frame->returnVar->bool(isset($entry->constDeclaredTypes[$key]));
         }
     }
 }

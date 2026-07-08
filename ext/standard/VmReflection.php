@@ -2259,6 +2259,41 @@ final class VmReflection
         }
     }
 
+    /** Register ReflectionClassConstant::IS_* class constants (#17360, ext/reflection/php_reflection.c). */
+    public static function registerReflectionClassConstantClassConstants(ClassEntry $entry): void
+    {
+        foreach (
+            [
+                'is_public' => self::REFLECTION_METHOD_IS_PUBLIC,
+                'is_protected' => self::REFLECTION_METHOD_IS_PROTECTED,
+                'is_private' => self::REFLECTION_METHOD_IS_PRIVATE,
+                'is_final' => self::REFLECTION_METHOD_IS_FINAL,
+            ] as $name => $value
+        ) {
+            $const = new Variable();
+            $const->int($value);
+            $entry->constants[$name] = $const;
+            $entry->constNames[$name] = strtoupper($name);
+        }
+    }
+
+    /** php-src reflection_class_constant_get_modifiers() (#17360). */
+    public static function cfgClassConstantFlagsToReflectionModifiers(int $cfgVisibility, bool $isFinal): int
+    {
+        if (($cfgVisibility & \PHPCfg\Func::FLAG_PRIVATE) !== 0) {
+            $modifiers = self::REFLECTION_METHOD_IS_PRIVATE;
+        } elseif (($cfgVisibility & \PHPCfg\Func::FLAG_PROTECTED) !== 0) {
+            $modifiers = self::REFLECTION_METHOD_IS_PROTECTED;
+        } else {
+            $modifiers = self::REFLECTION_METHOD_IS_PUBLIC;
+        }
+        if ($isFinal) {
+            $modifiers |= self::REFLECTION_METHOD_IS_FINAL;
+        }
+
+        return $modifiers;
+    }
+
     /** php-src ReflectionMethod::IS_* values returned by getModifiers() (#7116). */
     public const REFLECTION_METHOD_IS_STATIC = 16;
 
