@@ -28,9 +28,8 @@ final class usort_ extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (2 !== \count($frame->calledArgs)) {
-            throw new \LogicException('usort() requires exactly two arguments');
-        }
+        VmArraySort::assertUserSortArgCount($frame, 'usort');
+        $descending = VmArraySort::resolveUserSortDescending($frame, 'usort');
         $ht = VmArray::requireArray($frame->calledArgs[0], 'usort');
         $array = $frame->calledArgs[0]->resolveIndirect();
         $callback = $frame->calledArgs[1]->resolveIndirect();
@@ -56,7 +55,8 @@ final class usort_ extends Internal
             VmClosureCall::sortVariableValues(
                 $frame->vmContext,
                 $values,
-                VmClosureCall::resolve($callback)
+                VmClosureCall::resolve($callback),
+                $descending
             );
         } else {
             if (!UsortCallbackPolicy::isVmSupportedType($callback->type)) {
@@ -67,7 +67,11 @@ final class usort_ extends Internal
                 throw new \LogicException(UsortCallbackPolicy::vmRejectionMessage());
             }
             $compare = VmInternalCompare::resolveStringCallback($name);
-            VmInternalCompare::sortVariableValues($values, $compare);
+            if ($descending) {
+                VmInternalCompare::sortVariableValuesDesc($values, $compare);
+            } else {
+                VmInternalCompare::sortVariableValues($values, $compare);
+            }
         }
         $array->separateArrayForWrite();
         $ht = $array->resolveIndirect()->toArray();
