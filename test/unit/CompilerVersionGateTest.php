@@ -705,6 +705,26 @@ final class CompilerVersionGateTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsEnumCaseList());
     }
 
+    public function testRejectsAllowDynamicPropertiesOnEnumFalseOnReferenceProfile(): void
+    {
+        $this->assertFalse(CompilerVersion::rejectsAllowDynamicPropertiesOnEnum());
+    }
+
+    public function testRejectsAllowDynamicPropertiesOnEnumTrueOnForwardProfile85(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.5');
+        try {
+            $this->assertTrue(CompilerVersion::rejectsAllowDynamicPropertiesOnEnum());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     public function testSupportsAsymmetricVisibilityFalseOn84DevReferenceProfile(): void
     {
         $this->assertFalse(CompilerVersion::supportsAsymmetricVisibility());
