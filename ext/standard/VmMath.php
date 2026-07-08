@@ -1308,4 +1308,42 @@ final class VmMath
 
         return $negative ? '-'.$buf : $buf;
     }
+
+    /**
+     * clamp() — PHP 8.3 (ext/standard/math.c php_math_clamp).
+     */
+    public static function clamp(
+        Variable $value,
+        Variable $min,
+        Variable $max,
+        Variable $result,
+        string $function = 'clamp'
+    ): void {
+        $value = $value->resolveIndirect();
+        $min = $min->resolveIndirect();
+        $max = $max->resolveIndirect();
+
+        if (Variable::TYPE_FLOAT === $min->type && \is_nan($min->toFloat())) {
+            throw new \ValueError($function.'(): Argument #2 ($min) must not be NAN');
+        }
+        if (Variable::TYPE_FLOAT === $max->type && \is_nan($max->toFloat())) {
+            throw new \ValueError($function.'(): Argument #3 ($max) must not be NAN');
+        }
+        if (Variable::spaceshipCompare($max, $min) < 0) {
+            throw new \ValueError(
+                $function.'(): Argument #2 ($min) must be smaller than or equal to argument #3 ($max)'
+            );
+        }
+        if (Variable::spaceshipCompare($max, $value) < 0) {
+            $result->copyFrom($max);
+
+            return;
+        }
+        if (Variable::spaceshipCompare($value, $min) < 0) {
+            $result->copyFrom($min);
+
+            return;
+        }
+        $result->copyFrom($value);
+    }
 }

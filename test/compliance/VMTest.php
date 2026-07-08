@@ -22,6 +22,10 @@ class VMTest extends BaseTest {
                 && str_contains($name, 'str_increment_phantom')) {
                 continue;
             }
+            if (!CompilerVersion::supportsClamp()
+                && str_contains($name, 'clamp')) {
+                continue;
+            }
             if (!CompilerVersion::supportsHex2binStrict()
                 && str_contains($name, 'hex2bin_strict')
                 && !str_contains($name, 'hex2bin_strict_arity_reference_profile')
