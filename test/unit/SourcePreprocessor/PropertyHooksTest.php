@@ -266,6 +266,44 @@ PHP;
         self::assertTrue($registry['box']['value']['virtual'] ?? false);
     }
 
+    /** @covers issue #17329 — PHP 8.4 set($param) => fat-arrow shorthand */
+    public function testLowersSetFatArrowWithCustomParam(): void
+    {
+        $src = <<<'PHP'
+<?php
+class Box {
+    private string $stored = '';
+    public string $x {
+        get => $this->stored;
+        set($v) => $this->stored = $v;
+    }
+}
+PHP;
+        [$out, $registry] = (new PropertyHooks())->process($src);
+        self::assertStringNotContainsString('$x {', $out);
+        self::assertStringContainsString('public string $x;', $out);
+        self::assertStringContainsString('function __phpc_property_set_x($v)', $out);
+        self::assertStringContainsString('$this->stored = $v;', $out);
+        self::assertSame('__phpc_property_set_x', $registry['box']['x']['set'] ?? null);
+    }
+
+    public function testLowersSetFatArrowWithTypedCustomParam(): void
+    {
+        $src = <<<'PHP'
+<?php
+class C {
+    private ?string $v = null;
+    public string $x {
+        get => $this->v ?? '';
+        set(string $value) => $this->v = trim($value);
+    }
+}
+PHP;
+        [$out] = (new PropertyHooks())->process($src);
+        self::assertStringContainsString('function __phpc_property_set_x(string $value)', $out);
+        self::assertStringContainsString('$this->v = trim($value);', $out);
+    }
+
     public function testLowersStaticPropertyHooks(): void
     {
         $src = <<<'PHP'
