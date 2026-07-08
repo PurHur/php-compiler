@@ -973,14 +973,12 @@ class Block {
 
     /**
      * Match unhandled-error lowering reads the scrutinee again on JUMPIF targets (#13955).
+     * Concat/?? chains read prefix temps on COALESCE/JUMP merge arms (#17375).
      */
     public function scopeSlotReadInJumpTargets(int $slot): bool
     {
         foreach ($this->opCodes as $op) {
-            if (OpCode::TYPE_JUMPIF !== $op->type) {
-                continue;
-            }
-            foreach ([$op->block1, $op->block2] as $target) {
+            foreach ($this->controlFlowBranchTargets($op) as $target) {
                 if (!$target instanceof self) {
                     continue;
                 }
@@ -995,6 +993,18 @@ class Block {
     }
 
     /**
+     * @return array<int, self|null>
+     */
+    private function controlFlowBranchTargets(OpCode $op): array
+    {
+        return match ($op->type) {
+            OpCode::TYPE_JUMPIF, OpCode::TYPE_COALESCE => [$op->block1, $op->block2],
+            OpCode::TYPE_JUMP => [$op->block1],
+            default => [],
+        };
+    }
+
+    /**
      * One-level JUMPIF target scan — enough to drop cond-expression temps without
      * treating distant merge/successor blocks as live (#14103 vs #13955 fcall keep).
      * ?: arms that JUMP to a shared merge must still preserve prefix temps (#14133);
@@ -1003,10 +1013,7 @@ class Block {
     public function scopeSlotReadInDirectJumpTargets(int $slot): bool
     {
         foreach ($this->opCodes as $op) {
-            if (OpCode::TYPE_JUMPIF !== $op->type) {
-                continue;
-            }
-            foreach ([$op->block1, $op->block2] as $target) {
+            foreach ($this->controlFlowBranchTargets($op) as $target) {
                 if (!$target instanceof self) {
                     continue;
                 }
@@ -1042,6 +1049,16 @@ class Block {
             ) {
                 return true;
             }
+            if (OpCode::TYPE_COALESCE === $branchOp->type) {
+                foreach ([$branchOp->block1, $branchOp->block2] as $target) {
+                    if (
+                        $target instanceof self
+                        && $this->branchOrJumpMergeReadsScopeSlot($target, $slot, $seen)
+                    ) {
+                        return true;
+                    }
+                }
+            }
             if (OpCode::TYPE_JUMPIF === $branchOp->type) {
                 foreach ([$branchOp->block1, $branchOp->block2] as $target) {
                     if (
@@ -1073,10 +1090,7 @@ class Block {
             }
         }
         foreach ($this->opCodes as $op) {
-            if (OpCode::TYPE_JUMPIF !== $op->type) {
-                continue;
-            }
-            foreach ([$op->block1, $op->block2] as $target) {
+            foreach ($this->controlFlowBranchTargets($op) as $target) {
                 if ($target instanceof self && $target->blockReadsScopeSlotTree($slot, $seen)) {
                     return true;
                 }
