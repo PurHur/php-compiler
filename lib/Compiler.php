@@ -32315,7 +32315,8 @@ class Compiler {
         Operand $valueOperand,
         Block $block,
         Op\Expr\Array_ $arrayExpr,
-        int $elementIndex
+        int $elementIndex,
+        bool $forRefBinding = false,
     ): array {
         $prefetchOps = $this->compileRuntimeEnumCaseFetchOpsForArrayElement(
             $valueOperand,
@@ -32333,11 +32334,12 @@ class Compiler {
         }
 
         $valueOperand = $arrayExpr->values[$elementIndex] ?? $valueOperand;
+        $isRead = !$forRefBinding;
         $producer = $this->findCfgProducerExprForOperand($valueOperand);
         if ($producer instanceof Op\Expr) {
             $ops = $this->rematerializeCfgProducerExprOps($producer, $block);
             if ([] !== $ops) {
-                $valueSlot = $this->compileOperand($valueOperand, $block, true);
+                $valueSlot = $this->compileOperand($valueOperand, $block, $isRead);
                 $snapshotOperand = new Operand\Temporary();
                 $snapshotSlot = $block->getVarSlot($snapshotOperand, false);
                 $ops[] = new OpCode(OpCode::TYPE_ASSIGN, $snapshotSlot, $valueSlot);
@@ -32346,7 +32348,7 @@ class Compiler {
             }
         }
 
-        return [[], $this->compileOperand($valueOperand, $block, true)];
+        return [[], $this->compileOperand($valueOperand, $block, $isRead)];
     }
 
     /**
@@ -42101,7 +42103,8 @@ class Compiler {
                     $expr->values[$i],
                     $block,
                     $expr,
-                    $i
+                    $i,
+                    !empty($byRefFlags[$i]),
                 );
                 if ([] !== $prefetchOps) {
                     $valueSlot = $prefetchOps[0]->arg1;
