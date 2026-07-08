@@ -60,7 +60,7 @@ final class VmStreamSocketPure
             return [false, $errno, '' !== $errstr ? $errstr : 'Connection refused', null];
         }
 
-        $socketFd = self::discoverNewSocketFd($beforeSockets);
+        $socketFd = VmSockets::discoverNewSocketFd($beforeSockets);
 
         $handle = VmFs::adoptStreamResource($sock, $remote, $socketFd);
         if (false === $handle) {
@@ -113,7 +113,7 @@ final class VmStreamSocketPure
             return [false, $errno, '' !== $errstr ? $errstr : 'Unable to create socket', null];
         }
 
-        $socketFd = self::discoverNewSocketFd($beforeSockets);
+        $socketFd = VmSockets::discoverNewSocketFd($beforeSockets);
 
         $handle = VmFs::adoptStreamResource($sock, $local, $socketFd);
         if (false === $handle) {
@@ -130,14 +130,7 @@ final class VmStreamSocketPure
      */
     private static function discoverNewSocketFd(array $beforeSockets): ?int
     {
-        $after = VmSockets::enumerateSocketFds();
-        foreach ($after as $fd => $target) {
-            if (!isset($beforeSockets[$fd])) {
-                return $fd;
-            }
-        }
-
-        return null;
+        return VmSockets::discoverNewSocketFd($beforeSockets);
     }
 
     /**
