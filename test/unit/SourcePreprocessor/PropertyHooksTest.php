@@ -913,4 +913,26 @@ PHP;
         self::assertFalse($registry['c']['x']['finalGet'] ?? false);
     }
 
+    /** @covers issue #17330 — get { } block records distinct read backing for VM dispatch */
+    public function testGetBlockBodyRegistersDistinctReadBacking(): void
+    {
+        $src = <<<'PHP'
+<?php
+class C {
+    private string $stored = 'g';
+    public string $x {
+        get {
+            return $this->stored;
+        }
+        set {
+            $this->stored = strtoupper($value);
+        }
+    }
+}
+PHP;
+        [, $registry] = (new PropertyHooks())->process($src);
+        self::assertSame('stored', $registry['c']['x']['getBacking'] ?? null);
+        self::assertSame('stored', $registry['c']['x']['setBacking'] ?? null);
+    }
+
 }
