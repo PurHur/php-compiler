@@ -3140,15 +3140,15 @@ class Compiler {
             return $block;
         }
         $coalesces = $this->findEmbeddedCoalesces($op->expr);
-        $flattened = $this->flattenBinaryConcatFromBlockOps($ops, $echoIndex, $op->expr)
-            ?? $this->unwrapConcatListExpr($op->expr)
-            ?? $this->flattenBinaryConcatToConcatList($op->expr);
-        if ([] === $coalesces && null === $flattened) {
-            return null;
-        }
         if ([] === $coalesces) {
             $coalesces = $this->findBlockCoalescesBeforeIndex($ops, $echoIndex);
         }
+        if ([] === $coalesces) {
+            return null;
+        }
+        $flattened = $this->flattenBinaryConcatFromBlockOps($ops, $echoIndex, $op->expr)
+            ?? $this->unwrapConcatListExpr($op->expr)
+            ?? $this->flattenBinaryConcatToConcatList($op->expr);
         $echoOperand = $op->expr;
         $coalesceSnapshots = [];
         foreach ($coalesces as $coalesce) {
@@ -3933,8 +3933,17 @@ class Compiler {
         for ($j = $index + 1; $j < $count; ++$j) {
             $next = $ops[$j];
             if ($next instanceof Op\Terminal\Echo_) {
+                $coalesces = $this->findEmbeddedCoalesces($next->expr);
+                if ([] === $coalesces) {
+                    $coalesces = $this->findBlockCoalescesBeforeIndex($ops, $j);
+                }
+                if ([] === $coalesces) {
+                    return false;
+                }
+
                 return null !== $this->flattenBinaryConcatFromBlockOps($ops, $j, $next->expr)
-                    || null !== $this->unwrapConcatListExpr($next->expr);
+                    || null !== $this->unwrapConcatListExpr($next->expr)
+                    || null !== $this->flattenBinaryConcatToConcatList($next->expr);
             }
             if ($next instanceof Op\Terminal\Return || $next instanceof Op\Expr\Assign) {
                 return false;
