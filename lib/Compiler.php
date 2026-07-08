@@ -16408,10 +16408,10 @@ class Compiler {
         }
         $callOp = $cfgCallOp;
         $argIndex = $knownArgIndex;
-        $callSite = $this->findCfgCallSiteForArg($block->orig->children, $arg, $cfgCallOp);
-        if (null !== $callSite) {
-            [$callOp, $foundArgIndex] = $callSite;
-            if (null === $knownArgIndex) {
+        if (null === $knownArgIndex) {
+            $callSite = $this->findCfgCallSiteForArg($block->orig->children, $arg, $cfgCallOp);
+            if (null !== $callSite) {
+                [$callOp, $foundArgIndex] = $callSite;
                 $argIndex = $foundArgIndex;
             }
         }
@@ -36021,6 +36021,32 @@ class Compiler {
             $nameSlot = $this->callArgNameSlot($arg, $block);
             // Early inline-array ARG_SEND paths continue before the main send site — unpack must be known up front (#16151).
             $unpackFlag = $this->callArgUnpack($arg) ? 1 : null;
+            if (
+                0 === (int) $argIndex
+                && null !== $cfgCallOp
+                && null !== $block->orig
+                && 1 === \count($args)
+                && (
+                    'closure::fromcallable' === strtolower((string) $calleeName)
+                    || (
+                        $cfgCallOp instanceof Op\Expr\StaticCall
+                        && 'closure' === strtolower((string) $this->staticNameFromOperand($cfgCallOp->class))
+                        && 'fromcallable' === strtolower((string) $this->staticNameFromOperand($cfgCallOp->name))
+                    )
+                )
+            ) {
+                $callIndex = array_search($cfgCallOp, $block->orig->children, true);
+                $leadingCallback = \is_int($callIndex) && $callIndex > 0
+                    ? ($block->orig->children[$callIndex - 1] ?? null)
+                    : null;
+                if ($leadingCallback instanceof Op\Expr\FirstClassCallable) {
+                    $fccInlineArgSlot = $this->slotForInlineFirstClassCallableProducer($leadingCallback, $block);
+                    if (null !== $fccInlineArgSlot) {
+                        $sends[] = new OpCode(OpCode::TYPE_ARG_SEND, (string) $fccInlineArgSlot, $nameSlot, $unpackFlag);
+                        continue;
+                    }
+                }
+            }
             if (
                 null !== $cfgCallOp
                 && null !== $block->orig
