@@ -7923,17 +7923,22 @@ restart:
                 if (!$local->isUndefined() && !$this->isUnboundLocalScopeRead($frame, $slot)) {
                     return $this->readScopeOperandForRuntimeRead($frame, $slot);
                 }
-                for ($f = $frame->parent; null !== $f; $f = $f->parent) {
-                    if (!isset($f->scope[$slot])) {
-                        continue;
-                    }
-                    $resolved = $f->scope[$slot]->resolveIndirect();
-                    if ($resolved->isUndefined() || $this->isUnboundLocalScopeRead($f, $slot)) {
-                        continue;
-                    }
-
-                    return $this->readScopeOperandForRuntimeRead($f, $slot);
+            }
+            $calleeFunc = $frame->block->func;
+            for ($f = $frame->parent; null !== $f; $f = $f->parent) {
+                // Callee concat must not read caller CVs when slot indices collide (#17383, re-#16253).
+                if ($f->block->func !== $calleeFunc) {
+                    break;
                 }
+                if (!isset($f->scope[$slot])) {
+                    continue;
+                }
+                $resolved = $f->scope[$slot]->resolveIndirect();
+                if ($resolved->isUndefined() || $this->isUnboundLocalScopeRead($f, $slot)) {
+                    continue;
+                }
+
+                return $this->readScopeOperandForRuntimeRead($f, $slot);
             }
 
             return $frame->block->constants[$slot];
