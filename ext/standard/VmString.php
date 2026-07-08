@@ -250,6 +250,10 @@ final class VmString
         int $argIndex = 0,
         string $paramName = 'path'
     ): string {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_NULL === $var->type) {
+            return '';
+        }
         $str = self::coerceStringBuiltinArg($var, $function, $argIndex, $paramName);
         if (str_contains($str, "\0")) {
             throw new \ValueError(
