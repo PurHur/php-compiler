@@ -40185,6 +40185,76 @@ class Compiler {
                     }
                 }
             }
+            // filter_var($v, FILTER_*, FLAGS|FLAGS) — hoisted filter const is not the trailing BitwiseOr (#17410).
+            if (
+                null !== $cfgCallOp
+                && null !== $block->orig
+                && 'filter_var' === strtolower($this->resolveCfgFuncCallName($cfgCallOp) ?? '')
+                && \is_array($cfgCallOp->args ?? null)
+                && 3 === \count($cfgCallOp->args)
+            ) {
+                $callIndex = null;
+                foreach ($block->orig->children as $i => $child) {
+                    if ($child === $cfgCallOp) {
+                        $callIndex = $i;
+                        break;
+                    }
+                }
+                if (null !== $callIndex) {
+                    if (1 === (int) $argIndex) {
+                        for ($i = $callIndex - 1; $i >= 0; --$i) {
+                            $child = $block->orig->children[$i];
+                            if (!$child instanceof Op\Expr\ConstFetch) {
+                                if ($child instanceof Op\Expr\Assign) {
+                                    break;
+                                }
+                                continue;
+                            }
+                            $name = strtolower($this->staticNameFromOperand($child->name) ?? '');
+                            if (
+                                !str_starts_with($name, 'filter_')
+                                || str_starts_with($name, 'filter_flag_')
+                            ) {
+                                continue;
+                            }
+                            if (null === $block->slotForOperand($child->result)) {
+                                foreach ($this->compileExpr($child, $block) as $op) {
+                                    $sends[] = $op;
+                                }
+                            }
+                            $filterSlot = $block->slotForOperand($child->result);
+                            if (null !== $filterSlot) {
+                                $valueSlot = (string) $filterSlot;
+                            }
+                            break;
+                        }
+                    } elseif (2 === (int) $argIndex) {
+                        $optionsArg = $cfgCallOp->args[2] ?? $arg;
+                        if (
+                            $this->callArgIsDeadInlineTemporary($optionsArg)
+                            && !$this->callArgOperandExpectsArrayProducer($optionsArg)
+                        ) {
+                            $immediate = $block->orig->children[$callIndex - 1] ?? null;
+                            if (
+                                $immediate instanceof Op\Expr\BinaryOp\BitwiseOr
+                                || $immediate instanceof Op\Expr\BinaryOp\BitwiseAnd
+                                || $immediate instanceof Op\Expr\BinaryOp\BitwiseXor
+                                || $immediate instanceof Op\Expr\ConstFetch
+                            ) {
+                                if (null === $block->slotForOperand($immediate->result)) {
+                                    foreach ($this->compileExpr($immediate, $block) as $op) {
+                                        $sends[] = $op;
+                                    }
+                                }
+                                $optionsSlot = $block->slotForOperand($immediate->result);
+                                if (null !== $optionsSlot) {
+                                    $valueSlot = (string) $optionsSlot;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
             // probe('label', in_array(..., g(), true)) — nested callee return, not inner ConstFetch (#14237, #16013).
             // array_slice([..], array_search(...)) — keep resolveArraySliceInlineCallArgSlot haystack/offset (#13684, #16023).
             $nestedCallArgSlot = null;

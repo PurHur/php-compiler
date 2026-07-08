@@ -77,6 +77,21 @@ final class VmFilterTest extends TestCase
         $this->assertFalse($out->toBool());
     }
 
+    public function testSanitizeNumberFloatIntFlags(): void
+    {
+        $v = new Variable();
+        $v->string('1,234.5e2');
+        $flags = new Variable();
+        $flags->int(
+            VmFilter::FILTER_FLAG_ALLOW_FRACTION
+            | VmFilter::FILTER_FLAG_ALLOW_THOUSAND
+            | VmFilter::FILTER_FLAG_ALLOW_SCIENTIFIC
+        );
+        $out = VmFilter::filterVar($v, VmFilter::FILTER_SANITIZE_NUMBER_FLOAT, $flags);
+        $this->assertSame(Variable::TYPE_STRING, $out->type);
+        $this->assertSame('1,234.5e2', $out->toString());
+    }
+
     public function testValidateIntAcceptsPlainDecimal(): void
     {
         $v = new Variable();

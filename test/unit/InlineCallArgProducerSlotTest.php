@@ -4399,6 +4399,66 @@ PHP;
         self::assertSame("ok\n", $out);
     }
 
+    /** Issue #17410 — filter_var() BitwiseOr int flags maps filter const + flags expr to arg slots. */
+    public function testFilterVarSanitizeNumberFloatBitmaskFlagsSlots(): void
+    {
+        $code = <<<'PHP'
+<?php
+$s = '1,234.5e2';
+filter_var(
+    $s,
+    FILTER_SANITIZE_NUMBER_FLOAT,
+    FILTER_FLAG_ALLOW_FRACTION | FILTER_FLAG_ALLOW_THOUSAND | FILTER_FLAG_ALLOW_SCIENTIFIC
+);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'filter_var_sanitize_float_flags.php');
+
+        $filterSlot = null;
+        $flagsSlot = null;
+        $sendSlots = [];
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_CONST_FETCH === $op->type && null === $filterSlot) {
+                $filterSlot = $op->arg1;
+            }
+            if (OpCode::TYPE_BITWISE_OR === $op->type) {
+                $flagsSlot = $op->arg1;
+            }
+            if (OpCode::TYPE_ARG_SEND === $op->type) {
+                $sendSlots[] = $op->arg1;
+            }
+        }
+
+        self::assertNotNull($filterSlot);
+        self::assertNotNull($flagsSlot);
+        self::assertCount(3, $sendSlots, 'filter_var arg sends='.json_encode($sendSlots));
+        self::assertSame($filterSlot, $sendSlots[1] ?? null, 'arg sends='.json_encode($sendSlots));
+        self::assertSame($flagsSlot, $sendSlots[2] ?? null, 'arg sends='.json_encode($sendSlots));
+    }
+
+    /** Issue #17410 — filter_var() sanitize-number-float + BitwiseOr flags runtime parity. */
+    public function testFilterVarSanitizeNumberFloatBitmaskFlagsRuntime(): void
+    {
+        $code = <<<'PHP'
+<?php
+declare(strict_types=1);
+
+$s = '1,234.5e2';
+$r = filter_var(
+    $s,
+    FILTER_SANITIZE_NUMBER_FLOAT,
+    FILTER_FLAG_ALLOW_FRACTION | FILTER_FLAG_ALLOW_THOUSAND | FILTER_FLAG_ALLOW_SCIENTIFIC
+);
+echo $r === '1,234.5e2' ? "ok\n" : "bad\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'filter_var_sanitize_float_flags_runtime.php');
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertSame("ok\n", $out);
+    }
+
     /** Issue #10566 — count([nested inline], COUNT_RECURSIVE) wires outer Array_ + mode const. */
     public function testCountNestedInlineLiteralRecursiveUsesArrayAndModeSlots(): void
     {
