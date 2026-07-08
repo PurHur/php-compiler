@@ -7,7 +7,7 @@ namespace PHPCompiler\JIT;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Issue #5938: settype() JIT/AOT lowers from ext/standard/JitSettype.php — no phpc_settype.c.
+ * Issue #17335: settype() JIT/AOT routes in-place casts through SettypeJitHelper PHP — no inline LLVM monolith.
  *
  * @group aot-lint
  */
@@ -21,11 +21,30 @@ final class SettypeRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('phpc_settype.c', $linker);
         $this->assertStringNotContainsString('phpc_settype', $linker);
 
-        $jitSettype = (string) file_get_contents(__DIR__.'/../../../ext/standard/JitSettype.php');
-        $this->assertStringContainsString('final class JitSettype', $jitSettype);
-        $this->assertStringContainsString('convertInPlace', $jitSettype);
-
         $settype = (string) file_get_contents(__DIR__.'/../../../ext/standard/settype.php');
         $this->assertStringContainsString('JitSettype::invoke', $settype);
+    }
+
+    public function testJitSettypeDelegatesToSettypeRuntime(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../../ext/standard/JitSettype.php');
+        $this->assertStringContainsString('final class JitSettype', $source);
+        $this->assertStringContainsString('SettypeRuntime::applyInPlace', $source);
+        $this->assertStringNotContainsString('convertInPlace', $source);
+        $this->assertStringNotContainsString('emitTargetFromString', $source);
+        $this->assertLessThanOrEqual(75, substr_count($source, "\n") + 1);
+    }
+
+    public function testSettypeRuntimeUsesJitVmHelperLink(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/SettypeRuntime.php');
+        $this->assertStringContainsString('SettypeJitHelper', $source);
+        $this->assertStringContainsString('JitVmHelperLink', $source);
+    }
+
+    public function testSettypeJitHelperDelegatesToVmSettype(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../../ext/standard/SettypeJitHelper.php');
+        $this->assertStringContainsString('VmSettype::apply', $source);
     }
 }
