@@ -32,10 +32,8 @@ final class ArrayCountValuesRuntime
 
     public static function countValues(Context $context, JITVariable $array): Value
     {
-        if (ArrayBuiltinHelper::isNativeArray($array->type)) {
-            return ArrayBuiltinHelper::arrayCountValues($context, $array);
-        }
-
+        // Route all operands through the PHP helper so warn-and-skip matches VM (#4267, #17398).
+        // Native LLVM array_count_values skips invalid entries without E_WARNING.
         self::ensureLinked($context);
         $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
 
