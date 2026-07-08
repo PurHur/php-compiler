@@ -48,8 +48,9 @@ final class VmArrayValueCallback
     }
 
     /**
-     * Invoke array_find-family predicate — closures/user fns get (value, key); internal builtins
-     * get arity-trimmed operands per php-src (ext/standard/array.c; #17300).
+     * Invoke array_find-family predicate — array_find/any/all closures get (value, key);
+     * array_find_key/any_key/all_key closures get (key, value); internal builtins get
+     * arity-trimmed operands per php-src (ext/standard/array.c; #17300, #17394).
      */
     public static function invokePredicate(
         Frame $frame,
@@ -61,6 +62,7 @@ final class VmArrayValueCallback
     ): Variable {
         self::requireCallback($frame, $callback, $function, $argNum);
         $callback = $callback->resolveIndirect();
+        $keyFirst = self::callbackKeyFirst($function);
         if (VmClosureCall::isClosure($callback)) {
             if (null === $frame->vmContext) {
                 throw new \LogicException(
@@ -71,8 +73,8 @@ final class VmArrayValueCallback
             return VmClosureCall::invoke(
                 $frame->vmContext,
                 VmClosureCall::resolve($callback),
-                $value,
-                $key,
+                $keyFirst ? $key : $value,
+                $keyFirst ? $value : $key,
             );
         }
         $name = $callback->toString();
@@ -84,6 +86,7 @@ final class VmArrayValueCallback
                 $value,
                 $key,
                 self::unaryInternalUsesKey($function),
+                $keyFirst,
             );
         } catch (\LogicException) {
             // Not a registered string builtin — try a user-defined function.
@@ -95,7 +98,22 @@ final class VmArrayValueCallback
         }
         $fn = VmUserCall::resolveStringCallback($frame->vmContext, $name);
 
-        return VmUserCall::invokeTwo($frame->vmContext, $fn, $value, $key);
+        return VmUserCall::invokeTwo(
+            $frame->vmContext,
+            $fn,
+            $keyFirst ? $key : $value,
+            $keyFirst ? $value : $key,
+        );
+    }
+
+    /**
+     * php_array_find_key / php_array_any_key / php_array_all_key pass key before value (#17394).
+     */
+    public static function callbackKeyFirst(string $function): bool
+    {
+        return 'array_find_key' === $function
+            || 'array_any_key' === $function
+            || 'array_all_key' === $function;
     }
 
     /**

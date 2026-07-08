@@ -124,6 +124,7 @@ final class ArrayFindHelper
         bool $unaryInternalUsesKey = false,
     ): Value {
         $strictI1 ??= $context->constantFromBool(false);
+        $keyFirst = self::callbackKeyFirstForMode($mode, $unaryInternalUsesKey);
         JitArrayElem::requireArrayArg($context, $array, self::functionNameForMode($mode));
         if (self::MODE_ANY === $mode || self::MODE_ALL === $mode) {
             $vacuous = self::vacuousAnyAllIfCompileTimeEmpty($context, $array, self::MODE_ALL === $mode);
@@ -142,7 +143,7 @@ final class ArrayFindHelper
             throw new \LogicException(ArrayFindCallbackPolicy::jitRejectionMessage());
         }
         if (ArrayBuiltinHelper::isNativeArray($array->type)) {
-            return self::buildFromNativeArray($context, $array, $callback, $mode, $strictI1, $unaryInternalUsesKey);
+            return self::buildFromNativeArray($context, $array, $callback, $mode, $strictI1, $unaryInternalUsesKey, $keyFirst);
         }
 
         return self::buildFromHashTable(
@@ -151,8 +152,14 @@ final class ArrayFindHelper
             $callback,
             $mode,
             $strictI1,
-            $unaryInternalUsesKey
+            $unaryInternalUsesKey,
+            $keyFirst
         );
+    }
+
+    private static function callbackKeyFirstForMode(int $mode, bool $unaryInternalUsesKey): bool
+    {
+        return self::MODE_FIND_KEY === $mode || $unaryInternalUsesKey;
     }
 
     private static function buildFromNativeArray(
@@ -162,6 +169,7 @@ final class ArrayFindHelper
         int $mode,
         Value $strictI1,
         bool $unaryInternalUsesKey = false,
+        bool $keyFirst = false,
     ): Value {
         $handler = self::resolvePredicateHandler($context, $callback);
         $elemType = $array->type & ~Variable::IS_NATIVE_ARRAY;
@@ -208,7 +216,7 @@ final class ArrayFindHelper
             );
         }
         $keyVar = self::indexToKeyVariable($context, $idx);
-        $truthy = self::invokePredicateMatch($context, $handler, $elem, $keyVar, $strictI1, $unaryInternalUsesKey);
+        $truthy = self::invokePredicateMatch($context, $handler, $elem, $keyVar, $strictI1, $unaryInternalUsesKey, $keyFirst);
         $shouldStop = self::stopOnPredicate($context, $truthy, $mode);
         $context->builder->branchIf($shouldStop, $match, $advance);
 
@@ -245,6 +253,7 @@ final class ArrayFindHelper
         int $mode,
         Value $strictI1,
         bool $unaryInternalUsesKey = false,
+        bool $keyFirst = false,
     ): Value {
         $handler = self::resolvePredicateHandler($context, $callback);
         $map = $context->structFieldMap['__hashtable__'];
@@ -293,7 +302,7 @@ final class ArrayFindHelper
         $context->builder->positionAtEnd($packedCheck);
         $elem = HashTableHelper::readIndexedToValueBox($context, $ht, $idx);
         $keyVar = self::indexToKeyVariable($context, $idx);
-        $truthy = self::invokePredicateMatch($context, $handler, $elem, $keyVar, $strictI1, $unaryInternalUsesKey);
+        $truthy = self::invokePredicateMatch($context, $handler, $elem, $keyVar, $strictI1, $unaryInternalUsesKey, $keyFirst);
         $shouldStop = self::stopOnPredicate($context, $truthy, $mode);
         $context->builder->branchIf($shouldStop, $packedMatch, $packedNext);
 
@@ -328,7 +337,8 @@ final class ArrayFindHelper
             $boolSlot,
             $done,
             $strictI1,
-            $unaryInternalUsesKey
+            $unaryInternalUsesKey,
+            $keyFirst
         );
 
         $context->builder->positionAtEnd($done);
@@ -349,6 +359,7 @@ final class ArrayFindHelper
         BasicBlock $doneBlock,
         Value $strictI1,
         bool $unaryInternalUsesKey = false,
+        bool $keyFirst = false,
     ): void {
         $map = $context->structFieldMap['__hashtable__'];
         $nodeMap = $context->structFieldMap['__strkey_node__'];
@@ -448,7 +459,7 @@ final class ArrayFindHelper
         $elem = new Variable($context, Variable::TYPE_VALUE, Variable::KIND_VARIABLE, $elemSlot);
         $keyStr = $context->builder->load($context->builder->structGep($node, $nodeMap['key']));
         $keyVar = self::separatedStringToKeyVariable($context, $keyStr);
-        $truthy = self::invokePredicateMatch($context, $handler, $elem, $keyVar, $strictI1, $unaryInternalUsesKey);
+        $truthy = self::invokePredicateMatch($context, $handler, $elem, $keyVar, $strictI1, $unaryInternalUsesKey, $keyFirst);
         $shouldStop = self::stopOnPredicate($context, $truthy, $mode);
         $context->builder->branchIf($shouldStop, $strMatch, $strNext);
 
@@ -541,16 +552,21 @@ final class ArrayFindHelper
         Variable $key,
         Value $strictI1,
         bool $unaryInternalUsesKey = false,
+        bool $keyFirst = false,
     ): Value {
         [$kind, $target] = $handler;
         if ('builtin' === $kind) {
             /** @var Internal $target */
-            $mapped = self::invokeBuiltinPredicate($context, $target, $elem, $key, $unaryInternalUsesKey);
+            $mapped = self::invokeBuiltinPredicate($context, $target, $elem, $key, $unaryInternalUsesKey, $keyFirst);
 
             return self::jitCallResultMatch($context, $mapped, $strictI1);
         }
         /** @var Call $target */
-        $result = $target->call($context, $elem, $key);
+        if ($keyFirst) {
+            $result = $target->call($context, $key, $elem);
+        } else {
+            $result = $target->call($context, $elem, $key);
+        }
 
         return self::jitCallResultMatch(
             $context,
@@ -565,10 +581,14 @@ final class ArrayFindHelper
         Variable $elem,
         Variable $key,
         bool $unaryInternalUsesKey,
+        bool $keyFirst = false,
     ): Value {
         $maxArgs = \PHPCompiler\ext\standard\InternalArityPolicy::maxArgsForArrayCallback($target);
         if ($maxArgs <= 1) {
             return $target->call($context, $unaryInternalUsesKey ? $key : $elem);
+        }
+        if ($keyFirst) {
+            return $target->call($context, $key, $elem);
         }
 
         return $target->call($context, $elem, $key);
