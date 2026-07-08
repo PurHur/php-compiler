@@ -49,23 +49,23 @@ final class StringWordwrap
 
     private static function implement(Context $context): void
     {
-        if (self::shouldDeferNestedHelper($context)) {
-            return;
-        }
-
         if (NestedJitCompileScope::isActive()) {
             return;
         }
 
         $probe = $context->module->getNamedFunction(self::ABI_WORDWRAP);
-        if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::BRIDGE_ENTRY)) {
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
             $context->registerFunction(self::ABI_WORDWRAP, $probe);
 
             return;
         }
 
         $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
-        self::implementBridge($context);
+        if (self::shouldDeferNestedHelper($context)) {
+            StringWordwrapLlvm::implement($context);
+        } else {
+            self::implementBridge($context);
+        }
         if (null !== $savedInsert) {
             BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
         } else {

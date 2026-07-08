@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 4264 |
-| Phase A inventory files (M2 ratio SSOT) | 4264 |
+| PHP files on vm.php path | 4265 |
+| Phase A inventory files (M2 ratio SSOT) | 4265 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 11477 |
+| Source constructs flagged (warnings) | 11478 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1296,7 +1296,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitVsprintf.php` | 0 | 2 |
 | `ext/standard/JitVsprintfArrayArg.php` | 0 | 1 |
 | `ext/standard/JitWebParams.php` | 0 | 15 |
-| `ext/standard/JitWordwrap.php` | 0 | 1 |
 | `ext/standard/JitZendScalarCast.php` | 0 | 1 |
 | `ext/standard/JitZlib.php` | 0 | 1 |
 | `ext/standard/JsonDecodeJitHelper.php` | 0 | 2 |
@@ -3358,6 +3357,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringVfscanf.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringVsprintf.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringWordwrap.php` | 0 | 1 |
+| `lib/JIT/Builtin/StringWordwrapLlvm.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringZlib.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringZstd.php` | 0 | 2 |
 | `lib/JIT/Builtin/StripWhitespace.php` | 0 | 2 |
@@ -3400,6 +3400,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/WeakRefRegistryRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/WeakRefRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/WeakRefSetup.php` | 0 | 1 |
+| `lib/JIT/Builtin/WordwrapLlvmEmit.php` | 0 | 1 |
 | `lib/JIT/Builtin/ZlibRuntime.php` | 0 | 3 |
 | `lib/JIT/Call.php` | 0 | 1 |
 | `lib/JIT/Call/ClosureBind.php` | 0 | 1 |
@@ -12308,11 +12309,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new JITVariable (line 228)
 - new strcmp (line 234)
 - 6 class method(s)
-
-### `ext/standard/JitWordwrap.php`
-
-**Warnings** (review for bootstrap subset):
-- 9 class method(s)
 
 ### `ext/standard/JitZendScalarCast.php`
 
@@ -26230,6 +26226,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 5 class method(s)
 
+### `lib/JIT/Builtin/StringWordwrapLlvm.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s)
+
 ### `lib/JIT/Builtin/StringZlib.php`
 
 **Warnings** (review for bootstrap subset):
@@ -26515,6 +26516,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 4 class method(s)
+
+### `lib/JIT/Builtin/WordwrapLlvmEmit.php`
+
+**Warnings** (review for bootstrap subset):
+- 9 class method(s)
 
 ### `lib/JIT/Builtin/ZlibRuntime.php`
 

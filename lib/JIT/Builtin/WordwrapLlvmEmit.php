@@ -3,15 +3,17 @@
 declare(strict_types=1);
 
 /**
- * LLVM JIT/AOT lowering for wordwrap() (issues #975, #3774, #5209).
+ * LLVM emit for wordwrap() user-script standalone AOT (#16734, #17349).
  *
- * Mirrors ext/standard/VmString.php — no compiler_wordwrap.c.
- *
+ * Nested WordwrapJitHelper segfaults in minimal standalone init; keep pre-#14565 LLVM.
+ * SSOT: {@see \PHPCompiler\ext\standard\VmString}.
  * php-src: ext/standard/string.c — PHP_FUNCTION(wordwrap)
  */
 
-namespace PHPCompiler\ext\standard;
+namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\ext\standard\VmMath;
+use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringArg;
@@ -19,7 +21,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-final class JitWordwrap
+final class WordwrapLlvmEmit
 {
     private static int $blockSerial = 0;
 
