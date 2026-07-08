@@ -195,6 +195,31 @@ final class ModuleRegistry
         return self::$extensionFunctions;
     }
 
+    /**
+     * Registered extension/builtin names for get_defined_functions() internal bucket (#17415).
+     *
+     * php-src: ext/standard/basic_functions.c — PHP_FUNCTION(get_defined_functions)
+     *
+     * @return list<string>
+     */
+    public static function advertisedInternalFunctionNames(): array
+    {
+        $names = [];
+        $seen = [];
+        foreach (self::$extensionFunctions as $funcs) {
+            foreach ($funcs as $name) {
+                $lc = strtolower($name);
+                if (isset($seen[$lc])) {
+                    continue;
+                }
+                $seen[$lc] = true;
+                $names[] = $name;
+            }
+        }
+
+        return $names;
+    }
+
     public static function isRegisteredBuiltinFunction(string $functionName): bool
     {
         return isset(self::$registeredFunctionLookup[strtolower($functionName)]);
