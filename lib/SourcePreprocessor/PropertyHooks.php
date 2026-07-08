@@ -1214,6 +1214,8 @@ final class PropertyHooks
                 $rest = preg_replace('/^get\s*/', '', $rest, 1) ?? $rest;
                 [$body, $rest] = $this->takeBraceBody($rest);
                 $usesBacking = $usesBacking || $this->hookTouchesBacking($body, $prop, $isStatic);
+                $this->registerHookBackingFromBody($lcClass, $prop, 'get', $body, $isStatic);
+                $this->registerGetHookReadBackingFromBody($lcClass, $prop, $body, $isStatic);
                 $method = self::GET_METHOD_PREFIX.$prop;
                 $methods[] = $this->hookMethodDecl($isStatic, $method, '', $body, $propertyType);
                 $this->registerHook($lcClass, $prop, 'get', $method, $isStatic, $hookFinal);
@@ -1657,6 +1659,27 @@ final class PropertyHooks
         if (preg_match('/\$this->(\w+)\s*=/', $body, $m) && strcasecmp($m[1], $prop) !== 0) {
             $key = 'get' === $kind ? 'getBacking' : 'setBacking';
             $this->registry[$lcClass][$prop][$key] = $m[1];
+        }
+    }
+
+    /**
+     * Record `$this->field` read targets from get { } bodies (#17330, #6635).
+     */
+    private function registerGetHookReadBackingFromBody(
+        string $lcClass,
+        string $prop,
+        string $body,
+        bool $isStatic
+    ): void {
+        if ($isStatic) {
+            if (preg_match('/\bself::\$(\w+)\b/', $body, $m) && strcasecmp($m[1], $prop) !== 0) {
+                $this->registry[$lcClass][$prop]['getBacking'] = $m[1];
+            }
+
+            return;
+        }
+        if (preg_match('/\$this->(\w+)\b/', $body, $m) && strcasecmp($m[1], $prop) !== 0) {
+            $this->registry[$lcClass][$prop]['getBacking'] = $m[1];
         }
     }
 
