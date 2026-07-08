@@ -10,12 +10,24 @@ use PHPUnit\Framework\TestCase;
 /** @covers issue #9793 */
 final class VmGraphemeStrimwidthTest extends TestCase
 {
-    public function testStrimwidthJapaneseWithEllipsis(): void
+    public function testStrimwidthJapaneseWithEncoding(): void
     {
-        $result = VmGrapheme::strimwidth('こんにちは', 0, 3, '...');
+        $result = VmGrapheme::strimwidth('日本語テスト', 0, 4, 'UTF-8');
+        $this->assertSame('日本', $result);
+    }
+
+    public function testStrimwidthJapaneseWithoutEncoding(): void
+    {
+        $result = VmGrapheme::strimwidth('こんにちは', 0, 3);
         $this->assertIsString($result);
-        $this->assertStringEndsWith('...', $result);
         $this->assertLessThan(\strlen('こんにちは'), \strlen($result));
+    }
+
+    public function testStrimwidthInvalidEncodingThrows(): void
+    {
+        $this->expectException(\ValueError::class);
+        $this->expectExceptionMessage('grapheme_strimwidth(): Argument #4 ($encoding) must be a valid encoding');
+        VmGrapheme::strimwidth('こんにちは', 0, 3, '...');
     }
 
     public function testStrimwidthAsciiNoTrim(): void

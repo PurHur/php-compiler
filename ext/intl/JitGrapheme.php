@@ -92,14 +92,14 @@ final class JitGrapheme
         if (null === $width) {
             return null;
         }
-        $trimmarker = '';
+        $encoding = null;
         if (isset($args[3])) {
-            $trimmarker = self::compileTimeString($args, 3);
-            if (null === $trimmarker) {
+            $encoding = self::compileTimeString($args, 3);
+            if (null === $encoding) {
                 return null;
             }
         }
-        $result = VmGrapheme::strimwidth($string, $start, $width, $trimmarker);
+        $result = VmGrapheme::strimwidth($string, $start, $width, $encoding);
         if (false === $result) {
             return $context->getTypeFromString('bool')->constInt(0, false);
         }
