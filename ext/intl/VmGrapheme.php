@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\intl;
 
 use PHPCompiler\ext\mbstring\EastAsianWidthTable;
+use PHPCompiler\ext\mbstring\MbstringEncodingRegistry;
 use PHPCompiler\ext\mbstring\VmMbstring;
 use PHPCompiler\ext\standard\VmString;
 
@@ -597,14 +598,20 @@ final class VmGrapheme
     }
 
     /**
-     * grapheme_strimwidth() — trim by display width in grapheme clusters (php-src ext/intl/grapheme; #9793).
+     * grapheme_strimwidth() — trim by display width in grapheme clusters (php-src ext/intl/grapheme; #9793, #17342).
      */
     public static function strimwidth(
         string $string,
         int $start,
         int $width,
-        string $trimmarker = ''
+        ?string $encoding = null
     ): string|false {
+        $encoding = MbstringEncodingRegistry::assertValid(
+            null === $encoding ? 'UTF-8' : $encoding,
+            'grapheme_strimwidth',
+            3
+        );
+        VmMbstring::assertSubstrCountEncoding($encoding, 'grapheme_strimwidth');
         if ('' === $string) {
             return '';
         }
@@ -633,18 +640,8 @@ final class VmGrapheme
         if ($totalWidth <= $width) {
             return \implode('', $graphemes);
         }
-        $markerGraphemes = '' !== $trimmarker ? self::splitGraphemes($trimmarker) : null;
-        if (null === $markerGraphemes && '' !== $trimmarker) {
-            return false;
-        }
-        $markerWidth = null !== $markerGraphemes ? self::graphemesDisplayWidth($markerGraphemes) : 0;
-        if ('' !== $trimmarker && $width <= $markerWidth) {
-            return $trimmarker;
-        }
-        $contentWidth = $width - $markerWidth;
-        $out = self::trimGraphemesToWidth($graphemes, $contentWidth);
 
-        return $out.$trimmarker;
+        return self::trimGraphemesToWidth($graphemes, $width);
     }
 
     /**
