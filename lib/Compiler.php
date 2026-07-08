@@ -2144,8 +2144,6 @@ class Compiler {
                             $i + 1 < $opCount
                             && $ops[$i + 1] instanceof Op\Expr\Assign
                             && $this->isCoalesceAssignTail($ops[$i + 1], $child)
-                            && null !== $child->left
-                            && $this->operandsChainEqual($ops[$i + 1]->var, $child->left)
                         ) {
                             /** @var Op\Expr\Assign $tailAssign */
                             $tailAssign = $ops[$i + 1];
@@ -3152,8 +3150,13 @@ class Compiler {
         $echoOperand = $op->expr;
         $coalesceSnapshots = [];
         foreach ($coalesces as $coalesce) {
-            $resultOverride = $this->findEchoCoalesceAssignTarget($ops, $echoIndex, $coalesce);
+            $resultOverride = $this->findCoalesceAssignTarget($ops, $coalesce)
+                ?? $this->findEchoCoalesceAssignTarget($ops, $echoIndex, $coalesce);
             $block = $this->compileCoalesceForAssign($coalesce, $block, $resultOverride);
+            if (null !== $resultOverride) {
+                $coalesceSnapshots[] = [$coalesce, $resultOverride];
+                continue;
+            }
             $snapshot = new Operand\Temporary();
             $readSlot = $this->compileOperand($coalesce->result, $block, true);
             $writeSlot = $block->forceFreshVarSlot($snapshot);
@@ -3168,7 +3171,7 @@ class Compiler {
                 null === $flattened
                 && $this->operandsChainEqual($echoOperand, $coalesce->result)
             ) {
-                $echoOperand = $resultOverride ?? $coalesce->result;
+                $echoOperand = $coalesce->result;
             }
         }
         $concat = $flattened;
@@ -3176,9 +3179,12 @@ class Compiler {
             $parts = [];
             foreach ($concat->list as $part) {
                 $replaced = $part;
-                foreach ($coalesceSnapshots as [$coalesce, $snapshot]) {
-                    if ($this->operandsChainEqual($part, $coalesce->result)) {
-                        $replaced = $snapshot;
+                foreach ($coalesceSnapshots as [$coalesce, $replacement]) {
+                    if (
+                        $this->operandsChainEqual($part, $coalesce->result)
+                        || $this->operandsChainEqual($part, $replacement)
+                    ) {
+                        $replaced = $replacement;
                         break;
                     }
                 }
@@ -3234,7 +3240,10 @@ class Compiler {
         }
         if (
             $this->isCoalesceAssignTail($assign, $coalesce)
-            && $this->operandsChainEqual($echoExpr, $coalesce->result)
+            && (
+                $this->operandsChainEqual($echoExpr, $coalesce->result)
+                || $this->operandsChainEqual($echoExpr, $assign->var)
+            )
         ) {
             return $assign->var;
         }
@@ -3258,6 +3267,29 @@ class Compiler {
     }
 
     /**
+     * php-cfg: Coalesce immediately followed by Assign(expr=coalesce.result).
+     *
+     * @param Op[] $ops
+     */
+    private function findCoalesceAssignTarget(array $ops, Op\Expr\BinaryOp\Coalesce $coalesce): ?Operand
+    {
+        $count = \count($ops);
+        for ($j = 0; $j < $count - 1; ++$j) {
+            if ($ops[$j] !== $coalesce) {
+                continue;
+            }
+            $next = $ops[$j + 1];
+            if ($next instanceof Op\Expr\Assign && $this->isCoalesceAssignTail($next, $coalesce)) {
+                return $next->var;
+            }
+
+            return null;
+        }
+
+        return null;
+    }
+
+    /**
      * php-cfg: Coalesce; Assign; Terminal_Echo(expr=coalesce.result) for inline ??= (#1980).
      *
      * @param Op[] $ops
@@ -3267,6 +3299,10 @@ class Compiler {
         int $echoIndex,
         Op\Expr\BinaryOp\Coalesce $coalesce
     ): ?Operand {
+        $direct = $this->findCoalesceAssignTarget($ops, $coalesce);
+        if (null !== $direct) {
+            return $direct;
+        }
         if ($echoIndex > 0) {
             $prev = $ops[$echoIndex - 1];
             if ($prev instanceof Op\Expr\Assign && $this->isCoalesceAssignTail($prev, $coalesce)) {
