@@ -31,6 +31,15 @@ final class OpensslConstants
     /**
      * @return array<string, int>
      */
+    /** @return array<string, int> */
+    public static function registeredConstants(): array
+    {
+        return [
+            'OPENSSL_RAW_DATA' => self::OPENSSL_RAW_DATA,
+            'OPENSSL_ZERO_PADDING' => self::OPENSSL_ZERO_PADDING,
+        ] + self::algorithmConstants();
+    }
+
     public static function algorithmConstants(): array
     {
         return [

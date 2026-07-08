@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
-use PHPCompiler\ext\filter\FilterConstants;
 use PHPCompiler\ClassConstVisibility;
 use PHPCfg\Func as CfgFunc;
 use PHPCompiler\VM\Context;
@@ -276,17 +275,27 @@ final class VmConstants
             $copy->copyFrom($value);
             $core->add($name, $copy);
         }
+        foreach (ExtensionConstantGroups::coreBucketNames() as $name) {
+            if (!isset($ctx->constants[$name])) {
+                continue;
+            }
+            $copy = new Variable();
+            $copy->copyFrom($ctx->constants[$name]);
+            $core->add($name, $copy);
+        }
         $result->add('Core', self::wrapArray($core));
 
-        $filter = self::extensionConstantBucket(FilterConstants::REGISTERED, $ctx);
-        if ($filter->getNumElements() > 0) {
-            $result->add('filter', self::wrapArray($filter));
+        foreach (ExtensionConstantGroups::groups() as $extension => $registered) {
+            $bucket = self::extensionConstantBucket($registered, $ctx);
+            if ($bucket->getNumElements() > 0) {
+                $result->add($extension, self::wrapArray($bucket));
+            }
         }
 
         if ([] !== $ctx->constants) {
             $user = new HashTable();
             foreach ($ctx->constants as $name => $value) {
-                if (FilterConstants::isRegisteredName($name)) {
+                if (ExtensionConstantGroups::isExtensionConstantName($name)) {
                     continue;
                 }
                 $copy = new Variable();
@@ -308,11 +317,18 @@ final class VmConstants
     {
         $bucket = new HashTable();
         foreach ($registered as $name => $fallback) {
-            $value = $ctx->constants[$name] ?? FilterConstants::variableForName($name);
-            if (null === $value) {
+            $value = $ctx->constants[$name] ?? null;
+            if (null === $value && \is_int($fallback)) {
                 $var = new Variable(Variable::TYPE_INTEGER);
                 $var->int($fallback);
                 $value = $var;
+            } elseif (null === $value && \is_string($fallback)) {
+                $var = new Variable(Variable::TYPE_STRING);
+                $var->string($fallback);
+                $value = $var;
+            }
+            if (null === $value) {
+                continue;
             }
             $copy = new Variable();
             $copy->copyFrom($value);

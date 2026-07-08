@@ -338,6 +338,7 @@
         "ext/intl/BuiltinClasses.php",
         "ext/intl/CollatorCreate.php",
         "ext/intl/IntlClassMethod.php",
+        "ext/intl/IntlConstants.php",
         "ext/intl/IntlDateFormatterCreate.php",
         "ext/intl/IntlError.php",
         "ext/intl/IntlExtensionPolicy.php",
@@ -591,6 +592,7 @@
         "ext/sodium/SodiumBoxKeypairExtractFunction.php",
         "ext/sodium/SodiumBoxSealFunction.php",
         "ext/sodium/SodiumBoxSealOpenFunction.php",
+        "ext/sodium/SodiumConstants.php",
         "ext/sodium/SodiumExtensionPolicy.php",
         "ext/sodium/SodiumFunction.php",
         "ext/sodium/SodiumGenerichashFunction.php",
@@ -814,6 +816,7 @@
         "ext/standard/ExpJitHelper.php",
         "ext/standard/ExplodeJitHelper.php",
         "ext/standard/Expm1JitHelper.php",
+        "ext/standard/ExtensionConstantGroups.php",
         "ext/standard/FileGetContentsJitHelper.php",
         "ext/standard/FilePutContentsJitHelper.php",
         "ext/standard/FindSubstrJitHelper.php",
@@ -1467,6 +1470,7 @@
         "ext/standard/StatFieldsJitHelper.php",
         "ext/standard/StatPathJitHelper.php",
         "ext/standard/StdlibConstants.php",
+        "ext/standard/StdlibModuleConstants.php",
         "ext/standard/StrContainsJitHelper.php",
         "ext/standard/StrIncdecJitHelper.php",
         "ext/standard/StrPadJitHelper.php",
@@ -4508,9 +4512,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 4274,
+        "inventory_files": 4278,
         "excluded": 0,
-        "eligible": 4274,
+        "eligible": 4278,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
