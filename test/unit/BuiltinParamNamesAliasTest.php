@@ -685,6 +685,15 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($cookie, 'value', 'setcookie'));
     }
 
+    /** @covers issue #17370 */
+    public function testTokenGetAllFlagsNamedParamResolves(): void
+    {
+        $names = BuiltinParamNames::forFunction('token_get_all');
+        self::assertSame(['source', 'flags'], $names);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'source', 'token_get_all'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'flags', 'token_get_all'));
+    }
+
     /** @covers issue #17090 */
     public function testParseIniNamedParamsResolve(): void
     {
