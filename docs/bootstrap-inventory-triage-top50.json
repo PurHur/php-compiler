@@ -1,5 +1,5 @@
 {
-    "scanned": 4274,
+    "scanned": 4287,
     "top": 50,
     "rows": [
         {
@@ -59,6 +59,15 @@
             ],
             "issue": null,
             "rank": 6
+        },
+        {
+            "message": "Unknown type declaration found: string>",
+            "file_count": 1,
+            "examples": [
+                "ext/standard/ExtensionConstantGroups.php"
+            ],
+            "issue": null,
+            "rank": 7
         }
     ],
     "source": "live"
