@@ -145,6 +145,7 @@ final class ProcessSlotJitHelper
             $signals['termsig'],
             $signals['stopsig'],
             $pendingSignals,
+            $entry['statusKnown'],
         );
     }
 

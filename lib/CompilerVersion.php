@@ -1588,6 +1588,14 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.3+ proc_get_status() cached bool — exit code cached after child exit (ext/standard/proc_open.c, #17362).
+     */
+    public static function supportsProcGetStatusCached(): bool
+    {
+        return version_compare(self::languageProfileVersion(), '8.3.0', '>=');
+    }
+
+    /**
      * PHP 8.4+ proc_get_status() pending_signals array (ext/standard/proc_open.c, #16707).
      *
      * Gated on stable 8.4.0 / PHP_COMPILER_PROFILE=8.4 so 8.4.0-dev reference profile matches Zend 8.2 phantom gate.
