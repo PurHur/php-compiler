@@ -2256,7 +2256,8 @@ final class VmString
                 ($ord >= 48 && $ord <= 57)
                 || ($ord >= 65 && $ord <= 90)
                 || ($ord >= 97 && $ord <= 122)
-                || $ch === '-' || $ch === '_' || $ch === '.' || $ch === '~'
+                || $ch === '-' || $ch === '_' || $ch === '.'
+                || (!$formEncoding && $ch === '~')
             ) {
                 $out .= $ch;
             } elseif ($formEncoding && $ch === ' ') {
