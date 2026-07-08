@@ -154,6 +154,8 @@ final class BuiltinParamNames
                 return ['callback', 'throw', 'prepend'];
             case 'touch':
                 return ['filename', 'mtime', 'atime'];
+            case 'token_get_all':
+                return ['source', 'flags'];
             case 'getenv':
                 return ['name', 'local_only'];
             case 'ini_get':
