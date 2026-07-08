@@ -926,6 +926,8 @@ class Module extends ModuleAbstract
             new date_format(),
             new date_timestamp_get(),
             new date_timestamp_set(),
+            new date_date_set(),
+            new date_time_set(),
             new date_timezone_get(),
             new date_timezone_set(),
             new date_get_last_errors(),
