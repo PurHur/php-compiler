@@ -156,6 +156,7 @@ use PHPCompiler\VM\Builtin\ReflectionClassResetAsLazyProxy;
 use PHPCompiler\VM\Builtin\ReflectionClassNewLazyProxy;
 use PHPCompiler\VM\Builtin\ReflectionConstantConstruct;
 use PHPCompiler\VM\Builtin\ReflectionConstantGetAttributes;
+use PHPCompiler\VM\Builtin\ReflectionConstantGetDeclaringClass;
 use PHPCompiler\VM\Builtin\ReflectionConstantGetName;
 use PHPCompiler\VM\Builtin\ReflectionConstantGetValue;
 use PHPCompiler\VM\Builtin\ReflectionEnumBackedCaseConstruct;
@@ -902,6 +903,8 @@ final class BuiltinClasses
             $rconst->methodVisibility['getvalue'] = $pub;
             $rconst->methods['getattributes'] = new ReflectionConstantGetAttributes();
             $rconst->methodVisibility['getattributes'] = $pub;
+            $rconst->methods['getdeclaringclass'] = new ReflectionConstantGetDeclaringClass();
+            $rconst->methodVisibility['getdeclaringclass'] = $pub;
             $rconst->methods['gettype'] = new ReflectionClassConstantGetType();
             $rconst->methodVisibility['gettype'] = $pub;
             if (CompilerVersion::supportsReflectionClassConstantIsDeprecated()) {
@@ -937,6 +940,8 @@ final class BuiltinClasses
         $rcc->methodVisibility['getvalue'] = $pub;
         $rcc->methods['getattributes'] = new ReflectionConstantGetAttributes();
         $rcc->methodVisibility['getattributes'] = $pub;
+        $rcc->methods['getdeclaringclass'] = new ReflectionConstantGetDeclaringClass();
+        $rcc->methodVisibility['getdeclaringclass'] = $pub;
         $rcc->methods['gettype'] = new ReflectionClassConstantGetType();
         $rcc->methodVisibility['gettype'] = $pub;
         if (CompilerVersion::supportsReflectionClassConstantIsDeprecated()) {

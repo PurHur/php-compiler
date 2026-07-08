@@ -577,6 +577,8 @@ require_once __DIR__.'/../../../ext/sockets/VmSocketArg.php';
 require_once __DIR__.'/../../../ext/sockets/VmSockets.php';
 require_once __DIR__.'/../../../ext/sockets/socket_atmark.php';
 require_once __DIR__.'/../../../ext/sockets/socket_import_stream.php';
+require_once __DIR__.'/../../../ext/sockets/socket_set_block.php';
+require_once __DIR__.'/../../../ext/sockets/socket_set_nonblock.php';
 require_once __DIR__.'/../../../ext/sodium/JitSodium.php';
 require_once __DIR__.'/../../../ext/sodium/Module.php';
 require_once __DIR__.'/../../../ext/sodium/SodiumAeadDecryptFunction.php';
@@ -3878,6 +3880,7 @@ require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassSetStaticPropertyV
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionCompositeTypeGetTypes.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionConstantConstruct.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionConstantGetAttributes.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionConstantGetDeclaringClass.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionConstantGetName.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionConstantGetValue.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionDeprecatedReturn.php';
