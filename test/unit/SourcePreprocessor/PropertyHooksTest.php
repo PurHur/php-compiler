@@ -470,6 +470,7 @@ PHP;
         self::assertStringContainsString('/*phpc-asymmetric-set:private*/ /*phpc-asymmetric-explicit-read*/ public string $x;', $out);
         self::assertStringContainsString('function __phpc_property_get_x', $out);
         self::assertArrayNotHasKey('set', $registry['c']['x'] ?? []);
+        self::assertArrayNotHasKey('requiresSet', $registry['c']['x'] ?? []);
         self::assertTrue($registry['c']['x']['virtual'] ?? false);
     }
 
