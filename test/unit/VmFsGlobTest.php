@@ -148,6 +148,23 @@ final class VmFsGlobTest extends TestCase
         $this->assertFalse($result);
     }
 
+    /** Issue #17456 — glob('/dir/.*') includes . and .. when pattern requests dotfiles. */
+    public function testVmFsGlobDotPatternIncludesDotEntries(): void
+    {
+        $tmp = sys_get_temp_dir();
+        if (!is_dir($tmp)) {
+            $this->markTestSkipped('sys_get_temp_dir() is not a directory');
+        }
+        $matches = \PHPCompiler\ext\standard\VmFsGlob::glob($tmp.'/.*');
+        $this->assertIsArray($matches);
+        $this->assertContains($tmp.'/.', $matches);
+        $this->assertContains($tmp.'/..', $matches);
+        $star = \PHPCompiler\ext\standard\VmFsGlob::glob($tmp.'/*');
+        $this->assertIsArray($star);
+        $this->assertNotContains($tmp.'/.', $star);
+        $this->assertNotContains($tmp.'/..', $star);
+    }
+
     /** Issue #14881 — absolute directory path without double leading slash. */
     public function testVmFsGlobAbsoluteDirNormalizesLeadingSlash(): void
     {
