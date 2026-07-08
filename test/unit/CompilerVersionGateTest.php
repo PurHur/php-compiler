@@ -605,6 +605,21 @@ final class CompilerVersionGateTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsHrtimeAsNumberFloat());
     }
 
+    public function testSupportsHrtimeAsNumberFloatTrueOnForwardProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertTrue(CompilerVersion::supportsHrtimeAsNumberFloat());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     public function testSupportsClassConstantsFalseOnReferenceProfile(): void
     {
         $this->assertFalse(CompilerVersion::supportsClassConstants());
@@ -618,6 +633,51 @@ final class CompilerVersionGateTest extends TestCase
     public function testSupportsArrayReplaceKeyFalseOnReferenceProfile(): void
     {
         $this->assertFalse(CompilerVersion::supportsArrayReplaceKey());
+    }
+
+    public function testSupportsArrayReplaceKeyTrueWhenProfile84(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertTrue(CompilerVersion::supportsArrayReplaceKey());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testSupportsClassConstantsTrueWhenProfile84(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertTrue(CompilerVersion::supportsClassConstants());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testSupportsHeaderListTrueWhenProfile84(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertTrue(CompilerVersion::supportsHeaderList());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
     }
 
     public function testSupportsHttpLastResponseHeadersWithheldOnReferenceProfile(): void
@@ -1458,6 +1518,25 @@ final class CompilerVersionGateTest extends TestCase
         $runtime = new Runtime();
         $this->assertFalse(isset($runtime->vmContext->functions['array_replace_key']));
         $this->assertTrue(isset($runtime->vmContext->functions['array_replace']));
+    }
+
+    public function testVmRegistersForwardProfileBuiltinsWhenProfile84(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $runtime = new Runtime();
+            $ctx = $runtime->vmContext;
+            $this->assertTrue(isset($ctx->functions['array_replace_key']));
+            $this->assertTrue(isset($ctx->functions['class_constants']));
+            $this->assertTrue(isset($ctx->functions['header_list']));
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
     }
 
     public function testSupportsClosureGetCurrentFalseOnReferenceProfile(): void

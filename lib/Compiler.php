@@ -18686,17 +18686,6 @@ class Compiler {
         return null;
     }
 
-    private function isFilterExtensionHoistedFlagConstName(string $lowerName): bool
-    {
-        return str_starts_with($lowerName, 'filter_flag_')
-            || \in_array($lowerName, [
-                'filter_null_on_failure',
-                'filter_require_scalar',
-                'filter_require_array',
-                'filter_force_array',
-            ], true);
-    }
-
     private function matchFilterExtensionInlineCallArgProducer(
         array $producers,
         array $callArgs,
@@ -21042,6 +21031,21 @@ class Compiler {
      *
      * @return array{0: Op\Expr\ConstFetch, 1: Op\Expr\Array_}|null
      */
+    /**
+     * FILTER_* names that are option bitmasks, not filter ids (php-src ext/filter/php_filter.h).
+     */
+    private function isFilterVarOptionFlagConstName(string $name): bool
+    {
+        return str_starts_with($name, 'filter_flag_')
+            || \in_array($name, [
+                'filter_null_on_failure',
+                'filter_throw_on_failure',
+                'filter_require_array',
+                'filter_require_scalar',
+                'filter_force_array',
+            ], true);
+    }
+
     private function splitLeadingConstFetchWithArrayLiteralCallArg(array $producers): ?array
     {
         $count = \count($producers);
@@ -40260,7 +40264,7 @@ class Compiler {
                             $name = strtolower($this->staticNameFromOperand($child->name) ?? '');
                             if (
                                 !str_starts_with($name, 'filter_')
-                                || $this->isFilterExtensionHoistedFlagConstName($name)
+                                || $this->isFilterVarOptionFlagConstName($name)
                             ) {
                                 continue;
                             }

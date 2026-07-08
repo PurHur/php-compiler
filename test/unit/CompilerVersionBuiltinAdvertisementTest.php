@@ -29,6 +29,11 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsSortingEnum());
     }
 
+    public function testRangeWithheldOnReferenceProfile(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsRange());
+    }
+
     public function testBuiltinStubEnumsWithheldOnReferenceProfile(): void
     {
         $this->assertFalse(CompilerVersion::supportsBuiltinStubEnums());
