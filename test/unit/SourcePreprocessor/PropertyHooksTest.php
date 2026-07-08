@@ -266,6 +266,26 @@ PHP;
         self::assertTrue($registry['box']['value']['virtual'] ?? false);
     }
 
+    public function testLowersSetParamArrowHook(): void
+    {
+        $src = <<<'PHP'
+<?php
+class Box {
+    private string $stored = 'init';
+    public string $x {
+        get => $this->stored;
+        set($v) => $this->stored = strtoupper($v);
+    }
+}
+PHP;
+        [$out, $registry] = (new PropertyHooks())->process($src);
+        self::assertStringNotContainsString('$x {', $out);
+        self::assertStringContainsString('public string $x;', $out);
+        self::assertStringContainsString('function __phpc_property_set_x($v)', $out);
+        self::assertStringContainsString('$this->stored = strtoupper($v);', $out);
+        self::assertSame('__phpc_property_set_x', $registry['box']['x']['set'] ?? null);
+    }
+
     public function testLowersStaticPropertyHooks(): void
     {
         $src = <<<'PHP'
