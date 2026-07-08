@@ -717,6 +717,16 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.4+ get_class()/get_parent_class() optional $allow_string (ext/standard/basic_functions.c, #17395).
+     *
+     * Gated on stable 8.4.0 so 8.4.0-dev reference profile rejects a second argument like Zend 8.2.
+     */
+    public static function supportsGetClassAllowString(): bool
+    {
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+    }
+
+    /**
      * PHP 8.2+ get_defined_functions() optional $exclude_disabled (ext/standard/basic_functions.c, #4942).
      *
      * Unlike {@see supportsGetDeclaredExcludeDeprecated()} (PHP 8.4-only), Zend exposes this on the

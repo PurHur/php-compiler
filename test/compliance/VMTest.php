@@ -110,6 +110,15 @@ class VMTest extends BaseTest {
                 && str_contains($name, 'get_declared_exclude_deprecated_reference_profile')) {
                 continue;
             }
+            if (!CompilerVersion::supportsGetClassAllowString()
+                && str_contains($name, 'get_class_allow_string')
+                && !str_contains($name, 'get_class_allow_string_reference_profile')) {
+                continue;
+            }
+            if (CompilerVersion::supportsGetClassAllowString()
+                && str_contains($name, 'get_class_allow_string_reference_profile')) {
+                continue;
+            }
             if (!CompilerVersion::supportsGetDeclaredExcludeDeprecated()
                 && str_contains($name, 'get_declared_argument_count_error')) {
                 continue;

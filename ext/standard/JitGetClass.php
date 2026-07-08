@@ -9,6 +9,7 @@ use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\ErrorRaise;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\ReflectionBuiltinHelper;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -38,13 +39,20 @@ final class JitGetClass
         );
     }
 
-    public static function invoke(Context $context, JITVariable $arg): Value
-    {
+    public static function invoke(
+        Context $context,
+        JITVariable $arg,
+        ?Value $allowString = null,
+        bool $allowStringKnownFalse = true
+    ): Value {
+        if (JITVariable::TYPE_STRING === $arg->type) {
+            return self::invokeStringOperand($context, $arg, $allowString, $allowStringKnownFalse);
+        }
         if (JITVariable::TYPE_OBJECT === $arg->type) {
             return ReflectionBuiltinHelper::getClassName($context, $arg);
         }
         if (JITVariable::TYPE_VALUE === $arg->type) {
-            return self::boxed($context, $arg);
+            return self::boxed($context, $arg, $allowString, $allowStringKnownFalse);
         }
 
         self::emitTypeErrorAndAbort($context, self::scalarTypeError($arg->type));
@@ -52,8 +60,67 @@ final class JitGetClass
         return $context->builder->load($context->constantStringFromString(''));
     }
 
-    private static function boxed(Context $context, JITVariable $arg): Value
+    private static function invokeStringOperand(
+        Context $context,
+        JITVariable $arg,
+        ?Value $allowString,
+        bool $allowStringKnownFalse
+    ): Value {
+        if ($allowStringKnownFalse) {
+            self::emitTypeErrorAndAbort($context, \sprintf(self::TYPE_ERROR, 'string'));
+
+            return self::emptyStringBox($context);
+        }
+        $literal = JitStringArg::compileTimeLiteral($arg);
+        if (null === $literal) {
+            throw new \LogicException(
+                'get_class() class name string must be a compile-time literal in this compiler build'
+            );
+        }
+        if (null !== $allowString) {
+            $trueBlock = BasicBlockHelper::append($context, 'get_class_allow_string_true');
+            $falseBlock = BasicBlockHelper::append($context, 'get_class_allow_string_false');
+            $context->builder->branchIf($allowString, $trueBlock, $falseBlock);
+
+            $context->builder->positionAtEnd($falseBlock);
+            self::emitTypeErrorAndAbort($context, \sprintf(self::TYPE_ERROR, 'string'));
+
+            $context->builder->positionAtEnd($trueBlock);
+            $resolved = self::resolveAllowStringLiteral($context, $literal);
+
+            return self::boxString(
+                $context,
+                $context->builder->load($context->constantStringFromString($resolved))
+            );
+        }
+
+        return self::boxString(
+            $context,
+            $context->builder->load($context->constantStringFromString(self::resolveAllowStringLiteral($context, $literal)))
+        );
+    }
+
+    private static function resolveAllowStringLiteral(Context $context, string $className): string
     {
+        $vm = $context->runtime->vmContext;
+        if (null === $vm) {
+            return $className;
+        }
+        try {
+            return VmReflection::resolveAllowStringClassName($vm, $className, 'get_class');
+        } catch (\ValueError $e) {
+            self::emitTypeErrorAndAbort($context, $e->getMessage());
+
+            return $className;
+        }
+    }
+
+    private static function boxed(
+        Context $context,
+        JITVariable $arg,
+        ?Value $allowString,
+        bool $allowStringKnownFalse
+    ): Value {
         $loaded = JitValueBox::valuePtrFromVariable($context, $arg);
         $typeField = $context->structFieldMap['__value__']['type'];
         $typeByte = $context->builder->load(
@@ -65,18 +132,35 @@ final class JitGetClass
             $typeByte,
             $i8->constInt(Variable::TYPE_OBJECT, false)
         );
+        $isString = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_STRING, false)
+        );
         $isNull = $context->builder->icmp(
             Builder::INT_EQ,
             $typeByte,
             $i8->constInt(Variable::TYPE_NULL, false)
         );
         $okBlock = BasicBlockHelper::append($context, 'get_class_ok');
+        $checkStringBlock = BasicBlockHelper::append($context, 'get_class_check_string');
+        $stringErrBlock = BasicBlockHelper::append($context, 'get_class_string_err');
         $checkNullBlock = BasicBlockHelper::append($context, 'get_class_check_null');
         $nullErrBlock = BasicBlockHelper::append($context, 'get_class_null_err');
         $mixedErrBlock = BasicBlockHelper::append($context, 'get_class_mixed_err');
-        $context->builder->branchIf($isObject, $okBlock, $checkNullBlock);
+        $context->builder->branchIf($isObject, $okBlock, $checkStringBlock);
 
-        $context->builder->positionAtEnd($checkNullBlock);
+        $context->builder->positionAtEnd($checkStringBlock);
+        $context->builder->branchIf($isString, $stringErrBlock, $checkNullBlock);
+
+        $context->builder->positionAtEnd($stringErrBlock);
+        if ($allowStringKnownFalse) {
+            self::emitTypeErrorAndAbort($context, \sprintf(self::TYPE_ERROR, 'string'));
+        } else {
+            throw new \LogicException(
+                'get_class() runtime string operand with allow_string requires a compile-time literal in this compiler build'
+            );
+        }
         $context->builder->branchIf($isNull, $nullErrBlock, $mixedErrBlock);
 
         $context->builder->positionAtEnd($nullErrBlock);
