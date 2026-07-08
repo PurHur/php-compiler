@@ -2132,6 +2132,9 @@ class Compiler {
                         if ($this->isCoalesceChainInnerStmt($child, $ops, $i)) {
                             break;
                         }
+                        if ($this->isCoalesceLoweredByFollowingEchoConcat($ops, $i)) {
+                            break;
+                        }
                         // php-cfg emits Coalesce before Throw when source is `throw … ?? …`; lower once inside compileThrowExpression (#15315).
                         if ($this->isCoalesceLoweredByFollowingThrow($ops, $i)) {
                             break;
@@ -2208,6 +2211,10 @@ class Compiler {
                             $tailAssign = $ops[$coalesceIndex + 1];
                             $resultOverride = $tailAssign->var;
                         }
+                        if ($this->isCoalesceLoweredByFollowingEchoConcat($ops, $coalesceIndex)) {
+                            $i = $coalesceIndex;
+                            break;
+                        }
                         $block = null !== $resultOverride
                             ? $this->compileCoalesceForAssign($coalesce, $block, $resultOverride)
                             : $this->compileCoalesce($coalesce, $block);
@@ -2242,6 +2249,10 @@ class Compiler {
                             /** @var Op\Expr\Assign $tailAssign */
                             $tailAssign = $ops[$coalesceIndex + 1];
                             $resultOverride = $tailAssign->var;
+                        }
+                        if ($this->isCoalesceLoweredByFollowingEchoConcat($ops, $coalesceIndex)) {
+                            $i = $coalesceIndex;
+                            break;
                         }
                         $block = $this->compileCoalesceForAssign($coalesce, $block, $resultOverride);
                         $i = $coalesceIndex;
@@ -2400,6 +2411,12 @@ class Compiler {
                             )
                         ) {
                             $this->emitImplicitNullableParamCoalesceReturn($paramOp, $block);
+                            break;
+                        }
+                        if (
+                            $child instanceof Op\Expr\BinaryOp\Concat
+                            && $this->isConcatLoweredByFollowingEcho($child, $ops, $i)
+                        ) {
                             break;
                         }
                         $savedAssignRefFlags = $this->assignRefBindRefFlags;
@@ -3123,24 +3140,52 @@ class Compiler {
             return $block;
         }
         $coalesces = $this->findEmbeddedCoalesces($op->expr);
-        if ([] === $coalesces) {
+        $flattened = $this->flattenBinaryConcatFromBlockOps($ops, $echoIndex, $op->expr)
+            ?? $this->unwrapConcatListExpr($op->expr)
+            ?? $this->flattenBinaryConcatToConcatList($op->expr);
+        if ([] === $coalesces && null === $flattened) {
             return null;
         }
+        if ([] === $coalesces) {
+            $coalesces = $this->findBlockCoalescesBeforeIndex($ops, $echoIndex);
+        }
         $echoOperand = $op->expr;
+        $coalesceSnapshots = [];
         foreach ($coalesces as $coalesce) {
             $resultOverride = $this->findEchoCoalesceAssignTarget($ops, $echoIndex, $coalesce);
-            if (!$this->isCoalesceLoweredBeforeEcho($ops, $echoIndex, $coalesce)) {
-                $block = $this->compileCoalesceForAssign($coalesce, $block, $resultOverride);
-            }
+            $block = $this->compileCoalesceForAssign($coalesce, $block, $resultOverride);
+            $snapshot = new Operand\Temporary();
+            $readSlot = $this->compileOperand($coalesce->result, $block, true);
+            $writeSlot = $block->forceFreshVarSlot($snapshot);
+            $block->addOpCode(new OpCode(
+                OpCode::TYPE_ASSIGN,
+                $writeSlot,
+                $writeSlot,
+                $readSlot
+            ));
+            $coalesceSnapshots[] = [$coalesce, $snapshot];
             if (
-                null === $this->unwrapConcatListExpr($echoOperand)
+                null === $flattened
                 && $this->operandsChainEqual($echoOperand, $coalesce->result)
             ) {
                 $echoOperand = $resultOverride ?? $coalesce->result;
             }
         }
-        $concat = $this->unwrapConcatListExpr($op->expr);
+        $concat = $flattened;
         if (null !== $concat) {
+            $parts = [];
+            foreach ($concat->list as $part) {
+                $replaced = $part;
+                foreach ($coalesceSnapshots as [$coalesce, $snapshot]) {
+                    if ($this->operandsChainEqual($part, $coalesce->result)) {
+                        $replaced = $snapshot;
+                        break;
+                    }
+                }
+                $parts[] = $replaced;
+            }
+            $concat = new Op\Expr\ConcatList($parts);
+            $concat->result = $flattened->result;
             $this->compileOp($concat, $block);
             $var = $this->compileOperand($concat->result, $block, true);
         } else {
@@ -3268,20 +3313,38 @@ class Compiler {
     private function findEmbeddedCoalesces(Operand $operand): array
     {
         $found = [];
+        $seen = [];
+        $add = function (Op\Expr\BinaryOp\Coalesce $coalesce) use (&$found, &$seen): void {
+            $id = spl_object_id($coalesce);
+            if (isset($seen[$id])) {
+                return;
+            }
+            $seen[$id] = true;
+            $found[] = $coalesce;
+        };
         $coalesce = $this->unwrapCoalesceExpr($operand);
         if (null !== $coalesce) {
-            $found[] = $coalesce;
+            $add($coalesce);
         }
         $root = $this->unwrapOperandChain($operand);
         if ($root instanceof Op\Expr\BinaryOp\Coalesce) {
-            $found[] = $root;
+            $add($root);
         }
         $concat = $this->unwrapConcatListExpr($operand);
         if (null !== $concat) {
             foreach ($concat->list as $part) {
                 foreach ($this->findEmbeddedCoalesces($part) as $nested) {
-                    $found[] = $nested;
+                    $add($nested);
                 }
+            }
+        }
+        $binaryConcat = $this->unwrapBinaryConcatExpr($operand);
+        if (null !== $binaryConcat) {
+            foreach ($this->findEmbeddedCoalesces($binaryConcat->left) as $nested) {
+                $add($nested);
+            }
+            foreach ($this->findEmbeddedCoalesces($binaryConcat->right) as $nested) {
+                $add($nested);
             }
         }
 
@@ -3728,6 +3791,209 @@ class Compiler {
         }
 
         return null;
+    }
+
+    private function unwrapBinaryConcatExpr(Operand $operand): ?Op\Expr\BinaryOp\Concat
+    {
+        while ($operand instanceof Temporary) {
+            if ($operand->original instanceof Op\Expr\BinaryOp\Concat) {
+                return $operand->original;
+            }
+            if (null === $operand->original) {
+                return null;
+            }
+            $operand = $operand->original;
+        }
+        if ($operand instanceof Op\Expr\BinaryOp\Concat) {
+            return $operand;
+        }
+
+        return null;
+    }
+
+    /**
+     * @param Op[] $ops
+     */
+    private function resolveBinaryConcatForOperand(Operand $operand, array $ops): ?Op\Expr\BinaryOp\Concat
+    {
+        $concat = $this->unwrapBinaryConcatExpr($operand);
+        if (null !== $concat) {
+            return $concat;
+        }
+        foreach ($ops as $op) {
+            if ($op instanceof Op\Expr\BinaryOp\Concat && $this->operandsChainEqual($op->result, $operand)) {
+                return $op;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Flatten nested BinaryOp\Concat trees to one ConcatList so ?? branches do not split temps (#10430).
+     *
+     * @param Op[] $ops
+     *
+     * @return ?Op\Expr\ConcatList
+     */
+    private function flattenBinaryConcatFromBlockOps(array $ops, int $echoIndex, Operand $echoExpr): ?Op\Expr\ConcatList
+    {
+        $outer = null;
+        for ($j = $echoIndex - 1; $j >= 0; --$j) {
+            $candidate = $ops[$j] ?? null;
+            if (
+                $candidate instanceof Op\Expr\BinaryOp\Concat
+                && $this->operandsChainEqual($candidate->result, $echoExpr)
+            ) {
+                $outer = $candidate;
+                break;
+            }
+        }
+        if (null === $outer) {
+            return $this->flattenBinaryConcatToConcatList($echoExpr);
+        }
+        $parts = [];
+        $current = $outer;
+        while ($current instanceof Op\Expr\BinaryOp\Concat) {
+            $parts[] = $current->right;
+            $inner = $this->resolveBinaryConcatForOperand($current->left, $ops);
+            if ($inner instanceof Op\Expr\BinaryOp\Concat) {
+                $current = $inner;
+                continue;
+            }
+            $parts[] = $current->left;
+            break;
+        }
+        if (\count($parts) < 2) {
+            return null;
+        }
+        $parts = array_reverse($parts);
+        $list = new Op\Expr\ConcatList($parts);
+        $list->result = $outer->result;
+
+        return $list;
+    }
+
+    /**
+     * @return ?Op\Expr\ConcatList
+     */
+    private function flattenBinaryConcatToConcatList(?Operand $operand): ?Op\Expr\ConcatList
+    {
+        if (null === $operand) {
+            return null;
+        }
+        $parts = [];
+        $current = $operand;
+        $topConcat = null;
+        while (null !== $current) {
+            $concat = $this->unwrapBinaryConcatExpr($current);
+            if (null === $concat) {
+                $parts[] = $current;
+                break;
+            }
+            if (null === $topConcat) {
+                $topConcat = $concat;
+            }
+            $parts[] = $concat->right;
+            $current = $concat->left;
+        }
+        if (\count($parts) < 2 || null === $topConcat) {
+            return null;
+        }
+        $parts = array_reverse($parts);
+        $list = new Op\Expr\ConcatList($parts);
+        $list->result = $topConcat->result;
+
+        return $list;
+    }
+
+    /**
+     * @param Op[] $ops
+     *
+     * @return list<Op\Expr\BinaryOp\Coalesce>
+     */
+    private function findBlockCoalescesBeforeIndex(array $ops, int $endIndex): array
+    {
+        $found = [];
+        for ($j = 0; $j < $endIndex; ++$j) {
+            if ($ops[$j] instanceof Op\Expr\BinaryOp\Coalesce) {
+                $found[] = $ops[$j];
+            }
+        }
+
+        return $found;
+    }
+
+    /**
+     * @param Op[] $ops
+     */
+    private function isConcatLoweredByFollowingEcho(Op\Expr\BinaryOp\Concat $concat, array $ops, int $index): bool
+    {
+        $count = \count($ops);
+        for ($j = $index + 1; $j < $count; ++$j) {
+            $next = $ops[$j];
+            if ($next instanceof Op\Terminal\Echo_) {
+                return null !== $this->flattenBinaryConcatFromBlockOps($ops, $j, $next->expr)
+                    || null !== $this->unwrapConcatListExpr($next->expr);
+            }
+            if ($next instanceof Op\Terminal\Return || $next instanceof Op\Expr\Assign) {
+                return false;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @param Op[] $ops
+     */
+    private function isCoalesceLoweredByFollowingEchoConcat(array $ops, int $index): bool
+    {
+        for ($j = $index + 1; $j < \count($ops); ++$j) {
+            if ($ops[$j] instanceof Op\Terminal\Echo_) {
+                if (null !== $this->flattenBinaryConcatToConcatList($ops[$j]->expr)) {
+                    return true;
+                }
+                if (null !== $this->flattenBinaryConcatFromBlockOps($ops, $j, $ops[$j]->expr)) {
+                    return true;
+                }
+
+                return false;
+            }
+            if ($ops[$j] instanceof Op\Terminal\Return) {
+                return false;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Copy ?? branch results into merge-block temps so concat reads live CVs (#10430, #9973).
+     */
+    private function materializeConcatListCoalesceParts(Op\Expr\ConcatList $concat, Block $block): Op\Expr\ConcatList
+    {
+        $parts = [];
+        foreach ($concat->list as $part) {
+            if ($part instanceof Operand\Literal) {
+                $parts[] = $part;
+                continue;
+            }
+            $readSlot = $this->compileOperand($part, $block, true);
+            $fresh = new Operand\Temporary();
+            $writeSlot = $block->forceFreshVarSlot($fresh);
+            $block->addOpCode(new OpCode(
+                OpCode::TYPE_ASSIGN,
+                $writeSlot,
+                $writeSlot,
+                $readSlot
+            ));
+            $parts[] = $fresh;
+        }
+        $materialized = new Op\Expr\ConcatList($parts);
+        $materialized->result = $concat->result;
+
+        return $materialized;
     }
 
     /**
@@ -32357,8 +32623,10 @@ class Compiler {
     protected function compileTerminal(Op\Terminal $terminal, Block $block): array {
         switch ($terminal->getType()) {
             case 'Terminal_Echo':
-                $concat = $this->unwrapConcatListExpr($terminal->expr);
+                $concat = $this->unwrapConcatListExpr($terminal->expr)
+                    ?? $this->flattenBinaryConcatToConcatList($terminal->expr);
                 if (null !== $concat) {
+                    $concat = $this->materializeConcatListCoalesceParts($concat, $block);
                     $this->compileOp($concat, $block);
                     $var = $this->compileOperand($concat->result, $block, true);
                 } else {

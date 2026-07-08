@@ -3207,9 +3207,9 @@ restart:
                     }
                     $arg1 = $frame->scope[$op->arg1];
                     $arg2 = $frame->scope[$op->arg2];
-                    $arg3 = isset($frame->block->constants[$op->arg3])
-                        ? $frame->block->constants[$op->arg3]
-                        : $this->readScopeOperandForRuntimeRead($frame, (int) $op->arg3);
+                    $arg3 = null !== $op->arg3
+                        ? $this->readRuntimeOperandPreferringInitializedCv($frame, (int) $op->arg3)
+                        : null;
                     $catchFrame = $this->enforcePropertyVisibilityWrite($arg2, $frame);
                     if (null !== $catchFrame) {
                         $frame = $catchFrame;
@@ -7912,14 +7912,34 @@ restart:
         return $operand;
     }
 
-    /** TYPE_CONCAT operands may be literal constant slots colliding with assign dest (#9973, #9063). */
-    private function readRuntimeOperandForConcat(Frame $frame, int $slot): Variable
+    /**
+     * Literal constant slots may alias branch-assigned CVs — prefer initialized runtime (#10430, #9973).
+     */
+    private function readRuntimeOperandPreferringInitializedCv(Frame $frame, int $slot): Variable
     {
         if (isset($frame->block->constants[$slot])) {
+            for ($f = $frame->parent; null !== $f; $f = $f->parent) {
+                if (!isset($f->scope[$slot])) {
+                    continue;
+                }
+                $resolved = $f->scope[$slot]->resolveIndirect();
+                if ($resolved->isUndefined() || $this->isUnboundLocalScopeRead($f, $slot)) {
+                    continue;
+                }
+
+                return $this->readScopeOperandForRuntimeRead($f, $slot);
+            }
+
             return $frame->block->constants[$slot];
         }
 
         return $this->readScopeOperandForRuntimeRead($frame, $slot);
+    }
+
+    /** TYPE_CONCAT operands may be literal constant slots colliding with assign dest (#9973, #9063). */
+    private function readRuntimeOperandForConcat(Frame $frame, int $slot): Variable
+    {
+        return $this->readRuntimeOperandPreferringInitializedCv($frame, $slot);
     }
 
     /** Bitwise ops in CFG branch blocks may inherit polluted literal slots (#15902). */
