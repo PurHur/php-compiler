@@ -101,6 +101,11 @@ final class filter_var extends Internal
             $filterVal,
             $i64->constInt(VmFilter::FILTER_VALIDATE_FLOAT, false)
         );
+        $isDomain = $context->builder->icmp(
+            Builder::INT_EQ,
+            $filterVal,
+            $i64->constInt(VmFilter::FILTER_VALIDATE_DOMAIN, false)
+        );
         $isEmail = $context->builder->icmp(
             Builder::INT_EQ,
             $filterVal,
@@ -128,6 +133,8 @@ final class filter_var extends Internal
         $boolOtherBlock = BasicBlockHelper::append($context, 'filter_var_bool_other');
         $floatBlock = BasicBlockHelper::append($context, 'filter_var_float');
         $floatOtherBlock = BasicBlockHelper::append($context, 'filter_var_float_other');
+        $domainBlock = BasicBlockHelper::append($context, 'filter_var_domain');
+        $domainOtherBlock = BasicBlockHelper::append($context, 'filter_var_domain_other');
         $emailBlock = BasicBlockHelper::append($context, 'filter_var_email');
         $emailOtherBlock = BasicBlockHelper::append($context, 'filter_var_email_other');
         $urlBlock = BasicBlockHelper::append($context, 'filter_var_url');
@@ -170,6 +177,17 @@ final class filter_var extends Internal
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($floatOtherBlock);
+        $context->builder->branchIf($isDomain, $domainBlock, $domainOtherBlock);
+
+        $context->builder->positionAtEnd($domainBlock);
+        $domainResult = JitFilter::validateDomain($context, $value);
+        if (null !== $optionsArg && JITVariable::TYPE_NULL !== $optionsArg->type) {
+            $domainResult = JitFilter::applyNullOnFailure($context, $domainResult, $nullOnFailure);
+        }
+        $domainTail = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($domainOtherBlock);
         $context->builder->branchIf($isEmail, $emailBlock, $emailOtherBlock);
 
         $context->builder->positionAtEnd($emailBlock);
@@ -233,6 +251,7 @@ final class filter_var extends Internal
         $phi->addIncoming($intResult, $intTail);
         $phi->addIncoming($boolResult, $boolTail);
         $phi->addIncoming($floatResult, $floatTail);
+        $phi->addIncoming($domainResult, $domainTail);
         $phi->addIncoming($emailResult, $emailTail);
         $phi->addIncoming($urlResult, $urlTail);
         $phi->addIncoming($ipResult, $ipTail);

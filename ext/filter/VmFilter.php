@@ -99,6 +99,7 @@ final class VmFilter
             || self::FILTER_VALIDATE_BOOLEAN === $filter
             || self::FILTER_VALIDATE_FLOAT === $filter
             || self::FILTER_VALIDATE_REGEXP === $filter
+            || self::FILTER_VALIDATE_DOMAIN === $filter
             || self::FILTER_VALIDATE_URL === $filter
             || self::FILTER_VALIDATE_EMAIL === $filter
             || self::FILTER_VALIDATE_IP === $filter
@@ -140,6 +141,9 @@ final class VmFilter
         }
         if (self::FILTER_VALIDATE_REGEXP === $filter) {
             return self::validateRegexp($value, $parsed['filterOptions'], $nullOnFailure);
+        }
+        if (self::FILTER_VALIDATE_DOMAIN === $filter) {
+            return self::validateDomain($value, $nullOnFailure, $parsed['flags']);
         }
         if (self::FILTER_VALIDATE_URL === $filter) {
             return self::validateUrl($value, $nullOnFailure, $parsed['flags']);
@@ -864,6 +868,27 @@ final class VmFilter
     }
 
     /**
+     * FILTER_VALIDATE_DOMAIN (php-src ext/filter/logical_filters.c — php_filter_validate_domain[_ex]).
+     */
+    private static function validateDomain(Variable $value, bool $nullOnFailure = false, int $flags = 0): Variable
+    {
+        if ($value->isUndefined() || Variable::TYPE_NULL === $value->type) {
+            return self::failureResult($nullOnFailure);
+        }
+        if (Variable::TYPE_STRING !== $value->type) {
+            return self::failureResult($nullOnFailure);
+        }
+        $s = $value->toString();
+        if (!self::isValidDomain($s, $flags)) {
+            return self::failureResult($nullOnFailure);
+        }
+        $out = new Variable();
+        $out->string($s);
+
+        return $out;
+    }
+
+    /**
      * php-src ext/filter/logical_filters.c — php_filter_validate_mac.
      */
     public static function isValidMacAddress(string $input, ?string $expectedSeparator = null): bool
@@ -914,6 +939,19 @@ final class VmFilter
         }
 
         return true;
+    }
+
+    /** SSOT used by JIT/AOT helper bridge. */
+    public static function isValidDomain(string $host, int $flags = 0): bool
+    {
+        if ('' === $host) {
+            return false;
+        }
+        if (0 !== ($flags & self::FILTER_FLAG_HOSTNAME)) {
+            return self::isValidDomainHostname($host);
+        }
+
+        return self::isValidDomainHostname($host);
     }
 
     /**
