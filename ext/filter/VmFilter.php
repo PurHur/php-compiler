@@ -190,7 +190,7 @@ final class VmFilter
             self::FILTER_SANITIZE_EMAIL => self::sanitizeEmail($subject),
             self::FILTER_SANITIZE_URL => self::sanitizeUrl($subject),
             self::FILTER_SANITIZE_NUMBER_INT => self::sanitizeNumberInt($subject),
-            self::FILTER_SANITIZE_NUMBER_FLOAT => self::sanitizeNumberFloat($subject),
+            self::FILTER_SANITIZE_NUMBER_FLOAT => self::sanitizeNumberFloat($subject, $flags),
             self::FILTER_SANITIZE_ADD_SLASHES => VmString::addslashes($subject),
             self::FILTER_UNSAFE_RAW, self::FILTER_DEFAULT => $subject,
             default => null,
@@ -224,7 +224,7 @@ final class VmFilter
             self::FILTER_SANITIZE_EMAIL => self::sanitizeEmail($subject),
             self::FILTER_SANITIZE_URL => self::sanitizeUrl($subject),
             self::FILTER_SANITIZE_NUMBER_INT => self::sanitizeNumberInt($subject),
-            self::FILTER_SANITIZE_NUMBER_FLOAT => self::sanitizeNumberFloat($subject),
+            self::FILTER_SANITIZE_NUMBER_FLOAT => self::sanitizeNumberFloat($subject, $flags),
             self::FILTER_SANITIZE_ADD_SLASHES => VmString::addslashes($subject),
             self::FILTER_UNSAFE_RAW, self::FILTER_DEFAULT => $subject,
             default => '',
@@ -300,9 +300,21 @@ final class VmFilter
         return preg_replace('/[^0-9+-]+/', '', $subject) ?? '';
     }
 
-    private static function sanitizeNumberFloat(string $subject): string
+    /** php-src ext/filter/sanitizing_filters.c — php_filter_number_float */
+    private static function sanitizeNumberFloat(string $subject, int $flags = 0): string
     {
-        return preg_replace('/[^0-9+-]+/', '', $subject) ?? '';
+        $extra = '';
+        if (0 !== ($flags & self::FILTER_FLAG_ALLOW_FRACTION)) {
+            $extra .= '.';
+        }
+        if (0 !== ($flags & self::FILTER_FLAG_ALLOW_THOUSAND)) {
+            $extra .= ',';
+        }
+        if (0 !== ($flags & self::FILTER_FLAG_ALLOW_SCIENTIFIC)) {
+            $extra .= 'eE';
+        }
+
+        return preg_replace('/[^0-9+\-'.preg_quote($extra, '/').']+/', '', $subject) ?? '';
     }
 
     /** php-src php_filter_sanitize_email allow-list. */
