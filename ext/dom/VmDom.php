@@ -5553,6 +5553,15 @@ final class VmDom
         self::ensureDocument($document);
         unset($ctx);
         if ('' === $filename || !is_file($filename)) {
+            $rngPath = $filename;
+            if ('' !== $rngPath && '/' !== $rngPath[0]) {
+                $rngPath = getcwd() . '/' . $rngPath;
+            }
+            if ('' !== $rngPath) {
+                // Mirror libxml's missing-RNG diagnostics closely enough for php-src parity.
+                self::triggerDomWarning($frame, sprintf('I/O warning : failed to load external entity "%s"', $rngPath));
+                self::triggerDomWarning($frame, sprintf('xmlRelaxNGParse: could not load %s', $rngPath));
+            }
             self::triggerDomWarning($frame, 'DOMDocument::relaxNGValidate(): Invalid RelaxNG');
 
             return false;
