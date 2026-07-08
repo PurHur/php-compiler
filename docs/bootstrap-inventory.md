@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 4263 |
-| Phase A inventory files (M2 ratio SSOT) | 4263 |
+| PHP files on vm.php path | 4264 |
+| Phase A inventory files (M2 ratio SSOT) | 4264 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 11470 |
+| Source constructs flagged (warnings) | 11474 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1296,7 +1296,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitVsprintf.php` | 0 | 2 |
 | `ext/standard/JitVsprintfArrayArg.php` | 0 | 1 |
 | `ext/standard/JitWebParams.php` | 0 | 15 |
-| `ext/standard/JitWordwrap.php` | 0 | 1 |
 | `ext/standard/JitZendScalarCast.php` | 0 | 1 |
 | `ext/standard/JitZlib.php` | 0 | 1 |
 | `ext/standard/JsonDecodeJitHelper.php` | 0 | 2 |
@@ -3358,6 +3357,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringVfscanf.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringVsprintf.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringWordwrap.php` | 0 | 1 |
+| `lib/JIT/Builtin/StringWordwrapLlvm.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringZlib.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringZstd.php` | 0 | 2 |
 | `lib/JIT/Builtin/StripWhitespace.php` | 0 | 2 |
@@ -3400,6 +3400,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/WeakRefRegistryRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/WeakRefRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/WeakRefSetup.php` | 0 | 1 |
+| `lib/JIT/Builtin/WordwrapLlvmEmit.php` | 0 | 1 |
 | `lib/JIT/Builtin/ZlibRuntime.php` | 0 | 3 |
 | `lib/JIT/Call.php` | 0 | 1 |
 | `lib/JIT/Call/ClosureBind.php` | 0 | 1 |
@@ -3446,7 +3447,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Call/ReflectionClassGetShortName.php` | 0 | 1 |
 | `lib/JIT/Call/ReflectionClassNewLazyGhost.php` | 0 | 1 |
 | `lib/JIT/Call/ReflectionClassNewLazyProxy.php` | 0 | 1 |
-| `lib/JIT/Call/ReflectionConstantConstruct.php` | 0 | 1 |
+| `lib/JIT/Call/ReflectionConstantConstruct.php` | 0 | 2 |
 | `lib/JIT/Call/ReflectionConstantGetAttributes.php` | 0 | 2 |
 | `lib/JIT/Call/ReflectionEnumConstruct.php` | 0 | 1 |
 | `lib/JIT/Call/ReflectionEnumGetCase.php` | 0 | 1 |
@@ -3836,7 +3837,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/VM/Builtin/ReflectionClassResetAsLazyProxy.php` | 0 | 1 |
 | `lib/VM/Builtin/ReflectionClassSetStaticPropertyValue.php` | 0 | 1 |
 | `lib/VM/Builtin/ReflectionCompositeTypeGetTypes.php` | 0 | 1 |
-| `lib/VM/Builtin/ReflectionConstantConstruct.php` | 0 | 1 |
+| `lib/VM/Builtin/ReflectionConstantConstruct.php` | 0 | 3 |
 | `lib/VM/Builtin/ReflectionConstantGetAttributes.php` | 0 | 1 |
 | `lib/VM/Builtin/ReflectionConstantGetName.php` | 0 | 1 |
 | `lib/VM/Builtin/ReflectionConstantGetValue.php` | 0 | 1 |
@@ -12307,11 +12308,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new JITVariable (line 228)
 - new strcmp (line 234)
 - 6 class method(s)
-
-### `ext/standard/JitWordwrap.php`
-
-**Warnings** (review for bootstrap subset):
-- 9 class method(s)
 
 ### `ext/standard/JitZendScalarCast.php`
 
@@ -26229,6 +26225,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 5 class method(s)
 
+### `lib/JIT/Builtin/StringWordwrapLlvm.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s)
+
 ### `lib/JIT/Builtin/StringZlib.php`
 
 **Warnings** (review for bootstrap subset):
@@ -26515,6 +26516,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 4 class method(s)
 
+### `lib/JIT/Builtin/WordwrapLlvmEmit.php`
+
+**Warnings** (review for bootstrap subset):
+- 9 class method(s)
+
 ### `lib/JIT/Builtin/ZlibRuntime.php`
 
 **Warnings** (review for bootstrap subset):
@@ -26766,6 +26772,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Call/ReflectionConstantConstruct.php`
 
 **Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 24)
 - 1 class method(s)
 
 ### `lib/JIT/Call/ReflectionConstantGetAttributes.php`
@@ -29470,6 +29477,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/Builtin/ReflectionConstantConstruct.php`
 
 **Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 26)
+- new ArgumentCountError (line 33)
 - 1 class method(s)
 
 ### `lib/VM/Builtin/ReflectionConstantGetAttributes.php`
@@ -31646,37 +31655,37 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/ReflectionSupport.php`
 
 **Warnings** (review for bootstrap subset):
-- new ReflectionException (line 167)
-- new AttributeEntry (line 177)
-- new Variable (line 196)
-- new ObjectEntry (line 203)
-- new Variable (line 208)
-- new Variable (line 221)
-- new Variable (line 225)
-- new Variable (line 228)
-- new Variable (line 249)
-- new Variable (line 285)
-- new Variable (line 296)
-- new Error (line 322)
-- new Error (line 326)
-- new ObjectEntry (line 328)
-- new Variable (line 329)
-- new Variable (line 340)
-- new Error (line 358)
-- new Error (line 362)
-- new Variable (line 366)
-- new Error (line 372)
-- new Variable (line 454)
-- new AttributeEntry (line 1270)
-- new Variable (line 1574)
-- new ObjectEntry (line 1689)
-- new ObjectEntry (line 1781)
-- new ObjectEntry (line 1794)
-- new Variable (line 1874)
-- new ObjectEntry (line 1979)
-- new Variable (line 2056)
-- new Variable (line 2241)
-- 125 class method(s)
+- new ReflectionException (line 182)
+- new AttributeEntry (line 192)
+- new Variable (line 211)
+- new ObjectEntry (line 218)
+- new Variable (line 223)
+- new Variable (line 236)
+- new Variable (line 240)
+- new Variable (line 243)
+- new Variable (line 264)
+- new Variable (line 300)
+- new Variable (line 311)
+- new Error (line 337)
+- new Error (line 341)
+- new ObjectEntry (line 343)
+- new Variable (line 344)
+- new Variable (line 355)
+- new Error (line 373)
+- new Error (line 377)
+- new Variable (line 381)
+- new Error (line 387)
+- new Variable (line 469)
+- new AttributeEntry (line 1285)
+- new Variable (line 1589)
+- new ObjectEntry (line 1704)
+- new ObjectEntry (line 1796)
+- new ObjectEntry (line 1809)
+- new Variable (line 1889)
+- new ObjectEntry (line 1994)
+- new Variable (line 2071)
+- new Variable (line 2256)
+- 127 class method(s)
 
 ### `lib/VM/ReflectionTypeSupport.php`
 
