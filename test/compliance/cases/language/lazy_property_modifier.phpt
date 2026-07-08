@@ -5,6 +5,9 @@ language lazy property modifier parses and ReflectionProperty::isLazy works (#16
 if (getenv('PHP_COMPILER_PROFILE') !== '8.4' && getenv('PHP_COMPILER_PROFILE') !== 'forward') {
     die('skip requires PHP_COMPILER_PROFILE=8.4');
 }
+?>
+--ENV--
+PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
 class LazyHolder {
