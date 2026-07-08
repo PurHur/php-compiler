@@ -8,6 +8,7 @@ use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPCompiler\JIT\UserScriptAotDeferNestedJit;
 use PHPLLVM\BasicBlock;
 use PHPLLVM\Builder;
 use PHPLLVM\Value\Function_ as LlvmFunction;
@@ -36,6 +37,12 @@ final class ObOutputExecCaptureRuntime
     {
         $append = $context->module->getNamedFunction('__phpc_ob_append_bytes');
         if (null !== $append && $append->countBasicBlocks() > 0) {
+            return;
+        }
+
+        if (UserScriptAotDeferNestedJit::shouldDefer($context)) {
+            ObOutputExecCaptureLlvm::ensureLinked($context);
+
             return;
         }
 

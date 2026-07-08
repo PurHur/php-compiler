@@ -16,11 +16,14 @@ final class ProcessRuntimeShrinkTest extends TestCase
     {
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ProcessRuntime.php');
         $this->assertStringContainsString('ProcessJitHelper', $runtime);
+        $this->assertStringContainsString('UserScriptAotDeferNestedJit::shouldDefer', $runtime);
+        $this->assertStringContainsString('ProcessExecCaptureLlvm::implementBridge', $runtime);
+        $this->assertStringContainsString('ProcessShellExecLibc::implement', $runtime);
         $this->assertStringNotContainsString('ProcessStandaloneLlvm', $runtime);
         $this->assertStringNotContainsString('emitShellExec', $runtime);
         $this->assertStringNotContainsString('emitEscapeshellarg', $runtime);
         $this->assertStringNotContainsString('ensureLibc', $runtime);
-        $this->assertLessThan(460, \substr_count($runtime, "\n") + 1);
+        $this->assertLessThan(470, \substr_count($runtime, "\n") + 1);
 
         $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/ProcessStandaloneLlvm.php');
     }
