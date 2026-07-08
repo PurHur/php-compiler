@@ -20,6 +20,7 @@ use PHPCompiler\VM\ClassReadonly;
  * php-src: Zend/zend_compile.c — zend_compile_class_decl, zend_compile_property_info();
  * Zend/zend_inheritance.c — inheritance_check_properties(), readonly parent/child checks;
  * per-property MODIFIER_READONLY cannot have default initializer;
+ * PHP 8.2+ readonly class (ZEND_ACC_READONLY) may declare instance property defaults (#9841);
  * PHP 8.3+ anonymous classes may use per-property `readonly` with defaults (#6724);
  * PHP 8.3+ `new readonly class` sets ZEND_ACC_READONLY on the anonymous class (#6991).
  */
@@ -210,12 +211,17 @@ final class ReadonlyClassCompileCheck
             return;
         }
 
+        // php-src zend_compile.c: ZEND_ACC_READONLY allows instance property defaults since PHP 8.2 (#9841).
+        if ($classReadonly) {
+            return;
+        }
+
         foreach ($class->stmts->children as $member) {
             if (!$member instanceof Op\Stmt\Property) {
                 continue;
             }
-            // php-src zend_compile.c: MODIFIER_READONLY and ZEND_ACC_READONLY both forbid defaults (#9653).
-            if (!$classReadonly && !$this->isCfgPropertyReadonly($member)) {
+            // php-src zend_compile.c: per-property MODIFIER_READONLY cannot have defaults (#9653).
+            if (!$this->isCfgPropertyReadonly($member)) {
                 continue;
             }
             if (null === $member->defaultVar && null === $member->defaultBlock) {
