@@ -4054,6 +4054,25 @@ class Compiler {
         return $this->compileOperand($part, $block, true);
     }
 
+    /** Concat destination must not alias an active catch variable slot (#17384). */
+    private function concatResultSlotAliasesCatchVar(int $slot): bool
+    {
+        if ([] === $this->activeCatchVarSlotsByName) {
+            return false;
+        }
+
+        return \in_array($slot, $this->activeCatchVarSlotsByName, true);
+    }
+
+    private function freshConcatResultSlotIfCatchAlias(int $slot, Block $block, Operand $result): int
+    {
+        if (!$this->concatResultSlotAliasesCatchVar($slot)) {
+            return $slot;
+        }
+
+        return $block->forceFreshVarSlot($result);
+    }
+
     /**
      * @return ?Op\Expr\BinaryOp\Coalesce
      */
@@ -8483,7 +8502,11 @@ class Compiler {
     protected function compileOp(Op $op, Block $block) {
         if ($op instanceof Op\Expr\ConcatList) {
             $total = count($op->list);
-            $return = $this->compileOperand($op->result, $block, false);
+            $return = $this->freshConcatResultSlotIfCatchAlias(
+                $this->compileOperand($op->result, $block, false),
+                $block,
+                $op->result
+            );
             if (0 === $total) {
                 $empty = new Operand\Literal('');
                 $empty->type = Type::string();
