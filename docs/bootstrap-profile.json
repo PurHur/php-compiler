@@ -2022,6 +2022,7 @@
         "ext/standard/date_create_from_format.php",
         "ext/standard/date_create_immutable.php",
         "ext/standard/date_create_immutable_from_format.php",
+        "ext/standard/date_date_set.php",
         "ext/standard/date_default_timezone_get.php",
         "ext/standard/date_default_timezone_set.php",
         "ext/standard/date_diff.php",
@@ -2037,6 +2038,7 @@
         "ext/standard/date_sun_info.php",
         "ext/standard/date_sunrise.php",
         "ext/standard/date_sunset.php",
+        "ext/standard/date_time_set.php",
         "ext/standard/date_timestamp_get.php",
         "ext/standard/date_timestamp_set.php",
         "ext/standard/date_timezone_get.php",
@@ -4505,9 +4507,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 4271,
+        "inventory_files": 4273,
         "excluded": 0,
-        "eligible": 4271,
+        "eligible": 4273,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
