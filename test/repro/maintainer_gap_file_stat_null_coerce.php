@@ -1,7 +1,5 @@
 <?php
 
-declare(strict_types=1);
-
 $fail = 0;
 
 if (false !== file_exists(null)) {
