@@ -98,7 +98,8 @@ class JITTest extends BaseTest {
                 continue;
             }
             if (!CompilerVersion::supportsGetDeclaredExcludeDeprecated()
-                && str_contains($name, 'get_declared_exclude_deprecated')
+                && (str_contains($name, 'get_declared_exclude_deprecated')
+                    || str_contains($name, 'classes_exclude_deprecated'))
                 && !str_contains($name, 'get_declared_exclude_deprecated_reference_profile')) {
                 continue;
             }
@@ -401,6 +402,12 @@ class JITTest extends BaseTest {
             }
             if (CompilerVersion::advertisesOverrideAttributeClass()
                 && str_contains($name, 'override_class_phantom')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsLazyPropertyModifier()
+                && (str_contains($name, 'lazy_property_modifier')
+                    || str_contains($name, 'reflection_lazy_modifier_property_names')
+                    || str_contains($name, 'lazy_property_init_once'))) {
                 continue;
             }
             if (!CompilerVersion::supportsLazyObjectFactories()

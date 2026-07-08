@@ -1447,6 +1447,7 @@
         "ext/standard/SessionStorageJitHelper.php",
         "ext/standard/SetcookieLine.php",
         "ext/standard/SetcookieOptions.php",
+        "ext/standard/SettypeJitHelper.php",
         "ext/standard/ShuffleJitHelper.php",
         "ext/standard/SimilarTextJitHelper.php",
         "ext/standard/SinJitHelper.php",
@@ -3162,6 +3163,7 @@
         "lib/JIT/Builtin/SessionStorageRuntime.php",
         "lib/JIT/Builtin/SessionUnset.php",
         "lib/JIT/Builtin/SessionWriteClose.php",
+        "lib/JIT/Builtin/SettypeRuntime.php",
         "lib/JIT/Builtin/ShuffleRuntime.php",
         "lib/JIT/Builtin/SilenceRuntime.php",
         "lib/JIT/Builtin/SocketAtmarkRuntime.php",
@@ -3900,7 +3902,6 @@
         "lib/VM/Builtin/ReflectionCompositeTypeGetTypes.php",
         "lib/VM/Builtin/ReflectionConstantConstruct.php",
         "lib/VM/Builtin/ReflectionConstantGetAttributes.php",
-        "lib/VM/Builtin/ReflectionConstantGetDeclaringClass.php",
         "lib/VM/Builtin/ReflectionConstantGetName.php",
         "lib/VM/Builtin/ReflectionConstantGetValue.php",
         "lib/VM/Builtin/ReflectionDeprecatedReturn.php",
@@ -4496,9 +4497,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 4262,
+        "inventory_files": 4263,
         "excluded": 0,
-        "eligible": 4262,
+        "eligible": 4263,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
