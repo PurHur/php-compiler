@@ -7918,16 +7918,22 @@ restart:
     private function readRuntimeOperandPreferringInitializedCv(Frame $frame, int $slot): Variable
     {
         if (isset($frame->block->constants[$slot])) {
-            for ($f = $frame->parent; null !== $f; $f = $f->parent) {
-                if (!isset($f->scope[$slot])) {
-                    continue;
+            if (isset($frame->scope[$slot])) {
+                $local = $frame->scope[$slot]->resolveIndirect();
+                if (!$local->isUndefined() && !$this->isUnboundLocalScopeRead($frame, $slot)) {
+                    return $this->readScopeOperandForRuntimeRead($frame, $slot);
                 }
-                $resolved = $f->scope[$slot]->resolveIndirect();
-                if ($resolved->isUndefined() || $this->isUnboundLocalScopeRead($f, $slot)) {
-                    continue;
-                }
+                for ($f = $frame->parent; null !== $f; $f = $f->parent) {
+                    if (!isset($f->scope[$slot])) {
+                        continue;
+                    }
+                    $resolved = $f->scope[$slot]->resolveIndirect();
+                    if ($resolved->isUndefined() || $this->isUnboundLocalScopeRead($f, $slot)) {
+                        continue;
+                    }
 
-                return $this->readScopeOperandForRuntimeRead($f, $slot);
+                    return $this->readScopeOperandForRuntimeRead($f, $slot);
+                }
             }
 
             return $frame->block->constants[$slot];
