@@ -1295,13 +1295,14 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.4+ hrtime(true) returns double (ext/standard/hrtime.c, #12779).
+     * PHP 8.4+ hrtime(true) returns double (ext/standard/hrtime.c, #12779, #17435).
      *
-     * Gated on stable 8.4.0 so 8.4.0-dev reference profile keeps integer nanoseconds (#12789, #13696).
+     * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev reference profile keeps
+     * integer nanoseconds (#12789, #13696); enable via `PHP_COMPILER_PROFILE=8.4`.
      */
     public static function supportsHrtimeAsNumberFloat(): bool
     {
-        return version_compare(self::VERSION, '8.4.0', '>=');
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
     }
 
     /**
