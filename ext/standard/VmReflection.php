@@ -352,9 +352,6 @@ final class VmReflection
         return $result;
     }
 
-    /** @var list<string>|null */
-    private static ?array $internalFunctionNames = null;
-
     /**
      * Registered ext Module internal function names (php-src internal bucket).
      *
@@ -362,29 +359,23 @@ final class VmReflection
      */
     public static function internalFunctionNameList(bool $excludeDisabled = false): array
     {
-        if (null === self::$internalFunctionNames) {
-            $names = [];
-            $seen = [];
-            foreach ([new Module(), new \PHPCompiler\ext\types\Module()] as $module) {
-                foreach ($module->getFunctions() as $func) {
-                    $name = $func->getName();
-                    $lc = strtolower($name);
-                    if (isset($seen[$lc]) || !self::isVisibleToFunctionExists($name)) {
-                        continue;
-                    }
-                    if (!BuiltinIntrospectionPolicy::functionIsAdvertised($lc)) {
-                        continue;
-                    }
-                    $seen[$lc] = true;
-                    $names[] = $name;
-                }
+        $names = [];
+        $seen = [];
+        foreach (ModuleRegistry::advertisedInternalFunctionNames() as $name) {
+            $lc = strtolower($name);
+            if (isset($seen[$lc]) || !self::isVisibleToFunctionExists($name)) {
+                continue;
             }
-            self::$internalFunctionNames = self::orderInternalFunctionNamesForIntrospection($names);
+            if (!BuiltinIntrospectionPolicy::functionIsAdvertised($lc)) {
+                continue;
+            }
+            $seen[$lc] = true;
+            $names[] = $name;
         }
 
         // php-src exclude_disabled omits ini-disabled functions only — deprecated builtins
         // such as utf8_encode remain listed (basic_functions.c, #16969, #16978).
-        return self::$internalFunctionNames;
+        return self::orderInternalFunctionNamesForIntrospection($names);
     }
 
     /** Zend internal bucket starts with engine introspection builtins (php-src zend_builtin_functions). */
