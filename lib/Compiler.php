@@ -18006,7 +18006,7 @@ class Compiler {
                     }
                 }
                 if ($argIndex === $constArgIndex) {
-                    return $leadingConsts[\count($leadingConsts) - 1] ?? $constFetch;
+                    return $constFetch;
                 }
                 if (isset($leadingConsts[$argIndex])) {
                     return $leadingConsts[$argIndex];
@@ -18041,7 +18041,7 @@ class Compiler {
                     }
                 }
                 if ($argIndex === $constArgIndex) {
-                    return $leadingConsts[\count($leadingConsts) - 1] ?? $constFetch;
+                    return $constFetch;
                 }
                 if (isset($leadingConsts[$argIndex])) {
                     return $leadingConsts[$argIndex];
@@ -18684,6 +18684,17 @@ class Compiler {
         }
 
         return null;
+    }
+
+    private function isFilterExtensionHoistedFlagConstName(string $lowerName): bool
+    {
+        return str_starts_with($lowerName, 'filter_flag_')
+            || \in_array($lowerName, [
+                'filter_null_on_failure',
+                'filter_require_scalar',
+                'filter_require_array',
+                'filter_force_array',
+            ], true);
     }
 
     private function matchFilterExtensionInlineCallArgProducer(
@@ -40249,7 +40260,7 @@ class Compiler {
                             $name = strtolower($this->staticNameFromOperand($child->name) ?? '');
                             if (
                                 !str_starts_with($name, 'filter_')
-                                || str_starts_with($name, 'filter_flag_')
+                                || $this->isFilterExtensionHoistedFlagConstName($name)
                             ) {
                                 continue;
                             }
