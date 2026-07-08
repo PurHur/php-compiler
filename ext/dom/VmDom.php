@@ -5525,6 +5525,15 @@ final class VmDom
         self::ensureDocument($document);
         unset($ctx, $flags);
         if ('' === $filename || !is_file($filename)) {
+            $schemaPath = $filename;
+            if ('' !== $schemaPath && '/' !== $schemaPath[0]) {
+                $schemaPath = getcwd() . '/' . $schemaPath;
+            }
+            if ('' !== $schemaPath) {
+                // Mirror libxml's missing-schema diagnostics closely enough for php-src parity.
+                self::triggerDomWarning($frame, sprintf('I/O warning : failed to load external entity "%s"', $schemaPath));
+                self::triggerDomWarning($frame, sprintf("Failed to locate the main schema resource at '%s'.", $schemaPath));
+            }
             self::triggerDomWarning($frame, 'DOMDocument::schemaValidate(): Invalid Schema');
 
             return false;
