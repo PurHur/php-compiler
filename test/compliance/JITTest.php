@@ -618,7 +618,8 @@ class JITTest extends BaseTest {
                     || str_contains($name, 'typed_enum_class_const')
                     || str_contains($name, 'enum_typed_class_const')
                     || str_contains($name, 'match_typed_class_const')
-                    || str_contains($name, 'reflection_class_constant_get_type'))
+                    || str_contains($name, 'reflection_class_constant_get_type')
+                    || str_contains($name, 'reflection_class_constant_has_type'))
                 && !str_contains($name, 'typed_class_const_reject')
                 && !str_contains($name, 'typed_class_const_reference_profile')) {
                 continue;

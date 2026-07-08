@@ -89,6 +89,7 @@ use PHPCompiler\VM\Builtin\ReflectionAttributeNewInstance;
 use PHPCompiler\VM\Builtin\ReflectionClassConstantGetDeprecatedMessage;
 use PHPCompiler\VM\Builtin\ReflectionClassConstantGetDeprecatedVersion;
 use PHPCompiler\VM\Builtin\ReflectionClassConstantGetType;
+use PHPCompiler\VM\Builtin\ReflectionClassConstantHasType;
 use PHPCompiler\VM\Builtin\ReflectionClassConstantIsDeprecated;
 use PHPCompiler\VM\Builtin\ReflectionClassConstantIsEnumCase;
 use PHPCompiler\VM\Builtin\ReflectionClassConstantIsFinal;
@@ -907,6 +908,8 @@ final class BuiltinClasses
             $rconst->methodVisibility['getdeclaringclass'] = $pub;
             $rconst->methods['gettype'] = new ReflectionClassConstantGetType();
             $rconst->methodVisibility['gettype'] = $pub;
+            $rconst->methods['hastype'] = new ReflectionClassConstantHasType();
+            $rconst->methodVisibility['hastype'] = $pub;
             if (CompilerVersion::supportsReflectionClassConstantIsDeprecated()) {
                 $rconst->methods['isdeprecated'] = new ReflectionClassConstantIsDeprecated();
                 $rconst->methodVisibility['isdeprecated'] = $pub;
@@ -944,6 +947,8 @@ final class BuiltinClasses
         $rcc->methodVisibility['getdeclaringclass'] = $pub;
         $rcc->methods['gettype'] = new ReflectionClassConstantGetType();
         $rcc->methodVisibility['gettype'] = $pub;
+        $rcc->methods['hastype'] = new ReflectionClassConstantHasType();
+        $rcc->methodVisibility['hastype'] = $pub;
         if (CompilerVersion::supportsReflectionClassConstantIsDeprecated()) {
             $rcc->methods['isdeprecated'] = new ReflectionClassConstantIsDeprecated();
             $rcc->methodVisibility['isdeprecated'] = $pub;
