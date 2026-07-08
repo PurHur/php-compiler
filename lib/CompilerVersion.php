@@ -1121,6 +1121,14 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.4+ Range value object — Range::from() inclusive intervals (ext/standard/range.c, #17427).
+     */
+    public static function supportsRange(): bool
+    {
+        return self::supportsBuiltinStubEnums();
+    }
+
+    /**
      * PHP 8.4+ builtin stub enums (StringTrimMode, PadType, MemoryUsage, ExitStatus, …).
      *
      * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev reference profile matches Zend 8.2 phantom gate (#13630, #15692).
