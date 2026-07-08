@@ -22,8 +22,10 @@ foreach ($warnings as $w) {
 --EXPECTF--
 schema-false
 relax-false
-4
+6
 I/O warning : failed to load external entity "%s/nonexistent.xsd"
 Failed to locate the main schema resource at '%s/nonexistent.xsd'.
 DOMDocument::schemaValidate(): Invalid Schema
+I/O warning : failed to load external entity "%s/nonexistent.rng"
+xmlRelaxNGParse: could not load %s/nonexistent.rng
 DOMDocument::relaxNGValidate(): Invalid RelaxNG
