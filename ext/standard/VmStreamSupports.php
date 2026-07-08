@@ -37,6 +37,7 @@ final class VmStreamSupports
     private const FEATURE_NAME_MAP = [
         'lock' => self::STREAM_LOCK,
         'seek' => self::STREAM_META_SEEKABLE,
+        'seekable' => self::STREAM_META_SEEKABLE,
         'tell' => self::STREAM_SUPPORT_TELL,
         'read' => self::STREAM_SUPPORT_READ,
         'write' => self::STREAM_SUPPORT_WRITE,
