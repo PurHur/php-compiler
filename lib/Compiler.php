@@ -135,6 +135,8 @@ class Compiler {
     private ?string $haltCompilerRemaining = null;
     /** {@see OpCode::ASSIGN_REF_FOREACH_PROPERTY_HOOK} for the next AssignRef compile (#6435). */
     private int $assignRefBindRefFlags = 0;
+    /** Force PROPERTY_FETCH_WRITE for array-literal by-ref element lowering (#6426, #17353). */
+    private int $forcePropertyFetchForWrite = 0;
 
     /** Byte offset where halt trailing data starts; null when no __halt_compiler() (#5455). */
     private ?int $haltCompilerOffset = null;
@@ -2294,6 +2296,16 @@ class Compiler {
                     ) {
                         // Lowered by compileExpr Assign via TYPE_PROPERTY_FETCH + TYPE_ASSIGN (#6834).
                         break;
+                    } elseif (
+                        $child instanceof Op\Expr\PropertyFetch
+                        && $i + 1 < $opCount
+                        && $this->isPropertyFetchLoweredByFollowingArrayLiteralByRefElement(
+                            $child,
+                            $ops[$i + 1]
+                        )
+                    ) {
+                        // Lowered by compileArrayLiteral PROPERTY_FETCH_WRITE + ASSIGN_REF (#6426, #17353).
+                        break;
                     } elseif ($this->isLoweredByFollowingCoalesce($child, $ops, $i)) {
                         break;
                     } elseif ($this->isLoweredByFollowingThrow($child, $ops, $i)) {
@@ -4319,6 +4331,45 @@ class Compiler {
         }
 
         return $var === $fetch->result;
+    }
+
+    /**
+     * `[&$obj->hook]` — php-cfg emits PropertyFetch then Expr_Array; eager read fetch breaks ref (#17353).
+     */
+    private function isPropertyFetchLoweredByFollowingArrayLiteralByRefElement(
+        Op\Expr\PropertyFetch $fetch,
+        Op $next
+    ): bool {
+        if (!$next instanceof Op\Expr\Array_) {
+            return false;
+        }
+
+        return $this->arrayLiteralHasByRefElementOperand($next, $fetch->result);
+    }
+
+    private function arrayLiteralHasByRefElementOperand(Op\Expr\Array_ $array, Operand $target): bool
+    {
+        $byRefFlags = property_exists($array, 'byRef') ? $array->byRef : [];
+        foreach ($array->values as $i => $value) {
+            if (empty($byRefFlags[$i])) {
+                continue;
+            }
+            if ($value === $target) {
+                return true;
+            }
+            $cursor = $value;
+            while ($cursor instanceof Temporary) {
+                if ($cursor === $target) {
+                    return true;
+                }
+                if (null === $cursor->original) {
+                    break;
+                }
+                $cursor = $cursor->original;
+            }
+        }
+
+        return false;
     }
 
     private function isPropertyFetchOnlyUnsetVar(
@@ -12974,6 +13025,9 @@ class Compiler {
      */
     protected function isPropertyFetchForWrite(Op\Expr\PropertyFetch $fetch, Block $block): bool
     {
+        if ($this->forcePropertyFetchForWrite > 0) {
+            return true;
+        }
         foreach ($fetch->result->usages as $usage) {
             if ($usage instanceof Op\Expr\Assign && $usage->var === $fetch->result) {
                 continue;
@@ -31213,6 +31267,26 @@ class Compiler {
     }
 
     /**
+     * Property fetch for `[&$obj->prop]` array-literal refs — operand may be the fetch expr (#17353).
+     */
+    private function resolvePropertyFetchForArrayLiteralRef(Operand $valueExpr, Block $block): ?Op\Expr\PropertyFetch
+    {
+        if ($valueExpr instanceof Op\Expr\PropertyFetch) {
+            return $valueExpr;
+        }
+        $unwrapped = $this->unwrapOperandChain($valueExpr);
+        if ($unwrapped instanceof Op\Expr\PropertyFetch) {
+            return $unwrapped;
+        }
+        $producer = $this->findCfgProducerExprForOperand($valueExpr);
+        if ($producer instanceof Op\Expr\PropertyFetch) {
+            return $producer;
+        }
+
+        return $this->findPropertyFetchForResult($valueExpr, $block);
+    }
+
+    /**
      * php-cfg lowers short list `[$a, $b] = …` and `[$a, $b]` RHS via Op\Expr\Array_ (#1222).
      */
     protected function unwrapArrayLiteralExpr(Operand $operand): ?Op\Expr\Array_
@@ -42022,25 +42096,50 @@ class Compiler {
                 continue;
             }
 
-            $prefetchOps = $this->compileRuntimeEnumCaseFetchOpsForArrayElement(
-                $expr->values[$i],
-                $block,
-                $expr,
-                $i
-            );
-            if ([] !== $prefetchOps) {
-                $valueSlot = $prefetchOps[0]->arg1;
-                $return = array_merge($return, $prefetchOps);
-            } else {
-                [$rematerializeOps, $valueSlot] = $this->compileDeferredArrayLiteralElementValue(
+            if (!empty($byRefFlags[$i])) {
+                // Reference cells must bind the live lvalue; deferred rematerialization snapshots
+                // copy hooked property reads and break set-hook ref writes (#6426, #17353).
+                $prefetchOps = $this->compileRuntimeEnumCaseFetchOpsForArrayElement(
                     $expr->values[$i],
                     $block,
                     $expr,
                     $i,
                     !empty($byRefFlags[$i]),
                 );
-                if ([] !== $rematerializeOps) {
-                    $return = array_merge($return, $rematerializeOps);
+                if ([] !== $prefetchOps) {
+                    $valueSlot = $prefetchOps[0]->arg1;
+                    $return = array_merge($return, $prefetchOps);
+                    $propFetch = null;
+                } else {
+                    $valueExpr = $expr->values[$i];
+                    $propFetch = $this->resolvePropertyFetchForArrayLiteralRef($valueExpr, $block);
+                    if (null !== $propFetch) {
+                        $valueTemp = new Operand\Temporary();
+                        $valueSlot = $block->getVarSlot($valueTemp, false);
+                    } else {
+                        $valueSlot = $this->compileOperand($valueExpr, $block, true);
+                    }
+                }
+            } else {
+                $prefetchOps = $this->compileRuntimeEnumCaseFetchOpsForArrayElement(
+                    $expr->values[$i],
+                    $block,
+                    $expr,
+                    $i
+                );
+                if ([] !== $prefetchOps) {
+                    $valueSlot = $prefetchOps[0]->arg1;
+                    $return = array_merge($return, $prefetchOps);
+                } else {
+                    [$rematerializeOps, $valueSlot] = $this->compileDeferredArrayLiteralElementValue(
+                        $expr->values[$i],
+                        $block,
+                        $expr,
+                        $i
+                    );
+                    if ([] !== $rematerializeOps) {
+                        $return = array_merge($return, $rematerializeOps);
+                    }
                 }
             }
             $keyOperand = $expr->keys[$i];
@@ -42076,14 +42175,15 @@ class Compiler {
                     $result,
                     $keySlot instanceof Operand\NullOperand ? null : $keySlot
                 );
-                $propFetch = $this->findPropertyFetchForResult($expr->values[$i], $block);
                 if (null !== $propFetch) {
+                    ++$this->forcePropertyFetchForWrite;
                     $return[] = new OpCode(
                         OpCode::TYPE_PROPERTY_FETCH_WRITE,
                         $valueSlot,
                         $this->compileOperand($propFetch->var, $block, true),
                         $this->compileOperand($propFetch->name, $block, true)
                     );
+                    --$this->forcePropertyFetchForWrite;
                 }
                 $return[] = new OpCode(
                     OpCode::TYPE_ASSIGN_REF,
