@@ -451,7 +451,7 @@ final class CompilerVersion
         return self::advertisesForwardProfile84BuiltinAttributeClass();
     }
 
-    /** PHP 8.4+ #[\Deprecated] builtin attribute class advertisement (Zend/zend_attributes.c, #11902). */
+    /** PHP 8.4+ #[\Deprecated] builtin attribute class advertisement (Zend/zend_attributes.c, #11902, #17318). */
     public static function advertisesDeprecatedAttributeClass(): bool
     {
         return self::advertisesForwardProfile84BuiltinAttributeClass();

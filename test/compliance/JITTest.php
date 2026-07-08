@@ -444,7 +444,8 @@ class JITTest extends BaseTest {
                 continue;
             }
             if (!CompilerVersion::advertisesDeprecatedAttributeClass()
-                && str_contains($name, 'deprecated_attribute_class')) {
+                && str_contains($name, 'deprecated_attribute_class')
+                && !str_contains($name, 'deprecated_attribute_class_forward_84')) {
                 continue;
             }
             if (!CompilerVersion::supportsDeprecatedAttributeRuntimeNotices()

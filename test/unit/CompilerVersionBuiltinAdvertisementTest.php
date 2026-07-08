@@ -335,6 +335,24 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         }
     }
 
+    public function testDeprecatedAttributeClassAdvertisedOnForwardProfile(): void
+    {
+        $this->assertFalse(CompilerVersion::advertisesDeprecatedAttributeClass());
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertTrue(CompilerVersion::advertisesDeprecatedAttributeClass());
+            $runtime = new Runtime();
+            $this->assertTrue(isset($runtime->vmContext->classes['deprecated']));
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     public function testVmRegistersFpowFamilyOnForwardProfile(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
