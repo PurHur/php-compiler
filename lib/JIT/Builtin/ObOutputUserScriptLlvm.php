@@ -9,7 +9,7 @@ use PHPCompiler\JIT\Context;
 use PHPLLVM\BasicBlock;
 
 /**
- * User-script standalone AOT: direct STDOUT echo without nested ObOutputJitHelper JIT (#13571, #13822).
+ * User-script standalone AOT: exec-capture ob stack + append-bytes echo (#13571, #10492).
  *
  * Quarantined from {@see ObOutputJitBridge} to keep bridge LOC under shrink guard (#12999).
  */
@@ -39,29 +39,12 @@ final class ObOutputUserScriptLlvm
     {
         $restore = self::captureInsertBlock($context);
         ObOutputJitBridge::prepareUserScriptEmit($context);
-        self::ensureWriteLibc($context);
         ObOutput::registerExternals($context);
-        EmbedObEchoBridge::implementAll($context);
+        ObOutputExecCaptureRuntime::ensureLinked($context);
+        ObOutputEchoJitEmit::implementAll($context);
         self::restoreInsertBlock($context, $restore);
         if (null === $restore) {
             $context->builder->clearInsertionPosition();
-        }
-    }
-
-    private static function ensureWriteLibc(Context $context): void
-    {
-        $i32 = $context->getTypeFromString('int32');
-        $i64 = $context->getTypeFromString('int64');
-        $i8p = $context->getTypeFromString('int8*');
-        $sizeT = $context->getTypeFromString('size_t');
-        try {
-            $context->lookupFunction('write');
-        } catch (\Throwable) {
-            $fn = $context->module->addFunction(
-                'write',
-                $context->context->functionType($i64, false, $i32, $i8p, $sizeT)
-            );
-            $context->registerFunction('write', $fn);
         }
     }
 
