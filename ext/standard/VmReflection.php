@@ -63,6 +63,78 @@ final class VmReflection
         );
     }
 
+    /** Max positional arity for get_class() on the active profile (ext/standard/basic_functions.c, #17395). */
+    public static function getClassMaxArgCount(): int
+    {
+        return CompilerVersion::supportsGetClassAllowString() ? 2 : 1;
+    }
+
+    /** Max positional arity for get_parent_class() on the active profile (#17395). */
+    public static function getParentClassMaxArgCount(): int
+    {
+        return CompilerVersion::supportsGetClassAllowString() ? 2 : 1;
+    }
+
+    public static function enforceGetClassMaxArgs(int $argc, string $function = 'get_class'): void
+    {
+        $max = self::getClassMaxArgCount();
+        if ($argc > $max) {
+            $suffix = 1 === $max ? '' : 's';
+            throw new \ArgumentCountError(
+                "{$function}() expects at most {$max} argument{$suffix}, {$argc} given"
+            );
+        }
+    }
+
+    public static function enforceGetParentClassMaxArgs(int $argc): void
+    {
+        $max = self::getParentClassMaxArgCount();
+        if ($argc > $max) {
+            $suffix = 1 === $max ? '' : 's';
+            throw new \ArgumentCountError(
+                "get_parent_class() expects at most {$max} argument{$suffix}, {$argc} given"
+            );
+        }
+    }
+
+    /**
+     * get_class()/get_parent_class() $allow_string operand (PHP 8.4, ext/standard/basic_functions.c).
+     */
+    public static function parseAllowStringArg(Frame $frame, string $function, int $argIndex): bool
+    {
+        return VmMath::parseBoolBuiltinArg(
+            $frame->calledArgs[$argIndex]->resolveIndirect(),
+            $function,
+            $argIndex + 1,
+            'allow_string'
+        );
+    }
+
+    /**
+     * Resolve a class-name string operand when $allow_string is true (php-src zend_lookup_class_ex).
+     */
+    public static function resolveAllowStringClassName(
+        Context $ctx,
+        string $className,
+        string $function,
+        string $paramName = 'object'
+    ): string {
+        $classLc = strtolower(self::normalizeGlobalIntrospectionName($className));
+        if (!isset($ctx->classes[$classLc])) {
+            $ctx->autoloadClass($className);
+        }
+        if (!isset($ctx->classes[$classLc])) {
+            throw new \ValueError(\sprintf(
+                '%s(): Argument #1 ($%s) must be an object or a valid class name, "%s" given',
+                $function,
+                $paramName,
+                $className
+            ));
+        }
+
+        return $className;
+    }
+
     /**
      * Optional $exclude_disabled for get_defined_functions() (PHP 8.4, #4942).
      *
