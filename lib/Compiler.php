@@ -131,6 +131,8 @@ class Compiler {
     private array $coalesceResultSlots = [];
     /** cfgVarRoot / call-arg oid => slot wired by syncCoalesceResultToDistinctFuncCallArg (#15915). */
     private array $syncedCoalesceFuncCallArgSlots = [];
+    /** spl_object_id(Coalesce) => ??= lvalue operand when result temp differs (#5337, #17458). */
+    private array $coalesceAssignLvalues = [];
     /** Trailing source bytes after __halt_compiler(); (issue #3479). */
     private ?string $haltCompilerRemaining = null;
     /** {@see OpCode::ASSIGN_REF_FOREACH_PROPERTY_HOOK} for the next AssignRef compile (#6435). */
@@ -3401,11 +3403,21 @@ class Compiler {
             }
         }
 
+        if (
+            null !== $resultOverride
+            && !$this->operandsChainEqual($resultOverride, $coalesce->result)
+        ) {
+            $this->coalesceAssignLvalues[spl_object_id($coalesce)] = $resultOverride;
+        }
+
         $block = $this->compileCoalesce($coalesce, $block, $resultOverride);
 
-        // php-cfg keeps a separate coalesce result temp when ??= is an expression (#5337).
+        // php-cfg keeps a separate coalesce result temp when ??= is an expression (#5337, #17458).
         // Skip when echo reads resultOverride directly — syncing would null the override slot (TYPE_ASSIGN).
-        if ($this->coalesceAssignNeedsResultTempSync($coalesce, $resultOverride, $block)) {
+        if (
+            $this->coalesceAssignNeedsResultTempSync($coalesce, $resultOverride, $block)
+            || $this->coalesceAssignHasFollowingCallExpressionConsumer($coalesce, $resultOverride, $block)
+        ) {
             $resultSlot = $this->compileOperand($coalesce->result, $block, false);
             $overrideSlot = $this->compileOperand($resultOverride, $block, false);
             $block->addOpCode(new OpCode(
@@ -3721,14 +3733,71 @@ class Compiler {
             if (null === $targetArg) {
                 return;
             }
+            $syncReadOperand = $this->coalesceAssignHasFollowingCallExpressionConsumer(
+                $coalesce,
+                $resultOverride,
+                $block
+            )
+                ? $coalesce->result
+                : ($resultOverride ?? $coalesce->result);
             // Wire the post-?? merge result slot — not an inner dim-fetch temp (#10743, #15915).
             $this->registerSyncedCoalesceFuncCallArgSlot(
                 $targetArg,
-                $this->compileOperand($resultOverride ?? $coalesce->result, $block, true)
+                $this->compileOperand($syncReadOperand, $block, true)
             );
 
             return;
         }
+    }
+
+    /**
+     * Stmt-level ??= immediately before FuncCall — expression value lives in a dead arg temp (#5337, #17458).
+     */
+    private function coalesceAssignHasFollowingCallExpressionConsumer(
+        Op\Expr\BinaryOp\Coalesce $coalesce,
+        ?Operand $resultOverride,
+        Block $block
+    ): bool {
+        if (
+            null === $resultOverride
+            || null === $block->orig
+            || $this->operandsChainEqual($resultOverride, $coalesce->result)
+        ) {
+            return false;
+        }
+        $ops = $block->orig->children;
+        $coalesceIdx = null;
+        foreach ($ops as $idx => $op) {
+            if ($op === $coalesce) {
+                $coalesceIdx = $idx;
+                break;
+            }
+        }
+        if (null === $coalesceIdx) {
+            return false;
+        }
+        for ($j = $coalesceIdx + 1, $count = \count($ops); $j < $count; ++$j) {
+            $next = $ops[$j];
+            if ($next instanceof Op\Expr\Assign && $this->isCoalesceAssignTail($next, $coalesce)) {
+                continue;
+            }
+            if ($next instanceof Op\Expr\FuncCall || $next instanceof Op\Expr\NsFuncCall) {
+                return true;
+            }
+            if ($next instanceof Op\Expr\MethodCall || $next instanceof Op\Expr\StaticCall) {
+                return true;
+            }
+            if ($next instanceof Op\Terminal\Echo) {
+                return false;
+            }
+            if ($next instanceof Op\Expr && $this->isInlineExprCallArgProducer($next)) {
+                continue;
+            }
+
+            break;
+        }
+
+        return false;
     }
 
     /**
@@ -14458,6 +14527,12 @@ class Compiler {
     private function slotForCoalesceResult(Block $block, Op\Expr\BinaryOp\Coalesce $coalesce): ?int
     {
         $coalesceId = spl_object_id($coalesce);
+        if (isset($this->coalesceAssignLvalues[$coalesceId])) {
+            $lvalueSlot = $block->slotForOperand($this->coalesceAssignLvalues[$coalesceId]);
+            if (null !== $lvalueSlot) {
+                return $lvalueSlot;
+            }
+        }
         if (isset($this->coalesceResultSlots[$coalesceId])) {
             return $this->coalesceResultSlots[$coalesceId];
         }
