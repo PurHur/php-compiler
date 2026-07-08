@@ -65,6 +65,17 @@ final class LibxmlConstants
      *
      * @return array<string, int>
      */
+    /** @return array<string, int> */
+    public static function registeredConstants(): array
+    {
+        return [
+            'LIBXML_ERR_NONE' => self::LIBXML_ERR_NONE,
+            'LIBXML_ERR_WARNING' => self::LIBXML_ERR_WARNING,
+            'LIBXML_ERR_ERROR' => self::LIBXML_ERR_ERROR,
+            'LIBXML_ERR_FATAL' => self::LIBXML_ERR_FATAL,
+        ] + self::parseFlagConstants();
+    }
+
     public static function parseFlagConstants(): array
     {
         return [
