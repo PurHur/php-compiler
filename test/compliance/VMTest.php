@@ -202,6 +202,15 @@ class VMTest extends BaseTest {
                 && str_contains($name, 'sorting_enum_phantom')) {
                 continue;
             }
+            if (!CompilerVersion::supportsRange()
+                && str_contains($name, 'range_from_84')
+                && !str_contains($name, 'range_phantom')) {
+                continue;
+            }
+            if (CompilerVersion::supportsRange()
+                && str_contains($name, 'range_phantom')) {
+                continue;
+            }
             if (!CompilerVersion::supportsBuiltinStubEnums()
                 && (str_contains($name, 'pad_type_enum')
                     || str_contains($name, 'string_trim_mode')
