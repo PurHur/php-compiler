@@ -151,6 +151,21 @@ final class ReflectionSupport
         return sprintf('Constant %s::%s does not exist', $className, $constant);
     }
 
+    public static function globalConstantNotFoundMessage(string $constant): string
+    {
+        return sprintf('Constant "%s" does not exist', $constant);
+    }
+
+    public static function isGlobalReflectionConstant(ObjectEntry $reflection): bool
+    {
+        $classVar = $reflection->getProperty(self::PROP_CLASS_NAME)->resolveIndirect();
+        if (Variable::TYPE_STRING !== $classVar->type) {
+            return false;
+        }
+
+        return '' === $classVar->toString();
+    }
+
     public static function functionNotFoundMessage(string $functionName): string
     {
         return sprintf('Function %s() does not exist', $functionName);

@@ -4,11 +4,12 @@ declare(strict_types=1);
 
 namespace PHPCompiler\VM\Builtin;
 
+use PHPCompiler\ext\standard\VmConstants;
 use PHPCompiler\ext\standard\VmReflection;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\ReflectionSupport;
 
-/** ReflectionConstant::__construct($class, $name) — VM (#3354). */
+/** ReflectionConstant::__construct($name) or ($class, $name) — VM (#3354, #17341). */
 final class ReflectionConstantConstruct extends VmClassMethod
 {
     public function __construct()
@@ -18,8 +19,33 @@ final class ReflectionConstantConstruct extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
+        $receiver = ReflectionSupport::requireReflectionConstant($frame, $frame->calledArgs[0]);
+        $isReflectionConstant = ReflectionSupport::REFLECTION_CONSTANT === strtolower($receiver->class->name);
         if (\count($frame->calledArgs) < 3) {
-            throw new \LogicException('ReflectionConstant::__construct() expects class and constant name');
+            if (\count($frame->calledArgs) < 2) {
+                throw new \ArgumentCountError(
+                    $isReflectionConstant
+                        ? 'ReflectionConstant::__construct() expects at least 1 argument, 0 given'
+                        : 'ReflectionClassConstant::__construct() expects exactly 2 arguments, 0 given'
+                );
+            }
+            if (!$isReflectionConstant) {
+                throw new \ArgumentCountError(
+                    'ReflectionClassConstant::__construct() expects exactly 2 arguments, 1 given'
+                );
+            }
+            $ctx = VmReflection::requireContext($frame);
+            $constant = VmReflection::stringArg($frame->calledArgs[1], 'ReflectionConstant::__construct() name', 1);
+            if (!VmConstants::constantDefined($ctx, $constant)) {
+                ReflectionSupport::throwReflectionException(
+                    ReflectionSupport::globalConstantNotFoundMessage($constant)
+                );
+            }
+            $receiver->getProperty(ReflectionSupport::PROP_CLASS_NAME)->string('');
+            $receiver->getProperty(ReflectionSupport::PROP_CONSTANT_NAME)->string($constant);
+            $receiver->constructed = true;
+
+            return;
         }
         $ctx = VmReflection::requireContext($frame);
         $entry = VmReflection::resolveClassFromArg($ctx, $frame->calledArgs[1]);
@@ -29,7 +55,6 @@ final class ReflectionConstantConstruct extends VmClassMethod
                 ReflectionSupport::constantNotFoundMessage($entry->name, $constant)
             );
         }
-        $receiver = ReflectionSupport::requireReflectionConstant($frame, $frame->calledArgs[0]);
         $receiver->getProperty(ReflectionSupport::PROP_CLASS_NAME)->string($entry->name);
         $receiver->getProperty(ReflectionSupport::PROP_CONSTANT_NAME)->string($constant);
         $receiver->constructed = true;
