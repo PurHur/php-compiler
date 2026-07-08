@@ -232,6 +232,16 @@ abstract class BaseTest extends TestCase {
             } elseif ('' === $stdoutTrim && '' !== $stderrTrim) {
                 // Stderr-only scripts (no user echo output).
                 $merged = $stderrTrim;
+            } elseif (
+                '' !== $stderrTrim
+                && '' !== $stdoutTrim
+                && self::phptExpectReferencesCliDiagnostics($sections)
+                && !self::stdoutAlreadyContainsCliDiagnostics($stdoutTrim)
+            ) {
+                // PHPT fixtures that list PHP Warning/Notice/Deprecated in EXPECT need stderr merged
+                // when display_errors=0 on the driver (#17398). Skip merge when VM already echoed
+                // diagnostics to stdout (display_errors=1 inside the script).
+                $merged = $stderrTrim."\n".$stdoutTrim;
             } else {
                 // php-src PHPT compares stdout; CLI notices/warnings stay on stderr (#13486, #16702).
                 $merged = $stdoutTrim;
@@ -265,6 +275,30 @@ abstract class BaseTest extends TestCase {
             }
         }
         throw new \RuntimeException('No PHPT assertion found');
+    }
+
+    /**
+     * True when a PHPT EXPECT section includes CLI diagnostics that land on stderr with display_errors=0.
+     *
+     * @param array<string, string> $sections
+     */
+    protected static function phptExpectReferencesCliDiagnostics(array $sections): bool
+    {
+        foreach (['EXPECT', 'EXPECTF', 'EXPECTREGEX'] as $key) {
+            if (!isset($sections[$key])) {
+                continue;
+            }
+            if (preg_match('/PHP (?:Warning|Notice|Deprecated):/', $sections[$key])) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    protected static function stdoutAlreadyContainsCliDiagnostics(string $stdout): bool
+    {
+        return (bool) preg_match('/PHP (?:Warning|Notice|Deprecated):/', $stdout);
     }
 
     protected function normalize(string $string): string {
