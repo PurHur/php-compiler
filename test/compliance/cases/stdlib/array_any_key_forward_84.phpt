@@ -11,8 +11,8 @@ foreach (['array_any', 'array_all', 'array_any_key', 'array_all_key'] as $fn) {
 }
 
 $a = ['x' => 1, 'y' => 2, 'z' => 3];
-echo 'any_key_y=', array_any_key($a, fn ($v, $k) => $k === 'y' && $v === 2) ? 'T' : 'F', "\n";
-echo 'all_key=', array_all_key($a, fn ($v, $k) => is_string($k) && $v > 0) ? 'T' : 'F', "\n";
+echo 'any_key_y=', array_any_key($a, fn ($k, $v) => $k === 'y' && $v === 2) ? 'T' : 'F', "\n";
+echo 'all_key=', array_all_key($a, fn ($k, $v) => is_string($k) && $v > 0) ? 'T' : 'F', "\n";
 echo 'any_empty=', array_any([], fn () => true) ? 'T' : 'F', "\n";
 echo 'all_empty=', array_all([], fn () => false) ? 'T' : 'F', "\n";
 echo 'any_key_empty=', array_any_key([], fn () => true) ? 'T' : 'F', "\n";
