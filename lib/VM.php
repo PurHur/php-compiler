@@ -3412,7 +3412,16 @@ restart:
                         $writeTarget = $lhsPeel;
                     } elseif (null !== $rhs->objectPropertyOwner) {
                         // $ref = &$obj->prop — bind variable slot, not peeled global wrapper (#13559).
-                        $writeTarget = $lhs;
+                        // `[&$obj->prop]` — bind the array bucket behind dim-fetch temp (#17353).
+                        if (
+                            $lhs->isIndirect()
+                            && null === $lhsPeel->objectPropertyOwner
+                            && !$this->context->isGlobalStorage($lhsPeel)
+                        ) {
+                            $writeTarget = $lhsPeel;
+                        } else {
+                            $writeTarget = $lhs;
+                        }
                     } else {
                         $writeTarget = $lhs->isIndirect() ? $lhsPeel : $lhs;
                     }
