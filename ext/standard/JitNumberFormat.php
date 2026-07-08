@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\CompilerVersion;
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Builtin\RoundingModeJit;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
@@ -70,6 +71,24 @@ final class JitNumberFormat
         $decimals = ($argc >= 2 && !NamedOptionalCallArgs::isOmittedOptional($args[1]))
             ? JitIntdiv::lowerIntBuiltinArg($context, $args[1], 'number_format', 2, 'decimals')
             : $i64->constInt(0, false);
+        if (version_compare(CompilerVersion::languageProfileVersion(), '8.4.0', '>=')) {
+            $negative = $context->builder->icmp(Builder::INT_SLT, $decimals, $i64->constInt(0, false));
+            $okBlock = BasicBlockHelper::append($context, 'number_format_decimals_ok');
+            $failBlock = BasicBlockHelper::append($context, 'number_format_decimals_fail');
+            $context->builder->branchIf($negative, $failBlock, $okBlock);
+            $context->builder->positionAtEnd($failBlock);
+            $message = 'number_format(): Argument #2 ($decimals) must be greater than or equal to 0';
+            TypeErrorRaise::registerDeclarations($context);
+            TypeErrorRaise::ensureLinked($context);
+            TypeErrorRaise::emitValueError($context, $message);
+            if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
+                $context->builder->call($context->lookupFunction('phpc_jit_abort_if_pending_type_error'));
+            } else {
+                $context->builder->call($context->lookupFunction('abort'));
+                $context->llvm->lib->LLVMBuildUnreachable($context->builder->builder);
+            }
+            $context->builder->positionAtEnd($okBlock);
+        }
         $decSep = ($argc >= 3 && !NamedOptionalCallArgs::isOmittedOptional($args[2]))
             ? JitStringBuiltinArg::lower($context, $args[2], 'number_format', 2, 'decimal_separator', '?string')
             : $context->builder->load($context->constantStringFromString('.'));

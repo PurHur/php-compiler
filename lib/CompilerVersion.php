@@ -672,8 +672,10 @@ final class CompilerVersion
     /**
      * PHP 8.3+ number_format() negative $decimals (ext/standard/number_format.c, #15917).
      *
-     * Prior to 8.3, negative values are ignored like 0. Requires explicit
-     * `PHP_COMPILER_PROFILE=8.3` / `8.4` so the 8.4.0-dev reference profile matches Zend 8.2.
+     * Prior to 8.3, negative values are ignored like 0. On PHP 8.4+, negative decimals are rejected
+     * with ValueError (re-#17261, #17369).
+     *
+     * Requires explicit `PHP_COMPILER_PROFILE=8.3` so the 8.4.0-dev reference profile matches Zend 8.2.
      */
     public static function supportsNumberFormatNegativeDecimals(): bool
     {
@@ -685,7 +687,12 @@ final class CompilerVersion
             return false;
         }
 
-        return version_compare(self::languageProfileVersion(), '8.3.0', '>=');
+        $profile = self::languageProfileVersion();
+        if (version_compare($profile, '8.4.0', '>=')) {
+            return false;
+        }
+
+        return version_compare($profile, '8.3.0', '>=');
     }
 
     /**

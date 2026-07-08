@@ -80,7 +80,8 @@ class VMTest extends BaseTest {
                 continue;
             }
             if (!CompilerVersion::supportsNumberFormatNegativeDecimals()
-                && str_contains($name, 'number_format_negative_decimals_84')) {
+                && str_contains($name, 'number_format_negative_decimals')
+                && !str_contains($name, 'number_format_negative_decimals_84')) {
                 continue;
             }
             if (CompilerVersion::supportsNumberFormatNegativeDecimals()
