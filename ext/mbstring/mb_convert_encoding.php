@@ -51,13 +51,13 @@ final class mb_convert_encoding extends Internal
             : VmMbstring::coerceEncodingString($frame->calledArgs[2], 'mb_convert_encoding', 2);
         if (!VmMbstring::isHtmlEntitiesEncoding($from) && null === CharsetEngine::parseEncodingSpec($from)) {
             throw new \ValueError(sprintf(
-                'mb_convert_encoding(): Argument #3 ($from_encoding) is not a supported encoding, "%s" given',
+                'mb_convert_encoding(): Argument #3 ($from_encoding) contains invalid encoding "%s"',
                 $from
             ));
         }
         if (!VmMbstring::isHtmlEntitiesEncoding($to) && null === CharsetEngine::parseEncodingSpec($to)) {
             throw new \ValueError(sprintf(
-                'mb_convert_encoding(): Argument #2 ($to_encoding) is not a supported encoding, "%s" given',
+                'mb_convert_encoding(): Argument #2 ($to_encoding) must be a valid encoding, "%s" given',
                 $to
             ));
         }
