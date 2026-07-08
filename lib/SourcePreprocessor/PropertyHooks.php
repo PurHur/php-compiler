@@ -1276,6 +1276,16 @@ final class PropertyHooks
             if (preg_match('/^(public|protected|private)\s+set\s*\(/s', $rest, $asymM)) {
                 $asymmetricSetVisibility = strtolower($asymM[1]);
                 $rest = preg_replace('/^(public|protected|private)\s+set\s*/i', '', $rest, 1) ?? $rest;
+                if (preg_match('/^\(([^)]*)\)\s*=>\s*/s', $rest, $pm)) {
+                    $params = trim($pm[1]);
+                    $rest = substr($rest, strlen($pm[0])) ?? $rest;
+                    [$expr, $rest] = $this->takeUntilSemicolon($rest);
+                    $methods = array_merge(
+                        $methods,
+                        $this->lowerSetArrowHook($lcClass, $prop, $isStatic, rtrim($expr), $usesBacking, $propertyType, $hookFinal, $params)
+                    );
+                    continue;
+                }
                 if (!preg_match('/^\(([^)]*)\)\s*\{/s', $rest, $pm)) {
                     break;
                 }
@@ -1300,6 +1310,17 @@ final class PropertyHooks
             }
             if (preg_match('/^set\s*\(/s', $rest)) {
                 $rest = preg_replace('/^set\s*/', '', $rest, 1) ?? $rest;
+                // php-src: Zend/zend_compile.c — `set($param) => expr` fat-arrow (#17329, PHP 8.4).
+                if (preg_match('/^\(([^)]*)\)\s*=>\s*/s', $rest, $pm)) {
+                    $params = trim($pm[1]);
+                    $rest = substr($rest, strlen($pm[0])) ?? $rest;
+                    [$expr, $rest] = $this->takeUntilSemicolon($rest);
+                    $methods = array_merge(
+                        $methods,
+                        $this->lowerSetArrowHook($lcClass, $prop, $isStatic, rtrim($expr), $usesBacking, $propertyType, $hookFinal, $params)
+                    );
+                    continue;
+                }
                 if (!preg_match('/^\(([^)]*)\)\s*\{/s', $rest, $pm)) {
                     break;
                 }
@@ -1357,7 +1378,8 @@ final class PropertyHooks
         string $expr,
         bool &$usesBacking,
         ?string $propertyType = null,
-        bool $isFinal = false
+        bool $isFinal = false,
+        string $params = '$value'
     ): array {
         if ($this->setArrowExprUsesStatementForm($expr, $isStatic)) {
             $usesBacking = $usesBacking || $this->hookTouchesBacking($expr, $prop, $isStatic);
@@ -1371,7 +1393,7 @@ final class PropertyHooks
         $method = self::SET_METHOD_PREFIX.$prop;
         $this->registerHook($lcClass, $prop, 'set', $method, $isStatic, $isFinal);
 
-        return [$this->hookMethodDecl($isStatic, $method, '$value', $body, $propertyType)];
+        return [$this->hookMethodDecl($isStatic, $method, $params, $body, $propertyType)];
     }
 
     /**
