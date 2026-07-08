@@ -1160,20 +1160,15 @@ final class PropertyHooks
                 $rest = preg_replace('/^get\s*;/', '', $rest, 1) ?? $rest;
                 continue;
             }
+            // php-src: asymmetric set visibility only — not an abstract set hook obligation (#9872, #17337).
             if (preg_match('/^(public|protected|private)\s+set\s*;/s', $rest, $asymM)) {
                 $asymmetricSetVisibility = strtolower($asymM[1]);
-                if (!$skipSemicolonRequiredHooks) {
-                    $this->registerRequiredHook($lcClass, $prop, 'requiresSet', $hookFinal);
-                }
                 $rest = preg_replace('/^(public|protected|private)\s+set\s*;/i', '', $rest, 1) ?? $rest;
                 continue;
             }
             // php-src: Zend/zend_compile.c — `private(set);` in hook block (#9872, PHP 8.4 asymmetric visibility).
             if (preg_match('/^(public|protected|private)\s*\(\s*set\s*\)\s*;/s', $rest, $asymM)) {
                 $asymmetricSetVisibility = strtolower($asymM[1]);
-                if (!$skipSemicolonRequiredHooks) {
-                    $this->registerRequiredHook($lcClass, $prop, 'requiresSet', $hookFinal);
-                }
                 $rest = preg_replace('/^(public|protected|private)\s*\(\s*set\s*\)\s*;/i', '', $rest, 1) ?? $rest;
                 continue;
             }
@@ -1186,9 +1181,6 @@ final class PropertyHooks
             }
             if (preg_match('/^set\s*\(\s*(public|protected|private)\s*\)\s*;/s', $rest, $asymM)) {
                 $asymmetricSetVisibility = strtolower($asymM[1]);
-                if (!$skipSemicolonRequiredHooks) {
-                    $this->registerRequiredHook($lcClass, $prop, 'requiresSet', $hookFinal);
-                }
                 $rest = preg_replace('/^set\s*\(\s*(public|protected|private)\s*\)\s*;/i', '', $rest, 1) ?? $rest;
                 continue;
             }
