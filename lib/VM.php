@@ -3207,9 +3207,14 @@ restart:
                     }
                     $arg1 = $frame->scope[$op->arg1];
                     $arg2 = $frame->scope[$op->arg2];
-                    $arg3 = null !== $op->arg3
-                        ? $this->readRuntimeOperandPreferringInitializedCv($frame, (int) $op->arg3)
-                        : null;
+                    if (null !== $op->arg3) {
+                        $arg3 = isset($frame->block->constants[$op->arg3])
+                            ? $frame->block->constants[$op->arg3]
+                            : $this->readRuntimeOperandPreferringInitializedCv($frame, (int) $op->arg3);
+                    } else {
+                        // ?: merge assigns omit arg3; legacy lowering reads slot 0 (#9159, re-#14134).
+                        $arg3 = $this->readScopeOperandForRuntimeRead($frame, 0);
+                    }
                     $catchFrame = $this->enforcePropertyVisibilityWrite($arg2, $frame);
                     if (null !== $catchFrame) {
                         $frame = $catchFrame;
