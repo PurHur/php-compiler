@@ -17,9 +17,9 @@ final class ArrayFirstLastVMTest extends BaseTest
             __DIR__.'/cases/stdlib/array_first_last.phpt',
             'array_first_last.phpt'
         );
-        yield 'array_first_last_empty.phpt' => self::parsePHPT(
-            __DIR__.'/cases/stdlib/array_first_last_empty.phpt',
-            'array_first_last_empty.phpt'
+        yield 'array_first_empty.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/array_first_empty.phpt',
+            'array_first_empty.phpt'
         );
     }
 
