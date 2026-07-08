@@ -16,7 +16,7 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** filter_var() subset — FILTER_VALIDATE_INT/BOOLEAN/FLOAT/REGEXP/EMAIL/URL/IP (#104, #4742, #5020, #6028, #4403). */
+/** filter_var() subset — FILTER_VALIDATE_INT/BOOLEAN/FLOAT/REGEXP/EMAIL/URL/IP/MAC (#104, #4742, #5020, #6028, #4403, #17411). */
 final class filter_var extends Internal
 {
     public function execute(Frame $frame): void
@@ -116,6 +116,11 @@ final class filter_var extends Internal
             $filterVal,
             $i64->constInt(VmFilter::FILTER_VALIDATE_IP, false)
         );
+        $isMac = $context->builder->icmp(
+            Builder::INT_EQ,
+            $filterVal,
+            $i64->constInt(VmFilter::FILTER_VALIDATE_MAC, false)
+        );
 
         $intBlock = BasicBlockHelper::append($context, 'filter_var_int');
         $otherBlock = BasicBlockHelper::append($context, 'filter_var_other');
@@ -128,6 +133,8 @@ final class filter_var extends Internal
         $urlBlock = BasicBlockHelper::append($context, 'filter_var_url');
         $urlOtherBlock = BasicBlockHelper::append($context, 'filter_var_url_other');
         $ipBlock = BasicBlockHelper::append($context, 'filter_var_ip');
+        $macCheckBlock = BasicBlockHelper::append($context, 'filter_var_mac_check');
+        $macBlock = BasicBlockHelper::append($context, 'filter_var_mac');
         $sanitizeCheckBlock = BasicBlockHelper::append($context, 'filter_var_sanitize_check');
         $sanitizeBlock = BasicBlockHelper::append($context, 'filter_var_sanitize');
         $failBlock = BasicBlockHelper::append($context, 'filter_var_fail');
@@ -185,7 +192,10 @@ final class filter_var extends Internal
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($urlOtherBlock);
-        $context->builder->branchIf($isIp, $ipBlock, $sanitizeCheckBlock);
+        $context->builder->branchIf($isIp, $ipBlock, $macCheckBlock);
+
+        $context->builder->positionAtEnd($macCheckBlock);
+        $context->builder->branchIf($isMac, $macBlock, $sanitizeCheckBlock);
 
         $context->builder->positionAtEnd($sanitizeCheckBlock);
         $isSanitize = JitFilter::isSanitizeFilterId($context, $filterVal);
@@ -197,6 +207,14 @@ final class filter_var extends Internal
             $ipResult = JitFilter::applyNullOnFailure($context, $ipResult, $nullOnFailure);
         }
         $ipTail = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($macBlock);
+        $macResult = JitFilter::validateMac($context, $value);
+        if (null !== $optionsArg && JITVariable::TYPE_NULL !== $optionsArg->type) {
+            $macResult = JitFilter::applyNullOnFailure($context, $macResult, $nullOnFailure);
+        }
+        $macTail = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($sanitizeBlock);
@@ -218,6 +236,7 @@ final class filter_var extends Internal
         $phi->addIncoming($emailResult, $emailTail);
         $phi->addIncoming($urlResult, $urlTail);
         $phi->addIncoming($ipResult, $ipTail);
+        $phi->addIncoming($macResult, $macTail);
         $phi->addIncoming($sanitizeResult, $sanitizeTail);
         $phi->addIncoming($falseResult, $failTail);
 

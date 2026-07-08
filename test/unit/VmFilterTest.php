@@ -174,6 +174,30 @@ final class VmFilterTest extends TestCase
         $this->assertFalse(VmFilter::isValidIpAddress('999.999.999.999'));
     }
 
+    public function testValidateMacReturnsStringForValidColonAddress(): void
+    {
+        $v = new Variable();
+        $v->string('00:00:5e:00:53:af');
+        $out = VmFilter::filterVar($v, VmFilter::FILTER_VALIDATE_MAC);
+        $this->assertSame(Variable::TYPE_STRING, $out->type);
+        $this->assertSame('00:00:5e:00:53:af', $out->toString());
+    }
+
+    public function testValidateMacReturnsFalseForInvalidAddress(): void
+    {
+        $v = new Variable();
+        $v->string('not-a-mac');
+        $out = VmFilter::filterVar($v, VmFilter::FILTER_VALIDATE_MAC);
+        $this->assertSame(Variable::TYPE_BOOLEAN, $out->type);
+        $this->assertFalse($out->toBool());
+    }
+
+    public function testIsValidMacAddressAcceptsHyphenFormat(): void
+    {
+        $this->assertTrue(VmFilter::isValidMacAddress('FA-F9-DD-B2-5E-0D'));
+        $this->assertFalse(VmFilter::isValidMacAddress('FA-F9-DD-B2-5E'));
+    }
+
     public function testIsIntegerStringRejectsLeadingZeros(): void
     {
         $this->assertFalse(VmFilter::isIntegerString('0123'));
