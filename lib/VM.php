@@ -3412,7 +3412,10 @@ restart:
                         $writeTarget = $lhsPeel;
                     } elseif (null !== $rhs->objectPropertyOwner) {
                         // $ref = &$obj->prop — bind variable slot, not peeled global wrapper (#13559).
-                        $writeTarget = $lhs;
+                        // Inline array [&$obj->hook] must bind the array cell, not the dim-fetch temp (#17353).
+                        $writeTarget = $lhs->isIndirect() && null === $lhsPeel->objectPropertyOwner
+                            ? $lhsPeel
+                            : $lhs;
                     } else {
                         $writeTarget = $lhs->isIndirect() ? $lhsPeel : $lhs;
                     }
