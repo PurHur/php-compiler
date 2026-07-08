@@ -3550,6 +3550,7 @@
         "lib/JIT/CastObjectNativeJit.php",
         "lib/JIT/CastUnsetJit.php",
         "lib/JIT/ClassConstFetchHelper.php",
+        "lib/JIT/ClassConstFetchHelperTrait.php",
         "lib/JIT/ClassConstVisibilityJitGuard.php",
         "lib/JIT/ClassParamCheck.php",
         "lib/JIT/CliArgvGlobalInit.php",
@@ -4507,9 +4508,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 4273,
+        "inventory_files": 4274,
         "excluded": 0,
-        "eligible": 4273,
+        "eligible": 4274,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
