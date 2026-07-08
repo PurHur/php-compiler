@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\ext\sockets\VmSockets;
+
 /**
  * stream_socket_pair without libc socketpair FFI (#12253, pairs #8953 VmStreamSocketPure).
  *
@@ -30,14 +32,16 @@ final class VmStreamSocketPairPure
             return false;
         }
 
+        $uri = 'unix://stream_socket_pair';
+        $beforeSockets = VmSockets::enumerateSocketFds();
         $pair = @\stream_socket_pair($domain, $type, $protocol);
         if (false === $pair || !isset($pair[0], $pair[1])) {
             return false;
         }
 
-        $uri = 'unix://stream_socket_pair';
-        $handle0 = VmFs::adoptStreamResource($pair[0], $uri);
-        $handle1 = VmFs::adoptStreamResource($pair[1], $uri);
+        $newFds = VmSockets::discoverNewSocketFds($beforeSockets);
+        $handle0 = VmFs::adoptStreamResource($pair[0], $uri, $newFds[0] ?? null);
+        $handle1 = VmFs::adoptStreamResource($pair[1], $uri, $newFds[1] ?? null);
         if (false === $handle0 || false === $handle1) {
             @\fclose($pair[0]);
             @\fclose($pair[1]);

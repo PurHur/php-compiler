@@ -44,6 +44,91 @@ final class VmSockets
         return $r >= 0 && 0 !== $r;
     }
 
+    /** php-src: ext/sockets/sockets.c — PHP_FUNCTION(socket_set_nonblock) via fcntl(F_SETFL). */
+    public static function setNonblockForObject(ObjectEntry $object): bool
+    {
+        $fd = VmSocket::fdForObject($object);
+        if (null === $fd) {
+            return false;
+        }
+
+        return self::setNonblockForFd($fd);
+    }
+
+    /** php-src: ext/sockets/sockets.c — PHP_FUNCTION(socket_set_block) via fcntl(F_SETFL). */
+    public static function setBlockForObject(ObjectEntry $object): bool
+    {
+        $fd = VmSocket::fdForObject($object);
+        if (null === $fd) {
+            return false;
+        }
+
+        return self::setBlockForFd($fd);
+    }
+
+    public static function setNonblockForFd(int $fd): bool
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return false;
+        }
+
+        try {
+            $flags = (int) $ffi->fcntl($fd, self::F_GETFL, 0);
+            if (-1 === $flags) {
+                return false;
+            }
+
+            return -1 !== (int) $ffi->fcntl($fd, self::F_SETFL, $flags | self::O_NONBLOCK);
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
+    public static function setBlockForFd(int $fd): bool
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return false;
+        }
+
+        try {
+            $flags = (int) $ffi->fcntl($fd, self::F_GETFL, 0);
+            if (-1 === $flags) {
+                return false;
+            }
+
+            return -1 !== (int) $ffi->fcntl($fd, self::F_SETFL, $flags & ~self::O_NONBLOCK);
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
+    private const F_GETFL = 3;
+    private const F_SETFL = 4;
+    private const O_NONBLOCK = 2048;
+
+    /** @return list<int> */
+    public static function discoverNewSocketFds(array $beforeSockets): array
+    {
+        $new = [];
+        foreach (self::enumerateSocketFds() as $fd => $_target) {
+            if (!isset($beforeSockets[$fd])) {
+                $new[] = $fd;
+            }
+        }
+        sort($new);
+
+        return $new;
+    }
+
+    public static function discoverNewSocketFd(array $beforeSockets): ?int
+    {
+        $new = self::discoverNewSocketFds($beforeSockets);
+
+        return $new[0] ?? null;
+    }
+
     public static function triggerWarning(Frame $frame, string $message): void
     {
         if (null === $frame->vmContext) {
@@ -75,7 +160,8 @@ final class VmSockets
             try {
                 self::$ffi = \FFI::cdef(
                     'int sockatmark(int sockfd);
-                    int getsockname(int sockfd, void *addr, unsigned int *addrlen);',
+                    int getsockname(int sockfd, void *addr, unsigned int *addrlen);
+                    int fcntl(int fd, int cmd, ...);',
                     $lib
                 );
 
