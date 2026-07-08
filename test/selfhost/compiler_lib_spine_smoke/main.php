@@ -25,6 +25,16 @@ if (!defined('PHP_COMPILER_LIB_SPINE_SMOKE')) {
 
 
 
+
+require_once __DIR__.'/../../../lib/OpCode.php';
+require_once __DIR__.'/../../../lib/Block.php';
+require_once __DIR__.'/../../../lib/Frame.php';
+require_once __DIR__.'/../../../lib/Func.php';
+require_once __DIR__.'/../../../lib/Handler.php';
+require_once __DIR__.'/../../../lib/JIT/Call.php';
+require_once __DIR__.'/../../../lib/Func/Internal.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/VmClassMethod.php';
+require_once __DIR__.'/../../../ext/dom/DomClassMethod.php';
 require_once __DIR__.'/../../../bin/vm.php';
 require_once __DIR__.'/../../../ext/bcmath/BcMathNumberMethod.php';
 require_once __DIR__.'/../../../ext/bcmath/BcmathFunction.php';
@@ -168,7 +178,6 @@ require_once __DIR__.'/../../../ext/dom/DocumentSaveXML.php';
 require_once __DIR__.'/../../../ext/dom/DocumentSchemaValidate.php';
 require_once __DIR__.'/../../../ext/dom/DocumentXInclude.php';
 require_once __DIR__.'/../../../ext/dom/DomClassConstants.php';
-require_once __DIR__.'/../../../ext/dom/DomClassMethod.php';
 require_once __DIR__.'/../../../ext/dom/DomConstants.php';
 require_once __DIR__.'/../../../ext/dom/DomDocumentPropertySupport.php';
 require_once __DIR__.'/../../../ext/dom/DomExceptionConstants.php';
@@ -339,7 +348,6 @@ require_once __DIR__.'/../../../ext/intl/CollatorCreate.php';
 require_once __DIR__.'/../../../ext/intl/IntlConstants.php';
 require_once __DIR__.'/../../../ext/intl/IntlClassMethod.php';
 require_once __DIR__.'/../../../ext/intl/IntlDateFormatterCreate.php';
-require_once __DIR__.'/../../../ext/intl/IntlConstants.php';
 require_once __DIR__.'/../../../ext/intl/IntlExtensionPolicy.php';
 require_once __DIR__.'/../../../ext/intl/JitGrapheme.php';
 require_once __DIR__.'/../../../ext/intl/JitLocaleParser.php';
@@ -775,12 +783,10 @@ require_once __DIR__.'/../../../ext/standard/CheckdnsrrJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/ChmodJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/ChownJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/ChunkSplitJitHelper.php';
-require_once __DIR__.'/../../../ext/standard/ClampJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/ClassExistsJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/ClassImplementsJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/ClassParentsJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/ClassUsesJitHelper.php';
-require_once __DIR__.'/../../../ext/standard/ClampJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/CliArgvJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/ClockGettimeJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/CloneWithJitHelper.php';
@@ -933,9 +939,7 @@ require_once __DIR__.'/../../../ext/standard/JitClassParents.php';
 require_once __DIR__.'/../../../ext/standard/JitClassUses.php';
 require_once __DIR__.'/../../../ext/standard/ClassUsesRecursiveJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/JitClassUsesRecursive.php';
-require_once __DIR__.'/../../../ext/standard/JitClamp.php';
 require_once __DIR__.'/../../../ext/standard/JitClearstatcache.php';
-require_once __DIR__.'/../../../ext/standard/JitClamp.php';
 require_once __DIR__.'/../../../ext/standard/JitCliProcessTitle.php';
 require_once __DIR__.'/../../../ext/standard/JitClockGettime.php';
 require_once __DIR__.'/../../../ext/standard/JitCloneWithReinit.php';
@@ -1376,7 +1380,6 @@ require_once __DIR__.'/../../../ext/standard/ModfJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/Module.php';
 require_once __DIR__.'/../../../ext/standard/ModuleRegistry.php';
 require_once __DIR__.'/../../../ext/standard/StdlibModuleConstants.php';
-require_once __DIR__.'/../../../ext/standard/ExtensionConstantGroups.php';
 require_once __DIR__.'/../../../ext/standard/MultisortJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/NCompareJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/NativeLastError.php';
@@ -1475,7 +1478,6 @@ require_once __DIR__.'/../../../ext/standard/StatCacheJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/StatFieldsJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/StatPathJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/StdlibConstants.php';
-require_once __DIR__.'/../../../ext/standard/StdlibModuleConstants.php';
 require_once __DIR__.'/../../../ext/standard/StrContainsJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/StrIncdecJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/StrPadJitHelper.php';
@@ -1999,9 +2001,7 @@ require_once __DIR__.'/../../../ext/standard/class_meth_exists_.php';
 require_once __DIR__.'/../../../ext/standard/class_parents_.php';
 require_once __DIR__.'/../../../ext/standard/class_uses_.php';
 require_once __DIR__.'/../../../ext/standard/class_uses_recursive.php';
-require_once __DIR__.'/../../../ext/standard/clamp.php';
 require_once __DIR__.'/../../../ext/standard/clearstatcache_.php';
-require_once __DIR__.'/../../../ext/standard/clamp.php';
 require_once __DIR__.'/../../../ext/standard/cli_get_process_title.php';
 require_once __DIR__.'/../../../ext/standard/cli_set_process_title.php';
 require_once __DIR__.'/../../../ext/standard/clock_gettime.php';
@@ -2035,7 +2035,6 @@ require_once __DIR__.'/../../../ext/standard/date_create_immutable_from_format.p
 require_once __DIR__.'/../../../ext/standard/date_date_set.php';
 require_once __DIR__.'/../../../ext/standard/date_default_timezone_get.php';
 require_once __DIR__.'/../../../ext/standard/date_default_timezone_set.php';
-require_once __DIR__.'/../../../ext/standard/date_date_set.php';
 require_once __DIR__.'/../../../ext/standard/date_diff.php';
 require_once __DIR__.'/../../../ext/standard/date_format.php';
 require_once __DIR__.'/../../../ext/standard/date_get_last_errors.php';
@@ -2046,12 +2045,10 @@ require_once __DIR__.'/../../../ext/standard/date_offset_get.php';
 require_once __DIR__.'/../../../ext/standard/date_parse.php';
 require_once __DIR__.'/../../../ext/standard/date_parse_from_format.php';
 require_once __DIR__.'/../../../ext/standard/date_sub.php';
-require_once __DIR__.'/../../../ext/standard/date_date_set.php';
 require_once __DIR__.'/../../../ext/standard/date_time_set.php';
 require_once __DIR__.'/../../../ext/standard/date_sun_info.php';
 require_once __DIR__.'/../../../ext/standard/date_sunrise.php';
 require_once __DIR__.'/../../../ext/standard/date_sunset.php';
-require_once __DIR__.'/../../../ext/standard/date_time_set.php';
 require_once __DIR__.'/../../../ext/standard/date_timestamp_get.php';
 require_once __DIR__.'/../../../ext/standard/date_timestamp_set.php';
 require_once __DIR__.'/../../../ext/standard/date_timezone_get.php';
@@ -2163,6 +2160,7 @@ require_once __DIR__.'/../../../ext/standard/get_class_methods_.php';
 require_once __DIR__.'/../../../ext/standard/get_class_vars_.php';
 require_once __DIR__.'/../../../ext/standard/get_current_user.php';
 require_once __DIR__.'/../../../ext/standard/get_debug_backtrace.php';
+require_once __DIR__.'/../../../ext/standard/VmObjectDebugType.php';
 require_once __DIR__.'/../../../ext/standard/get_debug_type.php';
 require_once __DIR__.'/../../../ext/standard/get_declared_attributes_.php';
 require_once __DIR__.'/../../../ext/standard/get_declared_classes_.php';
@@ -2791,7 +2789,6 @@ require_once __DIR__.'/../../../lib/Ast/TypedFunctionStaticRewriter.php';
 require_once __DIR__.'/../../../lib/Ast/VoidCastDesugar.php';
 require_once __DIR__.'/../../../lib/AsymmetricVisibilityRejector.php';
 require_once __DIR__.'/../../../lib/BareThrowSyntaxRejector.php';
-require_once __DIR__.'/../../../lib/Block.php';
 require_once __DIR__.'/../../../lib/BuiltinByRefParams.php';
 require_once __DIR__.'/../../../lib/BuiltinFunctionClassConstant.php';
 require_once __DIR__.'/../../../lib/BuiltinInternalArgInfo.php';
@@ -2861,16 +2858,12 @@ require_once __DIR__.'/../../../lib/EncapsedCoalesceRejector.php';
 require_once __DIR__.'/../../../lib/EnumCaseListRewriter.php';
 require_once __DIR__.'/../../../lib/EnumCaseListSyntaxRejector.php';
 require_once __DIR__.'/../../../lib/ExitFunctionSyntaxRejector.php';
-require_once __DIR__.'/../../../lib/Frame.php';
-require_once __DIR__.'/../../../lib/Func.php';
-require_once __DIR__.'/../../../lib/Func/Internal.php';
 require_once __DIR__.'/../../../lib/Func/JIT.php';
 require_once __DIR__.'/../../../lib/Func/PHP.php';
 require_once __DIR__.'/../../../lib/GenericArrayTypeSourceRewriter.php';
 require_once __DIR__.'/../../../lib/GenericArrayTypeSpec.php';
 require_once __DIR__.'/../../../lib/GlobalTypedConstSyntaxRejector.php';
 require_once __DIR__.'/../../../lib/GlobalDeprecatedConstSyntaxRejector.php';
-require_once __DIR__.'/../../../lib/Handler.php';
 require_once __DIR__.'/../../../lib/HexFloat.php';
 require_once __DIR__.'/../../../lib/JIT.php';
 require_once __DIR__.'/../../../lib/JIT/Analyzer.php';
@@ -3480,7 +3473,6 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/WeakRefRegistryRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/WeakRefRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/WeakRefSetup.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ZlibRuntime.php';
-require_once __DIR__.'/../../../lib/JIT/Call.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ClosureBind.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ClosureBindTo.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ClosureWithBinding.php';
@@ -3720,7 +3712,6 @@ require_once __DIR__.'/../../../lib/MethodVisibility.php';
 require_once __DIR__.'/../../../lib/Module.php';
 require_once __DIR__.'/../../../lib/ModuleAbstract.php';
 require_once __DIR__.'/../../../lib/NullSafeLivenessDetector.php';
-require_once __DIR__.'/../../../lib/OpCode.php';
 require_once __DIR__.'/../../../lib/OpCodeNames.php';
 require_once __DIR__.'/../../../lib/Printer.php';
 require_once __DIR__.'/../../../lib/PropertyHookSyntaxRejector.php';
@@ -4055,7 +4046,6 @@ require_once __DIR__.'/../../../lib/VM/Builtin/SensitiveParameterValueConstruct.
 require_once __DIR__.'/../../../lib/VM/Builtin/SensitiveParameterValueDebugInfo.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/SensitiveParameterValueGetValue.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ThrowableGetMessage.php';
-require_once __DIR__.'/../../../lib/VM/Builtin/VmClassMethod.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/WeakMapConstruct.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/WeakMapCount.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/WeakMapOffsetExists.php';
@@ -4285,38 +4275,6 @@ require_once __DIR__.'/../../../src/yay-php8-compat.php';
 require_once __DIR__.'/../../../test/bootstrap-aot/cli_spine_shim.php';
 require_once __DIR__.'/../../../test/bootstrap-aot/llvm_env_spine_shim.php';
 require_once __DIR__.'/../../../test/bootstrap-aot/macro_functions_spine_shim.php';
-// VM -r smoke: bootstrap-selfhost-lib-spine-vm-smoke.sh (#1846).
-// VM driver execute: bootstrap-selfhost-vm-driver-execute-probe.sh (#2201).
-
-$vmDriverExecute = getenv('PHP_COMPILER_VM_DRIVER_EXECUTE');
-if (is_string($vmDriverExecute) && ('1' === $vmDriverExecute || 'true' === strtolower($vmDriverExecute))) {
-    // Honest bin/vm.php run() dispatch: main() → run() on -r fixture (#8693, #2201).
-    run('Standard input code', '<?php echo "vm driver ok\n";', []);
-    exit(0);
-}
-
-$vmSpineSmoke = getenv('PHP_COMPILER_VM_SPINE_SMOKE');
-if (is_string($vmSpineSmoke) && ('1' === $vmSpineSmoke || 'true' === strtolower($vmSpineSmoke))) {
-    // Honest bin/vm.php run() dispatch: main() → run() on -r fixture (#8719, #1846).
-    run('Standard input code', '<?php echo "1\n";', []);
-    exit(0);
-}
-
-// M2 spine unit: mb_encode/decode_mimeheader Vm + JIT inventory (#8697).
-$__spineMimeSample = 'Hello 世界';
-$__spineMimeEnc = \PHPCompiler\ext\mbstring\VmMbstring::encodeMimeheader(
-    $__spineMimeSample,
-    'UTF-8',
-    true,
-    "\r\n",
-    0
-);
-$__spineMimeDec = \PHPCompiler\ext\mbstring\VmMbstring::decodeMimeheader($__spineMimeEnc);
-unset($__spineMimeSample, $__spineMimeEnc, $__spineMimeDec);
-
-// M2 spine unit: setcookie options array parser Vm inventory (#8698).
-\PHPCompiler\ext\standard\SetcookieOptions::spineSmokeParse();
-
 require_once __DIR__.'/../../../lib/AOT/HelperRuntimeCache.php';
 require_once __DIR__.'/../../../lib/VM/NativeDateMalformedPeriodStringException.php';
 require_once __DIR__.'/../../../ext/dom/CharacterDataSubstringData.php';
@@ -4353,4 +4311,36 @@ require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassIsInstance.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassIsInstantiable.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassIsSubclassOf.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ArrayPadTypeJit.php';
+// VM -r smoke: bootstrap-selfhost-lib-spine-vm-smoke.sh (#1846).
+// VM driver execute: bootstrap-selfhost-vm-driver-execute-probe.sh (#2201).
+
+$vmDriverExecute = getenv('PHP_COMPILER_VM_DRIVER_EXECUTE');
+if (is_string($vmDriverExecute) && ('1' === $vmDriverExecute || 'true' === strtolower($vmDriverExecute))) {
+    // Honest bin/vm.php run() dispatch: main() → run() on -r fixture (#8693, #2201).
+    run('Standard input code', '<?php echo "vm driver ok\n";', []);
+    exit(0);
+}
+
+$vmSpineSmoke = getenv('PHP_COMPILER_VM_SPINE_SMOKE');
+if (is_string($vmSpineSmoke) && ('1' === $vmSpineSmoke || 'true' === strtolower($vmSpineSmoke))) {
+    // Honest bin/vm.php run() dispatch: main() → run() on -r fixture (#8719, #1846).
+    run('Standard input code', '<?php echo "1\n";', []);
+    exit(0);
+}
+
+// M2 spine unit: mb_encode/decode_mimeheader Vm + JIT inventory (#8697).
+$__spineMimeSample = 'Hello 世界';
+$__spineMimeEnc = \PHPCompiler\ext\mbstring\VmMbstring::encodeMimeheader(
+    $__spineMimeSample,
+    'UTF-8',
+    true,
+    "\r\n",
+    0
+);
+$__spineMimeDec = \PHPCompiler\ext\mbstring\VmMbstring::decodeMimeheader($__spineMimeEnc);
+unset($__spineMimeSample, $__spineMimeEnc, $__spineMimeDec);
+
+// M2 spine unit: setcookie options array parser Vm inventory (#8698).
+\PHPCompiler\ext\standard\SetcookieOptions::spineSmokeParse();
+
 echo "compiler_lib_spine_smoke bundle OK\n";
