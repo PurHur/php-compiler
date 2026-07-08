@@ -101,7 +101,8 @@ final class VmFilter
             || self::FILTER_VALIDATE_REGEXP === $filter
             || self::FILTER_VALIDATE_URL === $filter
             || self::FILTER_VALIDATE_EMAIL === $filter
-            || self::FILTER_VALIDATE_IP === $filter;
+            || self::FILTER_VALIDATE_IP === $filter
+            || self::FILTER_VALIDATE_MAC === $filter;
     }
 
     public static function isSanitizeFilter(int $filter): bool
@@ -148,6 +149,9 @@ final class VmFilter
         }
         if (self::FILTER_VALIDATE_IP === $filter) {
             return self::validateIp($value, $nullOnFailure, $parsed['flags']);
+        }
+        if (self::FILTER_VALIDATE_MAC === $filter) {
+            return self::validateMac($value, $nullOnFailure, $parsed['filterOptions']);
         }
         if (self::isSanitizeFilter($filter)) {
             return self::sanitize($value, $filter, $parsed['flags'], $parsed['filterOptions']);
@@ -807,6 +811,97 @@ final class VmFilter
         $out->string($s);
 
         return $out;
+    }
+
+    /**
+     * FILTER_VALIDATE_MAC (php-src ext/filter/logical_filters.c — php_filter_validate_mac).
+     */
+    private static function validateMac(
+        Variable $value,
+        bool $nullOnFailure = false,
+        ?\PHPCompiler\VM\HashTable $filterOptions = null
+    ): Variable {
+        if ($value->isUndefined() || Variable::TYPE_NULL === $value->type) {
+            return self::failureResult($nullOnFailure);
+        }
+        if (Variable::TYPE_STRING !== $value->type) {
+            return self::failureResult($nullOnFailure);
+        }
+        $s = $value->toString();
+        $expectedSeparator = null;
+        if (null !== $filterOptions) {
+            $sepVar = $filterOptions->find('separator');
+            if (null !== $sepVar && !$sepVar->isUndefined() && Variable::TYPE_NULL !== $sepVar->type) {
+                $resolved = $sepVar->resolveIndirect();
+                if (Variable::TYPE_STRING !== $resolved->type) {
+                    return self::failureResult($nullOnFailure);
+                }
+                $expectedSeparator = $resolved->toString();
+                if (1 !== \strlen($expectedSeparator)) {
+                    throw new \ValueError('filter_var(): "separator" option must be one character long');
+                }
+            }
+        }
+        if (!self::isValidMacAddress($s, $expectedSeparator)) {
+            return self::failureResult($nullOnFailure);
+        }
+        $out = new Variable();
+        $out->string($s);
+
+        return $out;
+    }
+
+    /**
+     * php-src ext/filter/logical_filters.c — php_filter_validate_mac.
+     */
+    public static function isValidMacAddress(string $input, ?string $expectedSeparator = null): bool
+    {
+        $inputLen = \strlen($input);
+        if (14 === $inputLen) {
+            $tokens = 3;
+            $length = 4;
+            $separator = '.';
+        } elseif (17 === $inputLen && '-' === $input[2]) {
+            $tokens = 6;
+            $length = 2;
+            $separator = '-';
+        } elseif (17 === $inputLen && ':' === $input[2]) {
+            $tokens = 6;
+            $length = 2;
+            $separator = ':';
+        } else {
+            return false;
+        }
+        if (null !== $expectedSeparator && $separator !== $expectedSeparator) {
+            return false;
+        }
+        for ($i = 0; $i < $tokens; ++$i) {
+            $offset = $i * ($length + 1);
+            if ($i < $tokens - 1 && $input[$offset + $length] !== $separator) {
+                return false;
+            }
+            if (!self::isValidHexToken(substr($input, $offset, $length))) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static function isValidHexToken(string $token): bool
+    {
+        $len = \strlen($token);
+        if (0 === $len) {
+            return false;
+        }
+        for ($i = 0; $i < $len; ++$i) {
+            $ch = $token[$i];
+            if (!(($ch >= '0' && $ch <= '9') || ($ch >= 'a' && $ch <= 'f') || ($ch >= 'A' && $ch <= 'F'))) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**
