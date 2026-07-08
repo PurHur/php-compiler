@@ -1,5 +1,5 @@
 --TEST--
-stdlib proc_get_status() — status array key insertion order (ext/standard/exec.c, #13210, #16707, #16962)
+stdlib proc_get_status() — status array key insertion order (ext/standard/exec.c, #13210, #16707, #16962, #17362)
 --FILE--
 <?php
 $desc = [1 => ['pipe', 'w']];
@@ -11,6 +11,9 @@ if (!is_resource($proc)) {
 }
 $status = proc_get_status($proc);
 $expected = ['command', 'pid', 'running', 'signaled', 'stopped', 'exitcode', 'termsig', 'stopsig'];
+if (array_key_exists('cached', $status)) {
+    $expected[] = 'cached';
+}
 if (array_key_exists('pending_signals', $status)) {
     $expected[] = 'pending_signals';
 }
