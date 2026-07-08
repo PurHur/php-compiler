@@ -65,6 +65,10 @@ class AotTest extends BaseTest
                 && str_contains($name, 'str_increment_phantom')) {
                 continue;
             }
+            if (!CompilerVersion::supportsClamp()
+                && str_contains($name, 'clamp')) {
+                continue;
+            }
             if (!CompilerVersion::supportsPhp83ArrayKeyFunctions()
                 && str_contains($name, 'array_first_last_key')
                 && !str_contains($name, 'array_first_last_key_phantom')

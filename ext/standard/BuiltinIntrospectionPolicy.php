@@ -68,6 +68,9 @@ final class BuiltinIntrospectionPolicy
         if (\in_array($lc, ['str_increment', 'str_decrement'], true)) {
             return CompilerVersion::advertisesStrIncrement();
         }
+        if ('clamp' === $lc) {
+            return CompilerVersion::advertisesClamp();
+        }
         if ('zend_thread_id' === $lc) {
             return CompilerVersion::advertisesZendThreadId();
         }
