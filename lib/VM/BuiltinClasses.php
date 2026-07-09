@@ -10,6 +10,7 @@ use PHPCompiler\VM\Builtin\DatePeriodConstruct;
 use PHPCompiler\VM\Builtin\DatePeriodCreateFromISO8601String;
 use PHPCompiler\VM\Builtin\DatePeriodCurrent;
 use PHPCompiler\VM\Builtin\DatePeriodGetDateInterval;
+use PHPCompiler\VM\Builtin\DatePeriodGetEndDate;
 use PHPCompiler\VM\Builtin\DatePeriodGetRecurrences;
 use PHPCompiler\VM\Builtin\DatePeriodGetStartDate;
 use PHPCompiler\VM\Builtin\DatePeriodKey;
@@ -807,19 +808,10 @@ final class BuiltinClasses
                 'ispublic' => new ReflectionPropertyIsPublic(),
                 'isprivate' => new ReflectionPropertyIsPrivate(),
                 'isprotected' => new ReflectionPropertyIsProtected(),
-                'isabstract' => new ReflectionPropertyIsAbstract(),
-                'isvirtual' => new ReflectionPropertyIsVirtual(),
                 'getmangledname' => new ReflectionPropertyGetMangledName(),
-                'hashook' => new ReflectionPropertyHasHook(),
-                'hashooks' => new ReflectionPropertyHasHooks(),
-                'gethook' => new ReflectionPropertyGetHook(),
-                'gethooks' => new ReflectionPropertyGetHooks(),
                 'isreadonly' => new ReflectionPropertyIsReadOnly(),
                 'ispromoted' => new ReflectionPropertyIsPromoted(),
-                'islazy' => new ReflectionPropertyIsLazy(),
                 'isinitialized' => new ReflectionPropertyIsInitialized(),
-                'setrawvaluewithoutlazyinitialization' => new ReflectionPropertySetRawValueWithoutLazyInitialization(),
-                'skiplazyinitialization' => new ReflectionPropertySkipLazyInitialization(),
                 'isprivateset' => ReflectionPropertyAsymmetricProbe::isPrivateSet(),
                 'isprotectedset' => ReflectionPropertyAsymmetricProbe::isProtectedSet(),
                 'ispublicset' => ReflectionPropertyAsymmetricProbe::isPublicSet(),
@@ -835,6 +827,24 @@ final class BuiltinClasses
         ) {
             $rp->methods[$name] = $method;
             $rp->methodVisibility[$name] = $pub;
+        }
+        if (CompilerVersion::supportsReflectionPropertyHookProbes()) {
+            foreach (
+                [
+                    'isabstract' => new ReflectionPropertyIsAbstract(),
+                    'isvirtual' => new ReflectionPropertyIsVirtual(),
+                    'hashook' => new ReflectionPropertyHasHook(),
+                    'hashooks' => new ReflectionPropertyHasHooks(),
+                    'gethook' => new ReflectionPropertyGetHook(),
+                    'gethooks' => new ReflectionPropertyGetHooks(),
+                    'islazy' => new ReflectionPropertyIsLazy(),
+                    'setrawvaluewithoutlazyinitialization' => new ReflectionPropertySetRawValueWithoutLazyInitialization(),
+                    'skiplazyinitialization' => new ReflectionPropertySkipLazyInitialization(),
+                ] as $name => $method
+            ) {
+                $rp->methods[$name] = $method;
+                $rp->methodVisibility[$name] = $pub;
+            }
         }
         if (CompilerVersion::supportsReflectionPropertyAccessProbes()) {
             $rp->methods['isreadable'] = ReflectionPropertyAccessProbe::isReadable();
@@ -1292,6 +1302,8 @@ final class BuiltinClasses
         $dp->methodVisibility['getdateinterval'] = $pub;
         $dp->methods['getrecurrences'] = new DatePeriodGetRecurrences();
         $dp->methodVisibility['getrecurrences'] = $pub;
+        $dp->methods['getenddate'] = new DatePeriodGetEndDate();
+        $dp->methodVisibility['getenddate'] = $pub;
         if (CompilerVersion::supportsDatePeriodCreateFromISO8601String()) {
             $dp->methods['createfromiso8601string'] = new DatePeriodCreateFromISO8601String();
             $dp->methodVisibility['createfromiso8601string'] = $pubStatic;

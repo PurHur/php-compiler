@@ -242,6 +242,28 @@ PHP;
         self::assertSame("1\nNot yet implemented\n", ob_get_clean());
     }
 
+    public function test_dom_document_adopt_node_registered(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+$doc = new DOMDocument();
+$doc->loadXML('<root><a/></root>');
+$node = $doc->documentElement->firstChild;
+echo (int) method_exists($doc, 'adoptNode'), "\n";
+try {
+    $doc->adoptNode($node);
+    echo "no_throw\n";
+} catch (Error $e) {
+    echo $e->getMessage(), "\n";
+}
+PHP;
+        $block = $runtime->parseAndCompile($code, 'dom_adopt_node.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("1\nNot yet implemented\n", ob_get_clean());
+    }
+
     public function test_dom_node_is_supported_and_default_namespace(): void
     {
         $runtime = new Runtime();

@@ -155,6 +155,7 @@ require_once __DIR__.'/../../../ext/curl/curl_upkeep.php';
 require_once __DIR__.'/../../../ext/curl/curl_version.php';
 require_once __DIR__.'/../../../ext/dom/BuiltinClasses.php';
 require_once __DIR__.'/../../../ext/dom/DocumentAppendChild.php';
+require_once __DIR__.'/../../../ext/dom/DocumentAdoptNode.php';
 require_once __DIR__.'/../../../ext/dom/DocumentConstruct.php';
 require_once __DIR__.'/../../../ext/dom/DocumentCreateAttribute.php';
 require_once __DIR__.'/../../../ext/dom/DocumentCreateAttributeNS.php';
@@ -4350,4 +4351,5 @@ unset($__spineMimeSample, $__spineMimeEnc, $__spineMimeDec);
 // M2 spine unit: setcookie options array parser Vm inventory (#8698).
 \PHPCompiler\ext\standard\SetcookieOptions::spineSmokeParse();
 
+require_once __DIR__.'/../../../lib/VM/Builtin/DatePeriodGetEndDate.php';
 echo "compiler_lib_spine_smoke bundle OK\n";
