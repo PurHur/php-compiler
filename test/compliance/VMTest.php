@@ -352,6 +352,14 @@ class VMTest extends BaseTest {
                 && str_contains($name, 'reflection_property_isreadable_profile')) {
                 continue;
             }
+            if (!CompilerVersion::supportsReflectionPropertyHookProbes()
+                && str_contains($name, 'reflection_property_hook_methods_forward_profile')) {
+                continue;
+            }
+            if (CompilerVersion::supportsReflectionPropertyHookProbes()
+                && str_contains($name, 'reflection_property_hook_methods_reference_profile')) {
+                continue;
+            }
             if (!CompilerVersion::supportsReflectionPropertyIsDynamic()
                 && str_contains($name, 'reflection_property_isdynamic_forward_profile')) {
                 continue;
