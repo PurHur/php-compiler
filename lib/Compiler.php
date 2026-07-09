@@ -17135,6 +17135,29 @@ class Compiler {
         if (null !== $filterInline) {
             return $filterInline;
         }
+        // new DatePeriod(new DateTime(...), new DateInterval(...), …) — positional sibling New_ (#17524).
+        if (null !== $block && null !== $cfgCallOp) {
+            $siblingNews = $this->siblingInlineNewProducersBeforeCfgOp($block, $cfgCallOp);
+            if ([] !== $siblingNews) {
+                $matched = $this->matchSiblingInlineNewCallArgProducer($siblingNews, $callArgs, $argIndex);
+                if (null !== $matched) {
+                    return $matched;
+                }
+                $callArg = $callArgs[$argIndex] ?? null;
+                if (
+                    null !== $callArg
+                    && $this->callArgIsDeadInlineTemporary($callArg)
+                    && isset($siblingNews[$argIndex])
+                    && $siblingNews[$argIndex] instanceof Op\Expr\New_
+                ) {
+                    return $siblingNews[$argIndex];
+                }
+            }
+        }
+        $siblingInlineNew = $this->matchSiblingInlineNewCallArgProducer($producers, $callArgs, $argIndex);
+        if (null !== $siblingInlineNew) {
+            return $siblingInlineNew;
+        }
         // new LimitIterator(new ArrayIterator([...]), …) — Array_ is inner-ctor prelude (#12916).
         $nestedCtorNew = $this->matchNestedNewCtorInlineNewProducer($producers, $argIndex, $argCount, $callArgs);
         if (null !== $nestedCtorNew) {
@@ -26113,6 +26136,88 @@ class Compiler {
         return ($callIndex - $firstSibling) >= 2;
     }
 
+    /** True when php-cfg hoisted ≥2 sibling inline New_ producers before a multi-arg ctor (#17524, re-#15124). */
+    private function hasSiblingMultiArgInlineNewProducers(Block $block, Op $cfgCallOp): bool
+    {
+        if (null === $block->orig || !property_exists($cfgCallOp, 'args') || !is_array($cfgCallOp->args)) {
+            return false;
+        }
+        $args = $cfgCallOp->args;
+        if (\count($args) < 2) {
+            return false;
+        }
+        $callIndex = $this->cfgCallOpIndex($block, $cfgCallOp);
+        if (null === $callIndex || $callIndex < 2) {
+            return false;
+        }
+        $newCount = 0;
+        for ($i = $callIndex - 1; $i >= 0 && $newCount < \count($args); --$i) {
+            $child = $block->orig->children[$i] ?? null;
+            if (!$child instanceof Op\Expr\New_) {
+                break;
+            }
+            ++$newCount;
+        }
+
+        return $newCount >= 2 && $newCount === \count($args);
+    }
+
+    /**
+     * Positional sibling inline New_ → multi-arg ctor/call (#17524, re-#15124 / #14483).
+     *
+     * @param list<Op\Expr> $producers
+     * @param list<Operand|null> $callArgs
+     */
+    private function matchSiblingInlineNewCallArgProducer(
+        array $producers,
+        array $callArgs,
+        int $argIndex
+    ): ?Op\Expr\New_ {
+        $producerCount = \count($producers);
+        $argCount = \count($callArgs);
+        if ($producerCount < 2 || $producerCount !== $argCount) {
+            return null;
+        }
+        foreach ($producers as $producer) {
+            if (!$producer instanceof Op\Expr\New_) {
+                return null;
+            }
+        }
+        $callArg = $callArgs[$argIndex] ?? null;
+        if (null === $callArg || !$this->callArgIsDeadInlineTemporary($callArg)) {
+            return null;
+        }
+        $matched = $producers[$argIndex] ?? null;
+
+        return $matched instanceof Op\Expr\New_ ? $matched : null;
+    }
+
+    /**
+     * Consecutive sibling inline New_ stmts immediately before $cfgCallOp (#17524).
+     *
+     * @return list<Op\Expr\New_>
+     */
+    private function siblingInlineNewProducersBeforeCfgOp(Block $block, Op $cfgCallOp): array
+    {
+        if (null === $block->orig || !property_exists($cfgCallOp, 'args') || !is_array($cfgCallOp->args)) {
+            return [];
+        }
+        $callIndex = $this->cfgCallOpIndex($block, $cfgCallOp);
+        if (null === $callIndex) {
+            return [];
+        }
+        $producers = [];
+        for ($i = $callIndex - 1; $i >= 0 && \count($producers) < \count($cfgCallOp->args); --$i) {
+            $child = $block->orig->children[$i] ?? null;
+            if (!$child instanceof Op\Expr\New_) {
+                break;
+            }
+            array_unshift($producers, $child);
+        }
+
+        return $producers;
+    }
+
     private function cfgCallOpIndex(Block $block, Op $cfgCallOp): ?int
     {
         if (null === $block->orig) {
@@ -29976,6 +30081,12 @@ class Compiler {
             return null;
         }
         if ($prev instanceof Op\Expr\New_) {
+            if (
+                0 === $argIndex
+                && [] !== $this->siblingInlineNewProducersBeforeCfgOp($block, $cfgCallOp)
+            ) {
+                return null;
+            }
             if (
                 0 !== $argIndex
                 || !\is_array($cfgCallOp->args ?? null)
@@ -37155,7 +37266,8 @@ class Compiler {
                 && $this->callArgIsDeadInlineTemporary($arg)
                 && !$this->shouldSkipFinalAdjacentNestedFuncCallArgProbe($cfgCallOp, (int) $argIndex, $block)
                 && !(
-                    $this->hasSiblingMultiArgInlineCallProducers($block, $cfgCallOp)
+                    ($this->hasSiblingMultiArgInlineCallProducers($block, $cfgCallOp)
+                        || $this->hasSiblingMultiArgInlineNewProducers($block, $cfgCallOp))
                     && $this->callArgIsDeadInlineTemporary($cfgCallOp->args[(int) $argIndex] ?? $arg)
                     && null === $this->nestedFuncCallProducerBeforeTrailingConstFetchPreludes(
                         $cfgCallOp,
@@ -37189,14 +37301,25 @@ class Compiler {
                     $block->orig->children,
                     $cfgCallOp
                 );
+                $siblingNews = $this->siblingInlineNewProducersBeforeCfgOp($block, $cfgCallOp);
+                if ([] !== $siblingNews) {
+                    $nestedNewProducers = $siblingNews;
+                }
                 $nestedNewArgCount = \count($cfgCallOp->args ?? $args);
                 $nestedNewProducerCount = \count($nestedNewProducers);
-                $inlineNewProducer = $this->matchNestedNewCtorInlineNewProducer(
+                $inlineNewProducer = $this->matchSiblingInlineNewCallArgProducer(
                     $nestedNewProducers,
-                    (int) $argIndex,
-                    $nestedNewArgCount,
-                    $cfgCallOp->args ?? $args
+                    $cfgCallOp->args ?? $args,
+                    (int) $argIndex
                 );
+                if (null === $inlineNewProducer) {
+                    $inlineNewProducer = $this->matchNestedNewCtorInlineNewProducer(
+                        $nestedNewProducers,
+                        (int) $argIndex,
+                        $nestedNewArgCount,
+                        $cfgCallOp->args ?? $args
+                    );
+                }
                 if (null === $inlineNewProducer) {
                     $inlineNewProducer = $this->matchTrailingInlineNewCallArgProducer(
                         $nestedNewProducers,

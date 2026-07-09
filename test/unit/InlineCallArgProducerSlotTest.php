@@ -1342,6 +1342,38 @@ PHP;
         self::assertSame("ok\n", ob_get_clean());
     }
 
+    /** Issue #17524 — DatePeriod inline sibling New_ ctor args wire positional slots, not last New_. */
+    public function testDatePeriodInlineSiblingNewUsesPositionalProducerSlots(): void
+    {
+        $code = <<<'PHP'
+<?php
+new DatePeriod(new DateTime('2020-01-01'), new DateInterval('P1D'), new DateTime('2020-01-03'));
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'dateperiod_inline_sibling_new.php');
+
+        $newSlots = [];
+        $periodSends = [];
+        $inPeriodCtor = false;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_NEW === $op->type) {
+                $newSlots[] = $op->arg1;
+            }
+            if (OpCode::TYPE_NEW === $op->type && 4 === \count($newSlots)) {
+                $inPeriodCtor = true;
+            }
+            if ($inPeriodCtor && OpCode::TYPE_ARG_SEND === $op->type) {
+                $periodSends[] = $op->arg1;
+            }
+            if ($inPeriodCtor && OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
+                break;
+            }
+        }
+
+        self::assertSame([0, 4, 8, 12], $newSlots, 'new slots='.json_encode($newSlots));
+        self::assertSame([0, 4, 8], $periodSends, 'DatePeriod arg sends='.json_encode($periodSends));
+    }
+
     /** Issue #10143 — var_export((string) NAN) wires Cast producer, not dead arg temp. */
     public function testStringCastNanConstantUsesCastProducerSlot(): void
     {
