@@ -132,6 +132,7 @@
         "ext/curl/curl_version.php",
         "ext/dom/BuiltinClasses.php",
         "ext/dom/CharacterDataSubstringData.php",
+        "ext/dom/DocumentAdoptNode.php",
         "ext/dom/DocumentAppendChild.php",
         "ext/dom/DocumentConstruct.php",
         "ext/dom/DocumentCreateAttribute.php",
@@ -3770,6 +3771,7 @@
         "lib/VM/Builtin/DatePeriodCreateFromISO8601String.php",
         "lib/VM/Builtin/DatePeriodCurrent.php",
         "lib/VM/Builtin/DatePeriodGetDateInterval.php",
+        "lib/VM/Builtin/DatePeriodGetEndDate.php",
         "lib/VM/Builtin/DatePeriodGetRecurrences.php",
         "lib/VM/Builtin/DatePeriodGetStartDate.php",
         "lib/VM/Builtin/DatePeriodIteratorMethod.php",
@@ -4043,6 +4045,7 @@
         "lib/VM/Builtin/ReflectionPropertyGetValue.php",
         "lib/VM/Builtin/ReflectionPropertyHasDefaultValue.php",
         "lib/VM/Builtin/ReflectionPropertyHasHook.php",
+        "lib/VM/Builtin/ReflectionPropertyHasHooks.php",
         "lib/VM/Builtin/ReflectionPropertyIsAbstract.php",
         "lib/VM/Builtin/ReflectionPropertyIsAccessible.php",
         "lib/VM/Builtin/ReflectionPropertyIsDefaultValueAvailable.php",
@@ -4524,9 +4527,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 4290,
+        "inventory_files": 4293,
         "excluded": 0,
-        "eligible": 4290,
+        "eligible": 4293,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
