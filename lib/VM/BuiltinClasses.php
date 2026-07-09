@@ -264,6 +264,7 @@ use PHPCompiler\VM\Builtin\ReflectionPropertyIsDefaultValueAvailable;
 use PHPCompiler\VM\Builtin\ReflectionPropertyGetMangledName;
 use PHPCompiler\VM\Builtin\ReflectionPropertyGetName;
 use PHPCompiler\VM\Builtin\ReflectionPropertyHasHook;
+use PHPCompiler\VM\Builtin\ReflectionPropertyHasHooks;
 use PHPCompiler\VM\Builtin\ReflectionPropertyIsDeprecated;
 use PHPCompiler\VM\Builtin\ReflectionPropertyIsDynamic;
 use PHPCompiler\VM\Builtin\ReflectionPropertyIsVirtual;
@@ -810,6 +811,7 @@ final class BuiltinClasses
                 'isvirtual' => new ReflectionPropertyIsVirtual(),
                 'getmangledname' => new ReflectionPropertyGetMangledName(),
                 'hashook' => new ReflectionPropertyHasHook(),
+                'hashooks' => new ReflectionPropertyHasHooks(),
                 'gethook' => new ReflectionPropertyGetHook(),
                 'gethooks' => new ReflectionPropertyGetHooks(),
                 'isreadonly' => new ReflectionPropertyIsReadOnly(),
