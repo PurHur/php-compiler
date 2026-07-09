@@ -44,6 +44,8 @@ final class VmDom
 
     public const CLASS_TEXT = 'domtext';
 
+    public const CLASS_CDATA = 'domcdatasection';
+
     public const CLASS_CHARACTER_DATA = 'domcharacterdata';
 
     public const CLASS_COMMENT = 'domcomment';
@@ -260,6 +262,12 @@ final class VmDom
         $text->methodNames['splittext'] = 'splitText';
         $ctx->classes[self::CLASS_TEXT] = $text;
 
+        $cdata = new ClassEntry('DOMCDATASection');
+        $cdata->isInternal = true;
+        $cdata->parentLc = self::CLASS_TEXT;
+        $cdata->properties[] = new ClassProperty(self::PROP_NODE_NAME, null, $strProto);
+        $ctx->classes[self::CLASS_CDATA] = $cdata;
+
         $characterData = new ClassEntry('DOMCharacterData');
         $characterData->isInternal = true;
         $characterData->parentLc = self::CLASS_NODE;
@@ -475,6 +483,9 @@ final class VmDom
         $document->methods['createcomment'] = new DocumentCreateComment();
         $document->methodVisibility['createcomment'] = $pub;
         $document->methodNames['createcomment'] = 'createComment';
+        $document->methods['createcdatasection'] = new DocumentCreateCDATASection();
+        $document->methodVisibility['createcdatasection'] = $pub;
+        $document->methodNames['createcdatasection'] = 'createCDATASection';
         $document->methods['appendchild'] = new DocumentAppendChild();
         $document->methodVisibility['appendchild'] = $pub;
         $document->methods['savexml'] = new DocumentSaveXML();
@@ -1703,6 +1714,27 @@ final class VmDom
         return $entry;
     }
 
+    public static function createCdataSection(Context $ctx, string $data, ?ObjectEntry $ownerDocument = null): ObjectEntry
+    {
+        $class = self::resolveNodeClass($ctx, $ownerDocument, self::CLASS_CDATA);
+
+        $entry = new ObjectEntry($class);
+        $entry->constructed = true;
+        $entry->getProperty(self::PROP_NODE_NAME)->string('#cdata-section');
+        self::initNodePropertySlots($entry);
+
+        $state = new DomNodeState();
+        $state->nodeType = DomConstants::XML_CDATA_SECTION_NODE;
+        $state->nodeName = '#cdata-section';
+        $state->textContent = $data;
+        if (null !== $ownerDocument && self::isDocument($ownerDocument)) {
+            $state->documentId = $ownerDocument->id;
+        }
+        DomRegistry::attach($entry, $state);
+
+        return $entry;
+    }
+
     public static function characterDataReadContent(ObjectEntry $node): string
     {
         if (!self::isCharacterData($node)) {
@@ -1780,7 +1812,7 @@ final class VmDom
 
     public static function textSplitText(Context $ctx, ObjectEntry $node, int $offset): ObjectEntry
     {
-        if (!self::isTextNode($node)) {
+        if (!self::isTextOrCdataNode($node)) {
             throw new \LogicException('textSplitText() called on non-text node');
         }
         $data = self::characterDataReadContent($node);
@@ -2468,7 +2500,7 @@ final class VmDom
             return self::appendFragmentChildren($ctx, $parent, $child);
         }
 
-        if (!self::isElement($child) && !self::isEntityReference($child) && !self::isTextNode($child)) {
+        if (!self::isElement($child) && !self::isEntityReference($child) && !self::isTextOrCdataNode($child)) {
             throw new \DOMException('Hierarchy request error');
         }
 
@@ -3127,7 +3159,7 @@ final class VmDom
 
             return;
         }
-        if (!self::isElement($child) && !self::isTextNode($child) && !self::isEntityReference($child)) {
+        if (!self::isElement($child) && !self::isTextOrCdataNode($child) && !self::isEntityReference($child)) {
             throw new \DOMException('Hierarchy request error');
         }
         self::assertSameDocument($parent, $child);
@@ -3197,7 +3229,7 @@ final class VmDom
         ?ObjectEntry $refChild
     ): void {
         self::assertMutationParent($parent);
-        if (!self::isElement($newChild) && !self::isTextNode($newChild)) {
+        if (!self::isElement($newChild) && !self::isTextOrCdataNode($newChild)) {
             throw new \DOMException('Hierarchy request error');
         }
         self::assertSameDocument($parent, $newChild);
@@ -3809,6 +3841,15 @@ final class VmDom
 
                 continue;
             }
+            $cdata = VmXml::parseCdataSectionAt($inner, $pos);
+            if (null !== $cdata) {
+                $cdataNode = self::createCdataSection($ctx, $cdata['data'], null);
+                $state->childIds[] = $cdataNode->id;
+                self::linkChildToParent($cdataNode, $entry);
+                $pos = $cdata['end'];
+
+                continue;
+            }
             $end = self::findElementEnd($inner, $pos);
             if (null === $end) {
                 return null;
@@ -3878,6 +3919,12 @@ final class VmDom
 
                 continue;
             }
+            $cdata = VmXml::parseCdataSectionAt($content, $scan);
+            if (null !== $cdata) {
+                $scan = $cdata['end'];
+
+                continue;
+            }
             ++$scan;
         }
 
@@ -3896,6 +3943,9 @@ final class VmDom
             }
 
             return str_repeat('  ', $depth).$text;
+        }
+        if (self::isCdataNode($entry)) {
+            return '<![CDATA['.(DomRegistry::state($entry)->textContent ?? '').']]>';
         }
         if (self::isEntityReference($entry)) {
             return '&'.self::escapeName(DomRegistry::state($entry)->nodeName).';';
@@ -5132,7 +5182,8 @@ final class VmDom
         if (DomConstants::XML_DOCUMENT_NODE === $state->nodeType) {
             return null;
         }
-        if (DomConstants::XML_TEXT_NODE === $state->nodeType) {
+        if (DomConstants::XML_TEXT_NODE === $state->nodeType
+            || DomConstants::XML_CDATA_SECTION_NODE === $state->nodeType) {
             return $state->textContent ?? '';
         }
         if (DomConstants::XML_ATTRIBUTE_NODE === $state->nodeType) {
@@ -5193,7 +5244,8 @@ final class VmDom
             return '';
         }
         $state = DomRegistry::state($node);
-        if (DomConstants::XML_TEXT_NODE === $state->nodeType) {
+        if (DomConstants::XML_TEXT_NODE === $state->nodeType
+            || DomConstants::XML_CDATA_SECTION_NODE === $state->nodeType) {
             return $state->textContent ?? '';
         }
         if (DomConstants::XML_ATTRIBUTE_NODE === $state->nodeType) {
@@ -5227,6 +5279,17 @@ final class VmDom
             && DomConstants::XML_TEXT_NODE === DomRegistry::state($entry)->nodeType;
     }
 
+    public static function isCdataNode(ObjectEntry $entry): bool
+    {
+        return DomRegistry::has($entry)
+            && DomConstants::XML_CDATA_SECTION_NODE === DomRegistry::state($entry)->nodeType;
+    }
+
+    public static function isTextOrCdataNode(ObjectEntry $entry): bool
+    {
+        return self::isTextNode($entry) || self::isCdataNode($entry);
+    }
+
     public static function isCommentNode(ObjectEntry $entry): bool
     {
         return DomRegistry::has($entry)
@@ -5235,7 +5298,7 @@ final class VmDom
 
     public static function isCharacterData(ObjectEntry $entry): bool
     {
-        return self::isTextNode($entry) || self::isCommentNode($entry);
+        return self::isTextOrCdataNode($entry) || self::isCommentNode($entry);
     }
 
     public static function isEntityReference(ObjectEntry $entry): bool
@@ -5271,7 +5334,7 @@ final class VmDom
     {
         return self::isElement($entry)
             || self::isDocumentFragment($entry)
-            || self::isTextNode($entry)
+            || self::isTextOrCdataNode($entry)
             || self::isEntityReference($entry);
     }
 
@@ -5312,9 +5375,13 @@ final class VmDom
         ObjectEntry $node,
         bool $deep
     ): ObjectEntry {
-        if (self::isTextNode($node)) {
+        if (self::isTextOrCdataNode($node)) {
             $state = DomRegistry::state($node);
-            $text = self::createTextNode($ctx, $state->textContent ?? '', $document);
+            if (self::isCdataNode($node)) {
+                $text = self::createCdataSection($ctx, $state->textContent ?? '', $document);
+            } else {
+                $text = self::createTextNode($ctx, $state->textContent ?? '', $document);
+            }
             self::linkChildToParent($text, null);
 
             return $text;
@@ -5814,6 +5881,9 @@ final class VmDom
         }
         if (self::isTextNode($entry)) {
             return self::escapeText(DomRegistry::state($entry)->textContent ?? '');
+        }
+        if (self::isCdataNode($entry)) {
+            return DomRegistry::state($entry)->textContent ?? '';
         }
         if (self::isEntityReference($entry)) {
             return '&'.self::escapeName(DomRegistry::state($entry)->nodeName).';';
