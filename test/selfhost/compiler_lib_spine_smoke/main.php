@@ -4294,6 +4294,7 @@ require_once __DIR__.'/../../../ext/dom/CharacterDataDeleteData.php';
 require_once __DIR__.'/../../../ext/dom/CharacterDataInsertData.php';
 require_once __DIR__.'/../../../ext/dom/CharacterDataReplaceData.php';
 require_once __DIR__.'/../../../ext/dom/CharacterDataSubstringData.php';
+require_once __DIR__.'/../../../ext/dom/TextSplitText.php';
 require_once __DIR__.'/../../../ext/dom/DocumentCreateComment.php';
 require_once __DIR__.'/../../../ext/dom/DocumentCreateTextNode.php';
 require_once __DIR__.'/../../../ext/standard/JitDatePeriodCreateFromISO8601String.php';

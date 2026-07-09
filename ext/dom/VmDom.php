@@ -253,6 +253,9 @@ final class VmDom
         $text->isInternal = true;
         $text->parentLc = self::CLASS_CHARACTER_DATA;
         $text->properties[] = new ClassProperty(self::PROP_NODE_NAME, null, $strProto);
+        $text->methods['splittext'] = new TextSplitText();
+        $text->methodVisibility['splittext'] = $pub;
+        $text->methodNames['splittext'] = 'splitText';
         $ctx->classes[self::CLASS_TEXT] = $text;
 
         $characterData = new ClassEntry('DOMCharacterData');
@@ -1756,6 +1759,31 @@ final class VmDom
         }
 
         return substr($data, $offset, $count);
+    }
+
+    public static function textSplitText(Context $ctx, ObjectEntry $node, int $offset): ObjectEntry
+    {
+        if (!self::isTextNode($node)) {
+            throw new \LogicException('textSplitText() called on non-text node');
+        }
+        $data = self::characterDataReadContent($node);
+        $len = \strlen($data);
+        if ($offset < 0 || $offset > $len) {
+            throw new \DOMException('Index size error', DomExceptionConstants::INDEX_SIZE_ERR);
+        }
+        $ownerDocument = self::ownerDocumentEntry($node);
+        $tailNode = self::createTextNode($ctx, substr($data, $offset), $ownerDocument);
+        self::writeCharacterDataContent($node, substr($data, 0, $offset));
+        $state = DomRegistry::state($node);
+        if (null !== $state->parentId) {
+            $parent = DomRegistry::entry($state->parentId);
+            if (null !== $parent) {
+                self::insertAfterSibling($ctx, $parent, $tailNode, $node);
+                self::syncSubtree($ctx, $parent);
+            }
+        }
+
+        return $tailNode;
     }
 
     public static function createEntityReference(
@@ -4673,6 +4701,7 @@ final class VmDom
             if (null !== $list) {
                 self::updateNodeListMembers($list, $state->childIds);
                 $childNodesVar->object($list);
+                self::syncChildSiblingLinks($state->childIds);
                 if (self::isElement($node)) {
                     self::syncElementAttributes($ctx, $node);
                 }
@@ -4686,6 +4715,7 @@ final class VmDom
                 $state->childNodesListId = $existing->id;
                 self::updateNodeListMembers($existing, $state->childIds);
                 $childNodesVar->object($existing);
+                self::syncChildSiblingLinks($state->childIds);
                 if (self::isElement($node)) {
                     self::syncElementAttributes($ctx, $node);
                 }
@@ -4705,7 +4735,17 @@ final class VmDom
         $state->childNodesListId = $list->id;
         $childNodesVar->copyFrom($listVar);
 
-        foreach ($state->childIds as $index => $childId) {
+        self::syncChildSiblingLinks($state->childIds);
+
+        if (self::isElement($node)) {
+            self::syncElementAttributes($ctx, $node);
+        }
+    }
+
+    /** @param list<int> $childIds */
+    private static function syncChildSiblingLinks(array $childIds): void
+    {
+        foreach ($childIds as $index => $childId) {
             $child = DomRegistry::entry($childId);
             if (null === $child) {
                 continue;
@@ -4713,7 +4753,7 @@ final class VmDom
             self::initNodePropertySlots($child);
             $siblingVar = $child->getProperty(self::PROP_NEXT_SIBLING);
             $prevVar = $child->getProperty(self::PROP_PREVIOUS_SIBLING);
-            $prevId = $state->childIds[$index - 1] ?? null;
+            $prevId = $childIds[$index - 1] ?? null;
             if (null !== $prevId) {
                 $prev = DomRegistry::entry($prevId);
                 if (null !== $prev) {
@@ -4724,7 +4764,7 @@ final class VmDom
             } else {
                 $prevVar->null();
             }
-            $nextId = $state->childIds[$index + 1] ?? null;
+            $nextId = $childIds[$index + 1] ?? null;
             if (null !== $nextId) {
                 $next = DomRegistry::entry($nextId);
                 if (null !== $next) {
@@ -4735,10 +4775,6 @@ final class VmDom
             } else {
                 $siblingVar->null();
             }
-        }
-
-        if (self::isElement($node)) {
-            self::syncElementAttributes($ctx, $node);
         }
     }
 

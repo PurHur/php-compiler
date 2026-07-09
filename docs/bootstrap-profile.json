@@ -131,6 +131,10 @@
         "ext/curl/curl_upkeep.php",
         "ext/curl/curl_version.php",
         "ext/dom/BuiltinClasses.php",
+        "ext/dom/CharacterDataAppendData.php",
+        "ext/dom/CharacterDataDeleteData.php",
+        "ext/dom/CharacterDataInsertData.php",
+        "ext/dom/CharacterDataReplaceData.php",
         "ext/dom/CharacterDataSubstringData.php",
         "ext/dom/DocumentAdoptNode.php",
         "ext/dom/DocumentAppendChild.php",
@@ -240,6 +244,7 @@
         "ext/dom/NodeReplaceChild.php",
         "ext/dom/NodeReplaceChildren.php",
         "ext/dom/NodeReplaceWith.php",
+        "ext/dom/TextSplitText.php",
         "ext/dom/TokenListAdd.php",
         "ext/dom/TokenListContains.php",
         "ext/dom/TokenListCount.php",
@@ -4532,9 +4537,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 4298,
+        "inventory_files": 4303,
         "excluded": 0,
-        "eligible": 4298,
+        "eligible": 4303,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
