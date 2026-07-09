@@ -20301,6 +20301,25 @@ class Compiler {
     }
 
     /**
+     * php-cfg dead temps for `var_export($o->p)` / `var_export($a[0])` — immediate prelude feeds arg #0 (#17540).
+     */
+    private function isImmediateVarExportExpressionPrelude(mixed $expr): bool
+    {
+        if (!$expr instanceof Op\Expr) {
+            return false;
+        }
+
+        return $expr instanceof Op\Expr\PropertyFetch
+            || $expr instanceof Op\Expr\NullsafePropertyFetch
+            || $expr instanceof Op\Expr\StaticPropertyFetch
+            || $expr instanceof Op\Expr\ArrayDimFetch
+            || $expr instanceof Op\Expr\Cast
+            || $expr instanceof Op\Expr\UnaryMinus
+            || $expr instanceof Op\Expr\UnaryPlus
+            || $this->isComparisonInlineCallArgProducer($expr);
+    }
+
+    /**
      * php-cfg hoists Array_/FuncCall operands before a sibling compare feeding var_export arg (#17277).
      *
      * @param list<Op> $cfgChildren
@@ -28050,6 +28069,15 @@ class Compiler {
                 $candidate = $child;
                 break;
             }
+            // var_export($text->data) — PropertyFetch prelude must not fall through to stale MethodCall (#17540).
+            if (
+                $i === $callIndex - 1
+                && $this->callArgIsDeadInlineTemporary($callArg)
+                && $this->isImmediateVarExportExpressionPrelude($child)
+            ) {
+                $candidate = $child;
+                break;
+            }
             break;
         }
         if (!$candidate instanceof Op\Expr || null === $candidate->result) {
@@ -28067,6 +28095,7 @@ class Compiler {
                     || $candidate instanceof Op\Expr\FuncCall
                     || $candidate instanceof Op\Expr\NsFuncCall
                     || $candidate instanceof Op\Expr\MethodCall
+                    || $this->isImmediateVarExportExpressionPrelude($candidate)
                 )
             );
         if (!$feedsCallArg) {
@@ -34418,6 +34447,90 @@ class Compiler {
     }
 
     /**
+     * var_export($text->data) / var_export($expr instanceof T) — immediate PropertyFetch/compare prelude (#17540).
+     */
+    private function resolvePrecedingExpressionPreludeCallArgSlot(
+        Operand $arg,
+        Block $block,
+        ?Op $cfgCallOp,
+        int $argIndex
+    ): ?string {
+        if (null === $block->orig || null === $cfgCallOp || 0 !== $argIndex) {
+            return null;
+        }
+        if (!$this->callArgIsDeadInlineTemporary($arg)) {
+            return null;
+        }
+        $callIndex = null;
+        foreach ($block->orig->children as $i => $child) {
+            if ($child === $cfgCallOp) {
+                $callIndex = $i;
+                break;
+            }
+        }
+        if (null === $callIndex || $callIndex < 1) {
+            return null;
+        }
+        $prelude = $block->orig->children[$callIndex - 1] ?? null;
+        if (
+            !$prelude instanceof Op\Expr
+            || !$this->isImmediateVarExportExpressionPrelude($prelude)
+            || null === $prelude->result
+        ) {
+            return null;
+        }
+        $opcodeSlot = $this->compiledExpressionPreludeResultSlotBeforePendingFuncCall($block, $prelude);
+        if (null !== $opcodeSlot) {
+            return (string) $opcodeSlot;
+        }
+        $slot = $block->slotForOperand($prelude->result);
+        if (null === $slot) {
+            foreach ($this->compileExpr($prelude, $block) as $op) {
+                $block->addOpCode($op);
+            }
+            $slot = $block->slotForOperand($prelude->result)
+                ?? $this->compiledExpressionPreludeResultSlotBeforePendingFuncCall($block, $prelude);
+        }
+
+        return null !== $slot ? (string) $slot : null;
+    }
+
+    /**
+     * Operand slot map can lag TYPE_PROPERTY_FETCH / TYPE_INSTANCEOF when php-cfg reuses dead temps (#17540).
+     */
+    private function compiledExpressionPreludeResultSlotBeforePendingFuncCall(
+        Block $block,
+        Op\Expr $prelude
+    ): ?int {
+        $expectedTypes = match (true) {
+            $prelude instanceof Op\Expr\PropertyFetch,
+            $prelude instanceof Op\Expr\NullsafePropertyFetch => [OpCode::TYPE_PROPERTY_FETCH],
+            $prelude instanceof Op\Expr\StaticPropertyFetch => [OpCode::TYPE_STATIC_PROPERTY_FETCH],
+            $prelude instanceof Op\Expr\ArrayDimFetch => [OpCode::TYPE_ARRAY_DIM_FETCH, OpCode::TYPE_ARRAY_DIM_FETCH_WRITE],
+            $prelude instanceof Op\Expr\InstanceOf_ => [OpCode::TYPE_INSTANCEOF],
+            $prelude instanceof Op\Expr\Cast => [OpCode::TYPE_CAST],
+            $prelude instanceof Op\Expr\UnaryMinus => [OpCode::TYPE_UNARY_MINUS],
+            $prelude instanceof Op\Expr\UnaryPlus => [OpCode::TYPE_UNARY_PLUS],
+            $this->isComparisonInlineCallArgProducer($prelude) => [OpCode::TYPE_IDENTICAL, OpCode::TYPE_NOT_IDENTICAL, OpCode::TYPE_EQUAL, OpCode::TYPE_NOT_EQUAL, OpCode::TYPE_SPACESHIP, OpCode::TYPE_SMALLER, OpCode::TYPE_GREATER, OpCode::TYPE_SMALLER_OR_EQUAL, OpCode::TYPE_GREATER_OR_EQUAL, OpCode::TYPE_INSTANCEOF, OpCode::TYPE_IN],
+            default => [],
+        };
+        if ([] === $expectedTypes) {
+            return null;
+        }
+        for ($i = \count($block->opCodes) - 1; $i >= 0; --$i) {
+            $op = $block->opCodes[$i];
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type || OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
+                break;
+            }
+            if (\in_array($op->type, $expectedTypes, true)) {
+                return $op->arg1;
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * var_dump((['a'=>1])['a']) — php-cfg dead arg temp; Array_ + ArrayDimFetch immediately precede call (#16462).
      */
     private function resolveInlineArrayLiteralDimFetchCallArgSlot(
@@ -37301,6 +37414,23 @@ class Compiler {
                 $cfgCallOp,
                 (int) $argIndex
             );
+            $exprPreludeSlot = null === $dimFetchSlot
+                ? $this->resolvePrecedingExpressionPreludeCallArgSlot(
+                    $arg,
+                    $block,
+                    $cfgCallOp,
+                    (int) $argIndex
+                )
+                : null;
+            if (null !== $exprPreludeSlot) {
+                $sends[] = new OpCode(
+                    OpCode::TYPE_ARG_SEND,
+                    $exprPreludeSlot,
+                    $nameSlot,
+                    $unpackFlag
+                );
+                continue;
+            }
             // unserialize(serialize($obj)) — adjacent hoisted serialize must feed arg #0, not stale New_ slot (#16241).
             if (
                 null === $dimFetchSlot
@@ -44516,6 +44646,10 @@ class Compiler {
                 $producer = $block->orig->children[$probeIndex] ?? null;
                 // var_export($named === $pos) — comparison feeds arg #0, not prior fgets EXEC_RETURN (#11052, #17277).
                 if ($this->isComparisonInlineCallArgProducer($producer)) {
+                    return;
+                }
+                // var_export($text->data) — PropertyFetch prelude feeds arg #0, not stale MethodCall EXEC_RETURN (#17540).
+                if ($this->isImmediateVarExportExpressionPrelude($producer)) {
                     return;
                 }
                 if ($producer instanceof Op\Expr\MethodCall || $producer instanceof Op\Expr\StaticCall) {
