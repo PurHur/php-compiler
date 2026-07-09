@@ -35,8 +35,14 @@ final class TextSplitText extends DomClassMethod
             throw new \LogicException('DOMText::splitText() requires VM context in this compiler build');
         }
         $tail = VmDom::textSplitText($frame->vmContext, $receiver, $offsetVar->toInt());
-        if (null !== $frame->returnVar) {
-            $frame->returnVar->object($tail);
+        if (null === $frame->returnVar) {
+            return;
         }
+        if (null === $tail) {
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $frame->returnVar->object($tail);
     }
 }

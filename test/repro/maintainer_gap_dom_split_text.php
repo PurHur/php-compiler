@@ -45,9 +45,9 @@ try {
     $text->splitText(-1);
     echo "noexception\n";
     exit(1);
-} catch (DOMException $e) {
-    if (1 !== $e->getCode()) {
-        echo "badcode\n";
+} catch (ValueError $e) {
+    if ('DOMText::splitText(): Argument #1 ($offset) must be greater than or equal to 0' !== $e->getMessage()) {
+        echo "badmessage\n";
         exit(1);
     }
 }
