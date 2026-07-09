@@ -142,7 +142,7 @@ final class StdlibModuleConstants
     }
 
     /**
-     * @return array<string, array<string, int|string>>
+     * @return array<string, array<string, mixed>>
      */
     public static function categorizedBootstrapConstants(): array
     {

@@ -29,7 +29,7 @@ final class ExtensionConstantGroups
     /**
      * Extension name => constant name => fallback scalar for bucket materialization.
      *
-     * @return array<string, array<string, int|string>>
+     * @return array<string, array<string, mixed>>
      */
     public static function groups(): array
     {
