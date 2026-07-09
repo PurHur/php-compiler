@@ -26214,10 +26214,14 @@ class Compiler {
                 $cfgCallOp
             );
             foreach ($producers as $producer) {
-                if (!$producer instanceof Op\Expr\FuncCall && !$producer instanceof Op\Expr\NsFuncCall) {
+                $isFuncProducer = $producer instanceof Op\Expr\FuncCall
+                    || $producer instanceof Op\Expr\NsFuncCall;
+                $isMethodProducer = $producer instanceof Op\Expr\MethodCall
+                    || $producer instanceof Op\Expr\StaticCall;
+                if (!$isFuncProducer && !$isMethodProducer) {
                     continue;
                 }
-                if ($this->funcCallExprHasByRefMutatingSideEffects($producer)) {
+                if ($isFuncProducer && $this->funcCallExprHasByRefMutatingSideEffects($producer)) {
                     continue;
                 }
                 $producerIndex = array_search($producer, $block->orig->children, true);
@@ -29962,6 +29966,10 @@ class Compiler {
                 )
             ) {
                 return null;
+            }
+            $operandSlot = $block->slotForOperand($prev->result);
+            if (null !== $operandSlot) {
+                return (string) $operandSlot;
             }
             $methodSlot = $this->slotForSiblingMethodCallProducerExecReturn(
                 $block,
@@ -44314,9 +44322,8 @@ class Compiler {
         ) {
             return;
         }
-        $execSlot = $this->slotForLastPendingInlineCallResultBeforeFuncCallInit($nestedProducerOps)
-            ?? $this->slotForLastEmittedInlineCallResultBeforePendingFuncCall($block);
-        if (null === $execSlot && null !== $block->orig) {
+        $execSlot = null;
+        if (null !== $block->orig) {
             $callIndex = array_search($cfgCallOp, $block->orig->children, true);
             if (\is_int($callIndex) && $callIndex > 0) {
                 $probeIndex = $callIndex - 1;
@@ -44330,20 +44337,36 @@ class Compiler {
                 }
                 $producer = $block->orig->children[$probeIndex] ?? null;
                 if ($producer instanceof Op\Expr\MethodCall || $producer instanceof Op\Expr\StaticCall) {
-                    $execSlot = $this->slotForSiblingMethodCallProducerExecReturn(
-                        $block,
-                        $producer,
-                        $cfgCallOp,
-                        $block->orig->children
-                    );
+                    $operandSlot = $block->slotForOperand($producer->result);
+                    if (null !== $operandSlot) {
+                        $execSlot = (string) $operandSlot;
+                    } else {
+                        $execSlot = $this->slotForSiblingMethodCallProducerExecReturn(
+                            $block,
+                            $producer,
+                            $cfgCallOp,
+                            $block->orig->children
+                        );
+                    }
                 } elseif ($producer instanceof Op\Expr\FuncCall || $producer instanceof Op\Expr\NsFuncCall) {
-                    $execSlot = $this->slotForInlineFuncCallProducerExecReturnByCfgIndex(
-                        $block,
-                        $probeIndex,
-                        $block->orig->children
-                    );
+                    $operandSlot = $block->slotForOperand($producer->result);
+                    if (null !== $operandSlot) {
+                        $execSlot = (string) $operandSlot;
+                    } else {
+                        $execSlot = $this->slotForInlineFuncCallProducerExecReturnByCfgIndex(
+                            $block,
+                            $probeIndex,
+                            $block->orig->children
+                        );
+                    }
                 }
             }
+        }
+        if (null === $execSlot) {
+            $execSlot = $this->slotForLastPendingInlineCallResultBeforeFuncCallInit($nestedProducerOps);
+        }
+        if (null === $execSlot) {
+            $execSlot = $this->slotForLastEmittedInlineCallResultBeforePendingFuncCall($block);
         }
         if (null === $execSlot) {
             return;
@@ -44378,6 +44401,13 @@ class Compiler {
                     $send->arg1 = $execSlot;
                 } elseif (null !== $trueSlot && (string) $send->arg1 === (string) $trueSlot) {
                     // var_export($it->current(), true) / var_export(f(), true) — arg #0 is producer EXEC_RETURN (#17251).
+                    $send->arg1 = $execSlot;
+                } elseif (
+                    $callArg instanceof Operand
+                    && $this->callArgIsDeadInlineTemporary($callArg)
+                    && (string) $send->arg1 !== (string) $execSlot
+                ) {
+                    // var_export($g->valid(), true) after prior var_export — dead arg temp must not reuse stale EXEC_RETURN (#17520).
                     $send->arg1 = $execSlot;
                 }
             } elseif (1 === $sendOrdinal && null !== $trueSlot && (string) $send->arg1 === (string) $execSlot) {
