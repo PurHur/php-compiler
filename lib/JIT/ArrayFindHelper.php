@@ -8,6 +8,7 @@ use PHPCompiler\ext\standard\boolval;
 use PHPCompiler\ext\standard\JitArrayElem;
 use PHPCompiler\ext\standard\VmInternalCall;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\ArrayFindRuntime;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\VM\Variable as VmVariable;
 use PHPLLVM\BasicBlock;
@@ -124,6 +125,9 @@ final class ArrayFindHelper
         bool $unaryInternalUsesKey = false,
     ): Value {
         $strictI1 ??= $context->constantFromBool(false);
+        if (ArrayFindCallbackPolicy::isClosureJitLowerable($callback)) {
+            return ArrayFindRuntime::walkClosure($context, $array, $callback, $mode, $strictI1);
+        }
         $keyFirst = self::callbackKeyFirstForMode($mode, $unaryInternalUsesKey);
         JitArrayElem::requireArrayArg($context, $array, self::functionNameForMode($mode));
         if (self::MODE_ANY === $mode || self::MODE_ALL === $mode) {
@@ -525,9 +529,6 @@ final class ArrayFindHelper
     /** @return array{0: string, 1: Call|Internal} */
     private static function resolvePredicateHandler(Context $context, Variable $callback): array
     {
-        if (null !== $callback->closureCall) {
-            return ['closure', $callback->closureCall];
-        }
         $name = $callback->compileTimeString;
         if (null !== $name) {
             try {

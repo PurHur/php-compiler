@@ -141,6 +141,7 @@
         "ext/dom/DocumentConstruct.php",
         "ext/dom/DocumentCreateAttribute.php",
         "ext/dom/DocumentCreateAttributeNS.php",
+        "ext/dom/DocumentCreateCDATASection.php",
         "ext/dom/DocumentCreateComment.php",
         "ext/dom/DocumentCreateDocumentFragment.php",
         "ext/dom/DocumentCreateElement.php",
@@ -4542,9 +4543,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 4308,
+        "inventory_files": 4309,
         "excluded": 0,
-        "eligible": 4308,
+        "eligible": 4309,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
