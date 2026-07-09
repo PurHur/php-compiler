@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 4293 |
-| Phase A inventory files (M2 ratio SSOT) | 4293 |
+| PHP files on vm.php path | 4295 |
+| Phase A inventory files (M2 ratio SSOT) | 4295 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 11559 |
+| Source constructs flagged (warnings) | 11562 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -531,7 +531,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/random/RandomizerBuiltin.php` | 0 | 26 |
 | `ext/random/SecureInstance.php` | 0 | 1 |
 | `ext/random/Xoshiro256StarStarInstance.php` | 0 | 1 |
-| `ext/session/Module.php` | 0 | 22 |
+| `ext/session/Module.php` | 0 | 23 |
 | `ext/session/SessionConstants.php` | 0 | 1 |
 | `ext/session/SessionFileStorage.php` | 0 | 1 |
 | `ext/sockets/BuiltinClasses.php` | 0 | 1 |
@@ -2449,6 +2449,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/session_name.php` | 0 | 1 |
 | `ext/standard/session_regenerate_id.php` | 0 | 1 |
 | `ext/standard/session_reset.php` | 0 | 2 |
+| `ext/standard/session_save_path_.php` | 0 | 2 |
 | `ext/standard/session_set_cookie_params_.php` | 0 | 1 |
 | `ext/standard/session_start.php` | 0 | 1 |
 | `ext/standard/session_status_.php` | 0 | 2 |
@@ -7766,22 +7767,23 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new session_id (line 36)
 - new session_name (line 37)
 - new session_module_name (line 38)
-- new session_status (line 39)
-- new session_destroy (line 40)
-- new session_write_close (line 41)
-- new session_commit (line 42)
-- new session_regenerate_id (line 43)
-- new session_abort (line 44)
-- new session_reset (line 45)
-- new session_create_id (line 46)
-- new session_encode (line 47)
-- new session_decode (line 48)
-- new session_unset (line 49)
-- new session_gc (line 50)
-- new session_cache_expire (line 51)
-- new session_cache_limiter (line 52)
-- new session_set_cookie_params (line 53)
-- new session_get_cookie_params (line 54)
+- new session_save_path (line 39)
+- new session_status (line 40)
+- new session_destroy (line 41)
+- new session_write_close (line 42)
+- new session_commit (line 43)
+- new session_regenerate_id (line 44)
+- new session_abort (line 45)
+- new session_reset (line 46)
+- new session_create_id (line 47)
+- new session_encode (line 48)
+- new session_decode (line 49)
+- new session_unset (line 50)
+- new session_gc (line 51)
+- new session_cache_expire (line 52)
+- new session_cache_limiter (line 53)
+- new session_set_cookie_params (line 54)
+- new session_get_cookie_params (line 55)
 - 2 class method(s)
 
 ### `ext/session/SessionConstants.php`
@@ -15349,12 +15351,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmIni.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 719)
-- new HashTable (line 726)
-- new Variable (line 739)
-- new Variable (line 785)
-- new Variable (line 793)
-- 47 class method(s)
+- new HashTable (line 732)
+- new HashTable (line 739)
+- new Variable (line 752)
+- new Variable (line 798)
+- new Variable (line 806)
+- 49 class method(s)
 
 ### `ext/standard/VmIniIntrospection.php`
 
@@ -16132,22 +16134,22 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmSession.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 129)
-- new Variable (line 131)
-- new Variable (line 134)
-- new Variable (line 137)
-- new Variable (line 140)
-- new Variable (line 143)
-- new Variable (line 146)
-- new Variable (line 268)
-- new HashTable (line 458)
-- new HashTable (line 524)
-- new HashTable (line 546)
-- new HashTable (line 670)
-- new HashTable (line 676)
-- new HashTable (line 682)
-- new HashTable (line 687)
-- 46 class method(s)
+- new HashTable (line 136)
+- new Variable (line 138)
+- new Variable (line 141)
+- new Variable (line 144)
+- new Variable (line 147)
+- new Variable (line 150)
+- new Variable (line 153)
+- new Variable (line 275)
+- new HashTable (line 498)
+- new HashTable (line 564)
+- new HashTable (line 586)
+- new HashTable (line 710)
+- new HashTable (line 716)
+- new HashTable (line 722)
+- new HashTable (line 727)
+- 49 class method(s)
 
 ### `ext/standard/VmSessionSerializer.php`
 
@@ -20260,6 +20262,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 24)
+- 2 class method(s)
+
+### `ext/standard/session_save_path_.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 27)
 - 2 class method(s)
 
 ### `ext/standard/session_set_cookie_params_.php`

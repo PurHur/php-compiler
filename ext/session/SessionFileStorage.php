@@ -25,7 +25,7 @@ final class SessionFileStorage
             return rtrim($fromEnv, '/\\');
         }
 
-        return rtrim(sys_get_temp_dir(), '/\\').self::DEFAULT_DIR_SUFFIX;
+        return rtrim(VmSession::getSavePath(), '/\\');
     }
 
     public static function storagePath(string $id): string

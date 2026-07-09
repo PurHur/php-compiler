@@ -418,6 +418,19 @@ final class VmIni
         return self::$sessionGcMaxLifetime;
     }
 
+    public static function getSessionSavePath(): string
+    {
+        return self::$sessionSavePath;
+    }
+
+    public static function setSessionSavePathValue(string $newValue): string
+    {
+        $old = self::$sessionSavePath;
+        self::$sessionSavePath = $newValue;
+
+        return $old;
+    }
+
     private static function setErrorReporting(Context $ctx, string $newValue) {
         $old = (string) $ctx->errors->getErrorReporting();
         $ctx->errors->setErrorReporting(self::parseErrorReporting($newValue));
