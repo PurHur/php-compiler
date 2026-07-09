@@ -75,6 +75,22 @@ final class ReflectionPropertyHookSupport
         return VmReflection::manglePropertyKey($stub, $ctx);
     }
 
+    public static function hasHooks(
+        ClassEntry $entry,
+        ?ClassProperty $meta,
+        string $property,
+        Context $ctx
+    ): bool {
+        if (null !== $meta) {
+            return null !== $meta->getHookMethodLc
+                || null !== $meta->setHookMethodLc
+                || $meta->propertyHookVirtual;
+        }
+        $hooks = $entry->staticPropertyHooks[strtolower($property)] ?? [];
+
+        return [] !== $hooks;
+    }
+
     public static function hasHook(
         ClassEntry $entry,
         ?ClassProperty $meta,
