@@ -1,5 +1,5 @@
 --TEST--
-stdlib DatePeriod::getStartDate()/getDateInterval()/getRecurrences() (#16614, ext/date/php_date.c)
+stdlib DatePeriod::getStartDate()/getDateInterval()/getRecurrences()/getEndDate() (#16614, #17495, ext/date/php_date.c)
 --FILE--
 <?php
 $start = new DateTime('2020-01-01');
@@ -8,6 +8,8 @@ $period = new DatePeriod($start, $interval, 3);
 echo $period->getStartDate()->format('Y-m-d'), "\n";
 echo $period->getDateInterval()->format('P1D'), "\n";
 var_export($period->getRecurrences());
+echo "\n";
+var_export($period->getEndDate());
 echo "\n";
 $end = new DateTime('2020-01-05');
 $periodEnd = new DatePeriod($start, $interval, $end);
@@ -19,6 +21,7 @@ echo $periodEnd->getEndDate()->format('Y-m-d'), "\n";
 2020-01-01
 P1D
 3
+NULL
 2020-01-01
 NULL
 2020-01-05

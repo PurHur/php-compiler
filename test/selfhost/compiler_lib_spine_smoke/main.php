@@ -3760,6 +3760,7 @@ require_once __DIR__.'/../../../lib/VM/Builtin/DatePeriodConstruct.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/DatePeriodCreateFromISO8601String.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/DatePeriodCurrent.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/DatePeriodGetDateInterval.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/DatePeriodGetEndDate.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/DatePeriodGetRecurrences.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/DatePeriodGetStartDate.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/DatePeriodIteratorMethod.php';
@@ -4017,6 +4018,7 @@ require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertyGetDefaultValue
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertyGetDocComment.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertyGetHook.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertyGetHooks.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertyHasHooks.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertyGetMangledName.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertyGetName.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertyGetRawValue.php';
@@ -4026,7 +4028,6 @@ require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertyGetType.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertyGetValue.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertyHasDefaultValue.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertyHasHook.php';
-require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertyHasHooks.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertyIsAbstract.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertyIsAccessible.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertyIsDefaultValueAvailable.php';
@@ -4351,5 +4352,4 @@ unset($__spineMimeSample, $__spineMimeEnc, $__spineMimeDec);
 // M2 spine unit: setcookie options array parser Vm inventory (#8698).
 \PHPCompiler\ext\standard\SetcookieOptions::spineSmokeParse();
 
-require_once __DIR__.'/../../../lib/VM/Builtin/DatePeriodGetEndDate.php';
 echo "compiler_lib_spine_smoke bundle OK\n";

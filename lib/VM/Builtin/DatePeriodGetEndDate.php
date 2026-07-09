@@ -24,7 +24,7 @@ final class DatePeriodGetEndDate extends VmClassMethod
         if (null === $frame->returnVar) {
             return;
         }
-        $end = DatePeriodSupport::getEndDate($receiver);
+        $end = DatePeriodSupport::getEndDate($receiver, $frame->vmContext);
         if (null === $end) {
             $frame->returnVar->null();
         } else {

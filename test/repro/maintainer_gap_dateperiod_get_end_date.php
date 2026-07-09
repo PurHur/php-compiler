@@ -1,33 +1,30 @@
 <?php
-
 declare(strict_types=1);
-
-/**
- * Maintainer gap: DatePeriod::getEndDate() missing (#17495).
- */
 
 $start = new DateTime('2020-01-01');
 $interval = new DateInterval('P1D');
+$period = new DatePeriod($start, $interval, 3);
 
-$recurrence = new DatePeriod($start, $interval, 3);
-if (!method_exists($recurrence, 'getEndDate')) {
-    echo "fail: getEndDate missing\n";
+if (!method_exists($period, 'getEndDate')) {
+    fwrite(STDERR, "getEndDate not registered\n");
     exit(1);
 }
-if (null !== $recurrence->getEndDate()) {
-    echo "fail: recurrence-count period end should be null\n";
+
+$endDate = $period->getEndDate();
+if (null !== $endDate) {
+    fwrite(STDERR, "recurrence-count period getEndDate should be null, got ".get_debug_type($endDate)."\n");
     exit(1);
 }
 
 $end = new DateTime('2020-01-05');
-$bounded = new DatePeriod($start, $interval, $end);
-$gotEnd = $bounded->getEndDate();
-if (!($gotEnd instanceof DateTimeInterface)) {
-    echo "fail: end-date period should return DateTimeInterface\n";
+$periodEnd = new DatePeriod($start, $interval, $end);
+$gotEnd = $periodEnd->getEndDate();
+if (null === $gotEnd) {
+    fwrite(STDERR, "end-date period getEndDate should not be null\n");
     exit(1);
 }
 if ('2020-01-05' !== $gotEnd->format('Y-m-d')) {
-    echo "fail: end date mismatch\n";
+    fwrite(STDERR, 'unexpected end date: '.$gotEnd->format('Y-m-d')."\n");
     exit(1);
 }
 

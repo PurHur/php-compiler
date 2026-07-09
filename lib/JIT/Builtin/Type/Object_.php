@@ -3016,7 +3016,7 @@ class Object_ extends Type {
                 $this->defineMethodVisibility($id, 'createfromiso8601string', $pubStatic);
             }
             $pub = \PHPCfg\Func::FLAG_PUBLIC;
-            foreach (['rewind', 'valid', 'current', 'key', 'next', 'getstartdate', 'getdateinterval', 'getrecurrences'] as $method) {
+            foreach (['rewind', 'valid', 'current', 'key', 'next', 'getstartdate', 'getenddate', 'getdateinterval', 'getrecurrences'] as $method) {
                 $this->defineMethodVisibility($id, $method, $pub);
             }
         }
