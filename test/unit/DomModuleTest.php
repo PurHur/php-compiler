@@ -470,6 +470,29 @@ PHP;
         self::assertSame("1\nchild\n0\n", ob_get_clean());
     }
 
+    public function test_dom_text_split_text(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+$doc = new DOMDocument();
+$root = $doc->createElement('root');
+$doc->appendChild($root);
+$text = $doc->createTextNode('hello');
+$root->appendChild($text);
+$tail = $text->splitText(2);
+echo $text->data, "\n";
+echo $tail->data, "\n";
+echo ($tail->previousSibling === $text) ? "prev\n" : "noprev\n";
+echo ($text->nextSibling === $tail) ? "next\n" : "nonext\n";
+echo $doc->saveXML($root), "\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'dom_text_split_text.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("he\nllo\nprev\nnext\n<root>hello</root>\n", ob_get_clean());
+    }
+
     public function test_runtime_shrink_has_no_dom_c_runtime(): void
     {
         $linker = (string) file_get_contents(__DIR__.'/../../lib/AOT/Linker.php');
