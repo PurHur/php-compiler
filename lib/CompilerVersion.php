@@ -932,6 +932,18 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.4+ ReflectionProperty hook/lazy introspection
+     * ({hasHook,hasHooks,getHook,getHooks,isLazy,skipLazyInitialization}, ext/reflection/php_reflection.c, #17493).
+     *
+     * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev reference profile matches Zend 8.2
+     * (methods absent). Enable forward profile on dev via `PHP_COMPILER_PROFILE=8.4`.
+     */
+    public static function supportsReflectionPropertyHookProbes(): bool
+    {
+        return self::supportsPropertyHooks();
+    }
+
+    /**
      * PHP 8.4+ ReflectionProperty::isDynamic() (ext/reflection/php_reflection.c, #7295, #15676).
      *
      * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev reference profile matches Zend 8.2

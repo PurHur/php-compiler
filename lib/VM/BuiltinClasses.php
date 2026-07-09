@@ -807,19 +807,10 @@ final class BuiltinClasses
                 'ispublic' => new ReflectionPropertyIsPublic(),
                 'isprivate' => new ReflectionPropertyIsPrivate(),
                 'isprotected' => new ReflectionPropertyIsProtected(),
-                'isabstract' => new ReflectionPropertyIsAbstract(),
-                'isvirtual' => new ReflectionPropertyIsVirtual(),
                 'getmangledname' => new ReflectionPropertyGetMangledName(),
-                'hashook' => new ReflectionPropertyHasHook(),
-                'hashooks' => new ReflectionPropertyHasHooks(),
-                'gethook' => new ReflectionPropertyGetHook(),
-                'gethooks' => new ReflectionPropertyGetHooks(),
                 'isreadonly' => new ReflectionPropertyIsReadOnly(),
                 'ispromoted' => new ReflectionPropertyIsPromoted(),
-                'islazy' => new ReflectionPropertyIsLazy(),
                 'isinitialized' => new ReflectionPropertyIsInitialized(),
-                'setrawvaluewithoutlazyinitialization' => new ReflectionPropertySetRawValueWithoutLazyInitialization(),
-                'skiplazyinitialization' => new ReflectionPropertySkipLazyInitialization(),
                 'isprivateset' => ReflectionPropertyAsymmetricProbe::isPrivateSet(),
                 'isprotectedset' => ReflectionPropertyAsymmetricProbe::isProtectedSet(),
                 'ispublicset' => ReflectionPropertyAsymmetricProbe::isPublicSet(),
@@ -835,6 +826,24 @@ final class BuiltinClasses
         ) {
             $rp->methods[$name] = $method;
             $rp->methodVisibility[$name] = $pub;
+        }
+        if (CompilerVersion::supportsReflectionPropertyHookProbes()) {
+            foreach (
+                [
+                    'isabstract' => new ReflectionPropertyIsAbstract(),
+                    'isvirtual' => new ReflectionPropertyIsVirtual(),
+                    'hashook' => new ReflectionPropertyHasHook(),
+                    'hashooks' => new ReflectionPropertyHasHooks(),
+                    'gethook' => new ReflectionPropertyGetHook(),
+                    'gethooks' => new ReflectionPropertyGetHooks(),
+                    'islazy' => new ReflectionPropertyIsLazy(),
+                    'setrawvaluewithoutlazyinitialization' => new ReflectionPropertySetRawValueWithoutLazyInitialization(),
+                    'skiplazyinitialization' => new ReflectionPropertySkipLazyInitialization(),
+                ] as $name => $method
+            ) {
+                $rp->methods[$name] = $method;
+                $rp->methodVisibility[$name] = $pub;
+            }
         }
         if (CompilerVersion::supportsReflectionPropertyAccessProbes()) {
             $rp->methods['isreadable'] = ReflectionPropertyAccessProbe::isReadable();
