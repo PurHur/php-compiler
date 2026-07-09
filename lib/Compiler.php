@@ -14405,6 +14405,10 @@ class Compiler {
         ?string $calleeName,
         Operand $arg
     ): bool {
+        if ($this->callArgUnpack($arg)) {
+            return false;
+        }
+
         return $this->callArgIsDeadInlineTemporary($arg)
             && $this->callArgOperandExpectsArrayProducer($arg)
             && $this->shouldUseArrayProducerCallArgResolution($cfgCallOp, $argIndex, $calleeName);
@@ -14417,6 +14421,10 @@ class Compiler {
         ?string $calleeName,
         Operand $arg
     ): bool {
+        if ($this->callArgUnpack($arg)) {
+            return false;
+        }
+
         return null !== $cfgCallOp
             && $this->shouldUseArrayProducerCallArgResolution($cfgCallOp, $argIndex, $calleeName)
             && $this->callArgIsDeadInlineTemporary($arg);
@@ -36400,6 +36408,33 @@ class Compiler {
             $nameSlot = $this->callArgNameSlot($arg, $block);
             // Early inline-array ARG_SEND paths continue before the main send site — unpack must be known up front (#16151).
             $unpackFlag = $this->callArgUnpack($arg) ? 1 : null;
+            if (null !== $unpackFlag && null !== $cfgCallOp && null !== $block->orig) {
+                $unpackArrayProducer = $this->matchInlineArrayProducersToArrayCallArgs(
+                    $this->precedingInlineCallArgProducersBeforeCfgOp($block->orig->children, $cfgCallOp),
+                    $cfgCallOp->args ?? [],
+                    (int) $argIndex
+                );
+                if ($unpackArrayProducer instanceof Op\Expr\Array_) {
+                    $unpackArraySlot = $block->slotForOperand($unpackArrayProducer->result);
+                    if (null === $unpackArraySlot) {
+                        $unpackArrayOps = $this->compileArrayLiteral($unpackArrayProducer, $block);
+                        if ([] !== $unpackArrayOps) {
+                            $sends = array_merge($sends, $unpackArrayOps);
+                        }
+                        $unpackArraySlot = $block->slotForOperand($unpackArrayProducer->result)
+                            ?? $this->slotFromInitArrayLiteralOps($unpackArrayOps);
+                    }
+                    if (null !== $unpackArraySlot) {
+                        $sends[] = new OpCode(
+                            OpCode::TYPE_ARG_SEND,
+                            (string) $unpackArraySlot,
+                            $nameSlot,
+                            $unpackFlag
+                        );
+                        continue;
+                    }
+                }
+            }
             if (
                 0 === (int) $argIndex
                 && null !== $cfgCallOp
@@ -37366,6 +37401,20 @@ class Compiler {
             $inlineArray = null === $dimFetchSlot
                 ? $this->findInlineArrayProducerForCallArg($arg, $block, $cfgCallOp, (int) $argIndex)
                 : null;
+            if (
+                null !== $unpackFlag
+                && null !== $cfgCallOp
+                && null !== $block->orig
+            ) {
+                $unpackMatch = $this->matchInlineArrayProducersToArrayCallArgs(
+                    $this->precedingInlineCallArgProducersBeforeCfgOp($block->orig->children, $cfgCallOp),
+                    $cfgCallOp->args ?? [],
+                    (int) $argIndex
+                );
+                if ($unpackMatch instanceof Op\Expr\Array_) {
+                    $inlineArray = $unpackMatch;
+                }
+            }
             if (null !== $inlineArray && null !== $cfgCallOp && null !== $block->orig) {
                 $consumerCallIndex = null;
                 foreach ($block->orig->children as $ci => $cfgChild) {
@@ -37416,6 +37465,7 @@ class Compiler {
             if (
                 null !== $cfgCallOp
                 && null !== $block->orig
+                && null === $unpackFlag
                 && \in_array(
                     strtolower($this->resolveCfgFuncCallName($cfgCallOp) ?? ''),
                     ['array_merge', 'array_merge_recursive', 'array_replace', 'array_replace_recursive'],
@@ -37787,6 +37837,7 @@ class Compiler {
                     if (
                         null === $initSlot
                         && 0 === (int) $argIndex
+                        && null === $unpackFlag
                         && null !== $cfgCallOp
                         && \in_array(
                             strtolower($this->resolveCfgFuncCallName($cfgCallOp) ?? ''),
@@ -38965,9 +39016,12 @@ class Compiler {
                 $sends[] = $assignOp;
             }
             if (null !== $cfgCallOp) {
-                $skipSiblingArrayProducer = $this->callArgIsDeadInlineTemporary($arg)
-                    && $this->callArgOperandExpectsArrayProducer($arg)
-                    && !$this->shouldUseArrayProducerCallArgResolution($cfgCallOp, (int) $argIndex, $calleeName);
+                $skipSiblingArrayProducer = (null !== $unpackFlag)
+                    || (
+                        $this->callArgIsDeadInlineTemporary($arg)
+                        && $this->callArgOperandExpectsArrayProducer($arg)
+                        && !$this->shouldUseArrayProducerCallArgResolution($cfgCallOp, (int) $argIndex, $calleeName)
+                    );
                 $skipSiblingForLeadingArrayMergeFamily = false;
                 if (null !== $block->orig) {
                     $mergeName = strtolower($calleeName ?? $this->resolveCfgFuncCallName($cfgCallOp) ?? '');
@@ -39060,6 +39114,7 @@ class Compiler {
                 if (
                     0 === (int) $argIndex
                     && $skipSiblingForLeadingArrayMergeFamily
+                    && null === $unpackFlag
                     && null === $valueSlot
                 ) {
                     $leadingInitSlot = $this->slotForInitArrayOrdinal($block, 0, $sends);
