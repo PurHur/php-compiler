@@ -3775,7 +3775,7 @@ restart:
                         $this->tagHookedPropertyDimWriteLvalue($arg1, $containerSlot);
                         break;
                     }
-                    $arg3 = $frame->scope[$op->arg3];
+                    $arg3 = $this->readScopeOperandForRuntimeRead($frame, (int) $op->arg3);
                     if (Variable::TYPE_STRING_OFFSET === $container->type) {
                         $catchFrame = $this->dispatchVmError(
                             'Cannot use string offset as an array',
