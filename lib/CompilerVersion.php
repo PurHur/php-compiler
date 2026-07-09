@@ -1302,13 +1302,22 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.4+ hrtime(true) returns double (ext/standard/hrtime.c, #12779, #17435).
+     * PHP 8.4+ hrtime(true) returns double (ext/standard/hrtime.c, #12779, #17435, #17468).
      *
-     * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev reference profile keeps
-     * integer nanoseconds (#12789, #13696); enable via `PHP_COMPILER_PROFILE=8.4`.
+     * Withheld on 8.4.0-dev reference profile (matches Zend 8.2 integer nanoseconds). Enable via
+     * stable 8.4.0+ or explicit `PHP_COMPILER_PROFILE=8.4` forward profile.
      */
     public static function supportsHrtimeAsNumberFloat(): bool
     {
+        if (version_compare(self::VERSION, '8.4.0', '>=')) {
+            return true;
+        }
+
+        $raw = getenv('PHP_COMPILER_PROFILE');
+        if (!\is_string($raw) || '' === trim($raw)) {
+            return false;
+        }
+
         return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
     }
 
