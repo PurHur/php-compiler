@@ -542,6 +542,29 @@ PHP;
         self::assertSame("1\n1\n1\n1\n0\n", ob_get_clean());
     }
 
+    public function test_dom_comment_tree_mutation(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+$doc = new DOMDocument();
+$comment = $doc->createComment('note');
+$doc->appendChild($comment);
+echo get_class($doc->firstChild), "\n";
+echo null === $doc->documentElement ? "null\n" : "set\n";
+$root = $doc->createElement('r');
+$doc->appendChild($root);
+$child = $doc->createElement('c');
+$root->appendChild($child);
+$root->insertBefore($doc->createComment('note'), $child);
+echo $doc->saveXML($root), "\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'dom_comment_tree.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("DOMComment\nnull\n<r><!--note--><c/></r>\n", ob_get_clean());
+    }
+
     public function test_dom_xpath_query_attribute_predicate(): void
     {
         $runtime = new Runtime();
