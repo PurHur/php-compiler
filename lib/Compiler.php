@@ -44514,6 +44514,10 @@ class Compiler {
                     break;
                 }
                 $producer = $block->orig->children[$probeIndex] ?? null;
+                // var_export($named === $pos) — comparison feeds arg #0, not prior fgets EXEC_RETURN (#11052, #17277).
+                if ($this->isComparisonInlineCallArgProducer($producer)) {
+                    return;
+                }
                 if ($producer instanceof Op\Expr\MethodCall || $producer instanceof Op\Expr\StaticCall) {
                     $operandSlot = $block->slotForOperand($producer->result);
                     if (null !== $operandSlot) {
