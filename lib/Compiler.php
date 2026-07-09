@@ -3394,6 +3394,9 @@ class Compiler {
         Block $block,
         ?Operand $resultOverride = null
     ): Block {
+        if (null !== $resultOverride) {
+            $this->rejectNullsafeInWriteContext($resultOverride, $block);
+        }
         if (null === $resultOverride) {
             $dimFetch = $this->findCoalesceArrayDimFetch($coalesce->left, $block);
             if (null !== $dimFetch && $this->operandsChainEqual($coalesce->result, $dimFetch->result)) {
@@ -9768,6 +9771,11 @@ class Compiler {
                     $this->compileUnaryExprReadOperand($expr, $block)
                 )];
             case Op\Expr\Empty_::class:
+                if ([] !== ($nullsafeChain = $this->collectNullsafePropertyFetchChainForEmpty($expr, $block))) {
+                    $this->compileEmptyNullsafePropertyFetchChain($nullsafeChain, $expr, $block);
+
+                    return [];
+                }
                 $emptyOperand = $this->recoverEmptyExprOperand($expr, $block)
                     ?? $this->unaryExprOperandForRead($expr, $block);
                 $propFetch = null !== $emptyOperand
@@ -10415,6 +10423,12 @@ class Compiler {
     protected function compileIsset(Op\Expr\Isset_ $expr, Block $block): array
     {
         assert(1 === count($expr->vars));
+        $nullsafeChain = $this->collectNullsafePropertyFetchChain($expr->vars[0], $block);
+        if ([] !== $nullsafeChain) {
+            $this->compileIssetNullsafePropertyFetchChain($nullsafeChain, $expr, $block);
+
+            return [];
+        }
         $this->assertIssetVariableOperand($expr->vars[0], $block);
         $resultSlot = $this->compileOperand($expr->result, $block, false);
         $propFetch = $this->findCoalescePropertyFetch($expr->vars[0], $block);
@@ -12554,6 +12568,24 @@ class Compiler {
         ) {
             // isset() && … as call arg — php-cfg dead temp is && merge, not hoisted Isset_ (#10704).
             return null;
+        }
+        if ($producer instanceof Op\Expr\Isset_ && 1 === count($producer->vars)) {
+            $nullsafeChain = $this->collectNullsafePropertyFetchChain($producer->vars[0], $block);
+            if ([] !== $nullsafeChain) {
+                $existingSlot = $block->slotForOperand($producer->result);
+                if (null !== $existingSlot) {
+                    return $existingSlot;
+                }
+            }
+        }
+        if ($producer instanceof Op\Expr\Empty_) {
+            $nullsafeChain = $this->collectNullsafePropertyFetchChainForEmpty($producer, $block);
+            if ([] !== $nullsafeChain) {
+                $existingSlot = $block->slotForOperand($producer->result);
+                if (null !== $existingSlot) {
+                    return $existingSlot;
+                }
+            }
         }
         if ($producer instanceof Op\Expr\Isset_ && !$this->issetExprLoweringEmitted($block, $producer)) {
             foreach ($this->compileExpr($producer, $block) as $op) {
