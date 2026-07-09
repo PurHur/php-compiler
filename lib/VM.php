@@ -3822,9 +3822,9 @@ restart:
                     } elseif ($container->type === Variable::TYPE_ARRAY) {
                         if ($this->context->isGlobalsTable($container)) {
                             if (!$forWrite && Variable::TYPE_STRING === $arg3->type
-                                && null === $container->toArray()->find($arg3->toString())) {
-                                $this->context->errors->undefinedArrayKey(
-                                    $arg3,
+                                && !$this->context->globalsTableOffsetIsSet($arg3)) {
+                                $this->context->errors->undefinedGlobalVariable(
+                                    $arg3->toString(),
                                     $this->context,
                                     $frame,
                                     '' !== $frame->scriptPath ? $frame->scriptPath : null
