@@ -2557,25 +2557,13 @@ final class VmDom
             return self::appendFragmentChildren($ctx, $parent, $child);
         }
 
-        if (!self::isElement($child) && !self::isEntityReference($child) && !self::isTextOrCdataNode($child)) {
+        if (!self::isTreeMutationChild($child)) {
             throw new \DOMException('Hierarchy request error');
         }
 
         $parentState = DomRegistry::state($parent);
         if (DomConstants::XML_DOCUMENT_NODE === $parentState->nodeType) {
-            $existing = $parent->getProperty(self::PROP_DOCUMENT_ELEMENT)->resolveIndirect();
-            if (Variable::TYPE_NULL !== $existing->type) {
-                $parentState->childIds[] = $child->id;
-                self::linkChildToParent($child, $parent);
-                self::syncSubtree($ctx, $parent);
-
-                return $child;
-            }
-            $parentState->childIds = [$child->id];
-            $parentState->documentElementName = DomRegistry::state($child)->nodeName;
-            $parent->getProperty(self::PROP_DOCUMENT_ELEMENT)->object($child);
-            self::linkChildToParent($child, $parent);
-            self::propagateDocumentId($child, $parent->id);
+            self::appendDocumentChild($ctx, $parent, $child);
             self::syncSubtree($ctx, $parent);
 
             return $child;
@@ -2648,7 +2636,7 @@ final class VmDom
         if (self::isDocumentFragment($newChild)) {
             return self::insertFragmentChildrenBefore($ctx, $parent, $newChild, $refChild);
         }
-        if (!self::isElement($newChild)) {
+        if (!self::isTreeMutationChild($newChild)) {
             throw new \DOMException('Hierarchy request error');
         }
         self::assertSameDocument($parent, $newChild);
@@ -2669,7 +2657,7 @@ final class VmDom
         self::linkChildToParent($newChild, $parent);
         if (self::isDocument($parent)) {
             $existing = $parent->getProperty(self::PROP_DOCUMENT_ELEMENT)->resolveIndirect();
-            if (Variable::TYPE_NULL === $existing->type) {
+            if (Variable::TYPE_NULL === $existing->type && self::isElement($newChild)) {
                 $parent->getProperty(self::PROP_DOCUMENT_ELEMENT)->object($newChild);
                 $parentState->documentElementName = DomRegistry::state($newChild)->nodeName;
             }
@@ -3286,7 +3274,7 @@ final class VmDom
         ?ObjectEntry $refChild
     ): void {
         self::assertMutationParent($parent);
-        if (!self::isElement($newChild) && !self::isTextOrCdataNode($newChild)) {
+        if (!self::isTreeMutationChild($newChild)) {
             throw new \DOMException('Hierarchy request error');
         }
         self::assertSameDocument($parent, $newChild);
@@ -5422,15 +5410,44 @@ final class VmDom
 
     public static function isAppendableNode(ObjectEntry $entry): bool
     {
-        return self::isElement($entry) || self::isDocumentFragment($entry);
+        return self::isTreeMutationChild($entry) || self::isDocumentFragment($entry);
     }
 
     public static function isAppendChildCandidate(ObjectEntry $entry): bool
     {
+        return self::isTreeMutationChild($entry) || self::isDocumentFragment($entry);
+    }
+
+    private static function isTreeMutationChild(ObjectEntry $entry): bool
+    {
         return self::isElement($entry)
-            || self::isDocumentFragment($entry)
             || self::isTextOrCdataNode($entry)
+            || self::isCommentNode($entry)
             || self::isEntityReference($entry);
+    }
+
+    private static function appendDocumentChild(Context $ctx, ObjectEntry $document, ObjectEntry $child): void
+    {
+        $parentState = DomRegistry::state($document);
+        $existing = $document->getProperty(self::PROP_DOCUMENT_ELEMENT)->resolveIndirect();
+        if (Variable::TYPE_NULL !== $existing->type) {
+            $parentState->childIds[] = $child->id;
+            self::linkChildToParent($child, $document);
+
+            return;
+        }
+        if (self::isElement($child)) {
+            $parentState->childIds[] = $child->id;
+            $parentState->documentElementName = DomRegistry::state($child)->nodeName;
+            $document->getProperty(self::PROP_DOCUMENT_ELEMENT)->object($child);
+            self::linkChildToParent($child, $document);
+            self::propagateDocumentId($child, $document->id);
+
+            return;
+        }
+        $parentState->childIds[] = $child->id;
+        self::linkChildToParent($child, $document);
+        self::propagateDocumentId($child, $document->id);
     }
 
     public static function isCloneableNode(ObjectEntry $entry): bool
