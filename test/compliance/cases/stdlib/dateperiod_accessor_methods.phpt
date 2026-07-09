@@ -14,9 +14,11 @@ $periodEnd = new DatePeriod($start, $interval, $end);
 echo $periodEnd->getStartDate()->format('Y-m-d'), "\n";
 var_export($periodEnd->getRecurrences());
 echo "\n";
+echo $periodEnd->getEndDate()->format('Y-m-d'), "\n";
 --EXPECT--
 2020-01-01
 P1D
 3
 2020-01-01
 NULL
+2020-01-05
