@@ -3131,6 +3131,20 @@ class Compiler {
         if (!$op instanceof Op\Terminal || 'Terminal_Echo' !== $op->getType()) {
             return null;
         }
+        // php-cfg: BinaryOp\Coalesce child immediately before Terminal_Echo(expr=coalesce.result).
+        if ($echoIndex >= 1) {
+            $prior = $ops[$echoIndex - 1];
+            if (
+                $prior instanceof Op\Expr\BinaryOp\Coalesce
+                && $this->operandsChainEqual($op->expr, $prior->result)
+            ) {
+                $var = $this->compileOperand($prior->result, $block, true);
+                $line = $op->getLine();
+                $block->addOpCode(new OpCode(OpCode::TYPE_ECHO, $var, $line > 0 ? $line : null));
+
+                return $block;
+            }
+        }
         $echoAfterAssign = $this->resolveEchoAfterCoalesceAssign($ops, $echoIndex, $op->expr);
         if (null !== $echoAfterAssign && $this->isStmtCoalesceLoweredBeforeEcho($ops, $echoIndex)) {
             $var = $this->compileOperand($echoAfterAssign, $block, true);
@@ -3171,9 +3185,16 @@ class Compiler {
             $coalesceSnapshots[] = [$coalesce, $snapshot];
             if (
                 null === $flattened
-                && $this->operandsChainEqual($echoOperand, $coalesce->result)
+                && (
+                    $this->operandsChainEqual($echoOperand, $coalesce->result)
+                    || $echoOperand === $coalesce
+                    || (
+                        null !== ($embeddedCoalesce = $this->unwrapCoalesceExpr($echoOperand))
+                        && $embeddedCoalesce === $coalesce
+                    )
+                )
             ) {
-                $echoOperand = $coalesce->result;
+                $echoOperand = $snapshot;
             }
         }
         $concat = $flattened;
@@ -3185,6 +3206,11 @@ class Compiler {
                     if (
                         $this->operandsChainEqual($part, $coalesce->result)
                         || $this->operandsChainEqual($part, $replacement)
+                        || $part === $coalesce
+                        || (
+                            null !== ($embeddedCoalesce = $this->unwrapCoalesceExpr($part))
+                            && $embeddedCoalesce === $coalesce
+                        )
                     ) {
                         $replaced = $replacement;
                         break;
@@ -3258,6 +3284,9 @@ class Compiler {
      */
     private function isStmtCoalesceLoweredBeforeEcho(array $ops, int $echoIndex): bool
     {
+        if ($echoIndex >= 1 && $ops[$echoIndex - 1] instanceof Op\Expr\BinaryOp\Coalesce) {
+            return true;
+        }
         if ($echoIndex >= 2 && $ops[$echoIndex - 2] instanceof Op\Expr\BinaryOp\Coalesce) {
             return true;
         }
