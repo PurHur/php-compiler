@@ -186,7 +186,29 @@ final class ErrorReporter
         ?Frame $frame = null,
         ?string $file = null
     ): void {
-        $this->emitWarning("Undefined variable \${$name}", $context, $frame, $file);
+        $this->emitWarning(self::undefinedVariableMessage($name), $context, $frame, $file);
+    }
+
+    public static function undefinedVariableMessage(string $name): string
+    {
+        return "Undefined variable \${$name}";
+    }
+
+    /**
+     * Zend E_WARNING for undefined $GLOBALS['name'] read (zend_execute.c, #17482).
+     */
+    public function undefinedGlobalVariable(
+        string $name,
+        ?Context $context = null,
+        ?Frame $frame = null,
+        ?string $file = null
+    ): void {
+        $this->emitWarning(self::undefinedGlobalVariableMessage($name), $context, $frame, $file);
+    }
+
+    public static function undefinedGlobalVariableMessage(string $name): string
+    {
+        return "Undefined global variable \${$name}";
     }
 
     public function undefinedArrayKey(
