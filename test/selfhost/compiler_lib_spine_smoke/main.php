@@ -3958,6 +3958,7 @@ require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionFunctionIsAccessible.ph
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionFunctionIsAnonymous.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionFunctionIsClosure.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionFunctionIsDeprecated.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionFunctionIsGenerator.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionFunctionIsInternal.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionFunctionIsUserDefined.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionFunctionSetAccessible.php';
@@ -3996,6 +3997,7 @@ require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionMethodInvokeArgs.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionMethodIsAccessible.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionMethodIsDeprecated.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionMethodIsFinal.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionMethodIsGenerator.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionMethodIsPrivate.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionMethodIsProtected.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionMethodIsPublic.php';
