@@ -3634,6 +3634,15 @@ final class VmDom
 
                 continue;
             }
+            $comment = VmXml::parseCommentAt($inner, $pos);
+            if (null !== $comment) {
+                $commentNode = self::createComment($ctx, $comment['data'], $ownerDocument);
+                $state->childIds[] = $commentNode->id;
+                self::linkChildToParent($commentNode, $parent);
+                $pos = $comment['end'];
+
+                continue;
+            }
             $end = self::findHtmlElementEnd($inner, $pos);
             if (null === $end) {
                 $tagName = self::detectHtmlUnclosedTagName($inner, $pos);
@@ -3772,6 +3781,9 @@ final class VmDom
         }
         if (self::isTextNode($entry)) {
             return DomRegistry::state($entry)->textContent ?? '';
+        }
+        if (self::isCommentNode($entry)) {
+            return '<!--'.(DomRegistry::state($entry)->textContent ?? '').'-->';
         }
 
         throw new \DOMException('Cannot serialize node type in this compiler build');
