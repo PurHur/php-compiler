@@ -141,6 +141,7 @@
         "ext/dom/DocumentConstruct.php",
         "ext/dom/DocumentCreateAttribute.php",
         "ext/dom/DocumentCreateAttributeNS.php",
+        "ext/dom/DocumentCreateCDATASection.php",
         "ext/dom/DocumentCreateComment.php",
         "ext/dom/DocumentCreateDocumentFragment.php",
         "ext/dom/DocumentCreateElement.php",
@@ -244,6 +245,8 @@
         "ext/dom/NodeReplaceChild.php",
         "ext/dom/NodeReplaceChildren.php",
         "ext/dom/NodeReplaceWith.php",
+        "ext/dom/TextIsElementContentWhitespace.php",
+        "ext/dom/TextIsWhitespaceInElementContent.php",
         "ext/dom/TextSplitText.php",
         "ext/dom/TokenListAdd.php",
         "ext/dom/TokenListContains.php",
@@ -4542,9 +4545,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 4308,
+        "inventory_files": 4311,
         "excluded": 0,
-        "eligible": 4308,
+        "eligible": 4311,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
