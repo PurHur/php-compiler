@@ -48,6 +48,7 @@ use PHPCompiler\Compiler\EnumBackedCaseCheck;
 use PHPCompiler\Compiler\EnumMagicMethodCheck;
 use PHPCompiler\Compiler\EnumParentCompileCheck;
 use PHPCompiler\Compiler\MagicMethodReturnTypeCheck;
+use PHPCompiler\Compiler\PseudoClassTypeHintCompileCheck;
 use PHPCompiler\Compiler\FunctionStaticAnonymousClassCompileCheck;
 use PHPCompiler\Compiler\NewWithoutParensCompileCheck;
 use PHPCompiler\Compiler\NonEnumBuiltinInterfaceCompileCheck;
@@ -620,6 +621,7 @@ class Compiler {
         if (null === $returnType) {
             return;
         }
+        $this->rejectPseudoClassTypeHintOutsideClassScope($returnType, $block, $func);
         $this->assertFunctionSignatureNeverType($returnType);
         $this->assertNoRedundantTrueFalseUnion($returnType);
         $block->returnDeclaredType = $returnType;
@@ -5049,7 +5051,9 @@ class Compiler {
     {
         $this->registerMethodDeclaration($child->func->name);
         foreach ($child->func->params as $param) {
-            $this->assertParamDeclaredType($param->declaredType);
+            $methodBlock = new Block(null);
+            $methodBlock->func = $child->func;
+            $this->assertParamDeclaredType($param->declaredType, $methodBlock, $child->func);
         }
         if ('__construct' === $child->func->name) {
             foreach ($child->func->params as $param) {
@@ -5864,8 +5868,9 @@ class Compiler {
         return null;
     }
 
-    protected function assertParamDeclaredType(?Op\Type $declared): void
+    protected function assertParamDeclaredType(?Op\Type $declared, Block $block, CfgFunc $func): void
     {
+        $this->rejectPseudoClassTypeHintOutsideClassScope($declared, $block, $func);
         $this->assertFunctionSignatureNeverType($declared);
         $this->assertNoRedundantTrueFalseUnion($declared);
         if ($this->cfgTypeIsStandaloneNever($declared)) {
@@ -5876,7 +5881,10 @@ class Compiler {
     protected function applyParamDeclaredType(Op\Expr\Param $param, Block $block, int $slot, bool $variadicElement = false): void
     {
         $declared = $param->declaredType;
-        $this->assertParamDeclaredType($declared);
+        if (null === $block->func) {
+            throw new \LogicException('applyParamDeclaredType requires block func');
+        }
+        $this->assertParamDeclaredType($declared, $block, $block->func);
         if (null !== $declared) {
             $block->paramDeclaredTypes[$slot] = $declared;
         }
@@ -8316,6 +8324,28 @@ class Compiler {
         }
 
         return null !== $block->func && null !== $block->func->class;
+    }
+
+    /**
+     * Zend zend_compile.c — self/parent/static return & parameter types require class scope (#17480).
+     *
+     * @return never
+     */
+    protected function rejectPseudoClassTypeHintOutsideClassScope(?Op\Type $type, Block $block, CfgFunc $func): void
+    {
+        $keyword = PseudoClassTypeHintCompileCheck::findKeyword($type);
+        if (null === $keyword) {
+            return;
+        }
+        if ($this->pseudoClassInCompileScope($keyword, $block)) {
+            return;
+        }
+        $callable = $func->callableOp;
+        throw new CompileFatal(
+            $callable instanceof Op ? ($callable->getFile() ?: 'unknown') : 'unknown',
+            $callable instanceof Op ? max(1, $callable->getLine()) : 1,
+            PseudoClassTypeHintCompileCheck::messageFor($keyword)
+        );
     }
 
     protected function resolveDefaultClassConstScope(string $className, Block $block): ?string
