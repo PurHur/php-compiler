@@ -29726,6 +29726,7 @@ class Compiler {
 
     /**
      * var_export(g(), true) — nested callee before trailing ConstFetch preludes feeds arg #0 (#11272, #16298).
+     * is_a(new C(), Parent::class) — inline New_ before trailing ::class feeds arg #0 (#17502).
      *
      * @param list<Op> $cfgChildren
      */
@@ -29765,6 +29766,21 @@ class Compiler {
                 $consumerIndex,
                 $cfgChildren
             )) {
+                return null;
+            }
+        } elseif ($prev instanceof Op\Expr\New_) {
+            if (
+                !property_exists($consumer, 'args')
+                || !\is_array($consumer->args)
+                || \count($consumer->args) < 2
+            ) {
+                return null;
+            }
+            $callArg = $consumer->args[0] ?? null;
+            if (
+                !$this->callArgIsNewExpression($callArg)
+                && (!$callArg instanceof Operand || !$this->callArgIsDeadInlineTemporary($callArg))
+            ) {
                 return null;
             }
         } else {
@@ -29955,6 +29971,33 @@ class Compiler {
             );
             if (null !== $methodSlot) {
                 return $methodSlot;
+            }
+
+            return null;
+        }
+        if ($prev instanceof Op\Expr\New_) {
+            if (
+                0 !== $argIndex
+                || !\is_array($cfgCallOp->args ?? null)
+                || \count($cfgCallOp->args) < 2
+            ) {
+                return null;
+            }
+            $callArg = $cfgCallOp->args[0] ?? null;
+            if (
+                !$this->callArgIsNewExpression($callArg)
+                && (!$callArg instanceof Operand || !$this->callArgIsDeadInlineTemporary($callArg))
+            ) {
+                return null;
+            }
+            if (null === $block->slotForOperand($prev->result)) {
+                foreach ($this->compileExpr($prev, $block) as $op) {
+                    $block->addOpCode($op);
+                }
+            }
+            $newSlot = $this->slotForInlineNewProducer($block, $prev);
+            if (null !== $newSlot) {
+                return (string) $newSlot;
             }
 
             return null;
@@ -39277,7 +39320,11 @@ class Compiler {
                 null !== $cfgCallOp
                 && 0 === $argIndex
                 && $this->callArgIsDeadInlineTemporary($arg)
-                && 'filter_var' === strtolower($this->resolveCfgFuncCallName($cfgCallOp) ?? '')
+                && \in_array(
+                    strtolower($this->resolveCfgFuncCallName($cfgCallOp) ?? ''),
+                    ['filter_var', 'is_a', 'is_subclass_of'],
+                    true
+                )
             ) {
                 $nestedSubjectSlot = $this->slotForNestedSubjectExecBeforeLiteralPreludeCall($block);
                 if (null !== $nestedSubjectSlot) {
