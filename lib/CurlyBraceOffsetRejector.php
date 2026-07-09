@@ -149,11 +149,24 @@ final class CurlyBraceOffsetRejector
             return true;
         }
 
-        // `new class(...)` anonymous class ctor args — `{` opens class body, not offset access (#6881).
+        // `new class(...)` / `new readonly class(...)` anonymous ctor args — `{` is class body (#6881, #17467).
         if (T_CLASS === $beforeOpen[0]) {
-            $beforeClass = self::previousSignificantToken($tokens, $openParenIndex - 2);
-            if (\is_array($beforeClass) && T_NEW === $beforeClass[0]) {
+            $classIndex = self::indexOfClassKeywordBeforeParen($tokens, $openParenIndex);
+            if (null === $classIndex) {
+                return false;
+            }
+            $modifier = self::previousSignificantToken($tokens, $classIndex - 1);
+            if (\is_array($modifier) && T_NEW === $modifier[0]) {
                 return true;
+            }
+            if (\is_array($modifier) && T_READONLY === $modifier[0]) {
+                $readonlyIndex = self::indexOfSignificantToken($tokens, $classIndex - 1, T_READONLY);
+                if (null !== $readonlyIndex) {
+                    $beforeReadonly = self::previousSignificantToken($tokens, $readonlyIndex - 1);
+                    if (\is_array($beforeReadonly) && T_NEW === $beforeReadonly[0]) {
+                        return true;
+                    }
+                }
             }
         }
 
@@ -267,6 +280,50 @@ final class CurlyBraceOffsetRejector
             }
             if (\in_array($token[0], [T_WHITESPACE, T_COMMENT, T_DOC_COMMENT], true)) {
                 continue;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @param list<array{0: int, 1: string, 2: int}|string> $tokens
+     */
+    private static function indexOfClassKeywordBeforeParen(array $tokens, int $openParenIndex): ?int
+    {
+        for ($i = $openParenIndex - 1; $i >= 0; --$i) {
+            $token = $tokens[$i];
+            if (\is_array($token)) {
+                if (\in_array($token[0], [T_WHITESPACE, T_COMMENT, T_DOC_COMMENT], true)) {
+                    continue;
+                }
+                if (T_CLASS === $token[0]) {
+                    return $i;
+                }
+
+                return null;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @param list<array{0: int, 1: string, 2: int}|string> $tokens
+     */
+    private static function indexOfSignificantToken(array $tokens, int $startIndex, int $type): ?int
+    {
+        for ($i = $startIndex; $i >= 0; --$i) {
+            $token = $tokens[$i];
+            if (\is_array($token)) {
+                if (\in_array($token[0], [T_WHITESPACE, T_COMMENT, T_DOC_COMMENT], true)) {
+                    continue;
+                }
+                if ($type === $token[0]) {
+                    return $i;
+                }
+
+                return null;
             }
         }
 

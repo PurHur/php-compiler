@@ -215,6 +215,27 @@ PHP;
         $this->assertSame('1', ob_get_clean());
     }
 
+    /** @covers issue #17467 */
+    public function testReadonlyAnonymousClassCtorArgsCompiles(): void
+    {
+        if (!CompilerVersion::supportsReadonlyAnonymousClass()) {
+            $this->markTestSkipped('new readonly class requires PHP 8.3+ forward profile');
+        }
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+$o = new readonly class(5) {
+    public function __construct(public int $x) {}
+};
+var_export($o->x);
+PHP;
+        $block = $runtime->parseAndCompile($code, 'readonly_anon_ctor_args.php');
+        $this->assertNotNull($block);
+        ob_start();
+        $runtime->run($block);
+        $this->assertSame('5', ob_get_clean());
+    }
+
     /** @covers issue #6724 — ZEND_ACC_ANON_READONLY via per-property readonly on anonymous class */
     public function testReadonlyPropertyOnAnonymousClassDefaultCompiles(): void
     {
