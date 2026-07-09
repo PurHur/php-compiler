@@ -140,6 +140,8 @@ final class VmDom
 
     public const PROP_DATA = 'data';
 
+    public const PROP_WHOLE_TEXT = 'wholeText';
+
     public const PROP_OWNER_ELEMENT = 'ownerElement';
 
     public const PROP_PUBLIC_ID = 'publicId';
@@ -257,6 +259,7 @@ final class VmDom
         $text->isInternal = true;
         $text->parentLc = self::CLASS_CHARACTER_DATA;
         $text->properties[] = new ClassProperty(self::PROP_NODE_NAME, null, $strProto);
+        $text->properties[] = new ClassProperty(self::PROP_WHOLE_TEXT, null, $strProto);
         $text->methods['splittext'] = new TextSplitText();
         $text->methodVisibility['splittext'] = $pub;
         $text->methodNames['splittext'] = 'splitText';
@@ -1808,6 +1811,30 @@ final class VmDom
         }
 
         return substr($data, $offset, $count);
+    }
+
+    /** Adjacent text/CDATA merge (php-src ext/dom/text.c dom_text_whole_text_read; #17527). */
+    public static function readWholeText(ObjectEntry $node): string
+    {
+        if (!self::isTextOrCdataNode($node)) {
+            throw new \LogicException('readWholeText() called on non-text node');
+        }
+        $start = $node;
+        while (true) {
+            $prev = self::siblingEntry($start, self::PROP_PREVIOUS_SIBLING);
+            if (null === $prev || !self::isTextOrCdataNode($prev)) {
+                break;
+            }
+            $start = $prev;
+        }
+        $merged = '';
+        $current = $start;
+        while (null !== $current && self::isTextOrCdataNode($current)) {
+            $merged .= self::characterDataReadContent($current);
+            $current = self::siblingEntry($current, self::PROP_NEXT_SIBLING);
+        }
+
+        return $merged;
     }
 
     public static function textSplitText(Context $ctx, ObjectEntry $node, int $offset): ObjectEntry
@@ -4842,6 +4869,19 @@ final class VmDom
     }
 
     /** @param list<int> $childIds */
+    private static function siblingEntry(ObjectEntry $node, string $prop): ?ObjectEntry
+    {
+        if (!$node->hasProperty($prop)) {
+            return null;
+        }
+        $resolved = $node->getProperty($prop)->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $resolved->type) {
+            return null;
+        }
+
+        return $resolved->toObject();
+    }
+
     private static function syncChildSiblingLinks(array $childIds): void
     {
         foreach ($childIds as $index => $childId) {
