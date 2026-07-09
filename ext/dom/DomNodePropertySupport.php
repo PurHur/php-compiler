@@ -35,6 +35,7 @@ final class DomNodePropertySupport
             || (VmDom::isAttr($object) && strtolower(VmDom::PROP_VALUE) === $lc)
             || (VmDom::isAttr($object) && strtolower(VmDom::PROP_OWNER_ELEMENT) === $lc)
             || (VmDom::isCharacterData($object) && strtolower(VmDom::PROP_DATA) === $lc)
+            || (VmDom::isTextOrCdataNode($object) && strtolower(VmDom::PROP_WHOLE_TEXT) === $lc)
             || (VmDom::isNodeList($object) && strtolower(VmDom::PROP_LENGTH) === $lc);
     }
 
@@ -129,6 +130,11 @@ final class DomNodePropertySupport
         }
         if (VmDom::isCharacterData($object) && strtolower(VmDom::PROP_DATA) === $lc) {
             $var->string(DomRegistry::state($object)->textContent ?? '');
+
+            return $var;
+        }
+        if (VmDom::isTextOrCdataNode($object) && strtolower(VmDom::PROP_WHOLE_TEXT) === $lc) {
+            $var->string(VmDom::readWholeText($object));
 
             return $var;
         }
