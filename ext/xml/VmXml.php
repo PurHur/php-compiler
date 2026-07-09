@@ -241,6 +241,31 @@ final class VmXml
     }
 
     /**
+     * Parse a CDATA section at $pos (php-src libxml CDATA; #17526).
+     *
+     * @return null|array{end: int, data: string}
+     */
+    public static function parseCdataSectionAt(string $content, int $pos): ?array
+    {
+        if (!isset($content[$pos]) || '<' !== $content[$pos]) {
+            return null;
+        }
+        if (!str_starts_with(substr($content, $pos), '<![CDATA[')) {
+            return null;
+        }
+        $dataStart = $pos + 9;
+        $endMarker = strpos($content, ']]>', $dataStart);
+        if (false === $endMarker) {
+            return null;
+        }
+
+        return [
+            'end' => $endMarker + 3,
+            'data' => substr($content, $dataStart, $endMarker - $dataStart),
+        ];
+    }
+
+    /**
      * Validate sibling content inside an element (text nodes and child elements).
      *
      * @return null|array{level: int, code: int, column: int, message: string, file: string, line: int}
@@ -261,6 +286,12 @@ final class VmXml
             if ('<' !== $content[$pos]) {
                 $next = strpos($content, '<', $pos);
                 $pos = (false === $next) ? $len : $next;
+
+                continue;
+            }
+            $cdata = self::parseCdataSectionAt($content, $pos);
+            if (null !== $cdata) {
+                $pos = $cdata['end'];
 
                 continue;
             }
@@ -323,6 +354,12 @@ final class VmXml
             if (preg_match('/\G<([A-Za-z_][\w:.-]*)(\s[^>]*)?>/s', $content, $nested, 0, $scan)) {
                 $stack[] = $nested[1];
                 $scan += \strlen($nested[0]);
+
+                continue;
+            }
+            $cdata = self::parseCdataSectionAt($content, $scan);
+            if (null !== $cdata) {
+                $scan = $cdata['end'];
 
                 continue;
             }

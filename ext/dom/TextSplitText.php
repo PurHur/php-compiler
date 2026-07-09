@@ -18,7 +18,7 @@ final class TextSplitText extends DomClassMethod
     public function execute(Frame $frame): void
     {
         $receiver = $this->domRegistryNodeReceiver($frame, 'DOMText::splitText()');
-        if (!VmDom::isTextNode($receiver)) {
+        if (!VmDom::isTextOrCdataNode($receiver)) {
             throw new \TypeError('DOMText::splitText() must be called on a text node');
         }
         if (\count($frame->calledArgs) < 2) {
