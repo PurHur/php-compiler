@@ -266,6 +266,31 @@ final class VmXml
     }
 
     /**
+     * Parse an XML comment at $pos (php-src libxml comment nodes; #17530).
+     *
+     * @return null|array{end: int, data: string}
+     */
+    public static function parseCommentAt(string $content, int $pos): ?array
+    {
+        if (!isset($content[$pos]) || '<' !== $content[$pos]) {
+            return null;
+        }
+        if (!str_starts_with(substr($content, $pos), '<!--')) {
+            return null;
+        }
+        $dataStart = $pos + 4;
+        $endMarker = strpos($content, '-->', $dataStart);
+        if (false === $endMarker) {
+            return null;
+        }
+
+        return [
+            'end' => $endMarker + 3,
+            'data' => substr($content, $dataStart, $endMarker - $dataStart),
+        ];
+    }
+
+    /**
      * Validate sibling content inside an element (text nodes and child elements).
      *
      * @return null|array{level: int, code: int, column: int, message: string, file: string, line: int}
@@ -292,6 +317,12 @@ final class VmXml
             $cdata = self::parseCdataSectionAt($content, $pos);
             if (null !== $cdata) {
                 $pos = $cdata['end'];
+
+                continue;
+            }
+            $comment = self::parseCommentAt($content, $pos);
+            if (null !== $comment) {
+                $pos = $comment['end'];
 
                 continue;
             }
@@ -360,6 +391,12 @@ final class VmXml
             $cdata = self::parseCdataSectionAt($content, $scan);
             if (null !== $cdata) {
                 $scan = $cdata['end'];
+
+                continue;
+            }
+            $comment = self::parseCommentAt($content, $scan);
+            if (null !== $comment) {
+                $scan = $comment['end'];
 
                 continue;
             }
