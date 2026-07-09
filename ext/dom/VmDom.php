@@ -3779,6 +3779,13 @@ final class VmDom
 
                 continue;
             }
+            $comment = VmXml::parseCommentAt($xml, $pos);
+            if (null !== $comment) {
+                $children[] = self::createComment($ctx, $comment['data'], null);
+                $pos = $comment['end'];
+
+                continue;
+            }
             $end = self::findElementEnd($xml, $pos);
             if (null === $end) {
                 return null;
@@ -3847,6 +3854,15 @@ final class VmDom
                 $state->childIds[] = $cdataNode->id;
                 self::linkChildToParent($cdataNode, $entry);
                 $pos = $cdata['end'];
+
+                continue;
+            }
+            $comment = VmXml::parseCommentAt($inner, $pos);
+            if (null !== $comment) {
+                $commentNode = self::createComment($ctx, $comment['data'], null);
+                $state->childIds[] = $commentNode->id;
+                self::linkChildToParent($commentNode, $entry);
+                $pos = $comment['end'];
 
                 continue;
             }
@@ -3925,6 +3941,12 @@ final class VmDom
 
                 continue;
             }
+            $comment = VmXml::parseCommentAt($content, $scan);
+            if (null !== $comment) {
+                $scan = $comment['end'];
+
+                continue;
+            }
             ++$scan;
         }
 
@@ -3946,6 +3968,9 @@ final class VmDom
         }
         if (self::isCdataNode($entry)) {
             return '<![CDATA['.(DomRegistry::state($entry)->textContent ?? '').']]>';
+        }
+        if (self::isCommentNode($entry)) {
+            return '<!--'.(DomRegistry::state($entry)->textContent ?? '').'-->';
         }
         if (self::isEntityReference($entry)) {
             return '&'.self::escapeName(DomRegistry::state($entry)->nodeName).';';
