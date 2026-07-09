@@ -3688,11 +3688,6 @@ final class VmDom
         $pos = 0;
         $len = \strlen($xml);
         while ($pos < $len) {
-            if (preg_match('/\G\s+/s', $xml, $m, 0, $pos)) {
-                $pos += \strlen($m[0]);
-
-                continue;
-            }
             if ($pos >= $len) {
                 break;
             }
@@ -3753,11 +3748,6 @@ final class VmDom
         $inner = $matches[3];
         $len = \strlen($inner);
         while ($pos < $len) {
-            if (preg_match('/\G\s+/s', $inner, $m, 0, $pos)) {
-                $pos += \strlen($m[0]);
-
-                continue;
-            }
             if ($pos >= $len) {
                 break;
             }
