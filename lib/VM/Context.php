@@ -727,6 +727,25 @@ class Context {
         return isset($this->globalEverAssigned[$name]);
     }
 
+    /**
+     * Zend E_WARNING predicate for $GLOBALS['name'] read (zend_execute.c, #17482).
+     */
+    public function shouldWarnUndefinedGlobalRead(string $name): bool
+    {
+        if (!isset($this->globalVars[$name])) {
+            return true;
+        }
+        $global = $this->globalVars[$name]->resolveIndirect();
+        if ($global->isUndefined()) {
+            return true;
+        }
+        if (Variable::TYPE_NULL === $global->type && !$this->isGlobalEverAssigned($name)) {
+            return true;
+        }
+
+        return false;
+    }
+
     public function clearGlobalEverAssigned(string $name): void
     {
         unset($this->globalEverAssigned[$name]);

@@ -189,6 +189,18 @@ final class ErrorReporter
         $this->emitWarning("Undefined variable \${$name}", $context, $frame, $file);
     }
 
+    /**
+     * Zend E_WARNING for $GLOBALS['name'] read on an unset script-global symbol (#17482).
+     */
+    public function undefinedGlobalVariable(
+        string $name,
+        ?Context $context = null,
+        ?Frame $frame = null,
+        ?string $file = null
+    ): void {
+        $this->emitWarning("Undefined global variable \${$name}", $context, $frame, $file);
+    }
+
     public function undefinedArrayKey(
         Variable $index,
         ?Context $context = null,
