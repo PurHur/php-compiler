@@ -1,22 +1,20 @@
 --TEST--
-Language: {$GLOBALS[const]} undefined global warning — not array key (#17482, Zend/zend_execute.c)
+Language: {$GLOBALS[const]} undefined key warns as global variable not array key (#17482)
 --FILE--
 <?php
-function warn_capture(int $errno, string $message): bool
-{
-    echo 'W:', $message, "\n";
 
-    return true;
-}
-set_error_handler('warn_capture');
+declare(strict_types=1);
 
 const C = 'w';
+
+$message = '';
+set_error_handler(static function (int $severity, string $msg) use (&$message): bool {
+    $message = $msg;
+
+    return true;
+});
+
 echo "{$GLOBALS[C]}";
-echo "\n";
-echo $GLOBALS['w'];
-echo "\n";
+echo $message, "\n";
 --EXPECT--
-W:Undefined global variable $w
-
-W:Undefined global variable $w
-
+Undefined global variable $w
