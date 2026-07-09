@@ -155,6 +155,7 @@ require_once __DIR__.'/../../../ext/curl/curl_upkeep.php';
 require_once __DIR__.'/../../../ext/curl/curl_version.php';
 require_once __DIR__.'/../../../ext/dom/BuiltinClasses.php';
 require_once __DIR__.'/../../../ext/dom/DocumentAppendChild.php';
+require_once __DIR__.'/../../../ext/dom/DocumentAdoptNode.php';
 require_once __DIR__.'/../../../ext/dom/DocumentConstruct.php';
 require_once __DIR__.'/../../../ext/dom/DocumentCreateAttribute.php';
 require_once __DIR__.'/../../../ext/dom/DocumentCreateAttributeNS.php';

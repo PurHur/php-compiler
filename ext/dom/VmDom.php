@@ -459,6 +459,9 @@ final class VmDom
         $document->methodVisibility['getelementbyid'] = $pub;
         $document->methods['importnode'] = new DocumentImportNode();
         $document->methodVisibility['importnode'] = $pub;
+        $document->methods['adoptnode'] = new DocumentAdoptNode();
+        $document->methodVisibility['adoptnode'] = $pub;
+        $document->methodNames['adoptnode'] = 'adoptNode';
         $document->methods['registernodeclass'] = new DocumentRegisterNodeClass();
         $document->methodVisibility['registernodeclass'] = $pub;
         $document->methodNames['registernodeclass'] = 'registerNodeClass';

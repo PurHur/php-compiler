@@ -1304,6 +1304,8 @@ final class BuiltinClasses
         $dp->methodVisibility['getdateinterval'] = $pub;
         $dp->methods['getrecurrences'] = new DatePeriodGetRecurrences();
         $dp->methodVisibility['getrecurrences'] = $pub;
+        $dp->methods['getenddate'] = new DatePeriodGetEndDate();
+        $dp->methodVisibility['getenddate'] = $pub;
         if (CompilerVersion::supportsDatePeriodCreateFromISO8601String()) {
             $dp->methods['createfromiso8601string'] = new DatePeriodCreateFromISO8601String();
             $dp->methodVisibility['createfromiso8601string'] = $pubStatic;
