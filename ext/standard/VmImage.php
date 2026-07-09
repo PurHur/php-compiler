@@ -334,7 +334,8 @@ final class VmImage
             if (0xD9 === $marker) {
                 break;
             }
-            if ($marker <= 0xD0 || ($marker >= 0xD1 && $marker <= 0xD7)) {
+            // RST0–RST7 (php-src M_RST0..M_RST7) — no segment length field.
+            if ($marker >= 0xD0 && $marker <= 0xD7) {
                 $pos += 2;
 
                 continue;
