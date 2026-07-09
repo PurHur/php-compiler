@@ -1077,6 +1077,31 @@ PHP;
         self::assertSame([$castSlot], $sendSlots, 'arg sends='.json_encode($sendSlots));
     }
 
+    /** Issue #17551 — (object) array literal as call arg must compile (TYPE_CAST_OBJECT prelude slot). */
+    public function testArraySpliceObjectCastPreludeCompilesAndSendsCastSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+array_splice((object) [1, 2, 3], 1, 1);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'array_splice_object_cast.php');
+
+        $castSlot = null;
+        $sendSlots = [];
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_CAST_OBJECT === $op->type) {
+                $castSlot = $op->arg1;
+            }
+            if (OpCode::TYPE_ARG_SEND === $op->type) {
+                $sendSlots[] = $op->arg1;
+            }
+        }
+
+        self::assertNotNull($castSlot);
+        self::assertSame($castSlot, $sendSlots[0] ?? null, 'arg sends='.json_encode($sendSlots));
+    }
+
     /** Issue #9684 — enum case ->name/->value in direct call args use property-fetch slot. */
     public function testVarDumpEnumCaseMagicPropertyUsesPropertyFetchSlot(): void
     {
