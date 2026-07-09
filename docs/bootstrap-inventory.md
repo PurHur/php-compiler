@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 4288 |
-| Phase A inventory files (M2 ratio SSOT) | 4288 |
+| PHP files on vm.php path | 4290 |
+| Phase A inventory files (M2 ratio SSOT) | 4290 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 11549 |
+| Source constructs flagged (warnings) | 11551 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -3409,6 +3409,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/Type/String_.php` | 0 | 1 |
 | `lib/JIT/Builtin/Type/Value.php` | 0 | 4 |
 | `lib/JIT/Builtin/TypeErrorRaise.php` | 0 | 3 |
+| `lib/JIT/Builtin/UndefinedGlobalVariableRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/UndefinedPropertyFetchRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/UndefinedVariableRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/UnpackJitRuntime.php` | 0 | 1 |
@@ -4139,6 +4140,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/VM/TryCatchJitHelper.php` | 0 | 1 |
 | `lib/VM/TypeCheck.php` | 0 | 6 |
 | `lib/VM/TypedPropertyCheck.php` | 0 | 5 |
+| `lib/VM/UndefinedGlobalVariableJitHelper.php` | 0 | 1 |
 | `lib/VM/UndefinedPropertyFetchJitHelper.php` | 0 | 1 |
 | `lib/VM/UndefinedVariableJitHelper.php` | 0 | 1 |
 | `lib/VM/ValueEchoJitHelper.php` | 0 | 1 |
@@ -13725,8 +13727,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/ScopeBuiltinJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 194)
-- new Variable (line 244)
+- new Variable (line 195)
+- new Variable (line 236)
 - 15 class method(s)
 - 1 closure(s)
 
@@ -16050,17 +16052,17 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmScope.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 258)
-- new Variable (line 266)
-- new Variable (line 283)
-- new HashTable (line 396)
-- new Variable (line 408)
-- new Variable (line 443)
+- new HashTable (line 259)
+- new Variable (line 267)
+- new Variable (line 284)
+- new HashTable (line 388)
+- new Variable (line 400)
+- new Variable (line 435)
+- new Variable (line 473)
 - new Variable (line 481)
-- new Variable (line 489)
-- new HashTable (line 502)
-- new Variable (line 514)
-- new Variable (line 527)
+- new HashTable (line 494)
+- new Variable (line 506)
+- new Variable (line 519)
 - 26 class method(s)
 
 ### `ext/standard/VmSerialize.php`
@@ -26619,6 +26621,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 26 class method(s)
 - 2 closure(s)
 
+### `lib/JIT/Builtin/UndefinedGlobalVariableRuntime.php`
+
+**Warnings** (review for bootstrap subset):
+- 6 class method(s)
+
 ### `lib/JIT/Builtin/UndefinedPropertyFetchRuntime.php`
 
 **Warnings** (review for bootstrap subset):
@@ -32022,6 +32029,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Error (line 124)
 - new TypedPropertyReadSignal (line 126)
 - 10 class method(s)
+
+### `lib/VM/UndefinedGlobalVariableJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
 
 ### `lib/VM/UndefinedPropertyFetchJitHelper.php`
 
