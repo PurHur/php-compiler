@@ -7892,6 +7892,20 @@ class JIT {
                         if (null !== ($newVal->compileTimeString ?? null)) {
                             $result->compileTimeString = $newVal->compileTimeString;
                         }
+                    } elseif ($op->arg1 === $op->arg2) {
+                        // In-place concat chain: __string__realloc invalidates pre-load left pointer (#17522).
+                        $leftVar = $this->context->helper->loadValue(
+                            JIT\JitNativeString::coerce($this->context, $left)
+                        );
+                        $rightVar = $this->context->helper->loadValue(
+                            JIT\JitNativeString::coerce($this->context, $right)
+                        );
+                        $newStr = \PHPCompiler\ext\standard\JitStringConcat::concat(
+                            $this->context,
+                            $leftVar,
+                            $rightVar
+                        );
+                        $this->context->builder->store($newStr, $result->value);
                     } else {
                         $this->context->type->string->concat($result, $left, $right);
                     }
