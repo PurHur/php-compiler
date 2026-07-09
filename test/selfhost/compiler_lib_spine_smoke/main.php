@@ -3759,6 +3759,7 @@ require_once __DIR__.'/../../../lib/VM/Builtin/DatePeriodConstruct.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/DatePeriodCreateFromISO8601String.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/DatePeriodCurrent.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/DatePeriodGetDateInterval.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/DatePeriodGetEndDate.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/DatePeriodGetRecurrences.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/DatePeriodGetStartDate.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/DatePeriodIteratorMethod.php';
@@ -4016,6 +4017,7 @@ require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertyGetDefaultValue
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertyGetDocComment.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertyGetHook.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertyGetHooks.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertyHasHooks.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertyGetMangledName.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertyGetName.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertyGetRawValue.php';

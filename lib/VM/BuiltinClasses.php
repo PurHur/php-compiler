@@ -10,6 +10,7 @@ use PHPCompiler\VM\Builtin\DatePeriodConstruct;
 use PHPCompiler\VM\Builtin\DatePeriodCreateFromISO8601String;
 use PHPCompiler\VM\Builtin\DatePeriodCurrent;
 use PHPCompiler\VM\Builtin\DatePeriodGetDateInterval;
+use PHPCompiler\VM\Builtin\DatePeriodGetEndDate;
 use PHPCompiler\VM\Builtin\DatePeriodGetRecurrences;
 use PHPCompiler\VM\Builtin\DatePeriodGetStartDate;
 use PHPCompiler\VM\Builtin\DatePeriodKey;
@@ -1297,6 +1298,8 @@ final class BuiltinClasses
         $dp->methodVisibility['next'] = $pub;
         $dp->methods['getstartdate'] = new DatePeriodGetStartDate();
         $dp->methodVisibility['getstartdate'] = $pub;
+        $dp->methods['getenddate'] = new DatePeriodGetEndDate();
+        $dp->methodVisibility['getenddate'] = $pub;
         $dp->methods['getdateinterval'] = new DatePeriodGetDateInterval();
         $dp->methodVisibility['getdateinterval'] = $pub;
         $dp->methods['getrecurrences'] = new DatePeriodGetRecurrences();
