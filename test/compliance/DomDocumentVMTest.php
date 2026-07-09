@@ -208,6 +208,10 @@ final class DomDocumentVMTest extends BaseTest
             __DIR__.'/cases/stdlib/dom_namednodemap.phpt',
             'dom_namednodemap.phpt'
         );
+        yield 'dom_namednodemap_get_named_item_ns.phpt' => self::parsePHPT(
+            __DIR__.'/cases/dom/dom_namednodemap_get_named_item_ns.phpt',
+            'dom_namednodemap_get_named_item_ns.phpt'
+        );
         yield 'dom_text_nodes.phpt' => self::parsePHPT(
             __DIR__.'/cases/stdlib/dom_text_nodes.phpt',
             'dom_text_nodes.phpt'

@@ -326,6 +326,9 @@ final class VmDom
         $namedNodeMap->methods['getnameditem'] = new NamedNodeMapGetNamedItem();
         $namedNodeMap->methodVisibility['getnameditem'] = $pub;
         $namedNodeMap->methodNames['getnameditem'] = 'getNamedItem';
+        $namedNodeMap->methods['getnameditemns'] = new NamedNodeMapGetNamedItemNS();
+        $namedNodeMap->methodVisibility['getnameditemns'] = $pub;
+        $namedNodeMap->methodNames['getnameditemns'] = 'getNamedItemNS';
         $namedNodeMap->methods['count'] = new NamedNodeMapCount();
         $namedNodeMap->methodVisibility['count'] = $pub;
         $namedNodeMap->methods['rewind'] = new NamedNodeMapRewind();
@@ -4103,6 +4106,47 @@ final class VmDom
                 continue;
             }
             if (DomRegistry::state($node)->nodeName === $name) {
+                return $node;
+            }
+        }
+
+        return null;
+    }
+
+    public static function namedNodeMapGetNamedItemNS(
+        ObjectEntry $namedNodeMap,
+        ?string $namespace,
+        string $localName
+    ): ?ObjectEntry {
+        if (!self::isNamedNodeMap($namedNodeMap)) {
+            throw new \LogicException('DOMNamedNodeMap::getNamedItemNS() called on non-namednodemap in this compiler build');
+        }
+        $wantNs = $namespace ?? '';
+        $state = DomRegistry::state($namedNodeMap);
+        foreach ($state->listNodeIds as $nodeId) {
+            $node = DomRegistry::entry($nodeId);
+            if (null === $node || !self::isAttr($node)) {
+                continue;
+            }
+            $attrState = DomRegistry::state($node);
+            $qName = $attrState->nodeName;
+            if (self::isXmlnsAttributeName($qName)) {
+                continue;
+            }
+            $attrLocal = $attrState->localName ?? self::attributeLocalName($qName);
+            if ($attrLocal !== $localName) {
+                continue;
+            }
+            $ownerElementId = $attrState->ownerElementId;
+            if (null === $ownerElementId) {
+                continue;
+            }
+            $ownerElement = DomRegistry::entry($ownerElementId);
+            if (null === $ownerElement || !self::isElement($ownerElement)) {
+                continue;
+            }
+            [$prefix] = self::splitQualifiedName($qName);
+            if (self::resolveAttributeNamespaceUri($ownerElement, $qName, $prefix) === $wantNs) {
                 return $node;
             }
         }

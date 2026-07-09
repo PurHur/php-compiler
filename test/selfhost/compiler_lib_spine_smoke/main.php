@@ -243,6 +243,7 @@ require_once __DIR__.'/../../../ext/dom/NodeListValid.php';
 require_once __DIR__.'/../../../ext/dom/NamedNodeMapCount.php';
 require_once __DIR__.'/../../../ext/dom/NamedNodeMapCurrent.php';
 require_once __DIR__.'/../../../ext/dom/NamedNodeMapGetNamedItem.php';
+require_once __DIR__.'/../../../ext/dom/NamedNodeMapGetNamedItemNS.php';
 require_once __DIR__.'/../../../ext/dom/NamedNodeMapItem.php';
 require_once __DIR__.'/../../../ext/dom/NamedNodeMapKey.php';
 require_once __DIR__.'/../../../ext/dom/NamedNodeMapNext.php';
