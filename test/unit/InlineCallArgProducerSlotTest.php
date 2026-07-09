@@ -3915,6 +3915,28 @@ PHP;
         self::assertSame("key=1\n", $out);
     }
 
+    /** var_export($g->valid(), true) after Generator::send assign + prior var_export (Zend/zend_generators.c). */
+    public function testVarExportNestedGeneratorValidAfterSendAssignUsesMethodCallProducerSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+$g = (function (): Generator { yield 1; })();
+$g->next();
+$r = $g->send(99);
+echo 'send=', var_export($r, true), "\n";
+echo 'valid_inline=', var_export($g->valid(), true), "\n";
+$v = $g->valid();
+echo 'valid_stored=', var_export($v, true), "\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'var_export_nested_generator_valid_after_send.php');
+
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertSame("send=NULL\nvalid_inline=false\nvalid_stored=false\n", $out);
+    }
+
     /** Issue #13830 — var_export(next($a), true) in concat after prior next($a). */
     public function testVarExportNestedNextUsesFuncCallProducerSlot(): void
     {
