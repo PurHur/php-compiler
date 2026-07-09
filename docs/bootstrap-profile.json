@@ -258,6 +258,11 @@
         "ext/dom/VmDomJitDispatch.php",
         "ext/dom/VmDomJitFrame.php",
         "ext/dom/VmDomTokenList.php",
+        "ext/dom/VmDomXPath.php",
+        "ext/dom/XPathConstruct.php",
+        "ext/dom/XPathEvaluate.php",
+        "ext/dom/XPathQuery.php",
+        "ext/dom/XPathRegisterNamespace.php",
         "ext/filter/BuiltinEnums.php",
         "ext/filter/FilterBatchJitHelper.php",
         "ext/filter/FilterBooleanJitHelper.php",
@@ -4537,9 +4542,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 4303,
+        "inventory_files": 4308,
         "excluded": 0,
-        "eligible": 4303,
+        "eligible": 4308,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1

@@ -493,6 +493,25 @@ PHP;
         self::assertSame("he\nllo\nprev\nnext\n<root>hello</root>\n", ob_get_clean());
     }
 
+    public function test_dom_xpath_query_attribute_predicate(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+$doc = new DOMDocument();
+$doc->loadXML('<root><item id="1">a</item><item id="2">b</item></root>');
+echo (int) class_exists('DOMXPath', false), "\n";
+$xpath = new DOMXPath($doc);
+$nodes = $xpath->query('//item[@id="2"]');
+echo $nodes->length, "\n";
+echo $nodes->item(0)->textContent, "\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'dom_xpath_query.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("1\n1\nb\n", ob_get_clean());
+    }
+
     public function test_runtime_shrink_has_no_dom_c_runtime(): void
     {
         $linker = (string) file_get_contents(__DIR__.'/../../lib/AOT/Linker.php');

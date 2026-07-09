@@ -90,6 +90,16 @@ final class DomNodeState
     /** Owning element object id for {@see DomConstants::XML_TOKENLIST} handles (#16876). */
     public ?int $tokenListElementId = null;
 
+    /** Owning document object id for {@see DomConstants::XML_XPATH} handles (#6066). */
+    public ?int $xpathDocumentId = null;
+
+    /**
+     * Registered namespace prefixes for {@see DomConstants::XML_XPATH} (#6066).
+     *
+     * @var array<string, string>
+     */
+    public array $xpathNamespaces = [];
+
     /**
      * Ordered unique tokens for {@see DomConstants::XML_TOKENLIST} (#16876).
      *

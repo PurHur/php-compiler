@@ -34,6 +34,9 @@ final class DomConstants
     /** Internal marker for {@see VmDom::createTokenList()} handles (#16876). */
     public const XML_TOKENLIST = -3;
 
+    /** Internal marker for {@see VmDom::createXPath()} handles (#6066). */
+    public const XML_XPATH = -4;
+
     /** DOMNode::compareDocumentPosition() flags (php-src ext/dom/node.c; #14448). */
     public const DOCUMENT_POSITION_DISCONNECTED = 0x01;
 
