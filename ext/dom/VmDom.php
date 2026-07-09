@@ -259,6 +259,18 @@ final class VmDom
         $characterData->isInternal = true;
         $characterData->parentLc = self::CLASS_NODE;
         $characterData->properties[] = new ClassProperty(self::PROP_DATA, null, $strProto);
+        $characterData->methods['appenddata'] = new CharacterDataAppendData();
+        $characterData->methodVisibility['appenddata'] = $pub;
+        $characterData->methodNames['appenddata'] = 'appendData';
+        $characterData->methods['deletedata'] = new CharacterDataDeleteData();
+        $characterData->methodVisibility['deletedata'] = $pub;
+        $characterData->methodNames['deletedata'] = 'deleteData';
+        $characterData->methods['insertdata'] = new CharacterDataInsertData();
+        $characterData->methodVisibility['insertdata'] = $pub;
+        $characterData->methodNames['insertdata'] = 'insertData';
+        $characterData->methods['replacedata'] = new CharacterDataReplaceData();
+        $characterData->methodVisibility['replacedata'] = $pub;
+        $characterData->methodNames['replacedata'] = 'replaceData';
         $characterData->methods['substringdata'] = new CharacterDataSubstringData();
         $characterData->methodVisibility['substringdata'] = $pub;
         $characterData->methodNames['substringdata'] = 'substringData';
@@ -1668,12 +1680,73 @@ final class VmDom
         return $entry;
     }
 
+    public static function characterDataReadContent(ObjectEntry $node): string
+    {
+        if (!self::isCharacterData($node)) {
+            throw new \LogicException('characterDataReadContent() called on non-character-data node');
+        }
+
+        return DomRegistry::state($node)->textContent ?? '';
+    }
+
+    public static function writeCharacterDataContent(ObjectEntry $node, string $content): void
+    {
+        if (!self::isCharacterData($node)) {
+            throw new \LogicException('writeCharacterDataContent() called on non-character-data node');
+        }
+        DomRegistry::state($node)->textContent = $content;
+    }
+
+    public static function characterDataAppendData(ObjectEntry $node, string $arg): void
+    {
+        self::writeCharacterDataContent($node, self::characterDataReadContent($node).$arg);
+    }
+
+    public static function characterDataInsertData(ObjectEntry $node, int $offset, string $arg): void
+    {
+        $data = self::characterDataReadContent($node);
+        $len = \strlen($data);
+        if ($offset < 0 || $offset > $len) {
+            throw new \DOMException('Index size error', DomExceptionConstants::INDEX_SIZE_ERR);
+        }
+        self::writeCharacterDataContent($node, substr($data, 0, $offset).$arg.substr($data, $offset));
+    }
+
+    public static function characterDataDeleteData(ObjectEntry $node, int $offset, int $count): void
+    {
+        $data = self::characterDataReadContent($node);
+        $len = \strlen($data);
+        if ($offset < 0 || $offset > $len || $count < 0) {
+            throw new \DOMException('Index size error', DomExceptionConstants::INDEX_SIZE_ERR);
+        }
+        if ($count > $len - $offset) {
+            $count = $len - $offset;
+        }
+        self::writeCharacterDataContent($node, substr($data, 0, $offset).substr($data, $offset + $count));
+    }
+
+    public static function characterDataReplaceData(ObjectEntry $node, int $offset, int $count, string $arg): void
+    {
+        $data = self::characterDataReadContent($node);
+        $len = \strlen($data);
+        if ($offset < 0 || $offset > $len || $count < 0) {
+            throw new \DOMException('Index size error', DomExceptionConstants::INDEX_SIZE_ERR);
+        }
+        if ($count > $len - $offset) {
+            $count = $len - $offset;
+        }
+        self::writeCharacterDataContent(
+            $node,
+            substr($data, 0, $offset).$arg.substr($data, $offset + $count)
+        );
+    }
+
     public static function characterDataSubstringData(ObjectEntry $node, int $offset, int $count): string
     {
         if (!self::isCharacterData($node)) {
             throw new \LogicException('characterDataSubstringData() called on non-character-data node');
         }
-        $data = DomRegistry::state($node)->textContent ?? '';
+        $data = self::characterDataReadContent($node);
         $len = \strlen($data);
         if ($offset < 0 || $count < 0 || $offset > $len) {
             throw new \DOMException('Index size error', DomExceptionConstants::INDEX_SIZE_ERR);
