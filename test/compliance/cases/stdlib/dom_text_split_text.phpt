@@ -21,9 +21,11 @@ echo null === $detachedTail->parentNode ? "nullparent\n" : "badparent\n";
 try {
     $text->splitText(-1);
     echo "noexception\n";
-} catch (DOMException $e) {
-    echo $e->getCode(), "\n";
+} catch (ValueError $e) {
+    echo $e->getMessage(), "\n";
 }
+var_export((new DOMDocument())->createTextNode('a')->splitText(5));
+echo "\n";
 ?>
 --EXPECT--
 he
@@ -34,4 +36,5 @@ llo
 wo
 rld
 nullparent
-1
+DOMText::splitText(): Argument #1 ($offset) must be greater than or equal to 0
+false

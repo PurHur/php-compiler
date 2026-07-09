@@ -263,6 +263,12 @@ final class VmDom
         $text->methods['splittext'] = new TextSplitText();
         $text->methodVisibility['splittext'] = $pub;
         $text->methodNames['splittext'] = 'splitText';
+        $text->methods['iswhitespaceinelementcontent'] = new TextIsWhitespaceInElementContent();
+        $text->methodVisibility['iswhitespaceinelementcontent'] = $pub;
+        $text->methodNames['iswhitespaceinelementcontent'] = 'isWhitespaceInElementContent';
+        $text->methods['iselementcontentwhitespace'] = new TextIsElementContentWhitespace();
+        $text->methodVisibility['iselementcontentwhitespace'] = $pub;
+        $text->methodNames['iselementcontentwhitespace'] = 'isElementContentWhitespace';
         $ctx->classes[self::CLASS_TEXT] = $text;
 
         $cdata = new ClassEntry('DOMCDATASection');
@@ -1837,15 +1843,39 @@ final class VmDom
         return $merged;
     }
 
-    public static function textSplitText(Context $ctx, ObjectEntry $node, int $offset): ObjectEntry
+    /** Blank text node probe (php-src ext/dom/text.c dom_text_is_whitespace_in_element_content). */
+    public static function textIsWhitespaceInElementContent(ObjectEntry $node): bool
+    {
+        if (!self::isTextOrCdataNode($node)) {
+            throw new \LogicException('textIsWhitespaceInElementContent() called on non-text node');
+        }
+        $data = self::characterDataReadContent($node);
+        if ('' === $data) {
+            return true;
+        }
+        $len = \strlen($data);
+        for ($i = 0; $i < $len; ++$i) {
+            $ch = $data[$i];
+            if (' ' !== $ch && "\t" !== $ch && "\n" !== $ch && "\r" !== $ch) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    public static function textSplitText(Context $ctx, ObjectEntry $node, int $offset): ?ObjectEntry
     {
         if (!self::isTextOrCdataNode($node)) {
             throw new \LogicException('textSplitText() called on non-text node');
         }
+        if ($offset < 0) {
+            throw new \ValueError('DOMText::splitText(): Argument #1 ($offset) must be greater than or equal to 0');
+        }
         $data = self::characterDataReadContent($node);
         $len = \strlen($data);
-        if ($offset < 0 || $offset > $len) {
-            throw new \DOMException('Index size error', DomExceptionConstants::INDEX_SIZE_ERR);
+        if ($offset > $len) {
+            return null;
         }
         $ownerDocument = self::ownerDocumentEntry($node);
         $tailNode = self::createTextNode($ctx, substr($data, $offset), $ownerDocument);

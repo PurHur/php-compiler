@@ -493,6 +493,55 @@ PHP;
         self::assertSame("he\nllo\nprev\nnext\n<root>hello</root>\n", ob_get_clean());
     }
 
+    public function test_dom_text_split_text_offset_validation(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+$doc = new DOMDocument();
+$text = $doc->createTextNode('ab');
+try {
+    $text->splitText(-1);
+    echo "noexception\n";
+} catch (ValueError $e) {
+    echo $e->getMessage(), "\n";
+}
+var_export($doc->createTextNode('a')->splitText(5));
+echo "\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'dom_text_split_text_offset.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame(
+            "DOMText::splitText(): Argument #1 (\$offset) must be greater than or equal to 0\nfalse\n",
+            ob_get_clean()
+        );
+    }
+
+    public function test_dom_text_whitespace_methods(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+$doc = new DOMDocument();
+$root = $doc->createElement('root');
+$doc->appendChild($root);
+$ws = $doc->createTextNode('  ');
+$root->appendChild($ws);
+echo (int) method_exists($ws, 'isElementContentWhitespace'), "\n";
+echo (int) method_exists($ws, 'isWhitespaceInElementContent'), "\n";
+echo (int) $ws->isWhitespaceInElementContent(), "\n";
+echo (int) $ws->isElementContentWhitespace(), "\n";
+$nonWs = $doc->createTextNode('x');
+$root->appendChild($nonWs);
+echo (int) $nonWs->isWhitespaceInElementContent(), "\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'dom_text_whitespace_methods.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("1\n1\n1\n1\n0\n", ob_get_clean());
+    }
+
     public function test_dom_xpath_query_attribute_predicate(): void
     {
         $runtime = new Runtime();
