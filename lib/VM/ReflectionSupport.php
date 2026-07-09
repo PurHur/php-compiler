@@ -1099,6 +1099,58 @@ final class ReflectionSupport
         return self::resolveUserFunction($ctx, self::functionNameFromReflection($reflection));
     }
 
+    /**
+     * php-src: ext/reflection/php_reflection.c — reflection_function_is_generator().
+     */
+    public static function isReflectionFunctionGenerator(Context $ctx, ObjectEntry $reflection): bool
+    {
+        if ($reflection->reflectionIsInternalFunction ?? false) {
+            return false;
+        }
+        $func = self::resolveFunctionFromReflection($ctx, $reflection);
+
+        return $func->block->isGenerator;
+    }
+
+    /**
+     * php-src: ext/reflection/php_reflection.c — reflection_method_is_generator().
+     */
+    public static function isReflectionMethodGenerator(Context $ctx, ObjectEntry $reflection): bool
+    {
+        $className = self::classNameFromReflection($reflection);
+        $methodName = self::methodNameFromReflection($reflection);
+        $entry = VmReflection::resolveClassEntry($ctx, $className);
+        if (null === $entry) {
+            return false;
+        }
+        $func = self::resolveDeclaredMethodFunc($ctx, $entry, strtolower($methodName));
+        if (!($func instanceof PhpFunc)) {
+            return false;
+        }
+
+        return $func->block->isGenerator;
+    }
+
+    private static function resolveDeclaredMethodFunc(Context $ctx, ClassEntry $entry, string $methodLc): ?Func
+    {
+        $current = $entry;
+        while (null !== $current) {
+            if (isset($current->methods[$methodLc])) {
+                $method = $current->methods[$methodLc];
+                if ($method instanceof Func) {
+                    return $method;
+                }
+            }
+            $parentLc = $current->parentLc ?? '';
+            if ('' === $parentLc) {
+                break;
+            }
+            $current = $ctx->classes[$parentLc] ?? null;
+        }
+
+        return null;
+    }
+
     public static function constantNameFromReflection(ObjectEntry $reflection): string
     {
         $nameVar = $reflection->getProperty(self::PROP_CONSTANT_NAME)->resolveIndirect();

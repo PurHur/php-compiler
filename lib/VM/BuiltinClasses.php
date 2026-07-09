@@ -205,6 +205,7 @@ use PHPCompiler\VM\Builtin\ReflectionFunctionHasReturnType;
 use PHPCompiler\VM\Builtin\ReflectionFunctionInvoke;
 use PHPCompiler\VM\Builtin\ReflectionFunctionIsAnonymous;
 use PHPCompiler\VM\Builtin\ReflectionFunctionIsClosure;
+use PHPCompiler\VM\Builtin\ReflectionFunctionIsGenerator;
 use PHPCompiler\VM\Builtin\ReflectionFunctionIsInternal;
 use PHPCompiler\VM\Builtin\ReflectionFunctionIsDeprecated;
 use PHPCompiler\VM\Builtin\ReflectionFunctionIsUserDefined;
@@ -237,6 +238,7 @@ use PHPCompiler\VM\Builtin\ReflectionMethodGetDeprecatedVersion;
 use PHPCompiler\VM\Builtin\ReflectionMethodGetStartLine;
 use PHPCompiler\VM\Builtin\ReflectionMethodIsDeprecated;
 use PHPCompiler\VM\Builtin\ReflectionMethodIsFinal;
+use PHPCompiler\VM\Builtin\ReflectionMethodIsGenerator;
 use PHPCompiler\VM\Builtin\ReflectionMethodIsPrivate;
 use PHPCompiler\VM\Builtin\ReflectionMethodIsProtected;
 use PHPCompiler\VM\Builtin\ReflectionMethodIsPublic;
@@ -627,6 +629,8 @@ final class BuiltinClasses
         $rm->methodVisibility['isaccessible'] = $pub;
         $rm->methods['isfinal'] = new ReflectionMethodIsFinal();
         $rm->methodVisibility['isfinal'] = $pub;
+        $rm->methods['isgenerator'] = new ReflectionMethodIsGenerator();
+        $rm->methodVisibility['isgenerator'] = $pub;
         $rm->methods['getmodifiers'] = new ReflectionMethodGetModifiers();
         $rm->methodVisibility['getmodifiers'] = $pub;
         foreach (
@@ -877,6 +881,7 @@ final class BuiltinClasses
                 'hasreturntype' => new ReflectionFunctionHasReturnType(),
                 'isanonymous' => new ReflectionFunctionIsAnonymous(),
                 'isclosure' => new ReflectionFunctionIsClosure(),
+                'isgenerator' => new ReflectionFunctionIsGenerator(),
                 'isinternal' => new ReflectionFunctionIsInternal(),
                 'isuserdefined' => new ReflectionFunctionIsUserDefined(),
                 'getextensionname' => new ReflectionFunctionGetExtensionName(),
