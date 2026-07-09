@@ -566,6 +566,7 @@
         "ext/session/session_name.php",
         "ext/session/session_regenerate_id.php",
         "ext/session/session_reset.php",
+        "ext/session/session_save_path.php",
         "ext/session/session_set_cookie_params.php",
         "ext/session/session_start.php",
         "ext/session/session_status.php",
@@ -2499,6 +2500,7 @@
         "ext/standard/session_name.php",
         "ext/standard/session_regenerate_id.php",
         "ext/standard/session_reset.php",
+        "ext/standard/session_save_path_.php",
         "ext/standard/session_set_cookie_params_.php",
         "ext/standard/session_start.php",
         "ext/standard/session_status_.php",
@@ -4527,9 +4529,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 4293,
+        "inventory_files": 4295,
         "excluded": 0,
-        "eligible": 4293,
+        "eligible": 4295,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
