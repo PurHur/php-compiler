@@ -62,6 +62,8 @@ final class VmDom
 
     public const CLASS_TOKEN_LIST = 'domtokenlist';
 
+    public const CLASS_XPATH = 'domxpath';
+
     public const PROP_FORMAT_OUTPUT = 'formatOutput';
 
     public const PROP_IMPLEMENTATION = 'implementation';
@@ -382,6 +384,21 @@ final class VmDom
             $tokenList->methodVisibility['count'] = $pub;
             $ctx->classes[self::CLASS_TOKEN_LIST] = $tokenList;
         }
+
+        $xpath = new ClassEntry('DOMXPath');
+        $xpath->isInternal = true;
+        $xpathConstruct = new XPathConstruct();
+        $xpath->constructor = $xpathConstruct;
+        $xpath->methods['__construct'] = $xpathConstruct;
+        $xpath->methodVisibility['__construct'] = $pub;
+        $xpath->methods['query'] = new XPathQuery();
+        $xpath->methodVisibility['query'] = $pub;
+        $xpath->methods['evaluate'] = new XPathEvaluate();
+        $xpath->methodVisibility['evaluate'] = $pub;
+        $xpath->methods['registernamespace'] = new XPathRegisterNamespace();
+        $xpath->methodVisibility['registernamespace'] = $pub;
+        $xpath->methodNames['registernamespace'] = 'registerNamespace';
+        $ctx->classes[self::CLASS_XPATH] = $xpath;
 
         $impl = new ClassEntry('DOMImplementation');
         $impl->isInternal = true;
@@ -4356,6 +4373,13 @@ final class VmDom
         return self::CLASS_TOKEN_LIST === strtolower($entry->class->name)
             && DomRegistry::has($entry)
             && DomConstants::XML_TOKENLIST === DomRegistry::state($entry)->nodeType;
+    }
+
+    public static function isXPath(ObjectEntry $entry): bool
+    {
+        return self::CLASS_XPATH === strtolower($entry->class->name)
+            && DomRegistry::has($entry)
+            && DomConstants::XML_XPATH === DomRegistry::state($entry)->nodeType;
     }
 
     public static function syncElementClassList(Context $ctx, ObjectEntry $element): void
