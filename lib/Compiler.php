@@ -38192,7 +38192,18 @@ class Compiler {
                     || !$this->callArgIsDeadInlineTemporary($callArgProbeForArray)
                     || !$this->callArgOperandExpectsArrayProducer($callArgProbeForArray)
                 ) {
-                    $existingArraySlot = $block->slotForOperand($inlineArray->result);
+                    if ($arrayCombineSiblingArray && null !== $cfgCallOp) {
+                        // Sequential array_combine(array(...), array(...)) — operand slots from the first
+                        // call must not be reused via slotForOperand (#17629, re-#16080, #10214).
+                        $existingArraySlot = $this->slotForInitArrayProducerBeforeCfgCall(
+                            $block,
+                            $cfgCallOp,
+                            $inlineArray,
+                            $sends
+                        );
+                    } else {
+                        $existingArraySlot = $block->slotForOperand($inlineArray->result);
+                    }
                 }
                 if (
                     null === $existingArraySlot
@@ -44812,7 +44823,7 @@ class Compiler {
     }
 
     /**
-     * array_combine([...], [...]) — ARG_SEND must map to sibling INIT_ARRAY slots, not recent-init (#16080, #10214).
+     * array_combine([...], [...]) — ARG_SEND must map to sibling INIT_ARRAY slots, not recent-init (#16080, #10214, #17629).
      *
      * @param list<OpCode> $outerArgSends
      * @param list<OpCode> $allArgSends
@@ -44831,15 +44842,16 @@ class Compiler {
         if ('array_combine' !== $calleeLower) {
             return;
         }
-        if (null !== $block->orig) {
-            foreach ($this->precedingInlineCallArgProducersBeforeCfgOp(
-                $block->orig->children,
-                $cfgCallOp
-            ) as $producer) {
-                if ($producer instanceof Op\Expr\FuncCall || $producer instanceof Op\Expr\NsFuncCall) {
-                    // array_combine(array_keys(...), [...]) — nested FuncCall feeds arg #0 (#16097).
-                    return;
-                }
+        if (null === $block->orig) {
+            return;
+        }
+        foreach ($this->precedingInlineCallArgProducersBeforeCfgOp(
+            $block->orig->children,
+            $cfgCallOp
+        ) as $producer) {
+            if ($producer instanceof Op\Expr\FuncCall || $producer instanceof Op\Expr\NsFuncCall) {
+                // array_combine(array_keys(...), [...]) — nested FuncCall feeds arg #0 (#16097).
+                return;
             }
         }
         foreach ($cfgCallOp->args as $callArg) {
@@ -44851,11 +44863,34 @@ class Compiler {
                 return;
             }
         }
+        $producers = $this->precedingInlineCallArgProducersBeforeCfgOp(
+            $block->orig->children,
+            $cfgCallOp
+        );
+        $arrayProducers = array_values(array_filter(
+            $producers,
+            static fn (Op\Expr $producer): bool => $producer instanceof Op\Expr\Array_
+        ));
+        if (\count($arrayProducers) < 2) {
+            return;
+        }
         $initSlots = [];
-        foreach (array_merge($block->opCodes, $allArgSends) as $op) {
-            if (OpCode::TYPE_INIT_ARRAY === $op->type && null !== $op->arg1) {
-                $initSlots[] = (string) $op->arg1;
+        foreach (
+            [
+                $arrayProducers[\count($arrayProducers) - 2],
+                $arrayProducers[\count($arrayProducers) - 1],
+            ] as $arrayProducer
+        ) {
+            $slot = $this->slotForInitArrayProducerBeforeCfgCall(
+                $block,
+                $cfgCallOp,
+                $arrayProducer,
+                $allArgSends
+            );
+            if (null === $slot) {
+                return;
             }
+            $initSlots[] = $slot;
         }
         if (\count($initSlots) < 2) {
             return;
