@@ -588,85 +588,13 @@ final class HashTableHelper
 
     public static function offsetUnset(Context $context, Variable $container, Variable $dim): void
     {
-        $ht = self::loadHashtablePointer($context, $container);
-        if (Variable::TYPE_NATIVE_LONG === $dim->type) {
-            $index = $context->helper->loadValue($dim);
-            $context->builder->call(
-                $context->lookupFunction('__hashtable__unsetLongAt'),
-                $ht,
-                $index
-            );
-
-            return;
-        }
-        if (Variable::TYPE_STRING === $dim->type) {
-            $key = $context->helper->loadValue($dim);
-            $context->builder->call(
-                $context->lookupFunction('__hashtable__unsetStringKey'),
-                $ht,
-                $key
-            );
-
-            return;
-        }
-        if (Variable::TYPE_VALUE === $dim->type) {
-            HashTableWriteLlvm::unsetValueBoxKey($context, $ht, $dim);
-
-            return;
-        }
-        if (Variable::TYPE_OBJECT === $dim->type) {
-            self::emitIllegalOffsetType($context, 'Illegal offset type in unset');
-
-            return;
-        }
-        throw new \LogicException('unset() array offset requires int or string index in this compiler build');
+        HashTableWriteLlvm::offsetUnset($context, $container, $dim);
     }
 
-    /**
-     * isset() / empty() offset check for string, int, object, or boxed keys (issue #86).
-     */
+    /** isset() / empty() offset check for string, int, object, or boxed keys (issue #86). */
     public static function offsetIsSetDim(Context $context, Value $ht, Variable $dim): Value
     {
-        if (Variable::TYPE_NULL === $dim->type) {
-            $emptyKey = $context->builder->load($context->constantStringFromString(''));
-
-            return $context->builder->call(
-                $context->lookupFunction('__hashtable__offsetIsSetStringKey'),
-                $ht,
-                $emptyKey
-            );
-        }
-        if (Variable::TYPE_STRING === $dim->type) {
-            return $context->builder->call(
-                $context->lookupFunction('__hashtable__offsetIsSetStringKey'),
-                $ht,
-                $context->helper->loadValue($dim)
-            );
-        }
-        if (Variable::TYPE_NATIVE_LONG === $dim->type) {
-            $index = $context->builder->truncOrBitCast(
-                $context->helper->loadValue($dim),
-                $context->getTypeFromString('size_t')
-            );
-
-            return $context->builder->call(
-                $context->lookupFunction('__hashtable__offsetIsSet'),
-                $ht,
-                $index
-            );
-        }
-        if (Variable::TYPE_OBJECT === $dim->type) {
-            self::emitIllegalOffsetType($context, 'Illegal offset type in isset or empty');
-
-            return $context->getTypeFromString('int1')->constInt(0, false);
-        }
-        if (Variable::TYPE_VALUE === $dim->type) {
-            return HashTableReadLlvm::offsetIsSetValueBoxKey($context, $ht, $dim);
-        }
-
-        throw new \LogicException(
-            'isset() on HashTable arrays only supports integer or string indices in this compiler build'
-        );
+        return HashTableReadLlvm::offsetIsSetDim($context, $ht, $dim);
     }
 
     /**
@@ -680,32 +608,7 @@ final class HashTableHelper
         Variable $dim,
         ?string $superglobalName = null
     ): Variable {
-        if (Variable::TYPE_STRING === $dim->type) {
-            $key = $context->helper->loadValue($dim);
-            if (null !== $superglobalName) {
-                return self::readSuperglobalStringKeyToValueBox($context, $ht, $key);
-            }
-
-            return self::readStringKeyToValueBox($context, $ht, $key);
-        }
-        if (Variable::TYPE_NATIVE_LONG === $dim->type) {
-            $index = $context->builder->truncOrBitCast(
-                $context->helper->loadValue($dim),
-                $context->getTypeFromString('size_t')
-            );
-
-            return self::readIndexedToValueBox($context, $ht, $index);
-        }
-        if (Variable::TYPE_OBJECT === $dim->type) {
-            return self::readObjectKeyToValueBox($context, $ht, $context->helper->loadValue($dim));
-        }
-        if (Variable::TYPE_VALUE === $dim->type) {
-            return HashTableReadLlvm::readValueBoxKeyToValueBox($context, $ht, $dim, $superglobalName);
-        }
-
-        throw new \LogicException(
-            'Array fetch only supports integer or string indices in this compiler build'
-        );
+        return HashTableReadLlvm::readDimToValueBox($context, $ht, $dim, $superglobalName);
     }
 
     public static function readStringAt(Context $context, Value $ht, Value $index): Value
@@ -1462,41 +1365,7 @@ final class HashTableHelper
 
     public static function writableObjectKeyValueBox(Context $context, Value $ht, Value $keyObj): Variable
     {
-        $i1 = $context->getTypeFromString('int1');
-        $isSet = $context->builder->call(
-            $context->lookupFunction('__hashtable__offsetIsSetObjectKey'),
-            $ht,
-            $keyObj
-        );
-        $create = BasicBlockHelper::append($context, 'ht_ok_write_create');
-        $ready = BasicBlockHelper::append($context, 'ht_ok_write_ready');
-        $context->builder->branchIf($isSet, $ready, $create);
-
-        $context->builder->positionAtEnd($create);
-        $context->builder->call(
-            $context->lookupFunction('__hashtable__setObjectKeyLong'),
-            $ht,
-            $keyObj,
-            $context->constantFromInteger(0, 'int64')
-        );
-        $context->builder->branch($ready);
-
-        $context->builder->positionAtEnd($ready);
-        $valPtr = $context->builder->call(
-            $context->lookupFunction('__hashtable__readObjectKeyValue'),
-            $ht,
-            $keyObj
-        );
-        $var = new Variable(
-            $context,
-            Variable::TYPE_VALUE,
-            Variable::KIND_VARIABLE,
-            $valPtr
-        );
-        $var->writableHt = $ht;
-        $var->writableObjectKey = $keyObj;
-
-        return $var;
+        return HashTableWriteLlvm::writableObjectKeyValueBox($context, $ht, $keyObj);
     }
 
     /**

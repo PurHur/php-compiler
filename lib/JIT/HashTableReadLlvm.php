@@ -563,4 +563,88 @@ final class HashTableReadLlvm
         );
     }
 
+    /** isset() / empty() offset check for string, int, object, or boxed keys (#10031 v4). */
+    public static function offsetIsSetDim(Context $context, Value $ht, Variable $dim): Value
+    {
+        if (Variable::TYPE_NULL === $dim->type) {
+            $emptyKey = $context->builder->load($context->constantStringFromString(''));
+
+            return $context->builder->call(
+                $context->lookupFunction('__hashtable__offsetIsSetStringKey'),
+                $ht,
+                $emptyKey
+            );
+        }
+        if (Variable::TYPE_STRING === $dim->type) {
+            return $context->builder->call(
+                $context->lookupFunction('__hashtable__offsetIsSetStringKey'),
+                $ht,
+                $context->helper->loadValue($dim)
+            );
+        }
+        if (Variable::TYPE_NATIVE_LONG === $dim->type) {
+            $index = $context->builder->truncOrBitCast(
+                $context->helper->loadValue($dim),
+                $context->getTypeFromString('size_t')
+            );
+
+            return $context->builder->call(
+                $context->lookupFunction('__hashtable__offsetIsSet'),
+                $ht,
+                $index
+            );
+        }
+        if (Variable::TYPE_OBJECT === $dim->type) {
+            HashTableHelper::emitIllegalOffsetType($context, 'Illegal offset type in isset or empty');
+
+            return $context->getTypeFromString('int1')->constInt(0, false);
+        }
+        if (Variable::TYPE_VALUE === $dim->type) {
+            return self::offsetIsSetValueBoxKey($context, $ht, $dim);
+        }
+
+        throw new \LogicException(
+            'isset() on HashTable arrays only supports integer or string indices in this compiler build'
+        );
+    }
+
+    /**
+     * Read an element into a stack {@see __value__} slot (string/int/object/boxed keys; #10031 v4).
+     *
+     * @param string|null $superglobalName When set, string keys use superglobal-safe read (issue #273).
+     */
+    public static function readDimToValueBox(
+        Context $context,
+        Value $ht,
+        Variable $dim,
+        ?string $superglobalName = null
+    ): Variable {
+        if (Variable::TYPE_STRING === $dim->type) {
+            $key = $context->helper->loadValue($dim);
+            if (null !== $superglobalName) {
+                return self::readSuperglobalStringKeyToValueBox($context, $ht, $key);
+            }
+
+            return self::readStringKeyToValueBox($context, $ht, $key);
+        }
+        if (Variable::TYPE_NATIVE_LONG === $dim->type) {
+            $index = $context->builder->truncOrBitCast(
+                $context->helper->loadValue($dim),
+                $context->getTypeFromString('size_t')
+            );
+
+            return self::readIndexedToValueBox($context, $ht, $index);
+        }
+        if (Variable::TYPE_OBJECT === $dim->type) {
+            return self::readObjectKeyToValueBox($context, $ht, $context->helper->loadValue($dim));
+        }
+        if (Variable::TYPE_VALUE === $dim->type) {
+            return self::readValueBoxKeyToValueBox($context, $ht, $dim, $superglobalName);
+        }
+
+        throw new \LogicException(
+            'Array fetch only supports integer or string indices in this compiler build'
+        );
+    }
+
 }

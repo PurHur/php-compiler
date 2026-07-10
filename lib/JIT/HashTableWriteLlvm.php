@@ -450,4 +450,80 @@ final class HashTableWriteLlvm
         $context->builder->branch($done);
         $context->builder->positionAtEnd($done);
     }
+
+    /** unset() on array/container dimensions (#10031 v4). */
+    public static function offsetUnset(Context $context, Variable $container, Variable $dim): void
+    {
+        $ht = HashTableHelper::loadHashtablePointer($context, $container);
+        if (Variable::TYPE_NATIVE_LONG === $dim->type) {
+            $index = $context->helper->loadValue($dim);
+            $context->builder->call(
+                $context->lookupFunction('__hashtable__unsetLongAt'),
+                $ht,
+                $index
+            );
+
+            return;
+        }
+        if (Variable::TYPE_STRING === $dim->type) {
+            $key = $context->helper->loadValue($dim);
+            $context->builder->call(
+                $context->lookupFunction('__hashtable__unsetStringKey'),
+                $ht,
+                $key
+            );
+
+            return;
+        }
+        if (Variable::TYPE_VALUE === $dim->type) {
+            self::unsetValueBoxKey($context, $ht, $dim);
+
+            return;
+        }
+        if (Variable::TYPE_OBJECT === $dim->type) {
+            HashTableHelper::emitIllegalOffsetType($context, 'Illegal offset type in unset');
+
+            return;
+        }
+        throw new \LogicException('unset() array offset requires int or string index in this compiler build');
+    }
+
+    /** SplObjectStorage-style map: writable object-identity key slot (#10031 v4). */
+    public static function writableObjectKeyValueBox(Context $context, Value $ht, Value $keyObj): Variable
+    {
+        $isSet = $context->builder->call(
+            $context->lookupFunction('__hashtable__offsetIsSetObjectKey'),
+            $ht,
+            $keyObj
+        );
+        $create = BasicBlockHelper::append($context, 'ht_ok_write_create');
+        $ready = BasicBlockHelper::append($context, 'ht_ok_write_ready');
+        $context->builder->branchIf($isSet, $ready, $create);
+
+        $context->builder->positionAtEnd($create);
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setObjectKeyLong'),
+            $ht,
+            $keyObj,
+            $context->constantFromInteger(0, 'int64')
+        );
+        $context->builder->branch($ready);
+
+        $context->builder->positionAtEnd($ready);
+        $valPtr = $context->builder->call(
+            $context->lookupFunction('__hashtable__readObjectKeyValue'),
+            $ht,
+            $keyObj
+        );
+        $var = new Variable(
+            $context,
+            Variable::TYPE_VALUE,
+            Variable::KIND_VARIABLE,
+            $valPtr
+        );
+        $var->writableHt = $ht;
+        $var->writableObjectKey = $keyObj;
+
+        return $var;
+    }
 }
