@@ -695,7 +695,7 @@ class C {
 }
 PHP;
         $this->expectException(\PHPCompiler\Compiler\CompileFatal::class);
-        $this->expectExceptionMessage(PropertyHooks::REFERENCE_PROFILE_UNEXPECTED_ARROW);
+        $this->expectExceptionMessage(PropertyHooks::REFERENCE_PROFILE_PROPERTY_HOOKS_HINT);
         PropertyHookSyntaxRejector::reject($src, 'default_initializer.php');
     }
 
