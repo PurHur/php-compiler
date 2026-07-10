@@ -152,6 +152,9 @@ final class BuiltinIntrospectionPolicy
         if ('sqlite3' === $ext) {
             return \PHPCompiler\ext\sqlite3\Sqlite3ExtensionPolicy::advertisesExtension();
         }
+        if ('brotli' === $ext) {
+            return \PHPCompiler\ext\brotli\BrotliExtensionPolicy::advertisesExtension();
+        }
 
         return true;
     }

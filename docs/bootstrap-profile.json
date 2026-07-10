@@ -43,6 +43,7 @@
         "ext/bcmath/bcscale.php",
         "ext/bcmath/bcsqrt.php",
         "ext/bcmath/bcsub.php",
+        "ext/brotli/BrotliExtensionPolicy.php",
         "ext/brotli/BrotliJitHelper.php",
         "ext/brotli/JitBrotli.php",
         "ext/brotli/Module.php",
@@ -245,6 +246,8 @@
         "ext/dom/NodeReplaceChild.php",
         "ext/dom/NodeReplaceChildren.php",
         "ext/dom/NodeReplaceWith.php",
+        "ext/dom/TextIsElementContentWhitespace.php",
+        "ext/dom/TextIsWhitespaceInElementContent.php",
         "ext/dom/TextSplitText.php",
         "ext/dom/TokenListAdd.php",
         "ext/dom/TokenListContains.php",
@@ -4543,9 +4546,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 4309,
+        "inventory_files": 4312,
         "excluded": 0,
-        "eligible": 4309,
+        "eligible": 4312,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1

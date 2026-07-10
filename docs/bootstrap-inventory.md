@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 4311 |
-| Phase A inventory files (M2 ratio SSOT) | 4311 |
+| PHP files on vm.php path | 4312 |
+| Phase A inventory files (M2 ratio SSOT) | 4312 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 11621 |
+| Source constructs flagged (warnings) | 11622 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -56,6 +56,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/bcmath/bcscale.php` | 0 | 1 |
 | `ext/bcmath/bcsqrt.php` | 0 | 1 |
 | `ext/bcmath/bcsub.php` | 0 | 1 |
+| `ext/brotli/BrotliExtensionPolicy.php` | 0 | 1 |
 | `ext/brotli/BrotliJitHelper.php` | 0 | 1 |
 | `ext/brotli/JitBrotli.php` | 0 | 1 |
 | `ext/brotli/Module.php` | 0 | 3 |
@@ -4438,6 +4439,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `ext/brotli/BrotliExtensionPolicy.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `ext/brotli/BrotliJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
@@ -4451,8 +4457,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/brotli/Module.php`
 
 **Warnings** (review for bootstrap subset):
-- new brotli_compress (line 21)
-- new brotli_uncompress (line 22)
+- new brotli_compress (line 24)
+- new brotli_uncompress (line 25)
 - 1 class method(s)
 
 ### `ext/brotli/VmBrotliNative.php`
@@ -5786,48 +5792,48 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new DomNodeState (line 2414)
 - new DOMException (line 2561)
 - new DOMException (line 2575)
-- new Variable (line 2589)
-- new DOMException (line 2603)
-- new DOMException (line 2606)
-- new DOMException (line 2614)
-- new DOMException (line 2640)
-- new DOMException (line 2653)
-- new DOMException (line 2839)
-- new DOMException (line 3036)
-- new DOMException (line 3040)
-- new DOMException (line 3129)
-- new DOMException (line 3133)
-- new DOMException (line 3191)
-- new DOMException (line 3208)
-- new DOMException (line 3237)
-- new DOMException (line 3278)
-- new DOMException (line 3303)
-- new DOMException (line 3789)
-- new Variable (line 3813)
-- new DOMException (line 4036)
-- new DOMException (line 4117)
-- new DOMException (line 4159)
-- new ObjectEntry (line 4244)
-- new DomNodeState (line 4248)
-- new Variable (line 4255)
-- new ObjectEntry (line 4455)
-- new DomNodeState (line 4459)
-- new Variable (line 4466)
-- new ObjectEntry (line 4486)
-- new DomNodeState (line 4489)
-- new Variable (line 4497)
-- new DOMException (line 4699)
-- new DOMException (line 4706)
-- new DOMException (line 4713)
-- new DOMException (line 4717)
-- new DOMException (line 4720)
-- new DOMException (line 4729)
-- new Variable (line 5477)
-- new Variable (line 5490)
-- new DOMException (line 5572)
-- new DOMException (line 5583)
-- new DOMException (line 5649)
-- new DOMException (line 5657)
+- new Variable (line 2591)
+- new DOMException (line 2605)
+- new DOMException (line 2608)
+- new DOMException (line 2616)
+- new DOMException (line 2642)
+- new DOMException (line 2655)
+- new DOMException (line 2841)
+- new DOMException (line 3038)
+- new DOMException (line 3042)
+- new DOMException (line 3131)
+- new DOMException (line 3135)
+- new DOMException (line 3193)
+- new DOMException (line 3210)
+- new DOMException (line 3239)
+- new DOMException (line 3280)
+- new DOMException (line 3305)
+- new DOMException (line 3791)
+- new Variable (line 3815)
+- new DOMException (line 4038)
+- new DOMException (line 4119)
+- new DOMException (line 4161)
+- new ObjectEntry (line 4246)
+- new DomNodeState (line 4250)
+- new Variable (line 4257)
+- new ObjectEntry (line 4457)
+- new DomNodeState (line 4461)
+- new Variable (line 4468)
+- new ObjectEntry (line 4488)
+- new DomNodeState (line 4491)
+- new Variable (line 4499)
+- new DOMException (line 4701)
+- new DOMException (line 4708)
+- new DOMException (line 4715)
+- new DOMException (line 4719)
+- new DOMException (line 4722)
+- new DOMException (line 4731)
+- new Variable (line 5481)
+- new Variable (line 5494)
+- new DOMException (line 5576)
+- new DOMException (line 5587)
+- new DOMException (line 5653)
+- new DOMException (line 5661)
 - 277 class method(s)
 - 2 closure(s)
 
@@ -22569,45 +22575,45 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new OpCode (line 37435)
 - new OpCode (line 37467)
 - new OpCode (line 37529)
-- new Operand\Temporary (line 39209)
-- new Operand\Temporary (line 39702)
-- new Operand\Temporary (line 39888)
-- new Operand\Temporary (line 39920)
-- new Operand\Temporary (line 40016)
-- new Operand\Temporary (line 40138)
-- new OpCode (line 40140)
-- new OpCode (line 41518)
-- new Operand\Temporary (line 41976)
-- new OpCode (line 42500)
-- new Operand\Literal (line 42799)
-- new Variable (line 42801)
-- new OpCode (line 42847)
-- new OpCode (line 43062)
-- new OpCode (line 43072)
-- new OpCode (line 43075)
-- new Operand\Temporary (line 43102)
-- new Operand\Temporary (line 43139)
-- new OpCode (line 43141)
-- new OpCode (line 43152)
-- new Operand\Temporary (line 43155)
-- new OpCode (line 43157)
+- new Operand\Temporary (line 39217)
+- new Operand\Temporary (line 39710)
+- new Operand\Temporary (line 39896)
+- new Operand\Temporary (line 39928)
+- new Operand\Temporary (line 40024)
+- new Operand\Temporary (line 40146)
+- new OpCode (line 40148)
+- new OpCode (line 41526)
+- new Operand\Temporary (line 41984)
+- new OpCode (line 42508)
+- new Operand\Literal (line 42807)
+- new Variable (line 42809)
+- new OpCode (line 42855)
+- new OpCode (line 43070)
+- new OpCode (line 43080)
+- new OpCode (line 43083)
+- new Operand\Temporary (line 43110)
+- new Operand\Temporary (line 43147)
+- new OpCode (line 43149)
+- new OpCode (line 43160)
+- new Operand\Temporary (line 43163)
 - new OpCode (line 43165)
 - new OpCode (line 43173)
 - new OpCode (line 43181)
-- new OpCode (line 43184)
-- new OpCode (line 43212)
-- new OpCode (line 43235)
-- new OpCode (line 43252)
-- new OpCode (line 43259)
-- new Operand\Literal (line 43938)
-- new OpCode (line 45063)
-- new Literal (line 45095)
-- new OpCode (line 45194)
-- new Variable (line 45201)
-- new Temporary (line 45203)
+- new OpCode (line 43189)
+- new OpCode (line 43192)
+- new OpCode (line 43220)
+- new OpCode (line 43243)
+- new OpCode (line 43260)
+- new OpCode (line 43267)
+- new Operand\Literal (line 43946)
+- new OpCode (line 45075)
+- new Literal (line 45107)
 - new OpCode (line 45206)
-- new CompileFatal (line 45541)
-- new CompileFatal (line 45796)
+- new Variable (line 45213)
+- new Temporary (line 45215)
+- new OpCode (line 45218)
+- new CompileFatal (line 45553)
+- new CompileFatal (line 45808)
 - 962 class method(s)
 - 47 closure(s)
 
@@ -22960,7 +22966,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/CompilerVersion.php`
 
 **Warnings** (review for bootstrap subset):
-- 166 class method(s)
+- 167 class method(s)
 
 ### `lib/CurlyBraceOffsetRejector.php`
 
