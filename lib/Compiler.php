@@ -23133,6 +23133,11 @@ class Compiler {
                 $cfgChildren
             )
         ) {
+            // Stmt-level sibling with embedded haystack literal — not nested f(...), -N) (#17598).
+            if ($this->isEmbeddedCallLiteralArg($consumer->args[0] ?? null)) {
+                return false;
+            }
+
             return true;
         }
         if ($producerIndex + 2 === $consumerIndex) {
@@ -23146,6 +23151,10 @@ class Compiler {
                 && \count($consumer->args) >= 2
             ) {
                 // substr(sprintf('%o', fileperms($path)), -N) — UnaryMinus offset between nested callee and consumer (#16451, #16480).
+                if ($this->isEmbeddedCallLiteralArg($consumer->args[0] ?? null)) {
+                    return false;
+                }
+
                 return true;
             }
             if (
@@ -27255,6 +27264,7 @@ class Compiler {
             || !\is_array($cfgCallOp->args ?? null)
             || \count($cfgCallOp->args) < 2
             || $callIndex < 2
+            || $this->isEmbeddedCallLiteralArg($cfgCallOp->args[0] ?? null)
         ) {
             return null;
         }
