@@ -23982,6 +23982,10 @@ class Compiler {
                 ++$literalPreludeCount;
                 continue;
             }
+            if ($mid instanceof Op\Expr\Array_) {
+                ++$literalPreludeCount;
+                continue;
+            }
             if (
                 $mid instanceof Op\Expr\FuncCall
                 || $mid instanceof Op\Expr\NsFuncCall
@@ -27443,6 +27447,40 @@ class Compiler {
                 $block->orig->children
             );
             if (null === $producerIndex) {
+                $funcProducerCount = $this->countSiblingInlineFuncCallProducers(
+                    $firstSibling,
+                    $callIndex,
+                    $block->orig->children
+                );
+                if ($argIndex >= $funcProducerCount) {
+                    $preludeOrdinal = $argIndex - $funcProducerCount;
+                    $seenPrelude = -1;
+                    for ($j = $firstSibling + 1; $j < $callIndex; ++$j) {
+                        $scan = $block->orig->children[$j] ?? null;
+                        if (!$scan instanceof Op\Expr || $this->isSiblingInlineCallProducerExpr($scan)) {
+                            continue;
+                        }
+                        if (
+                            $scan instanceof Op\Expr\ConstFetch
+                            || $scan instanceof Op\Expr\ClassConstFetch
+                            || $scan instanceof Op\Expr\Array_
+                        ) {
+                            ++$seenPrelude;
+                            if ($seenPrelude === $preludeOrdinal) {
+                                if (null === $block->slotForOperand($scan->result)) {
+                                    foreach ($this->compileExpr($scan, $block) as $op) {
+                                        $emitOps[] = $op;
+                                    }
+                                }
+                                $preludeSlot = $block->slotForOperand($scan->result);
+                                if (null !== $preludeSlot) {
+                                    return (string) $preludeSlot;
+                                }
+                            }
+                        }
+                    }
+                }
+
                 return null;
             }
             if (
@@ -45925,8 +45963,6 @@ class Compiler {
         if (null !== $cfgCallOp) {
             $this->assignSourceMetadata($init, $cfgCallOp);
         }
-        // php-src resolves callee before evaluating call args (#17697).
-        $block->addOpCode($init);
 
         $argSends = $this->compileCallArgSends($args, $block, $calleeName, $cfgCallOp);
         [$nestedProducerOps, $outerArgSends] = $this->partitionNestedInlineCallArgProducerOps($argSends);
@@ -45974,6 +46010,9 @@ class Compiler {
         foreach ($nestedProducerOps as $op) {
             $return[] = $op;
         }
+        // php-src resolves callee before evaluating call args (#17697); hoisted nested FuncCall
+        // producers (ensureDeferredSiblingInlineCallArgProducersCompiled) must run first (#17708).
+        $return[] = $init;
         foreach ($outerArgSends as $send) {
             if (OpCode::TYPE_ASSIGN !== $send->type) {
                 $return[] = $send;
