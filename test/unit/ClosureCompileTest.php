@@ -132,4 +132,22 @@ PHP;
         $rt->run($block);
         $this->assertSame("ok\n", ob_get_clean());
     }
+
+    /** Regression: global $f = closure() must keep closureState after materialize (#17723). */
+    public function testMaterializeConstantValuePreservesClosureState(): void
+    {
+        $code = <<<'PHP'
+<?php
+declare(strict_types=1);
+$f = function (): int {
+    return 42;
+};
+echo $f(), "\n";
+PHP;
+        $rt = new PHPCompiler\Runtime();
+        $block = $rt->parseAndCompile($code, 'test.php');
+        ob_start();
+        $rt->run($block);
+        $this->assertSame("42\n", ob_get_clean());
+    }
 }
