@@ -299,6 +299,11 @@ phpc lint --native test/bootstrap-aot/compiler_smoke.php
 # Bootstrap SDK release tarball (#15602)
 make bootstrap-sdk-pack
 # → build/php-compiler-bootstrap-{spine-sha-prefix}.tar.gz
+make bootstrap-sdk-pack TAG=v1.0.0
+# → build/php-compiler-bootstrap-v1.0.0-linux-x86_64.tar.gz (GitHub Release asset)
+# Cold start from tarball:
+phpc bootstrap init --sdk-url file:///path/to/php-compiler-bootstrap-*.tar.gz
+# or: PHP_COMPILER_BOOTSTRAP_SDK=https://…/php-compiler-bootstrap-v1.0.0-linux-x86_64.tar.gz phpc bootstrap init
 # Extract at repo root to seed prelinked/bootstrap-gen0/ + vendor *.o
 
 # Honest compile gate — opt-in; fails until #15597 closes (#15603)

@@ -75,6 +75,79 @@ LOG;
         $body = (string) file_get_contents($script);
         $this->assertStringContainsString('BOOTSTRAP_M5_NO_ZEND=1', $body);
         $this->assertStringContainsString('--with-composer', $body);
+        $this->assertStringContainsString('--sdk-url', $body);
+        $this->assertStringContainsString('PHP_COMPILER_BOOTSTRAP_SDK', $body);
+        $this->assertStringContainsString('bootstrap-sdk-fetch.sh', $body);
+    }
+
+    public function testBootstrapSdkFetchScriptExists(): void
+    {
+        $script = self::$root.'/script/bootstrap-sdk-fetch.sh';
+        $this->assertFileExists($script);
+        $this->assertTrue(is_executable($script));
+        $body = (string) file_get_contents($script);
+        $this->assertStringContainsString('PHP_COMPILER_BOOTSTRAP_SDK', $body);
+        $this->assertStringContainsString('prelinked/bootstrap-gen0/', $body);
+        $this->assertStringContainsString('#15602', $body);
+    }
+
+    public function testBootstrapSdkFetchRoundTrip(): void
+    {
+        $pack = self::$root.'/script/bootstrap-sdk-pack.sh';
+        $fetch = self::$root.'/script/bootstrap-sdk-fetch.sh';
+        $tmpdir = sys_get_temp_dir().'/phpc-bootstrap-sdk-'.getmypid();
+        $this->assertTrue(mkdir($tmpdir) || is_dir($tmpdir));
+        $tarball = $tmpdir.'/sdk.tar.gz';
+        $extractRoot = $tmpdir.'/extract';
+        $this->assertTrue(mkdir($extractRoot));
+
+        $packCmd = 'cd '.escapeshellarg(self::$root).' && bash '.escapeshellarg($pack);
+        $proc = proc_open(['bash', '-lc', $packCmd], [
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ], $pipes, self::$root);
+        $this->assertIsResource($proc);
+        fclose($pipes[0]);
+        $stdout = stream_get_contents($pipes[1]);
+        $stderr = stream_get_contents($pipes[2]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        $exit = proc_close($proc);
+        $combined = ($stderr !== false ? $stderr : '').($stdout !== false ? $stdout : '');
+        $this->assertSame(0, $exit, $combined);
+        $this->assertMatchesRegularExpression(
+            '/build\/php-compiler-bootstrap-[0-9a-f]{12}\.tar\.gz/',
+            $combined
+        );
+        if (!preg_match('/build\/(php-compiler-bootstrap-[0-9a-f]{12}\.tar\.gz)/', $combined, $m)) {
+            $this->fail('pack output missing tarball path');
+        }
+        $built = self::$root.'/build/'.$m[1];
+        $this->assertFileExists($built);
+        copy($built, $tarball);
+
+        $fetchCmd = 'export PHP_COMPILER_BOOTSTRAP_SDK_ROOT='.escapeshellarg($extractRoot)
+            .'; bash '.escapeshellarg($fetch).' '.escapeshellarg('file://'.$tarball);
+        $proc = proc_open(['bash', '-lc', $fetchCmd], [
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ], $pipes, self::$root);
+        $this->assertIsResource($proc);
+        fclose($pipes[0]);
+        $stdout = stream_get_contents($pipes[1]);
+        $stderr = stream_get_contents($pipes[2]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        $exit = proc_close($proc);
+        $combined = ($stderr !== false ? $stderr : '').($stdout !== false ? $stdout : '');
+        $this->assertSame(0, $exit, $combined);
+        $this->assertFileExists($extractRoot.'/prelinked/bootstrap-gen0/bin-compile-aot');
+        $this->assertFileExists($extractRoot.'/prelinked/bootstrap-gen0/.m3_compiler_lib_sidecar.sha');
+
+        @unlink($tarball);
+        @rmdir($tmpdir);
     }
 
     public function testPhpcBootstrapInitWiring(): void
@@ -82,6 +155,7 @@ LOG;
         $phpc = (string) file_get_contents(self::$root.'/bin/phpc.php');
         $this->assertStringContainsString("case 'bootstrap':", $phpc);
         $this->assertStringContainsString('bootstrap-init.sh', $phpc);
+        $this->assertStringContainsString('--sdk-url', $phpc);
     }
 
     public function testBootstrapNativeLintScriptExists(): void
@@ -136,6 +210,7 @@ LOG;
         $this->assertTrue(is_executable($script));
         $body = (string) file_get_contents($script);
         $this->assertStringContainsString('php-compiler-bootstrap-', $body);
+        $this->assertStringContainsString('linux-x86_64', $body);
         $this->assertStringContainsString('prelinked/bootstrap-gen0', $body);
         $this->assertStringContainsString('#15602', $body);
     }
