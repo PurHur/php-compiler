@@ -26,6 +26,7 @@ use PHPCompiler\ext\types\strlen;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Builtin\ArrayMapRuntime;
 use PHPCompiler\JIT\Builtin\ArrayReduceRuntime;
+use PHPCompiler\JIT\Builtin\SortRuntime;
 use PHPCompiler\JIT\Builtin\ErrorRaise;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Call;
@@ -8996,42 +8997,6 @@ final class ArrayBuiltinHelper
         );
     }
 
-    public static function shufflePacked(Context $context, Variable $array): void
-    {
-        if (self::isNativeArray($array->type)) {
-            throw new \LogicException(
-                'shuffle() cannot compile fixed-size literal arrays in JIT/AOT yet; use bin/vm.php or bin/serve.php, or build the list with [] append'
-            );
-        }
-        $ht = self::loadHashTable($context, $array);
-        $context->builder->call($context->lookupFunction('__hashtable__shufflePacked'), $ht);
-        HashTableHelper::storeHashtableInArrayVariable($context, $array, $ht);
-    }
-
-    public static function sortPacked(Context $context, Variable $array): void
-    {
-        if (self::isNativeArray($array->type)) {
-            throw new \LogicException(
-                'sort() cannot compile fixed-size literal arrays in JIT/AOT yet; use bin/vm.php or bin/serve.php, or build the list with [] append'
-            );
-        }
-        $ht = self::loadHashTable($context, $array);
-        $context->builder->call($context->lookupFunction('__hashtable__sortPacked'), $ht);
-        HashTableHelper::storeHashtableInArrayVariable($context, $array, $ht);
-    }
-
-    public static function sortPackedLocale(Context $context, Variable $array): void
-    {
-        if (self::isNativeArray($array->type)) {
-            throw new \LogicException(
-                'sort() cannot compile fixed-size literal arrays in JIT/AOT yet; use bin/vm.php or bin/serve.php, or build the list with [] append'
-            );
-        }
-        $ht = self::loadHashTable($context, $array);
-        $context->builder->call($context->lookupFunction('__hashtable__sortPackedLocale'), $ht);
-        HashTableHelper::storeHashtableInArrayVariable($context, $array, $ht);
-    }
-
     /**
      * usort() packed list with closure/arrow comparator (issue #3597).
      */
@@ -9489,7 +9454,7 @@ final class ArrayBuiltinHelper
         $context->builder->branchIf($isList, $sortList, $sortAssoc);
 
         $context->builder->positionAtEnd($sortList);
-        self::sortPacked($context, $array);
+        SortRuntime::sortPacked($context, $array);
         $context->builder->branch($done);
 
         $context->builder->positionAtEnd($sortAssoc);
@@ -9513,7 +9478,7 @@ final class ArrayBuiltinHelper
         $context->builder->branchIf($isList, $sortList, $sortAssoc);
 
         $context->builder->positionAtEnd($sortList);
-        self::sortPackedLocale($context, $array);
+        SortRuntime::sortPackedLocale($context, $array);
         $context->builder->branch($done);
 
         $context->builder->positionAtEnd($sortAssoc);
@@ -9851,18 +9816,6 @@ final class ArrayBuiltinHelper
         $context->builder->positionAtEnd($done);
     }
 
-    public static function sortPackedNatural(Context $context, Variable $array): void
-    {
-        if (self::isNativeArray($array->type)) {
-            throw new \LogicException(
-                'natsort() cannot compile fixed-size literal arrays in JIT/AOT yet; use bin/vm.php or bin/serve.php'
-            );
-        }
-        $ht = self::loadHashTable($context, $array);
-        $context->builder->call($context->lookupFunction('__hashtable__sortPackedNatural'), $ht);
-        HashTableHelper::storeHashtableInArrayVariable($context, $array, $ht);
-    }
-
     public static function sortStringKeyValuesNatural(Context $context, Variable $array): void
     {
         $ht = self::loadHashTable($context, $array);
@@ -9894,18 +9847,6 @@ final class ArrayBuiltinHelper
         $context->builder->positionAtEnd($done);
     }
 
-    public static function sortPackedNaturalCase(Context $context, Variable $array): void
-    {
-        if (self::isNativeArray($array->type)) {
-            throw new \LogicException(
-                'natcasesort() cannot compile fixed-size literal arrays in JIT/AOT yet; use bin/vm.php or bin/serve.php'
-            );
-        }
-        $ht = self::loadHashTable($context, $array);
-        $context->builder->call($context->lookupFunction('__hashtable__sortPackedNaturalCase'), $ht);
-        HashTableHelper::storeHashtableInArrayVariable($context, $array, $ht);
-    }
-
     public static function sortStringKeyValuesNaturalCase(Context $context, Variable $array): void
     {
         $ht = self::loadHashTable($context, $array);
@@ -9924,18 +9865,6 @@ final class ArrayBuiltinHelper
     {
         $ht = self::loadHashTable($context, $array);
         $context->builder->call($context->lookupFunction('__hashtable__sortStringKeyValuesLocale'), $ht);
-        HashTableHelper::storeHashtableInArrayVariable($context, $array, $ht);
-    }
-
-    public static function sortPackedReverse(Context $context, Variable $array): void
-    {
-        if (self::isNativeArray($array->type)) {
-            throw new \LogicException(
-                'arsort() cannot compile fixed-size literal arrays in JIT/AOT yet; use bin/vm.php or bin/serve.php, or build the list with [] append'
-            );
-        }
-        $ht = self::loadHashTable($context, $array);
-        $context->builder->call($context->lookupFunction('__hashtable__sortPackedReverse'), $ht);
         HashTableHelper::storeHashtableInArrayVariable($context, $array, $ht);
     }
 
@@ -9960,7 +9889,7 @@ final class ArrayBuiltinHelper
         $context->builder->branchIf($isList, $sortList, $sortAssoc);
 
         $context->builder->positionAtEnd($sortList);
-        self::sortPackedReverse($context, $array);
+        SortRuntime::sortPackedReverse($context, $array);
         $context->builder->branch($done);
 
         $context->builder->positionAtEnd($sortAssoc);
