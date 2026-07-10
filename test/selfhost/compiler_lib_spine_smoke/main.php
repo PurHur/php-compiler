@@ -4109,6 +4109,7 @@ require_once __DIR__.'/../../../lib/VM/BuiltinExecute.php';
 require_once __DIR__.'/../../../lib/VM/CallUnpack.php';
 require_once __DIR__.'/../../../lib/VM/CallUnpackJitHelper.php';
 require_once __DIR__.'/../../../lib/VM/CallUnpackSupport.php';
+require_once __DIR__.'/../../../lib/VM/CallableCheck.php';
 require_once __DIR__.'/../../../lib/VM/CastJitHelper.php';
 require_once __DIR__.'/../../../lib/VM/CastSupport.php';
 require_once __DIR__.'/../../../lib/VM/ClassAbstract.php';
