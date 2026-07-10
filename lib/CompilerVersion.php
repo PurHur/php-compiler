@@ -2199,11 +2199,13 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.4+ DOMNode::contains() (ext/dom/node.c, #14447, #14535, #14723, #15613).
+     * PHP 8.0+ DOMNode::contains() (ext/dom/node.c, #14447, #17163).
+     *
+     * Available on Zend 8.0+; not gated behind PHP_COMPILER_PROFILE (8.4 DOM batch).
      */
     public static function supportsDomNodeContains(): bool
     {
-        return self::supportsDomApiSince('8.4.0');
+        return true;
     }
 
     /**

@@ -943,7 +943,8 @@ class Context {
         Builtin\StringStripslashes::ensureStandaloneBodies($this);
         Builtin\StringFilePutContents::ensureStandaloneBodies($this);
         Builtin\SuperglobalNameRuntime::ensureLinked($this);
-        if (CompilerVersion::supportsDomTokenList()) {
+        if (CompilerVersion::supportsDomTokenList()
+            && !DomInstanceMethodJit::shouldDeferToVmClassMethodLowering()) {
             Builtin\DomInstanceMethodRuntime::ensureLinked($this);
         }
     }
@@ -1327,6 +1328,7 @@ class Context {
         }
         Builtin\AttributeRegistryLowering::implementLookupFunctions($this);
         Builtin\ParamSensitiveLowering::implementLookupFunctions($this);
+        VmActiveContextInitLlvm::emitPendingBeforeSeal($this);
         $this->sealInitFunction();
         $this->sealInitShutdownReturn($this->shutdownBlock);
         $this->sealInitShutdownReturn($this->headerPreFlushBlock);

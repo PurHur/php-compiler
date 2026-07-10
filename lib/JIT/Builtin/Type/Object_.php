@@ -3020,6 +3020,11 @@ class Object_ extends Type {
                 $this->defineMethodVisibility($id, $method, $pub);
             }
         }
+        if ('domelement' === $lcname) {
+            $this->defineProperty($id, 'nodeName', Variable::TYPE_STRING);
+            $this->defineProperty($id, 'tagName', Variable::TYPE_STRING);
+            $this->defineProperty($id, 'attributes', Variable::TYPE_VALUE);
+        }
         if ('splobjectstorage' === $lcname) {
             $this->splObjectStorageClassId = $id;
             $this->defineProperty($id, '__spl_ht', Variable::TYPE_HASHTABLE);
