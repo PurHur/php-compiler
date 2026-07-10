@@ -262,6 +262,7 @@ use PHPCompiler\VM\Builtin\ReflectionParameterGetAttributes;
 use PHPCompiler\VM\Builtin\ReflectionParameterGetType;
 use PHPCompiler\VM\Builtin\ReflectionParameterGetValue;
 use PHPCompiler\VM\Builtin\ReflectionParameterIsDeprecated;
+use PHPCompiler\VM\Builtin\ReflectionParameterIsPromoted;
 use PHPCompiler\VM\Builtin\ReflectionParameterIsSensitive;
 use PHPCompiler\VM\Builtin\ReflectionParameterIsSensitiveParameter;
 use PHPCompiler\VM\Builtin\ReflectionPropertyConstruct;
@@ -572,6 +573,8 @@ final class BuiltinClasses
             $rparam->methods['isdeprecated'] = new ReflectionParameterIsDeprecated();
             $rparam->methodVisibility['isdeprecated'] = $pub;
         }
+        $rparam->methods['ispromoted'] = new ReflectionParameterIsPromoted();
+        $rparam->methodVisibility['ispromoted'] = $pub;
         $ctx->classes[ReflectionSupport::REFLECTION_PARAMETER] = $rparam;
 
         $rm = new ClassEntry('ReflectionMethod');
