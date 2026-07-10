@@ -708,6 +708,16 @@ final class EnumCaseSupport
             return $out;
         }
         $src = $src->resolveIndirect();
+        if ($src->is(Variable::TYPE_OBJECT)) {
+            $object = $src->toObject();
+            if (null !== $object->closureState) {
+                // Closures are live callables — must not immortalize/detach (#17723, zend_closures.c).
+                $out = new Variable();
+                $out->copyFrom($src);
+
+                return $out;
+            }
+        }
         if ($src->is(Variable::TYPE_ARRAY)) {
             if (self::arrayContainsRuntimeRefs($src)) {
                 $out = new Variable();
