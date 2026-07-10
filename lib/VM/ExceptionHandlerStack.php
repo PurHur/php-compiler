@@ -89,6 +89,12 @@ final class ExceptionHandlerStack
         }
     }
 
+    /** Active user exception handler without popping the stack (get_exception_handler parity, #17644). */
+    public function currentHandler(): ?Variable
+    {
+        return $this->activeCopy();
+    }
+
     private function activeCopy(): ?Variable
     {
         if ([] === $this->stack) {

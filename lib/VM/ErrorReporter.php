@@ -574,6 +574,12 @@ final class ErrorReporter
         return [$file, $line];
     }
 
+    /** Active user error handler without popping the stack (get_error_handler parity, #17644). */
+    public function currentHandler(): ?Variable
+    {
+        return $this->activeHandlerCopy();
+    }
+
     private function activeHandlerCopy(): ?Variable
     {
         if ([] === $this->handlerStack) {

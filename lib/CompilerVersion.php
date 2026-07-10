@@ -1950,6 +1950,21 @@ final class CompilerVersion
         return self::supportsRequestParseBody();
     }
 
+    /** PHP 8.4 get_error_handler() / get_exception_handler() (ext/standard/basic_functions.c, #17644). */
+    public static function supportsGetErrorHandlerIntrospection(): bool
+    {
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+    }
+
+    public static function advertisesGetErrorHandlerIntrospection(): bool
+    {
+        if (version_compare(self::VERSION, '8.4.0', '>=')) {
+            return true;
+        }
+
+        return self::supportsGetErrorHandlerIntrospection();
+    }
+
     /**
      * Whether a builtin removed in $removedIn should appear in function_exists() for the active profile.
      *

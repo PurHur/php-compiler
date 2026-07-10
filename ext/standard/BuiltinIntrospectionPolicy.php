@@ -99,6 +99,9 @@ final class BuiltinIntrospectionPolicy
         if ('request_parse_body' === $lc) {
             return CompilerVersion::advertisesRequestParseBody();
         }
+        if (\in_array($lc, ['get_error_handler', 'get_exception_handler'], true)) {
+            return CompilerVersion::advertisesGetErrorHandlerIntrospection();
+        }
         if ('stream_context_set_options' === $lc) {
             return CompilerVersion::advertisesStreamContextSetOptions();
         }
