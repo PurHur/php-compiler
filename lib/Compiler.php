@@ -42114,7 +42114,8 @@ class Compiler {
                             }
                         }
                     } elseif (
-                        null === $constPreludeSlot
+                        null === $valueSlot
+                        && null === $constPreludeSlot
                         && !$this->callArgHasHoistedConstPrelude($cfgCallOp, (int) $argIndex, $block)
                     ) {
                         $valueSlot = (string) $forcedSiblingSlot;
