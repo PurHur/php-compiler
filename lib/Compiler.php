@@ -130,6 +130,8 @@ class Compiler {
     private array $bareRethrowLines = [];
     /** spl_object_id(Coalesce expr) => scope slot for ?? result (stmt ?? before call args, #9479). */
     private array $coalesceResultSlots = [];
+    /** spl_object_id(Coalesce) => CFG merge block for chained ?? call-arg lowering (#17590). */
+    private array $coalesceMergeBlocks = [];
     /** cfgVarRoot / call-arg oid => slot wired by syncCoalesceResultToDistinctFuncCallArg (#15915). */
     private array $syncedCoalesceFuncCallArgSlots = [];
     /** spl_object_id(Coalesce) => ??= lvalue operand when result temp differs (#5337, #17458). */
@@ -473,6 +475,7 @@ class Compiler {
         $this->abstractClasses = [];
         $this->abstractEnums = [];
         $this->coalesceResultSlots = [];
+        $this->coalesceMergeBlocks = [];
         $this->syncedCoalesceFuncCallArgSlots = [];
         $this->compileTimeEnumBackedTypes = [];
         $this->compileTimeEnumCaseConstNames = [];
@@ -560,6 +563,7 @@ class Compiler {
         $this->abstractClasses = [];
         $this->abstractEnums = [];
         $this->coalesceResultSlots = [];
+        $this->coalesceMergeBlocks = [];
         $this->syncedCoalesceFuncCallArgSlots = [];
         $this->classCompileRegistry = new ClassCompileRegistry();
         $this->attributeClassRegistry = new AttributeClassRegistry();
@@ -3418,6 +3422,390 @@ class Compiler {
         }
 
         return $found;
+    }
+
+    /**
+     * Chained ?? call args: compile coalesce into a temp, then call on the merge block (#17380).
+     *
+     * @return ?list<OpCode>
+     */
+    private function compileFuncCallAfterChainedCoalesceArgs(Op\Expr\FuncCall $expr, Block $block): ?array
+    {
+        $newArgs = $expr->args;
+        $changed = false;
+        /** @var array<int, int> $chainedCoalesceArgTempSlots */
+        $chainedCoalesceArgTempSlots = [];
+        /** @var array<int, int> $chainedCoalesceArgMergeSources */
+        $chainedCoalesceArgMergeSources = [];
+        foreach ($expr->args as $i => $arg) {
+            $coalesce = $this->findChainedCoalesceForCallArg($arg, $block, $expr, (int) $i);
+            if (null === $coalesce) {
+                continue;
+            }
+            $mergeSlot = $this->coalesceResultSlots[spl_object_id($coalesce)]
+                ?? $this->slotForCoalesceResult($block, $coalesce);
+            if (null === $mergeSlot) {
+                continue;
+            }
+            $callArg = $expr->args[$i] ?? $arg;
+            $callBlock = $this->coalesceMergeBlocks[spl_object_id($coalesce)] ?? $block;
+            // Snapshot ?? merge into the php-cfg call-arg temp on the call block (#17590 AOT).
+            $argSendSlot = $this->compileOperand($callArg, $callBlock, false);
+            $this->registerSyncedCoalesceFuncCallArgSlot($arg, $argSendSlot);
+            $this->registerSyncedCoalesceFuncCallArgSlot($callArg, $argSendSlot);
+            $newArgs[$i] = $callArg;
+            $chainedCoalesceArgTempSlots[(int) $i] = $argSendSlot;
+            $chainedCoalesceArgMergeSources[(int) $i] = $mergeSlot;
+            $changed = true;
+        }
+        if (!$changed) {
+            return null;
+        }
+        $callBlock = $block;
+        foreach ($expr->args as $i => $arg) {
+            $coalesce = $this->findChainedCoalesceForCallArg($arg, $block, $expr, (int) $i);
+            if (null !== $coalesce && isset($this->coalesceMergeBlocks[spl_object_id($coalesce)])) {
+                $callBlock = $this->coalesceMergeBlocks[spl_object_id($coalesce)];
+                break;
+            }
+        }
+        $callOps = $this->compileFuncCall(
+            $this->compileOperand($expr->name, $callBlock, true),
+            $newArgs,
+            $expr->result,
+            $callBlock,
+            max(0, $expr->getLine()),
+            $expr
+        );
+        if ([] !== $chainedCoalesceArgTempSlots) {
+            $callOps = $this->rewireChainedCoalesceFuncCallArgSends($callOps, $chainedCoalesceArgTempSlots);
+        }
+        foreach ($chainedCoalesceArgMergeSources as $argIdx => $mergeSlot) {
+            $sendSlot = $chainedCoalesceArgTempSlots[(int) $argIdx];
+            $callBlock->addOpCode(new OpCode(
+                OpCode::TYPE_ASSIGN,
+                $sendSlot,
+                $sendSlot,
+                $mergeSlot
+            ));
+        }
+        foreach ($callOps as $op) {
+            $callBlock->addOpCode($op);
+        }
+        foreach ($chainedCoalesceArgTempSlots as $argIdx => $tempSlot) {
+            $this->patchBlockChainedCoalesceFuncCallArgSend($callBlock, (int) $argIdx, $tempSlot);
+        }
+
+        return [];
+    }
+
+    private function patchBlockChainedCoalesceFuncCallArgSend(Block $block, int $argIndex, int $tempSlot): void
+    {
+        $inCall = false;
+        $sendIdx = 0;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                $inCall = true;
+                $sendIdx = 0;
+                continue;
+            }
+            if (!$inCall || OpCode::TYPE_ARG_SEND !== $op->type) {
+                if (OpCode::TYPE_FUNCCALL_EXEC_NORETURN === $op->type || OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
+                    $inCall = false;
+                }
+                continue;
+            }
+            if ($sendIdx === $argIndex) {
+                $op->arg1 = (string) $tempSlot;
+            }
+            ++$sendIdx;
+        }
+    }
+
+    /**
+     * @param list<OpCode>     $callOps
+     * @param array<int, int> $argTempSlots
+     *
+     * @return list<OpCode>
+     */
+    private function rewireChainedCoalesceFuncCallArgSends(array $callOps, array $argTempSlots): array
+    {
+        $inCall = false;
+        $sendIdx = 0;
+        foreach ($callOps as $op) {
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                $inCall = true;
+                $sendIdx = 0;
+                continue;
+            }
+            if (!$inCall || OpCode::TYPE_ARG_SEND !== $op->type) {
+                if (OpCode::TYPE_FUNCCALL_EXEC_NORETURN === $op->type || OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
+                    $inCall = false;
+                }
+                continue;
+            }
+            if (isset($argTempSlots[$sendIdx])) {
+                $op->arg1 = (string) $argTempSlots[$sendIdx];
+            }
+            ++$sendIdx;
+        }
+
+        return $callOps;
+    }
+
+    private function findChainedCoalesceForCallArg(
+        Operand $arg,
+        Block $block,
+        ?Op $cfgCallOp,
+        int $argIndex
+    ): ?Op\Expr\BinaryOp\Coalesce {
+        foreach ($this->findEmbeddedCoalesces($arg) as $coalesce) {
+            if ($this->coalesceRhsIsNestedCoalesce($coalesce, $block)) {
+                return $coalesce;
+            }
+        }
+        if ($this->callArgReadsAssignLvalueNotInlineCoalesce($arg, $block)) {
+            return null;
+        }
+        $stmtCoalesce = $this->findOutermostChainedCoalesceStmtForCallArg($arg, $block, $cfgCallOp, $argIndex);
+        if (null !== $stmtCoalesce) {
+            return $stmtCoalesce;
+        }
+        if (null !== $cfgCallOp && is_array($cfgCallOp->args ?? null)) {
+            $cfgArg = $cfgCallOp->args[$argIndex] ?? null;
+            if (null !== $cfgArg && $cfgArg !== $arg) {
+                foreach ($this->findEmbeddedCoalesces($cfgArg) as $coalesce) {
+                    if ($this->coalesceRhsIsNestedCoalesce($coalesce, $block)) {
+                        return $coalesce;
+                    }
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private function findOutermostChainedCoalesceStmtForCallArg(
+        Operand $arg,
+        Block $block,
+        ?Op $cfgCallOp,
+        int $argIndex
+    ): ?Op\Expr\BinaryOp\Coalesce {
+        $inner = $this->findCoalesceStmtForCallArg($arg, $block);
+        if (null === $inner && null !== $cfgCallOp && is_array($cfgCallOp->args ?? null)) {
+            $cfgArg = $cfgCallOp->args[$argIndex] ?? null;
+            if (null !== $cfgArg && $cfgArg !== $arg) {
+                $inner = $this->findCoalesceStmtForCallArg($cfgArg, $block);
+            }
+        }
+        if (null === $inner || null === $block->orig) {
+            return null !== $inner && $this->coalesceRhsIsNestedCoalesce($inner, $block) ? $inner : null;
+        }
+        $outermost = $inner;
+        foreach ($block->orig->children as $op) {
+            if (!$op instanceof Op\Expr\BinaryOp\Coalesce) {
+                continue;
+            }
+            if (!$this->coalesceRhsIsNestedCoalesce($op, $block)) {
+                continue;
+            }
+            if (
+                $this->operandsChainEqual($op->right, $inner->result)
+                || $this->operandsReferToSameVariable($op->right, $inner->result)
+                || $op->right === $inner
+            ) {
+                $outermost = $op;
+            }
+        }
+
+        return $this->coalesceRhsIsNestedCoalesce($outermost, $block) ? $outermost : null;
+    }
+
+    private function coalesceRhsIsNestedCoalesce(Op\Expr\BinaryOp\Coalesce $coalesce, Block $block): bool
+    {
+        $rhsRoot = $this->unwrapOperandChain($coalesce->right);
+        if ($rhsRoot instanceof Op\Expr\BinaryOp\Coalesce) {
+            return true;
+        }
+
+        return $this->findOrigExprOpForOperand($coalesce->right, $block) instanceof Op\Expr\BinaryOp\Coalesce;
+    }
+
+    /**
+     * True when $arg is an assign lvalue fed by a prior stmt-level ?? (#17590).
+     *
+     * compileFuncCallAfterChainedCoalesceArgs must not re-lower ?? for var_export($v) after $v = … ?? ….
+     */
+    private function callArgReadsAssignLvalueNotInlineCoalesce(Operand $arg, Block $block): bool
+    {
+        if ($this->callArgIsDirectChainedCoalesceMergeTarget($arg)) {
+            return true;
+        }
+        if (null === $block->orig) {
+            return false;
+        }
+        foreach ($block->orig->children as $i => $child) {
+            if (
+                !($child instanceof Op\Expr\Assign)
+                || !$this->operandsReferToSameVariable($child->var, $arg)
+            ) {
+                continue;
+            }
+            if (
+                0 === $i
+                || !($block->orig->children[$i - 1] instanceof Op\Expr\BinaryOp\Coalesce)
+            ) {
+                continue;
+            }
+            /** @var Op\Expr\BinaryOp\Coalesce $priorCoalesce */
+            $priorCoalesce = $block->orig->children[$i - 1];
+
+            return $this->isCoalesceAssignTail($child, $priorCoalesce);
+        }
+
+        return false;
+    }
+
+    /** True when ?? was lowered with resultOverride = php-cfg call-arg temp (#17590). */
+    private function callArgIsDirectChainedCoalesceMergeTarget(Operand $arg): bool
+    {
+        foreach ($this->coalesceAssignLvalues as $lvalue) {
+            if (
+                $this->operandsReferToSameVariable($lvalue, $arg)
+                || $this->operandsChainEqual($lvalue, $arg)
+            ) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * php-cfg call-arg temp for chained ?? before FuncCall — mirror assign-then-call (#17590).
+     */
+    private function resolveChainedCoalesceCallArgOverride(
+        Op\Expr\BinaryOp\Coalesce $coalesce,
+        Block $block,
+        int $coalesceIdx
+    ): ?Operand {
+        if (null === $block->orig || !$this->followingFuncCallHasChainedCoalesceArg($block, $coalesceIdx)) {
+            return null;
+        }
+        $children = $block->orig->children;
+        for ($j = $coalesceIdx + 1, $count = \count($children); $j < $count; ++$j) {
+            $next = $children[$j];
+            if ($next instanceof Op\Expr\FuncCall || $next instanceof Op\Expr\NsFuncCall) {
+                if (!property_exists($next, 'args') || !\is_array($next->args)) {
+                    return null;
+                }
+                foreach ($next->args as $argIndex => $arg) {
+                    if (null === $arg) {
+                        continue;
+                    }
+                    $outermost = $this->findOutermostChainedCoalesceStmtForCallArg(
+                        $arg,
+                        $block,
+                        $next,
+                        (int) $argIndex
+                    );
+                    if ($outermost === $coalesce) {
+                        return $next->args[$argIndex];
+                    }
+                }
+
+                return null;
+            }
+            if ($next instanceof Op\Expr && $this->isInlineExprCallArgProducer($next)) {
+                continue;
+            }
+
+            return null;
+        }
+
+        return null;
+    }
+
+    private function coalesceStmtDeferredToChainedFuncCallArg(
+        Op\Expr\BinaryOp\Coalesce $coalesce,
+        Block $block
+    ): bool {
+        if (null === $block->orig) {
+            return false;
+        }
+        $idx = array_search($coalesce, $block->orig->children, true);
+
+        return \is_int($idx) && $this->followingFuncCallHasChainedCoalesceArg($block, $idx);
+    }
+
+    /**
+     * Inner ?? stmt whose result feeds outer chained ?? deferred to FuncCall (#17590).
+     */
+    private function coalesceStmtFeedsDeferredChainedFuncCallArg(
+        Op\Expr\BinaryOp\Coalesce $coalesce,
+        Block $block
+    ): bool {
+        if (null === $block->orig) {
+            return false;
+        }
+        $idx = array_search($coalesce, $block->orig->children, true);
+        if (!\is_int($idx)) {
+            return false;
+        }
+        $children = $block->orig->children;
+        for ($j = $idx + 1, $count = \count($children); $j < $count; ++$j) {
+            $next = $children[$j];
+            if ($next instanceof Op\Expr\BinaryOp\Coalesce) {
+                if (
+                    $this->operandsChainEqual($next->right, $coalesce->result)
+                    || $this->operandsReferToSameVariable($next->right, $coalesce->result)
+                    || $next->right === $coalesce
+                ) {
+                    return $this->coalesceStmtDeferredToChainedFuncCallArg($next, $block);
+                }
+
+                return false;
+            }
+            if ($next instanceof Op\Expr && $this->isInlineExprCallArgProducer($next)) {
+                continue;
+            }
+
+            return false;
+        }
+
+        return false;
+    }
+
+    private function followingFuncCallHasChainedCoalesceArg(Block $block, int $fromIdx): bool
+    {
+        if (null === $block->orig) {
+            return false;
+        }
+        $children = $block->orig->children;
+        for ($j = $fromIdx + 1, $count = \count($children); $j < $count; ++$j) {
+            $next = $children[$j];
+            if ($next instanceof Op\Expr\FuncCall || $next instanceof Op\Expr\NsFuncCall) {
+                if (!property_exists($next, 'args') || !\is_array($next->args)) {
+                    return false;
+                }
+                foreach ($next->args as $argIndex => $arg) {
+                    if (null !== $arg
+                        && null !== $this->findChainedCoalesceForCallArg($arg, $block, $next, (int) $argIndex)
+                    ) {
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+            if ($next instanceof Op\Expr && $this->isInlineExprCallArgProducer($next)) {
+                continue;
+            }
+
+            return false;
+        }
+
+        return false;
     }
 
     private function compileCoalesceForAssign(
@@ -9979,6 +10367,11 @@ class Compiler {
                     );
                 }
 
+                $splitCall = $this->compileFuncCallAfterChainedCoalesceArgs($expr, $block);
+                if (null !== $splitCall) {
+                    return $splitCall;
+                }
+
                 return $this->compileFuncCall(
                     $this->compileOperand($expr->name, $block, true),
                     $expr->args,
@@ -11133,6 +11526,7 @@ class Compiler {
         $endBlock->inheritScopeFrom($rightEmitBlock);
 
         $this->coalesceResultSlots[spl_object_id($expr)] = $resultSlot;
+        $this->coalesceMergeBlocks[spl_object_id($expr)] = $endBlock;
 
         $coalesceOp = new OpCode(
             OpCode::TYPE_COALESCE,
