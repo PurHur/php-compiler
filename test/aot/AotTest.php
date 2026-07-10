@@ -231,7 +231,8 @@ class AotTest extends BaseTest
             }
             if (!CompilerVersion::supportsStreamSupports()
                 && (str_contains($name, 'stream_supports') || str_contains($name, 'stream_meta_seekable'))
-                && !str_contains($name, 'stream_supports_lock')) {
+                && !str_contains($name, 'stream_supports_lock')
+                && !str_contains($name, 'stream_supports_undefined_function_before_const')) {
                 continue;
             }
             // STREAM_SUPPORT_READ/WRITE PHP 8.4 constants; forward profile only (#16846).

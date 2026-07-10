@@ -2343,6 +2343,14 @@ class Compiler {
                         // Hoisted sibling call-arg producers compile at the consumer via
                         // resolveSiblingInlineCallArgProducerSlot (#9463, #10981, #12421, #13788).
                         break;
+                    } elseif (
+                        ($child instanceof Op\Expr\ConstFetch || $child instanceof Op\Expr\ClassConstFetch)
+                        && $i + 1 < $opCount
+                        && ($ops[$i + 1] instanceof Op\Expr\FuncCall || $ops[$i + 1] instanceof Op\Expr\NsFuncCall)
+                        && $this->isDeferredHoistedConstFetchCallArgPrelude($child, $ops[$i + 1])
+                    ) {
+                        // stream_supports($fp, STREAM_SUPPORT_READ) — FUNCCALL_INIT before const (#17697).
+                        break;
                     } elseif ($this->isDeferredTrailingComparatorFirstClassCallable($child, $ops, $i)) {
                         // strcmp(...) trailing FCC with deferred sibling array_keys — emit at consumer (#15475).
                         break;
@@ -35916,6 +35924,25 @@ class Compiler {
     }
 
     /**
+     * php-cfg hoists ConstFetch/ClassConstFetch immediately before FuncCall for dead inline arg temps.
+     * Defer eager compileOps so FUNCCALL_INIT runs first (php-src undefined-function before undefined-const, #17697).
+     */
+    private function isDeferredHoistedConstFetchCallArgPrelude(
+        Op\Expr $fetch,
+        Op\Expr\FuncCall|Op\Expr\NsFuncCall $consumer
+    ): bool {
+        if (
+            !$fetch instanceof Op\Expr\ConstFetch
+            && !$fetch instanceof Op\Expr\ClassConstFetch
+        ) {
+            return false;
+        }
+
+        // php-cfg hoists call-arg ConstFetch as the stmt immediately before the consumer (#17697).
+        return true;
+    }
+
+    /**
      * True when a call arg reads the `@`-suppressed inner expression in the post-END_SILENCE block (#15916).
      */
     private function callArgIsErrorSuppressForwardedResult(Operand $callArg, Block $block): bool
@@ -38656,6 +38683,17 @@ class Compiler {
                 );
                 if (null !== $hoistedScalarSlot) {
                     $valueSlot = (string) $hoistedScalarSlot;
+                }
+            }
+            if (null === $valueSlot && null !== $cfgCallOp) {
+                $hoistedConstPreludeSlot = $this->slotForImmediateConstFetchPreludeCallArg(
+                    $block,
+                    $cfgCallOp,
+                    (int) $argIndex,
+                    $sends
+                );
+                if (null !== $hoistedConstPreludeSlot) {
+                    $valueSlot = (string) $hoistedConstPreludeSlot;
                 }
             }
             $syncedCoalesceSlot = $this->resolveSyncedCoalesceFuncCallArgSlot($callArgOperand);
@@ -44057,14 +44095,14 @@ class Compiler {
                 $return[] = $send;
             }
         }
-        foreach ($nestedProducerOps as $op) {
-            $return[] = $op;
-        }
         $return[] = new OpCode(
             OpCode::TYPE_METHODCALL_INIT,
             $receiver,
             $methodName
         );
+        foreach ($nestedProducerOps as $op) {
+            $return[] = $op;
+        }
         foreach ($outerArgSends as $send) {
             if (OpCode::TYPE_ASSIGN !== $send->type) {
                 $return[] = $send;
@@ -45879,6 +45917,17 @@ class Compiler {
 
         $this->lowerEmbeddedCoalesceCallArgs($args, $block);
 
+        $init = new OpCode(
+            OpCode::TYPE_FUNCCALL_INIT,
+            $callName,
+            $startLine > 0 ? $startLine : null
+        );
+        if (null !== $cfgCallOp) {
+            $this->assignSourceMetadata($init, $cfgCallOp);
+        }
+        // php-src resolves callee before evaluating call args (#17697).
+        $block->addOpCode($init);
+
         $argSends = $this->compileCallArgSends($args, $block, $calleeName, $cfgCallOp);
         [$nestedProducerOps, $outerArgSends] = $this->partitionNestedInlineCallArgProducerOps($argSends);
         $this->rewireArrayBuiltinAdjacentFuncCallArgSendSlots(
@@ -45925,15 +45974,6 @@ class Compiler {
         foreach ($nestedProducerOps as $op) {
             $return[] = $op;
         }
-        $init = new OpCode(
-            OpCode::TYPE_FUNCCALL_INIT,
-            $callName,
-            $startLine > 0 ? $startLine : null
-        );
-        if (null !== $cfgCallOp) {
-            $this->assignSourceMetadata($init, $cfgCallOp);
-        }
-        $return[] = $init;
         foreach ($outerArgSends as $send) {
             if (OpCode::TYPE_ASSIGN !== $send->type) {
                 $return[] = $send;
