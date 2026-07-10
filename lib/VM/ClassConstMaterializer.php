@@ -140,6 +140,21 @@ final class ClassConstMaterializer
                     $stored->object($srcObj);
                     break;
                 }
+                // Enum case singletons — preserve isEnumCase metadata (#17704 regression, #17744).
+                if (EnumCaseSupport::isEnumCase($srcObj)) {
+                    $backing = new Variable(Variable::TYPE_NULL);
+                    $backing->null();
+                    if (null !== $srcObj->enumCaseValue) {
+                        $backing->copyFrom($srcObj->enumCaseValue);
+                    }
+                    $objVar = EnumCaseSupport::createCase(
+                        $srcObj->class,
+                        $srcObj->enumCaseName ?? '',
+                        $backing
+                    );
+                    $stored->object($objVar->toObject());
+                    break;
+                }
                 $detached = new ObjectEntry($srcObj->class);
                 $detached->constructed = $srcObj->constructed;
                 foreach ($srcObj->propertiesWithNames() as $propName => $propVar) {

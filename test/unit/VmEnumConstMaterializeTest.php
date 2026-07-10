@@ -44,6 +44,28 @@ PHP;
         $this->assertTrue(EnumCaseSupport::isEnumCaseVariable($classConst));
     }
 
+    public function testDetachConstantValuePreservesEnumCaseMetadata(): void
+    {
+        $code = <<<'PHP'
+<?php
+enum E: string {
+    case A = 'a';
+}
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'enum_detach_case.php');
+        $runtime->run($block);
+        $enum = $runtime->vmContext->classes['e'];
+        $canonical = $enum->constants['a'];
+        $this->assertTrue(EnumCaseSupport::isEnumCaseVariable($canonical));
+
+        $detached = \PHPCompiler\VM\ClassConstMaterializer::detachConstantValue($canonical);
+        $this->assertTrue(EnumCaseSupport::isEnumCaseVariable($detached));
+        $object = $detached->toObject();
+        $this->assertSame('A', $object->enumCaseName);
+        $this->assertSame('a', $object->enumCaseValue?->toString());
+    }
+
     public function testMaterializeConstantValueUpgradesLegacyBackingScalar(): void
     {
         $code = <<<'PHP'
