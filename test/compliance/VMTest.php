@@ -611,6 +611,7 @@ class VMTest extends BaseTest {
                     || str_contains($name, 'lazy_ghost_trait')
                     || str_contains($name, 'class_has_lazy_object_initializer')
                     || str_contains($name, 'class_has_lazy_object_uninitializer')
+                    || str_contains($name, 'is_uninitialized_lazy_object')
                     || str_contains($name, 'reflection_lazy_property')
                     || str_contains($name, 'reflection_property_set_raw_without_lazy')
                     || str_contains($name, 'reflection_property_skip_lazy'))
