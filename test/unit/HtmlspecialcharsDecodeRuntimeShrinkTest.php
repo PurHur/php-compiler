@@ -19,10 +19,11 @@ final class HtmlspecialcharsDecodeRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('quoteBothFlag', $source);
     }
 
-    public function testHtmlspecialcharsDecodeJitHelperDelegatesToVmString(): void
+    public function testHtmlspecialcharsDecodeJitHelperMirrorsVmStringSemantics(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/HtmlspecialcharsDecodeJitHelper.php');
-        $this->assertStringContainsString('VmString::htmlspecialchars_decode', $source);
+        $this->assertStringContainsString('entityAt', $source);
+        $this->assertStringContainsString('Self-contained', $source);
 
         $input = '&lt;a&gt;&quot;b&#039;c';
         $flags = ENT_QUOTES | ENT_HTML5;
@@ -35,5 +36,11 @@ final class HtmlspecialcharsDecodeRuntimeShrinkTest extends TestCase
         $spine = (string) file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
         $this->assertStringContainsString('HtmlspecialcharsDecodeJitHelper.php', $spine);
         $this->assertStringContainsString('StringHtmlspecialcharsDecode.php', $spine);
+    }
+
+    public function testJitHtmlspecialcharsDecodeEnsuresLazyBridgeLink(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/JitHtmlspecialcharsDecode.php');
+        $this->assertStringContainsString('StringHtmlspecialcharsDecode::ensureLinked', $source);
     }
 }
