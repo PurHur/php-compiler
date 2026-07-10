@@ -426,7 +426,7 @@ final class ForwardProfilePhantomIntrospectionTest extends TestCase
         }
     }
 
-    public function testGraphemeProfile84BuiltinsCallableAndAdvertisedWithoutIntl(): void
+    public function testGraphemeProfile84BuiltinsNotAdvertisedWithoutIntl(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE=8.4');
@@ -434,6 +434,7 @@ final class ForwardProfilePhantomIntrospectionTest extends TestCase
             $this->assertTrue(CompilerVersion::supportsGraphemeStrContains());
             $this->assertTrue(CompilerVersion::supportsGraphemeStrimwidth());
             $this->assertTrue(CompilerVersion::supportsGraphemeForwardProfileCore());
+            $this->assertFalse(CompilerVersion::advertisesGraphemeForwardProfileCore());
             $this->assertFalse(
                 \PHPCompiler\ext\standard\ModuleRegistry::extensionLoaded('intl')
             );
@@ -446,7 +447,10 @@ final class ForwardProfilePhantomIntrospectionTest extends TestCase
                 'grapheme_str_contains',
                 'grapheme_strimwidth',
             ] as $fn) {
-                $this->assertTrue(BuiltinIntrospectionPolicy::functionIsAdvertised($fn), $fn);
+                $this->assertFalse(
+                    BuiltinIntrospectionPolicy::functionIsAdvertised($fn),
+                    $fn.' must not be advertised on forward 8.4 profile without intl'
+                );
             }
 
             $runtime = new Runtime();
@@ -460,10 +464,13 @@ final class ForwardProfilePhantomIntrospectionTest extends TestCase
                 'grapheme_str_contains',
                 'grapheme_strimwidth',
             ] as $fn) {
-                $this->assertTrue(isset($ctx->functions[$fn]));
-                $this->assertTrue(
+                $this->assertFalse(
+                    isset($ctx->functions[$fn]),
+                    $fn.' must not be registered without ext/intl'
+                );
+                $this->assertFalse(
                     \PHPCompiler\ext\standard\VmReflection::functionExists($ctx, $fn),
-                    $fn.' must be visible on forward 8.4 profile'
+                    $fn.' must not be visible on forward 8.4 profile without intl'
                 );
             }
         } finally {

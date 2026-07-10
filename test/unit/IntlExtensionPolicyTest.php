@@ -93,16 +93,16 @@ final class IntlExtensionPolicyTest extends TestCase
         }
     }
 
-    public function testGraphemeCoreAdvertisedOnForwardProfile84(): void
+    public function testGraphemeCoreWithheldOnForwardProfile84WithoutIntl(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE=8.4');
         try {
             self::assertTrue(CompilerVersion::supportsGraphemeForwardProfileCore());
-            self::assertTrue(CompilerVersion::advertisesGraphemeForwardProfileCore());
-            self::assertTrue(IntlExtensionPolicy::advertisesGraphemeCore());
-            self::assertTrue(IntlExtensionPolicy::advertisesGraphemeStrContains());
-            self::assertTrue(IntlExtensionPolicy::advertisesGraphemeStrimwidth());
+            self::assertFalse(CompilerVersion::advertisesGraphemeForwardProfileCore());
+            self::assertFalse(IntlExtensionPolicy::advertisesGraphemeCore());
+            self::assertFalse(IntlExtensionPolicy::advertisesGraphemeStrContains());
+            self::assertFalse(IntlExtensionPolicy::advertisesGraphemeStrimwidth());
             self::assertFalse(IntlExtensionPolicy::advertisesBuiltins());
 
             $runtime = new Runtime();
@@ -116,10 +116,10 @@ final class IntlExtensionPolicyTest extends TestCase
                 'grapheme_str_contains',
                 'grapheme_strimwidth',
             ] as $fn) {
-                self::assertTrue(isset($ctx->functions[$fn]));
-                self::assertTrue(
+                self::assertFalse(isset($ctx->functions[$fn]), $fn.' must not register without ext/intl');
+                self::assertFalse(
                     ext\standard\VmReflection::functionExists($ctx, $fn),
-                    $fn.' must be visible on forward 8.4 profile'
+                    $fn.' must not be visible on forward 8.4 profile without intl'
                 );
             }
             foreach (['grapheme_stripos', 'grapheme_stristr', 'grapheme_strrpos'] as $fn) {

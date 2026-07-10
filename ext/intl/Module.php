@@ -54,7 +54,6 @@ class Module extends ModuleAbstract
             return [
                 ...$functions,
                 ...IntlExtensionPolicy::profileLocaleParserFunctions(),
-                ...IntlExtensionPolicy::profileGraphemeFunctions(),
             ];
         }
 
