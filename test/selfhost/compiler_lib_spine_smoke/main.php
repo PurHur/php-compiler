@@ -211,6 +211,7 @@ require_once __DIR__.'/../../../ext/dom/ElementSetIdAttribute.php';
 require_once __DIR__.'/../../../ext/dom/ElementSetIdAttributeNS.php';
 require_once __DIR__.'/../../../ext/dom/FragmentAppendChild.php';
 require_once __DIR__.'/../../../ext/dom/FragmentAppendXML.php';
+require_once __DIR__.'/../../../ext/dom/FragmentConstruct.php';
 require_once __DIR__.'/../../../ext/dom/ImplementationCreateDocument.php';
 require_once __DIR__.'/../../../ext/dom/ImplementationCreateDocumentType.php';
 require_once __DIR__.'/../../../ext/dom/ImplementationGetFeature.php';
