@@ -9,7 +9,7 @@ use PHPCompiler\VM\Variable;
 use PHPCompiler\Web\Superglobals;
 
 /**
- * array_find family string-builtin path for compiled JIT/AOT modules (#14842, php-in-PHP).
+ * array_find family string-callback paths for compiled JIT/AOT modules (#14842, #17674, php-in-PHP).
  *
  * SSOT shared with {@see array_find} VM execute() via {@see VmArrayValueCallback}.
  * php-src: ext/standard/array.c — php_array_find, php_array_find_key, php_array_any, php_array_all
@@ -28,60 +28,66 @@ final class ArrayFindJitHelper
 
     public const MODE_ANY_KEY = 5;
 
-    public static function walkWithBuiltin(HashTable $ht, string $builtinName, int $mode): Variable
-    {
-        $fn = VmInternalCall::resolveStringCallback($builtinName);
-        $unaryUsesKey = self::MODE_ALL_KEY === $mode || self::MODE_ANY_KEY === $mode;
-        $keyFirst = self::MODE_ALL_KEY === $mode || self::MODE_ANY_KEY === $mode;
-        $out = new Variable();
-        foreach ($ht->iterateKeyed(true) as [$key, $value]) {
-            $item = new Variable();
-            $item->copyFrom($value);
-            $keyVar = new Variable();
-            $keyVar->copyFrom($key);
-            $result = VmArrayFindInternalInvoke::invoke($fn, $item, $keyVar, $unaryUsesKey, $keyFirst);
-            $truthy = VmArrayValueCallback::isTruthy($result);
-            if (self::MODE_ANY === $mode || self::MODE_ANY_KEY === $mode) {
-                if ($truthy) {
-                    $out->bool(true);
-
-                    return $out;
-                }
-
-                continue;
+    /**
+     * Walk hashtable with a compile-time string callback (stdlib builtin or user function).
+     */
+    public static function walkWithNamedCallback(
+        HashTable $ht,
+        string $name,
+        int $mode,
+        bool $strict,
+        bool $unaryInternalUsesKey = false,
+    ): Variable {
+        $ctx = Superglobals::getActiveContext();
+        $function = self::functionNameForMode($mode);
+        $keyFirst = VmArrayValueCallback::callbackKeyFirst($function) || $unaryInternalUsesKey;
+        $unaryUsesKey = $unaryInternalUsesKey || self::unaryInternalUsesKey($mode);
+        try {
+            $fn = VmInternalCall::resolveStringCallback($name);
+            $invoke = static function (Variable $item, Variable $keyVar) use (
+                $fn,
+                $unaryUsesKey,
+                $keyFirst
+            ): Variable {
+                return VmArrayFindInternalInvoke::invoke($fn, $item, $keyVar, $unaryUsesKey, $keyFirst);
+            };
+        } catch (\LogicException) {
+            if (null === $ctx) {
+                throw new \LogicException(
+                    'ArrayFindJitHelper::walkWithNamedCallback() requires an active VM context in this compiler build'
+                );
             }
-            if (self::MODE_ALL === $mode || self::MODE_ALL_KEY === $mode) {
-                if (!$truthy) {
-                    $out->bool(false);
-
-                    return $out;
-                }
-
-                continue;
-            }
-            if ($truthy) {
-                if (self::MODE_FIND_KEY === $mode) {
-                    $out->copyFrom($key);
-                } else {
-                    $out->copyFrom($value);
-                }
-
-                return $out;
-            }
-        }
-        if (self::MODE_ANY === $mode || self::MODE_ANY_KEY === $mode) {
-            $out->bool(false);
-        } elseif (self::MODE_ALL === $mode || self::MODE_ALL_KEY === $mode) {
-            $out->bool(true);
-        } else {
-            $out->null();
+            $userFn = VmUserCall::resolveStringCallback($ctx, $name);
+            $invoke = static function (Variable $item, Variable $keyVar) use (
+                $ctx,
+                $userFn,
+                $keyFirst
+            ): Variable {
+                return VmUserCall::invokeTwo(
+                    $ctx,
+                    $userFn,
+                    $keyFirst ? $keyVar : $item,
+                    $keyFirst ? $item : $keyVar,
+                );
+            };
         }
 
-        return $out;
+        return self::walkWithPredicate($ht, $mode, $strict, $invoke);
     }
 
-    public static function walkWithClosure(HashTable $ht, Variable $closure, int $mode, bool $strict): Variable
+    /** @deprecated use walkWithNamedCallback — strict=false preserved for legacy ABI callers */
+    public static function walkWithBuiltin(HashTable $ht, string $builtinName, int $mode): Variable
     {
+        return self::walkWithNamedCallback($ht, $builtinName, $mode, false);
+    }
+
+    public static function walkWithClosure(
+        HashTable $ht,
+        Variable $closure,
+        int $mode,
+        bool $strict,
+        bool $unaryInternalUsesKey = false,
+    ): Variable {
         $ctx = Superglobals::getActiveContext();
         if (null === $ctx) {
             throw new \LogicException(
@@ -90,19 +96,39 @@ final class ArrayFindJitHelper
         }
         $closureState = VmClosureCall::resolve($closure);
         $function = self::functionNameForMode($mode);
-        $keyFirst = VmArrayValueCallback::callbackKeyFirst($function);
+        $keyFirst = VmArrayValueCallback::callbackKeyFirst($function) || $unaryInternalUsesKey;
+        $invoke = static function (Variable $item, Variable $keyVar) use (
+            $ctx,
+            $closureState,
+            $keyFirst
+        ): Variable {
+            return VmClosureCall::invoke(
+                $ctx,
+                $closureState,
+                $keyFirst ? $keyVar : $item,
+                $keyFirst ? $item : $keyVar,
+            );
+        };
+
+        return self::walkWithPredicate($ht, $mode, $strict, $invoke);
+    }
+
+    /**
+     * @param callable(Variable, Variable): Variable $invokePredicate
+     */
+    private static function walkWithPredicate(
+        HashTable $ht,
+        int $mode,
+        bool $strict,
+        callable $invokePredicate
+    ): Variable {
         $out = new Variable();
         foreach ($ht->iterateKeyed(true) as [$key, $value]) {
             $item = new Variable();
             $item->copyFrom($value);
             $keyVar = new Variable();
             $keyVar->copyFrom($key);
-            $result = VmClosureCall::invoke(
-                $ctx,
-                $closureState,
-                $keyFirst ? $keyVar : $item,
-                $keyFirst ? $item : $keyVar,
-            );
+            $result = $invokePredicate($item, $keyVar);
             $matches = VmArrayValueCallback::predicateMatches($result, $strict);
             if (self::MODE_ANY === $mode || self::MODE_ANY_KEY === $mode) {
                 if ($matches) {
@@ -141,6 +167,11 @@ final class ArrayFindJitHelper
         }
 
         return $out;
+    }
+
+    private static function unaryInternalUsesKey(int $mode): bool
+    {
+        return self::MODE_ALL_KEY === $mode || self::MODE_ANY_KEY === $mode;
     }
 
     private static function functionNameForMode(int $mode): string

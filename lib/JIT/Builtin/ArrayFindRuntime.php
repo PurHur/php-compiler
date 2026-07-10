@@ -6,7 +6,7 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\ArrayFindCallbackPolicy;
-use PHPCompiler\JIT\ArrayMapCallbackPolicy;
+use PHPCompiler\JIT\ArrayReduceCallbackPolicy;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\JitVmHelperLink;
@@ -14,28 +14,27 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * JIT/AOT link for array_find family via ArrayFindJitHelper PHP (#14842, #17547).
+ * JIT/AOT link for array_find family via ArrayFindJitHelper PHP (#14842, #17547, #17674).
  *
- * String-builtin and closure callbacks route through nested PHP helpers; compile-unit
- * user-function callbacks still use {@see \PHPCompiler\JIT\ArrayFindHelper} LLVM.
+ * String and closure callbacks route through nested PHP helpers.
  * SSOT: {@see \PHPCompiler\ext\standard\array_find} and siblings.
  * php-src: ext/standard/array.c
  */
 final class ArrayFindRuntime
 {
-    private const ABI_FIND = '__array_find__builtin';
+    private const ABI_FIND = '__array_find__named';
 
     private const ABI_FIND_CLOSURE = '__array_find__closure';
 
     private const HELPER_PATH = '/ext/standard/ArrayFindJitHelper.php';
 
-    private const WALK_HELPER = 'PHPCompiler\\ext\\standard\\ArrayFindJitHelper::walkWithBuiltin';
+    private const WALK_NAMED_HELPER = 'PHPCompiler\\ext\\standard\\ArrayFindJitHelper::walkWithNamedCallback';
 
     private const WALK_CLOSURE_HELPER = 'PHPCompiler\\ext\\standard\\ArrayFindJitHelper::walkWithClosure';
 
     /** @var list<string> */
     private const COMPILED_HELPERS = [
-        self::WALK_HELPER,
+        self::WALK_NAMED_HELPER,
         self::WALK_CLOSURE_HELPER,
     ];
 
@@ -43,12 +42,14 @@ final class ArrayFindRuntime
         Context $context,
         JITVariable $array,
         JITVariable $callback,
-        int $mode
+        int $mode,
+        Value $strictI1,
+        bool $unaryInternalUsesKey = false,
     ): Value {
         if ($callback->isNullConstant) {
             throw new \TypeError(ArrayFindCallbackPolicy::invalidCallbackTypeError('array_find'));
         }
-        if (!self::isStringBuiltinCallback($callback)) {
+        if (!self::isStringCallback($callback)) {
             throw new \LogicException(ArrayFindCallbackPolicy::jitRejectionMessage());
         }
         $name = $callback->compileTimeString;
@@ -59,12 +60,15 @@ final class ArrayFindRuntime
         self::ensureLinked($context);
         $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
         $modeVal = $context->constantFromInteger($mode, 'int64');
+        $unaryKeyI1 = $context->constantFromBool($unaryInternalUsesKey);
 
         return $context->builder->call(
             $context->lookupFunction(self::ABI_FIND),
             $ht,
             $context->constantFromString($name),
-            $modeVal
+            $modeVal,
+            $strictI1,
+            $unaryKeyI1
         );
     }
 
@@ -73,7 +77,8 @@ final class ArrayFindRuntime
         JITVariable $array,
         JITVariable $callback,
         int $mode,
-        Value $strictI1
+        Value $strictI1,
+        bool $unaryInternalUsesKey = false,
     ): Value {
         if ($callback->isNullConstant) {
             throw new \TypeError(ArrayFindCallbackPolicy::invalidCallbackTypeError('array_find'));
@@ -91,7 +96,8 @@ final class ArrayFindRuntime
             $ht,
             JitValueBox::valuePtrFromVariable($context, $callback),
             $modeVal,
-            $strictI1
+            $strictI1,
+            $context->constantFromBool($unaryInternalUsesKey)
         );
     }
 
@@ -128,18 +134,18 @@ final class ArrayFindRuntime
             $context,
             self::ABI_FIND,
             'array_find_bridge_entry',
-            [$htPtr, $strPtr, $i64],
+            [$htPtr, $strPtr, $i64, $i1, $i1],
             $valuePtr,
-            self::WALK_HELPER,
+            self::WALK_NAMED_HELPER,
             self::HELPER_PATH,
             self::COMPILED_HELPERS,
-            '#14842'
+            '#17674'
         );
         JitVmHelperLink::ensureBridge(
             $context,
             self::ABI_FIND_CLOSURE,
             'array_find_closure_bridge_entry',
-            [$htPtr, $valuePtr, $i64, $i1],
+            [$htPtr, $valuePtr, $i64, $i1, $i1],
             $valuePtr,
             self::WALK_CLOSURE_HELPER,
             self::HELPER_PATH,
@@ -155,9 +161,9 @@ final class ArrayFindRuntime
         }
     }
 
-    private static function isStringBuiltinCallback(JITVariable $callback): bool
+    private static function isStringCallback(JITVariable $callback): bool
     {
-        return ArrayMapCallbackPolicy::isJitLowerableScalar(
+        return ArrayReduceCallbackPolicy::isJitLowerableScalar(
             $callback->type,
             $callback->isNullConstant,
             $callback->compileTimeString
@@ -181,7 +187,7 @@ final class ArrayFindRuntime
         foreach ([self::ABI_FIND, self::ABI_FIND_CLOSURE] as $name) {
             $fn = $context->module->getNamedFunction($name);
             if (null === $fn || 0 === $fn->countBasicBlocks()) {
-                throw new \LogicException($name.' missing after ArrayFindRuntime bridge (#17547)');
+                throw new \LogicException($name.' missing after ArrayFindRuntime bridge (#17674)');
             }
             $context->registerFunction($name, $fn);
         }
