@@ -941,6 +941,17 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.4+ `readonly function` / `readonly fn` declarations (#17657).
+     *
+     * Gated on {@see languageProfileVersion()} so 8.4.0-dev reference profile rejects like Zend 8.2.
+     * php-src: Zend/zend_compile.c ZEND_ACC_READONLY_FUNCTION; zend_ast.c ZEND_AST_FUNC_DECL.
+     */
+    public static function supportsReadonlyFunction(): bool
+    {
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+    }
+
+    /**
      * PHP 8.4+ try/catch/else — else runs when no exception was thrown (#15817).
      *
      * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev reference profile matches Zend 8.2

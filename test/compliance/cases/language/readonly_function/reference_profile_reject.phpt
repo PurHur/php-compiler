@@ -1,5 +1,5 @@
 --TEST--
-Language: readonly function declaration rejected — php-src parse error (#10012)
+Language: readonly function declaration rejected on reference profile (#10012, #17657)
 --SKIPIF--
 <?php
 if (!class_exists('PHPCompiler\\CompilerVersion')) {
@@ -11,7 +11,9 @@ if (PHPCompiler\CompilerVersion::supportsReadonlyFunction()) {
 ?>
 --FILE--
 <?php
-readonly function f(): int { return 1; }
-echo f();
+readonly function f(): void {
+    echo "ok\n";
+}
+f();
 --EXPECT_EXIT--
 255
