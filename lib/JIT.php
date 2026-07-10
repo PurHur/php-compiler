@@ -318,6 +318,7 @@ class JIT {
             $this->context->scopeStack = [];
             $this->context->inlineIncludeReturnOperands = [];
             $this->context->coalesceAssignTargets = new \SplObjectStorage();
+            $this->context->coalesceMergeSlotOperands = [];
             $this->context->listUnpackSkipAssignPath = false;
             $this->context->listUnpackMergeLlvmBlocks = new \SplObjectStorage();
             $this->context->listUnpackMergeNullInitTargets = [];
@@ -7003,7 +7004,15 @@ class JIT {
                     break;
                 case OpCode::TYPE_ASSIGN:
                     $rhsSlot = $this->assignRhsSlot($op);
-                    $value = $this->context->getVariableFromOp($block->getOperand($rhsSlot));
+                    $rhsOperand = $block->getOperand($rhsSlot);
+                    if (isset($this->context->coalesceMergeSlotOperands[(int) $rhsSlot])) {
+                        $value = $this->materializeCoalesceMergeSlotArgSend(
+                            $block,
+                            $this->context->coalesceMergeSlotOperands[(int) $rhsSlot]
+                        );
+                    } else {
+                        $value = $this->context->getVariableFromOp($rhsOperand);
+                    }
                     $destOp = $block->getOperand($op->arg1);
                     $aliasOp = $block->getOperand($op->arg2);
                     if (null !== $this->context->ternarySharedReturnSlot && $this->isTernaryBranchMergeAssign($block, $op)) {
@@ -8586,6 +8595,10 @@ class JIT {
                     $builder->positionAtEnd($branchBlock);
                     $coalesceResult = $block->getOperand($op->arg1);
                     $this->context->coalesceAssignTargets[$coalesceResult] = true;
+                    $mergeSlot = $block->slotForOperand($coalesceResult);
+                    if (null !== $mergeSlot) {
+                        $this->context->coalesceMergeSlotOperands[$mergeSlot] = $coalesceResult;
+                    }
                     $condition = JIT\CoalesceHelper::isTakeLeftBranch(
                         $this,
                         $this->context->getVariableFromOp($block->getOperand($op->arg2))
@@ -9175,7 +9188,29 @@ class JIT {
                     if ($this->context->inlineIncludeDepth > 0) {
                         JIT\IncludeHelper::refreshInlineIncludeBindings($this->context);
                     }
-                    $sendValue = $this->context->getVariableFromOp($block->getOperand($op->arg1));
+                    $sendSlot = (int) $op->arg1;
+                    $coalesceMergeOperand = $this->context->coalesceMergeSlotOperands[$sendSlot] ?? null;
+                    $sendOperand = $coalesceMergeOperand ?? $block->getOperand($sendSlot);
+                    if (
+                        null !== $sendOperand
+                        && !$this->context->hasVariableOp($sendOperand)
+                    ) {
+                        $this->context->aliasVariableOpFromSlot($block, $sendOperand);
+                    }
+                    if (null !== $coalesceMergeOperand) {
+                        $sendValue = $this->materializeCoalesceMergeSlotArgSend($block, $sendOperand);
+                    } else {
+                        $sendValue = $this->context->getVariableFromOp($sendOperand);
+                        if (
+                            Variable::TYPE_VALUE === $sendValue->type
+                            && Variable::KIND_VARIABLE === $sendValue->kind
+                        ) {
+                            JIT\JitValueBox::publishAfterWrite(
+                                $this->context,
+                                JIT\JitValueBox::pointer($this->context, $sendValue->value)
+                            );
+                        }
+                    }
                     if (null !== $op->arg3) {
                         $this->context->scope->args[] = ['unpack' => $sendValue];
                         $this->context->scope->argOperands[] = $block->getOperand($op->arg1);
@@ -12090,6 +12125,47 @@ class JIT {
         $this->context->listUnpackAssignSlots[
             $this->context->resolveRefAliasName($name)
         ] = $slot;
+    }
+
+    /**
+     * Chained ?? call-arg merge slots may carry isNullConstant from a dead CFG arm when
+     * the send block was compiled early; copy the live boxed value at the send site (#17590).
+     */
+    private function materializeCoalesceMergeSlotArgSend(Block $block, Operand $sendOperand): Variable
+    {
+        if (!$this->context->hasVariableOp($sendOperand)) {
+            $func = $this->context->builder->getInsertBlock()->getParent();
+            $llvmBlock = $this->context->builder->getInsertBlock();
+            $this->context->makeVariableFromOp($func, $llvmBlock, $block, $sendOperand);
+        }
+        $slotVar = $this->context->getVariableFromOp($sendOperand);
+        if (
+            Variable::TYPE_VALUE !== $slotVar->type
+            || Variable::KIND_VARIABLE !== $slotVar->kind
+        ) {
+            $slotVar->isNullConstant = false;
+            $slotVar->compileTimeString = null;
+            $slotVar->compileTimeFloat = null;
+            $slotVar->compileTimeConstantName = null;
+            $slotVar->compileTimeEnumCase = null;
+
+            return $slotVar;
+        }
+        $srcPtr = JIT\JitValueBox::valuePtrFromVariable($this->context, $slotVar);
+        JIT\JitValueBox::publishAfterWrite($this->context, $srcPtr);
+        $destSlot = JIT\JitValueBox::alloc($this->context);
+        JIT\JitValueBox::copyFromPointer($this->context, $destSlot, $srcPtr);
+        JIT\JitValueBox::publishAfterWrite(
+            $this->context,
+            JIT\JitValueBox::pointer($this->context, $destSlot)
+        );
+
+        return new Variable(
+            $this->context,
+            Variable::TYPE_VALUE,
+            Variable::KIND_VARIABLE,
+            $destSlot
+        );
     }
 
     private function prepareNestedJitCalleeParamArgument(Variable $arg): Variable

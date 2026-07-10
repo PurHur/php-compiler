@@ -191,6 +191,9 @@ class Context {
     /** ?? / ?-> result operands that must receive branch assigns even when php-cfg marks them dead (#99, #3219). */
     public \SplObjectStorage $coalesceAssignTargets;
 
+    /** Scope slot => ?? result operand for runtime reload at chained call-arg send (#17590). */
+    public array $coalesceMergeSlotOperands = [];
+
     /** `return $c ? $a : $b` shared merge operand — emit direct returns per arm (#8555 AOT). */
     public ?Operand $ternarySharedReturnOperand = null;
 
