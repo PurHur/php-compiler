@@ -24,6 +24,24 @@ final class CallableCheck
         return EnumCaseSupport::typeNameForVariable($value);
     }
 
+    /** Zend zend_is_callable_ex — scalar invoke ($x()) before function lookup (#17745). */
+    public static function scalarNotCallableMessage(Variable $value): string
+    {
+        return 'Value of type '.self::valueTypeName($value).' is not callable';
+    }
+
+    /** Zend zend_is_callable_ex — object without __invoke (#17745). */
+    public static function objectNotCallableMessage(Variable $value): string
+    {
+        return 'Object of type '.self::valueTypeName($value).' is not callable';
+    }
+
+    /** Zend zend_is_callable_ex — array callback count (#17745). */
+    public static function arrayCallbackTwoElementsMessage(): string
+    {
+        return 'Array callback must have exactly two elements';
+    }
+
     public static function assertParameter(
         Variable $value,
         Context $context,

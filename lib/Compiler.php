@@ -34764,7 +34764,8 @@ class Compiler {
         }
 
         if ($this->operandHasObjectType($operand)
-            && !$this->variableAssignIsNullableClosureBinding($operand, $block)) {
+            && !$this->variableAssignIsNullableClosureBinding($operand, $block)
+            && $this->operandObjectTypeHasProvableInvoke($operand, $block)) {
             return true;
         }
         $root = $this->unwrapOperandChain($operand);
@@ -34773,7 +34774,7 @@ class Compiler {
             return true;
         }
         if ($root instanceof Op\Expr\New_) {
-            return true;
+            return $this->newExprHasInvokeMethod($root, $block);
         }
         if (null === $block->orig) {
             return false;
@@ -34789,18 +34790,77 @@ class Compiler {
                 continue;
             }
             if ($this->operandDerivesFromNew($child->expr, $block)) {
-                return true;
+                $new = $this->findNewExprForCalleeOperand($operand, $block);
+                if (null !== $new && $this->newExprHasInvokeMethod($new, $block)) {
+                    return true;
+                }
+                continue;
             }
             if ($this->operandDerivesFromClosure($child->expr)) {
                 return true;
             }
-            if ($this->operandHasObjectType($child->expr)) {
+            if ($this->operandHasObjectType($child->expr)
+                && $this->operandObjectTypeHasProvableInvoke($child->expr, $block)) {
                 return true;
             }
             if ($child->expr instanceof Op\Expr\ClassConstFetch
                 && $this->classConstFetchIsInvokableEnumCase($child->expr, $block)) {
                 return true;
             }
+        }
+
+        return false;
+    }
+
+    /**
+     * Only rewrite `$v()` to `$v->__invoke()` when __invoke is provable at compile time (#17745).
+     *
+     * Untyped or non-invokable objects keep FUNCCALL_INIT so Zend callable errors apply.
+     */
+    protected function operandObjectTypeHasProvableInvoke(Operand $operand, Block $block): bool
+    {
+        if ($this->callArgOperandIsAssignedClosure($operand, $block)) {
+            return true;
+        }
+        $new = $this->findNewExprForCalleeOperand($operand, $block);
+        if (null !== $new) {
+            return $this->newExprHasInvokeMethod($new, $block);
+        }
+        $className = $this->unwrapOperandChain($operand)->type?->userType;
+        if (null === $className || '' === ltrim($className, '\\')) {
+            return false;
+        }
+        $lcClass = strtolower(ltrim($className, '\\'));
+        if ('closure' === $lcClass) {
+            return true;
+        }
+
+        return $this->declaredClassHasInstanceMethod($lcClass, '__invoke', $block);
+    }
+
+    /**
+     * @param non-empty-string $lcClass
+     */
+    protected function declaredClassHasInstanceMethod(string $lcClass, string $methodLc, Block $block): bool
+    {
+        if (null === $block->orig) {
+            return false;
+        }
+        foreach ($block->orig->children as $child) {
+            if (!$child instanceof Op\Stmt\Class_) {
+                continue;
+            }
+            $name = $this->literalScopeClassName($child->name);
+            if (null === $name || strtolower($name) !== $lcClass) {
+                continue;
+            }
+            foreach ($child->stmts->children as $stmt) {
+                if ($stmt instanceof Op\Stmt\ClassMethod && strtolower($stmt->func->name) === $methodLc) {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         return false;
