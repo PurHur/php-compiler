@@ -614,6 +614,10 @@ final class VmDom
         $fragment = new ClassEntry('DOMDocumentFragment');
         $fragment->isInternal = true;
         $fragment->parentLc = self::CLASS_NODE;
+        $fragmentConstruct = new FragmentConstruct();
+        $fragment->constructor = $fragmentConstruct;
+        $fragment->methods['__construct'] = $fragmentConstruct;
+        $fragment->methodVisibility['__construct'] = $pub;
         $fragment->properties[] = new ClassProperty(self::PROP_NODE_NAME, null, $strProto);
         $fragment->methods['appendchild'] = new FragmentAppendChild();
         $fragment->methodVisibility['appendchild'] = $pub;
@@ -681,6 +685,7 @@ final class VmDom
             $state->doctypeSystemId = $dt->systemId;
         }
         DomRegistry::attach($entry, $state);
+        self::ensureChildNodesList($ctx, $entry);
 
         if ('' !== $qualifiedName) {
             $rootVar = null !== $namespaceUri && '' !== $namespaceUri
@@ -830,6 +835,7 @@ final class VmDom
         if (CompilerVersion::supportsDomTokenList()) {
             self::syncElementClassList($ctx, $entry);
         }
+        self::ensureChildNodesList($ctx, $entry);
 
         $var = new Variable(Variable::TYPE_OBJECT);
         $var->object($entry);
@@ -868,6 +874,7 @@ final class VmDom
         if (CompilerVersion::supportsDomTokenList()) {
             self::syncElementClassList($ctx, $entry);
         }
+        self::ensureChildNodesList($ctx, $entry);
 
         $var = new Variable(Variable::TYPE_OBJECT);
         $var->object($entry);
@@ -1934,6 +1941,7 @@ final class VmDom
         $state->nodeType = DomConstants::XML_DOCUMENT_FRAG_NODE;
         $state->nodeName = '#document-fragment';
         DomRegistry::attach($entry, $state);
+        self::ensureChildNodesList($ctx, $entry);
 
         $var = new Variable(Variable::TYPE_OBJECT);
         $var->object($entry);
@@ -4782,6 +4790,26 @@ final class VmDom
                 self::propagateDocumentId($child, $documentId);
             }
         }
+    }
+
+    /** Zend dom_node_child_nodes_read — empty DOMNodeList before first mutation (ext/dom/node.c; #17617). */
+    public static function ensureChildNodesList(Context $ctx, ObjectEntry $node): void
+    {
+        if (!DomRegistry::has($node)) {
+            return;
+        }
+        if (!self::isElement($node)
+            && !self::isDocument($node)
+            && !self::isDocumentFragment($node)
+        ) {
+            return;
+        }
+        self::initNodePropertySlots($node);
+        $childNodesVar = $node->getProperty(self::PROP_CHILD_NODES)->resolveIndirect();
+        if (Variable::TYPE_OBJECT === $childNodesVar->type && self::isNodeList($childNodesVar->toObject())) {
+            return;
+        }
+        self::syncNodeLinks($ctx, $node);
     }
 
     private static function syncSubtree(Context $ctx, ObjectEntry $node): void
