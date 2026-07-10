@@ -132,6 +132,9 @@ final class HighlightEngine
         if ($id === $ids['T_VARIABLE']) {
             return self::COLOR_DEFAULT;
         }
+        if ($id === $ids['T_INLINE_HTML']) {
+            return self::COLOR_DEFAULT;
+        }
         if ($id >= 256) {
             return self::COLOR_KEYWORD;
         }
@@ -144,6 +147,7 @@ final class HighlightEngine
         $escaped = \htmlspecialchars($text, \ENT_QUOTES | \ENT_SUBSTITUTE, 'UTF-8');
         $escaped = \str_replace(' ', '&nbsp;', $escaped);
         $escaped = \str_replace("\t", '&nbsp;&nbsp;&nbsp;&nbsp;', $escaped);
+        $escaped = \str_replace("\n", '<br />', $escaped);
 
         return $escaped;
     }
