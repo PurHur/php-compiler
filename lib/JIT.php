@@ -7905,8 +7905,9 @@ class JIT {
                         if (null !== ($newVal->compileTimeString ?? null)) {
                             $result->compileTimeString = $newVal->compileTimeString;
                         }
-                    } elseif ($op->arg1 === $op->arg2) {
-                        // In-place concat chain: __string__realloc invalidates pre-load left pointer (#17522).
+                    } else {
+                        // Fresh and in-place native concat: JitStringConcat + store. Avoid
+                        // string->concat __string__realloc on entry allocas (AOT strlen→0, #15642).
                         $leftVar = $this->context->helper->loadValue(
                             JIT\JitNativeString::coerce($this->context, $left)
                         );
@@ -7919,8 +7920,6 @@ class JIT {
                             $rightVar
                         );
                         $this->context->builder->store($newStr, $result->value);
-                    } else {
-                        $this->context->type->string->concat($result, $left, $right);
                     }
                     if (
                         null !== ($left->compileTimeString ?? null)
