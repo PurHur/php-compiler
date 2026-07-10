@@ -920,6 +920,8 @@ class Context {
         Builtin\StringHtmlspecialcharsDecode::ensureStandaloneBodies($this);
         ExceptionBridge::ensureStandaloneBodies($this);
         ErrorBridge::ensureStandaloneBodies($this);
+        Builtin\ErrorHandlerJitRuntime::ensureStandaloneBodies($this);
+        Builtin\ExceptionHandlerJitRuntime::ensureStandaloneBodies($this);
         Builtin\StreamLifecycleRuntime::ensureDeferredStubsForInventoryEmit($this);
         Builtin\StreamBucketRuntime::ensureDeferredStubsForInventoryEmit($this);
         Builtin\StreamReadRuntime::ensureDeferredStubsForInventoryEmit($this);

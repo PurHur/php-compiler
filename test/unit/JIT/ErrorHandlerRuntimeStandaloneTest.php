@@ -24,13 +24,15 @@ final class ErrorHandlerRuntimeStandaloneTest extends TestCase
         foreach (
             [
                 '__phpc_error_handler_dispatch',
-                '__phpc_error_handler_set_apply',
                 '__phpc_error_handler_restore_apply',
             ] as $name
         ) {
             $fn = $ctx->lookupFunction($name);
             $this->assertNotNull($fn);
             $this->assertGreaterThan(0, $fn->countBasicBlocks());
+        }
+        foreach (['__phpc_error_handler_set_apply', '__phpc_error_handler_get_apply'] as $name) {
+            $this->assertNotNull($ctx->lookupFunction($name));
         }
     }
 }

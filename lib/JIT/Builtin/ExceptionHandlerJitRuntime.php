@@ -52,6 +52,11 @@ final class ExceptionHandlerJitRuntime
         '__phpc_exception_handler_get_apply',
     ];
 
+    public static function ensureStandaloneBodies(Context $context): void
+    {
+        self::implement($context);
+    }
+
     public static function ensureLinked(Context $context): void
     {
         self::implement($context);
