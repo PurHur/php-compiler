@@ -17,7 +17,7 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
 /**
  * JIT/AOT link for array_unshift() via ArrayUnshiftJitHelper PHP (#12717).
  *
- * Standalone AOT compiles {@see ArrayUnshiftJitHelper} via nested JIT bridges (#14316); native literal arrays keep LLVM in {@see ArrayBuiltinHelper::unshift()}.
+ * Standalone AOT compiles {@see ArrayUnshiftJitHelper} via nested JIT bridges (#14316, #17580).
  * SSOT: {@see \PHPCompiler\ext\standard\array_unshift}
  * php-src: ext/standard/array.c — PHP_FUNCTION(array_unshift)
  */
@@ -37,22 +37,23 @@ final class ArrayUnshiftRuntime
 
     public static function unshift(Context $context, JITVariable $array, JITVariable ...$values): Value
     {
-        if (ArrayBuiltinHelper::isNativeArray($array->type)) {
-            return ArrayBuiltinHelper::unshift($context, $array, ...$values);
-        }
-
         self::ensureLinked($context);
         $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
+        $native = ArrayBuiltinHelper::isNativeArray($array->type);
         if (0 === \count($values)) {
-            return self::callCount($context, $ht);
+            $count = self::callCount($context, $ht);
+        } else {
+            $valuesHt = HashTableHelper::alloc($context);
+            foreach ($values as $value) {
+                ArrayBuiltinHelper::appendElement($context, $valuesHt, $value);
+            }
+            $count = self::callPrepend($context, $ht, $valuesHt);
+        }
+        if ($native) {
+            HashTableHelper::storeHashtableInArrayVariable($context, $array, $ht);
         }
 
-        $valuesHt = HashTableHelper::alloc($context);
-        foreach ($values as $value) {
-            ArrayBuiltinHelper::appendElement($context, $valuesHt, $value);
-        }
-
-        return self::callPrepend($context, $ht, $valuesHt);
+        return $count;
     }
 
     public static function ensureLinked(Context $context): void
