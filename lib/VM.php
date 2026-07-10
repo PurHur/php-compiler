@@ -15557,6 +15557,46 @@ restart:
         return null;
     }
 
+    /** Evaluate declared default for ReflectionParameter::getDefaultValue() (#4385, ext/reflection/php_reflection.c). */
+    public function evaluateParameterDefaultForReflection(Block $block, int $paramIndex): ?Variable
+    {
+        if (VM\ReflectionSupport::parameterIsVariadic($block, $paramIndex)) {
+            return null;
+        }
+        if (isset($block->paramRuntimeDefaultInitBlocks[$paramIndex])) {
+            $initBlock = $block->paramRuntimeDefaultInitBlocks[$paramIndex];
+            $resultSlot = $block->paramRuntimeDefaultResultSlots[$paramIndex] ?? null;
+            if (null === $resultSlot) {
+                return null;
+            }
+            $copy = new Variable();
+            $copy->copyFrom($this->executePropertyDefaultInitBlock($initBlock, $resultSlot));
+
+            return $copy;
+        }
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_ARG_RECV !== $op->type || (int) $op->arg2 !== $paramIndex) {
+                continue;
+            }
+            if (null === $op->arg3 || !isset($block->constants[$op->arg3])) {
+                return null;
+            }
+            $default = $block->constants[$op->arg3];
+            $copy = new Variable();
+            if (VM\EnumCaseSupport::isEnumCaseVariable($default)) {
+                $copy->copyFrom(
+                    VM\EnumCaseSupport::materializeConstantValue($this->context, $default)
+                );
+            } else {
+                $copy->copyFrom($default);
+            }
+
+            return $copy;
+        }
+
+        return null;
+    }
+
     private function executePropertyDefaultInitBlock(Block $initBlock, int $resultSlot): Variable
     {
         $initFrame = $initBlock->getFrame($this->context);

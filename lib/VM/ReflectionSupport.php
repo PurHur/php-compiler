@@ -1380,6 +1380,65 @@ final class ReflectionSupport
         return null !== $paramMeta && $paramMeta->isPromoted;
     }
 
+    public static function resolveParameterBlock(Context $ctx, ObjectEntry $reflection): \PHPCompiler\Block
+    {
+        $classNameVar = $reflection->getProperty(self::PROP_CLASS_NAME)->resolveIndirect();
+        if (Variable::TYPE_STRING === $classNameVar->type) {
+            $className = $classNameVar->toString();
+            $method = self::methodNameFromReflection($reflection);
+            $entry = VmReflection::resolveClassEntry($ctx, $className);
+            if (null === $entry) {
+                throw new \LogicException('ReflectionParameter refers to unknown class in this compiler build');
+            }
+            $methodLc = strtolower($method);
+            $func = $entry->methods[$methodLc] ?? null;
+            if (!$func instanceof \PHPCompiler\Func\PHP) {
+                throw new \LogicException('ReflectionParameter refers to unknown method in this compiler build');
+            }
+
+            return $func->block;
+        }
+
+        return self::resolveFunctionForReflectionParameter($ctx, $reflection)->block;
+    }
+
+    public static function parameterIndexForReflection(ObjectEntry $reflection): int
+    {
+        $classNameVar = $reflection->getProperty(self::PROP_CLASS_NAME)->resolveIndirect();
+        if (Variable::TYPE_STRING === $classNameVar->type) {
+            return self::paramPositionFromReflection($reflection);
+        }
+
+        return self::paramIndexFromReflection($reflection);
+    }
+
+    public static function parameterIsVariadic(\PHPCompiler\Block $block, int $paramIndex): bool
+    {
+        return null !== $block->variadicParamIndex && $block->variadicParamIndex === $paramIndex;
+    }
+
+    public static function parameterDefaultValueIsAvailable(\PHPCompiler\Block $block, int $paramIndex): bool
+    {
+        if (self::parameterIsVariadic($block, $paramIndex)) {
+            return false;
+        }
+
+        return ParamArgumentCountError::parameterHasDefault($block, $paramIndex);
+    }
+
+    public static function parameterScopeSlot(\PHPCompiler\Block $block, int $paramIndex): ?int
+    {
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_ARG_RECV !== $op->type || (int) $op->arg2 !== $paramIndex) {
+                continue;
+            }
+
+            return (int) $op->arg1;
+        }
+
+        return null;
+    }
+
     /**
      * @return \PHPCompiler\Func\PHP
      */

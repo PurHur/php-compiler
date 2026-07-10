@@ -33,9 +33,20 @@ final class ReflectionTypeSupport
     public static function buildTypeObject(Context $ctx, CfgType $type): ObjectEntry
     {
         if ($type instanceof CfgType\Nullable) {
+            $subtype = $type->subtype;
+            if (
+                $subtype instanceof CfgType\Literal
+                || $subtype instanceof CfgType\Reference
+                || $subtype instanceof CfgType\Mixed_
+            ) {
+                $inner = self::cfgTypeString($subtype);
+
+                return self::buildNamedObject($ctx, $subtype, '?'.$inner, true);
+            }
+
             return self::buildUnionObject(
                 $ctx,
-                [$type->subtype, new CfgType\Literal('null')],
+                [$subtype, new CfgType\Literal('null')],
                 self::cfgTypeString($type)
             );
         }
@@ -234,13 +245,18 @@ final class ReflectionTypeSupport
         return $obj;
     }
 
-    private static function buildNamedObject(Context $ctx, CfgType $type, string $typeString): ObjectEntry
-    {
+    private static function buildNamedObject(
+        Context $ctx,
+        CfgType $type,
+        string $typeString,
+        ?bool $allowsNullOverride = null,
+    ): ObjectEntry {
         $class = self::requireClass($ctx, ReflectionSupport::REFLECTION_NAMED_TYPE);
         $obj = new ObjectEntry($class);
         $obj->constructed = true;
         $name = self::cfgTypeString($type);
-        self::storeCommonTypeProps($obj, $typeString, self::allowsNullFromCfg($type));
+        $allowsNull = $allowsNullOverride ?? self::allowsNullFromCfg($type);
+        self::storeCommonTypeProps($obj, $typeString, $allowsNull);
         $obj->getProperty(ReflectionSupport::PROP_TYPE_NAME)->string($name);
         $obj->getProperty(ReflectionSupport::PROP_TYPE_BUILTIN)->bool(self::isBuiltinTypeName($name));
         // Named types have no member list; empty array keeps var_export/get_object_vars off uninitialized slots (#9873).
