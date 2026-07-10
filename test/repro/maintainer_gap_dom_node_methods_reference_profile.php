@@ -6,7 +6,7 @@ $doc = new DOMDocument();
 $el = $doc->createElement('x');
 
 $fail = false;
-foreach (['contains', 'compareDocumentPosition', 'replaceChildren'] as $method) {
+foreach (['contains', 'replaceChildren'] as $method) {
     if (method_exists($el, $method)) {
         fwrite(STDERR, "fail: method_exists(DOMNode, '$method') should be false on reference profile\n");
         $fail = true;

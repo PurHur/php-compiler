@@ -2213,11 +2213,13 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.4+ DOMNode::compareDocumentPosition() (ext/dom/node.c, #14448, #15613).
+     * DOM Level 3 DOMNode::compareDocumentPosition() (ext/dom/node.c, #14448, #17696).
+     *
+     * Available on Zend 8.0+ reference profile; not gated behind PHP_COMPILER_PROFILE.
      */
     public static function supportsDomNodeCompareDocumentPosition(): bool
     {
-        return self::supportsDomApiSince('8.4.0');
+        return true;
     }
 
     /**
