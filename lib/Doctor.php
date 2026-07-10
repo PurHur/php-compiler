@@ -265,6 +265,7 @@ final class Doctor
             fwrite(STDOUT, "   docs/bootstrap-generations.md — generation ladder SSOT\n");
         }
         fwrite(STDOUT, "   phpc test --bootstrap [--strict]\n");
+        fwrite(STDOUT, "   phpc test --native  (Tier 1.5 — AOT smoke + VM compliance manifest; #15599)\n");
         fwrite(STDOUT, "   make bootstrap-wave-check  (opt-in --with-helloworld)\n");
         fwrite(STDOUT, "   ./phpc doctor --gates | grep -i bootstrap_inventory  (#2228)\n\n");
 

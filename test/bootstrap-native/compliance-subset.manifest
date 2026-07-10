@@ -1,0 +1,6 @@
+# Fast compliance subset for phpc test --native (#15599).
+# Format: REL_PATH [optional |EXPECT_SUBSTRING]
+# Runner: script/bootstrap-native-vm-compliance.sh (bin/vm.php, no PHPUnit)
+test/compliance/cases/language/magic_script_const/run.php|string
+test/compliance/cases/language/closure_magic_dir/run.php|closure_magic_dir/run.php
+test/bootstrap-aot/compiler_smoke_standalone.php|compiler smoke
