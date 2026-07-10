@@ -124,6 +124,11 @@ final class ClassConstMaterializer
                     $stored->copyFrom($src);
                     break;
                 }
+                // Builtin instances keep object identity — SplDualIteratorStorage keys on ObjectEntry::id (#17721).
+                if ($srcObj->class->isInternal) {
+                    $stored->object($srcObj);
+                    break;
+                }
                 $detached = new ObjectEntry($srcObj->class);
                 $detached->constructed = $srcObj->constructed;
                 foreach ($srcObj->propertiesWithNames() as $propName => $propVar) {
