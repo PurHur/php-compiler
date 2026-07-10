@@ -1979,6 +1979,7 @@ final class VmDom
     public static function loadXML(Context $ctx, ObjectEntry $document, string $xml, ?\PHPCompiler\Frame $frame = null): bool
     {
         self::ensureDocument($document);
+        self::rejectEmptyLoadSource($xml, 'DOMDocument::loadXML()');
 
         $trimmed = trim($xml);
         $decl = self::parseXmlDeclaration($trimmed);
@@ -2058,6 +2059,14 @@ final class VmDom
         }
 
         return self::loadXML($ctx, $document, $contents, $frame);
+    }
+
+    /** php-src ext/dom/document.c — empty $source rejected since PHP 8.0 (#17616). */
+    private static function rejectEmptyLoadSource(string $source, string $method): void
+    {
+        if ('' === $source) {
+            throw new \ValueError($method.': Argument #1 ($source) must not be empty');
+        }
     }
 
     /** Zend dom_document_documenturi_read default for in-memory documents (ext/dom/document.c; #14468). */
@@ -3448,6 +3457,7 @@ final class VmDom
         ?\PHPCompiler\Frame $frame = null
     ): bool {
         self::ensureDocument($document);
+        self::rejectEmptyLoadSource($html, 'DOMDocument::loadHTML()');
 
         $trimmed = trim($html);
         $childIds = [];

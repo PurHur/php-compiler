@@ -208,6 +208,10 @@ final class DomDocumentVMTest extends BaseTest
             __DIR__.'/cases/stdlib/dom_loadxml_comment.phpt',
             'dom_loadxml_comment.phpt'
         );
+        yield 'dom_load_empty_source.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/dom_load_empty_source.phpt',
+            'dom_load_empty_source.phpt'
+        );
         yield 'dom_namednodemap.phpt' => self::parsePHPT(
             __DIR__.'/cases/stdlib/dom_namednodemap.phpt',
             'dom_namednodemap.phpt'
