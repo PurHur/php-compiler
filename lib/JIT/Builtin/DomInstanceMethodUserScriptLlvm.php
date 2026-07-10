@@ -44,15 +44,7 @@ final class DomInstanceMethodUserScriptLlvm
             return;
         }
 
-        VmActiveContextLlvm::ensureAbi($context);
-        NestedVmActiveContextLlvm::ensureMethod($context);
-        NestedVmVariableMethodLlvm::ensureMethod($context, 'resolveindirect');
-        NestedVmVariableMethodLlvm::ensureMethod($context, 'toobject');
-        NestedVmVariableMethodLlvm::ensureMethod($context, 'tostring');
-        foreach (['string', 'int', 'null', 'object', 'bool'] as $writeMethod) {
-            NestedVmVariableMethodLlvm::ensureMethod($context, $writeMethod);
-        }
-        DomInstanceMethodRuntime::ensureActiveContextProxy($context);
+        self::ensureNestedHelperProxies($context);
         self::ensureMainModuleHelperCompiled($context);
 
         $savedBlock = null;
@@ -95,6 +87,19 @@ final class DomInstanceMethodUserScriptLlvm
     private static function lookupHelper(Context $context, string $logical): LlvmFunction
     {
         return JitVmHelperLink::lookupCompiled($context, $logical, '#17391');
+    }
+
+    private static function ensureNestedHelperProxies(Context $context): void
+    {
+        VmActiveContextLlvm::ensureAbi($context);
+        NestedVmActiveContextLlvm::ensureMethod($context);
+        NestedVmVariableMethodLlvm::ensureMethod($context, 'resolveindirect');
+        NestedVmVariableMethodLlvm::ensureMethod($context, 'toobject');
+        NestedVmVariableMethodLlvm::ensureMethod($context, 'tostring');
+        foreach (['string', 'int', 'null', 'object', 'bool'] as $writeMethod) {
+            NestedVmVariableMethodLlvm::ensureMethod($context, $writeMethod);
+        }
+        DomInstanceMethodRuntime::ensureActiveContextProxy($context);
     }
 
     private static function ensureMainModuleHelperCompiled(Context $context): void

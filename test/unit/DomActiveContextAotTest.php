@@ -37,13 +37,30 @@ final class DomActiveContextAotTest extends TestCase
         $this->assertStringNotContainsString('supportsDomTokenList', $source);
     }
 
+    public function testDomInstanceMethodJitDefersGenericProxiesForUserScript(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/DomInstanceMethodJit.php');
+        $this->assertStringContainsString('shouldDeferToVmClassMethodLowering', $source);
+        $this->assertStringContainsString('DomDocumentCreateElement', $source);
+    }
+
     public function testDomInstanceMethodUserScriptRegistersProxiesBeforeHelperCompile(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/DomInstanceMethodUserScriptLlvm.php');
-        $proxyPos = strpos($source, 'ensureActiveContextProxy');
-        $compilePos = strpos($source, 'ensureMainModuleHelperCompiled');
+        $bridgePos = strpos($source, 'function ensureBridge');
+        $this->assertNotFalse($bridgePos);
+        $bridgeBody = substr($source, $bridgePos);
+        $proxyPos = strpos($bridgeBody, 'ensureNestedHelperProxies');
+        $compilePos = strpos($bridgeBody, 'ensureMainModuleHelperCompiled');
         $this->assertNotFalse($proxyPos);
         $this->assertNotFalse($compilePos);
-        $this->assertLessThan($compilePos, $proxyPos, 'active-context proxy must register before nested helper compile');
+        $this->assertLessThan($compilePos, $proxyPos, 'nested helper proxies must register before main-module compile');
+    }
+
+    public function testDomInstanceMethodJitSeedsDomElementPropertyLayout(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/DomInstanceMethodJit.php');
+        $this->assertStringContainsString('ensureDomElementPropertyLayout', $source);
+        $this->assertStringContainsString('nodeName', $source);
     }
 }
