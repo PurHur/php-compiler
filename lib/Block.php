@@ -2951,6 +2951,45 @@ class Block {
         return false;
     }
 
+    /** func_get_arg(s) / func_num_args() — CallArgv must be stored at each call site (#197, #15907). */
+    public static function usesFuncArgsIntrospection(?self $root): bool
+    {
+        if (null === $root) {
+            return false;
+        }
+        $seen = new \SplObjectStorage();
+        $stack = [$root];
+        while ([] !== $stack) {
+            $block = array_pop($stack);
+            if (!$block instanceof self || $seen->contains($block)) {
+                continue;
+            }
+            $seen->attach($block);
+            foreach ($block->opCodes as $op) {
+                if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                    $nameOp = $block->getOperand($op->arg1);
+                    if ($nameOp instanceof Operand\Literal) {
+                        $lc = strtolower($nameOp->value);
+                        if (
+                            'func_get_args' === $lc
+                            || 'func_get_arg' === $lc
+                            || 'func_num_args' === $lc
+                        ) {
+                            return true;
+                        }
+                    }
+                }
+                foreach ([$op->block1, $op->block2, $op->block3] as $sub) {
+                    if ($sub instanceof self) {
+                        $stack[] = $sub;
+                    }
+                }
+            }
+        }
+
+        return false;
+    }
+
     public static function containsReflectionAttributeNewInstanceOpcodes(?self $root): bool
     {
         if (null === $root) {
