@@ -56,7 +56,7 @@ final class VmIconv
 
         $result = CharsetEngine::convert($fromEncoding, $toEncoding, $input);
         if (false === $result) {
-            self::triggerIllegalCharacterNotice($frame);
+            self::triggerConvertNotice($frame, CharsetEngine::lastError());
 
             return false;
         }
@@ -64,13 +64,16 @@ final class VmIconv
         return $result;
     }
 
-    private static function triggerIllegalCharacterNotice(?Frame $frame): void
+    private static function triggerConvertNotice(?Frame $frame, int $errorKind): void
     {
         if (null === $frame?->vmContext) {
             return;
         }
+        $message = CharsetEngine::ERROR_INCOMPLETE === $errorKind
+            ? 'iconv(): Detected an incomplete multibyte character in input string'
+            : 'iconv(): Detected an illegal character in input string';
         $frame->vmContext->errors->triggerError(
-            'iconv(): Detected an illegal character in input string',
+            $message,
             ErrorReporter::E_NOTICE,
             '' !== $frame->scriptPath ? $frame->scriptPath : null,
             $frame->vmContext,
@@ -102,7 +105,7 @@ final class VmIconv
             Variable::TYPE_NULL => 'null',
             Variable::TYPE_BOOLEAN => 'bool',
             Variable::TYPE_INTEGER => 'int',
-            Variable::TYPE_DOUBLE => 'float',
+            Variable::TYPE_FLOAT => 'float',
             Variable::TYPE_STRING => 'string',
             Variable::TYPE_ARRAY => 'array',
             Variable::TYPE_OBJECT => 'object',
