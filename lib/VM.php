@@ -8603,6 +8603,8 @@ restart:
             return $this->dispatchVmDateInvalidTimeZoneException($e, $callerFrame);
         } catch (VM\NativeDateMalformedStringException $e) {
             return $this->dispatchVmDateMalformedStringException($e, $callerFrame);
+        } catch (VM\NativeDateInvalidOperationException $e) {
+            return $this->dispatchVmDateInvalidOperationException($e, $callerFrame);
         } catch (VM\NativeDateMalformedIntervalException $e) {
             return $this->dispatchVmDateMalformedIntervalException($e, $callerFrame);
         } catch (VM\NativeDateMalformedPeriodStringException $e) {
@@ -9067,6 +9069,23 @@ restart:
     {
         [$file, $line] = VM\ExceptionSupport::userFatalSite($frame);
         $thrown = VM\BuiltinExceptionSupport::materializeDateMalformedStringException(
+            $this->context,
+            $error->getMessage(),
+            $file,
+            $line
+        );
+
+        return $this->dispatchBuiltinThrowable($frame, $thrown);
+    }
+
+    /** Bridge illegal date operations from date builtins into user catch handlers (#6048). */
+    private function dispatchVmDateInvalidOperationException(
+        VM\NativeDateInvalidOperationException $error,
+        Frame $frame
+    ): ?Frame
+    {
+        [$file, $line] = VM\ExceptionSupport::userFatalSite($frame);
+        $thrown = VM\BuiltinExceptionSupport::materializeDateInvalidOperationException(
             $this->context,
             $error->getMessage(),
             $file,
