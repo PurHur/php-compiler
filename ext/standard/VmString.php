@@ -368,6 +368,69 @@ final class VmString
     }
 
     /**
+     * Coerce a typed ?string builtin operand (php-src Z_PARAM_STR_OR_NULL; string|null only, #17765).
+     *
+     * @throws \TypeError when the operand is not string or null
+     */
+    public static function coerceTypedNullableStringBuiltinArg(
+        Variable $var,
+        string $function,
+        int $argIndex = 0,
+        string $paramName = 'string'
+    ): ?string {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_NULL === $var->type) {
+            return null;
+        }
+        if (Variable::TYPE_STRING === $var->type) {
+            return $var->toString();
+        }
+        if (Variable::TYPE_ARRAY === $var->type) {
+            throw new \TypeError(self::nullableStringBuiltinTypeError($function, $argIndex, $paramName, 'array'));
+        }
+        if (RuntimeStrictness::enforceStringBuiltinParityGuards() && EnumCaseSupport::isEnumCaseVariable($var)) {
+            throw new \TypeError(
+                self::nullableStringBuiltinTypeError(
+                    $function,
+                    $argIndex,
+                    $paramName,
+                    EnumCaseSupport::typeNameForVariable($var)
+                )
+            );
+        }
+        if (Variable::TYPE_OBJECT === $var->type) {
+            throw new \TypeError(
+                self::nullableStringBuiltinTypeError(
+                    $function,
+                    $argIndex,
+                    $paramName,
+                    $var->toObject()->class->name
+                )
+            );
+        }
+
+        throw new \TypeError(
+            self::nullableStringBuiltinTypeError(
+                $function,
+                $argIndex,
+                $paramName,
+                self::builtinScalarTypeName($var)
+            )
+        );
+    }
+
+    private static function builtinScalarTypeName(Variable $var): string
+    {
+        return match ($var->type) {
+            Variable::TYPE_BOOLEAN => 'bool',
+            Variable::TYPE_INTEGER => 'int',
+            Variable::TYPE_FLOAT => 'float',
+            Variable::TYPE_RESOURCE => 'resource',
+            default => 'mixed',
+        };
+    }
+
+    /**
      * strtok() arg #1 ($string) — accepts null; invalid types report "string" not "?string" (#9207, php-src string.c).
      *
      * @throws \TypeError when the operand cannot be converted like Zend PHP 8.x
