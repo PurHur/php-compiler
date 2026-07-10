@@ -52,8 +52,7 @@ final class preg_match extends Internal
         if ($hasMatches) {
             $target = $frame->calledArgs[2];
             if (false === $result) {
-                $target = $target->resolveIndirect();
-                $target->array(new HashTable());
+                $target->null();
             } else {
                 $target = $target->resolveIndirect();
                 $ht = VmPregMatches::hostMatchesToHashTable($hostMatches, $flags);
