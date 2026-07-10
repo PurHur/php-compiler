@@ -40383,11 +40383,39 @@ class Compiler {
                     && $skipSiblingForLeadingArrayMergeFamily
                     && null === $unpackFlag
                     && null === $valueSlot
+                    && null !== $block->orig
                 ) {
-                    $leadingInitSlot = $this->slotForInitArrayOrdinal($block, 0, $sends);
-                    if (null !== $leadingInitSlot) {
-                        $valueSlot = $leadingInitSlot;
-                        $inlineArrayLiteralArgWired = true;
+                    $mergeProducers = $this->arrayMergeFamilyInlineProducersForCfgCall(
+                        $block->orig->children,
+                        $cfgCallOp
+                    );
+                    $mergeMapped = $this->matchArrayMergeFuncCallAndArrayInlineProducers(
+                        $mergeProducers,
+                        (int) $argIndex
+                    );
+                    if (
+                        $mergeMapped instanceof Op\Expr\FuncCall
+                        || $mergeMapped instanceof Op\Expr\NsFuncCall
+                    ) {
+                        $funcOrdinal = 0;
+                        foreach ($mergeProducers as $producer) {
+                            if ($producer === $mergeMapped) {
+                                break;
+                            }
+                            if ($producer instanceof Op\Expr\FuncCall || $producer instanceof Op\Expr\NsFuncCall) {
+                                ++$funcOrdinal;
+                            }
+                        }
+                        $execSlot = $this->slotForFuncCallExecReturnOrdinal($block, $funcOrdinal, $sends);
+                        if (null !== $execSlot) {
+                            $valueSlot = (string) $execSlot;
+                        }
+                    } elseif ($mergeMapped instanceof Op\Expr\Array_) {
+                        $leadingInitSlot = $this->slotForInitArrayOrdinal($block, 0, $sends);
+                        if (null !== $leadingInitSlot) {
+                            $valueSlot = $leadingInitSlot;
+                            $inlineArrayLiteralArgWired = true;
+                        }
                     }
                 }
             }
@@ -42124,6 +42152,25 @@ class Compiler {
             if (
                 null !== $cfgCallOp
                 && null !== $block->orig
+                && \in_array(
+                    strtolower($this->resolveCfgFuncCallName($cfgCallOp) ?? ''),
+                    ['array_merge', 'array_merge_recursive', 'array_replace', 'array_replace_recursive'],
+                    true
+                )
+            ) {
+                $mergeForcedSlot = $this->finalizeArrayMergeFamilyCallArgSlot(
+                    $block,
+                    $cfgCallOp,
+                    (int) $argIndex,
+                    $sends
+                );
+                if (null !== $mergeForcedSlot) {
+                    $valueSlot = $mergeForcedSlot;
+                }
+            }
+            if (
+                null !== $cfgCallOp
+                && null !== $block->orig
                 && (int) $argIndex > 0
                 && \is_array($cfgCallOp->args ?? null)
                 && (int) $argIndex === \count($cfgCallOp->args) - 1
@@ -42642,6 +42689,25 @@ class Compiler {
                 );
                 if (null !== $comparisonSlot) {
                     $valueSlot = $comparisonSlot;
+                }
+            }
+            if (
+                null !== $cfgCallOp
+                && null !== $block->orig
+                && \in_array(
+                    strtolower($this->resolveCfgFuncCallName($cfgCallOp) ?? ''),
+                    ['array_merge', 'array_merge_recursive', 'array_replace', 'array_replace_recursive'],
+                    true
+                )
+            ) {
+                $mergeForcedSlot = $this->finalizeArrayMergeFamilyCallArgSlot(
+                    $block,
+                    $cfgCallOp,
+                    (int) $argIndex,
+                    $sends
+                );
+                if (null !== $mergeForcedSlot) {
+                    $valueSlot = $mergeForcedSlot;
                 }
             }
             $sends[] = new OpCode(OpCode::TYPE_ARG_SEND, $valueSlot, $nameSlot, $unpackFlag);
@@ -43175,6 +43241,93 @@ class Compiler {
         }
 
         return $execReturnSlots[$producerOrdinal] ?? null;
+    }
+
+    /**
+     * Last-chance ARG_SEND slot for array_merge*(array_keys(...), [...]) sibling producers (#12450, #13704, #17781).
+     *
+     * @param list<OpCode> $sends
+     */
+    private function finalizeArrayMergeFamilyCallArgSlot(
+        Block $block,
+        Op $cfgCallOp,
+        int $argIndex,
+        array &$sends
+    ): ?string {
+        $callee = strtolower($this->resolveCfgFuncCallName($cfgCallOp) ?? '');
+        if (!\in_array(
+            $callee,
+            ['array_merge', 'array_merge_recursive', 'array_replace', 'array_replace_recursive'],
+            true
+        )) {
+            return null;
+        }
+        if (\count($cfgCallOp->args ?? []) < 2 || null === $block->orig) {
+            return null;
+        }
+        $producers = $this->arrayMergeFamilyInlineProducersForCfgCall(
+            $block->orig->children,
+            $cfgCallOp
+        );
+        $matched = $this->matchArrayMergeFamilyFullInlineCallArgProducer(
+            $producers,
+            $argIndex,
+            \count($cfgCallOp->args ?? []),
+            $cfgCallOp->args ?? []
+        );
+        if (null === $matched) {
+            $matched = $this->matchArrayMergeFuncCallAndArrayInlineProducers($producers, $argIndex);
+        }
+        if (!$matched instanceof Op\Expr) {
+            return null;
+        }
+        if ($matched instanceof Op\Expr\FuncCall || $matched instanceof Op\Expr\NsFuncCall) {
+            $funcOrdinal = 0;
+            foreach ($producers as $producer) {
+                if ($producer === $matched) {
+                    break;
+                }
+                if ($producer instanceof Op\Expr\FuncCall || $producer instanceof Op\Expr\NsFuncCall) {
+                    ++$funcOrdinal;
+                }
+            }
+            $execSlot = $this->slotForFuncCallExecReturnOrdinal($block, $funcOrdinal, $sends);
+            if (null !== $execSlot) {
+                return $execSlot;
+            }
+            if (null === $block->slotForOperand($matched->result)) {
+                foreach ($this->compileExpr($matched, $block) as $op) {
+                    $sends[] = $op;
+                }
+            }
+            $execSlot = $this->slotForFuncCallExecReturnOrdinal($block, $funcOrdinal, $sends);
+            if (null !== $execSlot) {
+                return $execSlot;
+            }
+            $slot = $block->slotForOperand($matched->result);
+            if (null !== $slot) {
+                return (string) $slot;
+            }
+
+            return null;
+        }
+        if (null === $block->slotForOperand($matched->result)) {
+            if ($matched instanceof Op\Expr\Array_) {
+                foreach ($this->compileArrayLiteral($matched, $block) as $op) {
+                    $sends[] = $op;
+                }
+            } else {
+                foreach ($this->compileExpr($matched, $block) as $op) {
+                    $sends[] = $op;
+                }
+            }
+        }
+        $slot = $block->slotForOperand($matched->result);
+        if (null !== $slot) {
+            return (string) $slot;
+        }
+
+        return null;
     }
 
     /**

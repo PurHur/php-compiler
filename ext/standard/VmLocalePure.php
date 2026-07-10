@@ -74,6 +74,7 @@ final class VmLocalePure
             'AM_STR' => 131110,
             'CODESET' => 14,
             'CRNCYSTR' => 262159,
+            'DECIMAL_POINT' => 65536,
             'DAY_1' => 131079,
             'DAY_2' => 131080,
             'DAY_3' => 131081,
@@ -81,6 +82,7 @@ final class VmLocalePure
             'DAY_5' => 131083,
             'DAY_6' => 131084,
             'DAY_7' => 131085,
+            'GROUPING' => 65538,
             'D_FMT' => 131113,
             'D_T_FMT' => 131112,
             'MON_1' => 131098,
@@ -98,11 +100,16 @@ final class VmLocalePure
             'MON_DECIMAL_POINT' => 262146,
             'MON_GROUPING' => 262148,
             'MON_THOUSANDS_SEP' => 262147,
+            'NOEXPR' => 327681,
+            'NOSTR' => 327683,
             'PM_STR' => 131111,
             'RADIXCHAR' => 65536,
+            'THOUSANDS_SEP' => 65537,
             'THOUSEP' => 65537,
             'T_FMT' => 131114,
             'T_FMT_AMPM' => 131115,
+            'YESEXPR' => 327680,
+            'YESSTR' => 327682,
         ];
 
         $out = [];
