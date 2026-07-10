@@ -146,23 +146,17 @@ final class StdlibModuleConstants
      */
     public static function categorizedBootstrapConstants(): array
     {
-        $standard = [];
+        $standard = self::standardModuleConstants();
         $zlib = [];
         $json = [];
-        foreach (self::bootstrapIntConstants() as $name => $value) {
+        foreach ($standard as $name => $value) {
             if (str_starts_with($name, 'ZLIB_')) {
                 $zlib[$name] = $value;
+                unset($standard[$name]);
             } elseif (str_starts_with($name, 'JSON_')) {
                 $json[$name] = $value;
-            } elseif (!\in_array($name, self::CORE_BUCKET_NAMES, true)) {
-                $standard[$name] = $value;
+                unset($standard[$name]);
             }
-        }
-        foreach (self::bootstrapStringConstants() as $name => $value) {
-            if (str_starts_with($name, 'DATE_')) {
-                continue;
-            }
-            $standard[$name] = $value;
         }
 
         return [
@@ -171,5 +165,38 @@ final class StdlibModuleConstants
             'json' => $json,
             'date' => DateConstants::registeredConstants(),
         ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private static function standardModuleConstants(): array
+    {
+        $standard = [];
+        foreach (self::bootstrapIntConstants() as $name => $value) {
+            if (\in_array($name, self::CORE_BUCKET_NAMES, true)) {
+                continue;
+            }
+            $standard[$name] = $value;
+        }
+        foreach (self::bootstrapStringConstants() as $name => $value) {
+            if (str_starts_with($name, 'DATE_')) {
+                continue;
+            }
+            $standard[$name] = $value;
+        }
+        foreach (StdlibConstants::CORE_INT_BY_NAME as $lc => $value) {
+            $standard[strtoupper($lc)] = $value;
+        }
+        foreach (StdlibConstants::CORE_FLOAT_BY_NAME as $lc => $value) {
+            $standard[strtoupper($lc)] = $value;
+        }
+        foreach (StdlibConstants::CORE_STRING_BY_NAME as $lc => $value) {
+            $standard[strtoupper($lc)] = $value;
+        }
+        $standard['DIRECTORY_SEPARATOR'] = VmPhpCoreConstants::directorySeparatorValue();
+        $standard['PATH_SEPARATOR'] = VmPhpCoreConstants::pathSeparatorValue();
+
+        return $standard;
     }
 }

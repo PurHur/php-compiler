@@ -270,17 +270,9 @@ final class VmConstants
     {
         $result = new HashTable();
         $core = new HashTable();
-        foreach (self::coreConstantEntries($ctx, true) as $name => $value) {
+        foreach (self::categorizedCoreConstantEntries($ctx) as $name => $value) {
             $copy = new Variable();
             $copy->copyFrom($value);
-            $core->add($name, $copy);
-        }
-        foreach (ExtensionConstantGroups::coreBucketNames() as $name) {
-            if (!isset($ctx->constants[$name])) {
-                continue;
-            }
-            $copy = new Variable();
-            $copy->copyFrom($ctx->constants[$name]);
             $core->add($name, $copy);
         }
         $result->add('Core', self::wrapArray($core));
@@ -308,6 +300,48 @@ final class VmConstants
         }
 
         return $result;
+    }
+
+    /**
+     * @return array<string, Variable>
+     */
+    private static function categorizedCoreConstantEntries(Context $ctx): array
+    {
+        $entries = VmPhpCoreConstants::categorizedCoreEntries();
+        foreach (['true', 'false', 'null'] as $fetchName) {
+            $value = $ctx->constantFetch($fetchName);
+            if (null === $value) {
+                continue;
+            }
+            $outName = match ($fetchName) {
+                'true' => 'TRUE',
+                'false' => 'FALSE',
+                'null' => 'NULL',
+                default => strtoupper($fetchName),
+            };
+            $entries[$outName] = $value;
+        }
+        foreach (Context::errorReportingConstantFetchNames() as $fetchName) {
+            $value = $ctx->constantFetch($fetchName);
+            if (null === $value) {
+                continue;
+            }
+            $entries[strtoupper($fetchName)] = $value;
+        }
+        foreach (ExtensionConstantGroups::coreBucketNames() as $name) {
+            if (!isset($ctx->constants[$name])) {
+                continue;
+            }
+            $entries[$name] = $ctx->constants[$name];
+        }
+        foreach (['STDIN', 'STDOUT', 'STDERR'] as $name) {
+            if (!isset($ctx->constants[$name])) {
+                continue;
+            }
+            $entries[$name] = $ctx->constants[$name];
+        }
+
+        return $entries;
     }
 
     /**
