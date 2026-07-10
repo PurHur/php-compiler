@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+// Issue #17608 — forward 8.4 profile: core grapheme cluster advertised + callable without ext/intl.
 $core = [
     'grapheme_strlen',
     'grapheme_substr',
@@ -10,8 +11,8 @@ $core = [
     'grapheme_str_split',
 ];
 foreach ($core as $name) {
-    if (function_exists($name)) {
-        echo "fail: function_exists true for {$name} without ext/intl on forward 8.4 profile\n";
+    if (!function_exists($name)) {
+        echo "fail: function_exists false for {$name} on forward 8.4 profile\n";
         exit(1);
     }
 }

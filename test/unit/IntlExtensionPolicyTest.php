@@ -92,4 +92,48 @@ final class IntlExtensionPolicyTest extends TestCase
             }
         }
     }
+
+    public function testGraphemeCoreAdvertisedOnForwardProfile84(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            self::assertTrue(CompilerVersion::supportsGraphemeForwardProfileCore());
+            self::assertTrue(CompilerVersion::advertisesGraphemeForwardProfileCore());
+            self::assertTrue(IntlExtensionPolicy::advertisesGraphemeCore());
+            self::assertTrue(IntlExtensionPolicy::advertisesGraphemeStrContains());
+            self::assertTrue(IntlExtensionPolicy::advertisesGraphemeStrimwidth());
+            self::assertFalse(IntlExtensionPolicy::advertisesBuiltins());
+
+            $runtime = new Runtime();
+            $ctx = $runtime->vmContext;
+            foreach ([
+                'grapheme_strlen',
+                'grapheme_substr',
+                'grapheme_strpos',
+                'grapheme_extract',
+                'grapheme_str_split',
+                'grapheme_str_contains',
+                'grapheme_strimwidth',
+            ] as $fn) {
+                self::assertTrue(isset($ctx->functions[$fn]));
+                self::assertTrue(
+                    ext\standard\VmReflection::functionExists($ctx, $fn),
+                    $fn.' must be visible on forward 8.4 profile'
+                );
+            }
+            foreach (['grapheme_stripos', 'grapheme_stristr', 'grapheme_strrpos'] as $fn) {
+                self::assertFalse(
+                    ext\standard\VmReflection::functionExists($ctx, $fn),
+                    $fn.' must stay gated without full ext/intl'
+                );
+            }
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
 }

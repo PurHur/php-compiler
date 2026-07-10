@@ -38,6 +38,27 @@ final class IntlExtensionPolicy
         return ModuleRegistry::extensionLoaded('intl');
     }
 
+    /** grapheme_strlen/substr/strpos/extract/str_split — full ext/intl or forward 8.4 profile (#17608, #16915). */
+    public static function advertisesGraphemeCore(): bool
+    {
+        return self::advertisesBuiltins()
+            || CompilerVersion::advertisesGraphemeForwardProfileCore();
+    }
+
+    /** grapheme_str_contains — full ext/intl or forward 8.4 profile (#16667). */
+    public static function advertisesGraphemeStrContains(): bool
+    {
+        return self::advertisesBuiltins()
+            || CompilerVersion::advertisesGraphemeStrContains();
+    }
+
+    /** grapheme_strimwidth — full ext/intl or forward 8.4 profile (#9793). */
+    public static function advertisesGraphemeStrimwidth(): bool
+    {
+        return self::advertisesBuiltins()
+            || CompilerVersion::advertisesGraphemeStrimwidth();
+    }
+
     /**
      * PHP 8.4 profile grapheme builtins registered without full ext/intl (#16667, #7128, #9793).
      *
