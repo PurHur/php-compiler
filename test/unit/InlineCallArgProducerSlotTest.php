@@ -1497,6 +1497,51 @@ PHP;
         self::assertStringContainsString('1.0', $out);
     }
 
+    /** Issue #17562 — var_export(JSON_HEX_* | …) after echoed json_encode uses BitwiseOr slot, not stale EXEC_RETURN. */
+    public function testVarExportBitwiseOrAfterEchoedJsonEncodeUsesArithmeticProducerSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+echo json_encode('<', JSON_HEX_TAG | JSON_HEX_AMP);
+var_export(JSON_HEX_TAG | JSON_HEX_AMP);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'var_export_json_hex_after_encode.php');
+
+        $bitwiseOrSlots = [];
+        $jsonEncodeExecSlot = null;
+        $varExportSends = [];
+        $fcallOrdinal = 0;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                ++$fcallOrdinal;
+                if (2 === $fcallOrdinal) {
+                    $varExportSends = [];
+                }
+            }
+            if (OpCode::TYPE_BITWISE_OR === $op->type) {
+                $bitwiseOrSlots[] = $op->arg1;
+            }
+            if (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type && 1 === $fcallOrdinal) {
+                $jsonEncodeExecSlot = $op->arg1;
+            }
+            if (2 === $fcallOrdinal && OpCode::TYPE_ARG_SEND === $op->type) {
+                $varExportSends[] = $op->arg1;
+            }
+        }
+
+        self::assertCount(2, $bitwiseOrSlots, 'expected two BitwiseOr preludes');
+        self::assertNotNull($jsonEncodeExecSlot);
+        self::assertCount(1, $varExportSends);
+        self::assertSame($bitwiseOrSlots[1], $varExportSends[0], 'arg sends='.json_encode($varExportSends));
+        self::assertNotSame($jsonEncodeExecSlot, $varExportSends[0]);
+
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertStringEndsWith('3', trim($out));
+    }
+
     /** Issue #17250 — var_export($x !== false, true) wires NotIdentical producer, not hoisted false ConstFetch. */
     public function testVarExportNotIdenticalFalseReturnTrueUsesComparisonProducerSlot(): void
     {

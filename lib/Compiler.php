@@ -20301,6 +20301,24 @@ class Compiler {
     }
 
     /**
+     * php-cfg dead temps for inline arithmetic/bitwise before a consumer call arg (#17210, #17562).
+     */
+    private function isArithmeticInlineCallArgProducer(mixed $expr): bool
+    {
+        return $expr instanceof Op\Expr\BinaryOp\BitwiseAnd
+            || $expr instanceof Op\Expr\BinaryOp\BitwiseOr
+            || $expr instanceof Op\Expr\BinaryOp\BitwiseXor
+            || $expr instanceof Op\Expr\BinaryOp\Plus
+            || $expr instanceof Op\Expr\BinaryOp\Minus
+            || $expr instanceof Op\Expr\BinaryOp\Mul
+            || $expr instanceof Op\Expr\BinaryOp\Div
+            || $expr instanceof Op\Expr\BinaryOp\Mod
+            || $expr instanceof Op\Expr\BinaryOp\Pow
+            || $expr instanceof Op\Expr\BinaryOp\ShiftLeft
+            || $expr instanceof Op\Expr\BinaryOp\ShiftRight;
+    }
+
+    /**
      * php-cfg dead temps for `var_export($o->p)` / `var_export($a[0])` — immediate prelude feeds arg #0 (#17540).
      */
     private function isImmediateVarExportExpressionPrelude(mixed $expr): bool
@@ -20316,7 +20334,8 @@ class Compiler {
             || $expr instanceof Op\Expr\Cast
             || $expr instanceof Op\Expr\UnaryMinus
             || $expr instanceof Op\Expr\UnaryPlus
-            || $this->isComparisonInlineCallArgProducer($expr);
+            || $this->isComparisonInlineCallArgProducer($expr)
+            || $this->isArithmeticInlineCallArgProducer($expr);
     }
 
     /**
@@ -34521,6 +34540,19 @@ class Compiler {
             $prelude instanceof Op\Expr\UnaryMinus => [OpCode::TYPE_UNARY_MINUS],
             $prelude instanceof Op\Expr\UnaryPlus => [OpCode::TYPE_UNARY_PLUS],
             $this->isComparisonInlineCallArgProducer($prelude) => [OpCode::TYPE_IDENTICAL, OpCode::TYPE_NOT_IDENTICAL, OpCode::TYPE_EQUAL, OpCode::TYPE_NOT_EQUAL, OpCode::TYPE_SPACESHIP, OpCode::TYPE_SMALLER, OpCode::TYPE_GREATER, OpCode::TYPE_SMALLER_OR_EQUAL, OpCode::TYPE_GREATER_OR_EQUAL, OpCode::TYPE_INSTANCEOF, OpCode::TYPE_IN],
+            $this->isArithmeticInlineCallArgProducer($prelude) => [
+                OpCode::TYPE_BITWISE_AND,
+                OpCode::TYPE_BITWISE_OR,
+                OpCode::TYPE_BITWISE_XOR,
+                OpCode::TYPE_PLUS,
+                OpCode::TYPE_MINUS,
+                OpCode::TYPE_MUL,
+                OpCode::TYPE_DIV,
+                OpCode::TYPE_MODULO,
+                OpCode::TYPE_POW,
+                OpCode::TYPE_SHIFT_LEFT,
+                OpCode::TYPE_SHIFT_RIGHT,
+            ],
             default => [],
         };
         if ([] === $expectedTypes) {
@@ -44669,7 +44701,7 @@ class Compiler {
                 if ($producer instanceof Op\Expr\Isset_ || $producer instanceof Op\Expr\Empty_) {
                     return;
                 }
-                // var_export($text->data) — PropertyFetch prelude feeds arg #0, not stale MethodCall EXEC_RETURN (#17540).
+                // var_export($text->data) / var_export(JSON_HEX_TAG | JSON_HEX_AMP) — expression prelude feeds arg #0, not stale FuncCall EXEC_RETURN (#17540, #17562).
                 if ($this->isImmediateVarExportExpressionPrelude($producer)) {
                     return;
                 }
