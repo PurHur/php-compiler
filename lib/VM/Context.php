@@ -517,7 +517,7 @@ class Context {
                 return false;
             }
         }
-        $this->constants[$name] = clone $value;
+        $this->constants[$name] = EnumCaseSupport::materializeConstantValue($this, $value);
 
         return true;
     }

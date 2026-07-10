@@ -4028,9 +4028,12 @@ restart:
                             $propName = $keyVar->is(Variable::TYPE_INTEGER)
                                 ? (string) $keyVar->toInt()
                                 : $keyVar->toString();
-                            $object->allocateProperty($propName)->copyFrom($valueVar);
+                            $object->allocateProperty($propName)->copyFrom(
+                                VM\ClassConstMaterializer::detachConstantValue($valueVar)
+                            );
                         }
                     }
+                    $this->markScopeSlotInitialized($frame, (int) $op->arg1);
                     break;
                 case OpCode::TYPE_CAST_UNSET:
                     $src = $frame->scope[$op->arg2];
@@ -16425,7 +16428,6 @@ restart:
                 }
             }
         }
-        ObjectLifetime::releaseDirectObject($frame->scope[$slot]);
         $frame->scope[$slot]->null();
     }
 

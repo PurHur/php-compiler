@@ -26,7 +26,9 @@ use PHPCfg\Script;
 use PHPTypes\Type;
 use PHPCompiler\VM\AttributeSupport;
 use PHPCompiler\VM\ClassConstExpr;
+use PHPCompiler\VM\ClassConstMaterializer;
 use PHPCompiler\VM\ClassEntry;
+use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\EnumSupport;
 use PHPCompiler\VM\HashTable;
@@ -7894,6 +7896,9 @@ class Compiler {
             return null;
         }
         $castOpcode = $this->getOpCodeTypeFromCastOp($expr);
+        if (OpCode::TYPE_CAST_OBJECT === $castOpcode) {
+            return $this->tryFoldCompileTimeObjectCastOperand($operand);
+        }
         $targetType = match ($castOpcode) {
             OpCode::TYPE_CAST_STRING => Variable::TYPE_STRING,
             OpCode::TYPE_CAST_INT => Variable::TYPE_INTEGER,
@@ -7912,6 +7917,64 @@ class Compiler {
         }
 
         return $result;
+    }
+
+    /**
+     * Fold (object) array-literal casts for define() prescan / const folding (#17676, zend_operators.c cast_object).
+     */
+    protected function tryFoldCompileTimeObjectCastOperand(Variable $operand): ?Variable
+    {
+        if ($operand->is(Variable::TYPE_OBJECT)) {
+            $copy = new Variable();
+            $copy->copyFrom($operand);
+
+            return ClassConstMaterializer::detachConstantValue($copy);
+        }
+        if (!$operand->is(Variable::TYPE_ARRAY)) {
+            return null;
+        }
+        $class = new ClassEntry('stdClass');
+        $class->allowsDynamicProperties = true;
+        $object = new ObjectEntry($class);
+        $object->constructed = true;
+        foreach ($operand->toArray()->iterateKeyed(true) as [$keyVar, $valueVar]) {
+            $propName = $keyVar->is(Variable::TYPE_INTEGER)
+                ? (string) $keyVar->toInt()
+                : $keyVar->toString();
+            $object->allocateProperty($propName)->copyFrom(
+                ClassConstMaterializer::detachConstantValue($valueVar)
+            );
+        }
+        $result = new Variable(Variable::TYPE_OBJECT);
+        $result->object($object);
+
+        return ClassConstMaterializer::detachConstantValue($result);
+    }
+
+    /**
+     * define('NAME', (object)[...]) — prescan must not register the inner array (#17676).
+     */
+    protected function cfgArrayIsObjectCastSourceForOperand(
+        Operand $arrayResult,
+        Operand $valueRoot,
+        Block $block
+    ): bool {
+        if (null === $block->orig) {
+            return false;
+        }
+        foreach ($block->orig->children as $child) {
+            if (!$child instanceof Op\Expr\Cast\Object_) {
+                continue;
+            }
+            if (!$this->operandsReferToSameVariable($child->result, $valueRoot)) {
+                continue;
+            }
+            if ($this->operandsReferToSameVariable($child->expr, $arrayResult)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -8329,8 +8392,15 @@ class Compiler {
         if (Variable::TYPE_STRING !== Variable::mapFromType($constNameArg->type)) {
             return;
         }
+        // Runtime define('NAME', expr) must not seed compileTimeGlobalConsts (#17676).
+        if (!$valueArg instanceof Operand\Literal) {
+            return;
+        }
         $constName = $constNameArg->value;
         if (!is_string($constName) || '' === $constName || str_contains($constName, '::')) {
+            return;
+        }
+        if ($this->defineValueRequiresRuntimeEvaluation($valueArg, $block)) {
             return;
         }
         $vm = $this->tryFoldDefineValueOperand($valueArg, $block);
@@ -8357,6 +8427,9 @@ class Compiler {
             if ($child instanceof Op\Expr\Array_
                 && $this->operandsReferToSameVariable($child->result, $root)
             ) {
+                if ($this->cfgArrayIsObjectCastSourceForOperand($child->result, $root, $block)) {
+                    continue;
+                }
                 return $this->tryBuildCompileTimeArrayFromExpr($child);
             }
             if (!$child instanceof Op\Expr || !$this->operandsReferToSameVariable($child->result, $root)) {
@@ -8369,6 +8442,28 @@ class Compiler {
         }
 
         return null;
+    }
+
+    /** define('N', (object)[...]) and other runtime-only values must not prescan (#17676). */
+    protected function defineValueRequiresRuntimeEvaluation(Operand $valueArg, Block $block): bool
+    {
+        if (null === $block->orig) {
+            return false;
+        }
+        $root = $this->unwrapOperandChain($valueArg);
+        foreach ($block->orig->children as $child) {
+            if (!$child instanceof Op\Expr) {
+                continue;
+            }
+            if (!$this->operandsReferToSameVariable($child->result, $root)) {
+                continue;
+            }
+            if ($child instanceof Op\Expr\Cast) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     protected function storeCompileTimeGlobalConst(string $name, Variable $value): void
