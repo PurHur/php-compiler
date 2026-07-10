@@ -37763,6 +37763,14 @@ class Compiler {
             $assignedNamedLocal = null;
             $valueSlot = null;
             $hoistedEnumPropertyCallArgSlotWired = false;
+            if (null !== $cfgCallOp && !$this->isCallArgDirectArrayDimFetch($arg)) {
+                $valueSlot = $this->resolveHoistedIssetOrEmptyCallArgSlot(
+                    $arg,
+                    $block,
+                    $cfgCallOp,
+                    (int) $argIndex
+                );
+            }
             if (null !== $cfgCallOp && null !== $block->orig) {
                 $dateSunSlot = $this->wireDateSunFuncHoistedCallArgSlot($block, $cfgCallOp, (int) $argIndex);
                 if (null !== $dateSunSlot) {
@@ -38040,6 +38048,14 @@ class Compiler {
                 if (null === $valueSlot) {
                     $valueSlot = $this->tryResolveUnaryLiteralCallArgSlot($arg, $block, $sends, $cfgCallOp, (int) $argIndex);
                 }
+                if (null === $valueSlot && null !== $cfgCallOp && !$this->isCallArgDirectArrayDimFetch($arg)) {
+                    $valueSlot = $this->resolveHoistedIssetOrEmptyCallArgSlot(
+                        $arg,
+                        $block,
+                        $cfgCallOp,
+                        (int) $argIndex
+                    );
+                }
                 $assignVarProbe = $arg;
                 if (null !== $cfgCallOp && is_array($cfgCallOp->args ?? null) && isset($cfgCallOp->args[(int) $argIndex])) {
                     $assignVarProbe = $cfgCallOp->args[(int) $argIndex];
@@ -38060,14 +38076,6 @@ class Compiler {
                             $assignedNamedLocal,
                             true
                         );
-                }
-                if (null === $valueSlot && null !== $cfgCallOp && !$this->isCallArgDirectArrayDimFetch($arg)) {
-                    $valueSlot = $this->resolveHoistedIssetOrEmptyCallArgSlot(
-                        $arg,
-                        $block,
-                        $cfgCallOp,
-                        (int) $argIndex
-                    );
                 }
                 if (null === $valueSlot) {
                     $valueSlot = $this->resolveInlineFirstClassCallableCallArgSlot($arg, $block, $cfgCallOp, (int) $argIndex);
@@ -44659,6 +44667,10 @@ class Compiler {
                 }
                 // var_export($text->data) — PropertyFetch prelude feeds arg #0, not stale MethodCall EXEC_RETURN (#17540).
                 if ($this->isImmediateVarExportExpressionPrelude($producer)) {
+                    return;
+                }
+                // var_export(isset($o->x), true) — Isset_/Empty_ bool feeds arg #0, not prior New_ EXEC_RETURN (#17555).
+                if ($producer instanceof Op\Expr\Isset_ || $producer instanceof Op\Expr\Empty_) {
                     return;
                 }
                 if ($producer instanceof Op\Expr\MethodCall || $producer instanceof Op\Expr\StaticCall) {

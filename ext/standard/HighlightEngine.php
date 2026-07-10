@@ -38,6 +38,7 @@ final class HighlightEngine
         }
         $tokens = LanguageScanner::tokenize($code);
         $body = self::renderTokens($tokens);
+        $body = \str_replace("\n", '<br />'."\n", $body);
 
         // php-src ext/standard/php_highlight.h — outer wrapper newlines match Zend byte-for-byte (#10308).
         return '<code><span style="color: '.self::COLOR_DEFAULT.'">'."\n".$body."\n".'</span>'."\n".'</code>';

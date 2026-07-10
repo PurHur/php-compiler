@@ -396,6 +396,41 @@ PHP;
         self::assertSame("bool(true)\nbool(false)\n", ob_get_clean());
     }
 
+    /** Issue #17555 — var_export(isset($obj->typed), true) must export bool, not __set_state. */
+    public function testVarExportIssetUninitTypedPropertyUsesBoolSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+class T {
+    public int $i;
+}
+$t = new T();
+echo var_export(isset($t->i), true);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'var_export_isset_typed.php');
+
+        $issetSlots = [];
+        $sendSlots = [];
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_ISSET === $op->type) {
+                $issetSlots[] = $op->arg1;
+            }
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                $sendSlots = [];
+            }
+            if (OpCode::TYPE_ARG_SEND === $op->type) {
+                $sendSlots[] = $op->arg1;
+            }
+        }
+        self::assertNotEmpty($issetSlots);
+        self::assertContains($sendSlots[0] ?? null, $issetSlots, 'isset bool feeds var_export arg 0');
+
+        ob_start();
+        $runtime->run($block);
+        self::assertSame('false', ob_get_clean());
+    }
+
     /** Issue #10917 — sibling str_repeat() producers map to distinct levenshtein() arg slots. */
     public function testLevenshteinDualStrRepeatUsesDistinctProducerSlots(): void
     {
