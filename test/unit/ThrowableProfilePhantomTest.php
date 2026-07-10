@@ -24,7 +24,7 @@ final class ThrowableProfilePhantomTest extends TestCase
         $this->assertFalse(ThrowableManifest::isAdvertised('DateError'));
         $this->assertFalse(ThrowableManifest::isAdvertised('DateInvalidTimeZoneException'));
         $this->assertFalse(ThrowableManifest::isAdvertised('DateMalformedIntervalException'));
-        $this->assertFalse(ThrowableManifest::isAdvertised('DateMalformedString'));
+        $this->assertFalse(ThrowableManifest::isAdvertised('DateMalformedStringException'));
         $this->assertFalse(ThrowableManifest::isAdvertised('DateMalformedPeriodException'));
         $this->assertTrue(ThrowableManifest::isAdvertised('Exception'));
         $this->assertFalse(ThrowableManifest::isAdvertised('RequestParseBodyException'));
