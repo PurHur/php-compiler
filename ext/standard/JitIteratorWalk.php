@@ -26,7 +26,7 @@ use PHPLLVM\Value;
 final class JitIteratorWalk
 {
     /** Zend ext/spl/php_spl.c — iterator_count() on exhausted Generator (#5132). */
-    private const CLOSED_GENERATOR_ITERATOR_COUNT_ERROR = 'Cannot traverse an already closed generator';
+    private const CLOSED_GENERATOR_ITERATOR_COUNT_ERROR = \PHPCompiler\VM\GeneratorState::CLOSED_TRAVERSE_ERROR;
 
     public static function count(Context $context, Variable $iterable): Value
     {

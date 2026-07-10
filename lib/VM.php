@@ -7102,7 +7102,15 @@ restart:
                         unset($this->context->weakMapIterators[$op->arg1]);
                         $frame->iterators[$op->arg1] = $container;
                         $this->context->foreachIterators[$op->arg1] = $container;
-                        $container->toObject()->generatorState->rewind();
+                        try {
+                            $container->toObject()->generatorState->rewindForForeach();
+                        } catch (\Exception $e) {
+                            $catchFrame = $this->dispatchVmEngineException($e->getMessage(), $frame);
+                            if (null !== $catchFrame) {
+                                $frame = $catchFrame;
+                                goto restart;
+                            }
+                        }
                         break;
                     }
                     if (Variable::TYPE_ARRAY === $container->type) {
@@ -7121,7 +7129,15 @@ restart:
                             $this->context->foreachIterators[$op->arg1] = $iterable;
                             if ($this->variableIsGenerator($iterable)) {
                                 unset($this->context->foreachObjectAdvance[$op->arg1]);
-                                $iterable->toObject()->generatorState->rewind();
+                                try {
+                                    $iterable->toObject()->generatorState->rewindForForeach();
+                                } catch (\Exception $e) {
+                                    $catchFrame = $this->dispatchVmEngineException($e->getMessage(), $frame);
+                                    if (null !== $catchFrame) {
+                                        $frame = $catchFrame;
+                                        goto restart;
+                                    }
+                                }
                                 break;
                             }
                             $this->context->foreachObjectAdvance[$op->arg1] = false;
