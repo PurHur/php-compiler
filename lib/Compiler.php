@@ -2347,7 +2347,7 @@ class Compiler {
                         ($child instanceof Op\Expr\ConstFetch || $child instanceof Op\Expr\ClassConstFetch)
                         && $i + 1 < $opCount
                         && ($ops[$i + 1] instanceof Op\Expr\FuncCall || $ops[$i + 1] instanceof Op\Expr\NsFuncCall)
-                        && $this->isDeferredHoistedConstFetchCallArgPrelude($child, $ops[$i + 1])
+                        && $this->isDeferredHoistedConstFetchCallArgPrelude($child, $ops[$i + 1], $ops, $i)
                     ) {
                         // stream_supports($fp, STREAM_SUPPORT_READ) — FUNCCALL_INIT before const (#17697).
                         break;
@@ -36029,10 +36029,14 @@ class Compiler {
     /**
      * php-cfg hoists ConstFetch/ClassConstFetch immediately before FuncCall for dead inline arg temps.
      * Defer eager compileOps so FUNCCALL_INIT runs first (php-src undefined-function before undefined-const, #17697).
+     *
+     * @param Op[] $ops
      */
     private function isDeferredHoistedConstFetchCallArgPrelude(
         Op\Expr $fetch,
-        Op\Expr\FuncCall|Op\Expr\NsFuncCall $consumer
+        Op\Expr\FuncCall|Op\Expr\NsFuncCall $consumer,
+        array $ops,
+        int $fetchIndex
     ): bool {
         if (
             !$fetch instanceof Op\Expr\ConstFetch
@@ -36041,8 +36045,43 @@ class Compiler {
             return false;
         }
 
+        // Sibling comparison operands (false !== ini_get(...)) are not call args — compile eagerly (#17756, #17757).
+        if ($this->hoistedConstFetchFeedsSiblingComparisonAfterCall($fetch, $consumer, $ops, $fetchIndex)) {
+            return false;
+        }
+
         // php-cfg hoists call-arg ConstFetch as the stmt immediately before the consumer (#17697).
         return true;
+    }
+
+    /**
+     * True when a hoisted fetch supplies a comparison operand after the adjacent FuncCall, not a call arg.
+     *
+     * @param Op[] $ops
+     */
+    private function hoistedConstFetchFeedsSiblingComparisonAfterCall(
+        Op\Expr $fetch,
+        Op\Expr\FuncCall|Op\Expr\NsFuncCall $consumer,
+        array $ops,
+        int $fetchIndex
+    ): bool {
+        if (null === $fetch->result || ($ops[$fetchIndex + 1] ?? null) !== $consumer) {
+            return false;
+        }
+        for ($j = $fetchIndex + 2, $n = \count($ops); $j < $n; ++$j) {
+            $stmt = $ops[$j];
+            if (!$this->isComparisonInlineCallArgProducer($stmt) || !$stmt instanceof Op\Expr\BinaryOp) {
+                break;
+            }
+            if (
+                $this->operandsReferToSameVariable($stmt->left, $fetch->result)
+                || $this->operandsReferToSameVariable($stmt->right, $fetch->result)
+            ) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

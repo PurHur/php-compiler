@@ -6240,6 +6240,66 @@ PHP;
         self::assertNotSame($constSlots[0], $argSendSlots[0], 'hoisted false must not feed file_exists arg');
     }
 
+    /** Issue #17757 — false !== ini_get('bogus') must compare against false, not an uninitialized temp. */
+    public function testIniGetUnknownKeyInlineFalseComparisonEmitsConstFetch(): void
+    {
+        $code = <<<'PHP'
+<?php
+declare(strict_types=1);
+var_export(false !== ini_get('bogus_xyz'));
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'ini_get_unknown_inline_false.php');
+
+        $falseConstSlot = null;
+        $notIdenticalLeft = null;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_CONST_FETCH === $op->type && null === $falseConstSlot) {
+                $falseConstSlot = $op->arg1;
+            }
+            if (OpCode::TYPE_NOT_IDENTICAL === $op->type) {
+                $notIdenticalLeft = $op->arg2;
+            }
+        }
+
+        self::assertNotNull($falseConstSlot, 'missing false ConstFetch');
+        self::assertSame($falseConstSlot, $notIdenticalLeft, 'NOT_IDENTICAL left must be false literal slot');
+    }
+
+    /** Issue #17756 — false !== class_alias(...) must compare against false after EXEC_RETURN. */
+    public function testClassAliasInlineFalseComparisonEmitsConstFetch(): void
+    {
+        $code = <<<'PHP'
+<?php
+declare(strict_types=1);
+var_export(false !== class_alias('NoSuch17756', 'Alias17756'));
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'class_alias_unknown_inline_false.php');
+
+        $falseConstSlot = null;
+        $aliasReturnSlot = null;
+        $notIdenticalLeft = null;
+        $notIdenticalRight = null;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_CONST_FETCH === $op->type && null === $falseConstSlot) {
+                $falseConstSlot = $op->arg1;
+            }
+            if (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type && null === $aliasReturnSlot) {
+                $aliasReturnSlot = $op->arg1;
+            }
+            if (OpCode::TYPE_NOT_IDENTICAL === $op->type) {
+                $notIdenticalLeft = $op->arg2;
+                $notIdenticalRight = $op->arg3;
+            }
+        }
+
+        self::assertNotNull($falseConstSlot, 'missing false ConstFetch');
+        self::assertNotNull($aliasReturnSlot, 'missing class_alias return slot');
+        self::assertSame($falseConstSlot, $notIdenticalLeft);
+        self::assertSame($aliasReturnSlot, $notIdenticalRight);
+    }
+
     /** Issue #14042 — nested array_reverse() feeds trailing mixed param, not hoisted Array_ prelude. */
     public function testNestedArrayReverseTrailingMixedCallArgUsesFuncCallSlot(): void
     {
