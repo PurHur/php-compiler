@@ -50,11 +50,11 @@ final class preg_match extends Internal
         $result = VmPreg::pregMatch($pattern, $subject, $hostMatches, $flags, $offset);
 
         if ($hasMatches) {
-            $target = $frame->calledArgs[2];
+            $target = $frame->calledArgs[2]->resolveIndirect();
             if (false === $result) {
-                $target->null();
+                // Zend leaves $matches as [] on compile failure (ext/pcre/php_pcre.c, #17584).
+                $target->array(new HashTable());
             } else {
-                $target = $target->resolveIndirect();
                 $ht = VmPregMatches::hostMatchesToHashTable($hostMatches, $flags);
                 $target->array($ht);
             }
