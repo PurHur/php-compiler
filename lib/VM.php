@@ -16426,6 +16426,11 @@ restart:
 
                     return;
                 }
+                if ($this->context->userConstantReferencesObjectId($objectId)) {
+                    $frame->scope[$slot]->null();
+
+                    return;
+                }
             }
         }
         $frame->scope[$slot]->null();

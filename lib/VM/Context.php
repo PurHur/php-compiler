@@ -522,6 +522,25 @@ class Context {
         return true;
     }
 
+    /** True when a live user constant still holds the given object id (#17676). */
+    public function userConstantReferencesObjectId(int $objectId): bool
+    {
+        foreach ($this->constants as $constVar) {
+            $resolved = $constVar->resolveIndirect();
+            if (Variable::TYPE_OBJECT !== $resolved->type) {
+                continue;
+            }
+            try {
+                if ($resolved->toObject()->id === $objectId) {
+                    return true;
+                }
+            } catch (\LogicException) {
+            }
+        }
+
+        return false;
+    }
+
     public function declareFunction(Func $func): void {
         $lcname = strtolower($func->getName());
         $this->functions[$lcname] = $func;

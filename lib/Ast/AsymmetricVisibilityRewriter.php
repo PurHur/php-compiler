@@ -28,6 +28,9 @@ final class AsymmetricVisibilityRewriter
     /** php-src: Zend/zend_compile.c — zend_add_member_modifier() duplicate PPP / PPP_SET (#6774). */
     public const MULTIPLE_MODIFIERS_MESSAGE = 'Multiple access type modifiers are not allowed';
 
+    /** Actionable DX when asymmetric visibility syntax is rejected on the reference profile (#17695). */
+    public const REFERENCE_PROFILE_ASYMMETRIC_VISIBILITY_HINT = 'Asymmetric visibility requires PHP_COMPILER_PROFILE=8.4 (PHP 8.4 forward profile)';
+
     /** php-src: Zend/zend_language_scanner.l — invalid set/read modifier ordering on reference profile (#15446). */
     public const BARE_SET_WITHOUT_READ_MESSAGE = 'syntax error, unexpected token ")", expecting variable';
 
@@ -128,6 +131,34 @@ final class AsymmetricVisibilityRewriter
         }
 
         return 0;
+    }
+
+    /**
+     * Reference-profile reject message for multiple-modifier detection (#17695).
+     *
+     * Unparenthesized `public private(set)` is valid on the 8.4 forward profile; on the Zend 8.2
+     * reference profile emit the forward-profile env hint instead of Zend's duplicate-modifier fatal.
+     */
+    public static function referenceProfileMultipleModifierMessage(string $source, int $line): string
+    {
+        $sourceLine = self::sourceLineAt($source, $line);
+        if ('' !== $sourceLine
+            && !self::lineViolatesDuplicateSetModifierRules($sourceLine)
+            && self::lineHasExplicitReadPlusSetModifier($sourceLine)) {
+            return self::REFERENCE_PROFILE_ASYMMETRIC_VISIBILITY_HINT;
+        }
+
+        return self::MULTIPLE_MODIFIERS_MESSAGE;
+    }
+
+    private static function sourceLineAt(string $source, int $line): string
+    {
+        if ($line < 1) {
+            return '';
+        }
+        $lines = explode("\n", $source);
+
+        return $lines[$line - 1] ?? '';
     }
 
     /**

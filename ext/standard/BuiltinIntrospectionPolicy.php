@@ -143,6 +143,9 @@ final class BuiltinIntrospectionPolicy
         if (\in_array($lc, ['curl_escape', 'curl_unescape'], true)) {
             return CurlExtensionPolicy::advertisesExtension();
         }
+        if ('ldap_escape' === $lc) {
+            return \PHPCompiler\ext\ldap\LdapExtensionPolicy::advertisesBuiltins();
+        }
         if ('fastcgi_finish_request' === $lc) {
             return VmFastCgi::registersFinishRequestFunction();
         }
@@ -170,6 +173,9 @@ final class BuiltinIntrospectionPolicy
         }
         if ('brotli' === $ext) {
             return \PHPCompiler\ext\brotli\BrotliExtensionPolicy::advertisesExtension();
+        }
+        if ('ldap' === $ext) {
+            return \PHPCompiler\ext\ldap\LdapExtensionPolicy::advertisesExtension();
         }
 
         return true;
