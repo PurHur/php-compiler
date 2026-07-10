@@ -46,6 +46,16 @@ final class VmFilterTest extends TestCase
         $this->assertFalse($out->toBool());
     }
 
+    /** Issue #17585 — php-src ext/filter/logical_filters.c overflow past PHP_INT_MAX. */
+    public function testValidateIntRejectsOverflowPastPhpIntMax(): void
+    {
+        $v = new Variable();
+        $v->string((string) PHP_INT_MAX . '0');
+        $out = VmFilter::filterVar($v, VmFilter::FILTER_VALIDATE_INT);
+        $this->assertSame(Variable::TYPE_BOOLEAN, $out->type);
+        $this->assertFalse($out->toBool());
+    }
+
     public function testValidateIntAllowHexFlag(): void
     {
         $v = new Variable();

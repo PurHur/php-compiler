@@ -807,8 +807,34 @@ final class VmFilter
         if (!self::isIntegerString($s)) {
             return null;
         }
+        if (!self::decimalIntStringFitsPhpInt($s)) {
+            return null;
+        }
 
         return (int) $s;
+    }
+
+    /**
+     * php-src ext/filter/logical_filters.c — reject decimal strings past PHP_INT_MAX/MIN.
+     */
+    public static function decimalIntStringFitsPhpInt(string $s): bool
+    {
+        $neg = str_starts_with($s, '-');
+        $body = ltrim($s, '+-');
+        if ('' === $body) {
+            return false;
+        }
+        $limitBody = $neg ? substr((string) PHP_INT_MIN, 1) : (string) PHP_INT_MAX;
+        $bodyLen = \strlen($body);
+        $limitLen = \strlen($limitBody);
+        if ($bodyLen > $limitLen) {
+            return false;
+        }
+        if ($bodyLen < $limitLen) {
+            return true;
+        }
+
+        return strcmp($body, $limitBody) <= 0;
     }
 
     private static function validateEmail(Variable $value, bool $nullOnFailure = false, int $flags = 0): Variable
