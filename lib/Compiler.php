@@ -27239,25 +27239,27 @@ class Compiler {
     }
 
     /**
-     * substr(sprintf('%o', fileperms($path)), -N) — UnaryMinus offset + nested sprintf haystack (#16451, #16480).
+     * substr(f(...), -N) — nested FuncCall haystack cfg index + callee name (#10673, #16451, #17572).
      *
      * @param list<Op> $cfgChildren
+     *
+     * @return array{0: int, 1: string}|null
      */
-    private function isSubstrNestedSprintfUnaryMinusPattern(
+    private function substrNestedHaystackFuncCallAtUnaryMinusPattern(
         Op $cfgCallOp,
         int $callIndex,
         array $cfgChildren
-    ): bool {
+    ): ?array {
         if (
             'substr' !== strtolower($this->resolveInlineCallArgFuncName($cfgCallOp) ?? '')
             || !\is_array($cfgCallOp->args ?? null)
             || \count($cfgCallOp->args) < 2
             || $callIndex < 2
         ) {
-            return false;
+            return null;
         }
         if (!$this->isUnaryInlineSiblingCallArgExpr($cfgChildren[$callIndex - 1] ?? null)) {
-            return false;
+            return null;
         }
         $probeIndex = $callIndex - 2;
         while ($probeIndex >= 0) {
@@ -27268,25 +27270,67 @@ class Compiler {
             }
             break;
         }
-        $sprintfOp = $cfgChildren[$probeIndex] ?? null;
+        $producerOp = $cfgChildren[$probeIndex] ?? null;
+        if (!($producerOp instanceof Op\Expr\FuncCall || $producerOp instanceof Op\Expr\NsFuncCall)) {
+            return null;
+        }
+        $calleeName = $this->resolveCfgFuncCallName($producerOp);
+        if (null === $calleeName || '' === $calleeName) {
+            return null;
+        }
         if (
-            !($sprintfOp instanceof Op\Expr\FuncCall || $sprintfOp instanceof Op\Expr\NsFuncCall)
-            || 'sprintf' !== strtolower($this->resolveCfgFuncCallName($sprintfOp) ?? '')
+            !$this->isNestedCallArgProducerForConsumer(
+                $producerOp,
+                $cfgCallOp,
+                $probeIndex,
+                $callIndex,
+                $cfgChildren
+            )
+            || 0 !== $this->siblingMultiArgFuncCallProducerTargetArgIndex(
+                $probeIndex,
+                $callIndex,
+                $cfgChildren
+            )
         ) {
-            return false;
+            return null;
         }
 
-        return $this->isNestedCallArgProducerForConsumer(
-            $sprintfOp,
+        return [$probeIndex, $calleeName];
+    }
+
+    /**
+     * substr(sprintf('%o', fileperms($path)), -N) — UnaryMinus offset + nested FuncCall haystack (#16451, #16480).
+     *
+     * @param list<Op> $cfgChildren
+     */
+    private function isSubstrNestedSprintfUnaryMinusPattern(
+        Op $cfgCallOp,
+        int $callIndex,
+        array $cfgChildren
+    ): bool {
+        return null !== $this->substrNestedHaystackFuncCallAtUnaryMinusPattern(
             $cfgCallOp,
-            $probeIndex,
-            $callIndex,
-            $cfgChildren
-        ) && 0 === $this->siblingMultiArgFuncCallProducerTargetArgIndex(
-            $probeIndex,
             $callIndex,
             $cfgChildren
         );
+    }
+
+    /**
+     * @param list<Op> $cfgChildren
+     */
+    private function slotForSubstrNestedHaystackFuncCallExecReturn(
+        Block $block,
+        int $probeIndex,
+        string $calleeName,
+        array $cfgChildren
+    ): ?string {
+        return $this->slotForLastEmittedFuncCallExecReturnByName($block, $calleeName)
+            ?? $this->slotForInlineFuncCallProducerExecReturnByCfgIndex(
+                $block,
+                $probeIndex,
+                $cfgChildren
+            )
+            ?? $this->slotForLastEmittedInlineCallResultBeforePendingFuncCall($block);
     }
 
     /**
@@ -41612,21 +41656,30 @@ class Compiler {
             ) {
                 continue;
             }
+            $nestedName = $this->resolveCfgFuncCallName($scan) ?? '';
 
-            return $this->slotForLastEmittedFuncCallExecReturnByName($block, 'sprintf')
-                ?? $this->slotForInlineFuncCallProducerExecReturnByCfgIndex(
-                    $block,
-                    $j,
-                    $cfgChildren
-                )
-                ?? $this->slotForLastEmittedInlineCallResultBeforePendingFuncCall($block);
+            return $this->slotForSubstrNestedHaystackFuncCallExecReturn(
+                $block,
+                $j,
+                $nestedName,
+                $cfgChildren
+            );
         }
-        if (!$this->isSubstrNestedSprintfUnaryMinusPattern($cfgCallOp, $callIndex, $cfgChildren)) {
+        $nestedHaystack = $this->substrNestedHaystackFuncCallAtUnaryMinusPattern(
+            $cfgCallOp,
+            $callIndex,
+            $cfgChildren
+        );
+        if (null === $nestedHaystack) {
             return null;
         }
 
-        return $this->slotForLastEmittedFuncCallExecReturnByName($block, 'sprintf')
-            ?? $this->slotForLastEmittedInlineCallResultBeforePendingFuncCall($block);
+        return $this->slotForSubstrNestedHaystackFuncCallExecReturn(
+            $block,
+            $nestedHaystack[0],
+            $nestedHaystack[1],
+            $cfgChildren
+        );
     }
 
     /**
@@ -43952,10 +44005,20 @@ class Compiler {
             return;
         }
         $cfgChildren = $block->orig->children;
-        if (!$this->isSubstrNestedSprintfUnaryMinusPattern($cfgCallOp, $callIndex, $cfgChildren)) {
+        $nestedHaystack = $this->substrNestedHaystackFuncCallAtUnaryMinusPattern(
+            $cfgCallOp,
+            $callIndex,
+            $cfgChildren
+        );
+        if (null === $nestedHaystack) {
             return;
         }
-        $haystackSlot = $this->slotForLastEmittedFuncCallExecReturnByName($block, 'sprintf');
+        $haystackSlot = $this->slotForSubstrNestedHaystackFuncCallExecReturn(
+            $block,
+            $nestedHaystack[0],
+            $nestedHaystack[1],
+            $cfgChildren
+        );
         if (null === $haystackSlot) {
             return;
         }

@@ -4208,6 +4208,45 @@ PHP;
         self::assertSame('0644', $out);
     }
 
+    /** Issue #17572 — substr(dechex(...), -N) wires nested FuncCall + UnaryMinus producer slots. */
+    public function testSubstrNestedDechexUsesFuncCallProducerSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+echo substr(dechex(255), -2);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'nested_substr_dechex.php');
+
+        $dechexReturnSlot = null;
+        $substrSends = [];
+        $fcallOrdinal = 0;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                ++$fcallOrdinal;
+                if (2 === $fcallOrdinal) {
+                    $substrSends = [];
+                }
+            }
+            if (1 === $fcallOrdinal && OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
+                $dechexReturnSlot = $op->arg1;
+            }
+            if (2 === $fcallOrdinal && OpCode::TYPE_ARG_SEND === $op->type) {
+                $substrSends[] = $op->arg1;
+            }
+        }
+
+        self::assertNotNull($dechexReturnSlot);
+        self::assertCount(2, $substrSends);
+        self::assertSame($dechexReturnSlot, $substrSends[0], 'arg sends='.json_encode($substrSends));
+        self::assertNotSame($substrSends[0], $substrSends[1], 'arg sends='.json_encode($substrSends));
+
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertSame('ff', $out);
+    }
+
     /** Issue #13636 — substr(sprintf('%o', fileperms($path)), -N) nested int builtin arg slot + runtime. */
     public function testSubstrNestedSprintfFilepermsUsesFuncCallProducerSlot(): void
     {
