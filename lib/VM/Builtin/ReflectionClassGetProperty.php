@@ -19,8 +19,12 @@ final class ReflectionClassGetProperty extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        if (\count($frame->calledArgs) < 2) {
-            throw new \LogicException('ReflectionClass::getProperty() expects a property name');
+        $userArgCount = \count($frame->calledArgs) - 1;
+        if (1 !== $userArgCount) {
+            throw new \ArgumentCountError(\sprintf(
+                'ReflectionClass::getProperty() expects exactly 1 argument, %d given',
+                $userArgCount
+            ));
         }
         $receiver = ReflectionSupport::requireReflectionClass($frame, $frame->calledArgs[0]);
         $ctx = VmReflection::requireContext($frame);
