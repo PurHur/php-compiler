@@ -103,7 +103,7 @@ final class JitHash
         );
     }
 
-    private static function digestToValue(Context $context, Value $digest): Value
+    public static function digestToValue(Context $context, Value $digest): Value
     {
         $id = (string) (++self::$blockSerial);
         $strPtr = $context->getTypeFromString('__string__*');
