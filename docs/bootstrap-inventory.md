@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 4337 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 11699 |
+| Source constructs flagged (warnings) | 11697 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -2397,8 +2397,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/preg_grep.php` | 0 | 3 |
 | `ext/standard/preg_last_error_.php` | 0 | 1 |
 | `ext/standard/preg_last_error_msg_.php` | 0 | 1 |
-| `ext/standard/preg_match.php` | 0 | 2 |
-| `ext/standard/preg_match_all.php` | 0 | 2 |
+| `ext/standard/preg_match.php` | 0 | 1 |
+| `ext/standard/preg_match_all.php` | 0 | 1 |
 | `ext/standard/preg_quote.php` | 0 | 1 |
 | `ext/standard/preg_replace.php` | 0 | 4 |
 | `ext/standard/preg_replace_callback.php` | 0 | 4 |
@@ -20036,13 +20036,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/preg_match.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 56)
 - 2 class method(s)
 
 ### `ext/standard/preg_match_all.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 60)
 - 2 class method(s)
 
 ### `ext/standard/preg_quote.php`
@@ -24908,7 +24906,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/PregMatchRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 499)
+- new JIT (line 496)
 - 15 class method(s)
 - 2 closure(s)
 
