@@ -147,6 +147,7 @@ final class HighlightEngine
         $escaped = \htmlspecialchars($text, \ENT_QUOTES | \ENT_SUBSTITUTE, 'UTF-8');
         $escaped = \str_replace(' ', '&nbsp;', $escaped);
         $escaped = \str_replace("\t", '&nbsp;&nbsp;&nbsp;&nbsp;', $escaped);
+        // php-src ext/standard/php_highlight.h — line breaks inside spans become <br /> (#17557).
         $escaped = \str_replace("\n", '<br />', $escaped);
 
         return $escaped;
