@@ -3747,6 +3747,7 @@
         "lib/JIT/VmSpineSmokeNative.php",
         "lib/JIT/VmUnitProbeExecuteNative.php",
         "lib/JitMcjitEmbed.php",
+        "lib/LanguageProfileScope.php",
         "lib/LazyPropertyRejector.php",
         "lib/Lint/Issue.php",
         "lib/Lint/LintCompiler.php",
@@ -4571,9 +4572,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 4337,
+        "inventory_files": 4338,
         "excluded": 0,
-        "eligible": 4337,
+        "eligible": 4338,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
