@@ -163,7 +163,7 @@ final class ArrayFindHelper
 
     private static function callbackKeyFirstForMode(int $mode, bool $unaryInternalUsesKey): bool
     {
-        return self::MODE_FIND_KEY === $mode || $unaryInternalUsesKey;
+        return $unaryInternalUsesKey;
     }
 
     private static function buildFromNativeArray(

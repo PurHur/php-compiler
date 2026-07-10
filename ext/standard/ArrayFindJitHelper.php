@@ -32,7 +32,7 @@ final class ArrayFindJitHelper
     {
         $fn = VmInternalCall::resolveStringCallback($builtinName);
         $unaryUsesKey = self::MODE_ALL_KEY === $mode || self::MODE_ANY_KEY === $mode;
-        $keyFirst = self::MODE_FIND_KEY === $mode || self::MODE_ALL_KEY === $mode || self::MODE_ANY_KEY === $mode;
+        $keyFirst = self::MODE_ALL_KEY === $mode || self::MODE_ANY_KEY === $mode;
         $out = new Variable();
         foreach ($ht->iterateKeyed(true) as [$key, $value]) {
             $item = new Variable();
