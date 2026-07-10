@@ -2575,6 +2575,8 @@ final class VmDom
             throw new \DOMException('Hierarchy request error');
         }
 
+        self::assertSameDocument($parent, $child);
+        self::detachNodeIfAttached($ctx, $child);
         $parentState->childIds[] = $child->id;
         self::linkChildToParent($child, $parent);
         self::syncSubtree($ctx, $parent);
@@ -5440,6 +5442,8 @@ final class VmDom
 
     private static function appendDocumentChild(Context $ctx, ObjectEntry $document, ObjectEntry $child): void
     {
+        self::assertSameDocument($document, $child);
+        self::detachNodeIfAttached($ctx, $child);
         $parentState = DomRegistry::state($document);
         $existing = $document->getProperty(self::PROP_DOCUMENT_ELEMENT)->resolveIndirect();
         if (Variable::TYPE_NULL !== $existing->type) {
