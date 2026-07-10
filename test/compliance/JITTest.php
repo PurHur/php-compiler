@@ -203,6 +203,15 @@ class JITTest extends BaseTest {
                 && str_contains($name, 'mb_str_pad_phantom')) {
                 continue;
             }
+            if (!CompilerVersion::supportsMbUcfirstLcfirst()
+                && (str_contains($name, 'mb_ucfirst') || str_contains($name, 'mb_lcfirst'))
+                && !str_contains($name, 'mb_ucfirst_lcfirst_phantom')) {
+                continue;
+            }
+            if (CompilerVersion::supportsMbUcfirstLcfirst()
+                && str_contains($name, 'mb_ucfirst_lcfirst_phantom')) {
+                continue;
+            }
             if (!CompilerVersion::supportsSortingEnum()
                 && str_contains($name, 'sort_sorting_enum')
                 && !str_contains($name, 'sorting_enum_phantom')) {

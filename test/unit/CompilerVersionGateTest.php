@@ -1303,6 +1303,15 @@ final class CompilerVersionGateTest extends TestCase
         $this->assertFalse(isset($runtime->vmContext->functions['mb_str_pad']));
     }
 
+    public function testVmDoesNotRegisterMbUcfirstLcfirstOnReferenceProfile(): void
+    {
+        $runtime = new Runtime();
+        $ctx = $runtime->vmContext;
+        foreach (['mb_ucfirst', 'mb_lcfirst'] as $fn) {
+            $this->assertFalse(isset($ctx->functions[$fn]), $fn);
+        }
+    }
+
     public function testVmRegistersMbStrPadOnForwardProfile(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
@@ -1310,6 +1319,25 @@ final class CompilerVersionGateTest extends TestCase
         try {
             $runtime = new Runtime();
             $this->assertTrue(isset($runtime->vmContext->functions['mb_str_pad']));
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testVmRegistersMbUcfirstLcfirstOnForwardProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $runtime = new Runtime();
+            $ctx = $runtime->vmContext;
+            foreach (['mb_ucfirst', 'mb_lcfirst'] as $fn) {
+                $this->assertTrue(isset($ctx->functions[$fn]), $fn);
+            }
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');

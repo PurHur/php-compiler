@@ -64,6 +64,12 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsMbStrPad());
     }
 
+    public function testMbUcfirstLcfirstWithheldOnReferenceProfileUntilStable84(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsMbUcfirstLcfirst());
+        $this->assertFalse(CompilerVersion::advertisesMbUcfirstLcfirst());
+    }
+
     public function testGetObjectIdWithheldOnReferenceProfile(): void
     {
         $this->assertFalse(CompilerVersion::supportsGetObjectId());
@@ -291,6 +297,22 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         try {
             $this->assertTrue(CompilerVersion::supportsMbStrPad());
             $this->assertTrue(CompilerVersion::advertisesMbStrPad());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testMbUcfirstLcfirstAdvertisedOnForwardProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertTrue(CompilerVersion::supportsMbUcfirstLcfirst());
+            $this->assertTrue(CompilerVersion::advertisesMbUcfirstLcfirst());
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');

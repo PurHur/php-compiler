@@ -1337,6 +1337,13 @@ function withheldBuiltinGateDefinitions(): array
             'relPath' => 'ext/mbstring/mb_str_pad.php',
         ],
         [
+            'names' => ['mb_ucfirst', 'mb_lcfirst'],
+            'gate' => [PHPCompiler\CompilerVersion::class, 'supportsMbUcfirstLcfirst'],
+            'since' => '8.3.0',
+            'module' => 'mbstring',
+            'relPath' => 'ext/mbstring/mb_ucfirst.php',
+        ],
+        [
             'names' => ['mb_trim', 'mb_ltrim', 'mb_rtrim'],
             'gate' => [PHPCompiler\CompilerVersion::class, 'supportsMbTrimFunctions'],
             'since' => '8.4.0',
