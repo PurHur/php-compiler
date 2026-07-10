@@ -26,7 +26,7 @@ final class VmIniIntrospection
     /**
      * Host ini_get_all() registry — keys, per-extension filters, access metadata (#16433).
      *
-     * @var array{all: array<string, array{global_value: string, local_value: string, access: int}>, extensions: array<string, list<string>>}|null|false
+     * @var array{all: array<string, array{global_value: ?string, local_value: ?string, access: int}>, extensions: array<string, list<string>>}|null|false
      */
     private static array|false|null $iniRegistry = null;
 
@@ -119,9 +119,11 @@ final class VmIniIntrospection
             if (!\is_string($key) || !\is_array($entry)) {
                 continue;
             }
+            $global = $entry['global_value'] ?? null;
+            $local = $entry['local_value'] ?? null;
             $normalized[$key] = [
-                'global_value' => (string) ($entry['global_value'] ?? ''),
-                'local_value' => (string) ($entry['local_value'] ?? ''),
+                'global_value' => null === $global ? null : (string) $global,
+                'local_value' => null === $local ? null : (string) $local,
                 'access' => (int) ($entry['access'] ?? 7),
             ];
         }
@@ -174,7 +176,7 @@ final class VmIniIntrospection
     }
 
     /**
-     * @return array{global_value: string, local_value: string, access: int}|null
+     * @return array{global_value: ?string, local_value: ?string, access: int}|null
      */
     public static function registryEntry(string $key): ?array
     {
@@ -196,7 +198,7 @@ final class VmIniIntrospection
     }
 
     /**
-     * @return array{all: array<string, array{global_value: string, local_value: string, access: int}>, extensions: array<string, list<string>>}|null
+     * @return array{all: array<string, array{global_value: ?string, local_value: ?string, access: int}>, extensions: array<string, list<string>>}|null
      */
     private static function iniRegistryData(): ?array
     {

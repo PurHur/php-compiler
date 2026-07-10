@@ -225,7 +225,9 @@ final class VmIni
         if (!in_array($key, self::SUPPORTED_KEYS, true)) {
             $registry = VmIniIntrospection::registryEntry($key);
             if (null !== $registry) {
-                return $registry['local_value'];
+                $local = $registry['local_value'];
+
+                return null === $local ? '' : $local;
             }
 
             return false;
@@ -296,7 +298,9 @@ final class VmIni
         if (!in_array($key, self::SUPPORTED_KEYS, true)) {
             $registry = VmIniIntrospection::registryEntry($key);
             if (null !== $registry) {
-                return $registry['global_value'];
+                $global = $registry['global_value'];
+
+                return null === $global ? '' : $global;
             }
 
             return false;
@@ -737,17 +741,15 @@ final class VmIni
             }
             if ($details) {
                 $entry = new HashTable();
-                $global = self::getCfgVar($key);
-                if (false === $global) {
-                    $global = $local;
-                }
+                $global = self::detailGlobalValue($ctx, $key);
+                $local = self::detailLocalValue($ctx, $key);
                 $access = self::INI_ACCESS_ALL;
                 $registry = VmIniIntrospection::registryEntry($key);
                 if (null !== $registry) {
                     $access = $registry['access'];
                 }
-                $entry->add('global_value', self::stringVar($global));
-                $entry->add('local_value', self::stringVar($local));
+                $entry->add('global_value', self::detailVar($global));
+                $entry->add('local_value', self::detailVar($local));
                 $entry->add('access', self::intVar($access));
                 $slot = new Variable();
                 $slot->array($entry);
@@ -791,6 +793,72 @@ final class VmIni
             VmIniIntrospection::MIRRORED_HOST_INI_KEYS,
             ['engine', 'zend.exception_ignore_args'],
         )));
+    }
+
+    private static function detailLocalValue(Context $ctx, string $key): ?string
+    {
+        if ('assert.callback' === $key) {
+            return AssertOptionsJitHelper::getCallbackForOptions();
+        }
+
+        $local = self::get($ctx, $key);
+        if (false === $local) {
+            $registry = VmIniIntrospection::registryEntry($key);
+
+            return null !== $registry ? $registry['local_value'] : null;
+        }
+
+        return self::coalesceIniGetAllDetailValue($key, $local, 'local_value');
+    }
+
+    private static function detailGlobalValue(Context $ctx, string $key): ?string
+    {
+        if ('assert.callback' === $key) {
+            return AssertOptionsJitHelper::getCallbackForOptions();
+        }
+
+        $global = self::getCfgVar($key);
+        if (false === $global) {
+            return self::detailLocalValue($ctx, $key);
+        }
+
+        return self::coalesceIniGetAllDetailValue($key, $global, 'global_value');
+    }
+
+    /**
+     * php-src ini_get_all() exposes NULL for unset PG() entries while ini_get() returns ''.
+     *
+     * @param 'global_value'|'local_value' $slot
+     */
+    private static function coalesceIniGetAllDetailValue(string $key, string $value, string $slot): ?string
+    {
+        if ('' !== $value) {
+            return $value;
+        }
+
+        $registry = VmIniIntrospection::registryEntry($key);
+        if (null !== $registry && null === $registry[$slot]) {
+            return null;
+        }
+
+        return $value;
+    }
+
+    private static function detailVar(?string $value): Variable
+    {
+        if (null === $value) {
+            return self::nullVar();
+        }
+
+        return self::stringVar($value);
+    }
+
+    private static function nullVar(): Variable
+    {
+        $var = new Variable();
+        $var->null();
+
+        return $var;
     }
 
     private static function stringVar(string $value): Variable
