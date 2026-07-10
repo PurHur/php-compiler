@@ -29,12 +29,15 @@ final class ErrorHandlerJitRuntime
 
     private const RESTORE_HELPER = 'PHPCompiler\\ext\\standard\\ErrorHandlerJitHelper::restoreApply';
 
+    private const GET_TOP_NAME_HELPER = 'PHPCompiler\\ext\\standard\\ErrorHandlerJitHelper::getTopName';
+
     private const RESOLVE_HELPER = 'PHPCompiler\\ext\\standard\\ErrorHandlerJitHelper::resolveHandlerAddr';
 
     /** @var list<string> */
     private const COMPILED_HELPERS = [
         self::SET_APPLY_HELPER,
         self::RESTORE_HELPER,
+        self::GET_TOP_NAME_HELPER,
         self::RESOLVE_HELPER,
     ];
 
@@ -43,6 +46,7 @@ final class ErrorHandlerJitRuntime
         '__phpc_error_handler_dispatch',
         '__phpc_error_handler_set_apply',
         '__phpc_error_handler_restore_apply',
+        '__phpc_error_handler_get_apply',
     ];
 
     public static function ensureLinked(Context $context): void
@@ -57,8 +61,7 @@ final class ErrorHandlerJitRuntime
 
     public static function implement(Context $context): void
     {
-        $probe = $context->module->getNamedFunction('__phpc_error_handler_dispatch');
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+        if (self::allAbiFunctionsImplemented($context)) {
             self::registerLinkedRuntime($context);
 
             return;
@@ -80,6 +83,7 @@ final class ErrorHandlerJitRuntime
         self::implementDispatchBridge($context);
         self::implementSetApplyBridge($context);
         self::implementRestoreApplyBridge($context);
+        self::implementGetApplyBridge($context);
         self::registerLinkedRuntime($context);
         self::restoreInsertBlock($context, $restoreBlock);
     }
@@ -143,6 +147,24 @@ final class ErrorHandlerJitRuntime
             $context->builder->clearInsertionPosition();
         }
         $context->registerFunction('__phpc_error_handler_restore_apply', $restoreApply);
+
+        $getApply = self::standaloneAbiFunction(
+            $context,
+            '__phpc_error_handler_get_apply',
+            $context->context->functionType($voidTy, false, $valPtr)
+        );
+        if (0 === $getApply->countBasicBlocks()) {
+            $entry = $getApply->appendBasicBlock('entry');
+            $context->builder = $context->context->builderCreate();
+            $context->builder->positionAtEnd($entry);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeNull'),
+                $getApply->getParam(0)
+            );
+            $context->builder->returnVoid();
+            $context->builder->clearInsertionPosition();
+        }
+        $context->registerFunction('__phpc_error_handler_get_apply', $getApply);
 
         $context->builder = $savedBuilder;
     }
@@ -312,6 +334,33 @@ final class ErrorHandlerJitRuntime
             $out,
             $context->builder->zext($restored, $i32)
         );
+        $context->builder->returnVoid();
+        $context->registerFunction($abiName, $fn);
+    }
+
+    private static function implementGetApplyBridge(Context $context): void
+    {
+        $abiName = '__phpc_error_handler_get_apply';
+        $probe = $context->module->getNamedFunction($abiName);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
+
+        $valPtr = $context->getTypeFromString('__value__*');
+        $voidTy = $context->getTypeFromString('void');
+        $ft = $context->context->functionType($voidTy, false, $valPtr);
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction($abiName, $ft);
+
+        $entry = $fn->appendBasicBlock('eh_get_entry');
+        $context->builder->positionAtEnd($entry);
+
+        $out = $fn->getParam(0);
+        $active = $context->builder->call(self::helperFunction($context, self::GET_TOP_NAME_HELPER));
+        self::writeNullableStringToValue($context, $fn, $out, $active);
         $context->builder->returnVoid();
         $context->registerFunction($abiName, $fn);
     }
@@ -488,6 +537,18 @@ final class ErrorHandlerJitRuntime
             $fn = $context->module->addFunction($name, $ft);
             $context->registerFunction($name, $fn);
         }
+    }
+
+    private static function allAbiFunctionsImplemented(Context $context): bool
+    {
+        foreach (self::ABI_FUNCTIONS as $abiName) {
+            $probe = $context->module->getNamedFunction($abiName);
+            if (null === $probe || 0 === $probe->countBasicBlocks()) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private static function registerLinkedRuntime(Context $context): void

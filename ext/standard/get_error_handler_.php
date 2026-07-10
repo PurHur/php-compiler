@@ -36,6 +36,10 @@ final class get_error_handler_ extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('get_error_handler() is VM-only in this compiler build');
+        if (\count($args) > 0) {
+            throw new \LogicException('get_error_handler() takes no arguments');
+        }
+
+        return JitErrorHandler::get($context);
     }
 }
