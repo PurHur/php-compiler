@@ -1262,6 +1262,7 @@ final class BuiltinClasses
         $di->properties[] = new ClassProperty('f', null, $floatProto);
         $di->properties[] = new ClassProperty('days', null, $boolProto);
         $di->properties[] = new ClassProperty('from_string', null, $boolProto);
+        $di->properties[] = new ClassProperty('date_string', null, $strProto);
         foreach ($di->properties as $prop) {
             $prop->visibility = $pub;
         }
