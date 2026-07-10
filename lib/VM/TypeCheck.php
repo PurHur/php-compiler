@@ -23,6 +23,7 @@ final class TypeCheck
     {
         return isset($block->paramNeverSlots[$slot])
             || isset($block->paramIterableSlots[$slot])
+            || isset($block->paramCallableSlots[$slot])
             || isset($block->paramVariadicElementTypeConstraints[$slot])
             || isset($block->paramVariadicElementGenericArrayTypeSpecs[$slot])
             || isset($block->paramVariadicElementIntersectionConstraints[$slot])
