@@ -3420,6 +3420,131 @@ class Compiler {
         return $found;
     }
 
+    /**
+     * Chained ?? call args: compile coalesce into a temp, then call on the merge block (#17380).
+     *
+     * @return ?list<OpCode>
+     */
+    private function compileFuncCallAfterChainedCoalesceArgs(Op\Expr\FuncCall $expr, Block $block): ?array
+    {
+        $newArgs = $expr->args;
+        $changed = false;
+        foreach ($expr->args as $i => $arg) {
+            $coalesce = $this->findChainedCoalesceForCallArg($arg, $block, $expr, (int) $i);
+            if (null === $coalesce) {
+                continue;
+            }
+            $temp = new Temporary();
+            $temp->type = Type::mixed();
+            $block = $this->compileCoalesceForAssign($coalesce, $block, $temp);
+            $tempSlot = $block->getVarSlot($temp, false);
+            $this->registerSyncedCoalesceFuncCallArgSlot($arg, $tempSlot);
+            if (isset($expr->args[$i])) {
+                $this->registerSyncedCoalesceFuncCallArgSlot($expr->args[$i], $tempSlot);
+            }
+            $newArgs[$i] = $temp;
+            $changed = true;
+        }
+        if (!$changed) {
+            return null;
+        }
+        foreach ($this->compileFuncCall(
+            $this->compileOperand($expr->name, $block, true),
+            $newArgs,
+            $expr->result,
+            $block,
+            max(0, $expr->getLine()),
+            $expr
+        ) as $op) {
+            $block->addOpCode($op);
+        }
+
+        return [];
+    }
+
+    private function findChainedCoalesceForCallArg(
+        Operand $arg,
+        Block $block,
+        ?Op $cfgCallOp,
+        int $argIndex
+    ): ?Op\Expr\BinaryOp\Coalesce {
+        foreach ($this->findEmbeddedCoalesces($arg) as $coalesce) {
+            if ($this->coalesceRhsIsNestedCoalesce($coalesce, $block)) {
+                return $coalesce;
+            }
+        }
+        $stmtCoalesce = $this->findCoalesceStmtForCallArg($arg, $block);
+        if (null !== $stmtCoalesce && $this->coalesceRhsIsNestedCoalesce($stmtCoalesce, $block)) {
+            return $stmtCoalesce;
+        }
+        if (null !== $cfgCallOp && is_array($cfgCallOp->args ?? null)) {
+            $cfgArg = $cfgCallOp->args[$argIndex] ?? null;
+            if (null !== $cfgArg && $cfgArg !== $arg) {
+                foreach ($this->findEmbeddedCoalesces($cfgArg) as $coalesce) {
+                    if ($this->coalesceRhsIsNestedCoalesce($coalesce, $block)) {
+                        return $coalesce;
+                    }
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private function coalesceRhsIsNestedCoalesce(Op\Expr\BinaryOp\Coalesce $coalesce, Block $block): bool
+    {
+        $rhsRoot = $this->unwrapOperandChain($coalesce->right);
+        if ($rhsRoot instanceof Op\Expr\BinaryOp\Coalesce) {
+            return true;
+        }
+
+        return $this->findOrigExprOpForOperand($coalesce->right, $block) instanceof Op\Expr\BinaryOp\Coalesce;
+    }
+
+    private function coalesceStmtDeferredToChainedFuncCallArg(
+        Op\Expr\BinaryOp\Coalesce $coalesce,
+        Block $block
+    ): bool {
+        if (null === $block->orig) {
+            return false;
+        }
+        $idx = array_search($coalesce, $block->orig->children, true);
+
+        return \is_int($idx) && $this->followingFuncCallHasChainedCoalesceArg($block, $idx);
+    }
+
+    private function followingFuncCallHasChainedCoalesceArg(Block $block, int $fromIdx): bool
+    {
+        if (null === $block->orig) {
+            return false;
+        }
+        $children = $block->orig->children;
+        for ($j = $fromIdx + 1, $count = \count($children); $j < $count; ++$j) {
+            $next = $children[$j];
+            if ($next instanceof Op\Expr\FuncCall || $next instanceof Op\Expr\NsFuncCall) {
+                if (!property_exists($next, 'args') || !\is_array($next->args)) {
+                    return false;
+                }
+                foreach ($next->args as $argIndex => $arg) {
+                    if (null !== $arg
+                        && null !== $this->findChainedCoalesceForCallArg($arg, $block, $next, (int) $argIndex)
+                    ) {
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+            if ($next instanceof Op\Expr && $this->isInlineExprCallArgProducer($next)) {
+                continue;
+            }
+
+            return false;
+        }
+
+        return false;
+    }
+
     private function compileCoalesceForAssign(
         Op\Expr\BinaryOp\Coalesce $coalesce,
         Block $block,
@@ -9544,6 +9669,9 @@ class Compiler {
 
     protected function compileExpr(Op\Expr $expr, Block $block): array {
         if ($expr instanceof Op\Expr\BinaryOp\Coalesce) {
+            if ($this->coalesceStmtDeferredToChainedFuncCallArg($expr, $block)) {
+                return [];
+            }
             $this->compileCoalesce($expr, $block);
 
             return [];
@@ -9977,6 +10105,11 @@ class Compiler {
                         max(0, $expr->getLine()),
                         $expr
                     );
+                }
+
+                $splitCall = $this->compileFuncCallAfterChainedCoalesceArgs($expr, $block);
+                if (null !== $splitCall) {
+                    return $splitCall;
                 }
 
                 return $this->compileFuncCall(
@@ -14693,6 +14826,9 @@ class Compiler {
         if (null === $coalesce) {
             return null;
         }
+        if (isset($this->coalesceResultSlots[spl_object_id($coalesce)])) {
+            return $this->coalesceResultSlots[spl_object_id($coalesce)];
+        }
         $coalesceSlot = $this->slotForCoalesceResult($block, $coalesce);
         if (null === $coalesceSlot) {
             $this->compileCoalesce($coalesce, $block);
@@ -14809,6 +14945,9 @@ class Compiler {
     {
         foreach ($args as $arg) {
             foreach ($this->findEmbeddedCoalesces($arg) as $coalesce) {
+                if (isset($this->coalesceResultSlots[spl_object_id($coalesce)])) {
+                    continue;
+                }
                 if (null === $this->slotForCoalesceResult($block, $coalesce)) {
                     $this->compileCoalesce($coalesce, $block);
                 }
@@ -14816,6 +14955,7 @@ class Compiler {
             $stmtCoalesce = $this->findCoalesceStmtForCallArg($arg, $block);
             if (
                 null !== $stmtCoalesce
+                && !isset($this->coalesceResultSlots[spl_object_id($stmtCoalesce)])
                 && null === $this->slotForCoalesceResult($block, $stmtCoalesce)
             ) {
                 $this->compileCoalesce($stmtCoalesce, $block);

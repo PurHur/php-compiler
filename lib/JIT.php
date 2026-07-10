@@ -12581,6 +12581,10 @@ class JIT {
                 JIT\JitValueBox::pointer($this->context, $result->value),
                 $value
             );
+            JIT\JitValueBox::publishAfterWrite(
+                $this->context,
+                JIT\JitValueBox::pointer($this->context, $result->value)
+            );
             $resolved = JIT\OperandName::resolve($resultOp);
             if (null !== $resolved && '' !== $resolved) {
                 $this->context->bindVariableByName($resolved, $result);
