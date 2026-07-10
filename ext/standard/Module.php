@@ -729,8 +729,14 @@ class Module extends ModuleAbstract
             new compiler_language_warning_(),
             new set_error_handler_(),
             new restore_error_handler_(),
+            ...(CompilerVersion::supportsGetHandlerIntrospection() ? [
+                new get_error_handler_(),
+            ] : []),
             new set_exception_handler(),
             new restore_exception_handler(),
+            ...(CompilerVersion::supportsGetHandlerIntrospection() ? [
+                new get_exception_handler(),
+            ] : []),
             new error_get_last(),
             new error_clear_last(),
             new exif_tagname(),

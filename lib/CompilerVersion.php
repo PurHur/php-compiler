@@ -2152,6 +2152,26 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.4+ get_error_handler() / get_exception_handler() (ext/standard/basic_functions.c; #17644).
+     *
+     * Callable under forward profile via {@see languageProfileVersion()}; withheld on 8.4.0-dev reference profile.
+     */
+    public static function supportsGetHandlerIntrospection(): bool
+    {
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+    }
+
+    /** get_error_handler()/get_exception_handler() visible to function_exists() — stable runtime or forward 8.4+. */
+    public static function advertisesGetHandlerIntrospection(): bool
+    {
+        if (version_compare(self::VERSION, '8.4.0', '>=')) {
+            return true;
+        }
+
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+    }
+
+    /**
      * Forward DOM APIs gated like gc_status / str_increment (#15613, #14535).
      *
      * On `8.4.0-dev` reference profile (unset `PHP_COMPILER_PROFILE`), withhold PHP 8.3+/8.4+

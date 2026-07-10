@@ -83,11 +83,14 @@ final class BuiltinIntrospectionPolicy
         if ('readonly' === $lc) {
             return CompilerVersion::advertisesReadonlyBuiltin();
         }
-        if ('bcround' === $lc) {
+        if (\in_array($lc, ['bcceil', 'bcfloor', 'bcround'], true)) {
             return CompilerVersion::advertisesBcround();
         }
         if (str_starts_with($lc, 'bc')) {
             return CompilerVersion::advertisesBcmath();
+        }
+        if (\in_array($lc, ['get_error_handler', 'get_exception_handler'], true)) {
+            return CompilerVersion::advertisesGetHandlerIntrospection();
         }
         if (\in_array($lc, [
             'http_get_last_response_headers',

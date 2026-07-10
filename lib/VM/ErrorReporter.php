@@ -139,6 +139,11 @@ final class ErrorReporter
         return true;
     }
 
+    public function getActiveHandler(): ?Variable
+    {
+        return $this->activeHandlerCopy();
+    }
+
     public function stringOffsetCastOccurred(
         ?Context $context = null,
         ?Frame $frame = null,
