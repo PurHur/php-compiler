@@ -36,7 +36,7 @@ final class PropertyHookSyntaxReferenceProfileTest extends TestCase
     {
         $this->skipWhenForwardProfile();
         $this->expectException(\PHPCompiler\Compiler\CompileFatal::class);
-        $this->expectExceptionMessage(PropertyHooks::REFERENCE_PROFILE_UNEXPECTED_ARROW);
+        $this->expectExceptionMessage(PropertyHooks::REFERENCE_PROFILE_PROPERTY_HOOKS_HINT);
         PropertyHookSyntaxRejector::reject(
             file_get_contents(dirname(__DIR__).'/repro/maintainer_gap_property_hook_default_initializer.php'),
             'default_initializer.php'
@@ -47,7 +47,7 @@ final class PropertyHookSyntaxReferenceProfileTest extends TestCase
     {
         $this->skipWhenForwardProfile();
         $this->expectException(\PHPCompiler\Compiler\CompileFatal::class);
-        $this->expectExceptionMessage(PropertyHooks::REFERENCE_PROFILE_UNEXPECTED_BRACE);
+        $this->expectExceptionMessage(PropertyHooks::REFERENCE_PROFILE_PROPERTY_HOOKS_HINT);
         PropertyHookSyntaxRejector::reject(
             file_get_contents(dirname(__DIR__).'/repro/maintainer_gap_property_hooks_reference_profile.php'),
             'reference_profile.php'
@@ -65,7 +65,7 @@ final class PropertyHookSyntaxReferenceProfileTest extends TestCase
             );
             $this->fail('Expected compile failure');
         } catch (\PHPCompiler\Compiler\CompileFatal $e) {
-            $this->assertStringContainsString(PropertyHooks::REFERENCE_PROFILE_UNEXPECTED_ARROW, $e->getMessage());
+            $this->assertStringContainsString(PropertyHooks::REFERENCE_PROFILE_PROPERTY_HOOKS_HINT, $e->getMessage());
         }
     }
 
@@ -80,7 +80,7 @@ final class PropertyHookSyntaxReferenceProfileTest extends TestCase
             );
             $this->fail('Expected compile failure');
         } catch (\PHPCompiler\Compiler\CompileFatal $e) {
-            $this->assertStringContainsString(PropertyHooks::REFERENCE_PROFILE_UNEXPECTED_BRACE, $e->getMessage());
+            $this->assertStringContainsString(PropertyHooks::REFERENCE_PROFILE_PROPERTY_HOOKS_HINT, $e->getMessage());
         }
     }
 }
