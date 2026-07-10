@@ -67,6 +67,29 @@ LOG;
         $this->assertStringContainsString('BOOTSTRAP_HONEST_COMPILE_GATE=1', $script);
     }
 
+    public function testBootstrapHonestCompileMetricScriptExists(): void
+    {
+        $script = self::$root.'/script/bootstrap-honest-compile-metric.sh';
+        $this->assertFileExists($script);
+        $this->assertTrue(is_executable($script));
+        $body = (string) file_get_contents($script);
+        $this->assertStringContainsString('bootstrap-inventory-argv-probe.sh', $body);
+        $this->assertStringContainsString('#15603', $body);
+    }
+
+    public function testBootstrapHonestCompileMetricCheckJson(): void
+    {
+        $script = self::$root.'/script/bootstrap-honest-compile-metric.sh';
+        $cmd = 'bash '.escapeshellarg($script).' --check --json 2>/dev/null';
+        $raw = shell_exec($cmd);
+        $this->assertIsString($raw);
+        $payload = json_decode((string) $raw, true);
+        $this->assertIsArray($payload);
+        $this->assertArrayHasKey('status', $payload);
+        $this->assertSame('unknown', $payload['status']);
+        $this->assertTrue($payload['gate_available']);
+    }
+
     public function testBootstrapInitScriptExists(): void
     {
         $script = self::$root.'/script/bootstrap-init.sh';
