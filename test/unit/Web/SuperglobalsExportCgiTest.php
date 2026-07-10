@@ -14,12 +14,14 @@ final class SuperglobalsExportCgiTest extends TestCase
         $previousBody = getenv('REQUEST_BODY');
         $previousMethod = getenv('REQUEST_METHOD');
 
-        Superglobals::exportCgiEnvironment('name=Dev', 'field=1', '/tmp/index.php');
+        Superglobals::exportCgiEnvironment('name=Dev', 'field=1', '/tmp/index.php', '/index.php');
 
         $this->assertSame('name=Dev', getenv('QUERY_STRING'));
         $this->assertSame('field=1', getenv('REQUEST_BODY'));
         $this->assertSame('POST', getenv('REQUEST_METHOD'));
         $this->assertSame('/tmp/index.php', getenv('SCRIPT_FILENAME'));
+        $this->assertSame('/index.php', getenv('SCRIPT_NAME'));
+        $this->assertSame('/index.php', getenv('PHP_SELF'));
 
         if (false !== $previousQuery) {
             putenv('QUERY_STRING='.$previousQuery);
@@ -37,5 +39,7 @@ final class SuperglobalsExportCgiTest extends TestCase
             putenv('REQUEST_METHOD');
         }
         putenv('SCRIPT_FILENAME');
+        putenv('SCRIPT_NAME');
+        putenv('PHP_SELF');
     }
 }
