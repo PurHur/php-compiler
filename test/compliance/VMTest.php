@@ -544,7 +544,7 @@ class VMTest extends BaseTest {
             }
             if (!CompilerVersion::supportsReadonlyBuiltin()
                 && (str_contains($name, 'readonly_builtin')
-                    || preg_match('#/readonly_function\\.phpt$#', $name)
+                    || preg_match('#(?:^|/)readonly_function$#', $name)
                     || str_contains($name, 'readonly_function_jit'))
                 && !str_contains($name, 'readonly_phantom')) {
                 continue;

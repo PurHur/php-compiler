@@ -386,7 +386,7 @@ class JITTest extends BaseTest {
                 continue;
             }
             if (!CompilerVersion::supportsReadonlyBuiltin()
-                && (preg_match('#/readonly_function\\.phpt$#', $name)
+                && (preg_match('#(?:^|/)readonly_function$#', $name)
                     || str_contains($name, 'readonly_function_jit'))
                 && !str_contains($name, 'readonly_phantom')) {
                 continue;
