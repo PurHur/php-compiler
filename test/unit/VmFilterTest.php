@@ -46,6 +46,33 @@ final class VmFilterTest extends TestCase
         $this->assertFalse($out->toBool());
     }
 
+    public function testValidateIntRejectsOverflowPastPhpIntMax(): void
+    {
+        $v = new Variable();
+        $v->string(\PHP_INT_MAX.'0');
+        $out = VmFilter::filterVar($v, VmFilter::FILTER_VALIDATE_INT);
+        $this->assertSame(Variable::TYPE_BOOLEAN, $out->type);
+        $this->assertFalse($out->toBool());
+    }
+
+    public function testValidateIntAcceptsPhpIntMaxString(): void
+    {
+        $v = new Variable();
+        $v->string((string) \PHP_INT_MAX);
+        $out = VmFilter::filterVar($v, VmFilter::FILTER_VALIDATE_INT);
+        $this->assertSame(Variable::TYPE_INTEGER, $out->type);
+        $this->assertSame(\PHP_INT_MAX, $out->toInt());
+    }
+
+    public function testValidateIntAcceptsPhpIntMinString(): void
+    {
+        $v = new Variable();
+        $v->string((string) \PHP_INT_MIN);
+        $out = VmFilter::filterVar($v, VmFilter::FILTER_VALIDATE_INT);
+        $this->assertSame(Variable::TYPE_INTEGER, $out->type);
+        $this->assertSame(\PHP_INT_MIN, $out->toInt());
+    }
+
     public function testValidateIntAllowHexFlag(): void
     {
         $v = new Variable();

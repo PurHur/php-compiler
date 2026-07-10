@@ -808,7 +808,49 @@ final class VmFilter
             return null;
         }
 
-        return (int) $s;
+        return self::parseDecimalIntegerString($s);
+    }
+
+    /**
+     * Decimal string → native int when in [PHP_INT_MIN, PHP_INT_MAX] (php-src ext/filter/logical_filters.c).
+     */
+    public static function parseDecimalIntegerString(string $s): ?int
+    {
+        $negative = str_starts_with($s, '-');
+        $digits = ltrim($s, '+-');
+        $limit = $negative
+            ? self::incrementDecimalString((string) \PHP_INT_MAX)
+            : (string) \PHP_INT_MAX;
+        $len = \strlen($digits);
+        $limitLen = \strlen($limit);
+        if ($len > $limitLen || ($len === $limitLen && $digits > $limit)) {
+            return null;
+        }
+        if ($negative) {
+            if ($digits === $limit) {
+                return \PHP_INT_MIN;
+            }
+
+            return -((int) $digits);
+        }
+
+        return (int) $digits;
+    }
+
+    private static function incrementDecimalString(string $digits): string
+    {
+        $carry = 1;
+        $out = '';
+        for ($i = \strlen($digits) - 1; $i >= 0; --$i) {
+            $sum = (int) $digits[$i] + $carry;
+            $out = (string) ($sum % 10).$out;
+            $carry = intdiv($sum, 10);
+        }
+        if ($carry > 0) {
+            $out = (string) $carry.$out;
+        }
+
+        return $out;
     }
 
     private static function validateEmail(Variable $value, bool $nullOnFailure = false, int $flags = 0): Variable
