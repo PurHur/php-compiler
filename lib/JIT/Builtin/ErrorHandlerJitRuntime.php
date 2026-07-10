@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPCompiler\JIT\JitNestedHelperCoerce;
+use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\BasicBlock;
 use PHPLLVM\Builder;
 use PHPLLVM\LLVMAbstract\Builder as LLVMBuilderImpl;
@@ -25,19 +27,27 @@ final class ErrorHandlerJitRuntime
 {
     private const HELPER_PATH = '/ext/standard/ErrorHandlerJitHelper.php';
 
-    private const SET_APPLY_HELPER = 'PHPCompiler\\ext\\standard\\ErrorHandlerJitHelper::setApply';
+    private const PEEK_PREVIOUS_NAME_HELPER = 'PHPCompiler\\ext\\standard\\ErrorHandlerJitHelper::peekPreviousName';
+
+    private const PUSH_SCALARS_HELPER = 'PHPCompiler\\ext\\standard\\ErrorHandlerJitHelper::pushScalars';
+
+    private const HAS_ACTIVE_HELPER = 'PHPCompiler\\ext\\standard\\ErrorHandlerJitHelper::hasActiveHandler';
+
+    private const ACTIVE_NAME_GLOBAL = 'phpc_eh_active_handler_name';
 
     private const RESTORE_HELPER = 'PHPCompiler\\ext\\standard\\ErrorHandlerJitHelper::restoreApply';
 
-    private const GET_TOP_NAME_HELPER = 'PHPCompiler\\ext\\standard\\ErrorHandlerJitHelper::getTopName';
+    private const RESET_STACK_HELPER = 'PHPCompiler\\ext\\standard\\ErrorHandlerJitHelper::resetStack';
 
     private const RESOLVE_HELPER = 'PHPCompiler\\ext\\standard\\ErrorHandlerJitHelper::resolveHandlerAddr';
 
     /** @var list<string> */
     private const COMPILED_HELPERS = [
-        self::SET_APPLY_HELPER,
+        self::PEEK_PREVIOUS_NAME_HELPER,
+        self::HAS_ACTIVE_HELPER,
+        self::PUSH_SCALARS_HELPER,
         self::RESTORE_HELPER,
-        self::GET_TOP_NAME_HELPER,
+        self::RESET_STACK_HELPER,
         self::RESOLVE_HELPER,
     ];
 
@@ -63,16 +73,7 @@ final class ErrorHandlerJitRuntime
     {
         if (self::allAbiFunctionsImplemented($context)) {
             self::registerLinkedRuntime($context);
-
-            return;
-        }
-
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            $restoreBlock = self::captureInsertBlock($context);
-            self::ensureValueWriters($context);
-            self::implementStandaloneThinAbi($context);
-            self::registerLinkedRuntime($context);
-            self::restoreInsertBlock($context, $restoreBlock);
+            self::wireStandaloneStackInit($context);
 
             return;
         }
@@ -85,109 +86,30 @@ final class ErrorHandlerJitRuntime
         self::implementRestoreApplyBridge($context);
         self::implementGetApplyBridge($context);
         self::registerLinkedRuntime($context);
+        self::wireStandaloneStackInit($context);
         self::restoreInsertBlock($context, $restoreBlock);
     }
 
-    private static function implementStandaloneThinAbi(Context $context): void
+    private static bool $standaloneStackInitWired = false;
+
+    private static function wireStandaloneStackInit(Context $context): void
     {
-        $i32 = $context->getTypeFromString('int32');
-        $i8p = $context->getTypeFromString('int8*');
-        $sizeT = $context->getTypeFromString('size_t');
-        $valPtr = $context->getTypeFromString('__value__*');
-        $voidTy = $context->getTypeFromString('void');
-        $savedBuilder = $context->builder;
-
-        $dispatch = self::standaloneAbiFunction(
-            $context,
-            '__phpc_error_handler_dispatch',
-            $context->context->functionType($i32, false, $i32, $i8p, $sizeT, $i32)
-        );
-        if (0 === $dispatch->countBasicBlocks()) {
-            $entry = $dispatch->appendBasicBlock('entry');
-            $context->builder = $context->context->builderCreate();
-            $context->builder->positionAtEnd($entry);
-            $context->builder->returnValue($i32->constInt(0, false));
-            $context->builder->clearInsertionPosition();
+        if (\PHPCompiler\JIT\Builtin::LOAD_TYPE_STANDALONE !== $context->loadType
+            || self::$standaloneStackInitWired) {
+            return;
         }
-        $context->registerFunction('__phpc_error_handler_dispatch', $dispatch);
-
-        $setApply = self::standaloneAbiFunction(
-            $context,
-            '__phpc_error_handler_set_apply',
-            $context->context->functionType($voidTy, false, $valPtr, $i8p, $sizeT, $i8p, $i32)
-        );
-        if (0 === $setApply->countBasicBlocks()) {
-            $entry = $setApply->appendBasicBlock('entry');
-            $context->builder = $context->context->builderCreate();
-            $context->builder->positionAtEnd($entry);
-            $context->builder->call(
-                $context->lookupFunction('__value__writeNull'),
-                $setApply->getParam(0)
-            );
-            $context->builder->returnVoid();
-            $context->builder->clearInsertionPosition();
-        }
-        $context->registerFunction('__phpc_error_handler_set_apply', $setApply);
-
-        $restoreApply = self::standaloneAbiFunction(
-            $context,
-            '__phpc_error_handler_restore_apply',
-            $context->context->functionType($voidTy, false, $valPtr)
-        );
-        if (0 === $restoreApply->countBasicBlocks()) {
-            $entry = $restoreApply->appendBasicBlock('entry');
-            $context->builder = $context->context->builderCreate();
-            $context->builder->positionAtEnd($entry);
-            $context->builder->call(
-                $context->lookupFunction('__value__writeBool'),
-                $restoreApply->getParam(0),
-                $i32->constInt(1, false)
-            );
-            $context->builder->returnVoid();
-            $context->builder->clearInsertionPosition();
-        }
-        $context->registerFunction('__phpc_error_handler_restore_apply', $restoreApply);
-
-        $getApply = self::standaloneAbiFunction(
-            $context,
-            '__phpc_error_handler_get_apply',
-            $context->context->functionType($voidTy, false, $valPtr)
-        );
-        if (0 === $getApply->countBasicBlocks()) {
-            $entry = $getApply->appendBasicBlock('entry');
-            $context->builder = $context->context->builderCreate();
-            $context->builder->positionAtEnd($entry);
-            $context->builder->call(
-                $context->lookupFunction('__value__writeNull'),
-                $getApply->getParam(0)
-            );
-            $context->builder->returnVoid();
-            $context->builder->clearInsertionPosition();
-        }
-        $context->registerFunction('__phpc_error_handler_get_apply', $getApply);
-
-        $context->builder = $savedBuilder;
-    }
-
-    private static function standaloneAbiFunction(Context $context, string $abiName, $ft): LlvmFunction
-    {
-        $probe = $context->module->getNamedFunction($abiName);
-        if (null === $probe) {
-            $context->module->addFunction($abiName, $ft);
-            $probe = $context->module->getNamedFunction($abiName);
-        }
-        if (null === $probe) {
-            throw new \LogicException($abiName.' missing after standalone ABI declare (#9472)');
-        }
-
-        return $probe;
+        self::$standaloneStackInitWired = true;
+        $resetFn = self::helperFunction($context, self::RESET_STACK_HELPER);
+        $context->emitInInit(static function (Context $ctx) use ($resetFn): void {
+            $ctx->builder->call($resetFn);
+        });
     }
 
     private static function implementDispatchBridge(Context $context): void
     {
         $abiName = '__phpc_error_handler_dispatch';
         $probe = $context->module->getNamedFunction($abiName);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+        if (JitVmHelperLink::hasNamedBridgeEntry($probe, 'eh_dispatch_bridge')) {
             $context->registerFunction($abiName, $probe);
 
             return;
@@ -204,7 +126,7 @@ final class ErrorHandlerJitRuntime
             ? $probe
             : $context->module->addFunction($abiName, $ft);
 
-        $entry = $fn->appendBasicBlock('eh_dispatch_entry');
+        $entry = $fn->appendBasicBlock('eh_dispatch_bridge');
         $context->builder->positionAtEnd($entry);
 
         $errno = $fn->getParam(0);
@@ -213,10 +135,12 @@ final class ErrorHandlerJitRuntime
         $line = $fn->getParam(3);
         $zeroI32 = $i32->constInt(0, false);
 
-        $fnAddr = $context->builder->call(
+        $fnAddr = JitNestedHelperCoerce::callHelper(
+            $context,
             self::helperFunction($context, self::RESOLVE_HELPER),
-            $context->builder->sext($errno, $i64)
+            [$context->builder->sext($errno, $i64)]
         );
+        $fnAddr = JitNestedHelperCoerce::coerceHelperScalarResult($context, $fnAddr, $i64);
         $noHandlerBb = $fn->appendBasicBlock('eh_dispatch_no_handler');
         $callBb = $fn->appendBasicBlock('eh_dispatch_call');
         $context->builder->branchIf(
@@ -266,7 +190,7 @@ final class ErrorHandlerJitRuntime
     {
         $abiName = '__phpc_error_handler_set_apply';
         $probe = $context->module->getNamedFunction($abiName);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+        if (JitVmHelperLink::hasNamedBridgeEntry($probe, 'eh_set_bridge')) {
             $context->registerFunction($abiName, $probe);
 
             return;
@@ -283,7 +207,7 @@ final class ErrorHandlerJitRuntime
             ? $probe
             : $context->module->addFunction($abiName, $ft);
 
-        $entry = $fn->appendBasicBlock('eh_set_entry');
+        $entry = $fn->appendBasicBlock('eh_set_bridge');
         $context->builder->positionAtEnd($entry);
 
         $out = $fn->getParam(0);
@@ -293,13 +217,25 @@ final class ErrorHandlerJitRuntime
         $mask = $fn->getParam(4);
 
         $fnAddr = $context->builder->ptrToInt($fnOpaque, $i64);
-        $handlerName = self::optionalCstrToString($context, $fn, $name, $nameLen);
-        $previous = $context->builder->call(
-            self::helperFunction($context, self::SET_APPLY_HELPER),
-            $fnAddr,
-            $context->builder->sext($mask, $i64),
-            $handlerName
+        $handlerNameStr = self::optionalCstrToString($context, $fn, $name, $nameLen);
+        $previous = JitNestedHelperCoerce::callHelper(
+            $context,
+            self::helperFunction($context, self::PEEK_PREVIOUS_NAME_HELPER),
+            []
         );
+        $fnAddrSlot = BasicBlockHelper::entryAlloca($context, $i64);
+        $context->builder->store($fnAddr, $fnAddrSlot);
+        $maskSlot = BasicBlockHelper::entryAlloca($context, $i64);
+        $context->builder->store($context->builder->sext($mask, $i64), $maskSlot);
+        JitNestedHelperCoerce::callHelper(
+            $context,
+            self::helperFunction($context, self::PUSH_SCALARS_HELPER),
+            [
+                $context->builder->load($fnAddrSlot),
+                $context->builder->load($maskSlot),
+            ]
+        );
+        self::storeActiveNameGlobal($context, $handlerNameStr);
 
         self::writeNullableStringToValue($context, $fn, $out, $previous);
         $context->builder->returnVoid();
@@ -310,7 +246,7 @@ final class ErrorHandlerJitRuntime
     {
         $abiName = '__phpc_error_handler_restore_apply';
         $probe = $context->module->getNamedFunction($abiName);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+        if (JitVmHelperLink::hasNamedBridgeEntry($probe, 'eh_restore_bridge')) {
             $context->registerFunction($abiName, $probe);
 
             return;
@@ -324,15 +260,24 @@ final class ErrorHandlerJitRuntime
             ? $probe
             : $context->module->addFunction($abiName, $ft);
 
-        $entry = $fn->appendBasicBlock('eh_restore_entry');
+        $entry = $fn->appendBasicBlock('eh_restore_bridge');
         $context->builder->positionAtEnd($entry);
 
         $out = $fn->getParam(0);
-        $restored = $context->builder->call(self::helperFunction($context, self::RESTORE_HELPER));
+        $restored = JitNestedHelperCoerce::callHelper(
+            $context,
+            self::helperFunction($context, self::RESTORE_HELPER),
+            []
+        );
+        self::storeActiveNameGlobal(
+            $context,
+            $context->getTypeFromString('__string__*')->constNull()
+        );
+        $restoredScalar = JitNestedHelperCoerce::coerceHelperScalarResult($context, $restored, $i32);
         $context->builder->call(
             $context->lookupFunction('__value__writeBool'),
             $out,
-            $context->builder->zext($restored, $i32)
+            $restoredScalar
         );
         $context->builder->returnVoid();
         $context->registerFunction($abiName, $fn);
@@ -342,7 +287,7 @@ final class ErrorHandlerJitRuntime
     {
         $abiName = '__phpc_error_handler_get_apply';
         $probe = $context->module->getNamedFunction($abiName);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+        if (JitVmHelperLink::hasNamedBridgeEntry($probe, 'eh_get_bridge')) {
             $context->registerFunction($abiName, $probe);
 
             return;
@@ -355,12 +300,52 @@ final class ErrorHandlerJitRuntime
             ? $probe
             : $context->module->addFunction($abiName, $ft);
 
-        $entry = $fn->appendBasicBlock('eh_get_entry');
+        $entry = $fn->appendBasicBlock('eh_get_bridge');
         $context->builder->positionAtEnd($entry);
 
         $out = $fn->getParam(0);
-        $active = $context->builder->call(self::helperFunction($context, self::GET_TOP_NAME_HELPER));
-        self::writeNullableStringToValue($context, $fn, $out, $active);
+        $i32 = $context->getTypeFromString('int32');
+        $hasActive = JitNestedHelperCoerce::callHelper(
+            $context,
+            self::helperFunction($context, self::HAS_ACTIVE_HELPER),
+            []
+        );
+        $hasActiveScalar = JitNestedHelperCoerce::coerceHelperScalarResult($context, $hasActive, $i32);
+        $nullBb = $fn->appendBasicBlock('eh_get_no_handler');
+        $activeBb = $fn->appendBasicBlock('eh_get_active');
+        $doneBb = $fn->appendBasicBlock('eh_get_done');
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_NE, $hasActiveScalar, $i32->constInt(0, false)),
+            $activeBb,
+            $nullBb
+        );
+
+        $context->builder->positionAtEnd($nullBb);
+        $context->builder->call($context->lookupFunction('__value__writeNull'), $out);
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($activeBb);
+        $strPtrTy = $context->getTypeFromString('__string__*');
+        $nameStr = self::loadActiveNameGlobal($context);
+        $nameNullBb = $fn->appendBasicBlock('eh_get_name_null');
+        $nameStrBb = $fn->appendBasicBlock('eh_get_name_str');
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $nameStr, $strPtrTy->constNull()),
+            $nameNullBb,
+            $nameStrBb
+        );
+        $context->builder->positionAtEnd($nameNullBb);
+        $context->builder->call($context->lookupFunction('__value__writeNull'), $out);
+        $context->builder->branch($doneBb);
+        $context->builder->positionAtEnd($nameStrBb);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeString'),
+            $out,
+            $nameStr
+        );
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($doneBb);
         $context->builder->returnVoid();
         $context->registerFunction($abiName, $fn);
     }
@@ -404,12 +389,64 @@ final class ErrorHandlerJitRuntime
         return $phi;
     }
 
+    private static function ensureActiveNameGlobal(Context $context): void
+    {
+        if (null !== $context->module->getNamedGlobal(self::ACTIVE_NAME_GLOBAL)) {
+            return;
+        }
+        $strPtr = $context->getTypeFromString('__string__*');
+        $global = $context->module->addGlobal($strPtr, self::ACTIVE_NAME_GLOBAL);
+        $global->setInitializer($strPtr->constNull());
+    }
+
+    private static function storeActiveNameGlobal(Context $context, Value $maybeNullStr): void
+    {
+        self::ensureActiveNameGlobal($context);
+        $global = $context->module->getNamedGlobal(self::ACTIVE_NAME_GLOBAL);
+        if (null === $global) {
+            throw new \LogicException(self::ACTIVE_NAME_GLOBAL.' missing (#17671)');
+        }
+        $context->builder->store($maybeNullStr, $global);
+    }
+
+    private static function loadActiveNameGlobal(Context $context): Value
+    {
+        self::ensureActiveNameGlobal($context);
+        $global = $context->module->getNamedGlobal(self::ACTIVE_NAME_GLOBAL);
+        if (null === $global) {
+            throw new \LogicException(self::ACTIVE_NAME_GLOBAL.' missing (#17671)');
+        }
+
+        return $context->builder->load($global);
+    }
+
     private static function writeNullableStringToValue(
         Context $context,
         LlvmFunction $fn,
         Value $out,
         Value $maybeStr
     ): void {
+        if (JitNestedHelperCoerce::isValueBox($context, $maybeStr)) {
+            $valuePtr = JitNestedHelperCoerce::valueBoxPtrFromHelperResult($context, $maybeStr);
+            $nullBb = $fn->appendBasicBlock('eh_prev_null');
+            $copyBb = $fn->appendBasicBlock('eh_prev_copy');
+            $doneBb = $fn->appendBasicBlock('eh_prev_done');
+            $isNull = JitNestedHelperCoerce::isHelperResultNull($context, $maybeStr);
+            $context->builder->branchIf($isNull, $nullBb, $copyBb);
+
+            $context->builder->positionAtEnd($nullBb);
+            $context->builder->call($context->lookupFunction('__value__writeNull'), $out);
+            $context->builder->branch($doneBb);
+
+            $context->builder->positionAtEnd($copyBb);
+            JitValueBox::copyIntoPointer($context, $out, $valuePtr);
+            $context->builder->branch($doneBb);
+
+            $context->builder->positionAtEnd($doneBb);
+
+            return;
+        }
+
         $strPtr = $context->getTypeFromString('__string__*');
         $nullBb = $fn->appendBasicBlock('eh_prev_null');
         $strBb = $fn->appendBasicBlock('eh_prev_str');
@@ -459,44 +496,18 @@ final class ErrorHandlerJitRuntime
     private static function helperFunction(Context $context, string $logical): LlvmFunction
     {
         self::ensureJitHelperCompiled($context);
-        $lc = \strtolower($logical);
-        $fn = $context->functions[$lc] ?? null;
-        if (null === $fn) {
-            throw new \LogicException($logical.' missing after ErrorHandlerJitHelper compile (#9472)');
-        }
 
-        return $fn;
+        return JitVmHelperLink::lookupCompiled($context, $logical, '#9472');
     }
 
     private static function ensureJitHelperCompiled(Context $context): void
     {
-        $missing = false;
-        foreach (self::COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                $missing = true;
-                break;
-            }
-        }
-        if (!$missing) {
-            return;
-        }
-
-        $runtime = $context->runtime;
-        $path = \dirname(__DIR__, 3).self::HELPER_PATH;
-        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
-            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'ErrorHandlerJitHelper.php');
-            if (null === $block) {
-                throw new \LogicException('ErrorHandlerJitHelper.php parseAndCompile failed (#9472)');
-            }
-            $jit = new JIT($context);
-            $jit->compile($block);
-        });
-        foreach (self::COMPILED_HELPERS as $logical) {
-            $lc = \strtolower($logical);
-            if (!isset($context->functions[$lc])) {
-                throw new \LogicException($lc.' was not compiled for JIT (#9472)');
-            }
-        }
+        JitVmHelperLink::ensureCompiled(
+            $context,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#9472'
+        );
     }
 
     private static function ensureValueWriters(Context $context): void
@@ -539,11 +550,19 @@ final class ErrorHandlerJitRuntime
         }
     }
 
+    /** @var array<string, string> ABI name → real bridge entry block (not thin standalone stub). */
+    private const ABI_BRIDGE_ENTRIES = [
+        '__phpc_error_handler_dispatch' => 'eh_dispatch_bridge',
+        '__phpc_error_handler_set_apply' => 'eh_set_bridge',
+        '__phpc_error_handler_restore_apply' => 'eh_restore_bridge',
+        '__phpc_error_handler_get_apply' => 'eh_get_bridge',
+    ];
+
     private static function allAbiFunctionsImplemented(Context $context): bool
     {
-        foreach (self::ABI_FUNCTIONS as $abiName) {
+        foreach (self::ABI_BRIDGE_ENTRIES as $abiName => $entryBlock) {
             $probe = $context->module->getNamedFunction($abiName);
-            if (null === $probe || 0 === $probe->countBasicBlocks()) {
+            if (!JitVmHelperLink::hasNamedBridgeEntry($probe, $entryBlock)) {
                 return false;
             }
         }

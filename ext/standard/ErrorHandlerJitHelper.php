@@ -29,24 +29,58 @@ final class ErrorHandlerJitHelper
 
     private static ?string $savedName = null;
 
-    public static function setApply(int $fnAddr, int $mask, ?string $handlerName): ?string
+    /** Previous handler name before push; call before {@see pushScalars()} (#17671). */
+    public static function peekPreviousName(): ?string
     {
-        $previous = null;
         if (self::$depth > 0) {
-            $previous = self::$topName;
+            return self::$topName;
         }
+
+        return null;
+    }
+
+    /** Scalar stack push for AOT bridges (#17671). */
+    public static function pushScalars(int $fnAddr, int $mask): bool
+    {
         if (self::$depth >= self::MAX) {
-            return $previous;
+            return true;
         }
         if (1 === self::$depth) {
             self::$savedFnAddr = self::$topFnAddr;
             self::$savedMask = self::$topMask;
-            self::$savedName = self::$topName;
         }
         self::$topFnAddr = $fnAddr;
         self::$topMask = $mask;
-        self::$topName = $handlerName;
         ++self::$depth;
+
+        return true;
+    }
+
+    /** Clear handler name after {@see pushScalars()} (#17671). */
+    public static function clearTopName(): bool
+    {
+        self::$topName = null;
+
+        return true;
+    }
+
+    /** Bind handler name after {@see pushScalars()} (#17671). */
+    public static function bindTopNameString(string $handlerName): bool
+    {
+        self::$topName = $handlerName;
+
+        return true;
+    }
+
+    public static function setApply(int $fnAddr, int $mask, ?string $handlerName): ?string
+    {
+        $previous = self::peekPreviousName();
+        self::pushScalars($fnAddr, $mask);
+        if (null === $handlerName) {
+            self::clearTopName();
+        } else {
+            self::bindTopNameString($handlerName);
+        }
 
         return $previous;
     }
@@ -59,10 +93,8 @@ final class ErrorHandlerJitHelper
         if (self::$depth > 1) {
             self::$topFnAddr = self::$savedFnAddr;
             self::$topMask = self::$savedMask;
-            self::$topName = self::$savedName;
             self::$savedFnAddr = 0;
             self::$savedMask = 0;
-            self::$savedName = null;
         } else {
             self::$topFnAddr = 0;
             self::$topMask = 0;
@@ -88,6 +120,12 @@ final class ErrorHandlerJitHelper
         return self::$topFnAddr;
     }
 
+    /** Whether an error handler is active (AOT get bridge; #17671). */
+    public static function hasActiveHandler(): bool
+    {
+        return self::$depth > 0;
+    }
+
     /** Active handler name for get_error_handler() JIT/AOT (#17668). */
     public static function getTopName(): ?string
     {
@@ -96,5 +134,19 @@ final class ErrorHandlerJitHelper
         }
 
         return self::$topName;
+    }
+
+    /** Standalone AOT __init__: zero nested-compile static stack (#17671). */
+    public static function resetStack(): bool
+    {
+        self::$depth = 0;
+        self::$topFnAddr = 0;
+        self::$topMask = 0;
+        self::$topName = null;
+        self::$savedFnAddr = 0;
+        self::$savedMask = 0;
+        self::$savedName = null;
+
+        return true;
     }
 }

@@ -14,7 +14,8 @@ final class ExceptionHandlerRuntimeShrinkTest extends TestCase
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ExceptionHandlerJitRuntime.php');
         $this->assertStringContainsString('ExceptionHandlerJitHelper', $source);
-        $this->assertStringContainsString('NestedJitCompileScope', $source);
+        $this->assertStringContainsString('JitVmHelperLink', $source);
+        $this->assertStringNotContainsString('implementStandaloneThinAbi', $source);
         $this->assertStringNotContainsString("GLOBAL_DEPTH = 'phpc_exception_handler_depth'", $source);
         $this->assertStringNotContainsString("GLOBAL_FN = 'phpc_exception_handler_fn'", $source);
         $this->assertStringNotContainsString('ensureGlobals', $source);

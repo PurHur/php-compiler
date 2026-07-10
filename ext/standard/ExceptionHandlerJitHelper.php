@@ -141,4 +141,20 @@ final class ExceptionHandlerJitHelper
             case 3: self::$name3 = $name; break;
         }
     }
+
+    /** Standalone AOT __init__: zero nested-compile static stack (#17671). */
+    public static function resetStack(): bool
+    {
+        self::$depth = 0;
+        self::$fn0 = 0;
+        self::$fn1 = 0;
+        self::$fn2 = 0;
+        self::$fn3 = 0;
+        self::$name0 = null;
+        self::$name1 = null;
+        self::$name2 = null;
+        self::$name3 = null;
+
+        return true;
+    }
 }

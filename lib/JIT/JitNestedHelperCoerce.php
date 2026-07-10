@@ -181,6 +181,22 @@ final class JitNestedHelperCoerce
 
             return JitValueBox::pointer($context, $slot);
         }
+        if (self::isValueBoxType($context, $wantTy) && Type::KIND_INTEGER === $haveTy->getKind()) {
+            $i64 = $context->getTypeFromString('int64');
+            $slot = JitValueBox::alloc($context);
+            JitValueBox::writeLong($context, $slot, self::scalarToI64($context, $arg, $haveTy));
+
+            return JitValueBox::pointer($context, $slot);
+        }
+        if (self::isValueBoxType($context, $wantTy)) {
+            $haveStrBool = $context->getStringFromType($haveTy);
+            if ('int1' === $haveStrBool || 'bool' === $haveStrBool) {
+                $slot = JitValueBox::alloc($context);
+                JitValueBox::writeBool($context, $slot, $arg);
+
+                return JitValueBox::pointer($context, $slot);
+            }
+        }
         if (Type::KIND_INTEGER === $wantTy->getKind() && Type::KIND_INTEGER === $haveTy->getKind()) {
             if (('int8' === $haveStr || 'i8' === $haveStr) && ('int32' === $wantStr || 'int64' === $wantStr || 'long long' === $wantStr)) {
                 return $context->builder->zext($arg, $wantTy);

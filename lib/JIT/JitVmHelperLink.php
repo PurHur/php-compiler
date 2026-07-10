@@ -46,6 +46,11 @@ final class JitVmHelperLink
             if (!$missing) {
                 return;
             }
+            // Partial cache hit: drop cached bindings so one nested compile owns
+            // shared static state (ErrorHandlerJitHelper depth/name, #17671).
+            foreach ($compiledHelpers as $logical) {
+                unset($context->functions[\strtolower($logical)]);
+            }
         }
 
         $runtime = $context->runtime;
