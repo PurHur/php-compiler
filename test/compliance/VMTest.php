@@ -473,6 +473,15 @@ class VMTest extends BaseTest {
                 && str_contains($name, 'curl_escape_phantom')) {
                 continue;
             }
+            if (!\PHPCompiler\ext\ldap\LdapExtensionPolicy::advertisesBuiltins()
+                && str_contains($name, 'ldap_escape')
+                && !str_contains($name, 'ldap_escape_phantom')) {
+                continue;
+            }
+            if (\PHPCompiler\ext\ldap\LdapExtensionPolicy::advertisesBuiltins()
+                && str_contains($name, 'ldap_escape_phantom')) {
+                continue;
+            }
             if (!CompilerVersion::supportsBz2()
                 && (str_contains($name, 'bz2') || str_contains($name, 'bzcompress'))
                 && !str_contains($name, 'bz2_phantom')) {

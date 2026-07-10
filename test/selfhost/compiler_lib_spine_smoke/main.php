@@ -384,6 +384,7 @@ require_once __DIR__.'/../../../ext/intl/locale_get_region.php';
 require_once __DIR__.'/../../../ext/intl/locale_get_script.php';
 require_once __DIR__.'/../../../ext/intl/locale_set_default.php';
 require_once __DIR__.'/../../../ext/ldap/LdapConstants.php';
+require_once __DIR__.'/../../../ext/ldap/LdapExtensionPolicy.php';
 require_once __DIR__.'/../../../ext/ldap/Module.php';
 require_once __DIR__.'/../../../ext/ldap/VmLdapEscape.php';
 require_once __DIR__.'/../../../ext/ldap/ldap_escape.php';
