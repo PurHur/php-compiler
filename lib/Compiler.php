@@ -34347,31 +34347,29 @@ class Compiler {
     protected function compileFirstClassCallable(Op\Expr\FirstClassCallable $expr, Block $block): array
     {
         $result = $this->compileOperand($expr->result, $block, false);
+        // `parent::instanceMethod(...)` — bound closure with parent scope, not static (#17655, zend_compile.c).
+        if (
+            Op\Expr\FirstClassCallable::KIND_STATIC === $expr->kind
+            && null !== $expr->class
+            && $this->staticCallUsesParentScope($expr->class)
+        ) {
+            return $this->compileBoundMethodFirstClassCallable(
+                $expr,
+                $block,
+                $result,
+                new Operand\Variable(new Operand\Literal('this')),
+                true
+            );
+        }
         // Numeric kinds: avoid php-cfg class const fetch during self-host bundle JIT (#1056).
         if (3 === $expr->kind) {
-            $callableSlot = $this->compileOperand($expr->result, $block, false);
-            $receiver = $this->compileOperand($expr->var, $block, true);
-            $method = $this->compileOperand($expr->name, $block, true);
-
-            return [
-                new OpCode(
-                    OpCode::TYPE_INIT_ARRAY,
-                    $callableSlot,
-                    $receiver,
-                    $this->compileIntegerLiteralSlot(0, $block)
-                ),
-                new OpCode(
-                    OpCode::TYPE_ADD_ARRAY_ELEMENT,
-                    $callableSlot,
-                    $method,
-                    $this->compileIntegerLiteralSlot(1, $block)
-                ),
-                new OpCode(
-                    OpCode::TYPE_FROM_CALLABLE,
-                    $result,
-                    $callableSlot
-                ),
-            ];
+            return $this->compileBoundMethodFirstClassCallable(
+                $expr,
+                $block,
+                $result,
+                $expr->var,
+                false
+            );
         }
 
         if (Op\Expr\FirstClassCallable::KIND_NEW === $expr->kind) {
@@ -34396,6 +34394,45 @@ class Compiler {
             $result,
             $callableSlot
         )];
+    }
+
+    /**
+     * Lower `$obj->m(...)` / `parent::m(...)` to `[receiver, method]` + TYPE_FROM_CALLABLE (#3566, #17655).
+     *
+     * @return OpCode[]
+     */
+    private function compileBoundMethodFirstClassCallable(
+        Op\Expr\FirstClassCallable $expr,
+        Block $block,
+        int $result,
+        Operand $receiver,
+        bool $parentScope
+    ): array {
+        $callableSlot = $this->compileOperand($expr->result, $block, false);
+        $receiverSlot = $this->compileOperand($receiver, $block, true);
+        $methodSlot = $this->compileOperand($expr->name, $block, true);
+        $fromCallable = new OpCode(
+            OpCode::TYPE_FROM_CALLABLE,
+            $result,
+            $callableSlot
+        );
+        $fromCallable->fromCallableParentScope = $parentScope;
+
+        return [
+            new OpCode(
+                OpCode::TYPE_INIT_ARRAY,
+                $callableSlot,
+                $receiverSlot,
+                $this->compileIntegerLiteralSlot(0, $block)
+            ),
+            new OpCode(
+                OpCode::TYPE_ADD_ARRAY_ELEMENT,
+                $callableSlot,
+                $methodSlot,
+                $this->compileIntegerLiteralSlot(1, $block)
+            ),
+            $fromCallable,
+        ];
     }
 
     private function compileFirstClassFunctionNameSlot(Operand $name, Block $block): int
