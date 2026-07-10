@@ -44665,12 +44665,12 @@ class Compiler {
                 if ($this->isComparisonInlineCallArgProducer($producer)) {
                     return;
                 }
-                // var_export($text->data) — PropertyFetch prelude feeds arg #0, not stale MethodCall EXEC_RETURN (#17540).
-                if ($this->isImmediateVarExportExpressionPrelude($producer)) {
+                // var_export(isset($obj->p), true) / empty(...) — bool from TYPE_ISSET/EMPTY, not stale EXEC_RETURN (#17555).
+                if ($producer instanceof Op\Expr\Isset_ || $producer instanceof Op\Expr\Empty_) {
                     return;
                 }
-                // var_export(isset($o->x), true) — Isset_/Empty_ bool feeds arg #0, not prior New_ EXEC_RETURN (#17555).
-                if ($producer instanceof Op\Expr\Isset_ || $producer instanceof Op\Expr\Empty_) {
+                // var_export($text->data) — PropertyFetch prelude feeds arg #0, not stale MethodCall EXEC_RETURN (#17540).
+                if ($this->isImmediateVarExportExpressionPrelude($producer)) {
                     return;
                 }
                 if ($producer instanceof Op\Expr\MethodCall || $producer instanceof Op\Expr\StaticCall) {
