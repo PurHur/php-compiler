@@ -6,15 +6,16 @@ namespace PHPCompiler\Test\Unit;
 
 use PHPUnit\Framework\TestCase;
 
-/** HashTableHelper v1/v2 slices route DefineRuntime + splits write/read LLVM (#10031, #16390). */
+/** HashTableHelper v1/v2/v3 slices route DefineRuntime + splits read/write LLVM (#10031, #16390, #17710). */
 final class HashTableHelperShrinkTest extends TestCase
 {
+    private const HELPER_MAX_LINES = 1850;
+
     public function testHashTableHelperDelegatesWriteLlvm(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/HashTableHelper.php');
         $this->assertStringContainsString('HashTableWriteLlvm::setAtStringKey', $source);
         $this->assertStringContainsString('HashTableWriteLlvm::setAtIndex', $source);
-        $this->assertLessThan(1900, substr_count($source, "\n"));
     }
 
     public function testHashTableHelperDelegatesReadLlvm(): void
@@ -48,5 +49,44 @@ final class HashTableHelperShrinkTest extends TestCase
     {
         $table = \PHPCompiler\ext\standard\DefineJitHelper::createTable();
         $this->assertFalse(\PHPCompiler\ext\standard\DefineJitHelper::isDefined($table, 'FOO'));
+    }
+
+    public function testHashTableHelperDelegatesSuperglobalReadToReadLlvm(): void
+    {
+        $helper = (string) file_get_contents(__DIR__.'/../../lib/JIT/HashTableHelper.php');
+        $this->assertStringContainsString(
+            'HashTableReadLlvm::readSuperglobalStringKeyToValueBox',
+            $helper
+        );
+        $this->assertStringNotContainsString('sg_sk_has_', $helper);
+        $this->assertStringNotContainsString('__hashtable__peekStringKeyValue', $helper);
+
+        $read = (string) file_get_contents(__DIR__.'/../../lib/JIT/HashTableReadLlvm.php');
+        $this->assertStringContainsString('readSuperglobalStringKeyToValueBox', $read);
+        $this->assertStringContainsString('__hashtable__peekStringKeyValue', $read);
+    }
+
+    public function testHashTableHelperDelegatesValueBoxUnsetToWriteLlvm(): void
+    {
+        $helper = (string) file_get_contents(__DIR__.'/../../lib/JIT/HashTableHelper.php');
+        $this->assertStringContainsString('HashTableWriteLlvm::unsetValueBoxKey', $helper);
+        $this->assertStringNotContainsString('ht_unset_vk_str', $helper);
+
+        $write = (string) file_get_contents(__DIR__.'/../../lib/JIT/HashTableWriteLlvm.php');
+        $this->assertStringContainsString('unsetValueBoxKey', $write);
+        $this->assertStringContainsString('ht_unset_vk_str', $write);
+    }
+
+    public function testHashTableHelperLineBudgetAfterV3Slice(): void
+    {
+        $lines = substr_count(
+            (string) file_get_contents(__DIR__.'/../../lib/JIT/HashTableHelper.php'),
+            "\n"
+        ) + 1;
+        $this->assertLessThanOrEqual(
+            self::HELPER_MAX_LINES,
+            $lines,
+            'HashTableHelper.php should shrink as LLVM moves to Read/WriteLlvm (#17710)'
+        );
     }
 }

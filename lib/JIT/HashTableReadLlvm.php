@@ -445,7 +445,7 @@ final class HashTableReadLlvm
         $context->builder->positionAtEnd($stringBlock);
         $keyStr = $context->builder->call($context->lookupFunction('__value__readString'), $valPtr);
         $strBox = null !== $superglobalName
-            ? HashTableHelper::readSuperglobalStringKeyToValueBox($context, $ht, $keyStr)
+            ? self::readSuperglobalStringKeyToValueBox($context, $ht, $keyStr)
             : self::readStringKeyToValueBox($context, $ht, $keyStr);
         JitValueBox::copyFromPointer(
             $context,
@@ -504,6 +504,63 @@ final class HashTableReadLlvm
         $context->builder->positionAtEnd($merge);
 
         return new Variable($context, Variable::TYPE_VALUE, Variable::KIND_VARIABLE, $slot);
+    }
+
+    /**
+     * Read a CGI superglobal string slot without multi-block type dispatch (issue #273).
+     * Avoids LLVM dominance failures on ?? left branches when the key is absent at compile time.
+     */
+    public static function readSuperglobalStringKeyToValueBox(
+        Context $context,
+        Value $ht,
+        Value $keyStr
+    ): Variable {
+        $tag = 'sg'.(string) self::nextSeq();
+        $slot = JitValueBox::alloc($context);
+        $destPtr = JitValueBox::pointer($context, $slot);
+        $valPtr = $context->builder->call(
+            $context->lookupFunction('__hashtable__peekStringKeyValue'),
+            $ht,
+            $keyStr
+        );
+        $hasValue = BasicBlockHelper::append($context, 'sg_sk_has_'.$tag);
+        $missing = BasicBlockHelper::append($context, 'sg_sk_miss_'.$tag);
+        $done = BasicBlockHelper::append($context, 'sg_sk_done_'.$tag);
+        $isNull = $context->builder->icmp(
+            Builder::INT_EQ,
+            $valPtr,
+            $valPtr->typeOf()->constNull()
+        );
+        $context->builder->branchIf($isNull, $missing, $hasValue);
+
+        $context->builder->positionAtEnd($missing);
+        $context->builder->call($context->lookupFunction('__value__writeNull'), $destPtr);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($hasValue);
+        $str = $context->builder->call(
+            $context->lookupFunction('__value__readString'),
+            $valPtr
+        );
+        $owned = $context->builder->call(
+            $context->lookupFunction('__string__separate'),
+            $str
+        );
+        $context->builder->call(
+            $context->lookupFunction('__value__writeString'),
+            $destPtr,
+            $owned
+        );
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($done);
+
+        return new Variable(
+            $context,
+            Variable::TYPE_VALUE,
+            Variable::KIND_VARIABLE,
+            $slot
+        );
     }
 
 }
