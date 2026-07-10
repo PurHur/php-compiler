@@ -45,6 +45,10 @@ final class StringHtmlspecialcharsDecode
 
     public static function implement(Context $context): void
     {
+        if (NestedJitCompileScope::isActive()) {
+            return;
+        }
+
         if (UserScriptAotDeferNestedJit::shouldDefer($context)) {
             StringHtmlspecialcharsDecodeLlvm::implement($context);
 

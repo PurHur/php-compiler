@@ -331,11 +331,15 @@ function run(string $filename, string $code, array $options): void
             $scriptFilename = $resolved;
         }
     }
+    $scriptName = \function_exists('php_compiler_cli_server_script_name')
+        ? php_compiler_cli_server_script_name($filename, $options)
+        : null;
     Superglobals::populateFromEnvironment(
         $runtime->vmContext,
         is_string($queryString) ? $queryString : null,
         is_string($postBody) ? $postBody : null,
-        $scriptFilename
+        $scriptFilename,
+        $scriptName
     );
     $prevUserScriptAot = getenv('PHP_COMPILER_AOT_USER_SCRIPT');
     $prevHelperRuntimeO = getenv('PHP_COMPILER_HELPER_RUNTIME_O');

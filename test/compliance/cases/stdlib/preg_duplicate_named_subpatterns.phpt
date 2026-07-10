@@ -1,5 +1,5 @@
 --TEST--
-Stdlib: preg_match()/preg_replace() duplicate named subpatterns — compile failure (#17584, ext/pcre/php_pcre.c)
+Stdlib: preg_match()/preg_replace() duplicate named subpatterns — compile must fail (#17584, ext/pcre/php_pcre.c)
 --FILE--
 <?php
 declare(strict_types=1);
@@ -13,23 +13,21 @@ set_error_handler(static function (int $severity, string $message) use (&$warnin
     return true;
 });
 
-$matches = [];
-$result = @preg_match('/(?<x>a)(?<x>b)/', 'ab', $matches);
-var_export($result);
-echo "\n";
-var_export(preg_last_error());
-echo "\n";
-var_export($matches);
-echo "\n";
-var_export(preg_replace('/(?<x>a)(?<x>b)/', 'X', 'ab'));
-echo "\n";
-echo $warnings[0] ?? 'none';
-echo "\n";
+$m = [];
+$match = preg_match('/(?<x>a)(?<x>b)/', 'ab', $m);
+$replace = preg_replace('/(?<x>a)(?<x>b)/', 'X', 'ab');
+
 restore_error_handler();
+
+echo var_export($match, true), "\n";
+echo var_export($replace, true), "\n";
+echo preg_last_error(), "\n";
+echo $warnings[0] ?? 'none', "\n";
+echo $warnings[1] ?? 'none', "\n";
+?>
 --EXPECT--
 false
-1
-array (
-)
 NULL
+1
 preg_match(): Compilation failed: two named subpatterns have the same name (PCRE2_DUPNAMES not set) at offset 12
+preg_replace(): Compilation failed: two named subpatterns have the same name (PCRE2_DUPNAMES not set) at offset 12

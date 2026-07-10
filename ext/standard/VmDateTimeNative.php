@@ -339,6 +339,25 @@ final class VmDateTimeNative
         if (1 === preg_match('/^(next|last|this) month$/i', $time, $matches)) {
             return self::monthOffsetParseResult(strtolower($matches[1]), $base, $tzName);
         }
+        if (1 === preg_match('/^(last|next|this) year$/i', $time, $matches)) {
+            return self::yearOffsetParseResult(strtolower($matches[1]), $base, $tzName);
+        }
+        if (1 === preg_match('/^(.+?) (last|next|this) year$/i', $time, $matches)) {
+            return self::yearRelativeMonthDayParseResult(
+                strtolower($matches[2]),
+                trim($matches[1]),
+                $base,
+                $tzName
+            );
+        }
+        if (1 === preg_match('/^(last|next|this) year (.+)$/i', $time, $matches)) {
+            return self::yearRelativeMonthDayParseResult(
+                strtolower($matches[1]),
+                trim($matches[2]),
+                $base,
+                $tzName
+            );
+        }
         if (1 === preg_match(
             '/^(.+?)\s+([+-]\s*\d+\s+(?:second|seconds|minute|minutes|hour|hours|day|days|week|weeks|month|months|year|years))$/i',
             $time,
@@ -1967,6 +1986,107 @@ final class VmDateTimeNative
             'timestamp' => self::mktimeInTimezone($year, $month, $day, $hour, $minute, $second, $tzName),
             'microsecond' => 0,
         ];
+    }
+
+    /**
+     * php-src parse_date.re — last|next|this year preserving calendar date/time (#17586).
+     *
+     * @return array{timestamp: int, microsecond: int}|null
+     */
+    private static function yearOffsetParseResult(string $when, int $base, string $tzName): ?array
+    {
+        $tm = self::localtime($base);
+        if (null === $tm) {
+            return null;
+        }
+        $yearDelta = match ($when) {
+            'next' => 1,
+            'last' => -1,
+            'this' => 0,
+            default => 999,
+        };
+        if (999 === $yearDelta) {
+            return null;
+        }
+        $year = self::tmInt($tm, 'tm_year') + 1900 + $yearDelta;
+        $month = self::tmInt($tm, 'tm_mon') + 1;
+        $day = self::tmInt($tm, 'tm_mday');
+        $hour = self::tmInt($tm, 'tm_hour');
+        $minute = self::tmInt($tm, 'tm_min');
+        $second = self::tmInt($tm, 'tm_sec');
+
+        return [
+            'timestamp' => self::mktimeInTimezone($year, $month, $day, $hour, $minute, $second, $tzName),
+            'microsecond' => 0,
+        ];
+    }
+
+    /**
+     * php-src parse_date.re — "last year January 1" / "March 15 last year" (#17586).
+     *
+     * @return array{timestamp: int, microsecond: int}|null
+     */
+    private static function yearRelativeMonthDayParseResult(
+        string $when,
+        string $datePart,
+        int $base,
+        string $tzName
+    ): ?array {
+        $monthDay = self::tryParseEnglishMonthDay($datePart);
+        if (null === $monthDay) {
+            return null;
+        }
+        $tm = self::localtime($base);
+        if (null === $tm) {
+            return null;
+        }
+        $yearDelta = match ($when) {
+            'next' => 1,
+            'last' => -1,
+            'this' => 0,
+            default => 999,
+        };
+        if (999 === $yearDelta) {
+            return null;
+        }
+        $year = self::tmInt($tm, 'tm_year') + 1900 + $yearDelta;
+
+        return [
+            'timestamp' => self::mktimeInTimezone(
+                $year,
+                $monthDay['month'],
+                $monthDay['day'],
+                0,
+                0,
+                0,
+                $tzName
+            ),
+            'microsecond' => 0,
+        ];
+    }
+
+    /** @return array{month: int, day: int}|null */
+    private static function tryParseEnglishMonthDay(string $fragment): ?array
+    {
+        $fragment = trim($fragment);
+        if (1 === preg_match('/^([A-Za-z]+)\s+(\d{1,2})$/', $fragment, $matches)) {
+            $month = self::englishMonthToNumber($matches[1]);
+            if (null === $month) {
+                return null;
+            }
+
+            return ['month' => $month, 'day' => (int) $matches[2]];
+        }
+        if (1 === preg_match('/^(\d{1,2})\s+([A-Za-z]+)$/', $fragment, $matches)) {
+            $month = self::englishMonthToNumber($matches[2]);
+            if (null === $month) {
+                return null;
+            }
+
+            return ['month' => $month, 'day' => (int) $matches[1]];
+        }
+
+        return null;
     }
 
     /** @return array{0: int, 1: int} */

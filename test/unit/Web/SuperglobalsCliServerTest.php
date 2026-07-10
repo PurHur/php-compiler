@@ -19,7 +19,7 @@ final class SuperglobalsCliServerTest extends TestCase
 
     protected function tearDown(): void
     {
-        foreach (['REQUEST_METHOD', 'QUERY_STRING', 'REQUEST_BODY', 'SCRIPT_FILENAME'] as $key) {
+        foreach (['REQUEST_METHOD', 'QUERY_STRING', 'REQUEST_BODY', 'SCRIPT_FILENAME', 'SCRIPT_NAME', 'PHP_SELF'] as $key) {
             putenv($key);
             unset($_ENV[$key], $_SERVER[$key]);
         }
@@ -57,5 +57,50 @@ final class SuperglobalsCliServerTest extends TestCase
         $var = $server->find('PATH');
         $this->assertNotNull($var);
         $this->assertSame($environ['PATH'], $var->resolveIndirect()->toString());
+    }
+
+    public function testCliScriptNamePopulatedFromExport(): void
+    {
+        Superglobals::populateFromEnvironment(
+            $this->runtime->vmContext,
+            null,
+            null,
+            '/var/www/html/index.php',
+            'index.php'
+        );
+
+        $server = $this->runtime->vmContext->getSuperglobal('_SERVER')->toArray();
+        $this->assertSame('index.php', $this->readServer($server, 'SCRIPT_NAME'));
+        $this->assertSame('index.php', $this->readServer($server, 'PHP_SELF'));
+        $this->assertSame('/var/www/html/index.php', $this->readServer($server, 'SCRIPT_FILENAME'));
+    }
+
+    public function testCliVirtualScriptNameUsesStandardInputCode(): void
+    {
+        Superglobals::populateFromEnvironment(
+            $this->runtime->vmContext,
+            null,
+            null,
+            null,
+            'Standard input code'
+        );
+
+        $server = $this->runtime->vmContext->getSuperglobal('_SERVER')->toArray();
+        $this->assertSame('Standard input code', $this->readServer($server, 'SCRIPT_NAME'));
+        $this->assertNull($server->find('SCRIPT_FILENAME'));
+    }
+
+    private function readServer(\PHPCompiler\VM\HashTable $server, string $key): string
+    {
+        $var = $server->find($key);
+        if (null === $var) {
+            return '';
+        }
+        $resolved = $var->resolveIndirect();
+        if (\PHPCompiler\VM\Variable::TYPE_STRING !== $resolved->type) {
+            return '';
+        }
+
+        return $resolved->toString();
     }
 }

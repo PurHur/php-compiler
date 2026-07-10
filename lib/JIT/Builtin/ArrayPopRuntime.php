@@ -13,7 +13,7 @@ use PHPLLVM\Value;
 /**
  * JIT/AOT link for array_pop() via ArrayPopJitHelper PHP (#12647).
  *
- * Standalone AOT compiles {@see ArrayPopJitHelper} via JitVmHelperLink bridge (#14317); native literal arrays keep LLVM in {@see ArrayBuiltinHelper::popLast()}.
+ * Standalone AOT compiles {@see ArrayPopJitHelper} via JitVmHelperLink bridge (#14317, #17580).
  * SSOT: {@see \PHPCompiler\ext\standard\array_pop}
  * php-src: ext/standard/array.c — PHP_FUNCTION(array_pop)
  */
@@ -32,10 +32,6 @@ final class ArrayPopRuntime
 
     public static function pop(Context $context, JITVariable $array): Value
     {
-        if (ArrayBuiltinHelper::isNativeArray($array->type)) {
-            return ArrayBuiltinHelper::popLast($context, $array);
-        }
-
         self::ensureLinked($context);
         $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
 

@@ -51,6 +51,7 @@ final class VmPregEngine
 
     private bool $anchored = false;
 
+    /** PCRE2_DUPNAMES / `(?J)` — allow duplicate named subpatterns (ext/pcre/php_pcre.c, #17584). */
     private bool $allowDuplicateNames = false;
 
     private int $nextGroup = 1;
@@ -467,6 +468,7 @@ final class VmPregEngine
         $this->advance(1);
         $capture = true;
         $name = null;
+        $nameCloseOffset = -1;
         if ($this->peek() === '?') {
             $this->advance(1);
             $flag = $this->peek();
@@ -500,6 +502,7 @@ final class VmPregEngine
                 if ($this->peek() !== '>') {
                     throw new VmPregCompileException();
                 }
+                $nameCloseOffset = $this->pos;
                 $this->advance(1);
             } elseif ('R' === $flag || '0' === $flag) {
                 $this->advance(1);
@@ -526,11 +529,14 @@ final class VmPregEngine
             // php-src ext/pcre: capture numbers follow opening-paren order, not close order (#14574).
             $index = $this->nextGroup++;
             if (null !== $name) {
-                if (!$this->allowDuplicateNames && isset($this->groupNameToIndex[$name])) {
-                    throw new VmPregCompileException(
-                        'two named subpatterns have the same name (PCRE2_DUPNAMES not set)',
-                        $this->pos - 1
-                    );
+                if (isset($this->groupNameToIndex[$name])) {
+                    $existing = $this->groupNameToIndex[$name];
+                    if (!$this->allowDuplicateNames && $existing !== $index) {
+                        throw new VmPregCompileException(
+                            'two named subpatterns have the same name (PCRE2_DUPNAMES not set)',
+                            $nameCloseOffset >= 0 ? $nameCloseOffset : $openPos
+                        );
+                    }
                 }
                 $this->groupNameToIndex[$name] = $index;
             }
@@ -617,7 +623,7 @@ final class VmPregEngine
             's' => $this->dotall = $enable,
             'x' => $this->extended = $enable,
             'U' => $this->defaultGreedy = !$enable,
-            'J' => $this->allowDuplicateNames = $enable,
+            'J' => $this->allowDuplicateNames = $enable, // PCRE2_DUPNAMES (#17584)
             'u' => $this->utf = $enable,
             'D' => $this->dollarEndonly = $enable,
             'A' => $this->anchored = $enable,

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
-use PHPCompiler\JIT\ArrayBuiltinHelper;
+use PHPCompiler\JIT\Builtin\ArrayPushRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
@@ -21,10 +21,10 @@ final class array_push_spread_repro extends Internal
             $array,
             $values,
             function (Context $context, JITVariable $array, array $values): Value {
-                return ArrayBuiltinHelper::push($context, $array, ...$values);
+                return ArrayPushRuntime::push($context, $array, ...$values);
             }
         );
 
-        return ArrayBuiltinHelper::push($context, $array, ...$values);
+        return ArrayPushRuntime::push($context, $array, ...$values);
     }
 }

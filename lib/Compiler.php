@@ -27239,25 +27239,27 @@ class Compiler {
     }
 
     /**
-     * substr(sprintf('%o', fileperms($path)), -N) — UnaryMinus offset + nested sprintf haystack (#16451, #16480).
+     * substr(f(...), -N) — nested FuncCall haystack cfg index + callee name (#10673, #16451, #17572).
      *
      * @param list<Op> $cfgChildren
+     *
+     * @return array{0: int, 1: string}|null
      */
-    private function isSubstrNestedSprintfUnaryMinusPattern(
+    private function substrNestedHaystackFuncCallAtUnaryMinusPattern(
         Op $cfgCallOp,
         int $callIndex,
         array $cfgChildren
-    ): bool {
+    ): ?array {
         if (
             'substr' !== strtolower($this->resolveInlineCallArgFuncName($cfgCallOp) ?? '')
             || !\is_array($cfgCallOp->args ?? null)
             || \count($cfgCallOp->args) < 2
             || $callIndex < 2
         ) {
-            return false;
+            return null;
         }
         if (!$this->isUnaryInlineSiblingCallArgExpr($cfgChildren[$callIndex - 1] ?? null)) {
-            return false;
+            return null;
         }
         $probeIndex = $callIndex - 2;
         while ($probeIndex >= 0) {
@@ -27268,25 +27270,67 @@ class Compiler {
             }
             break;
         }
-        $sprintfOp = $cfgChildren[$probeIndex] ?? null;
+        $producerOp = $cfgChildren[$probeIndex] ?? null;
+        if (!($producerOp instanceof Op\Expr\FuncCall || $producerOp instanceof Op\Expr\NsFuncCall)) {
+            return null;
+        }
+        $calleeName = $this->resolveCfgFuncCallName($producerOp);
+        if (null === $calleeName || '' === $calleeName) {
+            return null;
+        }
         if (
-            !($sprintfOp instanceof Op\Expr\FuncCall || $sprintfOp instanceof Op\Expr\NsFuncCall)
-            || 'sprintf' !== strtolower($this->resolveCfgFuncCallName($sprintfOp) ?? '')
+            !$this->isNestedCallArgProducerForConsumer(
+                $producerOp,
+                $cfgCallOp,
+                $probeIndex,
+                $callIndex,
+                $cfgChildren
+            )
+            || 0 !== $this->siblingMultiArgFuncCallProducerTargetArgIndex(
+                $probeIndex,
+                $callIndex,
+                $cfgChildren
+            )
         ) {
-            return false;
+            return null;
         }
 
-        return $this->isNestedCallArgProducerForConsumer(
-            $sprintfOp,
+        return [$probeIndex, $calleeName];
+    }
+
+    /**
+     * substr(sprintf('%o', fileperms($path)), -N) — UnaryMinus offset + nested FuncCall haystack (#16451, #16480).
+     *
+     * @param list<Op> $cfgChildren
+     */
+    private function isSubstrNestedSprintfUnaryMinusPattern(
+        Op $cfgCallOp,
+        int $callIndex,
+        array $cfgChildren
+    ): bool {
+        return null !== $this->substrNestedHaystackFuncCallAtUnaryMinusPattern(
             $cfgCallOp,
-            $probeIndex,
-            $callIndex,
-            $cfgChildren
-        ) && 0 === $this->siblingMultiArgFuncCallProducerTargetArgIndex(
-            $probeIndex,
             $callIndex,
             $cfgChildren
         );
+    }
+
+    /**
+     * @param list<Op> $cfgChildren
+     */
+    private function slotForSubstrNestedHaystackFuncCallExecReturn(
+        Block $block,
+        int $probeIndex,
+        string $calleeName,
+        array $cfgChildren
+    ): ?string {
+        return $this->slotForLastEmittedFuncCallExecReturnByName($block, $calleeName)
+            ?? $this->slotForInlineFuncCallProducerExecReturnByCfgIndex(
+                $block,
+                $probeIndex,
+                $cfgChildren
+            )
+            ?? $this->slotForLastEmittedInlineCallResultBeforePendingFuncCall($block);
     }
 
     /**
@@ -28944,7 +28988,7 @@ class Compiler {
     }
 
     /**
-     * date_sunrise(time(), SUNFUNCS_RET_*, …) — hoisted FuncCall + SUNFUNCS ConstFetch (#13749, #11070).
+     * date_sunrise(time(), SUNFUNCS_RET_*, …) / date_sun_info(strtotime(...), lat, -lon) — hoisted FuncCall + prelude slots (#13749, #11070, #11336).
      */
     private function wireDateSunFuncHoistedCallArgSlot(Block $block, Op $cfgCallOp, int $argIndex): ?string
     {
@@ -28952,7 +28996,8 @@ class Compiler {
             return null;
         }
         $callee = strtolower($this->resolveCfgFuncCallName($cfgCallOp) ?? '');
-        if (!\in_array($callee, ['date_sunrise', 'date_sunset'], true)) {
+        $isDateSunInfo = 'date_sun_info' === $callee;
+        if (!\in_array($callee, ['date_sunrise', 'date_sunset', 'date_sun_info'], true)) {
             return null;
         }
         if (0 === $argIndex) {
@@ -29035,7 +29080,8 @@ class Compiler {
 
             return null;
         }
-        if (3 === $argIndex) {
+        $longitudeArgIndex = $isDateSunInfo ? 2 : 3;
+        if ($longitudeArgIndex === $argIndex) {
             foreach ($this->hoistedPreludeProducersImmediatelyBeforeCall($cfgCallOp, $block) as $prelude) {
                 if (!$prelude instanceof Op\Expr\UnaryMinus && !$prelude instanceof Op\Expr\UnaryPlus) {
                     continue;
@@ -29054,7 +29100,7 @@ class Compiler {
 
             return null;
         }
-        if (1 !== $argIndex) {
+        if ($isDateSunInfo || 1 !== $argIndex) {
             return null;
         }
         foreach ($this->hoistedPreludeProducersImmediatelyBeforeCall($cfgCallOp, $block) as $prelude) {
@@ -29791,7 +29837,7 @@ class Compiler {
     }
 
     /**
-     * date_sunrise(time(), SUNFUNCS_RET_*, …) — bypass sibling producer scan (#13749, #16012).
+     * date_sunrise(time(), SUNFUNCS_RET_*, …) / date_sun_info(strtotime(...), lat, -lon) — bypass sibling producer scan (#13749, #16012, #11336).
      *
      * @return list<OpCode>|null
      */
@@ -29804,7 +29850,8 @@ class Compiler {
             return null;
         }
         $callee = strtolower($this->resolveCfgFuncCallName($cfgCallOp) ?? '');
-        if (!\in_array($callee, ['date_sunrise', 'date_sunset'], true)) {
+        $isDateSunInfo = 'date_sun_info' === $callee;
+        if (!\in_array($callee, ['date_sunrise', 'date_sunset', 'date_sun_info'], true)) {
             return null;
         }
         $producerOps = [];
@@ -29866,14 +29913,15 @@ class Compiler {
                 }
             }
         }
+        $longitudeArgIndex = $isDateSunInfo ? 2 : 3;
         $sends = [];
         foreach ($args as $argIndex => $arg) {
             $valueSlot = null;
             if (0 === (int) $argIndex && null !== $timeArgSlot) {
                 $valueSlot = $timeArgSlot;
-            } elseif (1 === (int) $argIndex && null !== $sunfuncsArgSlot) {
+            } elseif (!$isDateSunInfo && 1 === (int) $argIndex && null !== $sunfuncsArgSlot) {
                 $valueSlot = $sunfuncsArgSlot;
-            } elseif (3 === (int) $argIndex && null !== $longitudeSlot) {
+            } elseif ($longitudeArgIndex === (int) $argIndex && null !== $longitudeSlot) {
                 $valueSlot = $longitudeSlot;
             }
             $literalProbe = ($cfgCallOp->args[(int) $argIndex] ?? null) ?? $arg;
@@ -31751,6 +31799,9 @@ class Compiler {
         }
         $producers = $this->precedingInlineCallArgProducersBeforeCfgOp($block->orig->children, $cfgCallOp);
         $argCount = \count($cfgCallOp->args);
+        if (null !== $this->matchNestedNewCtorInlineNewProducer($producers, $argIndex, $argCount, $cfgCallOp->args)) {
+            return true;
+        }
         if (\count($producers) === $argCount && isset($producers[$argIndex])) {
             $positional = $producers[$argIndex];
             if ($positional instanceof Op\Expr\New_) {
@@ -37014,6 +37065,7 @@ class Compiler {
                 && $cfgCallOp instanceof Op\Expr\New_
                 && 0 === (int) $argIndex
                 && $this->callArgOperandExpectsArrayProducer($arg)
+                && !$this->callArgInlineProducerIsNew($cfgCallOp, (int) $argIndex, $block)
             ) {
                 $ctorArrayPrelude = $this->inlineArrayProducerImmediatelyBeforeCfgCall($cfgCallOp, $block);
                 if ($ctorArrayPrelude instanceof Op\Expr\Array_) {
@@ -37206,6 +37258,7 @@ class Compiler {
                 && $this->callArgIsDeadInlineTemporary($arg)
                 && $this->callArgOperandExpectsArrayProducer($arg)
                 && !$this->shouldUseArrayProducerCallArgResolution($cfgCallOp, (int) $argIndex, $calleeName)
+                && !$this->callArgInlineProducerIsNew($cfgCallOp, (int) $argIndex, $block)
             ) {
                 // var_export/json_encode([…, $x->format(...)]) — stmt-before Array_ feeds the call arg (#10733, #16067).
                 // array_map('explode', [','], ['a,b']) — map each hoisted Array_ to its arg slot (#16085, #16078 regression).
@@ -37515,11 +37568,21 @@ class Compiler {
                     $block->orig->children,
                     $cfgCallOp
                 );
+                $nestedNewArgCount = \count($cfgCallOp->args ?? $args);
                 $siblingNews = $this->siblingInlineNewProducersBeforeCfgOp($block, $cfgCallOp);
                 if ([] !== $siblingNews) {
-                    $nestedNewProducers = $siblingNews;
+                    // new LimitIterator(new ArrayIterator([...]), …) — keep Array_ prelude + inner New_ (#12916, #17575).
+                    if (
+                        null === $this->matchNestedNewCtorInlineNewProducer(
+                            $nestedNewProducers,
+                            (int) $argIndex,
+                            $nestedNewArgCount,
+                            $cfgCallOp->args ?? $args
+                        )
+                    ) {
+                        $nestedNewProducers = $siblingNews;
+                    }
                 }
-                $nestedNewArgCount = \count($cfgCallOp->args ?? $args);
                 $nestedNewProducerCount = \count($nestedNewProducers);
                 $inlineNewProducer = $this->matchSiblingInlineNewCallArgProducer(
                     $nestedNewProducers,
@@ -41612,21 +41675,30 @@ class Compiler {
             ) {
                 continue;
             }
+            $nestedName = $this->resolveCfgFuncCallName($scan) ?? '';
 
-            return $this->slotForLastEmittedFuncCallExecReturnByName($block, 'sprintf')
-                ?? $this->slotForInlineFuncCallProducerExecReturnByCfgIndex(
-                    $block,
-                    $j,
-                    $cfgChildren
-                )
-                ?? $this->slotForLastEmittedInlineCallResultBeforePendingFuncCall($block);
+            return $this->slotForSubstrNestedHaystackFuncCallExecReturn(
+                $block,
+                $j,
+                $nestedName,
+                $cfgChildren
+            );
         }
-        if (!$this->isSubstrNestedSprintfUnaryMinusPattern($cfgCallOp, $callIndex, $cfgChildren)) {
+        $nestedHaystack = $this->substrNestedHaystackFuncCallAtUnaryMinusPattern(
+            $cfgCallOp,
+            $callIndex,
+            $cfgChildren
+        );
+        if (null === $nestedHaystack) {
             return null;
         }
 
-        return $this->slotForLastEmittedFuncCallExecReturnByName($block, 'sprintf')
-            ?? $this->slotForLastEmittedInlineCallResultBeforePendingFuncCall($block);
+        return $this->slotForSubstrNestedHaystackFuncCallExecReturn(
+            $block,
+            $nestedHaystack[0],
+            $nestedHaystack[1],
+            $cfgChildren
+        );
     }
 
     /**
@@ -43952,10 +44024,20 @@ class Compiler {
             return;
         }
         $cfgChildren = $block->orig->children;
-        if (!$this->isSubstrNestedSprintfUnaryMinusPattern($cfgCallOp, $callIndex, $cfgChildren)) {
+        $nestedHaystack = $this->substrNestedHaystackFuncCallAtUnaryMinusPattern(
+            $cfgCallOp,
+            $callIndex,
+            $cfgChildren
+        );
+        if (null === $nestedHaystack) {
             return;
         }
-        $haystackSlot = $this->slotForLastEmittedFuncCallExecReturnByName($block, 'sprintf');
+        $haystackSlot = $this->slotForSubstrNestedHaystackFuncCallExecReturn(
+            $block,
+            $nestedHaystack[0],
+            $nestedHaystack[1],
+            $cfgChildren
+        );
         if (null === $haystackSlot) {
             return;
         }
