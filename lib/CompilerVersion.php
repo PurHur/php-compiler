@@ -389,7 +389,7 @@ final class CompilerVersion
     }
 
     /**
-     * get_object_id() visible to function_exists() — stable runtime or forward 8.3+ (#17564).
+     * get_object_id() visible to function_exists() — stable runtime or forward 8.3+ (#17564, #17607).
      *
      * Callable under forward profile via {@see supportsGetObjectId()}; withheld from introspection on
      * 8.4.0-dev reference harness like Zend 8.2.
@@ -405,12 +405,7 @@ final class CompilerVersion
             return false;
         }
 
-        $profile = self::languageProfileVersion();
-        if (version_compare($profile, '8.4.0', '>=')) {
-            return false;
-        }
-
-        return version_compare($profile, '8.3.0', '>=');
+        return version_compare(self::languageProfileVersion(), '8.3.0', '>=');
     }
 
     /**
