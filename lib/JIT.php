@@ -8622,7 +8622,15 @@ class JIT {
                             JIT\IncludeHelper::refreshInlineIncludeBindings($this->context);
                         }
                         $mergeLimit = JIT\CoalesceHelper::mergeBlockOpcodeLimit($op->block3);
-                        $merged = $this->compileBlockInternal($func, $op->block3, $mergeLimit, $mergeBb, 0, false, ...$args);
+                        $savedSynthetic = $op->block3->syntheticCfgBranch ?? false;
+                        if (null !== $mergeLimit && $mergeLimit < $op->block3->nOpCodes) {
+                            $op->block3->syntheticCfgBranch = true;
+                        }
+                        try {
+                            $merged = $this->compileBlockInternal($func, $op->block3, $mergeLimit, $mergeBb, 0, false, ...$args);
+                        } finally {
+                            $op->block3->syntheticCfgBranch = $savedSynthetic;
+                        }
                         unset($this->context->coalesceAssignTargets[$coalesceResult]);
                         if ($this->context->inlineIncludeDepth > 0) {
                             // Do not set inlineIncludeExitBlock to the ?? merge block (#866, #784).
@@ -8678,7 +8686,15 @@ class JIT {
                             JIT\IncludeHelper::refreshInlineIncludeBindings($this->context);
                         }
                         $mergeLimit = JIT\CoalesceHelper::mergeBlockOpcodeLimit($op->block3);
-                        $merged = $this->compileBlockInternal($func, $op->block3, $mergeLimit, $mergeBb, 0, false, ...$args);
+                        $savedSynthetic = $op->block3->syntheticCfgBranch ?? false;
+                        if (null !== $mergeLimit && $mergeLimit < $op->block3->nOpCodes) {
+                            $op->block3->syntheticCfgBranch = true;
+                        }
+                        try {
+                            $merged = $this->compileBlockInternal($func, $op->block3, $mergeLimit, $mergeBb, 0, false, ...$args);
+                        } finally {
+                            $op->block3->syntheticCfgBranch = $savedSynthetic;
+                        }
                         unset($this->context->coalesceAssignTargets[$nullsafeResult]);
                         if ($this->context->inlineIncludeDepth > 0) {
                             // Mirror ?? lowering: stay in the including TU (#866, #784, #15149).
@@ -9985,7 +10001,7 @@ class JIT {
             }
         }
 
-        $tail = $builder->getInsertBlock();
+        $tail = JIT\BasicBlockHelper::tryGetInsertBlock($this->context);
         if (
             0 === $this->context->inlineIncludeDepth
             && $this->isVoidLlvmFunction($func)
@@ -9999,7 +10015,7 @@ class JIT {
             $this->context->builder->returnVoid();
         }
 
-        return $builder->getInsertBlock();
+        return JIT\BasicBlockHelper::tryGetInsertBlock($this->context) ?? $basicBlock;
     }
 
     /** `return $c ? $a : $b` nullable arm — direct return avoids AOT merge-slot segfault (#8555). */

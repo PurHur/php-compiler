@@ -29,6 +29,9 @@ final class VmPregEngine
 
     private const OPT_ANCHORED = 0x80000000;
 
+    /** PCRE2_DUPNAMES — PHP /J pattern modifier (ext/pcre/php_pcre.c, #17584). */
+    private const OPT_DUPNAMES = 0x00100000;
+
     /** @var array<string, int> */
     private array $groupNameToIndex = [];
 
@@ -48,6 +51,9 @@ final class VmPregEngine
 
     private bool $anchored = false;
 
+    /** PCRE2_DUPNAMES / `(?J)` — allow duplicate named subpatterns (ext/pcre/php_pcre.c, #17584). */
+    private bool $allowDuplicateNames = false;
+
     private int $nextGroup = 1;
 
     private string $regex = '';
@@ -65,9 +71,6 @@ final class VmPregEngine
     private int $recursionDepth = 0;
 
     private int $jitStackLimit = 0;
-
-    /** PCRE2_DUPNAMES / `(?J)` — allow duplicate named subpatterns (ext/pcre/php_pcre.c, #17584). */
-    private bool $allowDuplicateNames = false;
 
     public function resetMatchStart(int $start): void
     {
@@ -204,6 +207,7 @@ final class VmPregEngine
         $this->defaultGreedy = 0 === ($opts & self::OPT_UNGREEDY);
         $this->utf = 0 !== ($opts & self::OPT_UTF);
         $this->anchored = 0 !== ($opts & self::OPT_ANCHORED);
+        $this->allowDuplicateNames = 0 !== ($opts & self::OPT_DUPNAMES);
     }
 
     private function parsePattern(string $regex): ?VmPregAstNode
@@ -553,9 +557,11 @@ final class VmPregEngine
     private function parseBranchResetAlternation(): VmPregAstNode
     {
         $baseGroup = $this->nextGroup;
+        $savedNames = $this->groupNameToIndex;
         $branches = [];
         while (true) {
             $this->nextGroup = $baseGroup;
+            $this->groupNameToIndex = $savedNames;
             $branches[] = $this->parseConcatenation();
             if ('|' === $this->peek()) {
                 $this->advance(1);

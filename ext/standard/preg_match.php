@@ -9,6 +9,7 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -51,7 +52,8 @@ final class preg_match extends Internal
         if ($hasMatches) {
             $target = $frame->calledArgs[2];
             if (false === $result) {
-                $target->null();
+                $target = $target->resolveIndirect();
+                $target->array(new HashTable());
             } else {
                 $target = $target->resolveIndirect();
                 $ht = VmPregMatches::hostMatchesToHashTable($hostMatches, $flags);
