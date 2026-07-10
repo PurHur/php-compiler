@@ -8,6 +8,7 @@ use PHPCompiler\ext\standard\JitHash;
 use PHPCompiler\JIT\Builtin\HashContextCopyLlvm;
 use PHPCompiler\JIT\Builtin\HashContextEmbedBridge;
 use PHPCompiler\JIT\Builtin\HashContextFinalLlvm;
+use PHPCompiler\JIT\Builtin\HashContextRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitBoolArg;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
@@ -33,6 +34,8 @@ final class JitHashContext
 
     public static function dispatch(Context $context, string $name, JITVariable ...$args): Value
     {
+        HashContextRuntime::ensureLinked($context);
+
         return match ($name) {
             'hash_init' => self::init($context, ...$args),
             'hash_update' => self::update($context, ...$args),
@@ -82,7 +85,6 @@ final class JitHashContext
             throw new \LogicException('hash_final() requires one or two arguments in this compiler build');
         }
         HashContextEmbedBridge::ensureLinked($context);
-        HashContextFinalLlvm::implement($context);
 
         $rawBool = $context->getTypeFromString('int1')->constInt(0, false);
         if (isset($args[1])) {
@@ -119,7 +121,6 @@ final class JitHashContext
             throw new \LogicException('hash_copy() requires exactly one argument in this compiler build');
         }
         HashContextEmbedBridge::ensureLinked($context);
-        HashContextCopyLlvm::implement($context);
 
         return $context->builder->call(
             $context->lookupFunction('__compiler_hash_context_copy'),
