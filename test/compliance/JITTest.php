@@ -30,7 +30,7 @@ class JITTest extends BaseTest {
             if (!CompilerVersion::supportsGetObjectId()
                 && str_contains($name, 'get_object_id')
                 && !str_contains($name, 'get_object_id_phantom')
-                && !str_contains($name, 'get_object_id_function_exists_forward_profile')) {
+                && !str_contains($name, 'get_object_id_function_exists_forward')) {
                 continue;
             }
             if (CompilerVersion::supportsGetObjectId()
