@@ -16,13 +16,14 @@ final class ArrayPopRuntimeShrinkTest extends TestCase
     {
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ArrayPopRuntime.php');
         $this->assertStringContainsString('ArrayPopJitHelper', $runtime);
-        $this->assertStringContainsString('isNativeArray', $runtime);
-        $this->assertStringContainsString('ArrayBuiltinHelper::popLast', $runtime);
+        $this->assertStringNotContainsString('ArrayBuiltinHelper::popLast', $runtime);
         $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);
+
+        $helper = (string) file_get_contents(__DIR__.'/../../lib/JIT/ArrayBuiltinHelper.php');
+        $this->assertStringNotContainsString('function popLast', $helper);
 
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/array_pop.php');
         $this->assertStringContainsString('ArrayPopRuntime::pop', $builtin);
-        $this->assertStringNotContainsString('ArrayBuiltinHelper::popLast', $builtin);
     }
 
     public function testArrayPopJitHelperPopsLastElement(): void

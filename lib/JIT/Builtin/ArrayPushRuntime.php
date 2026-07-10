@@ -17,7 +17,7 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
 /**
  * JIT/AOT link for array_push() via ArrayPushJitHelper PHP (#12719).
  *
- * Standalone AOT compiles {@see ArrayPushJitHelper} via nested JIT bridges (#14303); native literal arrays keep LLVM in {@see ArrayBuiltinHelper::push()}.
+ * Standalone AOT compiles {@see ArrayPushJitHelper} via nested JIT bridges (#14303, #17580).
  * SSOT: {@see \PHPCompiler\ext\standard\array_push}
  * php-src: ext/standard/array.c — PHP_FUNCTION(array_push)
  */
@@ -37,22 +37,23 @@ final class ArrayPushRuntime
 
     public static function push(Context $context, JITVariable $array, JITVariable ...$values): Value
     {
-        if (ArrayBuiltinHelper::isNativeArray($array->type)) {
-            return ArrayBuiltinHelper::push($context, $array, ...$values);
-        }
-
         self::ensureLinked($context);
         $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
+        $native = ArrayBuiltinHelper::isNativeArray($array->type);
         if (0 === \count($values)) {
-            return self::callCount($context, $ht);
+            $count = self::callCount($context, $ht);
+        } else {
+            $valuesHt = HashTableHelper::alloc($context);
+            foreach ($values as $value) {
+                ArrayBuiltinHelper::appendElement($context, $valuesHt, $value);
+            }
+            $count = self::callAppend($context, $ht, $valuesHt);
+        }
+        if ($native) {
+            HashTableHelper::storeHashtableInArrayVariable($context, $array, $ht);
         }
 
-        $valuesHt = HashTableHelper::alloc($context);
-        foreach ($values as $value) {
-            ArrayBuiltinHelper::appendElement($context, $valuesHt, $value);
-        }
-
-        return self::callAppend($context, $ht, $valuesHt);
+        return $count;
     }
 
     public static function ensureLinked(Context $context): void

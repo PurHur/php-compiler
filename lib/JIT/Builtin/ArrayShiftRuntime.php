@@ -13,7 +13,7 @@ use PHPLLVM\Value;
 /**
  * JIT/AOT link for array_shift() via ArrayShiftJitHelper PHP (#12672).
  *
- * Standalone AOT compiles {@see ArrayShiftJitHelper} via JitVmHelperLink bridge (#14318); native literal arrays keep LLVM in {@see ArrayBuiltinHelper::shiftFirst()}.
+ * Standalone AOT compiles {@see ArrayShiftJitHelper} via JitVmHelperLink bridge (#14318, #17580).
  * SSOT: {@see \PHPCompiler\ext\standard\array_shift}
  * php-src: ext/standard/array.c — PHP_FUNCTION(array_shift)
  */
@@ -32,10 +32,6 @@ final class ArrayShiftRuntime
 
     public static function shift(Context $context, JITVariable $array): Value
     {
-        if (ArrayBuiltinHelper::isNativeArray($array->type)) {
-            return ArrayBuiltinHelper::shiftFirst($context, $array);
-        }
-
         self::ensureLinked($context);
         $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
 
