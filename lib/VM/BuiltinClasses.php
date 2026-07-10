@@ -207,6 +207,7 @@ use PHPCompiler\VM\Builtin\ReflectionFunctionGetClosureThis;
 use PHPCompiler\VM\Builtin\ReflectionFunctionGetClosureUsedVariables;
 use PHPCompiler\VM\Builtin\ReflectionFunctionGetExtensionName;
 use PHPCompiler\VM\Builtin\ReflectionFunctionGetName;
+use PHPCompiler\VM\Builtin\ReflectionFunctionGetNamedArguments;
 use PHPCompiler\VM\Builtin\ReflectionFunctionGetNumberOfParameters;
 use PHPCompiler\VM\Builtin\ReflectionFunctionGetParameters;
 use PHPCompiler\VM\Builtin\ReflectionFunctionGetReturnType;
@@ -659,6 +660,10 @@ final class BuiltinClasses
             $rm->methods[$name] = $method;
             $rm->methodVisibility[$name] = $pub;
         }
+        if (CompilerVersion::supportsReflectionFunctionGetNamedArguments()) {
+            $rm->methods['getnamedarguments'] = new ReflectionFunctionGetNamedArguments();
+            $rm->methodVisibility['getnamedarguments'] = $pub;
+        }
         $ctx->classes[ReflectionSupport::REFLECTION_METHOD] = $rm;
 
         $rc = new ClassEntry('ReflectionClass');
@@ -922,6 +927,11 @@ final class BuiltinClasses
         }
         $rf->methods['isdeprecated'] = new ReflectionFunctionIsDeprecated();
         $rf->methodVisibility['isdeprecated'] = $pub;
+        if (CompilerVersion::supportsReflectionFunctionGetNamedArguments()) {
+            $getNamedArguments = new ReflectionFunctionGetNamedArguments();
+            $rf->methods['getnamedarguments'] = $getNamedArguments;
+            $rf->methodVisibility['getnamedarguments'] = $pub;
+        }
         $ctx->classes[ReflectionSupport::REFLECTION_FUNCTION] = $rf;
 
         if (CompilerVersion::advertisesReflectionConstantClass()) {

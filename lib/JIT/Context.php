@@ -859,6 +859,10 @@ class Context {
         if (CompilerVersion::supportsReflectionParameterIsSensitiveParameter()) {
             $this->functionProxies['reflectionparameter::issensitiveparameter'] = new Call\ReflectionParameterIsSensitiveParameter();
         }
+        if (CompilerVersion::supportsReflectionFunctionGetNamedArguments()) {
+            $this->functionProxies['reflectionfunction::getnamedarguments'] = new Call\ReflectionFunctionGetNamedArguments();
+            $this->functionProxies['reflectionmethod::getnamedarguments'] = new Call\ReflectionMethodGetNamedArguments();
+        }
         $this->functionProxies['reflectionattribute::getname'] = new Call\ReflectionAttributeGetName();
         $this->functionProxies['reflectionattribute::newinstance'] = new Call\ReflectionAttributeNewInstance();
         $this->functionProxies['reflectionenum::__construct'] = new Call\ReflectionEnumConstruct();
@@ -1328,6 +1332,7 @@ class Context {
         }
         Builtin\AttributeRegistryLowering::implementLookupFunctions($this);
         Builtin\ParamSensitiveLowering::implementLookupFunctions($this);
+        Builtin\ReflectionNamedArgumentsLowering::implementLookupFunctions($this);
         VmActiveContextInitLlvm::emitPendingBeforeSeal($this);
         $this->sealInitFunction();
         $this->sealInitShutdownReturn($this->shutdownBlock);
