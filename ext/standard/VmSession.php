@@ -61,6 +61,9 @@ final class VmSession
 
     public const HEADERS_SENT_SAVE_PATH_WARNING = 'Session save path cannot be changed after headers have already been sent';
 
+    /** php-src ext/session/session.c — php_session_start() when SG(headers_sent). */
+    public const HEADERS_SENT_START_WARNING = 'session_start(): Session cannot be started after headers have already been sent';
+
     /** php-src ext/session/session.c — PG(session_save_path) default on Linux CLI. */
     public const DEFAULT_SAVE_PATH = '/var/lib/php/sessions';
 

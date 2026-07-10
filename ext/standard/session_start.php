@@ -9,6 +9,7 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\ErrorReporter;
+use PHPCompiler\VM\SapiOutput;
 use PHPLLVM\Value;
 
 /** session_start() — resume or create file-backed $_SESSION (issues #64, #1182–#1186). */
@@ -38,6 +39,21 @@ class session_start extends Internal
             );
             if (null !== $frame->returnVar) {
                 $frame->returnVar->bool(true);
+            }
+
+            return;
+        }
+        if (SapiOutput::headersSent()) {
+            $ctx->errors->triggerError(
+                VmSession::HEADERS_SENT_START_WARNING,
+                ErrorReporter::E_WARNING,
+                '' !== $frame->scriptPath ? $frame->scriptPath : null,
+                $ctx,
+                $frame,
+                $frame->callSiteLine
+            );
+            if (null !== $frame->returnVar) {
+                $frame->returnVar->bool(false);
             }
 
             return;
