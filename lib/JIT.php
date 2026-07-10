@@ -1428,6 +1428,20 @@ class JIT {
                 }
             }
         }
+        if (\PHPCompiler\CompilerVersion::supportsReflectionFunctionGetNamedArguments()) {
+            $paramNames = array_values($block->paramNames);
+            if ([] !== $paramNames) {
+                if (null !== $block->func && null !== $block->func->class) {
+                    JIT\Builtin\ReflectionNamedArgumentsLowering::recordMethod(
+                        strtolower((string) $block->func->class->value),
+                        strtolower($block->func->name),
+                        $paramNames
+                    );
+                } elseif (null !== $funcName && '' !== $funcName) {
+                    JIT\Builtin\ReflectionNamedArgumentsLowering::recordFunction(strtolower($funcName), $paramNames);
+                }
+            }
+        }
         $skipName = $this->jitFunctionSkipName($logicalName, $block);
         if (!is_null($funcName)) {
             $internalName = $this->llvmInternalName($funcName);
@@ -14707,6 +14721,9 @@ class JIT {
             } elseif ('getattributes' === $methodLc && $this->context->functionIsRegistered('reflectionmethod::getattributes')) {
                 $className = 'ReflectionMethod';
                 $declaringClassLc = 'reflectionmethod';
+            } elseif ('getnamedarguments' === $methodLc && $this->context->functionIsRegistered('reflectionfunction::getnamedarguments')) {
+                $className = 'ReflectionFunction';
+                $declaringClassLc = 'reflectionfunction';
             }
         }
 

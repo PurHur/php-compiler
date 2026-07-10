@@ -2087,4 +2087,45 @@ final class CompilerVersionGateTest extends TestCase
             }
         }
     }
+
+    public function testSupportsReflectionFunctionGetNamedArgumentsOnForwardProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertTrue(CompilerVersion::supportsReflectionFunctionGetNamedArguments());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testSupportsReflectionFunctionGetNamedArgumentsOnReferenceProfile(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsReflectionFunctionGetNamedArguments());
+    }
+
+    public function testVmRegistersReflectionFunctionGetNamedArgumentsOnForwardProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $runtime = new Runtime();
+            $rf = $runtime->vmContext->classes['reflectionfunction'] ?? null;
+            $rm = $runtime->vmContext->classes['reflectionmethod'] ?? null;
+            $this->assertNotNull($rf);
+            $this->assertNotNull($rm);
+            $this->assertTrue(isset($rf->methods['getnamedarguments']));
+            $this->assertTrue(isset($rm->methods['getnamedarguments']));
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
 }
