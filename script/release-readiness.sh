@@ -67,6 +67,7 @@ fi
 GATE_NAMES=()
 GATE_STATUSES=()
 GATE_MESSAGES=()
+HONEST_COMPILE_JSON=""
 
 log() {
   if [[ "${JSON_OUT}" -eq 1 ]]; then
@@ -241,6 +242,25 @@ release_readiness_ci_fast_subset() {
   "$PHP_BIN" "${PHP_OPTS[@]}" script/capability-matrix.php --check
 }
 
+release_readiness_collect_honest_compile_metric() {
+  local metric_args=(--json)
+  if [[ "${FULL_MODE}" -ne 1 ]]; then
+    metric_args+=(--check)
+  fi
+  if [[ "${DRY_RUN}" -eq 1 ]]; then
+    HONEST_COMPILE_JSON='{"status":"skip","message":"dry-run","gate_available":true}'
+    return 0
+  fi
+  local metric_out
+  metric_out="$("${_CI_SCRIPT_DIR}/bootstrap-honest-compile-metric.sh" "${metric_args[@]}" 2>/dev/null)" || true
+  if [[ -n "${metric_out}" ]] && php -r 'exit json_decode($argv[1], true) === null ? 1 : 0;' "${metric_out}"; then
+    HONEST_COMPILE_JSON="${metric_out}"
+    return 0
+  fi
+  HONEST_COMPILE_JSON='{"status":"unknown","message":"honest compile metric unavailable","gate_available":false}'
+  return 0
+}
+
 FAILED=0
 
 # --- Quick bundle ---
@@ -287,6 +307,8 @@ if [[ "${FULL_MODE}" -eq 1 ]]; then
     || FAILED=1
 fi
 
+release_readiness_collect_honest_compile_metric
+
 USER_RELEASE_READY=no
 if [[ "${FAILED}" -eq 0 ]]; then
   USER_RELEASE_READY=yes
@@ -309,6 +331,7 @@ fi
 if [[ "${JSON_OUT}" -eq 1 ]]; then
   export _RR_MODE="${MODE}"
   export _RR_READY="${USER_RELEASE_READY}"
+  export _RR_HONEST_COMPILE_JSON="${HONEST_COMPILE_JSON}"
   export _RR_GATE_COUNT="${#GATE_NAMES[@]}"
   for i in "${!GATE_NAMES[@]}"; do
     export "_RR_GATE_NAME_${i}=${GATE_NAMES[$i]}"

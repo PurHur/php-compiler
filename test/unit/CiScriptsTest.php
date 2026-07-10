@@ -499,6 +499,8 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('check-root-readme-sync.php', $body);
         $this->assertStringContainsString('north-star5-verify-fast', $body);
         $this->assertStringContainsString('bootstrap-selfhost-vm-driver-execute-probe', $body);
+        $this->assertStringContainsString('bootstrap-honest-compile-metric.sh', $body);
+        $this->assertStringContainsString('_RR_HONEST_COMPILE_JSON', $body);
         $this->assertStringContainsString('examples-aot-smoke.sh', $body);
         $this->assertStringContainsString('examples-web-smoke.sh', $body);
         $this->assertStringContainsString('(examples-aot-smoke|examples-web-smoke): ok$', $body);
@@ -531,6 +533,11 @@ final class CiScriptsTest extends TestCase
         $this->assertArrayHasKey('gates', $payload);
         $this->assertIsArray($payload['gates']);
         $this->assertNotEmpty($payload['gates']);
+        $this->assertArrayHasKey('honest_compile', $payload);
+        $this->assertIsArray($payload['honest_compile']);
+        $this->assertArrayHasKey('status', $payload['honest_compile']);
+        $this->assertArrayHasKey('message', $payload['honest_compile']);
+        $this->assertArrayHasKey('gate_available', $payload['honest_compile']);
         foreach ($payload['gates'] as $gate) {
             $this->assertArrayHasKey('name', $gate);
             $this->assertArrayHasKey('status', $gate);

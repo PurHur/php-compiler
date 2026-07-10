@@ -278,7 +278,7 @@ Track progress toward **gen-1+ only** development ([#1492](https://github.com/Pu
 | 4 | [#15600](https://github.com/PurHur/php-compiler/issues/15600) | Bootstrap cold path without `composer install` |
 | 5 | [#15601](https://github.com/PurHur/php-compiler/issues/15601) | Native lint via gen-2 driver |
 | 6 | [#15602](https://github.com/PurHur/php-compiler/issues/15602) | Bootstrap SDK release tarball |
-| 7 | [#15603](https://github.com/PurHur/php-compiler/issues/15603) | Honest compile CI gate — **landed:** `BOOTSTRAP_HONEST_COMPILE_GATE=1`, `bootstrap-loop-probe --honest-compile` |
+| 7 | [#15603](https://github.com/PurHur/php-compiler/issues/15603) | Honest compile CI gate — **landed:** `BOOTSTRAP_HONEST_COMPILE_GATE=1`, `bootstrap-loop-probe --honest-compile`, `release-readiness.sh --json` `honest_compile` metric |
 | 8 | [#15604](https://github.com/PurHur/php-compiler/issues/15604) | Inventory argv driver without emit-helper sidecar — **starter:** `make bootstrap-inventory-argv-probe` |
 | 9 | [#15605](https://github.com/PurHur/php-compiler/issues/15605) | Flip default onboarding to gen-1+ tiers |
 | 10 | [#15606](https://github.com/PurHur/php-compiler/issues/15606) | Bootstrap SDK platform contract |
