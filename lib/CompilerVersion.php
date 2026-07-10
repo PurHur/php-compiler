@@ -1363,23 +1363,14 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.4+ hrtime(true) returns double (ext/standard/hrtime.c, #12779, #17435, #17468).
+     * hrtime(true) scalar type follows platform width (ext/standard/hrtime.c, #12779, #17561).
      *
-     * Withheld on 8.4.0-dev reference profile (matches Zend 8.2 integer nanoseconds). Enable via
-     * stable 8.4.0+ or explicit `PHP_COMPILER_PROFILE=8.4` forward profile.
+     * php-src: RETURN_LONG when ZEND_ENABLE_ZVAL_LONG64 (64-bit), else RETURN_DOUBLE via zend_strtod.
+     * Profile gates do not change this — PHP 8.4 on 64-bit still returns integer nanoseconds.
      */
     public static function supportsHrtimeAsNumberFloat(): bool
     {
-        if (version_compare(self::VERSION, '8.4.0', '>=')) {
-            return true;
-        }
-
-        $raw = getenv('PHP_COMPILER_PROFILE');
-        if (!\is_string($raw) || '' === trim($raw)) {
-            return false;
-        }
-
-        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+        return \PHP_INT_SIZE < 8;
     }
 
     /**

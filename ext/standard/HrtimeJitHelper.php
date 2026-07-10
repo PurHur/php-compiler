@@ -24,7 +24,7 @@ final class HrtimeJitHelper
         return VmHrtimeNative::readMonotonic();
     }
 
-    /** php-src hrtime.c — RETURN_DOUBLE(sec * NS_PER_SEC + nsec) when as_number (#12779). */
+    /** php-src hrtime.c — RETURN_DOUBLE on 32-bit only (zend_strtod path, #12779, #17561). */
     public static function nsFloat(): float
     {
         [$sec, $nsec] = VmHrtimeNative::readMonotonic();

@@ -685,12 +685,15 @@ final class CompilerVersionGateTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsHrtimeAsNumberFloat());
     }
 
-    public function testSupportsHrtimeAsNumberFloatTrueOnForwardProfile(): void
+    public function testSupportsHrtimeAsNumberFloatFalseOnForwardProfile64Bit(): void
     {
+        if (\PHP_INT_SIZE < 8) {
+            $this->markTestSkipped('32-bit host only');
+        }
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE=8.4');
         try {
-            $this->assertTrue(CompilerVersion::supportsHrtimeAsNumberFloat());
+            $this->assertFalse(CompilerVersion::supportsHrtimeAsNumberFloat());
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');
