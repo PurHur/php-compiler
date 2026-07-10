@@ -21132,7 +21132,23 @@ class Compiler {
                     ) {
                         $consumerFn = strtolower($this->resolveCfgFuncCallName($callOp) ?? '');
                         if ('var_export' === $consumerFn) {
-                            return null;
+                            if (
+                                ($prev instanceof Op\Expr\FuncCall || $prev instanceof Op\Expr\NsFuncCall)
+                                && 'define' === strtolower($this->resolveCfgFuncCallName($prev) ?? '')
+                            ) {
+                                break;
+                            }
+                            $callArgZero = $callOp->args[0] ?? null;
+                            if (
+                                $callArgZero instanceof Operand
+                                && null !== $prev->result
+                                && (
+                                    $callArgZero === $prev->result
+                                    || $this->operandsReferToSameVariable($callArgZero, $prev->result)
+                                )
+                            ) {
+                                return null;
+                            }
                         }
                         if ($prev instanceof Op\Expr\FuncCall || $prev instanceof Op\Expr\NsFuncCall) {
                             $fn = $this->resolveCfgFuncCallName($prev);
@@ -22429,6 +22445,12 @@ class Compiler {
         $producers = [];
         for ($i = $callIndex - 1; $i >= 0; --$i) {
             $child = $cfgChildren[$i];
+            if (
+                ($child instanceof Op\Expr\FuncCall || $child instanceof Op\Expr\NsFuncCall)
+                && 'define' === strtolower($this->resolveCfgFuncCallName($child) ?? '')
+            ) {
+                break;
+            }
             if ($child instanceof Op\Expr\BinaryOp\Coalesce) {
                 // Stmt-level ?? before the call — dim-fetch tails are not arg producers (#10743, #11601).
                 break;
@@ -23820,6 +23842,12 @@ class Compiler {
             && !$producer instanceof Op\Expr\NsFuncCall
             && !$producer instanceof Op\Expr\StaticCall
             && !$producer instanceof Op\Expr\MethodCall
+        ) {
+            return false;
+        }
+        if (
+            ($producer instanceof Op\Expr\FuncCall || $producer instanceof Op\Expr\NsFuncCall)
+            && 'define' === strtolower($this->resolveCfgFuncCallName($producer) ?? '')
         ) {
             return false;
         }
@@ -26850,6 +26878,9 @@ class Compiler {
                 $isMethodProducer = $producer instanceof Op\Expr\MethodCall
                     || $producer instanceof Op\Expr\StaticCall;
                 if (!$isFuncProducer && !$isMethodProducer) {
+                    continue;
+                }
+                if ($isFuncProducer && 'define' === strtolower($this->resolveCfgFuncCallName($producer) ?? '')) {
                     continue;
                 }
                 if ($isFuncProducer && $this->funcCallExprHasByRefMutatingSideEffects($producer)) {
@@ -31300,6 +31331,7 @@ class Compiler {
                 'fwrite',
                 'fputs',
                 'ftruncate',
+                'define',
                 'date_sunrise',
                 'date_sunset',
             ],
@@ -36165,7 +36197,23 @@ class Compiler {
                 ) {
                     $consumerFn = strtolower($this->resolveCfgFuncCallName($cfgCallOp) ?? '');
                     if ('var_export' === $consumerFn) {
-                        return null;
+                        if (
+                            ($prev instanceof Op\Expr\FuncCall || $prev instanceof Op\Expr\NsFuncCall)
+                            && 'define' === strtolower($this->resolveCfgFuncCallName($prev) ?? '')
+                        ) {
+                            break;
+                        }
+                        $callArgZero = $callArgs[0] ?? null;
+                        if (
+                            $callArgZero instanceof Operand
+                            && null !== $prev->result
+                            && (
+                                $callArgZero === $prev->result
+                                || $this->operandsReferToSameVariable($callArgZero, $prev->result)
+                            )
+                        ) {
+                            return null;
+                        }
                     }
                     if ($prev instanceof Op\Expr\FuncCall || $prev instanceof Op\Expr\NsFuncCall) {
                         $fn = $this->resolveCfgFuncCallName($prev);
@@ -36431,6 +36479,10 @@ class Compiler {
     {
         $slot = $block->slotForOperand($fetch->result);
         if (null === $slot) {
+            $vm = $this->tryFoldGlobalConstFetch($fetch);
+            if (null !== $vm) {
+                return $block->registerConstant($fetch->result ?? new Operand\Temporary(), $vm);
+            }
             foreach ($this->compileExpr($fetch, $block) as $op) {
                 $block->addOpCode($op);
             }
@@ -36438,10 +36490,6 @@ class Compiler {
         }
         if (null !== $slot) {
             return $slot;
-        }
-        $vm = $this->tryFoldGlobalConstFetch($fetch);
-        if (null !== $vm) {
-            return $block->registerConstant($fetch->result ?? new Operand\Temporary(), $vm);
         }
 
         return null;
@@ -37370,10 +37418,14 @@ class Compiler {
                 if ($deadInlinePrelude instanceof Op\Expr) {
                     $preludeSlot = $block->slotForOperand($deadInlinePrelude->result);
                     if (null === $preludeSlot) {
-                        foreach ($this->compileExpr($deadInlinePrelude, $block) as $op) {
-                            $sends[] = $op;
+                        if ($deadInlinePrelude instanceof Op\Expr\ConstFetch) {
+                            $preludeSlot = $this->slotForHoistedScalarConstFetchCallArg($deadInlinePrelude, $block);
+                        } else {
+                            foreach ($this->compileExpr($deadInlinePrelude, $block) as $op) {
+                                $sends[] = $op;
+                            }
+                            $preludeSlot = $block->slotForOperand($deadInlinePrelude->result);
                         }
-                        $preludeSlot = $block->slotForOperand($deadInlinePrelude->result);
                     }
                     if (null !== $preludeSlot) {
                         $callArg = $cfgCallOp->args[(int) $argIndex] ?? $arg;
