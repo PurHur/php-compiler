@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 4321 |
-| Phase A inventory files (M2 ratio SSOT) | 4321 |
+| PHP files on vm.php path | 4325 |
+| Phase A inventory files (M2 ratio SSOT) | 4325 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 11660 |
+| Source constructs flagged (warnings) | 11671 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -377,6 +377,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/locale_get_region.php` | 0 | 3 |
 | `ext/intl/locale_get_script.php` | 0 | 3 |
 | `ext/intl/locale_set_default.php` | 0 | 2 |
+| `ext/ldap/LdapConstants.php` | 0 | 1 |
+| `ext/ldap/Module.php` | 0 | 3 |
+| `ext/ldap/VmLdapEscape.php` | 0 | 1 |
+| `ext/ldap/ldap_escape.php` | 0 | 2 |
 | `ext/libxml/BuiltinClasses.php` | 0 | 1 |
 | `ext/libxml/LibxmlConstants.php` | 0 | 1 |
 | `ext/libxml/LibxmlFunction.php` | 0 | 1 |
@@ -2785,7 +2789,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/Compiler/ClassConstDuplicateCheck.php` | 0 | 3 |
 | `lib/Compiler/ClassConstValueFold.php` | 0 | 6 |
 | `lib/Compiler/CompileFatal.php` | 0 | 1 |
-| `lib/Compiler/DeprecatedMetadata.php` | 0 | 3 |
+| `lib/Compiler/DeprecatedMetadata.php` | 0 | 6 |
 | `lib/Compiler/EnumAbstractMethodCompileCheck.php` | 0 | 4 |
 | `lib/Compiler/EnumBackedCaseCheck.php` | 0 | 4 |
 | `lib/Compiler/EnumMagicMethodCheck.php` | 0 | 3 |
@@ -3701,7 +3705,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/ReadonlyFunctionRejector.php` | 0 | 2 |
 | `lib/ReadonlyMethodModifierRejector.php` | 0 | 2 |
 | `lib/ReferenceProfileTokenScan.php` | 0 | 1 |
-| `lib/Runtime.php` | 0 | 71 |
+| `lib/Runtime.php` | 0 | 72 |
 | `lib/RuntimeStrictness.php` | 0 | 1 |
 | `lib/SourceBareThrowRewriter.php` | 0 | 1 |
 | `lib/SourcePreprocessor/PropertyHooks.php` | 0 | 4 |
@@ -6715,6 +6719,29 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 20)
 - 2 class method(s)
 
+### `ext/ldap/LdapConstants.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/ldap/Module.php`
+
+**Warnings** (review for bootstrap subset):
+- new VM\Variable (line 22)
+- new ldap_escape (line 31)
+- 2 class method(s)
+
+### `ext/ldap/VmLdapEscape.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s)
+
+### `ext/ldap/ldap_escape.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 29)
+- 4 class method(s)
+
 ### `ext/libxml/BuiltinClasses.php`
 
 **Warnings** (review for bootstrap subset):
@@ -8675,9 +8702,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new OutOfBoundsException (line 243)
 - new UnexpectedValueException (line 386)
 - new Variable (line 435)
-- new UnexpectedValueException (line 608)
-- new ArgumentCountError (line 670)
-- new ArgumentCountError (line 702)
+- new UnexpectedValueException (line 610)
+- new ArgumentCountError (line 672)
+- new ArgumentCountError (line 704)
 - 62 class method(s)
 - 1 closure(s)
 
@@ -11513,7 +11540,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitObEndClean.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 19)
+- new ArgumentCountError (line 20)
 - 1 class method(s)
 
 ### `ext/standard/JitObEndFlush.php`
@@ -22757,9 +22784,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Compiler/DeprecatedMetadata.php`
 
 **Warnings** (review for bootstrap subset):
-- new self (line 88)
-- new self (line 218)
-- 20 class method(s)
+- new self (line 69)
+- new self (line 72)
+- new self (line 75)
+- new self (line 169)
+- new self (line 299)
+- 24 class method(s)
 
 ### `lib/Compiler/EnumAbstractMethodCompileCheck.php`
 
@@ -23311,38 +23341,38 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 7476)
 - new Variable (line 7525)
 - new Variable (line 7528)
-- new Variable (line 8603)
-- new Variable (line 8639)
-- new Variable (line 8647)
-- new Variable (line 8657)
-- new Variable (line 8668)
-- new Variable (line 8676)
-- new Variable (line 8725)
-- new Variable (line 8746)
-- new Variable (line 8767)
-- new Variable (line 8791)
-- new Variable (line 8820)
-- new Variable (line 8840)
-- new Variable (line 8891)
-- new Variable (line 8899)
-- new Variable (line 9249)
-- new Variable (line 11606)
-- new Variable (line 11637)
-- new Variable (line 11654)
-- new Variable (line 11670)
-- new strval (line 11695)
-- new Variable (line 11944)
-- new Variable (line 11960)
-- new Variable (line 12133)
-- new Variable (line 12149)
-- new Variable (line 12197)
-- new Variable (line 12502)
-- new Variable (line 12511)
-- new Variable (line 12997)
-- new Variable (line 13013)
-- new Variable (line 13063)
-- new Variable (line 13569)
-- new Variable (line 13575)
+- new Variable (line 8612)
+- new Variable (line 8648)
+- new Variable (line 8656)
+- new Variable (line 8666)
+- new Variable (line 8677)
+- new Variable (line 8685)
+- new Variable (line 8735)
+- new Variable (line 8756)
+- new Variable (line 8777)
+- new Variable (line 8801)
+- new Variable (line 8830)
+- new Variable (line 8850)
+- new Variable (line 8901)
+- new Variable (line 8909)
+- new Variable (line 9259)
+- new Variable (line 11616)
+- new Variable (line 11647)
+- new Variable (line 11664)
+- new Variable (line 11680)
+- new strval (line 11705)
+- new Variable (line 11954)
+- new Variable (line 11970)
+- new Variable (line 12143)
+- new Variable (line 12159)
+- new Variable (line 12207)
+- new Variable (line 12512)
+- new Variable (line 12521)
+- new Variable (line 13007)
+- new Variable (line 13023)
+- new Variable (line 13073)
+- new Variable (line 13579)
+- new Variable (line 13585)
 - 270 class method(s)
 - 14 closure(s)
 
@@ -24659,8 +24689,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/ObOutputExecCaptureLlvm.php`
 
 **Warnings** (review for bootstrap subset):
-- 12 class method(s)
-- 3 closure(s)
+- 21 class method(s)
+- 7 closure(s)
 
 ### `lib/JIT/Builtin/ObOutputExecCaptureRuntime.php`
 
@@ -24679,7 +24709,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/ObOutputRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- 3 class method(s)
+- 4 class method(s)
 
 ### `lib/JIT/Builtin/ObOutputUserScriptLlvm.php`
 
@@ -28586,37 +28616,38 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ext\mbstring\Module (line 231)
 - new ext\filter\Module (line 232)
 - new ext\calendar\Module (line 233)
-- new ext\session\Module (line 234)
-- new ext\bcmath\Module (line 235)
-- new ext\stats\Module (line 236)
-- new ext\openssl\Module (line 237)
-- new ext\curl\Module (line 238)
-- new ext\hash\Module (line 239)
-- new ext\posix\Module (line 240)
-- new ext\sockets\Module (line 241)
-- new ext\ftp\Module (line 242)
-- new ext\ctype\Module (line 243)
-- new ext\tokenizer\Module (line 244)
-- new ext\random\Module (line 245)
-- new ext\igbinary\Module (line 246)
-- new ext\msgpack\Module (line 247)
-- new ext\zstd\Module (line 248)
-- new ext\lzf\Module (line 249)
-- new ext\bz2\Module (line 250)
-- new ext\brotli\Module (line 251)
-- new ext\sodium\Module (line 252)
-- new ext\sqlite3\Module (line 253)
-- new ext\standard\Module (line 254)
-- new JIT (line 330)
-- new JITContext (line 344)
-- new SealedClassPreprocessor (line 408)
-- new StaticClassPreprocessor (line 411)
-- new SourcePreprocessor\PropertyHooks (line 414)
-- new State (line 547)
-- new ReflectionProperty (line 574)
-- new ReflectionProperty (line 577)
-- new LintCompiler (line 983)
-- new Variable (line 1113)
+- new ext\ldap\Module (line 234)
+- new ext\session\Module (line 235)
+- new ext\bcmath\Module (line 236)
+- new ext\stats\Module (line 237)
+- new ext\openssl\Module (line 238)
+- new ext\curl\Module (line 239)
+- new ext\hash\Module (line 240)
+- new ext\posix\Module (line 241)
+- new ext\sockets\Module (line 242)
+- new ext\ftp\Module (line 243)
+- new ext\ctype\Module (line 244)
+- new ext\tokenizer\Module (line 245)
+- new ext\random\Module (line 246)
+- new ext\igbinary\Module (line 247)
+- new ext\msgpack\Module (line 248)
+- new ext\zstd\Module (line 249)
+- new ext\lzf\Module (line 250)
+- new ext\bz2\Module (line 251)
+- new ext\brotli\Module (line 252)
+- new ext\sodium\Module (line 253)
+- new ext\sqlite3\Module (line 254)
+- new ext\standard\Module (line 255)
+- new JIT (line 331)
+- new JITContext (line 345)
+- new SealedClassPreprocessor (line 409)
+- new StaticClassPreprocessor (line 412)
+- new SourcePreprocessor\PropertyHooks (line 415)
+- new State (line 548)
+- new ReflectionProperty (line 575)
+- new ReflectionProperty (line 578)
+- new LintCompiler (line 984)
+- new Variable (line 1114)
 - 53 class method(s)
 
 ### `lib/RuntimeStrictness.php`
