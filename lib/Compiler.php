@@ -16053,23 +16053,37 @@ class Compiler {
      */
     private function slotForInitArrayBeforeCurrentFunccall(Block $block): ?string
     {
-        for ($i = \count($block->opCodes) - 1; $i >= 0; --$i) {
-            $op = $block->opCodes[$i];
-            if (OpCode::TYPE_INIT_ARRAY === $op->type) {
-                return (string) $op->arg1;
-            }
-            if (
-                OpCode::TYPE_FUNCCALL_INIT === $op->type
-                || OpCode::TYPE_CLASS_CONST_FETCH === $op->type
-                || OpCode::TYPE_DECLARE_ENUM === $op->type
-            ) {
-                continue;
-            }
+        $slots = $this->initArraySlotsForCurrentFunccall($block);
 
-            break;
+        return $slots[0] ?? null;
+    }
+
+    /**
+     * INIT_ARRAY result slots for the active call — since last FUNCCALL_EXEC_RETURN (#17629).
+     *
+     * @param list<OpCode> $pendingOps
+     *
+     * @return list<string>
+     */
+    private function initArraySlotsForCurrentFunccall(Block $block, array $pendingOps = []): array
+    {
+        $ops = array_merge($block->opCodes, $pendingOps);
+        $start = 0;
+        for ($i = \count($ops) - 1; $i >= 0; --$i) {
+            if (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $ops[$i]->type) {
+                $start = $i + 1;
+                break;
+            }
+        }
+        $slots = [];
+        for ($i = $start, $n = \count($ops); $i < $n; ++$i) {
+            $op = $ops[$i];
+            if (OpCode::TYPE_INIT_ARRAY === $op->type && null !== $op->arg1) {
+                $slots[] = (string) $op->arg1;
+            }
         }
 
-        return null;
+        return $slots;
     }
 
     /**
@@ -42345,10 +42359,6 @@ class Compiler {
                 $sends[] = $op;
             }
         }
-        $slot = $block->slotForOperand($matched->result);
-        if (null !== $slot) {
-            return (string) $slot;
-        }
         if ($matched instanceof Op\Expr\Array_) {
             $ordinalSlot = $this->slotForArrayCombineSiblingInitArray(
                 $block,
@@ -42359,9 +42369,17 @@ class Compiler {
             if (null !== $ordinalSlot) {
                 return $ordinalSlot;
             }
+            $byArgSlot = $this->slotForArrayCombineInitArrayByArgIndex($block, $cfgCallOp, $argIndex, $sends);
+            if (null !== $byArgSlot) {
+                return $byArgSlot;
+            }
+        }
+        $slot = $block->slotForOperand($matched->result);
+        if (null !== $slot) {
+            return (string) $slot;
         }
 
-        return $this->slotForArrayCombineInitArrayByArgIndex($block, $cfgCallOp, $argIndex, $sends);
+        return null;
     }
 
     /**
@@ -42387,12 +42405,7 @@ class Compiler {
                 return null;
             }
         }
-        $initSlots = [];
-        foreach (array_merge($block->opCodes, $pendingSends) as $op) {
-            if (OpCode::TYPE_INIT_ARRAY === $op->type && null !== $op->arg1) {
-                $initSlots[] = (string) $op->arg1;
-            }
-        }
+        $initSlots = $this->initArraySlotsForCurrentFunccall($block, $pendingSends);
         if (\count($initSlots) <= $argIndex) {
             return null;
         }
@@ -42426,12 +42439,7 @@ class Compiler {
         if (false === $ordinal) {
             return null;
         }
-        $initSlots = [];
-        foreach (array_merge($block->opCodes, $pendingSends) as $op) {
-            if (OpCode::TYPE_INIT_ARRAY === $op->type && null !== $op->arg1) {
-                $initSlots[] = (string) $op->arg1;
-            }
-        }
+        $initSlots = $this->initArraySlotsForCurrentFunccall($block, $pendingSends);
 
         return $initSlots[$ordinal] ?? null;
     }
@@ -44851,12 +44859,7 @@ class Compiler {
                 return;
             }
         }
-        $initSlots = [];
-        foreach (array_merge($block->opCodes, $allArgSends) as $op) {
-            if (OpCode::TYPE_INIT_ARRAY === $op->type && null !== $op->arg1) {
-                $initSlots[] = (string) $op->arg1;
-            }
-        }
+        $initSlots = $this->initArraySlotsForCurrentFunccall($block, $allArgSends);
         if (\count($initSlots) < 2) {
             return;
         }
