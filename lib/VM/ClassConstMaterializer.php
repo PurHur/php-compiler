@@ -120,6 +120,10 @@ final class ClassConstMaterializer
                 break;
             case Variable::TYPE_OBJECT:
                 $srcObj = $src->toObject();
+                if (null !== $srcObj->closureState) {
+                    $stored->copyFrom($src);
+                    break;
+                }
                 $detached = new ObjectEntry($srcObj->class);
                 $detached->constructed = $srcObj->constructed;
                 foreach ($srcObj->propertiesWithNames() as $propName => $propVar) {
