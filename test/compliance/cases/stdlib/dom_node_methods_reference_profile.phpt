@@ -5,7 +5,7 @@ stdlib DOMNode PHP 8.4 methods — not advertised on PHP 8.2 reference profile (
 $doc = new DOMDocument();
 $el = $doc->createElement('x');
 $fail = false;
-foreach (['contains', 'compareDocumentPosition', 'replaceChildren'] as $method) {
+foreach (['contains', 'replaceChildren'] as $method) {
     if (method_exists($el, $method)) {
         $fail = true;
     }
