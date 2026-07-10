@@ -2,6 +2,9 @@
 
 declare(strict_types=1);
 
+/**
+ * Issue #17744 — json_encode() on backed enum case must encode backing scalar.
+ */
 enum E: string
 {
     case A = 'a';

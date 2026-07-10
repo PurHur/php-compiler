@@ -6365,6 +6365,11 @@ class Compiler {
 
                 return;
             }
+            if ('callable' === $declName) {
+                $block->paramCallableSlots[$slot] = true;
+
+                return;
+            }
             if ('mixed' !== $declName) {
                 $rawType = Type::fromDecl($declared->name);
                 $mapped = Variable::mapFromType($rawType);

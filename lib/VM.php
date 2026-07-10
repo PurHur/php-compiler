@@ -34,6 +34,7 @@ use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\VM\FiberState;
 use PHPCompiler\VM\GeneratorState;
 use PHPCompiler\VM\HashTable;
+use PHPCompiler\VM\CallableCheck;
 use PHPCompiler\VM\IterableCheck;
 use PHPCompiler\VM\NamedArgs;
 use PHPCompiler\VM\ObjectEntry;
@@ -5637,6 +5638,21 @@ restart:
                                     }
                                     continue;
                                 }
+                                if (isset($calleeBlock->paramCallableSlots[$slot])) {
+                                    if (!CallableCheck::isCallable($arg, $this->context, $frame)) {
+                                        $paramName = $calleeBlock->paramNames[$paramIdx] ?? 'param'.$paramIdx;
+                                        throw VM\ParamTypeError::forUserCallWithExpectedType(
+                                            $frame->call->getName(),
+                                            $paramIdx,
+                                            $paramName,
+                                            CallableCheck::TYPE_LABEL,
+                                            $arg,
+                                            $frame->scriptPath,
+                                            $callSiteLine
+                                        );
+                                    }
+                                    continue;
+                                }
                                 if (isset($calleeBlock->paramIntersectionConstraints[$slot])) {
                                     $paramName = $calleeBlock->paramNames[$paramIdx] ?? 'param'.$paramIdx;
                                     $expected = $calleeBlock->paramIntersectionDisplayLabels[$slot]
@@ -5925,6 +5941,8 @@ restart:
                                 TypeCheck::assertNeverParameter($arg1);
                             } elseif (isset($frame->block->paramIterableSlots[$op->arg1])) {
                                 IterableCheck::assertParameter($arg1, $this->context);
+                            } elseif (isset($frame->block->paramCallableSlots[$op->arg1])) {
+                                CallableCheck::assertParameter($arg1, $this->context, $frame);
                             } elseif (isset($frame->block->paramDnfConstraints[$op->arg1])) {
                                 DnfCheck::assertMatches(
                                     $arg1,

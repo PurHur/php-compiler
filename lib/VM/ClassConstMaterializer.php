@@ -140,9 +140,9 @@ final class ClassConstMaterializer
                     $stored->object($srcObj);
                     break;
                 }
-                // Enum case singletons — preserve isEnumCase metadata (#17704 regression, #17744).
+                // Enum case singletons — preserve magic name/value metadata (#17743, #17744, Zend/zend_enum.c).
                 if (EnumCaseSupport::isEnumCase($srcObj)) {
-                    $backing = new Variable(Variable::TYPE_NULL);
+                    $backing = new Variable();
                     $backing->null();
                     if (null !== $srcObj->enumCaseValue) {
                         $backing->copyFrom($srcObj->enumCaseValue);
