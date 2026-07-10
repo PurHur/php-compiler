@@ -101,7 +101,12 @@ final class ClassConstMaterializer
                 $stored->null();
                 break;
             case Variable::TYPE_STRING:
-                $stored->string($src->toString());
+                $str = $src->optionalScalarString();
+                if (null === $str) {
+                    $stored->undefined();
+                    break;
+                }
+                $stored->string($str);
                 break;
             case Variable::TYPE_INTEGER:
                 if ($src->isStreamResource()) {
@@ -109,7 +114,12 @@ final class ClassConstMaterializer
                 } elseif ($src->isDirResource()) {
                     $stored->legacyDirHandle($src->toInt());
                 } else {
-                    $stored->int($src->toInt());
+                    $int = $src->optionalScalarInt();
+                    if (null === $int) {
+                        $stored->undefined();
+                        break;
+                    }
+                    $stored->int($int);
                 }
                 break;
             case Variable::TYPE_FLOAT:
@@ -132,6 +142,9 @@ final class ClassConstMaterializer
                 $detached = new ObjectEntry($srcObj->class);
                 $detached->constructed = $srcObj->constructed;
                 foreach ($srcObj->propertiesWithNames() as $propName => $propVar) {
+                    if (!self::isDetachablePropertySlot($propVar)) {
+                        continue;
+                    }
                     $detached->allocateProperty($propName)->copyFrom(
                         self::detachConstantValue($propVar)
                     );
@@ -156,6 +169,28 @@ final class ClassConstMaterializer
         }
 
         return $stored;
+    }
+
+    /** Skip uninitialized typed instance slots (ext/dom prototypes, #17722). */
+    private static function isDetachablePropertySlot(Variable $propVar): bool
+    {
+        if (TypedPropertyCheck::isUninitialized($propVar)) {
+            return false;
+        }
+        $resolved = $propVar->resolveIndirect();
+        if (Variable::TYPE_STRING === $resolved->type && null === $resolved->optionalScalarString()) {
+            return false;
+        }
+        if (
+            Variable::TYPE_INTEGER === $resolved->type
+            && null === $resolved->optionalScalarInt()
+            && !$resolved->isStreamResource()
+            && !$resolved->isDirResource()
+        ) {
+            return false;
+        }
+
+        return true;
     }
 
     /**

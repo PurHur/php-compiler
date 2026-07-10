@@ -695,6 +695,42 @@ final class EnumCaseSupport
     }
 
     /**
+     * Runtime script-scope / $GLOBALS assign — keep live object identity (#17722).
+     *
+     * Deep detach via {@see materializeConstantValue()} is for define()/class const (#17676).
+     */
+    public static function materializeGlobalVariableValue(Context $context, Variable $src): Variable
+    {
+        if ($src->is(Variable::TYPE_INDIRECT) || $src->is(Variable::TYPE_PROPERTY_HOOK_REF)) {
+            $out = new Variable();
+            $out->copyFrom($src);
+
+            return $out;
+        }
+        $src = $src->resolveIndirect();
+        if ($src->is(Variable::TYPE_OBJECT)) {
+            $out = new Variable();
+            $out->copyFrom($src);
+
+            return $out;
+        }
+        if ($src->is(Variable::TYPE_ARRAY)) {
+            if (self::arrayContainsRuntimeRefs($src)) {
+                $out = new Variable();
+                $out->copyFrom($src);
+
+                return $out;
+            }
+
+            return ClassConstMaterializer::detachConstantValue(
+                self::materializeConstantArrayDeep($context, $src)
+            );
+        }
+
+        return self::materializeConstantValue($context, $src);
+    }
+
+    /**
      * Store const/define/class-const values as immortal enum case objects (#5738, zend_constants.c).
      *
      * Converts legacy backing scalars from enum case constant tables to canonical singletons.

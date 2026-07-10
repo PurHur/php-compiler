@@ -3284,7 +3284,7 @@ restart:
                     ) {
                         $resolvedArg = $arg3->resolveIndirect();
                         if (!$resolvedArg->isUndefined()) {
-                            $stored = VM\EnumCaseSupport::materializeConstantValue($this->context, $arg3);
+                            $stored = VM\EnumCaseSupport::materializeGlobalVariableValue($this->context, $arg3);
                             $arg2->copyFrom($stored);
                             $arg1->copyFrom($stored);
                         } else {
