@@ -230,10 +230,7 @@ final class PregMatchRuntime
         $context->builder->branchIf($isError, $failBb, $okBb);
 
         $context->builder->positionAtEnd($failBb);
-        $context->builder->call(
-            $context->lookupFunction('__value__writeNull'),
-            $fn->getParam(2)
-        );
+        // Zend leaves by-ref $matches untouched on compile failure (ext/pcre/php_pcre.c, #17597).
         $context->builder->returnValue($negOne);
 
         $context->builder->positionAtEnd($okBb);
