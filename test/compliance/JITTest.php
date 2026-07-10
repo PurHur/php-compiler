@@ -396,7 +396,8 @@ class JITTest extends BaseTest {
                 continue;
             }
             if (!CompilerVersion::supportsReadonlyFunction()
-                && str_contains($name, 'readonly_function/')) {
+                && (str_contains($name, 'readonly_function/')
+                    || str_contains($name, 'readonly_function_84'))) {
                 continue;
             }
             if (CompilerVersion::supportsReadonlyFunction()
