@@ -808,15 +808,6 @@ final class CompilerVersion
      */
     public static function supportsExitFunctionForm(): bool
     {
-        if (version_compare(self::VERSION, '8.4.0', '>=')) {
-            return true;
-        }
-
-        $raw = getenv('PHP_COMPILER_PROFILE');
-        if (!\is_string($raw) || '' === trim($raw)) {
-            return false;
-        }
-
         return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
     }
 

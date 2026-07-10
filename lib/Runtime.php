@@ -475,10 +475,15 @@ class Runtime {
      */
     public function prepareSourceForParser(string $code, string $filename = 'unknown'): array
     {
-        [$code, $bareRethrowLines] = $this->preprocessSourceForParse($code, $filename);
-        $code = $this->rewriteSourceBeforeParser($code, $filename);
+        $profileScope = LanguageProfileScope::beginForCompilationUnit($code, $filename);
+        try {
+            [$code, $bareRethrowLines] = $this->preprocessSourceForParse($code, $filename);
+            $code = $this->rewriteSourceBeforeParser($code, $filename);
 
-        return [$code, $bareRethrowLines];
+            return [$code, $bareRethrowLines];
+        } finally {
+            $profileScope->end();
+        }
     }
 
     /**
