@@ -4033,6 +4033,7 @@ require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionParameterGetAttributes.
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionParameterGetType.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionParameterGetValue.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionParameterIsDeprecated.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionParameterIsPromoted.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionParameterIsSensitive.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionParameterIsSensitiveParameter.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertyAccessProbe.php';
@@ -4394,4 +4395,5 @@ unset($__spineMimeSample, $__spineMimeEnc, $__spineMimeDec);
 require_once __DIR__.'/../../../ext/dom/DocumentCreateCDATASection.php';
 require_once __DIR__.'/../../../ext/dom/TextIsElementContentWhitespace.php';
 require_once __DIR__.'/../../../ext/dom/TextIsWhitespaceInElementContent.php';
+require_once __DIR__.'/../../../lib/VM/NativeDateInvalidOperationException.php';
 echo "compiler_lib_spine_smoke bundle OK\n";
