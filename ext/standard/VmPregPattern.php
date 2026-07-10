@@ -55,7 +55,7 @@ final class VmPregPattern
                 return 'The /e modifier is no longer supported, use preg_replace_callback instead';
             }
             $mod = match ($pattern[$j]) {
-                'i', 'm', 's', 'x', 'A', 'D', 'U', 'u' => true,
+                'i', 'm', 's', 'x', 'A', 'D', 'U', 'u', 'J' => true,
                 default => null,
             };
             if (null === $mod) {
@@ -128,6 +128,7 @@ final class VmPregPattern
                 'D' => 0x00000010,
                 'U' => 0x00040000,
                 'u' => self::PCRE2_UTF,
+                'J' => 0x00100000,
                 default => 0,
             };
         }
