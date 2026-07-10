@@ -24,6 +24,13 @@ use PHPCompiler\ext\tokenizer\TokenConstants;
  */
 final class ExtensionConstantGroups
 {
+    /** CLI stdio constants registered at runtime — Zend Core bucket, not user (#4840). */
+    private const CATEGORIZED_CORE_RUNTIME_NAMES = [
+        'STDIN' => true,
+        'STDOUT' => true,
+        'STDERR' => true,
+    ];
+
     /** @var array<string, true>|null */
     private static ?array $registeredNameSet = null;
 
@@ -77,7 +84,8 @@ final class ExtensionConstantGroups
 
     public static function isExtensionConstantName(string $name): bool
     {
-        return isset(self::registeredNameSet()[$name]);
+        return isset(self::registeredNameSet()[$name])
+            || isset(self::CATEGORIZED_CORE_RUNTIME_NAMES[$name]);
     }
 
     /** @return list<string> */
