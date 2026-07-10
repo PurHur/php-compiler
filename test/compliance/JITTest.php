@@ -386,12 +386,23 @@ class JITTest extends BaseTest {
                 continue;
             }
             if (!CompilerVersion::supportsReadonlyBuiltin()
-                && str_contains($name, 'readonly_function')
+                && (preg_match('#/readonly_function\\.phpt$#', $name)
+                    || str_contains($name, 'readonly_function_jit'))
                 && !str_contains($name, 'readonly_phantom')) {
                 continue;
             }
             if (CompilerVersion::supportsReadonlyBuiltin()
                 && str_contains($name, 'readonly_phantom')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsReadonlyFunction()
+                && str_contains($name, 'readonly_function/')) {
+                continue;
+            }
+            if (CompilerVersion::supportsReadonlyFunction()
+                && (str_contains($name, 'readonly_function_decl')
+                    || str_contains($name, 'readonly_function_reject')
+                    || str_contains($name, 'readonly_function_mutable_capture'))) {
                 continue;
             }
             if (!CompilerVersion::supportsStreamContextSetOptions()
