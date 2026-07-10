@@ -24148,6 +24148,20 @@ class Compiler {
         }
         $consumerIndex = $this->deferredSiblingInlineCallArgConsumerIndex($op, $ops, $producerIndex);
         if (null !== $consumerIndex) {
+            $consumer = $ops[$consumerIndex] ?? null;
+            if (
+                $op instanceof Op\Expr
+                && null !== $consumer
+                && $this->isIifeHoistedFuncCallArgProducer(
+                    $op,
+                    $consumer,
+                    $producerIndex,
+                    $consumerIndex,
+                    $ops
+                )
+            ) {
+                return true;
+            }
             $firstSibling = $this->firstSiblingInlineFuncCallProducerIndex($consumerIndex, $ops);
             if (null === $firstSibling) {
                 return false;
@@ -24167,6 +24181,17 @@ class Compiler {
                     $op instanceof Op\Expr
                     && null !== $consumer
                     && $this->isSiblingMultiArgFuncCallProducer(
+                        $op,
+                        $consumer,
+                        $producerIndex,
+                        $consumerIndex,
+                        $ops
+                    )
+                )
+                || (
+                    $op instanceof Op\Expr
+                    && null !== $consumer
+                    && $this->isIifeHoistedFuncCallArgProducer(
                         $op,
                         $consumer,
                         $producerIndex,
@@ -24282,6 +24307,16 @@ class Compiler {
                             $producerIndex,
                             $j,
                             $ops
+                        )
+                        || (
+                            $op instanceof Op\Expr
+                            && $this->isIifeHoistedFuncCallArgProducer(
+                                $op,
+                                $next,
+                                $producerIndex,
+                                $j,
+                                $ops
+                            )
                         )
                     )
                 ) {
@@ -26947,9 +26982,6 @@ class Compiler {
             return;
         }
         $argCount = \count($cfgCallOp->args);
-        if ($argCount < 2) {
-            return;
-        }
         $callIndex = null;
         foreach ($block->orig->children as $i => $child) {
             if ($child === $cfgCallOp) {
@@ -26961,11 +26993,66 @@ class Compiler {
             return;
         }
         $cfgChildren = $block->orig->children;
+        if (
+            $argCount < 2
+            && !(
+                1 === $argCount
+                && $callIndex >= 2
+                && ($cfgChildren[$callIndex - 2] ?? null) instanceof Op\Expr
+                && $this->isIifeHoistedFuncCallArgProducer(
+                    $cfgChildren[$callIndex - 2],
+                    $cfgCallOp,
+                    $callIndex - 2,
+                    $callIndex,
+                    $cfgChildren
+                )
+            )
+        ) {
+            return;
+        }
         if ($this->isSubstrNestedSprintfUnaryMinusPattern($cfgCallOp, $callIndex, $cfgChildren)) {
             $this->ensureSideEffectsBeforeSubstrNestedSprintfCompiled($block, $callIndex, $cfgChildren);
         }
         $firstSibling = $this->firstSiblingInlineFuncCallProducerIndex($callIndex, $block->orig->children);
         if (null === $firstSibling) {
+            if (
+                1 === $argCount
+                && $callIndex >= 2
+            ) {
+                $producerIndex = $callIndex - 2;
+                $producer = $cfgChildren[$producerIndex] ?? null;
+                if (
+                    $producer instanceof Op\Expr
+                    && $this->isIifeHoistedFuncCallArgProducer(
+                        $producer,
+                        $cfgCallOp,
+                        $producerIndex,
+                        $callIndex,
+                        $cfgChildren
+                    )
+                    && null === $block->slotForOperand($producer->result)
+                ) {
+                    $this->ensureStatementLevelSideEffectsBeforeChainStartCompiled(
+                        $block,
+                        $producerIndex,
+                        $cfgChildren
+                    );
+                    $emitOps = [];
+                    $prevForce = $this->forceDeferredSiblingCallReturnSlot;
+                    $this->forceDeferredSiblingCallReturnSlot = true;
+                    try {
+                        foreach ($this->compileExpr($producer, $block) as $op) {
+                            $emitOps[] = $op;
+                        }
+                    } finally {
+                        $this->forceDeferredSiblingCallReturnSlot = $prevForce;
+                    }
+                    foreach ($emitOps as $op) {
+                        $block->addOpCode($op);
+                    }
+                }
+            }
+
             return;
         }
         $arrayPreludeChain = $this->siblingFuncCallChainHasArrayPrelude(
@@ -44328,6 +44415,26 @@ class Compiler {
                 continue;
             }
             if (!property_exists($consumer, 'args') || !is_array($consumer->args) || \count($consumer->args) < 2) {
+                if (
+                    property_exists($consumer, 'args')
+                    && \is_array($consumer->args)
+                    && 1 === \count($consumer->args)
+                ) {
+                    $iifeProducerIndex = array_search($cfgCallOp, $cfgChildren, true);
+                    if (
+                        \is_int($iifeProducerIndex)
+                        && $cfgCallOp instanceof Op\Expr
+                        && $this->isIifeHoistedFuncCallArgProducer(
+                            $cfgCallOp,
+                            $consumer,
+                            $iifeProducerIndex,
+                            $consumerIndex,
+                            $cfgChildren
+                        )
+                    ) {
+                        return true;
+                    }
+                }
                 continue;
             }
             $firstSibling = $this->firstSiblingInlineFuncCallProducerIndex($consumerIndex, $cfgChildren);
