@@ -4349,6 +4349,7 @@ require_once __DIR__.'/../../../lib/Ast/LazyPropertyRewriter.php';
 require_once __DIR__.'/../../../lib/Ast/ReadonlyFunctionAnnotator.php';
 require_once __DIR__.'/../../../lib/Ast/ReadonlyFunctionRewriter.php';
 require_once __DIR__.'/../../../lib/LazyPropertyRejector.php';
+require_once __DIR__.'/../../../lib/LanguageProfileScope.php';
 require_once __DIR__.'/../../../lib/VM/LazyPropertySupport.php';
 require_once __DIR__.'/../../../ext/standard/TimezoneAbbreviationsData.php';
 require_once __DIR__.'/../../../lib/Ast/ListSpreadAssignSyntax.php';
