@@ -2920,6 +2920,10 @@ class Object_ extends Type {
             $this->defineProperty($id, 'name', Variable::TYPE_STRING);
             $this->defineProperty($id, 'enumClass', Variable::TYPE_STRING);
         }
+        // HashContext JIT handle slot must exist before allocate() (ext/hash/JitHashContext.php, #3357).
+        if ('hashcontext' === $lcname) {
+            $this->defineProperty($id, '__hcId', Variable::TYPE_NATIVE_LONG);
+        }
         if ('phpcompiler\vm\context' === $lcname) {
             $this->defineProperty($id, 'runtime', Variable::TYPE_OBJECT);
             $this->defineProperty($id, 'errors', Variable::TYPE_OBJECT);
@@ -3359,9 +3363,9 @@ class Object_ extends Type {
             return Variable::TYPE_HASHTABLE;
         }
 
-        // HashContext incremental digest buffers (ext/hash/JitHashContext.php, #3357).
-        if ('hashcontext' === $lcClass && in_array($lcName, ['__hcalgo', '__hcdata', '__hclive'], true)) {
-            return Variable::TYPE_STRING;
+        // HashContext JIT handle (ext/hash/JitHashContext.php, #3357).
+        if ('hashcontext' === $lcClass && '__hcid' === $lcName) {
+            return Variable::TYPE_NATIVE_LONG;
         }
 
         return Variable::TYPE_VALUE;
