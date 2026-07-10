@@ -7368,4 +7368,56 @@ PHP;
         self::assertStringContainsString("29\n", $out);
         self::assertStringContainsString('proc_sync', $out);
     }
+
+    /** Issue #17767 — var_export($obj->m(), true) in concat must wire method EXEC_RETURN, not spurious echo. */
+    public function testMethodCallFalseReturnVarExportConcatOperandSlotWiring(): void
+    {
+        $code = <<<'PHP'
+<?php
+declare(strict_types=1);
+class C { public function f(): bool { return false; } }
+$c = new C();
+echo 'x='.var_export($c->f(), true)."\n";
+function gen(): Generator { yield 1; return 99; }
+$g = gen(); $g->next(); $g->next();
+echo 'valid='.var_export($g->valid(), true)."\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'method_call_concat_operand.php');
+
+        $methodReturnSlot = null;
+        $varExportArgSend = null;
+        $pendingMethod = null;
+        $fcallOrdinal = 0;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_METHODCALL_INIT === $op->type) {
+                $pendingMethod = $block->constants[$op->arg2]->toString();
+                continue;
+            }
+            if ('f' === $pendingMethod && OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
+                $methodReturnSlot = $op->arg1;
+                $pendingMethod = null;
+                continue;
+            }
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                ++$fcallOrdinal;
+                $name = $block->constants[$op->arg1]->toString();
+                if (1 === $fcallOrdinal && 'var_export' === $name) {
+                    continue;
+                }
+            }
+            if (1 === $fcallOrdinal && OpCode::TYPE_ARG_SEND === $op->type && null === $varExportArgSend) {
+                $varExportArgSend = $op->arg1;
+            }
+        }
+
+        self::assertNotNull($methodReturnSlot, 'method f() must EXEC_RETURN before var_export');
+        self::assertNotNull($varExportArgSend, 'var_export must ARG_SEND method return');
+        self::assertSame($methodReturnSlot, $varExportArgSend, 'var_export arg0 must reuse method return slot');
+
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertSame("x=false\nvalid=false\n", $out);
+    }
 }
