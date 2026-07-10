@@ -66,6 +66,7 @@ require_once __DIR__.'/../../../ext/bcmath/bcround.php';
 require_once __DIR__.'/../../../ext/bcmath/bcscale.php';
 require_once __DIR__.'/../../../ext/bcmath/bcsqrt.php';
 require_once __DIR__.'/../../../ext/bcmath/bcsub.php';
+require_once __DIR__.'/../../../ext/brotli/BrotliExtensionPolicy.php';
 require_once __DIR__.'/../../../ext/brotli/BrotliJitHelper.php';
 require_once __DIR__.'/../../../ext/brotli/JitBrotli.php';
 require_once __DIR__.'/../../../ext/brotli/Module.php';
