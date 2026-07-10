@@ -480,6 +480,11 @@ final class SplDualIteratorStorage
                     $entry['state'] = self::RS_TEST;
                     // fall through
                 case self::RS_TEST:
+                    if (null !== $frame->vmContext
+                        && self::mustSkipForMaxDepth($frame->vmContext, $frame, $object, $iterator)) {
+                        $entry['state'] = self::RS_NEXT;
+                        continue 2;
+                    }
                     $mode = self::traversalMode($state['mode']);
                     if (self::iteratorHasChildren($frame, $object, $iterator, $level, $state)) {
                         if (self::canDescend($state, $level)) {
@@ -559,9 +564,6 @@ final class SplDualIteratorStorage
         int $level,
         array $state
     ): bool {
-        if (self::mustSkipForMaxDepth($frame->vmContext, $frame, $object, $iterator)) {
-            return false;
-        }
         if (null === $frame->vmContext) {
             return false;
         }
