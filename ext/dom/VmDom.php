@@ -281,6 +281,7 @@ final class VmDom
         $characterData->isInternal = true;
         $characterData->parentLc = self::CLASS_NODE;
         $characterData->properties[] = new ClassProperty(self::PROP_DATA, null, $strProto);
+        $characterData->properties[] = new ClassProperty(self::PROP_LENGTH, null, $intProto);
         $characterData->methods['appenddata'] = new CharacterDataAppendData();
         $characterData->methodVisibility['appenddata'] = $pub;
         $characterData->methodNames['appenddata'] = 'appendData';

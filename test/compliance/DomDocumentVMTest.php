@@ -224,6 +224,10 @@ final class DomDocumentVMTest extends BaseTest
             __DIR__.'/cases/stdlib/dom_text_nodes.phpt',
             'dom_text_nodes.phpt'
         );
+        yield 'dom_character_data_length.phpt' => self::parsePHPT(
+            __DIR__.'/cases/dom/dom_character_data_length.phpt',
+            'dom_character_data_length.phpt'
+        );
     }
 
     public function setUp(): void
