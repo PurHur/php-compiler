@@ -119,7 +119,15 @@ final class ClassConstMaterializer
                 $stored->bool($src->toBool());
                 break;
             case Variable::TYPE_OBJECT:
-                $stored->object($src->toObject());
+                $srcObj = $src->toObject();
+                $detached = new ObjectEntry($srcObj->class);
+                $detached->constructed = $srcObj->constructed;
+                foreach ($srcObj->propertiesWithNames() as $propName => $propVar) {
+                    $detached->allocateProperty($propName)->copyFrom(
+                        self::detachConstantValue($propVar)
+                    );
+                }
+                $stored->object($detached);
                 break;
             case Variable::TYPE_ENUM_CASE:
                 $case = $src->toEnumCase();
@@ -137,6 +145,33 @@ final class ClassConstMaterializer
                     'Unsupported class constant value type: '.$src->type
                 );
         }
+
+        return $stored;
+    }
+
+    /**
+     * Compile-time (object) array cast for define()/const (#17676, basic_functions.c).
+     */
+    public static function materializeStdClassFromArrayVariable(Variable $src): ?Variable
+    {
+        $src = $src->resolveIndirect();
+        if ($src->is(Variable::TYPE_OBJECT)) {
+            return self::detachConstantValue($src);
+        }
+        if (!$src->is(Variable::TYPE_ARRAY)) {
+            return null;
+        }
+        $classEntry = new ClassEntry('stdClass');
+        $object = new ObjectEntry($classEntry);
+        $object->constructed = true;
+        foreach ($src->toArray()->iterateKeyed(true) as [$keyVar, $valueVar]) {
+            $propName = $keyVar->is(Variable::TYPE_INTEGER)
+                ? (string) $keyVar->toInt()
+                : $keyVar->toString();
+            $object->allocateProperty($propName)->copyFrom(self::detachConstantValue($valueVar));
+        }
+        $stored = new Variable(Variable::TYPE_OBJECT);
+        $stored->object($object);
 
         return $stored;
     }

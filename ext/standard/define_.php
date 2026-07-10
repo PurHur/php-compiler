@@ -205,7 +205,14 @@ final class define_ extends Internal
 
     private static function compileTimeVmVariableFromRegisteredGlobal(Context $context, JITVariable $arg): ?Variable
     {
-        if (!$arg->value->isALoadInst()) {
+        if (null === $arg->value) {
+            return null;
+        }
+        try {
+            if (!$arg->value->isALoadInst()) {
+                return null;
+            }
+        } catch (\TypeError) {
             return null;
         }
         $ptr = $arg->value->getOperand(0);

@@ -517,34 +517,9 @@ class Context {
                 return false;
             }
         }
-        $this->constants[$name] = self::materializeConstantValue($value);
+        $this->constants[$name] = EnumCaseSupport::materializeConstantValue($this, $value);
 
         return true;
-    }
-
-    /**
-     * Detach user constant storage from ephemeral call-arg temps (php-src zend_register_constant, #17676).
-     *
-     * Shallow {@see clone} on {@see Variable} shares {@see ObjectEntry} handles; outgoing call cleanup
-     * may release the backing object while the constant table still references it.
-     */
-    private static function materializeConstantValue(Variable $value): Variable
-    {
-        $resolved = $value->resolveIndirect();
-        $stored = new Variable();
-        if (Variable::TYPE_OBJECT === $resolved->type) {
-            $stored->object($resolved->toObject()->cloneShallow());
-
-            return $stored;
-        }
-        if (Variable::TYPE_ARRAY === $resolved->type) {
-            $stored->array($resolved->toArray()->duplicate());
-
-            return $stored;
-        }
-        $stored->copyFrom($resolved);
-
-        return $stored;
     }
 
     /** True when a live user constant still holds the given object id (#17676). */
