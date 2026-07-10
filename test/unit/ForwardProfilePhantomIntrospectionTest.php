@@ -148,6 +148,30 @@ final class ForwardProfilePhantomIntrospectionTest extends TestCase
         }
     }
 
+    public function testGetObjectIdCallableAndAdvertisedOnForwardProfile83(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.3');
+        try {
+            $this->assertTrue(CompilerVersion::supportsGetObjectId());
+            $this->assertTrue(CompilerVersion::advertisesGetObjectId());
+            $this->assertTrue(BuiltinIntrospectionPolicy::functionIsAdvertised('get_object_id'));
+
+            $runtime = new Runtime();
+            $ctx = $runtime->vmContext;
+            $this->assertTrue(isset($ctx->functions['get_object_id']));
+            $this->assertTrue(
+                \PHPCompiler\ext\standard\VmReflection::functionExists($ctx, 'get_object_id')
+            );
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     public function testHttpLastResponseHeadersAdvertisedOnForwardProfile84(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');

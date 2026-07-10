@@ -712,7 +712,7 @@ class Module extends ModuleAbstract
             ...(CompilerVersion::supportsPhp84ReflectionProbeBuiltins() ? [new attribute_exists_()] : []),
             new get_object_vars_(),
             new get_mangled_object_vars_(),
-            new get_object_id(),
+            ...(CompilerVersion::supportsGetObjectId() ? [new get_object_id()] : []),
             new spl_object_id(),
             new spl_object_hash(),
             new get_class_(),

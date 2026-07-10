@@ -54,6 +54,46 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
+    public function testSupportsGetObjectIdFalseOnReferenceProfile(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsGetObjectId());
+    }
+
+    public function testSupportsGetObjectIdTrueOnForwardProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.3');
+        try {
+            $this->assertTrue(CompilerVersion::supportsGetObjectId());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testAdvertisesGetObjectIdFalseOnReferenceProfile(): void
+    {
+        $this->assertFalse(CompilerVersion::advertisesGetObjectId());
+    }
+
+    public function testAdvertisesGetObjectIdTrueOnForwardProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.3');
+        try {
+            $this->assertTrue(CompilerVersion::advertisesGetObjectId());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     public function testSupportsClassHasFunctionsFalseOnReferenceProfile(): void
     {
         $this->assertFalse(CompilerVersion::supportsClassHasFunctions());

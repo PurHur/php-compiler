@@ -68,6 +68,9 @@ final class BuiltinIntrospectionPolicy
         if (\in_array($lc, ['str_increment', 'str_decrement'], true)) {
             return CompilerVersion::advertisesStrIncrement();
         }
+        if ('get_object_id' === $lc) {
+            return CompilerVersion::advertisesGetObjectId();
+        }
         if ('clamp' === $lc) {
             return CompilerVersion::advertisesClamp();
         }
