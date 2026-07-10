@@ -883,6 +883,8 @@ class Context {
                 $this->functionProxies['dateperiod::'.$dpIterMethod] = new Call\DatePeriodIteratorMethod($dpIterMethod);
             }
         }
+        $this->functionProxies['datetime::format'] = new Call\DateTimeFormat();
+        $this->functionProxies['datetimeimmutable::format'] = new Call\DateTimeFormat();
         if (CompilerVersion::supportsDomTokenList()) {
             DomInstanceMethodJit::registerKnownProxies($this);
         }
