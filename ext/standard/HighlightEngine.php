@@ -132,6 +132,9 @@ final class HighlightEngine
         if ($id === $ids['T_VARIABLE']) {
             return self::COLOR_DEFAULT;
         }
+        if ($id === $ids['T_INLINE_HTML']) {
+            return self::COLOR_DEFAULT;
+        }
         if ($id >= 256) {
             return self::COLOR_KEYWORD;
         }
