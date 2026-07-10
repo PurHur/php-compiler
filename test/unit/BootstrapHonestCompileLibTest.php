@@ -93,6 +93,33 @@ LOG;
         $this->assertStringContainsString('bin-compile-aot-inventory', $body);
         $this->assertStringContainsString('bin/compile.php', $body);
         $this->assertStringContainsString('#15601', $body);
+        $this->assertStringContainsString('zend_lint_fallback', $body);
+        $this->assertStringContainsString('PHP_COMPILER_NATIVE_LINT_ZEND_ONLY', $body);
+    }
+
+    public function testPhpcLintNativeCompilerSmokeFallback(): void
+    {
+        $fixture = self::$root.'/test/bootstrap-aot/compiler_smoke.php';
+        $this->assertFileExists($fixture);
+        $cmd = array_merge(
+            self::phpCommand(),
+            [self::$root.'/bin/phpc.php', 'lint', '--native', $fixture]
+        );
+        $proc = proc_open($cmd, [
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ], $pipes, self::$root);
+        $this->assertIsResource($proc);
+        fclose($pipes[0]);
+        $stdout = stream_get_contents($pipes[1]);
+        $stderr = stream_get_contents($pipes[2]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        $exit = proc_close($proc);
+        $combined = ($stderr !== false ? $stderr : '').($stdout !== false ? $stdout : '');
+        $this->assertSame(0, $exit, $combined);
+        $this->assertStringContainsString('OK (Zend fallback)', $combined);
     }
 
     public function testPhpcLintNativeWiring(): void

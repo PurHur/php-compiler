@@ -110,7 +110,6 @@ After Tier 0 setup, use the **inventory argv driver** for compile work (gen-2 in
 
 **Still use Zend for:**
 
-- `php bin/compile.php -l …` (fast lint during editing)
 - `vendor/bin/phpunit` (full test matrix)
 - `composer install` / `script/apply-patches.sh`
 
@@ -219,7 +218,7 @@ GitHub Actions runs the same spine gates on matching paths — see [`.github/wor
 | Task | Use |
 |------|-----|
 | Run PHPUnit / compliance | **Zend** — `make test-fast` / `ci-fast.sh` |
-| Lint single file quickly | **Zend** — `php bin/compile.php -l path.php` |
+| Lint single file quickly | **gen-2 + Zend fallback** — `phpc lint --native path.php` (tries `build/bin-compile-aot-inventory -l`, falls back to `php bin/compile.php -l` until #15597) |
 | Compile bootstrap fixture / spine | **gen-2** — `build/bin-compile-aot-inventory -o OUT SRC` |
 | Cold empty `build/` | **gen-0 prelinked** — `BOOTSTRAP_M5_NO_ZEND=1 make bootstrap-selfhost-link` |
 | LLVM / AOT / spine link | **Docker** — `./script/docker-exec.sh` |
@@ -294,7 +293,8 @@ make bootstrap-init
 # Native lint via gen-2 driver -l (#15601)
 phpc lint --native test/bootstrap-aot/compiler_smoke.php
 ./script/bootstrap-native-lint.sh path/to/file.php
-# Fallback when build/bin-compile-aot-inventory is missing: php bin/compile.php -l
+# Tries gen-2 driver -l first; Zend php bin/compile.php -l when parse spine gaps (#15597)
+# Force Zend only: PHP_COMPILER_NATIVE_LINT_ZEND_ONLY=1 phpc lint --native FILE.php
 
 # Bootstrap SDK release tarball (#15602)
 make bootstrap-sdk-pack
