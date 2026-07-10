@@ -182,7 +182,16 @@ use PHPCompiler\VM\Builtin\ReflectionEnumUnitCaseIsBacked;
 use PHPCompiler\VM\Builtin\ReflectionEnumUnitCaseIsDeprecated;
 use PHPCompiler\VM\Builtin\ReflectionExtensionConstruct;
 use PHPCompiler\VM\Builtin\ReflectionExtensionGetName;
+use PHPCompiler\VM\Builtin\ReflectionFiberConstruct;
 use PHPCompiler\VM\Builtin\ReflectionFiberGetExecutingFiber;
+use PHPCompiler\VM\Builtin\ReflectionFiberGetExecutingFile;
+use PHPCompiler\VM\Builtin\ReflectionFiberGetExecutingLine;
+use PHPCompiler\VM\Builtin\ReflectionFiberGetFiber;
+use PHPCompiler\VM\Builtin\ReflectionFiberGetTrace;
+use PHPCompiler\VM\Builtin\ReflectionFiberIsRunning;
+use PHPCompiler\VM\Builtin\ReflectionFiberIsStarted;
+use PHPCompiler\VM\Builtin\ReflectionFiberIsSuspended;
+use PHPCompiler\VM\Builtin\ReflectionFiberIsTerminated;
 use PHPCompiler\VM\Builtin\ReflectionGeneratorConstruct;
 use PHPCompiler\VM\Builtin\ReflectionGeneratorGetExecutingFile;
 use PHPCompiler\VM\Builtin\ReflectionGeneratorGetExecutingGenerator;
@@ -1107,8 +1116,25 @@ final class BuiltinClasses
         $objProto = new Variable(Variable::TYPE_OBJECT);
         $rfiber = new ClassEntry('ReflectionFiber');
         $rfiber->properties[] = new ClassProperty(ReflectionSupport::PROP_FIBER_TARGET, null, $objProto);
-        $rfiber->methods['getexecutingfiber'] = new ReflectionFiberGetExecutingFiber();
-        $rfiber->methodVisibility['getexecutingfiber'] = $pub | CfgFunc::FLAG_STATIC;
+        $rfiber->constructor = new ReflectionFiberConstruct();
+        $rfiber->methods['__construct'] = $rfiber->constructor;
+        $rfiber->methodVisibility['__construct'] = $pub;
+        foreach (
+            [
+                'getfiber' => new ReflectionFiberGetFiber(),
+                'isstarted' => new ReflectionFiberIsStarted(),
+                'issuspended' => new ReflectionFiberIsSuspended(),
+                'isterminated' => new ReflectionFiberIsTerminated(),
+                'isrunning' => new ReflectionFiberIsRunning(),
+                'getexecutingline' => new ReflectionFiberGetExecutingLine(),
+                'getexecutingfile' => new ReflectionFiberGetExecutingFile(),
+                'gettrace' => new ReflectionFiberGetTrace(),
+                'getexecutingfiber' => new ReflectionFiberGetExecutingFiber(),
+            ] as $name => $method
+        ) {
+            $rfiber->methods[$name] = $method;
+            $rfiber->methodVisibility[$name] = 'getexecutingfiber' === $name ? ($pub | CfgFunc::FLAG_STATIC) : $pub;
+        }
         $ctx->classes[ReflectionSupport::REFLECTION_FIBER] = $rfiber;
 
         $rgen = new ClassEntry('ReflectionGenerator');
