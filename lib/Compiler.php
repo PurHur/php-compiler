@@ -29667,10 +29667,15 @@ class Compiler {
             return null;
         }
         $producerOps = [];
-        foreach ($this->compileArrayLiteral($arrayProducer, $block) as $op) {
-            $producerOps[] = $op;
+        $existingHaystackSlot = $block->slotForOperand($arrayProducer->result);
+        if (null === $existingHaystackSlot) {
+            foreach ($this->compileArrayLiteral($arrayProducer, $block) as $op) {
+                $producerOps[] = $op;
+            }
+            $haystackSlot = $this->slotForInitArrayOrdinal($block, 0, $producerOps);
+        } else {
+            $haystackSlot = (string) $existingHaystackSlot;
         }
-        $haystackSlot = $this->slotForInitArrayOrdinal($block, 0, $producerOps);
         if (null === $haystackSlot) {
             return null;
         }
