@@ -152,6 +152,7 @@ use PHPCompiler\VM\Builtin\ReflectionClassIsUninitializedLazyObject;
 use PHPCompiler\VM\Builtin\ReflectionClassMarkLazyObjectAsInitialized;
 use PHPCompiler\VM\Builtin\ReflectionClassCreateLazyGhost;
 use PHPCompiler\VM\Builtin\ReflectionClassCreateLazyProxy;
+use PHPCompiler\VM\Builtin\ReflectionClassNewInstanceWithoutConstructor;
 use PHPCompiler\VM\Builtin\ReflectionClassNewLazyGhost;
 use PHPCompiler\VM\Builtin\ReflectionClassResetAsLazyGhost;
 use PHPCompiler\VM\Builtin\ReflectionClassResetAsLazyObject;
@@ -707,6 +708,8 @@ final class BuiltinClasses
         $rc->methodVisibility['isinstance'] = $pub;
         $rc->methods['isinstantiable'] = new ReflectionClassIsInstantiable();
         $rc->methodVisibility['isinstantiable'] = $pub;
+        $rc->methods['newinstancewithoutconstructor'] = new ReflectionClassNewInstanceWithoutConstructor();
+        $rc->methodVisibility['newinstancewithoutconstructor'] = $pub;
         $rc->methods['isabstract'] = new ReflectionClassIsAbstract();
         $rc->methodVisibility['isabstract'] = $pub;
         $rc->methods['getconstant'] = new ReflectionClassGetConstant();
