@@ -4033,6 +4033,7 @@ require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionParameterGetAttributes.
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionParameterGetType.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionParameterGetValue.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionParameterIsDeprecated.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionParameterIsPromoted.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionParameterIsSensitive.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionParameterIsSensitiveParameter.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertyAccessProbe.php';

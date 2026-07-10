@@ -1360,6 +1360,26 @@ final class ReflectionSupport
         return false;
     }
 
+    public static function parameterIsPromoted(Context $ctx, ObjectEntry $reflection): bool
+    {
+        $classNameVar = $reflection->getProperty(self::PROP_CLASS_NAME)->resolveIndirect();
+        if (Variable::TYPE_STRING !== $classNameVar->type) {
+            return false;
+        }
+        $className = $classNameVar->toString();
+        $method = self::methodNameFromReflection($reflection);
+        $entry = VmReflection::resolveClassEntry($ctx, $className);
+        if (null === $entry) {
+            return false;
+        }
+        $methodLc = strtolower($method);
+        $position = self::paramPositionFromReflection($reflection);
+        $params = $entry->methodParameterMetadata[$methodLc] ?? [];
+        $paramMeta = $params[$position] ?? null;
+
+        return null !== $paramMeta && $paramMeta->isPromoted;
+    }
+
     /**
      * @return \PHPCompiler\Func\PHP
      */

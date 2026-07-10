@@ -5504,7 +5504,8 @@ class Compiler {
             }
             $metadata[] = new ParameterMetadata(
                 $param->name->value,
-                AttributeMetadata::fromOp($param)
+                AttributeMetadata::fromOp($param),
+                $this->isPromotedParam($param),
             );
         }
 
