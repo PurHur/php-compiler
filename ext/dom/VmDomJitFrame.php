@@ -6,29 +6,19 @@ namespace PHPCompiler\ext\dom;
 
 use PHPCompiler\Frame;
 use PHPCompiler\VM\Context as VmContext;
-use PHPCompiler\Web\Superglobals;
+use PHPCompiler\VM\VmActiveContextJitHelper;
 
 /** Active VM context for DOM JIT/AOT helpers (#17130, #17391). */
 final class VmDomJitFrame
 {
     public static function vmContext(): VmContext
     {
-        $ctx = Superglobals::getActiveContext();
-        if (null === $ctx) {
-            throw new \LogicException(
-                'VmDomJitFrame requires an active VM context in this compiler build'
-            );
-        }
-
-        return $ctx;
+        return VmActiveContextJitHelper::resolve();
     }
 
     public static function executingFrame(): ?Frame
     {
-        $ctx = Superglobals::getActiveContext();
-        if (null === $ctx) {
-            return null;
-        }
+        $ctx = self::vmContext();
         $vm = $ctx->runtime->vm;
         if (null === $vm) {
             return null;

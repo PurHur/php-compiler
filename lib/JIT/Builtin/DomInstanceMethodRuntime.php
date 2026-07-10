@@ -9,6 +9,8 @@ use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedVmVariableMethodLlvm;
 use PHPCompiler\JIT\Variable;
+use PHPCompiler\JIT\VmActiveContextInitLlvm;
+use PHPCompiler\JIT\VmActiveContextLlvm;
 use PHPLLVM\Value;
 
 /**
@@ -34,7 +36,7 @@ final class DomInstanceMethodRuntime
     ];
 
     /** @var list<string> */
-    private const COMPILED_HELPERS = [
+    public const COMPILED_HELPER_LOGICALS = [
         self::INVOKE_BY_ARITY[0],
         self::INVOKE_BY_ARITY[1],
         self::INVOKE_BY_ARITY[2],
@@ -52,9 +54,7 @@ final class DomInstanceMethodRuntime
         if ($extraArgCount !== \count($extraArgs)) {
             throw new \LogicException('DomInstanceMethodRuntime arity mismatch');
         }
-        if ($extraArgCount > self::MAX_EXTRA_ARGS) {
-            throw new \LogicException('Too many arguments for DOM instance method JIT bridge');
-        }
+        self::assertValidArity($extraArgCount);
         self::ensureBridge($context, $extraArgCount);
         $llvmArgs = [
             self::receiverValuePtr($context, $receiver),
@@ -65,13 +65,14 @@ final class DomInstanceMethodRuntime
         }
 
         return $context->builder->call(
-            $context->lookupFunction(self::ABI_PREFIX.$extraArgCount),
+            $context->lookupFunction(self::abiForArity($extraArgCount)),
             ...$llvmArgs
         );
     }
 
     public static function ensureLinked(Context $context): void
     {
+        VmActiveContextLlvm::ensureAbi($context);
         for ($i = 0; $i <= self::MAX_EXTRA_ARGS; ++$i) {
             self::ensureBridge($context, $i);
         }
@@ -84,10 +85,15 @@ final class DomInstanceMethodRuntime
 
     public static function ensureBridge(Context $context, int $extraArgCount): void
     {
-        if ($extraArgCount < 0 || $extraArgCount > self::MAX_EXTRA_ARGS) {
-            throw new \LogicException('Invalid DOM instance method JIT bridge arity');
+        self::assertValidArity($extraArgCount);
+        VmActiveContextInitLlvm::requestThinStandaloneInit($context);
+        if (DomInstanceMethodUserScriptLlvm::shouldUse($context)) {
+            DomInstanceMethodUserScriptLlvm::ensureBridge($context, $extraArgCount);
+
+            return;
         }
-        $abi = self::ABI_PREFIX.$extraArgCount;
+
+        $abi = self::abiForArity($extraArgCount);
         $probe = $context->module->getNamedFunction($abi);
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             $context->registerFunction($abi, $probe);
@@ -103,6 +109,11 @@ final class DomInstanceMethodRuntime
 
         NestedVmVariableMethodLlvm::ensureMethod($context, 'resolveindirect');
         NestedVmVariableMethodLlvm::ensureMethod($context, 'toobject');
+        NestedVmVariableMethodLlvm::ensureMethod($context, 'tostring');
+        foreach (['string', 'int', 'null', 'object', 'bool'] as $writeMethod) {
+            NestedVmVariableMethodLlvm::ensureMethod($context, $writeMethod);
+        }
+        self::ensureActiveContextProxy($context);
 
         $valuePtr = $context->getTypeFromString('__value__*');
         $strPtr = $context->getTypeFromString('__string__*');
@@ -116,9 +127,9 @@ final class DomInstanceMethodRuntime
             'dom_instance_method_bridge_'.$extraArgCount,
             $paramTypes,
             $valuePtr,
-            self::INVOKE_BY_ARITY[$extraArgCount],
+            self::invokeLogicalForArity($extraArgCount),
             self::HELPER_PATH,
-            self::COMPILED_HELPERS,
+            self::COMPILED_HELPER_LOGICALS,
             '#17130'
         );
 
@@ -127,6 +138,25 @@ final class DomInstanceMethodRuntime
         } else {
             $context->builder->clearInsertionPosition();
         }
+    }
+
+    public static function assertValidArity(int $extraArgCount): void
+    {
+        if ($extraArgCount < 0 || $extraArgCount > self::MAX_EXTRA_ARGS) {
+            throw new \LogicException('Invalid DOM instance method JIT bridge arity');
+        }
+    }
+
+    public static function abiForArity(int $extraArgCount): string
+    {
+        return self::ABI_PREFIX.$extraArgCount;
+    }
+
+    public static function invokeLogicalForArity(int $extraArgCount): string
+    {
+        self::assertValidArity($extraArgCount);
+
+        return self::INVOKE_BY_ARITY[$extraArgCount];
     }
 
     private static function receiverValuePtr(Context $context, Variable $receiver): Value
@@ -147,5 +177,15 @@ final class DomInstanceMethodRuntime
         }
 
         throw new \LogicException('DOM instance method receiver must be object or value box');
+    }
+
+    public static function ensureActiveContextProxy(Context $context): void
+    {
+        $proxy = 'phpcompiler\\vm\\vmactivecontextjithelper::resolve';
+        if ($context->functionIsRegistered($proxy)) {
+            return;
+        }
+        VmActiveContextLlvm::ensureAbi($context);
+        $context->functionProxies[$proxy] = new \PHPCompiler\JIT\Call\VmActiveContextResolve();
     }
 }

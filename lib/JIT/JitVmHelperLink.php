@@ -51,6 +51,7 @@ final class JitVmHelperLink
         $runtime = $context->runtime;
         $path = self::resolveHelperPath($relativeHelperPath);
         $basename = \basename($path);
+        NestedVmActiveContextLlvm::ensureMethod($context);
         NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path, $basename, $compileLabel): void {
             $block = $runtime->parseAndCompile((string) \file_get_contents($path), $basename);
             if (null === $block) {
