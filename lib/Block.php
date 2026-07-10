@@ -78,6 +78,9 @@ class Block {
     /** Parameter scope slots declared `iterable` (array|Traversable union, #4829). */
     public array $paramIterableSlots = [];
 
+    /** Parameter scope slots declared `callable` (#17742, zend_type.c IS_CALLABLE). */
+    public array $paramCallableSlots = [];
+
     /** Parameter scope slots declared standalone `never` (#6633). */
     public array $paramNeverSlots = [];
 
@@ -805,6 +808,7 @@ class Block {
             $this->paramClassConstraints = $parent->paramClassConstraints;
             $this->paramDeclaredTypeLabels = $parent->paramDeclaredTypeLabels;
             $this->paramIterableSlots = $parent->paramIterableSlots;
+            $this->paramCallableSlots = $parent->paramCallableSlots;
             $this->paramNeverSlots = $parent->paramNeverSlots;
             $this->paramLiteralBoolTypes = $parent->paramLiteralBoolTypes;
             $this->returnLiteralBoolType = $parent->returnLiteralBoolType;
