@@ -48,9 +48,9 @@ final class VmArrayValueCallback
     }
 
     /**
-     * Invoke array_find-family predicate — array_find/any/all closures get (value, key);
-     * array_find_key/any_key/all_key closures get (key, value); internal builtins get
-     * arity-trimmed operands per php-src (ext/standard/array.c; #17300, #17394).
+     * Invoke array_find-family predicate — php-src php_array_find passes (value, key) for
+     * array_find/array_find_key/array_any/array_all; forward-profile array_any_key/array_all_key
+     * closures get (key, value); internal builtins get arity-trimmed operands (#17300, #17599).
      */
     public static function invokePredicate(
         Frame $frame,
@@ -107,12 +107,11 @@ final class VmArrayValueCallback
     }
 
     /**
-     * php_array_find_key / php_array_any_key / php_array_all_key pass key before value (#17394).
+     * Forward-profile array_any_key/array_all_key pass key before value; php-src array_find_key uses (value, key) (#17599).
      */
     public static function callbackKeyFirst(string $function): bool
     {
-        return 'array_find_key' === $function
-            || 'array_any_key' === $function
+        return 'array_any_key' === $function
             || 'array_all_key' === $function;
     }
 
