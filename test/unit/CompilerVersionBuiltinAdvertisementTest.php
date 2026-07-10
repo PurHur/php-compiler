@@ -64,6 +64,28 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsMbStrPad());
     }
 
+    public function testGetObjectIdWithheldOnReferenceProfile(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsGetObjectId());
+        $this->assertFalse(CompilerVersion::advertisesGetObjectId());
+    }
+
+    public function testGetObjectIdAdvertisedOnForwardProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.3');
+        try {
+            $this->assertTrue(CompilerVersion::supportsGetObjectId());
+            $this->assertTrue(CompilerVersion::advertisesGetObjectId());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     public function testStrIncrementWithheldOnReferenceProfile(): void
     {
         $this->assertFalse(CompilerVersion::supportsStrIncrement());

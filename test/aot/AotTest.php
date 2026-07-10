@@ -65,6 +65,16 @@ class AotTest extends BaseTest
                 && str_contains($name, 'str_increment_phantom')) {
                 continue;
             }
+            if (!CompilerVersion::supportsGetObjectId()
+                && str_contains($name, 'get_object_id')
+                && !str_contains($name, 'get_object_id_phantom')
+                && !str_contains($name, 'get_object_id_function_exists_forward_profile')) {
+                continue;
+            }
+            if (CompilerVersion::supportsGetObjectId()
+                && str_contains($name, 'get_object_id_phantom')) {
+                continue;
+            }
             if (!CompilerVersion::supportsClamp()
                 && str_contains($name, 'clamp')) {
                 continue;
