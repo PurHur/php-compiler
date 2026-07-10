@@ -15375,6 +15375,33 @@ restart:
      *
      * @param list<Variable> $ctorArgs
      */
+    /**
+     * ReflectionClass::newInstanceWithoutConstructor() object allocation (#5443, zend_objects.c).
+     */
+    public function allocateObjectWithoutConstructor(ClassEntry $class): ObjectEntry
+    {
+        VM\ReservedBuiltinClass::assertUserInstantiable($class);
+        if ($class->isEnum) {
+            throw new \Error("Cannot instantiate enum {$class->name}");
+        }
+        if ($class->isInterface) {
+            throw new \Error("Cannot instantiate interface {$class->name}");
+        }
+        if ($class->isTrait) {
+            throw new \Error("Cannot instantiate trait {$class->name}");
+        }
+        if ($class->isAbstract) {
+            throw new \Error("Cannot instantiate abstract class {$class->name}");
+        }
+        $object = new ObjectEntry($class);
+        $this->initInstancePropertyDefaults($object);
+        if (null === $class->constructor && !$this->hasInstanceMethod($class, '__construct')) {
+            $object->constructed = true;
+        }
+
+        return $object;
+    }
+
     public function instantiateFromNewCallable(ClassEntry $class, Frame $frame, Variable ...$ctorArgs): ObjectEntry
     {
         VM\ReservedBuiltinClass::assertUserInstantiable($class);
