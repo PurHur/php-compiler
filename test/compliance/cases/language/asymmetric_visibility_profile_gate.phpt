@@ -1,17 +1,20 @@
 --TEST--
-Language: public private(set) — Zend message on reference profile (#12576, Zend/zend_language_parser.y)
+Language: asymmetric visibility public private(set) — reference profile gate (#17695, Zend/zend_compile.c)
 --SKIPIF--
 <?php
 if (!class_exists('PHPCompiler\\CompilerVersion')) {
     require __DIR__ . '/../../../../vendor/autoload.php';
 }
 if (PHPCompiler\CompilerVersion::supportsAsymmetricVisibility()) {
-    die('skip asymmetric visibility enabled on PHP 8.4.0+ target');
+    die('skip asymmetric visibility enabled on PHP 8.4 forward profile');
 }
 ?>
 --FILE--
 <?php
-class C {
+declare(strict_types=1);
+
+class C
+{
     public private(set) int $x = 1;
 }
 --EXPECT_EXIT--

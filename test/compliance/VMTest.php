@@ -797,6 +797,7 @@ class VMTest extends BaseTest {
                 && (str_contains($name, 'private_set_reference_profile')
                     || str_contains($name, 'asymmetric_double_modifier_reference_profile')
                     || str_contains($name, 'asymmetric_visibility_reference_profile')
+                    || str_contains($name, 'asymmetric_visibility_profile_gate')
                     || str_contains($name, 'asymmetric_visibility_public_protected_set_compile_error')
                     || str_contains($name, 'asymmetric_visibility_promoted_public_protected_set_compile_error')
                     || str_contains($name, 'asymmetric_visibility_promoted_public_private_set_compile_error'))) {
@@ -826,6 +827,7 @@ class VMTest extends BaseTest {
                 && !str_contains($name, 'private_set_reference_profile')
                 && !str_contains($name, 'asymmetric_double_modifier_reference_profile')
                 && !str_contains($name, 'asymmetric_visibility_reference_profile')
+                && !str_contains($name, 'asymmetric_visibility_profile_gate')
                 && !str_contains($name, 'asymmetric_visibility_forward_84')) {
                 continue;
             }
