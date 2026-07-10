@@ -4409,6 +4409,32 @@ PHP, 'fopen_chained_concat_path_warn.php');
         self::assertStringContainsString('/tmp/maint_99/sub/file.txt', $err['message'] ?? '');
     }
 
+    /** Issue #17478 — file_get_contents($path) after concat assign must wire path variable, not literal prefix. */
+    public function testFileGetContentsAfterConcatAssignUsesPathVariableSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+declare(strict_types=1);
+$path = '/nope/'.getmypid();
+file_get_contents($path);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'file_get_contents_concat_assign.php');
+
+        $concatSlots = [];
+        $sendSlots = [];
+        $this->collectOpCodesFromBlock($block, $concatSlots, $sendSlots);
+
+        self::assertNotEmpty($concatSlots, 'concat slots='.json_encode($concatSlots));
+        self::assertContains($concatSlots[\count($concatSlots) - 1], $sendSlots, 'arg sends='.json_encode($sendSlots));
+
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type || OpCode::TYPE_FUNCCALL_EXEC_NORETURN === $op->type) {
+                self::assertNotSame('/nope/', $op->arg1, 'must not misbind concat literal into funccall slot');
+            }
+        }
+    }
+
     /** Issue #15929 — chained Mul/Div in call operands wires final Div slot, not inner Mul. */
     public function testSprintfMulFloatDivChainUsesFinalDivSlot(): void
     {
