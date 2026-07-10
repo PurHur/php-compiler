@@ -16998,6 +16998,31 @@ class Compiler {
         $producers = $this->filterNestedNewInlineCallArgProducers($producers, $cfgCallOp);
         $producers = $this->filterKnownVoidMethodCallPreludes($producers);
         $producers = $this->filterStmtLevelArrayPointerFuncPreludes($producers);
+        // array_walk(new ArrayObject([...]), fn(...)) — New_ + Closure hoisted before consumer (#17504).
+        if (
+            \in_array($inlineFuncName, ['array_walk', 'array_walk_recursive'], true)
+            && 2 === \count($callArgs)
+            && null !== $cfgCallOp
+            && null !== $block
+        ) {
+            $leadingCallback = $this->leadingCallbackFirstInlineProducerBeforeCfgCall($cfgCallOp, $block);
+            if (
+                $leadingCallback instanceof Op\Expr\Closure
+                || $leadingCallback instanceof Op\Expr\ArrowFunction
+            ) {
+                $inlineNewSubject = $this->leadingInlineNewBeforeCallbackBeforeCfgCall($cfgCallOp, $block);
+                if ($inlineNewSubject instanceof Op\Expr\New_) {
+                    if (0 === $argIndex) {
+                        return $inlineNewSubject;
+                    }
+                    if (1 === $argIndex) {
+                        return $leadingCallback;
+                    }
+
+                    return null;
+                }
+            }
+        }
         // is_array(file(..., FLAGS)) — dead temp may alias bitmask OR, not file() result (#10474).
         if (
             0 === $argIndex
@@ -22872,6 +22897,39 @@ class Compiler {
             if (!$this->isInlineExprCallArgProducer($prev)) {
                 return null;
             }
+        }
+
+        return null;
+    }
+
+    /**
+     * array_walk(new C(...), fn(...)) — inline New_ subject before trailing closure callback (#17504).
+     */
+    private function leadingInlineNewBeforeCallbackBeforeCfgCall(?Op $cfgCallOp, ?Block $block): ?Op\Expr\New_
+    {
+        if (null === $cfgCallOp || null === $block || null === $block->orig) {
+            return null;
+        }
+        if (1 !== $this->inlineClosureArrayPairCallbackArgIndex($this->resolveInlineCallArgFuncName($cfgCallOp))) {
+            return null;
+        }
+        $callIndex = $this->cfgCallOpIndex($block, $cfgCallOp);
+        if (null === $callIndex || $callIndex < 2) {
+            return null;
+        }
+        $callback = $block->orig->children[$callIndex - 1] ?? null;
+        if (!$callback instanceof Op\Expr\Closure && !$callback instanceof Op\Expr\ArrowFunction) {
+            return null;
+        }
+        for ($i = $callIndex - 2; $i >= 0; --$i) {
+            $prev = $block->orig->children[$i];
+            if ($prev instanceof Op\Expr\New_) {
+                return $prev;
+            }
+            if ($prev instanceof Op\Expr\Array_ || $prev instanceof Op\Expr\ConstFetch) {
+                continue;
+            }
+            break;
         }
 
         return null;
@@ -29402,6 +29460,66 @@ class Compiler {
      *
      * @return list<OpCode>|null
      */
+    private function compileArrayWalkInlineNewClosureCallArgSends(
+        array $args,
+        Block $block,
+        ?Op $cfgCallOp
+    ): ?array {
+        if (null === $cfgCallOp || null === $block->orig || 2 !== \count($args)) {
+            return null;
+        }
+        $funcName = $this->resolveCfgFuncCallName($cfgCallOp);
+        if (!\in_array($funcName, ['array_walk', 'array_walk_recursive'], true)) {
+            return null;
+        }
+        if (
+            !$this->callArgIsDeadInlineTemporary($cfgCallOp->args[0] ?? null)
+            || !$this->callArgIsDeadInlineTemporary($cfgCallOp->args[1] ?? null)
+        ) {
+            return null;
+        }
+        $leadingCallback = $this->leadingCallbackFirstInlineProducerBeforeCfgCall($cfgCallOp, $block);
+        if (
+            !$leadingCallback instanceof Op\Expr\Closure
+            && !$leadingCallback instanceof Op\Expr\ArrowFunction
+        ) {
+            return null;
+        }
+        $inlineNew = $this->leadingInlineNewBeforeCallbackBeforeCfgCall($cfgCallOp, $block);
+        if (!$inlineNew instanceof Op\Expr\New_) {
+            return null;
+        }
+        $producerOps = [];
+        $subjectSlot = $block->slotForOperand($inlineNew->result);
+        if (null === $subjectSlot) {
+            foreach ($this->compileExpr($inlineNew, $block) as $op) {
+                $producerOps[] = $op;
+            }
+            $subjectSlot = $this->slotForInlineNewProducer($block, $inlineNew, $producerOps);
+        }
+        if (null === $subjectSlot) {
+            return null;
+        }
+        $callbackSlot = $block->slotForOperand($leadingCallback->result);
+        if (null === $callbackSlot) {
+            foreach ($this->compileExpr($leadingCallback, $block) as $op) {
+                $producerOps[] = $op;
+            }
+            $callbackSlot = $this->slotForInlineClosureProducer($leadingCallback, $block);
+        }
+        if (null === $callbackSlot) {
+            return null;
+        }
+        $sends = $producerOps;
+        foreach ($args as $argIndex => $arg) {
+            $nameSlot = $this->callArgNameSlot($arg, $block);
+            $valueSlot = 0 === (int) $argIndex ? (string) $subjectSlot : (string) $callbackSlot;
+            $sends[] = new OpCode(OpCode::TYPE_ARG_SEND, $valueSlot, $nameSlot, null);
+        }
+
+        return $sends;
+    }
+
     private function compileArrayPadInlineHaystackCallArgSends(
         array $args,
         Block $block,
@@ -36612,6 +36730,10 @@ class Compiler {
             $dateSunSends = $this->compileDateSunFuncInlineCallArgSends($args, $block, $cfgCallOp);
             if (null !== $dateSunSends) {
                 return $dateSunSends;
+            }
+            $arrayWalkSends = $this->compileArrayWalkInlineNewClosureCallArgSends($args, $block, $cfgCallOp);
+            if (null !== $arrayWalkSends) {
+                return $arrayWalkSends;
             }
             $this->ensureDeferredSiblingInlineCallArgProducersCompiled($block, $cfgCallOp);
         }
