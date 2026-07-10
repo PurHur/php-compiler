@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\VM;
 
+use PHPCompiler\ext\spl\SplDualIteratorStorage;
 use PHPCompiler\Frame;
 use PHPCompiler\RuntimeStrictness;
 
@@ -712,6 +713,13 @@ final class EnumCaseSupport
             $object = $src->toObject();
             if (null !== $object->closureState) {
                 // Closures are live callables — must not immortalize/detach (#17723, zend_closures.c).
+                $out = new Variable();
+                $out->copyFrom($src);
+
+                return $out;
+            }
+            if (SplDualIteratorStorage::hasStateFor($object)) {
+                // SPL iterator wrappers keep sidecar state keyed by object id (#17721).
                 $out = new Variable();
                 $out->copyFrom($src);
 

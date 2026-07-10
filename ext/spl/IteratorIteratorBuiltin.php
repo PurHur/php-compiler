@@ -163,6 +163,23 @@ final class SplDualIteratorStorage
     /** @var array<int, array{inner: ObjectEntry, recursive: bool, mode: int, stack: list<array{iterator: ObjectEntry, state: int}>, maxDepth: int, rewound: bool, noRewind: bool}> */
     private static array $store = [];
 
+    public static function hasStateFor(ObjectEntry $object): bool
+    {
+        return isset(self::$store[$object->id]);
+    }
+
+    /**
+     * Move wrapper sidecar when ClassConstMaterializer detaches object identity (#17721).
+     */
+    public static function transferState(int $fromId, int $toId): void
+    {
+        if (!isset(self::$store[$fromId])) {
+            return;
+        }
+        self::$store[$toId] = self::$store[$fromId];
+        unset(self::$store[$fromId]);
+    }
+
     public static function initSimple(ObjectEntry $object, ObjectEntry $inner): void
     {
         self::$store[$object->id] = [
