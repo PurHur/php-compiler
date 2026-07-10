@@ -36,4 +36,13 @@ final class ErrorHandlerJitHelperTest extends TestCase
         $this->assertSame(0, ErrorHandlerJitHelper::resolveHandlerAddr(\E_ALL));
         $this->assertTrue(ErrorHandlerJitHelper::restoreApply());
     }
+
+    public function testGetTopNameReflectsActiveHandler(): void
+    {
+        $this->assertNull(ErrorHandlerJitHelper::getTopName());
+        ErrorHandlerJitHelper::setApply(0x1000, \E_ALL, 'h1');
+        $this->assertSame('h1', ErrorHandlerJitHelper::getTopName());
+        $this->assertTrue(ErrorHandlerJitHelper::restoreApply());
+        $this->assertNull(ErrorHandlerJitHelper::getTopName());
+    }
 }

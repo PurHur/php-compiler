@@ -87,4 +87,14 @@ final class ErrorHandlerJitHelper
 
         return self::$topFnAddr;
     }
+
+    /** Active handler name for get_error_handler() JIT/AOT (#17668). */
+    public static function getTopName(): ?string
+    {
+        if (self::$depth <= 0) {
+            return null;
+        }
+
+        return self::$topName;
+    }
 }

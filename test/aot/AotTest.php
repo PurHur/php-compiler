@@ -225,6 +225,10 @@ class AotTest extends BaseTest
             if (!CompilerVersion::supportsMbStrPad() && str_contains($name, 'mb_str_pad')) {
                 continue;
             }
+            if (!CompilerVersion::supportsGetHandlerIntrospection()
+                && (str_contains($name, 'get_error_handler') || str_contains($name, 'get_exception_handler'))) {
+                continue;
+            }
             if (!CompilerVersion::supportsStreamSupports()
                 && (str_contains($name, 'stream_supports') || str_contains($name, 'stream_meta_seekable'))
                 && !str_contains($name, 'stream_supports_lock')) {
