@@ -1,5 +1,5 @@
 --TEST--
-stdlib PHP 8.4 profile — grapheme forward-profile helpers callable but not advertised without intl (#11803, ext/intl/grapheme)
+stdlib PHP 8.4 profile — grapheme forward-profile helpers advertised and callable without intl (#17608, ext/intl/grapheme)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--
@@ -30,17 +30,17 @@ echo "\n";
 echo count(grapheme_str_split($s)), "\n";
 ?>
 --EXPECT--
-false
 true
-false
+true
+true
 hello
-false
+true
 2
-false
+true
 b
-false
+true
 1
-false
+true
 á
-false
+true
 2

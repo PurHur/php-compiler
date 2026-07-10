@@ -102,8 +102,11 @@ final class BuiltinIntrospectionPolicy
         if ('stream_context_set_options' === $lc) {
             return CompilerVersion::advertisesStreamContextSetOptions();
         }
-        if ('grapheme_str_contains' === $lc || 'grapheme_strimwidth' === $lc) {
-            return IntlExtensionPolicy::advertisesBuiltins();
+        if ('grapheme_str_contains' === $lc) {
+            return IntlExtensionPolicy::advertisesGraphemeStrContains();
+        }
+        if ('grapheme_strimwidth' === $lc) {
+            return IntlExtensionPolicy::advertisesGraphemeStrimwidth();
         }
         if (\in_array($lc, [
             'grapheme_strlen',
@@ -111,6 +114,10 @@ final class BuiltinIntrospectionPolicy
             'grapheme_strpos',
             'grapheme_extract',
             'grapheme_str_split',
+        ], true)) {
+            return IntlExtensionPolicy::advertisesGraphemeCore();
+        }
+        if (\in_array($lc, [
             'grapheme_stripos',
             'grapheme_stristr',
             'grapheme_strrpos',
