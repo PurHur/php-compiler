@@ -6707,6 +6707,23 @@ PHP;
         );
     }
 
+    /** Issue #17598 — stmt-level substr(..., -N) must not wire prior discard as nested haystack for 3-arg substr. */
+    public function testSubstrNegativeLengthAfterDiscardedNegativeOffsetRuntime(): void
+    {
+        $code = <<<'PHP'
+<?php
+declare(strict_types=1);
+substr('hello', -3);
+echo substr('hello', 0, -2), "\n";
+echo substr('abcdef', -4, 2), "\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'substr_neg_len_after_offset.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("hel\ncd\n", ob_get_clean());
+    }
+
     /** Issue #16481 — mb_substr/mb_strcut($s, -N, null[, $enc]) wires UnaryMinus offset + null length. */
     public function testMbstringNegativeOffsetNullLengthRuntime(): void
     {
