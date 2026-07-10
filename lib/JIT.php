@@ -628,6 +628,9 @@ class JIT {
                 'Return value'
             );
         }
+        if (!$this->emitJitClassReturnTypeCheck($cfgBlock, $return)) {
+            return;
+        }
         $retval = $this->context->helper->loadValue($return);
         $expected = $this->cfgFunctionReturnCallbackType($cfgBlock->func);
         if (null === $expected && null !== $this->context->activeFunction) {
@@ -8995,6 +8998,9 @@ class JIT {
                                 'Return value'
                             );
                         }
+                        if (!$this->emitJitClassReturnTypeCheck($block, $return)) {
+                            return $origBasicBlock;
+                        }
                         $retval = $this->context->helper->loadValue($return);
                         $expected = $this->cfgFunctionReturnCallbackType($block->func);
                         if (null === $expected && null !== $this->context->activeFunction) {
@@ -10113,6 +10119,9 @@ class JIT {
                 'Return value'
             );
         }
+        if (!$this->emitJitClassReturnTypeCheck($block, $value)) {
+            return;
+        }
         $expected = $this->cfgFunctionReturnCallbackType($block->func);
         if (null === $expected && null !== $this->context->activeFunction) {
             $expected = $this->context->functionReturnType[strtolower($this->context->activeFunction)] ?? null;
@@ -10120,6 +10129,12 @@ class JIT {
         $retval = $this->coerceReturnValue($value, $this->context->helper->loadValue($value), $expected);
         $retval = $this->alignRetvalToLlvmFnReturn($retval, $func);
         $builder->returnValue($retval);
+    }
+
+    /** @return bool false when class return TypeError was emitted (skip ret) */
+    private function emitJitClassReturnTypeCheck(Block $block, Variable $return): bool
+    {
+        return JIT\ClassReturnCheck::enforce($this->context, $block, $return);
     }
 
     private function coerceReturnValue(Variable $return, PHPLLVM\Value $retval, ?string $expected): PHPLLVM\Value
