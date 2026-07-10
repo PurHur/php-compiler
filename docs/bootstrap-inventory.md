@@ -21981,16 +21981,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Ast/AsymmetricVisibilityRewriter.php`
 
 **Warnings** (review for bootstrap subset):
-- new CompileError (line 296)
-- new CompileError (line 306)
-- new CompileError (line 399)
-- new CompileError (line 434)
-- new CompileError (line 487)
-- new CompileError (line 609)
-- new CompileError (line 686)
-- new CompileError (line 692)
-- new CompileError (line 704)
-- 44 class method(s)
+- new CompileError (line 327)
+- new CompileError (line 337)
+- new CompileError (line 430)
+- new CompileError (line 465)
+- new CompileError (line 518)
+- new CompileError (line 640)
+- new CompileError (line 717)
+- new CompileError (line 723)
+- new CompileError (line 735)
+- 46 class method(s)
 - 8 closure(s)
 
 ### `lib/Ast/CloneWithDesugar.php`
@@ -22172,8 +22172,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new CompileFatal (line 36)
 - new CompileFatal (line 45)
 - new CompileFatal (line 58)
-- new CompileFatal (line 62)
-- new CompileFatal (line 70)
+- new CompileFatal (line 66)
+- new CompileFatal (line 74)
 - 3 class method(s)
 
 ### `lib/BareThrowSyntaxRejector.php`
