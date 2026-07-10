@@ -270,7 +270,7 @@ final class ForwardProfilePhantomIntrospectionTest extends TestCase
         }
     }
 
-    public function testReadonlyCallableAndAdvertisedOnForwardProfile84(): void
+    public function testReadonlyAdvertisedOnForwardProfile84(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE=8.4');

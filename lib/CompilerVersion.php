@@ -1318,20 +1318,15 @@ final class CompilerVersion
     }
 
     /**
-     * readonly() visible to function_exists() — stable runtime only (#16357, re-#16292).
+     * readonly() visible to function_exists() — stable runtime or forward 8.4+ profile (#16357, #17693).
      *
-     * Callable under forward profile via {@see supportsReadonlyBuiltin()}; withheld from introspection on 8.4.0-dev
-     * reference harness like Zend 8.2.
+     * Withheld on 8.4.0-dev reference profile (matches Zend 8.2 phantom gate). Callable and advertised when
+     * {@see supportsReadonlyBuiltin()} is true (stable 8.4.0+ or explicit {@code PHP_COMPILER_PROFILE=8.4}).
      */
     public static function advertisesReadonlyBuiltin(): bool
     {
         if (version_compare(self::VERSION, '8.4.0', '>=')) {
             return true;
-        }
-
-        $raw = getenv('PHP_COMPILER_PROFILE');
-        if (!\is_string($raw) || '' === trim($raw)) {
-            return false;
         }
 
         return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
