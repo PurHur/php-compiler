@@ -84,8 +84,8 @@ php-compiler CLI
       --json fields: file, line, kind, message, issue, issue_url (when tracked)
   phpc init [--profile default|miniwebapp|sessionsweb|apijson|fileupload|throwsweb|selfhostprobe|fastcgiweb] [--force] [target-dir]
                                               Scaffold web project (default, miniwebapp, sessionsweb, apijson, fileupload, throwsweb, selfhostprobe, or fastcgiweb)
-  phpc bootstrap init [--with-composer] [--skip-verify]
-                                              Bootstrap SDK cold start (gen-0 prelink, Tier 1; #15600)
+  phpc bootstrap init [--with-composer] [--skip-verify] [--sdk-url URL]
+                                              Bootstrap SDK cold start (gen-0 prelink, Tier 1; #15600/#15602)
   phpc test [--fast] [args...]                  Run ci-local.sh (full) or ci-fast.sh (no LLVM)
   phpc test --bootstrap [--strict]              Bootstrap subset (inventory + spine sync; #1961)
   phpc test --native                            Native harness subset (AOT + VM compliance; #15599)
