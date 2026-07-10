@@ -7,6 +7,7 @@ namespace PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPCompiler\JIT\UserScriptAotDeferNestedJit;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
@@ -45,6 +46,12 @@ final class StringHtmlspecialcharsDecode
     public static function implement(Context $context): void
     {
         if (NestedJitCompileScope::isActive()) {
+            return;
+        }
+
+        if (UserScriptAotDeferNestedJit::shouldDefer($context)) {
+            StringHtmlspecialcharsDecodeLlvm::implement($context);
+
             return;
         }
 

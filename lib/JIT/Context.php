@@ -914,6 +914,7 @@ class Context {
         Builtin\StringJsonDecode::ensureDeferredStubsForInventoryEmit($this);
         Builtin\StringJsonEncode::ensureDeferredStubsForInventoryEmit($this);
         Builtin\StringHtmlspecialchars::ensureStandaloneBodies($this);
+        Builtin\StringHtmlspecialcharsDecode::ensureStandaloneBodies($this);
         ExceptionBridge::ensureStandaloneBodies($this);
         ErrorBridge::ensureStandaloneBodies($this);
         Builtin\StreamLifecycleRuntime::ensureDeferredStubsForInventoryEmit($this);
