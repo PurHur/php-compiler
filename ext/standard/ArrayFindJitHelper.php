@@ -32,13 +32,14 @@ final class ArrayFindJitHelper
     {
         $fn = VmInternalCall::resolveStringCallback($builtinName);
         $unaryUsesKey = self::MODE_ALL_KEY === $mode || self::MODE_ANY_KEY === $mode;
+        $keyFirst = self::MODE_FIND_KEY === $mode || self::MODE_ALL_KEY === $mode || self::MODE_ANY_KEY === $mode;
         $out = new Variable();
         foreach ($ht->iterateKeyed(true) as [$key, $value]) {
             $item = new Variable();
             $item->copyFrom($value);
             $keyVar = new Variable();
             $keyVar->copyFrom($key);
-            $result = VmArrayFindInternalInvoke::invoke($fn, $item, $keyVar, $unaryUsesKey);
+            $result = VmArrayFindInternalInvoke::invoke($fn, $item, $keyVar, $unaryUsesKey, $keyFirst);
             $truthy = VmArrayValueCallback::isTruthy($result);
             if (self::MODE_ANY === $mode || self::MODE_ANY_KEY === $mode) {
                 if ($truthy) {

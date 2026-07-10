@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-function phpc_aot_all_key_returns_int($v, $k)
+function phpc_aot_all_key_returns_int($k, $v)
 {
     return $v == 1 ? 1 : 0;
 }
 
-function phpc_aot_any_key_returns_int($v, $k)
+function phpc_aot_any_key_returns_int($k, $v)
 {
     return $v == 1 ? 1 : 0;
 }
