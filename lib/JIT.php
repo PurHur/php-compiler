@@ -1900,7 +1900,8 @@ class JIT {
                     $this->paramByRefForNativeCall($block),
                     $block->paramNames,
                     $block->variadicParamIndex,
-                    $this->paramImplicitNullableForNativeCall($block)
+                    $this->paramImplicitNullableForNativeCall($block),
+                    Block::usesFuncArgsIntrospection($block)
                 );
                 JIT\NoDiscardCallGuard::registerCallee($this->context, $funcName, $block);
             }

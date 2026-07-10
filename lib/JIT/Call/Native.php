@@ -59,6 +59,9 @@ class Native implements Call {
     /** LLVM arg index => implicit nullable (`int $x = null`, #4449). */
     public array $paramImplicitNullableByArg = [];
 
+    /** When false, skip CallArgv hashtable pack at call sites (#15907 perf). */
+    public bool $emitCallArgv = true;
+
     public function __construct(
         Value $function,
         string $name,
@@ -72,7 +75,8 @@ class Native implements Call {
         array $paramByRefByArg = [],
         array $paramNames = [],
         ?int $namedArgsVariadicIndex = null,
-        array $paramImplicitNullableByArg = []
+        array $paramImplicitNullableByArg = [],
+        bool $emitCallArgv = true
     ) {
         $this->function = $function;
         $this->name = $name;
@@ -87,6 +91,7 @@ class Native implements Call {
         $this->paramNames = $paramNames;
         $this->namedArgsVariadicIndex = $namedArgsVariadicIndex;
         $this->paramImplicitNullableByArg = $paramImplicitNullableByArg;
+        $this->emitCallArgv = $emitCallArgv;
     }
 
     public function call(Context $context, Variable ... $args): Value {
@@ -95,8 +100,10 @@ class Native implements Call {
             $this->enforceVariadicTrailingArgs($context, $args);
             $args = $this->packVariadicCallArgs($context, $args);
         }
-        // Store call-site argv for func_get_args/func_num_args (issue #197).
-        CallArgv::emitStore($context, HashTableHelper::packVariables($context, $sentArgs));
+        if ($this->emitCallArgv) {
+            // Store call-site argv for func_get_args/func_num_args (issue #197).
+            CallArgv::emitStore($context, HashTableHelper::packVariables($context, $sentArgs));
+        }
         $argValues = [];
         $total = count($this->argTypes);
         for ($index = 0; $index < $total; $index++) {
