@@ -31799,6 +31799,9 @@ class Compiler {
         }
         $producers = $this->precedingInlineCallArgProducersBeforeCfgOp($block->orig->children, $cfgCallOp);
         $argCount = \count($cfgCallOp->args);
+        if (null !== $this->matchNestedNewCtorInlineNewProducer($producers, $argIndex, $argCount, $cfgCallOp->args)) {
+            return true;
+        }
         if (\count($producers) === $argCount && isset($producers[$argIndex])) {
             $positional = $producers[$argIndex];
             if ($positional instanceof Op\Expr\New_) {
@@ -37062,6 +37065,7 @@ class Compiler {
                 && $cfgCallOp instanceof Op\Expr\New_
                 && 0 === (int) $argIndex
                 && $this->callArgOperandExpectsArrayProducer($arg)
+                && !$this->callArgInlineProducerIsNew($cfgCallOp, (int) $argIndex, $block)
             ) {
                 $ctorArrayPrelude = $this->inlineArrayProducerImmediatelyBeforeCfgCall($cfgCallOp, $block);
                 if ($ctorArrayPrelude instanceof Op\Expr\Array_) {
@@ -37254,6 +37258,7 @@ class Compiler {
                 && $this->callArgIsDeadInlineTemporary($arg)
                 && $this->callArgOperandExpectsArrayProducer($arg)
                 && !$this->shouldUseArrayProducerCallArgResolution($cfgCallOp, (int) $argIndex, $calleeName)
+                && !$this->callArgInlineProducerIsNew($cfgCallOp, (int) $argIndex, $block)
             ) {
                 // var_export/json_encode([…, $x->format(...)]) — stmt-before Array_ feeds the call arg (#10733, #16067).
                 // array_map('explode', [','], ['a,b']) — map each hoisted Array_ to its arg slot (#16085, #16078 regression).
@@ -37563,11 +37568,21 @@ class Compiler {
                     $block->orig->children,
                     $cfgCallOp
                 );
+                $nestedNewArgCount = \count($cfgCallOp->args ?? $args);
                 $siblingNews = $this->siblingInlineNewProducersBeforeCfgOp($block, $cfgCallOp);
                 if ([] !== $siblingNews) {
-                    $nestedNewProducers = $siblingNews;
+                    // new LimitIterator(new ArrayIterator([...]), …) — keep Array_ prelude + inner New_ (#12916, #17575).
+                    if (
+                        null === $this->matchNestedNewCtorInlineNewProducer(
+                            $nestedNewProducers,
+                            (int) $argIndex,
+                            $nestedNewArgCount,
+                            $cfgCallOp->args ?? $args
+                        )
+                    ) {
+                        $nestedNewProducers = $siblingNews;
+                    }
                 }
-                $nestedNewArgCount = \count($cfgCallOp->args ?? $args);
                 $nestedNewProducerCount = \count($nestedNewProducers);
                 $inlineNewProducer = $this->matchSiblingInlineNewCallArgProducer(
                     $nestedNewProducers,
