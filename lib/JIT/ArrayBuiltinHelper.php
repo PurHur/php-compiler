@@ -8333,14 +8333,14 @@ final class ArrayBuiltinHelper
         $ht = self::isNativeArray($haystack->type)
             ? self::nativeListToHashTable($context, $haystack)
             : self::loadHashTable($context, $haystack);
+        $map = $context->structFieldMap['__hashtable__'];
         $sizeT = $context->getTypeFromString('size_t');
         $zero = $sizeT->constInt(0, false);
         $one = $sizeT->constInt(1, false);
         $idxSlot = $context->builder->alloca($sizeT, 1, 'in_array_idx'.$tag);
         $context->builder->store($zero, $idxSlot);
-        $num = $context->builder->call(
-            $context->lookupFunction('__hashtable__getNumElements'),
-            $ht
+        $nextFree = $context->builder->load(
+            $context->builder->structGep($ht, $map['nextFreeElement'])
         );
 
         $foundSlot = $context->builder->alloca(
@@ -8353,18 +8353,27 @@ final class ArrayBuiltinHelper
         $done = BasicBlockHelper::append($context, 'in_array_done'.$tag);
         $head = BasicBlockHelper::append($context, 'in_array_head'.$tag);
         $body = BasicBlockHelper::append($context, 'in_array_body'.$tag);
+        $bodyMatch = BasicBlockHelper::append($context, 'in_array_body_match'.$tag);
         $foundBlock = BasicBlockHelper::append($context, 'in_array_found_block'.$tag);
         $context->builder->branch($head);
 
         $context->builder->positionAtEnd($head);
         $idx = $context->builder->load($idxSlot);
-        $atEnd = $context->builder->icmp(Builder::INT_SGE, $idx, $num);
+        $atEnd = $context->builder->icmp(Builder::INT_SGE, $idx, $nextFree);
         $context->builder->branchIf($atEnd, $done, $body);
 
         $context->builder->positionAtEnd($body);
+        $isSet = $context->builder->call(
+            $context->lookupFunction('__hashtable__offsetIsSet'),
+            $ht,
+            $idx
+        );
+        $continueBlock = BasicBlockHelper::append($context, 'in_array_continue'.$tag);
+        $context->builder->branchIf($isSet, $bodyMatch, $continueBlock);
+
+        $context->builder->positionAtEnd($bodyMatch);
         $entry = self::listEntryAt($context, $ht, $idx);
         $match = self::entryMatchesNeedle($context, $entry, $needle, $strict);
-        $continueBlock = BasicBlockHelper::append($context, 'in_array_continue'.$tag);
         $context->builder->branchIf($match, $foundBlock, $continueBlock);
 
         $context->builder->positionAtEnd($continueBlock);
@@ -8695,6 +8704,7 @@ final class ArrayBuiltinHelper
             $context->builder->structGep($entry, $valueMap['type'])
         );
         $i8 = $context->getTypeFromString('int8');
+        $baseType = $context->builder->and($typeByte, $i8->constInt(0x7f, false));
         $i1 = $context->getTypeFromString('int1');
         $false = $i1->constInt(0, false);
         $resultSlot = $context->builder->alloca($i1, 1, 'entry_match');
@@ -8716,8 +8726,8 @@ final class ArrayBuiltinHelper
 
         $isString = $context->builder->icmp(
             Builder::INT_EQ,
-            $typeByte,
-            $i8->constInt(Variable::TYPE_STRING & 0xff, false)
+            $baseType,
+            $i8->constInt(Variable::TYPE_STRING & 0x7f, false)
         );
         $context->builder->branchIf($isString, $bbString, $bbCheckLong);
 
@@ -8737,8 +8747,8 @@ final class ArrayBuiltinHelper
         $context->builder->positionAtEnd($bbCheckLong);
         $isLong = $context->builder->icmp(
             Builder::INT_EQ,
-            $typeByte,
-            $i8->constInt(Variable::TYPE_NATIVE_LONG, false)
+            $baseType,
+            $i8->constInt(Variable::TYPE_NATIVE_LONG & 0x7f, false)
         );
         $context->builder->branchIf($isLong, $bbLong, $bbCheckBool);
 
@@ -8758,8 +8768,8 @@ final class ArrayBuiltinHelper
         $context->builder->positionAtEnd($bbCheckBool);
         $isBool = $context->builder->icmp(
             Builder::INT_EQ,
-            $typeByte,
-            $i8->constInt(Variable::TYPE_NATIVE_BOOL, false)
+            $baseType,
+            $i8->constInt(Variable::TYPE_NATIVE_BOOL & 0x7f, false)
         );
         $context->builder->branchIf($isBool, $bbBool, $bbCheckDouble);
 
@@ -8782,8 +8792,8 @@ final class ArrayBuiltinHelper
         $context->builder->positionAtEnd($bbCheckDouble);
         $isDouble = $context->builder->icmp(
             Builder::INT_EQ,
-            $typeByte,
-            $i8->constInt(Variable::TYPE_NATIVE_DOUBLE, false)
+            $baseType,
+            $i8->constInt(Variable::TYPE_NATIVE_DOUBLE & 0x7f, false)
         );
         $context->builder->branchIf($isDouble, $bbDouble, $bbCheckHashtable);
 
@@ -8803,16 +8813,16 @@ final class ArrayBuiltinHelper
         $context->builder->positionAtEnd($bbCheckHashtable);
         $isHashtable = $context->builder->icmp(
             Builder::INT_EQ,
-            $typeByte,
-            $i8->constInt(Variable::TYPE_HASHTABLE, false)
+            $baseType,
+            $i8->constInt(Variable::TYPE_HASHTABLE & 0x7f, false)
         );
         $context->builder->branchIf($isHashtable, $bbHashtable, $bbCheckObject);
 
         $context->builder->positionAtEnd($bbCheckObject);
         $isObject = $context->builder->icmp(
             Builder::INT_EQ,
-            $typeByte,
-            $i8->constInt(Variable::TYPE_OBJECT, false)
+            $baseType,
+            $i8->constInt(Variable::TYPE_OBJECT & 0x7f, false)
         );
         $context->builder->branchIf($isObject, $bbObject, $bbNull);
 
@@ -8853,8 +8863,8 @@ final class ArrayBuiltinHelper
         if (Variable::TYPE_NULL === $needle->type) {
             $isNull = $context->builder->icmp(
                 Builder::INT_EQ,
-                $typeByte,
-                $i8->constInt(Variable::TYPE_NULL, false)
+                $baseType,
+                $i8->constInt(Variable::TYPE_NULL & 0x7f, false)
             );
             $context->builder->store($isNull, $resultSlot);
         }
