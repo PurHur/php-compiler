@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\VM;
 
 use PHPCompiler\Block;
+use PHPCompiler\ext\spl\SplDualIteratorStorage;
 use PHPCompiler\Frame;
 use PHPCompiler\OpCode;
 use PHPCompiler\VM as VmEngine;
@@ -149,6 +150,7 @@ final class ClassConstMaterializer
                         self::detachConstantValue($propVar)
                     );
                 }
+                SplDualIteratorStorage::transferState($srcObj->id, $detached->id);
                 $stored->object($detached);
                 break;
             case Variable::TYPE_ENUM_CASE:
