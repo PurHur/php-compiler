@@ -3178,6 +3178,14 @@ class Object_ extends Type {
                 $this->defineEnumCaseConst($id, $caseName, $backing);
             }
         }
+        if ('arraypadtype' === $lcname && \PHPCompiler\CompilerVersion::supportsArrayPadTypeEnum()) {
+            $this->enums[$lcname] = true;
+            foreach (['Positive', 'Negative'] as $caseName) {
+                $backing = new VMVariable();
+                $backing->null();
+                $this->defineEnumCaseConst($id, $caseName, $backing);
+            }
+        }
         if ('parseurl' === $lcname) {
             $this->enums[$lcname] = true;
             $this->setEnumBackedType($id, 'int');
@@ -5522,6 +5530,11 @@ class Object_ extends Type {
     public function roundingModeEnumClassId(): ?int
     {
         return $this->classes['roundingmode'] ?? null;
+    }
+
+    public function arrayPadTypeEnumClassId(): ?int
+    {
+        return $this->classes['arraypadtype'] ?? null;
     }
 
     public function infoViewEnumClassId(): ?int

@@ -98,10 +98,6 @@ class VMTest extends BaseTest {
                 && 'number_format_negative_decimals.phpt' === $name) {
                 continue;
             }
-            if (!CompilerVersion::supportsArrayPadTypeEnum()
-                && str_contains($name, 'array_pad_type_enum')) {
-                continue;
-            }
             if (!CompilerVersion::supportsRandomIntervalBoundary()
                 && str_contains($name, 'random_interval_boundary')
                 && !str_contains($name, 'random_interval_boundary_reference_profile')) {

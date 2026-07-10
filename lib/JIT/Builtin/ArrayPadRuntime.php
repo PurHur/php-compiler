@@ -60,6 +60,12 @@ final class ArrayPadRuntime
         )) {
             return ArrayBuiltinHelper::pad($context, $array, $length, $value);
         }
+        if (null !== $padType && (
+            Builtin::LOAD_TYPE_STANDALONE === $context->loadType
+            || ArrayBuiltinHelper::isNativeArray($array->type)
+        )) {
+            return ArrayBuiltinHelper::padWithType($context, $array, $length, $value, $padType);
+        }
 
         self::ensureLinked($context);
         $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
