@@ -16433,6 +16433,7 @@ restart:
                 }
             }
         }
+        ObjectLifetime::releaseDirectObject($frame->scope[$slot]);
         $frame->scope[$slot]->null();
     }
 
