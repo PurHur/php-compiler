@@ -45,14 +45,7 @@ final class DomInstanceMethodUserScriptLlvm
         }
 
         VmActiveContextLlvm::ensureAbi($context);
-        self::ensureMainModuleHelperCompiled($context);
-
-        $savedBlock = null;
-        try {
-            $savedBlock = $context->builder->getInsertBlock();
-        } catch (\Throwable) {
-        }
-
+        NestedVmActiveContextLlvm::ensureMethod($context);
         NestedVmVariableMethodLlvm::ensureMethod($context, 'resolveindirect');
         NestedVmVariableMethodLlvm::ensureMethod($context, 'toobject');
         NestedVmVariableMethodLlvm::ensureMethod($context, 'tostring');
@@ -60,6 +53,13 @@ final class DomInstanceMethodUserScriptLlvm
             NestedVmVariableMethodLlvm::ensureMethod($context, $writeMethod);
         }
         DomInstanceMethodRuntime::ensureActiveContextProxy($context);
+        self::ensureMainModuleHelperCompiled($context);
+
+        $savedBlock = null;
+        try {
+            $savedBlock = $context->builder->getInsertBlock();
+        } catch (\Throwable) {
+        }
 
         $valuePtr = $context->getTypeFromString('__value__*');
         $strPtr = $context->getTypeFromString('__string__*');
@@ -112,7 +112,6 @@ final class DomInstanceMethodUserScriptLlvm
 
         $runtime = $context->runtime;
         $path = \dirname(__DIR__, 3).self::HELPER_PATH;
-        NestedVmActiveContextLlvm::ensureMethod($context);
         NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
             $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'VmDomInstanceInvoke.php');
             if (null === $block) {

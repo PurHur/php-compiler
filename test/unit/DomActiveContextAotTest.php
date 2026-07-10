@@ -36,4 +36,14 @@ final class DomActiveContextAotTest extends TestCase
         $this->assertStringContainsString('emitPendingBeforeSeal', $source);
         $this->assertStringNotContainsString('supportsDomTokenList', $source);
     }
+
+    public function testDomInstanceMethodUserScriptRegistersProxiesBeforeHelperCompile(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/DomInstanceMethodUserScriptLlvm.php');
+        $proxyPos = strpos($source, 'ensureActiveContextProxy');
+        $compilePos = strpos($source, 'ensureMainModuleHelperCompiled');
+        $this->assertNotFalse($proxyPos);
+        $this->assertNotFalse($compilePos);
+        $this->assertLessThan($compilePos, $proxyPos, 'active-context proxy must register before nested helper compile');
+    }
 }
