@@ -5211,7 +5211,12 @@ restart:
                         throw new \LogicException('TYPE_FROM_CALLABLE missing callable slot');
                     }
                     try {
-                        $entry = VM\ClosureSupport::fromCallable($this->context, $frame, $callable);
+                        $entry = VM\ClosureSupport::fromCallable(
+                            $this->context,
+                            $frame,
+                            $callable,
+                            $op->fromCallableParentScope
+                        );
                         $frame->scope[$op->arg1]->object($entry);
                     } catch (\Error $e) {
                         $catchFrame = $this->dispatchVmError($e->getMessage(), $frame);
