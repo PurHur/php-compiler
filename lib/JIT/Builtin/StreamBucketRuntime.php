@@ -338,4 +338,50 @@ final class StreamBucketRuntime
         }
         $context->builder->clearInsertionPosition();
     }
+
+    public static function shouldDeferInventoryEmitStubs(Context $context): bool
+    {
+        return StreamIoRuntime::shouldDeferHeavyStreamIoEmitters($context);
+    }
+
+    public static function ensureDeferredStubsForInventoryEmit(Context $context): void
+    {
+        if (!self::shouldDeferInventoryEmitStubs($context)) {
+            return;
+        }
+        self::implementDeferredResourceProbeStubs($context);
+    }
+
+    public static function implementDeferredResourceProbeStubs(Context $context): void
+    {
+        $restore = self::captureInsertBlock($context);
+        $i32 = $context->getTypeFromString('int32');
+        $zero = $i32->constInt(0, false);
+        foreach (['__compiler_is_bucket_resource', '__compiler_is_brigade_resource'] as $name) {
+            self::implementI32I64RetStub($context, $name, $zero);
+        }
+        self::registerLinkedRuntime($context);
+        self::restoreInsertBlock($context, $restore);
+    }
+
+    private static function implementI32I64RetStub(Context $context, string $name, Value $ret): void
+    {
+        $probe = $context->module->getNamedFunction($name);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction($name, $probe);
+
+            return;
+        }
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $fn = $probe ?? $context->module->addFunction(
+            $name,
+            $context->context->functionType($i32, false, $i64)
+        );
+        $entry = $fn->appendBasicBlock('stream_bucket_probe_stub');
+        $context->builder->positionAtEnd($entry);
+        $context->builder->returnValue($ret);
+        $context->registerFunction($name, $fn);
+        $context->builder->clearInsertionPosition();
+    }
 }

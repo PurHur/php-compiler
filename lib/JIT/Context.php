@@ -918,6 +918,7 @@ class Context {
         ExceptionBridge::ensureStandaloneBodies($this);
         ErrorBridge::ensureStandaloneBodies($this);
         Builtin\StreamLifecycleRuntime::ensureDeferredStubsForInventoryEmit($this);
+        Builtin\StreamBucketRuntime::ensureDeferredStubsForInventoryEmit($this);
         Builtin\StreamReadRuntime::ensureDeferredStubsForInventoryEmit($this);
         Builtin\AssertFail::ensureStandaloneBodies($this);
         Builtin\JitReturnPending::ensureStandaloneBodies($this);
