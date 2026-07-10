@@ -77,8 +77,10 @@ final class ModuleRegistry
             && !\PHPCompiler\ext\openssl\OpensslExtensionPolicy::advertisesExtension();
         $withholdSqlite3Surface = 'sqlite3' === $primary
             && !\PHPCompiler\ext\sqlite3\Sqlite3ExtensionPolicy::advertisesExtension();
+        $withholdLdapSurface = 'ldap' === $primary
+            && !\PHPCompiler\ext\ldap\LdapExtensionPolicy::advertisesExtension();
 
-        if (!$withholdOpensslSurface && !$withholdSqlite3Surface) {
+        if (!$withholdOpensslSurface && !$withholdSqlite3Surface && !$withholdLdapSurface) {
             self::register($module->getExtensionName(), $moduleVersion);
         }
         $additional = $module->getAdditionalExtensionNames();
@@ -93,7 +95,7 @@ final class ModuleRegistry
                 continue;
             }
             $fnName = strtolower($func->getName());
-            if ($withholdOpensslSurface || $withholdSqlite3Surface) {
+            if ($withholdOpensslSurface || $withholdSqlite3Surface || $withholdLdapSurface) {
                 self::registerBuiltinLookup($fnName);
 
                 continue;

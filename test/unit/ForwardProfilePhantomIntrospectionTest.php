@@ -270,19 +270,19 @@ final class ForwardProfilePhantomIntrospectionTest extends TestCase
         }
     }
 
-    public function testReadonlyCallableButNotAdvertisedOnForwardProfile(): void
+    public function testReadonlyCallableAndAdvertisedOnForwardProfile84(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE=8.4');
         try {
             $this->assertTrue(CompilerVersion::supportsReadonlyBuiltin());
-            $this->assertFalse(CompilerVersion::advertisesReadonlyBuiltin());
-            $this->assertFalse(BuiltinIntrospectionPolicy::functionIsAdvertised('readonly'));
+            $this->assertTrue(CompilerVersion::advertisesReadonlyBuiltin());
+            $this->assertTrue(BuiltinIntrospectionPolicy::functionIsAdvertised('readonly'));
 
             $runtime = new Runtime();
             $ctx = $runtime->vmContext;
             $this->assertTrue(isset($ctx->functions['readonly']));
-            $this->assertFalse(
+            $this->assertTrue(
                 \PHPCompiler\ext\standard\VmReflection::functionExists($ctx, 'readonly')
             );
         } finally {

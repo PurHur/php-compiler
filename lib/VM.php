@@ -16423,6 +16423,11 @@ restart:
 
                     return;
                 }
+                if ($this->context->userConstantReferencesObjectId($objectId)) {
+                    $frame->scope[$slot]->null();
+
+                    return;
+                }
             }
         }
         ObjectLifetime::releaseDirectObject($frame->scope[$slot]);

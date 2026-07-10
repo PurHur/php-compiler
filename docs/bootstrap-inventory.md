@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 4338 |
-| Phase A inventory files (M2 ratio SSOT) | 4338 |
+| PHP files on vm.php path | 4339 |
+| Phase A inventory files (M2 ratio SSOT) | 4339 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 11691 |
+| Source constructs flagged (warnings) | 11693 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -378,6 +378,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/locale_get_script.php` | 0 | 3 |
 | `ext/intl/locale_set_default.php` | 0 | 2 |
 | `ext/ldap/LdapConstants.php` | 0 | 1 |
+| `ext/ldap/LdapExtensionPolicy.php` | 0 | 1 |
 | `ext/ldap/Module.php` | 0 | 3 |
 | `ext/ldap/VmLdapEscape.php` | 0 | 1 |
 | `ext/ldap/ldap_escape.php` | 0 | 2 |
@@ -4089,7 +4090,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/VM/CoalesceJitHelper.php` | 0 | 1 |
 | `lib/VM/CompareJitHelper.php` | 0 | 1 |
 | `lib/VM/CompareStringableHelper.php` | 0 | 1 |
-| `lib/VM/Context.php` | 0 | 39 |
+| `lib/VM/Context.php` | 0 | 40 |
 | `lib/VM/CycleCollector.php` | 0 | 2 |
 | `lib/VM/DateIntervalSupport.php` | 0 | 2 |
 | `lib/VM/DatePeriodIteratorJitHelper.php` | 0 | 7 |
@@ -6736,6 +6737,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
+
+### `ext/ldap/LdapExtensionPolicy.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
 
 ### `ext/ldap/Module.php`
 
@@ -31554,19 +31560,20 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 399)
 - new Variable (line 406)
 - new Variable (line 417)
-- new Variable (line 676)
-- new HashTable (line 677)
-- new Variable (line 692)
-- new Variable (line 792)
-- new Variable (line 804)
-- new HashTable (line 805)
+- new Variable (line 534)
+- new Variable (line 720)
+- new HashTable (line 721)
+- new Variable (line 736)
 - new Variable (line 836)
-- new Variable (line 843)
-- new Variable (line 901)
-- new Variable (line 908)
-- new Variable (line 917)
-- new RunStackEntry (line 952)
-- 50 class method(s)
+- new Variable (line 848)
+- new HashTable (line 849)
+- new Variable (line 880)
+- new Variable (line 887)
+- new Variable (line 945)
+- new Variable (line 952)
+- new Variable (line 961)
+- new RunStackEntry (line 996)
+- 52 class method(s)
 
 ### `lib/VM/CycleCollector.php`
 
