@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\ext\standard\ob_end_clean;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\VM\ObStackLimits;
 use PHPLLVM\BasicBlock;
@@ -16,15 +17,14 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  *
  * Nested-JIT {@see ObOutputExecCaptureJitHelper} segfaults under
  * {@see \PHPCompiler\JIT\UserScriptAotDeferNestedJit}; this path keeps exec
- * stdout capture + ob_get_clean() on fixed char buffers instead.
+ * stdout capture + ob read/discard API on fixed char buffers (#4914).
  * php-src: ext/standard/output.c
  */
 final class ObOutputExecCaptureLlvm
 {
     public static function ensureLinked(Context $context): void
     {
-        $append = $context->module->getNamedFunction('__phpc_ob_append_bytes');
-        if (null !== $append && $append->countBasicBlocks() > 0) {
+        if (self::isFullyLinked($context)) {
             return;
         }
 
@@ -37,10 +37,55 @@ final class ObOutputExecCaptureLlvm
         self::implementStart($context);
         self::implementAppendBytes($context);
         self::implementGetClean($context);
+        StringTriggerErrorJit::implement($context);
+        self::implementReadApi($context);
         self::restoreInsertBlock($context, $restore);
         if (null === $restore) {
             $context->builder->clearInsertionPosition();
         }
+    }
+
+    /** Lazy link when echo/start already emitted but ob_get_* / ob_end_clean lowered later (#4914). */
+    public static function ensureReadApiLinked(Context $context): void
+    {
+        if (self::isReadApiLinked($context)) {
+            return;
+        }
+
+        $restore = self::captureInsertBlock($context);
+        ObOutputJitBridge::prepareUserScriptEmit($context);
+        self::ensureWriteLibc($context);
+        StringTriggerErrorJit::implement($context);
+        ObStorageGlobals::ensureGlobals($context);
+        self::implementReadApi($context);
+        self::restoreInsertBlock($context, $restore);
+        if (null === $restore) {
+            $context->builder->clearInsertionPosition();
+        }
+    }
+
+    private static function isFullyLinked(Context $context): bool
+    {
+        $append = $context->module->getNamedFunction('__phpc_ob_append_bytes');
+
+        return null !== $append
+            && $append->countBasicBlocks() > 0
+            && self::isReadApiLinked($context);
+    }
+
+    private static function isReadApiLinked(Context $context): bool
+    {
+        $contents = $context->module->getNamedFunction('__phpc_ob_get_contents');
+
+        return null !== $contents && $contents->countBasicBlocks() > 0;
+    }
+
+    private static function implementReadApi(Context $context): void
+    {
+        self::implementGetLevel($context);
+        self::implementGetContents($context);
+        self::implementGetLength($context);
+        self::implementEndClean($context);
     }
 
     private static function implementStart(Context $context): void
@@ -188,6 +233,126 @@ final class ObOutputExecCaptureLlvm
         });
     }
 
+    private static function implementGetLevel(Context $context): void
+    {
+        self::implementIfMissing($context, '__phpc_ob_get_level', static function (Context $context, LlvmFunction $fn): void {
+            $entry = $fn->appendBasicBlock('oec_llvm_get_level_entry');
+            $context->builder->positionAtEnd($entry);
+            $i32 = $context->getTypeFromString('int32');
+            $level = $context->builder->load(self::levelPtr($context));
+            $context->builder->returnValue($level);
+        });
+    }
+
+    private static function implementGetContents(Context $context): void
+    {
+        self::implementIfMissing($context, '__phpc_ob_get_contents', static function (Context $context, LlvmFunction $fn): void {
+            $entry = $fn->appendBasicBlock('oec_llvm_get_contents_entry');
+            $fail = $fn->appendBasicBlock('oec_llvm_get_contents_fail');
+            $okBb = $fn->appendBasicBlock('oec_llvm_get_contents_ok');
+            $context->builder->positionAtEnd($entry);
+            $out = $fn->getParam(0);
+            $i32 = $context->getTypeFromString('int32');
+            $i64 = $context->getTypeFromString('int64');
+            $level = $context->builder->load(self::levelPtr($context));
+            $context->builder->branchIf(
+                $context->builder->icmp(Builder::INT_EQ, $level, $i32->constInt(0, false)),
+                $fail,
+                $okBb
+            );
+            $context->builder->positionAtEnd($fail);
+            $context->builder->call($context->lookupFunction('__value__writeBool'), $out, $i32->constInt(0, false));
+            $context->builder->returnValue($i32->constInt(0, false));
+            $context->builder->positionAtEnd($okBb);
+            $idx = $context->builder->sub($level, $i32->constInt(1, false));
+            $len = $context->builder->load(self::lenElemPtr($context, $idx));
+            $str = $context->builder->call(
+                $context->lookupFunction('__string__init'),
+                $len,
+                self::storageRowPtr($context, $idx)
+            );
+            $context->builder->call($context->lookupFunction('__value__writeString'), $out, $str);
+            $context->builder->returnValue($i32->constInt(1, false));
+        });
+    }
+
+    private static function implementGetLength(Context $context): void
+    {
+        self::implementIfMissing($context, '__phpc_ob_get_length', static function (Context $context, LlvmFunction $fn): void {
+            $entry = $fn->appendBasicBlock('oec_llvm_get_length_entry');
+            $fail = $fn->appendBasicBlock('oec_llvm_get_length_fail');
+            $okBb = $fn->appendBasicBlock('oec_llvm_get_length_ok');
+            $context->builder->positionAtEnd($entry);
+            $out = $fn->getParam(0);
+            $i32 = $context->getTypeFromString('int32');
+            $level = $context->builder->load(self::levelPtr($context));
+            $context->builder->branchIf(
+                $context->builder->icmp(Builder::INT_EQ, $level, $i32->constInt(0, false)),
+                $fail,
+                $okBb
+            );
+            $context->builder->positionAtEnd($fail);
+            $context->builder->call($context->lookupFunction('__value__writeBool'), $out, $i32->constInt(0, false));
+            $context->builder->returnValue($i32->constInt(0, false));
+            $context->builder->positionAtEnd($okBb);
+            $idx = $context->builder->sub($level, $i32->constInt(1, false));
+            $len = $context->builder->load(self::lenElemPtr($context, $idx));
+            $context->builder->call($context->lookupFunction('__value__writeLong'), $out, $len);
+            $context->builder->returnValue($i32->constInt(1, false));
+        });
+    }
+
+    private static function implementEndClean(Context $context): void
+    {
+        self::implementIfMissing($context, '__phpc_ob_end_clean', static function (Context $context, LlvmFunction $fn): void {
+            $entry = $fn->appendBasicBlock('oec_llvm_end_clean_entry');
+            $fail = $fn->appendBasicBlock('oec_llvm_end_clean_fail');
+            $okBb = $fn->appendBasicBlock('oec_llvm_end_clean_ok');
+            $context->builder->positionAtEnd($entry);
+            $out = $fn->getParam(0);
+            $i32 = $context->getTypeFromString('int32');
+            $i64 = $context->getTypeFromString('int64');
+            $i8 = $context->getTypeFromString('int8');
+            $levelPtr = self::levelPtr($context);
+            $level = $context->builder->load($levelPtr);
+            $context->builder->branchIf(
+                $context->builder->icmp(Builder::INT_EQ, $level, $i32->constInt(0, false)),
+                $fail,
+                $okBb
+            );
+            $context->builder->positionAtEnd($fail);
+            self::emitObNoBufferNotice($context, ob_end_clean::NO_BUFFER_NOTICE);
+            $context->builder->call($context->lookupFunction('__value__writeBool'), $out, $i32->constInt(0, false));
+            $context->builder->returnValue($i32->constInt(0, false));
+            $context->builder->positionAtEnd($okBb);
+            $idx = $context->builder->sub($level, $i32->constInt(1, false));
+            $row = self::storageRowPtr($context, $idx);
+            $context->builder->store($context->builder->sub($level, $i32->constInt(1, false)), $levelPtr);
+            $context->builder->store($i64->constInt(0, false), self::lenElemPtr($context, $idx));
+            $context->builder->store($i8->constInt(0, false), $row);
+            $context->builder->call($context->lookupFunction('__value__writeBool'), $out, $i32->constInt(1, false));
+            $context->builder->returnValue($i32->constInt(1, false));
+        });
+    }
+
+    private static function emitObNoBufferNotice(Context $context, string $message): void
+    {
+        $i8p = $context->getTypeFromString('int8*');
+        $i32 = $context->getTypeFromString('int32');
+        $sizeT = $context->getTypeFromString('size_t');
+        $msgPtr = $context->builder->pointerCast($context->constantFromString($message), $i8p);
+        $msgLen = $context->builder->call($context->lookupFunction('strlen'), $msgPtr);
+        $emptyFile = $context->builder->pointerCast($context->constantFromString(''), $i8p);
+        $context->builder->call(
+            $context->lookupFunction('__compiler_trigger_error'),
+            $msgPtr,
+            $context->builder->sext($msgLen, $sizeT),
+            $i32->constInt(8, false),
+            $emptyFile,
+            $i32->constInt(0, false)
+        );
+    }
+
     private static function levelPtr(Context $context): Value
     {
         $i32 = $context->getTypeFromString('int32');
@@ -242,15 +407,20 @@ final class ObOutputExecCaptureLlvm
         $i64 = $context->getTypeFromString('int64');
         $i8p = $context->getTypeFromString('int8*');
         $sizeT = $context->getTypeFromString('size_t');
-        foreach (['write', 'memcpy'] as $name) {
+        foreach (
+            [
+                'write' => [$i64, false, [$i32, $i8p, $sizeT]],
+                'memcpy' => [$i8p, false, [$i8p, $i8p, $sizeT]],
+                'strlen' => [$sizeT, false, [$i8p]],
+            ] as $name => $spec
+        ) {
+            [$ret, $vararg, $params] = $spec;
             try {
                 $context->lookupFunction($name);
             } catch (\Throwable) {
-                $ret = 'write' === $name ? $i64 : $i8p;
-                $params = 'write' === $name ? [$i32, $i8p, $sizeT] : [$i8p, $i8p, $sizeT];
                 $fn = $context->module->addFunction(
                     $name,
-                    $context->context->functionType($ret, false, ...$params)
+                    $context->context->functionType($ret, $vararg, ...$params)
                 );
                 $context->registerFunction($name, $fn);
             }
