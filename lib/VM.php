@@ -5332,12 +5332,38 @@ restart:
 
                         return self::EXCEPTION;
                     }
+                    if (Variable::TYPE_INTEGER === $callee->type
+                        || Variable::TYPE_FLOAT === $callee->type
+                        || Variable::TYPE_BOOLEAN === $callee->type) {
+                        $catchFrame = $this->dispatchVmError(
+                            VM\CallableCheck::scalarNotCallableMessage($callee),
+                            $frame
+                        );
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
+
+                        return self::EXCEPTION;
+                    }
                     if (Variable::TYPE_OBJECT === $callee->type) {
                         $closureState = $callee->toObject()->closureState;
                         if (null !== $closureState) {
                             $this->initClosureCall($frame, $closureState);
                             $frame->closureCallableSlot = $op->arg1;
                             break;
+                        }
+                        if (!$this->hasInstanceMethod($callee->toObject()->class, '__invoke')) {
+                            $catchFrame = $this->dispatchVmError(
+                                VM\CallableCheck::objectNotCallableMessage($callee),
+                                $frame
+                            );
+                            if (null !== $catchFrame) {
+                                $frame = $catchFrame;
+                                goto restart;
+                            }
+
+                            return self::EXCEPTION;
                         }
                         $catchFrame = $this->initMethodCall($frame, $callee, '__invoke');
                         if (null !== $catchFrame) {
@@ -5348,6 +5374,18 @@ restart:
                     }
                     if (Variable::TYPE_ENUM_CASE === $callee->type) {
                         $receiver = VM\EnumCaseSupport::receiverForInstanceMethod($callee);
+                        if (!$this->hasInstanceMethod($receiver->toObject()->class, '__invoke')) {
+                            $catchFrame = $this->dispatchVmError(
+                                VM\CallableCheck::objectNotCallableMessage($callee),
+                                $frame
+                            );
+                            if (null !== $catchFrame) {
+                                $frame = $catchFrame;
+                                goto restart;
+                            }
+
+                            return self::EXCEPTION;
+                        }
                         $catchFrame = $this->initMethodCall($frame, $receiver, '__invoke');
                         if (null !== $catchFrame) {
                             $frame = $catchFrame;
@@ -5356,7 +5394,11 @@ restart:
                         break;
                     }
                     if (Variable::TYPE_ARRAY === $callee->type) {
-                        $this->initArrayCallable($frame, $callee);
+                        $catchFrame = $this->initArrayCallable($frame, $callee);
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
                         break;
                     }
                     $name = $callee->toString();
@@ -14615,7 +14657,7 @@ restart:
         throw new \LogicException("Call to undefined static method {$lcClass}::{$methodLc}()");
     }
 
-    protected function initArrayCallable(Frame $frame, Variable $callable): void
+    protected function initArrayCallable(Frame $frame, Variable $callable): ?Frame
     {
         $table = $callable->toArray();
         $idx0 = new Variable(Variable::TYPE_INTEGER);
@@ -14623,7 +14665,10 @@ restart:
         $idx1 = new Variable(Variable::TYPE_INTEGER);
         $idx1->int(1);
         if (!$table->keyExists($idx0) || !$table->keyExists($idx1)) {
-            throw new \LogicException('Invalid array callable');
+            return $this->dispatchVmError(
+                VM\CallableCheck::arrayCallbackTwoElementsMessage(),
+                $frame
+            );
         }
         $receiver = $table->findVariable($idx0, false)->resolveIndirect();
         $methodName = $table->findVariable($idx1, false)->resolveIndirect()->toString();
@@ -14634,7 +14679,7 @@ restart:
             }
             $this->initStaticCallable($frame, $class.'::'.$methodName);
 
-            return;
+            return null;
         }
         if (Variable::TYPE_OBJECT !== $receiver->type
             && Variable::TYPE_ENUM_CASE !== $receiver->type) {
@@ -14643,7 +14688,8 @@ restart:
         if (Variable::TYPE_ENUM_CASE === $receiver->type) {
             $receiver = VM\EnumCaseSupport::receiverForInstanceMethod($receiver);
         }
-        $this->initMethodCall($frame, $receiver, $methodName);
+
+        return $this->initMethodCall($frame, $receiver, $methodName);
     }
 
     protected function defineClass(ClassEntry $entry, Block $block, ?Frame $warningFrame = null): void {
