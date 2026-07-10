@@ -16298,6 +16298,10 @@ class Compiler {
                     if ($child instanceof Op\Expr\ConstFetch || $child instanceof Op\Expr\ClassConstFetch) {
                         continue;
                     }
+                    // bind(inline closure, new C(), Scope::class) — newThis is between scope prelude and call (#17633).
+                    if ($child instanceof Op\Expr\New_) {
+                        continue;
+                    }
                     if ($child instanceof Op\Expr\Closure || $child instanceof Op\Expr\ArrowFunction) {
                         $producer = $child;
                     }
