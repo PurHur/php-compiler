@@ -65,6 +65,9 @@ final class BuiltinIntrospectionPolicy
         if (\in_array($lc, ['mb_trim', 'mb_ltrim', 'mb_rtrim'], true)) {
             return CompilerVersion::advertisesMbTrimFunctions();
         }
+        if (\in_array($lc, ['mb_ucfirst', 'mb_lcfirst'], true)) {
+            return CompilerVersion::advertisesMbUcfirstLcfirst();
+        }
         if (\in_array($lc, ['str_increment', 'str_decrement'], true)) {
             return CompilerVersion::advertisesStrIncrement();
         }
