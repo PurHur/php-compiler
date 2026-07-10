@@ -51,13 +51,15 @@ final class ReflectionParameterGetType extends VmClassMethod
                 return null;
             }
             $index = ReflectionSupport::paramPositionFromReflection($receiver);
+            $slot = ReflectionSupport::parameterScopeSlot($func->block, $index);
 
-            return $func->block->paramDeclaredTypes[$index] ?? null;
+            return null !== $slot ? ($func->block->paramDeclaredTypes[$slot] ?? null) : null;
         }
 
         $func = ReflectionSupport::resolveFunctionForReflectionParameter($ctx, $receiver);
         $index = ReflectionSupport::paramIndexFromReflection($receiver);
+        $slot = ReflectionSupport::parameterScopeSlot($func->block, $index);
 
-        return $func->block->paramDeclaredTypes[$index] ?? null;
+        return null !== $slot ? ($func->block->paramDeclaredTypes[$slot] ?? null) : null;
     }
 }

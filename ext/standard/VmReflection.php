@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\Block;
 use PHPCompiler\CompilerVersion;
 use PHPCompiler\Frame;
 use PHPCompiler\Func;
@@ -1677,6 +1678,26 @@ final class VmReflection
     public static function copyPropertyDefaultValue(Variable $dest, ClassProperty $prop, Context $ctx): bool
     {
         $value = $ctx->runtime->vm()->evaluatePropertyDefaultForReflection($prop);
+        if (null === $value) {
+            return false;
+        }
+        $dest->copyFrom($value);
+
+        return true;
+    }
+
+    public static function parameterDefaultValueIsAvailable(Block $block, int $paramIndex): bool
+    {
+        return ReflectionSupport::parameterDefaultValueIsAvailable($block, $paramIndex);
+    }
+
+    public static function copyParameterDefaultValue(
+        Variable $dest,
+        Block $block,
+        int $paramIndex,
+        Context $ctx,
+    ): bool {
+        $value = $ctx->runtime->vm()->evaluateParameterDefaultForReflection($block, $paramIndex);
         if (null === $value) {
             return false;
         }
