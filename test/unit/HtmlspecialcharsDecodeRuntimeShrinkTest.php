@@ -14,6 +14,8 @@ final class HtmlspecialcharsDecodeRuntimeShrinkTest extends TestCase
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringHtmlspecialcharsDecode.php');
         $this->assertStringContainsString('HtmlspecialcharsDecodeJitHelper', $source);
+        $this->assertStringContainsString('UserScriptAotDeferNestedJit', $source);
+        $this->assertStringContainsString('StringHtmlspecialcharsDecodeLlvm', $source);
         $this->assertStringNotContainsString('countLoop', $source);
         $this->assertStringNotContainsString('writeLoop', $source);
         $this->assertStringNotContainsString('quoteBothFlag', $source);
@@ -42,5 +44,12 @@ final class HtmlspecialcharsDecodeRuntimeShrinkTest extends TestCase
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/JitHtmlspecialcharsDecode.php');
         $this->assertStringContainsString('StringHtmlspecialcharsDecode::ensureLinked', $source);
+    }
+
+    public function testContextMinimalUserStandaloneBodiesRegistersDecodeBridge(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Context.php');
+        $this->assertStringContainsString('StringHtmlspecialchars::ensureStandaloneBodies', $source);
+        $this->assertStringContainsString('StringHtmlspecialcharsDecode::ensureStandaloneBodies', $source);
     }
 }
