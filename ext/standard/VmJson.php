@@ -361,6 +361,11 @@ final class VmJson
                         );
                     }
                     $serialized = $vm->invokeInstanceMethod($object, 'jsonSerialize')->resolveIndirect();
+                    if (Variable::TYPE_OBJECT === $serialized->type
+                        && $serialized->toObject() === $object) {
+                        // Zend ext/json/php_json_encoder.c — self-return encodes as {} (#17706).
+                        return new \stdClass();
+                    }
 
                     return self::exportValue(
                         $serialized,
@@ -492,6 +497,10 @@ final class VmJson
                 );
             }
             $serialized = $vm->invokeInstanceMethod($object, 'jsonSerialize')->resolveIndirect();
+            if (Variable::TYPE_OBJECT === $serialized->type
+                && $serialized->toObject() === $object) {
+                return new \stdClass();
+            }
 
             return self::exportValue(
                 $serialized,

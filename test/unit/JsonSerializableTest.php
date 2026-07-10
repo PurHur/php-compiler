@@ -42,6 +42,37 @@ PHP;
         self::assertSame(['id' => 1], $exported);
     }
 
+    public function testJsonSerializeSelfReturnEncodesAsEmptyObject(): void
+    {
+        $source = <<<'PHP'
+<?php
+class SelfSerializable implements JsonSerializable {
+    public function jsonSerialize(): mixed {
+        return $this;
+    }
+}
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($source, 'self_serializable.php');
+        self::assertNotNull($block);
+        $runtime->run($block);
+
+        $ctx = $runtime->vmContext;
+        $vm = $runtime->vm;
+        self::assertNotNull($vm);
+
+        $class = $ctx->classes['selfserializable'];
+        $object = new ObjectEntry($class);
+        $object->constructed = true;
+
+        $var = new Variable();
+        $var->object($object);
+
+        $exported = VmJson::export($var, $ctx, $vm);
+        self::assertInstanceOf(\stdClass::class, $exported);
+        self::assertSame([], get_object_vars($exported));
+    }
+
     public function testNonJsonSerializableObjectEncodesAsEmptyObject(): void
     {
         $source = <<<'PHP'
