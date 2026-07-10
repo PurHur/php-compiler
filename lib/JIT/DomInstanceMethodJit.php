@@ -87,7 +87,8 @@ final class DomInstanceMethodJit
         if ($object->hasProperty($classId, 'nodeName')) {
             return;
         }
-        $object->defineProperty($classId, 'nodeName', Variable::TYPE_VALUE);
+        $object->defineProperty($classId, 'nodeName', Variable::TYPE_STRING);
+        $object->defineProperty($classId, 'tagName', Variable::TYPE_STRING);
         $object->defineProperty($classId, 'attributes', Variable::TYPE_VALUE);
     }
 }

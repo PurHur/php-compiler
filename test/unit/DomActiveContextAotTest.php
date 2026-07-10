@@ -62,5 +62,6 @@ final class DomActiveContextAotTest extends TestCase
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/DomInstanceMethodJit.php');
         $this->assertStringContainsString('ensureDomElementPropertyLayout', $source);
         $this->assertStringContainsString('nodeName', $source);
+        $this->assertStringContainsString('tagName', $source);
     }
 }
