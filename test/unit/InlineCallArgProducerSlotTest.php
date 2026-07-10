@@ -1627,6 +1627,39 @@ PHP;
         self::assertStringContainsString('truetrue', str_replace("\n", '', $out));
     }
 
+    /** Issue #17757 — false !== ini_get('bogus') must wire false into NOT_IDENTICAL LHS (#17697). */
+    public function testJumpIfNotIdenticalFalseBuiltinCallEmitsConstFetchForFalse(): void
+    {
+        $code = <<<'PHP'
+<?php
+if (false !== ini_get('bogus_xyz')) {
+    echo "bad\n";
+} else {
+    echo "ok\n";
+}
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'ini_get_not_identical_false.php');
+
+        $notIdenticalLeft = null;
+        $notIdenticalRight = null;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_NOT_IDENTICAL === $op->type) {
+                $notIdenticalLeft = $op->arg2;
+                $notIdenticalRight = $op->arg3;
+            }
+        }
+
+        self::assertNotNull($notIdenticalLeft, 'NOT_IDENTICAL must be lowered');
+        self::assertNotNull($notIdenticalRight, 'NOT_IDENTICAL must compare builtin return');
+        self::assertNotSame($notIdenticalLeft, $notIdenticalRight, 'false and ini_get() must use distinct slots');
+
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertSame("ok\n", $out);
+    }
+
     /** Issue #17259 — static call with two hoisted !== preludes wires distinct comparison slots. */
     public function testStaticCallDualComparisonPreludeArgsUseDistinctSlots(): void
     {

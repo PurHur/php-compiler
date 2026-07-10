@@ -36044,14 +36044,27 @@ class Compiler {
         ) {
             return false;
         }
-
         // Sibling comparison operands (false !== ini_get(...)) are not call args — compile eagerly (#17756, #17757).
         if ($this->hoistedConstFetchFeedsSiblingComparisonAfterCall($fetch, $consumer, $ops, $fetchIndex)) {
             return false;
         }
-
+        if (!isset($fetch->result)) {
+            return false;
+        }
+        if (!property_exists($consumer, 'args') || !\is_array($consumer->args)) {
+            return false;
+        }
         // php-cfg hoists call-arg ConstFetch as the stmt immediately before the consumer (#17697).
-        return true;
+        foreach ($consumer->args as $arg) {
+            if (null === $arg) {
+                continue;
+            }
+            if ($arg === $fetch->result || $this->operandsReferToSameVariable($arg, $fetch->result)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
