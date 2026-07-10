@@ -510,6 +510,11 @@ class VMTest extends BaseTest {
                 && !str_contains($name, 'bcmath_phantom')) {
                 continue;
             }
+            if (!CompilerVersion::supportsGetHandlerIntrospection()
+                && (str_contains($name, 'get_error_handler')
+                    || str_contains($name, 'get_exception_handler'))) {
+                continue;
+            }
             if (!CompilerVersion::supportsStreamSupports()
                 && (('stdlib/stream_supports' === $name)
                     || str_contains($name, 'stream_support_constants')
