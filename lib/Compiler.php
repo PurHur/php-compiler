@@ -28988,7 +28988,7 @@ class Compiler {
     }
 
     /**
-     * date_sunrise(time(), SUNFUNCS_RET_*, …) — hoisted FuncCall + SUNFUNCS ConstFetch (#13749, #11070).
+     * date_sunrise(time(), SUNFUNCS_RET_*, …) / date_sun_info(strtotime(...), lat, -lon) — hoisted FuncCall + prelude slots (#13749, #11070, #11336).
      */
     private function wireDateSunFuncHoistedCallArgSlot(Block $block, Op $cfgCallOp, int $argIndex): ?string
     {
@@ -28996,7 +28996,8 @@ class Compiler {
             return null;
         }
         $callee = strtolower($this->resolveCfgFuncCallName($cfgCallOp) ?? '');
-        if (!\in_array($callee, ['date_sunrise', 'date_sunset'], true)) {
+        $isDateSunInfo = 'date_sun_info' === $callee;
+        if (!\in_array($callee, ['date_sunrise', 'date_sunset', 'date_sun_info'], true)) {
             return null;
         }
         if (0 === $argIndex) {
@@ -29079,7 +29080,8 @@ class Compiler {
 
             return null;
         }
-        if (3 === $argIndex) {
+        $longitudeArgIndex = $isDateSunInfo ? 2 : 3;
+        if ($longitudeArgIndex === $argIndex) {
             foreach ($this->hoistedPreludeProducersImmediatelyBeforeCall($cfgCallOp, $block) as $prelude) {
                 if (!$prelude instanceof Op\Expr\UnaryMinus && !$prelude instanceof Op\Expr\UnaryPlus) {
                     continue;
@@ -29098,7 +29100,7 @@ class Compiler {
 
             return null;
         }
-        if (1 !== $argIndex) {
+        if ($isDateSunInfo || 1 !== $argIndex) {
             return null;
         }
         foreach ($this->hoistedPreludeProducersImmediatelyBeforeCall($cfgCallOp, $block) as $prelude) {
@@ -29835,7 +29837,7 @@ class Compiler {
     }
 
     /**
-     * date_sunrise(time(), SUNFUNCS_RET_*, …) — bypass sibling producer scan (#13749, #16012).
+     * date_sunrise(time(), SUNFUNCS_RET_*, …) / date_sun_info(strtotime(...), lat, -lon) — bypass sibling producer scan (#13749, #16012, #11336).
      *
      * @return list<OpCode>|null
      */
@@ -29848,7 +29850,8 @@ class Compiler {
             return null;
         }
         $callee = strtolower($this->resolveCfgFuncCallName($cfgCallOp) ?? '');
-        if (!\in_array($callee, ['date_sunrise', 'date_sunset'], true)) {
+        $isDateSunInfo = 'date_sun_info' === $callee;
+        if (!\in_array($callee, ['date_sunrise', 'date_sunset', 'date_sun_info'], true)) {
             return null;
         }
         $producerOps = [];
@@ -29910,14 +29913,15 @@ class Compiler {
                 }
             }
         }
+        $longitudeArgIndex = $isDateSunInfo ? 2 : 3;
         $sends = [];
         foreach ($args as $argIndex => $arg) {
             $valueSlot = null;
             if (0 === (int) $argIndex && null !== $timeArgSlot) {
                 $valueSlot = $timeArgSlot;
-            } elseif (1 === (int) $argIndex && null !== $sunfuncsArgSlot) {
+            } elseif (!$isDateSunInfo && 1 === (int) $argIndex && null !== $sunfuncsArgSlot) {
                 $valueSlot = $sunfuncsArgSlot;
-            } elseif (3 === (int) $argIndex && null !== $longitudeSlot) {
+            } elseif ($longitudeArgIndex === (int) $argIndex && null !== $longitudeSlot) {
                 $valueSlot = $longitudeSlot;
             }
             $literalProbe = ($cfgCallOp->args[(int) $argIndex] ?? null) ?? $arg;
