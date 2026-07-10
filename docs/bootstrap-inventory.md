@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 4351 |
-| Phase A inventory files (M2 ratio SSOT) | 4351 |
+| PHP files on vm.php path | 4349 |
+| Phase A inventory files (M2 ratio SSOT) | 4349 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 11723 |
+| Source constructs flagged (warnings) | 11721 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -3416,7 +3416,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringVfscanf.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringVsprintf.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringWordwrap.php` | 0 | 1 |
-| `lib/JIT/Builtin/StringWordwrapLlvm.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringZlib.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringZstd.php` | 0 | 2 |
 | `lib/JIT/Builtin/StripWhitespace.php` | 0 | 2 |
@@ -3460,7 +3459,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/WeakRefRegistryRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/WeakRefRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/WeakRefSetup.php` | 0 | 1 |
-| `lib/JIT/Builtin/WordwrapLlvmEmit.php` | 0 | 1 |
 | `lib/JIT/Builtin/ZlibRuntime.php` | 0 | 3 |
 | `lib/JIT/Call.php` | 0 | 1 |
 | `lib/JIT/Call/ClosureBind.php` | 0 | 1 |
@@ -26721,12 +26719,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringWordwrap.php`
 
 **Warnings** (review for bootstrap subset):
-- 5 class method(s)
-
-### `lib/JIT/Builtin/StringWordwrapLlvm.php`
-
-**Warnings** (review for bootstrap subset):
-- 3 class method(s)
+- 4 class method(s)
 
 ### `lib/JIT/Builtin/StringZlib.php`
 
@@ -27019,11 +27012,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 4 class method(s)
-
-### `lib/JIT/Builtin/WordwrapLlvmEmit.php`
-
-**Warnings** (review for bootstrap subset):
-- 9 class method(s)
 
 ### `lib/JIT/Builtin/ZlibRuntime.php`
 

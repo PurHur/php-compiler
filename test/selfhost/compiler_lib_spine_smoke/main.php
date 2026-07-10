@@ -3451,8 +3451,6 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/StringVersionCompareJit.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringVfscanf.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringVsprintf.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringWordwrap.php';
-require_once __DIR__.'/../../../lib/JIT/Builtin/StringWordwrapLlvm.php';
-require_once __DIR__.'/../../../lib/JIT/Builtin/WordwrapLlvmEmit.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringZlib.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringZstd.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StripWhitespace.php';
