@@ -11,5 +11,5 @@ try {
 }
 echo quotemeta('a.b'), "\n";
 --EXPECT--
-quotemeta(): Argument #1 ($str) must be of type string, E given
+quotemeta(): Argument #1 ($string) must be of type string, E given
 a\.b

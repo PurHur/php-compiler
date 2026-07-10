@@ -24,7 +24,7 @@ final class quotemeta extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('quotemeta() requires exactly one argument in this compiler build');
         }
-        $str = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'quotemeta', 0, 'str');
+        $str = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'quotemeta', 0, 'string');
         if (null === $frame->returnVar) {
             return;
         }
@@ -41,7 +41,7 @@ final class quotemeta extends Internal
 
         return $context->builder->call(
             $context->lookupFunction('__string__quotemeta'),
-            JitStringBuiltinArg::lower($context, $args[0], 'quotemeta', 0, 'str')
+            JitStringBuiltinArg::lower($context, $args[0], 'quotemeta', 0, 'string')
         );
     }
 }
