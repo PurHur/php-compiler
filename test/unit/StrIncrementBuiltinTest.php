@@ -60,7 +60,7 @@ final class StrIncrementBuiltinTest extends TestCase
 
     public function testIncrementEmptyThrows(): void
     {
-        $this->expectException(\Error::class);
+        $this->expectException(\ValueError::class);
         $this->runIncrement('');
     }
 
@@ -91,7 +91,7 @@ final class StrIncrementBuiltinTest extends TestCase
 
     public function testDecrementEmptyThrows(): void
     {
-        $this->expectException(\Error::class);
+        $this->expectException(\ValueError::class);
         $this->expectExceptionMessage('str_decrement(): Argument #1 ($string) must not be empty');
         $this->runDecrement('');
     }
