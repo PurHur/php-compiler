@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace PHPCompiler\VM;
 
 use PHPCompiler\Block;
+use PHPCompiler\BuiltinByRefParams;
+use PHPCompiler\BuiltinInternalArgInfo;
+use PHPCompiler\BuiltinParamNames;
 use PHPCompiler\Compiler\AttributeEntry;
 use PHPCompiler\Compiler\AttributeNames;
 use PHPCompiler\Compiler\DeprecatedMetadata;
@@ -1415,6 +1418,192 @@ final class ReflectionSupport
     public static function parameterIsVariadic(\PHPCompiler\Block $block, int $paramIndex): bool
     {
         return null !== $block->variadicParamIndex && $block->variadicParamIndex === $paramIndex;
+    }
+
+    public static function parameterIsOptional(Context $ctx, ObjectEntry $reflection): bool
+    {
+        if (self::parameterIsInternal($ctx, $reflection)) {
+            return self::internalParameterIsOptional($ctx, $reflection);
+        }
+        $block = self::resolveParameterBlock($ctx, $reflection);
+        $index = self::parameterIndexForReflection($reflection);
+
+        return self::parameterIsVariadic($block, $index)
+            || ParamArgumentCountError::parameterHasDefault($block, $index);
+    }
+
+    public static function parameterAllowsNull(Context $ctx, ObjectEntry $reflection): bool
+    {
+        if (self::parameterIsInternal($ctx, $reflection)) {
+            return self::internalParameterAllowsNull($ctx, $reflection);
+        }
+        $block = self::resolveParameterBlock($ctx, $reflection);
+        $index = self::parameterIndexForReflection($reflection);
+        $slot = self::parameterScopeSlot($block, $index);
+        if (null === $slot || !isset($block->paramDeclaredTypes[$slot])) {
+            return true;
+        }
+
+        return ReflectionTypeSupport::allowsNullFromCfg($block->paramDeclaredTypes[$slot]);
+    }
+
+    public static function parameterIsPassedByReference(Context $ctx, ObjectEntry $reflection): bool
+    {
+        if (self::parameterIsInternal($ctx, $reflection)) {
+            return self::internalParameterIsPassedByReference($ctx, $reflection);
+        }
+        $block = self::resolveParameterBlock($ctx, $reflection);
+        $index = self::parameterIndexForReflection($reflection);
+
+        return isset($block->paramByRef[$index]);
+    }
+
+    public static function parameterCanBePassedByValue(Context $ctx, ObjectEntry $reflection): bool
+    {
+        if (self::parameterIsInternal($ctx, $reflection)) {
+            return self::internalParameterCanBePassedByValue($ctx, $reflection);
+        }
+        if (!self::parameterIsPassedByReference($ctx, $reflection)) {
+            return true;
+        }
+        $block = self::resolveParameterBlock($ctx, $reflection);
+        $index = self::parameterIndexForReflection($reflection);
+        $slot = self::parameterScopeSlot($block, $index);
+        if (null === $slot || !isset($block->paramDeclaredTypes[$slot])) {
+            return true;
+        }
+
+        return self::cfgTypeAllowsPassByValueWithByRef($block->paramDeclaredTypes[$slot]);
+    }
+
+    /** php-src: ReflectionParameter::isNamed() — PHP 8.0+ always true for declared parameters. */
+    public static function parameterIsNamed(ObjectEntry $reflection): bool
+    {
+        return '' !== self::paramNameFromReflection($reflection);
+    }
+
+    public static function parameterIsInternal(Context $ctx, ObjectEntry $reflection): bool
+    {
+        $classNameVar = $reflection->getProperty(self::PROP_CLASS_NAME)->resolveIndirect();
+        if (Variable::TYPE_STRING === $classNameVar->type) {
+            $entry = VmReflection::resolveClassEntry($ctx, $classNameVar->toString());
+
+            return null !== $entry && $entry->isInternal;
+        }
+        $funcName = self::functionNameFromReflection($reflection);
+        $func = $ctx->functions[strtolower($funcName)] ?? null;
+
+        return $func instanceof Func\Internal;
+    }
+
+    private static function internalParameterIsOptional(Context $ctx, ObjectEntry $reflection): bool
+    {
+        $info = self::internalParameterInfo($ctx, $reflection);
+        if (null !== $info) {
+            return $info['isOptional'];
+        }
+        $index = self::parameterIndexForReflection($reflection);
+        $funcName = self::internalCallableName($ctx, $reflection);
+        $variadic = BuiltinParamNames::variadicParamIndexForFunction($funcName);
+
+        return null !== $variadic && $variadic === $index;
+    }
+
+    private static function internalParameterAllowsNull(Context $ctx, ObjectEntry $reflection): bool
+    {
+        $info = self::internalParameterInfo($ctx, $reflection);
+        if (null === $info) {
+            return true;
+        }
+
+        return BuiltinInternalArgInfo::typeStringAllowsNull($info['type']);
+    }
+
+    private static function internalParameterIsPassedByReference(Context $ctx, ObjectEntry $reflection): bool
+    {
+        $index = self::parameterIndexForReflection($reflection);
+        $callable = self::internalCallableName($ctx, $reflection);
+        if (str_contains($callable, '::')) {
+            return false;
+        }
+
+        return \in_array($index, BuiltinByRefParams::forFunction($callable), true);
+    }
+
+    private static function internalParameterCanBePassedByValue(Context $ctx, ObjectEntry $reflection): bool
+    {
+        if (!self::internalParameterIsPassedByReference($ctx, $reflection)) {
+            return true;
+        }
+        $info = self::internalParameterInfo($ctx, $reflection);
+        if (null === $info) {
+            return true;
+        }
+
+        return BuiltinInternalArgInfo::typeStringAllowsPassByValueWithByRef($info['type']);
+    }
+
+    /**
+     * @return array{name: string, type: string, isOptional: bool}|null
+     */
+    private static function internalParameterInfo(Context $ctx, ObjectEntry $reflection): ?array
+    {
+        $index = self::parameterIndexForReflection($reflection);
+        $classNameVar = $reflection->getProperty(self::PROP_CLASS_NAME)->resolveIndirect();
+        if (Variable::TYPE_STRING === $classNameVar->type) {
+            return BuiltinInternalArgInfo::paramInfoForClassMethod(
+                $classNameVar->toString(),
+                self::methodNameFromReflection($reflection),
+                $index
+            );
+        }
+
+        return BuiltinInternalArgInfo::paramInfoForFunction(self::functionNameFromReflection($reflection), $index);
+    }
+
+    private static function internalCallableName(Context $ctx, ObjectEntry $reflection): string
+    {
+        $classNameVar = $reflection->getProperty(self::PROP_CLASS_NAME)->resolveIndirect();
+        if (Variable::TYPE_STRING === $classNameVar->type) {
+            return $classNameVar->toString().'::'.self::methodNameFromReflection($reflection);
+        }
+
+        return self::functionNameFromReflection($reflection);
+    }
+
+    private static function cfgTypeAllowsPassByValueWithByRef(CfgType $type): bool
+    {
+        if ($type instanceof CfgType\Nullable) {
+            return self::cfgTypeAllowsPassByValueWithByRef($type->type);
+        }
+        if ($type instanceof CfgType\Union_) {
+            foreach ($type->types as $member) {
+                if ($member instanceof CfgType\Literal && 'null' === strtolower($member->name)) {
+                    continue;
+                }
+                if (self::cfgTypeAllowsPassByValueWithByRef($member)) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+        if ($type instanceof CfgType\Intersection) {
+            foreach ($type->types as $member) {
+                if (!self::cfgTypeAllowsPassByValueWithByRef($member)) {
+                    return false;
+                }
+            }
+
+            return [] !== $type->types;
+        }
+        if ($type instanceof CfgType\Literal) {
+            $name = strtolower($type->name);
+
+            return !\in_array($name, ['int', 'float', 'string', 'bool', 'array', 'callable', 'iterable', 'never', 'true', 'false'], true);
+        }
+
+        return true;
     }
 
     public static function parameterDefaultValueIsAvailable(\PHPCompiler\Block $block, int $paramIndex): bool
