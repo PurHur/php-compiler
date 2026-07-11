@@ -78,6 +78,12 @@ class Context {
     /** Operand for call_user_func_array() $args during FUNCCALL lowering (#10359). */
     public ?Operand $jitCallUserFuncArrayParamsOperand = null;
 
+    /** Operand for mb_encode/decode_numericentity() convmap during FUNCCALL lowering (#7237, #18035). */
+    public ?Operand $jitMbNumericEntityConvmapOperand = null;
+
+    /** CFG block for {@see self::$jitMbNumericEntityConvmapOperand} (#18035). */
+    public ?Block $jitMbNumericEntityConvmapBlock = null;
+
     /**
      * Backing property name for raw writes inside a lowering set-hook method (#4025).
      *
@@ -947,6 +953,7 @@ class Context {
         Builtin\StatPathRuntime::ensureStandaloneBodies($this);
         Builtin\StringFileGetContents::ensureStandaloneBodies($this);
         Builtin\StringHashCrypto::ensureStandaloneBodies($this);
+        Builtin\MbNumericEntity::ensureStandaloneBodies($this);
         Builtin\StringReadfile::ensureStandaloneBodies($this);
         Builtin\StringAddslashes::ensureStandaloneBodies($this);
         Builtin\StringStripslashes::ensureStandaloneBodies($this);
@@ -990,6 +997,7 @@ class Context {
                 Builtin\StringUcwords::ensureStandaloneBodies($this);
                 Builtin\StringMetaphone::ensureStandaloneBodies($this);
                 Builtin\StringWordwrap::ensureStandaloneBodies($this);
+                Builtin\MbNumericEntity::ensureStandaloneBodies($this);
                 Builtin\StringBin2hex::ensureStandaloneBodies($this);
                 Builtin\StringBase64Encode::ensureStandaloneBodies($this);
                 Builtin\StringBase64Decode::ensureStandaloneBodies($this);

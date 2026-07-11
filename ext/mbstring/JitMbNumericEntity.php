@@ -6,10 +6,12 @@ namespace PHPCompiler\ext\mbstring;
 
 use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\Builtin\MbNumericEntity;
+use PHPCompiler\JIT\CallUnpackHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\OpCode;
 use PHPLLVM\Value;
 
 /**
@@ -130,6 +132,56 @@ final class JitMbNumericEntity
     }
 
     /**
+     * @param list<Operand|null> $operands
+     * @param JITVariable[]      $args
+     */
+    public static function tryEncodeCompileTimeFoldFromCallSite(
+        Context $context,
+        \PHPCompiler\Block $block,
+        array $operands,
+        array $args
+    ): ?Value {
+        if (\count($args) < 2 || \count($args) > 4 || !isset($operands[1])) {
+            return null;
+        }
+        $savedOperand = $context->jitMbNumericEntityConvmapOperand;
+        $savedBlock = $context->jitMbNumericEntityConvmapBlock;
+        $context->jitMbNumericEntityConvmapOperand = $operands[1];
+        $context->jitMbNumericEntityConvmapBlock = $block;
+        try {
+            return self::tryEncodeCompileTimeFold($context, $args);
+        } finally {
+            $context->jitMbNumericEntityConvmapOperand = $savedOperand;
+            $context->jitMbNumericEntityConvmapBlock = $savedBlock;
+        }
+    }
+
+    /**
+     * @param list<Operand|null> $operands
+     * @param JITVariable[]      $args
+     */
+    public static function tryDecodeCompileTimeFoldFromCallSite(
+        Context $context,
+        \PHPCompiler\Block $block,
+        array $operands,
+        array $args
+    ): ?Value {
+        if (\count($args) < 2 || \count($args) > 3 || !isset($operands[1])) {
+            return null;
+        }
+        $savedOperand = $context->jitMbNumericEntityConvmapOperand;
+        $savedBlock = $context->jitMbNumericEntityConvmapBlock;
+        $context->jitMbNumericEntityConvmapOperand = $operands[1];
+        $context->jitMbNumericEntityConvmapBlock = $block;
+        try {
+            return self::tryDecodeCompileTimeFold($context, $args);
+        } finally {
+            $context->jitMbNumericEntityConvmapOperand = $savedOperand;
+            $context->jitMbNumericEntityConvmapBlock = $savedBlock;
+        }
+    }
+
+    /**
      * @param JITVariable[] $args
      */
     public static function tryEncodeCompileTimeFold(Context $context, array $args): ?Value
@@ -138,7 +190,7 @@ final class JitMbNumericEntity
             return null;
         }
         $str = JitStringArg::compileTimeLiteral($args[0]);
-        $convmap = self::compileTimeConvMap($context, $args[1]);
+        $convmap = self::compileTimeConvMap($context, $args[1], 'mb_encode_numericentity');
         if (null === $str || null === $convmap) {
             return null;
         }
@@ -155,8 +207,10 @@ final class JitMbNumericEntity
             $isHex = $boolFold;
         }
 
-        return $context->constantFromString(
-            VmMbstring::encodeNumericEntity($str, $convmap, $encoding ?? 'UTF-8', $isHex)
+        return $context->builder->load(
+            $context->constantStringFromString(
+                VmMbstring::encodeNumericEntity($str, $convmap, $encoding ?? 'UTF-8', $isHex)
+            )
         );
     }
 
@@ -169,7 +223,7 @@ final class JitMbNumericEntity
             return null;
         }
         $str = JitStringArg::compileTimeLiteral($args[0]);
-        $convmap = self::compileTimeConvMap($context, $args[1]);
+        $convmap = self::compileTimeConvMap($context, $args[1], 'mb_decode_numericentity');
         if (null === $str || null === $convmap) {
             return null;
         }
@@ -178,16 +232,109 @@ final class JitMbNumericEntity
             return null;
         }
 
-        return $context->constantFromString(
-            VmMbstring::decodeNumericEntity($str, $convmap, $encoding ?? 'UTF-8')
+        return $context->builder->load(
+            $context->constantStringFromString(
+                VmMbstring::decodeNumericEntity($str, $convmap, $encoding ?? 'UTF-8')
+            )
         );
     }
 
     /**
      * @return list<int>|null
      */
-    private static function compileTimeConvMap(Context $context, JITVariable $var): ?array
+    private static function compileTimeConvMapFromContextOperand(Context $context, string $function): ?array
     {
+        $operand = $context->jitMbNumericEntityConvmapOperand;
+        $block = $context->jitMbNumericEntityConvmapBlock ?? $context->jitEnclosingBlock;
+        if (null === $operand || null === $block) {
+            return null;
+        }
+        $slot = $block->slotForOperand($operand);
+        if (null !== $slot) {
+            $fromSlot = self::compileTimeConvMapFromBlockSlot($block, $slot, $function);
+            if (null !== $fromSlot) {
+                return $fromSlot;
+            }
+        }
+        $vmArray = CallUnpackHelper::tryCompileTimeArrayFromOperand($block, $operand);
+        if (null === $vmArray) {
+            return null;
+        }
+        try {
+            return VmMbstring::coerceConvMapArg($vmArray, $function);
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    /**
+     * Append-style `[int, ...]` literals — CallUnpackCompileTime rejects null keys (#18035).
+     *
+     * @return list<int>|null
+     */
+    private static function compileTimeConvMapFromBlockSlot(
+        \PHPCompiler\Block $block,
+        int $slot,
+        string $function
+    ): ?array {
+        $foundInit = false;
+        $elements = [];
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_ARRAY_SPREAD === $op->type && $op->arg1 === $slot) {
+                return null;
+            }
+            if (OpCode::TYPE_INIT_ARRAY === $op->type && $op->arg1 === $slot) {
+                $foundInit = true;
+                if (null !== $op->arg2) {
+                    $value = self::compileTimeIntFromBlockSlot($block, (int) $op->arg2);
+                    if (null === $value) {
+                        return null;
+                    }
+                    $elements[] = $value;
+                }
+                continue;
+            }
+            if (OpCode::TYPE_ADD_ARRAY_ELEMENT === $op->type && $op->arg1 === $slot) {
+                $value = self::compileTimeIntFromBlockSlot($block, (int) $op->arg2);
+                if (null === $value) {
+                    return null;
+                }
+                $elements[] = $value;
+            }
+        }
+        if (!$foundInit || [] === $elements) {
+            return null;
+        }
+        try {
+            return VmMbstring::validateConvMapElements($elements, $function);
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    private static function compileTimeIntFromBlockSlot(\PHPCompiler\Block $block, int $valueSlot): ?int
+    {
+        if (!isset($block->constants[$valueSlot])) {
+            return null;
+        }
+        $const = $block->constants[$valueSlot];
+        if (\PHPCompiler\VM\Variable::TYPE_INTEGER !== $const->type) {
+            return null;
+        }
+
+        return $const->toInt();
+    }
+
+    /**
+     * @return list<int>|null
+     */
+    private static function compileTimeConvMap(Context $context, JITVariable $var, string $function): ?array
+    {
+        $fromOperand = self::compileTimeConvMapFromContextOperand($context, $function);
+        if (null !== $fromOperand) {
+            return $fromOperand;
+        }
+
         if (0 !== ($var->type & JITVariable::IS_NATIVE_ARRAY)) {
             $elemType = $var->type & ~JITVariable::IS_NATIVE_ARRAY;
             if (JITVariable::TYPE_NATIVE_LONG !== $elemType) {
