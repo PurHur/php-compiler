@@ -28,8 +28,18 @@ final class array_slice extends Internal
 {
     public function execute(Frame $frame): void
     {
-        if (!isset($frame->calledArgs[0], $frame->calledArgs[1])) {
-            throw new \LogicException('array_slice() requires at least two arguments in this compiler build');
+        $argc = \count($frame->calledArgs);
+        if ($argc < 2) {
+            throw new \ArgumentCountError(\sprintf(
+                'array_slice() expects at least 2 arguments, %d given',
+                $argc
+            ));
+        }
+        if ($argc > 4) {
+            throw new \ArgumentCountError(\sprintf(
+                'array_slice() expects at most 4 arguments, %d given',
+                $argc
+            ));
         }
         if (null === $frame->returnVar) {
             return;
@@ -58,8 +68,17 @@ final class array_slice extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         $argc = \count($args);
-        if ($argc < 2 || $argc > 4) {
-            throw new \LogicException('array_slice() requires two to four arguments in this compiler build');
+        if ($argc < 2) {
+            throw new \ArgumentCountError(\sprintf(
+                'array_slice() expects at least 2 arguments, %d given',
+                $argc
+            ));
+        }
+        if ($argc > 4) {
+            throw new \ArgumentCountError(\sprintf(
+                'array_slice() expects at most 4 arguments, %d given',
+                $argc
+            ));
         }
         JitArrayElem::requireArrayArg($context, $args[0], 'array_slice');
         $hasExplicitLength = false;
