@@ -187,6 +187,9 @@ class ObjectEntry {
         if (\PHPCompiler\ext\dom\DomHtmlDocumentPropertySupport::isManagedProperty($this, $name)) {
             return true;
         }
+        if (\PHPCompiler\ext\xmlreader\XmlReaderPropertySupport::isManagedProperty($this, $name)) {
+            return true;
+        }
 
         return isset($this->properties[$name]);
     }
@@ -216,6 +219,9 @@ class ObjectEntry {
         }
         if (\PHPCompiler\ext\dom\DomHtmlDocumentPropertySupport::isManagedProperty($this, $name)) {
             return \PHPCompiler\ext\dom\DomHtmlDocumentPropertySupport::getProperty($this, $name);
+        }
+        if (\PHPCompiler\ext\xmlreader\XmlReaderPropertySupport::isManagedProperty($this, $name)) {
+            return \PHPCompiler\ext\xmlreader\XmlReaderPropertySupport::getProperty($this, $name);
         }
         if (!isset($this->properties[$name])) {
             throw new \LogicException('Undefined property access');
