@@ -39,7 +39,6 @@ final class ArraySliceRuntime
         ?Value $preserveKeys = null
     ): Value {
         self::ensureLinked($context);
-        $ht = self::argToHashtable($context, $array);
         $i1 = $context->getTypeFromString('int1');
         $flag = null === $preserveKeys
             ? $i1->constInt(0, false)
@@ -47,7 +46,7 @@ final class ArraySliceRuntime
 
         return $context->builder->call(
             $context->lookupFunction(self::ABI_SLICE),
-            $ht,
+            self::argToHashtable($context, $array),
             $offset,
             $hasLength,
             $length,
