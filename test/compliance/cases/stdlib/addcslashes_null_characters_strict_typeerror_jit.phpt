@@ -1,7 +1,8 @@
 --TEST--
-stdlib addcslashes() null $characters JIT — TypeError not silent coerce (#16159, ext/standard/string.c)
+stdlib addcslashes() null $characters under strict_types JIT — TypeError (#17829, ext/standard/string.c)
 --FILE--
 <?php
+declare(strict_types=1);
 $ok = false;
 try {
     addcslashes('abc', null);
