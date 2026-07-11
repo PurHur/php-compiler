@@ -6,10 +6,10 @@ namespace PHPCompiler\Test\Unit;
 
 use PHPUnit\Framework\TestCase;
 
-/** HashTableHelper v1/v2/v3/v4/v5 slices route DefineRuntime + splits read/write LLVM (#10031, #17809). */
+/** HashTableHelper v1–v6 slices route DefineRuntime + splits read/write/spread LLVM (#10031, #17809, #17824). */
 final class HashTableHelperShrinkTest extends TestCase
 {
-    private const HELPER_MAX_LINES = 1350;
+    private const HELPER_MAX_LINES = 980;
 
     public function testHashTableHelperDelegatesWriteLlvm(): void
     {
@@ -107,8 +107,27 @@ final class HashTableHelperShrinkTest extends TestCase
         $this->assertLessThanOrEqual(
             self::HELPER_MAX_LINES,
             $lines,
-            'HashTableHelper.php should shrink as LLVM moves to Read/WriteLlvm (#10031 v4, #17809 v5)'
+            'HashTableHelper.php should shrink as LLVM moves to Read/WriteLlvm (#10031 v4, #17809 v5, #17824 v6)'
         );
+    }
+
+    public function testHashTableHelperDelegatesSpreadAndRangeLlvmV6(): void
+    {
+        $helper = (string) file_get_contents(__DIR__.'/../../lib/JIT/HashTableHelper.php');
+        $this->assertStringContainsString('HashTableWriteLlvm::spreadAddElement', $helper);
+        $this->assertStringContainsString('HashTableWriteLlvm::spreadInto', $helper);
+        $this->assertStringContainsString('HashTableWriteLlvm::reserveAppendSlot', $helper);
+        $this->assertStringContainsString('HashTableWriteLlvm::buildIntegerRange', $helper);
+        $this->assertStringNotContainsString('function buildArrayFill', $helper);
+        $this->assertStringNotContainsString('function spreadPackedInto', $helper);
+        $this->assertStringNotContainsString('ht_spread_add_str_', $helper);
+
+        $write = (string) file_get_contents(__DIR__.'/../../lib/JIT/HashTableWriteLlvm.php');
+        $this->assertStringContainsString('public static function spreadAddElement', $write);
+        $this->assertStringContainsString('public static function spreadInto', $write);
+        $this->assertStringContainsString('public static function reserveAppendSlot', $write);
+        $this->assertStringContainsString('public static function buildIntegerRange', $write);
+        $this->assertStringContainsString('private static function spreadPackedInto', $write);
     }
 
     public function testHashTableHelperDelegatesWritePathLlvmV5(): void
