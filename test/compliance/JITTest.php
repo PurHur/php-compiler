@@ -1009,6 +1009,19 @@ class JITTest extends BaseTest {
                 && str_contains($name, 'class_const_brace_deref_forward')) {
                 continue;
             }
+            // 8.3-target reject gate; skipped when dynamic class const fetch enabled (#17863).
+            if (CompilerVersion::supportsDynamicClassConstFetch()
+                && str_contains($name, 'class_const_dynamic_fetch_profile')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsDynamicClassConstFetch()
+                && str_contains($name, 'class_const_dynamic_fetch_forward')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsDynamicClassConstFetch()
+                && str_contains($name, 'class_const_dynamic_fetch_no_warnings')) {
+                continue;
+            }
             // 8.4-target reject gate; skipped when parenthesized DNF intersection types enabled (#14904).
             if (CompilerVersion::supportsParenthesizedDnfIntersectionTypes()
                 && str_contains($name, 'dnf_paren_intersection_reference_profile')) {

@@ -1,5 +1,14 @@
 --TEST--
 Language: dynamic enum case fetch E::{$name} returns enum singleton (#9937, Zend/zend_enum.c)
+--SKIPIF--
+<?php
+if (!class_exists('PHPCompiler\\CompilerVersion')) {
+    require __DIR__ . '/../../../../vendor/autoload.php';
+}
+if (!PHPCompiler\CompilerVersion::supportsDynamicClassConstFetch()) {
+    die('skip dynamic class/enum const fetch disabled on reference profile');
+}
+?>
 --FILE--
 <?php
 enum E: int { case A = 1; case B = 2; }

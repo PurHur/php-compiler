@@ -204,7 +204,7 @@ final class HashTableWriteLlvm
     public static function setAtIndex(Context $context, Value $ht, Value $index, Variable $element): void
     {
         if (0 !== ($element->type & Variable::IS_NATIVE_ARRAY)) {
-            $materialized = HashTableHelper::materializeNativeArrayForCall($context, $element);
+            $materialized = self::materializeNativeArrayForCall($context, $element);
             $context->builder->call(
                 $context->lookupFunction('__hashtable__setHashtableAt'),
                 $ht,
@@ -594,7 +594,7 @@ final class HashTableWriteLlvm
         if (0 === ($array->type & Variable::IS_NATIVE_ARRAY)) {
             return;
         }
-        $ht = HashTableHelper::materializeNativeArrayForCall($context, $array);
+        $ht = self::materializeNativeArrayForCall($context, $array);
         $slot = JitValueBox::alloc($context);
         $context->builder->call(
             $context->lookupFunction('__value__writeHashtable'),
@@ -1233,5 +1233,196 @@ final class HashTableWriteLlvm
         $context->builder->branch($head);
 
         $context->builder->positionAtEnd($done);
+    }
+
+    /** Persist in-place hashtable mutations on native/boxed array operands (#1086, #17865). */
+    public static function storeHashtableInArrayVariable(Context $context, Variable $array, Value $ht): void
+    {
+        if (0 !== ($array->type & Variable::IS_NATIVE_ARRAY)) {
+            if (Variable::KIND_VARIABLE !== $array->kind) {
+                return;
+            }
+            $boxed = JitValueBox::alloc($context);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeHashtable'),
+                JitValueBox::pointer($context, $boxed),
+                $ht
+            );
+            $voidPtr = $context->getTypeFromString('void*');
+            $context->builder->store(
+                $context->builder->pointerCast(JitValueBox::pointer($context, $boxed), $voidPtr),
+                $array->value
+            );
+            $array->type = Variable::TYPE_VALUE;
+            $array->valueBoxHashtable = true;
+
+            return;
+        }
+        if (Variable::TYPE_HASHTABLE === $array->type) {
+            return;
+        }
+        if (Variable::TYPE_VALUE === $array->type || JitValueBox::isValueOperand($array)) {
+            if (null !== $array->objectPropertySlot) {
+                $valPtr = $context->builder->pointerCast(
+                    $context->builder->load($array->objectPropertySlot),
+                    $context->getTypeFromString('__value__*')
+                );
+            } else {
+                $valPtr = JitValueBox::valuePtrFromVariable($context, $array);
+            }
+            $context->builder->call(
+                $context->lookupFunction('__value__writeHashtable'),
+                $valPtr,
+                $ht
+            );
+        }
+    }
+
+    /**
+     * Lvalue marker for $arr['key'] = … without reading the old value first (#107, #17865).
+     */
+    public static function prepareStringKeyWrite(Context $context, Value $ht, Value $keyStr): Variable
+    {
+        $slot = JitValueBox::alloc($context);
+        $var = new Variable(
+            $context,
+            Variable::TYPE_VALUE,
+            Variable::KIND_VARIABLE,
+            $slot
+        );
+        $var->writableHt = $ht;
+        $var->writableStringKey = $keyStr;
+
+        return $var;
+    }
+
+    /** Lvalue marker for $arr[$key] = … when $key is a boxed __value__ (issue #86, #17865). */
+    public static function prepareValueBoxKeyWrite(Context $context, Value $ht, Variable $dim): Variable
+    {
+        $slot = JitValueBox::alloc($context);
+        $var = new Variable(
+            $context,
+            Variable::TYPE_VALUE,
+            Variable::KIND_VARIABLE,
+            $slot
+        );
+        $var->writableHt = $ht;
+        $var->writableValueBoxKey = $dim;
+
+        return $var;
+    }
+
+    /** Lvalue marker for $arr[0] = … on a native hashtable (#107, #17865). */
+    public static function prepareIndexWrite(Context $context, Value $ht, Value $index): Variable
+    {
+        $slot = JitValueBox::alloc($context);
+        $var = new Variable(
+            $context,
+            Variable::TYPE_VALUE,
+            Variable::KIND_VARIABLE,
+            $slot
+        );
+        $var->writableHt = $ht;
+        $var->writableIndex = $index;
+
+        return $var;
+    }
+
+    /**
+     * Writable __value__ slot for a string key (creates an empty string entry if missing; #103, #17865).
+     */
+    public static function writableStringKeyValueBox(Context $context, Value $ht, Value $keyStr): Variable
+    {
+        $isSet = $context->builder->call(
+            $context->lookupFunction('__hashtable__offsetIsSetStringKey'),
+            $ht,
+            $keyStr
+        );
+        $create = BasicBlockHelper::append($context, 'ht_sk_write_create');
+        $ready = BasicBlockHelper::append($context, 'ht_sk_write_ready');
+        $context->builder->branchIf($isSet, $ready, $create);
+
+        $context->builder->positionAtEnd($create);
+        $empty = $context->builder->call($context->lookupFunction('__string__alloc'), $context->constantFromInteger(0, 'size_t'));
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setStringKeyString'),
+            $ht,
+            $keyStr,
+            $empty
+        );
+        $context->builder->branch($ready);
+
+        $context->builder->positionAtEnd($ready);
+        $valPtr = $context->builder->call(
+            $context->lookupFunction('__hashtable__readStringKeyValue'),
+            $ht,
+            $keyStr
+        );
+        $var = new Variable(
+            $context,
+            Variable::TYPE_VALUE,
+            Variable::KIND_VARIABLE,
+            $valPtr
+        );
+        $var->writableHt = $ht;
+        $var->writableStringKey = $keyStr;
+
+        return $var;
+    }
+
+    /**
+     * Copy a compile-time native array into a refcounted __hashtable__ for calls/properties (#767, #17865).
+     */
+    public static function materializeNativeArrayForCall(Context $context, Variable $array): Value
+    {
+        if (0 === ($array->type & Variable::IS_NATIVE_ARRAY)) {
+            throw new \LogicException('materializeNativeArrayForCall requires a native array');
+        }
+        $dest = HashTableHelper::alloc($context);
+        $map = $context->structFieldMap['__hashtable__'];
+        $elemType = $array->type & ~Variable::IS_NATIVE_ARRAY;
+        $sizeT = $context->getTypeFromString('size_t');
+        $zero = $sizeT->constInt(0, false);
+        $one = $sizeT->constInt(1, false);
+        $count = $context->constantFromInteger($array->nextFreeElement, 'size_t');
+        $idxSlot = $context->builder->alloca($sizeT, 1, 'native_ht_idx');
+        $context->builder->store($zero, $idxSlot);
+        $head = BasicBlockHelper::append($context, 'native_ht_head');
+        $body = BasicBlockHelper::append($context, 'native_ht_body');
+        $advance = BasicBlockHelper::append($context, 'native_ht_advance');
+        $done = BasicBlockHelper::append($context, 'native_ht_done');
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($head);
+        $idx = $context->builder->load($idxSlot);
+        $atEnd = $context->builder->icmp(Builder::INT_SGE, $idx, $count);
+        $context->builder->branchIf($atEnd, $done, $body);
+
+        $context->builder->positionAtEnd($body);
+        $slot = $context->builder->inBoundsGep($array->value, $zero, $idx);
+        if (Variable::TYPE_STRING === $elemType) {
+            $elem = new Variable($context, $elemType, Variable::KIND_VARIABLE, $slot);
+        } else {
+            $elem = new Variable(
+                $context,
+                $elemType,
+                Variable::KIND_VALUE,
+                $context->builder->load($slot)
+            );
+        }
+        self::setAtIndex($context, $dest, $idx, $elem);
+        $context->builder->branch($advance);
+
+        $context->builder->positionAtEnd($advance);
+        $context->builder->store($context->builder->addNoSignedWrap($idx, $one), $idxSlot);
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($done);
+        $context->builder->store($count, $context->builder->structGep($dest, $map['numElements']));
+        $context->builder->store($count, $context->builder->structGep($dest, $map['nextFreeElement']));
+
+        $context->refcount->addref($dest);
+
+        return $dest;
     }
 }

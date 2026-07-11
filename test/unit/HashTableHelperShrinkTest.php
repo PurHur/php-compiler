@@ -6,10 +6,10 @@ namespace PHPCompiler\Test\Unit;
 
 use PHPUnit\Framework\TestCase;
 
-/** HashTableHelper v1–v6 slices route DefineRuntime + splits read/write/spread LLVM (#10031, #17809, #17824). */
+/** HashTableHelper v1–v7 slices route DefineRuntime + splits read/write/spread/ensure LLVM (#10031, #17809, #17824, #17865). */
 final class HashTableHelperShrinkTest extends TestCase
 {
-    private const HELPER_MAX_LINES = 980;
+    private const HELPER_MAX_LINES = 720;
 
     public function testHashTableHelperDelegatesWriteLlvm(): void
     {
@@ -107,8 +107,32 @@ final class HashTableHelperShrinkTest extends TestCase
         $this->assertLessThanOrEqual(
             self::HELPER_MAX_LINES,
             $lines,
-            'HashTableHelper.php should shrink as LLVM moves to Read/WriteLlvm (#10031 v4, #17809 v5, #17824 v6)'
+            'HashTableHelper.php should shrink as LLVM moves to Read/WriteLlvm (#10031 v4, #17809 v5, #17824 v6, #17865 v7)'
         );
+    }
+
+    public function testHashTableHelperDelegatesEnsureAndMaterializeLlvmV7(): void
+    {
+        $helper = (string) file_get_contents(__DIR__.'/../../lib/JIT/HashTableHelper.php');
+        $this->assertStringContainsString('HashTableReadLlvm::ensureHashtablePointer', $helper);
+        $this->assertStringContainsString('HashTableWriteLlvm::materializeNativeArrayForCall', $helper);
+        $this->assertStringContainsString('HashTableWriteLlvm::writableStringKeyValueBox', $helper);
+        $this->assertStringContainsString('HashTableWriteLlvm::prepareStringKeyWrite', $helper);
+        $this->assertStringContainsString('HashTableWriteLlvm::storeHashtableInArrayVariable', $helper);
+        $this->assertStringNotContainsString('ht_ensure_box_init', $helper);
+        $this->assertStringNotContainsString('native_ht_head', $helper);
+        $this->assertStringNotContainsString('ht_sk_write_create', $helper);
+
+        $read = (string) file_get_contents(__DIR__.'/../../lib/JIT/HashTableReadLlvm.php');
+        $this->assertStringContainsString('public static function ensureHashtablePointer', $read);
+        $this->assertStringContainsString('ht_ensure_box_init', $read);
+
+        $write = (string) file_get_contents(__DIR__.'/../../lib/JIT/HashTableWriteLlvm.php');
+        $this->assertStringContainsString('public static function materializeNativeArrayForCall', $write);
+        $this->assertStringContainsString('public static function writableStringKeyValueBox', $write);
+        $this->assertStringContainsString('public static function prepareStringKeyWrite', $write);
+        $this->assertStringContainsString('public static function storeHashtableInArrayVariable', $write);
+        $this->assertStringContainsString('native_ht_head', $write);
     }
 
     public function testHashTableHelperDelegatesSpreadAndRangeLlvmV6(): void

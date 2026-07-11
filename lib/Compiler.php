@@ -212,8 +212,8 @@ class Compiler {
     /** Force FUNCCALL_EXEC_RETURN while lowering hoisted sibling call-arg producers (#10981). */
     private bool $forceDeferredSiblingCallReturnSlot = false;
 
-    /** Nested inline call-arg producers must keep FUNCCALL_INIT in returned ops (#17862, re-#11767). */
-    private bool $suppressFuncCallInitPrepend = false;
+    /** Keep nested inline producer FUNCCALL_INIT in argSends return, not prepended on $block (#17862). */
+    private bool $inlineNestedProducerOpsInArgSends = false;
 
     /** Reentrancy guard — statementLevel() ↔ firstSibling() mutual recursion (#9321). */
     private bool $firstSiblingInlineFuncCallProducerIndexActive = false;
@@ -30079,6 +30079,24 @@ class Compiler {
     }
 
     /**
+     * Nested inline producer compile may prepend FUNCCALL_INIT to $block early (#17697);
+     * drain back into the producer chain so partitionNestedInlineCallArgProducerOps stays contiguous (#17862).
+     *
+     * @return list<OpCode>
+     */
+    private function drainBlockOpcodesAppendedSince(Block $block, int $sinceIndex): array
+    {
+        $drained = array_slice($block->opCodes, $sinceIndex);
+        if ([] === $drained) {
+            return [];
+        }
+        $block->opCodes = array_slice($block->opCodes, 0, $sinceIndex);
+        $block->nOpCodes = $sinceIndex;
+
+        return $drained;
+    }
+
+    /**
      * array_chunk(range(1,5), 2, true) — hoisted FuncCall haystack + ConstFetch preserve_keys (#11767).
      *
      * @return list<OpCode>|null
@@ -30088,6 +30106,7 @@ class Compiler {
         Block $block,
         Op $cfgCallOp
     ): ?array {
+        $blockOpsAtEntry = \count($block->opCodes);
         if (null === $block->orig || !property_exists($cfgCallOp, 'args') || !is_array($cfgCallOp->args)) {
             return null;
         }
@@ -30136,14 +30155,19 @@ class Compiler {
         $producerOps = [];
         $haystackSlot = null;
         $prevForce = $this->forceDeferredSiblingCallReturnSlot;
-        $prevSuppressInitPrepend = $this->suppressFuncCallInitPrepend;
+        $prevInlineNested = $this->inlineNestedProducerOpsInArgSends;
         $this->forceDeferredSiblingCallReturnSlot = true;
-        $this->suppressFuncCallInitPrepend = true;
+        $this->inlineNestedProducerOpsInArgSends = true;
         try {
+            $blockOpsBeforeProducer = \count($block->opCodes);
             $producerOps = $this->compileExpr($funcProducer, $block);
+            $producerOps = array_merge(
+                $this->drainBlockOpcodesAppendedSince($block, $blockOpsBeforeProducer),
+                $producerOps
+            );
         } finally {
             $this->forceDeferredSiblingCallReturnSlot = $prevForce;
-            $this->suppressFuncCallInitPrepend = $prevSuppressInitPrepend;
+            $this->inlineNestedProducerOpsInArgSends = $prevInlineNested;
         }
         foreach ($producerOps as $op) {
             if (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type && null !== $op->arg1) {
@@ -30154,11 +30178,21 @@ class Compiler {
         if (null === $haystackSlot) {
             return null;
         }
+        $blockOpsBeforeConst = \count($block->opCodes);
         $preserveKeysSlot = $this->slotForHoistedScalarConstFetchCallArg($constProducer, $block);
+        $producerOps = array_merge(
+            $producerOps,
+            $this->drainBlockOpcodesAppendedSince($block, $blockOpsBeforeConst)
+        );
         if (null === $preserveKeysSlot) {
+            $blockOpsBeforeConstCompile = \count($block->opCodes);
             foreach ($this->compileExpr($constProducer, $block) as $op) {
                 $producerOps[] = $op;
             }
+            $producerOps = array_merge(
+                $producerOps,
+                $this->drainBlockOpcodesAppendedSince($block, $blockOpsBeforeConstCompile)
+            );
             $preserveKeysSlot = $this->slotForHoistedScalarConstFetchCallArg($constProducer, $block);
         }
         if (null === $preserveKeysSlot) {
@@ -30179,6 +30213,11 @@ class Compiler {
                 $valueSlot = $this->compileOperand($arg, $block, true);
             }
             $sends[] = new OpCode(OpCode::TYPE_ARG_SEND, $valueSlot, null, null);
+        }
+
+        $strayBlockOps = $this->drainBlockOpcodesAppendedSince($block, $blockOpsAtEntry);
+        if ([] !== $strayBlockOps) {
+            $producerOps = array_merge($strayBlockOps, $producerOps);
         }
 
         return array_merge($producerOps, $sends);
@@ -36983,6 +37022,9 @@ class Compiler {
      */
     private function prependFuncCallInitBeforeTrailingArgConstFetches(Block $block, OpCode $init): bool
     {
+        if ($this->inlineNestedProducerOpsInArgSends) {
+            return false;
+        }
         $n = \count($block->opCodes);
         if (0 === $n || OpCode::TYPE_CONST_FETCH !== $block->opCodes[$n - 1]->type) {
             return false;
@@ -46492,7 +46534,7 @@ class Compiler {
             }
         }
         $initPrependedBeforeArgConstFetch = false;
-        if (!$skipPrependForSiblingFuncProducer && !$this->suppressFuncCallInitPrepend) {
+        if (!$skipPrependForSiblingFuncProducer) {
             $initPrependedBeforeArgConstFetch = $this->prependFuncCallInitBeforeTrailingArgConstFetches(
                 $block,
                 $init

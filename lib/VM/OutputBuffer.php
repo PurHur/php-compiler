@@ -111,7 +111,7 @@ final class OutputBuffer
         }
         $level = array_pop(self::$stack);
 
-        // ob_get_clean() returns raw buffer; handler runs on flush/end_flush only (php-src output.c, #17861).
+        // php-src: ob_get_clean returns raw buffer contents; handlers run only on flush.
         return $level['content'];
     }
 
@@ -212,12 +212,17 @@ final class OutputBuffer
         if ([] === self::$stack) {
             return false;
         }
-        $content = self::popWithHandler();
-        if ('' !== $content) {
-            self::append($content);
+        $level = array_pop(self::$stack);
+        $raw = $level['content'];
+        $flushed = $raw;
+        if (null !== $level['handler']) {
+            $flushed = self::applyHandler($raw, $level['handler']);
+        }
+        if ('' !== $flushed) {
+            self::append($flushed);
         }
 
-        return $content;
+        return $raw;
     }
 
     /** flush() — sapi_flush / fflush(stdout) (issue #3388, php-src basic_functions.c PHP_FUNCTION(flush)). */
