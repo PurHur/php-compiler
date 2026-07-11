@@ -30512,6 +30512,91 @@ class Compiler {
         return $sends;
     }
 
+    /**
+     * array_filter(explode(...), fn(...)) / array_filter(str_split(...), is_numeric(...)) — hoisted haystack
+     * FuncCall + callback (closure/FCC) before the consumer; wire arg 0/1 explicitly (#17948, #15490, #15961).
+     *
+     * @param list<Operand|null> $args
+     *
+     * @return list<OpCode>|null
+     */
+    private function compileInlineClosurePairHaystackCallbackCallArgSends(
+        array $args,
+        Block $block,
+        ?Op $cfgCallOp
+    ): ?array {
+        if (null === $cfgCallOp || null === $block->orig || 2 !== \count($args)) {
+            return null;
+        }
+        $funcName = $this->resolveCfgFuncCallName($cfgCallOp);
+        if (1 !== $this->inlineClosureArrayPairCallbackArgIndex($funcName)) {
+            return null;
+        }
+        $leadingCallback = $this->leadingCallbackFirstInlineProducerBeforeCfgCall($cfgCallOp, $block);
+        if (
+            !$leadingCallback instanceof Op\Expr\Closure
+            && !$leadingCallback instanceof Op\Expr\ArrowFunction
+            && !$leadingCallback instanceof Op\Expr\FirstClassCallable
+        ) {
+            return null;
+        }
+        $haystackProducer = $this->trailingInlineFuncCallHaystackBeforeCfgCall($cfgCallOp, $block);
+        if (
+            !$haystackProducer instanceof Op\Expr\FuncCall
+            && !$haystackProducer instanceof Op\Expr\NsFuncCall
+        ) {
+            return null;
+        }
+        $producerOps = [];
+        $cfgChildren = $block->orig->children;
+        $haystackIndex = array_search($haystackProducer, $cfgChildren, true);
+        $haystackSlot = \is_int($haystackIndex)
+            ? $this->slotForInlineFuncCallProducerExecReturnByCfgIndex($block, $haystackIndex, $cfgChildren)
+            : null;
+        if (null === $haystackSlot) {
+            $haystackSlot = $block->slotForOperand($haystackProducer->result);
+        }
+        if (null === $haystackSlot) {
+            foreach ($this->compileExpr($haystackProducer, $block) as $op) {
+                $producerOps[] = $op;
+            }
+            if (\is_int($haystackIndex)) {
+                $haystackSlot = $this->slotForInlineFuncCallProducerExecReturnByCfgIndex(
+                    $block,
+                    $haystackIndex,
+                    $cfgChildren
+                );
+            }
+            $haystackSlot ??= $block->slotForOperand($haystackProducer->result)
+                ?? $this->slotForLastInlineFuncCallExecReturn($block, $producerOps);
+        }
+        if (null === $haystackSlot) {
+            return null;
+        }
+        $callbackSlot = $block->slotForOperand($leadingCallback->result);
+        if (null === $callbackSlot) {
+            if ($leadingCallback instanceof Op\Expr\FirstClassCallable) {
+                $callbackSlot = $this->slotForInlineFirstClassCallableProducer($leadingCallback, $block);
+            } else {
+                foreach ($this->compileExpr($leadingCallback, $block) as $op) {
+                    $producerOps[] = $op;
+                }
+                $callbackSlot = $this->slotForInlineClosureProducer($leadingCallback, $block);
+            }
+        }
+        if (null === $callbackSlot) {
+            return null;
+        }
+        $sends = $producerOps;
+        foreach ($args as $argIndex => $arg) {
+            $nameSlot = $this->callArgNameSlot($arg, $block);
+            $valueSlot = 0 === (int) $argIndex ? (string) $haystackSlot : (string) $callbackSlot;
+            $sends[] = new OpCode(OpCode::TYPE_ARG_SEND, $valueSlot, $nameSlot, null);
+        }
+
+        return $sends;
+    }
+
     private function compileArrayPadInlineHaystackCallArgSends(
         array $args,
         Block $block,
@@ -38029,6 +38114,14 @@ class Compiler {
             if (null !== $arrayWalkSends) {
                 return $arrayWalkSends;
             }
+            $inlineClosurePairSends = $this->compileInlineClosurePairHaystackCallbackCallArgSends(
+                $args,
+                $block,
+                $cfgCallOp
+            );
+            if (null !== $inlineClosurePairSends) {
+                return $inlineClosurePairSends;
+            }
             $this->ensureDeferredSiblingInlineCallArgProducersCompiled($block, $cfgCallOp);
         }
 
@@ -44991,6 +45084,7 @@ class Compiler {
             || $this->siblingInlineCallArgProducerNeedsReturnSlot($cfgCallOp, $block)
             || $this->outerSiblingInlineFuncCallProducerNeedsReturnSlot($cfgCallOp, $block)
             || $this->hoistedSiblingFeedsLaterMultiArgConsumer($cfgCallOp, $block)
+            || $this->inlineClosurePairHaystackFuncCallNeedsReturnSlot($cfgCallOp, $block)
             || $this->isAdjacentOuterHoistedFuncCallBeforeMultiArgConsumer($cfgCallOp, $block)
             || $this->nestedLiteralPreludeInlineCallProducerNeedsReturnSlot($cfgCallOp, $block)
             || $this->cfgCallIsHoistedArrayKeysForArrayCombine($cfgCallOp, $block)
@@ -45167,6 +45261,59 @@ class Compiler {
                 $consumerIndex,
                 $cfgChildren
             )) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * array_filter(explode(...), fn(...)) — hoisted haystack FuncCall before callback-at-arg-1 consumer (#17948).
+     */
+    private function inlineClosurePairHaystackFuncCallNeedsReturnSlot(?Op $cfgCallOp, Block $block): bool
+    {
+        if (
+            !$cfgCallOp instanceof Op\Expr\FuncCall
+            && !$cfgCallOp instanceof Op\Expr\NsFuncCall
+        ) {
+            return false;
+        }
+        if (null === $block->orig) {
+            return false;
+        }
+        $cfgChildren = $block->orig->children;
+        $producerIndex = array_search($cfgCallOp, $cfgChildren, true);
+        if (!\is_int($producerIndex)) {
+            return false;
+        }
+        for ($consumerIndex = $producerIndex + 1, $n = \count($cfgChildren); $consumerIndex < $n; ++$consumerIndex) {
+            $consumer = $cfgChildren[$consumerIndex] ?? null;
+            if (!$this->isSiblingMultiArgInlineCallConsumer($consumer)) {
+                continue;
+            }
+            $consumerName = $this->resolveCfgFuncCallName($consumer);
+            if (1 !== $this->inlineClosureArrayPairCallbackArgIndex($consumerName)) {
+                continue;
+            }
+            if (!\is_array($consumer->args ?? null) || \count($consumer->args) < 2) {
+                continue;
+            }
+            $hasCallbackBetween = false;
+            for ($j = $producerIndex + 1; $j < $consumerIndex; ++$j) {
+                $mid = $cfgChildren[$j] ?? null;
+                if ($mid instanceof Op\Expr\ArrowFunction
+                    || $mid instanceof Op\Expr\Closure
+                    || $mid instanceof Op\Expr\FirstClassCallable) {
+                    $hasCallbackBetween = true;
+                    break;
+                }
+            }
+            if (!$hasCallbackBetween) {
+                continue;
+            }
+            $haystack = $this->trailingInlineFuncCallHaystackBeforeCfgCall($consumer, $block);
+            if ($haystack === $cfgCallOp) {
                 return true;
             }
         }
