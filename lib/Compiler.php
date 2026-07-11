@@ -36787,8 +36787,8 @@ class Compiler {
             if (
                 'var_export' === strtolower($this->resolveCfgFuncCallName($cfgCallOp) ?? '')
                 && 1 === $argIndex
-                && $callArg instanceof Operand
-                && $this->callArgIsDeadInlineTemporary($callArg)
+                && $arg instanceof Operand
+                && $this->callArgIsDeadInlineTemporary($arg)
             ) {
                 $producers = $this->precedingInlineCallArgProducersBeforeCfgOp($children, $cfgCallOp);
                 if ($this->producersIncludeInlineArrayUnionPlus($producers)) {
