@@ -183,6 +183,58 @@ class Holder {
 PHP);
     }
 
+    public function testAsymmetricVisibilityLiteralDefaultCompilesOn84Profile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            if (!CompilerVersion::supportsAsymmetricVisibility()) {
+                $this->markTestSkipped('requires PHP_COMPILER_PROFILE=8.4 asymmetric visibility gate');
+            }
+            $runtime = new Runtime();
+            $block = $runtime->parseAndCompile(<<<'PHP'
+<?php
+class C {
+    public private(set) string $x = 'hi';
+    public (private(set)) int $n = 1;
+}
+PHP, 'asymmetric_visibility_literal_default.php');
+            $this->assertNotNull($block);
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testAsymmetricVisibilityPropertyDefaultNewCompilesOn84Profile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            if (!CompilerVersion::supportsAsymmetricVisibility()
+                || !CompilerVersion::supportsPropertyDefaultObjectExpressions()) {
+                $this->markTestSkipped('requires PHP 8.4 forward profile gates');
+            }
+            $runtime = new Runtime();
+            $block = $runtime->parseAndCompile(<<<'PHP'
+<?php
+class C {
+    public private(set) stdClass $obj = new stdClass();
+}
+PHP, 'asymmetric_visibility_property_default_new.php');
+            $this->assertNotNull($block);
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     private function expectCompileError(string $code): void
     {
         $runtime = new Runtime();

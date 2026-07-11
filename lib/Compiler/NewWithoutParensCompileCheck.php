@@ -77,6 +77,9 @@ final class NewWithoutParensCompileCheck
     {
         $topLevelNewCount = 0;
         foreach ($ops as $op) {
+            if (!$op instanceof Op) {
+                continue;
+            }
             if ($op instanceof New_) {
                 if (!$atTopLevel) {
                     throw new \CompileError(self::MESSAGE);
@@ -150,6 +153,9 @@ final class NewWithoutParensCompileCheck
     {
         $topLevelNewCount = 0;
         foreach ($ops as $op) {
+            if (!$op instanceof Op) {
+                continue;
+            }
             if ($op instanceof New_) {
                 if (!$atTopLevel) {
                     throw new \CompileError(self::MESSAGE);
@@ -187,6 +193,9 @@ final class NewWithoutParensCompileCheck
     private function walkOpsRejectAllNew(array $ops): void
     {
         foreach ($ops as $op) {
+            if (!$op instanceof Op) {
+                continue;
+            }
             if ($op instanceof New_) {
                 throw new \CompileError(self::MESSAGE);
             }
