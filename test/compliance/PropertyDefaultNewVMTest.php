@@ -19,5 +19,9 @@ final class PropertyDefaultNewVMTest extends VMTest
             __DIR__.'/cases/language/instance_typed_property_new_reject.phpt',
             'instance_typed_property_new_reject.phpt'
         );
+        yield 'property_initializer_new_84' => self::parsePHPT(
+            __DIR__.'/cases/language/property_initializer_new_84.phpt',
+            'property_initializer_new_84.phpt'
+        );
     }
 }
