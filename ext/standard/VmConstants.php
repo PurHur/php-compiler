@@ -356,6 +356,10 @@ final class VmConstants
                 $var = new Variable(Variable::TYPE_INTEGER);
                 $var->int($fallback);
                 $value = $var;
+            } elseif (null === $value && \is_float($fallback)) {
+                $var = new Variable(Variable::TYPE_FLOAT);
+                $var->float($fallback);
+                $value = $var;
             } elseif (null === $value && \is_string($fallback)) {
                 $var = new Variable(Variable::TYPE_STRING);
                 $var->string($fallback);
