@@ -7,6 +7,7 @@ namespace PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
+use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPCompiler\JIT\UserScriptAotDeferNestedJit;
 use PHPLLVM\Value;
@@ -46,16 +47,16 @@ final class StringHashCryptoPhp
         '__compiler_hash_hkdf',
     ];
 
-    public static function implement(Context $context): void
+    public static function implement(Context $context, bool $forceNested = false): void
     {
-        if (UserScriptAotDeferNestedJit::shouldDefer($context)) {
+        if (!$forceNested && UserScriptAotDeferNestedJit::shouldDefer($context)) {
             StringHashCryptoLlvm::implement($context);
 
             return;
         }
 
         $probe = $context->module->getNamedFunction('__compiler_hash');
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+        if (!$forceNested && null !== $probe && $probe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);
 
             return;
@@ -74,7 +75,7 @@ final class StringHashCryptoPhp
     {
         $abiName = '__compiler_hash';
         $probe = $context->module->getNamedFunction($abiName);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+        if (null !== $probe && JitVmHelperLink::hasNamedBridgeEntry($probe, 'hc_hash_bridge_entry')) {
             $context->registerFunction($abiName, $probe);
 
             return;
@@ -101,7 +102,7 @@ final class StringHashCryptoPhp
     {
         $abiName = '__compiler_hash_hmac';
         $probe = $context->module->getNamedFunction($abiName);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+        if (null !== $probe && JitVmHelperLink::hasNamedBridgeEntry($probe, 'hc_hmac_bridge_entry')) {
             $context->registerFunction($abiName, $probe);
 
             return;
@@ -128,7 +129,7 @@ final class StringHashCryptoPhp
     {
         $abiName = '__compiler_hash_pbkdf2';
         $probe = $context->module->getNamedFunction($abiName);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+        if (null !== $probe && JitVmHelperLink::hasNamedBridgeEntry($probe, 'hc_pbkdf2_bridge_entry')) {
             $context->registerFunction($abiName, $probe);
 
             return;
@@ -156,7 +157,7 @@ final class StringHashCryptoPhp
     {
         $abiName = '__compiler_hash_hkdf';
         $probe = $context->module->getNamedFunction($abiName);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+        if (null !== $probe && JitVmHelperLink::hasNamedBridgeEntry($probe, 'hc_hkdf_bridge_entry')) {
             $context->registerFunction($abiName, $probe);
 
             return;
