@@ -1420,12 +1420,22 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.3+ header_list() (ext/standard/head.c, #12546).
+     * PHP 8.4+ header_list() (ext/standard/head.c, #12546, #17791).
      *
-     * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev reference profile matches Zend 8.2 CLI phantom gate.
+     * Withheld on 8.4.0-dev reference profile (matches Zend 8.2 function_exists gate). Enable via
+     * stable 8.4.0+ or explicit `PHP_COMPILER_PROFILE=8.4` forward profile.
      */
     public static function supportsHeaderList(): bool
     {
+        if (version_compare(self::VERSION, '8.4.0', '>=')) {
+            return true;
+        }
+
+        $raw = getenv('PHP_COMPILER_PROFILE');
+        if (!\is_string($raw) || '' === trim($raw)) {
+            return false;
+        }
+
         return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
     }
 
