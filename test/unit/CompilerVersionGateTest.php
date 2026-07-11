@@ -1450,6 +1450,43 @@ final class CompilerVersionGateTest extends TestCase
         $this->assertFalse(isset($ctx->classes['clockinterface']));
     }
 
+    public function testSupportsDateTimeCreateFromTimestampFalseOnReferenceProfile(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsDateTimeCreateFromTimestamp());
+    }
+
+    public function testVmDoesNotRegisterCreateFromTimestampOnReferenceProfile(): void
+    {
+        $runtime = new Runtime();
+        $dt = $runtime->vmContext->classes['datetime'] ?? null;
+        $dti = $runtime->vmContext->classes['datetimeimmutable'] ?? null;
+        $this->assertNotNull($dt);
+        $this->assertNotNull($dti);
+        $this->assertFalse(isset($dt->methods['createfromtimestamp']));
+        $this->assertFalse(isset($dti->methods['createfromtimestamp']));
+    }
+
+    public function testVmRegistersCreateFromTimestampOnForwardProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.3');
+        try {
+            $runtime = new Runtime();
+            $dt = $runtime->vmContext->classes['datetime'] ?? null;
+            $dti = $runtime->vmContext->classes['datetimeimmutable'] ?? null;
+            $this->assertNotNull($dt);
+            $this->assertNotNull($dti);
+            $this->assertTrue(isset($dt->methods['createfromtimestamp']));
+            $this->assertTrue(isset($dti->methods['createfromtimestamp']));
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     public function testVmDoesNotRegisterRoundingModeOnReferenceProfile(): void
     {
         $runtime = new Runtime();
