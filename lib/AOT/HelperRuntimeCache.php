@@ -53,13 +53,12 @@ final class HelperRuntimeCache
     private static array $usedUnits = [];
 
     /**
-     * User-script AOT must inline-compile these helpers — pre-emitted units embed
-     * stale VmDom semantics (#17954).
+     * User-script AOT previously forced inline compile for stale prelink units (#17954).
+     * ObjectEntry ABI + ext/dom fingerprint deps invalidate stale helper TUs.
      *
      * @var array<string, true>
      */
     private const USER_SCRIPT_INLINE_ONLY_LOGICALS = [
-        'phpcompiler\\ext\\dom\\domloadhtmljithelper::loadhtmlargv' => true,
     ];
 
     private static bool $loggedHit = false;

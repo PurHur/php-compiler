@@ -6,6 +6,9 @@ namespace PHPCompiler\JIT;
 
 use PHPCompiler\ext\dom\VmDom;
 use PHPCompiler\JIT\Call;
+use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\Variable;
+use PHPCompiler\JIT\VmActiveContextInitLlvm;
 
 /** Lazy registration for ext/dom JIT instance-method proxies (#17130). */
 final class DomInstanceMethodJit
@@ -83,6 +86,7 @@ final class DomInstanceMethodJit
     public static function registerKnownProxies(Context $context): void
     {
         if (self::shouldDeferToVmClassMethodLowering()) {
+            VmActiveContextInitLlvm::requestThinStandaloneInit($context);
             self::ensureDomElementPropertyLayout($context);
             self::ensureProxy($context, 'domdocument::createelement');
             self::ensureProxy($context, 'domdocument::loadhtml');

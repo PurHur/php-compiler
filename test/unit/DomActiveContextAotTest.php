@@ -49,13 +49,23 @@ final class DomActiveContextAotTest extends TestCase
         $this->assertStringContainsString('DomDocumentGetElementById', $source);
     }
 
-    public function testDomLoadHTMLRuntimeUsesValueBoxedReceiverBridge(): void
+    public function testDomLoadHTMLRuntimeSchedulesActiveContextInit(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/DomLoadHTMLRuntime.php');
-        $this->assertStringContainsString('__value__*', $source);
+        $this->assertStringContainsString('VmActiveContextInitLlvm::requestThinStandaloneInit', $source);
+        $this->assertStringContainsString('ensureActiveContextProxy', $source);
+    }
+
+    public function testDomLoadHTMLRuntimeUsesObjectReceiverBridge(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/DomLoadHTMLRuntime.php');
+        $this->assertStringContainsString('__object__*', $source);
         $this->assertStringContainsString('DomLoadHTMLJitHelper::loadHTMLArgv', $source);
         $helper = (string) file_get_contents(__DIR__.'/../../ext/dom/DomLoadHTMLJitHelper.php');
-        $this->assertStringContainsString('VariableObject::entry', $helper);
+        $this->assertStringContainsString('Context $ctx', $helper);
+        $this->assertStringContainsString('ObjectEntry $document', $helper);
+        $cache = (string) file_get_contents(__DIR__.'/../../lib/AOT/HelperRuntimeCache.php');
+        $this->assertStringNotContainsString('domloadhtmljithelper::loadhtmlargv', strtolower($cache));
     }
 
     public function testDomGetElementByIdUsesPureLlvmIdMap(): void
@@ -96,7 +106,9 @@ final class DomActiveContextAotTest extends TestCase
     public function testLoadHTMLJitHelperSyncsDocumentSlots(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/dom/DomLoadHTMLJitHelper.php');
-        $this->assertStringContainsString('VariableObject::entry', $source);
+        $this->assertStringContainsString('Context $ctx', $source);
+        $this->assertStringContainsString('ObjectEntry $document', $source);
+        $this->assertStringContainsString('VmDom::loadHTML', $source);
         $this->assertStringNotContainsString('DomRegistry::entry', $source);
     }
 
@@ -135,10 +147,10 @@ final class DomActiveContextAotTest extends TestCase
         $this->assertStringContainsString('resyncNamedBindings', $source);
     }
 
-    public function testDomLoadHTMLLoweringPassesValueBoxedHtml(): void
+    public function testDomLoadHTMLLoweringPassesObjectReceiver(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/dom/JitDomLoadHTML.php');
-        $this->assertStringContainsString('JitValueBox::valuePtrFromVariable', $source);
+        $this->assertStringContainsString('loadObjectArg', $source);
         $this->assertStringContainsString('DomLoadHTMLRuntime::ABI_NAME', $source);
     }
 

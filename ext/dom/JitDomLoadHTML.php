@@ -25,7 +25,7 @@ final class JitDomLoadHTML
             throw new \LogicException('DOMDocument::loadHTML() expects receiver and HTML string');
         }
 
-        $receiverPtr = self::receiverValuePtr($context, $args[0]);
+        $document = self::loadObjectArg($context, $args[0]);
         $htmlStr = self::loadStringArg($context, $args[1]);
         $options = $context->getTypeFromString('int64')->constInt(0, false);
         if (isset($args[2]) && !NamedOptionalCallArgs::isOmittedOptional($args[2])) {
@@ -34,10 +34,25 @@ final class JitDomLoadHTML
 
         return $context->builder->call(
             $context->lookupFunction(DomLoadHTMLRuntime::ABI_NAME),
-            $receiverPtr,
+            $document,
             $htmlStr,
             $options
         );
+    }
+
+    private static function loadObjectArg(Context $context, JITVariable $arg): Value
+    {
+        if (JITVariable::TYPE_OBJECT === $arg->type) {
+            return $context->helper->loadValue($arg);
+        }
+        if (JITVariable::TYPE_VALUE === $arg->type) {
+            return $context->builder->call(
+                $context->lookupFunction('__value__readObject'),
+                JitValueBox::valuePtrFromVariable($context, $arg)
+            );
+        }
+
+        throw new \LogicException('DOMDocument::loadHTML() receiver must be an object');
     }
 
     private static function loadStringArg(Context $context, JITVariable $arg): Value
@@ -52,23 +67,4 @@ final class JitDomLoadHTML
         );
     }
 
-    private static function receiverValuePtr(Context $context, JITVariable $receiver): Value
-    {
-        if (JITVariable::TYPE_VALUE === $receiver->type) {
-            return JitValueBox::valuePtrFromVariable($context, $receiver);
-        }
-        $slot = JitValueBox::alloc($context);
-        $ptr = JitValueBox::pointer($context, $slot);
-        if (JITVariable::TYPE_OBJECT === $receiver->type) {
-            $context->builder->call(
-                $context->lookupFunction('__value__writeObject'),
-                $ptr,
-                $context->helper->loadValue($receiver)
-            );
-
-            return $ptr;
-        }
-
-        throw new \LogicException('DOMDocument::loadHTML() receiver must be object or value box');
-    }
 }
