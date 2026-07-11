@@ -51,6 +51,7 @@ class Module extends ModuleAbstract
             new openssl_free_key(),
             new openssl_spki_new(),
             new openssl_spki_verify(),
+            new openssl_error_string(),
         ];
     }
 }
