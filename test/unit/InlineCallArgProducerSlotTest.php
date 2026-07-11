@@ -288,6 +288,60 @@ PHP;
         self::assertStringContainsString('ok', $out);
     }
 
+    /** Issue #17950 — usort($a = explode(...), fn) wires assign result + closure, runtime by-ref Error. */
+    public function testUsortInlineAssignByRefUsesAssignAndClosureSlots(): void
+    {
+        $code = <<<'PHP'
+<?php
+usort($items = explode(',', '3,1,2'), static fn ($a, $b): int => $a <=> $b);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'usort_inline_assign_slots.php');
+
+        $assignSlot = null;
+        $closureSlot = null;
+        $usortSends = [];
+        $fcallOrdinal = 0;
+        $lastAssignDest = null;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_CLOSURE === $op->type) {
+                $closureSlot = $op->arg1;
+            }
+            if (OpCode::TYPE_ASSIGN === $op->type) {
+                $lastAssignDest = $op->arg1;
+            }
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                ++$fcallOrdinal;
+                if (2 === $fcallOrdinal) {
+                    $assignSlot = $lastAssignDest;
+                    $usortSends = [];
+                }
+            }
+            if (2 === $fcallOrdinal && OpCode::TYPE_ARG_SEND === $op->type) {
+                $usortSends[] = $op->arg1;
+            }
+        }
+
+        self::assertNotNull($closureSlot);
+        self::assertNotNull($assignSlot);
+        self::assertCount(2, $usortSends, 'usort sends='.json_encode($usortSends));
+        self::assertSame($assignSlot, $usortSends[0], 'assign result slot');
+        self::assertSame($closureSlot, $usortSends[1], 'callback slot');
+        self::assertNotSame($closureSlot, $usortSends[0], 'closure must not feed arg #0');
+    }
+
+    public function testUsortInlineAssignByRefRuntime(): void
+    {
+        $code = file_get_contents(__DIR__.'/../repro/maintainer_gap_usort_inline_assign_byref.php');
+        self::assertNotFalse($code);
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'maintainer_gap_usort_inline_assign_byref.php');
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertStringContainsString('ok', $out);
+    }
+
     /** Issue #11153 — vacuous array_all on inline [] matches Zend. */
     public function testArrayAllInlineEmptyArrayRuntime(): void
     {
