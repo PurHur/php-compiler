@@ -5507,19 +5507,27 @@ final class VmString
      */
     public static function strtok(?string $str, ?string $tok = null): string|false
     {
-        if (null === $str) {
-            if (null === $tok || null === self::$strtokString) {
+        if (null !== $tok) {
+            // php-src: second parameter provided — (re)init; null haystack leaves no buffer (#5515).
+            if (null === $str) {
+                self::strtokReset();
+
                 return false;
             }
-            $delimiter = $tok;
-        } elseif (null !== $tok) {
             self::$strtokString = $str;
             self::$strtokLast = 0;
             $delimiter = $tok;
+        } elseif (null === $str) {
+            if (null === self::$strtokString) {
+                return false;
+            }
+            // One-arg strtok(null): tok = str (null); php-src uses null delimiter (remainder token).
+            $delimiter = '';
         } else {
             if (null === self::$strtokString) {
                 return false;
             }
+            // One-arg strtok($token): continue with delimiter string (php-src tok = str).
             $delimiter = $str;
         }
 
