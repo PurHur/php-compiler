@@ -110,13 +110,9 @@ final class OutputBuffer
             return '';
         }
         $level = array_pop(self::$stack);
-        $content = $level['content'];
-        $handler = $level['handler'];
-        if (null === $handler) {
-            return $content;
-        }
 
-        return self::applyHandler($content, $handler);
+        // ob_get_clean() returns raw buffer; handler runs on flush/end_flush only (php-src output.c, #17861).
+        return $level['content'];
     }
 
     /** ob_get_contents() — read active buffer without ending (ext/standard/output.c, issue #3236). */

@@ -212,6 +212,9 @@ class Compiler {
     /** Force FUNCCALL_EXEC_RETURN while lowering hoisted sibling call-arg producers (#10981). */
     private bool $forceDeferredSiblingCallReturnSlot = false;
 
+    /** Nested inline call-arg producers must keep FUNCCALL_INIT in returned ops (#17862, re-#11767). */
+    private bool $suppressFuncCallInitPrepend = false;
+
     /** Reentrancy guard — statementLevel() ↔ firstSibling() mutual recursion (#9321). */
     private bool $firstSiblingInlineFuncCallProducerIndexActive = false;
 
@@ -30133,11 +30136,14 @@ class Compiler {
         $producerOps = [];
         $haystackSlot = null;
         $prevForce = $this->forceDeferredSiblingCallReturnSlot;
+        $prevSuppressInitPrepend = $this->suppressFuncCallInitPrepend;
         $this->forceDeferredSiblingCallReturnSlot = true;
+        $this->suppressFuncCallInitPrepend = true;
         try {
             $producerOps = $this->compileExpr($funcProducer, $block);
         } finally {
             $this->forceDeferredSiblingCallReturnSlot = $prevForce;
+            $this->suppressFuncCallInitPrepend = $prevSuppressInitPrepend;
         }
         foreach ($producerOps as $op) {
             if (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type && null !== $op->arg1) {
@@ -46486,7 +46492,7 @@ class Compiler {
             }
         }
         $initPrependedBeforeArgConstFetch = false;
-        if (!$skipPrependForSiblingFuncProducer) {
+        if (!$skipPrependForSiblingFuncProducer && !$this->suppressFuncCallInitPrepend) {
             $initPrependedBeforeArgConstFetch = $this->prependFuncCallInitBeforeTrailingArgConstFetches(
                 $block,
                 $init

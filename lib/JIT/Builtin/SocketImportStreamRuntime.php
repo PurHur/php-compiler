@@ -138,16 +138,20 @@ final class SocketImportStreamRuntime
         }
 
         $voidTy = $context->getTypeFromString('void');
+        $i64 = $context->getTypeFromString('int64');
         $fn = null !== $probe
             ? $probe
             : $context->module->addFunction(
                 $abiName,
-                $context->context->functionType($voidTy, false)
+                $context->context->functionType($voidTy, false, $i64)
             );
 
         $entry = $fn->appendBasicBlock('socket_import_warn_entry');
         $context->builder->positionAtEnd($entry);
-        $context->builder->call(self::helperFunction($context, self::H.'::warnUnableToImport'));
+        $context->builder->call(
+            self::helperFunction($context, self::H.'::warnUnableToImport'),
+            $fn->getParam(0)
+        );
         $context->builder->returnVoid();
         $context->registerFunction($abiName, $fn);
         $context->builder->clearInsertionPosition();
