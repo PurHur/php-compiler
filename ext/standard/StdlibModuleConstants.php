@@ -130,7 +130,7 @@ final class StdlibModuleConstants
             'PSFS_FLAG_FLUSH_INC' => StdlibConstants::PSFS_FLAG_FLUSH_INC,
             'PSFS_FLAG_FLUSH_CLOSE' => StdlibConstants::PSFS_FLAG_FLUSH_CLOSE,
         ] + VmStreamSupports::constants() + VmStreamNotification::constants() + VmImage::constants() + VmJsonFlags::constants()
-            + GetDefinedConstantsParity::standardIntConstants();
+            + VmHttpConstants::constants() + GetDefinedConstantsParity::standardIntConstants();
     }
 
     /**
