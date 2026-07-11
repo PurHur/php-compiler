@@ -12,5 +12,6 @@ final class BuiltinClasses
     public static function register(Context $ctx): void
     {
         VmSimpleXml::registerClass($ctx);
+        VmSimpleXmlIterator::registerClass($ctx);
     }
 }
