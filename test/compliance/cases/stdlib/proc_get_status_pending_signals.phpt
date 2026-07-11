@@ -1,7 +1,7 @@
 --TEST--
-stdlib proc_get_status() pending_signals on PHP_COMPILER_PROFILE=8.4 (ext/standard/proc_open.c, #16707)
+stdlib proc_get_status() pending_signals on PHP_COMPILER_PROFILE=8.3 (ext/standard/proc_open.c, #16707, #17907)
 --ENV--
-PHP_COMPILER_PROFILE=8.4
+PHP_COMPILER_PROFILE=8.3
 --FILE--
 <?php
 $desc = [1 => ['pipe', 'w']];
