@@ -9,7 +9,7 @@ use PHPUnit\Framework\TestCase;
 require_once __DIR__.'/../LlvmToolchain.php';
 
 /**
- * LLVM compile-only verify for Enum::cases() JIT lowering (#4068, #3308, #6487).
+ * LLVM compile-only verify for Enum::cases() JIT lowering (#4068, #3308, #6487, #9471).
  *
  * Uses bin/jit.php -l in a child process (issue #98).
  *
@@ -45,6 +45,20 @@ PHP
 enum U { case A; case B; }
 $cases = U::cases();
 echo count($cases), ':', $cases[0]->name, "\n";
+PHP
+        );
+    }
+
+    public function testArrayAllAnyEnumClosureCompileOnly(): void
+    {
+        if (!CompilerVersion::supportsPhp84ArraySearchFunctions()) {
+            $this->markTestSkipped('array_all()/array_any() unavailable on reference profile');
+        }
+        $this->assertJitCompileOnly(<<<'PHP'
+<?php
+enum E: int { case A = 1; case B = 2; }
+array_all([E::A, E::B], fn ($v) => $v instanceof E);
+array_any([E::A, E::B], fn ($v) => $v instanceof E);
 PHP
         );
     }

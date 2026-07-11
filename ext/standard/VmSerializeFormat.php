@@ -60,7 +60,7 @@ final class VmSerializeFormat
             return $num > 0.0 ? 'INF' : '-INF';
         }
         if (0.0 === $num) {
-            return '0';
+            return Ieee754::isNegativeZero($num) ? '-0' : '0';
         }
         if ($precision < 0) {
             return self::formatDtoa($num);
@@ -108,10 +108,10 @@ final class VmSerializeFormat
             return '0';
         }
 
-        $negative = $num < 0.0;
+        $negative = $num < 0.0 || Ieee754::isNegativeZero($num);
         $num = abs($num);
         if (0.0 === $num) {
-            return '0';
+            return ($negative ? '-' : '').'0';
         }
 
         $exp = (int) floor(\log10($num));
@@ -144,7 +144,7 @@ final class VmSerializeFormat
             return VmFloatDtoa::formatH($num);
         }
 
-        $negative = $num < 0.0;
+        $negative = $num < 0.0 || Ieee754::isNegativeZero($num);
         $num = abs($num);
 
         for ($digits = 1; $digits <= 17; ++$digits) {

@@ -39,10 +39,11 @@ final class UsortCallbackPolicyTest extends TestCase
         $this->assertTrue(UsortCallbackPolicy::isJitLowerable($callback));
     }
 
-    public function testVmAllowsStrcmpAndStrcasecmpNames(): void
+    public function testVmAllowsStrcmpFamilyNames(): void
     {
-        $this->assertTrue(UsortCallbackPolicy::isVmSupportedName('strcmp'));
-        $this->assertTrue(UsortCallbackPolicy::isVmSupportedName('strcasecmp'));
+        foreach (['strcmp', 'strcasecmp', 'strcoll', 'strnatcmp', 'strnatcasecmp'] as $name) {
+            $this->assertTrue(UsortCallbackPolicy::isVmSupportedName($name), $name);
+        }
         $this->assertFalse(UsortCallbackPolicy::isVmSupportedName('strlen'));
     }
 }

@@ -13,6 +13,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\StringStrContains;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
@@ -32,20 +33,8 @@ final class str_contains extends Internal
         $this->requireExactArgCount($frame, 'str_contains', 2);
         InternalStrictArg::rejectNullString($frame->calledArgs[0], 'str_contains', 'haystack', 0, $frame);
         InternalStrictArg::rejectNullString($frame->calledArgs[1], 'str_contains', 'needle', 1, $frame);
-        InternalStrictArg::requireString($frame, 0, 'str_contains', 'haystack');
-        InternalStrictArg::requireString($frame, 1, 'str_contains', 'needle');
-        $haystackStr = VmString::coerceStringBuiltinArg(
-            $frame->calledArgs[0],
-            'str_contains',
-            0,
-            'haystack'
-        );
-        $needleStr = VmString::coerceStringBuiltinArg(
-            $frame->calledArgs[1],
-            'str_contains',
-            1,
-            'needle'
-        );
+        $haystackStr = self::vmStringArg($frame, 0, 'haystack');
+        $needleStr = self::vmStringArg($frame, 1, 'needle');
         BuiltinExecute::writeReturn(
             $frame,
             static function (Variable $ret) use ($haystackStr, $needleStr): void {
@@ -69,9 +58,14 @@ final class str_contains extends Internal
         }
         JitInternalStrictArg::rejectNullString($context, $args[0], 'str_contains', 'haystack', 1);
         JitInternalStrictArg::rejectNullString($context, $args[1], 'str_contains', 'needle', 2);
-        $hay = JitStringBuiltinArg::lowerCoercible($context, $args[0], 'str_contains', 0, 'haystack');
-        $needle = JitStringBuiltinArg::lowerCoercible($context, $args[1], 'str_contains', 1, 'needle');
+        $hay = JitStringBuiltinArg::lowerCoercible($context, $args[0], 'str_contains', 0, 'haystack', 'string', null, true);
+        $needle = JitStringBuiltinArg::lowerCoercible($context, $args[1], 'str_contains', 1, 'needle', 'string', null, true);
 
-        return JitStringSearch::contains($context, $hay, $needle);
+        return StringStrContains::invokeContains($context, $hay, $needle);
+    }
+
+    private static function vmStringArg(Frame $frame, int $argIndex, string $paramName): string
+    {
+        return VmString::zParamStrWithStringableForFrame($frame, $argIndex, 'str_contains', $paramName);
     }
 }

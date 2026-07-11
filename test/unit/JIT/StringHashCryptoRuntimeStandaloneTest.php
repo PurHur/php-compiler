@@ -25,6 +25,7 @@ final class StringHashCryptoRuntimeStandaloneTest extends TestCase
         $this->assertStringContainsString('__compiler_hash', $jit);
         $this->assertStringContainsString('StringHashEquals', $jit);
         $this->assertStringContainsString('StringHashHmacAlgos', $jit);
+        $this->assertStringContainsString('StringHashAlgos', $jit);
         $this->assertStringContainsString('StringHashCryptoPhp', $jit);
         $this->assertStringNotContainsString('StringHashCryptoNativeJit', $jit);
         $this->assertStringNotContainsString('ensureBitcode', $jit);
@@ -55,6 +56,7 @@ final class StringHashCryptoRuntimeStandaloneTest extends TestCase
             '__compiler_hash_hkdf',
             '__compiler_hash_equals',
             '__compiler_hash_hmac_algos',
+            '__compiler_hash_algos',
         ] as $name) {
             $fn = $ctx->lookupFunction($name);
             $this->assertNotNull($fn, $name);

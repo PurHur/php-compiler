@@ -29,6 +29,8 @@ final class BcmathJit
 
     private const DIV_HELPER = 'PHPCompiler\\ext\\bcmath\\BcmathJitHelper::div';
 
+    private const MOD_HELPER = 'PHPCompiler\\ext\\bcmath\\BcmathJitHelper::mod';
+
     private const COMP_HELPER = 'PHPCompiler\\ext\\bcmath\\BcmathJitHelper::comp';
 
     private const POWMOD_HELPER = 'PHPCompiler\\ext\\bcmath\\BcmathJitHelper::powmod';
@@ -42,6 +44,7 @@ final class BcmathJit
         self::SUB_HELPER,
         self::MUL_HELPER,
         self::DIV_HELPER,
+        self::MOD_HELPER,
         self::COMP_HELPER,
         self::POWMOD_HELPER,
         self::ROUND_HELPER,
@@ -54,6 +57,7 @@ final class BcmathJit
         '__compiler_bcsub',
         '__compiler_bcmul',
         '__compiler_bcdiv',
+        '__compiler_bcmod',
         '__compiler_bccomp',
         '__compiler_bcpowmod',
         '__compiler_bcround',
@@ -74,28 +78,35 @@ final class BcmathJit
             $context,
             '__compiler_bcadd',
             static function (Context $ctx, LlvmFunction $fn): void {
-                self::implementBinaryStringBridge($ctx, $fn, self::ADD_HELPER);
+                self::implementBinaryStringWithRoundModeBridge($ctx, $fn, self::ADD_HELPER);
             }
         );
         self::implementIfMissing(
             $context,
             '__compiler_bcsub',
             static function (Context $ctx, LlvmFunction $fn): void {
-                self::implementBinaryStringBridge($ctx, $fn, self::SUB_HELPER);
+                self::implementBinaryStringWithRoundModeBridge($ctx, $fn, self::SUB_HELPER);
             }
         );
         self::implementIfMissing(
             $context,
             '__compiler_bcmul',
             static function (Context $ctx, LlvmFunction $fn): void {
-                self::implementBinaryStringBridge($ctx, $fn, self::MUL_HELPER);
+                self::implementBinaryStringWithRoundModeBridge($ctx, $fn, self::MUL_HELPER);
             }
         );
         self::implementIfMissing(
             $context,
             '__compiler_bcdiv',
             static function (Context $ctx, LlvmFunction $fn): void {
-                self::implementBinaryStringBridge($ctx, $fn, self::DIV_HELPER);
+                self::implementBinaryStringWithRoundModeBridge($ctx, $fn, self::DIV_HELPER);
+            }
+        );
+        self::implementIfMissing(
+            $context,
+            '__compiler_bcmod',
+            static function (Context $ctx, LlvmFunction $fn): void {
+                self::implementBinaryStringWithRoundModeBridge($ctx, $fn, self::MOD_HELPER);
             }
         );
         self::implementIfMissing($context, '__compiler_bccomp', self::implementCompBridge(...));
@@ -142,10 +153,14 @@ final class BcmathJit
             ),
             '__compiler_bcadd',
             '__compiler_bcsub',
-            '__compiler_bcmul',
-            '__compiler_bcdiv' => $context->module->addFunction(
+            '__compiler_bcmul' => $context->module->addFunction(
                 $name,
-                $context->context->functionType($str, false, $str, $str, $i64, $i32)
+                $context->context->functionType($str, false, $str, $str, $i64, $i32, $i64, $i32)
+            ),
+            '__compiler_bcdiv',
+            '__compiler_bcmod' => $context->module->addFunction(
+                $name,
+                $context->context->functionType($str, false, $str, $str, $i64, $i32, $i64, $i32)
             ),
             '__compiler_bccomp' => $context->module->addFunction(
                 $name,
@@ -153,7 +168,7 @@ final class BcmathJit
             ),
             '__compiler_bcpowmod' => $context->module->addFunction(
                 $name,
-                $context->context->functionType($str, false, $str, $str, $str, $i64, $i32)
+                $context->context->functionType($str, false, $str, $str, $str, $i64, $i32, $i64, $i32)
             ),
             '__compiler_bcround' => $context->module->addFunction(
                 $name,
@@ -192,6 +207,25 @@ final class BcmathJit
         $context->builder->returnValue($result);
     }
 
+    private static function implementBinaryStringWithRoundModeBridge(
+        Context $context,
+        LlvmFunction $fn,
+        string $helperLogical
+    ): void {
+        $entry = $fn->appendBasicBlock('bcmath_bin_round_bridge_entry');
+        $context->builder->positionAtEnd($entry);
+        $result = $context->builder->call(
+            self::helperFunction($context, $helperLogical),
+            $fn->getParam(0),
+            $fn->getParam(1),
+            $fn->getParam(2),
+            $fn->getParam(3),
+            $fn->getParam(4),
+            $fn->getParam(5)
+        );
+        $context->builder->returnValue($result);
+    }
+
     private static function implementCompBridge(Context $context, LlvmFunction $fn): void
     {
         $entry = $fn->appendBasicBlock('bccomp_bridge_entry');
@@ -217,7 +251,9 @@ final class BcmathJit
             $fn->getParam(1),
             $fn->getParam(2),
             $fn->getParam(3),
-            $fn->getParam(4)
+            $fn->getParam(4),
+            $fn->getParam(5),
+            $fn->getParam(6)
         );
         $context->builder->returnValue($result);
     }

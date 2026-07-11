@@ -9,6 +9,8 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\ErrorReporter;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -31,10 +33,19 @@ final class unserialize extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $payloadVar = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_STRING !== $payloadVar->type) {
-            throw new \LogicException('unserialize() first argument must be a string in this compiler build');
-        }
+        InternalStrictArg::rejectNullString(
+            $frame->calledArgs[0],
+            'unserialize',
+            'data',
+            0,
+            $frame
+        );
+        $payload = VmString::coerceStringBuiltinArg(
+            $frame->calledArgs[0],
+            'unserialize',
+            0,
+            'data'
+        );
         $options = null;
         if ($argc > 1) {
             $optionsVar = $frame->calledArgs[1]->resolveIndirect();
@@ -45,11 +56,12 @@ final class unserialize extends Internal
         }
         $decoded = VmSerialize::unserializePayload(
             $frame->vmContext,
-            $payloadVar->toString(),
+            $payload,
             $options,
             $frame
         );
         if (false === $decoded) {
+            self::emitParseFailureNotice($frame, $payload, $options);
             $frame->returnVar->bool(false);
 
             return;
@@ -97,6 +109,16 @@ final class unserialize extends Internal
      */
     private static function compileTimeUnserialize(Context $context, JITVariable $arg, ?array $options = null): ?Value
     {
+        if (JITVariable::TYPE_NULL === $arg->type || ($arg->isNullConstant ?? false)) {
+            return $context->helper->loadValue(
+                new JITVariable(
+                    $context,
+                    JITVariable::TYPE_NATIVE_BOOL,
+                    JITVariable::KIND_VALUE,
+                    $context->getTypeFromString('int1')->constInt(0, false)
+                )
+            );
+        }
         if (JITVariable::TYPE_STRING !== $arg->type) {
             return null;
         }
@@ -184,5 +206,38 @@ final class unserialize extends Internal
     private static function extractUnserializeOptions(Variable $optionsVar): array
     {
         return self::parseUnserializeOptionsArray($optionsVar);
+    }
+
+    /** php-src var_unserializer.c — E_WARNING on max_depth, then E_NOTICE + error_get_last (#13715, #9206). */
+    private static function emitParseFailureNotice(Frame $frame, string $payload, ?array $options = null): void
+    {
+        if (null === $frame->vmContext) {
+            return;
+        }
+        $depthLimit = VmUnserializeFormat::lastMaxDepthExceeded();
+        if (null !== $depthLimit) {
+            $frame->vmContext->errors->triggerError(
+                \sprintf(
+                    'unserialize(): Maximum depth of %d exceeded. The depth limit can be changed using the max_depth unserialize() option or the unserialize_max_depth ini setting',
+                    $depthLimit
+                ),
+                ErrorReporter::E_WARNING,
+                '' !== $frame->scriptPath ? $frame->scriptPath : null,
+                $frame->vmContext,
+                $frame
+            );
+        }
+        $offset = VmUnserializeFormat::lastErrorOffset();
+        $length = VmUnserializeFormat::lastPayloadLength();
+        if (null === $offset || null === $length) {
+            return;
+        }
+        $frame->vmContext->errors->triggerError(
+            \sprintf('unserialize(): Error at offset %d of %d bytes', $offset, $length),
+            ErrorReporter::E_NOTICE,
+            '' !== $frame->scriptPath ? $frame->scriptPath : null,
+            $frame->vmContext,
+            $frame
+        );
     }
 }

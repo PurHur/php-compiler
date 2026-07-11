@@ -12,6 +12,8 @@ final class JitHtmlspecialcharsDecode
 {
     public static function decode(Context $context, Value $strPtr, Value $flags): Value
     {
+        \PHPCompiler\JIT\Builtin\StringHtmlspecialcharsDecode::ensureLinked($context);
+
         return $context->builder->call(
             $context->lookupFunction('__string__htmlspecialchars_decode'),
             $strPtr,

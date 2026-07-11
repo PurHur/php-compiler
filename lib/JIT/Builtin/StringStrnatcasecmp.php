@@ -7,13 +7,13 @@ namespace PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 
 /**
- * JIT LLVM body for strnatcasecmp (case-insensitive natural-order compare).
+ * JIT bridge for strnatcasecmp — delegates to {@see StringNaturalCompare} (#13535).
  */
 final class StringStrnatcasecmp
 {
     public static function ensureLinked(Context $context): void
     {
-        StringNaturalCompareJit::implementStrnatcasecmp($context);
+        StringNaturalCompare::ensureStrnatcasecmpLinked($context);
     }
 
     public static function implement(Context $context): void

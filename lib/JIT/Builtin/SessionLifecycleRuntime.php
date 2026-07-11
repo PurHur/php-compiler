@@ -101,21 +101,36 @@ final class SessionLifecycleRuntime
         $active = $context->builder->load(SessionStorageGlobals::$activeGlobal);
         $isActive = $context->builder->icmp(Builder::INT_NE, $active, $zeroI8);
         $bbInactive = BasicBlockHelper::append($context, 'ssr_inactive');
+        $bbCheckHeaders = BasicBlockHelper::append($context, 'ssr_check_headers');
+        $bbHeadersFail = BasicBlockHelper::append($context, 'ssr_headers_fail');
         $bbStart = BasicBlockHelper::append($context, 'ssr_start');
         $bbDone = BasicBlockHelper::append($context, 'ssr_done');
-        $context->builder->branchIf($isActive, $bbInactive, $bbStart);
+        $context->builder->branchIf($isActive, $bbInactive, $bbCheckHeaders);
 
         $context->builder->positionAtEnd($bbInactive);
         SessionStart::emitWriteBool($context, $outPtr, false);
         $context->builder->branch($bbDone);
 
+        $context->builder->positionAtEnd($bbCheckHeaders);
+        $headersSent = $context->builder->call($context->lookupFunction('__phpc_headers_sent'));
+        $headersSentNonZero = $context->builder->icmp(Builder::INT_NE, $headersSent, $i32->constInt(0, false));
+        $context->builder->branchIf($headersSentNonZero, $bbHeadersFail, $bbStart);
+
+        $context->builder->positionAtEnd($bbHeadersFail);
+        SessionStart::emitHeadersSentWarning($context);
+        SessionStart::emitWriteBool($context, $outPtr, false);
+        $context->builder->branch($bbDone);
+
         $context->builder->positionAtEnd($bbStart);
         SessionStorageGlobals::emitCallEnsureDefaults($context);
+        $idLen = $context->builder->load(SessionStorageGlobals::$idLenGlobal);
+        $noExistingId = $context->builder->icmp(Builder::INT_EQ, $idLen, $zeroI64);
         $cookieOk = $context->builder->call($context->lookupFunction('phpc_session_apply_incoming_cookie'));
         $cookieFailed = $context->builder->icmp(Builder::INT_EQ, $cookieOk, $i32->constInt(0, false));
+        $needNewId = $context->builder->and($cookieFailed, $noExistingId);
         $bbNewId = BasicBlockHelper::append($context, 'ssr_new_id');
         $bbAfterCookie = BasicBlockHelper::append($context, 'ssr_after_cookie');
-        $context->builder->branchIf($cookieFailed, $bbNewId, $bbAfterCookie);
+        $context->builder->branchIf($needNewId, $bbNewId, $bbAfterCookie);
 
         $context->builder->positionAtEnd($bbNewId);
         $context->builder->call($context->lookupFunction('__phpc_session_generate_new_id'));

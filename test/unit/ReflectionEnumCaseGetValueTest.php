@@ -28,4 +28,20 @@ PHP;
         $runtime->run($runtime->parseAndCompile($code, 'reflection_enum_case_get_value.php'));
         $this->assertSame("\\E::A\n1\n", ob_get_clean());
     }
+
+    public function testGetValueReturnsPureEnumCaseObject(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+enum Pure { case Alpha; }
+$c = (new ReflectionEnum(Pure::class))->getCase('Alpha');
+echo $c->getValue()->name, "\n";
+var_export($c->getValue());
+echo "\n";
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'reflection_enum_pure_get_value.php'));
+        $this->assertSame("Alpha\n\\Pure::Alpha\n", ob_get_clean());
+    }
 }

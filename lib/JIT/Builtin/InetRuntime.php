@@ -15,7 +15,8 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
 /**
  * JIT/AOT link for __compiler_ip2long/long2ip/inet_* via InetJitHelper PHP (#8969).
  *
- * Replaces ~590-line libc LLVM in embedded JIT. SSOT: {@see \PHPCompiler\ext\standard\VmInet}.
+ * Embed and standalone AOT compile the same PHP bridge; no libc inet LLVM (#13193).
+ * SSOT: {@see \PHPCompiler\ext\standard\VmInet}.
  * php-src: ext/standard/basic_functions.c — PHP_FUNCTION(ip2long), long2ip, inet_ntop, inet_pton
  */
 final class InetRuntime
@@ -73,12 +74,6 @@ final class InetRuntime
         $probe = $context->module->getNamedFunction('__compiler_ip2long');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);
-
-            return;
-        }
-
-        if (\PHPCompiler\JIT\Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            InetLibcBridge::implement($context);
 
             return;
         }

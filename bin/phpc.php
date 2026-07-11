@@ -22,11 +22,12 @@ declare(strict_types=1);
  *   phpc cgi [binary]                           CGI wrapper for AOT binary (issue #665)
  *   phpc fcgi [--listen host:port] [--project dir] [docroot]  FastCGI worker (#2427, #173)
  *   phpc lint [-r 'code'] [--json] entry.php
+ *   phpc lint --native <file.php>                 Gen-2 driver compile lint (#15601)
  *   phpc lint --project <entry.php> [--json]
  *   phpc lint --all <dir-or-file> [--json]
  *   phpc lint --bootstrap-inventory [--check] [--json]
  *   phpc init [--profile default|miniwebapp|sessionsweb|apijson|fileupload|throwsweb|selfhostprobe|fastcgiweb] [--force] [target-dir]
- *   phpc test [--fast] [--bootstrap] [--bootstrap-strict] [-- phpunit/ci-local args...]
+ *   phpc test [--fast] [--bootstrap] [--bootstrap-strict] [--native] [-- phpunit/ci-local args...]
  *   phpc doctor [--gates] [--selfhost] [--no-lint] [--jit-probe] [--aot-project-probe [dir]]  Env probes; --gates MiniWebApp; --selfhost NS2 (#2053)
  *   phpc validate-manifest [dir]                 Validate phpc.json schema and paths (issue #263)
  */
@@ -75,6 +76,7 @@ php-compiler CLI
       --binary path                             Force AOT binary path
       phpc fcgi --help                          Full flags and examples
   phpc lint [-r 'code'] [--json] <entry.php>    Report unsupported syntax (line-accurate)
+  phpc lint --native <file.php>                 Parse/compile lint via gen-2 driver -l (#15601)
   phpc lint --project <entry.php> [--json]    Entry + literal include/require chain
   phpc lint --all <dir-or-file> [--json]      All .php under a tree (aggregated)
   phpc lint --bootstrap-inventory [--check]   Lint all bin/vm.php-path files (#2208)
@@ -82,8 +84,11 @@ php-compiler CLI
       --json fields: file, line, kind, message, issue, issue_url (when tracked)
   phpc init [--profile default|miniwebapp|sessionsweb|apijson|fileupload|throwsweb|selfhostprobe|fastcgiweb] [--force] [target-dir]
                                               Scaffold web project (default, miniwebapp, sessionsweb, apijson, fileupload, throwsweb, selfhostprobe, or fastcgiweb)
+  phpc bootstrap init [--with-composer] [--skip-verify] [--sdk-url URL]
+                                              Bootstrap SDK cold start (gen-0 prelink, Tier 1; #15600/#15602)
   phpc test [--fast] [args...]                  Run ci-local.sh (full) or ci-fast.sh (no LLVM)
   phpc test --bootstrap [--strict]              Bootstrap subset (inventory + spine sync; #1961)
+  phpc test --native                            Native harness subset (AOT + VM compliance; #15599)
   phpc doctor [--gates] [--selfhost] [--no-lint] [--jit-probe] [--aot-project-probe [dir]]
                                               Probe environment; LLVM/JIT readiness (#717, #746)
       --gates                                     MiniWebApp ladder + self-host + 005-SessionsWeb (#1969)
@@ -282,18 +287,66 @@ switch ($command) {
         exit(runProcess(array_merge($php, [$repoRoot.'/bin/compile.php'], $args), $repoRoot));
 
     case 'lint':
-        exit(runProcess(array_merge($php, [$repoRoot.'/bin/lint.php'], $args), $repoRoot));
+        $nativeLint = false;
+        $lintArgs = [];
+        foreach ($args as $arg) {
+            if ('--native' === $arg) {
+                $nativeLint = true;
+                continue;
+            }
+            $lintArgs[] = $arg;
+        }
+        if ($nativeLint) {
+            if ([] === $lintArgs) {
+                fwrite(STDERR, "phpc lint --native: missing file.php\n");
+                exit(1);
+            }
+            if (count($lintArgs) > 1) {
+                fwrite(STDERR, "phpc lint --native: single file only\n");
+                exit(1);
+            }
+            $nativeLintScript = $repoRoot.'/script/bootstrap-native-lint.sh';
+            if (!is_executable($nativeLintScript)) {
+                fwrite(STDERR, "phpc lint --native: {$nativeLintScript} is not executable\n");
+                exit(1);
+            }
+            exit(runProcess([$nativeLintScript, $lintArgs[0]], $repoRoot));
+        }
+        exit(runProcess(array_merge($php, [$repoRoot.'/bin/lint.php'], $lintArgs), $repoRoot));
 
     case 'init':
         exit(runProcess(array_merge($php, [$repoRoot.'/bin/init.php'], $args), $repoRoot));
+
+    case 'bootstrap':
+        if ([] === $args) {
+            fwrite(STDERR, "phpc bootstrap: missing subcommand (try: phpc bootstrap init)\n");
+            exit(1);
+        }
+        $sub = array_shift($args);
+        if ('init' !== $sub) {
+            fwrite(STDERR, "phpc bootstrap: unknown subcommand: {$sub}\n");
+            exit(1);
+        }
+        $initScript = $repoRoot.'/script/bootstrap-init.sh';
+        if (!is_executable($initScript)) {
+            fwrite(STDERR, "phpc bootstrap: {$initScript} is not executable\n");
+            exit(1);
+        }
+        exit(runProcess(array_merge([$initScript], $args), $repoRoot));
 
     case 'test':
         $fast = false;
         $bootstrap = false;
         $bootstrapStrict = false;
+        $native = false;
         while ([] !== $args) {
             if (in_array($args[0], ['--fast', 'fast'], true)) {
                 $fast = true;
+                array_shift($args);
+                continue;
+            }
+            if ('--native' === $args[0]) {
+                $native = true;
                 array_shift($args);
                 continue;
             }
@@ -318,6 +371,18 @@ switch ($command) {
                 continue;
             }
             break;
+        }
+        if ($native) {
+            if ($fast || $bootstrap) {
+                fwrite(STDERR, "phpc test: --native cannot be combined with --fast or --bootstrap\n");
+                exit(1);
+            }
+            $nativeScript = $repoRoot.'/script/bootstrap-native-test-subset.sh';
+            if (!is_executable($nativeScript)) {
+                fwrite(STDERR, "phpc test: {$nativeScript} is not executable\n");
+                exit(1);
+            }
+            exit(runProcess([$nativeScript], $repoRoot));
         }
         if ($bootstrap) {
             if ($fast) {

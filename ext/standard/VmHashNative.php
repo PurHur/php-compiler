@@ -27,6 +27,12 @@ final class VmHashNative
         0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2,
     ];
 
+    /** Whether this build implements $algo without host ext/hash delegation (#13629). */
+    public static function supports(string $algo): bool
+    {
+        return 0 !== self::algoId($algo);
+    }
+
     public static function hash(string $algo, string $data, bool $raw = false): string|false
     {
         $id = self::algoId($algo);
@@ -113,7 +119,7 @@ final class VmHashNative
         bool $raw = false
     ): string {
         $id = self::algoId($algo);
-        if (0 === $id || $iterations < 1) {
+        if (0 === $id) {
             return '';
         }
         $hlen = self::digestLen($id);
@@ -141,7 +147,7 @@ final class VmHashNative
         return $hex;
     }
 
-    /** 0 unknown, 1 sha256, 2 sha1, 3 md5, 4 crc32b, 5 crc32, 6 adler32, 7 fnv132, 8 fnv1a32, 9 xxh3, 10 xxh128 */
+    /** 0 unknown, 1 sha256, 2 sha1, 3 md5, 4 crc32b, 5 crc32, 6 adler32, 7 fnv132, 8 fnv1a32, 9 xxh3, 10 xxh128, 11 crc32c */
     private static function algoId(string $algo): int
     {
         if (self::eqCi($algo, 'sha256')) {
@@ -173,6 +179,21 @@ final class VmHashNative
         }
         if (self::eqCi($algo, 'xxh128')) {
             return 10;
+        }
+        if (self::eqCi($algo, 'crc32c')) {
+            return 11;
+        }
+        if (self::eqCi($algo, 'sha3-224')) {
+            return 12;
+        }
+        if (self::eqCi($algo, 'sha3-256')) {
+            return 13;
+        }
+        if (self::eqCi($algo, 'sha3-384')) {
+            return 14;
+        }
+        if (self::eqCi($algo, 'sha3-512')) {
+            return 15;
         }
 
         return 0;
@@ -261,6 +282,21 @@ final class VmHashNative
         if ($algo >= 4 && $algo <= 8) {
             return 4;
         }
+        if (11 === $algo) {
+            return 4;
+        }
+        if (12 === $algo) {
+            return 28;
+        }
+        if (13 === $algo) {
+            return self::SHA256_DIGEST_SIZE;
+        }
+        if (14 === $algo) {
+            return 48;
+        }
+        if (15 === $algo) {
+            return 64;
+        }
         if (1 === $algo) {
             return self::SHA256_DIGEST_SIZE;
         }
@@ -269,6 +305,18 @@ final class VmHashNative
         }
 
         return self::MD5_DIGEST_SIZE;
+    }
+
+    /** HMAC block size in bytes — SHA-3 uses sponge rate (ext/hash/hash.c). */
+    private static function hmacBlockSize(int $algo): int
+    {
+        return match ($algo) {
+            12 => 144,
+            13 => 136,
+            14 => 104,
+            15 => 72,
+            default => 64,
+        };
     }
 
     /** @param list<int> $digest */
@@ -326,6 +374,21 @@ final class VmHashNative
         }
         if (10 === $algo) {
             return VmHashXxh::xxh128DigestBytes($data);
+        }
+        if (11 === $algo) {
+            return VmHashNonCrypto::digestBytes(VmCrc32c::compute($data));
+        }
+        if (12 === $algo) {
+            return VmHashSha3::sha3_224DigestBytes($data);
+        }
+        if (13 === $algo) {
+            return VmHashSha3::sha3_256DigestBytes($data);
+        }
+        if (14 === $algo) {
+            return VmHashSha3::sha3_384DigestBytes($data);
+        }
+        if (15 === $algo) {
+            return VmHashSha3::sha3_512DigestBytes($data);
         }
 
         return self::md5($data);
@@ -836,9 +899,10 @@ final class VmHashNative
     /** @return list<int> */
     private static function hmac(int $algo, string $data, string $key): array
     {
-        $kPad = \array_fill(0, 64, 0);
+        $blockSize = self::hmacBlockSize($algo);
+        $kPad = \array_fill(0, $blockSize, 0);
         $dlen = self::digestLen($algo);
-        if (\strlen($key) > 64) {
+        if (\strlen($key) > $blockSize) {
             $tk = self::digest($algo, $key);
             for ($i = 0; $i < $dlen; $i++) {
                 $kPad[$i] = $tk[$i];
@@ -849,20 +913,20 @@ final class VmHashNative
                 $kPad[$i] = \ord($key[$i]);
             }
         }
-        for ($i = 0; $i < 64; $i++) {
+        for ($i = 0; $i < $blockSize; $i++) {
             $kPad[$i] ^= 0x36;
         }
         $innerBuf = '';
-        for ($i = 0; $i < 64; $i++) {
+        for ($i = 0; $i < $blockSize; $i++) {
             $innerBuf .= \chr($kPad[$i]);
         }
         $innerBuf .= $data;
         $inner = self::digest($algo, $innerBuf);
-        for ($i = 0; $i < 64; $i++) {
+        for ($i = 0; $i < $blockSize; $i++) {
             $kPad[$i] ^= (0x36 ^ 0x5C);
         }
         $outerBuf = '';
-        for ($i = 0; $i < 64; $i++) {
+        for ($i = 0; $i < $blockSize; $i++) {
             $outerBuf .= \chr($kPad[$i]);
         }
         for ($i = 0; $i < $dlen; $i++) {

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\libxml;
 
+use PHPCompiler\ext\standard\VmCallable;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\ClassProperty;
@@ -22,6 +23,12 @@ final class VmLibxml
     public const CLASS_LC = 'libxmlerror';
 
     private static bool $useInternalErrors = false;
+
+    private static ?Variable $streamsContext = null;
+
+    private static bool $entityLoaderDisabled = false;
+
+    private static ?Variable $externalEntityLoader = null;
 
     /** @var list<array{level: int, code: int, column: int, message: string, file: string, line: int}> */
     private static array $errors = [];
@@ -55,6 +62,61 @@ final class VmLibxml
         return $previous;
     }
 
+    /** php-src ext/libxml/libxml.c — libxml_set_streams_context() global IO context (#14495). */
+    public static function setStreamsContext(Variable $context): void
+    {
+        self::$streamsContext = $context->resolveIndirect();
+    }
+
+    public static function streamsContext(): ?Variable
+    {
+        return self::$streamsContext;
+    }
+
+    /** php-src ext/libxml/libxml.c — php_libxml_disable_entity_loader() (#6379). */
+    public static function disableEntityLoader(bool $disable = true): bool
+    {
+        $previous = self::$entityLoaderDisabled;
+        self::$entityLoaderDisabled = $disable;
+
+        return $previous;
+    }
+
+    public static function entityLoaderDisabled(): bool
+    {
+        return self::$entityLoaderDisabled;
+    }
+
+    /** php-src ext/libxml/libxml.c — libxml_set_external_entity_loader() (#6379, #14953). */
+    public static function setExternalEntityLoader(Context $ctx, Variable $resolver): void
+    {
+        $resolved = $resolver->resolveIndirect();
+        if (Variable::TYPE_NULL === $resolved->type) {
+            self::$externalEntityLoader = null;
+
+            return;
+        }
+        if (!VmCallable::isCallable($ctx, $resolver)) {
+            throw new \TypeError(
+                'libxml_set_external_entity_loader(): Argument #1 ($resolver_function) must be a valid callback'
+            );
+        }
+        $stored = new Variable();
+        $stored->copyFrom($resolved);
+        self::$externalEntityLoader = $stored;
+    }
+
+    public static function getExternalEntityLoader(): ?Variable
+    {
+        return self::$externalEntityLoader;
+    }
+
+    public static function resetEntityLoaderStateForTest(): void
+    {
+        self::$entityLoaderDisabled = false;
+        self::$externalEntityLoader = null;
+    }
+
     public static function getErrors(Context $ctx): HashTable
     {
         $ht = new HashTable();
@@ -63,6 +125,22 @@ final class VmLibxml
         }
 
         return $ht;
+    }
+
+    /**
+     * php-src libxml_get_last_error() — tail of the internal error buffer, or false when empty.
+     */
+    public static function getLastError(Context $ctx): Variable
+    {
+        $var = new Variable();
+        if ([] === self::$errors) {
+            $var->bool(false);
+
+            return $var;
+        }
+        $var->copyFrom(self::createErrorObject($ctx, self::$errors[\count(self::$errors) - 1]));
+
+        return $var;
     }
 
     public static function clearErrors(): void
@@ -77,7 +155,8 @@ final class VmLibxml
         Context $ctx,
         array $record,
         ?Frame $frame = null,
-        ?string $file = null
+        ?string $file = null,
+        ?string $warningMessage = null
     ): void {
         if (self::$useInternalErrors) {
             self::$errors[] = $record;
@@ -85,10 +164,12 @@ final class VmLibxml
             return;
         }
 
+        // libxml record line is XML entity line; PHP warning cites user call site via Frame (#11163, #15140).
+        $warningLine = null !== $frame ? 0 : $record['line'];
         $ctx->errors->languageWarning(
-            $record['message'],
+            $warningMessage ?? $record['message'],
             '' !== $record['file'] ? $record['file'] : $file,
-            $record['line'],
+            $warningLine,
             $ctx,
             $frame
         );

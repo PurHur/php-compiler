@@ -25,6 +25,8 @@ class ClassProperty {
     public bool $propertyHookVirtual = false;
     /** Individual readonly property (issue #3149, promoted readonly #3432). */
     public bool $readonly = false;
+    /** PHP 8.4 lazy modifier — default initializer runs on first read (#16813). */
+    public bool $lazy = false;
     /** Constructor promotion (#7383, ext/reflection/php_reflection.c reflection_property_is_promoted). */
     public bool $fromConstructorPromotion = false;
     /** Per-instance `new` default initializer (issue #3391). */
@@ -36,6 +38,8 @@ class ClassProperty {
     public int $setVisibility = 0;
     /** Asymmetric get visibility; 0 means same as write (#5059). */
     public int $getVisibility = 0;
+    /** Source declared an explicit read modifier before asymmetric set (#15995). */
+    public bool $asymmetricExplicitRead = false;
     /** Lowercase class that declared this property (issue #145). */
     public string $declaringClassLc;
 
@@ -47,16 +51,20 @@ class ClassProperty {
         int $visibility = \PHPCfg\Func::FLAG_PUBLIC,
         string $declaringClassLc = '',
         int $setVisibility = 0,
-        int $getVisibility = 0
+        int $getVisibility = 0,
+        bool $asymmetricExplicitRead = false,
+        bool $lazy = false
     ) {
         $this->name = $name;
         $this->default = $default;
         $this->prototype = $prototype;
         $this->readonly = $readonly;
+        $this->lazy = $lazy;
         $this->visibility = $visibility;
         $this->declaringClassLc = $declaringClassLc;
         $this->setVisibility = $setVisibility;
         $this->getVisibility = $getVisibility;
+        $this->asymmetricExplicitRead = $asymmetricExplicitRead;
     }
 
     public function hasRuntimeDefaultInit(): bool
@@ -66,7 +74,12 @@ class ClassProperty {
 
     public function getVariable(): Variable {
         $var = clone $this->prototype;
-        if (!is_null($this->default) && !$this->hasRuntimeDefaultInit()) {
+        if (
+            !is_null($this->default)
+            && !$this->hasRuntimeDefaultInit()
+            && !$this->lazy
+            && !($this->readonly && $this->fromConstructorPromotion)
+        ) {
             $var->copyFrom($this->default);
         }
 

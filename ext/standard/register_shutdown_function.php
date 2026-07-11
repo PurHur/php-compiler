@@ -27,10 +27,8 @@ final class register_shutdown_function extends Internal
 
     public function execute(Frame $frame): void
     {
+        $this->requireAtLeastArgCount($frame, 'register_shutdown_function', 1);
         $argc = \count($frame->calledArgs);
-        if ($argc < 1) {
-            throw new \LogicException('register_shutdown_function() requires at least one argument');
-        }
         $callable = $frame->calledArgs[0];
         if (EnumCaseSupport::isEnumCaseVariable($callable)) {
             throw new \TypeError(ShutdownCallbackPolicy::invalidCallbackTypeError());
@@ -47,14 +45,12 @@ final class register_shutdown_function extends Internal
 
             return;
         }
-        if (Variable::TYPE_STRING === $resolved->type) {
-            $callableCopy = new Variable();
-            $callableCopy->string($resolved->toString());
-            ShutdownQueue::register($callableCopy, ...$extra);
-
-            return;
+        if (!VmCallable::isCallable($frame->vmContext, $callable)) {
+            throw new \TypeError(ShutdownCallbackPolicy::invalidCallbackTypeError());
         }
-        throw new \TypeError(ShutdownCallbackPolicy::invalidCallbackTypeError());
+        $callableCopy = new Variable();
+        $callableCopy->copyFrom($resolved);
+        ShutdownQueue::register($callableCopy, ...$extra);
     }
 
     public function call(Context $context, JITVariable ...$args): Value

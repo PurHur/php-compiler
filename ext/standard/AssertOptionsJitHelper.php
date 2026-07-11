@@ -85,6 +85,17 @@ final class AssertOptionsJitHelper
         return self::$callback;
     }
 
+    /** assert_options(ASSERT_CALLBACK) get — null when unset (php-src RETURN_NULL). */
+    public static function getCallbackForOptions(): ?string
+    {
+        return self::$callback;
+    }
+
+    public static function hasCallback(): int
+    {
+        return null === self::$callback ? 0 : 1;
+    }
+
     public static function setCallbackString(string $value): string
     {
         $old = self::getCallbackString();

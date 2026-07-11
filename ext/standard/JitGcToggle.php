@@ -38,8 +38,16 @@ final class JitGcToggle
     /** @return Value */
     public static function disable(Context $context, JITVariable ...$args): Value
     {
-        if (\count($args) > 0) {
-            throw new \LogicException('gc_disable() takes no arguments');
+        $argc = \count($args);
+        if ($argc > 0) {
+            TypeErrorRaise::ensureLinked($context);
+            TypeErrorRaise::emitArgumentCountError(
+                $context,
+                'gc_disable() expects exactly 0 arguments, '.$argc.' given'
+            );
+            $slot = JitValueBox::alloc($context);
+
+            return JitValueBox::pointer($context, $slot);
         }
         GcToggleRuntime::ensureLinked($context);
         $context->builder->call($context->lookupFunction('phpc_gc_disable'));

@@ -6,11 +6,14 @@ namespace PHPCompiler;
 
 use PHPUnit\Framework\TestCase;
 
-/** Closure::getUsedVariables() VM builtin (#6067). */
+/** Closure::getUsedVariables() VM builtin (#6067, #16735 profile gate). */
 final class ClosureGetUsedVariablesBuiltinTest extends TestCase
 {
     public function testClosureGetUsedVariablesReturnsCaptureMap(): void
     {
+        if (!CompilerVersion::supportsClosureGetUsedVariables()) {
+            $this->markTestSkipped('Closure::getUsedVariables() requires PHP_COMPILER_PROFILE=8.4');
+        }
         $rt = new Runtime();
         $code = <<<'PHP'
 <?php

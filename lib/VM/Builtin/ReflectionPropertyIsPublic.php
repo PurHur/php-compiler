@@ -34,14 +34,21 @@ final class ReflectionPropertyIsPublic extends VmClassMethod
 
             return;
         }
-        $meta = VmReflection::findClassProperty($entry, $property, $ctx);
+        if (ReflectionSupport::isDynamicReflectionProperty($receiver)) {
+            if (null !== $frame->returnVar) {
+                $frame->returnVar->bool(true);
+            }
+
+            return;
+        }
+        $meta = VmReflection::propertyVisibilityMeta($entry, $property, $ctx);
         if (null === $meta) {
             ReflectionSupport::throwReflectionException(
                 ReflectionSupport::propertyNotFoundMessage($className, $property)
             );
         }
         if (null !== $frame->returnVar) {
-            $frame->returnVar->bool(MethodVisibility::isPublic($meta->visibility));
+            $frame->returnVar->bool(MethodVisibility::isPublic($meta['visibility']));
         }
     }
 }

@@ -5,8 +5,12 @@ declare(strict_types=1);
 namespace PHPCompiler\Compiler;
 
 use PHPCfg\Op;
+use PHPCfg\Op\Expr\Param;
 use PHPCfg\Operand;
 use PHPCfg\Script;
+use PHPCompiler\Ast\AsymmetricVisibilityRewriter;
+use PHPCompiler\CompilerVersion;
+use PHPCompiler\MethodVisibility;
 use PHPCompiler\VM\ClassReadonly;
 
 /**
@@ -16,6 +20,7 @@ use PHPCompiler\VM\ClassReadonly;
  * php-src: Zend/zend_compile.c — zend_compile_class_decl, zend_compile_property_info();
  * Zend/zend_inheritance.c — inheritance_check_properties(), readonly parent/child checks;
  * per-property MODIFIER_READONLY cannot have default initializer;
+ * PHP 8.2+ readonly class (ZEND_ACC_READONLY) inherits readonly on instance props — no defaults (#17379);
  * PHP 8.3+ anonymous classes may use per-property `readonly` with defaults (#6724);
  * PHP 8.3+ `new readonly class` sets ZEND_ACC_READONLY on the anonymous class (#6991).
  */
@@ -148,19 +153,36 @@ final class ReadonlyClassCompileCheck
         bool $classReadonly
     ): void {
         foreach ($class->stmts->children as $member) {
-            if (!$member instanceof Op\Stmt\Property || $member->static) {
+            if ($member instanceof Op\Stmt\Property && !$member->static) {
+                if (!$classReadonly && !$this->isCfgPropertyReadonly($member)) {
+                    continue;
+                }
+                if ($this->propertyHasDeclaredType($member->declaredType ?? null)) {
+                    continue;
+                }
+                $propName = $this->propertyDisplayName($member->name);
+                throw new \CompileError(
+                    "Readonly property {$classDisplay}::\${$propName} must have type"
+                );
+            }
+            if (!$member instanceof Op\Stmt\ClassMethod || !$this->isConstructor($member)) {
                 continue;
             }
-            if (!$classReadonly && !$this->isCfgPropertyReadonly($member)) {
-                continue;
+            foreach ($member->func->params as $param) {
+                if (!$this->isPromotedParam($param)) {
+                    continue;
+                }
+                if (!$classReadonly && !$this->isPromotedParamReadonly($param)) {
+                    continue;
+                }
+                if ($this->propertyHasDeclaredType($param->declaredType ?? null)) {
+                    continue;
+                }
+                $propName = $this->propertyDisplayName($param->name);
+                throw new \CompileError(
+                    "Readonly property {$classDisplay}::\${$propName} must have type"
+                );
             }
-            if ($this->propertyHasDeclaredType($member->declaredType ?? null)) {
-                continue;
-            }
-            $propName = $this->propertyDisplayName($member->name);
-            throw new \CompileError(
-                "Readonly property {$classDisplay}::\${$propName} must have type"
-            );
         }
     }
 
@@ -184,8 +206,8 @@ final class ReadonlyClassCompileCheck
 
     private function verifyNoPropertyDefaults(Op\Stmt\Class_ $class, string $classDisplay, bool $classReadonly): void
     {
-        // php-src ZEND_ACC_ANON_READONLY: per-property readonly on anonymous classes (#6724).
-        if ($this->isAnonymousClass($class->name)) {
+        // php-src ZEND_ACC_ANON_READONLY: per-property readonly on anonymous classes (#6724, PHP 8.3+).
+        if ($this->isAnonymousClass($class->name) && CompilerVersion::supportsReadonlyAnonymousClass()) {
             return;
         }
 
@@ -193,7 +215,7 @@ final class ReadonlyClassCompileCheck
             if (!$member instanceof Op\Stmt\Property) {
                 continue;
             }
-            // php-src zend_compile.c: MODIFIER_READONLY and ZEND_ACC_READONLY both forbid defaults (#9653).
+            // php-src zend_compile.c: ZEND_ACC_READONLY_CLASS sets MODIFIER_READONLY — no defaults (#17379).
             if (!$classReadonly && !$this->isCfgPropertyReadonly($member)) {
                 continue;
             }
@@ -298,6 +320,28 @@ final class ReadonlyClassCompileCheck
         }
 
         return null;
+    }
+
+    private function isConstructor(Op\Stmt\ClassMethod $method): bool
+    {
+        $name = $method->func->name ?? null;
+        if (!is_string($name)) {
+            return false;
+        }
+
+        return '__construct' === strtolower($name);
+    }
+
+    private function isPromotedParam(Param $param): bool
+    {
+        return 0 !== MethodVisibility::mask($param->promotionFlags)
+            || (property_exists($param, 'promotionSetVisibility') && 0 !== (int) $param->promotionSetVisibility)
+            || 0 !== AsymmetricVisibilityRewriter::extractSetVisibilityFromAttributes($param->getAttributes());
+    }
+
+    private function isPromotedParamReadonly(Param $param): bool
+    {
+        return property_exists($param, 'promotionReadonly') && $param->promotionReadonly;
     }
 
     private function isCfgPropertyReadonly(Op\Stmt\Property $member): bool

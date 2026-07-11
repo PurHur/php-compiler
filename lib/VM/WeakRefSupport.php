@@ -42,8 +42,14 @@ final class WeakRefSupport
         if (Variable::TYPE_ARRAY !== $slot->resolveIndirect()->type) {
             $slot->newArray();
         }
+        $key = $key->resolveIndirect();
         $copy = new Variable();
-        $copy->copyFrom($key);
+        if (Variable::TYPE_OBJECT === $key->type) {
+            // GC mark list only — must not retain a strong ref (zend_weakrefs.c, #14103).
+            $copy->weakObject($key->toObject());
+        } else {
+            $copy->copyFrom($key);
+        }
         $slot->toArray()->append($copy);
     }
 
@@ -104,6 +110,40 @@ final class WeakRefSupport
         }
 
         throw new \TypeError('WeakMap key must be an object');
+    }
+
+    /**
+     * Stable hash-table storage key for enum case array offsets, or null when not an enum case (#9871).
+     */
+    public static function objectKeyIfEnumCase(Variable $key): ?string
+    {
+        $key = $key->resolveIndirect();
+        if (EnumCaseSupport::isEnumCaseVariable($key)) {
+            return self::objectKey($key);
+        }
+        if (Variable::TYPE_OBJECT === $key->type && EnumCaseSupport::isEnumCase($key->toObject())) {
+            return self::objectKey($key);
+        }
+
+        return null;
+    }
+
+    /** Materialize int/string/enum-case keys from hash-table storage (#9871, zend_hash.c). */
+    public static function materializeArrayKey(Variable $key): Variable
+    {
+        if (Variable::TYPE_STRING === $key->type) {
+            $resolved = self::resolveMapKeyVariable($key->toString());
+            if (null !== $resolved) {
+                $out = new Variable();
+                $out->copyFrom($resolved);
+
+                return $out;
+            }
+        }
+        $out = new Variable();
+        $out->copyFrom($key);
+
+        return $out;
     }
 
     public static function objectKey(Variable $key): string
@@ -191,8 +231,18 @@ final class WeakRefSupport
             if (WeakRefRegistry::isReferentInvalidated($objectId)) {
                 return false;
             }
+            if (!ObjectRegistry::isRegistered($objectId)) {
+                return false;
+            }
+            if ($object->refCount <= 0) {
+                return false;
+            }
+            // Orphan internal refcount with no live scope binding — treat as collected (#13474).
+            if (!self::hasStrongScopeBinding($objectId)) {
+                return false;
+            }
 
-            return ObjectRegistry::isRegistered($objectId);
+            return true;
         }
 
         return true;
@@ -218,7 +268,11 @@ final class WeakRefSupport
                 continue;
             }
             $objectId = (int) substr($storedKey, 2);
-            if (!ObjectRegistry::isRegistered($objectId)) {
+            if (
+                !ObjectRegistry::isRegistered($objectId)
+                || WeakRefRegistry::isReferentInvalidated($objectId)
+                || !self::hasStrongScopeBinding($objectId)
+            ) {
                 $keyVar->string($storedKey);
                 $ht->offsetUnset($keyVar);
                 WeakRefRegistry::unregisterWeakMapEntry($objectId, $weakMap->id, $storedKey);
@@ -244,6 +298,33 @@ final class WeakRefSupport
             }
         }
         $dst->copyFrom($target);
+    }
+
+    /** True when a named local, dynamic local, or global still holds a strong ref (#13474, #14103, #14132). */
+    public static function hasStrongScopeBinding(int $objectId): bool
+    {
+        $vm = \PHPCompiler\VM::running();
+        if (null === $vm) {
+            return false;
+        }
+        $found = false;
+        $vm->visitNamedStrongRefRoots(static function (Variable $var) use ($objectId, &$found): void {
+            if ($found) {
+                return;
+            }
+            $resolved = $var->resolveIndirect();
+            if (Variable::TYPE_OBJECT !== $resolved->type) {
+                return;
+            }
+            try {
+                if ($resolved->toObject()->id === $objectId) {
+                    $found = true;
+                }
+            } catch (\LogicException) {
+            }
+        });
+
+        return $found;
     }
 
     /** Stable WeakMap hash key for enum case operands — identity is class+name, not ephemeral object id (#5629). */

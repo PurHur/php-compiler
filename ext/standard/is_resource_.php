@@ -72,7 +72,8 @@ final class is_resource_ extends Internal
         if ($v->isStreamResource()) {
             $handle = \PHPCompiler\VM\ResourceSupport::resolveHandle($v);
 
-            return null !== $handle && VmFs::isValidHandle($handle);
+            return null !== $handle
+                && (VmFs::isValidHandle($handle) || VmFs::isFailedStreamHandle($handle));
         }
         if ($v->isDirResource()) {
             $handle = \PHPCompiler\VM\ResourceSupport::resolveHandle($v);

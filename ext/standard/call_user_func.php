@@ -27,7 +27,10 @@ final class call_user_func extends Internal
     {
         $argc = \count($frame->calledArgs);
         if ($argc < 1) {
-            throw new \LogicException('call_user_func() requires at least one argument');
+            throw new \ArgumentCountError(\sprintf(
+                'call_user_func() expects at least 1 argument, %d given',
+                $argc
+            ));
         }
         $ctx = VmReflection::requireContext($frame);
         $callback = $frame->calledArgs[0];
@@ -51,7 +54,7 @@ final class call_user_func extends Internal
         }
         if (2 === $argc) {
             $sole = $frame->calledArgs[1]->resolveIndirect();
-            if (Variable::TYPE_ARRAY === $sole->type) {
+            if (Variable::TYPE_ARRAY === $sole->type && self::arrayArgShouldUnpack($sole)) {
                 return VmCallable::arrayVariableToArgEntries($sole);
             }
         }
@@ -67,10 +70,32 @@ final class call_user_func extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (\count($args) < 1) {
-            throw new \LogicException('call_user_func() requires at least one argument');
+        $argc = \count($args);
+        if ($argc < 1) {
+            throw new \ArgumentCountError(\sprintf(
+                'call_user_func() expects at least 1 argument, %d given',
+                $argc
+            ));
         }
 
         return JitCallUserFunc::invoke($context, $args[0], \array_slice($args, 1));
+    }
+
+    /** Named-arg lowering packs string keys; list arrays are single value args (#14829). */
+    private static function arrayArgShouldUnpack(Variable $arrayVar): bool
+    {
+        foreach ($arrayVar->toArray()->iterateKeyed(false) as $pair) {
+            [$keyVar, ] = $pair;
+            $key = $keyVar->resolveIndirect();
+            if (Variable::TYPE_STRING !== $key->type) {
+                continue;
+            }
+            $keyStr = $key->toString();
+            if ('' !== $keyStr && !ctype_digit($keyStr)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

@@ -32,9 +32,26 @@ final class JitVmHelperLink
             return;
         }
 
+        // Split compilation (#15889): the cached helper TU provides these
+        // symbols as available_externally imports + helpers.o at link time,
+        // skipping the nested PHP lowering below entirely.
+        if (\PHPCompiler\AOT\HelperRuntimeCache::tryProvide($context, $compiledHelpers)) {
+            $missing = false;
+            foreach ($compiledHelpers as $logical) {
+                if (!isset($context->functions[\strtolower($logical)])) {
+                    $missing = true;
+                    break;
+                }
+            }
+            if (!$missing) {
+                return;
+            }
+        }
+
         $runtime = $context->runtime;
-        $path = \dirname(__DIR__).$relativeHelperPath;
+        $path = self::resolveHelperPath($relativeHelperPath);
         $basename = \basename($path);
+        NestedVmActiveContextLlvm::ensureMethod($context);
         NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path, $basename, $compileLabel): void {
             $block = $runtime->parseAndCompile((string) \file_get_contents($path), $basename);
             if (null === $block) {
@@ -77,10 +94,16 @@ final class JitVmHelperLink
         string $issueTag
     ): void {
         $probe = $context->module->getNamedFunction($abiName);
-        if (self::bridgeEntryComplete($probe)) {
+        if (self::hasNamedBridgeEntry($probe, $entryBlockName)) {
             $context->registerFunction($abiName, $probe);
 
             return;
+        }
+
+        $savedBlock = null;
+        try {
+            $savedBlock = $context->builder->getInsertBlock();
+        } catch (\Throwable) {
         }
 
         self::ensureCompiled($context, $relativeHelperPath, $compiledHelpers, $issueTag);
@@ -100,10 +123,63 @@ final class JitVmHelperLink
             $args[] = JitNestedHelperCoerce::coerceArgForHelper($context, $abiParam, $helperTy);
         }
         $result = $context->builder->call($helperFn, ...$args);
-        $ret = JitNestedHelperCoerce::coerceBridgeResult($context, $result, $returnType);
-        $context->builder->returnValue($ret);
+        if ('void' === $context->getStringFromType($returnType)) {
+            $context->builder->returnVoid();
+        } else {
+            $ret = JitNestedHelperCoerce::coerceBridgeResult($context, $result, $returnType);
+            $context->builder->returnValue($ret);
+        }
         $context->registerFunction($abiName, $fn);
-        $context->builder->clearInsertionPosition();
+
+        if (null !== $savedBlock) {
+            $context->builder->positionAtEnd($savedBlock);
+        } else {
+            $fallback = null;
+            if ('' !== $context->activeFunction && isset($context->functions[$context->activeFunction])) {
+                $active = $context->functions[$context->activeFunction];
+                if ($active instanceof LlvmFunction) {
+                    $fallback = $active;
+                }
+            }
+            if (null === $fallback && $context->main instanceof LlvmFunction) {
+                $fallback = $context->main;
+            }
+            if (null !== $fallback && $fallback->countBasicBlocks() > 0) {
+                $context->builder->positionAtEnd($fallback->getEntryBasicBlock());
+            } else {
+                $context->builder->clearInsertionPosition();
+            }
+        }
+    }
+
+    /**
+     * Resolve helper source path: ext/* and lib/* live at repo root; /VM/* under lib/.
+     */
+    private static function resolveHelperPath(string $relativeHelperPath): string
+    {
+        if (\str_starts_with($relativeHelperPath, '/ext/')
+            || \str_starts_with($relativeHelperPath, '/lib/')) {
+            return \dirname(__DIR__, 2).$relativeHelperPath;
+        }
+
+        return \dirname(__DIR__).$relativeHelperPath;
+    }
+
+    public static function hasNamedBridgeEntry(?LlvmFunction $probe, string $entryBlockName): bool
+    {
+        if (null === $probe || '' === $entryBlockName) {
+            return false;
+        }
+        try {
+            foreach ($probe->getBasicBlocks() as $block) {
+                if ($block->getName() === $entryBlockName && null !== $block->getTerminator()) {
+                    return true;
+                }
+            }
+        } catch (\Throwable) {
+        }
+
+        return false;
     }
 
     private static function bridgeEntryComplete(?LlvmFunction $probe): bool
@@ -124,6 +200,11 @@ final class JitVmHelperLink
     private static function bridgeEntryForEmit(LlvmFunction $fn, string $entryBlockName): \PHPLLVM\BasicBlock
     {
         try {
+            foreach ($fn->getBasicBlocks() as $block) {
+                if ($block->getName() === $entryBlockName) {
+                    return $block;
+                }
+            }
             $blocks = $fn->getBasicBlocks();
             $entry = $blocks[0] ?? null;
             if (null !== $entry && null === $entry->getTerminator()) {

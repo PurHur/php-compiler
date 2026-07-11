@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT;
 
+use PHPCompiler\JIT\Builtin\UndefinedGlobalVariableRuntime;
 use PHPLLVM\Builder;
 use PHPCompiler\VM\Variable as VmVariable;
 
@@ -27,6 +28,9 @@ final class GlobalsTableInit
         $name = self::resolveStringKey($context, $key);
         if (null === $name) {
             throw new \LogicException('$GLOBALS[] JIT lowering requires a compile-time string key (issue #4423)');
+        }
+        if (!$forWrite && !self::hasGlobal($context, $name)) {
+            UndefinedGlobalVariableRuntime::emitWarningForName($context, $name);
         }
 
         return self::ensureGlobal($context, $name);

@@ -12,14 +12,24 @@ final class DomRegistry
     /** @var array<int, DomNodeState> */
     private static array $states = [];
 
+    /** @var array<int, ObjectEntry> */
+    private static array $entries = [];
+
     public static function reset(): void
     {
         self::$states = [];
+        self::$entries = [];
     }
 
     public static function attach(ObjectEntry $entry, DomNodeState $state): void
     {
         self::$states[$entry->id] = $state;
+        self::$entries[$entry->id] = $entry;
+    }
+
+    public static function entry(int $id): ?ObjectEntry
+    {
+        return self::$entries[$id] ?? null;
     }
 
     public static function state(ObjectEntry $entry): DomNodeState

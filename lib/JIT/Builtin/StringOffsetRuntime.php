@@ -56,13 +56,24 @@ final class StringOffsetRuntime
             return;
         }
 
+        $savedBlock = null;
+        try {
+            $savedBlock = $context->builder->getInsertBlock();
+        } catch (\Throwable) {
+        }
+
         if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
             self::implementStandaloneNormalizeBridge($context);
         } else {
             self::ensureJitHelperCompiled($context);
             self::implementEmbedNormalizeBridge($context);
         }
-        $context->builder->clearInsertionPosition();
+
+        if (null !== $savedBlock) {
+            $context->builder->positionAtEnd($savedBlock);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
     }
 
     public static function emitIncDecError(Context $context): void
@@ -72,10 +83,16 @@ final class StringOffsetRuntime
         ErrorRaise::emitRaise($context, StringOffsetJitHelper::incDecErrorMessage());
     }
 
-    public static function dimFetch(Context $context, Value $strSlot, JitVariable $dim): Value
+    public static function emitEmptyAssignError(Context $context): void
+    {
+        ErrorRaise::registerDeclarations($context);
+        ErrorRaise::ensureLinked($context);
+        ErrorRaise::emitRaise($context, StringOffsetJitHelper::emptyAssignErrorMessage());
+    }
+
+    public static function dimFetch(Context $context, Value $str, JitVariable $dim): Value
     {
         self::ensureLinked($context);
-        $str = $context->builder->load($strSlot);
         $map = $context->structFieldMap['__string__'];
         $chars = $context->builder->structGep($str, $map['value']);
         $len = $context->builder->load(
@@ -104,6 +121,11 @@ final class StringOffsetRuntime
 
     public static function dimAssign(Context $context, Value $charPtr, JitVariable $value): void
     {
+        if (self::assignRhsIsEmptyAtCompileTime($value)) {
+            self::emitEmptyAssignError($context);
+
+            return;
+        }
         $byte = self::assignByte($context, $value);
         $context->builder->store($byte, $charPtr);
     }
@@ -121,6 +143,15 @@ final class StringOffsetRuntime
             $context->getTypeFromString('int64')->constInt(1, false),
             $bufChar
         );
+    }
+
+    private static function assignRhsIsEmptyAtCompileTime(JitVariable $value): bool
+    {
+        if (JitVariable::TYPE_NULL === $value->type || $value->isNullConstant) {
+            return true;
+        }
+
+        return '' === ($value->compileTimeString ?? null);
     }
 
     private static function assignByte(Context $context, JitVariable $value): Value

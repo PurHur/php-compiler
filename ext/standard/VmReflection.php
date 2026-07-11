@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\Block;
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\Frame;
 use PHPCompiler\Func;
 use PHPCompiler\Func\Internal as FuncInternal;
@@ -15,6 +17,8 @@ use PHPCompiler\VM\ClassProperty;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\EnumSupport;
+use PHPCompiler\VM\ErrorReporter;
+use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\InterfaceCheck;
 use PHPCompiler\VM\LazyGhostTraitSupport;
 use PHPCompiler\VM\ReflectionSupport;
@@ -34,6 +38,144 @@ final class VmReflection
         }
 
         return $frame->vmContext;
+    }
+
+    /**
+     * Strip leading backslash on global names for introspection builtins (#12176).
+     *
+     * php-src: ext/standard/basic_functions.c — php_stripcslashes / name normalization
+     */
+    public static function normalizeGlobalIntrospectionName(string $name): string
+    {
+        return ltrim($name, '\\');
+    }
+
+    /**
+     * Optional $exclude_deprecated for get_declared_* (PHP 8.4, #12177 / #4711).
+     *
+     * php-src: ext/standard/basic_functions.c — Z_PARAM_OPTIONAL Z_PARAM_BOOL
+     */
+    public static function parseExcludeDeprecatedArg(Frame $frame, string $function): bool
+    {
+        return self::parseOptionalBoolBuiltinArg(
+            $frame,
+            $function,
+            CompilerVersion::supportsGetDeclaredExcludeDeprecated(...)
+        );
+    }
+
+    /** Max positional arity for get_class() on the active profile (ext/standard/basic_functions.c, #17395). */
+    public static function getClassMaxArgCount(): int
+    {
+        return CompilerVersion::supportsGetClassAllowString() ? 2 : 1;
+    }
+
+    /** Max positional arity for get_parent_class() on the active profile (#17395). */
+    public static function getParentClassMaxArgCount(): int
+    {
+        return CompilerVersion::supportsGetClassAllowString() ? 2 : 1;
+    }
+
+    public static function enforceGetClassMaxArgs(int $argc, string $function = 'get_class'): void
+    {
+        $max = self::getClassMaxArgCount();
+        if ($argc > $max) {
+            $suffix = 1 === $max ? '' : 's';
+            throw new \ArgumentCountError(
+                "{$function}() expects at most {$max} argument{$suffix}, {$argc} given"
+            );
+        }
+    }
+
+    public static function enforceGetParentClassMaxArgs(int $argc): void
+    {
+        $max = self::getParentClassMaxArgCount();
+        if ($argc > $max) {
+            $suffix = 1 === $max ? '' : 's';
+            throw new \ArgumentCountError(
+                "get_parent_class() expects at most {$max} argument{$suffix}, {$argc} given"
+            );
+        }
+    }
+
+    /**
+     * get_class()/get_parent_class() $allow_string operand (PHP 8.4, ext/standard/basic_functions.c).
+     */
+    public static function parseAllowStringArg(Frame $frame, string $function, int $argIndex): bool
+    {
+        return VmMath::parseBoolBuiltinArg(
+            $frame->calledArgs[$argIndex]->resolveIndirect(),
+            $function,
+            $argIndex + 1,
+            'allow_string'
+        );
+    }
+
+    /**
+     * Resolve a class-name string operand when $allow_string is true (php-src zend_lookup_class_ex).
+     */
+    public static function resolveAllowStringClassName(
+        Context $ctx,
+        string $className,
+        string $function,
+        string $paramName = 'object'
+    ): string {
+        $classLc = strtolower(self::normalizeGlobalIntrospectionName($className));
+        if (!isset($ctx->classes[$classLc])) {
+            $ctx->autoloadClass($className);
+        }
+        if (!isset($ctx->classes[$classLc])) {
+            throw new \ValueError(\sprintf(
+                '%s(): Argument #1 ($%s) must be an object or a valid class name, "%s" given',
+                $function,
+                $paramName,
+                $className
+            ));
+        }
+
+        return $className;
+    }
+
+    /**
+     * Optional $exclude_disabled for get_defined_functions() (PHP 8.4, #4942).
+     *
+     * php-src: ext/standard/basic_functions.c — Z_PARAM_OPTIONAL Z_PARAM_BOOL
+     */
+    public static function parseExcludeDisabledArg(Frame $frame, string $function): bool
+    {
+        return self::parseOptionalBoolBuiltinArg(
+            $frame,
+            $function,
+            CompilerVersion::supportsGetDefinedFunctionsExcludeDisabled(...)
+        );
+    }
+
+    /**
+     * @param callable(): bool $supportsOptionalArg
+     */
+    private static function parseOptionalBoolBuiltinArg(Frame $frame, string $function, callable $supportsOptionalArg): bool
+    {
+        $argc = \count($frame->calledArgs);
+        if (!$supportsOptionalArg()) {
+            if ($argc > 0) {
+                throw new \ArgumentCountError("{$function}() expects exactly 0 arguments, {$argc} given");
+            }
+
+            return false;
+        }
+        if ($argc > 1) {
+            throw new \ArgumentCountError("{$function}() expects at most 1 argument, {$argc} given");
+        }
+        if (0 === $argc) {
+            return false;
+        }
+
+        return $frame->calledArgs[0]->resolveIndirect()->toBool();
+    }
+
+    public static function isDeprecatedClassEntry(ClassEntry $entry): bool
+    {
+        return null !== $entry->classDeprecated;
     }
 
     /**
@@ -57,21 +199,62 @@ final class VmReflection
 
     public static function resolveClassEntry(Context $ctx, string $className): ?ClassEntry
     {
-        $lc = strtolower($className);
+        $lc = strtolower(self::normalizeGlobalIntrospectionName($className));
 
         return $ctx->classes[$lc] ?? null;
     }
 
-    public static function classExists(Context $ctx, string $className): bool
+    /**
+     * Second parameter for class_exists/interface_exists/trait_exists/enum_exists (php-src zif_* autoload flag).
+     */
+    public static function autoloadFlagFromFrame(Frame $frame, int $argIndex = 1, bool $default = true): bool
     {
-        $entry = self::resolveClassEntry($ctx, $className);
+        if (\count($frame->calledArgs) <= $argIndex) {
+            return $default;
+        }
+        $arg = $frame->calledArgs[$argIndex]->resolveIndirect();
+        if (Variable::TYPE_BOOLEAN !== $arg->type) {
+            throw new \TypeError(
+                \sprintf(
+                    '%s(): Argument #%d ($autoload) must be of type bool, %s given',
+                    $frame->func->getName(),
+                    $argIndex + 1,
+                    EnumCaseSupport::typeNameForVariable($arg)
+                )
+            );
+        }
 
-        return null !== $entry && !$entry->isInterface && !$entry->isTrait;
+        return $arg->toBool();
     }
 
-    public static function enumExists(Context $ctx, string $enumName): bool
+    private static function maybeAutoloadClass(Context $ctx, string $className, bool $autoload): void
     {
-        return isset($ctx->enums[strtolower($enumName)]);
+        if (!$autoload || null !== self::resolveClassEntry($ctx, $className)) {
+            return;
+        }
+        $ctx->autoloadClass($className);
+    }
+
+    public static function classExists(Context $ctx, string $className, bool $autoload = true): bool
+    {
+        self::maybeAutoloadClass($ctx, $className, $autoload);
+        $entry = self::resolveClassEntry($ctx, $className);
+
+        return null !== $entry
+            && !$entry->isInterface
+            && !$entry->isTrait
+            && !\PHPCompiler\VM\ResourceSupport::isHiddenPseudoClassEntry($entry)
+            && !\PHPCompiler\ext\openssl\VmOpensslObjects::isHiddenClassEntry($entry);
+    }
+
+    public static function enumExists(Context $ctx, string $enumName, bool $autoload = true): bool
+    {
+        if ($autoload && null === self::resolveClassEntry($ctx, $enumName)) {
+            $ctx->autoloadClass($enumName);
+        }
+        $entry = self::resolveClassEntry($ctx, $enumName);
+
+        return null !== $entry && $entry->isEnum;
     }
 
     /**
@@ -104,8 +287,9 @@ final class VmReflection
         return $result;
     }
 
-    public static function interfaceExists(Context $ctx, string $interfaceName): bool
+    public static function interfaceExists(Context $ctx, string $interfaceName, bool $autoload = true): bool
     {
+        self::maybeAutoloadClass($ctx, $interfaceName, $autoload);
         $entry = self::resolveClassEntry($ctx, $interfaceName);
 
         return null !== $entry && $entry->isInterface;
@@ -116,11 +300,14 @@ final class VmReflection
      *
      * php-src: ext/standard/basic_functions.c — PHP_FUNCTION(get_declared_interfaces)
      */
-    public static function declaredInterfacesTable(Context $ctx): \PHPCompiler\VM\HashTable
+    public static function declaredInterfacesTable(Context $ctx, bool $excludeDeprecated = false): \PHPCompiler\VM\HashTable
     {
         $result = new \PHPCompiler\VM\HashTable();
         foreach ($ctx->classes as $lc => $entry) {
             if (!$entry->isInterface || isset($ctx->classAliases[$lc])) {
+                continue;
+            }
+            if ($excludeDeprecated && self::isDeprecatedClassEntry($entry)) {
                 continue;
             }
             $value = new Variable();
@@ -153,11 +340,22 @@ final class VmReflection
      *
      * php-src: ext/standard/basic_functions.c — PHP_FUNCTION(get_declared_classes)
      */
-    public static function declaredClassesTable(Context $ctx): \PHPCompiler\VM\HashTable
+    public static function declaredClassesTable(Context $ctx, bool $excludeDeprecated = false): \PHPCompiler\VM\HashTable
     {
         $result = new \PHPCompiler\VM\HashTable();
         foreach ($ctx->classes as $lc => $entry) {
+            self::markCompilerBootstrapClassInternal($entry);
             if ($entry->isInterface || $entry->isTrait || isset($ctx->classAliases[$lc])) {
+                continue;
+            }
+            if (\PHPCompiler\VM\ResourceSupport::isHiddenPseudoClassEntry($entry)) {
+                continue;
+            }
+            // Hide compiler bootstrap types only — CE_INTERNAL builtins belong in the list (#11813, #11688).
+            if (str_starts_with($entry->name, 'PHPCompiler\\')) {
+                continue;
+            }
+            if ($excludeDeprecated && self::isDeprecatedClassEntry($entry)) {
                 continue;
             }
             $value = new Variable();
@@ -169,11 +367,21 @@ final class VmReflection
     }
 
     /**
+     * Compiler bootstrap types (PHPCompiler\\*) are CE_INTERNAL for user reflection (#11688).
+     */
+    public static function markCompilerBootstrapClassInternal(ClassEntry $entry): void
+    {
+        if (!$entry->isInternal && str_starts_with($entry->name, 'PHPCompiler\\')) {
+            $entry->isInternal = true;
+        }
+    }
+
+    /**
      * get_declared_traits() — numerically indexed trait name list (issue #3128).
      *
      * php-src: ext/standard/basic_functions.c — PHP_FUNCTION(get_declared_traits)
      */
-    public static function declaredTraitsTable(Context $ctx): \PHPCompiler\VM\HashTable
+    public static function declaredTraitsTable(Context $ctx, bool $excludeDeprecated = false): \PHPCompiler\VM\HashTable
     {
         $result = new \PHPCompiler\VM\HashTable();
         foreach ($ctx->classes as $lc => $entry) {
@@ -181,6 +389,9 @@ final class VmReflection
                 continue;
             }
             if (LazyGhostTraitSupport::isLazyGhostTrait($entry->name)) {
+                continue;
+            }
+            if ($excludeDeprecated && self::isDeprecatedClassEntry($entry)) {
                 continue;
             }
             $value = new Variable();
@@ -214,30 +425,73 @@ final class VmReflection
         return $result;
     }
 
-    /** @var list<string>|null */
-    private static ?array $internalFunctionNames = null;
-
     /**
      * Registered ext Module internal function names (php-src internal bucket).
      *
      * @return list<string>
      */
-    public static function internalFunctionNameList(): array
+    public static function internalFunctionNameList(bool $excludeDisabled = false): array
     {
-        if (null !== self::$internalFunctionNames) {
-            return self::$internalFunctionNames;
-        }
         $names = [];
-        foreach ([new Module(), new \PHPCompiler\ext\types\Module()] as $module) {
-            foreach ($module->getFunctions() as $func) {
-                $names[] = $func->getName();
+        $seen = [];
+        foreach (ModuleRegistry::advertisedInternalFunctionNames() as $name) {
+            $lc = strtolower($name);
+            if (isset($seen[$lc]) || !self::isVisibleToFunctionExists($name)) {
+                continue;
+            }
+            if (!BuiltinIntrospectionPolicy::functionIsAdvertised($lc)) {
+                continue;
+            }
+            $seen[$lc] = true;
+            $names[] = $name;
+        }
+
+        // php-src exclude_disabled omits ini-disabled functions only — deprecated builtins
+        // such as utf8_encode remain listed (basic_functions.c, #16969, #16978).
+        return self::orderInternalFunctionNamesForIntrospection($names);
+    }
+
+    /** Zend internal bucket starts with engine introspection builtins (php-src zend_builtin_functions). */
+    private const INTERNAL_INTROSPECTION_HEAD = [
+        'zend_version',
+        'func_num_args',
+        'func_get_args',
+        'func_get_arg',
+    ];
+
+    /**
+     * @param list<string> $names
+     *
+     * @return list<string>
+     */
+    private static function orderInternalFunctionNamesForIntrospection(array $names): array
+    {
+        $byLc = [];
+        foreach ($names as $name) {
+            $byLc[strtolower($name)] = $name;
+        }
+        $ordered = [];
+        foreach (self::INTERNAL_INTROSPECTION_HEAD as $headLc) {
+            if (isset($byLc[$headLc])) {
+                $ordered[] = $byLc[$headLc];
+                unset($byLc[$headLc]);
             }
         }
-        $names = array_values(array_unique($names));
-        sort($names);
-        self::$internalFunctionNames = $names;
+        foreach (CoreExtensionFunctions::FUNCTIONS as $coreLc) {
+            if (isset($byLc[$coreLc])) {
+                $ordered[] = $byLc[$coreLc];
+                unset($byLc[$coreLc]);
+            }
+        }
+        foreach ($names as $name) {
+            $lc = strtolower($name);
+            if (isset($byLc[$lc])) {
+                $ordered[] = $name;
+                unset($byLc[$lc]);
+            }
+        }
 
-        return self::$internalFunctionNames;
+        return $ordered;
     }
 
     /**
@@ -245,14 +499,14 @@ final class VmReflection
      *
      * php-src: ext/standard/basic_functions.c — PHP_FUNCTION(get_defined_functions)
      */
-    public static function definedFunctionsTable(Context $ctx): \PHPCompiler\VM\HashTable
+    public static function definedFunctionsTable(Context $ctx, bool $excludeDisabled = false): \PHPCompiler\VM\HashTable
     {
         $result = new \PHPCompiler\VM\HashTable();
 
         $internalVar = new Variable();
         $internalVar->newArray();
         $internalHt = $internalVar->toArray();
-        foreach (self::internalFunctionNameList() as $name) {
+        foreach (self::internalFunctionNameList($excludeDisabled) as $name) {
             $value = new Variable();
             $value->string($name);
             $internalHt->append($value);
@@ -275,19 +529,58 @@ final class VmReflection
         return $result;
     }
 
-    public static function traitExists(Context $ctx, string $traitName): bool
+    public static function traitExists(Context $ctx, string $traitName, bool $autoload = true): bool
     {
         if (LazyGhostTraitSupport::isLazyGhostTrait($traitName)) {
             return false;
         }
+        self::maybeAutoloadClass($ctx, $traitName, $autoload);
         $entry = self::resolveClassEntry($ctx, $traitName);
 
         return null !== $entry && $entry->isTrait;
     }
 
+    /**
+     * Language constructs and compile-time-only symbols excluded from function_exists() (php-src basic_functions.c).
+     *
+     * @var list<string> lowercase names
+     */
+    private const FUNCTION_EXISTS_EXCLUDED = [
+        '__halt_compiler',
+        'die',
+        'eval',
+        'exit',
+    ];
+
+    /** Whether function_exists() may report true — excludes constructs Zend omits from the function table. */
+    public static function isVisibleToFunctionExists(string $functionName): bool
+    {
+        $lc = \strtolower($functionName);
+        if (self::isCompilerAbiHelperName($lc)) {
+            return false;
+        }
+
+        return !\in_array($lc, self::FUNCTION_EXISTS_EXCLUDED, true);
+    }
+
+    /** JIT/AOT self-host ABI helpers — linkable but hidden from user introspection (#15046). */
+    public static function isCompilerAbiHelperName(string $functionName): bool
+    {
+        return str_starts_with(\strtolower($functionName), '__compiler_');
+    }
+
     public static function functionExists(Context $ctx, string $functionName): bool
     {
-        return isset($ctx->functions[strtolower($functionName)]);
+        $normalized = \strtolower(self::normalizeGlobalIntrospectionName($functionName));
+        if (!self::isVisibleToFunctionExists($normalized)) {
+            return false;
+        }
+
+        if (!isset($ctx->functions[$normalized])) {
+            return false;
+        }
+
+        return BuiltinIntrospectionPolicy::functionIsAdvertised($normalized);
     }
 
     /**
@@ -384,7 +677,10 @@ final class VmReflection
                 'method_exists(): Argument #1 ($object_or_class) must be of type object|string, null given'
             );
         }
-        throw new \LogicException('Expected object or class name string in this compiler build');
+        throw new \TypeError(\sprintf(
+            'method_exists(): Argument #1 ($object_or_class) must be of type object|string, %s given',
+            VmClassHas::vmTypeName($objectOrClass->type)
+        ));
     }
 
     /**
@@ -405,6 +701,141 @@ final class VmReflection
         $methodLc = strtolower($method);
 
         return 'closure' === $classLc && '__invoke' === $methodLc;
+    }
+
+    /**
+     * Lexical class scope for is_callable() visibility (php-src zend_is_callable_at_frame, #9334).
+     */
+    public static function callerClassLcFromFrame(Frame $frame): ?string
+    {
+        $scopeFrame = self::reflectionCallerFrame($frame);
+        if (
+            null !== $scopeFrame->block
+            && null !== $scopeFrame->block->func
+            && (($scopeFrame->block->func->flags ?? 0) & CfgFunc::FLAG_CLOSURE) !== 0
+            && null !== $scopeFrame->calledClass
+            && '' !== $scopeFrame->calledClass
+        ) {
+            return strtolower($scopeFrame->calledClass);
+        }
+        if (null !== $scopeFrame->block && null !== $scopeFrame->block->func && null !== $scopeFrame->block->func->class) {
+            return strtolower($scopeFrame->block->func->class->value);
+        }
+        if (null !== $scopeFrame->calledClass && '' !== $scopeFrame->calledClass) {
+            return strtolower($scopeFrame->calledClass);
+        }
+
+        return null;
+    }
+
+    /**
+     * is_callable() visibility probe for a resolved method (#9334).
+     */
+    public static function isMethodCallableFromScope(
+        Context $ctx,
+        int $visibilityFlags,
+        string $declaringClassLc,
+        ?string $callerClassLc
+    ): bool {
+        return MethodVisibility::isCallable(
+            $visibilityFlags,
+            $callerClassLc,
+            $declaringClassLc,
+            false,
+            fn (string $classLc, string $ancestorLc): bool => self::isSameOrSubclassOf($ctx, $classLc, $ancestorLc)
+        );
+    }
+
+    /**
+     * is_callable() class-string probe — instance methods are not statically invokable (#12545).
+     *
+     * php-src: ext/standard/basic_functions.c — zend_is_callable_at_frame
+     */
+    public static function isStaticallyCallableMethod(
+        Context $ctx,
+        string $className,
+        string $method,
+        ?string $callerClassLc = null
+    ): bool
+    {
+        $lcClass = strtolower(ltrim($className, '\\'));
+        $methodLc = strtolower($method);
+        if ('' === $lcClass || '' === $methodLc || '__construct' === $methodLc) {
+            return false;
+        }
+        $entry = self::resolveClassEntry($ctx, $className);
+        if (null === $entry) {
+            $ctx->autoloadClass($className);
+            $entry = self::resolveClassEntry($ctx, $className);
+            if (null === $entry) {
+                return false;
+            }
+        }
+        if ($entry->isEnum) {
+            EnumSupport::ensureBuiltinCasesMethod($entry);
+            if ('cases' === $methodLc) {
+                return true;
+            }
+            if (null !== $entry->backedType && ('from' === $methodLc || 'tryfrom' === $methodLc)) {
+                return true;
+            }
+        }
+        if ($entry->usesLazyGhostTrait && 'createlazyghost' === $methodLc) {
+            LazyGhostTraitSupport::ensureBuiltinLazyGhostMethods($entry);
+
+            return true;
+        }
+        $visited = [];
+        $walk = $lcClass;
+        while (!isset($visited[$walk])) {
+            $visited[$walk] = true;
+            if (!isset($ctx->classes[$walk])) {
+                break;
+            }
+            $class = $ctx->classes[$walk];
+            if (isset($class->methods[$methodLc])) {
+                $vis = $class->methodVisibility[$methodLc] ?? CfgFunc::FLAG_PUBLIC;
+                if (($vis & CfgFunc::FLAG_STATIC) !== 0) {
+                    return self::isMethodCallableFromScope($ctx, $vis, $walk, $callerClassLc);
+                }
+                $func = $class->methods[$methodLc];
+                if ($func instanceof Func\PHP) {
+                    $decl = $func->block->func;
+                    if (null !== $decl && (($decl->flags ?? 0) & CfgFunc::FLAG_STATIC) !== 0) {
+                        return self::isMethodCallableFromScope($ctx, $vis, $walk, $callerClassLc);
+                    }
+                }
+
+                return false;
+            }
+            if (null === $class->parentLc) {
+                break;
+            }
+            $walk = $class->parentLc;
+        }
+
+        return self::classHasStaticMagicCall($ctx, $lcClass);
+    }
+
+    private static function classHasStaticMagicCall(Context $ctx, string $lcClass): bool
+    {
+        $visited = [];
+        while (!isset($visited[$lcClass])) {
+            $visited[$lcClass] = true;
+            if (!isset($ctx->classes[$lcClass])) {
+                return false;
+            }
+            $entry = $ctx->classes[$lcClass];
+            if (isset($entry->methods['__callstatic'])) {
+                return true;
+            }
+            if (null === $entry->parentLc) {
+                return false;
+            }
+            $lcClass = $entry->parentLc;
+        }
+
+        return false;
     }
 
     /**
@@ -486,6 +917,27 @@ final class VmReflection
         $meta = self::findClassProperty($class, $property, $ctx);
 
         return null !== $meta ? $meta->name : null;
+    }
+
+    /**
+     * Runtime dynamic instance property on $object — not declared on CE (#15540, zend_property_exists).
+     */
+    public static function isRuntimeDynamicProperty(
+        Variable $objectArg,
+        string $property,
+        ClassEntry $entry,
+        Context $ctx
+    ): bool {
+        $objectArg = $objectArg->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $objectArg->type) {
+            return false;
+        }
+        $object = $objectArg->toObject();
+        if (self::propertyExistsOnClass($entry, $property, $ctx)) {
+            return false;
+        }
+
+        return $object->hasProperty($property);
     }
 
     /**
@@ -585,6 +1037,7 @@ final class VmReflection
         $obj->getProperty(ReflectionSupport::PROP_CLASS_NAME)->string($reflectedClassName);
         $obj->getProperty(ReflectionSupport::PROP_PROPERTY_NAME)->string($propertyName);
         $obj->getProperty(ReflectionSupport::PROP_DECLARING_CLASS_NAME)->string($declaringClassName);
+        $obj->getProperty(ReflectionSupport::PROP_IS_DYNAMIC)->bool(false);
     }
 
     /** Static property storage key on $class or an ancestor, or null. */
@@ -746,6 +1199,30 @@ final class VmReflection
     }
 
     /**
+     * php-src basic_functions.c / class.c — warn when class-string operand cannot be resolved (#14764).
+     */
+    public static function warnClassOperandNotFound(
+        Frame $frame,
+        string $function,
+        string $className,
+        bool $autoload
+    ): void {
+        if (null === $frame->vmContext) {
+            return;
+        }
+        $message = $autoload
+            ? \sprintf('%s(): Class %s does not exist and could not be loaded', $function, $className)
+            : \sprintf('%s(): Class %s does not exist', $function, $className);
+        $frame->vmContext->errors->triggerError(
+            $message,
+            ErrorReporter::E_WARNING,
+            '' !== $frame->scriptPath ? $frame->scriptPath : null,
+            $frame->vmContext,
+            $frame
+        );
+    }
+
+    /**
      * trait name => trait name (Zend class_uses map).
      *
      * @return array<string, string>
@@ -782,6 +1259,112 @@ final class VmReflection
         }
 
         return $result;
+    }
+
+    /**
+     * ReflectionClass::getInterfaceNames() / ReflectionEnum::getInterfaceNames() (#9692).
+     *
+     * php-src: ext/reflection/php_reflection.c — zim_ReflectionClass_getInterfaceNames
+     * walks ce->interfaces (direct implements + inherited parent interfaces).
+     *
+     * @return Variable list<string> indexed interface names in zend order
+     */
+    public static function reflectionClassInterfaceNamesArray(ClassEntry $entry, Context $ctx): Variable
+    {
+        $result = new Variable();
+        $result->newArray();
+        $ht = $result->toArray();
+        foreach (self::reflectionClassInterfaceNamesList($entry, $ctx) as $ifaceName) {
+            $slot = new Variable();
+            $slot->string($ifaceName);
+            $ht->append($slot);
+        }
+
+        return $result;
+    }
+
+    /**
+     * @return list<string> interface display names in zend ce->interfaces order
+     */
+    public static function reflectionClassInterfaceNamesList(ClassEntry $entry, Context $ctx): array
+    {
+        $ordered = [];
+        $seen = [];
+        foreach ($entry->interfaces as $ifaceLc) {
+            self::appendReflectionInterfaceName($ifaceLc, $ctx, $ordered, $seen);
+        }
+
+        $names = [];
+        foreach ($ordered as $lc) {
+            $names[] = self::interfaceDisplayNameForReflection($lc, $ctx);
+        }
+
+        return $names;
+    }
+
+    private static function interfaceDisplayNameForReflection(string $ifaceLc, Context $ctx): string
+    {
+        $builtin = self::builtinEnumInterfaceDisplayName($ifaceLc);
+        if (null !== $builtin) {
+            return $builtin;
+        }
+        if (isset($ctx->classes[$ifaceLc])) {
+            return $ctx->classes[$ifaceLc]->name;
+        }
+
+        return $ifaceLc;
+    }
+
+    /** @param list<string> $ordered */
+    private static function appendReflectionInterfaceName(
+        string $ifaceLc,
+        Context $ctx,
+        array &$ordered,
+        array &$seen
+    ): void {
+        if (isset($seen[$ifaceLc])) {
+            return;
+        }
+        $seen[$ifaceLc] = true;
+        $ordered[] = $ifaceLc;
+
+        if (!isset($ctx->classes[$ifaceLc])) {
+            return;
+        }
+
+        $parents = $ctx->classes[$ifaceLc]->interfaces;
+        for ($i = count($parents) - 1; $i >= 0; --$i) {
+            $parentLc = $parents[$i];
+            if (isset($seen[$parentLc])) {
+                continue;
+            }
+            $seen[$parentLc] = true;
+            $ordered[] = $parentLc;
+            self::appendReflectionInterfaceParents($parentLc, $ctx, $ordered, $seen);
+        }
+    }
+
+    /** @param list<string> $ordered */
+    private static function appendReflectionInterfaceParents(
+        string $ifaceLc,
+        Context $ctx,
+        array &$ordered,
+        array &$seen
+    ): void {
+        if (!isset($ctx->classes[$ifaceLc])) {
+            return;
+        }
+
+        $parents = $ctx->classes[$ifaceLc]->interfaces;
+        for ($i = count($parents) - 1; $i >= 0; --$i) {
+            $parentLc = $parents[$i];
+            if (isset($seen[$parentLc])) {
+                continue;
+            }
+            $seen[$parentLc] = true;
+            $ordered[] = $parentLc;
+            self::appendReflectionInterfaceParents($parentLc, $ctx, $ordered, $seen);
+        }
     }
 
     /**
@@ -1103,6 +1686,26 @@ final class VmReflection
         return true;
     }
 
+    public static function parameterDefaultValueIsAvailable(Block $block, int $paramIndex): bool
+    {
+        return ReflectionSupport::parameterDefaultValueIsAvailable($block, $paramIndex);
+    }
+
+    public static function copyParameterDefaultValue(
+        Variable $dest,
+        Block $block,
+        int $paramIndex,
+        Context $ctx,
+    ): bool {
+        $value = $ctx->runtime->vm()->evaluateParameterDefaultForReflection($block, $paramIndex);
+        if (null === $value) {
+            return false;
+        }
+        $dest->copyFrom($value);
+
+        return true;
+    }
+
     public static function copyStaticPropertyDefaultValue(Variable $dest, Variable $storage): bool
     {
         if (!self::staticPropertyHasDefaultValue($storage)) {
@@ -1255,8 +1858,12 @@ final class VmReflection
      */
     public static function userCallArgs(Frame $frame): array
     {
+        $entryCandidate = null;
         for ($f = $frame->parent; null !== $f; $f = $f->parent) {
-            if (null !== $f->block && null !== $f->block->func && !$f->hasHandler()) {
+            if (null === $f->block || null === $f->block->func || $f->hasHandler()) {
+                continue;
+            }
+            if ([] !== $f->calledArgs) {
                 $args = $f->calledArgs;
                 if (null !== $f->block->func->class) {
                     return array_slice($args, 1);
@@ -1264,6 +1871,17 @@ final class VmReflection
 
                 return $args;
             }
+            if ($f->block->func instanceof Func\PHP && $f->block === $f->block->func->block) {
+                $entryCandidate = $f;
+            }
+        }
+        if (null !== $entryCandidate) {
+            $args = $entryCandidate->calledArgs;
+            if (null !== $entryCandidate->block->func->class) {
+                return array_slice($args, 1);
+            }
+
+            return $args;
         }
         throw new \LogicException('Must be called from a function context');
     }
@@ -1372,6 +1990,25 @@ final class VmReflection
      *
      * php-src: zend_get_properties_for(..., ZEND_PROP_PURPOSE_GET_OBJECT_VARS)
      */
+    /**
+     * Zend get_object_vars / var_export property map keys — numeric property names become int keys (#12042).
+     */
+    private static function addObjectPropertyEntry(HashTable $ht, string|int $name, Variable $value): void
+    {
+        if (\is_int($name)) {
+            $ht->addIndex($name, $value);
+
+            return;
+        }
+        $intKey = HashTable::tryIntFromNumericString($name);
+        if (null !== $intKey) {
+            $ht->addIndex($intKey, $value);
+
+            return;
+        }
+        $ht->add($name, $value);
+    }
+
     public static function getObjectVars(Variable $object, Frame $frame): Variable
     {
         $object = $object->resolveIndirect();
@@ -1380,7 +2017,7 @@ final class VmReflection
             $result->newArray();
             $ht = $result->toArray();
             foreach (EnumCaseSupport::objectVarsForCaseVariable($object) as $name => $value) {
-                $ht->add($name, $value);
+                self::addObjectPropertyEntry($ht, $name, $value);
             }
 
             return $result;
@@ -1396,7 +2033,7 @@ final class VmReflection
         $result->newArray();
         $ht = $result->toArray();
         foreach ($ctx->runtime->vm()->collectObjectVarsForBuiltin($object->toObject(), $frame) as $name => $value) {
-            $ht->add($name, $value);
+            self::addObjectPropertyEntry($ht, $name, $value);
         }
 
         return $result;
@@ -1428,7 +2065,7 @@ final class VmReflection
         $result->newArray();
         $ht = $result->toArray();
         foreach ($ctx->runtime->vm()->collectVarExportPropertiesForBuiltin($object->toObject(), $frame) as $name => $value) {
-            $ht->add($name, $value);
+            self::addObjectPropertyEntry($ht, $name, $value);
         }
 
         return $result;
@@ -1493,10 +2130,8 @@ final class VmReflection
         return $meta->declaringClassLc;
     }
 
-    /** Default visibility filter: public | protected | private (php-src get_class_methods). */
-    public const METHOD_FILTER_DEFAULT = \PHPCfg\Func::FLAG_PUBLIC
-        | \PHPCfg\Func::FLAG_PROTECTED
-        | \PHPCfg\Func::FLAG_PRIVATE;
+    /** Default visibility filter: public only (php-src get_class_methods, basic_functions.c #4756). */
+    public const METHOD_FILTER_DEFAULT = \PHPCfg\Func::FLAG_PUBLIC;
 
     /**
      * get_class_methods() operand — object or class name string (#3118).
@@ -1520,43 +2155,77 @@ final class VmReflection
             return $ctx->classes[$lc] ?? null;
         }
 
-        throw new \LogicException('get_class_methods() argument must be an object or class name string in this compiler build');
+        return null;
     }
 
     /**
      * @return list<string>
      */
-    public static function classMethodsList(ClassEntry $entry, int $filter = 7): array
+    public static function classMethodsList(ClassEntry $entry, int $filter = 7, ?Context $ctx = null): array
     {
-        if ($entry->isEnum) {
-            EnumSupport::ensureBuiltinCasesMethod($entry);
+        $entries = [$entry];
+        if ($entry->isInterface && null !== $ctx) {
+            $entries = self::interfaceDeclarationChain($entry, $ctx);
         }
         $names = [];
-        $methodLcs = array_keys($entry->methods);
-        foreach (array_keys($entry->abstractMethods) as $abstractLc) {
-            if (!in_array($abstractLc, $methodLcs, true)) {
-                $methodLcs[] = $abstractLc;
+        /** @var array<string, true> */
+        $seenMethodLcs = [];
+        foreach ($entries as $scan) {
+            if ($scan->isEnum) {
+                EnumSupport::ensureBuiltinCasesMethod($scan);
             }
-        }
-        foreach ($methodLcs as $methodLc) {
-            $vis = $entry->methodVisibility[$methodLc] ?? \PHPCfg\Func::FLAG_PUBLIC;
-            if (0 !== ($filter & 7) && 0 === ($vis & $filter & 7)) {
-                continue;
+            $methodLcs = array_keys($scan->methods);
+            foreach (array_keys($scan->abstractMethods) as $abstractLc) {
+                if (!in_array($abstractLc, $methodLcs, true)) {
+                    $methodLcs[] = $abstractLc;
+                }
             }
-            $handler = $entry->methods[$methodLc] ?? null;
-            if ($handler instanceof \PHPCompiler\Func\Internal) {
-                $names[] = $handler->getName();
-            } else {
-                $names[] = $entry->methodNames[$methodLc] ?? $methodLc;
+            foreach ($methodLcs as $methodLc) {
+                if (isset($seenMethodLcs[$methodLc])) {
+                    continue;
+                }
+                $vis = $scan->methodVisibility[$methodLc] ?? \PHPCfg\Func::FLAG_PUBLIC;
+                if (0 !== ($filter & 7) && 0 === ($vis & $filter & 7)) {
+                    continue;
+                }
+                $seenMethodLcs[$methodLc] = true;
+                $handler = $scan->methods[$methodLc] ?? null;
+                if ($handler instanceof \PHPCompiler\Func\Internal) {
+                    $names[] = $handler->getName();
+                } else {
+                    $names[] = $scan->methodNames[$methodLc] ?? $methodLc;
+                }
             }
-        }
-        foreach (self::syntheticEnumMethodNames($entry, $filter) as $methodName) {
-            if (!in_array($methodName, $names, true)) {
-                $names[] = $methodName;
+            foreach (self::syntheticEnumMethodNames($scan, $filter) as $methodName) {
+                if (!in_array($methodName, $names, true)) {
+                    $names[] = $methodName;
+                }
             }
         }
 
         return $names;
+    }
+
+    /**
+     * Interface + parent interfaces for get_class_methods() (php-src basic_functions.c, #11689).
+     *
+     * @return list<ClassEntry>
+     */
+    private static function interfaceDeclarationChain(ClassEntry $entry, Context $ctx): array
+    {
+        $chain = [$entry];
+        foreach ($entry->interfaces as $parentLc) {
+            if (!isset($ctx->classes[$parentLc])) {
+                continue;
+            }
+            foreach (self::interfaceDeclarationChain($ctx->classes[$parentLc], $ctx) as $parent) {
+                if (!in_array($parent, $chain, true)) {
+                    $chain[] = $parent;
+                }
+            }
+        }
+
+        return $chain;
     }
 
     /**
@@ -1577,12 +2246,12 @@ final class VmReflection
         return ['from', 'tryFrom'];
     }
 
-    public static function classMethodsArray(ClassEntry $entry, int $filter = 7): Variable
+    public static function classMethodsArray(ClassEntry $entry, int $filter = 7, ?Context $ctx = null): Variable
     {
         $result = new Variable();
         $result->newArray();
         $ht = $result->toArray();
-        foreach (self::classMethodsList($entry, $filter) as $methodName) {
+        foreach (self::classMethodsList($entry, $filter, $ctx) as $methodName) {
             $value = new Variable();
             $value->string($methodName);
             $ht->append($value);
@@ -1638,12 +2307,14 @@ final class VmReflection
         return $current->block->func->class->value;
     }
 
-    /** php-src ZEND_ACC_* filter bitmask for getProperties()/getMethods() (not getModifiers()). */
-    public const REFLECTION_IS_PUBLIC = 256;
+    /** php-src ZEND_ACC_* filter bitmask for getProperties() (ReflectionProperty::IS_*). */
+    public const REFLECTION_IS_PUBLIC = \PHPCfg\Func::FLAG_PUBLIC;
 
-    public const REFLECTION_IS_PROTECTED = 512;
+    public const REFLECTION_IS_PROTECTED = \PHPCfg\Func::FLAG_PROTECTED;
 
-    public const REFLECTION_IS_PRIVATE = 1024;
+    public const REFLECTION_IS_PRIVATE = \PHPCfg\Func::FLAG_PRIVATE;
+
+    public const REFLECTION_IS_STATIC = 16;
 
     /** Register ReflectionAttribute::IS_INSTANCEOF (#11471, ext/reflection/php_reflection.c). */
     public static function registerReflectionAttributeClassConstants(ClassEntry $entry): void
@@ -1654,7 +2325,7 @@ final class VmReflection
         $entry->constNames['is_instanceof'] = 'IS_INSTANCEOF';
     }
 
-    /** Register ReflectionProperty::IS_* class constants (#5060). */
+    /** Register ReflectionProperty::IS_* class constants (#5060, #4470). */
     public static function registerReflectionPropertyClassConstants(ClassEntry $entry): void
     {
         foreach (
@@ -1662,6 +2333,7 @@ final class VmReflection
                 'is_public' => self::REFLECTION_IS_PUBLIC,
                 'is_protected' => self::REFLECTION_IS_PROTECTED,
                 'is_private' => self::REFLECTION_IS_PRIVATE,
+                'is_static' => self::REFLECTION_IS_STATIC,
             ] as $name => $value
         ) {
             $const = new Variable();
@@ -1669,6 +2341,41 @@ final class VmReflection
             $entry->constants[$name] = $const;
             $entry->constNames[$name] = strtoupper($name);
         }
+    }
+
+    /** Register ReflectionClassConstant::IS_* class constants (#17360, ext/reflection/php_reflection.c). */
+    public static function registerReflectionClassConstantClassConstants(ClassEntry $entry): void
+    {
+        foreach (
+            [
+                'is_public' => self::REFLECTION_METHOD_IS_PUBLIC,
+                'is_protected' => self::REFLECTION_METHOD_IS_PROTECTED,
+                'is_private' => self::REFLECTION_METHOD_IS_PRIVATE,
+                'is_final' => self::REFLECTION_METHOD_IS_FINAL,
+            ] as $name => $value
+        ) {
+            $const = new Variable();
+            $const->int($value);
+            $entry->constants[$name] = $const;
+            $entry->constNames[$name] = strtoupper($name);
+        }
+    }
+
+    /** php-src reflection_class_constant_get_modifiers() (#17360). */
+    public static function cfgClassConstantFlagsToReflectionModifiers(int $cfgVisibility, bool $isFinal): int
+    {
+        if (($cfgVisibility & \PHPCfg\Func::FLAG_PRIVATE) !== 0) {
+            $modifiers = self::REFLECTION_METHOD_IS_PRIVATE;
+        } elseif (($cfgVisibility & \PHPCfg\Func::FLAG_PROTECTED) !== 0) {
+            $modifiers = self::REFLECTION_METHOD_IS_PROTECTED;
+        } else {
+            $modifiers = self::REFLECTION_METHOD_IS_PUBLIC;
+        }
+        if ($isFinal) {
+            $modifiers |= self::REFLECTION_METHOD_IS_FINAL;
+        }
+
+        return $modifiers;
     }
 
     /** php-src ReflectionMethod::IS_* values returned by getModifiers() (#7116). */
@@ -1703,11 +2410,31 @@ final class VmReflection
 
     public static function matchesReflectionVisibilityFilter(int $cfgVisibility, int $filter): bool
     {
+        return self::propertyMatchesReflectionFilter($cfgVisibility, false, $filter);
+    }
+
+    /** ReflectionClass::getMethods() filter — include static/final/abstract from method flags (#4480). */
+    public static function methodMatchesReflectionFilter(int $cfgFlags, int $filter): bool
+    {
         if (0 === $filter) {
             return true;
         }
+        $flags = self::cfgMethodFlagsToReflectionModifiers($cfgFlags);
 
-        return (self::visibilityToReflectionBitmask($cfgVisibility) & $filter) !== 0;
+        return ($flags & $filter) !== 0;
+    }
+
+    public static function propertyMatchesReflectionFilter(int $cfgVisibility, bool $isStatic, int $filter): bool
+    {
+        if (0 === $filter) {
+            return true;
+        }
+        $flags = self::visibilityToReflectionBitmask($cfgVisibility);
+        if ($isStatic) {
+            $flags |= self::REFLECTION_IS_STATIC;
+        }
+
+        return ($flags & $filter) !== 0;
     }
 
     public static function visibilityToReflectionBitmask(int $cfgVisibility): int
@@ -1746,23 +2473,65 @@ final class VmReflection
     }
 
     /**
-     * Instance properties visible on $entry (child overrides parent), php-src ReflectionClass::getProperties.
+     * Instance and static properties visible on $entry, php-src ReflectionClass::getProperties (#4470).
      *
      * @return list<ClassProperty>
      */
     public static function collectClassPropertiesForReflection(ClassEntry $entry, Context $ctx, int $filter = 0): array
     {
-        $byLc = [];
-        foreach (array_reverse(self::classHierarchyChain($entry, $ctx)) as $class) {
+        $result = [];
+        /** @var array<string, true> */
+        $seenLc = [];
+        foreach (self::classHierarchyChain($entry, $ctx) as $class) {
             foreach ($class->properties as $prop) {
-                if (!self::matchesReflectionVisibilityFilter($prop->visibility, $filter)) {
+                $declLc = '' !== $prop->declaringClassLc
+                    ? $prop->declaringClassLc
+                    : strtolower(ltrim($class->name, '\\'));
+                if (
+                    ($prop->visibility & \PHPCfg\Func::FLAG_PRIVATE) !== 0
+                    && $declLc !== strtolower(ltrim($entry->name, '\\'))
+                ) {
                     continue;
                 }
-                $byLc[strtolower($prop->name)] = $prop;
+                $lc = strtolower($prop->name);
+                if (isset($seenLc[$lc])) {
+                    continue;
+                }
+                if (!self::propertyMatchesReflectionFilter($prop->visibility, false, $filter)) {
+                    continue;
+                }
+                $seenLc[$lc] = true;
+                $result[] = $prop;
+            }
+            $classLc = strtolower(ltrim($class->name, '\\'));
+            foreach ($class->staticProperties as $propLc => $storage) {
+                if (isset($seenLc[$propLc])) {
+                    continue;
+                }
+                $vis = $class->staticPropertyVisibility[$propLc] ?? CfgFunc::FLAG_PUBLIC;
+                $declLc = $class->staticPropertyDeclaringClassLc[$propLc] ?? $classLc;
+                if (($vis & CfgFunc::FLAG_PRIVATE) !== 0 && $declLc !== strtolower(ltrim($entry->name, '\\'))) {
+                    continue;
+                }
+                if (!self::propertyMatchesReflectionFilter($vis, true, $filter)) {
+                    continue;
+                }
+                $seenLc[$propLc] = true;
+                $displayName = $storage->objectPropertyName ?? $propLc;
+                $proto = new Variable();
+                $proto->copyFrom($storage->resolveIndirect());
+                $result[] = new ClassProperty(
+                    $displayName,
+                    null,
+                    $proto,
+                    false,
+                    $vis,
+                    $declLc,
+                );
             }
         }
 
-        return array_values($byLc);
+        return $result;
     }
 
     /**
@@ -1772,11 +2541,20 @@ final class VmReflection
      */
     public static function collectClassMethodsForReflection(ClassEntry $entry, Context $ctx, int $filter = 0): array
     {
+        $chain = $entry->isInterface
+            ? array_reverse(self::interfaceDeclarationChain($entry, $ctx))
+            : array_reverse(self::classHierarchyChain($entry, $ctx));
         $byLc = [];
-        foreach (array_reverse(self::classHierarchyChain($entry, $ctx)) as $class) {
-            foreach ($class->methods as $methodLc => $_func) {
+        foreach ($chain as $class) {
+            $methodLcs = array_keys($class->methods);
+            foreach (array_keys($class->abstractMethods) as $abstractLc) {
+                if (!in_array($abstractLc, $methodLcs, true)) {
+                    $methodLcs[] = $abstractLc;
+                }
+            }
+            foreach ($methodLcs as $methodLc) {
                 $vis = $class->methodVisibility[$methodLc] ?? \PHPCfg\Func::FLAG_PUBLIC;
-                if (!self::matchesReflectionVisibilityFilter($vis, $filter)) {
+                if (!self::methodMatchesReflectionFilter($vis, $filter)) {
                     continue;
                 }
                 // php-src add_reflection_method_sub: parent-private methods hidden on child (#7191).
@@ -1875,16 +2653,16 @@ final class VmReflection
         if ($entry->isInterface || $entry->isTrait || $entry->isEnum) {
             return [];
         }
-        if (!\PHPCompiler\VM\LazyGhostTraitSupport::classUsesLazyGhostTrait($entry, $ctx)) {
-            return [];
-        }
+        $usesLazyGhostTrait = \PHPCompiler\VM\LazyGhostTraitSupport::classUsesLazyGhostTrait($entry, $ctx);
         $byLc = [];
         foreach (array_reverse(self::classHierarchyChain($entry, $ctx)) as $class) {
             foreach ($class->properties as $prop) {
                 if ($prop->propertyHookVirtual) {
                     continue;
                 }
-                $byLc[strtolower($prop->name)] = $prop->name;
+                if ($usesLazyGhostTrait || $prop->lazy) {
+                    $byLc[strtolower($prop->name)] = $prop->name;
+                }
             }
         }
 
@@ -2152,8 +2930,9 @@ final class VmReflection
         }
         $obj = new \PHPCompiler\VM\ObjectEntry($reucClass);
         $obj->constructed = true;
-        $obj->getProperty(\PHPCompiler\VM\ReflectionSupport::PROP_CLASS_NAME)->string($enumEntry->name);
-        $obj->getProperty(\PHPCompiler\VM\ReflectionSupport::PROP_ENUM_CASE_NAME)->string(
+        \PHPCompiler\VM\ReflectionSupport::initReflectionEnumCaseMetadata(
+            $obj,
+            $enumEntry->name,
             $enumEntry->enumCaseCanonicalNames[$caseLc]
         );
 
@@ -2183,8 +2962,9 @@ final class VmReflection
         }
         $obj = new \PHPCompiler\VM\ObjectEntry($rebcClass);
         $obj->constructed = true;
-        $obj->getProperty(\PHPCompiler\VM\ReflectionSupport::PROP_CLASS_NAME)->string($enumEntry->name);
-        $obj->getProperty(\PHPCompiler\VM\ReflectionSupport::PROP_ENUM_CASE_NAME)->string(
+        \PHPCompiler\VM\ReflectionSupport::initReflectionEnumCaseMetadata(
+            $obj,
+            $enumEntry->name,
             $enumEntry->enumCaseCanonicalNames[$caseLc]
         );
 
@@ -2202,6 +2982,51 @@ final class VmReflection
         if (null === $entry) {
             return false;
         }
+        if ([] !== ReflectionSupport::filterEntriesByName($ctx, $entry->attributeEntries, $attributeName)) {
+            return true;
+        }
+
+        return [] !== ReflectionSupport::filterByName($ctx, $entry->attributeNames, $attributeName);
+    }
+
+    /**
+     * attribute_exists() operand dispatch — php-src attribute first, object|string second (#16844).
+     */
+    public static function attributeExistsForObjectOrClass(
+        Context $ctx,
+        Variable $objectOrClass,
+        string $attributeName
+    ): bool {
+        $objectOrClass = $objectOrClass->resolveIndirect();
+        if (Variable::TYPE_STRING === $objectOrClass->type) {
+            return self::attributeExists($ctx, $objectOrClass->toString(), $attributeName);
+        }
+        if (Variable::TYPE_OBJECT === $objectOrClass->type) {
+            $object = $objectOrClass->toObject();
+            if (EnumCaseSupport::isEnumCase($object)) {
+                $class = EnumSupport::resolveRuntimeEnumClass($ctx, $object->class);
+
+                return self::attributeExistsOnClassEntry($ctx, $class, $attributeName);
+            }
+
+            return self::attributeExistsOnClassEntry($ctx, $object->class, $attributeName);
+        }
+        if (Variable::TYPE_ENUM_CASE === $objectOrClass->type) {
+            $class = EnumSupport::resolveRuntimeEnumClass($ctx, $objectOrClass->toEnumCase()->enumClass);
+
+            return self::attributeExistsOnClassEntry($ctx, $class, $attributeName);
+        }
+        throw new \TypeError(\sprintf(
+            'attribute_exists(): Argument #2 ($object) must be of type object|string, %s given',
+            VmClassHas::vmTypeName($objectOrClass->type)
+        ));
+    }
+
+    private static function attributeExistsOnClassEntry(
+        Context $ctx,
+        ClassEntry $entry,
+        string $attributeName
+    ): bool {
         if ([] !== ReflectionSupport::filterEntriesByName($ctx, $entry->attributeEntries, $attributeName)) {
             return true;
         }
@@ -2250,16 +3075,60 @@ final class VmReflection
     }
 
     /**
-     * Class constants visible on $entry (child overrides parent), php-src ReflectionClass::getConstants (#6950).
+     * get_class_vars() — resolve class/interface/trait/enum or reject invalid operand (#13271).
+     *
+     * php-src: ext/standard/class.c — PHP_FUNCTION(get_class_vars) / zend_fetch_class()
+     */
+    public static function fetchClassEntryForGetClassVars(Context $ctx, string $className): ClassEntry
+    {
+        $classLc = strtolower(self::normalizeGlobalIntrospectionName($className));
+        if (!isset($ctx->classes[$classLc])) {
+            $ctx->autoloadClass($className);
+        }
+        if (!isset($ctx->classes[$classLc])) {
+            throw new \TypeError(\sprintf(
+                'get_class_vars(): Argument #1 ($class) must be a valid class name, %s given',
+                $className
+            ));
+        }
+
+        return $ctx->classes[$classLc];
+    }
+
+    /**
+     * True when $constLc is declared on $class (not only inherited onto its merged constant table).
+     */
+    private static function isClassConstantDeclaredOnClass(ClassEntry $class, string $constLc): bool
+    {
+        if ($class->isEnum && isset($class->enumCaseCanonicalNames[$constLc])) {
+            return true;
+        }
+        $classLc = strtolower(ltrim($class->name, '\\'));
+        $declLc = $class->constDeclaringClassLc[$constLc] ?? $classLc;
+
+        return $declLc === $classLc;
+    }
+
+    /**
+     * Class constants visible on $entry (child overrides parent), php-src ReflectionClass::getConstants (#6950, #4479).
      *
      * @return list<array{name: string, declaring: ClassEntry, constLc: string}>
      */
     public static function collectClassConstantsForReflection(ClassEntry $entry, Context $ctx, int $filter): array
     {
+        $entryLc = strtolower(ltrim($entry->name, '\\'));
         $byLc = [];
-        foreach (array_reverse(self::classHierarchyChain($entry, $ctx)) as $class) {
+        foreach (self::classHierarchyChain($entry, $ctx) as $class) {
             foreach ($class->constants as $constLc => $_stored) {
+                if (!self::isClassConstantDeclaredOnClass($class, $constLc)) {
+                    continue;
+                }
                 $vis = $class->constVisibility[$constLc] ?? \PHPCfg\Func::FLAG_PUBLIC;
+                $declLc = $class->constDeclaringClassLc[$constLc]
+                    ?? strtolower(ltrim($class->name, '\\'));
+                if (($vis & \PHPCfg\Func::FLAG_PRIVATE) !== 0 && $declLc !== $entryLc) {
+                    continue;
+                }
                 if (!self::matchesReflectionVisibilityFilter($vis, $filter)) {
                     continue;
                 }

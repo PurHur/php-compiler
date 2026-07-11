@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\Test\Unit;
 
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
@@ -44,6 +45,7 @@ final class AotRegressionFixtureCatalogTest extends TestCase
         'new_static.phpt',
         'match_guard_falsy.phpt',
         'fcc_new_instance.phpt',
+        'strlen_script_global.phpt',
     ];
 
     /**
@@ -53,6 +55,9 @@ final class AotRegressionFixtureCatalogTest extends TestCase
     {
         $cases = [];
         foreach (self::REGRESSION_FIXTURES as $basename) {
+            if (!CompilerVersion::supportsCrc32c() && 'crc32c.phpt' === $basename) {
+                continue;
+            }
             $cases[$basename] = [$basename];
         }
 
@@ -110,6 +115,7 @@ final class AotRegressionFixtureCatalogTest extends TestCase
             'urlencode_enum_typeerror.php' => ['urlencode_enum_typeerror.php'],
             'password_needs_rehash_enum_typeerror.php' => ['password_needs_rehash_enum_typeerror.php'],
             'password_hash_enum_case_typeerror.php' => ['password_hash_enum_case_typeerror.php'],
+            'password_hash_null_password_coerce.php' => ['password_hash_null_password_coerce.php'],
             'json_encode_stringable.php' => ['json_encode_stringable.php'],
             'stat_is_link_enum_typeerror.php' => ['stat_is_link_enum_typeerror.php'],
             'fs_path_enum_typeerror.php' => ['fs_path_enum_typeerror.php'],

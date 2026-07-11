@@ -1,11 +1,11 @@
 --TEST--
-stdlib gc_mem_caches() returns non-zero on first call (#9160)
+stdlib gc_mem_caches() returns Zend MM cache on first call (#9160, #12071, #12921)
 --FILE--
 <?php
+$binary = defined('PHP_BINARY') ? PHP_BINARY : 'php';
+$probe = (int) trim((string) shell_exec($binary . ' -n -r ' . escapeshellarg('echo gc_mem_caches();')));
 $first = gc_mem_caches();
 $second = gc_mem_caches();
-echo 'first=', ($first > 0 ? 'nonzero' : 'zero'), "\n";
-echo 'second=', ($second > 0 ? 'nonzero' : 'zero'), "\n";
+echo ($first === $probe && 0 === $second) ? "ok\n" : "fail first=$first probe=$probe second=$second\n";
 --EXPECT--
-first=nonzero
-second=zero
+ok

@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace PHPCompiler\VM;
 
+use PHPCompiler\Block;
 use PHPCompiler\Compiler\AttributeEntry;
 use PHPCompiler\Compiler\AttributeNames;
+use PHPCompiler\Compiler\DeprecatedMetadata;
 use PHPCompiler\Compiler\CompileTimeEnumCase;
 use PHPCompiler\Compiler\CompileTimeNew;
 use PHPCompiler\Compiler\SourceLocation;
@@ -13,10 +15,15 @@ use PHPCompiler\ext\standard\VmClosureCall;
 use PHPCompiler\ext\standard\VmReflection;
 use PHPCompiler\Frame;
 use PHPCompiler\Func;
+use PHPCompiler\MethodVisibility;
+use PHPCompiler\Func\PHP as PhpFunc;
+use PHPCompiler\OpCode;
 use PHPCfg\Op\Type as CfgType;
 use PHPCompiler\VM as VmEngine;
 use PHPCompiler\VM\Builtin\AttributeConstruct;
 use PHPCompiler\VM\Builtin\DeprecatedConstruct;
+use PHPCompiler\VM\Builtin\EnumCasesConstruct;
+use PHPCompiler\VM\Builtin\NoDiscardConstruct;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\Variable;
 
@@ -39,6 +46,8 @@ final class ReflectionSupport
 
     public const REFLECTION_ATTRIBUTE = 'reflectionattribute';
 
+    public const REFLECTION_EXTENSION = 'reflectionextension';
+
     /** php-src REFLECTION_ATTRIBUTE_IS_INSTANCEOF — getAttributes() filter flag (#11471). */
     public const REFLECTION_ATTRIBUTE_IS_INSTANCEOF = 2;
 
@@ -60,6 +69,8 @@ final class ReflectionSupport
 
     public const REFLECTION_FIBER = 'reflectionfiber';
 
+    public const REFLECTION_GENERATOR = 'reflectiongenerator';
+
     public const PROP_CLASS_NAME = 'name';
 
     public const PROP_METHOD_NAME = 'method';
@@ -68,6 +79,12 @@ final class ReflectionSupport
 
     /** Declaring class name on ReflectionProperty instances (#9878). */
     public const PROP_DECLARING_CLASS_NAME = 'declaringClass';
+
+    /** Runtime dynamic property introspection (#15540, ext/reflection/php_reflection.c). */
+    public const PROP_IS_DYNAMIC = 'isDynamicFlag';
+
+    /** setAccessible() override — php-src ref->accessible (#9823). */
+    public const PROP_ACCESSIBLE = 'accessible';
 
     public const PROP_FUNCTION_NAME = 'function';
 
@@ -81,12 +98,21 @@ final class ReflectionSupport
     /** Whether this attribute name is duplicated on the target (#6912). */
     public const PROP_ATTR_IS_REPEATED = 'isRepeated';
 
+    public const PROP_EXTENSION_NAME = 'extension';
+
+    /** Internal enum class name on ReflectionEnumUnitCase / ReflectionEnumBackedCase (#10000). */
+    public const PROP_ENUM_CLASS_NAME = 'enumClass';
+
+    /** @deprecated Use PROP_CLASS_NAME (`name`) for case name + PROP_ENUM_CLASS_NAME for enum type. */
     public const PROP_ENUM_CASE_NAME = 'case';
 
     public const PROP_FUNC_NAME = 'funcName';
 
     /** Wrapped Fiber object on ReflectionFiber instances (#6793). */
     public const PROP_FIBER_TARGET = 'fiber';
+
+    /** Wrapped Generator object on ReflectionGenerator instances (#5964). */
+    public const PROP_GENERATOR_TARGET = 'generator';
 
     public const PROP_PARAM_INDEX = 'paramIndex';
 
@@ -123,6 +149,21 @@ final class ReflectionSupport
     public static function constantNotFoundMessage(string $className, string $constant): string
     {
         return sprintf('Constant %s::%s does not exist', $className, $constant);
+    }
+
+    public static function globalConstantNotFoundMessage(string $constant): string
+    {
+        return sprintf('Constant "%s" does not exist', $constant);
+    }
+
+    public static function isGlobalReflectionConstant(ObjectEntry $reflection): bool
+    {
+        $classVar = $reflection->getProperty(self::PROP_CLASS_NAME)->resolveIndirect();
+        if (Variable::TYPE_STRING !== $classVar->type) {
+            return false;
+        }
+
+        return '' === $classVar->toString();
     }
 
     public static function functionNotFoundMessage(string $functionName): string
@@ -386,6 +427,8 @@ final class ReflectionSupport
         if ($ctor instanceof Func\Internal) {
             return match ($ctor::class) {
                 DeprecatedConstruct::class => ['message', 'since'],
+                NoDiscardConstruct::class => ['message'],
+                EnumCasesConstruct::class => ['name'],
                 AttributeConstruct::class => ['flags'],
                 default => [],
             };
@@ -538,6 +581,20 @@ final class ReflectionSupport
         return $obj;
     }
 
+    public static function requireReflectionExtension(Frame $frame, Variable $receiver): ObjectEntry
+    {
+        $receiver = $receiver->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $receiver->type) {
+            throw new \LogicException('ReflectionExtension method called without object');
+        }
+        $obj = $receiver->toObject();
+        if (strtolower($obj->class->name) !== self::REFLECTION_EXTENSION) {
+            throw new \LogicException('Expected ReflectionExtension instance');
+        }
+
+        return $obj;
+    }
+
     public static function requireReflectionClass(Frame $frame, Variable $receiver): ObjectEntry
     {
         $receiver = $receiver->resolveIndirect();
@@ -608,6 +665,34 @@ final class ReflectionSupport
         return $obj;
     }
 
+    public static function requireReflectionGenerator(Frame $frame, Variable $receiver): ObjectEntry
+    {
+        $receiver = $receiver->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $receiver->type) {
+            throw new \LogicException('ReflectionGenerator method called without object');
+        }
+        $obj = $receiver->toObject();
+        if (strtolower($obj->class->name) !== self::REFLECTION_GENERATOR) {
+            throw new \LogicException('Expected ReflectionGenerator instance');
+        }
+
+        return $obj;
+    }
+
+    public static function reflectionFunctionFromGenerator(Context $ctx, GeneratorState $gen): ObjectEntry
+    {
+        if (null !== $gen->closureCall) {
+            return self::reflectionFunctionFromClosureState($ctx, $gen->closureCall);
+        }
+
+        return self::reflectionFunctionFromFunctionName($ctx, $gen->func->getName());
+    }
+
+    public static function reflectionFunctionFromClosureState(Context $ctx, ClosureState $state): ObjectEntry
+    {
+        return self::populateReflectionFunctionFromClosureState($ctx, $state);
+    }
+
     public static function isReflectionEnumCaseObject(ObjectEntry $obj): bool
     {
         $lc = strtolower($obj->class->name);
@@ -668,6 +753,83 @@ final class ReflectionSupport
         return $nameVar->toString();
     }
 
+    /** ReflectionClass::getShortName() — unqualified class name (ext/reflection/php_reflection.c). */
+    public static function shortClassNameFromReflection(ObjectEntry $reflection): string
+    {
+        $name = self::classNameFromReflection($reflection);
+        $pos = strrpos($name, '\\');
+        if (false === $pos) {
+            return $name;
+        }
+
+        return substr($name, $pos + 1);
+    }
+
+    /**
+     * ReflectionClass::{isSubclassOf,implementsInterface} — string|ReflectionClass operand (#6302).
+     */
+    public static function classNameFromReflectionClassArg(
+        Variable $arg,
+        string $method,
+        string $param = 'class'
+    ): string {
+        $arg = $arg->resolveIndirect();
+        if (Variable::TYPE_STRING === $arg->type) {
+            return $arg->toString();
+        }
+        if (Variable::TYPE_OBJECT === $arg->type) {
+            $obj = $arg->toObject();
+            $lc = strtolower($obj->class->name);
+            if (self::REFLECTION_CLASS !== $lc && self::REFLECTION_ENUM !== $lc) {
+                throw new \TypeError(
+                    'ReflectionClass::'.$method.'(): Argument #1 ($'.$param.') must be of type string|ReflectionClass, '
+                    .$obj->class->name.' given'
+                );
+            }
+
+            return self::classNameFromReflection($obj);
+        }
+
+        throw new \TypeError(
+            'ReflectionClass::'.$method.'(): Argument #1 ($'.$param.') must be of type string|ReflectionClass, '
+            .self::valueTypeLabel($arg).' given'
+        );
+    }
+
+    /**
+     * @return array{0: ObjectEntry, 1: ClassEntry, 2: \PHPCompiler\VM\Context}
+     */
+    public static function requireReflectedClassEntry(Frame $frame, Variable $receiver): array
+    {
+        $obj = self::requireReflectionClass($frame, $receiver);
+        $ctx = VmReflection::requireContext($frame);
+        $className = self::classNameFromReflection($obj);
+        $entry = VmReflection::resolveClassEntry($ctx, $className);
+        if (null === $entry) {
+            throw new \LogicException('ReflectionClass refers to unknown class in this compiler build');
+        }
+
+        return [$obj, $entry, $ctx];
+    }
+
+    /** php-src zim_ReflectionClass_isInstantiable — abstract/interface/trait/enum/static/private ctor (#6302). */
+    public static function reflectionClassIsInstantiable(ClassEntry $entry): bool
+    {
+        if ($entry->isInterface || $entry->isTrait || $entry->isEnum || $entry->isAbstract || $entry->isStatic) {
+            return false;
+        }
+        if ([] !== $entry->abstractMethods) {
+            return false;
+        }
+        $ctorLc = '__construct';
+        if (!isset($entry->methods[$ctorLc])) {
+            return true;
+        }
+        $flags = $entry->methodVisibility[$ctorLc] ?? 0;
+
+        return 0 === ($flags & \PHPCfg\Func::FLAG_PRIVATE);
+    }
+
     /**
      * ReflectionClass::newLazyGhost/Proxy — class name string or ReflectionClass receiver (#6399).
      */
@@ -709,11 +871,41 @@ final class ReflectionSupport
         };
     }
 
+    /**
+     * Wire declared properties + sidecar fields on ReflectionEnum*Case wrappers (#10000, #16331).
+     */
+    public static function initReflectionEnumCaseMetadata(
+        ObjectEntry $reflection,
+        string $enumClassName,
+        string $caseCanonicalName
+    ): void {
+        $reflection->reflectionEnumClassName = $enumClassName;
+        $reflection->reflectionEnumCaseName = $caseCanonicalName;
+        $reflection->getProperty(self::PROP_CLASS_NAME)->string($caseCanonicalName);
+        $reflection->getProperty(self::PROP_ENUM_CLASS_NAME)->string($enumClassName);
+    }
+
     public static function enumCaseNameFromReflection(ObjectEntry $reflection): string
     {
-        $nameVar = $reflection->getProperty(self::PROP_ENUM_CASE_NAME)->resolveIndirect();
+        if (null !== $reflection->reflectionEnumCaseName && '' !== $reflection->reflectionEnumCaseName) {
+            return $reflection->reflectionEnumCaseName;
+        }
+        $nameVar = $reflection->getProperty(self::PROP_CLASS_NAME)->resolveIndirect();
         if (Variable::TYPE_STRING !== $nameVar->type) {
             throw new \LogicException('ReflectionEnumUnitCase missing case name');
+        }
+
+        return $nameVar->toString();
+    }
+
+    public static function enumClassNameFromReflection(ObjectEntry $reflection): string
+    {
+        if (null !== $reflection->reflectionEnumClassName && '' !== $reflection->reflectionEnumClassName) {
+            return $reflection->reflectionEnumClassName;
+        }
+        $nameVar = $reflection->getProperty(self::PROP_ENUM_CLASS_NAME)->resolveIndirect();
+        if (Variable::TYPE_STRING !== $nameVar->type) {
+            throw new \LogicException('ReflectionEnumUnitCase missing enum class name');
         }
 
         return $nameVar->toString();
@@ -787,6 +979,16 @@ final class ReflectionSupport
         return $nameVar->toString();
     }
 
+    public static function isDynamicReflectionProperty(ObjectEntry $reflection): bool
+    {
+        $flag = $reflection->getProperty(self::PROP_IS_DYNAMIC)->resolveIndirect();
+        if (Variable::TYPE_BOOLEAN !== $flag->type) {
+            return false;
+        }
+
+        return $flag->toBool();
+    }
+
     /**
      * Declaring class for a ReflectionProperty — stored at construction or resolved from metadata (#9878).
      */
@@ -804,6 +1006,28 @@ final class ReflectionSupport
         }
 
         return VmReflection::declaringClassNameForPropertyLookup($entry, $property, $ctx);
+    }
+
+    /** php-src ext/reflection/php_reflection.c — ReflectionMethod::getDeclaringClass() (#15658). */
+    public static function declaringClassNameFromReflectionMethod(ObjectEntry $reflection, Context $ctx): string
+    {
+        $className = self::classNameFromReflection($reflection);
+        $methodName = self::methodNameFromReflection($reflection);
+        $entry = VmReflection::resolveClassEntry($ctx, $className);
+        if (null === $entry) {
+            throw new \LogicException('ReflectionMethod refers to unknown class in this compiler build');
+        }
+        $methodLc = strtolower($methodName);
+        // Trait-imported methods (incl. aliases) report the composing class, not the trait (#15658).
+        if (isset($entry->traitMethodSources[$methodLc])) {
+            return $entry->name;
+        }
+        $declLc = $entry->methodDeclaringClassLc[$methodLc] ?? strtolower($entry->name);
+        if (isset($ctx->classes[$declLc])) {
+            return $ctx->classes[$declLc]->name;
+        }
+
+        return $entry->name;
     }
 
     public static function functionNameFromReflection(ObjectEntry $reflection): string
@@ -847,6 +1071,7 @@ final class ReflectionSupport
      */
     public static function resolveFunctionForReflection(Context $ctx, string $functionName): Func
     {
+        $functionName = VmReflection::normalizeGlobalIntrospectionName($functionName);
         $lc = strtolower($functionName);
         $func = $ctx->functions[$lc] ?? null;
         if (null === $func) {
@@ -872,6 +1097,58 @@ final class ReflectionSupport
         }
 
         return self::resolveUserFunction($ctx, self::functionNameFromReflection($reflection));
+    }
+
+    /**
+     * php-src: ext/reflection/php_reflection.c — reflection_function_is_generator().
+     */
+    public static function isReflectionFunctionGenerator(Context $ctx, ObjectEntry $reflection): bool
+    {
+        if ($reflection->reflectionIsInternalFunction ?? false) {
+            return false;
+        }
+        $func = self::resolveFunctionFromReflection($ctx, $reflection);
+
+        return $func->block->isGenerator;
+    }
+
+    /**
+     * php-src: ext/reflection/php_reflection.c — reflection_method_is_generator().
+     */
+    public static function isReflectionMethodGenerator(Context $ctx, ObjectEntry $reflection): bool
+    {
+        $className = self::classNameFromReflection($reflection);
+        $methodName = self::methodNameFromReflection($reflection);
+        $entry = VmReflection::resolveClassEntry($ctx, $className);
+        if (null === $entry) {
+            return false;
+        }
+        $func = self::resolveDeclaredMethodFunc($ctx, $entry, strtolower($methodName));
+        if (!($func instanceof PhpFunc)) {
+            return false;
+        }
+
+        return $func->block->isGenerator;
+    }
+
+    private static function resolveDeclaredMethodFunc(Context $ctx, ClassEntry $entry, string $methodLc): ?Func
+    {
+        $current = $entry;
+        while (null !== $current) {
+            if (isset($current->methods[$methodLc])) {
+                $method = $current->methods[$methodLc];
+                if ($method instanceof Func) {
+                    return $method;
+                }
+            }
+            $parentLc = $current->parentLc ?? '';
+            if ('' === $parentLc) {
+                break;
+            }
+            $current = $ctx->classes[$parentLc] ?? null;
+        }
+
+        return null;
     }
 
     public static function constantNameFromReflection(ObjectEntry $reflection): string
@@ -1048,8 +1325,11 @@ final class ReflectionSupport
         if (Variable::TYPE_STRING !== $funcNameVar->type) {
             return [];
         }
-        $func = self::resolveUserFunction($ctx, $funcNameVar->toString());
+        $func = self::resolveFunctionForReflectionParameter($ctx, $reflection);
         $index = self::paramIndexFromReflection($reflection);
+        if (isset($func->parameterMetadata[$index])) {
+            return $func->parameterMetadata[$index]->attributes;
+        }
         if (!isset($func->block->paramSensitive[$index])) {
             return [];
         }
@@ -1068,6 +1348,97 @@ final class ReflectionSupport
         return false;
     }
 
+    public static function parameterIsDeprecated(Context $ctx, ObjectEntry $reflection): bool
+    {
+        foreach (self::parameterAttributeEntries($ctx, $reflection) as $entry) {
+            $meta = DeprecatedMetadata::fromAttributeEntry($entry);
+            if (null !== $meta && $meta->isDeprecatedForReflection()) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public static function parameterIsPromoted(Context $ctx, ObjectEntry $reflection): bool
+    {
+        $classNameVar = $reflection->getProperty(self::PROP_CLASS_NAME)->resolveIndirect();
+        if (Variable::TYPE_STRING !== $classNameVar->type) {
+            return false;
+        }
+        $className = $classNameVar->toString();
+        $method = self::methodNameFromReflection($reflection);
+        $entry = VmReflection::resolveClassEntry($ctx, $className);
+        if (null === $entry) {
+            return false;
+        }
+        $methodLc = strtolower($method);
+        $position = self::paramPositionFromReflection($reflection);
+        $params = $entry->methodParameterMetadata[$methodLc] ?? [];
+        $paramMeta = $params[$position] ?? null;
+
+        return null !== $paramMeta && $paramMeta->isPromoted;
+    }
+
+    public static function resolveParameterBlock(Context $ctx, ObjectEntry $reflection): \PHPCompiler\Block
+    {
+        $classNameVar = $reflection->getProperty(self::PROP_CLASS_NAME)->resolveIndirect();
+        if (Variable::TYPE_STRING === $classNameVar->type) {
+            $className = $classNameVar->toString();
+            $method = self::methodNameFromReflection($reflection);
+            $entry = VmReflection::resolveClassEntry($ctx, $className);
+            if (null === $entry) {
+                throw new \LogicException('ReflectionParameter refers to unknown class in this compiler build');
+            }
+            $methodLc = strtolower($method);
+            $func = $entry->methods[$methodLc] ?? null;
+            if (!$func instanceof \PHPCompiler\Func\PHP) {
+                throw new \LogicException('ReflectionParameter refers to unknown method in this compiler build');
+            }
+
+            return $func->block;
+        }
+
+        return self::resolveFunctionForReflectionParameter($ctx, $reflection)->block;
+    }
+
+    public static function parameterIndexForReflection(ObjectEntry $reflection): int
+    {
+        $classNameVar = $reflection->getProperty(self::PROP_CLASS_NAME)->resolveIndirect();
+        if (Variable::TYPE_STRING === $classNameVar->type) {
+            return self::paramPositionFromReflection($reflection);
+        }
+
+        return self::paramIndexFromReflection($reflection);
+    }
+
+    public static function parameterIsVariadic(\PHPCompiler\Block $block, int $paramIndex): bool
+    {
+        return null !== $block->variadicParamIndex && $block->variadicParamIndex === $paramIndex;
+    }
+
+    public static function parameterDefaultValueIsAvailable(\PHPCompiler\Block $block, int $paramIndex): bool
+    {
+        if (self::parameterIsVariadic($block, $paramIndex)) {
+            return false;
+        }
+
+        return ParamArgumentCountError::parameterHasDefault($block, $paramIndex);
+    }
+
+    public static function parameterScopeSlot(\PHPCompiler\Block $block, int $paramIndex): ?int
+    {
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_ARG_RECV !== $op->type || (int) $op->arg2 !== $paramIndex) {
+                continue;
+            }
+
+            return (int) $op->arg1;
+        }
+
+        return null;
+    }
+
     /**
      * @return \PHPCompiler\Func\PHP
      */
@@ -1080,6 +1451,21 @@ final class ReflectionSupport
         }
 
         return $func;
+    }
+
+    /**
+     * Resolve declaring function for ReflectionParameter on named or closure functions (#11545).
+     *
+     * @return \PHPCompiler\Func\PHP
+     */
+    public static function resolveFunctionForReflectionParameter(Context $ctx, ObjectEntry $parameter): \PHPCompiler\Func\PHP
+    {
+        $closure = $parameter->reflectionClosureState;
+        if (null !== $closure) {
+            return $closure->func;
+        }
+
+        return self::resolveUserFunction($ctx, self::functionNameFromReflection($parameter));
     }
 
     public static function typeStringFromReflection(ObjectEntry $reflection): string
@@ -1145,6 +1531,94 @@ final class ReflectionSupport
         return $flags;
     }
 
+    /** php-src reflection_*_set_accessible — stores override on reflection object (#9823). */
+    public static function setReflectionAccessible(ObjectEntry $reflection, bool $accessible): void
+    {
+        $reflection->getProperty(self::PROP_ACCESSIBLE)->bool($accessible);
+    }
+
+    private static function reflectionAccessibleForced(ObjectEntry $reflection): bool
+    {
+        $slot = $reflection->getProperty(self::PROP_ACCESSIBLE);
+        if ($slot->isUndefined()) {
+            return false;
+        }
+        $resolved = $slot->resolveIndirect();
+        if (Variable::TYPE_BOOLEAN !== $resolved->type) {
+            return false;
+        }
+
+        return $resolved->toBool();
+    }
+
+    /** php-src reflection_method_is_accessible (#9823). */
+    public static function isReflectionMethodAccessible(Context $ctx, ObjectEntry $reflection): bool
+    {
+        $flags = self::reflectedMethodCfgFlags($ctx, $reflection);
+        if (MethodVisibility::isPublic($flags)) {
+            return true;
+        }
+
+        return self::reflectionAccessibleForced($reflection);
+    }
+
+    public static function assertReflectionMethodAccessible(Context $ctx, ObjectEntry $reflection): void
+    {
+        if (self::isReflectionMethodAccessible($ctx, $reflection)) {
+            return;
+        }
+        $className = self::classNameFromReflection($reflection);
+        $methodName = self::methodNameFromReflection($reflection);
+        $flags = self::reflectedMethodCfgFlags($ctx, $reflection);
+        $vis = MethodVisibility::isPrivate($flags) ? 'private' : 'protected';
+        self::throwReflectionException(
+            'Trying to invoke '.$vis.' method '.$className.'::'.$methodName.'() from global scope'
+        );
+    }
+
+    /** php-src reflection_property_is_accessible (#9823). */
+    public static function isReflectionPropertyAccessible(Context $ctx, ObjectEntry $reflection): bool
+    {
+        $className = self::classNameFromReflection($reflection);
+        $entry = VmReflection::resolveClassEntry($ctx, $className);
+        if (null === $entry) {
+            return false;
+        }
+        $property = self::propertyNameFromReflection($reflection);
+        if (VmReflection::isEnumReflectionPseudoProperty($entry, $property)
+            || self::isDynamicReflectionProperty($reflection)
+        ) {
+            return true;
+        }
+        $visibilityMeta = VmReflection::propertyVisibilityMeta($entry, $property, $ctx);
+        if (null === $visibilityMeta) {
+            return false;
+        }
+        if (MethodVisibility::isPublic($visibilityMeta['visibility'])) {
+            return true;
+        }
+
+        return self::reflectionAccessibleForced($reflection);
+    }
+
+    public static function assertReflectionPropertyAccessible(Context $ctx, ObjectEntry $reflection): void
+    {
+        if (self::isReflectionPropertyAccessible($ctx, $reflection)) {
+            return;
+        }
+        $className = self::classNameFromReflection($reflection);
+        $property = self::propertyNameFromReflection($reflection);
+        self::throwReflectionException(
+            'Cannot access non-public property '.$className.'::$'.$property
+        );
+    }
+
+    /** php-src reflection_function_is_accessible — global functions always accessible (#9823). */
+    public static function isReflectionFunctionAccessible(): bool
+    {
+        return true;
+    }
+
     /**
      * Whether compile-time metadata includes a user-declared return type (#5141).
      *
@@ -1199,6 +1673,7 @@ final class ReflectionSupport
         array $invokeArgs
     ): Variable {
         $ctx = VmReflection::requireContext($frame);
+        self::assertReflectionMethodAccessible($ctx, $reflection);
         [$declaring, $methodLc, $func] = self::resolveReflectedMethod($ctx, $reflection);
         $methodName = $declaring->methodNames[$methodLc] ?? self::methodNameFromReflection($reflection);
         if (!$func instanceof Func\PHP) {
@@ -1328,7 +1803,8 @@ final class ReflectionSupport
         if (!isset($entry->methods[$methodLc]) && !isset($entry->abstractMethods[$methodLc])) {
             self::throwReflectionException(self::methodNotFoundMessage($entry->name, $methodName));
         }
-
+        // php-src ext/reflection/php_reflection.c — store the requested class (composing
+        // class for trait imports/aliases), matching ReflectionClass::getMethod().
         return [$entry, $methodName];
     }
 
@@ -1427,6 +1903,32 @@ final class ReflectionSupport
             return;
         }
         $returnVar->string('Core');
+    }
+
+    public static function returnExtension(?Variable $returnVar, ClassEntry $entry, Context $ctx): void
+    {
+        if (null === $returnVar) {
+            return;
+        }
+        if (!$entry->isInternal) {
+            $returnVar->null();
+
+            return;
+        }
+        $returnVar->object(self::newReflectionExtensionObject($ctx, 'Core'));
+    }
+
+    public static function newReflectionExtensionObject(Context $ctx, string $name): ObjectEntry
+    {
+        $class = $ctx->classes[self::REFLECTION_EXTENSION] ?? null;
+        if (null === $class) {
+            throw new \LogicException('ReflectionExtension is not registered in this compiler build');
+        }
+        $obj = new ObjectEntry($class);
+        $obj->getProperty(self::PROP_EXTENSION_NAME)->string($name);
+        $obj->constructed = true;
+
+        return $obj;
     }
 
     public static function newReflectionFunctionObject(Context $ctx): ObjectEntry
@@ -1741,5 +2243,185 @@ final class ReflectionSupport
         }
 
         return [null, null];
+    }
+
+    /** php-src: ReflectionFunctionAbstract::getStaticVariables() (#14166). */
+    public static function returnStaticVariablesFromFunctionReflection(
+        Context $ctx,
+        ObjectEntry $reflection,
+        ?Variable $returnVar
+    ): void {
+        if (null === $returnVar) {
+            return;
+        }
+        if ($reflection->reflectionIsInternalFunction) {
+            $returnVar->newArray();
+
+            return;
+        }
+        $closure = $reflection->reflectionClosureState;
+        if (null !== $closure) {
+            self::returnFunctionStaticVariables($ctx, $returnVar, $closure->func, $closure);
+
+            return;
+        }
+        try {
+            $func = self::resolveFunctionFromReflection($ctx, $reflection);
+        } catch (\ReflectionException) {
+            $returnVar->newArray();
+
+            return;
+        }
+        self::returnFunctionStaticVariables($ctx, $returnVar, $func, null);
+    }
+
+    /** php-src: ReflectionMethod::getStaticVariables() (#14166). */
+    public static function returnStaticVariablesFromMethodReflection(
+        Context $ctx,
+        ObjectEntry $reflection,
+        ?Variable $returnVar
+    ): void {
+        if (null === $returnVar) {
+            return;
+        }
+        $func = self::resolvePhpFuncFromReflectionMethod($ctx, $reflection);
+        if (null === $func) {
+            $returnVar->newArray();
+
+            return;
+        }
+        self::returnFunctionStaticVariables($ctx, $returnVar, $func, null);
+    }
+
+    public static function returnFunctionStaticVariables(
+        Context $ctx,
+        ?Variable $returnVar,
+        PhpFunc $func,
+        ?ClosureState $closureState
+    ): void {
+        if (null === $returnVar) {
+            return;
+        }
+        $returnVar->newArray();
+        $ht = $returnVar->toArray();
+        foreach (self::collectFunctionStaticVarDeclarations($func->block) as $varName => $info) {
+            $copy = self::resolveStaticVarReflectionValue(
+                $ctx,
+                $info['storageKey'],
+                $info['defaultSlot'],
+                $info['block'],
+                $closureState
+            );
+            $ht->add($varName, $copy);
+        }
+    }
+
+    /**
+     * @return array<string, array{storageKey: string, defaultSlot: ?int, block: Block}>
+     */
+    private static function collectFunctionStaticVarDeclarations(Block $entry): array
+    {
+        $decls = [];
+        foreach (self::collectBlocksForStaticReflection($entry) as $block) {
+            foreach ($block->opCodes as $op) {
+                if (OpCode::TYPE_DECLARE_FUNCTION_STATIC !== $op->type) {
+                    continue;
+                }
+                $varName = $op->functionStaticVarName;
+                if (null === $varName || '' === $varName || !isset($block->constants[$op->arg2])) {
+                    continue;
+                }
+                if (!isset($decls[$varName])) {
+                    $decls[$varName] = [
+                        'storageKey' => $block->constants[$op->arg2]->toString(),
+                        'defaultSlot' => null !== $op->arg3 ? (int) $op->arg3 : null,
+                        'block' => $block,
+                    ];
+                }
+            }
+        }
+
+        return $decls;
+    }
+
+    /** @return list<Block> */
+    private static function collectBlocksForStaticReflection(Block $block): array
+    {
+        $seen = new \SplObjectStorage();
+        $out = [];
+        self::collectBlocksForStaticReflectionInternal($block, $seen, $out);
+
+        return $out;
+    }
+
+    /** @param list<Block> $out */
+    private static function collectBlocksForStaticReflectionInternal(
+        Block $block,
+        \SplObjectStorage $seen,
+        array &$out
+    ): void {
+        if ($seen->contains($block)) {
+            return;
+        }
+        $seen->attach($block);
+        $out[] = $block;
+        foreach ($block->blocks as $nested) {
+            self::collectBlocksForStaticReflectionInternal($nested, $seen, $out);
+        }
+        foreach ($block->opCodes as $op) {
+            foreach ([$op->block1, $op->block2, $op->block3] as $sub) {
+                if ($sub instanceof Block) {
+                    self::collectBlocksForStaticReflectionInternal($sub, $seen, $out);
+                }
+            }
+        }
+    }
+
+    private static function resolveStaticVarReflectionValue(
+        Context $ctx,
+        string $storageKey,
+        ?int $defaultSlot,
+        Block $block,
+        ?ClosureState $closureState
+    ): Variable {
+        $copy = new Variable();
+        $initialized = false;
+        $source = null;
+        if (null !== $closureState && !str_contains($storageKey, "\0")) {
+            $source = $closureState->peekStatic($storageKey);
+            $initialized = $closureState->isStaticInitialized($storageKey);
+        } else {
+            $source = $ctx->peekFunctionStatic($storageKey);
+            $initialized = $ctx->isFunctionStaticInitialized($storageKey);
+        }
+        if ($initialized && null !== $source) {
+            $copy->copyFrom($source->resolveIndirect());
+
+            return $copy;
+        }
+        if (null !== $defaultSlot && isset($block->constants[$defaultSlot])) {
+            $copy->copyFrom($block->constants[$defaultSlot]);
+
+            return $copy;
+        }
+        $copy->null();
+
+        return $copy;
+    }
+
+    private static function resolvePhpFuncFromReflectionMethod(Context $ctx, ObjectEntry $reflection): ?PhpFunc
+    {
+        $className = self::classNameFromReflection($reflection);
+        $method = self::methodNameFromReflection($reflection);
+        $entry = VmReflection::resolveClassEntry($ctx, $className);
+        if (null === $entry) {
+            return null;
+        }
+        $func = $entry->methods[strtolower($method)] ?? null;
+        if (!$func instanceof PhpFunc) {
+            return null;
+        }
+
+        return $func;
     }
 }

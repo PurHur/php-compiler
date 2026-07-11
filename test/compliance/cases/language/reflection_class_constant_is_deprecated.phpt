@@ -1,5 +1,7 @@
 --TEST--
-Language: ReflectionClassConstant::isDeprecated() on #[\Deprecated] class constants (#6920)
+Language: ReflectionClassConstant::isDeprecated() on #[\Deprecated] class constants (#6920, #16820)
+--ENV--
+PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
 class C {

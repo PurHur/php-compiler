@@ -30,8 +30,9 @@ final class error_reporting extends Internal
         }
         $old = VmIni::errorReporting($frame->vmContext);
         if (1 === $argc) {
-            $level = VmMath::parseNullableIntBuiltinArg(
-                $frame->calledArgs[0]->resolveIndirect(),
+            $level = VmMath::parseNullableIntBuiltinArgForFrame(
+                $frame,
+                0,
                 'error_reporting',
                 1,
                 'error_level'

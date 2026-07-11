@@ -8,7 +8,6 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /** phpversion() — runtime version string (ext/standard/info.c parity, issue #3174). */
@@ -23,20 +22,19 @@ final class phpversion extends Internal
     {
         $argc = \count($frame->calledArgs);
         if ($argc > 1) {
-            throw new \LogicException('phpversion() accepts at most one argument');
+            throw new \ArgumentCountError('phpversion() expects at most 1 argument, '.$argc.' given');
         }
         if (null === $frame->returnVar) {
             return;
         }
         $extension = null;
         if (1 === $argc) {
-            $arg = $frame->calledArgs[0]->resolveIndirect();
-            if (Variable::TYPE_NULL !== $arg->type) {
-                if (Variable::TYPE_STRING !== $arg->type) {
-                    throw new \LogicException('phpversion() extension must be a string or null in this compiler build');
-                }
-                $extension = $arg->toString();
-            }
+            $extension = VmString::coerceNullableStringBuiltinArg(
+                $frame->calledArgs[0],
+                'phpversion',
+                0,
+                'extension'
+            );
         }
         $result = VmInfo::phpversion($extension);
         if (false === $result) {
@@ -49,7 +47,7 @@ final class phpversion extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         if (\count($args) > 1) {
-            throw new \LogicException('phpversion() accepts at most one argument');
+            throw new \ArgumentCountError('phpversion() expects at most 1 argument, '.\count($args).' given');
         }
 
         return JitInfo::phpversion($context, $args[0] ?? null);

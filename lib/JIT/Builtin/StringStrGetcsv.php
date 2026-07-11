@@ -13,10 +13,9 @@ use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_str_getcsv via CsvJitHelper PHP (#9444).
+ * JIT/AOT link for __compiler_str_getcsv via CsvJitHelper PHP (#9444, #13358).
  *
- * JIT/normal modules use compiled {@see CsvJitHelper}; AOT standalone keeps
- * {@see StringStrGetcsvJit} until native link can host compiled helpers reliably.
+ * Embed and standalone AOT compile {@see CsvJitHelper}; thin LLVM bridges forward the ABI.
  * php-src: ext/standard/string.c — PHP_FUNCTION(str_getcsv)
  */
 final class StringStrGetcsv
@@ -49,12 +48,6 @@ final class StringStrGetcsv
 
     public static function implement(Context $context): void
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            StringStrGetcsvJit::implement($context);
-
-            return;
-        }
-
         $probe = $context->module->getNamedFunction('__compiler_str_getcsv');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);

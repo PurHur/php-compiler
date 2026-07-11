@@ -20,8 +20,59 @@ final class GlobalTypedConstRewriter
     /** @internal Marker embedded in source for PHPCfg to recover declared type. */
     public const MARKER_PATTERN = '/\/\*\s*phpc-global-typed-const:([^*]+?)\s*\*\//';
 
-    /** Zend PHP ≤8.3: `final const` at compile-unit scope is invalid (#10324, zend_compile.c). */
+    /** Zend/php-src: `final const` at compile-unit scope rejected below PHP 8.4 (#10324, #15185, #16859). */
     public const FINAL_GLOBAL_CONST_REJECT_MESSAGE = 'syntax error, unexpected token "const", expecting "abstract" or "final" or "readonly" or "class"';
+
+    /**
+     * Zend 8.2 reference profile diagnostic for file/namespace `const T $name` (#16651).
+     *
+     * @return array{line: int, message: string}|null
+     */
+    public static function referenceProfileSyntaxError(string $source): ?array
+    {
+        if (false === stripos($source, 'const')) {
+            return null;
+        }
+
+        $tokens = token_get_all($source);
+        $n = \count($tokens);
+        $classLikeDepth = 0;
+        $pendingClassLike = false;
+
+        for ($i = 0; $i < $n; ++$i) {
+            $tok = $tokens[$i];
+            $text = self::tokenText($tok);
+
+            if (\is_array($tok)) {
+                if (\in_array($tok[0], [T_CLASS, T_INTERFACE, T_TRAIT, T_ENUM], true)) {
+                    $pendingClassLike = true;
+                } elseif (T_FINAL === $tok[0] && 0 === $classLikeDepth) {
+                    $finalConst = self::detectFinalGlobalConstSyntaxError($tokens, $i + 1);
+                    if (null !== $finalConst) {
+                        return $finalConst;
+                    }
+                } elseif (T_CONST === $tok[0] && 0 === $classLikeDepth) {
+                    $typed = self::tryParseTypedConst($tokens, $i + 1);
+                    if (null !== $typed) {
+                        [$typeExpr, $nameIdx] = $typed;
+                        $typeStartIdx = self::skipIgnorable($tokens, $i + 1, $n);
+
+                        return [
+                            'line' => self::tokenLine($tokens[$typeStartIdx]),
+                            'message' => self::zendReferenceProfileSyntaxMessage($tokens, $typeStartIdx, $nameIdx, $typeExpr),
+                        ];
+                    }
+                }
+            } elseif ('{' === $text && $pendingClassLike) {
+                ++$classLikeDepth;
+                $pendingClassLike = false;
+            } elseif ('}' === $text && $classLikeDepth > 0) {
+                --$classLikeDepth;
+            }
+        }
+
+        return null;
+    }
 
     public static function rewrite(string $source): string
     {
@@ -51,16 +102,17 @@ final class GlobalTypedConstRewriter
                 } elseif ('}' === $text && $classLikeDepth > 0) {
                     --$classLikeDepth;
                 } elseif (T_FINAL === $tok[0] && 0 === $classLikeDepth) {
-                    if (!CompilerVersion::supportsFinalGlobalTypedConstants()) {
+                    if (CompilerVersion::supportsFinalGlobalTypedConstants()) {
+                        $finalTyped = self::tryParseFinalGlobalTypedConst($tokens, $i + 1);
+                        if (null !== $finalTyped) {
+                            [$typeExpr, $nameIdx] = $finalTyped;
+                            self::rejectDisallowedGlobalConstType($typeExpr, $tok[2] ?? 1);
+                            $out .= '/*'.self::MARKER_PREFIX.'final:'.$typeExpr.'*/ const ';
+                            $i = $nameIdx - 1;
+                            continue;
+                        }
+                    } else {
                         self::rejectFinalGlobalConstIfPresent($tokens, $i + 1);
-                    }
-                    $typed = self::tryParseFinalTypedConst($tokens, $i + 1);
-                    if (null !== $typed) {
-                        [$typeExpr, $end] = $typed;
-                        self::rejectDisallowedGlobalConstType($typeExpr, $tok[2] ?? 1);
-                        $out .= '/*'.self::MARKER_PREFIX.'final:'.$typeExpr.'*/ const ';
-                        $i = $end - 1;
-                        continue;
                     }
                 } elseif (T_CONST === $tok[0] && 0 === $classLikeDepth) {
                     $typed = self::tryParseTypedConst($tokens, $i + 1);
@@ -112,7 +164,7 @@ final class GlobalTypedConstRewriter
      *
      * @return array{0: string, 1: int}|null [type expression, index of const name token]
      */
-    private static function tryParseFinalTypedConst(array $tokens, int $start): ?array
+    private static function tryParseFinalGlobalTypedConst(array $tokens, int $start): ?array
     {
         $j = self::skipIgnorable($tokens, $start, \count($tokens));
         if ($j >= \count($tokens) || !\is_array($tokens[$j]) || T_CONST !== $tokens[$j][0]) {
@@ -313,15 +365,65 @@ final class GlobalTypedConstRewriter
     /**
      * @param list<array{0: int, 1: string, 2: int}|string> $tokens
      */
-    private static function rejectFinalGlobalConstIfPresent(array $tokens, int $start): void
+    private static function tokenLine($token): int
+    {
+        return \is_array($token) ? ($token[2] ?? 1) : 1;
+    }
+
+    /**
+     * @param list<array{0: int, 1: string, 2: int}|string> $tokens
+     */
+    private static function zendReferenceProfileSyntaxMessage(
+        array $tokens,
+        int $typeStartIdx,
+        int $nameIdx,
+        string $typeExpr
+    ): string {
+        $typeTok = $tokens[$typeStartIdx];
+        if (\is_array($typeTok) && T_ARRAY === $typeTok[0]) {
+            return 'syntax error, unexpected token "array", expecting identifier';
+        }
+
+        $nameTok = $tokens[$nameIdx];
+        if (\is_array($nameTok) && T_STRING === $nameTok[0]) {
+            return sprintf('syntax error, unexpected identifier "%s", expecting "="', $nameTok[1]);
+        }
+
+        $first = strtok($typeExpr, " \t|&()");
+
+        return sprintf('syntax error, unexpected identifier "%s", expecting "="', $first ?: $typeExpr);
+    }
+
+    /**
+     * @param list<array{0: int, 1: string, 2: int}|string> $tokens
+     *
+     * @return array{line: int, message: string}|null
+     */
+    private static function detectFinalGlobalConstSyntaxError(array $tokens, int $start): ?array
     {
         $j = self::skipIgnorable($tokens, $start, \count($tokens));
         if ($j >= \count($tokens) || !\is_array($tokens[$j]) || T_CONST !== $tokens[$j][0]) {
+            return null;
+        }
+
+        return [
+            'line' => $tokens[$j][2] ?? 1,
+            'message' => self::FINAL_GLOBAL_CONST_REJECT_MESSAGE,
+        ];
+    }
+
+    /**
+     * @param list<array{0: int, 1: string, 2: int}|string> $tokens
+     */
+    private static function rejectFinalGlobalConstIfPresent(array $tokens, int $start): void
+    {
+        $error = self::detectFinalGlobalConstSyntaxError($tokens, $start);
+        if (null === $error) {
             return;
         }
         throw new ParserError(
-            self::FINAL_GLOBAL_CONST_REJECT_MESSAGE,
-            ['startLine' => $tokens[$j][2] ?? 1, 'endLine' => $tokens[$j][2] ?? 1]
+            $error['message'],
+            ['startLine' => $error['line'], 'endLine' => $error['line']]
         );
     }
 

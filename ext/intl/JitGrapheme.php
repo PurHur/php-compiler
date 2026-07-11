@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\intl;
 
-use PHPCompiler\ext\standard\JitStringSearch;
+use PHPCompiler\JIT\Builtin\StringStrContains;
 use PHPCompiler\JIT\Builtin\StringUtf8Runtime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -73,6 +73,38 @@ final class JitGrapheme
     public static function tryStrposFold(Context $context, array $args): ?Value
     {
         return self::tryPosFoldInternal($context, $args, static fn (string $h, string $n, int $o): int|false => VmGrapheme::strpos($h, $n, $o));
+    }
+
+    /**
+     * @param JITVariable[] $args
+     */
+    public static function tryStrimwidthFold(Context $context, array $args): ?Value
+    {
+        $string = self::compileTimeString($args, 0);
+        if (null === $string) {
+            return null;
+        }
+        $start = self::compileTimeInt($args, 1);
+        if (null === $start) {
+            return null;
+        }
+        $width = self::compileTimeInt($args, 2);
+        if (null === $width) {
+            return null;
+        }
+        $encoding = null;
+        if (isset($args[3])) {
+            $encoding = self::compileTimeString($args, 3);
+            if (null === $encoding) {
+                return null;
+            }
+        }
+        $result = VmGrapheme::strimwidth($string, $start, $width, $encoding);
+        if (false === $result) {
+            return $context->getTypeFromString('bool')->constInt(0, false);
+        }
+
+        return $context->builder->load($context->constantStringFromString($result));
     }
 
     /**
@@ -183,7 +215,7 @@ final class JitGrapheme
             $context->builder->icmp(Builder::INT_NE, $hayValid, $zeroI64),
             $context->builder->icmp(Builder::INT_NE, $needleValid, $zeroI64)
         );
-        $found = JitStringSearch::contains($context, $haystack, $needle);
+        $found = StringStrContains::invokeContains($context, $haystack, $needle);
 
         return $context->builder->select(
             $isEmptyNeedle,

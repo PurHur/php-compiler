@@ -20,10 +20,12 @@ class Type extends Builtin {
     protected array $fields;
 
     public function register(): void {
-        $this->string = new Type\String_($this->context, $this->loadType);
-        $this->object = new Type\Object_($this->context, $this->loadType);
+        // Construct Value/HashTable before String_ so nested JIT helpers in String_::implement()
+        // see __value__/__hashtable__ LLVM bodies (#12910).
         $this->value = new Type\Value($this->context, $this->loadType);
         $this->hashtable = new Type\HashTable($this->context, $this->loadType);
+        $this->object = new Type\Object_($this->context, $this->loadType);
+        $this->string = new Type\String_($this->context, $this->loadType);
         // $this->maskedarray = new Type\MaskedArray($this->context, $this->loadType);
         // $this->nativearray = new Type\NativeArray($this->context, $this->loadType);
         $this->string->register();
@@ -64,7 +66,8 @@ class Type extends Builtin {
             $this->context->getTypeFromString('double'),
             $this->context->getTypeFromString('int64'),
             $this->context->getTypeFromString('__string__*'),
-            $this->context->getTypeFromString('__string__*')
+            $this->context->getTypeFromString('__string__*'),
+            $this->context->getTypeFromString('int64')
         );
         $fnNumberFormat = $this->context->module->addFunction('__compiler_number_format', $fntypeNumberFormat);
         $this->context->registerFunction('__compiler_number_format', $fnNumberFormat);
@@ -332,6 +335,17 @@ class Type extends Builtin {
             $fntypeGetMetaTags
         );
         $this->context->registerFunction('__compiler_get_meta_tags', $fnGetMetaTags);
+        $fntypeGetHeaders = $this->context->context->functionType(
+            $this->context->getTypeFromString('__hashtable__*'),
+            false,
+            $this->context->getTypeFromString('__string__*'),
+            $this->context->getTypeFromString('int1')
+        );
+        $fnGetHeaders = $this->context->module->addFunction(
+            '__compiler_get_headers',
+            $fntypeGetHeaders
+        );
+        $this->context->registerFunction('__compiler_get_headers', $fnGetHeaders);
         $fntypeFilePutContents = $this->context->context->functionType(
             $i64,
             false,
@@ -466,6 +480,16 @@ class Type extends Builtin {
         $fntypeStreamSetBlocking = $this->context->context->functionType($i32, false, $i64, $i64);
         $fnStreamSetBlocking = $this->context->module->addFunction('__compiler_stream_set_blocking', $fntypeStreamSetBlocking);
         $this->context->registerFunction('__compiler_stream_set_blocking', $fnStreamSetBlocking);
+        $fntypeStreamEnableCrypto = $this->context->context->functionType($i32, false, $i64, $i64, $i64, $i64);
+        $fnStreamEnableCrypto = $this->context->module->addFunction('__compiler_stream_enable_crypto', $fntypeStreamEnableCrypto);
+        $this->context->registerFunction('__compiler_stream_enable_crypto', $fnStreamEnableCrypto);
+        $fntypeStreamSocketGetName = $this->context->context->functionType($strPtr, false, $i64, $i64);
+        $fnStreamSocketGetName = $this->context->module->addFunction('__compiler_stream_socket_get_name', $fntypeStreamSocketGetName);
+        $this->context->registerFunction('__compiler_stream_socket_get_name', $fnStreamSocketGetName);
+        $double = $this->context->getTypeFromString('double');
+        $fntypeStreamSocketAccept = $this->context->context->functionType($i64, false, $i64, $i64, $double);
+        $fnStreamSocketAccept = $this->context->module->addFunction('__compiler_stream_socket_accept', $fntypeStreamSocketAccept);
+        $this->context->registerFunction('__compiler_stream_socket_accept', $fnStreamSocketAccept);
         $fntypeFtruncate = $this->context->context->functionType($i32, false, $i64, $i64);
         $fnFtruncate = $this->context->module->addFunction('__compiler_ftruncate', $fntypeFtruncate);
         $this->context->registerFunction('__compiler_ftruncate', $fnFtruncate);
@@ -636,6 +660,17 @@ class Type extends Builtin {
             $fntypeHashHmacAlgos
         );
         $this->context->registerFunction('__compiler_hash_hmac_algos', $fnHashHmacAlgos);
+        $fnHashAlgos = $this->context->module->addFunction(
+            '__compiler_hash_algos',
+            $fntypeHashHmacAlgos
+        );
+        $this->context->registerFunction('__compiler_hash_algos', $fnHashAlgos);
+        $fntypeOpensslSign = $this->context->context->functionType($strPtr, false, $strPtr, $strPtr, $i64);
+        $fnOpensslSign = $this->context->module->addFunction('__compiler_openssl_sign', $fntypeOpensslSign);
+        $this->context->registerFunction('__compiler_openssl_sign', $fnOpensslSign);
+        $fntypeOpensslVerify = $this->context->context->functionType($i32, false, $strPtr, $strPtr, $strPtr, $i64);
+        $fnOpensslVerify = $this->context->module->addFunction('__compiler_openssl_verify', $fntypeOpensslVerify);
+        $this->context->registerFunction('__compiler_openssl_verify', $fnOpensslVerify);
         $double = $this->context->getTypeFromString('double');
         $fntypeMicrotimeStr = $this->context->context->functionType($strPtr, false);
         $fnMicrotimeStr = $this->context->module->addFunction('__compiler_microtime_string', $fntypeMicrotimeStr);
@@ -692,9 +727,8 @@ class Type extends Builtin {
             $fntypeGettimeofdayFloat
         );
         $this->context->registerFunction('__compiler_gettimeofday_float', $fnGettimeofdayFloat);
-        $i64 = $this->context->getTypeFromString('int64');
         $htPtr = $this->context->getTypeFromString('__hashtable__*');
-        $fntypeHrtimeNs = $this->context->context->functionType($i64, false);
+        $fntypeHrtimeNs = $this->context->context->functionType($double, false);
         $fnHrtimeNs = $this->context->module->addFunction('__compiler_hrtime_ns', $fntypeHrtimeNs);
         $this->context->registerFunction('__compiler_hrtime_ns', $fnHrtimeNs);
         $fntypeHrtimePair = $this->context->context->functionType($htPtr, false);
@@ -713,6 +747,15 @@ class Type extends Builtin {
             $fntypeTimeSleepUntil
         );
         $this->context->registerFunction('__compiler_time_sleep_until', $fnTimeSleepUntil);
+        $fntypePasswordRandomBytes = $this->context->context->functionType($strPtr, false, $i64);
+        $fnPasswordRandomBytes = $this->context->module->addFunction(
+            '__compiler_password_random_bytes',
+            $fntypePasswordRandomBytes
+        );
+        $this->context->registerFunction('__compiler_password_random_bytes', $fnPasswordRandomBytes);
+        $fntypeLibcrypt = $this->context->context->functionType($strPtr, false, $strPtr, $strPtr);
+        $fnLibcrypt = $this->context->module->addFunction('__compiler_libcrypt', $fntypeLibcrypt);
+        $this->context->registerFunction('__compiler_libcrypt', $fnLibcrypt);
         $fntypePasswordHash = $this->context->context->functionType($strPtr, false, $strPtr, $i64, $i64);
         $fnPasswordHash = $this->context->module->addFunction('__compiler_password_hash', $fntypePasswordHash);
         $this->context->registerFunction('__compiler_password_hash', $fnPasswordHash);
@@ -1332,14 +1375,22 @@ class Type extends Builtin {
     }
 
     public function initialize(): void {
-        Sscanf::ensureLinked($this->context);
-        StringFormat::ensureLinked($this->context);
-        StringStripTags::ensureLinked($this->context);
+        if (Builtin::LOAD_TYPE_STANDALONE !== $this->loadType) {
+            Sscanf::ensureLinked($this->context);
+            StringFormat::ensureLinked($this->context);
+            StringStripTags::ensureLinked($this->context);
+        }
         HttpResponseCode::implement($this->context);
         ObOutput::registerExternals($this->context);
-        ObGzhandler::ensureLinked($this->context);
-        ObOutputRuntime::ensureLinked($this->context);
+        if (Builtin::LOAD_TYPE_STANDALONE !== $this->loadType) {
+            ObGzhandler::ensureLinked($this->context);
+            ObOutputRuntime::ensureLinked($this->context);
+        }
         PendingHeadersRuntime::ensureLinked($this->context);
+        if (Builtin::LOAD_TYPE_STANDALONE === $this->loadType) {
+            // Remaining runtimes link lazily via Context::defineBuiltins ensureStandaloneBodies (#12910).
+            return;
+        }
         PowIntRuntime::ensureLinked($this->context);
         GethostbynamelRuntime::ensureLinked($this->context);
         GethostbyaddrRuntime::ensureLinked($this->context);
@@ -1352,10 +1403,13 @@ class Type extends Builtin {
         ProcessRuntime::ensureLinked($this->context);
         ProcessOpen::ensureLinked($this->context);
         StreamSocketPair::ensureLinked($this->context);
+        StreamSocketGetNameRuntime::ensureLinked($this->context);
+        StreamSocketAccept::ensureLinked($this->context);
         StringMicrotime::ensureLinked($this->context);
         StringGettimeofday::ensureLinked($this->context);
         StringGetrusage::ensureLinked($this->context);
         StringNetInterfacesJit::ensureLinked($this->context);
+        StringGetenv::ensureLinked($this->context);
         StringGetenvAll::ensureLinked($this->context);
         ListUnpackRuntime::ensureLinked($this->context);
         StringInfo::ensureLinked($this->context);
@@ -1372,6 +1426,7 @@ class Type extends Builtin {
         StreamLifecycle::ensureLinked($this->context);
         StreamIo::ensureLinked($this->context);
         GzStreamIo::ensureLinked($this->context);
+        Bz2StreamIo::ensureLinked($this->context);
         StreamBuffer::ensureLinked($this->context);
         StreamMeta::ensureLinked($this->context);
         StreamRead::ensureLinked($this->context);

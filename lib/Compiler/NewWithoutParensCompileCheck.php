@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\Compiler;
 
+use PHPCompiler\CompilerVersion;
 use PHPCfg\Op;
 use PHPCfg\Op\Expr\New_;
 use PHPCfg\Op\Stmt\Property;
@@ -28,6 +29,7 @@ final class NewWithoutParensCompileCheck
     {
         NewCtorParens::resetMatchCursor();
         $check = new self();
+        $check->sourceCode = $sourceCode;
         foreach ($script->main->cfg->children as $child) {
             if ($child instanceof Op\Stmt\Class_
                 || $child instanceof Op\Stmt\Interface_
@@ -39,16 +41,67 @@ final class NewWithoutParensCompileCheck
         }
     }
 
+    private ?string $sourceCode = null;
+
     private function walkClassLike(
         Op\Stmt\Class_|Op\Stmt\Interface_|Op\Stmt\Trait_|Op\Stmt\Enum_ $class
     ): void {
         foreach ($class->stmts->children as $stmt) {
             if ($stmt instanceof ConstTerminal) {
-                $this->walkOpsRejectAllNew($stmt->valueBlock->children ?? []);
+                $this->walkClassConstValue($stmt, $this->sourceCode);
                 continue;
             }
             if ($stmt instanceof Property) {
                 $this->rejectPropertyDefaultNew($stmt);
+            }
+        }
+    }
+
+    private function walkClassConstValue(ConstTerminal $const, ?string $sourceCode): void
+    {
+        $children = $const->valueBlock->children ?? [];
+        if (!CompilerVersion::supportsClassConstObjectExpressions()) {
+            $this->walkOpsRejectAllNew($children);
+
+            return;
+        }
+        $this->walkClassConstNewExpr($children, $sourceCode, true);
+    }
+
+    /**
+     * PHP 8.3+ allows a single top-level `new Class(...)` in class constants (#12940, #16878).
+     *
+     * @param list<Op> $ops
+     */
+    private function walkClassConstNewExpr(array $ops, ?string $sourceCode, bool $atTopLevel): void
+    {
+        $topLevelNewCount = 0;
+        foreach ($ops as $op) {
+            if ($op instanceof New_) {
+                if (!$atTopLevel) {
+                    throw new \CompileError(self::MESSAGE);
+                }
+                if (!NewCtorParens::hasCtorParens($op, $sourceCode)) {
+                    throw new \CompileError(self::MESSAGE);
+                }
+                ++$topLevelNewCount;
+                continue;
+            }
+            if ($atTopLevel && $topLevelNewCount > 0) {
+                throw new \CompileError(self::MESSAGE);
+            }
+            $this->walkSubBlocksClassConstNew($op, $sourceCode, false);
+        }
+        if ($atTopLevel && $topLevelNewCount > 1) {
+            throw new \CompileError(self::MESSAGE);
+        }
+    }
+
+    private function walkSubBlocksClassConstNew(Op $op, ?string $sourceCode, bool $atTopLevel): void
+    {
+        foreach ($op->getSubBlocks() as $sub) {
+            if (null !== $sub && property_exists($sub, 'children') && is_array($sub->children)) {
+                $this->walkClassConstNewExpr($sub->children, $sourceCode, $atTopLevel);
             }
         }
     }

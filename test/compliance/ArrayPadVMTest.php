@@ -25,6 +25,34 @@ final class ArrayPadVMTest extends BaseTest
             __DIR__.'/cases/stdlib/array_pad_negative_length.phpt',
             'array_pad_negative_length.phpt'
         );
+        yield 'array_pad_negative_after_udf.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/array_pad_negative_after_udf.phpt',
+            'array_pad_negative_after_udf.phpt'
+        );
+        yield 'array_pad_float_length_strict.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/array_pad_float_length_strict.phpt',
+            'array_pad_float_length_strict.phpt'
+        );
+        yield 'array_pad_float_length_coerce.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/array_pad_float_length_coerce.phpt',
+            'array_pad_float_length_coerce.phpt'
+        );
+        yield 'array_pad_pad_type.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/array_pad_pad_type.phpt',
+            'array_pad_pad_type.phpt'
+        );
+        yield 'array_pad_type_enum.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/array_pad_type_enum.phpt',
+            'array_pad_type_enum.phpt'
+        );
+        yield 'array_pad_neg_after_udf_array.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/array_pad_neg_after_udf_array.phpt',
+            'array_pad_neg_after_udf_array.phpt'
+        );
+        yield 'array_pad_enum_length_typeerror.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/array_pad_enum_length_typeerror.phpt',
+            'array_pad_enum_length_typeerror.phpt'
+        );
     }
 
     public function setUp(): void

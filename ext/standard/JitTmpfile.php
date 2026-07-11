@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\StreamIoRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPLLVM\Builder;
@@ -16,6 +17,8 @@ final class JitTmpfile
     /** @return Value (int handle, or boolean false on failure) */
     public static function invoke(Context $context): Value
     {
+        StreamIoRuntime::ensureLinkedForUserScriptLowering($context);
+
         $handle = $context->builder->call($context->lookupFunction('__compiler_tmpfile'));
         $i64 = $context->getTypeFromString('int64');
         $failed = $context->builder->icmp(Builder::INT_SLT, $handle, $i64->constInt(0, false));

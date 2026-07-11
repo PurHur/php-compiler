@@ -28,13 +28,15 @@ final class GeneratorValid implements Call
         $zero = $sizeT->constInt(0, false);
         $done = $context->builder->load($context->builder->structGep($statePtr, $map['done']));
         $hasCurrent = $context->builder->load($context->builder->structGep($statePtr, $map['has_current']));
+        $hasReturned = $context->builder->load($context->builder->structGep($statePtr, $map['has_returned']));
         $resumeIp = $context->builder->load($context->builder->structGep($statePtr, $map['resume_ip']));
         $notDone = $context->builder->icmp(\PHPLLVM\Builder::INT_EQ, $done, $i1->constInt(0, false));
+        $notReturned = $context->builder->icmp(\PHPLLVM\Builder::INT_EQ, $hasReturned, $i1->constInt(0, false));
         $active = $context->builder->or(
             $context->builder->icmp(\PHPLLVM\Builder::INT_NE, $hasCurrent, $i1->constInt(0, false)),
             $context->builder->icmp(\PHPLLVM\Builder::INT_NE, $resumeIp, $zero)
         );
-        $valid = $context->builder->and($notDone, $active);
+        $valid = $context->builder->and($notDone, $context->builder->and($notReturned, $active));
         $slot = JitValueBox::alloc($context);
         $context->builder->call(
             $context->lookupFunction('__value__writeBool'),

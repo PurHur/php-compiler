@@ -6,6 +6,9 @@ namespace PHPCompiler\ext\posix;
 
 use PHPCompiler\ext\standard\JitGetcwd;
 use PHPCompiler\ext\standard\JitSleep;
+use PHPCompiler\JIT\Builtin\PosixCtermidRuntime;
+use PHPCompiler\JIT\Builtin\PosixSessionRuntime;
+use PHPCompiler\JIT\Builtin\PosixStrerrorRuntime;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\StringInfo;
 use PHPCompiler\JIT\Context;
@@ -53,6 +56,17 @@ final class JitPosix
             : $context->builder->zExt($raw, $i64);
     }
 
+    public static function getgid(Context $context): Value
+    {
+        self::ensureLibcGid($context);
+        $i64 = $context->getTypeFromString('int64');
+        $raw = $context->builder->call($context->lookupFunction('getgid'));
+
+        return $raw->typeOf() === $i64
+            ? $raw
+            : $context->builder->zExt($raw, $i64);
+    }
+
     public static function getegid(Context $context): Value
     {
         self::ensureLibcEgid($context);
@@ -66,57 +80,7 @@ final class JitPosix
 
     public static function strerror(Context $context, JITVariable $errnoArg): Value
     {
-        self::ensureLibcStrerror($context);
-        $errno = JitLongArg::lower($context, $errnoArg, 'posix_strerror() errno');
-        $i32 = $context->getTypeFromString('int32');
-        $zeroI32 = $i32->constInt(0, false);
-        $errnoI32 = $errno->typeOf() === $i32
-            ? $errno
-            : $context->builder->trunc($errno, $i32);
-
-        $id = (string) (++self::$blockSerial);
-        $negBlock = BasicBlockHelper::append($context, 'posix_strerror_neg_'.$id);
-        $okBlock = BasicBlockHelper::append($context, 'posix_strerror_ok_'.$id);
-        $doneBlock = BasicBlockHelper::append($context, 'posix_strerror_done_'.$id);
-
-        $isNeg = $context->builder->icmp(Builder::INT_SLT, $errnoI32, $zeroI32);
-        $context->builder->branchIf($isNeg, $negBlock, $okBlock);
-
-        $slot = JitValueBox::alloc($context);
-        $ptr = JitValueBox::pointer($context, $slot);
-        $i1 = $context->getTypeFromString('int1');
-
-        $context->builder->positionAtEnd($negBlock);
-        JitValueBox::writeBool($context, $slot, $i1->constInt(0, false));
-        $context->builder->branch($doneBlock);
-
-        $context->builder->positionAtEnd($okBlock);
-        $i8p = $context->getTypeFromString('int8*');
-        $msgPtr = $context->builder->call(
-            $context->lookupFunction('strerror'),
-            $errnoI32
-        );
-        $i64 = $context->getTypeFromString('int64');
-        $len = $context->builder->call(
-            $context->lookupFunction('strlen'),
-            $msgPtr
-        );
-        $lenI64 = $context->builder->zExt($len, $i64);
-        $resultStr = $context->builder->call(
-            $context->lookupFunction('__string__init'),
-            $lenI64,
-            $msgPtr
-        );
-        $context->builder->call(
-            $context->lookupFunction('__value__writeString'),
-            $ptr,
-            $resultStr
-        );
-        $context->builder->branch($doneBlock);
-
-        $context->builder->positionAtEnd($doneBlock);
-
-        return $ptr;
+        return PosixStrerrorRuntime::strerror($context, $errnoArg);
     }
 
     public static function getLastError(Context $context): Value
@@ -156,29 +120,29 @@ final class JitPosix
     /** posix_getpgid() — process group ID or false (php-src ext/posix/posix.c; #6505 JIT). */
     public static function getpgid(Context $context, JITVariable $pidArg): Value
     {
-        self::ensureLibcPidLookup($context, 'getpgid');
-        $pid = JitSleep::zParamLong($context, $pidArg, 'posix_getpgid', 1, 'pid');
-        $i32 = $context->getTypeFromString('int32');
-        $raw = $context->builder->call(
-            $context->lookupFunction('getpgid'),
-            $context->builder->trunc($pid, $i32)
-        );
+        return PosixSessionRuntime::getpgid($context, $pidArg);
+    }
 
-        return self::boxedPidOrFalse($context, $raw, 'posix_getpgid');
+    /** posix_setsid() — create session (php-src ext/posix/posix.c; #9218 JIT). */
+    public static function setsid(Context $context): Value
+    {
+        self::ensureLibcSetsid($context);
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $raw = $context->builder->call($context->lookupFunction('setsid'));
+        $rawI32 = $raw->typeOf() === $i32
+            ? $raw
+            : $context->builder->trunc($raw, $i32);
+        $slot = JitValueBox::alloc($context);
+        JitValueBox::writeLong($context, $slot, $context->builder->sext($rawI32, $i64));
+
+        return JitValueBox::pointer($context, $slot);
     }
 
     /** posix_getsid() — session ID or false (php-src ext/posix/posix.c; #6505 JIT). */
     public static function getsid(Context $context, JITVariable $pidArg): Value
     {
-        self::ensureLibcPidLookup($context, 'getsid');
-        $pid = JitSleep::zParamLong($context, $pidArg, 'posix_getsid', 1, 'pid');
-        $i32 = $context->getTypeFromString('int32');
-        $raw = $context->builder->call(
-            $context->lookupFunction('getsid'),
-            $context->builder->trunc($pid, $i32)
-        );
-
-        return self::boxedPidOrFalse($context, $raw, 'posix_getsid');
+        return PosixSessionRuntime::getsid($context, $pidArg);
     }
 
     /** posix_setpgid() — set process group (php-src ext/posix/posix.c; #6505 JIT). */
@@ -202,33 +166,7 @@ final class JitPosix
 
     public static function ctermid(Context $context): Value
     {
-        self::ensureLibcCtermid($context);
-        $i8p = $context->getTypeFromString('int8*');
-        $msgPtr = $context->builder->call(
-            $context->lookupFunction('ctermid'),
-            $i8p->constNull()
-        );
-
-        $slot = JitValueBox::alloc($context);
-        $ptr = JitValueBox::pointer($context, $slot);
-        $i64 = $context->getTypeFromString('int64');
-        $len = $context->builder->call(
-            $context->lookupFunction('strlen'),
-            $msgPtr
-        );
-        $lenI64 = $context->builder->zExt($len, $i64);
-        $resultStr = $context->builder->call(
-            $context->lookupFunction('__string__init'),
-            $lenI64,
-            $msgPtr
-        );
-        $context->builder->call(
-            $context->lookupFunction('__value__writeString'),
-            $ptr,
-            $resultStr
-        );
-
-        return $ptr;
+        return PosixCtermidRuntime::ctermid($context);
     }
 
     /** posix_uname() — hashtable of utsname fields or false (#6123 JIT phase). */
@@ -267,7 +205,7 @@ final class JitPosix
         return $ptr;
     }
 
-    private static function boxedPidOrFalse(Context $context, Value $raw, string $label): Value
+    public static function boxedPidOrFalse(Context $context, Value $raw, string $label): Value
     {
         $i32 = $context->getTypeFromString('int32');
         $i64 = $context->getTypeFromString('int64');
@@ -333,18 +271,6 @@ final class JitPosix
         }
     }
 
-    private static function ensureLibcPidLookup(Context $context, string $name): void
-    {
-        $i32 = $context->getTypeFromString('int32');
-        try {
-            $context->lookupFunction($name);
-        } catch (\Throwable) {
-            $ft = $context->context->functionType($i32, false, $i32);
-            $fn = $context->module->addFunction($name, $ft);
-            $context->registerFunction($name, $fn);
-        }
-    }
-
     private static function ensureLibcSetpgid(Context $context): void
     {
         $i32 = $context->getTypeFromString('int32');
@@ -354,6 +280,18 @@ final class JitPosix
             $ft = $context->context->functionType($i32, false, $i32, $i32);
             $fn = $context->module->addFunction('setpgid', $ft);
             $context->registerFunction('setpgid', $fn);
+        }
+    }
+
+    private static function ensureLibcSetsid(Context $context): void
+    {
+        $i32 = $context->getTypeFromString('int32');
+        try {
+            $context->lookupFunction('setsid');
+        } catch (\Throwable) {
+            $ft = $context->context->functionType($i32, false);
+            $fn = $context->module->addFunction('setsid', $ft);
+            $context->registerFunction('setsid', $fn);
         }
     }
 
@@ -383,6 +321,18 @@ final class JitPosix
         }
     }
 
+    private static function ensureLibcGid(Context $context): void
+    {
+        $i32 = $context->getTypeFromString('int32');
+        try {
+            $context->lookupFunction('getgid');
+        } catch (\Throwable $e) {
+            $ft = $context->context->functionType($i32, false);
+            $fn = $context->module->addFunction('getgid', $ft);
+            $context->registerFunction('getgid', $fn);
+        }
+    }
+
     private static function ensureLibcEgid(Context $context): void
     {
         $i32 = $context->getTypeFromString('int32');
@@ -395,28 +345,4 @@ final class JitPosix
         }
     }
 
-    private static function ensureLibcStrerror(Context $context): void
-    {
-        $i32 = $context->getTypeFromString('int32');
-        $i8p = $context->getTypeFromString('int8*');
-        try {
-            $context->lookupFunction('strerror');
-        } catch (\Throwable $e) {
-            $ft = $context->context->functionType($i8p, false, $i32);
-            $fn = $context->module->addFunction('strerror', $ft);
-            $context->registerFunction('strerror', $fn);
-        }
-    }
-
-    private static function ensureLibcCtermid(Context $context): void
-    {
-        $i8p = $context->getTypeFromString('int8*');
-        try {
-            $context->lookupFunction('ctermid');
-        } catch (\Throwable $e) {
-            $ft = $context->context->functionType($i8p, false, $i8p);
-            $fn = $context->module->addFunction('ctermid', $ft);
-            $context->registerFunction('ctermid', $fn);
-        }
-    }
 }

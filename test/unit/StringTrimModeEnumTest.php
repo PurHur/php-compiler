@@ -5,13 +5,17 @@ declare(strict_types=1);
 namespace PHPCompiler\Test\Unit;
 
 use PHPCompiler\Runtime;
+use PHPCompiler\Test\Support\BuiltinStubEnumTestSkip;
 use PHPUnit\Framework\TestCase;
 
 /** @covers issue #7283 */
 final class StringTrimModeEnumTest extends TestCase
 {
+    use BuiltinStubEnumTestSkip;
+
     public function testStringTrimModeBuiltinEnumAndTrim(): void
     {
+        $this->skipUnlessBuiltinStubEnumsEnabled();
         $runtime = new Runtime();
         $code = <<<'PHP'
 <?php

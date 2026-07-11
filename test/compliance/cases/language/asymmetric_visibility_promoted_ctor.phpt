@@ -1,19 +1,12 @@
 --TEST--
-PHP 8.4 asymmetric visibility: constructor-promoted private(set) (#6981, zend_compile.c)
+PHP 8.4 asymmetric visibility: constructor-promoted public (private(set)) compiles (#16495, zend_compile.c)
 --FILE--
 <?php
 class User {
     public function __construct(
-        private(set) string $name,
+        public (private(set)) string $name,
     ) {}
 }
-$u = new User('alice');
-echo $u->name, "\n";
-try {
-    $u->name = 'bob';
-} catch (Error $e) {
-    echo get_class($e), ': ', $e->getMessage(), "\n";
-}
+echo (new User('alice'))->name, "\n";
 --EXPECT--
 alice
-Error: Cannot modify private(set) property User::$name from global scope

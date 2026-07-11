@@ -20,19 +20,41 @@ final class VmDirPure
     /** @return list<string>|false */
     public static function listSorted(string $path): array|false
     {
-        if (str_contains($path, "\0")) {
+        $entries = self::listRaw($path);
+        if (false === $entries) {
+            return false;
+        }
+
+        \sort($entries, \SORT_STRING);
+
+        /** @var list<string> $entries */
+        return $entries;
+    }
+
+    /**
+     * Filesystem iteration order for opendir/readdir (php-src plain_wrapper readdir; #14859).
+     *
+     * @return list<string>|false
+     */
+    public static function listUnsorted(string $path): array|false
+    {
+        return self::listRaw($path);
+    }
+
+    /** @return list<string>|false */
+    private static function listRaw(string $path): array|false
+    {
+        if ('' === $path || str_contains($path, "\0")) {
             return false;
         }
         if (!self::available()) {
             return false;
         }
 
-        $entries = @\scandir($path);
+        $entries = @\scandir($path, \SCANDIR_SORT_NONE);
         if (false === $entries || !\is_array($entries)) {
             return false;
         }
-
-        \sort($entries, \SORT_STRING);
 
         /** @var list<string> $entries */
         return $entries;

@@ -22,6 +22,9 @@ final class RandomModuleSkeletonTest extends TestCase
         foreach ([
             'Random\\Randomizer',
             'Random\\Engine\\Mt19937',
+            'Random\\Engine\\Secure',
+            'Random\\Engine\\Xoshiro256StarStar',
+            'Random\\Engine\\PcgOneseq128XslRr64',
             'Random\\RandomException',
             'Random\\RandomError',
             'Random\\BrokenRandomEngineError',

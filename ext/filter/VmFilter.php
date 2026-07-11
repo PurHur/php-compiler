@@ -4,9 +4,14 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\filter;
 
+use PHPCompiler\ext\standard\StdlibConstants;
+use PHPCompiler\ext\standard\VmInetPure;
 use PHPCompiler\ext\standard\VmPregNative;
 use PHPCompiler\ext\standard\VmString;
+use PHPCompiler\Frame;
+use PHPCompiler\VM\Context;
 use PHPCompiler\VM\EnumCaseSupport;
+use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 
 /**
@@ -16,18 +21,60 @@ use PHPCompiler\VM\Variable;
  */
 final class VmFilter
 {
-    public const FILTER_VALIDATE_INT = 257;
+    public const FILTER_FLAG_NONE = 0;
+    public const FILTER_REQUIRE_ARRAY = 0x1000000;
+    public const FILTER_REQUIRE_SCALAR = 0x2000000;
+    public const FILTER_FORCE_ARRAY = 0x4000000;
+    public const FILTER_NULL_ON_FAILURE = 0x8000000;
+    public const FILTER_THROW_ON_FAILURE = 0x10000000;
+    public const FILTER_FLAG_ALLOW_OCTAL = 0x0001;
+    public const FILTER_FLAG_ALLOW_HEX = 0x0002;
+    public const FILTER_FLAG_STRIP_LOW = 0x0004;
+    public const FILTER_FLAG_STRIP_HIGH = 0x0008;
+    public const FILTER_FLAG_ENCODE_LOW = 0x0010;
+    public const FILTER_FLAG_ENCODE_HIGH = 0x0020;
+    public const FILTER_FLAG_ENCODE_AMP = 0x0040;
+    public const FILTER_FLAG_NO_ENCODE_QUOTES = 0x0080;
+    public const FILTER_FLAG_EMPTY_STRING_NULL = 0x0100;
+    public const FILTER_FLAG_STRIP_BACKTICK = 0x0200;
+    public const FILTER_FLAG_ALLOW_FRACTION = 0x1000;
+    public const FILTER_FLAG_ALLOW_THOUSAND = 0x2000;
+    public const FILTER_FLAG_ALLOW_SCIENTIFIC = 0x4000;
+    public const FILTER_FLAG_PATH_REQUIRED = 0x010000;
+    public const FILTER_FLAG_QUERY_REQUIRED = 0x080000;
+    public const FILTER_FLAG_IPV4 = 0x00100000;
+    public const FILTER_FLAG_IPV6 = 0x00200000;
+    public const FILTER_FLAG_NO_RES_RANGE = 0x00400000;
+    public const FILTER_FLAG_NO_PRIV_RANGE = 0x00800000;
+    public const FILTER_FLAG_GLOBAL_RANGE = 0x20000000;
+    public const FILTER_FLAG_HOSTNAME = 0x100000;
+    public const FILTER_FLAG_EMAIL_UNICODE = 0x100000;
+    public const FILTER_VALIDATE_INT = 0x0101;
     /** php-src ext/filter/php_filter.h — FILTER_VALIDATE_BOOLEAN */
-    public const FILTER_VALIDATE_BOOLEAN = 258;
+    public const FILTER_VALIDATE_BOOLEAN = 0x0102;
     /** php-src ext/filter/php_filter.h — FILTER_VALIDATE_FLOAT */
-    public const FILTER_VALIDATE_FLOAT = 259;
+    public const FILTER_VALIDATE_FLOAT = 0x0103;
     /** php-src ext/filter/filter_private.h — FILTER_VALIDATE_REGEXP */
-    public const FILTER_VALIDATE_REGEXP = 272;
+    public const FILTER_VALIDATE_REGEXP = 0x0110;
     /** php-src ext/filter/php_filter.h — FILTER_VALIDATE_URL */
-    public const FILTER_VALIDATE_URL = 273;
-    public const FILTER_VALIDATE_EMAIL = 274;
-    /** php-src ext/filter/php_filter.h — PHP_FILTER_FLAG_NULL_ON_FAILURE */
-    public const FILTER_NULL_ON_FAILURE = 134217728;
+    public const FILTER_VALIDATE_URL = 0x0111;
+    public const FILTER_VALIDATE_EMAIL = 0x0112;
+    /** php-src ext/filter/php_filter.h — FILTER_VALIDATE_IP */
+    public const FILTER_VALIDATE_IP = 0x0113;
+    public const FILTER_VALIDATE_MAC = 0x0114;
+    public const FILTER_VALIDATE_DOMAIN = 0x0115;
+    public const FILTER_DEFAULT = 0x0204;
+    public const FILTER_UNSAFE_RAW = 0x0204;
+    public const FILTER_SANITIZE_STRING = 0x0201;
+    public const FILTER_SANITIZE_ENCODED = 0x0202;
+    public const FILTER_SANITIZE_SPECIAL_CHARS = 0x0203;
+    public const FILTER_SANITIZE_EMAIL = 0x0205;
+    public const FILTER_SANITIZE_URL = 0x0206;
+    public const FILTER_SANITIZE_NUMBER_INT = 0x0207;
+    public const FILTER_SANITIZE_NUMBER_FLOAT = 0x0208;
+    public const FILTER_SANITIZE_FULL_SPECIAL_CHARS = 0x020a;
+    public const FILTER_SANITIZE_ADD_SLASHES = 0x020b;
+    public const FILTER_CALLBACK = 0x0400;
     /** php-src ext/filter/php_filter.h */
     public const INPUT_POST = 0;
 
@@ -43,12 +90,35 @@ final class VmFilter
 
     public static function isSupportedFilter(int $filter): bool
     {
+        return self::isValidateFilter($filter) || self::isSanitizeFilter($filter);
+    }
+
+    public static function isValidateFilter(int $filter): bool
+    {
         return self::FILTER_VALIDATE_INT === $filter
             || self::FILTER_VALIDATE_BOOLEAN === $filter
             || self::FILTER_VALIDATE_FLOAT === $filter
             || self::FILTER_VALIDATE_REGEXP === $filter
+            || self::FILTER_VALIDATE_DOMAIN === $filter
             || self::FILTER_VALIDATE_URL === $filter
-            || self::FILTER_VALIDATE_EMAIL === $filter;
+            || self::FILTER_VALIDATE_EMAIL === $filter
+            || self::FILTER_VALIDATE_IP === $filter
+            || self::FILTER_VALIDATE_MAC === $filter;
+    }
+
+    public static function isSanitizeFilter(int $filter): bool
+    {
+        return self::FILTER_SANITIZE_STRING === $filter
+            || self::FILTER_SANITIZE_ENCODED === $filter
+            || self::FILTER_SANITIZE_SPECIAL_CHARS === $filter
+            || self::FILTER_SANITIZE_FULL_SPECIAL_CHARS === $filter
+            || self::FILTER_SANITIZE_EMAIL === $filter
+            || self::FILTER_SANITIZE_URL === $filter
+            || self::FILTER_SANITIZE_NUMBER_INT === $filter
+            || self::FILTER_SANITIZE_NUMBER_FLOAT === $filter
+            || self::FILTER_SANITIZE_ADD_SLASHES === $filter
+            || self::FILTER_UNSAFE_RAW === $filter
+            || self::FILTER_DEFAULT === $filter;
     }
 
     public static function unknownFilterWarningMessage(int $filter): string
@@ -61,25 +131,240 @@ final class VmFilter
         $parsed = self::parseFilterArgs($options);
         $nullOnFailure = 0 !== ($parsed['flags'] & self::FILTER_NULL_ON_FAILURE);
         if (self::FILTER_VALIDATE_INT === $filter) {
-            return self::validateInt($value, $nullOnFailure);
+            return self::validateInt($value, $nullOnFailure, $parsed['flags'], $parsed['filterOptions']);
         }
         if (self::FILTER_VALIDATE_BOOLEAN === $filter) {
             return self::validateBoolean($value, $nullOnFailure);
         }
         if (self::FILTER_VALIDATE_FLOAT === $filter) {
-            return self::validateFloat($value, $nullOnFailure);
+            return self::validateFloat($value, $nullOnFailure, $parsed['filterOptions']);
         }
         if (self::FILTER_VALIDATE_REGEXP === $filter) {
             return self::validateRegexp($value, $parsed['filterOptions'], $nullOnFailure);
         }
+        if (self::FILTER_VALIDATE_DOMAIN === $filter) {
+            return self::validateDomain($value, $nullOnFailure, $parsed['flags']);
+        }
         if (self::FILTER_VALIDATE_URL === $filter) {
-            return self::validateUrl($value, $nullOnFailure);
+            return self::validateUrl($value, $nullOnFailure, $parsed['flags']);
         }
         if (self::FILTER_VALIDATE_EMAIL === $filter) {
-            return self::validateEmail($value, $nullOnFailure);
+            return self::validateEmail($value, $nullOnFailure, $parsed['flags']);
+        }
+        if (self::FILTER_VALIDATE_IP === $filter) {
+            return self::validateIp($value, $nullOnFailure, $parsed['flags']);
+        }
+        if (self::FILTER_VALIDATE_MAC === $filter) {
+            return self::validateMac($value, $nullOnFailure, $parsed['filterOptions']);
+        }
+        if (self::isSanitizeFilter($filter)) {
+            return self::sanitize($value, $filter, $parsed['flags'], $parsed['filterOptions']);
         }
 
         return self::failureResult(false);
+    }
+
+    /**
+     * Sanitizing filters (php-src ext/filter/sanitizing_filters.c; #11419).
+     */
+    public static function sanitize(
+        Variable $value,
+        int $filter,
+        int $flags = 0,
+        ?\PHPCompiler\VM\HashTable $filterOptions = null
+    ): Variable {
+        if (self::FILTER_CALLBACK === $filter) {
+            throw new \ValueError('filter_var(): Option must be a valid callback');
+        }
+        $subject = self::coerceFilterScalarString($value);
+        if (null === $subject) {
+            return self::failureResult(false);
+        }
+
+        $sanitized = match ($filter) {
+            self::FILTER_SANITIZE_STRING => self::sanitizeString($subject, $flags),
+            self::FILTER_SANITIZE_ENCODED => rawurlencode($subject),
+            self::FILTER_SANITIZE_SPECIAL_CHARS => self::sanitizeSpecialChars($subject, $flags),
+            self::FILTER_SANITIZE_FULL_SPECIAL_CHARS => VmString::htmlspecialchars(
+                $subject,
+                StdlibConstants::ENT_QUOTES | StdlibConstants::ENT_SUBSTITUTE,
+                'UTF-8',
+                true
+            ),
+            self::FILTER_SANITIZE_EMAIL => self::sanitizeEmail($subject),
+            self::FILTER_SANITIZE_URL => self::sanitizeUrl($subject),
+            self::FILTER_SANITIZE_NUMBER_INT => self::sanitizeNumberInt($subject),
+            self::FILTER_SANITIZE_NUMBER_FLOAT => self::sanitizeNumberFloat($subject, $flags),
+            self::FILTER_SANITIZE_ADD_SLASHES => VmString::addslashes($subject),
+            self::FILTER_UNSAFE_RAW, self::FILTER_DEFAULT => $subject,
+            default => null,
+        };
+        if (null === $sanitized) {
+            return self::failureResult(false);
+        }
+
+        return self::stringResult($sanitized);
+    }
+
+    /**
+     * JIT/AOT bridge — returns sanitized string or empty string when input is not scalar.
+     */
+    public static function sanitizeStringForJit(int $filter, string $subject, int $flags = 0): string
+    {
+        if (!self::isSanitizeFilter($filter)) {
+            return '';
+        }
+
+        return match ($filter) {
+            self::FILTER_SANITIZE_STRING => self::sanitizeString($subject, $flags),
+            self::FILTER_SANITIZE_ENCODED => rawurlencode($subject),
+            self::FILTER_SANITIZE_SPECIAL_CHARS => self::sanitizeSpecialChars($subject, $flags),
+            self::FILTER_SANITIZE_FULL_SPECIAL_CHARS => VmString::htmlspecialchars(
+                $subject,
+                StdlibConstants::ENT_QUOTES | StdlibConstants::ENT_SUBSTITUTE,
+                'UTF-8',
+                true
+            ),
+            self::FILTER_SANITIZE_EMAIL => self::sanitizeEmail($subject),
+            self::FILTER_SANITIZE_URL => self::sanitizeUrl($subject),
+            self::FILTER_SANITIZE_NUMBER_INT => self::sanitizeNumberInt($subject),
+            self::FILTER_SANITIZE_NUMBER_FLOAT => self::sanitizeNumberFloat($subject, $flags),
+            self::FILTER_SANITIZE_ADD_SLASHES => VmString::addslashes($subject),
+            self::FILTER_UNSAFE_RAW, self::FILTER_DEFAULT => $subject,
+            default => '',
+        };
+    }
+
+    private static function coerceFilterScalarString(Variable $value): ?string
+    {
+        if ($value->isUndefined() || Variable::TYPE_NULL === $value->type) {
+            return '';
+        }
+        if (Variable::TYPE_STRING === $value->type) {
+            return $value->toString();
+        }
+        if (Variable::TYPE_INTEGER === $value->type) {
+            return (string) $value->toInt();
+        }
+        if (Variable::TYPE_FLOAT === $value->type) {
+            return (string) $value->toFloat();
+        }
+        if (Variable::TYPE_BOOLEAN === $value->type) {
+            return $value->toBool() ? '1' : '';
+        }
+
+        return null;
+    }
+
+    private static function stringResult(string $s): Variable
+    {
+        $out = new Variable();
+        $out->string($s);
+
+        return $out;
+    }
+
+    /** php-src php_filter_sanitize_string — strip_tags + optional flag stripping. */
+    private static function sanitizeString(string $subject, int $flags): string
+    {
+        $out = VmString::stripTags($subject);
+        if (0 !== ($flags & self::FILTER_FLAG_STRIP_LOW)) {
+            $out = self::stripCharsBelow($out, 32);
+        }
+        if (0 !== ($flags & self::FILTER_FLAG_STRIP_HIGH)) {
+            $out = self::stripCharsAbove($out, 127);
+        }
+        if (0 !== ($flags & self::FILTER_FLAG_STRIP_BACKTICK)) {
+            $out = str_replace('`', '', $out);
+        }
+
+        return $out;
+    }
+
+    /** php-src php_filter_sanitize_special_chars — numeric entities for <>&"' */
+    private static function sanitizeSpecialChars(string $subject, int $flags): string
+    {
+        $encodeQuotes = 0 === ($flags & self::FILTER_FLAG_NO_ENCODE_QUOTES);
+        $out = '';
+        $len = strlen($subject);
+        for ($i = 0; $i < $len; ++$i) {
+            $ch = $subject[$i];
+            if ('<' === $ch || '>' === $ch || '&' === $ch || ('"' === $ch && $encodeQuotes) || ("'" === $ch && $encodeQuotes)) {
+                $out .= '&#'.ord($ch).';';
+                continue;
+            }
+            $out .= $ch;
+        }
+
+        return $out;
+    }
+
+    private static function sanitizeNumberInt(string $subject): string
+    {
+        return preg_replace('/[^0-9+-]+/', '', $subject) ?? '';
+    }
+
+    /** php-src ext/filter/sanitizing_filters.c — php_filter_number_float */
+    private static function sanitizeNumberFloat(string $subject, int $flags = 0): string
+    {
+        $extra = '';
+        if (0 !== ($flags & self::FILTER_FLAG_ALLOW_FRACTION)) {
+            $extra .= '.';
+        }
+        if (0 !== ($flags & self::FILTER_FLAG_ALLOW_THOUSAND)) {
+            $extra .= ',';
+        }
+        if (0 !== ($flags & self::FILTER_FLAG_ALLOW_SCIENTIFIC)) {
+            $extra .= 'eE';
+        }
+
+        return preg_replace('/[^0-9+\-'.preg_quote($extra, '/').']+/', '', $subject) ?? '';
+    }
+
+    /** php-src php_filter_sanitize_email allow-list. */
+    private static function sanitizeEmail(string $subject): string
+    {
+        return preg_replace(
+            '/[^0-9a-zA-Z!#$%&\'*+\/=?^_`{|}~@.-]+/',
+            '',
+            $subject
+        ) ?? '';
+    }
+
+    /** php-src php_filter_sanitize_url allow-list. */
+    private static function sanitizeUrl(string $subject): string
+    {
+        return preg_replace(
+            '/[^-a-zA-Z0-9+&@#\/%?=~_|!:,.;]+/',
+            '',
+            $subject
+        ) ?? '';
+    }
+
+    private static function stripCharsBelow(string $s, int $threshold): string
+    {
+        $out = '';
+        $len = strlen($s);
+        for ($i = 0; $i < $len; ++$i) {
+            if (ord($s[$i]) >= $threshold) {
+                $out .= $s[$i];
+            }
+        }
+
+        return $out;
+    }
+
+    private static function stripCharsAbove(string $s, int $threshold): string
+    {
+        $out = '';
+        $len = strlen($s);
+        for ($i = 0; $i < $len; ++$i) {
+            if (ord($s[$i]) <= $threshold) {
+                $out .= $s[$i];
+            }
+        }
+
+        return $out;
     }
 
     public static function resolveInputType(Variable $var, string $fn): int
@@ -176,9 +461,80 @@ final class VmFilter
                 throw new \LogicException('filter_var() options[options] must be an array');
             }
             $filterOptions = $nested->toArray();
+        } elseif (self::arrayLooksLikeBareFilterOptions($ht)) {
+            // Named-parameter lowering may pass the inner options hash directly (#4404, #5020).
+            $filterOptions = $ht;
         }
 
         return ['flags' => $flags, 'filterOptions' => $filterOptions];
+    }
+
+    private static function arrayLooksLikeBareFilterOptions(\PHPCompiler\VM\HashTable $ht): bool
+    {
+        foreach (['regexp', 'min_range', 'max_range', 'default', 'decimal'] as $key) {
+            $var = $ht->find($key);
+            if (null !== $var && !$var->isUndefined() && Variable::TYPE_NULL !== $var->type) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @return array{min: int|float|null, max: int|float|null}
+     */
+    private static function parseRangeOptions(?\PHPCompiler\VM\HashTable $filterOptions, bool $asFloat): array
+    {
+        $min = null;
+        $max = null;
+        if (null === $filterOptions) {
+            return ['min' => null, 'max' => null];
+        }
+        $minVar = $filterOptions->find('min_range');
+        if (null !== $minVar && !$minVar->isUndefined() && Variable::TYPE_NULL !== $minVar->type) {
+            $resolved = $minVar->resolveIndirect();
+            if (Variable::TYPE_INTEGER === $resolved->type) {
+                $min = $asFloat ? (float) $resolved->toInt() : $resolved->toInt();
+            } elseif (Variable::TYPE_FLOAT === $resolved->type) {
+                $min = $resolved->toFloat();
+            }
+        }
+        $maxVar = $filterOptions->find('max_range');
+        if (null !== $maxVar && !$maxVar->isUndefined() && Variable::TYPE_NULL !== $maxVar->type) {
+            $resolved = $maxVar->resolveIndirect();
+            if (Variable::TYPE_INTEGER === $resolved->type) {
+                $max = $asFloat ? (float) $resolved->toInt() : $resolved->toInt();
+            } elseif (Variable::TYPE_FLOAT === $resolved->type) {
+                $max = $resolved->toFloat();
+            }
+        }
+
+        return ['min' => $min, 'max' => $max];
+    }
+
+    private static function intInRange(int $value, int|float|null $min, int|float|null $max): bool
+    {
+        if (null !== $min && $value < $min) {
+            return false;
+        }
+        if (null !== $max && $value > $max) {
+            return false;
+        }
+
+        return true;
+    }
+
+    private static function floatInRange(float $value, ?float $min, ?float $max): bool
+    {
+        if (null !== $min && $value < $min) {
+            return false;
+        }
+        if (null !== $max && $value > $max) {
+            return false;
+        }
+
+        return true;
     }
 
     private static function validateRegexp(
@@ -229,7 +585,11 @@ final class VmFilter
     private static function validateBoolean(Variable $value, bool $nullOnFailure = false): Variable
     {
         if ($value->isUndefined() || Variable::TYPE_NULL === $value->type) {
-            return self::failureResult($nullOnFailure);
+            // php-src coerces null/undefined to "" before boolean validation (#17238).
+            $out = new Variable();
+            $out->bool(false);
+
+            return $out;
         }
         if (Variable::TYPE_BOOLEAN === $value->type) {
             $out = new Variable();
@@ -284,20 +644,31 @@ final class VmFilter
         return $out;
     }
 
-    private static function validateFloat(Variable $value, bool $nullOnFailure = false): Variable
-    {
+    private static function validateFloat(
+        Variable $value,
+        bool $nullOnFailure = false,
+        ?\PHPCompiler\VM\HashTable $filterOptions = null
+    ): Variable {
+        $range = self::parseRangeOptions($filterOptions, true);
         if ($value->isUndefined() || Variable::TYPE_NULL === $value->type) {
             return self::failureResult($nullOnFailure);
         }
         if (Variable::TYPE_INTEGER === $value->type) {
+            $f = (float) $value->toInt();
+            if (!self::floatInRange($f, $range['min'], $range['max'])) {
+                return self::failureResult($nullOnFailure);
+            }
             $out = new Variable();
-            $out->float((float) $value->toInt());
+            $out->float($f);
 
             return $out;
         }
         if (Variable::TYPE_FLOAT === $value->type) {
             $f = $value->toFloat();
             if (!is_finite($f)) {
+                return self::failureResult($nullOnFailure);
+            }
+            if (!self::floatInRange($f, $range['min'], $range['max'])) {
                 return self::failureResult($nullOnFailure);
             }
             $out = new Variable();
@@ -309,7 +680,7 @@ final class VmFilter
             return self::failureResult($nullOnFailure);
         }
         $parsed = self::parseFloatString($value->toString());
-        if (null === $parsed) {
+        if (null === $parsed || !self::floatInRange($parsed, $range['min'], $range['max'])) {
             return self::failureResult($nullOnFailure);
         }
         $out = new Variable();
@@ -383,14 +754,23 @@ final class VmFilter
         return is_finite($f) ? $f : null;
     }
 
-    private static function validateInt(Variable $value, bool $nullOnFailure = false): Variable
-    {
+    private static function validateInt(
+        Variable $value,
+        bool $nullOnFailure = false,
+        int $flags = 0,
+        ?\PHPCompiler\VM\HashTable $filterOptions = null
+    ): Variable {
+        $range = self::parseRangeOptions($filterOptions, false);
         if ($value->isUndefined() || Variable::TYPE_NULL === $value->type) {
             return self::failureResult($nullOnFailure);
         }
         if (Variable::TYPE_INTEGER === $value->type) {
+            $intVal = $value->toInt();
+            if (!self::intInRange($intVal, $range['min'], $range['max'])) {
+                return self::failureResult($nullOnFailure);
+            }
             $out = new Variable();
-            $out->int($value->toInt());
+            $out->int($intVal);
 
             return $out;
         }
@@ -398,16 +778,82 @@ final class VmFilter
             return self::failureResult($nullOnFailure);
         }
         $s = $value->toString();
-        if ('' === $s || !self::isIntegerString($s)) {
+        if ('' === $s) {
+            return self::failureResult($nullOnFailure);
+        }
+        $parsed = self::parseIntFilterString($s, $flags);
+        if (null === $parsed || !self::intInRange($parsed, $range['min'], $range['max'])) {
             return self::failureResult($nullOnFailure);
         }
         $out = new Variable();
-        $out->int((int) $s);
+        $out->int($parsed);
 
         return $out;
     }
 
-    private static function validateEmail(Variable $value, bool $nullOnFailure = false): Variable
+    /**
+     * FILTER_VALIDATE_INT string parsing (php-src ext/filter/logical_filters.c).
+     */
+    public static function parseIntFilterString(string $s, int $flags = 0): ?int
+    {
+        $allowHex = 0 !== ($flags & self::FILTER_FLAG_ALLOW_HEX);
+        $allowOctal = 0 !== ($flags & self::FILTER_FLAG_ALLOW_OCTAL);
+        if ($allowHex && self::isHexIntegerString($s)) {
+            return self::parseHexIntegerString($s);
+        }
+        if ($allowOctal && self::isOctalIntegerString($s)) {
+            return self::parseOctalIntegerString($s);
+        }
+        if (!self::isIntegerString($s)) {
+            return null;
+        }
+
+        return self::parseDecimalIntegerString($s);
+    }
+
+    /**
+     * Decimal string → native int when in [PHP_INT_MIN, PHP_INT_MAX] (php-src ext/filter/logical_filters.c).
+     */
+    public static function parseDecimalIntegerString(string $s): ?int
+    {
+        $negative = str_starts_with($s, '-');
+        $digits = ltrim($s, '+-');
+        $limit = $negative
+            ? self::incrementDecimalString((string) \PHP_INT_MAX)
+            : (string) \PHP_INT_MAX;
+        $len = \strlen($digits);
+        $limitLen = \strlen($limit);
+        if ($len > $limitLen || ($len === $limitLen && $digits > $limit)) {
+            return null;
+        }
+        if ($negative) {
+            if ($digits === $limit) {
+                return \PHP_INT_MIN;
+            }
+
+            return -((int) $digits);
+        }
+
+        return (int) $digits;
+    }
+
+    private static function incrementDecimalString(string $digits): string
+    {
+        $carry = 1;
+        $out = '';
+        for ($i = \strlen($digits) - 1; $i >= 0; --$i) {
+            $sum = (int) $digits[$i] + $carry;
+            $out = (string) ($sum % 10).$out;
+            $carry = intdiv($sum, 10);
+        }
+        if ($carry > 0) {
+            $out = (string) $carry.$out;
+        }
+
+        return $out;
+    }
+
+    private static function validateEmail(Variable $value, bool $nullOnFailure = false, int $flags = 0): Variable
     {
         if ($value->isUndefined() || Variable::TYPE_NULL === $value->type) {
             return self::failureResult($nullOnFailure);
@@ -416,7 +862,7 @@ final class VmFilter
             return self::failureResult($nullOnFailure);
         }
         $s = $value->toString();
-        if (!self::isValidEmailSubset($s)) {
+        if (!self::isValidEmailSubset($s, $flags)) {
             return self::failureResult($nullOnFailure);
         }
         $out = new Variable();
@@ -425,7 +871,48 @@ final class VmFilter
         return $out;
     }
 
-    private static function validateUrl(Variable $value, bool $nullOnFailure = false): Variable
+    /**
+     * FILTER_VALIDATE_MAC (php-src ext/filter/logical_filters.c — php_filter_validate_mac).
+     */
+    private static function validateMac(
+        Variable $value,
+        bool $nullOnFailure = false,
+        ?\PHPCompiler\VM\HashTable $filterOptions = null
+    ): Variable {
+        if ($value->isUndefined() || Variable::TYPE_NULL === $value->type) {
+            return self::failureResult($nullOnFailure);
+        }
+        if (Variable::TYPE_STRING !== $value->type) {
+            return self::failureResult($nullOnFailure);
+        }
+        $s = $value->toString();
+        $expectedSeparator = null;
+        if (null !== $filterOptions) {
+            $sepVar = $filterOptions->find('separator');
+            if (null !== $sepVar && !$sepVar->isUndefined() && Variable::TYPE_NULL !== $sepVar->type) {
+                $resolved = $sepVar->resolveIndirect();
+                if (Variable::TYPE_STRING !== $resolved->type) {
+                    return self::failureResult($nullOnFailure);
+                }
+                $expectedSeparator = $resolved->toString();
+                if (1 !== \strlen($expectedSeparator)) {
+                    throw new \ValueError('filter_var(): "separator" option must be one character long');
+                }
+            }
+        }
+        if (!self::isValidMacAddress($s, $expectedSeparator)) {
+            return self::failureResult($nullOnFailure);
+        }
+        $out = new Variable();
+        $out->string($s);
+
+        return $out;
+    }
+
+    /**
+     * FILTER_VALIDATE_DOMAIN (php-src ext/filter/logical_filters.c — php_filter_validate_domain[_ex]).
+     */
+    private static function validateDomain(Variable $value, bool $nullOnFailure = false, int $flags = 0): Variable
     {
         if ($value->isUndefined() || Variable::TYPE_NULL === $value->type) {
             return self::failureResult($nullOnFailure);
@@ -434,7 +921,277 @@ final class VmFilter
             return self::failureResult($nullOnFailure);
         }
         $s = $value->toString();
-        if (!self::isValidUrlSubset($s)) {
+        if (!self::isValidDomain($s, $flags)) {
+            return self::failureResult($nullOnFailure);
+        }
+        $out = new Variable();
+        $out->string($s);
+
+        return $out;
+    }
+
+    /**
+     * php-src ext/filter/logical_filters.c — php_filter_validate_mac.
+     */
+    public static function isValidMacAddress(string $input, ?string $expectedSeparator = null): bool
+    {
+        $inputLen = \strlen($input);
+        if (14 === $inputLen) {
+            $tokens = 3;
+            $length = 4;
+            $separator = '.';
+        } elseif (17 === $inputLen && '-' === $input[2]) {
+            $tokens = 6;
+            $length = 2;
+            $separator = '-';
+        } elseif (17 === $inputLen && ':' === $input[2]) {
+            $tokens = 6;
+            $length = 2;
+            $separator = ':';
+        } else {
+            return false;
+        }
+        if (null !== $expectedSeparator && $separator !== $expectedSeparator) {
+            return false;
+        }
+        for ($i = 0; $i < $tokens; ++$i) {
+            $offset = $i * ($length + 1);
+            if ($i < $tokens - 1 && $input[$offset + $length] !== $separator) {
+                return false;
+            }
+            if (!self::isValidHexToken(substr($input, $offset, $length))) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static function isValidHexToken(string $token): bool
+    {
+        $len = \strlen($token);
+        if (0 === $len) {
+            return false;
+        }
+        for ($i = 0; $i < $len; ++$i) {
+            $ch = $token[$i];
+            if (!(($ch >= '0' && $ch <= '9') || ($ch >= 'a' && $ch <= 'f') || ($ch >= 'A' && $ch <= 'F'))) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /** SSOT used by JIT/AOT helper bridge. */
+    public static function isValidDomain(string $host, int $flags = 0): bool
+    {
+        if ('' === $host) {
+            return false;
+        }
+        if (0 !== ($flags & self::FILTER_FLAG_HOSTNAME)) {
+            return self::isValidDomainHostname($host);
+        }
+
+        return self::isValidDomainHostname($host);
+    }
+
+    /**
+     * FILTER_VALIDATE_IP (php-src ext/filter/logical_filters.c — php_filter_validate_ip).
+     */
+    private static function validateIp(Variable $value, bool $nullOnFailure = false, int $flags = 0): Variable
+    {
+        if ($value->isUndefined() || Variable::TYPE_NULL === $value->type) {
+            return self::failureResult($nullOnFailure);
+        }
+        if (Variable::TYPE_STRING !== $value->type) {
+            return self::failureResult($nullOnFailure);
+        }
+        $s = $value->toString();
+        if (!self::isValidIpAddress($s, $flags)) {
+            return self::failureResult($nullOnFailure);
+        }
+        $out = new Variable();
+        $out->string($s);
+
+        return $out;
+    }
+
+    /**
+     * php-src ext/filter/logical_filters.c — php_filter_validate_ip / _php_parse_ip.
+     */
+    public static function isValidIpAddress(string $s, int $flags = 0): bool
+    {
+        if ('' === $s) {
+            return false;
+        }
+        $addr = $s;
+        if (str_starts_with($s, '[') && str_ends_with($s, ']')) {
+            $addr = substr($s, 1, -1);
+        }
+        $packed = VmInetPure::inet_pton($addr);
+        if (false === $packed) {
+            return false;
+        }
+        $isV4 = 4 === \strlen($packed);
+        $isV6 = 16 === \strlen($packed);
+        $ipv4Only = 0 !== ($flags & self::FILTER_FLAG_IPV4);
+        $ipv6Only = 0 !== ($flags & self::FILTER_FLAG_IPV6);
+        if ($ipv4Only && !$ipv6Only) {
+            return $isV4;
+        }
+        if ($ipv6Only && !$ipv4Only) {
+            return $isV6;
+        }
+        if (!$isV4 && !$isV6) {
+            return false;
+        }
+
+        $noPriv = 0 !== ($flags & self::FILTER_FLAG_NO_PRIV_RANGE);
+        $noRes = 0 !== ($flags & self::FILTER_FLAG_NO_RES_RANGE);
+        $globalOnly = 0 !== ($flags & self::FILTER_FLAG_GLOBAL_RANGE);
+        if ($noPriv || $noRes || $globalOnly) {
+            $status = self::ipSpecialStatus($packed);
+            if (null !== $status) {
+                if ($noPriv && $status['private']) {
+                    return false;
+                }
+                if ($noRes && $status['reserved']) {
+                    return false;
+                }
+                if ($globalOnly && !$status['global']) {
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * RFC 6890 special-purpose status (php-src ext/filter/logical_filters.c).
+     *
+     * @return array{global: bool, reserved: bool, private: bool}|null null when no special block
+     */
+    private static function ipSpecialStatus(string $packed): ?array
+    {
+        if (4 === \strlen($packed)) {
+            return self::ipv4SpecialStatus(array_values(unpack('C4', $packed)));
+        }
+        if (16 === \strlen($packed)) {
+            return self::ipv6SpecialStatus(array_values(unpack('n8', $packed)));
+        }
+
+        return null;
+    }
+
+    /**
+     * @param array<int, int> $ip
+     *
+     * @return array{global: bool, reserved: bool, private: bool}|null
+     */
+    private static function ipv4SpecialStatus(array $ip): ?array
+    {
+        $global = false;
+        $reserved = false;
+        $private = false;
+
+        if (0 === $ip[0]) {
+            $reserved = true;
+        } elseif (10 === $ip[0]) {
+            $private = true;
+        } elseif (100 === $ip[0] && $ip[1] >= 64 && $ip[1] <= 127) {
+            // RFC 6598 — Shared Address Space
+        } elseif (127 === $ip[0]) {
+            $reserved = true;
+        } elseif (169 === $ip[0] && 254 === $ip[1]) {
+            $reserved = true;
+        } elseif (172 === $ip[0] && $ip[1] >= 16 && $ip[1] <= 31) {
+            $private = true;
+        } elseif (192 === $ip[0] && 0 === $ip[1] && 0 === $ip[2]) {
+            // RFC 6890 — IETF Protocol Assignments
+        } elseif (192 === $ip[0] && 0 === $ip[1] && 0 === $ip[2] && $ip[3] >= 0 && $ip[3] <= 7) {
+            // RFC 6333 — DS-Lite
+        } elseif (192 === $ip[0] && 0 === $ip[1] && 2 === $ip[2]) {
+            // RFC 5737 — Documentation
+        } elseif (192 === $ip[0] && 88 === $ip[1] && 99 === $ip[2]) {
+            $global = true;
+        } elseif (192 === $ip[0] && 168 === $ip[1]) {
+            $private = true;
+        } elseif (198 === $ip[0] && $ip[1] >= 18 && $ip[1] <= 19) {
+            // RFC 2544 — Benchmarking
+        } elseif (198 === $ip[0] && 51 === $ip[1] && 100 === $ip[2]) {
+            // RFC 5737 — Documentation
+        } elseif (203 === $ip[0] && 0 === $ip[1] && 113 === $ip[2]) {
+            // RFC 5737 — Documentation
+        } elseif ($ip[0] >= 240 && $ip[0] <= 255) {
+            $reserved = true;
+        } elseif (255 === $ip[0] && 255 === $ip[1] && 255 === $ip[2] && 255 === $ip[3]) {
+            $reserved = true;
+        } else {
+            return null;
+        }
+
+        return ['global' => $global, 'reserved' => $reserved, 'private' => $private];
+    }
+
+    /**
+     * @param array<int, int> $ip eight 16-bit words
+     *
+     * @return array{global: bool, reserved: bool, private: bool}|null
+     */
+    private static function ipv6SpecialStatus(array $ip): ?array
+    {
+        $global = false;
+        $reserved = false;
+        $private = false;
+
+        if (0 === $ip[0] && 0 === $ip[1] && 0 === $ip[2] && 0 === $ip[3]
+            && 0 === $ip[4] && 0 === $ip[5] && 0 === $ip[6] && 0 === $ip[7]) {
+            $reserved = true;
+        } elseif (0 === $ip[0] && 0 === $ip[1] && 0 === $ip[2] && 0 === $ip[3]
+            && 0 === $ip[4] && 0 === $ip[5] && 0 === $ip[6] && 1 === $ip[7]) {
+            $reserved = true;
+        } elseif (0x0064 === $ip[0] && 0xff9b === $ip[1]) {
+            $global = true;
+        } elseif (0 === $ip[0] && 0 === $ip[1] && 0 === $ip[2] && 0 === $ip[3]
+            && 0 === $ip[4] && 0 === $ip[5] && 0xffff === $ip[6]) {
+            $reserved = true;
+        } elseif (0x0100 === $ip[0] && 0 === $ip[1] && 0 === $ip[2] && 0 === $ip[3]) {
+            // RFC 6666 — Discard-Only
+        } elseif (0x2001 === $ip[0] && 0 === $ip[1]) {
+            // RFC 4380 — TEREDO
+        } elseif (0x2001 === $ip[0] && $ip[1] <= 0x01ff) {
+            // RFC 2928 — IETF Protocol Assignments
+        } elseif (0x2001 === $ip[0] && 0x0002 === $ip[1] && 0 === $ip[2]) {
+            // RFC 5180 — Benchmarking
+        } elseif (0x2001 === $ip[0] && 0x0db8 === $ip[1]) {
+            // RFC 3849 — Documentation
+        } elseif (0x2001 === $ip[0] && $ip[1] >= 0x0010 && $ip[1] <= 0x001f) {
+            // RFC 4843 — ORCHID
+        } elseif (0x2002 === $ip[0]) {
+            // RFC 3056 — 6to4
+        } elseif ($ip[0] >= 0xfc00 && $ip[0] <= 0xfdff) {
+            $private = true;
+        } elseif ($ip[0] >= 0xfe80 && $ip[0] <= 0xfebf) {
+            $reserved = true;
+        } else {
+            return null;
+        }
+
+        return ['global' => $global, 'reserved' => $reserved, 'private' => $private];
+    }
+
+    private static function validateUrl(Variable $value, bool $nullOnFailure = false, int $flags = 0): Variable
+    {
+        if ($value->isUndefined() || Variable::TYPE_NULL === $value->type) {
+            return self::failureResult($nullOnFailure);
+        }
+        if (Variable::TYPE_STRING !== $value->type) {
+            return self::failureResult($nullOnFailure);
+        }
+        $s = $value->toString();
+        if (!self::isValidUrlSubset($s, $flags)) {
             return self::failureResult($nullOnFailure);
         }
         $out = new Variable();
@@ -446,7 +1203,7 @@ final class VmFilter
     /**
      * Practical URL subset for FILTER_VALIDATE_URL (php-src ext/filter/logical_filters.c).
      */
-    public static function isValidUrlSubset(string $s): bool
+    public static function isValidUrlSubset(string $s, int $flags = 0): bool
     {
         if ('' === $s) {
             return false;
@@ -464,9 +1221,16 @@ final class VmFilter
         $scheme = strtolower($parsed['scheme']);
         $host = $parsed['host'] ?? null;
         if (null === $host || '' === $host) {
-            return \in_array($scheme, ['mailto', 'news', 'file'], true);
+            if (!\in_array($scheme, ['mailto', 'news', 'file'], true)) {
+                return false;
+            }
+        } elseif (\in_array($scheme, ['http', 'https'], true) && !self::isValidUrlHost($host)) {
+            return false;
         }
-        if (\in_array($scheme, ['http', 'https'], true) && !self::isValidUrlHost($host)) {
+        if ((0 !== ($flags & self::FILTER_FLAG_PATH_REQUIRED)) && !isset($parsed['path'])) {
+            return false;
+        }
+        if ((0 !== ($flags & self::FILTER_FLAG_QUERY_REQUIRED)) && !isset($parsed['query'])) {
             return false;
         }
 
@@ -573,10 +1337,46 @@ final class VmFilter
         return true;
     }
 
+    public static function isHexIntegerString(string $s): bool
+    {
+        return (bool) preg_match('/^[+-]?0[xX][0-9a-fA-F]+$/', $s);
+    }
+
+    public static function isOctalIntegerString(string $s): bool
+    {
+        if (!preg_match('/^[+-]?0[0-7]*$/', $s)) {
+            return false;
+        }
+        $body = ltrim($s, '+-');
+        if (str_starts_with($body, '0x') || str_starts_with($body, '0X')) {
+            return false;
+        }
+
+        return true;
+    }
+
+    public static function parseHexIntegerString(string $s): int
+    {
+        $neg = str_starts_with($s, '-');
+        $body = ltrim($s, '+-');
+        $val = (int) hexdec(substr($body, 2));
+
+        return $neg ? -$val : $val;
+    }
+
+    public static function parseOctalIntegerString(string $s): int
+    {
+        $neg = str_starts_with($s, '-');
+        $body = ltrim($s, '+-');
+        $val = (int) octdec($body);
+
+        return $neg ? -$val : $val;
+    }
+
     /**
      * Practical email subset: one @, non-empty local/domain, domain has a dot, ASCII only.
      */
-    public static function isValidEmailSubset(string $s): bool
+    public static function isValidEmailSubset(string $s, int $flags = 0): bool
     {
         $len = strlen($s);
         if (0 === $len || $len > 320) {
@@ -594,20 +1394,29 @@ final class VmFilter
         if ('' === $local || '' === $domain || !str_contains($domain, '.')) {
             return false;
         }
-        if (!self::isEmailLocalPart($local) || !self::isEmailDomainPart($domain)) {
+        $unicode = 0 !== ($flags & self::FILTER_FLAG_EMAIL_UNICODE);
+        if (!self::isEmailLocalPart($local, $unicode) || !self::isEmailDomainPart($domain, $unicode)) {
             return false;
         }
 
         return true;
     }
 
-    private static function isEmailLocalPart(string $local): bool
+    private static function isEmailLocalPart(string $local, bool $unicode): bool
     {
+        if ($unicode) {
+            return (bool) preg_match('/^[\p{L}\p{N}.!#$%&\'*+\/=?^_`{|}~-]+$/u', $local);
+        }
+
         return self::charsMatch($local, [self::class, 'isEmailLocalChar']);
     }
 
-    private static function isEmailDomainPart(string $domain): bool
+    private static function isEmailDomainPart(string $domain, bool $unicode): bool
     {
+        if ($unicode) {
+            return (bool) preg_match('/^[\p{L}\p{N}.-]+$/u', $domain);
+        }
+
         return self::charsMatch($domain, [self::class, 'isEmailDomainChar']);
     }
 
@@ -637,5 +1446,137 @@ final class VmFilter
             || ($ch >= 'A' && $ch <= 'Z')
             || ($ch >= '0' && $ch <= '9')
             || '.' === $ch || '-' === $ch;
+    }
+
+    /** filter_has_var() — key present in INPUT_* superglobal (php-src ext/filter/filter.c; #3294). */
+    public static function hasInputVar(Context $ctx, int $type, string $key): bool
+    {
+        $sgName = self::inputSuperglobalName($type);
+        $sg = $ctx->getSuperglobal($sgName);
+        if (null === $sg || Variable::TYPE_ARRAY !== $sg->type) {
+            return false;
+        }
+        $keyVar = new Variable();
+        $keyVar->string($key);
+
+        return $sg->toArray()->offsetIsSet($keyVar);
+    }
+
+    /**
+     * filter_input_array() — batch filter from superglobal (#3294).
+     *
+     * @return HashTable|null null when the input superglobal is missing or not an array
+     */
+    public static function filterInputArray(
+        Context $ctx,
+        int $type,
+        ?HashTable $definition,
+        int $addEmpty,
+        Frame $frame
+    ): ?HashTable {
+        $sgName = self::inputSuperglobalName($type);
+        $sg = $ctx->getSuperglobal($sgName);
+        if (null === $sg || Variable::TYPE_ARRAY !== $sg->type) {
+            return null;
+        }
+
+        return self::filterVarArray($sg->toArray(), $definition, $addEmpty, $frame);
+    }
+
+    /**
+     * filter_var_array() — batch filter_var() over keys (#3294).
+     *
+     * @return HashTable|null false-equivalent when definition is null and FILTER_DEFAULT fails
+     */
+    public static function filterVarArray(
+        HashTable $data,
+        ?HashTable $definition,
+        int $addEmpty,
+        Frame $frame
+    ): ?HashTable {
+        if (null === $definition) {
+            return self::filterVarArrayWithDefaultFilter($data, $frame);
+        }
+
+        return self::filterVarArrayWithDefinition($data, $definition, $addEmpty, $frame);
+    }
+
+    /** php-src php_filter_var_array — no definition uses FILTER_DEFAULT for every element. */
+    private static function filterVarArrayWithDefaultFilter(HashTable $data, Frame $frame): ?HashTable
+    {
+        $filterId = self::FILTER_DEFAULT;
+        if (!self::isSupportedFilter($filterId)) {
+            filter_var::triggerUnknownFilterWarning($frame, $filterId);
+
+            return null;
+        }
+        $out = new HashTable();
+        foreach ($data->iterateKeyed(true) as [$keyVar, $valueVar]) {
+            $filtered = self::filterVar($valueVar->resolveIndirect(), $filterId, null);
+            self::storeFilteredEntry($out, $keyVar, $filtered);
+        }
+
+        return $out;
+    }
+
+    private static function filterVarArrayWithDefinition(
+        HashTable $data,
+        HashTable $definition,
+        int $addEmpty,
+        Frame $frame
+    ): HashTable {
+        $out = new HashTable();
+        foreach ($definition->iterateKeyed(true) as [$defKeyVar, $filterVar]) {
+            $defKey = $defKeyVar->resolveIndirect();
+            $filterResolved = $filterVar->resolveIndirect();
+            if (Variable::TYPE_INTEGER !== $filterResolved->type) {
+                throw new \LogicException('filter_var_array() definition values must be filter IDs');
+            }
+            $filterId = $filterResolved->toInt();
+            if (!self::isSupportedFilter($filterId)) {
+                filter_var::triggerUnknownFilterWarning($frame, $filterId);
+            }
+            $stored = self::lookupDataValue($data, $defKey);
+            if (null === $stored) {
+                if (0 !== $addEmpty) {
+                    self::storeFilteredEntry($out, $defKeyVar, self::failureResult(false));
+                }
+                continue;
+            }
+            $filtered = self::filterVar($stored->resolveIndirect(), $filterId, null);
+            self::storeFilteredEntry($out, $defKeyVar, $filtered);
+        }
+
+        return $out;
+    }
+
+    private static function lookupDataValue(HashTable $data, Variable $key): ?Variable
+    {
+        if (Variable::TYPE_INTEGER === $key->type) {
+            return $data->findIndex($key->toInt());
+        }
+        if (Variable::TYPE_STRING === $key->type) {
+            return $data->find($key->toString());
+        }
+
+        return null;
+    }
+
+    private static function storeFilteredEntry(HashTable $out, Variable $keyVar, Variable $filtered): void
+    {
+        $stored = new Variable();
+        $stored->copyFrom($filtered);
+        $key = $keyVar->resolveIndirect();
+        if (Variable::TYPE_INTEGER === $key->type) {
+            $out->addIndex($key->toInt(), $stored);
+
+            return;
+        }
+        if (Variable::TYPE_STRING === $key->type) {
+            $out->add($key->toString(), $stored);
+
+            return;
+        }
+        throw new \LogicException('filter_var_array() only supports string or integer keys');
     }
 }

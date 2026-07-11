@@ -90,7 +90,7 @@ final class ClosureSupport
         return self::wrapState($ctx, self::fromStaticStringCallable($ctx, $frame, $name));
     }
 
-    public static function fromCallable(Context $ctx, Frame $frame, Variable $callable): ObjectEntry
+    public static function fromCallable(Context $ctx, Frame $frame, Variable $callable, bool $parentScope = false): ObjectEntry
     {
         $callable = $callable->resolveIndirect();
         if (Variable::TYPE_OBJECT === $callable->type) {
@@ -124,7 +124,7 @@ final class ClosureSupport
             return self::wrapState($ctx, self::fromFunctionName($ctx, $name));
         }
         if (Variable::TYPE_ARRAY === $callable->type) {
-            return self::wrapState($ctx, self::fromArrayCallable($ctx, $frame, $callable));
+            return self::wrapState($ctx, self::fromArrayCallable($ctx, $frame, $callable, $parentScope));
         }
 
         throw new \LogicException(
@@ -162,7 +162,14 @@ final class ClosureSupport
         } else {
             $boundThis = new Variable();
             $boundThis->copyFrom($newThis);
-            $bound->boundThis = $boundThis;
+            $boundThis = $boundThis->resolveIndirect();
+            if (Variable::TYPE_OBJECT === $boundThis->type && isset($boundThis->object)) {
+                // Inline `new` call args release temps after bind; keep $this alive (#11857).
+                ObjectLifetime::addRef($boundThis->object);
+            }
+            $stored = new Variable();
+            $stored->copyFrom($boundThis);
+            $bound->boundThis = $stored;
         }
         $scopeClass = self::resolveScopeClass($newScope, $newThis, $context);
         if (null !== $scopeClass && self::isExplicitStringScope($newScope)) {
@@ -172,7 +179,11 @@ final class ClosureSupport
                 return null;
             }
         }
-        if (null !== $scopeClass && self::isInternalScopeClass($ctx, $scopeClass)) {
+        if (
+            null !== $scopeClass
+            && self::isExplicitScope($newScope)
+            && self::isInternalScopeClass($ctx, $scopeClass)
+        ) {
             self::warnCannotBindInternalScope($ctx, $frame, $scopeClass);
 
             return null;
@@ -193,6 +204,20 @@ final class ClosureSupport
         }
 
         return 'static' !== strtolower($newScope->toString());
+    }
+
+    /** True when $newScope was passed explicitly (not omitted / not the static alias). */
+    private static function isExplicitScope(?Variable $newScope): bool
+    {
+        if (null === $newScope) {
+            return false;
+        }
+        $newScope = $newScope->resolveIndirect();
+        if (Variable::TYPE_OBJECT === $newScope->type) {
+            return true;
+        }
+
+        return self::isExplicitStringScope($newScope);
     }
 
     private static function scopeClassExists(Context $ctx, string $scopeClass): bool
@@ -380,8 +405,12 @@ final class ClosureSupport
         return ClosureState::fromWrappedFunc($class->methods[$methodLc]);
     }
 
-    private static function fromArrayCallable(Context $ctx, Frame $frame, Variable $callable): ClosureState
-    {
+    private static function fromArrayCallable(
+        Context $ctx,
+        Frame $frame,
+        Variable $callable,
+        bool $parentScope = false
+    ): ClosureState {
         $table = $callable->toArray();
         $idx0 = new Variable(Variable::TYPE_INTEGER);
         $idx0->int(0);
@@ -395,7 +424,7 @@ final class ClosureSupport
         $receiver = $table->findVariable($idx0, false)->resolveIndirect();
         $methodName = $table->findVariable($idx1, false)->resolveIndirect()->toString();
         if (Variable::TYPE_OBJECT === $receiver->type) {
-            return self::fromInstanceMethodCallable($ctx, $frame, $receiver, $methodName);
+            return self::fromInstanceMethodCallable($ctx, $frame, $receiver, $methodName, $parentScope);
         }
         if (Variable::TYPE_ENUM_CASE === $receiver->type) {
             return self::fromInstanceMethodCallable(
@@ -442,15 +471,35 @@ final class ClosureSupport
         Context $ctx,
         Frame $frame,
         Variable $receiver,
-        string $methodName
+        string $methodName,
+        bool $parentScope = false
     ): ClosureState {
         $object = $receiver->toObject();
         $methodLc = strtolower($methodName);
         $class = $object->class;
-        [$declaringClass, $methodLc] = self::resolveStaticMethod($ctx, strtolower($class->name), $methodLc);
+        $resolveFromLc = strtolower($class->name);
+        $boundScopeClass = $class->name;
+        if ($parentScope) {
+            $resolveFromLc = self::resolveClassScopeName('parent', $frame, $ctx);
+            if (!isset($ctx->classes[$resolveFromLc])) {
+                throw new \LogicException('parent:: used when class has no parent');
+            }
+            $boundScopeClass = $ctx->classes[$resolveFromLc]->name;
+        }
+        [$declaringClass, $methodLc] = self::resolveStaticMethod($ctx, $resolveFromLc, $methodLc);
         $vis = $declaringClass->methodVisibility[$methodLc] ?? \PHPCfg\Func::FLAG_PUBLIC;
         $callerClassLc = self::callerClassLc($frame);
         $callerDisplay = self::classDisplayName($ctx, $callerClassLc);
+        $parentScopeAllows = false;
+        if ($parentScope) {
+            $parentScopeAllows = MethodVisibility::parentScopeAllows(
+                $vis,
+                $callerClassLc,
+                $resolveFromLc,
+                strtolower($declaringClass->name),
+                fn (string $classLc, string $ancestorLc): bool => self::isClassSameOrSubclassOf($ctx, $classLc, $ancestorLc)
+            );
+        }
         self::assertMethodAccessibleForFromCallable(
             $vis,
             $callerClassLc,
@@ -458,12 +507,19 @@ final class ClosureSupport
             $declaringClass->name,
             $declaringClass->methodNames[$methodLc] ?? $methodName,
             fn (string $classLc, string $ancestorLc): bool => self::isClassSameOrSubclassOf($ctx, $classLc, $ancestorLc),
-            $callerDisplay
+            $callerDisplay,
+            $parentScopeAllows
         );
         $boundThis = new Variable();
         $boundThis->copyFrom($receiver);
         $state = ClosureState::fromMethodCallable($declaringClass->methods[$methodLc], $boundThis, $methodName);
-        $state->boundScopeClass = $class->name;
+        $state->boundScopeClass = $boundScopeClass;
+        if ($parentScope) {
+            // Invoke the resolved parent Func directly — virtual dispatch would hit child overrides (#17655).
+            $state->methodReceiver = null;
+            $state->methodName = null;
+            $state->boundThis = $boundThis;
+        }
 
         return $state;
     }
@@ -651,7 +707,8 @@ final class ClosureSupport
         string $declaringClassDisplay,
         string $methodName,
         ?callable $isSameOrSubclassOf = null,
-        ?string $callerClassDisplay = null
+        ?string $callerClassDisplay = null,
+        bool $parentScopeAllows = false
     ): void {
         try {
             MethodVisibility::assertCallable(
@@ -662,7 +719,8 @@ final class ClosureSupport
                 $methodName,
                 false,
                 $isSameOrSubclassOf,
-                $callerClassDisplay
+                $callerClassDisplay,
+                $parentScopeAllows
             );
         } catch (\LogicException) {
             $kind = ($visibilityFlags & \PHPCfg\Func::FLAG_PRIVATE) !== 0 ? 'private' : 'protected';

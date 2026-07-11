@@ -12,6 +12,10 @@ final class NoDiscardBuiltinAttributeTest extends TestCase
 {
     public function testNoDiscardRegisteredFromExtStandard(): void
     {
+        if (!\PHPCompiler\CompilerVersion::advertisesNoDiscardAttributeClass()) {
+            $this->markTestSkipped('NoDiscard attribute class not advertised on reference profile');
+        }
+
         $runtime = new Runtime();
         $code = <<<'PHP'
 <?php

@@ -18,14 +18,23 @@ final class JitUnpack
     {
         UnpackJitRuntime::ensureLinked($context);
         $argc = \count($args);
-        if ($argc < 2 || $argc > 3) {
-            throw new \LogicException('unpack() requires two or three arguments in this compiler build');
+        if ($argc < 2) {
+            throw new \ArgumentCountError(\sprintf(
+                'unpack() expects at least 2 arguments, %d given',
+                $argc
+            ));
+        }
+        if ($argc > 3) {
+            throw new \ArgumentCountError(\sprintf(
+                'unpack() expects at most 3 arguments, %d given',
+                $argc
+            ));
         }
         $fmt = JitStringBuiltinArg::lower($context, $args[0], 'unpack', 0, 'format');
         $data = JitStringBuiltinArg::lower($context, $args[1], 'unpack', 1, 'string');
         $offset = $context->getTypeFromString('int64')->constInt(0, false);
         if (3 === $argc) {
-            $offset = JitSleep::zParamLong($context, $args[2], 'unpack', 3, 'offset');
+            $offset = JitIntdiv::lowerIntBuiltinArgForCaller($context, $args[2], 'unpack', 3, 'offset');
         }
 
         $slot = JitValueBox::alloc($context);

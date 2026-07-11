@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\StringPropertyExists;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringArg;
@@ -15,7 +16,7 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** LLVM lowering for property_exists() (issue #1372). */
+/** JIT/AOT helper for property_exists() via PropertyExistsJitHelper PHP (#1372, #16442). */
 final class JitPropertyExists
 {
     private const TYPE_ERROR =
@@ -41,7 +42,7 @@ final class JitPropertyExists
             return ReflectionBuiltinHelper::propertyExistsLiteral($context, $classLiteral, $propLiteral);
         }
         if (null !== $classLiteral) {
-            return self::forClassLiteralRuntimeProperty($context, $classLiteral, $propertyArg);
+            return self::routeThroughPhpHelper($context, $objectOrClass, $propertyArg);
         }
 
         throw new \LogicException('property_exists() requires a string literal class name in this compiler build');
@@ -117,7 +118,7 @@ final class JitPropertyExists
                 $propLiteral
             );
         } elseif (null !== $classLiteral) {
-            $strResult = self::forClassLiteralRuntimeProperty($context, $classLiteral, $propertyArg);
+            $strResult = self::routeThroughPhpHelper($context, $objectOrClass, $propertyArg);
         } else {
             $i1 = $context->getTypeFromString('int1');
             $strResult = $i1->constInt(0, false);
@@ -133,6 +134,35 @@ final class JitPropertyExists
         $phi->addIncoming($strResult, $stringBlock);
 
         return $phi;
+    }
+
+    private static function routeThroughPhpHelper(
+        Context $context,
+        JITVariable $objectOrClass,
+        JITVariable $propertyArg
+    ): Value {
+        $operandPtr = JitValueBox::valuePtrFromVariable($context, $objectOrClass);
+        $propertyStr = JitStringArg::lower($context, $propertyArg, 'property_exists() property name');
+
+        return StringPropertyExists::invoke($context, $operandPtr, $propertyStr);
+    }
+
+    private static function routeObjectThroughPhpHelper(
+        Context $context,
+        JITVariable $objectArg,
+        JITVariable $propertyArg
+    ): Value {
+        $obj = $context->helper->loadValue($objectArg);
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeObject'),
+            $ptr,
+            $obj
+        );
+        $propertyStr = JitStringArg::lower($context, $propertyArg, 'property_exists() property name');
+
+        return StringPropertyExists::invoke($context, $ptr, $propertyStr);
     }
 
     private static function emitTypeErrorAndAbort(Context $context, string $message): void
@@ -181,9 +211,7 @@ final class JitPropertyExists
 
             return self::existsForClassIdLiteralProperty($context, $classId, $propLiteral);
         }
-        $propStr = JitStringArg::lower($context, $propertyArg, 'property_exists() property name');
-
-        return self::existsForClassIdRuntimePropertyDynamic($context, $classId, $propStr);
+        return self::routeObjectThroughPhpHelper($context, $objectArg, $propertyArg);
     }
 
     private static function existsForEnumCasePropertyLiteral(
@@ -215,23 +243,6 @@ final class JitPropertyExists
         return $exists;
     }
 
-    private static function forClassLiteralRuntimeProperty(
-        Context $context,
-        string $className,
-        JITVariable $propertyArg
-    ): Value {
-        $object = $context->type->object;
-        if (!$object->hasUserDeclaredClass($className)) {
-            $i1 = $context->getTypeFromString('int1');
-
-            return $i1->constInt(0, false);
-        }
-        $classId = $object->lookup($className);
-        $propStr = JitStringArg::lower($context, $propertyArg, 'property_exists() property name');
-
-        return self::existsForClassIdRuntimeProperty($context, $classId, $propStr);
-    }
-
     private static function existsForClassIdLiteralProperty(
         Context $context,
         Value $classId,
@@ -253,82 +264,5 @@ final class JitPropertyExists
         }
 
         return $exists;
-    }
-
-    private static function existsForClassIdRuntimePropertyDynamic(
-        Context $context,
-        Value $classId,
-        Value $propertyStr
-    ): Value {
-        $i1 = $context->getTypeFromString('int1');
-        $exists = $i1->constInt(0, false);
-        $object = $context->type->object;
-        $propData = self::stringDataPtr($context, $propertyStr);
-        $strcasecmpFn = $context->lookupFunction('strcasecmp');
-        $i32 = $context->getTypeFromString('int32');
-        $nameStr = $context->builder->load($context->constantStringFromString('name'));
-        $enumNameCmp = $context->builder->call(
-            $strcasecmpFn,
-            $propData,
-            self::stringDataPtr($context, $nameStr)
-        );
-        $enumNameMatch = $context->builder->icmp(Builder::INT_EQ, $enumNameCmp, $i32->constInt(0, false));
-        $valueStr = $context->builder->load($context->constantStringFromString('value'));
-        $enumValueCmp = $context->builder->call(
-            $strcasecmpFn,
-            $propData,
-            self::stringDataPtr($context, $valueStr)
-        );
-        $enumValueMatch = $context->builder->icmp(Builder::INT_EQ, $enumValueCmp, $i32->constInt(0, false));
-
-        foreach ($object->allClassNamesById() as $id => $className) {
-            $isClass = $context->builder->icmp(
-                Builder::INT_EQ,
-                $classId,
-                $context->constantFromInteger($id, 'int64')
-            );
-            if ($object->isEnumClassId($id)) {
-                $classExists = $enumNameMatch;
-                if ($object->enumHasBacking($id)) {
-                    $classExists = $context->builder->or($enumNameMatch, $enumValueMatch);
-                }
-            } else {
-                $classExists = self::existsForClassIdRuntimeProperty($context, $id, $propertyStr);
-            }
-            $exists = $context->builder->select($isClass, $classExists, $exists);
-        }
-
-        return $exists;
-    }
-
-    private static function existsForClassIdRuntimeProperty(
-        Context $context,
-        int $classId,
-        Value $propertyStr
-    ): Value {
-        $i1 = $context->getTypeFromString('int1');
-        $exists = $i1->constInt(0, false);
-        $object = $context->type->object;
-        $propData = self::stringDataPtr($context, $propertyStr);
-        $strcasecmpFn = $context->lookupFunction('strcasecmp');
-        $i32 = $context->getTypeFromString('int32');
-
-        foreach ($object->declaredPropertyNames($classId) as $candidate) {
-            $lit = $context->builder->load($context->constantStringFromString($candidate));
-            $candidateData = self::stringDataPtr($context, $lit);
-            $cmp = $context->builder->call($strcasecmpFn, $propData, $candidateData);
-            $match = $context->builder->icmp(Builder::INT_EQ, $cmp, $i32->constInt(0, false));
-            $exists = $context->builder->or($exists, $match);
-        }
-
-        return $exists;
-    }
-
-    private static function stringDataPtr(Context $context, Value $strPtr): Value
-    {
-        $structName = $strPtr->typeOf()->getElementType()->getName();
-        $off = $context->structFieldMap[$structName]['value'];
-
-        return $context->builder->structGep($strPtr, $off);
     }
 }

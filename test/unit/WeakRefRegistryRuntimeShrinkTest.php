@@ -7,19 +7,46 @@ namespace PHPCompiler\Test\Unit;
 use PHPCompiler\ext\standard\WeakRefRegistryJitHelper;
 use PHPUnit\Framework\TestCase;
 
-/** WeakRefRegistry JIT routes through WeakRefRegistryJitHelper PHP not LLVM globals (#9191). */
+/** WeakRefRegistry JIT routes through WeakRefRegistryJitHelper PHP not LLVM globals (#9191, #15968). */
 final class WeakRefRegistryRuntimeShrinkTest extends TestCase
 {
     public function testWeakRefRegistryRuntimeUsesJitHelperNotLlvmGlobals(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/WeakRefRegistryRuntime.php');
         $this->assertStringContainsString('WeakRefRegistryJitHelper', $source);
+        $this->assertStringContainsString('WeakRefRegistryJitHelper::registerRef', $source);
+        $this->assertStringContainsString('WeakRefRegistryJitHelper::registerMap', $source);
+        $this->assertStringContainsString('WeakRefRegistryJitHelper::clearObject', $source);
         $this->assertStringNotContainsString('phpc_wr_ref_count', $source);
         $this->assertStringNotContainsString('ensureGlobals', $source);
         $this->assertStringNotContainsString('refEntryPtr', $source);
         $this->assertStringNotContainsString('mapEntryPtr', $source);
+        $this->assertStringNotContainsString('wr_reg_ref_bridge_check_max', $source);
+        $this->assertStringNotContainsString('wr_reg_map_bridge_check_key', $source);
+        $this->assertStringNotContainsString('emitClearRefLoop', $source);
+        $this->assertStringNotContainsString('emitClearMapLoop', $source);
+        $this->assertStringNotContainsString('wr_clear_refs_do', $source);
         $this->assertStringContainsString('sext($i, $i64)', $source);
-        $this->assertStringContainsString("appendBasicBlock('wr_clear_refs_do')", $source);
+    }
+
+    public function testWeakRefRegistryJitHelperRegisterGuards(): void
+    {
+        WeakRefRegistryJitHelper::resetForTest();
+        WeakRefRegistryJitHelper::registerRef(0, 0x100);
+        $this->assertSame(0, WeakRefRegistryJitHelper::refCount());
+        WeakRefRegistryJitHelper::registerRef(0x100, 0);
+        $this->assertSame(0, WeakRefRegistryJitHelper::refCount());
+        WeakRefRegistryJitHelper::registerRef(0x100, 0x200);
+        $this->assertSame(1, WeakRefRegistryJitHelper::refCount());
+
+        WeakRefRegistryJitHelper::registerMap(0, 0x300, 'k');
+        $this->assertSame(0, WeakRefRegistryJitHelper::mapCount());
+        WeakRefRegistryJitHelper::registerMap(0x100, 0, 'k');
+        $this->assertSame(0, WeakRefRegistryJitHelper::mapCount());
+        WeakRefRegistryJitHelper::registerMap(0x100, 0x300, '');
+        $this->assertSame(0, WeakRefRegistryJitHelper::mapCount());
+        WeakRefRegistryJitHelper::registerMap(0x100, 0x300, 'k');
+        $this->assertSame(1, WeakRefRegistryJitHelper::mapCount());
     }
 
     public function testWeakRefRegistryJitHelperRegistryRoundtrip(): void

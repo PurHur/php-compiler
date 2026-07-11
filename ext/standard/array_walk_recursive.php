@@ -6,8 +6,8 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
-use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\ArrayMapCallbackPolicy;
+use PHPCompiler\JIT\Builtin\ArrayWalkRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
@@ -37,6 +37,7 @@ final class array_walk_recursive extends Internal
             );
         }
         $subject = $frame->calledArgs[0]->resolveIndirect();
+        VmArraySortCallback::requireCallback($frame->calledArgs[1], 'array_walk_recursive', 2);
         $callback = $frame->calledArgs[1]->resolveIndirect();
         $userdata = 3 === $argc ? $frame->calledArgs[2]->resolveIndirect() : null;
         if (Variable::TYPE_ARRAY !== $subject->type && Variable::TYPE_OBJECT !== $subject->type) {
@@ -65,6 +66,11 @@ final class array_walk_recursive extends Internal
                 'array_walk_recursive() requires two or three arguments in this compiler build'
             );
         }
+        if (JITVariable::TYPE_NULL === $args[1]->type || $args[1]->isNullConstant) {
+            throw new \TypeError(
+                'array_walk_recursive(): Argument #2 ($callback) must be a valid callback, no array or string given'
+            );
+        }
         if (3 === $argc) {
             throw new \LogicException(
                 'array_walk_recursive() userdata is not supported for JIT/AOT in this compiler build (#4913)'
@@ -74,13 +80,13 @@ final class array_walk_recursive extends Internal
             throw new \LogicException(ArrayMapCallbackPolicy::jitRejectionMessage());
         }
         if (ArrayMapCallbackPolicy::isClosureJitLowerable($args[1])) {
-            return ArrayBuiltinHelper::walkRecursiveInPlaceWithClosure($context, $args[0], $args[1], null);
+            return ArrayWalkRuntime::walkRecursiveInPlaceWithClosure($context, $args[0], $args[1], null);
         }
         if (JITVariable::TYPE_STRING === $args[1]->type || JITVariable::TYPE_VALUE === $args[1]->type) {
             $this->jitString($context, $args[1], 'array_walk_recursive() callback');
         }
 
-        return ArrayBuiltinHelper::walkRecursiveInPlace($context, $args[0], $args[1]);
+        return ArrayWalkRuntime::walkRecursiveInPlaceWithStringBuiltin($context, $args[0], $args[1]);
     }
 
     private function walkSubjectArray(
@@ -106,11 +112,23 @@ final class array_walk_recursive extends Internal
         if (!ArrayMapCallbackPolicy::isVmSupportedType($callback->type)) {
             throw new \LogicException(ArrayMapCallbackPolicy::vmRejectionMessage());
         }
+        [$internal, $userFn] = VmArrayWalkCallback::resolveString($frame, $callback->toString());
+        if (null !== $userFn) {
+            if (null === $frame->vmContext) {
+                throw new \LogicException(
+                    'array_walk_recursive() requires VM context in this compiler build'
+                );
+            }
 
-        return VmArrayWalk::walkArrayRecursiveString(
-            $table,
-            VmInternalCall::resolveStringCallback($callback->toString())
-        );
+            return VmArrayWalk::walkArrayRecursiveUserFunction(
+                $frame->vmContext,
+                $table,
+                $userFn,
+                $userdata
+            );
+        }
+
+        return VmArrayWalk::walkArrayRecursiveString($table, $internal);
     }
 
     private function walkSubjectObject(
@@ -137,12 +155,24 @@ final class array_walk_recursive extends Internal
         if (!ArrayMapCallbackPolicy::isVmSupportedType($callback->type)) {
             throw new \LogicException(ArrayMapCallbackPolicy::vmRejectionMessage());
         }
+        [$internal, $userFn] = VmArrayWalkCallback::resolveString($frame, $callback->toString());
+        if (null !== $userFn) {
+            if (null === $frame->vmContext) {
+                throw new \LogicException(
+                    'array_walk_recursive() requires VM context in this compiler build'
+                );
+            }
 
-        return VmArrayWalk::walkObjectRecursiveString(
-            $object,
-            $frame,
-            VmInternalCall::resolveStringCallback($callback->toString())
-        );
+            return VmArrayWalk::walkObjectRecursiveUserFunction(
+                $frame->vmContext,
+                $object,
+                $frame,
+                $userFn,
+                $userdata
+            );
+        }
+
+        return VmArrayWalk::walkObjectRecursiveString($object, $frame, $internal);
     }
 
     private static function valueTypeName(Variable $value): string

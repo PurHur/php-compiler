@@ -22,6 +22,7 @@ abstract class GettextFunction extends Internal
             'dgettext' => JitGettext::dgettext($context, ...$args),
             'dcgettext' => JitGettext::dcgettext($context, ...$args),
             'dngettext' => JitGettext::dngettext($context, ...$args),
+            'ngettext' => JitGettext::ngettext($context, ...$args),
             'dcngettext' => JitGettext::dcngettext($context, ...$args),
             'bindtextdomain' => JitGettext::bindtextdomain($context, ...$args),
             'textdomain' => JitGettext::textdomain($context, ...$args),

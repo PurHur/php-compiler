@@ -14,14 +14,14 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\StringExplode;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
-use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
+use PHPCompiler\VM\Variable;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\HashTable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
@@ -32,18 +32,23 @@ final class explode extends Internal
     public function execute(Frame $frame): void
     {
         $argc = \count($frame->calledArgs);
-        if ($argc < 2 || $argc > 3) {
-            throw new \LogicException('explode() expects 2 or 3 arguments in this compiler build');
+        if ($argc < 2) {
+            throw new \ArgumentCountError(\sprintf(
+                'explode() expects at least 2 arguments, %d given',
+                $argc
+            ));
+        }
+        if ($argc > 3) {
+            throw new \ArgumentCountError(\sprintf(
+                'explode() expects at most 3 arguments, %d given',
+                $argc
+            ));
         }
         $delimiter = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'explode', 0, 'separator');
         $string = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'explode', 1, 'string');
         $limit = \PHP_INT_MAX;
         if (3 === $argc) {
-            $limitArg = $frame->calledArgs[2]->resolveIndirect();
-            if (Variable::TYPE_INTEGER !== $limitArg->type) {
-                throw new \TypeError('explode(): Argument #3 ($limit) must be of type int');
-            }
-            $limit = $limitArg->toInt();
+            $limit = VmMath::parseIntBuiltinArgForFrame($frame, 2, 'explode', 3, 'limit');
         }
         if (null === $frame->returnVar) {
             return;
@@ -63,8 +68,17 @@ final class explode extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         $argc = \count($args);
-        if ($argc < 2 || $argc > 3) {
-            throw new \LogicException('explode() expects 2 or 3 arguments in this compiler build');
+        if ($argc < 2) {
+            throw new \ArgumentCountError(\sprintf(
+                'explode() expects at least 2 arguments, %d given',
+                $argc
+            ));
+        }
+        if ($argc > 3) {
+            throw new \ArgumentCountError(\sprintf(
+                'explode() expects at most 3 arguments, %d given',
+                $argc
+            ));
         }
         if ('' === ($args[0]->compileTimeString ?? null)) {
             TypeErrorRaise::registerDeclarations($context);
@@ -79,33 +93,55 @@ final class explode extends Internal
 
             return HashTableHelper::alloc($context);
         }
-        $delimiter = JitStringBuiltinArg::lower($context, $args[0], 'explode', 0, 'separator');
-        $haystack = JitStringBuiltinArg::lower($context, $args[1], 'explode', 1, 'string');
+
+        $delimLit = $args[0]->compileTimeString ?? null;
+        $hayLit = $args[1]->compileTimeString ?? null;
         if (3 === $argc) {
-            $limitLit = self::compileTimeLimit($args[2]);
-            $delimLit = $args[0]->compileTimeString ?? null;
-            $hayLit = $args[1]->compileTimeString ?? null;
+            $limitLit = self::compileTimeLimit($context, $args[2]);
             if (null !== $limitLit && null !== $delimLit && null !== $hayLit) {
                 return JitExplode::buildPackedStrings($context, $delimLit, $hayLit, $limitLit);
             }
-            $limit = null !== $limitLit
-                ? $context->constantFromInteger($limitLit, 'int64')
-                : JitLongArg::lower($context, $args[2], 'explode() argument #3 ($limit)');
-
-            return JitExplode::explode($context, $delimiter, $haystack, $limit);
+        } elseif (null !== $delimLit && null !== $hayLit) {
+            return JitExplode::buildPackedStrings($context, $delimLit, $hayLit, \PHP_INT_MAX);
         }
 
-        return JitExplode::explode($context, $delimiter, $haystack);
+        StringExplode::ensureLinked($context);
+        $delimiter = JitStringBuiltinArg::lower($context, $args[0], 'explode', 0, 'separator');
+        $haystack = JitStringBuiltinArg::lower($context, $args[1], 'explode', 1, 'string');
+        $i64 = $context->getTypeFromString('int64');
+        if (3 === $argc) {
+            $limitLit = self::compileTimeLimit($context, $args[2]);
+            if (null !== $limitLit) {
+                $limit = $context->constantFromInteger($limitLit, 'int64');
+            } else {
+                $limit = JitIntdiv::lowerIntBuiltinArgForCaller($context, $args[2], 'explode', 3, 'limit');
+            }
+
+            return StringExplode::invoke($context, $delimiter, $haystack, $limit);
+        }
+
+        return StringExplode::invoke(
+            $context,
+            $delimiter,
+            $haystack,
+            $i64->constInt(\PHP_INT_MAX, false)
+        );
     }
 
-    private static function compileTimeLimit(JITVariable $arg): ?int
+    private static function compileTimeLimit(Context $context, JITVariable $arg): ?int
     {
-        if (JITVariable::TYPE_NATIVE_LONG !== $arg->type
-            || JITVariable::KIND_VALUE !== $arg->kind) {
+        if (JITVariable::KIND_VALUE !== $arg->kind) {
             return null;
         }
-        if (null !== ($arg->compileTimeLong ?? null)) {
+        if (JITVariable::TYPE_NATIVE_LONG === $arg->type && null !== ($arg->compileTimeLong ?? null)) {
             return (int) $arg->compileTimeLong;
+        }
+        if (JITVariable::TYPE_NATIVE_DOUBLE === $arg->type && null !== ($arg->compileTimeDouble ?? null)) {
+            if ($context->callerStrictTypes) {
+                return null;
+            }
+
+            return VmMath::floatToZendLong((float) $arg->compileTimeDouble);
         }
 
         return null;

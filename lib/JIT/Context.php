@@ -11,6 +11,7 @@ namespace PHPCompiler\JIT;
 
 use PHPCfg\Operand;
 use PHPCompiler\AOT\Linker;
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\Runtime;
 use PHPCompiler\Block;
 use PHPCompiler\Module;
@@ -70,6 +71,9 @@ class Context {
 
     /** Operand for unserialize() options arg during FUNCCALL lowering (#3300). */
     public ?Operand $jitUnserializeOptionsOperand = null;
+
+    /** Operand for json_encode() value arg during FUNCCALL lowering (#14040). */
+    public ?Operand $jitJsonEncodeValueOperand = null;
 
     /** Operand for call_user_func_array() $args during FUNCCALL lowering (#10359). */
     public ?Operand $jitCallUserFuncArrayParamsOperand = null;
@@ -187,6 +191,9 @@ class Context {
     /** ?? / ?-> result operands that must receive branch assigns even when php-cfg marks them dead (#99, #3219). */
     public \SplObjectStorage $coalesceAssignTargets;
 
+    /** Scope slot => ?? result operand for runtime reload at chained call-arg send (#17590). */
+    public array $coalesceMergeSlotOperands = [];
+
     /** `return $c ? $a : $b` shared merge operand — emit direct returns per arm (#8555 AOT). */
     public ?Operand $ternarySharedReturnOperand = null;
 
@@ -290,6 +297,9 @@ class Context {
     /** @var array<string, true> */
     public array $foreachByRefLocalNames = [];
 
+    /** @var array<string, true> `global $name` imports in the active LLVM function (#16828). */
+    public array $jitImportedGlobalNames = [];
+
     /** CFG entry block for the function currently being lowered (foreach local scan). */
     public ?Block $jitFunctionRootBlock = null;
 
@@ -323,7 +333,7 @@ class Context {
     public function recordJitIncludedFile(string $path): void
     {
         $normalized = \PHPCompiler\VM\ScriptStack::normalize($path);
-        if ('' !== $normalized) {
+        if ('' !== $normalized && !\PHPCompiler\VM\ScriptStack::isVirtualCompileUnit($normalized)) {
             $this->jitIncludedFiles[] = $normalized;
         }
     }
@@ -370,7 +380,22 @@ class Context {
      */
     private function shouldSkipStandaloneMainEnvProbeGate(): bool
     {
+        if ($this->isThinStandaloneAotMain()) {
+            return true;
+        }
+        $entry = $this->resolveJitAotEntryScriptPath();
+        if ('' !== $entry && str_contains($entry, '/bootstrap-aot/')) {
+            return true;
+        }
         if ($this->isBootstrapNonSpineSelfhostEntry()) {
+            return true;
+        }
+        $entry = $this->resolveJitAotEntryScriptPath();
+        if ('' !== $entry && str_contains($entry, 'bootstrap-aot/')) {
+            return true;
+        }
+        $bootstrapLink = getenv('PHP_COMPILER_BOOTSTRAP_AOT_LINK');
+        if ('1' === $bootstrapLink || 'true' === strtolower((string) $bootstrapLink)) {
             return true;
         }
         $flag = getenv('PHP_COMPILER_M3_COMPILE_DRIVER_MAIN');
@@ -493,6 +518,7 @@ class Context {
     }
 
     public function __construct(Runtime $runtime, int $loadType) {
+        $runtime->claimJitContextSlot($this);
         $this->runtime = $runtime;
         $this->scope = new Scope;
         $this->tryCatch = TryCatchState::create();
@@ -548,7 +574,9 @@ class Context {
     }
 
     public function popScope(): void {
-        assert(!empty($this->scopeStack));
+        if ([] === $this->scopeStack) {
+            return;
+        }
         $this->scope = array_pop($this->scopeStack);
     }
 
@@ -640,6 +668,13 @@ class Context {
 
             return $internal;
         }
+        if (DomInstanceMethodJit::isDomInstanceMethodProxy($lc)) {
+            DomInstanceMethodJit::ensureProxy($this, $lc);
+            if (isset($this->functionProxies[$lc])
+                && !($this->functionProxies[$lc] instanceof Call\ExternalMethod)) {
+                return $this->functionProxies[$lc];
+            }
+        }
 
         return null;
     }
@@ -670,7 +705,11 @@ class Context {
      */
     public function functionIsRegistered(string $name): bool
     {
-        $lc = strtolower($name);
+        $normalized = ltrim($name, '\\');
+        $lc = strtolower($normalized);
+        if (DomInstanceMethodJit::isDomInstanceMethodProxy($lc)) {
+            DomInstanceMethodJit::ensureProxy($this, $lc);
+        }
         if ($this->functionProxyIsCallable($lc)) {
             return true;
         }
@@ -774,40 +813,13 @@ class Context {
         Builtin\ReflectionNative::registerDeclarations($this);
         Builtin\AttributeRegistry::registerDeclarations($this);
         if (Builtin::LOAD_TYPE_STANDALONE === $this->loadType) {
-            ExceptionBridge::ensureStandaloneBodies($this);
-            ErrorBridge::ensureStandaloneBodies($this);
-            Builtin\AssertFail::ensureStandaloneBodies($this);
-            Builtin\AssertOptionsRuntime::ensureStandaloneBodies($this);
-            Builtin\JitReturnPending::ensureStandaloneBodies($this);
-            Builtin\CliArgvRuntime::ensureStandaloneBodies($this);
-            Builtin\Sscanf::ensureStandaloneBodies($this);
-            Builtin\StringStripTags::ensureStandaloneBodies($this);
-            Builtin\StringStrtr::ensureStandaloneBodies($this);
-            Builtin\StringParseStrJit::ensureStandaloneBodies($this);
-            Builtin\StringJsonDecode::ensureStandaloneBodies($this);
-            Builtin\StringMultipart::ensureStandaloneBodies($this);
-            Builtin\StringGetenv::ensureStandaloneBodies($this);
-            Builtin\StringGetenvAll::ensureStandaloneBodies($this);
-            Builtin\StringTriggerError::ensureStandaloneBodies($this);
-            Builtin\ScalarDimFetchRuntime::ensureStandaloneBodies($this);
-            Builtin\StringOffsetRuntime::ensureStandaloneBodies($this);
-            // UndefinedVariableRuntime: ensureLinked only — emitWarningForName uses __compiler_trigger_error
-            // (StringTriggerError already linked above; avoid duplicate standalone bodies — #10524).
-            Builtin\StringFormat::ensureStandaloneBodies($this);
-            Builtin\GcToggleRuntime::ensureStandaloneBodies($this);
-            Builtin\FunctionStaticRuntime::ensureStandaloneBodies($this);
-            Builtin\GcCollectCyclesRuntime::ensureStandaloneBodies($this);
-            Builtin\ProgressNoteRuntime::ensureStandaloneBodies($this);
-            Builtin\LastErrorRuntime::ensureStandaloneBodies($this);
-            Builtin\RewriteVarsRuntime::ensureStandaloneBodies($this);
-            Builtin\DefineRuntime::ensureStandaloneBodies($this);
-            Builtin\SuperglobalRefreshRuntime::ensureStandaloneBodies($this);
-            Builtin\SuperglobalNameRuntime::ensureLinked($this);
-            \PHPCompiler\ext\standard\JitStrspn::ensureStandaloneBodies($this);
-            Builtin\TokenGetAll::ensureStandaloneBodies($this);
-            Builtin\Highlight::ensureStandaloneBodies($this);
-            Builtin\Hebrev::ensureStandaloneBodies($this);
-            Builtin\StreamBucketRuntime::ensureStandaloneBodies($this);
+            if ($this->isUserScriptAot()) {
+                $this->ensureMinimalUserStandaloneBodies();
+            } elseif ($this->shouldUseBootstrapAotStandaloneBodies()) {
+                $this->ensureBootstrapAotStandaloneBodies();
+            } else {
+                $this->ensureFullStandaloneBodies();
+            }
         }
 
         $this->functionProxies['is_null'] = new Builtin\IsNullFn();
@@ -829,18 +841,28 @@ class Context {
 
         $this->functionProxies['reflectionclass::__construct'] = new Call\ReflectionClassConstruct();
         $this->functionProxies['reflectionclass::getname'] = new Call\ReflectionClassGetName();
+        $this->functionProxies['reflectionclass::getshortname'] = new Call\ReflectionClassGetShortName();
         $this->functionProxies['reflectionclass::getattributes'] = new Call\ReflectionClassGetAttributes();
         $this->functionProxies['reflectionclass::getmethod'] = new Call\ReflectionClassGetMethod();
         $this->functionProxies['reflectionclass::getreflectionconstant'] = new Call\ReflectionClassGetReflectionConstant();
-        $this->functionProxies['reflectionclass::newlazyproxy'] = new Call\ReflectionClassNewLazyProxy();
-        $this->functionProxies['reflectionclass::newlazyghost'] = new Call\ReflectionClassNewLazyGhost();
-        $this->functionProxies['reflectionclass::createlazyghost'] = new Call\ReflectionClassCreateLazyGhost();
-        $this->functionProxies['reflectionclass::createlazyproxy'] = new Call\ReflectionClassCreateLazyProxy();
+        if (CompilerVersion::supportsLazyObjectFactories()) {
+            $this->functionProxies['reflectionclass::newlazyproxy'] = new Call\ReflectionClassNewLazyProxy();
+            $this->functionProxies['reflectionclass::newlazyghost'] = new Call\ReflectionClassNewLazyGhost();
+            $this->functionProxies['reflectionclass::createlazyghost'] = new Call\ReflectionClassCreateLazyGhost();
+            $this->functionProxies['reflectionclass::createlazyproxy'] = new Call\ReflectionClassCreateLazyProxy();
+        }
         $this->functionProxies['reflectionproperty::__construct'] = new Call\ReflectionPropertyConstruct();
         $this->functionProxies['reflectionproperty::getattributes'] = new Call\ReflectionPropertyGetAttributes();
         $this->functionProxies['reflectionconstant::__construct'] = new Call\ReflectionConstantConstruct();
         $this->functionProxies['reflectionconstant::getattributes'] = new Call\ReflectionConstantGetAttributes();
         $this->functionProxies['reflectionmethod::getattributes'] = new Call\ReflectionMethodGetAttributes();
+        if (CompilerVersion::supportsReflectionParameterIsSensitiveParameter()) {
+            $this->functionProxies['reflectionparameter::issensitiveparameter'] = new Call\ReflectionParameterIsSensitiveParameter();
+        }
+        if (CompilerVersion::supportsReflectionFunctionGetNamedArguments()) {
+            $this->functionProxies['reflectionfunction::getnamedarguments'] = new Call\ReflectionFunctionGetNamedArguments();
+            $this->functionProxies['reflectionmethod::getnamedarguments'] = new Call\ReflectionMethodGetNamedArguments();
+        }
         $this->functionProxies['reflectionattribute::getname'] = new Call\ReflectionAttributeGetName();
         $this->functionProxies['reflectionattribute::newinstance'] = new Call\ReflectionAttributeNewInstance();
         $this->functionProxies['reflectionenum::__construct'] = new Call\ReflectionEnumConstruct();
@@ -855,6 +877,173 @@ class Context {
         FiberHelper::registerJitMethods($this);
         GeneratorHelper::registerJitMethods($this);
         ClosureBindHelper::registerJitMethods($this);
+        if (CompilerVersion::supportsDatePeriodCreateFromISO8601String()) {
+            $this->functionProxies['dateperiod::createfromiso8601string'] = new Call\DatePeriodCreateFromISO8601String();
+            foreach (['rewind', 'valid', 'current', 'key', 'next'] as $dpIterMethod) {
+                $this->functionProxies['dateperiod::'.$dpIterMethod] = new Call\DatePeriodIteratorMethod($dpIterMethod);
+            }
+        }
+        $this->functionProxies['datetime::format'] = new Call\DateTimeFormat();
+        $this->functionProxies['datetimeimmutable::format'] = new Call\DateTimeFormat();
+        if (CompilerVersion::supportsDomTokenList()) {
+            DomInstanceMethodJit::registerKnownProxies($this);
+        }
+    }
+
+    /** User examples or bootstrap-aot-link: thin standalone main without session/header reset LLVM (#13571, #14459). */
+    public function isThinStandaloneAotMain(): bool
+    {
+        return $this->isUserScriptAot() || $this->shouldUseBootstrapAotStandaloneBodies();
+    }
+
+    private function isUserScriptAot(): bool
+    {
+        $userScript = getenv('PHP_COMPILER_AOT_USER_SCRIPT');
+        if ('1' === $userScript || 'true' === strtolower((string) $userScript)) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /** bootstrap-aot-link: thin LLVM during Context init — defer nested php-in-PHP JIT (#14459, #13245). */
+    private function shouldUseBootstrapAotStandaloneBodies(): bool
+    {
+        $bootstrapLink = getenv('PHP_COMPILER_BOOTSTRAP_AOT_LINK');
+        if ('1' === $bootstrapLink || 'true' === strtolower((string) $bootstrapLink)) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /** examples/000–009 user-script AOT: thin LLVM bridges only — no nested-JIT stdlib during init (#13571). */
+    private function ensureMinimalUserStandaloneBodies(): void
+    {
+        Builtin\StringJsonDecode::ensureDeferredStubsForInventoryEmit($this);
+        Builtin\StringJsonEncode::ensureDeferredStubsForInventoryEmit($this);
+        Builtin\StringHtmlspecialchars::ensureStandaloneBodies($this);
+        Builtin\StringHtmlspecialcharsDecode::ensureStandaloneBodies($this);
+        ExceptionBridge::ensureStandaloneBodies($this);
+        ErrorBridge::ensureStandaloneBodies($this);
+        Builtin\ErrorHandlerJitRuntime::ensureStandaloneBodies($this);
+        Builtin\ExceptionHandlerJitRuntime::ensureStandaloneBodies($this);
+        if (!$this->isUserScriptAot()) {
+            Builtin\StreamLifecycleRuntime::ensureDeferredStubsForInventoryEmit($this);
+        }
+        Builtin\StreamBucketRuntime::ensureDeferredStubsForInventoryEmit($this);
+        Builtin\StreamReadRuntime::ensureDeferredStubsForInventoryEmit($this);
+        Builtin\AssertFail::ensureStandaloneBodies($this);
+        Builtin\JitReturnPending::ensureStandaloneBodies($this);
+        Builtin\ObOutputRuntime::ensureLinked($this);
+        Builtin\StringTriggerError::ensureStandaloneBodies($this);
+        Builtin\StringRandomBytes::implement($this);
+        Builtin\ProgressNoteRuntime::ensureStandaloneBodies($this);
+        Builtin\GcCollectCyclesRuntime::ensureStandaloneBodies($this);
+        Builtin\LastErrorRuntime::ensureStandaloneBodies($this);
+        Builtin\RewriteVarsRuntime::ensureStandaloneBodies($this);
+        Builtin\DefineRuntime::ensureStandaloneBodies($this);
+        Builtin\StringStrContains::ensureStandaloneBodies($this);
+        Builtin\StatPathRuntime::ensureStandaloneBodies($this);
+        Builtin\StringFileGetContents::ensureStandaloneBodies($this);
+        Builtin\StringReadfile::ensureStandaloneBodies($this);
+        Builtin\StringAddslashes::ensureStandaloneBodies($this);
+        Builtin\StringStripslashes::ensureStandaloneBodies($this);
+        Builtin\StringFilePutContents::ensureStandaloneBodies($this);
+        Builtin\SuperglobalNameRuntime::ensureLinked($this);
+        if (CompilerVersion::supportsDomTokenList()
+            && !DomInstanceMethodJit::shouldDeferToVmClassMethodLowering()) {
+            Builtin\DomInstanceMethodRuntime::ensureLinked($this);
+        }
+    }
+
+    /** bootstrap-aot-link fixtures: minimal init + CLI argv / superglobal refresh for standalone main (#14459). */
+    private function ensureBootstrapAotStandaloneBodies(): void
+    {
+        Builtin\StringJsonDecode::ensureDeferredStubsForInventoryEmit($this);
+        Builtin\StringJsonEncode::ensureDeferredStubsForInventoryEmit($this);
+        $this->ensureMinimalUserStandaloneBodies();
+        Builtin\CliArgvRuntime::ensureUserScriptMainStubs($this);
+        Builtin\SuperglobalRefreshRuntime::ensureStandaloneBodies($this);
+    }
+
+    private function ensureFullStandaloneBodies(): void
+    {
+        Builtin\StreamIoRuntime::beginStandaloneInitPhase();
+        try {
+            ExceptionBridge::ensureStandaloneBodies($this);
+            ErrorBridge::ensureStandaloneBodies($this);
+            Builtin\StreamLifecycleRuntime::ensureDeferredStubsForInventoryEmit($this);
+            Builtin\StreamReadRuntime::ensureDeferredStubsForInventoryEmit($this);
+            Builtin\AssertFail::ensureStandaloneBodies($this);
+            Builtin\AssertOptionsRuntime::ensureStandaloneBodies($this);
+            Builtin\JitReturnPending::ensureStandaloneBodies($this);
+            Builtin\ObOutputRuntime::ensureLinked($this);
+            Builtin\ValueEchoRuntime::ensureLinked($this);
+            Builtin\CliArgvRuntime::ensureStandaloneBodies($this);
+            // Nested-JIT string helpers: lazy via ensureLinked during spine init (#14472).
+            if (!Builtin\StreamIoRuntime::shouldDeferHeavyStreamIoEmitters($this)) {
+                Builtin\StringSoundex::ensureStandaloneBodies($this);
+                Builtin\StringQuotemeta::ensureStandaloneBodies($this);
+                Builtin\StringNl2br::ensureStandaloneBodies($this);
+                Builtin\StringUcwords::ensureStandaloneBodies($this);
+                Builtin\StringMetaphone::ensureStandaloneBodies($this);
+                Builtin\StringWordwrap::ensureStandaloneBodies($this);
+                Builtin\StringBin2hex::ensureStandaloneBodies($this);
+                Builtin\StringBase64Encode::ensureStandaloneBodies($this);
+                Builtin\StringBase64Decode::ensureStandaloneBodies($this);
+                Builtin\StringStrrev::ensureStandaloneBodies($this);
+                Builtin\StringStrRepeat::ensureStandaloneBodies($this);
+                Builtin\StringStrPad::ensureStandaloneBodies($this);
+                Builtin\StringStrRot13::ensureStandaloneBodies($this);
+                Builtin\StringUniqid::ensureStandaloneBodies($this);
+                Builtin\StringChunkSplit::ensureStandaloneBodies($this);
+                Builtin\StringHex2bin::ensureStandaloneBodies($this);
+                Builtin\StringLevenshtein::ensureStandaloneBodies($this);
+                Builtin\StringSubstrCount::ensureStandaloneBodies($this);
+                Builtin\StringCountChars::ensureStandaloneBodies($this);
+                Builtin\StringNCompare::ensureStandaloneBodies($this);
+                Builtin\StringStrWordCount::ensureStandaloneBodies($this);
+                Builtin\StringStripTags::ensureStandaloneBodies($this);
+                Builtin\StringStrtr::ensureStandaloneBodies($this);
+                Builtin\StringParseStr::ensureStandaloneBodies($this);
+            }
+            Builtin\StringJsonEncode::ensureStandaloneBodies($this);
+            Builtin\StringJsonDecode::ensureStandaloneBodies($this);
+            Builtin\StringGetenv::ensureDeferredStubsForInventoryEmit($this);
+            Builtin\StringGetenv::ensureStandaloneBodies($this);
+            Builtin\StringGetenvAll::ensureStandaloneBodies($this);
+            Builtin\StringTriggerError::ensureStandaloneBodies($this);
+            Builtin\StringRandomBytes::implement($this);
+            Builtin\ScalarDimFetchRuntime::ensureStandaloneBodies($this);
+            Builtin\StringOffsetRuntime::ensureStandaloneBodies($this);
+            // UndefinedVariableRuntime: ensureLinked only — emitWarningForName uses __compiler_trigger_error
+            // (StringTriggerError already linked above; avoid duplicate standalone bodies — #10524).
+            Builtin\StringFormat::ensureDeferredStubsForInventoryEmit($this);
+            Builtin\StringJsonEncode::ensureDeferredStubsForInventoryEmit($this);
+            Builtin\StringJsonDecode::ensureDeferredStubsForInventoryEmit($this);
+            Builtin\StreamFilterJit::ensureDeferredStubsForInventoryEmit($this);
+            Builtin\GcToggleRuntime::ensureStandaloneBodies($this);
+            Builtin\FunctionStaticRuntime::ensureStandaloneBodies($this);
+            Builtin\GcCollectCyclesRuntime::ensureStandaloneBodies($this);
+            Builtin\ProgressNoteRuntime::ensureStandaloneBodies($this);
+            Builtin\LastErrorRuntime::ensureStandaloneBodies($this);
+            Builtin\RewriteVarsRuntime::ensureStandaloneBodies($this);
+            Builtin\DefineRuntime::ensureStandaloneBodies($this);
+            Builtin\SuperglobalRefreshRuntime::ensureStandaloneBodies($this);
+            Builtin\SuperglobalNameRuntime::ensureLinked($this);
+            Builtin\StringStrspn::ensureStandaloneBodies($this);
+            // BootstrapCompileSmokeM3Emit / inventory argv {main} calls __compiler_file_get_contents (#15604).
+            Builtin\StringFileGetContents::ensureStandaloneBodies($this);
+            Builtin\StringReadfile::ensureStandaloneBodies($this);
+            Builtin\TokenGetAll::ensureStandaloneBodies($this);
+            Builtin\Highlight::ensureStandaloneBodies($this);
+            Builtin\Hebrev::ensureStandaloneBodies($this);
+            Builtin\Hebrevc::ensureStandaloneBodies($this);
+            Builtin\StreamBucketRuntime::ensureStandaloneBodies($this);
+        } finally {
+            Builtin\StreamIoRuntime::endStandaloneInitPhase();
+        }
     }
 
     public function compileToFile(string $file) {
@@ -882,6 +1071,11 @@ class Context {
             ));
         }
 
+        if (Builtin::LOAD_TYPE_STANDALONE === $this->loadType && $this->isThinStandaloneAotMain()) {
+            Builtin\CliArgvRuntime::ensureUserScriptMainStubs($this);
+            Builtin\SuperglobalRefreshRuntime::ensureUserScriptRefreshEmit($this);
+        }
+
         // add main function
         if (!is_null($this->main)) {
             $i32 = $this->context->int32Type();
@@ -904,18 +1098,22 @@ class Context {
             $emitInStandaloneMain(fn () => $this->builder->call($this->initFunc));
             $emitInStandaloneMain(fn () => Progress::emitNativeNote($this, 'c:main_after_init'));
             if (Builtin::LOAD_TYPE_STANDALONE === $this->loadType) {
-                $emitInStandaloneMain(fn () => Builtin\HttpResponseCode::emitResetForStandaloneMain($this));
-                $emitInStandaloneMain(fn () => Builtin\SessionId::emitResetForStandaloneMain($this));
-                $emitInStandaloneMain(fn () => Builtin\SessionName::emitResetForStandaloneMain($this));
-                $emitInStandaloneMain(fn () => Builtin\SessionModuleName::emitResetForStandaloneMain($this));
-                $emitInStandaloneMain(fn () => Builtin\PendingHeaders::emitResetForStandaloneMain($this));
+                if (!$this->isThinStandaloneAotMain()) {
+                    $emitInStandaloneMain(fn () => Builtin\HttpResponseCode::emitResetForStandaloneMain($this));
+                    $emitInStandaloneMain(fn () => Builtin\SessionId::emitResetForStandaloneMain($this));
+                    $emitInStandaloneMain(fn () => Builtin\SessionName::emitResetForStandaloneMain($this));
+                    $emitInStandaloneMain(fn () => Builtin\SessionModuleName::emitResetForStandaloneMain($this));
+                    $emitInStandaloneMain(fn () => Builtin\PendingHeaders::emitResetForStandaloneMain($this));
+                }
                 $emitInStandaloneMain(fn () => $this->builder->call($this->lookupFunction('__superglobals__refresh')));
-                $emitInStandaloneMain(fn () => Builtin\JitThrow::registerDeclarations($this));
-                $emitInStandaloneMain(fn () => $this->builder->call($this->lookupFunction('phpc_jit_clear_throw_pending')));
-                $emitInStandaloneMain(fn () => Builtin\JitReturnPending::registerDeclarations($this));
-                $emitInStandaloneMain(fn () => $this->builder->call($this->lookupFunction('phpc_jit_clear_return_pending')));
-                $emitInStandaloneMain(fn () => ErrorBridge::emitClearForStandaloneMain($this));
-                $emitInStandaloneMain(fn () => ExceptionBridge::emitClearForStandaloneMain($this));
+                if (!$this->isThinStandaloneAotMain()) {
+                    $emitInStandaloneMain(fn () => Builtin\JitThrow::registerDeclarations($this));
+                    $emitInStandaloneMain(fn () => $this->builder->call($this->lookupFunction('phpc_jit_clear_throw_pending')));
+                    $emitInStandaloneMain(fn () => Builtin\JitReturnPending::registerDeclarations($this));
+                    $emitInStandaloneMain(fn () => $this->builder->call($this->lookupFunction('phpc_jit_clear_return_pending')));
+                    $emitInStandaloneMain(fn () => ErrorBridge::emitClearForStandaloneMain($this));
+                    $emitInStandaloneMain(fn () => ExceptionBridge::emitClearForStandaloneMain($this));
+                }
             }
             $emitInStandaloneMain(fn () => Progress::emitNativeNote($this, 'c:main_before_php'));
             if (Builtin::LOAD_TYPE_STANDALONE === $this->loadType
@@ -925,14 +1123,16 @@ class Context {
                 $emitInStandaloneMain(fn () => $this->builder->call($this->main));
             }
             $emitInStandaloneMain(fn () => Progress::emitNativeNote($this, 'c:main_after_php'));
-            if (Builtin::LOAD_TYPE_STANDALONE === $this->loadType) {
+            if (Builtin::LOAD_TYPE_STANDALONE === $this->loadType && !$this->isThinStandaloneAotMain()) {
                 $emitInStandaloneMain(fn () => ErrorBridge::emitAbortIfPendingForStandaloneMain($this));
                 $emitInStandaloneMain(fn () => ExceptionBridge::emitAbortIfPendingForStandaloneMain($this));
                 $emitInStandaloneMain(fn () => Builtin\PendingHeaders::emitFlushForStandalone($this));
                 $emitInStandaloneMain(fn () => Builtin\ObOutput::emitEndAllForStandalone($this));
             }
-            // User __destruct before __shutdown__ frees compile-time strings / sg_* (#4013).
-            $emitInStandaloneMain(fn () => $this->type->object->emitShutdownDestructorsCall());
+            if (!$this->isThinStandaloneAotMain()) {
+                // User __destruct before __shutdown__ frees compile-time strings / sg_* (#4013).
+                $emitInStandaloneMain(fn () => $this->type->object->emitShutdownDestructorsCall());
+            }
             $emitInStandaloneMain(fn () => $this->builder->call($this->shutdownFunc));
             $emitInStandaloneMain(fn () => $this->builder->returnValue($i32->constInt(0, false)));
         }
@@ -1067,14 +1267,20 @@ class Context {
             $this->context->voidType(),
             false
         );
-        $this->initFunc = $this->module->addFunction('__init__', $signature);
+        // Split-compilation unit emission suffixes these per unit (env) so the
+        // unit's init/shutdown survive the -z muldefs merge and the consuming
+        // script's __init__ can call them explicitly — colliding symbols were
+        // silently discarded and unit module state never initialized
+        // (#15889 / #16075 step 4).
+        $suffix = (string) getenv('PHP_COMPILER_INIT_SYMBOL_SUFFIX');
+        $this->initFunc = $this->module->addFunction('__init__'.$suffix, $signature);
         $this->initBlock = $this->initFunc->appendBasicBlock('main');
         $this->initLinearBlock = $this->initBlock;
 
-        $this->shutdownFunc = $this->module->addFunction('__shutdown__', $signature);
+        $this->shutdownFunc = $this->module->addFunction('__shutdown__'.$suffix, $signature);
         $this->shutdownBlock = $this->shutdownFunc->appendBasicBlock('main');
 
-        $this->headerPreFlushFunc = $this->module->addFunction('__header_pre_flush__', $signature);
+        $this->headerPreFlushFunc = $this->module->addFunction('__header_pre_flush__'.$suffix, $signature);
         $this->headerPreFlushBlock = $this->headerPreFlushFunc->appendBasicBlock('main');
 
         $this->initShutdownBlocksReady = true;
@@ -1129,6 +1335,9 @@ class Context {
             $builtin->shutdown();
         }
         Builtin\AttributeRegistryLowering::implementLookupFunctions($this);
+        Builtin\ParamSensitiveLowering::implementLookupFunctions($this);
+        Builtin\ReflectionNamedArgumentsLowering::implementLookupFunctions($this);
+        VmActiveContextInitLlvm::emitPendingBeforeSeal($this);
         $this->sealInitFunction();
         $this->sealInitShutdownReturn($this->shutdownBlock);
         $this->sealInitShutdownReturn($this->headerPreFlushBlock);
@@ -1280,10 +1489,7 @@ class Context {
                     $ptr = $slot;
                 }
 
-                return (new \PHPCompiler\ext\standard\boolval())->call(
-                    $this,
-                    new Variable($this, Variable::TYPE_VALUE, Variable::KIND_VALUE, $ptr)
-                );
+                return \PHPCompiler\ext\standard\boolval::boxedTruthyScalar($this, $ptr);
             case '__string__':
                 $slot = BasicBlockHelper::entryAlloca($this, $type);
                 $this->builder->store($value, $slot);
@@ -1357,7 +1563,6 @@ class Context {
                 return $name;
             }
         }
-        var_dump($type->getKind());
         return 'unknown';
     }
 
@@ -1707,12 +1912,90 @@ class Context {
                 return;
             }
         }
+        $slot = $block->slotForOperand($op);
+        if (null !== $slot && isset($block->constants[$slot])) {
+            $this->scope->variables[$op] = VmConstantJit::toVariable($this, $block->constants[$slot]);
+
+            return;
+        }
         $this->scope->variables[$op] = Variable::fromOp($this, $func, $basicBlock, $block, $op);
         $this->scope->variables[$op]->initialize();
     }
 
     public function setVariableOp(Operand $op, Variable $var) {
         $this->scope->variables[$op] = $var;
+    }
+
+    /**
+     * php-cfg may use distinct {@see Operand\Variable}/{@see Operand\Temporary} objects for one scope slot (#72, #12036).
+     */
+    private function aliasVariableOpByName(Operand $op): bool
+    {
+        $name = OperandName::resolve($op);
+        if (null === $name || '' === $name) {
+            return false;
+        }
+        $resolved = $this->resolveRefAliasName($name);
+        if (isset($this->namedVariableBindings[$resolved])) {
+            $this->scope->variables[$op] = $this->namedVariableBindings[$resolved];
+
+            return true;
+        }
+        // CLI globals imported via `global $argv` / `global $argc` on inventory argv spine (#12036).
+        if ('argv' === $name || 'argc' === $name) {
+            $global = $this->ensureScriptGlobal($name);
+            $alias = new Variable(
+                $this,
+                Variable::TYPE_VALUE,
+                Variable::KIND_VARIABLE,
+                JitValueBox::alloc($this)
+            );
+            $alias->valueBoxAliasPtr = JitValueBox::valuePtrFromVariable($this, $global);
+            $alias->functionStaticGlobal = true;
+            $this->bindVariableByName($name, $alias);
+            $this->scope->variables[$op] = $alias;
+
+            return true;
+        }
+        foreach ($this->scope->variables as $scopeOp) {
+            if ($name === OperandName::resolve($scopeOp)) {
+                $this->scope->variables[$op] = $this->scope->variables[$scopeOp];
+
+                return true;
+            }
+        }
+        foreach ($this->scopeStack as $scope) {
+            foreach ($scope->variables as $scopeOp) {
+                if ($name === OperandName::resolve($scopeOp)) {
+                    $this->scope->variables[$op] = $scope->variables[$scopeOp];
+
+                    return true;
+                }
+            }
+        }
+        $block = $this->jitCurrentBlock;
+        if (null !== $block) {
+            if ($block->declaresGlobalName($name)) {
+                $global = $this->ensureScriptGlobal($name);
+                $this->bindVariableByName($name, $global);
+                $this->scope->variables[$op] = $global;
+
+                return true;
+            }
+            $slot = $block->slotForOperand($op);
+            if (null !== $slot) {
+                foreach ($block->scopedOperands() as $scopeOp) {
+                    if ($block->slotForOperand($scopeOp) !== $slot || !$this->scope->variables->contains($scopeOp)) {
+                        continue;
+                    }
+                    $this->scope->variables[$op] = $this->scope->variables[$scopeOp];
+
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -1723,21 +2006,8 @@ class Context {
         if ($this->scope->variables->contains($op)) {
             return true;
         }
-        $name = OperandName::resolve($op);
-        if (null !== $name && '' !== $name) {
-            $resolved = $this->resolveRefAliasName($name);
-            if (isset($this->namedVariableBindings[$resolved])) {
-                $this->scope->variables[$op] = $this->namedVariableBindings[$resolved];
-
-                return true;
-            }
-            foreach ($this->scope->variables as $scopeOp) {
-                if ($name === OperandName::resolve($scopeOp)) {
-                    $this->scope->variables[$op] = $this->scope->variables[$scopeOp];
-
-                    return true;
-                }
-            }
+        if ($this->aliasVariableOpByName($op)) {
+            return true;
         }
         $slot = $block->slotForOperand($op);
         if (null === $slot) {
@@ -1853,6 +2123,18 @@ class Context {
                     throw new \LogicException("Unknown variable referenced: " . get_class($op));
                 }
             } elseif ($op instanceof Operand\Temporary) {
+                $block = $this->jitCurrentBlock;
+                if (null !== $block) {
+                    $slot = $block->slotForOperand($op);
+                    if (null !== $slot && isset($block->constants[$slot])) {
+                        $this->scope->variables[$op] = VmConstantJit::toVariable(
+                            $this,
+                            $block->constants[$slot]
+                        );
+
+                        return $this->scope->variables[$op];
+                    }
+                }
                 // Temporaries can be introduced by CFG transforms after scope variable allocation.
                 // Treat unknown temporaries as boxed __value__ slots to keep self-host emit paths alive.
                 $slot = JitValueBox::alloc($this);
@@ -1866,6 +2148,8 @@ class Context {
                     Variable::KIND_VARIABLE,
                     $slot
                 );
+            } elseif ($op instanceof Operand\Variable && $this->aliasVariableOpByName($op)) {
+                // Distinct Variable operand for an already-allocated scope slot (#12036 inventory argv).
             } else {
                 throw new \LogicException("Unknown variable referenced: " . get_class($op));
             }
@@ -2000,6 +2284,28 @@ class Context {
         }
     }
 
+    /**
+     * CLI stdio constants lower to integer fds for fwrite/standalone AOT (#90953, #10163).
+     * VmStdStreamConstants registers stream objects on the VM; JIT must not see TYPE_OBJECT.
+     */
+    private function vmStdioFdVariable(string $name): ?VMVariable
+    {
+        return match ($name) {
+            'STDIN' => $this->vmIntegerConstant(0),
+            'STDOUT' => $this->vmIntegerConstant(1),
+            'STDERR' => $this->vmIntegerConstant(2),
+            default => null,
+        };
+    }
+
+    private function vmIntegerConstant(int $value): VMVariable
+    {
+        $var = new VMVariable(VMVariable::TYPE_INTEGER);
+        $var->int($value);
+
+        return $var;
+    }
+
     private function zendConstantVariable(string $name): ?VMVariable
     {
         if (!\is_string($name) || !\defined($name)) {
@@ -2007,10 +2313,7 @@ class Context {
         }
         $value = \constant($name);
         if (\is_int($value)) {
-            $var = new VMVariable(VMVariable::TYPE_INTEGER);
-            $var->int($value);
-
-            return $var;
+            return $this->vmIntegerConstant($value);
         }
         if (\is_float($value)) {
             $var = new VMVariable(VMVariable::TYPE_FLOAT);
@@ -2031,23 +2334,9 @@ class Context {
             return $var;
         }
         if (\is_resource($value)) {
-            if ('STDIN' === $name) {
-                $var = new VMVariable(VMVariable::TYPE_INTEGER);
-                $var->int(0);
-
-                return $var;
-            }
-            if ('STDOUT' === $name) {
-                $var = new VMVariable(VMVariable::TYPE_INTEGER);
-                $var->int(1);
-
-                return $var;
-            }
-            if ('STDERR' === $name) {
-                $var = new VMVariable(VMVariable::TYPE_INTEGER);
-                $var->int(2);
-
-                return $var;
+            $stdio = $this->vmStdioFdVariable($name);
+            if (null !== $stdio) {
+                return $stdio;
             }
             // Other stream resources are unused in bundled bootstrap fixtures.
             $var = new VMVariable(VMVariable::TYPE_NULL);
@@ -2068,6 +2357,11 @@ class Context {
             $phpVar = $this->runtime->vmContext->constantFetch($name);
             if (is_null($phpVar)) {
                 $phpVar = $this->zendConstantVariable($name);
+            } elseif (VMVariable::TYPE_OBJECT === $phpVar->type) {
+                $stdio = $this->vmStdioFdVariable($name);
+                if (null !== $stdio) {
+                    $phpVar = $stdio;
+                }
             }
             if (is_null($phpVar)) {
                 return null;
@@ -2103,8 +2397,9 @@ class Context {
                     $this->constants[$name] = [Variable::TYPE_NATIVE_BOOL, $global];
                     break;
                 case VMVariable::TYPE_STRING:
-                    $global = $this->constantStringFromString($phpVar->toString());
-                    $this->constants[$name] = [Variable::TYPE_STRING, $global];
+                    $compileTimeStr = $phpVar->toString();
+                    $global = $this->constantStringFromString($compileTimeStr);
+                    $this->constants[$name] = [Variable::TYPE_STRING, $global, $compileTimeStr];
                     break;
                 case VMVariable::TYPE_ARRAY:
                     $global = $this->constantArrayFromVmHashTable($name, $phpVar->toArray());
@@ -2121,6 +2416,9 @@ class Context {
             $this->builder->load($this->constants[$name][1])
         );
         $var->compileTimeConstantName = $name;
+        if (Variable::TYPE_STRING === $this->constants[$name][0] && isset($this->constants[$name][2])) {
+            $var->compileTimeString = $this->constants[$name][2];
+        }
 
         return $var;
     }

@@ -7,9 +7,12 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\ArrayBuiltinHelper;
+use PHPCompiler\JIT\Builtin\MultisortRuntime;
+use PHPCompiler\JIT\Builtin\SortRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\EnumCaseSupport;
+use PHPCompiler\VM\ReferencableCheck;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -81,22 +84,22 @@ final class array_multisort extends Internal
 
         $indices = range(0, $length - 1);
         self::sortIndicesByMultisort($indices, $allValues, $entries);
+        $caller = self::callerFrame($frame);
+        $skipCoupledWriteback = self::shouldSkipCoupledMultisortWriteback($entries, $caller);
         foreach ($entries as $entryIdx => $entry) {
-            $entry['array']->separateArrayForWrite();
-            $target = $entry['array']->resolveIndirect()->toArray();
-            if ($allPacked[$entryIdx]) {
-                $reordered = [];
-                foreach ($indices as $idx) {
-                    $reordered[] = $allValues[$entryIdx][$idx];
-                }
-                $target->replacePackedValues($reordered);
-            } else {
-                $reorderedPairs = [];
-                foreach ($indices as $idx) {
-                    $reorderedPairs[] = $allPairs[$entryIdx][$idx];
-                }
-                $target->reorderKeyedPairs($reorderedPairs);
+            if ($skipCoupledWriteback) {
+                continue;
             }
+            if (!ReferencableCheck::isReferenceable($entry['array'], $caller)) {
+                continue;
+            }
+            self::writeSortedArray(
+                $entry['array'],
+                $allValues[$entryIdx],
+                $allPairs[$entryIdx],
+                $allPacked[$entryIdx],
+                $indices
+            );
         }
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool(true);
@@ -109,9 +112,9 @@ final class array_multisort extends Internal
         if (1 === \count($entries)) {
             $entry = $entries[0];
             if (StdlibConstants::SORT_DESC === $entry['sortOrder']) {
-                ArrayBuiltinHelper::sortPackedReverse($context, $entry['array']);
+                SortRuntime::sortPackedReverse($context, $entry['array']);
             } else {
-                ArrayBuiltinHelper::sortPacked($context, $entry['array']);
+                SortRuntime::sortPacked($context, $entry['array']);
             }
 
             return $context->getTypeFromString('int1')->constInt(1, false);
@@ -119,7 +122,7 @@ final class array_multisort extends Internal
 
         $arrays = array_column($entries, 'array');
         $descending = StdlibConstants::SORT_DESC === $entries[0]['sortOrder'];
-        ArrayBuiltinHelper::multisortPacked($context, $arrays, $descending);
+        MultisortRuntime::multisortPacked($context, $arrays, $descending);
 
         return $context->getTypeFromString('int1')->constInt(1, false);
     }
@@ -163,6 +166,81 @@ final class array_multisort extends Internal
         }
         $indices = range(0, $length - 1);
         self::sortIndicesByMultisort($indices, [0 => $values], [$entry]);
+        self::writeSortedArray($array, $values, $pairs, $isPacked, $indices);
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool(true);
+        }
+    }
+
+    /**
+     * php-src skips coupled companion writeback when the primary array operand is an inline temp (#15151).
+     *
+     * @param list<array{array: Variable, sortOrder: int, sortType: int}> $entries
+     */
+    private static function callerFrame(Frame $handlerFrame): Frame
+    {
+        return $handlerFrame->parent ?? $handlerFrame;
+    }
+
+    /** True when the primary multisort array operand is an inline literal temp (#15151). */
+    private static function isInlinePrimaryMultisortArray(Variable $arg, Frame $caller): bool
+    {
+        if (ReferencableCheck::isEphemeralArrayArg($arg, $caller)) {
+            return true;
+        }
+        if (!$arg->isIndirect()) {
+            return false;
+        }
+        $target = $arg->byRefTarget();
+        foreach ($caller->scope as $slot => $scoped) {
+            if ($scoped === $arg && $scoped !== $target
+                && null !== $caller->block
+                && $caller->block->isNamedVariableSlot((int) $slot)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * php-src skips coupled writeback when inline primary storage aliases a writable companion (#15151).
+     *
+     * @param list<array{array: Variable, sortOrder: int, sortType: int}> $entries
+     */
+    private static function shouldSkipCoupledMultisortWriteback(array $entries, Frame $caller): bool
+    {
+        if (\count($entries) < 2) {
+            return false;
+        }
+        if (!ReferencableCheck::isReferenceable($entries[1]['array'], $caller)) {
+            return false;
+        }
+        if (!self::isInlinePrimaryMultisortArray($entries[0]['array'], $caller)) {
+            return false;
+        }
+        $primaryInner = $entries[0]['array']->byRefTarget();
+        $companionInner = $entries[1]['array']->byRefTarget();
+        $primaryHt = $primaryInner->resolveIndirect()->toArray();
+        $companionHt = $companionInner->resolveIndirect()->toArray();
+
+        return $primaryInner === $companionInner || $primaryHt === $companionHt;
+    }
+
+    /**
+     * Write sorted values back — php-src php_array_multisort reindexes int keys to 0..n-1 (#13449).
+     *
+     * @param list<Variable>                             $values
+     * @param list<array{0: Variable, 1: Variable}>|null $pairs
+     * @param list<int>                                  $indices
+     */
+    private static function writeSortedArray(
+        Variable $array,
+        array $values,
+        ?array $pairs,
+        bool $isPacked,
+        array $indices
+    ): void {
         $array->separateArrayForWrite();
         $target = $array->resolveIndirect()->toArray();
         if ($isPacked) {
@@ -171,16 +249,23 @@ final class array_multisort extends Internal
                 $reordered[] = $values[$idx];
             }
             $target->replacePackedValues($reordered);
-        } else {
-            $reorderedPairs = [];
-            foreach ($indices as $idx) {
-                $reorderedPairs[] = $pairs[$idx];
+
+            return;
+        }
+        $reorderedPairs = [];
+        $numericNext = 0;
+        foreach ($indices as $idx) {
+            [$key, $value] = $pairs[$idx];
+            $keyResolved = $key->resolveIndirect();
+            if (Variable::TYPE_INTEGER === $keyResolved->type) {
+                $newKey = new Variable();
+                $newKey->int($numericNext++);
+                $reorderedPairs[] = [$newKey, $value];
+            } else {
+                $reorderedPairs[] = [$key, $value];
             }
-            $target->reorderKeyedPairs($reorderedPairs);
         }
-        if (null !== $frame->returnVar) {
-            $frame->returnVar->bool(true);
-        }
+        $target->reorderKeyedPairs($reorderedPairs);
     }
 
     /**
@@ -298,18 +383,15 @@ final class array_multisort extends Internal
 
             $flag = self::tryResolveJitMultisortFlag($context, $arg);
             if (null === $flag) {
-                throw new \TypeError(sprintf(
-                    'array_multisort(): Argument #%d must be an array or a sort flag',
-                    $i + 1
-                ));
+                throw new \TypeError(VmArraySort::multisortOperandTypeError($i));
             }
 
             $masked = $flag & ~StdlibConstants::SORT_FLAG_CASE;
             if (StdlibConstants::SORT_ASC === $masked || StdlibConstants::SORT_DESC === $masked) {
                 if (!$parseOrder) {
-                    throw new \TypeError(sprintf(
-                        'array_multisort(): Argument #%d must be an array or a sort flag that has not already been specified',
-                        $i + 1
+                    throw new \TypeError(VmArraySort::multisortOperandTypeError(
+                        $i,
+                        ' that has not already been specified'
                     ));
                 }
                 $sortOrder = $masked;
@@ -318,9 +400,9 @@ final class array_multisort extends Internal
             }
 
             if (!$parseType) {
-                throw new \TypeError(sprintf(
-                    'array_multisort(): Argument #%d must be an array or a sort flag that has not already been specified',
-                    $i + 1
+                throw new \TypeError(VmArraySort::multisortOperandTypeError(
+                    $i,
+                    ' that has not already been specified'
                 ));
             }
             $sortType = $flag;

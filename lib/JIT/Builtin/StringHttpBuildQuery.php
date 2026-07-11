@@ -5,17 +5,18 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT;
-use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\HashTableNestedExportLlvm;
+use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPCompiler\JIT\NestedVmVariableMethodLlvm;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
  * JIT/AOT link for __compiler_http_build_query via HttpBuildQueryJitHelper PHP (#9443).
  *
- * JIT embed uses compiled PHP SSOT; AOT standalone keeps {@see StringHttpBuildQueryStandaloneLlvm}
- * until HashTable iteration compiles in native standalone nested link.
- * php-src: ext/standard/http.c — http_build_query
+ * JIT embed and AOT standalone compile {@see \PHPCompiler\ext\standard\HttpBuildQueryJitHelper}; thin LLVM
+ * bridge forwards the ABI. php-src: ext/standard/http.c — http_build_query
  */
 final class StringHttpBuildQuery
 {
@@ -52,13 +53,6 @@ final class StringHttpBuildQuery
             return;
         }
 
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            StringHttpBuildQueryStandaloneLlvm::implement($context);
-            self::registerLinkedRuntime($context);
-
-            return;
-        }
-
         self::ensureJitHelperCompiled($context);
         self::implementBuildBridge($context);
         self::registerLinkedRuntime($context);
@@ -85,13 +79,12 @@ final class StringHttpBuildQuery
 
         $entry = $fn->appendBasicBlock('http_build_query_bridge_entry');
         $context->builder->positionAtEnd($entry);
-        $result = $context->builder->call(
+        $resultRaw = JitNestedHelperCoerce::callHelper(
+            $context,
             self::helperFunction($context, self::BUILD_HELPER),
-            $fn->getParam(0),
-            $fn->getParam(1),
-            $fn->getParam(2),
-            $fn->getParam(3)
+            [$fn->getParam(0), $fn->getParam(1), $fn->getParam(2), $fn->getParam(3)]
         );
+        $result = JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $resultRaw);
         $context->builder->returnValue($result);
         $context->registerFunction($abiName, $fn);
     }
@@ -123,6 +116,13 @@ final class StringHttpBuildQuery
 
         $runtime = $context->runtime;
         $path = \dirname(__DIR__, 3).self::HELPER_PATH;
+        HashTableNestedExportLlvm::ensureLinked($context);
+        NestedVmVariableMethodLlvm::ensureMethod($context, 'resolveindirect');
+        NestedVmVariableMethodLlvm::ensureMethod($context, 'tostring');
+        NestedVmVariableMethodLlvm::ensureMethod($context, 'toint');
+        NestedVmVariableMethodLlvm::ensureMethod($context, 'tofloat');
+        NestedVmVariableMethodLlvm::ensureMethod($context, 'tobool');
+        NestedVmVariableMethodLlvm::ensureMethod($context, 'toarray');
         NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
             $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'HttpBuildQueryJitHelper.php');
             if (null === $block) {

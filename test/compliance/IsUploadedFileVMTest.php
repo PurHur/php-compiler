@@ -17,6 +17,10 @@ final class IsUploadedFileVMTest extends BaseTest
             __DIR__.'/cases/stdlib/is_uploaded_file.phpt',
             'is_uploaded_file.phpt'
         );
+        yield 'is_uploaded_file_null_strict.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/is_uploaded_file_null_strict.phpt',
+            'is_uploaded_file_null_strict.phpt'
+        );
     }
 
     public function setUp(): void

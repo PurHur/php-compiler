@@ -6,12 +6,21 @@ namespace PHPCompiler\Test\Unit;
 
 use PHPCompiler\Runtime;
 use PHPCompiler\ext\standard\VmEval;
+use PHPCompiler\Test\Support\PropertyHookTestSkip;
 use PHPUnit\Framework\TestCase;
 
 /** @covers issue #7031 */
 final class PropertyHooksEvalRegistryTest extends TestCase
 {
-    public function testEvalConcretePropertyHookMergesSameNameBackingField(): void
+        use PropertyHookTestSkip;
+
+    protected function setUp(): void
+    {
+        $this->skipUnlessPropertyHooksEnabled();
+    }
+
+
+public function testEvalConcretePropertyHookMergesSameNameBackingField(): void
     {
         $runtime = new Runtime();
         $code = <<<'EVAL'

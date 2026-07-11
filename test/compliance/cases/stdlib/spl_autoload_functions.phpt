@@ -19,7 +19,7 @@ echo "\n";
 array (
 )
 array (
-  0 => Closure::__set_state(array (
+  0 => \Closure::__set_state(array(
   )),
   1 => 'spl_autoload',
 )

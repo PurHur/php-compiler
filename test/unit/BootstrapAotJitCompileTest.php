@@ -28,6 +28,120 @@ PHP;
         $this->assertCompileExitZero($source, 'Runtime::MODE_AOT class const fetch');
     }
 
+    /** Issue #14472: standalone AOT init must not segfault on JsonEncode nested-JIT during loadJitContext. */
+    public function testEchoHelloBootstrapAotCompileDoesNotSegfault(): void
+    {
+        $this->skipUnlessLlvmReady();
+        $repoRoot = dirname(__DIR__, 2);
+        $sourcePath = $repoRoot.'/test/bootstrap-aot/echo_hello.php';
+        $outfile = tempnam(sys_get_temp_dir(), 'bootstrap_aot_echo_hello_');
+        $this->assertNotFalse($outfile);
+        unlink($outfile);
+
+        $env = [];
+        foreach (array_merge($_ENV, $_SERVER) as $key => $value) {
+            if (is_string($value)) {
+                $env[$key] = $value;
+            }
+        }
+        LlvmToolchain::applyProcessEnv($env, $repoRoot);
+
+        $compileArgv = array_merge(
+            LlvmToolchain::envPrefix($repoRoot),
+            [PHP_BINARY, $repoRoot.'/bin/compile.php', '-o', $outfile, $sourcePath]
+        );
+        $descriptorSpec = [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']];
+        $compile = proc_open($compileArgv, $descriptorSpec, $pipes, $repoRoot, $env);
+        $this->assertIsResource($compile);
+        fclose($pipes[0]);
+        fclose($pipes[1]);
+        $stderr = stream_get_contents($pipes[2]);
+        fclose($pipes[2]);
+        $exitCode = proc_close($compile);
+        $stderr = trim($stderr !== false ? $stderr : '');
+        if (is_file($outfile)) {
+            @unlink($outfile);
+        }
+        $this->assertSame(0, $exitCode, 'echo_hello bootstrap AOT compile: '.$stderr);
+        $this->assertStringNotContainsString('Segmentation fault', $stderr);
+    }
+
+    /** Nested array class constants (ProcessOpenJitHelper::DEFAULT_PIPE_DESCRIPTOR) must JIT (#1492 bootstrap). */
+    public function testProcessOpenJitHelperNestedArrayClassConstCompiles(): void
+    {
+        $this->skipUnlessLlvmReady();
+        $repoRoot = dirname(__DIR__, 2);
+        $sourcePath = $repoRoot.'/ext/standard/ProcessOpenJitHelper.php';
+        $outfile = tempnam(sys_get_temp_dir(), 'bootstrap_aot_process_open_');
+        $this->assertNotFalse($outfile);
+        unlink($outfile);
+
+        $env = [];
+        foreach (array_merge($_ENV, $_SERVER) as $key => $value) {
+            if (is_string($value)) {
+                $env[$key] = $value;
+            }
+        }
+        LlvmToolchain::applyProcessEnv($env, $repoRoot);
+
+        $compileArgv = array_merge(
+            LlvmToolchain::envPrefix($repoRoot),
+            [PHP_BINARY, $repoRoot.'/bin/compile.php', '-o', $outfile, $sourcePath]
+        );
+        $descriptorSpec = [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']];
+        $compile = proc_open($compileArgv, $descriptorSpec, $pipes, $repoRoot, $env);
+        $this->assertIsResource($compile);
+        fclose($pipes[0]);
+        fclose($pipes[1]);
+        $stderr = stream_get_contents($pipes[2]);
+        fclose($pipes[2]);
+        $exitCode = proc_close($compile);
+        $stderr = trim($stderr !== false ? $stderr : '');
+        if (is_file($outfile)) {
+            @unlink($outfile);
+        }
+        $this->assertSame(0, $exitCode, 'ProcessOpenJitHelper AOT compile: '.$stderr);
+        $this->assertStringNotContainsString('not jittable', $stderr);
+    }
+
+    public function testLoadJitContextStandaloneInitCompletes(): void
+    {
+        $this->skipUnlessLlvmReady();
+        $repoRoot = dirname(__DIR__, 2);
+        $env = [];
+        foreach (array_merge($_ENV, $_SERVER) as $key => $value) {
+            if (is_string($value)) {
+                $env[$key] = $value;
+            }
+        }
+        LlvmToolchain::applyProcessEnv($env, $repoRoot);
+        $script = <<<'PHP'
+<?php
+require 'vendor/autoload.php';
+$r = new PHPCompiler\Runtime(PHPCompiler\Runtime::MODE_AOT);
+$r->loadJitContext();
+echo "ok\n";
+PHP;
+        $tmp = tempnam(sys_get_temp_dir(), 'load_jit_ctx_');
+        $this->assertNotFalse($tmp);
+        $path = $tmp.'.php';
+        rename($tmp, $path);
+        file_put_contents($path, $script);
+        $argv = array_merge(LlvmToolchain::envPrefix($repoRoot), [PHP_BINARY, $path]);
+        $descriptorSpec = [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']];
+        $proc = proc_open($argv, $descriptorSpec, $pipes, $repoRoot, $env);
+        $this->assertIsResource($proc);
+        fclose($pipes[0]);
+        $stdout = stream_get_contents($pipes[1]);
+        fclose($pipes[1]);
+        $stderr = stream_get_contents($pipes[2]);
+        fclose($pipes[2]);
+        $exit = proc_close($proc);
+        @unlink($path);
+        $this->assertSame(0, $exit, trim($stderr !== false ? $stderr : ''));
+        $this->assertSame("ok\n", $stdout !== false ? $stdout : '');
+    }
+
     public function testNativeStringArrayIntoMixedValueBoxCompiles(): void
     {
         $this->skipUnlessLlvmReady();
@@ -127,6 +241,45 @@ PHP;
         );
     }
 
+    /** Issue #16828: global assign inside foreach/try after early return must AOT-compile (llvm-env pattern). */
+    public function testGlobalForeachTryAfterEarlyReturnCompiles(): void
+    {
+        $this->skipUnlessLlvmReady();
+        $repoRoot = dirname(__DIR__, 2);
+        $sourcePath = $repoRoot.'/test/fixtures/aot/compile-only/global_foreach_try_after_early_return.php';
+        $outfile = tempnam(sys_get_temp_dir(), 'bootstrap_aot_global_foreach_try_');
+        $this->assertNotFalse($outfile);
+        unlink($outfile);
+
+        $env = [];
+        foreach (array_merge($_ENV, $_SERVER) as $key => $value) {
+            if (is_string($value)) {
+                $env[$key] = $value;
+            }
+        }
+        LlvmToolchain::applyProcessEnv($env, $repoRoot);
+
+        $compileArgv = array_merge(
+            LlvmToolchain::envPrefix($repoRoot),
+            [PHP_BINARY, $repoRoot.'/bin/compile.php', '-o', $outfile, $sourcePath]
+        );
+        $descriptorSpec = [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']];
+        $compile = proc_open($compileArgv, $descriptorSpec, $pipes, $repoRoot, $env);
+        $this->assertIsResource($compile);
+        fclose($pipes[0]);
+        fclose($pipes[1]);
+        $stderr = stream_get_contents($pipes[2]);
+        fclose($pipes[2]);
+        $exitCode = proc_close($compile);
+        $stderr = trim($stderr !== false ? $stderr : '');
+        if (is_file($outfile)) {
+            @unlink($outfile);
+        }
+        $this->assertSame(0, $exitCode, 'global foreach/try AOT compile: '.$stderr);
+        $this->assertStringNotContainsString('Cannot assignOperandValue to a value', $stderr);
+        $this->assertStringNotContainsString('Cannot assign to a value', $stderr);
+    }
+
     /** bin/vm.php {main} guard — defined()&&const phi must not throw assignOperand (#1492). */
     public function testBinVmTopLevelSpineGuardAssignOperandCompiles(): void
     {
@@ -143,6 +296,54 @@ if (
 PHP;
         $stderr = $this->compileSourceAllowFailure($source, 'bin/vm.php top-level spine guard');
         $this->assertStringNotContainsString('Cannot assign to a value', $stderr);
+    }
+
+    /** SodiumJitHelper memcmp guard — bool phi + string offset in nested JIT (#16828). */
+    public function testSodiumMemcmpGuardAssignOperandValueCompiles(): void
+    {
+        $this->skipUnlessLlvmReady();
+        $source = <<<'PHP'
+<?php
+declare(strict_types=1);
+function sodium_memcmp_guard(string $string1, string $string2): int {
+    if (\strlen($string1) !== \strlen($string2)) {
+        return -1;
+    }
+    if (\function_exists('sodium_memcmp')) {
+        return \sodium_memcmp($string1, $string2);
+    }
+    $sum = 0;
+    for ($i = 0; $i < \strlen($string1); ++$i) {
+        $sum += \ord($string1[$i]);
+    }
+    return $sum;
+}
+PHP;
+        $stderr = $this->compileSourceAllowFailure($source, 'sodium memcmp guard bool phi');
+        $this->assertStringNotContainsString('Cannot assign to a value', $stderr);
+        $this->assertStringNotContainsString(
+            'Array offset access requires hashtable or boxed array',
+            $stderr
+        );
+    }
+
+    /** TimezoneAbbreviationsData nested array literal via require — compile (#16866). */
+    public function testTimezoneAbbreviationsDataRequireCompiles(): void
+    {
+        $this->skipUnlessLlvmReady();
+        $repoRoot = dirname(__DIR__, 2);
+        $dataPath = $repoRoot.'/ext/standard/TimezoneAbbreviationsData.php';
+        $source = '<?php
+declare(strict_types=1);
+$tz = require '.var_export($dataPath, true).';
+echo count($tz), "\n";
+';
+        $stderr = $this->compileSourceAllowFailure($source, 'timezone abbreviations require');
+        $this->assertStringNotContainsString(
+            'Array offset access requires hashtable or boxed array',
+            $stderr
+        );
+        $this->assertStringNotContainsString('loadHashtablePointer on native string', $stderr);
     }
 
     /** Self-host AOT: `new Runtime()` must not segfault LLVM 9 (#2600). */

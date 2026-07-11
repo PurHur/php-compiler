@@ -9,25 +9,27 @@ use PHPCompiler\ext\standard\VmDir;
 use PHPCompiler\ext\standard\VmFsGlob;
 use PHPUnit\Framework\TestCase;
 
-/** StringFsGlobVecJit embed routes through FsGlobJitHelper PHP not libc LLVM (#11515). */
+/** StringFsGlobVecJit routes through FsGlobJitHelper PHP not libc LLVM (#11515, #12909). */
 final class FsGlobVecRuntimeShrinkTest extends TestCase
 {
     public function testStringFsGlobVecJitIsThinDispatcher(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringFsGlobVecJit.php');
         $this->assertStringContainsString('FsGlobVecRuntime', $source);
-        $this->assertStringContainsString('FsGlobVecStandaloneLlvm', $source);
+        $this->assertStringNotContainsString('FsGlobVecStandaloneLlvm', $source);
         $this->assertStringNotContainsString('emitGlobVec', $source);
         $this->assertStringNotContainsString('emitScandirVec', $source);
-        $this->assertLessThan(35, \substr_count($source, "\n") + 1);
+        $this->assertLessThan(25, \substr_count($source, "\n") + 1);
+        $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/FsGlobVecStandaloneLlvm.php');
     }
 
-    public function testJitFsGlobUsesFsGlobJitHelperOnEmbed(): void
+    public function testJitFsGlobUsesFsGlobJitHelperOnEmbedAndStandalone(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/JitFsGlob.php');
         $this->assertStringContainsString('FsGlobVecRuntime::GLOB_HELPER', $source);
         $this->assertStringContainsString('collectFromHelper', $source);
-        $this->assertStringContainsString('LOAD_TYPE_STANDALONE', $source);
+        $this->assertStringNotContainsString('__phpc_glob_vec', $source);
+        $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $source);
     }
 
     public function testFsGlobJitHelperDelegatesToVmSsot(): void

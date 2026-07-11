@@ -37,6 +37,11 @@ final class dns_get_record extends Internal
         }
 
         $hostname = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'dns_get_record', 0, 'hostname');
+        if ('' === $hostname) {
+            $frame->returnVar->array(new \PHPCompiler\VM\HashTable());
+
+            return;
+        }
         $type = StdlibConstants::DNS_A;
         if ($argc >= 2) {
             $typeVar = $frame->calledArgs[1]->resolveIndirect();

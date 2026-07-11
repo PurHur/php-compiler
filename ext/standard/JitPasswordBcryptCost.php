@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -60,16 +61,71 @@ final class JitPasswordBcryptCost
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($hasBlock);
-        $costLong = $context->builder->call(
-            $context->lookupFunction('__value__readLong'),
-            $valPtr
-        );
+        $costLong = self::lowerNumericOptionLong($context, $valPtr);
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($doneBlock);
         $phi = $context->builder->phi($i64);
         $phi->addIncoming($defaultCost, $missBlock);
         $phi->addIncoming($costLong, $hasBlock);
+
+        return $phi;
+    }
+
+    /** Coerce options['cost'] int or numeric string to i64 (php-src password.c, #11766). */
+    private static function lowerNumericOptionLong(Context $context, Value $valuePtr): Value
+    {
+        $map = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($valuePtr, $map['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $i64 = $context->getTypeFromString('int64');
+        $tag = 'pw_cost_val_'.bin2hex(random_bytes(3));
+        $longBlock = BasicBlockHelper::append($context, $tag.'_long');
+        $stringBlock = BasicBlockHelper::append($context, $tag.'_string');
+        $defaultBlock = BasicBlockHelper::append($context, $tag.'_default');
+        $doneBlock = BasicBlockHelper::append($context, $tag.'_done');
+        $afterTag = BasicBlockHelper::append($context, $tag.'_after_tag');
+
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(JITVariable::TYPE_NATIVE_LONG, false)),
+            $longBlock,
+            $afterTag
+        );
+
+        $context->builder->positionAtEnd($longBlock);
+        $longVal = $context->builder->call(
+            $context->lookupFunction('__value__readLong'),
+            $valuePtr
+        );
+        $longEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($afterTag);
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(JITVariable::TYPE_STRING, false)),
+            $stringBlock,
+            $defaultBlock
+        );
+
+        $context->builder->positionAtEnd($stringBlock);
+        $stringVal = $context->builder->call(
+            $context->lookupFunction('__value__readString'),
+            $valuePtr
+        );
+        $stringLong = JitLongArg::lowerStringValue($context, $stringVal);
+        $stringEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($defaultBlock);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+        $phi = $context->builder->phi($i64);
+        $phi->addIncoming($longVal, $longEnd);
+        $phi->addIncoming($stringLong, $stringEnd);
+        $phi->addIncoming($i64->constInt(0, false), $defaultBlock);
 
         return $phi;
     }

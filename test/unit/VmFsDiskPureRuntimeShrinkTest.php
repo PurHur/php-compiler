@@ -12,12 +12,14 @@ use PHPUnit\Framework\TestCase;
 /** VmFsDiskPure — disk_free_space()/disk_total_space() without libc statvfs FFI (#8989). */
 final class VmFsDiskPureRuntimeShrinkTest extends TestCase
 {
-    public function testVmFsDiskNativeDelegatesToPureWhenFfiDisabled(): void
+    public function testVmFsDiskNativeDelegatesToPureWithoutFfi(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/VmFsDiskNative.php');
         $this->assertStringContainsString('VmFsDiskPure::diskFreeSpace', $source);
         $this->assertStringContainsString('VmFsDiskPure::diskTotalSpace', $source);
         $this->assertStringContainsString('VmFsDiskPure::available()', $source);
+        $this->assertStringNotContainsString('FFI::cdef', $source);
+        $this->assertStringNotContainsString('$ffi->statvfs', $source);
     }
 
     public function testVmFsDiskPureDoesNotUseStatvfsFfi(): void

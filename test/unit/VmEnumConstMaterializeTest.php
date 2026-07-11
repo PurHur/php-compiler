@@ -44,6 +44,28 @@ PHP;
         $this->assertTrue(EnumCaseSupport::isEnumCaseVariable($classConst));
     }
 
+    public function testDetachConstantValuePreservesEnumCaseMetadata(): void
+    {
+        $code = <<<'PHP'
+<?php
+enum E: string {
+    case A = 'a';
+}
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'enum_detach_case.php');
+        $runtime->run($block);
+        $enum = $runtime->vmContext->classes['e'];
+        $canonical = $enum->constants['a'];
+        $this->assertTrue(EnumCaseSupport::isEnumCaseVariable($canonical));
+
+        $detached = \PHPCompiler\VM\ClassConstMaterializer::detachConstantValue($canonical);
+        $this->assertTrue(EnumCaseSupport::isEnumCaseVariable($detached));
+        $object = $detached->toObject();
+        $this->assertSame('A', $object->enumCaseName);
+        $this->assertSame('a', $object->enumCaseValue?->toString());
+    }
+
     public function testMaterializeConstantValueUpgradesLegacyBackingScalar(): void
     {
         $code = <<<'PHP'
@@ -93,6 +115,30 @@ PHP;
         $elem = $materialized->toArray()->findVariable($idx, false);
         $this->assertNotNull($elem);
         $this->assertTrue(EnumCaseSupport::isEnumCaseVariable($elem->resolveIndirect()));
+    }
+
+    public function testFetchCaseByMemberNamePreservesEnumCaseMetadata(): void
+    {
+        $code = <<<'PHP'
+<?php
+enum E: string {
+    case A = 'a';
+}
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'enum_fetch_case_metadata.php');
+        $runtime->run($block);
+        $enum = $runtime->vmContext->classes['e'];
+
+        $dest = new Variable();
+        $this->assertTrue(
+            EnumCaseSupport::fetchCaseByMemberName($enum, 'a', $dest, $runtime->vmContext)
+        );
+        $this->assertTrue(EnumCaseSupport::isEnumCaseVariable($dest));
+        $object = $dest->resolveIndirect()->toObject();
+        $this->assertSame('A', $object->enumCaseName);
+        $this->assertNotNull($object->enumCaseValue);
+        $this->assertSame('a', $object->enumCaseValue->toString());
     }
 
     public function testClassConstArrayLiteralMaterializesEnumCases(): void

@@ -48,7 +48,7 @@ trait VmArrayAssocSetOps
             return false;
         }
 
-        return $value->resolveIndirect()->identicalTo($stored->resolveIndirect());
+        return $value->resolveIndirect()->equals($stored->resolveIndirect());
     }
 
     /**

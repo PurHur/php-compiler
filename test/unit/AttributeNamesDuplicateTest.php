@@ -56,12 +56,38 @@ final class AttributeNamesDuplicateTest extends TestCase
 
     public function testRejectsAllowDynamicPropertiesOnEnum(): void
     {
-        $this->expectException(\CompileError::class);
-        $this->expectExceptionMessage(
-            'Cannot apply #[AllowDynamicProperties] to enum Bad'
-        );
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.5');
+        try {
+            $this->expectException(\CompileError::class);
+            $this->expectExceptionMessage(
+                'Cannot apply #[AllowDynamicProperties] to enum Bad'
+            );
 
-        AttributeNames::assertAllowDynamicPropertiesNotOnEnum(['AllowDynamicProperties'], 'Bad');
+            AttributeNames::assertAllowDynamicPropertiesNotOnEnum(['AllowDynamicProperties'], 'Bad');
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testAllowsAllowDynamicPropertiesOnEnumOnReferenceProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE');
+        try {
+            AttributeNames::assertAllowDynamicPropertiesNotOnEnum(['AllowDynamicProperties'], 'Bad');
+            $this->addToAssertionCount(1);
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
     }
 
     public function testRejectsOverrideOnClass(): void

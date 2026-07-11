@@ -96,12 +96,37 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'limit', 'debug_backtrace'));
     }
 
+    /** @covers issue #10320 */
+    public function testSubstrCompareNamedParamsResolve(): void
+    {
+        $names = BuiltinParamNames::forFunction('substr_compare');
+        self::assertSame(['haystack', 'needle', 'offset', 'length', 'case_insensitive'], $names);
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'offset', 'substr_compare'));
+        self::assertSame(3, BuiltinParamNames::lookupNamedParamIndex($names, 'length', 'substr_compare'));
+    }
+
     /** @covers issue #10474 */
     public function testFileFlagsNamedParamResolves(): void
     {
         $names = BuiltinParamNames::forFunction('file');
         self::assertSame(['filename', 'flags'], $names);
         self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'flags', 'file'));
+    }
+
+    /** @covers issue #9565 */
+    public function testPathinfoFlagsNamedParamResolves(): void
+    {
+        $names = BuiltinParamNames::forFunction('pathinfo');
+        self::assertSame(['path', 'flags'], $names);
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'flags', 'pathinfo'));
+    }
+
+    /** @covers issue #9620 */
+    public function testExtractFlagsNamedParamResolves(): void
+    {
+        $names = BuiltinParamNames::forFunction('extract');
+        self::assertSame(['array', 'flags', 'prefix'], $names);
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'flags', 'extract'));
     }
 
     /** @covers issue #10644 */
@@ -130,6 +155,36 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'format', 'unpack'));
         self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'string', 'unpack'));
         self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'offset', 'unpack'));
+    }
+
+    /** @covers issue #16887 */
+    public function testOpensslCipherLengthCipherAlgoNamedParamResolves(): void
+    {
+        foreach (['openssl_cipher_iv_length', 'openssl_cipher_key_length'] as $fn) {
+            $names = BuiltinParamNames::forFunction($fn);
+            self::assertSame(['cipher_algo'], $names);
+            self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'cipher_algo', $fn));
+        }
+    }
+
+    /** @covers issue #16886 */
+    public function testMbConvertEncodingNamedParamsResolve(): void
+    {
+        $names = BuiltinParamNames::forFunction('mb_convert_encoding');
+        self::assertSame(['string', 'to_encoding', 'from_encoding'], $names);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'string', 'mb_convert_encoding'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'to_encoding', 'mb_convert_encoding'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'from_encoding', 'mb_convert_encoding'));
+    }
+
+    /** @covers issue #16885 */
+    public function testMbSearchEncodingNamedParamsResolve(): void
+    {
+        foreach (['mb_stripos', 'mb_strpos', 'mb_strrpos'] as $fn) {
+            $names = BuiltinParamNames::forFunction($fn);
+            self::assertSame(['haystack', 'needle', 'offset', 'encoding'], $names, $fn);
+            self::assertSame(3, BuiltinParamNames::lookupNamedParamIndex($names, 'encoding', $fn), $fn);
+        }
     }
 
     /** @covers issue #10027 */
@@ -208,6 +263,23 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(3, BuiltinParamNames::lookupNamedParamIndex($names, 'cwd', 'proc_open'));
     }
 
+    /** @covers issue #16625 */
+    public function testProcGetStatusNamedParameters(): void
+    {
+        $names = BuiltinParamNames::forFunction('proc_get_status');
+        self::assertSame(['process'], $names);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'process', 'proc_get_status'));
+
+        $close = BuiltinParamNames::forFunction('proc_close');
+        self::assertSame(['process'], $close);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($close, 'process', 'proc_close'));
+
+        $terminate = BuiltinParamNames::forFunction('proc_terminate');
+        self::assertSame(['process', 'signal'], $terminate);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($terminate, 'process', 'proc_terminate'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($terminate, 'signal', 'proc_terminate'));
+    }
+
     /** @covers issue #10043 */
     public function testRandomIntNamedParameters(): void
     {
@@ -277,7 +349,18 @@ final class BuiltinParamNamesAliasTest extends TestCase
             self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'array', $fn));
             self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'callback', $fn));
         }
-        self::assertSame(['array', 'flags'], BuiltinParamNames::forFunction('sort'));
+        self::assertSame(['array', 'flags', 'direction'], BuiltinParamNames::forFunction('sort'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex(['array', 'flags', 'direction'], 'direction', 'sort'));
+    }
+
+    /** @covers issue #16463 */
+    public function testArraySumProductNamedParameters(): void
+    {
+        foreach (['array_sum', 'array_product'] as $fn) {
+            $names = BuiltinParamNames::forFunction($fn);
+            self::assertSame(['array'], $names, $fn);
+            self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'array', $fn));
+        }
     }
 
     /** @covers issue #11147 */
@@ -322,7 +405,7 @@ final class BuiltinParamNamesAliasTest extends TestCase
     /** @covers issue #11349 */
     public function testVariadicArrayBuiltinsRejectNamedParameters(): void
     {
-        foreach (['array_replace', 'array_merge', 'array_replace_recursive', 'array_merge_recursive'] as $fn) {
+        foreach (['array_replace', 'array_merge', 'array_replace_recursive', 'array_merge_recursive', 'pack'] as $fn) {
             self::assertTrue(BuiltinParamNames::rejectsNamedParameters($fn), $fn);
         }
         self::assertFalse(BuiltinParamNames::rejectsNamedParameters('array_combine'));
@@ -376,5 +459,254 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(3, BuiltinParamNames::lookupNamedParamIndex($names, 'timeout', 'stream_socket_client'));
         self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'error_code', 'stream_socket_client'));
         self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'error_message', 'stream_socket_client'));
+    }
+
+    /** @covers issue #12101 */
+    public function testAtan2HypotNamedParameters(): void
+    {
+        $atan2 = BuiltinParamNames::forFunction('atan2');
+        self::assertSame(['y', 'x'], $atan2);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($atan2, 'y', 'atan2'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($atan2, 'x', 'atan2'));
+
+        $hypot = BuiltinParamNames::forFunction('hypot');
+        self::assertSame(['x', 'y'], $hypot);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($hypot, 'x', 'hypot'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($hypot, 'y', 'hypot'));
+    }
+
+    /** @covers issue #12102 */
+    public function testFilestatFilenameNamedParameter(): void
+    {
+        foreach (['file_exists', 'is_readable', 'filesize', 'is_file', 'is_dir'] as $fn) {
+            $names = BuiltinParamNames::forFunction($fn);
+            self::assertSame(['filename'], $names, $fn);
+            self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'filename', $fn), $fn);
+        }
+    }
+
+    /** @covers issue #12103 */
+    public function testRoundNamedParameters(): void
+    {
+        $names = BuiltinParamNames::forFunction('round');
+        self::assertSame(['num', 'precision', 'mode'], $names);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'num', 'round'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'precision', 'round'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'mode', 'round'));
+    }
+
+    /** @covers issue #11785 */
+    public function testDateTimeClassMethodNamedParameters(): void
+    {
+        $names = BuiltinParamNames::forClassMethod('DateTime::createFromFormat');
+        self::assertSame(['format', 'datetime', 'timezone'], $names);
+        self::assertSame(
+            1,
+            BuiltinParamNames::lookupNamedParamIndex($names, 'datetime', 'DateTime::createFromFormat')
+        );
+
+        $ctor = BuiltinParamNames::forClassMethod('DateTimeImmutable::__construct');
+        self::assertSame(['datetime', 'timezone'], $ctor);
+        self::assertSame(
+            1,
+            BuiltinParamNames::lookupNamedParamIndex($ctor, 'timezone', 'DateTimeImmutable::__construct')
+        );
+    }
+
+    /** @covers issue #10059 */
+    public function testArrayMultisortArraySpliceNamedParameters(): void
+    {
+        $multisort = BuiltinParamNames::forFunction('array_multisort');
+        self::assertSame(['array', 'rest'], $multisort);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($multisort, 'array', 'array_multisort'));
+        self::assertSame(1, BuiltinParamNames::variadicParamIndexForFunction('array_multisort'));
+
+        $splice = BuiltinParamNames::forFunction('array_splice');
+        self::assertSame(['array', 'offset', 'length', 'replacement'], $splice);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($splice, 'array', 'array_splice'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($splice, 'offset', 'array_splice'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($splice, 'length', 'array_splice'));
+        self::assertSame(3, BuiltinParamNames::lookupNamedParamIndex($splice, 'replacement', 'array_splice'));
+    }
+
+    /** @covers issue #10047 */
+    public function testArrayMapFilterReduceNamedParameters(): void
+    {
+        $map = BuiltinParamNames::forFunction('array_map');
+        self::assertSame(['callback', 'array', 'arrays'], $map);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($map, 'callback', 'array_map'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($map, 'array', 'array_map'));
+        self::assertSame(2, BuiltinParamNames::variadicParamIndexForFunction('array_map'));
+
+        $filter = BuiltinParamNames::forFunction('array_filter');
+        self::assertSame(['array', 'callback', 'mode'], $filter);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($filter, 'array', 'array_filter'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($filter, 'callback', 'array_filter'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($filter, 'mode', 'array_filter'));
+
+        $reduce = BuiltinParamNames::forFunction('array_reduce');
+        self::assertSame(['array', 'callback', 'initial'], $reduce);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($reduce, 'array', 'array_reduce'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($reduce, 'callback', 'array_reduce'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($reduce, 'initial', 'array_reduce'));
+    }
+
+    /** @covers issue #9918 */
+    public function testFdivRoundingModeNamedParameters(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $names = BuiltinParamNames::forFunction('fdiv');
+            self::assertSame(['num1', 'num2', 'rounding_mode'], $names);
+            self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'num1', 'fdiv'));
+            self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'num2', 'fdiv'));
+            self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'rounding_mode', 'fdiv'));
+            self::assertSame(3, BuiltinParamNames::paramCountForInternalFunction('fdiv'));
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    /** @covers issue #9990 */
+    public function testFpowRoundingModeNamedParameters(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $names = BuiltinParamNames::forFunction('fpow');
+            self::assertSame(['num', 'exponent', 'rounding_mode'], $names);
+            self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'num', 'fpow'));
+            self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'exponent', 'fpow'));
+            self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'rounding_mode', 'fpow'));
+            self::assertSame(3, BuiltinParamNames::paramCountForInternalFunction('fpow'));
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    /** @covers issue #10071 */
+    public function testTypeProbeAutoloadNamedParamsResolve(): void
+    {
+        self::assertSame(['class', 'autoload'], BuiltinParamNames::forFunction('class_exists'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex(
+            BuiltinParamNames::forFunction('class_exists'),
+            'autoload',
+            'class_exists'
+        ));
+
+        self::assertSame(['interface', 'autoload'], BuiltinParamNames::forFunction('interface_exists'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex(
+            BuiltinParamNames::forFunction('interface_exists'),
+            'autoload',
+            'interface_exists'
+        ));
+
+        self::assertSame(['trait', 'autoload'], BuiltinParamNames::forFunction('trait_exists'));
+        self::assertSame(['enum', 'autoload'], BuiltinParamNames::forFunction('enum_exists'));
+
+        foreach (['class_parents', 'class_implements', 'class_uses', 'class_uses_recursive'] as $fn) {
+            self::assertSame(['object_or_class', 'autoload'], BuiltinParamNames::forFunction($fn));
+            self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex(
+                BuiltinParamNames::forFunction($fn),
+                'autoload',
+                $fn
+            ));
+        }
+
+        $isSubclass = BuiltinParamNames::forFunction('is_subclass_of');
+        self::assertSame(['object_or_class', 'class', 'allow_string'], $isSubclass);
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($isSubclass, 'allow_string', 'is_subclass_of'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($isSubclass, 'autoload', 'is_subclass_of'));
+
+        $isA = BuiltinParamNames::forFunction('is_a');
+        self::assertSame(['object_or_class', 'class', 'allow_string'], $isA);
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($isA, 'allow_string', 'is_a'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($isA, 'autoload', 'is_a'));
+    }
+
+    /** @covers issue #16627 */
+    public function testParseStrNamedResultParamResolves(): void
+    {
+        $names = BuiltinParamNames::forFunction('parse_str');
+        self::assertSame(['string', 'result'], $names);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'string', 'parse_str'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'result', 'parse_str'));
+    }
+
+    /** @covers issue #17320 */
+    public function testParseStrSeparatorNamedParamOnForwardProfile(): void
+    {
+        $previous = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $names = BuiltinParamNames::forFunction('parse_str');
+            self::assertSame(['string', 'result', 'separator'], $names);
+            self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'separator', 'parse_str'));
+        } finally {
+            if (false === $previous) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$previous);
+            }
+        }
+    }
+
+    /** @covers issue #17092 */
+    public function testTimersAndHttpNamedParamsResolve(): void
+    {
+        $gettimeofday = BuiltinParamNames::forFunction('gettimeofday');
+        self::assertSame(['as_float'], $gettimeofday);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($gettimeofday, 'as_float', 'gettimeofday'));
+
+        $sleep = BuiltinParamNames::forFunction('sleep');
+        self::assertSame(['seconds'], $sleep);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($sleep, 'seconds', 'sleep'));
+
+        $usleep = BuiltinParamNames::forFunction('usleep');
+        self::assertSame(['microseconds'], $usleep);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($usleep, 'microseconds', 'usleep'));
+
+        $http = BuiltinParamNames::forFunction('http_response_code');
+        self::assertSame(['response_code'], $http);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($http, 'response_code', 'http_response_code'));
+
+        $cookie = BuiltinParamNames::forFunction('setcookie');
+        self::assertSame(['name', 'value', 'expires', 'path', 'domain', 'secure', 'httponly'], $cookie);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($cookie, 'name', 'setcookie'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($cookie, 'value', 'setcookie'));
+    }
+
+    /** @covers issue #17370 */
+    public function testTokenGetAllFlagsNamedParamResolves(): void
+    {
+        $names = BuiltinParamNames::forFunction('token_get_all');
+        self::assertSame(['source', 'flags'], $names);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'source', 'token_get_all'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'flags', 'token_get_all'));
+    }
+
+    /** @covers issue #17090 */
+    public function testParseIniNamedParamsResolve(): void
+    {
+        $stringNames = BuiltinParamNames::forFunction('parse_ini_string');
+        self::assertSame(['ini_string', 'process_sections', 'scanner_mode'], $stringNames);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($stringNames, 'ini_string', 'parse_ini_string'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($stringNames, 'process_sections', 'parse_ini_string'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($stringNames, 'scanner_mode', 'parse_ini_string'));
+
+        $fileNames = BuiltinParamNames::forFunction('parse_ini_file');
+        self::assertSame(['filename', 'process_sections', 'scanner_mode'], $fileNames);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($fileNames, 'filename', 'parse_ini_file'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($fileNames, 'process_sections', 'parse_ini_file'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($fileNames, 'scanner_mode', 'parse_ini_file'));
     }
 }

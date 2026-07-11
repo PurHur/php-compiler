@@ -23,25 +23,19 @@ final class vsprintf extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (2 !== \count($frame->calledArgs)) {
-            throw new \LogicException('vsprintf() requires exactly two arguments');
+        $argc = \count($frame->calledArgs);
+        if (2 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'vsprintf() expects exactly 2 arguments, %d given',
+                $argc
+            ));
         }
         if (null === $frame->returnVar) {
             return;
         }
-        $fmtVar = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_STRING !== $fmtVar->type) {
-            throw new \LogicException('vsprintf() format must be a string in this compiler build');
-        }
+        $format = VmString::stringBuiltinArgForFrame($frame, 0, 'vsprintf', 0, 'format');
         $argsVar = $frame->calledArgs[1]->resolveIndirect();
-        if (Variable::TYPE_ARRAY !== $argsVar->type) {
-            throw new \LogicException('vsprintf() second argument must be an array in this compiler build');
-        }
-        $values = [];
-        foreach ($argsVar->toArray()->iterate(true) as $element) {
-            $values[] = $element->resolveIndirect();
-        }
-        $frame->returnVar->string(VmSprintf::format($fmtVar->toString(), $values, $frame));
+        $frame->returnVar->string(VmVprintf::formatString($format, $argsVar, $frame, 'vsprintf'));
     }
 
     public function call(Context $context, JITVariable ...$args): Value

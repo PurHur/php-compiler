@@ -1,5 +1,11 @@
 --TEST--
 Language: invalid #[\Override] — compile-time fatal (#4995)
+--SKIPIF--
+<?php
+if (!PHPCompiler\CompilerVersion::supportsOverrideAttribute()) {
+    echo "skip — Override validation disabled on reference profile\n";
+}
+?>
 --FILE--
 <?php
 class Base {

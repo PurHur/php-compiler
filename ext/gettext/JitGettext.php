@@ -78,6 +78,26 @@ final class JitGettext
         );
     }
 
+    public static function ngettext(Context $context, JITVariable ...$args): Value
+    {
+        if (3 !== \count($args)) {
+            throw new \ArgumentCountError(
+                'ngettext() expects exactly 3 arguments, '.\max(0, \count($args) - 1).' given'
+            );
+        }
+
+        return self::writeStringResult(
+            $context,
+            self::callStringFn(
+                $context,
+                '__compiler_ngettext',
+                JitStringBuiltinArg::lower($context, $args[0], 'ngettext', 0, 'msgid1'),
+                JitStringBuiltinArg::lower($context, $args[1], 'ngettext', 1, 'msgid2'),
+                JitLongArg::lower($context, $args[2], 'ngettext() count')
+            )
+        );
+    }
+
     public static function dngettext(Context $context, JITVariable ...$args): Value
     {
         if (4 !== \count($args)) {

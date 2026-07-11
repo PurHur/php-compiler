@@ -9,7 +9,7 @@ use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Issue #10343 / #10526: AOT standalone scalar dim fetch uses inline LLVM bridge (no nested JIT).
+ * Issue #10343: AOT standalone scalar dim fetch routes through compiled ScalarDimFetchJitHelper PHP.
  *
  * @group aot-lint
  */
@@ -24,9 +24,9 @@ final class ScalarDimFetchRuntimeStandaloneTest extends TestCase
         $fn = $ctx->lookupFunction('__scalar_dim_fetch__emitWarning');
         $this->assertNotNull($fn);
         $this->assertGreaterThan(0, $fn->countBasicBlocks());
-        $this->assertNull(
+        $this->assertNotNull(
             $ctx->functions[\strtolower('PHPCompiler\\VM\\ScalarDimFetchJitHelper::emitWarningForJitType')] ?? null,
-            'standalone AOT must not nest-compile ScalarDimFetchJitHelper (#10526)'
+            'standalone AOT must compile ScalarDimFetchJitHelper PHP bridge (#10343)'
         );
     }
 }

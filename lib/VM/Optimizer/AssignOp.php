@@ -40,17 +40,33 @@ class AssignOp extends Optimizer
         }
         $seen->attach($block);
         $prior = null;
+        $priorPrior = null;
         $toRemove = [];
         foreach ($block->opCodes as $key => $op) {
             if ($op->type === OpCode::TYPE_ASSIGN && null !== $prior && in_array($prior->type, self::CANDIDATE_OPS, true)) {
                 // replace
                 $binaryOpResult = $block->getOperand($prior->arg1);
-                if (count($binaryOpResult->usages) === 1) {
+                if (
+                    count($binaryOpResult->usages) === 1
+                    && !$this->assignOpMustSkipConcatChainPeephole($prior, $priorPrior, $op)
+                ) {
                     // We can safely replace it with an assign op
+                    $binaryDest = $prior->arg1;
+                    // ??/?: deferred RHS: assign copies a pre-bound producer slot into merge dest (#11801, #16206).
+                    if (null !== $op->arg3 && (int) $op->arg3 !== (int) $binaryDest) {
+                        $priorPrior = $prior;
+                        $prior = $op;
+                        continue;
+                    }
                     $prior->arg1 = $op->arg2;
+                    // Compound assign ($x += 1): arg2 is the in-place lvalue — redirect both (#13083).
+                    // Do not clobber additive/concat operands on ??/?: deferred RHS (#11801, #13104, #13105).
+                    if (null === $prior->arg2 || (int) $prior->arg2 === (int) $binaryDest) {
+                        $prior->arg2 = $op->arg2;
+                    }
                     $assignResult = $block->getOperand($op->arg1);
-                    if (empty($assignResult->usages)) {
-                        // remove assign as it's dead
+                    if ((int) $op->arg3 === (int) $binaryDest || empty($assignResult->usages)) {
+                        // Binary result was only copied into the assign dest; redirect makes assign dead (#11801).
                         $toRemove[] = $key;
                     } else {
                         // We still need the assign, since we're using the result
@@ -58,6 +74,7 @@ class AssignOp extends Optimizer
                     }
                 }
             }
+            $priorPrior = $prior;
             $prior = $op;
             if (null !== $op->block1) {
                 $this->optimize($op->block1, $seen);
@@ -74,5 +91,27 @@ class AssignOp extends Optimizer
             $block->opCodes = array_values($block->opCodes);
             $block->nOpCodes = \count($block->opCodes);
         }
+    }
+
+    /**
+     * Multi-part encapsed ConcatList lowers as CONCAT chain + assign; redirecting the
+     * trailing in-place append to the assign dest drops the prior chain result (#13466).
+     */
+    private function assignOpMustSkipConcatChainPeephole(OpCode $prior, ?OpCode $priorPrior, OpCode $assign): bool
+    {
+        if (OpCode::TYPE_CONCAT !== $prior->type) {
+            return false;
+        }
+        if (null === $prior->arg1 || null === $prior->arg2 || (int) $prior->arg2 !== (int) $prior->arg1) {
+            return false;
+        }
+        if (null === $assign->arg2 || (int) $prior->arg1 === (int) $assign->arg2) {
+            return false;
+        }
+        if (null === $priorPrior || OpCode::TYPE_CONCAT !== $priorPrior->type) {
+            return false;
+        }
+
+        return null !== $priorPrior->arg1 && (int) $priorPrior->arg1 === (int) $prior->arg1;
     }
 }

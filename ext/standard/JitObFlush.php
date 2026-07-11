@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
@@ -16,7 +17,13 @@ final class JitObFlush
     public static function invoke(Context $context, JITVariable ...$args): Value
     {
         if (\count($args) > 0) {
-            throw new \LogicException('ob_flush() takes no arguments');
+            ExceptionBridge::emitArgumentCountError(
+                $context,
+                \sprintf('ob_flush() expects exactly 0 arguments, %d given', \count($args))
+            );
+            $slot = JitValueBox::alloc($context);
+
+            return JitValueBox::pointer($context, $slot);
         }
         $slot = JitValueBox::alloc($context);
         $ptr = JitValueBox::pointer($context, $slot);

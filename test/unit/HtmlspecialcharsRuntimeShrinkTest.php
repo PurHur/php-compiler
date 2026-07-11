@@ -6,15 +6,24 @@ namespace PHPCompiler\Test\Unit;
 
 use PHPUnit\Framework\TestCase;
 
-/** StringHtmlspecialchars JIT path uses HtmlspecialcharsJitHelper PHP, not inline LLVM (#9445). */
+/** StringHtmlspecialchars JIT path uses HtmlspecialcharsJitHelper PHP, not inline LLVM (#9445, #15820). */
 final class HtmlspecialcharsRuntimeShrinkTest extends TestCase
 {
+    public function testStandaloneLlvmSourceDeleted(): void
+    {
+        $this->assertFileDoesNotExist(
+            __DIR__.'/../../lib/JIT/Builtin/StringHtmlspecialcharsStandaloneLlvm.php',
+            'StringHtmlspecialcharsStandaloneLlvm must stay deleted (#15820)'
+        );
+    }
+
     public function testStringHtmlspecialcharsUsesJitHelperForJitPath(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringHtmlspecialchars.php');
         $this->assertStringContainsString('HtmlspecialcharsJitHelper', $source);
         $this->assertStringNotContainsString('htmlspecialchars_count_head', $source);
-        $this->assertStringContainsString('StringHtmlspecialcharsStandaloneLlvm', $source);
+        $this->assertStringNotContainsString('StringHtmlspecialcharsStandaloneLlvm', $source);
+        $this->assertStringContainsString('StringHtmlspecialcharsUserScriptLlvm', $source);
     }
 
     public function testHtmlspecialcharsJitHelperIsSelfContained(): void
@@ -31,12 +40,19 @@ final class HtmlspecialcharsRuntimeShrinkTest extends TestCase
         $expected = \PHPCompiler\ext\standard\VmString::htmlspecialchars($input, $flags);
         $actual = \PHPCompiler\ext\standard\HtmlspecialcharsJitHelper::htmlspecialchars($input, $flags);
         $this->assertSame($expected, $actual);
+
+        $compat = ENT_COMPAT;
+        $this->assertSame(
+            \PHPCompiler\ext\standard\VmString::htmlspecialchars($input, $compat),
+            \PHPCompiler\ext\standard\HtmlspecialcharsJitHelper::htmlspecialchars($input, $compat)
+        );
     }
 
     public function testSpineBundleIncludesHtmlspecialcharsJitHelper(): void
     {
         $spine = (string) file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
         $this->assertStringContainsString('HtmlspecialcharsJitHelper.php', $spine);
-        $this->assertStringContainsString('StringHtmlspecialcharsStandaloneLlvm.php', $spine);
+        $this->assertStringNotContainsString('StringHtmlspecialcharsStandaloneLlvm.php', $spine);
+        $this->assertStringContainsString('StringHtmlspecialcharsUserScriptLlvm.php', $spine);
     }
 }

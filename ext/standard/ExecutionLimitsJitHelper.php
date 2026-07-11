@@ -23,14 +23,21 @@ final class ExecutionLimitsJitHelper
     /** @return bool LLVM i1 ABI for phpc_set_time_limit */
     public static function setTimeLimit(int $seconds): bool
     {
+        self::applyMaxExecutionTime($seconds);
+
+        return true;
+    }
+
+    /** ini_set('max_execution_time') / internal sync (#12481). */
+    public static function applyMaxExecutionTime(int $seconds): void
+    {
         self::$limitSeconds = $seconds;
         if (0 === $seconds) {
             self::$deadline = 0.0;
         } else {
             self::$deadline = microtime(true) + (float) $seconds;
         }
-
-        return true;
+        IniJitHelper::syncMaxExecutionTime($seconds);
     }
 
     /** @return int LLVM i32 ABI for phpc_ignore_user_abort */

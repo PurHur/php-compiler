@@ -9,7 +9,7 @@ use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Issue #6607: pack() LLVM helpers replace pack_jit_runtime.c.
+ * Issue #6607 / #13062: pack() routes through PackJitHelper PHP, not StringPackJit LLVM.
  *
  * @group aot-lint
  */
@@ -18,15 +18,15 @@ final class StringPackRuntimeStandaloneTest extends TestCase
     public function testRuntimeShrinkRoutesPackThroughPhpHelper(): void
     {
         $this->assertFileDoesNotExist(__DIR__.'/../../../lib/JIT/Builtin/pack_jit_runtime.c');
-        $jit = (string) file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/StringPackJit.php');
-        $this->assertStringContainsString('StringPackJit', $jit);
+        $this->assertFileDoesNotExist(__DIR__.'/../../../lib/JIT/Builtin/StringPackJit.php');
         $runtime = (string) file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/PackJitRuntime.php');
         $this->assertStringContainsString('StringPack', $runtime);
         $this->assertStringNotContainsString('pack_jit_runtime.c', $runtime);
         $bridge = (string) file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/StringPack.php');
         $this->assertStringContainsString('PackJitHelper', $bridge);
-        $engine = (string) file_get_contents(__DIR__.'/../../../ext/standard/PackEngine.php');
-        $this->assertStringContainsString('PackEngine', $engine);
+        $this->assertStringNotContainsString('StringPackJit', $bridge);
+        $engine = (string) file_get_contents(__DIR__.'/../../../ext/standard/PackJitEngine.php');
+        $this->assertStringContainsString('PackJitEngine', $engine);
     }
 
     /**

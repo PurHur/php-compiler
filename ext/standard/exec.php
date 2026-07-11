@@ -34,6 +34,7 @@ final class exec extends Internal
         }
         InternalStrictArg::rejectNullString($frame->calledArgs[0], 'exec', 'command', 0, $frame);
         $command = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'exec', 0, 'command');
+        VmString::rejectEmptyBuiltinStringArg($command, 'exec', 0, 'command');
         $result = VmExecNative::run($command);
         if (false !== $result && $argc >= 2) {
             $ht = new HashTable();

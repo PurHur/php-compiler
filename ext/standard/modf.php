@@ -6,7 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
-use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\MathModf;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -41,15 +41,7 @@ final class modf extends Internal
         $double = $context->getTypeFromString('double');
         $num = pow::toJitDouble($context, $args[0], $double);
         $outPtr = JitValueBox::valuePtrFromVariable($context, $args[1]);
-        $iptr = BasicBlockHelper::entryAlloca($context, $double);
-        $frac = $context->builder->call($context->lookupFunction('modf'), $num, $iptr);
-        $intPart = $context->builder->load($iptr);
-        $context->builder->call(
-            $context->lookupFunction('__value__writeDouble'),
-            $outPtr,
-            $intPart
-        );
 
-        return $frac;
+        return MathModf::invoke($context, $num, $outPtr);
     }
 }

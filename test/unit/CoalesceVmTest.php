@@ -212,6 +212,29 @@ echo $hit, "\n";
         );
     }
 
+    /** Issue #15315: throw expr as ?? LHS — php-cfg emits Coalesce then Throw; must not double-lower. */
+    public function testThrowExpressionNullCoalesceLeftOperand(): void
+    {
+        $this->assertVmOutput(
+            '<?php
+class Ex extends Exception {}
+try {
+    $x = throw new Ex("coalesce") ?? 1;
+    echo "fail\n";
+} catch (Ex $e) {
+    echo "ok\n";
+}
+try {
+    $y = (throw new Ex("nested") ?? 2) ?? 3;
+    echo "fail\n";
+} catch (Ex $e) {
+    echo "ok\n";
+}
+',
+            "ok\nok\n"
+        );
+    }
+
     /** Issue #9479: null container dim ?? default in func-call arg must not leave dead temp (#10390 audit). */
     public function testNullCoalesceNullOffsetFuncCallArg(): void
     {
@@ -222,6 +245,128 @@ var_export($x["message"] ?? "no warning");
 echo "\n";
 ',
             "'no warning'\n"
+        );
+    }
+
+    /** Issue #10743: chained dim-fetch ?? in func-call arg must read coalesce merge slot, not inner fetch temp. */
+    public function testChainedArrayDimCoalesceFuncCallArg(): void
+    {
+        $this->assertVmOutput(
+            '<?php
+date_create_from_format("!Y-m-d", "2024-02-30");
+$errs = DateTime::getLastErrors();
+var_export($errs["warnings"][10] ?? null);
+echo "\n";
+',
+            "'The parsed date was invalid'\n"
+        );
+    }
+
+    /** Issue #11601: stmt ?? before var_export(..., true) after prior call must wire coalesce slot (WeakMap repro). */
+    public function testCoalesceFuncCallArgAfterPriorVarExport(): void
+    {
+        $this->assertVmOutput(
+            '<?php
+declare(strict_types=1);
+$wm = new WeakMap();
+$obj = new stdClass();
+$wm[$obj] = "val";
+echo "direct=", var_export($wm[$obj], true), "\n";
+echo "nullco=", var_export($wm[$obj] ?? null, true), "\n";
+',
+            "direct='val'\nnullco='val'\n"
+        );
+    }
+
+    public function testArrayDimCoalesceFuncCallArgWithTrueSecondArg(): void
+    {
+        $this->assertVmOutput(
+            '<?php
+$a = ["k" => "val"];
+echo "x=", var_export($a["k"], true), "\n";
+echo "y=", var_export($a["k"] ?? null, true), "\n";
+',
+            "x='val'\ny='val'\n"
+        );
+    }
+
+    /** Issue #15946 — outer call must use inner callee result, not ?? slot (array_keys after dim ??). */
+    public function testArrayDimCoalesceNestedFuncCallArg(): void
+    {
+        $this->assertVmOutput(
+            '<?php
+declare(strict_types=1);
+$a = ["k" => ["x" => 1]];
+var_dump(array_keys($a["k"] ?? []));
+',
+            "array(1) {\n [0]=>\n string(1) \"x\"\n}\n"
+        );
+    }
+
+    /** Issue #16127 — inline dim-fetch ?? as call arg (regression from #16125 branch rewire). */
+    public function testArrayDimCoalesceInlineFuncCallArgWithoutAssign(): void
+    {
+        $this->assertVmOutput(
+            file_get_contents(__DIR__ . '/../repro/maintainer_gap_ini_get_all_array_keys_inline.php'),
+            "array(3) {\n [0]=>\n string(12) \"global_value\"\n [1]=>\n string(11) \"local_value\"\n [2]=>\n string(6) \"access\"\n}\n"
+            . "array(1) {\n [0]=>\n string(1) \"x\"\n}\n"
+        );
+    }
+
+    /** Issue #10743 — nested dim-fetch ?? before func call must pass coalesce result (#15945). */
+    public function testNestedDimFetchCoalesceFuncCallArg(): void
+    {
+        $this->assertVmOutput(
+            '<?php
+declare(strict_types=1);
+$root = ["warnings" => [10 => "The parsed date was invalid"]];
+var_export($root["warnings"][10] ?? null);
+echo "\n";
+',
+            "'The parsed date was invalid'\n"
+        );
+    }
+
+    /** Issue #15946 — ini_get_all details nested under array_keys(??). */
+    public function testIniGetAllDetailsCoalesceInArrayKeys(): void
+    {
+        $this->assertVmOutput(
+            '<?php
+declare(strict_types=1);
+
+$all = ini_get_all(null, true);
+var_dump(array_keys($all[\'display_errors\'] ?? []));
+$flat = ini_get_all(null, false);
+echo is_string($flat[\'display_errors\'] ?? null) ? "flat string\n" : "flat not string\n";
+',
+            "array(3) {\n [0]=>\n string(12) \"global_value\"\n [1]=>\n string(11) \"local_value\"\n [2]=>\n string(6) \"access\"\n}\nflat string\n"
+        );
+    }
+
+    /** Issue #11801: ?? binds below additive/concat; deferred RHS must run on the null branch. */
+    public function testNullCoalesceOperatorPrecedence(): void
+    {
+        $this->assertVmOutput(
+            file_get_contents(__DIR__ . '/../repro/maintainer_gap_null_coalesce_precedence.php'),
+            "ok null ?? 1 + 2\n"
+            . "ok unset coalesce add\n"
+            . "ok dim coalesce add\n"
+            . "ok null ?? concat\n"
+            . "ok nullsafe coalesce add\n"
+            . "ok chained coalesce add\n"
+        );
+    }
+
+    /** Issue #13105: ?: binds below additive/concat; deferred RHS must run on the falsy branch. */
+    public function testElvisOperatorPrecedence(): void
+    {
+        $this->assertVmOutput(
+            file_get_contents(__DIR__ . '/../repro/maintainer_gap_elvis_precedence.php'),
+            "ok null ?: 1 + 2\n"
+            . "ok 0 ?: 1 + 2\n"
+            . "ok false ?: 1 + 2\n"
+            . "ok empty string ?: concat\n"
+            . "ok var 0 ?: 1 + 2\n"
         );
     }
 

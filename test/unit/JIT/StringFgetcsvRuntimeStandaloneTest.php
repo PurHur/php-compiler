@@ -4,31 +4,26 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT;
 
-use PHPCompiler\JIT\Builtin\StringStreamCsv;
-use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Issue #6750: AOT standalone must define fgetcsv CSV helpers without phpc_parse_csv_line in C.
+ * Issue #6750 / #9444 / #13358: CSV standalone AOT routes through CsvJitHelper PHP, not LLVM monolith.
  *
  * @group aot-lint
  */
 final class StringFgetcsvRuntimeStandaloneTest extends TestCase
 {
-    public function testEnsureLinkedDefinesFgetcsvForStandalone(): void
+    public function testRuntimeShrinkRemovesStringStrGetcsvJitMonolith(): void
     {
-        $runtime = new Runtime(Runtime::MODE_AOT);
-        $ctx = new Context($runtime, Builtin::LOAD_TYPE_STANDALONE);
-        StringStreamCsv::ensureLinked($ctx);
+        $this->assertFileDoesNotExist(__DIR__.'/../../../lib/JIT/Builtin/StringStrGetcsvJit.php');
 
-        foreach ([
-            '__phpc_csv_parse_line',
-            '__compiler_fgetcsv',
-            '__compiler_str_getcsv',
-        ] as $name) {
-            $fn = $ctx->lookupFunction($name);
-            $this->assertNotNull($fn);
-            $this->assertGreaterThan(0, $fn->countBasicBlocks());
-        }
+        $strGetcsv = (string) file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/StringStrGetcsv.php');
+        $this->assertStringContainsString('CsvJitHelper', $strGetcsv);
+        $this->assertStringNotContainsString('StringStrGetcsvJit', $strGetcsv);
+        $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $strGetcsv);
+
+        $fgetcsv = (string) file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/StringFgetcsvJit.php');
+        $this->assertStringContainsString('emitCompilerFgetcsvPhpParse', $fgetcsv);
+        $this->assertStringNotContainsString('__phpc_csv_parse_line', $fgetcsv);
     }
 }

@@ -7,7 +7,7 @@ namespace PHPCompiler\ext\bz2;
 /**
  * bzcompress()/bzdecompress() for compiled JIT/AOT modules (#8868, php-in-PHP).
  *
- * SSOT: {@see VmBz2Native}
+ * SSOT: {@see VmBz2Core}
  * php-src: ext/bz2/bz2.c
  */
 final class Bz2JitHelper

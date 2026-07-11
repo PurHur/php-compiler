@@ -11,7 +11,7 @@ use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** rename() — VM via VmFs; JIT/AOT via libc rename(2). */
+/** rename() — VM via VmFs; JIT/AOT via RenameJitHelper PHP (#15533). */
 final class rename_ extends Internal
 {
     public function __construct()
@@ -21,11 +21,22 @@ final class rename_ extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (2 !== \count($frame->calledArgs)) {
-            throw new \LogicException('rename() requires exactly two arguments in this compiler build');
+        $argc = \count($frame->calledArgs);
+        if ($argc < 2) {
+            throw new \ArgumentCountError(
+                'rename() expects at least 2 arguments, '.$argc.' given'
+            );
         }
-        $from = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'rename', 0, 'from');
-        $to = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'rename', 1, 'to');
+        if ($argc > 3) {
+            throw new \ArgumentCountError(
+                'rename() expects at most 3 arguments, '.$argc.' given'
+            );
+        }
+        if (isset($frame->calledArgs[2])) {
+            VmStreamContext::validateOptionalContextArg($frame->calledArgs[2], 'rename', 3);
+        }
+        $from = VmFilestatArg::coerceFilenameArg($frame->calledArgs[0], 'rename', 0, 'from', $frame);
+        $to = VmFilestatArg::coerceFilenameArg($frame->calledArgs[1], 'rename', 1, 'to', $frame);
         $ok = VmFs::rename($from, $to);
         if (!$ok) {
             VmFilestatFailure::warnRenameFailed($frame, $from, $to);
@@ -37,11 +48,22 @@ final class rename_ extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (2 !== \count($args)) {
-            throw new \LogicException('rename() requires exactly two arguments in this compiler build');
+        $argc = \count($args);
+        if ($argc < 2) {
+            throw new \ArgumentCountError(
+                'rename() expects at least 2 arguments, '.$argc.' given'
+            );
         }
-        $from = JitStringBuiltinArg::lower($context, $args[0], 'rename', 0, 'from');
-        $to = JitStringBuiltinArg::lower($context, $args[1], 'rename', 1, 'to');
+        if ($argc > 3) {
+            throw new \ArgumentCountError(
+                'rename() expects at most 3 arguments, '.$argc.' given'
+            );
+        }
+        if (isset($args[2])) {
+            JitStreamContextOptionalArg::validate($context, $args[2], 'rename', 3);
+        }
+        $from = JitStringBuiltinArg::lowerPath($context, $args[0], 'rename', 0, 'from');
+        $to = JitStringBuiltinArg::lowerPath($context, $args[1], 'rename', 1, 'to');
 
         return JitRename::invoke($context, $from, $to);
     }

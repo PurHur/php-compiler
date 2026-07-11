@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\Test\Unit;
 
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\Runtime;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\TestCase;
@@ -14,6 +15,10 @@ final class ReflectionOopTest extends TestCase
 {
     public function testReflectionPropertyFunctionConstant(): void
     {
+        if (!CompilerVersion::advertisesReflectionConstantClass()) {
+            $this->markTestSkipped('ReflectionConstant not advertised on reference profile');
+        }
+
         $runtime = new Runtime();
         $code = <<<'PHP'
 <?php

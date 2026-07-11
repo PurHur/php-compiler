@@ -21,14 +21,28 @@ final class RewriteVarsRuntime
 {
     private const HELPER_PATH = '/ext/standard/OutputRewriteVarsJitHelper.php';
 
+    private const URL_REWRITER_PATH = '/ext/standard/VmUrlRewriterOb.php';
+
     private const ADD_HELPER = 'PHPCompiler\\ext\\standard\\OutputRewriteVarsJitHelper::add';
 
     private const RESET_HELPER = 'PHPCompiler\\ext\\standard\\OutputRewriteVarsJitHelper::reset';
 
+    private const ENSURE_URL_REWRITER = 'PHPCompiler\\ext\\standard\\VmUrlRewriterOb::ensureRegistered';
+
+    private const RESET_URL_REWRITER = 'PHPCompiler\\ext\\standard\\VmUrlRewriterOb::resetState';
+
     /** @var list<string> */
     private const COMPILED_HELPERS = [
+        self::ENSURE_URL_REWRITER,
+        self::RESET_URL_REWRITER,
         self::ADD_HELPER,
         self::RESET_HELPER,
+    ];
+
+    /** @var list<string> */
+    private const COMPILE_PATHS = [
+        self::URL_REWRITER_PATH,
+        self::HELPER_PATH,
     ];
 
     public static function ensureLinked(Context $context): void
@@ -89,16 +103,19 @@ final class RewriteVarsRuntime
         }
 
         $runtime = $context->runtime;
-        $path = \dirname(__DIR__, 3).self::HELPER_PATH;
-        $realPath = \realpath($path) ?: $path;
-        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path, $realPath): void {
-            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'OutputRewriteVarsJitHelper.php');
-            if (null === $block) {
-                throw new \LogicException('OutputRewriteVarsJitHelper.php parseAndCompile failed (#9477)');
+        $root = \dirname(__DIR__, 3);
+        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $root): void {
+            foreach (self::COMPILE_PATHS as $relPath) {
+                $path = $root.$relPath;
+                $realPath = \realpath($path) ?: $path;
+                $block = $runtime->parseAndCompile((string) \file_get_contents($path), \basename($path));
+                if (null === $block) {
+                    throw new \LogicException(\basename($path).' parseAndCompile failed (#9477)');
+                }
+                $jit = new JIT($context);
+                $jit->compile($block);
+                $context->markJitIncludedFileCompiled($realPath);
             }
-            $jit = new JIT($context);
-            $jit->compile($block);
-            $context->markJitIncludedFileCompiled($realPath);
         });
         foreach (self::COMPILED_HELPERS as $logical) {
             $lc = \strtolower($logical);

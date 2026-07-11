@@ -9,6 +9,7 @@ use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitBoolArg;
 use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\JIT\Variable;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -65,9 +66,29 @@ final class JitExecutionLimits
         $apply = $zero;
         $value = $zero;
         if (1 === $argc) {
-            $apply = $one;
-            $boolVal = JitBoolArg::lower($context, $args[0], 'ignore_user_abort() value');
-            $value = $context->builder->zext($boolVal, $i32);
+            $arg = $args[0];
+            if (Variable::TYPE_NULL === $arg->type) {
+                $apply = $zero;
+            } else {
+                $apply = $one;
+                if ($context->callerStrictTypes) {
+                    $boolVal = JitBoolArg::lowerBuiltinTyped(
+                        $context,
+                        $arg,
+                        'ignore_user_abort',
+                        'enable',
+                        1,
+                        '?bool'
+                    );
+                } else {
+                    $boolVal = JitBoolArg::lower(
+                        $context,
+                        $arg,
+                        'ignore_user_abort(): Argument #1 ($enable)'
+                    );
+                }
+                $value = $context->builder->zext($boolVal, $i32);
+            }
         }
 
         $previous = $context->builder->call(

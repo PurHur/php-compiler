@@ -4,14 +4,23 @@ declare(strict_types=1);
 
 namespace PHPCompiler\Test\Unit;
 
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
 /** @covers issue #7229 */
 final class SortingEnumTest extends TestCase
 {
+    private function requireSortingEnum(): void
+    {
+        if (!CompilerVersion::supportsSortingEnum()) {
+            $this->markTestSkipped('Sorting enum withheld on reference profile');
+        }
+    }
+
     public function testSortingBuiltinEnumExists(): void
     {
+        $this->requireSortingEnum();
         $runtime = new Runtime();
         $code = <<<'PHP'
 <?php
@@ -30,6 +39,7 @@ PHP;
 
     public function testArrayMultisortAcceptsSortingEnumCases(): void
     {
+        $this->requireSortingEnum();
         $runtime = new Runtime();
         $code = <<<'PHP'
 <?php
@@ -45,5 +55,43 @@ PHP;
         ob_start();
         $runtime->run($runtime->parseAndCompile($code, 'sorting_multisort.php'));
         $this->assertSame("1,2,3\n3,2,1\n", ob_get_clean());
+    }
+
+    /** @covers issue #9947 */
+    public function testSortAcceptsSortingEnumAndSortDirectionNamed(): void
+    {
+        $this->requireSortingEnum();
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+$a = [3, 1, 2];
+sort($a, Sorting::Ascending);
+echo implode(',', $a), "\n";
+$b = [3, 1, 2];
+sort($b, direction: SortDirection::Ascending);
+echo implode(',', $b), "\n";
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'sort_sorting_enum.php'));
+        $this->assertSame("1,2,3\n1,2,3\n", ob_get_clean());
+    }
+
+    /** @covers issue #17429 */
+    public function testUserSortAcceptsSortDirectionNamed(): void
+    {
+        $this->requireSortingEnum();
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+$a = [3, 1, 2];
+usort($a, 'strcmp', direction: SortDirection::Ascending);
+echo implode(',', $a), "\n";
+$b = ['b' => 2, 'a' => 1, 'c' => 3];
+uksort($b, 'strcmp', direction: SortDirection::Descending);
+echo implode(',', array_keys($b)), "\n";
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'usort_sort_direction.php'));
+        $this->assertSame("1,2,3\nc,b,a\n", ob_get_clean());
     }
 }

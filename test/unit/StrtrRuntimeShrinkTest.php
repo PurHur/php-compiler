@@ -24,20 +24,21 @@ final class StrtrRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('VmString::strtr(', $twoString);
 
         $array = (string) file_get_contents(__DIR__.'/../../ext/standard/StrtrArrayJitHelper.php');
-        $this->assertStringContainsString('VmString::strtrArray', $array);
+        $this->assertStringContainsString('VmString::strtrArrayFromHashTable', $array);
     }
 
-    public function testStandaloneArrayQuarantineDocumented(): void
+    public function testStringStrtrStandaloneLlvmDeleted(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringStrtr.php');
-        $this->assertStringContainsString('StringStrtrStandaloneLlvm', $source);
-        $this->assertFileExists(__DIR__.'/../../lib/JIT/Builtin/StringStrtrStandaloneLlvm.php');
+        $this->assertStringNotContainsString('StringStrtrStandaloneLlvm', $source);
+        $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StringStrtrStandaloneLlvm.php');
     }
 
     public function testSpineBundleOmitsDeletedStringStrtrJit(): void
     {
         $spine = (string) file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
         $this->assertStringNotContainsString('StringStrtrJit.php', $spine);
+        $this->assertStringNotContainsString('StringStrtrStandaloneLlvm.php', $spine);
         $this->assertStringContainsString('StrtrTwoStringJitHelper.php', $spine);
         $this->assertStringContainsString('StrtrArrayJitHelper.php', $spine);
     }

@@ -3,12 +3,13 @@
 declare(strict_types=1);
 
 /**
- * LLVM JIT helper for strpbrk() — libc strpbrk(3) plus haystack slice from first match.
+ * LLVM lowering for strpbrk() via StringStrpbrk / StrpbrkJitHelper PHP (#14791).
  */
 
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\StringStrpbrk;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPLLVM\Builder;
@@ -22,19 +23,11 @@ final class JitStrpbrk
     public static function find(Context $context, Value $haystack, Value $mask): Value
     {
         $id = (string) (++self::$blockSerial);
-        $map = $context->structFieldMap['__string__'];
-        $hayLen = $context->builder->load(
-            $context->builder->structGep($haystack, $map['length'])
-        );
-        $hayPtr = $context->builder->structGep($haystack, $map['value']);
-        $maskPtr = $context->builder->structGep($mask, $map['value']);
-        $found = $context->builder->call(
-            $context->lookupFunction('strpbrk'),
-            $hayPtr,
-            $maskPtr
-        );
-        $null = $context->getTypeFromString('int8*')->constNull();
-        $isNull = $context->builder->icmp(Builder::INT_EQ, $found, $null);
+
+        StringStrpbrk::ensureLinked($context);
+        $raw = StringStrpbrk::invoke($context, $haystack, $mask);
+        $null = $context->getTypeFromString('__string__*')->constNull();
+        $isNull = $context->builder->icmp(Builder::INT_EQ, $raw, $null);
 
         $slot = JitValueBox::alloc($context);
         $ptr = JitValueBox::pointer($context, $slot);
@@ -49,16 +42,10 @@ final class JitStrpbrk
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($okBlock);
-        $i64 = $context->getTypeFromString('int64');
-        $foundInt = $context->builder->ptrToInt($found, $i64);
-        $baseInt = $context->builder->ptrToInt($hayPtr, $i64);
-        $pos = $context->builder->sub($foundInt, $baseInt);
-        $lenAfter = $context->builder->sub($hayLen, $pos);
-        $slice = string_trim::jitCopySlice($context, $haystack, $hayPtr, $pos, $lenAfter, 'src'.$id);
         $context->builder->call(
             $context->lookupFunction('__value__writeString'),
             $ptr,
-            $slice
+            $raw
         );
         $context->builder->branch($doneBlock);
 

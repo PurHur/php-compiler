@@ -1,0 +1,1 @@
+{"fingerprint":"fded9e7cea486defe8ed","unit":"/VM/TryCatchJitHelper.php","helpers":{"phpcompiler\\vm\\trycatchjithelper::encodedtypesmatchargv":"phpcompiler_vm_trycatchjithelper__encodedtypesmatchargv"},"init_symbol":"__init__unit_VM_TryCatchJitHelper_php","shutdown_symbol":"__shutdown__unit_VM_TryCatchJitHelper_php","runtime_safe":true}

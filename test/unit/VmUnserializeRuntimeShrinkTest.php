@@ -30,7 +30,7 @@ final class VmUnserializeRuntimeShrinkTest extends TestCase
             $this->assertDoesNotMatchRegularExpression('/@\\\\unserialize\\s*\\(/', $source, $class);
         }
         $helper = (string) file_get_contents(__DIR__.'/../../ext/standard/UnserializeJitHelper.php');
-        $this->assertStringContainsString('VmUnserializeFormat::decodePayload', $helper);
+        $this->assertStringContainsString('VmUnserializeFormat::decodeToVariableWithContext', $helper);
     }
 
     public function testDecodeScalarsAndArrays(): void
@@ -51,9 +51,20 @@ final class VmUnserializeRuntimeShrinkTest extends TestCase
     {
         $nested = 'a:1:{i:0;a:1:{i:0;a:1:{i:0;i:1;}}}';
         $this->assertFalse(VmUnserializeFormat::decodePayload($nested, ['max_depth' => 2]));
+        $this->assertSame(2, VmUnserializeFormat::lastMaxDepthExceeded());
         $ok = VmUnserializeFormat::decodePayload($nested, ['max_depth' => 4]);
+        $this->assertNull(VmUnserializeFormat::lastMaxDepthExceeded());
         $this->assertIsArray($ok);
         $this->assertSame(1, $ok[0][0][0]);
+    }
+
+    /** Issue #13777 — max_depth Notice offset matches Zend (end of exceeded nesting, not early abort). */
+    public function testMaxDepthNoticeOffsetMatchesZend(): void
+    {
+        $nested = 'a:1:{i:0;a:1:{i:0;a:1:{i:0;i:1;}}}';
+        $this->assertFalse(VmUnserializeFormat::decodePayload($nested, ['max_depth' => 1]));
+        $this->assertSame(14, VmUnserializeFormat::lastErrorOffset());
+        $this->assertSame(34, VmUnserializeFormat::lastPayloadLength());
     }
 
     public function testRoundTripViaVmSerializeExported(): void
@@ -61,5 +72,30 @@ final class VmUnserializeRuntimeShrinkTest extends TestCase
         $payload = VmSerialize::serializeExported(['ok' => true, 'n' => 1, 'msg' => 'hi']);
         $decoded = VmUnserializeFormat::decodePayload($payload);
         $this->assertSame(['ok' => true, 'n' => 1, 'msg' => 'hi'], $decoded);
+    }
+
+    public function testDecodeRReferenceMarker(): void
+    {
+        $decoded = VmUnserializeFormat::decodePayload('a:2:{i:0;i:1;i:1;R:2;}');
+        $this->assertIsArray($decoded);
+        $this->assertSame(1, $decoded[0]);
+        $this->assertSame(1, $decoded[1]);
+        $decoded[0] = 5;
+        $this->assertSame(5, $decoded[1]);
+    }
+
+    public function testDecodeToVariableRReferenceMarker(): void
+    {
+        $var = VmUnserializeFormat::decodeToVariable('a:2:{i:0;i:1;i:1;R:2;}');
+        $this->assertInstanceOf(\PHPCompiler\VM\Variable::class, $var);
+        $ht = $var->toArray();
+        $s0 = $ht->findIndex(0);
+        $s1 = $ht->findIndex(1);
+        $this->assertNotNull($s0);
+        $this->assertNotNull($s1);
+        $t0 = $s0->directIndirectTarget();
+        $t1 = $s1->directIndirectTarget();
+        $this->assertNotNull($t0);
+        $this->assertSame($t0, $t1);
     }
 }

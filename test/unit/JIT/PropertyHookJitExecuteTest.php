@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\Test\Unit\JIT;
 
 use PHPCompiler\LlvmToolchain;
+use PHPCompiler\Test\Support\PropertyHookTestSkip;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -14,10 +15,14 @@ use PHPUnit\Framework\TestCase;
  */
 final class PropertyHookJitExecuteTest extends TestCase
 {
-    private string $repoRoot;
+        use PropertyHookTestSkip;
+
+
+private string $repoRoot;
 
     protected function setUp(): void
     {
+        $this->skipUnlessPropertyHooksEnabled();
         $this->repoRoot = dirname(__DIR__, 3);
         if (!LlvmToolchain::isReady($this->repoRoot)) {
             $this->markTestSkipped(

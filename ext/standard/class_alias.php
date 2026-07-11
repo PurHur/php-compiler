@@ -41,7 +41,7 @@ final class class_alias extends Internal
             }
             $autoload = $autoloadArg->toBool();
         }
-        $ok = $ctx->registerClassAlias($original, $alias, $autoload);
+        $ok = $ctx->registerClassAlias($original, $alias, $autoload, $frame);
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool($ok);
         }

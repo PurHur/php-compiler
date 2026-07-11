@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\DefineRuntime;
 use PHPCompiler\JIT\Builtin\ErrorRaise;
+use PHPCompiler\JIT\Builtin\GlobalIntrospectionNameRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -34,6 +35,7 @@ final class JitConstant
         if (null === $context->runtime->vmContext) {
             throw new \LogicException('constant() requires VM context');
         }
+        $name = VmReflection::normalizeGlobalIntrospectionName($name);
         $phpVar = VmConstants::constantLookup($context->runtime->vmContext, $name);
         $slot = JitValueBox::alloc($context);
         $ptr = JitValueBox::pointer($context, $slot);
@@ -47,6 +49,7 @@ final class JitConstant
 
     private static function invokeRuntime(Context $context, Value $nameStr): Value
     {
+        $nameStr = GlobalIntrospectionNameRuntime::normalizeString($context, $nameStr);
         $ht = DefineRuntime::loadTable($context);
         $valPtr = $context->builder->call(
             $context->lookupFunction('__hashtable__peekStringKeyValue'),

@@ -10,23 +10,21 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPUnit\Framework\TestCase;
 
-/** SessionStorageRuntime routes file I/O through SessionStorageJitHelper PHP (#9495). */
+/** SessionStorageRuntime embed + standalone route through SessionStorageJitHelper PHP (#9495, #12938). */
 final class SessionStorageRuntimeShrinkTest extends TestCase
 {
-    public function testSessionStorageRuntimeUsesJitHelperNotLlvmFileIo(): void
+    public function testSessionStorageRuntimeUsesJitHelperNotStandaloneLlvm(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/SessionStorageRuntime.php');
         $this->assertStringContainsString('SessionStorageJitHelper', $source);
-        $this->assertStringContainsString('SessionStorageStandaloneLlvm', $source);
+        $this->assertStringNotContainsString('SessionStorageStandaloneLlvm', $source);
         $this->assertStringNotContainsString('emitLoadFromDisk', $source);
         $this->assertStringNotContainsString('emitSaveToDisk', $source);
         $this->assertStringNotContainsString('emitMergeHashtable', $source);
         $this->assertStringNotContainsString('buildStoragePathCstr', $source);
         $this->assertLessThan(520, \substr_count($source, "\n") + 1);
 
-        $llvm = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/SessionStorageStandaloneLlvm.php');
-        $this->assertStringContainsString('emitLoadFromDisk', $llvm);
-        $this->assertStringContainsString('emitSaveToDisk', $llvm);
+        $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/SessionStorageStandaloneLlvm.php');
     }
 
     public function testSessionStorageJitHelperRoundTrip(): void

@@ -4,12 +4,16 @@ declare(strict_types=1);
 
 namespace PHPCompiler\Test\Unit;
 
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\Runtime;
+use PHPCompiler\Test\Support\PropertyHookTestSkip;
 use PHPUnit\Framework\TestCase;
 
 /** @covers issue #3386, #3536 */
 final class InterfaceImplementationCheckTest extends TestCase
 {
+    use PropertyHookTestSkip;
+
     public function testMissingInterfaceMethodFailsAtCompileTime(): void
     {
         $runtime = new Runtime();
@@ -155,11 +159,17 @@ PHP;
 
     public function testInterfaceAsymmetricVisibilityPropertyCompiles(): void
     {
+        if (!CompilerVersion::supportsAsymmetricVisibility()) {
+            $this->markTestSkipped('asymmetric visibility disabled on reference profile (#12508)');
+        }
+        if (!CompilerVersion::supportsParenthesizedAsymmetricSetModifier()) {
+            $this->markTestSkipped('parenthesized asymmetric set modifier disabled on 8.4.0-dev reference profile (#16450)');
+        }
         $runtime = new Runtime();
         $code = <<<'PHP'
 <?php
 interface I {
-    private(set) string $slug;
+    public (private(set)) string $slug;
 }
 class C implements I {
     public string $slug = 'b';
@@ -178,13 +188,14 @@ PHP;
         ob_start();
         $runtime->run($block);
         $this->assertSame(
-            "b\nCannot modify private(set) property C::\$slug from global scope\n",
+            "b\nCannot modify public (private(set)) property C::\$slug from global scope\n",
             ob_get_clean()
         );
     }
 
     public function testMissingInterfacePropertyHookFailsAtCompileTime(): void
     {
+        $this->skipUnlessPropertyHooksEnabled();
         $runtime = new Runtime();
         $code = <<<'PHP'
 <?php
@@ -204,6 +215,7 @@ PHP;
 
     public function testImplementedInterfacePropertyHookCompiles(): void
     {
+        $this->skipUnlessPropertyHooksEnabled();
         $runtime = new Runtime();
         $code = <<<'PHP'
 <?php
@@ -224,6 +236,7 @@ PHP;
 
     public function testMissingInterfaceStaticPropertyHookFailsAtCompileTime(): void
     {
+        $this->skipUnlessPropertyHooksEnabled();
         $runtime = new Runtime();
         $code = <<<'PHP'
 <?php
@@ -241,6 +254,7 @@ PHP;
 
     public function testImplementedInterfaceStaticPropertyHookCompiles(): void
     {
+        $this->skipUnlessPropertyHooksEnabled();
         $runtime = new Runtime();
         $code = <<<'PHP'
 <?php
@@ -265,6 +279,7 @@ PHP;
 
     public function testConcreteClassAbstractPropertyHookFailsAtCompileTime(): void
     {
+        $this->skipUnlessPropertyHooksEnabled();
         $runtime = new Runtime();
         $code = <<<'PHP'
 <?php
@@ -282,6 +297,7 @@ PHP;
 
     public function testMissingParentAbstractPropertyHooksFailsAtCompileTime(): void
     {
+        $this->skipUnlessPropertyHooksEnabled();
         $runtime = new Runtime();
         $code = <<<'PHP'
 <?php
@@ -302,6 +318,7 @@ PHP;
 
     public function testEvalAbstractPropertyHookFailsAtCompileTime(): void
     {
+        $this->skipUnlessPropertyHooksEnabled();
         $runtime = new Runtime();
         $outer = <<<'PHP'
 <?php

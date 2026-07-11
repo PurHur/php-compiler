@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\StringClassUsesRecursive;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitStringArg;
@@ -25,39 +26,51 @@ final class JitClassUsesRecursive
         }
 
         $literal = JitStringArg::compileTimeLiteral($whatArg);
-        if (null === $literal) {
-            if (JITVariable::TYPE_VALUE === $whatArg->type) {
-                $valuePtr = JitValueBox::valuePtrFromVariable($context, $whatArg);
-                $obj = $context->builder->call(
-                    $context->lookupFunction('__value__readObject'),
-                    $valuePtr
-                );
-                $objType = $context->getTypeFromString('__object__*');
-                $isObject = $context->builder->icmp(
-                    Builder::INT_NE,
-                    $obj,
-                    $objType->constNull()
-                );
-                if (!$isObject) {
-                    throw new \LogicException(
-                        'class_uses_recursive() argument must be an object or class name string in this compiler build'
-                    );
-                }
-                $objVar = new JITVariable(
-                    $context,
-                    JITVariable::TYPE_OBJECT,
-                    JITVariable::KIND_VALUE,
-                    $obj
-                );
+        if (null !== $literal) {
+            return self::invokeForClassName($context, $literal, $autoload);
+        }
 
-                return self::invokeForObject($context, $objVar, $autoload);
-            }
+        return self::routeThroughPhpHelper($context, $whatArg, $autoload);
+    }
+
+    private static function routeThroughPhpHelper(
+        Context $context,
+        JITVariable $whatArg,
+        bool $autoload
+    ): Value {
+        $operandPtr = self::operandToValueBox($context, $whatArg);
+        $i1 = $context->getTypeFromString('int1');
+        $autoloadVal = $autoload ? $i1->constInt(1, false) : $i1->constInt(0, false);
+
+        return StringClassUsesRecursive::invoke($context, $operandPtr, $autoloadVal);
+    }
+
+    private static function operandToValueBox(Context $context, JITVariable $whatArg): Value
+    {
+        if (JITVariable::TYPE_VALUE === $whatArg->type) {
+            return JitValueBox::valuePtrFromVariable($context, $whatArg);
+        }
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        if (JITVariable::TYPE_OBJECT === $whatArg->type) {
+            $context->builder->call(
+                $context->lookupFunction('__value__writeObject'),
+                $ptr,
+                $context->helper->loadValue($whatArg)
+            );
+        } elseif (JITVariable::TYPE_STRING === $whatArg->type) {
+            $context->builder->call(
+                $context->lookupFunction('__value__writeString'),
+                $ptr,
+                $context->helper->loadValue($whatArg)
+            );
+        } else {
             throw new \LogicException(
-                'class_uses_recursive() class name must be a string literal in this compiler build'
+                'class_uses_recursive() class name must be a string literal or object in this compiler build'
             );
         }
 
-        return self::invokeForClassName($context, $literal, $autoload);
+        return $ptr;
     }
 
     private static function invokeForObject(

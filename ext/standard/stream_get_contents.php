@@ -8,6 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
+use PHPCompiler\JIT\NamedOptionalCallArgs;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\Variable;
@@ -22,8 +23,10 @@ final class stream_get_contents extends Internal
 {
     public function execute(Frame $frame): void
     {
-        $argc = \count($frame->calledArgs);
-        if ($argc < 1 || $argc > 3) {
+        if (!isset($frame->calledArgs[0])) {
+            throw new \LogicException('stream_get_contents() requires one to three arguments in this compiler build');
+        }
+        if (isset($frame->calledArgs[3])) {
             throw new \LogicException('stream_get_contents() requires one to three arguments in this compiler build');
         }
         $handleVar = $frame->calledArgs[0]->resolveIndirect();
@@ -35,10 +38,10 @@ final class stream_get_contents extends Internal
         }
         $maxlength = -1;
         $offset = -1;
-        if ($argc >= 2) {
+        if (isset($frame->calledArgs[1])) {
             $maxlength = self::parseLengthArg($frame->calledArgs[1]->resolveIndirect());
         }
-        if (3 === $argc) {
+        if (isset($frame->calledArgs[2])) {
             $offset = VmMath::parseIntBuiltinArg(
                 $frame->calledArgs[2]->resolveIndirect(),
                 'stream_get_contents',
@@ -66,12 +69,12 @@ final class stream_get_contents extends Internal
             JitLongArg::lower($context, $args[0], 'stream_get_contents() handle'),
             $i64
         );
-        if ($argc >= 2) {
+        if ($argc >= 2 && !NamedOptionalCallArgs::isOmittedOptional($args[1])) {
             $maxlength = JitStreamGetContents::lowerLengthArg($context, $args[1]);
         } else {
             $maxlength = $i64->constInt(-1, true);
         }
-        if (3 === $argc) {
+        if ($argc >= 3 && !NamedOptionalCallArgs::isOmittedOptional($args[2])) {
             $offset = JitStreamGetContents::lowerOffsetArg($context, $args[2]);
         } else {
             $offset = $i64->constInt(-1, true);

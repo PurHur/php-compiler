@@ -28,11 +28,13 @@ function run(string $filename, string $code, array $options): void
             $scriptFilename = $resolved;
         }
     }
+    $scriptName = php_compiler_cli_server_script_name($filename, $options);
     Superglobals::populateFromEnvironment(
         $runtime->vmContext,
         is_string($queryString) ? $queryString : null,
         is_string($postBody) ? $postBody : null,
-        $scriptFilename
+        $scriptFilename,
+        $scriptName
     );
     $scriptArgv = $options['--script-argv'] ?? null;
     if (is_array($scriptArgv)) {
@@ -50,7 +52,7 @@ function run(string $filename, string $code, array $options): void
     }
     if (! isset($options['-l'])) {
         try {
-            $runtime->run($block);
+            $runtime->run($block, false);
         } catch (PHPCompiler\VM\ScriptExit $e) {
             exit($e->status);
         } catch (\LogicException $e) {

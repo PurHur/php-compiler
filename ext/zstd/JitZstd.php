@@ -7,12 +7,11 @@ namespace PHPCompiler\ext\zstd;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\StringZstd;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitStrictIntArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** LLVM helpers for zstd_*() — libzstd via StringZstdJit (#6387, #8564). */
+/** LLVM helpers for zstd_*() — ZstdJitHelper in-module (#6387, #8564, #8869). */
 final class JitZstd
 {
     private static int $blockSerial = 0;
@@ -22,7 +21,7 @@ final class JitZstd
         StringZstd::ensureLinked($context);
 
         return self::stringOrFalse($context, $context->builder->call(
-            $context->lookupFunction('__compiler_zstd_compress'),
+            StringZstd::compressHelper($context),
             $data,
             $level
         ));
@@ -33,7 +32,7 @@ final class JitZstd
         StringZstd::ensureLinked($context);
 
         return self::stringOrFalse($context, $context->builder->call(
-            $context->lookupFunction('__compiler_zstd_decompress'),
+            StringZstd::decompressHelper($context),
             $data
         ));
     }

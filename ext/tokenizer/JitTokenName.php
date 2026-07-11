@@ -23,7 +23,9 @@ final class JitTokenName
         if (null !== $arg->compileTimeConstantName) {
             $constants = TokenConstants::registeredConstants();
             if (isset($constants[$arg->compileTimeConstantName])) {
-                return $arg->compileTimeConstantName;
+                $resolved = TokenConstants::nameForId($constants[$arg->compileTimeConstantName]);
+
+                return null !== $resolved ? $resolved : 'UNKNOWN';
             }
         }
         if (JITVariable::TYPE_NATIVE_LONG === $arg->type && JITVariable::KIND_VALUE === $arg->kind) {
@@ -34,7 +36,8 @@ final class JitTokenName
                 if (null !== $name) {
                     return $name;
                 }
-                throw new \Error('token_name(): Unknown token ID '.$id.' in this compiler build');
+
+                return 'UNKNOWN';
             }
         }
 

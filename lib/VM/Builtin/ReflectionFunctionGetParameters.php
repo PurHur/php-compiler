@@ -30,6 +30,7 @@ final class ReflectionFunctionGetParameters extends VmClassMethod
             $func = ReflectionSupport::resolveFunctionFromReflection($ctx, $receiver);
             $paramNames = $func->block->paramNames;
         }
+        $closureState = $receiver->reflectionClosureState;
         $paramClass = $ctx->classes[ReflectionSupport::REFLECTION_PARAMETER] ?? null;
         if (null === $paramClass) {
             throw new \LogicException('ReflectionParameter is not registered in this compiler build');
@@ -45,6 +46,9 @@ final class ReflectionFunctionGetParameters extends VmClassMethod
             $param->getProperty(ReflectionSupport::PROP_METHOD_NAME)->null();
             $param->getProperty(ReflectionSupport::PROP_PARAM_INDEX)->int((int) $index);
             $param->getProperty(ReflectionSupport::PROP_PARAM_NAME)->string($paramNames[$index]);
+            if (null !== $closureState) {
+                $param->reflectionClosureState = $closureState;
+            }
             $slot = new Variable(Variable::TYPE_OBJECT);
             $slot->object($param);
             $ht->append($slot);

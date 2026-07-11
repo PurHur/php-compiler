@@ -12,11 +12,14 @@ use PHPUnit\Framework\TestCase;
 /** VmFsReadPure — file reads without libc open/read FFI (#8920). */
 final class VmFsReadPureRuntimeShrinkTest extends TestCase
 {
-    public function testVmFsReadNativeDelegatesToPureWhenFfiDisabled(): void
+    public function testVmFsReadNativeDelegatesToPureWithoutFfi(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/VmFsReadNative.php');
         $this->assertStringContainsString('VmFsReadPure::readSlice', $source);
+        $this->assertStringContainsString('VmFsReadPure::read', $source);
         $this->assertStringContainsString('VmFsReadPure::available()', $source);
+        $this->assertStringNotContainsString('FFI::cdef', $source);
+        $this->assertStringNotContainsString('int open(const char', $source);
     }
 
     public function testVmFsReadPureDoesNotUseLibcFfi(): void

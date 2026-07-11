@@ -16,6 +16,6 @@ sort($objMethods);
 echo count($objMethods), "\n";
 echo in_array('run', $objMethods, true) ? '1' : '0';
 --EXPECT--
-2
-112
+1
+101
 1

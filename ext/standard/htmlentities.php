@@ -15,7 +15,7 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * htmlentities() — same entity subset as htmlspecialchars(); default ENT_COMPAT (#2472).
+ * htmlentities() — full HTML_ENTITIES table; default ENT_QUOTES | ENT_SUBSTITUTE (php-src html.c).
  */
 final class htmlentities extends Internal
 {
@@ -36,7 +36,7 @@ final class htmlentities extends Internal
             0,
             'string'
         );
-        $flags = ENT_COMPAT;
+        $flags = ENT_QUOTES | ENT_SUBSTITUTE;
         $encoding = 'UTF-8';
         $doubleEncode = true;
         if (isset($frame->calledArgs[1])) {
@@ -90,7 +90,7 @@ final class htmlentities extends Internal
                 $literal = $maybeLiteral;
             }
         }
-        $flags = ENT_COMPAT;
+        $flags = ENT_QUOTES | ENT_SUBSTITUTE;
         $flagsKnown = $argc < 2;
         if ($argc >= 2) {
             $flagsVal = self::compileTimeLong($context, $args[1]);
@@ -108,7 +108,7 @@ final class htmlentities extends Internal
         }
 
         $str = JitStringBuiltinArg::lower($context, $args[0], 'htmlentities', 0, 'string');
-        $flagsLlvm = $context->getTypeFromString('int64')->constInt(ENT_COMPAT, false);
+        $flagsLlvm = $context->getTypeFromString('int64')->constInt(ENT_QUOTES | ENT_SUBSTITUTE, false);
         if ($argc >= 2) {
             $flagsLlvm = $flagsKnown
                 ? $context->getTypeFromString('int64')->constInt($flags, false)

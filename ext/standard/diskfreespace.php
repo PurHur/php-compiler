@@ -20,7 +20,7 @@ final class diskfreespace extends Internal
 
     public function execute(Frame $frame): void
     {
-        (new disk_free_space())->execute($frame);
+        (new disk_free_space('diskfreespace'))->execute($frame);
     }
 
     public function call(Context $context, JITVariable ...$args): Value
@@ -28,8 +28,6 @@ final class diskfreespace extends Internal
         if (\count($args) > 1) {
             throw new \LogicException('diskfreespace() accepts at most one argument in this compiler build');
         }
-        $path = JitDiskPath::lower($context, $args[0] ?? null, 'diskfreespace');
-
-        return JitStat::pathDiskFreeSpaceBoxed($context, $path);
+        return JitDiskPath::lowerDiskSpaceBoxed($context, $args[0] ?? null, 'diskfreespace', true);
     }
 }

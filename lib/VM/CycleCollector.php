@@ -6,6 +6,7 @@ namespace PHPCompiler\VM;
 
 use PHPCompiler\ext\standard\GcToggleJitHelper;
 use PHPCompiler\Frame;
+use PHPCompiler\Web\Superglobals;
 
 /**
  * VM cycle collector entry point — Zend gc_collect_cycles() subset (issue #3113).
@@ -31,6 +32,21 @@ final class CycleCollector
 
     private static bool $protected = false;
 
+    /** Highest {@see ObjectEntry::id} before user script execution (#13437). */
+    private static int $baselineObjectMaxId = 0;
+
+    /** @var array<int, true> spl_object_id of arrays registered before user script (#13437). */
+    private static array $baselineArrayIds = [];
+
+    public static function captureRequestBaseline(): void
+    {
+        self::$baselineObjectMaxId = ObjectEntry::maxId();
+        self::$baselineArrayIds = [];
+        foreach (array_keys(HashTableRegistry::snapshot()) as $arrayId) {
+            self::$baselineArrayIds[$arrayId] = true;
+        }
+    }
+
     public static function isEnabled(): bool
     {
         return GcToggleJitHelper::isEnabled();
@@ -46,16 +62,17 @@ final class CycleCollector
         GcToggleJitHelper::disable();
     }
 
+    public static function isGcProtected(): bool
+    {
+        return self::$protected;
+    }
+
     /**
      * @return array{
      *     running: bool,
      *     protected: bool,
      *     full: bool,
-     *     runs: int,
-     *     collected: int,
-     *     threshold: int,
-     *     buffer_size: int,
-     *     roots: int
+     *     buffer_size: int
      * }
      *
      * @see https://github.com/php/php-src/blob/master/ext/standard/php_gc.c PHP_FUNCTION(gc_status)
@@ -65,10 +82,25 @@ final class CycleCollector
         $roots = self::countBufferedRoots($ctx);
 
         return [
+            'running' => self::$running,
+            'protected' => self::$protected,
+            'full' => $roots >= self::ROOT_THRESHOLD,
+            'buffer_size' => self::DEFAULT_BUFFER_SIZE,
+        ];
+    }
+
+    /**
+     * @return array{runs: int, collected: int, threshold: int, roots: int}
+     *
+     * @see https://github.com/php/php-src/blob/master/ext/standard/php_gc.c PHP_FUNCTION(gc_status) pre-8.4
+     */
+    public static function legacyStatus(Context $ctx): array
+    {
+        return [
             'runs' => self::$runs,
             'collected' => self::$totalCollected,
             'threshold' => self::ROOT_THRESHOLD,
-            'roots' => $roots,
+            'roots' => self::countBufferedRoots($ctx),
         ];
     }
 
@@ -76,6 +108,17 @@ final class CycleCollector
     public static function memCaches(): int
     {
         return MemoryAccounting::releaseMmCaches();
+    }
+
+    /** JIT-callable bridge when Superglobals holds the active VM context (#13882). */
+    public static function collectActiveContext(): int
+    {
+        $ctx = Superglobals::getActiveContext();
+        if (null === $ctx) {
+            return 0;
+        }
+
+        return self::collect($ctx);
     }
 
     public static function collect(Context $ctx): int
@@ -86,7 +129,7 @@ final class CycleCollector
         self::$running = true;
         self::$protected = true;
         ++self::$runs;
-        /** @var array<int, true> $marked */
+        /** @var array<string, true> $marked */
         $marked = [];
         $visitVar = static function (Variable $var) use (&$marked, &$visitVar): void {
             self::markVariable($var, $marked, $visitVar);
@@ -95,24 +138,31 @@ final class CycleCollector
         $ctx->visitGcRoots($visitVar);
 
         foreach (WeakRefRegistry::weakTargetIds() as $targetId) {
-            unset($marked[$targetId]);
+            unset($marked['o'.$targetId]);
         }
         foreach (WeakRefRegistry::weakMapKeyTargetIds() as $targetId) {
-            unset($marked[$targetId]);
+            unset($marked['o'.$targetId]);
         }
 
         $collected = 0;
         /** @var array<int, ObjectEntry> $candidates */
         $candidates = [];
         foreach (ObjectRegistry::snapshot() as $object) {
-            if (!isset($marked[$object->id])) {
+            if (!isset($marked['o'.$object->id])) {
                 $candidates[$object->id] = $object;
+            }
+        }
+        /** @var array<int, HashTable> $arrayCandidates */
+        $arrayCandidates = [];
+        foreach (HashTableRegistry::snapshot() as $arrayId => $table) {
+            if (!isset($marked['a'.$arrayId])) {
+                $arrayCandidates[$arrayId] = $table;
             }
         }
         /** @var array<int, true> $peerLinked */
         $peerLinked = [];
         foreach ($candidates as $object) {
-            if (self::referencesCandidatePeer($object, $candidates)) {
+            if (self::referencesCandidatePeer($object, $candidates, $arrayCandidates)) {
                 $peerLinked[$object->id] = true;
             }
         }
@@ -128,6 +178,29 @@ final class CycleCollector
             ++$collected;
         }
 
+        foreach ($arrayCandidates as $arrayId => $table) {
+            if (self::referencesCandidateArrayObjectPeer($table, $candidates)) {
+                HashTableRegistry::release($table);
+                ++$collected;
+
+                continue;
+            }
+            if (!self::referencesCandidateArrayPeer($table, $candidates, $arrayCandidates)) {
+                // Unreachable compiler literal temp — reclaim registry slot (#15139).
+                HashTableRegistry::release($table);
+
+                continue;
+            }
+            if (!self::arrayCandidateInArrayCycle($arrayId, $arrayCandidates)) {
+                // Nested literal tree (array→array) without a cycle — not Zend GC (#15139).
+                HashTableRegistry::release($table);
+
+                continue;
+            }
+            HashTableRegistry::release($table);
+            ++$collected;
+        }
+
         self::$totalCollected += $collected;
         self::$running = false;
         self::$protected = false;
@@ -140,20 +213,202 @@ final class CycleCollector
      *
      * @param array<int, ObjectEntry> $candidates
      */
-    private static function referencesCandidatePeer(ObjectEntry $object, array $candidates): bool
-    {
+    /**
+     * True when an unreachable object still references another GC candidate (#10111, #13400).
+     *
+     * @param array<int, ObjectEntry> $objectCandidates
+     * @param array<int, HashTable> $arrayCandidates
+     */
+    private static function referencesCandidatePeer(
+        ObjectEntry $object,
+        array $objectCandidates,
+        array $arrayCandidates
+    ): bool {
         foreach ($object->propertiesWithNames() as $prop) {
-            if (Variable::TYPE_OBJECT !== $prop->type) {
-                continue;
-            }
-            try {
-                $peer = $prop->toObject();
-            } catch (\LogicException) {
-                continue;
-            }
-            if ($peer->id !== $object->id && isset($candidates[$peer->id])) {
+            if (self::variableReferencesGcCandidates($prop, $objectCandidates, $arrayCandidates)) {
                 return true;
             }
+        }
+
+        return false;
+    }
+
+    /**
+     * @param array<int, ObjectEntry> $objectCandidates
+     * @param array<int, HashTable> $arrayCandidates
+     */
+    private static function referencesCandidateArrayPeer(
+        HashTable $table,
+        array $objectCandidates,
+        array $arrayCandidates
+    ): bool {
+        $selfId = \spl_object_id($table);
+        foreach ($table->iterate(false) as $element) {
+            if (self::variableReferencesGcCandidates($element, $objectCandidates, $arrayCandidates, $selfId)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @param array<int, ObjectEntry> $objectCandidates
+     */
+    private static function referencesCandidateArrayObjectPeer(
+        HashTable $table,
+        array $objectCandidates
+    ): bool {
+        foreach ($table->iterate(false) as $element) {
+            if (self::variableReferencesObjectCandidates($element, $objectCandidates)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * True when an unreachable array candidate participates in an array-only reference cycle.
+     *
+     * @param array<int, HashTable> $arrayCandidates
+     */
+    private static function arrayCandidateInArrayCycle(int $startId, array $arrayCandidates): bool
+    {
+        if (!isset($arrayCandidates[$startId])) {
+            return false;
+        }
+        $visited = [];
+
+        return self::arrayCycleDfs($startId, $arrayCandidates, $visited, []);
+    }
+
+    /**
+     * @param array<int, true> $visited
+     * @param array<int, true> $stack
+     * @param array<int, HashTable> $arrayCandidates
+     */
+    private static function arrayCycleDfs(
+        int $nodeId,
+        array $arrayCandidates,
+        array &$visited,
+        array $stack
+    ): bool {
+        if (isset($stack[$nodeId])) {
+            return true;
+        }
+        if (isset($visited[$nodeId])) {
+            return false;
+        }
+        $visited[$nodeId] = true;
+        $stack[$nodeId] = true;
+        $table = $arrayCandidates[$nodeId];
+        foreach ($table->iterate(false) as $element) {
+            foreach (self::arrayCandidatePeerIds($element, $arrayCandidates, $nodeId) as $peerId) {
+                if (self::arrayCycleDfs($peerId, $arrayCandidates, $visited, $stack)) {
+                    return true;
+                }
+            }
+        }
+        unset($stack[$nodeId]);
+
+        return false;
+    }
+
+    /**
+     * @param array<int, HashTable> $arrayCandidates
+     *
+     * @return list<int>
+     */
+    private static function arrayCandidatePeerIds(
+        Variable $var,
+        array $arrayCandidates,
+        int $selfArrayId
+    ): array {
+        if ($var->isUndefined()) {
+            return [];
+        }
+        if (Variable::TYPE_INDIRECT === $var->type) {
+            return self::arrayCandidatePeerIds($var->resolveIndirect(), $arrayCandidates, $selfArrayId);
+        }
+        if (Variable::TYPE_ARRAY !== $var->type) {
+            return [];
+        }
+        try {
+            $arrayId = \spl_object_id($var->toArray());
+        } catch (\LogicException) {
+            return [];
+        }
+        if (!isset($arrayCandidates[$arrayId])) {
+            return [];
+        }
+
+        return [$arrayId];
+    }
+
+    /**
+     * @param array<int, ObjectEntry> $objectCandidates
+     */
+    private static function variableReferencesObjectCandidates(
+        Variable $var,
+        array $objectCandidates
+    ): bool {
+        if ($var->isUndefined()) {
+            return false;
+        }
+        if (Variable::TYPE_INDIRECT === $var->type) {
+            return self::variableReferencesObjectCandidates($var->resolveIndirect(), $objectCandidates);
+        }
+        if (Variable::TYPE_OBJECT !== $var->type) {
+            return false;
+        }
+        try {
+            $objectId = $var->toObject()->id;
+        } catch (\LogicException) {
+            return false;
+        }
+
+        return isset($objectCandidates[$objectId]);
+    }
+
+    /**
+     * @param array<int, ObjectEntry> $objectCandidates
+     * @param array<int, HashTable> $arrayCandidates
+     */
+    private static function variableReferencesGcCandidates(
+        Variable $var,
+        array $objectCandidates,
+        array $arrayCandidates,
+        ?int $selfArrayId = null
+    ): bool {
+        if ($var->isUndefined()) {
+            return false;
+        }
+        if (Variable::TYPE_INDIRECT === $var->type) {
+            return self::variableReferencesGcCandidates(
+                $var->resolveIndirect(),
+                $objectCandidates,
+                $arrayCandidates,
+                $selfArrayId
+            );
+        }
+        if (Variable::TYPE_OBJECT === $var->type) {
+            try {
+                $objectId = $var->toObject()->id;
+            } catch (\LogicException) {
+                return false;
+            }
+
+            return isset($objectCandidates[$objectId]);
+        }
+        if (Variable::TYPE_ARRAY === $var->type) {
+            try {
+                $arrayId = \spl_object_id($var->toArray());
+            } catch (\LogicException) {
+                return false;
+            }
+
+            return ($selfArrayId !== null && $arrayId === $selfArrayId) || isset($arrayCandidates[$arrayId]);
         }
 
         return false;
@@ -162,7 +417,7 @@ final class CycleCollector
     /** Objects not reachable from VM roots — Zend GC root-buffer analogue. */
     private static function countBufferedRoots(Context $ctx): int
     {
-        /** @var array<int, true> $marked */
+        /** @var array<string, true> $marked */
         $marked = [];
         $visitVar = static function (Variable $var) use (&$marked, &$visitVar): void {
             self::markVariable($var, $marked, $visitVar);
@@ -171,15 +426,26 @@ final class CycleCollector
         $ctx->visitGcRoots($visitVar);
 
         foreach (WeakRefRegistry::weakTargetIds() as $targetId) {
-            unset($marked[$targetId]);
+            unset($marked['o'.$targetId]);
         }
         foreach (WeakRefRegistry::weakMapKeyTargetIds() as $targetId) {
-            unset($marked[$targetId]);
+            unset($marked['o'.$targetId]);
         }
 
         $roots = 0;
         foreach (ObjectRegistry::snapshot() as $object) {
-            if (!isset($marked[$object->id])) {
+            if ($object->id <= self::$baselineObjectMaxId) {
+                continue;
+            }
+            if (!isset($marked['o'.$object->id])) {
+                ++$roots;
+            }
+        }
+        foreach (HashTableRegistry::snapshot() as $arrayId => $table) {
+            if (isset(self::$baselineArrayIds[$arrayId])) {
+                continue;
+            }
+            if (!isset($marked['a'.$arrayId])) {
                 ++$roots;
             }
         }
@@ -188,7 +454,7 @@ final class CycleCollector
     }
 
     /**
-     * @param array<int, true> $marked
+     * @param array<string, true> $marked
      * @param callable(Variable): void $visitVar
      */
     private static function markVariable(Variable $var, array &$marked, callable $visitVar): void
@@ -212,10 +478,10 @@ final class CycleCollector
                 return;
             case Variable::TYPE_OBJECT:
                 $object = $var->toObject();
-                if (isset($marked[$object->id])) {
+                if (isset($marked['o'.$object->id])) {
                     return;
                 }
-                $marked[$object->id] = true;
+                $marked['o'.$object->id] = true;
                 foreach ($object->propertiesWithNames() as $name => $prop) {
                     if (WeakRefSupport::shouldSkipGcMark($object, $name)) {
                         continue;
@@ -231,7 +497,13 @@ final class CycleCollector
 
                 return;
             case Variable::TYPE_ARRAY:
-                foreach ($var->toArray()->iterate(true) as $element) {
+                $array = $var->toArray();
+                $arrayId = \spl_object_id($array);
+                if (isset($marked['a'.$arrayId])) {
+                    return;
+                }
+                $marked['a'.$arrayId] = true;
+                foreach ($array->iterate(true) as $element) {
                     $visitVar($element);
                 }
 
@@ -265,10 +537,18 @@ final class CycleCollector
     }
 
     /** @param callable(Variable): void $visitVar */
-    public static function markFrameRoots(Frame $frame, callable $visitVar): void
+    public static function markFrameRoots(Frame $frame, callable $visitVar, bool $includeParents = true): void
     {
-        foreach ($frame->scope as $slot) {
-            $visitVar($slot);
+        // Named locals + dynamic locals only — compiler temps in scope[] are not Zend roots (#14827).
+        if (null !== $frame->block) {
+            foreach ($frame->block->eachNamedScopeSlot() as [, $slot]) {
+                if (isset($frame->scope[$slot])) {
+                    $visitVar($frame->scope[$slot]);
+                }
+            }
+        }
+        foreach ($frame->dynamicLocals as $var) {
+            $visitVar($var);
         }
         foreach ($frame->calledArgs as $arg) {
             $visitVar($arg);
@@ -288,8 +568,8 @@ final class CycleCollector
         if (null !== $frame->generatorState) {
             self::markGeneratorState($frame->generatorState, $visitVar);
         }
-        if (null !== $frame->parent) {
-            self::markFrameRoots($frame->parent, $visitVar);
+        if ($includeParents && null !== $frame->parent) {
+            self::markFrameRoots($frame->parent, $visitVar, true);
         }
     }
 }

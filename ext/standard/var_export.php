@@ -8,6 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\OutputBuffer;
 use PHPCompiler\VM\TypedPropertyCheck;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -26,12 +27,8 @@ final class var_export extends Internal
         $v = $frame->calledArgs[0]->resolveIndirect();
         TypedPropertyCheck::assertReadable($v);
         $return = false;
-        if (2 === $argc) {
-            $retArg = $frame->calledArgs[1]->resolveIndirect();
-            if (Variable::TYPE_BOOLEAN !== $retArg->type) {
-                throw new \LogicException('var_export() return argument must be boolean in this compiler build');
-            }
-            $return = $retArg->toBool();
+        if (isset($frame->calledArgs[1])) {
+            $return = $frame->calledArgs[1]->resolveIndirect()->toBool();
         }
         $vm = $frame->vmContext?->runtime->vm;
         if (null === $vm) {
@@ -44,7 +41,7 @@ final class var_export extends Internal
             }
             $frame->returnVar->string($exported);
         } else {
-            echo $exported;
+            OutputBuffer::append($exported);
         }
     }
 

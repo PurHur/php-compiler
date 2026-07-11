@@ -68,6 +68,40 @@ final class DeprecatedAttributeTest extends TestCase
         $this->assertTrue($meta->emitsRuntimeNotice());
     }
 
+    public function testIsDeprecatedForReflectionGatesSinceAgainstLanguageProfileVersion(): void
+    {
+        $meta = new DeprecatedMetadata('old fn', '8.4');
+        $this->assertFalse($meta->isDeprecatedForReflection());
+
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertTrue($meta->isDeprecatedForReflection());
+        } finally {
+            putenv('PHP_COMPILER_PROFILE');
+        }
+
+        $meta = new DeprecatedMetadata('old fn', '8.2');
+        $this->assertTrue($meta->isDeprecatedForReflection());
+
+        $meta = new DeprecatedMetadata(null, null);
+        $this->assertTrue($meta->isDeprecatedForReflection());
+    }
+
+    public function testFromDocCommentTextDetectsBareDeprecatedTag(): void
+    {
+        $meta = DeprecatedMetadata::fromDocCommentText("/** @deprecated */");
+        $this->assertNotNull($meta);
+        $this->assertTrue($meta->isDeprecatedForReflection());
+    }
+
+    public function testFromDocCommentTextParsesVersionAndMessage(): void
+    {
+        $meta = DeprecatedMetadata::fromDocCommentText("/** @deprecated 8.4 use Other::X */");
+        $this->assertNotNull($meta);
+        $this->assertSame('8.4', $meta->since);
+        $this->assertSame('use Other::X', $meta->message);
+    }
+
     public function testBareDeprecatedMethodCallIsSilent(): void
     {
         $runtime = new Runtime();
@@ -88,8 +122,11 @@ PHP;
 
     public function testFunctionCallRecordsDeprecation(): void
     {
-        $runtime = new Runtime();
-        $code = <<<'PHP'
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $runtime = new Runtime();
+            $code = <<<'PHP'
 <?php
 ini_set('error_reporting', '32767');
 ini_set('display_errors', '0');
@@ -99,8 +136,15 @@ f();
 $last = error_get_last();
 echo $last['message'] ?? 'none';
 PHP;
-        ob_start();
-        $runtime->run($runtime->parseAndCompile($code, 'deprecated_fn.php'));
-        $this->assertSame('Function f() is deprecated, old', ob_get_clean());
+            ob_start();
+            $runtime->run($runtime->parseAndCompile($code, 'deprecated_fn.php'));
+            $this->assertSame('Function f() is deprecated, old', ob_get_clean());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
     }
 }

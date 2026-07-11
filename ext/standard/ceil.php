@@ -13,6 +13,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\MathCeil;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
@@ -31,12 +32,13 @@ final class ceil extends Internal
             $frame->calledArgs[0]->resolveIndirect(),
             'ceil',
             1,
-            'num'
+            'num',
+            $frame
         );
         if (null === $frame->returnVar) {
             return;
         }
-        $frame->returnVar->float(\ceil((float) $num));
+        $frame->returnVar->float(VmMath::ceil((float) $num));
     }
 
     public Context $context;
@@ -48,8 +50,7 @@ final class ceil extends Internal
             throw new \LogicException('ceil() requires exactly one argument');
         }
         $asFloat = JitMathNumberArg::lowerToDouble($context, $args[0], 'ceil', 1, 'num');
-        $fn = $context->lookupFunction('ceil');
 
-        return $context->builder->call($fn, $asFloat);
+        return MathCeil::invoke($context, $asFloat);
     }
 }

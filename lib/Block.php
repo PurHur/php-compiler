@@ -63,6 +63,9 @@ class Block {
     /** File-level declare(strict_types=1) for this function body (issue #156). */
     public bool $strictTypes = false;
 
+    /** True when this CFG block emitted declare(ticks=N) enter (#3343). */
+    public bool $tickScopeOpened = false;
+
     /** __COMPILER_HALT_OFFSET__ when the script contains __halt_compiler() (#5455). */
     public ?int $haltCompilerOffset = null;
 
@@ -77,6 +80,9 @@ class Block {
 
     /** Parameter scope slots declared `iterable` (array|Traversable union, #4829). */
     public array $paramIterableSlots = [];
+
+    /** Parameter scope slots declared `callable` (#17742). */
+    public array $paramCallableSlots = [];
 
     /** Parameter scope slots declared standalone `never` (#6633). */
     public array $paramNeverSlots = [];
@@ -180,6 +186,9 @@ class Block {
     /** Closure `use (&$var)` slots that alias enclosing storage at call (issue #72). */
     public array $closureCaptureByRef = [];
 
+    /** @var array<int, string> Closure `use` slot => captured variable name (#17089). */
+    public array $closureCaptureSlotNames = [];
+
     /** Arrow function body: register outer lexical reads for auto-capture (#4944, #4952, #10304). */
     public bool $arrowAutoCapture = false;
 
@@ -193,22 +202,92 @@ class Block {
      */
     public array $deployIncludePaths = [];
 
+    /**
+     * Operand slots for deferred inline array literals — must survive JUMPIF dead-temp release
+     * until INIT_ARRAY materialization (#14134, Zend/zend_compile.c).
+     *
+     * @var array<int, true>
+     */
+    public array $deferredArrayLiteralKeepSlots = [];
+
     /** Absolute entry script path when CFG filename attribute is missing (issue #707). */
     private string $scriptPathOverride = '';
 
+    /** Preprocessed source for bundle line reverse-mapping (#13201). */
+    private ?string $compileSource = null;
+
     /** Operand / cfg-Var roots assigned in this block (not inherited reads, #2059). */
     private \SplObjectStorage $localWrittenVars;
+
+    /** @var array<string, true> php-cfg may emit distinct Var operands per name (#15658 method_exists $method). */
+    private array $localWrittenVarNames = [];
+
+    /** php-cfg assign.var root => result slot for `$local = …` reads (#5644). */
+    private \SplObjectStorage $namedAssignDestSlots;
+
+    /** @var array<int, true> */
+    private array $namedAssignDestSlotIndexes = [];
+
+    /** assign.result temp => CV lvalue slot for reads after in-place mutation (#15125). */
+    private array $assignResultToLvalueSlot = [];
 
     public function __construct(?CfgBlock $block) {
         $this->orig = $block;
         $this->scope = new \SplObjectStorage;
         $this->args = new \SplObjectStorage;
         $this->localWrittenVars = new \SplObjectStorage;
+        $this->namedAssignDestSlots = new \SplObjectStorage;
+    }
+
+    public function registerNamedAssignDest(Operand $varRoot, int $slot): void
+    {
+        $this->namedAssignDestSlots[$varRoot] = $slot;
+        $this->namedAssignDestSlotIndexes[$slot] = true;
+    }
+
+    public function registerAssignResultLvalue(int $resultSlot, int $lvalueSlot): void
+    {
+        $this->assignResultToLvalueSlot[$resultSlot] = $lvalueSlot;
+    }
+
+    public function lvalueSlotForAssignResult(int $resultSlot): ?int
+    {
+        return $this->assignResultToLvalueSlot[$resultSlot] ?? null;
+    }
+
+    public function slotForNamedAssignDest(Operand $operand): ?int
+    {
+        $root = self::cfgVarRoot($operand);
+        if (null !== $root && $this->namedAssignDestSlots->contains($root)) {
+            return $this->namedAssignDestSlots[$root];
+        }
+        // php-cfg distinct Var operands per name — assign.var vs later read (#15658).
+        $name = self::resolveVariableName($operand);
+        if (null === $name || '' === $name) {
+            return null;
+        }
+        foreach ($this->namedAssignDestSlots as $storedRoot) {
+            if (self::resolveVariableName($storedRoot) === $name) {
+                return $this->namedAssignDestSlots[$storedRoot];
+            }
+        }
+
+        return null;
     }
 
     public function setScriptPath(string $path): void
     {
         $this->scriptPathOverride = ScriptStack::normalize($path);
+    }
+
+    public function setCompileSource(?string $source): void
+    {
+        $this->compileSource = $source;
+    }
+
+    public function compileSource(): ?string
+    {
+        return $this->compileSource;
     }
 
     /** Absolute path of the PHP source unit for this block (issue #707). */
@@ -255,12 +334,14 @@ class Block {
             && !$this->inheritUndefinedLocals;
     }
 
-    public function getOperand(int $offset): Operand {
+    public function getOperand(int $offset): ?Operand {
         foreach ($this->scope as $operand) {
             if ($this->scope[$operand] === $offset) {
                 return $operand;
             }
         }
+
+        return null;
     }
 
     /**
@@ -307,16 +388,88 @@ class Block {
         return $frag;
     }
 
-    public function getVarSlot(Operand $operand, bool $isRead): int {
-        if ($this->scope->contains($operand)) {
-            if ($isRead && $this->shouldRegisterInheritedArg($operand)) {
-                $this->args[$operand] = $this->scope[$operand];
+    /** Scope slot for a declared parameter by name (php-cfg clones Var operands per read site, #16264). */
+    public function paramSlotForName(string $name): ?int
+    {
+        $paramIdx = array_search($name, $this->paramNames, true);
+        if (false === $paramIdx) {
+            return null;
+        }
+        foreach ($this->opCodes as $op) {
+            if (OpCode::TYPE_ARG_RECV === $op->type && (int) $op->arg2 === $paramIdx) {
+                return (int) $op->arg1;
             }
-            if (!$isRead) {
-                $this->markLocallyWritten($operand);
-            }
+        }
 
-            return $this->scope[$operand];
+        return $this->slotIndexForVariableName($name);
+    }
+
+    /**
+     * Closure capture CV slots are read-only for unrelated expression writes (#17089).
+     */
+    public function closureCaptureSlotWritableForOperand(int $slot, Operand $operand): bool
+    {
+        if (!isset($this->closureCaptureSlots[$slot])) {
+            return true;
+        }
+        $captureName = $this->closureCaptureSlotNames[$slot] ?? null;
+        if (null === $captureName || '' === $captureName) {
+            return false;
+        }
+        foreach ([$operand, self::cfgVarRoot($operand)] as $candidate) {
+            if (!$candidate instanceof Operand) {
+                continue;
+            }
+            $name = self::resolveVariableName($candidate);
+            if ($captureName === $name) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public function getVarSlot(Operand $operand, bool $isRead): int {
+        if ($isRead) {
+            $name = self::resolveVariableName($operand);
+            if (null !== $name && '' !== $name) {
+                $paramSlot = $this->paramSlotForName($name);
+                if (null !== $paramSlot) {
+                    $this->scope[$operand] = $paramSlot;
+                    if ($this->shouldRegisterInheritedArg($operand)) {
+                        $this->args[$operand] = $paramSlot;
+                    }
+
+                    return $paramSlot;
+                }
+            }
+            $namedDest = $this->slotForNamedAssignDest($operand);
+            if (null === $namedDest) {
+                if (null !== $name && '' !== $name) {
+                    $namedDest = $this->slotIndexForVariableName($name);
+                }
+            }
+            if (null !== $namedDest) {
+                $this->scope[$operand] = $namedDest;
+                if ($this->shouldRegisterInheritedArg($operand)) {
+                    $this->args[$operand] = $namedDest;
+                }
+
+                return $namedDest;
+            }
+        }
+        if ($this->scope->contains($operand)) {
+            $existing = $this->scope[$operand];
+            if ($isRead || $this->closureCaptureSlotWritableForOperand($existing, $operand)) {
+                if ($isRead && $this->shouldRegisterInheritedArg($operand)) {
+                    $this->args[$operand] = $existing;
+                }
+                if (!$isRead) {
+                    $this->markLocallyWritten($operand);
+                }
+
+                return $existing;
+            }
         }
         // php-cfg may wrap named locals in temporaries after while-assign conditions; bind by
         // variable name before call-site temp clone reuse (#10702, #8560).
@@ -325,7 +478,7 @@ class Block {
             $name = self::resolveVariableName($namedRoot);
             if (null !== $name) {
                 $existing = $this->slotIndexForVariableName($name);
-                if (null !== $existing) {
+                if (null !== $existing && ($isRead || $this->closureCaptureSlotWritableForOperand($existing, $operand))) {
                     $this->scope[$operand] = $existing;
                     if ($isRead && $this->shouldRegisterInheritedArg($operand)) {
                         $this->args[$operand] = $existing;
@@ -341,20 +494,22 @@ class Block {
         // Call-site arg clones wrap inline Expr temps; reuse the producer slot (#8560, #3553).
         if ($operand instanceof Temporary && null !== $operand->original && $this->scope->contains($operand->original)) {
             $existing = $this->scope[$operand->original];
-            $this->scope[$operand] = $existing;
-            if ($isRead && $this->shouldRegisterInheritedArg($operand)) {
-                $this->args[$operand] = $existing;
-            }
-            if (!$isRead) {
-                $this->markLocallyWritten($operand);
-            }
+            if ($isRead || $this->closureCaptureSlotWritableForOperand($existing, $operand)) {
+                $this->scope[$operand] = $existing;
+                if ($isRead && $this->shouldRegisterInheritedArg($operand)) {
+                    $this->args[$operand] = $existing;
+                }
+                if (!$isRead) {
+                    $this->markLocallyWritten($operand);
+                }
 
-            return $existing;
+                return $existing;
+            }
         }
         $name = self::resolveVariableName($operand);
         if (null !== $name) {
             $existing = $this->slotIndexForVariableName($name);
-            if (null !== $existing) {
+            if (null !== $existing && ($isRead || $this->closureCaptureSlotWritableForOperand($existing, $operand))) {
                 $this->scope[$operand] = $existing;
                 if ($isRead && $this->shouldRegisterInheritedArg($operand)) {
                     $this->args[$operand] = $existing;
@@ -371,6 +526,9 @@ class Block {
             foreach ($this->scope as $scopedOp) {
                 if (self::cfgVarRoot($scopedOp) === $cfgVar) {
                     $existing = $this->scope[$scopedOp];
+                    if (!$isRead && !$this->closureCaptureSlotWritableForOperand($existing, $operand)) {
+                        continue;
+                    }
                     $this->scope[$operand] = $existing;
                     if ($isRead && $this->shouldRegisterInheritedArg($operand)) {
                         $this->args[$operand] = $existing;
@@ -422,6 +580,10 @@ class Block {
         if (null !== $root) {
             $this->localWrittenVars[$root] = true;
         }
+        $name = self::resolveVariableName($operand);
+        if (null !== $name && '' !== $name) {
+            $this->localWrittenVarNames[$name] = true;
+        }
     }
 
     private function isLocallyWritten(Operand $operand): bool
@@ -431,6 +593,10 @@ class Block {
         }
         $root = self::cfgVarRoot($operand);
         if (null !== $root && isset($this->localWrittenVars[$root])) {
+            return true;
+        }
+        $name = self::resolveVariableName($operand);
+        if (null !== $name && '' !== $name && isset($this->localWrittenVarNames[$name])) {
             return true;
         }
 
@@ -462,8 +628,43 @@ class Block {
 
     public function registerConstant(Operand $operand, Variable $const): int {
         $slot = $this->getVarSlot($operand, false);
+        if (isset($this->constants[$slot]) && !$this->compileTimeConstantsMatch($this->constants[$slot], $const)) {
+            $slot = $this->forceFreshVarSlot($operand);
+        }
         $this->constants[$slot] = $const;
+
         return $slot;
+    }
+
+    /** True when two compile-time slot constants are the same value (#15902). */
+    private function compileTimeConstantsMatch(Variable $existing, Variable $incoming): bool
+    {
+        if ($existing->type !== $incoming->type) {
+            return false;
+        }
+
+        return match ($existing->type) {
+            Variable::TYPE_INTEGER => $existing->toInt() === $incoming->toInt(),
+            Variable::TYPE_FLOAT => $existing->toFloat() === $incoming->toFloat(),
+            Variable::TYPE_BOOLEAN => $existing->toBool() === $incoming->toBool(),
+            Variable::TYPE_STRING => $existing->toString() === $incoming->toString(),
+            Variable::TYPE_NULL => true,
+            default => false,
+        };
+    }
+
+    /**
+     * Per-run copy of a compile-time constant for frame scope (#12040, ServeCompileCache).
+     *
+     * Cached {@see Block} instances must not share {@see Variable} cells with execution
+     * scope — builtins may coerce/mutate argument operands in place.
+     */
+    private function scopeConstantVariable(int $slot): Variable
+    {
+        $copy = new Variable();
+        $copy->duplicateFrom($this->constants[$slot]);
+
+        return $copy;
     }
 
     /**
@@ -473,6 +674,14 @@ class Block {
     {
         foreach ($sibling->eachCfgVarRootSlot() as [$root, $slot]) {
             if ($this->scope->contains($root)) {
+                continue;
+            }
+            // Named locals keep their CV slot; sibling &&/|| phi maps must not rebind (#15183, #16040).
+            $name = self::resolveVariableName($root);
+            if (null !== $name && '' !== $name) {
+                continue;
+            }
+            if ($this->namedAssignDestSlots->contains($root)) {
                 continue;
             }
             $this->scope[$root] = $slot;
@@ -503,6 +712,19 @@ class Block {
     /** Pre-bind a cfg Var root before lowering branch assigns (#3790). */
     public function prebindCfgVarRoot(VarOperand $root, int $slot): void
     {
+        if ($this->namedAssignDestSlots->contains($root)) {
+            $dest = $this->namedAssignDestSlots[$root];
+            if ($dest !== $slot) {
+                return;
+            }
+        }
+        $name = self::resolveVariableName($root);
+        if (null !== $name && '' !== $name) {
+            $existing = $this->slotForNamedAssignDest($root);
+            if (null !== $existing && $existing !== $slot) {
+                return;
+            }
+        }
         if (!$this->scope->contains($root)) {
             $this->scope[$root] = $slot;
         }
@@ -511,6 +733,13 @@ class Block {
     /** Ensure a ?: merge phi slot is present in this branch frame (#5506). */
     public function bindScopeSlot(Operand $operand, int $slot): void
     {
+        $name = self::resolveVariableName($operand);
+        if (null !== $name && '' !== $name) {
+            $existing = $this->slotIndexForVariableName($name);
+            if (null !== $existing && $existing !== $slot) {
+                return;
+            }
+        }
         if (!$this->scope->contains($operand)) {
             $this->scope[$operand] = $slot;
         }
@@ -551,6 +780,19 @@ class Block {
                 $this->constants[$slot] = $parent->constants[$slot];
             }
         }
+        foreach ($parent->namedAssignDestSlotIndexes as $slot => $_) {
+            $this->namedAssignDestSlotIndexes[$slot] = true;
+        }
+        foreach ($parent->namedAssignDestSlots as $root) {
+            if (!$this->namedAssignDestSlots->contains($root)) {
+                $this->namedAssignDestSlots[$root] = $parent->namedAssignDestSlots[$root];
+            }
+        }
+        foreach ($parent->assignResultToLvalueSlot as $resultSlot => $lvalueSlot) {
+            if (!isset($this->assignResultToLvalueSlot[$resultSlot])) {
+                $this->assignResultToLvalueSlot[$resultSlot] = $lvalueSlot;
+            }
+        }
         // literal/deploy include path tables are per-block; inheriting parent paths breaks
         // arg3 indices and can recurse into the wrong TU (layout vs partial, issue #784).
         if (null !== $parent->func) {
@@ -569,6 +811,7 @@ class Block {
             $this->paramClassConstraints = $parent->paramClassConstraints;
             $this->paramDeclaredTypeLabels = $parent->paramDeclaredTypeLabels;
             $this->paramIterableSlots = $parent->paramIterableSlots;
+            $this->paramCallableSlots = $parent->paramCallableSlots;
             $this->paramNeverSlots = $parent->paramNeverSlots;
             $this->paramLiteralBoolTypes = $parent->paramLiteralBoolTypes;
             $this->returnLiteralBoolType = $parent->returnLiteralBoolType;
@@ -633,18 +876,29 @@ class Block {
 
     public function slotIndexForVariableName(string $name): ?int
     {
+        $fallback = null;
         foreach ($this->scope as $operand) {
-            if (self::resolveVariableName($operand) === $name) {
-                return $this->scope[$operand];
+            if (self::resolveVariableName($operand) !== $name) {
+                continue;
+            }
+            $slot = $this->scope[$operand];
+            if (isset($this->namedAssignDestSlotIndexes[$slot])) {
+                return $slot;
+            }
+            if (null === $fallback) {
+                $fallback = $slot;
             }
         }
 
-        return null;
+        return $fallback;
     }
 
     /** True when $slot holds a named local ($a), not a compiler temporary (#5340). */
     public function isNamedVariableSlot(int $slot): bool
     {
+        if (isset($this->namedAssignDestSlotIndexes[$slot])) {
+            return true;
+        }
         foreach ($this->scope as $operand) {
             if ($this->scope[$operand] === $slot && null !== self::resolveVariableName($operand)) {
                 return true;
@@ -708,6 +962,145 @@ class Block {
         foreach ([$op->arg1, $op->arg2, $op->arg3] as $arg) {
             if (null !== $arg && (int) $arg === $slot) {
                 return true;
+            }
+        }
+
+        return false;
+    }
+
+    public function markDeferredArrayLiteralKeepSlot(int $slot): void
+    {
+        $this->deferredArrayLiteralKeepSlots[$slot] = true;
+        foreach ($this->parents as $parent) {
+            if ($parent instanceof self) {
+                $parent->markDeferredArrayLiteralKeepSlot($slot);
+            }
+        }
+    }
+
+    /**
+     * Match unhandled-error lowering reads the scrutinee again on JUMPIF targets (#13955).
+     * Concat/?? chains read prefix temps on COALESCE/JUMP merge arms (#17375).
+     */
+    public function scopeSlotReadInJumpTargets(int $slot): bool
+    {
+        foreach ($this->opCodes as $op) {
+            foreach ($this->controlFlowBranchTargets($op) as $target) {
+                if (!$target instanceof self) {
+                    continue;
+                }
+                $seen = [];
+                if ($target->blockReadsScopeSlotTree($slot, $seen)) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @return array<int, self|null>
+     */
+    private function controlFlowBranchTargets(OpCode $op): array
+    {
+        return match ($op->type) {
+            OpCode::TYPE_JUMPIF, OpCode::TYPE_COALESCE => [$op->block1, $op->block2],
+            OpCode::TYPE_JUMP => [$op->block1],
+            default => [],
+        };
+    }
+
+    /**
+     * One-level JUMPIF target scan — enough to drop cond-expression temps without
+     * treating distant merge/successor blocks as live (#14103 vs #13955 fcall keep).
+     * ?: arms that JUMP to a shared merge must still preserve prefix temps (#14133);
+     * nested ?: arms may chain through inner JUMPIF + JUMP blocks (#14260).
+     */
+    public function scopeSlotReadInDirectJumpTargets(int $slot): bool
+    {
+        foreach ($this->opCodes as $op) {
+            foreach ($this->controlFlowBranchTargets($op) as $target) {
+                if (!$target instanceof self) {
+                    continue;
+                }
+                $seen = [];
+                if ($this->branchOrJumpMergeReadsScopeSlot($target, $slot, $seen)) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @param array<int, true> $seen
+     */
+    private function branchOrJumpMergeReadsScopeSlot(self $branch, int $slot, array &$seen = []): bool
+    {
+        $id = spl_object_id($branch);
+        if (isset($seen[$id])) {
+            return false;
+        }
+        $seen[$id] = true;
+
+        foreach ($branch->opCodes as $branchOp) {
+            if ($this->opCodeReadsScopeSlot($branchOp, $slot)) {
+                return true;
+            }
+            if (
+                OpCode::TYPE_JUMP === $branchOp->type
+                && $branchOp->block1 instanceof self
+                && $this->branchOrJumpMergeReadsScopeSlot($branchOp->block1, $slot, $seen)
+            ) {
+                return true;
+            }
+            if (OpCode::TYPE_COALESCE === $branchOp->type) {
+                foreach ([$branchOp->block1, $branchOp->block2] as $target) {
+                    if (
+                        $target instanceof self
+                        && $this->branchOrJumpMergeReadsScopeSlot($target, $slot, $seen)
+                    ) {
+                        return true;
+                    }
+                }
+            }
+            if (OpCode::TYPE_JUMPIF === $branchOp->type) {
+                foreach ([$branchOp->block1, $branchOp->block2] as $target) {
+                    if (
+                        $target instanceof self
+                        && $this->branchOrJumpMergeReadsScopeSlot($target, $slot, $seen)
+                    ) {
+                        return true;
+                    }
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @param array<int, true> $seen
+     */
+    private function blockReadsScopeSlotTree(int $slot, array &$seen): bool
+    {
+        $id = spl_object_id($this);
+        if (isset($seen[$id])) {
+            return false;
+        }
+        $seen[$id] = true;
+        foreach ($this->opCodes as $op) {
+            if ($this->opCodeReadsScopeSlot($op, $slot)) {
+                return true;
+            }
+        }
+        foreach ($this->opCodes as $op) {
+            foreach ($this->controlFlowBranchTargets($op) as $target) {
+                if ($target instanceof self && $target->blockReadsScopeSlotTree($slot, $seen)) {
+                    return true;
+                }
             }
         }
 
@@ -875,7 +1268,7 @@ class Block {
             // Variable reads in args must still resolve (#3787 merge + literal arm).
             if (isset($scope[$pos]) && !$this->args->contains($op)) {
                 if (isset($this->constants[$pos])) {
-                    $scope[$pos] = $this->constants[$pos];
+                    $scope[$pos] = $this->scopeConstantVariable($pos);
                 }
 
                 continue;
@@ -908,7 +1301,7 @@ class Block {
             }
 
             if (isset($this->constants[$pos]) && !$this->args->contains($op)) {
-                $scope[$pos] = $this->constants[$pos];
+                $scope[$pos] = $this->scopeConstantVariable($pos);
             } elseif (isset($this->closureCaptureSlots[$pos])) {
                 $scope[$pos] = self::initialVariableForOperand($op, $context, $pos, $this);
             } elseif ($this->isArgRecvParameterSlot($pos)) {
@@ -1027,12 +1420,23 @@ class Block {
                 $return->generatorState = $frame->generatorState;
             }
             // Zend CV "initialized" bitmap survives across CFG block frames (#4489, generator_nested.phpt).
+            // Do not inherit caller slot-init bits when entering a nested user function (#12421).
             for ($f = $frame; null !== $f; $f = $f->parent) {
+                if (
+                    null !== $this->func
+                    && (null === $f->block->func || $f->block->func !== $this->func)
+                ) {
+                    break;
+                }
                 foreach ($f->initializedSlots as $slot => $_) {
                     if (isset($scope[$slot])) {
                         $return->initializedSlots[$slot] = true;
                     }
                 }
+            }
+            // func_get_arg(s)/func_num_args() read calledArgs on the active frame (#12337).
+            if ([] !== $frame->calledArgs) {
+                $return->calledArgs = $frame->calledArgs;
             }
         }
         return $return;
@@ -1055,13 +1459,13 @@ class Block {
         for ($i = 0; $i <= $max; ++$i) {
             if (isset($scope[$i])) {
                 if (isset($this->constants[$i])) {
-                    $scope[$i] = $this->constants[$i];
+                    $scope[$i] = $this->scopeConstantVariable($i);
                 }
 
                 continue;
             }
             if (isset($this->constants[$i])) {
-                $scope[$i] = $this->constants[$i];
+                $scope[$i] = $this->scopeConstantVariable($i);
 
                 continue;
             }
@@ -1324,18 +1728,15 @@ class Block {
      */
     public function paramRequiresExactLiteralMatch(int $slot): bool
     {
-        if (isset($this->paramLiteralBoolTypes[$slot])) {
-            return true;
-        }
-        if (!isset($this->paramTypeConstraints[$slot])) {
-            return false;
-        }
-        if (Variable::TYPE_NULL !== $this->paramTypeConstraints[$slot]) {
-            return false;
-        }
-
-        return !isset($this->paramDnfConstraints[$slot])
-            && !isset($this->paramIntersectionConstraints[$slot]);
+        return isset($this->paramLiteralBoolTypes[$slot])
+            || isset($this->paramIterableSlots[$slot])
+            || isset($this->paramCallableSlots[$slot])
+            || (
+                isset($this->paramTypeConstraints[$slot])
+                && Variable::TYPE_NULL === $this->paramTypeConstraints[$slot]
+                && !isset($this->paramDnfConstraints[$slot])
+                && !isset($this->paramIntersectionConstraints[$slot])
+            );
     }
 
     public static function resolveVariableName(Operand $op): ?string
@@ -2159,7 +2560,7 @@ class Block {
             }
             $seen->attach($block);
             foreach ($block->opCodes as $i => $op) {
-                if (OpCode::TYPE_PROPERTY_FETCH !== $op->type) {
+                if (!in_array($op->type, [OpCode::TYPE_PROPERTY_FETCH, OpCode::TYPE_PROPERTY_FETCH_WRITE], true)) {
                     foreach ([$op->block1, $op->block2, $op->block3] as $sub) {
                         if ($sub instanceof self) {
                             $stack[] = $sub;
@@ -2235,7 +2636,7 @@ class Block {
             }
             $seen->attach($block);
             foreach ($block->opCodes as $i => $op) {
-                if (OpCode::TYPE_PROPERTY_FETCH !== $op->type) {
+                if (!in_array($op->type, [OpCode::TYPE_PROPERTY_FETCH, OpCode::TYPE_PROPERTY_FETCH_WRITE], true)) {
                     foreach ([$op->block1, $op->block2, $op->block3] as $sub) {
                         if ($sub instanceof self) {
                             $stack[] = $sub;
@@ -2541,6 +2942,45 @@ class Block {
                     $codeOp = $block->getOperand($op->arg2);
                     if (!$codeOp instanceof Operand\Literal) {
                         return true;
+                    }
+                }
+                foreach ([$op->block1, $op->block2, $op->block3] as $sub) {
+                    if ($sub instanceof self) {
+                        $stack[] = $sub;
+                    }
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /** func_get_arg(s) / func_num_args() — CallArgv must be stored at each call site (#197, #15907). */
+    public static function usesFuncArgsIntrospection(?self $root): bool
+    {
+        if (null === $root) {
+            return false;
+        }
+        $seen = new \SplObjectStorage();
+        $stack = [$root];
+        while ([] !== $stack) {
+            $block = array_pop($stack);
+            if (!$block instanceof self || $seen->contains($block)) {
+                continue;
+            }
+            $seen->attach($block);
+            foreach ($block->opCodes as $op) {
+                if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                    $nameOp = $block->getOperand($op->arg1);
+                    if ($nameOp instanceof Operand\Literal) {
+                        $lc = strtolower($nameOp->value);
+                        if (
+                            'func_get_args' === $lc
+                            || 'func_get_arg' === $lc
+                            || 'func_num_args' === $lc
+                        ) {
+                            return true;
+                        }
                     }
                 }
                 foreach ([$op->block1, $op->block2, $op->block3] as $sub) {

@@ -13,21 +13,19 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
-use PHPCompiler\JIT\ArrayBuiltinHelper;
+use PHPCompiler\JIT\Builtin\ArrayProductRuntime;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * array_product() for arrays of integers and floats (subset of PHP; native LLVM in JIT).
+ * array_product() for arrays of integers and floats (ext/standard/array.c subset).
+ *
+ * VM/JIT SSOT: {@see ArrayProductJitHelper}
  */
 final class array_product extends Internal
 {
-    private const ELEMENT_TYPE_ERROR =
-        'array_product(): Argument #1 ($array) must contain only int and float values';
-
     public function execute(Frame $frame): void
     {
         $argc = \count($frame->calledArgs);
@@ -37,39 +35,10 @@ final class array_product extends Internal
             );
         }
         $ht = VmArray::requireArray($frame->calledArgs[0]->resolveIndirect(), 'array_product');
-        $prodInt = 1;
-        $prodFloat = 1.0;
-        $useFloat = false;
-        foreach ($ht->iterate(true) as $value) {
-            $coerced = VmArray::coerceArrayFoldNumericElement($value);
-            if (null === $coerced) {
-                continue;
-            }
-            [$num, $isFloat] = $coerced;
-            if ($isFloat) {
-                if (!$useFloat) {
-                    $useFloat = true;
-                    $prodFloat = (float) $prodInt * (float) $num;
-                } else {
-                    $prodFloat *= (float) $num;
-                }
-                continue;
-            }
-            $intNum = (int) $num;
-            if ($useFloat) {
-                $prodFloat *= (float) $intNum;
-            } else {
-                $prodInt *= $intNum;
-            }
-        }
         if (null === $frame->returnVar) {
             return;
         }
-        if ($useFloat) {
-            $frame->returnVar->float($prodFloat);
-        } else {
-            $frame->returnVar->int($prodInt);
-        }
+        $frame->returnVar->copyFrom(ArrayProductJitHelper::product($ht));
     }
 
     public Context $context;
@@ -92,15 +61,15 @@ final class array_product extends Internal
             }
         }
         if ($args[0]->type & JITVariable::IS_NATIVE_ARRAY) {
-            return ArrayBuiltinHelper::arrayProduct($context, $args[0]);
+            return ArrayProductRuntime::product($context, $args[0]);
         }
         if (JITVariable::TYPE_HASHTABLE === $args[0]->type) {
-            return ArrayBuiltinHelper::arrayProduct($context, $args[0]);
+            return ArrayProductRuntime::product($context, $args[0]);
         }
         if (JITVariable::TYPE_VALUE === $args[0]->type) {
             JitArrayElem::requireArrayArg($context, $args[0], 'array_product');
 
-            return ArrayBuiltinHelper::arrayProduct($context, $args[0]);
+            return ArrayProductRuntime::product($context, $args[0]);
         }
         TypeErrorRaise::emitRaise(
             $context,

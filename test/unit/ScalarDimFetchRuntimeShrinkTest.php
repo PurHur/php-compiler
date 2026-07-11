@@ -14,7 +14,7 @@ final class ScalarDimFetchRuntimeShrinkTest extends TestCase
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ScalarDimFetchRuntime.php');
         $this->assertStringContainsString('ScalarDimFetchJitHelper', $source);
         $this->assertStringContainsString('emitWarningForJitType', $source);
-        $this->assertStringContainsString('ensureJitHelperCompiled', $source);
+        $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $source);
         $this->assertStringNotContainsString('__compiler_trigger_error', $source);
         $this->assertStringNotContainsString('scalar_dim_fetch_warn_t', $source);
     }

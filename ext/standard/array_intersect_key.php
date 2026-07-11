@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+require_once __DIR__.'/VmArrayAssocSetOps.php';
+
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
-use PHPCompiler\JIT\ArrayBuiltinHelper;
+use PHPCompiler\JIT\Builtin\ArrayIntersectKeyRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\HashTable;
@@ -86,6 +88,6 @@ final class array_intersect_key extends Internal
             }
         }
 
-        return ArrayBuiltinHelper::arrayIntersectKey($context, ...$args);
+        return ArrayIntersectKeyRuntime::intersectKey($context, $args[0], ...\array_slice($args, 1));
     }
 }

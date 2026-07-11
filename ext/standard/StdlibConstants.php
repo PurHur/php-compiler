@@ -36,6 +36,11 @@ final class StdlibConstants
     public const STR_PAD_RIGHT = 1;
     public const STR_PAD_BOTH = 2;
 
+    /** array_pad() pad type (ext/standard/array.c, PHP 8.4+, #14993). */
+    public const ARRAY_PAD_LEFT = 0;
+    public const ARRAY_PAD_RIGHT = 1;
+    public const ARRAY_PAD_BOTH = 2;
+
     /** get_html_translation_table() table selector (ext/standard/html.c). */
     public const HTML_SPECIALCHARS = 0;
     public const HTML_ENTITIES = 1;
@@ -43,6 +48,8 @@ final class StdlibConstants
     /** htmlspecialchars() / htmlentities() flags (ext/standard/html.c). */
     public const ENT_COMPAT = 2;
     public const ENT_QUOTES = 3;
+    /** php-src default for htmlentities() / html_entity_decode() ($flags parameter). */
+    public const ENT_HTML_DEFAULT = self::ENT_QUOTES | self::ENT_SUBSTITUTE;
     public const ENT_NOQUOTES = 0;
     public const ENT_IGNORE = 4;
     public const ENT_SUBSTITUTE = 8;
@@ -76,6 +83,17 @@ final class StdlibConstants
     public const FILE_IGNORE_NEW_LINES = 2;
     public const FILE_SKIP_EMPTY_LINES = 4;
     public const FILE_APPEND = 8;
+    public const FILE_NO_DEFAULT_CONTEXT = 16;
+
+    /** fseek()/gzseek() whence values (ext/standard/file.c, stddef.h SEEK_*). */
+    public const SEEK_SET = 0;
+    public const SEEK_CUR = 1;
+    public const SEEK_END = 2;
+
+    /** scandir() sort order (ext/standard/dir.c). */
+    public const SCANDIR_SORT_ASCENDING = 0;
+    public const SCANDIR_SORT_DESCENDING = 1;
+    public const SCANDIR_SORT_NONE = 2;
 
     /** sort() / array_multisort() flags (ext/standard/php_array.h). */
     public const SORT_REGULAR = 0;
@@ -131,6 +149,10 @@ final class StdlibConstants
     public const PREG_BAD_UTF8_OFFSET_ERROR = 5;
     public const PREG_JIT_STACKLIMIT_ERROR = 6;
 
+    /** http_build_query() encoding_type (ext/standard/http.c, main/php_variables.h). */
+    public const PHP_QUERY_RFC1738 = VmHttpBuildQuery::ENCODING_RFC1738;
+    public const PHP_QUERY_RFC3986 = VmHttpBuildQuery::ENCODING_RFC3986;
+
     /** password_hash() algorithms — user-visible string ids (ext/standard/password.c). */
     public const PASSWORD_BCRYPT = '2y';
 
@@ -139,6 +161,18 @@ final class StdlibConstants
     public const PASSWORD_ARGON2I = 'argon2i';
 
     public const PASSWORD_ARGON2ID = 'argon2id';
+
+    /**
+     * Lowercase name => string value for compile-time ConstFetch (ext/standard/password.c).
+     *
+     * @var array<string, string>
+     */
+    public const CORE_STRING_BY_NAME = [
+        'password_bcrypt' => self::PASSWORD_BCRYPT,
+        'password_default' => self::PASSWORD_DEFAULT,
+        'password_argon2i' => self::PASSWORD_ARGON2I,
+        'password_argon2id' => self::PASSWORD_ARGON2ID,
+    ];
 
     /** assert_options() selectors (ext/standard/assert.c). */
     public const ASSERT_ACTIVE = 1;
@@ -152,8 +186,26 @@ final class StdlibConstants
 
     public const STREAM_FILTER_WRITE = 2;
 
+    /** php_user_filter::filter() status (ext/standard/php_stream_filter.h; #11747). */
+    public const PSFS_PASS_ON = 2;
+
+    public const PSFS_FEED_ME = 1;
+
+    public const PSFS_FLAG_NORMAL = 0;
+
+    public const PSFS_FLAG_FLUSH_INC = 1;
+
+    public const PSFS_FLAG_FLUSH_CLOSE = 2;
+
     /** stream_socket_client() / stream_socket_server() flags (ext/standard/streamsfuncs.c, #4993). */
+    public const STREAM_CLIENT_PERSISTENT = 1;
+
+    public const STREAM_CLIENT_ASYNC_CONNECT = 2;
+
     public const STREAM_CLIENT_CONNECT = 4;
+
+    /** stream_socket_client() error reporting (main/streams/php_stream_wrappers.h). */
+    public const STREAM_REPORT_ERRORS = 8;
 
     public const STREAM_SERVER_BIND = 4;
 
@@ -169,6 +221,11 @@ final class StdlibConstants
     public const STREAM_SOCK_DGRAM = 2;
 
     public const STREAM_IPPROTO_IP = 0;
+
+    /** stream_cast() cast modes (ext/standard/streams.c PHP_MINIT). */
+    public const STREAM_CAST_AS_STREAM = 0;
+
+    public const STREAM_CAST_FOR_SELECT = 3;
 
     /** syslog priorities (syslog.h; ext/standard/basic_functions.c). */
     public const LOG_EMERG = 0;
@@ -225,6 +282,11 @@ final class StdlibConstants
     public const DNS_A6 = 2048;
     public const DNS_ALL = 4095;
     public const DNS_ANY = 4096;
+    public const DNS_CAA = 8192;
+
+    /** stream_socket_enable_crypto() client/server method flags (ext/standard/streams.c). */
+    public const STREAM_CRYPTO_METHOD_TLS_SERVER = 120;
+    public const STREAM_CRYPTO_METHOD_TLS_CLIENT = 121;
 
     /** glob() flags (ext/standard/dir.c / glob.h; values match php-src on Linux). */
     public const GLOB_ERR = 1;
@@ -241,6 +303,9 @@ final class StdlibConstants
         'str_pad_left' => self::STR_PAD_LEFT,
         'str_pad_right' => self::STR_PAD_RIGHT,
         'str_pad_both' => self::STR_PAD_BOTH,
+        'array_pad_left' => self::ARRAY_PAD_LEFT,
+        'array_pad_right' => self::ARRAY_PAD_RIGHT,
+        'array_pad_both' => self::ARRAY_PAD_BOTH,
         'html_specialchars' => self::HTML_SPECIALCHARS,
         'html_entities' => self::HTML_ENTITIES,
         'ent_compat' => self::ENT_COMPAT,
@@ -257,6 +322,10 @@ final class StdlibConstants
         'php_round_half_down' => self::PHP_ROUND_HALF_DOWN,
         'php_round_half_even' => self::PHP_ROUND_HALF_EVEN,
         'php_round_half_odd' => self::PHP_ROUND_HALF_ODD,
+        'php_round_ceiling' => self::PHP_ROUND_CEILING,
+        'php_round_floor' => self::PHP_ROUND_FLOOR,
+        'php_round_toward_zero' => self::PHP_ROUND_TOWARD_ZERO,
+        'php_round_away_from_zero' => self::PHP_ROUND_AWAY_FROM_ZERO,
         'case_lower' => self::CASE_LOWER,
         'case_upper' => self::CASE_UPPER,
         'ini_scanner_normal' => self::INI_SCANNER_NORMAL,
@@ -266,6 +335,13 @@ final class StdlibConstants
         'file_skip_empty_lines' => self::FILE_SKIP_EMPTY_LINES,
         'file_use_include_path' => self::FILE_USE_INCLUDE_PATH,
         'file_append' => self::FILE_APPEND,
+        'file_no_default_context' => self::FILE_NO_DEFAULT_CONTEXT,
+        'seek_set' => self::SEEK_SET,
+        'seek_cur' => self::SEEK_CUR,
+        'seek_end' => self::SEEK_END,
+        'scandir_sort_ascending' => self::SCANDIR_SORT_ASCENDING,
+        'scandir_sort_descending' => self::SCANDIR_SORT_DESCENDING,
+        'scandir_sort_none' => self::SCANDIR_SORT_NONE,
         'pathinfo_dirname' => self::PATHINFO_DIRNAME,
         'pathinfo_basename' => self::PATHINFO_BASENAME,
         'pathinfo_extension' => self::PATHINFO_EXTENSION,
@@ -277,7 +353,15 @@ final class StdlibConstants
         'fnm_casefold' => VmFnmatch::FNM_CASEFOLD,
         'stream_filter_read' => self::STREAM_FILTER_READ,
         'stream_filter_write' => self::STREAM_FILTER_WRITE,
+        'psfs_pass_on' => self::PSFS_PASS_ON,
+        'psfs_feed_me' => self::PSFS_FEED_ME,
+        'psfs_flag_normal' => self::PSFS_FLAG_NORMAL,
+        'psfs_flag_flush_inc' => self::PSFS_FLAG_FLUSH_INC,
+        'psfs_flag_flush_close' => self::PSFS_FLAG_FLUSH_CLOSE,
+        'stream_client_persistent' => self::STREAM_CLIENT_PERSISTENT,
+        'stream_client_async_connect' => self::STREAM_CLIENT_ASYNC_CONNECT,
         'stream_client_connect' => self::STREAM_CLIENT_CONNECT,
+        'stream_report_errors' => self::STREAM_REPORT_ERRORS,
         'stream_server_bind' => self::STREAM_SERVER_BIND,
         'stream_server_listen' => self::STREAM_SERVER_LISTEN,
         'stream_pf_unix' => self::STREAM_PF_UNIX,
@@ -285,6 +369,8 @@ final class StdlibConstants
         'stream_sock_stream' => self::STREAM_SOCK_STREAM,
         'stream_sock_dgram' => self::STREAM_SOCK_DGRAM,
         'stream_iproto_ip' => self::STREAM_IPPROTO_IP,
+        'stream_cast_as_stream' => self::STREAM_CAST_AS_STREAM,
+        'stream_cast_for_select' => self::STREAM_CAST_FOR_SELECT,
         'sunfuncs_ret_string' => VmDate::SUNFUNCS_RET_STRING,
         'sunfuncs_ret_double' => VmDate::SUNFUNCS_RET_DOUBLE,
         'sunfuncs_ret_timestamp' => VmDate::SUNFUNCS_RET_TIMESTAMP,
@@ -323,6 +409,8 @@ final class StdlibConstants
         'preg_bad_utf8_error' => self::PREG_BAD_UTF8_ERROR,
         'preg_bad_utf8_offset_error' => self::PREG_BAD_UTF8_OFFSET_ERROR,
         'preg_jit_stacklimit_error' => self::PREG_JIT_STACKLIMIT_ERROR,
+        'php_query_rfc1738' => self::PHP_QUERY_RFC1738,
+        'php_query_rfc3986' => self::PHP_QUERY_RFC3986,
         'log_emerg' => self::LOG_EMERG,
         'log_alert' => self::LOG_ALERT,
         'log_crit' => self::LOG_CRIT,
@@ -379,6 +467,9 @@ final class StdlibConstants
         'dns_a6' => self::DNS_A6,
         'dns_all' => self::DNS_ALL,
         'dns_any' => self::DNS_ANY,
+        'dns_caa' => self::DNS_CAA,
+        'stream_crypto_method_tls_server' => self::STREAM_CRYPTO_METHOD_TLS_SERVER,
+        'stream_crypto_method_tls_client' => self::STREAM_CRYPTO_METHOD_TLS_CLIENT,
         'assert_active' => self::ASSERT_ACTIVE,
         'assert_callback' => self::ASSERT_CALLBACK,
         'assert_bail' => self::ASSERT_BAIL,
@@ -412,6 +503,9 @@ final class StdlibConstants
         'str_pad_left',
         'str_pad_right',
         'str_pad_both',
+        'array_pad_left',
+        'array_pad_right',
+        'array_pad_both',
         'html_specialchars',
         'html_entities',
         'ent_compat',
@@ -428,6 +522,10 @@ final class StdlibConstants
         'php_round_half_down',
         'php_round_half_even',
         'php_round_half_odd',
+        'php_round_ceiling',
+        'php_round_floor',
+        'php_round_toward_zero',
+        'php_round_away_from_zero',
         'case_lower',
         'case_upper',
         'ini_scanner_normal',
@@ -437,6 +535,13 @@ final class StdlibConstants
         'file_skip_empty_lines',
         'file_use_include_path',
         'file_append',
+        'file_no_default_context',
+        'seek_set',
+        'seek_cur',
+        'seek_end',
+        'scandir_sort_ascending',
+        'scandir_sort_descending',
+        'scandir_sort_none',
         'pathinfo_dirname',
         'pathinfo_basename',
         'pathinfo_extension',

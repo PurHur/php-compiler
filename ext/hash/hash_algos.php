@@ -13,7 +13,7 @@ use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** hash_algos() — digest algorithms supported by VmHashNative (ext/hash/hash.c, issue #6937). */
+/** hash_algos() — digest algorithms registered in ext/hash (ext/hash/hash.c, issues #6937, #11463). */
 final class hash_algos extends Internal
 {
     public function __construct()

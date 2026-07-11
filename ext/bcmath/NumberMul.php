@@ -22,7 +22,8 @@ final class NumberMul extends BcMathNumberMethod
         }
         $right = $this->coerceOperand($frame, 1, 'BcMath\\Number::mul', 'num');
         $scale = $this->optionalScale($frame, 2, 'BcMath\\Number::mul');
-        $result = VmBcmath::mul(VmBcMathNumber::valueString($receiver), $right, $scale);
-        $this->returnNumber($frame, $result, $scale);
+        $effectiveScale = $this->effectiveMulScale($receiver, $right, $scale);
+        $result = VmBcmath::mul(VmBcMathNumber::valueString($receiver), $right, $effectiveScale);
+        $this->returnNumber($frame, $result, $effectiveScale);
     }
 }

@@ -4,12 +4,16 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\types;
 
+use PHPCompiler\ext\standard\JitBuiltinWarning;
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\StringTriggerErrorJit;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
+use PHPCompiler\JIT\JitNativeString;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\TryCatchHelper;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -28,11 +32,22 @@ final class JitStrlen
 
                 return $context->getTypeFromString('int64')->constInt(0, false);
             }
+            self::emitNullStringDeprecation($context);
 
             return $context->getTypeFromString('int64')->constInt(0, false);
         }
         if (JITVariable::TYPE_VALUE === $arg->type) {
+            $literal = JitStringArg::compileTimeLiteral($arg);
+            if (null !== $literal) {
+                return $context->getTypeFromString('int64')->constInt(\strlen($literal), false);
+            }
+
             return self::lowerLengthFromValueBox($context, $arg);
+        }
+        if (null !== JitStringArg::compileTimeLiteral($arg)) {
+            $literal = JitStringArg::compileTimeLiteral($arg);
+
+            return $context->getTypeFromString('int64')->constInt(\strlen($literal), false);
         }
         $strPtr = self::lowerStringOperand($context, $arg);
         $doneBlock = BasicBlockHelper::append($context, 'strlen_scalar_done');
@@ -50,9 +65,13 @@ final class JitStrlen
             return self::unreachableStringPtr($context);
         }
         if (JITVariable::TYPE_OBJECT === $arg->type) {
-            JitStringBuiltinArg::emitObjectTypeErrorReject($context, $arg, 'strlen', 0, 'string');
+            if ($context->callerStrictTypes) {
+                JitStringBuiltinArg::emitObjectTypeErrorReject($context, $arg, 'strlen', 0, 'string');
 
-            return self::unreachableStringPtr($context);
+                return self::unreachableStringPtr($context);
+            }
+
+            return $context->helper->loadValue(JitNativeString::coerce($context, $arg));
         }
         if (JITVariable::TYPE_VALUE === $arg->type) {
             return self::lowerBoxedStringOperand($context, $arg);
@@ -61,7 +80,7 @@ final class JitStrlen
             JitInternalStrictArg::requireString($context, $arg, 'strlen', 'string', 1);
         }
 
-        return JitStringArg::lower($context, $arg, 'strlen() string');
+        return JitStringArg::lowerDominating($context, $arg, 'strlen() string');
     }
 
     public static function lowerBoxedStringOperand(Context $context, JITVariable $arg): Value
@@ -97,7 +116,11 @@ final class JitStrlen
         $context->builder->branchIf($isObjOrEnum, $objectBlock, $strictBlock);
 
         $context->builder->positionAtEnd($objectBlock);
-        JitStringBuiltinArg::emitRuntimeBoxedRejectForStrlen($context, $valuePtr, $isEnumCase);
+        if ($context->callerStrictTypes) {
+            JitStringBuiltinArg::emitRuntimeBoxedRejectForStrlen($context, $valuePtr, $isEnumCase);
+        } else {
+            return JitStringBuiltinArg::lowerCoercible($context, $arg, 'strlen', 0, 'string');
+        }
 
         $context->builder->positionAtEnd($strictBlock);
         if ($context->callerStrictTypes) {
@@ -114,7 +137,7 @@ final class JitStrlen
             $context->builder->positionAtEnd($coerceBlock);
         }
 
-        return JitStringArg::lower($context, $arg, 'strlen() string');
+        return JitStringArg::lowerDominating($context, $arg, 'strlen() string');
     }
 
     /** @return Value int64 length */
@@ -134,18 +157,30 @@ final class JitStrlen
             $typeKind,
             $i8->constInt(VmVariable::TYPE_NULL, false)
         );
+        $i64 = $context->getTypeFromString('int64');
+        $mergeBlock = null;
+        $nullEnd = null;
+        $nullLen = null;
         if ($context->callerStrictTypes) {
             $context->builder->branchIf($isNull, $nullErrBlock, $okBlock);
             $context->builder->positionAtEnd($nullErrBlock);
             self::emitTypeErrorAndAbort($context, 'null');
-            $context->builder->positionAtEnd($okBlock);
         } else {
-            $coerceFromNullBlock = BasicBlockHelper::append($context, 'strlen_value_null_len');
-            $context->builder->branchIf($isNull, $coerceFromNullBlock, $okBlock);
-            $context->builder->positionAtEnd($coerceFromNullBlock);
-
-            return $context->getTypeFromString('int64')->constInt(0, false);
+            // Null coerces to length 0 (deprecation); every other type continues
+            // through the array/object/coerce checks below. All live non-strict
+            // paths merge in $mergeBlock via phi — an early return here leaves
+            // $okBlock/$coerceBlock dangling and the binary exits mid-output
+            // (#15632, #15641 follow-up).
+            $nullLenBlock = BasicBlockHelper::append($context, 'strlen_value_null_len');
+            $mergeBlock = BasicBlockHelper::append($context, 'strlen_value_done');
+            $context->builder->branchIf($isNull, $nullLenBlock, $okBlock);
+            $context->builder->positionAtEnd($nullLenBlock);
+            self::emitNullStringDeprecation($context);
+            $nullLen = $i64->constInt(0, false);
+            $nullEnd = $context->builder->getInsertBlock();
+            $context->builder->branch($mergeBlock);
         }
+        $context->builder->positionAtEnd($okBlock);
         $arrayTy = $i8->constInt(JITVariable::TYPE_HASHTABLE & 0x7f, false);
         $objectTy = $i8->constInt(VmVariable::TYPE_OBJECT, false);
         $enumCaseTy = $i8->constInt(VmVariable::TYPE_ENUM_CASE, false);
@@ -163,11 +198,32 @@ final class JitStrlen
         $isObjOrEnum = $context->builder->or($isObject, $isEnumCase);
         $context->builder->branchIf($isObjOrEnum, $objectBlock, $coerceBlock);
         $context->builder->positionAtEnd($objectBlock);
-        JitStringBuiltinArg::emitRuntimeBoxedRejectForStrlen($context, $valuePtr, $isEnumCase);
+        $objEnd = null;
+        $objLen = null;
+        if ($context->callerStrictTypes) {
+            JitStringBuiltinArg::emitRuntimeBoxedRejectForStrlen($context, $valuePtr, $isEnumCase);
+        } else {
+            $argValue = JitStringBuiltinArg::lowerCoercible($context, $arg, 'strlen', 0, 'string');
+            $objLen = self::loadStringLength($context, $argValue);
+            $objEnd = $context->builder->getInsertBlock();
+            $context->builder->branch($mergeBlock);
+        }
         $context->builder->positionAtEnd($coerceBlock);
-        $argValue = JitStringArg::lower($context, $arg, 'strlen() string');
+        $argValue = JitStringArg::lowerDominating($context, $arg, 'strlen() string');
+        $coerceLen = self::loadStringLength($context, $argValue);
+        if (null === $mergeBlock) {
+            return $coerceLen;
+        }
+        $coerceEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($mergeBlock);
 
-        return self::loadStringLength($context, $argValue);
+        $context->builder->positionAtEnd($mergeBlock);
+        $phi = $context->builder->phi($i64, 'strlen_value_len');
+        $phi->addIncoming($nullLen, $nullEnd);
+        $phi->addIncoming($objLen, $objEnd);
+        $phi->addIncoming($coerceLen, $coerceEnd);
+
+        return $phi;
     }
 
     private static function loadStringLength(Context $context, Value $strPtr): Value
@@ -224,5 +280,17 @@ final class JitStrlen
     private static function unreachableStringPtr(Context $context): Value
     {
         return $context->getTypeFromString('__string__*')->constNull();
+    }
+
+    private static function emitNullStringDeprecation(Context $context): void
+    {
+        if (NestedJitCompileScope::isActive()) {
+            return;
+        }
+        StringTriggerErrorJit::implement($context);
+        JitBuiltinWarning::emitDeprecated(
+            $context,
+            'strlen(): Passing null to parameter #1 ($string) of type string is deprecated'
+        );
     }
 }

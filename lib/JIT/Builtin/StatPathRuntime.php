@@ -101,6 +101,11 @@ final class StatPathRuntime
         self::implement($context);
     }
 
+    public static function ensureStandaloneBodies(Context $context): void
+    {
+        self::implement($context);
+    }
+
     public static function implement(Context $context): void
     {
         $probe = $context->module->getNamedFunction(self::FN_EXISTS);

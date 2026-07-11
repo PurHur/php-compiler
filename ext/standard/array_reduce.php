@@ -14,12 +14,13 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func;
 use PHPCompiler\Func\Internal;
-use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\ArrayReduceCallbackPolicy;
+use PHPCompiler\JIT\Builtin\ArrayReduceRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\ClosureState;
 use PHPCompiler\VM\Context as VmContext;
+use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -36,10 +37,7 @@ final class array_reduce extends Internal
         if ($argc < 2 || $argc > 3) {
             throw new \LogicException('array_reduce() requires two or three arguments in this compiler build');
         }
-        $array = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_ARRAY !== $array->type) {
-            throw new \LogicException('array_reduce() first argument must be an array in this compiler build');
-        }
+        $array = VmArray::requireArrayParam($frame->calledArgs[0], 'array_reduce', 1, 'array');
         if (null === $frame->vmContext) {
             throw new \LogicException('array_reduce() requires VM context in this compiler build');
         }
@@ -50,6 +48,16 @@ final class array_reduce extends Internal
         if (null === $frame->returnVar) {
             return;
         }
+        if ($callbackFn instanceof Internal && null === $closure) {
+            $nullInitial = new Variable();
+            $nullInitial->null();
+            $initialOrNull = $hasInitial ? $initial : $nullInitial;
+            $frame->returnVar->copyFrom(
+                ArrayReduceJitHelper::reduceWithBuiltin($array, $callbackFn->name, $initialOrNull)
+            );
+
+            return;
+        }
         self::reduceVm($frame, $array, $hasInitial, $initial, $closure, $callbackFn, $frame->vmContext);
     }
 
@@ -58,7 +66,7 @@ final class array_reduce extends Internal
      */
     private static function reduceVm(
         Frame $frame,
-        Variable $array,
+        HashTable $array,
         bool $hasInitial,
         ?Variable $initial,
         ?ClosureState $closureOrNull,
@@ -71,7 +79,7 @@ final class array_reduce extends Internal
             $carry->copyFrom($initial);
         }
         $empty = true;
-        foreach ($array->toArray()->iterateKeyed(true) as [, $value]) {
+        foreach ($array->iterateKeyed(true) as [, $value]) {
             $empty = false;
             $item = new Variable();
             $item->copyFrom($value);
@@ -113,6 +121,7 @@ final class array_reduce extends Internal
         if ($argc < 2 || $argc > 3) {
             throw new \LogicException('array_reduce() requires two or three arguments in this compiler build');
         }
+        JitArrayElem::requireArrayParam($context, $args[0], 'array_reduce', 1, 'array');
         if ($args[1]->isNullConstant) {
             throw new \TypeError(ArrayReduceCallbackPolicy::invalidCallbackTypeError());
         }
@@ -120,13 +129,10 @@ final class array_reduce extends Internal
             throw new \LogicException(ArrayReduceCallbackPolicy::jitRejectionMessage());
         }
         $initial = 3 === $argc ? $args[2] : null;
-        if (ArrayReduceCallbackPolicy::isClosureJitLowerable($args[1])) {
-            return ArrayBuiltinHelper::buildReduceArrayWithClosure($context, $args[0], $args[1], $initial);
-        }
         if (JITVariable::TYPE_STRING === $args[1]->type || JITVariable::TYPE_VALUE === $args[1]->type) {
             $this->jitString($context, $args[1], 'array_reduce() callback');
         }
 
-        return ArrayBuiltinHelper::buildReduceArray($context, $args[0], $args[1], $initial);
+        return ArrayReduceRuntime::reduce($context, $args[0], $args[1], $initial);
     }
 }

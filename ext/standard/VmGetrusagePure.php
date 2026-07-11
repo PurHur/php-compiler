@@ -14,25 +14,34 @@ namespace PHPCompiler\ext\standard;
  */
 final class VmGetrusagePure
 {
+    /** Linux RUSAGE_CHILDREN — php-src maps user arg 1 to this value (#13018). */
+    public const RUSAGE_CHILDREN = -1;
+
+    public static function available(): bool
+    {
+        return null !== self::readProcSelfStat();
+    }
+
     /**
-     * @return array<int|string, int>|false
+     * @return array<string, int>|false
      */
     public static function getrusage(int $who = 0): array|false
     {
-        // v1: treat children mode as best-effort self stats (issue allows documenting children gaps).
-        unset($who);
+        if (self::RUSAGE_CHILDREN === $who) {
+            return self::zeroedChildrenUsage();
+        }
 
         $stat = self::readProcSelfStat();
         if (null === $stat) {
             return false;
         }
 
-        // Field map: /proc/[pid]/stat (man 5 proc). utime/stime are clock ticks.
-        $minflt = self::intField($stat, 7);
-        $majflt = self::intField($stat, 9);
-        $utimeTicks = self::intField($stat, 11);
-        $stimeTicks = self::intField($stat, 12);
-        $rssPages = self::intField($stat, 21);
+        // Field map: /proc/[pid]/stat (man 5 proc). $parts[$i] == proc field ($i + 4).
+        $minflt = self::intField($stat, 6);
+        $majflt = self::intField($stat, 8);
+        $utimeTicks = self::intField($stat, 10);
+        $stimeTicks = self::intField($stat, 11);
+        $rssPages = self::intField($stat, 20);
 
         [$utimeSec, $utimeUsec] = self::ticksToTimeval($utimeTicks);
         [$stimeSec, $stimeUsec] = self::ticksToTimeval($stimeTicks);
@@ -42,37 +51,62 @@ final class VmGetrusagePure
         $maxrssKb = (int) max(0, (int) (($rssPages * $pageSize) / 1024));
 
         return self::toPhpArray([
-            'ru_utime.tv_sec' => $utimeSec,
-            'ru_utime.tv_usec' => $utimeUsec,
-            'ru_stime.tv_sec' => $stimeSec,
-            'ru_stime.tv_usec' => $stimeUsec,
+            'ru_oublock' => 0,
+            'ru_inblock' => 0,
+            'ru_msgsnd' => 0,
+            'ru_msgrcv' => 0,
             'ru_maxrss' => $maxrssKb,
             'ru_ixrss' => 0,
             'ru_idrss' => 0,
             'ru_minflt' => $minflt,
             'ru_majflt' => $majflt,
-            'ru_nswap' => 0,
-            'ru_inblock' => 0,
-            'ru_oublock' => 0,
-            'ru_msgsnd' => 0,
-            'ru_msgrcv' => 0,
             'ru_nsignals' => 0,
             'ru_nvcsw' => 0,
             'ru_nivcsw' => 0,
+            'ru_nswap' => 0,
+            'ru_utime.tv_usec' => $utimeUsec,
+            'ru_utime.tv_sec' => $utimeSec,
+            'ru_stime.tv_usec' => $stimeUsec,
+            'ru_stime.tv_sec' => $stimeSec,
         ]);
     }
 
     /**
-     * @return array<int|string, int>
+     * RUSAGE_CHILDREN with no waited children — Zend returns zeroed fields (#13018).
+     *
+     * @return array<string, int>
+     */
+    private static function zeroedChildrenUsage(): array
+    {
+        return self::toPhpArray([
+            'ru_oublock' => 0,
+            'ru_inblock' => 0,
+            'ru_msgsnd' => 0,
+            'ru_msgrcv' => 0,
+            'ru_maxrss' => 0,
+            'ru_ixrss' => 0,
+            'ru_idrss' => 0,
+            'ru_minflt' => 0,
+            'ru_majflt' => 0,
+            'ru_nsignals' => 0,
+            'ru_nvcsw' => 0,
+            'ru_nivcsw' => 0,
+            'ru_nswap' => 0,
+            'ru_utime.tv_usec' => 0,
+            'ru_utime.tv_sec' => 0,
+            'ru_stime.tv_usec' => 0,
+            'ru_stime.tv_sec' => 0,
+        ]);
+    }
+
+    /**
+     * @return array<string, int>
      */
     private static function toPhpArray(array $named): array
     {
         $out = [];
-        $i = 0;
         foreach ($named as $key => $value) {
             $out[(string) $key] = (int) $value;
-            $out[$i] = (int) $value;
-            ++$i;
         }
 
         return $out;
@@ -128,7 +162,7 @@ final class VmGetrusagePure
         if ($ticks <= 0) {
             return [0, 0];
         }
-        $hz = self::clockTicksPerSecond();
+        $hz = VmProcClockTicksPure::clockTicksPerSecond();
         if ($hz <= 0) {
             $hz = 100;
         }
@@ -137,20 +171,6 @@ final class VmGetrusagePure
         $usec = (int) max(0, (int) (($rem * 1000000) / $hz));
 
         return [$sec, $usec];
-    }
-
-    private static function clockTicksPerSecond(): int
-    {
-        // Best-effort: allow overriding for deterministic tests.
-        $v = getenv('PHP_COMPILER_PROC_CLK_TCK');
-        if (false !== $v && '' !== $v) {
-            $n = (int) $v;
-            if ($n > 0) {
-                return $n;
-            }
-        }
-
-        return 100;
     }
 
     private static function pageSizeBytes(): int

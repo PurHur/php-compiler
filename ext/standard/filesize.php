@@ -19,13 +19,14 @@ final class filesize extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('filesize() requires exactly one argument in this compiler build');
         }
+        $filenameArg = $frame->calledArgs[0];
         if (null === $frame->returnVar) {
             return;
         }
-        $path = VmFilestatArg::coerceFilenameArg($frame->calledArgs[0], 'filesize');
+        $path = VmFilestatArg::filenameArgForFrame($frame, 0, 'filesize');
         $size = VmFs::fileSize($path);
         if (false === $size) {
-            VmFilestatFailure::warnPathStatFailed($frame, 'filesize', $path, false);
+            VmFilestatArg::warnPathStatFailedForFilenameArg($frame, $filenameArg, 'filesize', $path, false);
             $frame->returnVar->bool(false);
         } else {
             $frame->returnVar->int($size);

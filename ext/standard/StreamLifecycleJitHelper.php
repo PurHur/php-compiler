@@ -18,6 +18,9 @@ final class StreamLifecycleJitHelper
         if ($handle <= 0) {
             return 0;
         }
+        if (VmFs::isFailedStreamHandle($handle)) {
+            return 1;
+        }
         if (VmDir::isValidHandle($handle)) {
             return 1;
         }
@@ -76,6 +79,10 @@ final class StreamLifecycleJitHelper
     /** @return int ABI for __compiler_pclose (status or -1) */
     public static function pcloseArgv(int $handle): int
     {
+        if (VmFs::isValidHandle($handle)) {
+            return VmFs::pclose($handle);
+        }
+
         return StreamLibcHandleJitHelper::pclose($handle);
     }
 }

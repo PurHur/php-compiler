@@ -1,3 +1,5 @@
+# Local Jekyll preview only (cd docs/pages && jekyll serve).
+# GitHub Pages uses the repo-root _config.yml (jekyll-build-pages source=.).
 title: php-compiler
 description: Compile PHP to native binaries — VM, LLVM JIT, AOT web deployment, and self-host bootstrap
 url: "https://purhur.github.io"
@@ -7,4 +9,3 @@ kramdown:
   input: GFM
 exclude:
   - PAGES.md
-  - README.md

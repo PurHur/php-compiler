@@ -25,8 +25,9 @@ final class StatArrayRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('emitStat', $source);
         $this->assertStringNotContainsString('__hashtable__setStringKeyLong', $source);
         $this->assertStringNotContainsString("lookupFunction('lstat')", $source);
+        $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StatArrayLlvm.php');
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StatArrayRuntime.php');
-        $this->assertStringContainsString('StatArrayLlvm::implement', $runtime);
+        $this->assertStringNotContainsString('StatArrayLlvm', $runtime);
     }
 
     public function testStatArrayRuntimeUsesJitHelper(): void

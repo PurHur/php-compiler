@@ -11,6 +11,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
@@ -22,20 +23,14 @@ use PHPLLVM\Value;
 /**
  * number_format() for integers and floats (C-style locale subset; LLVM JIT/AOT).
  *
- * php-src: ext/standard/number_format.c — Z_PARAM_LONG / Z_PARAM_STR
+ * php-src: ext/standard/number_format.c — Z_PARAM_LONG / Z_PARAM_STR / RoundingMode
  */
 final class number_format extends Internal
 {
     public function execute(Frame $frame): void
     {
-        if (!isset($frame->calledArgs[0])) {
-            throw new \LogicException('number_format() requires at least one argument');
-        }
-        foreach (array_keys($frame->calledArgs) as $idx) {
-            if ($idx < 0 || $idx > 3) {
-                throw new \LogicException('number_format() requires one to four arguments');
-            }
-        }
+        $argc = \count($frame->calledArgs);
+        VmNumberFormat::assertArgCount($argc, $frame->calledArgs[4] ?? null);
         if (null === $frame->returnVar) {
             return;
         }
@@ -52,6 +47,9 @@ final class number_format extends Internal
                 'decimals'
             )
             : 0;
+        if ($decimals < 0 && version_compare(CompilerVersion::languageProfileVersion(), '8.4.0', '>=')) {
+            throw new \ValueError('number_format(): Argument #2 ($decimals) must be greater than or equal to 0');
+        }
         $decimalSeparator = isset($frame->calledArgs[2])
             ? VmString::coerceNullableStringBuiltinArg(
                 $frame->calledArgs[2],
@@ -68,11 +66,17 @@ final class number_format extends Internal
                 'thousands_separator'
             ) ?? ','
             : ',';
+        $roundingMode = StdlibConstants::PHP_ROUND_HALF_UP;
+        if (5 === $argc && CompilerVersion::supportsRoundingModeEnum() && isset($frame->calledArgs[4])) {
+            $roundingMode = VmRoundMode::tryRoundModeInt($frame->calledArgs[4]->resolveIndirect())
+                ?? StdlibConstants::PHP_ROUND_HALF_UP;
+        }
         $frame->returnVar->string(VmNumberFormat::format(
             $num,
             $decimals,
             $decimalSeparator,
-            $thousandsSeparator
+            $thousandsSeparator,
+            $roundingMode
         ));
     }
 
@@ -80,10 +84,7 @@ final class number_format extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        $argc = \count($args);
-        if ($argc < 1 || $argc > 4) {
-            throw new \LogicException('number_format() requires one to four arguments');
-        }
+        JitNumberFormat::assertArgCount($context, ...$args);
 
         return JitNumberFormat::format($context, ...$args);
     }

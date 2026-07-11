@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\bcmath;
 
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\JIT\Builtin\Bcmath;
 use PHPCompiler\JIT\Builtin\RoundingModeJit;
 use PHPCompiler\JIT\Context;
@@ -193,20 +194,28 @@ final class JitBcmath
 
     public static function powmod(Context $context, JITVariable ...$args): Value
     {
-        if (\count($args) < 3 || \count($args) > 4) {
-            throw new \LogicException('bcpowmod() requires three or four arguments in this compiler build');
+        $maxArgs = CompilerVersion::supportsRoundingModeEnum() ? 5 : 4;
+        if (\count($args) < 3 || \count($args) > $maxArgs) {
+            throw new \LogicException(
+                5 === $maxArgs
+                    ? 'bcpowmod() requires three to five arguments in this compiler build'
+                    : 'bcpowmod() requires three or four arguments in this compiler build'
+            );
         }
 
         $baseLit = self::compileTimeString($args[0]);
         $expLit = self::compileTimeString($args[1]);
         $modLit = self::compileTimeString($args[2]);
         $scaleLit = isset($args[3]) ? self::compileTimeLong($args[3]) : null;
-        $canFold = null !== $baseLit && null !== $expLit && null !== $modLit && (!isset($args[3]) || null !== $scaleLit);
+        $modeLit = isset($args[4]) ? self::compileTimeRoundMode($context, $args[4]) : null;
+        $canFold = null !== $baseLit && null !== $expLit && null !== $modLit
+            && (!isset($args[3]) || null !== $scaleLit)
+            && (!isset($args[4]) || null !== $modeLit);
         if ($canFold && self::$compileTimeScaleKnown) {
             $scale = null !== $scaleLit ? $scaleLit : self::$compileTimeScale;
 
             return $context->builder->load(
-                $context->constantStringFromString(VmBcmath::powmod($baseLit, $expLit, $modLit, $scale))
+                $context->constantStringFromString(VmBcmath::powmod($baseLit, $expLit, $modLit, $scale, $modeLit))
             );
         }
 
@@ -215,6 +224,7 @@ final class JitBcmath
         $exp = JitStringBuiltinArg::lower($context, $args[1], 'bcpowmod', 1, 'exponent');
         $mod = JitStringBuiltinArg::lower($context, $args[2], 'bcpowmod', 2, 'modulus');
         [$scale, $hasScale] = self::scaleAndFlag($context, $args, 3, 'bcpowmod');
+        [$roundMode, $hasRoundMode] = self::roundModeAndFlag($context, $args, 4, 'bcpowmod');
 
         return $context->builder->call(
             $context->lookupFunction('__compiler_bcpowmod'),
@@ -222,7 +232,9 @@ final class JitBcmath
             $exp,
             $mod,
             $scale,
-            $hasScale
+            $hasScale,
+            $roundMode,
+            $hasRoundMode
         );
     }
 
@@ -284,17 +296,25 @@ final class JitBcmath
         string $leftName,
         string $rightName
     ): Value {
-        if (\count($args) < 2 || \count($args) > 3) {
-            throw new \LogicException($function.'() requires two or three arguments in this compiler build');
+        $maxArgs = CompilerVersion::supportsRoundingModeEnum() ? 4 : 3;
+        if (\count($args) < 2 || \count($args) > $maxArgs) {
+            throw new \LogicException(
+                4 === $maxArgs
+                    ? $function.'() requires two to four arguments in this compiler build'
+                    : $function.'() requires two or three arguments in this compiler build'
+            );
         }
         $leftLit = self::compileTimeString($args[0]);
         $rightLit = self::compileTimeString($args[1]);
         $scaleLit = isset($args[2]) ? self::compileTimeLong($args[2]) : null;
-        $canFold = null !== $leftLit && null !== $rightLit && (!isset($args[2]) || null !== $scaleLit);
+        $modeLit = isset($args[3]) ? self::compileTimeRoundMode($context, $args[3]) : null;
+        $canFold = null !== $leftLit && null !== $rightLit
+            && (!isset($args[2]) || null !== $scaleLit)
+            && (!isset($args[3]) || null !== $modeLit);
         if ($canFold && self::$compileTimeScaleKnown) {
             $scale = null !== $scaleLit ? $scaleLit : self::$compileTimeScale;
             /** @var string $result */
-            $result = VmBcmath::$vmMethod($leftLit, $rightLit, $scale);
+            $result = VmBcmath::$vmMethod($leftLit, $rightLit, $scale, $modeLit);
 
             return $context->builder->load($context->constantStringFromString($result));
         }
@@ -303,14 +323,35 @@ final class JitBcmath
         $left = JitStringBuiltinArg::lower($context, $args[0], $function, 0, $leftName);
         $right = JitStringBuiltinArg::lower($context, $args[1], $function, 1, $rightName);
         [$scale, $hasScale] = self::scaleAndFlag($context, $args, 2, $function);
+        [$roundMode, $hasRoundMode] = self::roundModeAndFlag($context, $args, 3, $function);
 
         return $context->builder->call(
             $context->lookupFunction('__compiler_'.$function),
             $left,
             $right,
             $scale,
-            $hasScale
+            $hasScale,
+            $roundMode,
+            $hasRoundMode
         );
+    }
+
+    /** @param array<int, JITVariable> $args */
+    private static function roundModeAndFlag(Context $context, array $args, int $index, string $function): array
+    {
+        $i64 = $context->getTypeFromString('int64');
+        $i32 = $context->getTypeFromString('int32');
+        if (!isset($args[$index])) {
+            return [$i64->constInt(0, false), $i32->constInt(-1, true)];
+        }
+        if (!CompilerVersion::supportsRoundingModeEnum()) {
+            throw new \LogicException($function.'() accepts at most three arguments in this compiler build');
+        }
+
+        return [
+            self::lowerRoundModeArg($context, $args[$index]),
+            $i32->constInt(1, true),
+        ];
     }
 
     /** @param array<int, JITVariable> $args */

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\JIT\Builtin\StreamReadRuntime;
 use PHPCompiler\JIT\Context;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -15,6 +16,7 @@ final class JitRewind
      * true when rewind succeeds */
     public static function invoke(Context $context, Value $handleLong): Value
     {
+        StreamReadRuntime::ensureLinked($context);
         $i64 = $context->getTypeFromString('int64');
         $result = $context->builder->call(
             $context->lookupFunction('__compiler_fseek'),

@@ -24,7 +24,7 @@ class Module extends ModuleAbstract
             'LIBXML_ERR_WARNING' => LibxmlConstants::LIBXML_ERR_WARNING,
             'LIBXML_ERR_ERROR' => LibxmlConstants::LIBXML_ERR_ERROR,
             'LIBXML_ERR_FATAL' => LibxmlConstants::LIBXML_ERR_FATAL,
-        ] as $name => $value) {
+        ] + LibxmlConstants::parseFlagConstants() as $name => $value) {
             $var = new VM\Variable();
             $var->int($value);
             $runtime->vmContext->defineConstant($name, $var);
@@ -36,7 +36,12 @@ class Module extends ModuleAbstract
         return [
             new libxml_use_internal_errors(),
             new libxml_get_errors(),
+            new libxml_get_last_error(),
             new libxml_clear_errors(),
+            new libxml_set_streams_context(),
+            new libxml_disable_entity_loader(),
+            new libxml_set_external_entity_loader(),
+            new libxml_get_external_entity_loader(),
         ];
     }
 }

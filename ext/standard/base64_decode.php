@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\StringBase64Decode;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -79,10 +80,11 @@ final class base64_decode extends Internal
             );
         }
 
-        return JitBase64Decode::decode(
-            $context,
-            JitStringBuiltinArg::lower($context, $args[0], 'base64_decode', 0, 'string'),
-            $strict
+        StringBase64Decode::ensureLinked($context);
+
+        return $context->builder->call(
+            $context->lookupFunction('__compiler_base64_decode'),
+            JitStringBuiltinArg::lower($context, $args[0], 'base64_decode', 0, 'string')
         );
     }
 }

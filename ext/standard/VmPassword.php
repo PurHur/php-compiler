@@ -9,7 +9,7 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 
 /**
- * VM password_hash() / password_verify() / crypt() — libcrypt via VmPasswordNative (#4794, #6906).
+ * VM password_hash() / password_verify() / crypt() — bcrypt via VmPasswordPure, Argon2 via VmPasswordNative (#4794, #6906, #14182).
  * password_get_info() / password_needs_rehash() — native PHP (issue #6503).
  */
 final class VmPassword
@@ -35,14 +35,18 @@ final class VmPassword
 
     private const BCRYPT_DEFAULT_COST = 10;
 
-    /** crypt() salt generation flags (ext/standard/password.c — CRYPT_*). */
+    /** crypt() salt generation flags (ext/standard/crypt.c — all CRYPT_* are bitmask 1). */
     public const CRYPT_STD_DES = 1;
 
-    public const CRYPT_EXT_DES = 2;
+    public const CRYPT_EXT_DES = 1;
 
-    public const CRYPT_MD5 = 3;
+    public const CRYPT_MD5 = 1;
 
-    public const CRYPT_BLOWFISH = 4;
+    public const CRYPT_BLOWFISH = 1;
+
+    public const CRYPT_SHA256 = 1;
+
+    public const CRYPT_SHA512 = 1;
 
     public static function hash(string $password, int $algo, array $options = [])
     {
@@ -98,7 +102,7 @@ final class VmPassword
         return VmPasswordNative::passwordVerify($password, $hash);
     }
 
-    /** crypt() — libcrypt(3) via FFI (issue #3771, #4794). */
+    /** crypt() — host crypt() via VmPasswordPure (#3771, #4794, #14182). */
     public static function crypt(string $password, string $salt): string
     {
         return VmPasswordNative::crypt($password, $salt);
@@ -207,7 +211,7 @@ final class VmPassword
         return match ($var->type) {
             Variable::TYPE_NULL => 'null',
             Variable::TYPE_BOOLEAN => 'bool',
-            Variable::TYPE_DOUBLE => 'float',
+            Variable::TYPE_FLOAT => 'float',
             Variable::TYPE_STRING => 'string',
             Variable::TYPE_ARRAY => 'array',
             Variable::TYPE_OBJECT => $var->toObject()->class->name,

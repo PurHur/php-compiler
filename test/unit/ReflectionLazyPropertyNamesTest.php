@@ -4,12 +4,20 @@ declare(strict_types=1);
 
 namespace PHPCompiler\Test\Unit;
 
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
-/** ReflectionClass::getLazyPropertyNames() — #6606. */
+/** ReflectionClass::getLazyPropertyNames() — #6606, #16954. */
 final class ReflectionLazyPropertyNamesTest extends TestCase
 {
+    protected function setUp(): void
+    {
+        if (!CompilerVersion::supportsLazyObjectFactories()) {
+            $this->markTestSkipped('Lazy object factories require stable PHP 8.4+ profile (#12375)');
+        }
+    }
+
     public function testMethodExistsAndLazyGhostTraitListsInstanceProperties(): void
     {
         $code = <<<'PHP'
@@ -29,5 +37,24 @@ PHP;
         ob_start();
         $rt->run($block);
         self::assertSame("true\n1\nid\n", ob_get_clean());
+    }
+
+    public function testLazyModifierPropertyNames(): void
+    {
+        $code = <<<'PHP'
+<?php
+class LazyDecl {
+    public lazy string $a = '1';
+    public string $b = '2';
+}
+$names = (new ReflectionClass(LazyDecl::class))->getLazyPropertyNames();
+sort($names);
+echo implode(',', $names), "\n";
+PHP;
+        $rt = new Runtime();
+        $block = $rt->parseAndCompile($code, 'test.php');
+        ob_start();
+        $rt->run($block);
+        self::assertSame("a\n", ob_get_clean());
     }
 }

@@ -57,6 +57,12 @@ final class AttributeRegistryLookupRuntime
             return;
         }
 
+        if (StreamIoRuntime::shouldDeferHeavyStreamIoEmitters($context)) {
+            self::implementDeferredUserScriptStubs($context);
+
+            return;
+        }
+
         self::ensureJitHelperCompiled($context);
         self::implementClassCountBridge($context, $classNamesJson);
         self::implementClassNameAtBridge($context, $classNamesJson);
@@ -64,6 +70,77 @@ final class AttributeRegistryLookupRuntime
         self::implementMethodNameAtBridge($context, $methodNamesJson);
         self::implementClassArgsHashtableBridge($context, $classEntriesJson);
         $context->builder->clearInsertionPosition();
+    }
+
+    /** User-script AOT: linkable attr ABI without nested AttributeRegistryJitHelper JIT (#15417). */
+    private static function implementDeferredUserScriptStubs(Context $context): void
+    {
+        $sizeT = $context->getTypeFromString('size_t');
+        $i8p = $context->getTypeFromString('int8*');
+        $htPtr = $context->getTypeFromString('__hashtable__*');
+        $voidp = $context->getTypeFromString('void*');
+
+        self::implementDeferredSizeTUnaryStub(
+            $context,
+            '__compiler_attr_class_count',
+            $context->context->functionType($sizeT, false, $i8p)
+        );
+        self::implementDeferredCstrTernaryStub(
+            $context,
+            '__compiler_attr_class_name_at',
+            $context->context->functionType($i8p, false, $i8p, $sizeT)
+        );
+        self::implementDeferredSizeTBinaryStub(
+            $context,
+            '__compiler_attr_method_count',
+            $context->context->functionType($sizeT, false, $i8p, $i8p)
+        );
+        self::implementDeferredCstrQuaternaryStub(
+            $context,
+            '__compiler_attr_method_name_at',
+            $context->context->functionType($i8p, false, $i8p, $i8p, $sizeT)
+        );
+
+        $abiName = '__compiler_attr_class_args_hashtable';
+        $ft = $context->context->functionType($htPtr, false, $i8p, $sizeT);
+        $fn = $context->module->addFunction($abiName, $ft);
+        $entry = $fn->appendBasicBlock('attr_class_args_ht_user_stub');
+        $context->builder->positionAtEnd($entry);
+        $context->builder->returnValue(
+            $context->builder->pointerCast($voidp->constNull(), $htPtr)
+        );
+        $context->registerFunction($abiName, $fn);
+        $context->builder->clearInsertionPosition();
+    }
+
+    private static function implementDeferredSizeTUnaryStub(Context $context, string $abiName, $ft): void
+    {
+        $sizeT = $context->getTypeFromString('size_t');
+        $fn = $context->module->addFunction($abiName, $ft);
+        $entry = $fn->appendBasicBlock($abiName.'_user_stub');
+        $context->builder->positionAtEnd($entry);
+        $context->builder->returnValue($sizeT->constInt(0, false));
+        $context->registerFunction($abiName, $fn);
+    }
+
+    private static function implementDeferredSizeTBinaryStub(Context $context, string $abiName, $ft): void
+    {
+        self::implementDeferredSizeTUnaryStub($context, $abiName, $ft);
+    }
+
+    private static function implementDeferredCstrTernaryStub(Context $context, string $abiName, $ft): void
+    {
+        $i8p = $context->getTypeFromString('int8*');
+        $fn = $context->module->addFunction($abiName, $ft);
+        $entry = $fn->appendBasicBlock($abiName.'_user_stub');
+        $context->builder->positionAtEnd($entry);
+        $context->builder->returnValue($i8p->constNull());
+        $context->registerFunction($abiName, $fn);
+    }
+
+    private static function implementDeferredCstrQuaternaryStub(Context $context, string $abiName, $ft): void
+    {
+        self::implementDeferredCstrTernaryStub($context, $abiName, $ft);
     }
 
     private static function implementClassCountBridge(Context $context, string $classNamesJson): void
@@ -259,7 +336,7 @@ final class AttributeRegistryLookupRuntime
         $isNull = $context->builder->icmp(Builder::INT_EQ, $strPtr, $nullStr);
         $empty = $context->builder->pointerCast($context->constantFromString(''), $i8p);
         $map = $context->structFieldMap['__string__'];
-        $chars = $context->builder->load($context->builder->structGep($strPtr, $map['value']));
+        $chars = $context->builder->structGep($strPtr, $map['value']);
         $cstr = $context->builder->pointerCast($chars, $i8p);
 
         return $context->builder->select($isNull, $empty, $cstr);

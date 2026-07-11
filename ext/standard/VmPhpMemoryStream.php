@@ -41,6 +41,30 @@ final class VmPhpMemoryStream
         return $id;
     }
 
+    /**
+     * Open an in-memory stream with a pre-filled buffer (data:// wrapper, #10263).
+     */
+    public static function openWithBuffer(string $uri, string $buffer, string $mode): int|false
+    {
+        $flags = self::parseMode($mode);
+        if (null === $flags) {
+            return false;
+        }
+
+        $id = VmFs::allocateStreamHandleId();
+        $state = new PhpMemoryStreamState($uri, $flags);
+        $state->canRead = true;
+        if ($flags['truncate']) {
+            $state->buffer = '';
+        } else {
+            $state->buffer = $buffer;
+        }
+        $state->position = $flags['append'] ? \strlen($state->buffer) : 0;
+        self::$streams[$id] = $state;
+
+        return $id;
+    }
+
     public static function isValidHandle(int $handle): bool
     {
         return isset(self::$streams[$handle]);
@@ -83,6 +107,9 @@ final class VmPhpMemoryStream
         $take = \min($length, $remaining);
         $chunk = \substr($state->buffer, $state->position, $take);
         $state->position += $take;
+        if ($length > $remaining) {
+            $state->atEof = true;
+        }
 
         return $chunk;
     }
@@ -150,8 +177,35 @@ final class VmPhpMemoryStream
         if (null === $state) {
             return false;
         }
+        if ($state->position > \strlen($state->buffer)) {
+            return false;
+        }
 
         return $state->position;
+    }
+
+    /**
+     * Truncate in-memory buffer (php-src main/streams/php_stream_memory.c).
+     */
+    public static function truncate(int $handle, int $size): bool
+    {
+        $state = self::$streams[$handle] ?? null;
+        if (null === $state || !$state->canWrite || $size < 0) {
+            return false;
+        }
+
+        $len = \strlen($state->buffer);
+        if ($size < $len) {
+            $state->buffer = \substr($state->buffer, 0, $size);
+        } elseif ($size > $len) {
+            $state->buffer .= \str_repeat("\0", $size - $len);
+        }
+        if ($state->position > $size) {
+            $state->position = $size;
+        }
+        $state->atEof = false;
+
+        return true;
     }
 
     public static function eof(int $handle): bool
@@ -212,6 +266,36 @@ final class VmPhpMemoryStream
         return $previous;
     }
 
+    /**
+     * stream_set_write_buffer() / set_file_buffer() for php://memory|temp (#12532, php-src streamsfuncs.c).
+     *
+     * @return int|false previous buffer size (-1 on memory streams)
+     */
+    public static function setWriteBuffer(int $handle, int $buffer): int|false
+    {
+        $state = self::$streams[$handle] ?? null;
+        if (null === $state) {
+            return false;
+        }
+
+        return -1;
+    }
+
+    /**
+     * stream_set_read_buffer() for php://memory|temp (#10489, php-src streamsfuncs.c).
+     *
+     * @return int|false previous buffer size (0 on memory streams)
+     */
+    public static function setReadBuffer(int $handle, int $buffer): int|false
+    {
+        $state = self::$streams[$handle] ?? null;
+        if (null === $state) {
+            return false;
+        }
+
+        return 0;
+    }
+
     public static function streamGetContents(int $handle, int $maxlength = -1, int $offset = -1): string|false
     {
         $state = self::$streams[$handle] ?? null;
@@ -227,10 +311,13 @@ final class VmPhpMemoryStream
         if ($maxlength < 0) {
             $remaining = \strlen($state->buffer) - $state->position;
             if ($remaining <= 0) {
+                $state->atEof = true;
+
                 return '';
             }
             $data = \substr($state->buffer, $state->position, $remaining);
             $state->position += \strlen($data);
+            $state->atEof = true;
 
             return $data;
         }
@@ -274,6 +361,9 @@ final class VmPhpMemoryStream
         if ('' === $line && self::eof($handle)) {
             return false;
         }
+        if ($state->position >= \strlen($state->buffer)) {
+            $state->atEof = true;
+        }
 
         return $line;
     }
@@ -316,6 +406,14 @@ final class VmPhpMemoryStream
         }
 
         return $result;
+    }
+
+    /**
+     * @return array{canRead: bool, canWrite: bool, truncate: bool, append: bool}|null
+     */
+    public static function isValidMode(string $mode): bool
+    {
+        return null !== self::parseMode($mode);
     }
 
     /**

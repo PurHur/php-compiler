@@ -19,13 +19,15 @@ final class VmJsonParser
     private int $depth = 0;
     private int $maxDepth;
     private bool $assoc;
+    private int $flags;
 
-    public function __construct(string $json, int $maxDepth, bool $assoc)
+    public function __construct(string $json, int $maxDepth, bool $assoc, int $flags = 0)
     {
         $this->json = $json;
         $this->len = \strlen($json);
         $this->maxDepth = $maxDepth;
         $this->assoc = $assoc;
+        $this->flags = $flags;
     }
 
     public function atEnd(): bool
@@ -60,11 +62,6 @@ final class VmJsonParser
      */
     private function parseValue(): mixed
     {
-        if ($this->depth > $this->maxDepth) {
-            VmJson::setLastError(1);
-
-            return null;
-        }
         $this->skipWs();
         if ($this->pos >= $this->len) {
             VmJson::setLastError(4);
@@ -76,6 +73,11 @@ final class VmJsonParser
             return $this->parseStringValue();
         }
         if ('{' === $c) {
+            if ($this->depth + 1 >= $this->maxDepth) {
+                VmJson::setLastError(1);
+
+                return null;
+            }
             ++$this->depth;
             $result = $this->parseObjectValue();
             --$this->depth;
@@ -83,6 +85,11 @@ final class VmJsonParser
             return $result;
         }
         if ('[' === $c) {
+            if ($this->depth + 1 >= $this->maxDepth) {
+                VmJson::setLastError(1);
+
+                return null;
+            }
             ++$this->depth;
             $result = $this->parseArrayValue();
             --$this->depth;
@@ -267,9 +274,9 @@ final class VmJsonParser
     }
 
     /**
-     * @return int|float|null
+     * @return array<mixed>|bool|float|int|string|null
      */
-    private function parseNumberValue(): int|float|null
+    private function parseNumberValue(): int|float|string|null
     {
         $start = $this->pos;
         if ('-' === $this->json[$this->pos]) {
@@ -319,8 +326,47 @@ final class VmJsonParser
         if ($isFloat) {
             return (float) $numStr;
         }
+        if (self::fitsSignedInt64Digits($numStr)) {
+            return (int) $numStr;
+        }
+        if (VmJsonFlags::bigintAsString($this->flags)) {
+            return $numStr;
+        }
 
-        return (int) $numStr;
+        return (float) $numStr;
+    }
+
+    /** php-src ext/json/php_json_parser.c — signed 64-bit integer range without host (int) clamp. */
+    private static function fitsSignedInt64Digits(string $numStr): bool
+    {
+        if ('' === $numStr) {
+            return false;
+        }
+        $negative = '-' === $numStr[0];
+        $digits = $negative ? \substr($numStr, 1) : $numStr;
+        if ('' === $digits || !ctype_digit($digits)) {
+            return false;
+        }
+        if ($negative) {
+            $absMin = \substr((string) \PHP_INT_MIN, 1);
+            if (\strlen($digits) > \strlen($absMin)) {
+                return false;
+            }
+            if (\strlen($digits) < \strlen($absMin)) {
+                return true;
+            }
+
+            return strcmp($digits, $absMin) <= 0;
+        }
+        $maxStr = (string) \PHP_INT_MAX;
+        if (\strlen($digits) > \strlen($maxStr)) {
+            return false;
+        }
+        if (\strlen($digits) < \strlen($maxStr)) {
+            return true;
+        }
+
+        return strcmp($digits, $maxStr) <= 0;
     }
 
     private function skipWs(): void

@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace PHPCompiler;
 
+use PHPCompiler\ext\standard\VmRandomNative;
+use PHPCompiler\ext\standard\VmRandomPure;
 use PHPUnit\Framework\TestCase;
 
-/** VM random_bytes/uniqid — no host \\fopen/\\gettimeofday delegation (#8402). */
+/** VmRandomNative — random_bytes without libc getrandom FFI (#12181). */
 final class VmRandomNativeRuntimeShrinkTest extends TestCase
 {
     private string $repoRoot;
@@ -25,22 +27,42 @@ final class VmRandomNativeRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('\\gettimeofday()', $source);
     }
 
-    public function testVmRandomNativeUsesLibcFfiWhenAvailable(): void
+    public function testVmRandomNativeDelegatesToPureWithoutFfi(): void
     {
         $source = (string) file_get_contents($this->repoRoot.'/ext/standard/VmRandomNative.php');
-        $this->assertStringContainsString('getrandom', $source);
-        $this->assertStringContainsString('/dev/urandom', $source);
         $this->assertStringContainsString('VmRandomPure::randomBytes', $source);
-        $this->assertStringNotContainsString('\\fopen', $source);
+        $this->assertStringContainsString('VmRandomPure::available()', $source);
+        $this->assertStringNotContainsString('FFI::cdef', $source);
+        $this->assertDoesNotMatchRegularExpression('/\$ffi->getrandom/', $source);
     }
 
     public function testRandomBytesVmReturnsRequestedLength(): void
     {
-        if (!\PHPCompiler\ext\standard\VmRandomNative::available()) {
-            $this->markTestSkipped('FFI unavailable');
+        if (!VmRandomNative::available()) {
+            $this->markTestSkipped('/dev/urandom unavailable');
         }
         $bytes = \PHPCompiler\ext\standard\VmString::randomBytes(16);
         $this->assertSame(16, \strlen($bytes));
+    }
+
+    public function testRandomBytesWorksWithFfiDisabled(): void
+    {
+        if (!VmRandomPure::available()) {
+            $this->markTestSkipped('/dev/urandom unavailable');
+        }
+        $previous = getenv('PHP_COMPILER_DISABLE_FFI');
+        putenv('PHP_COMPILER_DISABLE_FFI=1');
+        try {
+            $this->assertTrue(VmRandomNative::available());
+            $bytes = VmRandomNative::randomBytes(16);
+            $this->assertSame(16, \strlen($bytes));
+        } finally {
+            if (false === $previous) {
+                putenv('PHP_COMPILER_DISABLE_FFI');
+            } else {
+                putenv('PHP_COMPILER_DISABLE_FFI='.$previous);
+            }
+        }
     }
 
     public function testUniqidVmReturnsNonEmpty(): void

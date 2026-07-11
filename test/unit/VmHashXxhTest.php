@@ -9,7 +9,7 @@ use PHPCompiler\ext\standard\VmHashNative;
 use PHPCompiler\ext\standard\VmHashXxh;
 use PHPUnit\Framework\TestCase;
 
-/** hash() xxh3/xxh128 via libxxhash FFI (issue #5165). */
+/** hash() xxh3/xxh128 via pure PHP VmHashXxhPure (#5165, #12209). */
 final class VmHashXxhTest extends TestCase
 {
     /** @return iterable<string, array{0: string, 1: string, 2: string}> */
@@ -27,7 +27,7 @@ final class VmHashXxhTest extends TestCase
     public function testVmHashNativeMatchesZend(string $algo, string $data, string $expectedHex): void
     {
         if (!VmHashXxh::available()) {
-            self::markTestSkipped('libxxhash FFI unavailable');
+            self::markTestSkipped('VmHashXxh unavailable');
         }
         $this->assertSame($expectedHex, VmHashNative::hash($algo, $data));
         $this->assertSame($expectedHex, VmHash::hash($algo, $data));
@@ -36,7 +36,7 @@ final class VmHashXxhTest extends TestCase
     public function testRawOutputLengths(): void
     {
         if (!VmHashXxh::available()) {
-            self::markTestSkipped('libxxhash FFI unavailable');
+            self::markTestSkipped('VmHashXxh unavailable');
         }
         $this->assertSame(8, \strlen(VmHashNative::hash('xxh3', 'a', true)));
         $this->assertSame(16, \strlen(VmHashNative::hash('xxh128', 'a', true)));

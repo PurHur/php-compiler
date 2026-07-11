@@ -14,7 +14,7 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
 /**
  * JIT/AOT link for __compiler_gethostbyaddr via GethostbyaddrJitHelper PHP (#9474).
  *
- * Replaces glibc gethostbyaddr/inet_pton LLVM. SSOT: {@see \PHPCompiler\ext\standard\VmDns}.
+ * Embed and standalone AOT compile the same PHP bridge; no libc gethostbyaddr LLVM (#13195).
  * php-src: ext/standard/dns.c — PHP_FUNCTION(gethostbyaddr)
  */
 final class GethostbyaddrRuntime
@@ -45,12 +45,6 @@ final class GethostbyaddrRuntime
         $probe = $context->module->getNamedFunction(self::ABI_NAME);
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);
-
-            return;
-        }
-
-        if (\PHPCompiler\JIT\Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            GethostbyaddrLibcBridge::implement($context);
 
             return;
         }

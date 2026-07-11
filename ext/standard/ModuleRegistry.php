@@ -24,6 +24,9 @@ final class ModuleRegistry
     /** @var array<string, string> lowercase extension name => module version */
     private static array $extensionVersions = [];
 
+    /** @var array<string, true> lowercase registered internal function names */
+    private static array $registeredFunctionLookup = [];
+
     /** @var list<string> */
     private const DATE_EXTENSION_FUNCTIONS = [
         'checkdate',
@@ -47,6 +50,7 @@ final class ModuleRegistry
         self::$loaded = [];
         self::$extensionFunctions = [];
         self::$extensionVersions = [];
+        self::$registeredFunctionLookup = [];
     }
 
     public static function register(string $extensionName, ?string $version = null): void
@@ -68,7 +72,17 @@ final class ModuleRegistry
         self::register('core');
         $moduleVersion = $module->getExtensionVersion();
         $additionalVersions = $module->getAdditionalExtensionVersions();
-        self::register($module->getExtensionName(), $moduleVersion);
+        $primary = strtolower($module->getExtensionName());
+        $withholdOpensslSurface = 'openssl' === $primary
+            && !\PHPCompiler\ext\openssl\OpensslExtensionPolicy::advertisesExtension();
+        $withholdSqlite3Surface = 'sqlite3' === $primary
+            && !\PHPCompiler\ext\sqlite3\Sqlite3ExtensionPolicy::advertisesExtension();
+        $withholdLdapSurface = 'ldap' === $primary
+            && !\PHPCompiler\ext\ldap\LdapExtensionPolicy::advertisesExtension();
+
+        if (!$withholdOpensslSurface && !$withholdSqlite3Surface && !$withholdLdapSurface) {
+            self::register($module->getExtensionName(), $moduleVersion);
+        }
         $additional = $module->getAdditionalExtensionNames();
         foreach ($additional as $name) {
             $logical = strtolower($name);
@@ -76,12 +90,16 @@ final class ModuleRegistry
             self::register($name, $version);
         }
 
-        $primary = strtolower($module->getExtensionName());
         foreach ($module->getFunctions() as $func) {
             if (!$func instanceof Internal) {
                 continue;
             }
             $fnName = strtolower($func->getName());
+            if ($withholdOpensslSurface || $withholdSqlite3Surface || $withholdLdapSurface) {
+                self::registerBuiltinLookup($fnName);
+
+                continue;
+            }
             $logical = self::logicalExtensionForFunction($fnName, $primary, $additional);
             self::registerModuleFunction($logical, $fnName);
             if (CoreExtensionFunctions::isCoreFunction($fnName)) {
@@ -92,7 +110,12 @@ final class ModuleRegistry
 
     public static function extensionLoaded(string $extension): bool
     {
-        return \in_array(strtolower($extension), self::$loaded, true);
+        $ext = strtolower($extension);
+        if (!\in_array($ext, self::$loaded, true)) {
+            return false;
+        }
+
+        return BuiltinIntrospectionPolicy::extensionIsAdvertised($ext);
     }
 
     /**
@@ -147,7 +170,10 @@ final class ModuleRegistry
      */
     public static function getLoadedExtensions(): array
     {
-        return self::$loaded;
+        return array_values(array_filter(
+            self::$loaded,
+            static fn (string $name): bool => BuiltinIntrospectionPolicy::extensionIsAdvertised($name)
+        ));
     }
 
     /**
@@ -171,9 +197,46 @@ final class ModuleRegistry
         return self::$extensionFunctions;
     }
 
+    /**
+     * Registered extension/builtin names for get_defined_functions() internal bucket (#17415).
+     *
+     * php-src: ext/standard/basic_functions.c — PHP_FUNCTION(get_defined_functions)
+     *
+     * @return list<string>
+     */
+    public static function advertisedInternalFunctionNames(): array
+    {
+        $names = [];
+        $seen = [];
+        foreach (self::$extensionFunctions as $funcs) {
+            foreach ($funcs as $name) {
+                $lc = strtolower($name);
+                if (isset($seen[$lc])) {
+                    continue;
+                }
+                $seen[$lc] = true;
+                $names[] = $name;
+            }
+        }
+
+        return $names;
+    }
+
+    public static function isRegisteredBuiltinFunction(string $functionName): bool
+    {
+        return isset(self::$registeredFunctionLookup[strtolower($functionName)]);
+    }
+
+    private static function registerBuiltinLookup(string $functionName): void
+    {
+        self::$registeredFunctionLookup[strtolower($functionName)] = true;
+    }
+
     private static function registerModuleFunction(string $extension, string $functionName): void
     {
         $ext = strtolower($extension);
+        $fnLc = strtolower($functionName);
+        self::$registeredFunctionLookup[$fnLc] = true;
         if (!isset(self::$extensionFunctions[$ext])) {
             self::$extensionFunctions[$ext] = [];
         }
@@ -210,6 +273,9 @@ final class ModuleRegistry
             'zlib' => str_starts_with($functionName, 'gz')
                 || str_starts_with($functionName, 'zlib_')
                 || 'readgzfile' === $functionName,
+            'readline' => str_starts_with($functionName, 'readline'),
+            'bcmath' => str_starts_with($functionName, 'bc'),
+            'openssl' => str_starts_with($functionName, 'openssl_'),
             default => false,
         };
     }

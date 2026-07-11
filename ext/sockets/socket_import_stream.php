@@ -37,7 +37,7 @@ final class socket_import_stream extends Internal
         $handle = VmStreamArg::requireStreamHandle($frame->calledArgs[0], 'socket_import_stream', 1);
         $wrapped = VmSocket::importStreamHandle($handle, $frame->vmContext);
         if (false === $wrapped) {
-            VmSockets::triggerWarning($frame, 'socket_import_stream(): Unable to import stream');
+            VmSockets::triggerWarning($frame, self::importFailureMessage($handle));
             BuiltinExecute::writeReturn(
                 $frame,
                 static fn (Variable $ret) => $ret->bool(false)
@@ -48,12 +48,22 @@ final class socket_import_stream extends Internal
 
         BuiltinExecute::writeReturn(
             $frame,
-            static fn (Variable $ret) => $ret->assign($wrapped)
+            static fn (Variable $ret) => $ret->copyFrom($wrapped)
         );
     }
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \Error('socket_import_stream() is not implemented for JIT in this compiler build (issue #6203)');
+        $argc = \count($args);
+        if (1 !== $argc) {
+            return JitSocketImportStream::emitArgumentCountError($context, $argc);
+        }
+
+        return JitSocketImportStream::invoke($context, $args[0]);
+    }
+
+    private static function importFailureMessage(int $handle): string
+    {
+        return SocketImportStreamJitHelper::failureMessage($handle);
     }
 }

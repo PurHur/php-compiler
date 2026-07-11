@@ -1,0 +1,40 @@
+<?php
+
+declare(strict_types=1);
+
+namespace PHPCompiler\ext\pcntl;
+
+use PHPCompiler\ModuleAbstract;
+use PHPCompiler\Runtime;
+use PHPCompiler\VM;
+
+/** pcntl extension module entry (php-src ext/pcntl/pcntl.c; issue #6680). */
+class Module extends ModuleAbstract
+{
+    public function init(Runtime $runtime): void
+    {
+        parent::init($runtime);
+        foreach (PcntlConstants::registeredConstants() as $name => $value) {
+            $var = new VM\Variable();
+            $var->int($value);
+            $runtime->vmContext->defineConstant($name, $var);
+        }
+    }
+
+    public function getFunctions(): array
+    {
+        return [
+            new pcntl_fork(),
+            new pcntl_waitpid(),
+            new pcntl_wifexited(),
+            new pcntl_wexitstatus(),
+            new pcntl_signal(),
+            new pcntl_signal_dispatch(),
+            new pcntl_async_signals(),
+            new pcntl_signal_get_handler(),
+            new pcntl_sigprocmask(),
+            new pcntl_sigtimedwait(),
+            new pcntl_waitid(),
+        ];
+    }
+}

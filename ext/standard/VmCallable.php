@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\Frame;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\NamedArgs;
 use PHPCompiler\VM\Variable;
@@ -22,11 +23,13 @@ final class VmCallable
         Context $ctx,
         Variable $var,
         bool $syntaxOnly = false,
-        ?Variable $callableNameOut = null
+        ?Variable $callableNameOut = null,
+        ?Frame $scopeFrame = null
     ): bool {
         $var = $var->resolveIndirect();
         $name = null;
-        $ok = self::probeCallable($ctx, $var, $syntaxOnly, $name);
+        $callerClassLc = null !== $scopeFrame ? VmReflection::callerClassLcFromFrame($scopeFrame) : null;
+        $ok = self::probeCallable($ctx, $var, $syntaxOnly, $name, $callerClassLc);
         if (null !== $callableNameOut && null !== $name) {
             self::writeCallableName($callableNameOut, $name);
         }
@@ -102,10 +105,14 @@ final class VmCallable
     public static function arrayVariableToArgEntries(Variable $arrayVar): array
     {
         $entries = [];
-        foreach ($arrayVar->toArray()->iterateKeyed(true) as $pair) {
+        foreach ($arrayVar->toArray()->iterateKeyed(false) as $pair) {
             [$keyVar, $value] = $pair;
-            $copy = new Variable();
-            $copy->copyFrom($value);
+            if (Variable::TYPE_INDIRECT === $value->type) {
+                $copy = $value;
+            } else {
+                $copy = new Variable();
+                $copy->copyFrom($value);
+            }
             $keyResolved = $keyVar->resolveIndirect();
             if (Variable::TYPE_INTEGER === $keyResolved->type) {
                 $entries[] = ['p', $copy];
@@ -166,7 +173,8 @@ final class VmCallable
         Context $ctx,
         Variable $var,
         bool $syntaxOnly,
-        ?string &$callableName
+        ?string &$callableName,
+        ?string $callerClassLc = null
     ): bool {
         if (VmClosureCall::isClosure($var)) {
             $callableName = '{closure}';
@@ -174,10 +182,10 @@ final class VmCallable
             return true;
         }
         if (Variable::TYPE_STRING === $var->type) {
-            return self::probeStringCallable($ctx, $var->toString(), $syntaxOnly, $callableName);
+            return self::probeStringCallable($ctx, $var->toString(), $syntaxOnly, $callableName, $callerClassLc);
         }
         if (Variable::TYPE_ARRAY === $var->type) {
-            return self::probeArrayCallable($ctx, $var, $syntaxOnly, $callableName);
+            return self::probeArrayCallable($ctx, $var, $syntaxOnly, $callableName, $callerClassLc);
         }
         if (Variable::TYPE_OBJECT === $var->type) {
             $object = $var->toObject();
@@ -224,7 +232,8 @@ final class VmCallable
         Context $ctx,
         string $name,
         bool $syntaxOnly,
-        ?string &$callableName
+        ?string &$callableName,
+        ?string $callerClassLc = null
     ): bool {
         if ('' === $name) {
             $callableName = '';
@@ -233,15 +242,16 @@ final class VmCallable
         }
         if (str_contains($name, '::')) {
             [$class, $method] = explode('::', $name, 2);
+            $class = VmReflection::normalizeGlobalIntrospectionName($class);
             if ('' === $class || '' === $method || !self::isValidMethodName($method)) {
                 return false;
             }
-            $callableName = $name;
+            $callableName = $class.'::'.$method;
             if ($syntaxOnly) {
                 return true;
             }
 
-            return VmReflection::classMethExists($ctx, $class, $method);
+            return VmReflection::isStaticallyCallableMethod($ctx, $class, $method, $callerClassLc);
         }
         $callableName = $name;
         if (!self::isValidFunctionName($name)) {
@@ -261,7 +271,8 @@ final class VmCallable
         Context $ctx,
         Variable $callback,
         bool $syntaxOnly,
-        ?string &$callableName
+        ?string &$callableName,
+        ?string $callerClassLc = null
     ): bool {
         $table = $callback->toArray();
         $idx0 = new Variable(Variable::TYPE_INTEGER);
@@ -289,8 +300,7 @@ final class VmCallable
                 return true;
             }
 
-            return $ctx->runtime->vm->hasInstanceMethod($target->toObject()->class, $method)
-                || self::hasInstanceMagicCall($ctx, $target->toObject()->class);
+            return self::isInstanceMethodCallable($ctx, $target->toObject()->class, $method, $callerClassLc);
         }
         if (Variable::TYPE_STRING === $target->type) {
             $class = $target->toString();
@@ -302,11 +312,37 @@ final class VmCallable
                 return true;
             }
 
-            return VmReflection::classMethExists($ctx, $class, $method)
-                || self::hasStaticMagicCall($ctx, $class);
+            return VmReflection::isStaticallyCallableMethod($ctx, $class, $method, $callerClassLc);
         }
 
         return false;
+    }
+
+    /**
+     * php-src zend_is_callable — instance method exists and is visible from scope (#9334).
+     */
+    private static function isInstanceMethodCallable(
+        Context $ctx,
+        \PHPCompiler\VM\ClassEntry $objectClass,
+        string $method,
+        ?string $callerClassLc
+    ): bool {
+        if (!$ctx->runtime->vm->hasInstanceMethod($objectClass, $method)) {
+            return self::hasInstanceMagicCall($ctx, $objectClass);
+        }
+        try {
+            [$declaring, $methodLc] = $ctx->runtime->vm->resolveInstanceMethod($objectClass, $method);
+        } catch (\LogicException) {
+            return self::hasInstanceMagicCall($ctx, $objectClass);
+        }
+        $vis = $declaring->methodVisibility[$methodLc] ?? \PHPCfg\Func::FLAG_PUBLIC;
+
+        return VmReflection::isMethodCallableFromScope(
+            $ctx,
+            $vis,
+            strtolower($declaring->name),
+            $callerClassLc
+        );
     }
 
     private static function invokeStringCallable(Context $ctx, string $name, Variable ...$args): Variable
@@ -321,18 +357,18 @@ final class VmCallable
         }
         try {
             $internal = VmInternalCall::resolveStringCallback($name);
-
-            return VmInternalCall::invoke($internal, ...$args);
         } catch (\LogicException) {
             // Not a registered string builtin — try a user-defined function.
-        }
-        try {
-            $fn = VmUserCall::resolveStringCallback($ctx, $name);
-        } catch (\LogicException) {
-            throw new \TypeError(self::invalidStringCallbackTypeError($name));
+            try {
+                $fn = VmUserCall::resolveStringCallback($ctx, $name);
+            } catch (\LogicException) {
+                throw new \TypeError(self::invalidStringCallbackTypeError($name));
+            }
+
+            return $ctx->runtime->vm->invokePhpFunction($fn, ...$args);
         }
 
-        return $ctx->runtime->vm->invokePhpFunction($fn, ...$args);
+        return VmInternalCall::invokeInContext($ctx, $internal, ...$args);
     }
 
     /**
@@ -347,22 +383,22 @@ final class VmCallable
         }
         try {
             $internal = VmInternalCall::resolveStringCallback($name);
-            $paramNames = \PHPCompiler\BuiltinParamNames::forFunction($name) ?? [];
-            $variadicIndex = \PHPCompiler\BuiltinParamNames::variadicParamIndexForFunction($name);
-            $resolved = NamedArgs::resolve($entries, $paramNames, $variadicIndex, $name);
-            ksort($resolved);
-
-            return VmInternalCall::invoke($internal, ...array_values($resolved));
         } catch (\LogicException) {
             // Not a registered string builtin — try a user-defined function.
-        }
-        try {
-            $fn = VmUserCall::resolveStringCallback($ctx, $name);
-        } catch (\LogicException) {
-            throw new \TypeError(self::invalidStringCallbackTypeError($name));
-        }
+            try {
+                $fn = VmUserCall::resolveStringCallback($ctx, $name);
+            } catch (\LogicException) {
+                throw new \TypeError(self::invalidStringCallbackTypeError($name));
+            }
 
-        return $ctx->runtime->vm->invokePhpFunctionWithArgEntries($fn, $entries);
+            return $ctx->runtime->vm->invokePhpFunctionWithArgEntries($fn, $entries);
+        }
+        $paramNames = \PHPCompiler\BuiltinParamNames::forFunction($name) ?? [];
+        $variadicIndex = \PHPCompiler\BuiltinParamNames::variadicParamIndexForFunction($name);
+        $resolved = NamedArgs::resolve($entries, $paramNames, $variadicIndex, $name);
+        ksort($resolved);
+
+        return VmInternalCall::invokeInContext($ctx, $internal, ...array_values($resolved));
     }
 
     /**

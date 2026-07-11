@@ -1,5 +1,5 @@
 --TEST--
-set_error_handler() receives trigger file and line for builtin warnings (#11163, Zend/zend_execute.c)
+set_error_handler() receives trigger file and line for builtin warnings (#11163, #17478, Zend/zend_execute.c)
 --RUNFILE--
 set_error_handler_file_line/script.php
 --EXPECT--

@@ -14,17 +14,21 @@ use PHPUnit\Framework\TestCase;
 /** VmChdirPure / VmGetcwdPure — chdir/getcwd without libc FFI (#8955). */
 final class VmChdirPureRuntimeShrinkTest extends TestCase
 {
-    public function testVmChdirNativeDelegatesToPureWhenFfiDisabled(): void
+    public function testVmChdirNativeDelegatesToPureWithoutLibcFfi(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/VmChdirNative.php');
         $this->assertStringContainsString('VmChdirPure::', $source);
         $this->assertStringContainsString('VmChdirPure::available()', $source);
+        $this->assertStringNotContainsString('FFI::cdef', $source);
+        $this->assertStringNotContainsString('\\FFI', $source);
     }
 
-    public function testVmGetcwdNativeDelegatesToPureWhenFfiDisabled(): void
+    public function testVmGetcwdNativeDelegatesToPureWithoutLibcFfi(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/VmGetcwdNative.php');
         $this->assertStringContainsString('VmGetcwdPure::', $source);
+        $this->assertStringNotContainsString('FFI::cdef', $source);
+        $this->assertStringNotContainsString('\\FFI', $source);
     }
 
     public function testVmChdirPureDoesNotUseLibcFfi(): void

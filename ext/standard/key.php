@@ -25,7 +25,7 @@ final class key extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \ArgumentCountError('key() expects exactly 1 argument, '.\count($frame->calledArgs).' given');
         }
-        $target = VmArrayPointer::requirePointerTarget($frame->calledArgs[0], 'key', false);
+        $target = VmArrayPointer::requirePointerTarget($frame->calledArgs[0], 'key', false, $frame->vmContext);
         VmArrayPointer::returnKey($frame, $target->pointerKey());
     }
 
@@ -33,6 +33,12 @@ final class key extends Internal
     {
         if (1 !== \count($args)) {
             throw new \ArgumentCountError('key() expects exactly 1 argument, '.\count($args).' given');
+        }
+
+        if (JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false)) {
+            JitArrayElem::requireArrayParam($context, $args[0], 'key', 1, 'array');
+
+            return JitValueBox::pointer($context, JitValueBox::alloc($context));
         }
 
         if (!JitReferencableCheck::guardArrayMutatorByRefArg($context, 'key', $args[0])) {

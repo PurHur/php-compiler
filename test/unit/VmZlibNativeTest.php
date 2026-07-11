@@ -4,30 +4,26 @@ declare(strict_types=1);
 
 namespace PHPCompiler\Test\Unit;
 
-use PHPCompiler\ext\standard\VmZlibNative;
+use PHPCompiler\ext\standard\VmZlibCore;
 use PHPUnit\Framework\TestCase;
 
-/** @covers issue #6476 */
+/** @covers issue #6476 — VmZlibNative removed; VmZlibCore is SSOT (#8837) */
 final class VmZlibNativeTest extends TestCase
 {
     public function testGzRoundTripWithoutHostGz(): void
     {
-        if (!VmZlibNative::available()) {
-            $this->markTestSkipped('libz FFI unavailable in this environment');
-        }
-
         $plain = 'hello';
-        $compressed = VmZlibNative::gzcompress($plain);
+        $compressed = VmZlibCore::gzcompress($plain);
         $this->assertIsString($compressed);
-        $this->assertSame($plain, VmZlibNative::gzuncompress($compressed));
+        $this->assertSame($plain, VmZlibCore::gzuncompress($compressed));
 
-        $raw = VmZlibNative::gzdeflate($plain);
+        $raw = VmZlibCore::gzdeflate($plain);
         $this->assertIsString($raw);
-        $this->assertSame($plain, VmZlibNative::gzinflate($raw));
+        $this->assertSame($plain, VmZlibCore::gzinflate($raw));
 
-        $gzip = VmZlibNative::gzencode($plain);
+        $gzip = VmZlibCore::gzencode($plain);
         $this->assertIsString($gzip);
         $this->assertSame("\x1f\x8b", substr($gzip, 0, 2));
-        $this->assertSame($plain, VmZlibNative::gzdecode($gzip));
+        $this->assertSame($plain, VmZlibCore::gzdecode($gzip));
     }
 }

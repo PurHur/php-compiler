@@ -22,6 +22,14 @@ final class TypedPropertyCheck
         return self::isUninitialized($target);
     }
 
+    /**
+     * Zend php_var_serialize plain object: omit only uninitialized typed slots, not null (#14619).
+     */
+    public static function omitFromSerialize(Variable $var): bool
+    {
+        return self::isUninitialized($var);
+    }
+
     public static function isUninitialized(Variable $var): bool
     {
         $target = $var->resolveIndirect();
@@ -100,6 +108,51 @@ final class TypedPropertyCheck
     }
 
     /**
+     * Zend by-reference write to uninitialized non-nullable typed property (zend_types.c, type.c).
+     */
+    public static function assertWritableByReference(Variable $var): void
+    {
+        if (!self::isUninitialized($var)) {
+            return;
+        }
+        if (self::propertyAllowsNull($var)) {
+            return;
+        }
+        $vm = \PHPCompiler\VM::running();
+        $message = self::writableByReferenceErrorMessage($var);
+        if (null === $vm) {
+            throw new \Error($message);
+        }
+        throw new TypedPropertyReadSignal($vm->makeEngineError($message));
+    }
+
+    public static function writableByReferenceErrorMessage(Variable $var): string
+    {
+        $target = $var->resolveIndirect();
+        $name = $target->objectPropertyName ?? 'property';
+        if (null !== $target->staticPropertyClassLc) {
+            $classLabel = $target->staticPropertyClassLc;
+            $vm = \PHPCompiler\VM::running();
+            if (null !== $vm && isset($vm->context->classes[$target->staticPropertyClassLc])) {
+                $classLabel = $vm->context->classes[$target->staticPropertyClassLc]->name;
+            }
+
+            return sprintf(
+                'Cannot access uninitialized non-nullable property %s::$%s by reference',
+                $classLabel,
+                $name
+            );
+        }
+        $owner = $target->objectPropertyOwner;
+
+        return sprintf(
+            'Cannot access uninitialized non-nullable property %s::$%s by reference',
+            $owner->class->name,
+            $name
+        );
+    }
+
+    /**
      * Nullable typed property (`?T`, `T|null`, `mixed`) — Zend nullsafe short-circuit (#5220).
      */
     public static function propertyAllowsNull(Variable $var): bool
@@ -110,8 +163,13 @@ final class TypedPropertyCheck
             if ('mixed' === $label || 'null' === $label) {
                 return true;
             }
-            if (str_contains($label, '|null')) {
+            if (str_starts_with($label, '?')) {
                 return true;
+            }
+            foreach (explode('|', $label) as $arm) {
+                if ('null' === trim($arm)) {
+                    return true;
+                }
             }
         }
         if (null !== $target->dnfArms) {
@@ -139,8 +197,8 @@ final class TypedPropertyCheck
 
     /**
      * ?-> receiver short-circuit: PHP null, or uninitialized nullable typed slot after a
-     * standalone PropertyFetch (e.g. $a->b?->v, #5220). Chained $x?->y reads y in the
-     * nullsafe fetch arm and must throw via nullsafeFetchPropertyRead (#5361).
+     * standalone PropertyFetch (e.g. $a->b?->v, #5220). Chained $x?->y direct read throws
+     * via nullsafeFetchPropertyRead (#5361); ??/isset/empty use nullsafeUninitNullableToNull (#13747).
      */
     public static function nullsafeShortCircuitReceiver(Variable $receiver): bool
     {

@@ -16,4 +16,4 @@ try {
 --EXPECT--
 prev
 str
-umask(): Argument #1 ($mask) must be of type int, array given
+umask(): Argument #1 ($mask) must be of type ?int, array given

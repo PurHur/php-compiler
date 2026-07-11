@@ -22,7 +22,7 @@ final class compact_ extends Internal
     public function execute(Frame $frame): void
     {
         if (0 === \count($frame->calledArgs)) {
-            throw new \LogicException('compact() requires at least one argument in this compiler build');
+            throw new \ArgumentCountError('compact() expects at least 1 argument, 0 given');
         }
         if (null === $frame->returnVar) {
             VmScope::compact($frame);
@@ -35,7 +35,7 @@ final class compact_ extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         if (0 === \count($args)) {
-            throw new \LogicException('compact() requires at least one argument in this compiler build');
+            throw new \ArgumentCountError('compact() expects at least 1 argument, 0 given');
         }
 
         foreach ($args as $i => $arg) {

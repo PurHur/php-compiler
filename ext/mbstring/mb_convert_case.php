@@ -44,11 +44,13 @@ final class mb_convert_case extends Internal
         }
         $mode = VmMbstring::coerceModeArg($frame->calledArgs[1], 'mb_convert_case', 1);
         $encoding = 2 === $argc
-            ? 'UTF-8'
-            : VmMbstring::coerceEncodingArg($frame->calledArgs[2], 'mb_convert_case', 2);
+            ? MbstringState::internalEncoding()
+            : VmMbstring::coerceMbEncodingNameArg($frame->calledArgs[2], 'mb_convert_case', 2);
         BuiltinExecute::writeReturn(
             $frame,
-            static fn (Variable $ret) => $ret->string(VmMbstring::convertCase($source, $mode, $encoding))
+            static fn (Variable $ret) => $ret->string(
+                VmMbstring::convertCase($source, $mode, $encoding, 'mb_convert_case', 2)
+            )
         );
     }
 

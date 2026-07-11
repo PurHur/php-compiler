@@ -7,8 +7,8 @@ namespace PHPCompiler\ext\standard;
 /**
  * gzopen/gzwrite/gzread/gzclose — zlib stream resource API (ext/zlib/zlib.c, #6168).
  *
- * VM via {@see VmGzStreamNative} libz FFI — no host ext/zlib gz* delegation (#8220).
- * JIT/AOT via {@see \PHPCompiler\JIT\Builtin\GzStreamIoJit} + {@see JitGzfile} / {@see JitReadgzfile} (#4657 phase 2).
+ * VM via {@see VmGzStreamPure} buffered I/O + {@see VmZlib} — no libz gzFile FFI (#8936, #8220).
+ * JIT/AOT via {@see \PHPCompiler\JIT\Builtin\GzStreamRuntime} + {@see JitGzfile} / {@see JitReadgzfile} (#4657, #13420).
  */
 final class VmGzStream
 {
@@ -90,6 +90,46 @@ final class VmGzStream
         }
 
         return VmGzStreamNative::gzclose($handle);
+    }
+
+    /** gzseek() — seek within decompressed gzip stream (ext/zlib/zlib.c, #14585). */
+    public static function gzseek(int $handle, int $offset, int $whence = \SEEK_SET): int
+    {
+        if (!VmGzStreamNative::isNativeHandle($handle)) {
+            return -1;
+        }
+
+        return VmGzStreamNative::gzseek($handle, $offset, $whence);
+    }
+
+    /** gztell() — tell position in decompressed gzip stream (ext/zlib/zlib.c, #14585). */
+    public static function gztell(int $handle): int|false
+    {
+        if (!VmGzStreamNative::isNativeHandle($handle)) {
+            return false;
+        }
+
+        return VmGzStreamNative::gztell($handle);
+    }
+
+    /** gzrewind() — rewind decompressed gzip stream (ext/zlib/zlib.c, #14585). */
+    public static function gzrewind(int $handle): bool
+    {
+        if (!VmGzStreamNative::isNativeHandle($handle)) {
+            return false;
+        }
+
+        return VmGzStreamNative::gzrewind($handle);
+    }
+
+    /** gzeof() — EOF probe on gzip stream (ext/zlib/zlib.c, #14596). */
+    public static function gzeof(int $handle): bool
+    {
+        if (!VmGzStreamNative::isNativeHandle($handle)) {
+            return true;
+        }
+
+        return VmGzStreamNative::gzeof($handle);
     }
 
     /**

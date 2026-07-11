@@ -22,7 +22,7 @@ final class ReflectionEnumUnitCaseGetName implements Call
             $context,
             $obj,
             'ReflectionEnumUnitCase',
-            ReflectionSupport::PROP_ENUM_CASE_NAME
+            ReflectionSupport::PROP_CLASS_NAME
         );
         $i64 = $context->getTypeFromString('int64');
 

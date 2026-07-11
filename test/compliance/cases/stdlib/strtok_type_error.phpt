@@ -17,6 +17,6 @@ try {
 $s = 'a,b,c';
 echo strtok($s, ','), ' ', strtok(','), ' ', strtok(','), "\n";
 --EXPECT--
-arg1: strtok(): Argument #1 ($string) must be of type ?string, array given
-arg2: strtok(): Argument #2 ($token) must be of type string, array given
+arg1: strtok(): Argument #1 ($string) must be of type string, array given
+arg2: strtok(): Argument #2 ($token) must be of type ?string, array given
 a b c

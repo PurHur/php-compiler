@@ -6,16 +6,17 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\ArrayRandRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
+use PHPCompiler\VM\HashTable;
 use PHPLLVM\Value;
 
 /**
  * array_rand() — random key(s) from an array (issue #2321, #4460).
  *
- * VM: returns actual keys (string or int); CSPRNG via {@see VmString::randomBytes()}.
- * JIT/AOT: {@see JitArrayRand} (packed lists; num>1 returns array of keys).
+ * VM: returns actual keys (string or int); MT19937 via {@see VmMt19937} (php-src php_array_pick_keys).
+ * JIT/AOT: {@see \PHPCompiler\JIT\Builtin\ArrayRandRuntime::call()} via {@see ArrayRandJitHelper}.
  */
 final class array_rand extends Internal
 {
@@ -30,15 +31,12 @@ final class array_rand extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('array_rand() accepts one or two arguments');
         }
-        $array = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_ARRAY !== $array->type) {
-            throw new \LogicException('array_rand() argument #1 must be an array in this compiler build');
-        }
+        $array = VmArray::requireArrayParam($frame->calledArgs[0], 'array_rand', 1, 'array');
         $num = 1;
         if (2 === $argc) {
             $num = VmMath::parseIntBuiltinArgForFrame($frame, 1, 'array_rand', 2, 'num');
         }
-        $result = VmArray::arrayRandPacked($array->toArray(), $num);
+        $result = VmArray::arrayRandPacked($array, $num);
         if (null === $frame->returnVar) {
             return;
         }
@@ -47,6 +45,6 @@ final class array_rand extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        return JitArrayRand::call($context, ...$args);
+        return ArrayRandRuntime::call($context, ...$args);
     }
 }

@@ -12,14 +12,14 @@ use PHPCompiler\VM\Variable as VMVariable;
  *
  * JIT/AOT lowers null (identity copy), compile-time string stdlib builtins, and closure/arrow
  * callbacks with native int/double returns ([#142](https://github.com/PurHur/php-compiler/issues/142)).
- * Array callables ([Class::class, 'method']) and invokable objects stay deferred (#1154).
+ * Array callables ([Class::class, 'method']) stay deferred (#1154). Invokable objects are VM-only (#16228).
  */
 final class ArrayMapCallbackPolicy
 {
     public const DEFERRED_SUMMARY =
         'array_map callbacks: null, compile-time string builtins, closure/arrow (int/double); [class, method] callables deferred';
 
-    public const DEFERRED_KINDS = 'array callables and invokable objects';
+    public const DEFERRED_KINDS = 'array callables';
 
     public const JIT_SUBSET = 'null, compile-time string stdlib builtin names, or closure/arrow callbacks';
 
@@ -55,6 +55,37 @@ final class ArrayMapCallbackPolicy
         return \in_array($type, [VMVariable::TYPE_NULL, VMVariable::TYPE_STRING], true);
     }
 
+    /** Scalar types Zend rejects before callable dispatch (ext/standard/array.c; #12676). */
+    public static function isPhpSrcInvalidCallbackType(int $type): bool
+    {
+        return \in_array($type, [
+            VMVariable::TYPE_INTEGER,
+            VMVariable::TYPE_BOOLEAN,
+            VMVariable::TYPE_FLOAT,
+            VMVariable::TYPE_ARRAY,
+        ], true);
+    }
+
+    /** @see JITVariable type bits for compile-time scalars */
+    public static function isJitPhpSrcInvalidCallbackType(int $type): bool
+    {
+        return \in_array($type, [
+            JITVariable::TYPE_NATIVE_LONG,
+            JITVariable::TYPE_NATIVE_DOUBLE,
+            JITVariable::TYPE_NATIVE_BOOL,
+            JITVariable::TYPE_HASHTABLE,
+            JITVariable::TYPE_OBJECT,
+        ], true) || 0 !== ($type & JITVariable::IS_NATIVE_ARRAY);
+    }
+
+    /**
+     * Zend array_map() invalid callback TypeError (ext/standard/array.c; #12676).
+     */
+    public static function invalidCallbackTypeError(): string
+    {
+        return 'array_map(): Argument #1 ($callback) must be a valid callback or null, no array or string given';
+    }
+
     public static function jitRejectionMessage(): string
     {
         return 'array_map() callback must be '.self::JIT_SUBSET
@@ -63,7 +94,7 @@ final class ArrayMapCallbackPolicy
 
     public static function vmRejectionMessage(): string
     {
-        return 'array_map() callback must be null or a string builtin name in this compiler build; '
+        return 'array_map() callback must be null, a string builtin name, a closure, or an invokable object in this compiler build; '
             .self::DEFERRED_KINDS.' are deferred';
     }
 }

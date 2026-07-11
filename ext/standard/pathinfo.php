@@ -12,7 +12,7 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/** pathinfo() for file paths (subset of PHP; JIT/AOT via JitPathinfo). */
+/** pathinfo() for file paths (subset of PHP; JIT/AOT via JitPathinfo + PathinfoJitHelper #15322). */
 final class pathinfo extends Internal
 {
     public function execute(Frame $frame): void
@@ -21,7 +21,7 @@ final class pathinfo extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('pathinfo() requires one or two arguments in this compiler build');
         }
-        $path = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'pathinfo', 0, 'path');
+        $path = VmFilestatArg::filenameArgForFrame($frame, 0, 'pathinfo', 'path');
         $flags = 15;
         if (2 === $argc) {
             $flagVar = $frame->calledArgs[1]->resolveIndirect();

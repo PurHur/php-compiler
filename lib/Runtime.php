@@ -23,9 +23,14 @@ use PHPTypes\State;
 use PHPCompiler\VM\Optimizer;
 use PHPCompiler\VM\Context as VMContext;
 use PHPCompiler\VM\ObjectRegistry;
+use PHPCompiler\VM\HashTableRegistry;
 use PHPCompiler\JIT\Context as JITContext;
 use PHPCompiler\Ast\AsymmetricVisibilityRewriter;
+use PHPCompiler\Ast\LazyPropertyRewriter;
+use PHPCompiler\Ast\ReadonlyFunctionRewriter;
+use PHPCompiler\Ast\ReadonlyFunctionAnnotator;
 use PHPCompiler\Ast\DnfParenTypeRewriter;
+use PHPCompiler\Ast\GlobalDeprecatedConstRewriter;
 use PHPCompiler\Ast\GlobalTypedConstRewriter;
 use PHPCompiler\Ast\TypedFunctionStaticRewriter;
 use PHPCompiler\Ast\GroupUseStripper;
@@ -40,6 +45,12 @@ use PHPCompiler\Ast\HexFloatLiteralDesugar;
 use PHPCompiler\Ast\NewDereferenceableDesugar;
 use PHPCompiler\Ast\CloneWithDesugar;
 use PHPCompiler\Ast\PipeOperatorDesugar;
+use PHPCompiler\Ast\EncapsedCoalesceDesugar;
+use PHPCompiler\EncapsedCoalesceRejector;
+use PHPCompiler\BareThrowSyntaxRejector;
+use PHPCompiler\TryCatchElseSyntaxRejector;
+use PHPCompiler\Ast\TryCatchElseSupport;
+use PHPCompiler\Ast\TryCatchElseAttacher;
 use PHPCompiler\Ast\VoidCastDesugar;
 use PHPCompiler\Visitor\InOperatorResolver;
 use PHPCompiler\Visitor\ExitFunctionResolver;
@@ -58,6 +69,9 @@ use PHPCompiler\VM\Variable;
 class Runtime {
     const MODE_NORMAL   = 0b0001;
     const MODE_AOT      = 0b0010;
+
+    /** @var array<string, Block> basename → CFG for nested JIT helper units (#17150) */
+    private static array $nestedJitParseAndCompileCache = [];
 
     public Compiler $compiler;
     public Parser $parser;
@@ -106,6 +120,7 @@ class Runtime {
 
     public function __construct(int $mode = self::MODE_NORMAL) {
         ObjectRegistry::reset();
+        HashTableRegistry::reset();
         ext\standard\ModuleRegistry::reset();
         self::clearLastParseFailure();
         ext\standard\VmIniIntrospection::seedHostIniEnvFromZend();
@@ -121,7 +136,7 @@ class Runtime {
         $astTraverser = new NodeTraverser;
         $astTraverser->addVisitor(new MultiBlockNameResolver());
         $astTraverser->addVisitor(new Ast\EnumCaseImportRewriter());
-        $astTraverser->addVisitor(new Ast\EnumCaseMatchSwitchRewriter());
+        // Bare enum case names in match/switch are not in scope outside qualified fetch (#16720, re-#6947).
         $astTraverser->addVisitor(new GroupUseStripper());
         $this->abstractEnumMarker = new Ast\AbstractEnumMarker();
         $astTraverser->addVisitor($this->abstractEnumMarker);
@@ -131,6 +146,8 @@ class Runtime {
         $astTraverser->addVisitor($this->staticClassAnnotator);
         $astTraverser->addVisitor(new Ast\EnumPropertyCompileCheck());
         $astTraverser->addVisitor(new Ast\GeneratorYieldSourceMarker());
+        $astTraverser->addVisitor(new ReadonlyFunctionAnnotator());
+        $astTraverser->addVisitor(new TryCatchElseAttacher());
         $this->parser = new Parser(
             (new ParserFactory)->create(ParserFactory::ONLY_PHP7),
             $astTraverser
@@ -210,13 +227,17 @@ class Runtime {
         $this->load(new ext\zip\Module);
         $this->load(new ext\libxml\Module);
         $this->load(new ext\dom\Module);
+        $this->load(new ext\simplexml\Module);
         $this->load(new ext\xml\Module);
+        $this->load(new ext\xmlreader\Module);
+        $this->load(new ext\xmlwriter\Module);
         $this->load(new ext\gd\Module);
         $this->load(new ext\iconv\Module);
         $this->load(new ext\gettext\Module);
         $this->load(new ext\mbstring\Module);
         $this->load(new ext\filter\Module);
         $this->load(new ext\calendar\Module);
+        $this->load(new ext\ldap\Module);
         $this->load(new ext\session\Module);
         $this->load(new ext\bcmath\Module);
         $this->load(new ext\stats\Module);
@@ -224,7 +245,10 @@ class Runtime {
         $this->load(new ext\curl\Module);
         $this->load(new ext\hash\Module);
         $this->load(new ext\posix\Module);
+        $this->load(new ext\inotify\Module);
+        $this->load(new ext\pcntl\Module);
         $this->load(new ext\sockets\Module);
+        $this->load(new ext\ftp\Module);
         $this->load(new ext\ctype\Module);
         $this->load(new ext\tokenizer\Module);
         $this->load(new ext\random\Module);
@@ -233,6 +257,10 @@ class Runtime {
         $this->load(new ext\zstd\Module);
         $this->load(new ext\lzf\Module);
         $this->load(new ext\bz2\Module);
+        $this->load(new ext\brotli\Module);
+        $this->load(new ext\sodium\Module);
+        $this->load(new ext\sqlite3\Module);
+        $this->load(new ext\uri\Module);
         $this->load(new ext\standard\Module);
     }
 
@@ -330,11 +358,30 @@ class Runtime {
             if (!is_null($this->debugFile)) {
                 $this->jitContext->setDebugFile($this->debugFile);
             }
+            // User-script ParseStr/environ nested JIT before registerModule — post-module nested JIT segfaults (#15417).
+            if (JIT\Builtin::LOAD_TYPE_STANDALONE === $this->jitContext->loadType
+                && $this->jitContext->isThinStandaloneAotMain()) {
+                JIT\Builtin\SuperglobalRefreshRuntime::ensureUserScriptRefreshPrerequisites($this->jitContext);
+            }
             foreach ($this->modules as $module) {
                 $this->jitContext->registerModule($module);
             }
         }
         return $this->jitContext;
+    }
+
+    /**
+     * Bind the in-flight JIT Context before defineBuiltins finishes (#14459).
+     *
+     * Nested php-in-PHP helper JIT during Context construction can call
+     * {@see loadJitContext()} / {@see loadJit()} reentrantly; without an early slot,
+     * a second Context + LLVM module is created and CallArgv LLVM globals leak across modules.
+     */
+    public function claimJitContextSlot(JITContext $context): void
+    {
+        if (null === $this->jitContext) {
+            $this->jitContext = $context;
+        }
     }
 
     public function load(Module $module): void {
@@ -348,6 +395,26 @@ class Runtime {
 
     public function preprocessSourceForParse(string $code, string $filename = 'unknown'): array
     {
+        if (\PHPCompiler\JIT\NestedJitCompileScope::isActive() || null !== $this->jitContext) {
+            // Nested JIT parses multi-megabyte lib/ units — skip reference-profile token scans (#17150).
+            TryCatchElseSupport::beginCompilationUnit();
+
+            return [$code, []];
+        }
+        AsymmetricVisibilityRejector::reject($code, $filename);
+        LazyPropertyRejector::reject($code, $filename);
+        CloneWithSyntaxRejector::reject($code, $filename);
+        ListSpreadAssignSyntaxRejector::reject($code, $filename);
+        ReadonlyAnonymousClassSyntaxRejector::reject($code, $filename);
+        DnfParenIntersectionSyntaxRejector::reject($code, $filename);
+        ExitFunctionSyntaxRejector::reject($code, $filename);
+        TypedFunctionStaticSyntaxRejector::reject($code, $filename);
+        GlobalTypedConstSyntaxRejector::reject($code, $filename);
+        GlobalDeprecatedConstSyntaxRejector::reject($code, $filename);
+        PropertyHookSyntaxRejector::reject($code, $filename);
+        TryCatchElseSyntaxRejector::reject($code, $filename);
+        TryCatchElseSupport::beginCompilationUnit();
+        $code = TryCatchElseSupport::extract($code);
         $sealedPreprocessor = new SealedClassPreprocessor();
         [$code, $permitsByLine] = $sealedPreprocessor->preprocess($code);
         $this->sealedClassAnnotator->setPermitsByLine($permitsByLine);
@@ -364,13 +431,18 @@ class Runtime {
             $this->vmContext->propertyHookRegistry = $newRegistry;
         }
         CurlyBraceOffsetRejector::reject($code, $filename);
+        ClassConstBraceDerefRejector::reject($code, $filename);
+        ClassConstDynamicFetchRejector::reject($code, $filename);
+        EncapsedCoalesceRejector::reject($code, $filename);
         ReadonlyMethodModifierRejector::reject($code, $filename);
         ReadonlyFunctionRejector::reject($code, $filename);
+        EnumCaseListSyntaxRejector::reject($code, $filename);
         $code = EnumCaseListRewriter::rewrite($code);
         $code = SwitchCommaCaseRewriter::rewrite($code);
         $code = GenericArrayTypeSourceRewriter::rewrite($code);
         [$code, $abstractEnumLines] = AbstractEnumSourceRewriter::rewrite($code);
         $this->abstractEnumMarker->setAbstractLines($abstractEnumLines);
+        BareThrowSyntaxRejector::reject($code, $filename);
 
         return SourceBareThrowRewriter::rewrite($code);
     }
@@ -410,10 +482,15 @@ class Runtime {
      */
     public function prepareSourceForParser(string $code, string $filename = 'unknown'): array
     {
-        [$code, $bareRethrowLines] = $this->preprocessSourceForParse($code, $filename);
-        $code = $this->rewriteSourceBeforeParser($code);
+        $profileScope = LanguageProfileScope::beginForCompilationUnit($code, $filename);
+        try {
+            [$code, $bareRethrowLines] = $this->preprocessSourceForParse($code, $filename);
+            $code = $this->rewriteSourceBeforeParser($code, $filename);
 
-        return [$code, $bareRethrowLines];
+            return [$code, $bareRethrowLines];
+        } finally {
+            $profileScope->end();
+        }
     }
 
     /**
@@ -443,12 +520,21 @@ class Runtime {
      *
      * Must run on any path that calls Parser::parse() directly (AOT include discovery, etc.).
      */
-    public function rewriteSourceBeforeParser(string $code): string
+    public function rewriteSourceBeforeParser(string $code, string $filename = 'unknown'): string
     {
+        if (\PHPCompiler\JIT\NestedJitCompileScope::isActive() || null !== $this->jitContext) {
+            return $code;
+        }
+        if (ReferenceProfileTokenScan::shouldSkipReferenceProfileReject($code, $filename)) {
+            return $code;
+        }
         $code = GlobalTypedConstRewriter::rewrite($code);
-        $code = TypedFunctionStaticRewriter::rewrite($code);
+        $code = GlobalDeprecatedConstRewriter::rewrite($code);
         $code = DnfParenTypeRewriter::rewrite($code);
         $code = AsymmetricVisibilityRewriter::rewrite($code);
+        $code = LazyPropertyRewriter::rewrite($code);
+        $code = ReadonlyFunctionRewriter::rewrite($code);
+        $code = TypedFunctionStaticRewriter::rewrite($code);
         $code = HexFloatLiteralDesugar::desugar($code);
         $code = NewDereferenceableDesugar::desugar($code);
         $code = InOperatorDesugar::desugar($code);
@@ -456,6 +542,7 @@ class Runtime {
         $code = CloneWithDesugar::desugar($code);
         $code = VoidCastDesugar::desugar($code);
         $code = PipeOperatorDesugar::desugar($code);
+        $code = EncapsedCoalesceDesugar::desugar($code);
         return $code;
     }
 
@@ -464,7 +551,7 @@ class Runtime {
         if (method_exists($this->compiler, 'setBareRethrowLines')) {
             $this->compiler->setBareRethrowLines($bareRethrowLines);
         }
-        $fileStrictTypes = $this->detectFileStrictTypes($code);
+        $fileStrictTypes = $this->detectFileStrictTypes($code, $filename);
         $this->resetParserNameResolverState();
         try {
             $script = $this->parser->parse($code, $filename);
@@ -520,8 +607,14 @@ class Runtime {
         }
     }
 
-    private function detectFileStrictTypes(string $code): bool
+    private function detectFileStrictTypes(string $code, string $filename = 'unknown'): bool
     {
+        if (\PHPCompiler\JIT\NestedJitCompileScope::isActive() || null !== $this->jitContext) {
+            return false;
+        }
+        if (ReferenceProfileTokenScan::exceedsTokenScanBudget($code)) {
+            return false;
+        }
         if (!\function_exists('token_get_all')) {
             return false;
         }
@@ -732,6 +825,7 @@ class Runtime {
             $block = $this->compileEmitSmoke($script);
             if (null !== $block) {
                 $block->setScriptPath($filename);
+                $block->setCompileSource($code);
             }
 
             return $block;
@@ -822,12 +916,22 @@ class Runtime {
         $this->compiler->setDebugLastPhaseInputFile($filename);
         \PHPCompiler\JIT\Progress::notePhase('runtime_parseandcompile_begin');
         \PHPCompiler\JIT\Progress::noteEntry($filename);
+        if (\PHPCompiler\JIT\NestedJitCompileScope::isActive()) {
+            $cacheKey = \basename($filename);
+            if (isset(self::$nestedJitParseAndCompileCache[$cacheKey])) {
+                return self::$nestedJitParseAndCompileCache[$cacheKey];
+            }
+        }
         try {
             $script = $this->parse($code, $filename);
             $this->compiler->setCompileSourceCode($code);
             $block = $this->compile($script);
             if (null !== $block) {
                 $block->setScriptPath($filename);
+                $block->setCompileSource($code);
+                if (\PHPCompiler\JIT\NestedJitCompileScope::isActive()) {
+                    self::$nestedJitParseAndCompileCache[\basename($filename)] = $block;
+                }
             }
 
             return $block;
@@ -868,6 +972,7 @@ class Runtime {
             \PHPCompiler\JIT\Progress::noteFunction('runtime_parseandcompilefile_compile_done');
             if (null !== $block) {
                 $block->setScriptPath($filename);
+                $block->setCompileSource($code);
             }
 
             return $block;
@@ -957,14 +1062,17 @@ class Runtime {
         }
     }
 
-    public function run(?Block $block) {
+    public function run(?Block $block, bool $bubbleUncaught = true) {
         $this->ensureVm();
         MemoryAccounting::beginRequest();
         Superglobals::setActiveContext($this->vmContext);
         OutputBuffer::setActiveContext($this->vmContext);
+        $prevBubble = $this->vmContext->bubbleUncaughtToNative;
+        $this->vmContext->bubbleUncaughtToNative = $bubbleUncaught;
         try {
             return $this->vm->run($block);
         } finally {
+            $this->vmContext->bubbleUncaughtToNative = $prevBubble;
             ShutdownQueue::run($this->vmContext);
             OutputBuffer::endAllAtShutdown();
             OutputBuffer::setActiveContext(null);

@@ -25,6 +25,7 @@ final class ReflectionPropertyGetValue extends VmClassMethod
         }
         $receiver = ReflectionSupport::requireReflectionProperty($frame, $frame->calledArgs[0]);
         $ctx = VmReflection::requireContext($frame);
+        ReflectionSupport::assertReflectionPropertyAccessible($ctx, $receiver);
         $className = ReflectionSupport::classNameFromReflection($receiver);
         $entry = VmReflection::resolveClassEntry($ctx, $className);
         if (null === $entry) {
@@ -87,6 +88,31 @@ final class ReflectionPropertyGetValue extends VmClassMethod
                 return;
             }
             $frame->returnVar->null();
+
+            return;
+        }
+        if (ReflectionSupport::isDynamicReflectionProperty($receiver)) {
+            if (\count($frame->calledArgs) < 2) {
+                throw new \TypeError(
+                    'ReflectionProperty::getValue(): Argument #1 ($object) must be provided for instance properties'
+                );
+            }
+            $object = $frame->calledArgs[1]->resolveIndirect();
+            if (Variable::TYPE_OBJECT !== $object->type) {
+                throw new \TypeError(
+                    'ReflectionProperty::getValue(): Argument #1 ($object) must be of type ?object, '
+                    .EnumCaseSupport::typeNameForVariable($object).' given'
+                );
+            }
+            if (null === $frame->returnVar) {
+                return;
+            }
+            $raw = $ctx->runtime->vm()->readInstancePropertyRawForReflection(
+                $object->toObject(),
+                $property,
+                null
+            );
+            $frame->returnVar->copyFrom($raw);
 
             return;
         }

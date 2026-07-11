@@ -31,6 +31,7 @@ final class system extends Internal
         }
         InternalStrictArg::rejectNullString($frame->calledArgs[0], 'system', 'command', 0, $frame);
         $command = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'system', 0, 'command');
+        VmString::rejectEmptyBuiltinStringArg($command, 'system', 0, 'command');
         $result = VmExecNative::run($command);
         if (false !== $result) {
             if (!VmExecNative::linesToStdout($result['lines'])) {

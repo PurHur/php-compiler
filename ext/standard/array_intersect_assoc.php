@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+require_once __DIR__.'/VmArrayAssocSetOps.php';
+
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
-use PHPCompiler\JIT\ArrayBuiltinHelper;
+use PHPCompiler\JIT\Builtin\ArrayIntersectAssocRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\HashTable;
@@ -14,7 +16,7 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * array_intersect_assoc() — intersect with strict key+value equality (php-src ext/standard/array.c, #3129).
+ * array_intersect_assoc() — intersect with key match and loose value equality (php-src ext/standard/array.c, #3129).
  */
 final class array_intersect_assoc extends Internal
 {
@@ -70,6 +72,6 @@ final class array_intersect_assoc extends Internal
             }
         }
 
-        return ArrayBuiltinHelper::arrayIntersectAssoc($context, ...$args);
+        return ArrayIntersectAssocRuntime::intersectAssoc($context, $args[0], ...\array_slice($args, 1));
     }
 }

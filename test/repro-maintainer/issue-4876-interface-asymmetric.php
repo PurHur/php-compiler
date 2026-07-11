@@ -1,6 +1,6 @@
 <?php
 interface I {
-    private(set) string $slug;
+    public (private(set)) string $slug;
 }
 class C implements I {
     public string $slug = 'b';

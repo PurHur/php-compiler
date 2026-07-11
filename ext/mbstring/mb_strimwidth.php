@@ -25,11 +25,16 @@ final class mb_strimwidth extends Internal
 
     public function execute(Frame $frame): void
     {
-        $argc = \count($frame->calledArgs);
-        if ($argc < 3 || $argc > 5) {
+        if (!isset($frame->calledArgs[0]) || !isset($frame->calledArgs[1]) || !isset($frame->calledArgs[2])) {
             throw new \ArgumentCountError(sprintf(
                 'mb_strimwidth() expects at least 3 arguments, %d given',
-                $argc
+                \count($frame->calledArgs)
+            ));
+        }
+        if (isset($frame->calledArgs[5])) {
+            throw new \ArgumentCountError(sprintf(
+                'mb_strimwidth() expects at most 5 arguments, %d given',
+                max(\array_keys($frame->calledArgs)) + 1
             ));
         }
         $string = VmString::coerceStringBuiltinArg(
@@ -41,12 +46,12 @@ final class mb_strimwidth extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $from = VmMbstring::coerceStartArg($frame->calledArgs[1], 'mb_strimwidth', 1);
-        $width = VmMbstring::coerceLengthArg($frame->calledArgs[2], 'mb_strimwidth', 2);
-        $trimmarker = $argc >= 4
+        $from = VmMbstring::coerceStartArg($frame, 'mb_strimwidth', 1);
+        $width = VmMbstring::coerceLengthArg($frame, 'mb_strimwidth', 2);
+        $trimmarker = isset($frame->calledArgs[3])
             ? VmString::coerceStringBuiltinArg($frame->calledArgs[3], 'mb_strimwidth', 3, 'trimmarker')
             : '';
-        $encoding = $argc >= 5
+        $encoding = isset($frame->calledArgs[4])
             ? VmMbstring::coerceEncodingArg($frame->calledArgs[4], 'mb_strimwidth', 4)
             : 'UTF-8';
         BuiltinExecute::writeReturn(

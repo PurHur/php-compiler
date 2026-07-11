@@ -1,0 +1,44 @@
+<?php
+
+declare(strict_types=1);
+
+namespace PHPCompiler\Test\Unit;
+
+use PHPCompiler\ext\standard\PathJitHelper;
+use PHPCompiler\ext\standard\VmString;
+use PHPUnit\Framework\TestCase;
+
+/** dirname()/basename() JIT routes through PathJitHelper PHP not inline LLVM (#15286). */
+final class PathRuntimeShrinkTest extends TestCase
+{
+    public function testJitPathUsesPhpBridgeNotInlineLlvm(): void
+    {
+        $jitPath = (string) file_get_contents(__DIR__.'/../../ext/standard/JitPath.php');
+        $this->assertStringContainsString('StringPath::invokeDirname', $jitPath);
+        $this->assertStringContainsString('StringPath::invokeBasename', $jitPath);
+        $this->assertStringNotContainsString('trimTrailingSeparators', $jitPath);
+        $this->assertStringNotContainsString('scanBackwardForSeparator', $jitPath);
+
+        $bridge = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringPath.php');
+        $this->assertStringContainsString('PathJitHelper', $bridge);
+        $this->assertStringContainsString('phpc_dirname', $bridge);
+    }
+
+    public function testPathJitHelperDelegatesToVmString(): void
+    {
+        $this->assertSame(VmString::dirname('/foo/bar/baz.txt'), PathJitHelper::dirnameArgv('/foo/bar/baz.txt'));
+        $this->assertSame(VmString::dirname('/a/b/c', 2), PathJitHelper::dirnameWithLevelsArgv('/a/b/c', 2));
+        $this->assertSame(VmString::basename('/foo/bar/baz.txt'), PathJitHelper::basenameArgv('/foo/bar/baz.txt'));
+        $this->assertSame(
+            VmString::basename('/foo/bar/baz.txt', '.txt'),
+            PathJitHelper::basenameWithSuffixArgv('/foo/bar/baz.txt', '.txt')
+        );
+    }
+
+    public function testSpineBundleIncludesPathJitHelper(): void
+    {
+        $spine = (string) file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
+        $this->assertStringContainsString('PathJitHelper.php', $spine);
+        $this->assertStringContainsString('StringPath.php', $spine);
+    }
+}

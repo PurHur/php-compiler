@@ -24,23 +24,22 @@ final class get_defined_functions_ extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (\count($frame->calledArgs) > 0) {
-            throw new \LogicException('get_defined_functions() takes no arguments');
-        }
+        $excludeDisabled = VmReflection::parseExcludeDisabledArg($frame, 'get_defined_functions');
         if (null === $frame->returnVar) {
             return;
         }
         $frame->returnVar->array(
-            VmReflection::definedFunctionsTable(VmReflection::requireContext($frame))
+            VmReflection::definedFunctionsTable(
+                VmReflection::requireContext($frame),
+                $excludeDisabled
+            )
         );
     }
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (\count($args) > 0) {
-            throw new \LogicException('get_defined_functions() takes no arguments');
-        }
+        $literal = GetDefinedExcludeDisabledJit::parseLiteral($context, $args, 'get_defined_functions');
 
-        return JitGetDefinedFunctions::invoke($context);
+        return JitGetDefinedFunctions::invoke($context, $literal ?? false);
     }
 }

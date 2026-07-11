@@ -61,13 +61,14 @@ final class UndefinedVariableRuntime
         $msgPtr = $context->builder->pointerCast($context->constantFromString($message), $i8p);
         $msgLen = $sizeT->constInt(\strlen($message), false);
         $emptyFile = $context->builder->pointerCast($context->constantFromString(''), $i8p);
+        $lineVal = $i32->constInt(max(0, $context->callSiteLine), false);
         $context->builder->call(
             $context->lookupFunction('__compiler_trigger_error'),
             $msgPtr,
             $msgLen,
             $i32->constInt(ErrorReporter::E_WARNING, false),
             $emptyFile,
-            $i32->constInt(0, false)
+            $lineVal
         );
     }
 
@@ -145,13 +146,14 @@ final class UndefinedVariableRuntime
             $bufPtr
         );
         $emptyFile = $context->builder->pointerCast($context->constantFromString(''), $i8p);
+        $lineVal = $i32->constInt(max(0, $context->callSiteLine), false);
         $context->builder->call(
             $context->lookupFunction('__compiler_trigger_error'),
             $msgBufPtr,
             $context->builder->zext($written, $sizeT),
             $i32->constInt(ErrorReporter::E_WARNING, false),
             $emptyFile,
-            $i32->constInt(0, false)
+            $lineVal
         );
     }
 

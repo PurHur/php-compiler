@@ -6,45 +6,61 @@ namespace PHPCompiler\Test\Unit;
 
 use PHPCompiler\Compiler\AsymmetricVisibilityCompileCheck;
 use PHPCompiler\Ast\AsymmetricVisibilityRewriter;
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
 /** PHP 8.4 asymmetric visibility compile-time validation (#6589). */
 final class AsymmetricVisibilityCompileCheckTest extends TestCase
 {
+    protected function setUp(): void
+    {
+        if (!CompilerVersion::supportsAsymmetricVisibility()) {
+            $this->markTestSkipped('asymmetric visibility disabled on reference profile (#12508)');
+        }
+    }
     public function testProtectedPublicSetCompileErrors(): void
     {
+        if (!CompilerVersion::supportsParenthesizedAsymmetricSetModifier()) {
+            $this->markTestSkipped('parenthesized asymmetric set modifier disabled on 8.4.0-dev reference profile (#16450)');
+        }
         $this->expectCompileError(
             <<<'PHP'
 <?php
 class C {
-    protected public(set) string $x = 'a';
+    protected (public(set)) string $x = 'a';
 }
 PHP,
-            AsymmetricVisibilityCompileCheck::MULTIPLE_MODIFIERS_MESSAGE
+            AsymmetricVisibilityCompileCheck::WEAKER_THAN_SET_MESSAGE
         );
     }
 
     public function testPrivateProtectedSetCompileErrors(): void
     {
+        if (!CompilerVersion::supportsParenthesizedAsymmetricSetModifier()) {
+            $this->markTestSkipped('parenthesized asymmetric set modifier disabled on 8.4.0-dev reference profile (#16450)');
+        }
         $this->expectCompileError(
             <<<'PHP'
 <?php
 class C {
-    private protected(set) string $x = 'a';
+    private (protected(set)) string $x = 'a';
 }
 PHP,
-            AsymmetricVisibilityCompileCheck::MULTIPLE_MODIFIERS_MESSAGE
+            AsymmetricVisibilityCompileCheck::WEAKER_THAN_SET_MESSAGE
         );
     }
 
     public function testUntypedAsymmetricSetCompileErrors(): void
     {
+        if (!CompilerVersion::supportsParenthesizedAsymmetricSetModifier()) {
+            $this->markTestSkipped('parenthesized asymmetric set modifier disabled on 8.4.0-dev reference profile (#16450)');
+        }
         $this->expectCompileError(
             <<<'PHP'
 <?php
 class C {
-    private(set) $x = 1;
+    public (private(set)) $x = 1;
 }
 PHP,
             'must have type'
@@ -53,64 +69,66 @@ PHP,
 
     public function testPublicPrivateSetCompileErrors(): void
     {
-        $this->expectCompileError(
-            <<<'PHP'
+        $this->expectCompileError(<<<'PHP'
 <?php
 class Demo {
     public private(set) string $name = 'a';
 }
-PHP,
-            AsymmetricVisibilityCompileCheck::MULTIPLE_MODIFIERS_MESSAGE
-        );
+PHP, AsymmetricVisibilityRewriter::MULTIPLE_MODIFIERS_MESSAGE);
     }
 
-    public function testPromotedPublicPrivateSetCompileErrors(): void
+    public function testPromotedPublicPrivateSetParenthesizedFormRejects(): void
     {
-        $runtime = new Runtime();
-        try {
-            $runtime->parseAndCompile(<<<'PHP'
+        $this->expectCompileError(<<<'PHP'
 <?php
 class User {
     public function __construct(
-        public private(set) string $name,
+        public (private(set)) string $name,
     ) {}
 }
-PHP, 'promoted_asymmetric.php');
-            $this->fail('Expected compile failure');
-        } catch (\Throwable $e) {
-            $this->assertStringContainsString(
-                AsymmetricVisibilityCompileCheck::MULTIPLE_MODIFIERS_MESSAGE,
-                $e->getMessage()
-            );
-        }
+PHP, 'syntax error, unexpected token "private"');
     }
 
-    public function testPromotedSingleLinePublicPrivateSetCompileErrors(): void
+    public function testPromotedSingleLinePublicPrivateSetParenthesizedFormRejects(): void
     {
-        $runtime = new Runtime();
-        try {
-            $runtime->parseAndCompile(<<<'PHP'
+        $this->expectCompileError(<<<'PHP'
+<?php
+class D {
+    public function __construct(public (private(set)) int $x = 1) {}
+}
+PHP, 'syntax error, unexpected token "private"');
+    }
+
+    public function testPromotedExplicitReadBeforePrivateSetCompileErrors(): void
+    {
+        $this->expectCompileError(<<<'PHP'
 <?php
 class D {
     public function __construct(public private(set) int $x = 1) {}
 }
-PHP, 'promoted_single_line.php');
-            $this->fail('Expected compile failure');
-        } catch (\Throwable $e) {
-            $this->assertStringContainsString(
-                AsymmetricVisibilityCompileCheck::MULTIPLE_MODIFIERS_MESSAGE,
-                $e->getMessage()
-            );
-        }
+PHP, AsymmetricVisibilityRewriter::MULTIPLE_MODIFIERS_MESSAGE);
     }
 
-    public function testValidPrivateSetStillCompiles(): void
+    public function testExplicitReadBeforePrivateSetCompileErrors(): void
     {
+        $this->expectCompileError(<<<'PHP'
+<?php
+class Demo {
+    public private(set) string $name = 'a';
+}
+PHP, AsymmetricVisibilityRewriter::MULTIPLE_MODIFIERS_MESSAGE);
+    }
+
+    public function testValidParenthesizedPrivateSetStillCompiles(): void
+    {
+        if (!CompilerVersion::supportsParenthesizedAsymmetricSetModifier()) {
+            $this->markTestSkipped('parenthesized asymmetric set modifier disabled on 8.4.0-dev reference profile (#16450)');
+        }
         $runtime = new Runtime();
         $block = $runtime->parseAndCompile(<<<'PHP'
 <?php
 class Demo {
-    private(set) string $name = 'a';
+    public (private(set)) string $name = 'a';
 }
 PHP, 'asymmetric_ok.php');
         $this->assertNotNull($block);
@@ -118,12 +136,15 @@ PHP, 'asymmetric_ok.php');
 
     public function testStaticPublicPrivateSetCompileErrors(): void
     {
+        if (!CompilerVersion::supportsParenthesizedAsymmetricSetModifier()) {
+            $this->markTestSkipped('parenthesized asymmetric set modifier disabled on 8.4.0-dev reference profile (#16450)');
+        }
         $runtime = new Runtime();
         try {
             $runtime->parseAndCompile(<<<'PHP'
 <?php
 class C {
-    public private(set) static int $x = 1;
+    public (private(set)) static int $x = 1;
 }
 PHP, 'static_asymmetric_reject.php');
             $this->fail('Expected compile failure');
@@ -135,16 +156,24 @@ PHP, 'static_asymmetric_reject.php');
         }
     }
 
-    public function testSetBeforeReadStillCompiles(): void
+    public function testSetBeforeReadRejects(): void
     {
-        $runtime = new Runtime();
-        $block = $runtime->parseAndCompile(<<<'PHP'
+        $this->expectCompileError(<<<'PHP'
 <?php
 class C {
     private(set) public string $x = 'a';
 }
-PHP, 'asymmetric_order.php');
-        $this->assertNotNull($block);
+PHP, AsymmetricVisibilityRewriter::BARE_SET_WITHOUT_READ_MESSAGE);
+    }
+
+    public function testBarePrivateSetRejects(): void
+    {
+        $this->expectCompileError(<<<'PHP'
+<?php
+class C {
+    private(set) string $p = 'x';
+}
+PHP, AsymmetricVisibilityRewriter::BARE_SET_WITHOUT_READ_MESSAGE);
     }
 
     private function expectCompileError(string $code, string $messageNeedle): void

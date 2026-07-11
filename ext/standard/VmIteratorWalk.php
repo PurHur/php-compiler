@@ -16,7 +16,7 @@ use PHPCompiler\VM\Variable;
 final class VmIteratorWalk
 {
     /** Zend ext/spl/php_spl.c — iterator_count() on exhausted Generator (#5132). */
-    private const CLOSED_GENERATOR_ITERATOR_COUNT_ERROR = 'Cannot traverse an already closed generator';
+    private const CLOSED_GENERATOR_ITERATOR_COUNT_ERROR = VM\GeneratorState::CLOSED_TRAVERSE_ERROR;
 
     public static function isIterable(Variable $value, Context $ctx): bool
     {
@@ -64,8 +64,8 @@ final class VmIteratorWalk
         $count = 0;
         $iterable = $iterable->resolveIndirect();
         if (Variable::TYPE_ARRAY === $iterable->type) {
-            foreach ($iterable->toArray()->iterateKeyed(true) as [$key, $value]) {
-                if (!self::invokeApplyCallback($frame, $callback, $value, $key, $params)) {
+            foreach ($iterable->toArray()->iterateKeyed(true) as $pair) {
+                if (!self::invokeApplyCallback($frame, $callback, $params)) {
                     break;
                 }
                 ++$count;
@@ -77,11 +77,7 @@ final class VmIteratorWalk
             $gen = $iterable->toObject()->generatorState;
             $gen->rewind();
             while ($vm->resumeGenerator($gen)) {
-                $value = new Variable();
-                $value->copyFrom($gen->currentValue);
-                $key = new Variable();
-                $key->copyFrom($gen->currentKey);
-                if (!self::invokeApplyCallback($frame, $callback, $value, $key, $params)) {
+                if (!self::invokeApplyCallback($frame, $callback, $params)) {
                     break;
                 }
                 ++$count;
@@ -93,14 +89,15 @@ final class VmIteratorWalk
         $object = ForeachIterator::resolveTraversableObject($vm, $frame, $iterable);
         $vm->invokeForeachInstanceMethod($frame, $object, 'rewind');
         while ($vm->invokeForeachInstanceMethod($frame, $object, 'valid')->toBool()) {
-            $value = $vm->invokeForeachInstanceMethod($frame, $object, 'current')->resolveIndirect();
-            $key = $vm->invokeForeachInstanceMethod($frame, $object, 'key')->resolveIndirect();
-            if (!self::invokeApplyCallback($frame, $callback, $value, $key, $params)) {
+            if (!self::invokeApplyCallback($frame, $callback, $params)) {
                 break;
             }
             ++$count;
-            $before = $value;
+            $before = $vm->invokeForeachInstanceMethod($frame, $object, 'current')->resolveIndirect();
             $vm->invokeForeachInstanceMethod($frame, $object, 'next');
+            if (!$vm->invokeForeachInstanceMethod($frame, $object, 'valid')->toBool()) {
+                break;
+            }
             $after = $vm->invokeForeachInstanceMethod($frame, $object, 'current')->resolveIndirect();
             if (self::vmValuesEqual($before, $after) && $count > 0) {
                 break;
@@ -141,11 +138,8 @@ final class VmIteratorWalk
     private static function invokeApplyCallback(
         Frame $frame,
         Variable $callback,
-        Variable $value,
-        Variable $key,
         array $params
     ): bool {
-        unset($value, $key);
         $callback = $callback->resolveIndirect();
         if (VmClosureCall::isClosure($callback)) {
             if (null === $frame->vmContext) {
@@ -191,8 +185,11 @@ final class VmIteratorWalk
 
     private static function countGenerator(VM $vm, VM\GeneratorState $gen): int
     {
-        if ($gen->started) {
+        if ($gen->done) {
             throw new \Exception(self::CLOSED_GENERATOR_ITERATOR_COUNT_ERROR);
+        }
+        if ($gen->started) {
+            throw new \Exception(VM\GeneratorState::REWIND_ALREADY_RUN_ERROR);
         }
         $gen->rewind();
         $count = 0;
@@ -212,6 +209,9 @@ final class VmIteratorWalk
             $before = $vm->invokeForeachInstanceMethod($frame, $object, 'current')->resolveIndirect();
             ++$count;
             $vm->invokeForeachInstanceMethod($frame, $object, 'next');
+            if (!$vm->invokeForeachInstanceMethod($frame, $object, 'valid')->toBool()) {
+                break;
+            }
             $after = $vm->invokeForeachInstanceMethod($frame, $object, 'current')->resolveIndirect();
             if (self::vmValuesEqual($before, $after) && $count > 0) {
                 break;

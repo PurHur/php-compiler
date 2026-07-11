@@ -46,8 +46,9 @@ final class VmCsv
                 if ("\0" === $c) {
                     break;
                 }
-                if ($c === $esc && $i + 1 < $len) {
-                    // php-src ext/standard/file.c — state 1 copies escape + next byte inside enclosure.
+                // php-src ext/standard/file.c — when escape equals enclosure, only doubled-enclosure
+                // unescaping applies; the escape+next-byte branch is disabled (#9303).
+                if ($esc !== $enc && $c === $esc && $i + 1 < $len) {
                     $field .= $esc.$line[$i + 1];
                     $i += 2;
                     continue;
@@ -148,11 +149,8 @@ final class VmCsv
         for ($i = 0, $len = \strlen($field); $i < $len; ++$i) {
             $c = $field[$i];
             if ($c === $enc) {
+                // php-src ext/standard/file.c — only enclosure is doubled inside quotes.
                 $out .= $enc.$enc;
-                continue;
-            }
-            if ($c === $esc) {
-                $out .= $esc.$esc;
                 continue;
             }
             $out .= $c;

@@ -1,0 +1,13 @@
+diff --git vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/Property.php vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/Property.php
+--- vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/Property.php
++++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/Property.php
+@@ -42,6 +42,9 @@ class Property extends Stmt
+     /** php-parser Stmt\Property flags (includes MODIFIER_READONLY, issue #3149). */
+     public int $propertyFlags = 0;
+ 
++    /** PHP 8.4 lazy property modifier recovered from phpc-lazy-property marker (#16813). */
++    public bool $propertyLazy = false;
++
+     public function __construct(Operand $name, int $visibility, bool $static, Op\Type $declaredType, Operand $defaultVar = null, Block $defaultBlock = null, array $attributes = [])
+     {
+         parent::__construct($attributes);

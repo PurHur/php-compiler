@@ -8,8 +8,6 @@ use PHPUnit\Framework\TestCase;
 
 /**
  * AOT runtime surface inventory — lib/AOT/runtime/ and lib/JIT/Builtin/*.c shrink guard (#5211, #1492).
- *
- * After php-in-php migrations, only phpc_progress.c (frozen SIGSEGV ABI) may remain under lib/AOT/runtime/.
  */
 final class AotRuntimeInventoryTest extends TestCase
 {
@@ -20,31 +18,24 @@ final class AotRuntimeInventoryTest extends TestCase
         $this->repoRoot = dirname(__DIR__, 2);
     }
 
-    public function testAotRuntimeDirectoryContainsOnlyProgressAbi(): void
+    public function testAotRuntimeDirectoryContainsNoCRuntimeSources(): void
     {
         $runtimeDir = $this->repoRoot.'/lib/AOT/runtime';
         $this->assertDirectoryExists($runtimeDir);
 
         $cFiles = glob($runtimeDir.'/*.c') ?: [];
         sort($cFiles);
-        $this->assertSame(
-            [$runtimeDir.'/phpc_progress.c'],
-            $cFiles,
-            'lib/AOT/runtime/ must contain only phpc_progress.c (thin SIGSEGV ABI; see ProgressNoteRuntimeStandaloneTest)'
-        );
+        $this->assertSame([], $cFiles, 'lib/AOT/runtime/ must contain no hand-written C runtime TUs');
     }
 
-    public function testLinkerRuntimeCSourcesOnlyProgressAbi(): void
+    public function testLinkerRuntimeCSourcesEmpty(): void
     {
         $linker = (string) file_get_contents($this->repoRoot.'/lib/AOT/Linker.php');
-        $this->assertStringContainsString("'/runtime/phpc_progress.c'", $linker);
-        $this->assertStringContainsString("'phpc_progress.c'", $linker);
-
         if (!preg_match('/private const RUNTIME_C_SOURCES = \[(.*?)\];/s', $linker, $m)) {
             $this->fail('Linker::RUNTIME_C_SOURCES not found');
         }
         $block = $m[1];
-        $this->assertStringNotContainsString('.c', preg_replace('/phpc_progress\.c/', '', $block) ?? $block);
+        $this->assertStringNotContainsString('.c', $block, 'Linker::RUNTIME_C_SOURCES must remain empty');
     }
 
     /** Bundled LLVM sysroot may ship stdio.h without stddef.h — layer host -isystem on sysroot (#1492). */
@@ -84,5 +75,7 @@ final class AotRuntimeInventoryTest extends TestCase
 
         $gettimeofday = (string) file_get_contents($this->repoRoot.'/lib/JIT/Builtin/StringGettimeofday.php');
         $this->assertStringContainsString('__compiler_gettimeofday', $gettimeofday);
+        $this->assertStringContainsString('GettimeofdayJitHelper', $gettimeofday);
+        $this->assertStringNotContainsString("lookupFunction('gettimeofday')", $gettimeofday);
     }
 }

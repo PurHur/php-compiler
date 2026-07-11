@@ -8,11 +8,44 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\Variable;
 
 final class VmNumberFormat
 {
+    private const MAX_ARGS = 4;
+
+    /**
+     * php-src ext/standard/math.c — ZEND_PARSE_PARAMETERS_START(1, 4).
+     *
+     * PHP 8.4 forward profile allows a fifth positional only when it is a RoundingMode enum (#9438).
+     */
+    public static function assertArgCount(int $argc, ?Variable $fifthArg = null): void
+    {
+        if ($argc < 1) {
+            throw new \ArgumentCountError(\sprintf(
+                'number_format() expects at least 1 argument, %d given',
+                $argc
+            ));
+        }
+        if ($argc <= self::MAX_ARGS) {
+            return;
+        }
+        if (5 === $argc
+            && CompilerVersion::supportsRoundingModeEnum()
+            && null !== $fifthArg
+            && null !== VmRoundMode::tryRoundModeInt($fifthArg->resolveIndirect())) {
+            return;
+        }
+
+        throw new \ArgumentCountError(\sprintf(
+            'number_format() expects at most %d arguments, %d given',
+            self::MAX_ARGS,
+            $argc
+        ));
+    }
+
     /**
      * Coerce number_format() argument #1 to float (php-src ext/standard/number_format.c).
      *
@@ -60,7 +93,8 @@ final class VmNumberFormat
         float $number,
         int $decimals = 0,
         string $decimalSeparator = '.',
-        string $thousandsSeparator = ','
+        string $thousandsSeparator = ',',
+        int $roundingMode = StdlibConstants::PHP_ROUND_HALF_UP
     ): string {
         // php-src ext/standard/math.c _php_math_number_format_ex: non-finite via %F, lowercased
         if (\is_nan($number)) {
@@ -70,20 +104,32 @@ final class VmNumberFormat
             return 'inf';
         }
 
+        // php-src ext/standard/math.c _php_math_number_format_ex (#15917):
+        // _php_math_round($d, $dec, …) then $dec = MAX(0, $dec) for display precision.
+        // Pre-8.3 ignores negative $decimals like 0.
+        $roundPlaces = $decimals;
+        if ($decimals < 0) {
+            if (version_compare(CompilerVersion::languageProfileVersion(), '8.4.0', '>=')) {
+                throw new \ValueError('number_format(): Argument #2 ($decimals) must be greater than or equal to 0');
+            }
+            if (!CompilerVersion::supportsNumberFormatNegativeDecimals()) {
+                $roundPlaces = 0;
+                $decimals = 0;
+            } else {
+                $decimals = 0;
+            }
+        }
+
         $negative = $number < 0.0;
         if ($negative) {
             $number = -$number;
         }
 
+        $rounded = VmRound::mathRound($number, $roundPlaces, $roundingMode);
+
         $pow = 1;
         for ($i = 0; $i < $decimals; ++$i) {
             $pow *= 10;
-        }
-
-        if ($decimals > 0) {
-            $rounded = round($number, $decimals);
-        } else {
-            $rounded = round($number, 0);
         }
 
         $intPart = (int) floor($rounded);

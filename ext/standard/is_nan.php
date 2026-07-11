@@ -13,10 +13,10 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\MathIsNan;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
-use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
@@ -26,9 +26,7 @@ final class is_nan extends Internal
 {
     public function execute(Frame $frame): void
     {
-        if (1 !== count($frame->calledArgs)) {
-            throw new \LogicException('is_nan() requires exactly one argument');
-        }
+        $this->requireExactArgCount($frame, 'is_nan', 1);
         $v = $frame->calledArgs[0]->resolveIndirect();
         if (null === $frame->returnVar) {
             return;
@@ -38,7 +36,7 @@ final class is_nan extends Internal
 
             return;
         }
-        $num = VmMath::parseDoubleBuiltinArg($v, 'is_nan', 1, 'num');
+        $num = VmMath::parseStrictFloatBuiltinArgForFrame($frame, 'is_nan', 1, 'num');
         $frame->returnVar->bool(\is_nan($num));
     }
 
@@ -47,17 +45,14 @@ final class is_nan extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         $this->context = $context;
-        if (1 !== count($args)) {
-            throw new \LogicException('is_nan() requires exactly one argument');
+        if (!$this->requireExactJitArgCount($context, $args, 'is_nan', 1)) {
+            return $context->constantFromBool(false);
         }
         if (JITVariable::TYPE_NATIVE_LONG === $args[0]->type) {
             return $context->constantFromBool(false);
         }
         $asFloat = JitFdiv::lowerSingleOperand($context, $args[0], 1, 'num', 'is_nan', 'float');
-        $fn = $context->lookupFunction('isnan');
-        $raw = $context->builder->call($fn, $asFloat);
-        $zero = $raw->typeOf()->constInt(0, false);
 
-        return $context->builder->icmp(Builder::INT_NE, $raw, $zero);
+        return MathIsNan::invoke($context, $asFloat);
     }
 }

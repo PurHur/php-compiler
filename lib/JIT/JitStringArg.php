@@ -38,6 +38,11 @@ final class JitStringArg
             if (Variable::TYPE_STRING === $arg->type && Variable::KIND_VALUE === $arg->kind) {
                 return self::stringPtrFromVariable($context, $arg);
             }
+            // Slot-backed concat temps carry compileTimeString for other folds but must
+            // read the runtime __string__* written by JitStringConcat (AOT tier-2, #15642).
+            if (Variable::TYPE_STRING === $arg->type && Variable::KIND_VARIABLE === $arg->kind) {
+                return self::materializeStringSlot($context, $context->helper->loadValue($arg));
+            }
 
             return $context->builder->load($context->constantStringFromString($literal));
         }
@@ -114,6 +119,11 @@ final class JitStringArg
      */
     public static function lowerDominating(Context $context, Variable $arg, string $contextLabel = 'argument'): Value
     {
+        // Slot-backed locals may receive different ?: arm values; compileTimeString from the
+        // first arm must not fold into a shared merge echo (standalone AOT — #15704).
+        if (Variable::KIND_VARIABLE === $arg->kind && Variable::TYPE_STRING === $arg->type) {
+            return self::materializeStringSlot($context, $context->helper->loadValue($arg));
+        }
         $literal = self::compileTimeLiteral($arg);
         if (null !== $literal) {
             return $context->builder->load($context->constantStringFromString($literal));
@@ -131,6 +141,12 @@ final class JitStringArg
         }
 
         return self::lower($context, $arg, $contextLabel);
+    }
+
+    /** @return Value owning {@see __string__*} in an entry alloca */
+    public static function materializeStringDominating(Context $context, Value $sourceStr): Value
+    {
+        return self::materializeStringSlot($context, $sourceStr);
     }
 
     /** @return Value owning {@see __string__*} in an entry alloca */

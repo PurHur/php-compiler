@@ -22,20 +22,22 @@ final class VmFsGlobTest extends TestCase
         $this->assertStringContainsString('VmFsGlob::glob', $source);
     }
 
-    /** Issue #7906: VmFsGlob must not delegate to host \\glob(). */
+    /** Issue #7906 / #12208: VmFsGlob must not delegate to host \\glob() or libc FFI. */
     public function testVmFsGlobDoesNotReferenceHostGlob(): void
     {
         $source = (string) file_get_contents(self::$root.'/ext/standard/VmFsGlob.php');
-        $this->assertStringContainsString('globFallback', $source);
-        $this->assertStringContainsString('libcGlob', $source);
+        $pure = (string) file_get_contents(self::$root.'/ext/standard/VmFsGlobPure.php');
+        $this->assertStringContainsString('VmFsGlobPure::glob', $source);
+        $this->assertStringNotContainsString('FFI::cdef', $source);
         $this->assertStringNotContainsString("function_exists('glob')", $source);
         $this->assertStringNotContainsString('hostGlob', $source);
+        $this->assertStringNotContainsString('FFI::cdef', $pure);
     }
 
     /** Issue #8167: VmFsGlob pathIsDir must not delegate to host \\stat(). */
     public function testVmFsGlobDoesNotReferenceHostStat(): void
     {
-        $source = (string) file_get_contents(self::$root.'/ext/standard/VmFsGlob.php');
+        $source = (string) file_get_contents(self::$root.'/ext/standard/VmFsGlobPure.php');
         $this->assertStringContainsString('VmStatCache::stat', $source);
         $this->assertDoesNotMatchRegularExpression('/@\\\\stat\\s*\\(/', $source);
         $this->assertDoesNotMatchRegularExpression('/[^:]\\\\stat\\s*\\(/', $source);
@@ -76,5 +78,104 @@ final class VmFsGlobTest extends TestCase
         $this->assertIsArray($matches);
         $this->assertCount(1, $matches);
         $this->assertSame('subdir', basename($matches[0]));
+    }
+
+    /** Issue #12626 — GLOB_BRACE with no matches returns empty array, not false. */
+    public function testVmFsGlobBraceEmptyReturnsArray(): void
+    {
+        $matches = \PHPCompiler\ext\standard\VmFsGlob::glob('{a,b}.txt', \GLOB_BRACE);
+        $this->assertIsArray($matches);
+        $this->assertSame([], $matches);
+    }
+
+    /** Issue #12626 — GLOB_BRACE expands alternatives. */
+    public function testVmFsGlobBraceExpandsMatches(): void
+    {
+        $dir = self::$root.'/test/compliance/cases/stdlib/glob_scandir_fixture';
+        $matches = \PHPCompiler\ext\standard\VmFsGlob::glob($dir.'/{a,b}.php', \GLOB_BRACE);
+        $this->assertIsArray($matches);
+        $this->assertCount(2, $matches);
+        $names = array_map('basename', $matches);
+        sort($names);
+        $this->assertSame(['a.php', 'b.php'], $names);
+    }
+
+    /** Issue #12627 — GLOB_MARK appends slash to directories only. */
+    public function testVmFsGlobMarkAppendsSlashToDirectories(): void
+    {
+        $dir = self::$root.'/test/compliance/cases/stdlib/glob_onlydir_fixture';
+        $matches = \PHPCompiler\ext\standard\VmFsGlob::glob($dir.'/*', \GLOB_MARK);
+        $this->assertIsArray($matches);
+        $marked = false;
+        foreach ($matches as $entry) {
+            if (str_ends_with($entry, '/')) {
+                $marked = true;
+                $this->assertStringEndsWith('/subdir/', $entry);
+            }
+        }
+        $this->assertTrue($marked);
+        $files = \PHPCompiler\ext\standard\VmFsGlob::glob($dir.'/*.php', \GLOB_MARK);
+        foreach ($files as $entry) {
+            $this->assertFalse(str_ends_with($entry, '/'));
+        }
+    }
+
+    /** Issue #14881 — glob('.') returns current directory entry. */
+    public function testVmFsGlobDotPatternReturnsDot(): void
+    {
+        $matches = \PHPCompiler\ext\standard\VmFsGlob::glob('.');
+        $this->assertSame(['.'], $matches);
+    }
+
+    /** Issue #14914 — directory path with trailing slash matches itself. */
+    public function testVmFsGlobTrailingSlashDirectoryMatchesSelf(): void
+    {
+        $tmp = sys_get_temp_dir();
+        if (!is_dir($tmp)) {
+            $this->markTestSkipped('sys_get_temp_dir() is not a directory');
+        }
+        $dir = rtrim($tmp, '/').'/';
+        $matches = \PHPCompiler\ext\standard\VmFsGlob::glob($dir);
+        $this->assertSame([$dir], $matches);
+    }
+
+    /** Issue #16970 — invalid flag bits emit warning and return false (php-src dir.c). */
+    public function testVmFsGlobInvalidFlagsRejected(): void
+    {
+        $this->assertTrue(\PHPCompiler\ext\standard\VmFsGlob::hasInvalidFlags(99999));
+        $this->assertFalse(\PHPCompiler\ext\standard\VmFsGlob::hasInvalidFlags(\GLOB_MARK));
+        $result = \PHPCompiler\ext\standard\VmFsGlob::glob('*', 99999);
+        $this->assertFalse($result);
+    }
+
+    /** Issue #17456 — glob('/dir/.*') includes . and .. when pattern requests dotfiles. */
+    public function testVmFsGlobDotPatternIncludesDotEntries(): void
+    {
+        $tmp = sys_get_temp_dir();
+        if (!is_dir($tmp)) {
+            $this->markTestSkipped('sys_get_temp_dir() is not a directory');
+        }
+        $matches = \PHPCompiler\ext\standard\VmFsGlob::glob($tmp.'/.*');
+        $this->assertIsArray($matches);
+        $this->assertContains($tmp.'/.', $matches);
+        $this->assertContains($tmp.'/..', $matches);
+        $star = \PHPCompiler\ext\standard\VmFsGlob::glob($tmp.'/*');
+        $this->assertIsArray($star);
+        $this->assertNotContains($tmp.'/.', $star);
+        $this->assertNotContains($tmp.'/..', $star);
+    }
+
+    /** Issue #14881 — absolute directory path without double leading slash. */
+    public function testVmFsGlobAbsoluteDirNormalizesLeadingSlash(): void
+    {
+        $tmp = sys_get_temp_dir();
+        if (!is_dir($tmp)) {
+            $this->markTestSkipped('sys_get_temp_dir() is not a directory');
+        }
+        $matches = \PHPCompiler\ext\standard\VmFsGlob::glob($tmp);
+        $this->assertIsArray($matches);
+        $this->assertCount(1, $matches);
+        $this->assertSame($tmp, $matches[0]);
+        $this->assertStringNotContainsString('//', $matches[0]);
     }
 }

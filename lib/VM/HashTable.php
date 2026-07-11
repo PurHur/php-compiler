@@ -10,6 +10,8 @@
 namespace PHPCompiler\VM;
 
 use php\MaskedArray;
+use PHPCompiler\ext\standard\StdlibConstants;
+use PHPCompiler\ext\standard\VmMath;
 
 final class HashTable {
     const OKAY                     = 0b0000000;
@@ -47,6 +49,7 @@ final class HashTable {
         $this->flags = self::FLAG_UNINITIALIZED;
         $this->indexes = MaskedArray::allocate(self::MIN_SIZE);
         $this->buckets = MaskedArray::allocate(self::MIN_SIZE);
+        HashTableRegistry::register($this);
     }
 
     public function addRef(): void {
@@ -55,6 +58,30 @@ final class HashTable {
 
     public function delRef(): void {
         $this->refcount->delRef();
+        if (0 === $this->refcount->refcount && !$this->isDestroyed() && !CycleCollector::isGcProtected()) {
+            HashTableRegistry::release($this);
+        }
+    }
+
+    public function isDestroyed(): bool
+    {
+        return self::DESTROYED === ($this->flags & self::FLAG_CONSISTENCY);
+    }
+
+    /** Break bucket edges after cycle collection (#13400). */
+    public function destroyForGc(): void
+    {
+        if ($this->isDestroyed()) {
+            return;
+        }
+        $this->flags = ($this->flags & ~self::FLAG_CONSISTENCY) | self::IS_DESTROYING;
+        for ($i = 0; $i < $this->numUsed; ++$i) {
+            $bucket = $this->buckets->read($i);
+            if (!$bucket->value->isUndefined()) {
+                $bucket->value->reset();
+            }
+        }
+        $this->flags = ($this->flags & ~self::FLAG_CONSISTENCY) | self::DESTROYED;
     }
 
     public function needsSeparate(): bool {
@@ -108,17 +135,21 @@ final class HashTable {
                 }
             }
         }
-        if ($maxIntKey > 0) {
+        if ($maxIntKey > 0 && $maxIntKey < \PHP_INT_MAX) {
             $out->ensureHashSlotCapacity($maxIntKey);
         }
         foreach ($this->iterateKeyed(false) as [$key, $value]) {
-            if (Variable::TYPE_INTEGER === $key->type) {
-                $out->insertDuplicatedIndex($key->toInt(), $value);
+            $storageKey = self::normalizeIndexKey($key);
+            if (Variable::TYPE_INTEGER === $storageKey->type) {
+                $out->insertDuplicatedIndex($storageKey->toInt(), $value);
             } else {
-                $out->insertDuplicatedKey($key->toString(), $value);
+                $out->insertDuplicatedKey($storageKey->toString(), $value);
             }
         }
         $out->internalPointer = $this->internalPointer;
+        if ($this->flags & self::FLAG_ALLOW_COW_VIOLATION) {
+            $out->markResourceLikeHandle();
+        }
 
         return $out;
     }
@@ -142,9 +173,7 @@ final class HashTable {
         $bucket->value->next = $this->indexes->read($index);
         $this->indexes->write($index, $id);
         $bucket->value->duplicateFrom($data);
-        if ($index >= $this->nextFreeElement) {
-            $this->nextFreeElement = $index + 1;
-        }
+        $this->bumpNextFreeElementForIndex($index);
     }
 
     private function insertDuplicatedKey(string $key, Variable $data): void
@@ -200,12 +229,7 @@ final class HashTable {
             if ($bucket->value->isUndefined()) {
                 continue;
             }
-            $keyVar = new Variable();
-            if (null !== $bucket->key) {
-                $keyVar->string($bucket->key);
-            } else {
-                $keyVar->int($bucket->hash);
-            }
+            $keyVar = $this->bucketKeyToVariable($bucket);
             $value = $bucket->value;
             if ($resolveIndirect) {
                 $value = $value->resolveIndirect();
@@ -214,6 +238,33 @@ final class HashTable {
         }
 
         return new \ArrayIterator($pairs);
+    }
+
+    /**
+     * Materialize key/value pairs for JIT/AOT nested helper foreach (#12908).
+     *
+     * Prefer over iterateKeyed() in compiled php-in-PHP helpers — nested JIT lowers array
+     * foreach but not HashTable::iterateKeyed() yet.
+     *
+     * @return list<array{Variable, Variable}>
+     */
+    public function exportKeyValuePairs(bool $resolveIndirect = false): array
+    {
+        $pairs = [];
+        for ($i = 0; $i < $this->numUsed; ++$i) {
+            $bucket = $this->buckets->read($i);
+            if ($bucket->value->isUndefined()) {
+                continue;
+            }
+            $keyVar = $this->bucketKeyToVariable($bucket);
+            $value = $bucket->value;
+            if ($resolveIndirect) {
+                $value = $value->resolveIndirect();
+            }
+            $pairs[] = [$keyVar, $value];
+        }
+
+        return $pairs;
     }
 
     public function iterReset(): void
@@ -235,14 +286,8 @@ final class HashTable {
     public function iterCurrentKey(): Variable
     {
         $bucket = $this->buckets->read($this->internalPointer);
-        $keyVar = new Variable();
-        if (null !== $bucket->key) {
-            $keyVar->string($bucket->key);
-        } else {
-            $keyVar->int($bucket->hash);
-        }
 
-        return $keyVar;
+        return $this->bucketKeyToVariable($bucket);
     }
 
     public function iterCurrentValue(bool $byRef = false): Variable
@@ -325,15 +370,7 @@ final class HashTable {
             return null;
         }
         if ($this->internalPointer >= $this->numUsed) {
-            $idx = $this->prevUsedBucketIndex($this->numUsed - 1);
-            if (self::INVALID_INDEX === $idx) {
-                $this->internalPointer = self::INVALID_INDEX;
-
-                return null;
-            }
-            $this->internalPointer = $idx;
-
-            return $this->iterCurrentValue();
+            return null;
         }
         if (self::INVALID_INDEX === $this->internalPointer) {
             return null;
@@ -448,6 +485,13 @@ final class HashTable {
         if (Variable::TYPE_BOOLEAN === $index->type) {
             $intKey = new Variable();
             $intKey->int($index->toBool() ? 1 : 0);
+
+            return $intKey;
+        }
+        if (Variable::TYPE_FLOAT === $index->type) {
+            // Zend zend_hash: float offsets coerce to int keys without deprecation (#5123, #16739).
+            $intKey = new Variable();
+            $intKey->int(VmMath::floatToZendLong($index->toFloat()));
 
             return $intKey;
         }
@@ -793,16 +837,23 @@ final class HashTable {
             if ($bucket->value->isUndefined()) {
                 continue;
             }
-            $keyVar = new Variable();
-            if (null !== $bucket->key) {
-                $keyVar->string($bucket->key);
-            } else {
-                $keyVar->int($bucket->hash);
-            }
-            $out->append($keyVar);
+            $out->append($this->bucketKeyToVariable($bucket));
         }
 
         return $out;
+    }
+
+    private function bucketKeyToVariable(object $bucket): Variable
+    {
+        $keyVar = new Variable();
+        if (null !== $bucket->key) {
+            $keyVar->string($bucket->key);
+
+            return WeakRefSupport::materializeArrayKey($keyVar);
+        }
+        $keyVar->int($bucket->hash);
+
+        return $keyVar;
     }
 
     /**
@@ -1114,10 +1165,11 @@ final class HashTable {
         foreach ($this->iterateKeyed(true) as [$key, $value]) {
             $copy = new Variable();
             $copy->copyFrom($value);
-            if (Variable::TYPE_INTEGER === $key->type) {
-                $out->addIndex($key->toInt(), $copy);
+            $storageKey = self::normalizeIndexKey($key);
+            if (Variable::TYPE_INTEGER === $storageKey->type) {
+                $out->addIndex($storageKey->toInt(), $copy);
             } else {
-                $out->add($key->toString(), $copy);
+                $out->add($storageKey->toString(), $copy);
             }
         }
         $out->unionInPlace($other);
@@ -1133,6 +1185,9 @@ final class HashTable {
         $this->assertConsistent();
         $this->assertSeparatedForWrite();
         foreach ($other->iterateKeyed(true) as [$key, $value]) {
+            if (null !== WeakRefSupport::objectKeyIfEnumCase($key)) {
+                throw new \TypeError('Illegal offset type');
+            }
             EnumCaseSupport::rejectIllegalArrayOffset($key);
             if (Variable::TYPE_INTEGER === $key->type) {
                 if (null !== $this->findIndex($key->toInt())) {
@@ -1231,13 +1286,57 @@ final class HashTable {
 
     /**
      * Pad a packed list to {@param $length} elements with {@param $value} (array_pad subset).
+     *
+     * When {@param $padType} is set (PHP 8.4+ 4-arg form), {@param $length} is absolute size and
+     * {@param $padType} selects ARRAY_PAD_LEFT/RIGHT/BOTH. Otherwise sign of {@param $length}
+     * selects prepend vs append (legacy 3-arg form).
      */
-    public function padCopy(int $length, Variable $value): HashTable
+    public function padCopy(int $length, Variable $value, ?int $padType = null): HashTable
     {
         if (!$this->isWithoutHoles()) {
             throw new \LogicException('padCopy() only supports packed list arrays without holes');
         }
         $count = $this->numElements;
+        if (null !== $padType) {
+            $target = abs($length);
+            if ($target <= $count) {
+                return $this->copyAllKeyedEntries();
+            }
+            $padCount = $target - $count;
+            $pad = new Variable();
+            $pad->copyFrom($value);
+
+            if (StdlibConstants::ARRAY_PAD_BOTH === $padType) {
+                $leftCount = intdiv($padCount + 1, 2);
+                $rightCount = $padCount - $leftCount;
+                $prepend = [];
+                for ($i = 0; $i < $leftCount; ++$i) {
+                    $copy = new Variable();
+                    $copy->copyFrom($pad);
+                    $prepend[] = $copy;
+                }
+                $out = new self();
+                $out->unshiftPrepend(...$prepend);
+                foreach ($this->iterate(true) as $element) {
+                    $copy = new Variable();
+                    $copy->copyFrom($element);
+                    $out->append($copy);
+                }
+                for ($i = 0; $i < $rightCount; ++$i) {
+                    $copy = new Variable();
+                    $copy->copyFrom($pad);
+                    $out->append($copy);
+                }
+
+                return $out;
+            }
+            if (StdlibConstants::ARRAY_PAD_LEFT === $padType) {
+                return $this->padCopy(-$target, $value, null);
+            }
+
+            return $this->padCopy($target, $value, null);
+        }
+
         $target = abs($length);
         if ($target <= $count) {
             return $this->copyAllKeyedEntries();
@@ -1255,18 +1354,20 @@ final class HashTable {
 
             return $out;
         }
-        $prepend = [];
+        $out = new self();
         for ($i = 0; $i < $padCount; ++$i) {
             $copy = new Variable();
             $copy->copyFrom($pad);
-            $prepend[] = $copy;
+            $out->addIndex($i, $copy);
         }
-        $out = new self();
-        $out->unshiftPrepend(...$prepend);
-        foreach ($this->iterate(true) as $element) {
+        foreach ($this->iterateKeyed(true) as [$key, $element]) {
             $copy = new Variable();
             $copy->copyFrom($element);
-            $out->append($copy);
+            if (Variable::TYPE_INTEGER === $key->type) {
+                $out->addIndex($key->toInt() + $padCount, $copy);
+            } else {
+                $out->add($key->toString(), $copy);
+            }
         }
 
         return $out;
@@ -1473,7 +1574,8 @@ final class HashTable {
 
         $num = $this->numElements;
         $newValues = [];
-        for ($i = 0; $i < $offset; ++$i) {
+        $prefixLen = $offset < $num ? $offset : $num;
+        for ($i = 0; $i < $prefixLen; ++$i) {
             $copy = new Variable();
             $copy->copyFrom($values[$i]);
             $newValues[] = $copy;
@@ -1509,7 +1611,8 @@ final class HashTable {
         }
 
         $newPairs = [];
-        for ($i = 0; $i < $offset; ++$i) {
+        $prefixLen = $offset < $num ? $offset : $num;
+        for ($i = 0; $i < $prefixLen; ++$i) {
             $newPairs[] = $this->duplicateKeyedPair($pairs[$i]);
         }
         $replacementCount = null !== $replacement ? $replacement->getNumElements() : 0;
@@ -1878,6 +1981,9 @@ final class HashTable {
     public static function spreadMergeKey(HashTable $dest, Variable $key, Variable $value): void
     {
         $key = $key->resolveIndirect();
+        if (Variable::TYPE_STRING === $key->type && str_starts_with($key->toString(), 'e:')) {
+            throw new \TypeError('Illegal offset type');
+        }
         EnumCaseSupport::rejectIllegalArrayOffset($key);
         if ($key->is(Variable::TYPE_INTEGER)) {
             $dest->append($value);
@@ -1898,10 +2004,20 @@ final class HashTable {
      */
     public function spreadFrom(HashTable $source): void
     {
-        foreach ($source->iterateKeyed(true) as [$key, $value]) {
+        for ($i = 0; $i < $source->numUsed; ++$i) {
+            $bucket = $source->buckets->read($i);
+            if ($bucket->value->isUndefined()) {
+                continue;
+            }
+            $keyVar = new Variable();
+            if (null !== $bucket->key) {
+                $keyVar->string($bucket->key);
+            } else {
+                $keyVar->int($bucket->hash);
+            }
             $copy = new Variable();
-            $copy->copyFrom($value);
-            self::spreadMergeKey($this, $key, $copy);
+            $copy->copyFrom($bucket->value->resolveIndirect());
+            self::spreadMergeKey($this, $keyVar, $copy);
         }
     }
 
@@ -1914,6 +2030,9 @@ final class HashTable {
         $this->assertConsistent();
         if ($this->flags & self::FLAG_UNINITIALIZED) {
             $this->initMixed();
+        }
+        if ($maxHashIndex >= \PHP_INT_MAX) {
+            return;
         }
         while ($maxHashIndex >= $this->indexes->size()) {
             $this->resize();
@@ -2018,10 +2137,22 @@ final class HashTable {
         } else {
             $bucket->value->copyFrom($data);
         }
-        if (is_null($key) && $hash >= $this->nextFreeElement) {
-            $this->nextFreeElement = $hash + 1;
+        if (is_null($key)) {
+            $this->bumpNextFreeElementForIndex($hash);
         }
         return $bucket->value;
+    }
+
+    /**
+     * Advance nextFreeElement after storing integer key $index (php-src nNextFreeElement; #9534).
+     * PHP int cannot represent PHP_INT_MAX + 1 — skip bump so append finds the first free slot.
+     */
+    private function bumpNextFreeElementForIndex(int $index): void
+    {
+        if ($index < $this->nextFreeElement || $index >= \PHP_INT_MAX) {
+            return;
+        }
+        $this->nextFreeElement = $index + 1;
     }
 
     private function findBucket(int $hash, ?string $key): ?HashTableBucket
@@ -2155,7 +2286,7 @@ final class HashTable {
             if ($bucket->value->isUndefined()) {
                 continue;
             }
-            if (null === $bucket->key && $bucket->hash >= $next) {
+            if (null === $bucket->key && $bucket->hash >= $next && $bucket->hash < \PHP_INT_MAX) {
                 $next = $bucket->hash + 1;
             }
         }

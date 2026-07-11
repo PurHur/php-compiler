@@ -1,5 +1,5 @@
 --TEST--
-stdlib parse_str() one-arg at {main} throws ArgumentCountError (#4050)
+stdlib parse_str() one-arg at script scope throws ArgumentCountError (#14112, ext/standard/basic_functions.c)
 --FILE--
 <?php
 try {

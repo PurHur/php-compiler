@@ -5,12 +5,21 @@ declare(strict_types=1);
 namespace PHPCompiler\Test\Unit;
 
 use PHPCompiler\Runtime;
+use PHPCompiler\Test\Support\PropertyHookTestSkip;
 use PHPUnit\Framework\TestCase;
 
 /** @covers issue #7222 */
 final class PropertyHookTypeEnumTest extends TestCase
 {
-    public function testPropertyHookTypeBuiltinEnumExists(): void
+        use PropertyHookTestSkip;
+
+    protected function setUp(): void
+    {
+        $this->skipUnlessPropertyHooksEnabled();
+    }
+
+
+public function testPropertyHookTypeBuiltinEnumExists(): void
     {
         $runtime = new Runtime();
         $code = <<<'PHP'

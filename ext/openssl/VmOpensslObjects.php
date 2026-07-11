@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\openssl;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\EnumCaseSupport;
+use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\Variable;
 
@@ -37,6 +38,29 @@ final class VmOpensslObjects
         self::registerInternalClass($ctx, self::CERT_LC, 'OpenSSLCertificate');
         self::registerInternalClass($ctx, self::KEY_LC, 'OpenSSLAsymmetricKey');
         self::registerInternalClass($ctx, self::CSR_LC, 'OpenSSLCertificateSigningRequest');
+    }
+
+    /**
+     * Withhold openssl object classes from class_exists() until extension_loaded('openssl') (#11859, #16765).
+     */
+    public static function isHiddenClassEntry(ClassEntry $entry): bool
+    {
+        if (OpensslExtensionPolicy::advertisesExtension()) {
+            return false;
+        }
+        $lc = strtolower(ltrim($entry->name, '\\'));
+
+        return \in_array($lc, [self::CERT_LC, self::KEY_LC, self::CSR_LC], true);
+    }
+
+    public static function isHiddenClassLc(string $classLc): bool
+    {
+        if (OpensslExtensionPolicy::advertisesExtension()) {
+            return false;
+        }
+        $lc = strtolower(ltrim($classLc, '\\'));
+
+        return \in_array($lc, [self::CERT_LC, self::KEY_LC, self::CSR_LC], true);
     }
 
     public static function readCertificate(Context $ctx, Variable $arg): Variable
@@ -99,6 +123,26 @@ final class VmOpensslObjects
         return $var;
     }
 
+    public static function wrapKey(Context $ctx, string $pem): Variable
+    {
+        $class = $ctx->classes[self::KEY_LC] ?? null;
+        if (null === $class) {
+            throw new \LogicException('OpenSSLAsymmetricKey is not registered in this compiler build');
+        }
+        $entry = new ObjectEntry($class);
+        $entry->constructed = true;
+        self::$keyStore[$entry->id] = $pem;
+        $var = new Variable(Variable::TYPE_OBJECT);
+        $var->object($entry);
+
+        return $var;
+    }
+
+    public static function keyPem(\PHPCompiler\VM\ObjectEntry $entry): string
+    {
+        return self::$keyStore[$entry->id] ?? '';
+    }
+
     public static function isCertificate(Variable $var): bool
     {
         $var = $var->resolveIndirect();
@@ -122,6 +166,106 @@ final class VmOpensslObjects
     public static function certificatePem(ObjectEntry $entry): string
     {
         return self::$certStore[$entry->id] ?? '';
+    }
+
+    /**
+     * openssl_x509_parse() — X509 PEM or OpenSSLCertificate to metadata array (ext/openssl/xp.c; #6274).
+     */
+    public static function parseCertificate(Context $ctx, Variable $arg, bool $shortnames): Variable
+    {
+        $pem = self::resolveCertificatePem($ctx, $arg, 'openssl_x509_parse');
+        if (null === $pem) {
+            $result = new Variable();
+            $result->bool(false);
+
+            return $result;
+        }
+
+        $parsed = VmOpensslX509Native::parseCertificatePem($pem, $shortnames);
+        $result = new Variable();
+        if (false === $parsed) {
+            $result->bool(false);
+
+            return $result;
+        }
+        $result->copyFrom(self::phpValueToVariable($parsed));
+
+        return $result;
+    }
+
+    /**
+     * @param array<string, mixed>|string|int|float|bool|null $value
+     */
+    private static function phpValueToVariable(array|string|int|float|bool|null $value): Variable
+    {
+        $var = new Variable();
+        if (\is_array($value)) {
+            $ht = new HashTable();
+            foreach ($value as $key => $item) {
+                $ht->update((string) $key, self::phpValueToVariable($item));
+            }
+            $var->array($ht);
+
+            return $var;
+        }
+        if (\is_string($value)) {
+            $var->string($value);
+
+            return $var;
+        }
+        if (\is_int($value)) {
+            $var->int($value);
+
+            return $var;
+        }
+        if (\is_float($value)) {
+            $var->float($value);
+
+            return $var;
+        }
+        if (\is_bool($value)) {
+            $var->bool($value);
+
+            return $var;
+        }
+        $var->null();
+
+        return $var;
+    }
+
+    /**
+     * @return string|null PEM material, or null when caller should return false
+     */
+    private static function resolveCertificatePem(Context $ctx, Variable $arg, string $function): ?string
+    {
+        $arg = $arg->resolveIndirect();
+        if (Variable::TYPE_OBJECT === $arg->type) {
+            $object = $arg->toObject();
+            if (self::CERT_LC === strtolower($object->class->name)) {
+                return self::certificatePem($object);
+            }
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #1 ($certificate) must be of type OpenSSLCertificate|string, %s given',
+                $function,
+                $object->class->name
+            ));
+        }
+        if (EnumCaseSupport::isEnumCaseVariable($arg)) {
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #1 ($certificate) must be of type OpenSSLCertificate|string, %s given',
+                $function,
+                EnumCaseSupport::typeNameForVariable($arg)
+            ));
+        }
+        if (Variable::TYPE_STRING !== $arg->type) {
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #1 ($certificate) must be of type OpenSSLCertificate|string, %s given',
+                $function,
+                self::typeLabel($arg)
+            ));
+        }
+
+        return $arg->toString();
     }
 
     private static function registerInternalClass(Context $ctx, string $lc, string $name): void

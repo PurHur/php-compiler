@@ -25,6 +25,10 @@ final class StrGetcsvVMTest extends BaseTest
             __DIR__.'/cases/stdlib/str_getcsv_newline_only.phpt',
             'str_getcsv_newline_only.phpt'
         );
+        yield 'str_getcsv_null_separator.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/str_getcsv_null_separator.phpt',
+            'str_getcsv_null_separator.phpt'
+        );
     }
 
     public function setUp(): void

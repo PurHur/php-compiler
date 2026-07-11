@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\spl;
 
-use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\Context;
 
 /**
@@ -16,9 +15,31 @@ final class BuiltinClasses
     {
         $before = array_keys($ctx->classes);
         self::registerArrayObject($ctx);
-        self::registerSplDoublyLinkedList($ctx);
+        SplDoublyLinkedListBuiltin::registerClass($ctx);
+        SplQueueSplStackBuiltin::registerClasses($ctx);
+        SplFileInfoBuiltin::registerClass($ctx);
+        SplFileObjectBuiltin::registerClass($ctx);
+        SplTempFileObjectBuiltin::registerClass($ctx);
+        DirectoryIteratorBuiltin::registerClass($ctx);
+        FilesystemIteratorBuiltin::registerClass($ctx);
+        GlobIteratorBuiltin::registerClass($ctx);
+        SplFixedArrayBuiltin::registerClass($ctx);
+        SplObjectStorageBuiltin::registerClass($ctx);
+        IteratorIteratorBuiltin::registerClass($ctx);
+        FilterIteratorBuiltin::registerClass($ctx);
+        CallbackFilterIteratorBuiltin::registerClass($ctx);
+        RegexIteratorBuiltin::registerClass($ctx);
+        ParentIteratorBuiltin::registerClass($ctx);
+        AppendIteratorBuiltin::registerClass($ctx);
+        MultipleIteratorBuiltin::registerClass($ctx);
+        LimitIteratorBuiltin::registerClass($ctx);
+        CachingIteratorBuiltin::registerClass($ctx);
+        InfiniteIteratorBuiltin::registerClass($ctx);
+        NoRewindIteratorBuiltin::registerClass($ctx);
+        RecursiveTreeIteratorBuiltin::registerClass($ctx);
         VmSplIterators::register($ctx);
         VmSplObserver::register($ctx);
+        VmSplRegistry::registerStubs($ctx);
         foreach (array_diff(array_keys($ctx->classes), $before) as $lc) {
             $ctx->classes[$lc]->isInternal = true;
         }
@@ -29,21 +50,4 @@ final class BuiltinClasses
         ArrayObjectBuiltin::registerClass($ctx);
     }
 
-    private static function registerSplDoublyLinkedList(Context $ctx): void
-    {
-        $entry = new ClassEntry('SplDoublyLinkedList');
-        if (isset($ctx->classes['iterator'])) {
-            $entry->interfaces[] = 'iterator';
-        }
-        if (isset($ctx->classes['countable'])) {
-            $entry->interfaces[] = 'countable';
-        }
-        if (isset($ctx->classes['arrayaccess'])) {
-            $entry->interfaces[] = 'arrayaccess';
-        }
-        if (isset($ctx->classes['serializable'])) {
-            $entry->interfaces[] = 'serializable';
-        }
-        $ctx->classes['spldoublylinkedlist'] = $entry;
-    }
 }

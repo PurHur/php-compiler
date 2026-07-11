@@ -10,6 +10,8 @@ use PHPCompiler\Handler;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Context as JITContext;
 use PHPCompiler\JIT\ExceptionBridge;
+use PHPCompiler\JIT\Builtin;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\JitBoolArg;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitStringArg;
@@ -30,7 +32,10 @@ abstract class Internal extends Func implements Handler, Call
 
     public function getFrame(Context $context, ?Frame $frame = null): Frame
     {
-        return new Frame($this, null, null);
+        $handlerFrame = new Frame($this, null, $frame);
+        $handlerFrame->vmContext = $context;
+
+        return $handlerFrame;
     }
 
     protected function jitString(JITContext $context, JITVariable $arg, string $contextLabel = 'argument'): Value
@@ -46,6 +51,24 @@ abstract class Internal extends Func implements Handler, Call
     protected function jitBool(JITContext $context, JITVariable $arg, string $contextLabel = 'argument'): Value
     {
         return JitBoolArg::lower($context, $arg, $contextLabel);
+    }
+
+    /**
+     * Standalone AOT: bare int1 bool returns mis-lower in ?: / if (issue #15704).
+     */
+    protected function boxStandaloneBoolJitResult(JITContext $context, Value $result): Value
+    {
+        if (Builtin::LOAD_TYPE_STANDALONE !== $context->loadType) {
+            return $result;
+        }
+        $ty = $context->getStringFromType($result->typeOf());
+        if ('int1' !== $ty && 'bool' !== $ty) {
+            return $result;
+        }
+        $slot = JitValueBox::alloc($context);
+        JitValueBox::writeBool($context, $slot, $result);
+
+        return $context->builder->load($slot);
     }
 
     protected function requireStringArgs(JITContext $context, array $args, int $n, string $contextLabel = 'argument'): void
@@ -90,6 +113,33 @@ abstract class Internal extends Func implements Handler, Call
         }
     }
 
+    protected function requireAtLeastArgCount(Frame $frame, string $function, int $minimum): void
+    {
+        $argc = \count($frame->calledArgs);
+        if ($argc < $minimum) {
+            throw new \ArgumentCountError(self::atLeastArgCountMessage($function, $minimum, $argc));
+        }
+    }
+
+    protected function requireAtMostArgCount(Frame $frame, string $function, int $maximum): void
+    {
+        $argc = \count($frame->calledArgs);
+        if ($argc > $maximum) {
+            throw new \ArgumentCountError(self::atMostArgCountMessage($function, $maximum, $argc));
+        }
+    }
+
+    protected function requireArgCountRange(Frame $frame, string $function, int $minimum, int $maximum): void
+    {
+        $argc = \count($frame->calledArgs);
+        if ($argc < $minimum) {
+            throw new \ArgumentCountError(self::atLeastArgCountMessage($function, $minimum, $argc));
+        }
+        if ($argc > $maximum) {
+            throw new \ArgumentCountError(self::atMostArgCountMessage($function, $maximum, $argc));
+        }
+    }
+
     /**
      * Arity guard for JIT/AOT builtin lowering (#4145).
      *
@@ -113,6 +163,68 @@ abstract class Internal extends Func implements Handler, Call
         return true;
     }
 
+    /**
+     * @param JITVariable[] $args
+     */
+    protected function requireAtLeastJitArgCount(JITContext $context, array $args, string $function, int $minimum): bool
+    {
+        $argc = \count($args);
+        if ($argc < $minimum) {
+            ExceptionBridge::emitArgumentCountError(
+                $context,
+                self::atLeastArgCountMessage($function, $minimum, $argc)
+            );
+
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * @param JITVariable[] $args
+     */
+    protected function requireAtMostJitArgCount(JITContext $context, array $args, string $function, int $maximum): bool
+    {
+        $argc = \count($args);
+        if ($argc > $maximum) {
+            ExceptionBridge::emitArgumentCountError(
+                $context,
+                self::atMostArgCountMessage($function, $maximum, $argc)
+            );
+
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * @param JITVariable[] $args
+     */
+    protected function requireArgCountRangeJit(JITContext $context, array $args, string $function, int $minimum, int $maximum): bool
+    {
+        $argc = \count($args);
+        if ($argc < $minimum) {
+            ExceptionBridge::emitArgumentCountError(
+                $context,
+                self::atLeastArgCountMessage($function, $minimum, $argc)
+            );
+
+            return false;
+        }
+        if ($argc > $maximum) {
+            ExceptionBridge::emitArgumentCountError(
+                $context,
+                self::atMostArgCountMessage($function, $maximum, $argc)
+            );
+
+            return false;
+        }
+
+        return true;
+    }
+
     private static function exactArgCountMessage(string $function, int $expected, int $given): string
     {
         return \sprintf(
@@ -120,6 +232,28 @@ abstract class Internal extends Func implements Handler, Call
             $function,
             $expected,
             1 === $expected ? '' : 's',
+            $given
+        );
+    }
+
+    private static function atLeastArgCountMessage(string $function, int $minimum, int $given): string
+    {
+        return \sprintf(
+            '%s() expects at least %d argument%s, %d given',
+            $function,
+            $minimum,
+            1 === $minimum ? '' : 's',
+            $given
+        );
+    }
+
+    private static function atMostArgCountMessage(string $function, int $maximum, int $given): string
+    {
+        return \sprintf(
+            '%s() expects at most %d argument%s, %d given',
+            $function,
+            $maximum,
+            1 === $maximum ? '' : 's',
             $given
         );
     }

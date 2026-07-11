@@ -68,4 +68,11 @@ final class IconvNativeTest extends TestCase
         $this->assertSame('a', CharsetEngine::convert('UTF-16LE', 'UTF-8', (string) $le));
         $this->assertSame('a', VmIconv::iconv('UTF-16LE', 'UTF-8', (string) $le));
     }
+
+    public function testUtf8IgnoreSuffixStripsInvalidBytesOnSameEncoding(): void
+    {
+        $input = "a\xc0b";
+        $this->assertSame('ab', CharsetEngine::convert('UTF-8', 'UTF-8//IGNORE', $input));
+        $this->assertSame('ab', VmIconv::iconv('UTF-8', 'UTF-8//IGNORE', $input));
+    }
 }

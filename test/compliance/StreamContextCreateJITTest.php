@@ -26,6 +26,10 @@ final class StreamContextCreateJITTest extends BaseTest
             __DIR__.'/cases/stdlib/stream_context_create_options_jit.phpt',
             'stream_context_create_options_jit.phpt'
         );
+        yield 'stream_context_create_notification_value_error_jit.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/stream_context_create_notification_value_error_jit.phpt',
+            'stream_context_create_notification_value_error_jit.phpt'
+        );
     }
 
     public function setUp(): void

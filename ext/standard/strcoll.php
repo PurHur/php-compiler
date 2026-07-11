@@ -6,13 +6,16 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\StringStrcoll;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPLLVM\Value;
 
 /**
- * strcoll() — locale-aware string comparison (libc strcoll; issue #4376).
+ * strcoll() — locale-aware string comparison (JIT via StrcollJitHelper PHP #13566).
  *
  * php-src: ext/standard/string.c — PHP_FUNCTION(strcoll)
  */
@@ -28,8 +31,10 @@ final class strcoll extends Internal
         if (2 !== \count($frame->calledArgs)) {
             throw new \LogicException('strcoll() requires exactly two arguments');
         }
-        $a = VmString::requireStringBuiltinArg($frame->calledArgs[0], 'strcoll', 0, 'string1');
-        $b = VmString::requireStringBuiltinArg($frame->calledArgs[1], 'strcoll', 1, 'string2');
+        InternalStrictArg::rejectNullString($frame->calledArgs[0], 'strcoll', 'string1', 0, $frame);
+        InternalStrictArg::rejectNullString($frame->calledArgs[1], 'strcoll', 'string2', 1, $frame);
+        $a = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'strcoll', 0, 'string1');
+        $b = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'strcoll', 1, 'string2');
         if (null === $frame->returnVar) {
             return;
         }
@@ -44,8 +49,11 @@ final class strcoll extends Internal
         if (2 !== \count($args)) {
             throw new \LogicException('strcoll() requires exactly two arguments');
         }
-        $p0 = $this->stringDataPtr($context, JitStringBuiltinArg::lowerRequiredString($context, $args[0], 'strcoll', 0, 'string1'));
-        $p1 = $this->stringDataPtr($context, JitStringBuiltinArg::lowerRequiredString($context, $args[1], 'strcoll', 1, 'string2'));
+        JitInternalStrictArg::rejectNullString($context, $args[0], 'strcoll', 'string1', 1);
+        JitInternalStrictArg::rejectNullString($context, $args[1], 'strcoll', 'string2', 2);
+        StringStrcoll::ensureLinked($context);
+        $p0 = $this->stringDataPtr($context, JitStringBuiltinArg::lower($context, $args[0], 'strcoll', 0, 'string1'));
+        $p1 = $this->stringDataPtr($context, JitStringBuiltinArg::lower($context, $args[1], 'strcoll', 1, 'string2'));
         $fn = $context->lookupFunction('strcoll');
         $raw = $context->builder->call($fn, $p0, $p1);
         $i64 = $context->getTypeFromString('int64');

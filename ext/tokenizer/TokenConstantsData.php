@@ -170,7 +170,6 @@ final class TokenConstantsData
     public static function idToName(): array
     {
         return [
-            1 => 'TOKEN_PARSE',
             260 => 'T_LNUMBER',
             261 => 'T_DNUMBER',
             262 => 'T_STRING',

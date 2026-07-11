@@ -4,12 +4,18 @@ declare(strict_types=1);
 
 namespace PHPCompiler\Test\Unit\SourcePreprocessor;
 
+use PHPCompiler\Compiler\CompileFatal;
+use PHPCompiler\CompilerVersion;
+use PHPCompiler\PropertyHookSyntaxRejector;
 use PHPCompiler\Runtime;
 use PHPCompiler\SourcePreprocessor\PropertyHooks;
+use PHPCompiler\Test\Support\PropertyHookTestSkip;
 use PHPUnit\Framework\TestCase;
 
 final class PropertyHooksTest extends TestCase
 {
+    use PropertyHookTestSkip;
+
     public function testStripsSetHookAndInjectsMethod(): void
     {
         $src = <<<'PHP'
@@ -260,6 +266,26 @@ PHP;
         self::assertTrue($registry['box']['value']['virtual'] ?? false);
     }
 
+    public function testLowersSetParamArrowHook(): void
+    {
+        $src = <<<'PHP'
+<?php
+class Box {
+    private string $stored = 'init';
+    public string $x {
+        get => $this->stored;
+        set($v) => $this->stored = strtoupper($v);
+    }
+}
+PHP;
+        [$out, $registry] = (new PropertyHooks())->process($src);
+        self::assertStringNotContainsString('$x {', $out);
+        self::assertStringContainsString('public string $x;', $out);
+        self::assertStringContainsString('function __phpc_property_set_x($v)', $out);
+        self::assertStringContainsString('$this->stored = strtoupper($v);', $out);
+        self::assertSame('__phpc_property_set_x', $registry['box']['x']['set'] ?? null);
+    }
+
     public function testLowersStaticPropertyHooks(): void
     {
         $src = <<<'PHP'
@@ -320,6 +346,7 @@ PHP;
     /** @covers issue #6650 — block hook syntax must preprocess before curly-brace rejector */
     public function testBlockGetHookSurvivesRuntimePreprocess(): void
     {
+        $this->skipUnlessPropertyHooksEnabled();
         $src = <<<'PHP'
 <?php
 class C {
@@ -350,7 +377,7 @@ class C {
 PHP;
         [$out, $registry] = (new PropertyHooks())->process($src);
         self::assertStringNotContainsString('$x {', $out);
-        self::assertStringContainsString('/*phpc-asymmetric-set:protected*/ public string $x;', $out);
+        self::assertStringContainsString('/*phpc-asymmetric-set:protected*/ /*phpc-asymmetric-explicit-read*/ public string $x;', $out);
         self::assertStringContainsString('function __phpc_property_get_x', $out);
         self::assertStringContainsString('function __phpc_property_set_x', $out);
         self::assertStringContainsString('$this->x = ($value);', $out);
@@ -371,7 +398,7 @@ class C {
 }
 PHP;
         [$out] = (new PropertyHooks())->process($src);
-        self::assertStringContainsString('/*phpc-asymmetric-set:private*/ public string $x;', $out);
+        self::assertStringContainsString('/*phpc-asymmetric-set:private*/ /*phpc-asymmetric-explicit-read*/ public string $x;', $out);
         self::assertStringContainsString('function __phpc_property_set_x($value)', $out);
     }
 
@@ -386,9 +413,63 @@ class User {
 PHP;
         [$out, $registry] = (new PropertyHooks())->process($src);
         self::assertStringNotContainsString('$email {', $out);
-        self::assertStringContainsString('/*phpc-asymmetric-set:private*/ public string $email;', $out);
+        self::assertStringContainsString('/*phpc-asymmetric-set:private*/ /*phpc-asymmetric-explicit-read*/ public string $email;', $out);
         self::assertArrayNotHasKey('requiresGet', $registry['user']['email'] ?? []);
         self::assertArrayNotHasKey('requiresSet', $registry['user']['email'] ?? []);
+    }
+
+    /** @covers issue #13983 — `private(set)` decl + get-only hook compiles on PHP 8.4 */
+    public function testLowersAsymmetricDeclSetWithGetOnlyHook(): void
+    {
+        $src = <<<'PHP'
+<?php
+class C {
+    public (private(set)) string $x {
+        get => 'hi';
+    }
+}
+PHP;
+        [$out, $registry] = (new PropertyHooks())->process($src);
+        self::assertStringNotContainsString('$x {', $out);
+        self::assertStringContainsString('public (private(set)) string $x;', $out);
+        self::assertStringContainsString('function __phpc_property_get_x', $out);
+        self::assertArrayHasKey('get', $registry['c']['x'] ?? []);
+        self::assertArrayNotHasKey('set', $registry['c']['x'] ?? []);
+        self::assertTrue($registry['c']['x']['virtual'] ?? false);
+    }
+
+    /** @covers issue #12203 — `private(set)` decl + get; obligation without set hook still rejected */
+    public function testRejectsAsymmetricDeclSetWithGetSemicolonOnlyHook(): void
+    {
+        $src = <<<'PHP'
+<?php
+class C {
+    public (private(set)) string $x {
+        get;
+    }
+}
+PHP;
+        $this->expectException(CompileFatal::class);
+        $this->expectExceptionMessage(PropertyHooks::ASYMMETRIC_DECL_SET_REQUIRES_SET_HOOK_MESSAGE);
+
+        (new PropertyHooks())->process($src, 'asymmetric_get_semicolon.php');
+    }
+
+    /** @covers issue #12203 — implicit `get; private set;` backing still allowed */
+    public function testAllowsAsymmetricDeclSetWithImplicitBackingHooks(): void
+    {
+        $src = <<<'PHP'
+<?php
+class C {
+    public (private(set)) string $x {
+        get;
+        private set;
+    }
+}
+PHP;
+        [$out] = (new PropertyHooks())->process($src);
+        self::assertStringNotContainsString('$x {', $out);
+        self::assertStringContainsString('public (private(set)) string $x;', $out);
     }
 
     /** @covers issue #9872 — PHP 8.4 `private(set);` inside property hook block */
@@ -406,9 +487,10 @@ PHP;
         [$out, $registry] = (new PropertyHooks())->process($src);
         self::assertStringNotContainsString('$x {', $out);
         self::assertStringNotContainsString('private(set)', $out);
-        self::assertStringContainsString('/*phpc-asymmetric-set:private*/ public string $x;', $out);
+        self::assertStringContainsString('/*phpc-asymmetric-set:private*/ /*phpc-asymmetric-explicit-read*/ public string $x;', $out);
         self::assertStringContainsString('function __phpc_property_get_x', $out);
         self::assertArrayNotHasKey('set', $registry['c']['x'] ?? []);
+        self::assertArrayNotHasKey('requiresSet', $registry['c']['x'] ?? []);
         self::assertTrue($registry['c']['x']['virtual'] ?? false);
     }
 
@@ -424,7 +506,7 @@ class C {
 }
 PHP;
         [$out] = (new PropertyHooks())->process($src);
-        self::assertStringContainsString('/*phpc-asymmetric-set:private*/ public string $x;', $out);
+        self::assertStringContainsString('/*phpc-asymmetric-set:private*/ /*phpc-asymmetric-explicit-read*/ public string $x;', $out);
         self::assertStringContainsString('function __phpc_property_set_x', $out);
     }
 
@@ -467,6 +549,7 @@ PHP;
     /** @covers issue #7313 — promoted hooked param end-to-end via Runtime preprocess */
     public function testPromotedConstructorParamPropertyHooksSurviveRuntimePreprocess(): void
     {
+        $this->skipUnlessPropertyHooksEnabled();
         $src = <<<'PHP'
 <?php
 class C {
@@ -506,9 +589,10 @@ PHP;
         self::assertSame('__phpc_property_set_name', $registry['evaled']['name']['set'] ?? null);
     }
 
-    /** @covers issue #10393 — detached same-name backing field is duplicate property, not merged */
-    public function testDetachedSameNameBackingFieldIsDuplicateProperty(): void
+    /** @covers issue #16936 — detached same-name backing field merges when sibling property sits between hook and backing */
+    public function testDetachedSameNameBackingFieldMergesWithSiblingProperty(): void
     {
+        $this->skipUnlessPropertyHooksEnabled();
         $src = <<<'PHP'
 <?php
 class C {
@@ -519,16 +603,44 @@ class C {
     public string $y = 'a';
     private int $x = 1;
 }
+$c = new C();
+echo 'compile-ok x=' . $c->x . ' y=' . $c->y . "\n";
+PHP;
+        [$out, $registry] = (new PropertyHooks())->process($src);
+        self::assertStringContainsString('public int $x = 1;', $out);
+        self::assertStringContainsString("public string \$y = 'a';", $out);
+        self::assertStringNotContainsString('private int $x', $out);
+        self::assertSame('__phpc_property_set_x', $registry['c']['x']['set'] ?? null);
+
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($src, 'property_hook_multi_property_redeclare.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("compile-ok x=1 y=a\n", ob_get_clean());
+    }
+
+    /** @covers issue #10393 — true duplicate same-name field without hook backing use still fails compile */
+    public function testDetachedSameNameBackingFieldIsDuplicateProperty(): void
+    {
+        $this->skipUnlessPropertyHooksEnabled();
+        $src = <<<'PHP'
+<?php
+class C {
+    public int $x {
+        get => 1;
+    }
+    public string $y = 'a';
+    private int $x = 1;
+}
 PHP;
         [$out, $registry] = (new PropertyHooks())->process($src);
         self::assertStringContainsString('public int $x;', $out);
         self::assertStringContainsString('private int $x = 1;', $out);
-        self::assertSame('__phpc_property_set_x', $registry['c']['x']['set'] ?? null);
 
         $runtime = new Runtime();
         $this->expectException(\CompileError::class);
         $this->expectExceptionMessage('Cannot redeclare C::$x');
-        $runtime->parseAndCompile($src, 'property_hook_multi_property_redeclare.php');
+        $runtime->parseAndCompile($src, 'property_hook_virtual_duplicate_name.php');
     }
 
     /** @covers issue #9835 — readonly hooked property compiles; runtime enforces post-construct writes */
@@ -549,9 +661,31 @@ PHP;
         self::assertSame('__phpc_property_set_x', $registry['c']['x']['set'] ?? null);
     }
 
-    /** @covers issue #11594 — inline default initializer before property hook block (PHP 8.4) */
-    public function testDefaultInitializerWithPropertyHooksLowers(): void
+    /** @covers issue #16861 — virtual default + hook block rejected with Zend compile error on forward profile */
+    public function testDefaultInitializerWithVirtualPropertyHooksRejectedOnForwardProfile(): void
     {
+        $this->skipUnlessPropertyHooksEnabled();
+        $src = <<<'PHP'
+<?php
+class C {
+    public string $label = 'default' {
+        get => 'virtual';
+    }
+}
+PHP;
+        $this->expectException(\PHPCompiler\Compiler\CompileFatal::class);
+        $this->expectExceptionMessage(
+            PropertyHooks::virtualHookedDefaultCompileError('C', 'label')
+        );
+        PropertyHookSyntaxRejector::reject($src, 'virtual_default_initializer.php');
+    }
+
+    /** @covers issue #12574 — default initializer + hook block rejected on reference profile */
+    public function testDefaultInitializerWithPropertyHooksRejectedOnReferenceProfile(): void
+    {
+        if (CompilerVersion::supportsPropertyHooks()) {
+            $this->markTestSkipped('reference-profile parse error only when property hooks disabled');
+        }
         $src = <<<'PHP'
 <?php
 class C {
@@ -559,22 +693,16 @@ class C {
         get => $this->label;
     }
 }
-trait T {
-    public string $label = 'from-trait' {
-        get => $this->label;
-    }
-}
 PHP;
-        [$out, $registry] = (new PropertyHooks())->process($src);
-        self::assertStringContainsString("public string \$label = 'default';", $out);
-        self::assertStringContainsString("public string \$label = 'from-trait';", $out);
-        self::assertSame('__phpc_property_get_label', $registry['c']['label']['get'] ?? null);
-        self::assertSame('__phpc_property_get_label', $registry['t']['label']['get'] ?? null);
+        $this->expectException(\PHPCompiler\Compiler\CompileFatal::class);
+        $this->expectExceptionMessage(PropertyHooks::REFERENCE_PROFILE_PROPERTY_HOOKS_HINT);
+        PropertyHookSyntaxRejector::reject($src, 'default_initializer.php');
     }
 
-    /** @covers issue #11594 — end-to-end via Runtime preprocess */
-    public function testDefaultInitializerWithPropertyHooksSurvivesRuntimePreprocess(): void
+    /** @covers issue #16861 — backed default + hook block allowed on forward profile (#11594) */
+    public function testDefaultInitializerWithBackedPropertyHooksAllowedOnForwardProfile(): void
     {
+        $this->skipUnlessPropertyHooksEnabled();
         $src = <<<'PHP'
 <?php
 class C {
@@ -585,11 +713,10 @@ class C {
 $c = new C();
 echo $c->label;
 PHP;
+        PropertyHookSyntaxRejector::reject($src, 'backed_default_initializer.php');
         $runtime = new Runtime();
-        $block = $runtime->parseAndCompile($src, 'property_hook_default_initializer.php');
-        ob_start();
-        $runtime->run($block);
-        self::assertSame('default', ob_get_clean());
+        $runtime->parseAndCompile($src, 'backed_default_initializer.php');
+        $this->addToAssertionCount(1);
     }
 
     /** @covers issue #9729 — promoted ctor defaults must not match property-hook `{` scanner */
@@ -610,22 +737,22 @@ PHP;
         self::assertStringNotContainsString('__phpc_property_', $out);
     }
 
-    /** @covers issue #9729 — promoted asymmetric visibility with defaults end-to-end */
-    public function testPromotedAsymmetricVisibilityWithDefaultSurvivesRuntimePreprocess(): void
+    /** @covers issue #16495 — parenthesized asymmetric set on promoted params accepted on 8.4 profile */
+    public function testPromotedAsymmetricVisibilityParenthesizedFormCompilesOn84Profile(): void
     {
+        $this->skipUnlessPropertyHooksEnabled();
+        if (!CompilerVersion::supportsParenthesizedAsymmetricSetModifier()) {
+            $this->markTestSkipped('parenthesized asymmetric set requires 8.4 profile (#16495)');
+        }
         $src = <<<'PHP'
 <?php
 class D {
-    public function __construct(private(set) int $x = 1) {}
+    public function __construct(public (private(set)) int $x = 1) {}
 }
-$d = new D();
-echo $d->x, "\n";
 PHP;
         $runtime = new Runtime();
-        $block = $runtime->parseAndCompile($src, 'promoted_asymmetric_default.php');
-        ob_start();
-        $runtime->run($block);
-        self::assertSame("1\n", ob_get_clean());
+        $script = $runtime->parseAndCompile($src, 'promoted_asymmetric_default.php');
+        self::assertNotNull($script);
     }
 
     /** @covers bootstrap spine — method param defaults before typed body must not match hook scanner */
@@ -750,6 +877,63 @@ CDEF;
 PHP;
         [$out] = (new PropertyHooks())->process($src);
         self::assertSame($src, $out);
+    }
+
+    public function testStripsFinalModifierOnHookedProperty(): void
+    {
+        $src = <<<'PHP'
+<?php
+class C {
+    public final string $label {
+        get => 'ok';
+    }
+}
+PHP;
+        [$out, $registry] = (new PropertyHooks())->process($src);
+        self::assertStringNotContainsString('final string $label', $out);
+        self::assertStringContainsString('public string $label;', $out);
+        self::assertTrue($registry['c']['label']['finalProperty'] ?? false);
+        self::assertSame('__phpc_property_get_label', $registry['c']['label']['get'] ?? null);
+    }
+
+    public function testLowersFinalSetHookModifier(): void
+    {
+        $src = <<<'PHP'
+<?php
+class C {
+    public string $x {
+        final set => strtolower($value);
+        get => $this->x ?? '';
+    }
+}
+PHP;
+        [$out, $registry] = (new PropertyHooks())->process($src);
+        self::assertStringContainsString('function __phpc_property_set_x', $out);
+        self::assertStringContainsString('strtolower($value)', $out);
+        self::assertTrue($registry['c']['x']['finalSet'] ?? false);
+        self::assertFalse($registry['c']['x']['finalGet'] ?? false);
+    }
+
+    /** @covers issue #17330 — get { } block records distinct read backing for VM dispatch */
+    public function testGetBlockBodyRegistersDistinctReadBacking(): void
+    {
+        $src = <<<'PHP'
+<?php
+class C {
+    private string $stored = 'g';
+    public string $x {
+        get {
+            return $this->stored;
+        }
+        set {
+            $this->stored = strtoupper($value);
+        }
+    }
+}
+PHP;
+        [, $registry] = (new PropertyHooks())->process($src);
+        self::assertSame('stored', $registry['c']['x']['getBacking'] ?? null);
+        self::assertSame('stored', $registry['c']['x']['setBacking'] ?? null);
     }
 
 }

@@ -229,12 +229,22 @@ abstract class BaseTest extends TestCase {
             if (isset($sections['EXPECT_EXIT']) && '' !== $stdoutTrim && str_contains($stderrTrim, 'PHP Fatal error:')) {
                 // PHPT --EXPECT-- is stdout; uncaught fatals after partial output land on stderr (#7468).
                 $merged = $stdoutTrim;
-            } elseif ('' === $stderrTrim) {
-                $merged = $stdoutTrim;
-            } elseif ('' === $stdoutTrim) {
+            } elseif ('' === $stdoutTrim && '' !== $stderrTrim) {
+                // Stderr-only scripts (no user echo output).
                 $merged = $stderrTrim;
+            } elseif (
+                '' !== $stderrTrim
+                && '' !== $stdoutTrim
+                && self::phptExpectReferencesCliDiagnostics($sections)
+                && !self::stdoutAlreadyContainsCliDiagnostics($stdoutTrim)
+            ) {
+                // PHPT fixtures that list PHP Warning/Notice/Deprecated in EXPECT need stderr merged
+                // when display_errors=0 on the driver (#17398). Skip merge when VM already echoed
+                // diagnostics to stdout (display_errors=1 inside the script).
+                $merged = $stderrTrim."\n".$stdoutTrim;
             } else {
-                $merged = $stderrTrim . "\n" . $stdoutTrim;
+                // php-src PHPT compares stdout; CLI notices/warnings stay on stderr (#13486, #16702).
+                $merged = $stdoutTrim;
             }
             $this->assertExpect($merged, $sections);
         }
@@ -265,6 +275,30 @@ abstract class BaseTest extends TestCase {
             }
         }
         throw new \RuntimeException('No PHPT assertion found');
+    }
+
+    /**
+     * True when a PHPT EXPECT section includes CLI diagnostics that land on stderr with display_errors=0.
+     *
+     * @param array<string, string> $sections
+     */
+    protected static function phptExpectReferencesCliDiagnostics(array $sections): bool
+    {
+        foreach (['EXPECT', 'EXPECTF', 'EXPECTREGEX'] as $key) {
+            if (!isset($sections[$key])) {
+                continue;
+            }
+            if (preg_match('/PHP (?:Warning|Notice|Deprecated):/', $sections[$key])) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    protected static function stdoutAlreadyContainsCliDiagnostics(string $stdout): bool
+    {
+        return (bool) preg_match('/PHP (?:Warning|Notice|Deprecated):/', $stdout);
     }
 
     protected function normalize(string $string): string {
@@ -342,6 +376,8 @@ abstract class BaseTest extends TestCase {
         $maxKb = $maxMb * 1024;
         $peakKb = 0;
         $lastExitCode = 0;
+        /** @var array<int, bool> */
+        $sigcontSent = [];
 
         while (true) {
             $status = proc_get_status($proc);
@@ -359,6 +395,9 @@ abstract class BaseTest extends TestCase {
                         (int) ceil($peakKb / 1024)
                     ));
                 }
+            }
+            if (isset($status['pid'])) {
+                self::ensureNoStoppedChildren((int) $status['pid'], $testName, $sigcontSent);
             }
             if (!$status['running']) {
                 $lastExitCode = (int) ($status['exitcode'] ?? 0);
@@ -437,6 +476,58 @@ abstract class BaseTest extends TestCase {
         }
 
         return $pids;
+    }
+
+    /**
+     * PHPUnit occasionally hangs when a vm child is stopped (issue #16657).
+     * If we detect a stopped process in the VM pid tree, send SIGCONT and emit
+     * a single diagnostic line (per pid per test) so the battery can complete.
+     *
+     * @param array<int, bool> $sigcontSent
+     */
+    private static function ensureNoStoppedChildren(int $rootPid, string $testName, array &$sigcontSent): void
+    {
+        foreach (self::processTreePids($rootPid) as $pid) {
+            if (isset($sigcontSent[$pid])) {
+                continue;
+            }
+            if (!self::isProcessStopped($pid)) {
+                continue;
+            }
+            self::sendSigcont($pid);
+            $sigcontSent[$pid] = true;
+            fwrite(STDERR, sprintf("vm-sigcont: test=%s pid=%d\n", $testName, $pid));
+        }
+    }
+
+    private static function isProcessStopped(int $pid): bool
+    {
+        $statFile = "/proc/{$pid}/stat";
+        $stat = @file_get_contents($statFile);
+        if (false === $stat || '' === $stat) {
+            return false;
+        }
+        // /proc/<pid>/stat: "pid (comm) state ..."
+        $close = strrpos($stat, ')');
+        if (false === $close) {
+            return false;
+        }
+        $rest = substr($stat, $close + 2);
+        if (false === $rest || '' === $rest) {
+            return false;
+        }
+        $state = $rest[0] ?? '';
+        return $state === 'T' || $state === 't';
+    }
+
+    private static function sendSigcont(int $pid): void
+    {
+        if (function_exists('posix_kill')) {
+            @posix_kill($pid, SIGCONT);
+            return;
+        }
+        // Best-effort fallback (posix may be unavailable in some envs).
+        @exec('kill -CONT ' . (int) $pid . ' 2>/dev/null');
     }
 
 }

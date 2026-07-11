@@ -10,34 +10,69 @@ namespace PHPCompiler;
 final class BuiltinParamNames
 {
     /**
+     * php-src stub parameter names for VM builtin class methods (#11785, ext/date/php_date.stub.php).
+     *
      * @return list<string>|null
      */
+    public static function forClassMethod(string $qualifiedMethod): ?array
+    {
+        return match (strtolower($qualifiedMethod)) {
+            'datetime::createfromformat',
+            'datetimeimmutable::createfromformat' => ['format', 'datetime', 'timezone'],
+            'datetime::__construct',
+            'datetimeimmutable::__construct' => ['datetime', 'timezone'],
+            'datetimezone::__construct' => ['timezone'],
+            default => null,
+        };
+    }
+
     public static function forFunction(string $name): ?array
     {
+        $classMethod = self::forClassMethod($name);
+        if (null !== $classMethod) {
+            return $classMethod;
+        }
+
         $lc = strtolower($name);
         switch ($lc) {
             case 'strlen':
+            case 'ucfirst':
+            case 'lcfirst':
+            case 'strtoupper':
+            case 'strtolower':
+            case 'addslashes':
+            case 'bin2hex':
                 return ['string'];
             case 'substr':
-                return ['string', 'offset', 'length'];
+                return \PHPCompiler\CompilerVersion::supportsSubstrTruncate()
+                    ? ['string', 'offset', 'length', 'truncate']
+                    : ['string', 'offset', 'length'];
             case 'wordwrap':
                 return ['string', 'width', 'break', 'cut'];
             case 'date':
                 return ['format', 'timestamp'];
             case 'array_all':
             case 'array_any':
+            case 'array_all_key':
+            case 'array_any_key':
             case 'array_find':
             case 'array_find_key':
-                return ['array', 'callback'];
+                return ['array', 'callback', 'strict'];
             case 'str_pad':
                 return ['string', 'length', 'pad_string', 'pad_type'];
             case 'str_replace':
             case 'str_ireplace':
                 return ['search', 'replace', 'subject', 'count'];
             case 'parse_str':
-                return ['string', 'array'];
+                return \PHPCompiler\CompilerVersion::supportsParseStrSeparator()
+                    ? ['string', 'result', 'separator']
+                    : ['string', 'result'];
+            case 'dns_get_mx':
+            case 'getmxrr':
+                return ['hostname', 'mxhosts', 'weight'];
             case 'sort':
             case 'rsort':
+                return ['array', 'flags', 'direction'];
             case 'asort':
             case 'arsort':
             case 'ksort':
@@ -48,7 +83,15 @@ final class BuiltinParamNames
             case 'usort':
             case 'uasort':
             case 'uksort':
-                return ['array', 'callback'];
+            case 'array_uasort':
+            case 'array_uksort':
+                return \PHPCompiler\CompilerVersion::supportsSortingEnum()
+                    ? ['array', 'callback', 'direction']
+                    : ['array', 'callback'];
+            case 'shuffle':
+            case 'array_sum':
+            case 'array_product':
+                return ['array'];
             case 'array_push':
             case 'array_pop':
             case 'array_shift':
@@ -65,8 +108,20 @@ final class BuiltinParamNames
                 return ['array', 'callback', 'arg'];
             case 'array_slice':
                 return ['array', 'offset', 'length', 'preserve_keys'];
+            case 'array_splice':
+                return ['array', 'offset', 'length', 'replacement'];
+            case 'array_multisort':
+                return ['array', 'rest'];
+            case 'array_map':
+                return ['callback', 'array', 'arrays'];
+            case 'array_filter':
+                return ['array', 'callback', 'mode'];
+            case 'array_reduce':
+                return ['array', 'callback', 'initial'];
             case 'array_pad':
-                return ['array', 'length', 'value'];
+                return \PHPCompiler\CompilerVersion::supportsArrayPadPadType()
+                    ? ['array', 'length', 'value', 'pad_type']
+                    : ['array', 'length', 'value'];
             case 'array_combine':
                 return ['keys', 'values'];
             case 'array_chunk':
@@ -89,14 +144,22 @@ final class BuiltinParamNames
                 return ['num', 'decimals', 'decimal_separator', 'thousands_separator'];
             case 'modf':
                 return ['num', 'num2'];
+            case 'round':
+                return ['num', 'precision', 'mode'];
             case 'frexp':
                 return ['arg1', 'exp'];
             case 'ldexp':
                 return ['num', 'exp'];
             case 'clearstatcache':
                 return ['clear_realpath_cache', 'filename'];
+            case 'mkdir':
+                return ['directory', 'permissions', 'recursive'];
+            case 'spl_autoload_register':
+                return ['callback', 'throw', 'prepend'];
             case 'touch':
                 return ['filename', 'mtime', 'atime'];
+            case 'token_get_all':
+                return ['source', 'flags'];
             case 'getenv':
                 return ['name', 'local_only'];
             case 'ini_get':
@@ -134,15 +197,56 @@ final class BuiltinParamNames
             case 'get_browser':
                 return ['browser_name', 'return_array'];
             case 'get_defined_constants':
-                return ['categorize'];
+                return \PHPCompiler\CompilerVersion::supportsGetDefinedConstantsCategory()
+                    ? ['categorize', 'category']
+                    : ['categorize'];
+            case 'get_declared_classes':
+            case 'get_declared_interfaces':
+            case 'get_declared_traits':
+                return \PHPCompiler\CompilerVersion::supportsGetDeclaredExcludeDeprecated()
+                    ? ['exclude_deprecated']
+                    : [];
+            case 'get_defined_functions':
+                return \PHPCompiler\CompilerVersion::supportsGetDefinedFunctionsExcludeDisabled()
+                    ? ['exclude_disabled']
+                    : [];
+            case 'fdiv':
+                return \PHPCompiler\CompilerVersion::supportsRoundingModeEnum()
+                    ? ['num1', 'num2', 'rounding_mode']
+                    : ['num1', 'num2'];
+            case 'bcadd':
+            case 'bcsub':
+            case 'bcmul':
+            case 'bcdiv':
+            case 'bcmod':
+                return \PHPCompiler\CompilerVersion::supportsRoundingModeEnum()
+                    ? ['num1', 'num2', 'scale', 'rounding_mode']
+                    : ['num1', 'num2', 'scale'];
+            case 'bcpowmod':
+                return \PHPCompiler\CompilerVersion::supportsRoundingModeEnum()
+                    ? ['num', 'exponent', 'modulus', 'scale', 'rounding_mode']
+                    : ['num', 'exponent', 'modulus', 'scale'];
+            case 'fpow':
+                return \PHPCompiler\CompilerVersion::supportsRoundingModeEnum()
+                    ? ['num', 'exponent', 'rounding_mode']
+                    : ['num', 'exponent'];
             case 'intdiv':
                 return ['num1', 'num2'];
+            case 'atan2':
+                return ['y', 'x'];
+            case 'hypot':
+                return ['x', 'y'];
             case 'random_int':
                 return ['min', 'max'];
             case 'hex2bin':
-                return ['data', 'strict'];
+                return \PHPCompiler\CompilerVersion::supportsHex2binStrict()
+                    ? ['string', 'strict']
+                    : ['string'];
             case 'unpack':
                 return ['format', 'string', 'offset'];
+            case 'openssl_cipher_iv_length':
+            case 'openssl_cipher_key_length':
+                return ['cipher_algo'];
             case 'hash':
                 return ['algo', 'data', 'binary'];
             case 'hash_hmac':
@@ -162,6 +266,10 @@ final class BuiltinParamNames
                 return ['value', 'flags', 'depth'];
             case 'json_decode':
                 return ['json', 'associative', 'depth', 'flags'];
+            case 'filter_var':
+                return ['value', 'filter', 'options'];
+            case 'filter_input':
+                return ['type', 'variable_name', 'filter', 'options'];
             case 'explode':
                 return ['separator', 'string', 'limit'];
             case 'implode':
@@ -170,19 +278,29 @@ final class BuiltinParamNames
             case 'nl2br':
                 return ['string', 'use_xhtml'];
             case 'str_contains':
+            case 'str_starts_with':
+            case 'str_ends_with':
                 return ['haystack', 'needle'];
             case 'preg_match':
+                return ['pattern', 'subject', 'matches', 'flags', 'offset'];
+            case 'preg_match_all':
                 return ['pattern', 'subject', 'matches', 'flags', 'offset'];
             case 'preg_split':
                 return ['pattern', 'subject', 'limit', 'flags'];
             case 'preg_replace':
                 return ['pattern', 'replacement', 'subject', 'limit', 'count'];
+            case 'preg_grep':
+                return ['pattern', 'array', 'flags'];
+            case 'preg_quote':
+                return ['str', 'delimiter'];
             case 'file_get_contents':
                 return ['filename', 'use_include_path', 'context', 'offset', 'length'];
             case 'file_put_contents':
                 return ['filename', 'data', 'flags', 'context'];
             case 'fopen':
                 return ['filename', 'mode', 'use_include_path', 'context'];
+            case 'stream_get_contents':
+                return ['stream', 'length', 'offset'];
             case 'fgets':
             case 'fgetss':
                 return ['stream', 'length'];
@@ -190,10 +308,19 @@ final class BuiltinParamNames
                 return ['stream', 'length', 'separator', 'enclosure', 'escape'];
             case 'str_getcsv':
                 return ['string', 'separator', 'enclosure', 'escape'];
+            case 'parse_ini_string':
+                return ['ini_string', 'process_sections', 'scanner_mode'];
+            case 'parse_ini_file':
+                return ['filename', 'process_sections', 'scanner_mode'];
             case 'parse_url':
                 return ['url', 'component'];
             case 'proc_open':
                 return ['command', 'descriptor_spec', 'pipes', 'cwd', 'env', 'options'];
+            case 'proc_get_status':
+            case 'proc_close':
+                return ['process'];
+            case 'proc_terminate':
+                return ['process', 'signal'];
             case 'getopt':
                 return ['short_options', 'long_options', 'rest_index'];
             case 'call_user_func':
@@ -202,19 +329,70 @@ final class BuiltinParamNames
                 return ['callback', 'args'];
             case 'is_callable':
                 return ['value', 'syntax_only', 'callable_name'];
+            case 'get_class':
+                return \PHPCompiler\CompilerVersion::supportsGetClassAllowString()
+                    ? ['object', 'allow_string']
+                    : ['object'];
+            case 'get_parent_class':
+                return \PHPCompiler\CompilerVersion::supportsGetClassAllowString()
+                    ? ['object_or_class', 'allow_string']
+                    : ['object_or_class'];
+            case 'class_exists':
+                return ['class', 'autoload'];
+            case 'interface_exists':
+                return ['interface', 'autoload'];
+            case 'trait_exists':
+                return ['trait', 'autoload'];
+            case 'enum_exists':
+                return ['enum', 'autoload'];
+            case 'class_parents':
+            case 'class_implements':
+            case 'class_uses':
+            case 'class_uses_recursive':
+                return ['object_or_class', 'autoload'];
+            case 'is_subclass_of':
+            case 'is_a':
+                return ['object_or_class', 'class', 'allow_string'];
             case 'iterator_to_array':
                 return ['iterator', 'preserve_keys'];
+            case 'generator_to_array':
+                return ['generator', 'preserve_keys'];
             case 'hrtime':
                 return ['as_number'];
             case 'memory_get_usage':
             case 'memory_get_peak_usage':
                 return ['real_usage'];
             case 'microtime':
+            case 'gettimeofday':
                 return ['as_float'];
+            case 'sleep':
+                return ['seconds'];
+            case 'usleep':
+                return ['microseconds'];
+            case 'http_response_code':
+                return ['response_code'];
+            case 'setcookie':
+                return ['name', 'value', 'expires', 'path', 'domain', 'secure', 'httponly'];
             case 'trim':
             case 'ltrim':
             case 'rtrim':
-                return ['string', 'characters'];
+                return ['string', 'characters', 'mode'];
+            case 'mb_strlen':
+                return ['string', 'encoding'];
+            case 'mb_substr':
+                return \PHPCompiler\CompilerVersion::supportsSubstrTruncate()
+                    ? ['string', 'start', 'length', 'encoding', 'truncate']
+                    : ['string', 'start', 'length', 'encoding'];
+            case 'mb_strcut':
+                return ['string', 'start', 'length', 'encoding'];
+            case 'mb_stripos':
+            case 'mb_strpos':
+            case 'mb_strrpos':
+                return ['haystack', 'needle', 'offset', 'encoding'];
+            case 'mb_strimwidth':
+                return ['string', 'start', 'width', 'trimmarker', 'encoding'];
+            case 'mb_convert_encoding':
+                return ['string', 'to_encoding', 'from_encoding'];
             case 'mb_trim':
             case 'mb_ltrim':
             case 'mb_rtrim':
@@ -235,8 +413,37 @@ final class BuiltinParamNames
             case 'debug_backtrace':
             case 'get_debug_backtrace':
                 return ['options', 'limit'];
+            case 'pathinfo':
+                return ['path', 'flags'];
+            case 'dirname':
+                return ['path', 'levels'];
+            case 'extract':
+                return ['array', 'flags', 'prefix'];
             case 'file':
                 return ['filename', 'flags'];
+            case 'glob':
+                return ['pattern', 'flags'];
+            case 'substr_compare':
+                return ['haystack', 'needle', 'offset', 'length', 'case_insensitive'];
+            case 'file_exists':
+            case 'filesize':
+            case 'filemtime':
+            case 'fileatime':
+            case 'filectime':
+            case 'fileinode':
+            case 'fileowner':
+            case 'filegroup':
+            case 'fileperms':
+            case 'is_file':
+            case 'is_dir':
+            case 'is_readable':
+            case 'is_writable':
+            case 'is_writeable':
+            case 'is_executable':
+            case 'is_link':
+            case 'stat':
+            case 'lstat':
+                return ['filename'];
         }
 
         return null;
@@ -262,6 +469,8 @@ final class BuiltinParamNames
     {
         return match (strtolower($name)) {
             'call_user_func' => 1,
+            'array_map' => 2,
+            'array_multisort' => 1,
             default => null,
         };
     }
@@ -275,7 +484,8 @@ final class BuiltinParamNames
             'array_replace',
             'array_merge',
             'array_replace_recursive',
-            'array_merge_recursive' => true,
+            'array_merge_recursive',
+            'pack' => true,
             default => false,
         };
     }
@@ -296,6 +506,9 @@ final class BuiltinParamNames
     public static function aliasesForFunction(string $name): array
     {
         $lc = strtolower($name);
+        if (str_contains($lc, '::')) {
+            return self::aliasesForClassMethod($lc);
+        }
         if ('implode' === $lc || 'join' === $lc) {
             // php-src InternalArgInfo glue/pieces; public stub names separator/array (#9985).
             return [
@@ -308,6 +521,32 @@ final class BuiltinParamNames
             return [
                 'input' => 0,
             ];
+        }
+        if ('fgetcsv' === $lc) {
+            // php-src 8.2 arginfo `delimiter` → 8.4 stub `separator` (#12018).
+            return [
+                'delimiter' => 2,
+            ];
+        }
+        if ('str_getcsv' === $lc) {
+            return [
+                'delimiter' => 1,
+            ];
+        }
+
+        return [];
+    }
+
+    /**
+     * Public stub names that differ from internal arginfo (#11785, DateTime::createFromFormat datetime).
+     *
+     * @return array<string, int>
+     */
+    public static function aliasesForClassMethod(string $qualifiedMethod): array
+    {
+        $lc = strtolower($qualifiedMethod);
+        if (str_ends_with($lc, '::createfromformat')) {
+            return ['datetime' => 1];
         }
 
         return [];

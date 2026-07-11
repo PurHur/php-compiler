@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\ext\session\SessionConstants;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\Context;
@@ -19,21 +20,28 @@ final class BuiltinEnums
     public static function register(Context $ctx): void
     {
         $before = array_keys($ctx->classes);
-        self::registerPropertyHookType($ctx);
-        self::registerExitStatus($ctx);
-        self::registerStringTrimMode($ctx);
-        self::registerPadType($ctx);
-        self::registerMemoryUsage($ctx);
-        self::registerConnectionStatus($ctx);
-        self::registerSessionStatus($ctx);
-        self::registerResponseCode($ctx);
-        self::registerSorting($ctx);
-        self::registerSortDirection($ctx);
-        self::registerRoundingMode($ctx);
-        self::registerParseUrl($ctx);
-        self::registerRequestMethod($ctx);
-        self::registerInfoView($ctx);
-        self::registerClockInterface($ctx);
+        if (CompilerVersion::supportsBuiltinStubEnums()) {
+            self::registerPropertyHookType($ctx);
+            self::registerExitStatus($ctx);
+            self::registerStringTrimMode($ctx);
+            self::registerPadType($ctx);
+            self::registerMemoryUsage($ctx);
+            self::registerConnectionStatus($ctx);
+            self::registerSessionStatus($ctx);
+            self::registerResponseCode($ctx);
+            self::registerSorting($ctx);
+            self::registerSortDirection($ctx);
+            self::registerParseUrl($ctx);
+            self::registerRequestMethod($ctx);
+            self::registerInfoView($ctx);
+            self::registerClockInterface($ctx);
+        }
+        if (CompilerVersion::supportsRoundingModeEnum()) {
+            self::registerRoundingMode($ctx);
+        }
+        if (CompilerVersion::supportsArrayPadTypeEnum()) {
+            self::registerArrayPadType($ctx);
+        }
         foreach (array_diff(array_keys($ctx->classes), $before) as $lc) {
             $ctx->classes[$lc]->isInternal = true;
         }
@@ -304,9 +312,34 @@ final class BuiltinEnums
     }
 
     /**
-     * PHP 8.4 RoundingMode: pure enum for round() mode (#5934).
+     * PHP 8.4 ArrayPadType: pure enum for array_pad() 4th $pad_type (#17240, #14993).
      *
-     * php-src: ext/standard/basic_functions.stub.php — enum RoundingMode
+     * php-src forward profile: ext/standard/array.c — ArrayPadType (Positive / Negative)
+     */
+    private static function registerArrayPadType(Context $ctx): void
+    {
+        if (isset($ctx->classes['arraypadtype'])) {
+            return;
+        }
+
+        $entry = new ClassEntry('ArrayPadType');
+        $entry->isEnum = true;
+
+        self::registerPureEnumCase($entry, 'Positive');
+        self::registerPureEnumCase($entry, 'Negative');
+
+        EnumSupport::ensureBuiltinCasesMethod($entry);
+        EnumSupport::ensureBuiltinEnumInterfaces($entry);
+
+        $lc = 'arraypadtype';
+        $ctx->classes[$lc] = $entry;
+        $ctx->enums[$lc] = true;
+    }
+
+    /**
+     * PHP 8.4 RoundingMode: int-backed enum for round() mode (#5934, #16875).
+     *
+     * php-src: ext/standard/basic_functions.stub.php — enum RoundingMode: int
      */
     private static function registerRoundingMode(Context $ctx): void
     {
@@ -316,6 +349,7 @@ final class BuiltinEnums
 
         $entry = new ClassEntry('RoundingMode');
         $entry->isEnum = true;
+        $entry->backedType = 'int';
 
         foreach ([
             'HalfAwayFromZero',
@@ -327,7 +361,7 @@ final class BuiltinEnums
             'NegativeInfinity',
             'PositiveInfinity',
         ] as $caseName) {
-            self::registerPureEnumCase($entry, $caseName);
+            self::registerBackedEnumCase($entry, $caseName, VmRoundMode::roundModeIntFromCaseName($caseName));
         }
 
         EnumSupport::ensureBuiltinCasesMethod($entry);

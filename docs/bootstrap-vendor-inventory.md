@@ -8,7 +8,7 @@ Regenerate: `php script/bootstrap-vendor-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| Vendor PHP files (bootstrap packages) | **512** |
+| Vendor PHP files (bootstrap packages) | **514** |
 | Packages | **5** |
 
 **M5 strategy:** prelink as native objects or bitcode; self-host links `lib/` + prelinked vendor — no `vendor/autoload.php` at cold boot. Compiler logic stays PHP; see [`docs/bootstrap-m5-fast-path.md`](bootstrap-m5-fast-path.md).
@@ -18,7 +18,7 @@ Regenerate: `php script/bootstrap-vendor-inventory.php`
 | Package | PHP files | Role |
 |---------|----------:|------|
 | `nikic/php-parser` | 250 | AST parse (Runtime constructor) |
-| `ircmaxell/php-cfg` | 151 | CFG + traversers |
+| `ircmaxell/php-cfg` | 153 | CFG + traversers |
 | `ircmaxell/php-types` | 8 | TypeReconstructor |
 | `ircmaxell/php-llvm` | 94 | LLVM FFI from PHP JIT |
 | `pre/plugin` | 9 | Parser plugin / autoload |

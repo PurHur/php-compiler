@@ -54,6 +54,11 @@ final class VmCalendar
         return self::gregorianToSdn($year, $month, $day);
     }
 
+    public static function julianToJd(int $month, int $day, int $year): int
+    {
+        return self::julianToSdn($year, $month, $day);
+    }
+
     public static function jdtogregorian(int $julday): string
     {
         [$year, $month, $day] = self::sdnToGregorian($julday);
@@ -73,6 +78,8 @@ final class VmCalendar
         return match ($calendar) {
             CalendarConstants::CAL_GREGORIAN => self::gregorianToSdn($year, $month, $day),
             CalendarConstants::CAL_JULIAN => self::julianToSdn($year, $month, $day),
+            CalendarConstants::CAL_JEWISH => VmJewishFrenchCalendar::jewishToSdnPublic($year, $month, $day),
+            CalendarConstants::CAL_FRENCH => VmJewishFrenchCalendar::frenchToSdn($year, $month, $day),
             default => throw new \LogicException(
                 'Calendar ID '.$calendar.' is not implemented in this compiler build (issue #3742)'
             ),
@@ -167,6 +174,8 @@ final class VmCalendar
         [$year, $month, $day] = match ($cal) {
             CalendarConstants::CAL_GREGORIAN => self::sdnToGregorian($jd),
             CalendarConstants::CAL_JULIAN => self::sdnToJulian($jd),
+            CalendarConstants::CAL_JEWISH => self::sdnToJewishParts($jd),
+            CalendarConstants::CAL_FRENCH => VmJewishFrenchCalendar::sdnToFrench($jd),
             default => throw new \LogicException(
                 'Calendar ID '.$cal.' is not implemented in this compiler build (issue #3742)'
             ),
@@ -218,10 +227,8 @@ final class VmCalendar
                 self::sdnToJulian($jd),
                 CalendarTables::GREGOR_MONTH_LONG
             ),
-            CalendarConstants::CAL_MONTH_JEWISH,
-            CalendarConstants::CAL_MONTH_FRENCH => throw new \LogicException(
-                'jdmonthname() mode '.$mode.' requires Jewish/French conversion (issue #3742)'
-            ),
+            CalendarConstants::CAL_MONTH_JEWISH => self::monthNameFromJewishSdn($jd),
+            CalendarConstants::CAL_MONTH_FRENCH => self::monthNameFromFrenchSdn($jd),
             default => self::monthNameFromSdn(
                 self::sdnToGregorian($jd),
                 CalendarTables::GREGOR_MONTH_SHORT
@@ -290,6 +297,8 @@ final class VmCalendar
         return match ($calendar) {
             CalendarConstants::CAL_GREGORIAN => self::gregorianToSdn($year, $month, $day),
             CalendarConstants::CAL_JULIAN => self::julianToSdn($year, $month, $day),
+            CalendarConstants::CAL_JEWISH => VmJewishFrenchCalendar::jewishToSdnPublic($year, $month, $day),
+            CalendarConstants::CAL_FRENCH => VmJewishFrenchCalendar::frenchToSdn($year, $month, $day),
             default => throw new \LogicException(
                 'Calendar ID '.$calendar.' is not implemented in this compiler build (issue #3742)'
             ),
@@ -356,6 +365,27 @@ final class VmCalendar
         [, $month] = $parts;
 
         return $names[$month] ?? '';
+    }
+
+    /** @return array{0: int, 1: int, 2: int} */
+    private static function sdnToJewishParts(int $jd): array
+    {
+        return VmJewishFrenchCalendar::sdnToJewishFromJd($jd);
+    }
+
+    private static function monthNameFromJewishSdn(int $jd): string
+    {
+        [, $month] = self::sdnToJewishParts($jd);
+        $names = CalendarTables::JEWISH_MONTH_LEAP;
+
+        return $names[$month] ?? '';
+    }
+
+    private static function monthNameFromFrenchSdn(int $jd): string
+    {
+        [, $month] = VmJewishFrenchCalendar::sdnToFrench($jd);
+
+        return CalendarTables::FRENCH_MONTH[$month] ?? '';
     }
 
     /** @param list<string> $values */

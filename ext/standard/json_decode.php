@@ -7,10 +7,12 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\NamedOptionalCallArgs;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -45,18 +47,11 @@ final class json_decode extends Internal
             0,
             'json'
         );
-        $assoc = false;
-        if (isset($frame->calledArgs[1])) {
-            $assocVar = $frame->calledArgs[1]->resolveIndirect();
-            if (Variable::TYPE_BOOLEAN !== $assocVar->type) {
-                throw new \TypeError('json_decode(): Argument #2 ($assoc) must be of type bool');
-            }
-            $assoc = $assocVar->toBool();
-        }
         $depth = 512;
         if (isset($frame->calledArgs[2])) {
-            $depth = VmMath::parseIntBuiltinArg(
-                $frame->calledArgs[2]->resolveIndirect(),
+            $depth = VmMath::parseIntBuiltinArgForFrame(
+                $frame,
+                2,
                 'json_decode',
                 3,
                 'depth'
@@ -67,13 +62,15 @@ final class json_decode extends Internal
         }
         $flags = 0;
         if (isset($frame->calledArgs[3])) {
-            $flags = VmMath::parseIntBuiltinArg(
-                $frame->calledArgs[3]->resolveIndirect(),
+            $flags = VmMath::parseIntBuiltinArgForFrame(
+                $frame,
+                3,
                 'json_decode',
                 4,
                 'flags'
             );
         }
+        $assoc = self::resolveEffectiveAssocVm($frame, $flags);
         $decoded = VmJsonFormat::decode($json, $assoc, $depth, $flags);
         if (null === $frame->returnVar) {
             return;
@@ -95,9 +92,9 @@ final class json_decode extends Internal
             throw new \LogicException('json_decode() expects at most 4 arguments');
         }
 
-        $assoc = self::resolveAssocFlag($context, $args);
         $depth = self::resolveDepthJit($context, $args);
         $flags = self::resolveFlagsJit($context, $args);
+        $assoc = self::resolveAssocFlag($context, $args, $flags);
         $literal = JitStringArg::compileTimeLiteral($args[0]);
         if (null !== $literal) {
             $decoded = VmJsonFormat::decode($literal, $assoc, $depth, $flags);
@@ -120,16 +117,47 @@ final class json_decode extends Internal
     }
 
     /**
-     * @param list<JITVariable> $args
+     * php-src ext/json/php_json.c — $assoc null uses JSON_OBJECT_AS_ARRAY (#11778).
      */
-    private static function resolveAssocFlag(Context $context, array $args): bool
+    private static function resolveEffectiveAssocVm(Frame $frame, int $flags): bool
+    {
+        if (!isset($frame->calledArgs[1])) {
+            return false;
+        }
+        $arg = $frame->calledArgs[1]->resolveIndirect();
+        if (Variable::TYPE_NULL === $arg->type) {
+            return VmJsonFlags::objectAsArray($flags);
+        }
+        if (InternalStrictArg::isCallerStrict($frame)) {
+            return InternalStrictArg::requireBool($frame, 1, 'json_decode', 'assoc')->toBool();
+        }
+
+        return VmMath::parseBoolBuiltinArg(
+            $frame->calledArgs[1],
+            'json_decode',
+            2,
+            'assoc'
+        );
+    }
+
+    private static function resolveAssocFlag(Context $context, array $args, int $flags): bool
     {
         if (!isset($args[1]) || NamedOptionalCallArgs::isOmittedOptional($args[1])) {
             return false;
         }
+        if (JITVariable::TYPE_NULL === $args[1]->type || ($args[1]->isNullConstant ?? false)) {
+            return VmJsonFlags::objectAsArray($flags);
+        }
+        if ($context->callerStrictTypes) {
+            JitInternalStrictArg::requireBool($context, $args[1], 'json_decode', 'assoc', 2);
+        }
         $assoc = self::compileTimeBool($context, $args[1]);
         if (null !== $assoc) {
             return $assoc;
+        }
+        $int = self::compileTimeInt($context, $args[1]);
+        if (null !== $int) {
+            return 0 !== $int;
         }
 
         throw new \LogicException('json_decode() assoc flag must be a compile-time boolean in this compiler build');
@@ -142,6 +170,9 @@ final class json_decode extends Internal
     {
         if (!isset($args[2]) || NamedOptionalCallArgs::isOmittedOptional($args[2])) {
             return 512;
+        }
+        if ($context->callerStrictTypes) {
+            JitInternalStrictArg::requireInt($context, $args[2], 'json_decode', 'depth', 3);
         }
         $depth = self::compileTimeInt($context, $args[2]);
         if (null === $depth) {
@@ -162,6 +193,9 @@ final class json_decode extends Internal
         if (!isset($args[3]) || NamedOptionalCallArgs::isOmittedOptional($args[3])) {
             return 0;
         }
+        if ($context->callerStrictTypes) {
+            JitInternalStrictArg::requireInt($context, $args[3], 'json_decode', 'flags', 4);
+        }
         $flags = self::compileTimeInt($context, $args[3]);
         if (null === $flags) {
             throw new \LogicException('json_decode() flags must be a compile-time integer in this compiler build');
@@ -176,7 +210,8 @@ final class json_decode extends Internal
             return null;
         }
         $lib = $context->llvm->lib;
-        if (JITVariable::TYPE_NATIVE_BOOL === $var->type && $var->value->isAConstantInt()) {
+        if (JITVariable::TYPE_NATIVE_BOOL === $var->type
+            && null !== $lib->LLVMIsAConstantInt($var->value->value)) {
             return 0 !== (int) $lib->LLVMConstIntGetZExtValue($var->value->value);
         }
         if (JITVariable::TYPE_NATIVE_LONG === $var->type

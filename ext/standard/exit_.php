@@ -48,12 +48,11 @@ final class exit_ extends Internal
     public static function invokeFromFrame(Frame $frame, string $function): void
     {
         $args = $frame->calledArgs;
-        $status = null;
-        if (\count($args) > 0) {
+        $status = \array_key_exists(0, $args) ? $args[0] : null;
+        $message = \array_key_exists(1, $args) ? $args[1] : null;
+        if (\array_key_exists(0, $args)) {
             self::validateStatusArg($args[0], $frame, $function);
-            $status = $args[0];
         }
-        $message = \count($args) > 1 ? $args[1] : null;
         $userFrame = $frame->parent ?? $frame;
         VmExit::terminate($status, $userFrame, $message);
     }
@@ -88,24 +87,32 @@ final class exit_ extends Internal
 
     private static function jitInvoke(Context $context, string $function, JITVariable ...$args): void
     {
-        if ($context->callerStrictTypes && isset($args[0])) {
-            self::jitRequireStringOrIntStatus($context, $args[0], $function);
+        $status = $args[0] ?? null;
+        $message = $args[1] ?? null;
+        if ($context->callerStrictTypes && null !== $status) {
+            self::jitRequireStringOrIntStatus($context, $status, $function);
         }
 
-        if (\count($args) > 1) {
-            ScriptExit::emitWithMessage($context, $args[0], $args[1]);
-        } elseif (isset($args[0])) {
-            ScriptExit::emit($context, $args[0]);
+        if (null !== $message) {
+            ScriptExit::emitWithMessage($context, $status ?? self::jitNullStatus($context), $message);
+        } elseif (null !== $status) {
+            ScriptExit::emit($context, $status);
         } else {
-            $null = new JITVariable(
-                $context,
-                JITVariable::TYPE_NULL,
-                JITVariable::KIND_VALUE,
-                $context->getTypeFromString('__value__*')->constNull()
-            );
-            $null->isNullConstant = true;
-            ScriptExit::emit($context, $null);
+            ScriptExit::emit($context, self::jitNullStatus($context));
         }
+    }
+
+    private static function jitNullStatus(Context $context): JITVariable
+    {
+        $null = new JITVariable(
+            $context,
+            JITVariable::TYPE_NULL,
+            JITVariable::KIND_VALUE,
+            $context->getTypeFromString('__value__*')->constNull()
+        );
+        $null->isNullConstant = true;
+
+        return $null;
     }
 
     private static function jitRequireStringOrIntStatus(Context $context, JITVariable $arg, string $function): void

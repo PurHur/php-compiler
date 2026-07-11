@@ -27,14 +27,12 @@ use PHPLLVM\Value;
 class strlen extends Internal {
 
     public function execute(Frame $frame): void {
-        if (count($frame->calledArgs) !== 1) {
-            throw new \LogicException("Expecting exactly a single argument to strlen()");
-        }
+        $this->requireExactArgCount($frame, 'strlen', 1);
         $var = $frame->calledArgs[0]->resolveIndirect();
         if (null !== $frame->parent && InternalStrictArg::isCallerStrict($frame)) {
             $string = VmString::requireStringBuiltinArg($var, 'strlen', 0, 'string');
         } else {
-            $string = VmString::coerceStringBuiltinArgNoObject($var, 'strlen', 0, 'string');
+            $string = VmString::coerceStringBuiltinArg($var, 'strlen', 0, 'string');
         }
         if (!is_null($frame->returnVar)) {
             $frame->returnVar->int(VmString::byteLength($string));
@@ -42,8 +40,8 @@ class strlen extends Internal {
     }
 
     public function call(Context $context, Variable ... $args): Value {
-        if (count($args) !== 1) {
-            throw new \LogicException('Too few args passed to strlen()');
+        if (!$this->requireExactJitArgCount($context, $args, 'strlen', 1)) {
+            return $context->getTypeFromString('int64')->constInt(0, false);
         }
 
         return JitStrlen::lowerLength($context, $args[0]);

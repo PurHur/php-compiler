@@ -105,8 +105,7 @@ final class JitPregReplace
         $context->builder->branchIf($isError, $failBlock, $okBlock);
 
         $context->builder->positionAtEnd($failBlock);
-        $i1 = $context->getTypeFromString('int1');
-        JitValueBox::writeBool($context, $slot, $i1->constInt(0, false));
+        $context->builder->call($context->lookupFunction('__value__writeNull'), $ptr);
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($okBlock);
@@ -133,8 +132,7 @@ final class JitPregReplace
         $context->builder->branchIf($isError, $failBlock, $okBlock);
 
         $context->builder->positionAtEnd($failBlock);
-        $i1 = $context->getTypeFromString('int1');
-        JitValueBox::writeBool($context, $slot, $i1->constInt(0, false));
+        $context->builder->call($context->lookupFunction('__value__writeNull'), $ptr);
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($okBlock);

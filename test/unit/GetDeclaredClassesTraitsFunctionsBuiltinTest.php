@@ -22,8 +22,11 @@ final class GetDeclaredClassesTraitsFunctionsBuiltinTest extends BaseTest
         foreach ([
             'get_declared_classes.phpt',
             'get_declared_classes_jit.phpt',
+            'get_declared_classes_includes_internal.phpt',
+            'get_declared_classes_includes_internal_jit.phpt',
             'get_declared_traits.phpt',
             'get_declared_traits_jit.phpt',
+            'get_declared_traits_nested_probe_arg.phpt',
             'get_declared_functions.phpt',
             'get_declared_functions_jit.phpt',
             'get_defined_functions.phpt',
@@ -38,6 +41,7 @@ final class GetDeclaredClassesTraitsFunctionsBuiltinTest extends BaseTest
         $root = __DIR__.'/../fixtures/aot/cases';
         foreach ([
             'get_declared_classes.phpt',
+            'get_declared_classes_includes_internal.phpt',
             'get_declared_traits.phpt',
             'get_declared_functions.phpt',
             'get_defined_functions.phpt',

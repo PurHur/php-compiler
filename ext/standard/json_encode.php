@@ -42,11 +42,17 @@ final class json_encode extends Internal
             return;
         }
         $flags = self::resolveFlagsVm($frame);
-        self::resolveDepthVm($frame);
+        $maxDepth = self::resolveDepthVm($frame);
         $ctx = $frame->vmContext;
         $vm = null !== $ctx ? $ctx->runtime->vm : null;
         try {
-            $value = VmJson::export($frame->calledArgs[0]->resolveIndirect(), $ctx, $vm, $frame);
+            $value = VmJson::export(
+                $frame->calledArgs[0]->resolveIndirect(),
+                $ctx,
+                $vm,
+                $frame,
+                $maxDepth
+            );
         } catch (VmJsonExportException $e) {
             VmJson::setLastError($e->errorCode);
             if (VmJsonFlags::throwsOnError($flags)) {
@@ -56,7 +62,7 @@ final class json_encode extends Internal
 
             return;
         }
-        $encoded = VmJsonFormat::encodeExported($value, $flags);
+        $encoded = VmJsonFormat::encodeExported($value, $flags, $maxDepth);
         if (false === $encoded) {
             $frame->returnVar->bool(false);
 
@@ -87,6 +93,15 @@ final class json_encode extends Internal
             }
 
             return $context->builder->load($context->constantStringFromString($encoded));
+        }
+        $arrayLiteral = JitJsonEncodeCompileTime::tryEncode(
+            $context,
+            $context->jitEnclosingBlock,
+            $context->jitJsonEncodeValueOperand,
+            $knownFlags ?? 0
+        );
+        if (null !== $arrayLiteral) {
+            return $arrayLiteral;
         }
         if (null !== $knownFlags && 0 !== ($knownFlags & ~VmJsonFlags::ENCODE_SUPPORTED)) {
             throw new \LogicException('json_encode() flags not supported at runtime in this compiler build');

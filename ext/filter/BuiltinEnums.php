@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\filter;
 
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\EnumCaseSupport;
@@ -17,6 +18,10 @@ final class BuiltinEnums
 {
     public static function register(Context $ctx): void
     {
+        if (!CompilerVersion::supportsBuiltinStubEnums()) {
+            return;
+        }
+
         $before = array_keys($ctx->classes);
         self::registerPhpInputFilter($ctx);
         foreach (array_diff(array_keys($ctx->classes), $before) as $lc) {

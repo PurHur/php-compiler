@@ -27,7 +27,11 @@ final class func_get_args extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $args = VmReflection::userCallArgs($frame);
+        try {
+            $args = VmReflection::userCallArgs($frame);
+        } catch (\LogicException) {
+            throw new \Error('func_get_args() cannot be called from the global scope');
+        }
         $frame->returnVar->copyFrom(VmReflection::copyArgsToArray($args));
     }
 

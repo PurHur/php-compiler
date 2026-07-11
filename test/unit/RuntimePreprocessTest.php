@@ -6,11 +6,19 @@ namespace PHPCompiler\Test\Unit;
 
 use PHPCompiler\Runtime;
 use PHPCompiler\Web\LiteralIncludeDiscovery;
+use PHPCompiler\Test\Support\PropertyHookTestSkip;
 use PHPUnit\Framework\TestCase;
 
 /** @covers issue #6654 — SSOT preprocess chain for VM + AOT-minimal parse paths */
 final class RuntimePreprocessTest extends TestCase
 {
+    use PropertyHookTestSkip;
+
+    protected function setUp(): void
+    {
+        $this->skipUnlessPropertyHooksEnabled();
+    }
+
     private const BLOCK_HOOK_SRC = <<<'PHP'
 <?php
 class C {

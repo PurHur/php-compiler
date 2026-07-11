@@ -20,7 +20,7 @@ final class is_executable extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('is_executable() requires exactly one argument in this compiler build');
         }
-        $path = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'is_executable', 0, 'filename');
+        $path = VmFilestatArg::filenameArgForFrame($frame, 0, 'is_executable');
         if (null === $frame->returnVar) {
             return;
         }
@@ -32,7 +32,7 @@ final class is_executable extends Internal
         if (1 !== \count($args)) {
             throw new \LogicException('is_executable() requires exactly one argument in this compiler build');
         }
-        $path = JitStringBuiltinArg::lower($context, $args[0], 'is_executable', 0, 'filename');
+        $path = JitStringBuiltinArg::lowerPath($context, $args[0], 'is_executable', 0, 'filename');
 
         return JitStat::pathIsExecutable($context, $path);
     }

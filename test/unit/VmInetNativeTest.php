@@ -9,7 +9,7 @@ use PHPCompiler\ext\standard\VmInetNative;
 use PHPCompiler\ext\standard\VmInetPure;
 use PHPUnit\Framework\TestCase;
 
-/** VmInet libc + pure-PHP path without host \\ip2long() delegation (#3225, #7929). */
+/** VmInet libc + pure-PHP path without host \\ip2long() delegation (#3225, #7929, #12354). */
 final class VmInetNativeTest extends TestCase
 {
     public function testVmInetDoesNotReferenceHostDelegation(): void
@@ -24,22 +24,24 @@ final class VmInetNativeTest extends TestCase
         $this->assertDoesNotMatchRegularExpression('/\\\\inet_pton\\s*\\(/', $source);
     }
 
-    public function testNativeDefinesLibcInetFfi(): void
+    public function testNativeDelegatesToPureWithoutFfi(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/VmInetNative.php');
-        $this->assertStringContainsString('int inet_aton(const char *cp', $source);
-        $this->assertStringContainsString('int inet_pton(int af', $source);
-        $this->assertStringContainsString('const char *inet_ntop', $source);
-        $this->assertStringContainsString('VmInetPure::', $source);
-        $this->assertDoesNotMatchRegularExpression('/\\\\long2ip\\s*\\(/', $source);
-        $this->assertDoesNotMatchRegularExpression('/\\\\inet_pton\\s*\\(/', $source);
+        $this->assertStringContainsString('VmInetPure::long2ip', $source);
+        $this->assertStringContainsString('VmInetPure::ip2long', $source);
+        $this->assertStringContainsString('VmInetPure::inet_ntop', $source);
+        $this->assertStringContainsString('VmInetPure::inet_pton', $source);
+        $this->assertStringNotContainsString('FFI::cdef', $source);
+        $this->assertDoesNotMatchRegularExpression('/\$ffi->inet_pton/', $source);
+        $this->assertDoesNotMatchRegularExpression('/PHP_COMPILER_INET_FFI/', $source);
     }
 
     public function testPureInetConversions(): void
     {
         $this->assertSame('127.0.0.1', VmInetPure::long2ip(2130706433));
         $this->assertSame(2130706433, VmInetPure::ip2long('127.0.0.1'));
-        $this->assertFalse(VmInetPure::long2ip(-1));
+        $this->assertSame('255.255.255.255', VmInetPure::long2ip(-1));
+        $this->assertSame('0.0.0.0', VmInetPure::long2ip(4294967296));
         $this->assertFalse(VmInetPure::ip2long('not-an-ip'));
         $this->assertFalse(VmInetPure::ip2long('01.02.03.04'));
         $this->assertSame(4294967295, VmInetPure::ip2long('255.255.255.255'));
@@ -53,17 +55,28 @@ final class VmInetNativeTest extends TestCase
         $this->assertIsString($v4);
         $this->assertSame(4, \strlen((string) $v4));
         $this->assertSame('127.0.0.1', VmInetPure::inet_ntop((string) $v4));
+
+        $mappedPacked = VmInetPure::inet_pton('::ffff:127.0.0.1');
+        $this->assertIsString($mappedPacked);
+        $this->assertSame('::ffff:127.0.0.1', VmInetPure::inet_ntop((string) $mappedPacked));
+
+        $compatPacked = \hex2bin('0000000000000000000000007f000001');
+        $this->assertIsString($compatPacked);
+        $this->assertSame('::127.0.0.1', VmInetPure::inet_ntop($compatPacked));
+
+        $loopback6 = VmInetPure::inet_pton('::1');
+        $this->assertIsString($loopback6);
+        $this->assertSame('::1', VmInetPure::inet_ntop((string) $loopback6));
     }
 
-    public function testNativeInetConversionsOnLinux(): void
+    public function testNativeInetMatchesPure(): void
     {
-        if (!VmInetNative::available()) {
-            $this->markTestSkipped('FFI inet unavailable');
-        }
+        $this->assertTrue(VmInetNative::available());
 
         $this->assertSame('127.0.0.1', VmInetNative::long2ip(2130706433));
         $this->assertSame(2130706433, VmInetNative::ip2long('127.0.0.1'));
-        $this->assertFalse(VmInetNative::long2ip(-1));
+        $this->assertSame('255.255.255.255', VmInetNative::long2ip(-1));
+        $this->assertSame('0.0.0.0', VmInetNative::long2ip(4294967296));
         $this->assertFalse(VmInetNative::ip2long('not-an-ip'));
         $this->assertFalse(VmInetNative::ip2long('01.02.03.04'));
 

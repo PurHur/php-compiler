@@ -12,7 +12,9 @@ use PHPLLVM\Function_ as LlvmFunction;
 use PHPLLVM\Value;
 
 /**
- * LLVM lowering for count($array, COUNT_RECURSIVE) (#3511, #4584, #10083).
+ * LLVM lowering for count($array, COUNT_RECURSIVE) — standalone AOT only (#3511, #4584, #13274).
+ *
+ * Embed JIT routes through {@see ArrayCountRecursiveRuntime} + {@see ArrayCountRecursiveJitHelper} PHP.
  *
  * php-src: ext/standard/array.c — php_count_recursive
  */

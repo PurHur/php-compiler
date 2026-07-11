@@ -3,12 +3,13 @@
 declare(strict_types=1);
 
 /**
- * LLVM JIT helper for strstr() — libc strstr(3) plus haystack slice (optional before_needle).
+ * LLVM lowering for strstr()/stristr()/strchr() via StringStrstr / StrstrJitHelper PHP (#14778).
  */
 
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\StringStrstr;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPLLVM\Builder;
@@ -18,7 +19,6 @@ final class JitStrstr
 {
     private static int $blockSerial = 0;
 
-    /** @return Value */
     public static function find(
         Context $context,
         Value $haystack,
@@ -27,20 +27,13 @@ final class JitStrstr
         bool $caseInsensitive = false
     ): Value {
         $id = (string) (++self::$blockSerial);
-        $map = $context->structFieldMap['__string__'];
-        $hayLen = $context->builder->load(
-            $context->builder->structGep($haystack, $map['length'])
-        );
-        $hayPtr = $context->builder->structGep($haystack, $map['value']);
-        $needlePtr = $context->builder->structGep($needle, $map['value']);
-        $searchFn = $caseInsensitive ? 'strcasestr' : 'strstr';
-        $found = $context->builder->call(
-            $context->lookupFunction($searchFn),
-            $hayPtr,
-            $needlePtr
-        );
-        $null = $context->getTypeFromString('int8*')->constNull();
-        $isNull = $context->builder->icmp(Builder::INT_EQ, $found, $null);
+        $i8 = $context->getTypeFromString('int8');
+        $before = $beforeNeedle ?? $i8->constInt(0, true);
+
+        StringStrstr::ensureLinked($context);
+        $raw = StringStrstr::invoke($context, $haystack, $needle, $before, $caseInsensitive);
+        $null = $context->getTypeFromString('__string__*')->constNull();
+        $isNull = $context->builder->icmp(Builder::INT_EQ, $raw, $null);
 
         $slot = JitValueBox::alloc($context);
         $ptr = JitValueBox::pointer($context, $slot);
@@ -55,46 +48,10 @@ final class JitStrstr
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($okBlock);
-        $i64 = $context->getTypeFromString('int64');
-        $foundInt = $context->builder->ptrToInt($found, $i64);
-        $baseInt = $context->builder->ptrToInt($hayPtr, $i64);
-        $pos = $context->builder->sub($foundInt, $baseInt);
-        $zero = JitStringIndex::zero($context);
-
-        if (null !== $beforeNeedle) {
-            $useBefore = $context->builder->truncOrBitCast($beforeNeedle, $i1);
-            $beforeBlock = BasicBlockHelper::append($context, 'strstr_before_'.$id);
-            $afterBlock = BasicBlockHelper::append($context, 'strstr_after_'.$id);
-            $sliceBlock = BasicBlockHelper::append($context, 'strstr_slice_'.$id);
-            $context->builder->branchIf($useBefore, $beforeBlock, $afterBlock);
-
-            $context->builder->positionAtEnd($beforeBlock);
-            $startBefore = $zero;
-            $lenBefore = $pos;
-            $context->builder->branch($sliceBlock);
-
-            $context->builder->positionAtEnd($afterBlock);
-            $startAfter = $pos;
-            $lenAfter = $context->builder->sub($hayLen, $pos);
-            $context->builder->branch($sliceBlock);
-
-            $context->builder->positionAtEnd($sliceBlock);
-            $startPhi = $context->builder->phi($i64);
-            $startPhi->addIncoming($startBefore, $beforeBlock);
-            $startPhi->addIncoming($startAfter, $afterBlock);
-            $lenPhi = $context->builder->phi($i64);
-            $lenPhi->addIncoming($lenBefore, $beforeBlock);
-            $lenPhi->addIncoming($lenAfter, $afterBlock);
-            $slice = string_trim::jitCopySlice($context, $haystack, $hayPtr, $startPhi, $lenPhi, 'ss'.$id);
-        } else {
-            $lenAfter = $context->builder->sub($hayLen, $pos);
-            $slice = string_trim::jitCopySlice($context, $haystack, $hayPtr, $pos, $lenAfter, 'ss'.$id);
-        }
-
         $context->builder->call(
             $context->lookupFunction('__value__writeString'),
             $ptr,
-            $slice
+            $raw
         );
         $context->builder->branch($doneBlock);
 

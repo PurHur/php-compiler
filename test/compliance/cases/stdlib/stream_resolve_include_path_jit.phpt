@@ -7,7 +7,7 @@ $inc = sys_get_temp_dir() . '/phpc_inc_' . getmypid();
 file_put_contents($inc . '/only_here.php', 'marker');
 $old = set_include_path($inc);
 $resolved = stream_resolve_include_path('only_here.php');
-restore_include_path();
+set_include_path($old);
 @unlink($inc . '/only_here.php');
 @rmdir($inc);
 echo is_string($resolved) ? "found\n" : "notfound\n";

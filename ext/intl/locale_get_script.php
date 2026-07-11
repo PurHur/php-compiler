@@ -1,0 +1,45 @@
+<?php
+
+declare(strict_types=1);
+
+namespace PHPCompiler\ext\intl;
+
+use PHPCompiler\ext\standard\VmString;
+use PHPCompiler\Frame;
+use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\Variable as JITVariable;
+use PHPLLVM\Value;
+
+/** locale_get_script() — BCP-47 script subtag (php-src ext/intl/locale/locale_methods.c; #5125). */
+final class locale_get_script extends Internal
+{
+    public function execute(Frame $frame): void
+    {
+        if (1 !== \count($frame->calledArgs)) {
+            throw new \ArgumentCountError(
+                'locale_get_script() expects exactly 1 argument, '.\count($frame->calledArgs).' given'
+            );
+        }
+        $locale = VmString::coerceStringBuiltinArg(
+            $frame->calledArgs[0],
+            'locale_get_script',
+            0,
+            'locale'
+        );
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->string(VmLocale::getScript($locale));
+        }
+    }
+
+    public function call(Context $context, JITVariable ...$args): Value
+    {
+        if (1 !== \count($args)) {
+            throw new \ArgumentCountError(
+                'locale_get_script() expects exactly 1 argument, '.\count($args).' given'
+            );
+        }
+
+        return JitLocaleParser::script($context, $args[0]);
+    }
+}

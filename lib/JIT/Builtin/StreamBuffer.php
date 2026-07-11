@@ -6,12 +6,12 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\Context;
 
-/** JIT LLVM bodies for stream buffer controls (#5343 phase 4). */
+/** JIT LLVM bodies for stream buffer controls (#5343 phase 4, #14462). */
 final class StreamBuffer
 {
     public static function ensureLinked(Context $context): void
     {
-        StreamBufferJit::implement($context);
+        StreamBufferRuntime::ensureLinked($context);
     }
 
     public static function implement(Context $context): void

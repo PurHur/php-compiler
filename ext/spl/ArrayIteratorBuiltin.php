@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\spl;
 
+use PHPCompiler\ext\standard\StdlibConstants;
+use PHPCompiler\ext\standard\VmInternalCompare;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPCompiler\VM\ClassEntry;
@@ -34,6 +36,24 @@ final class ArrayIteratorBuiltin
         if (isset($ctx->classes['countable'])) {
             $entry->interfaces[] = 'countable';
         }
+        if (isset($ctx->classes['arrayaccess'])) {
+            $entry->interfaces[] = 'arrayaccess';
+        }
+        if (isset($ctx->classes['seekableiterator'])) {
+            $entry->interfaces[] = 'seekableiterator';
+        }
+        if (isset($ctx->classes['serializable'])) {
+            $entry->interfaces[] = 'serializable';
+        }
+
+        foreach ([
+            'STD_PROP_LIST' => 1,
+            'ARRAY_AS_PROPS' => 2,
+        ] as $name => $value) {
+            $const = new Variable(Variable::TYPE_INTEGER);
+            $const->int($value);
+            $entry->constants[$name] = $const;
+        }
 
         $entry->constructor = new ArrayIteratorConstruct();
         $entry->methods['__construct'] = $entry->constructor;
@@ -46,14 +66,45 @@ final class ArrayIteratorBuiltin
         $entry->methodVisibility['next'] = $pub;
         $entry->methods['rewind'] = new ArrayIteratorRewind();
         $entry->methodVisibility['rewind'] = $pub;
+        $entry->methods['seek'] = new ArrayIteratorSeek();
+        $entry->methodVisibility['seek'] = $pub;
         $entry->methods['valid'] = new ArrayIteratorValid();
         $entry->methodVisibility['valid'] = $pub;
         $entry->methods['count'] = new ArrayIteratorCount();
         $entry->methodVisibility['count'] = $pub;
         $entry->methods['getarraycopy'] = new ArrayIteratorGetArrayCopy();
         $entry->methodVisibility['getarraycopy'] = $pub;
+        $entry->methods['getflags'] = new ArrayIteratorGetFlags();
+        $entry->methodVisibility['getflags'] = $pub;
+        $entry->methods['setflags'] = new ArrayIteratorSetFlags();
+        $entry->methodVisibility['setflags'] = $pub;
         $entry->methods['append'] = new ArrayIteratorAppend();
         $entry->methodVisibility['append'] = $pub;
+        $entry->methods['offsetget'] = new ArrayIteratorOffsetGet();
+        $entry->methodVisibility['offsetget'] = $pub;
+        $entry->methods['offsetset'] = new ArrayIteratorOffsetSet();
+        $entry->methodVisibility['offsetset'] = $pub;
+        $entry->methods['offsetexists'] = new ArrayIteratorOffsetExists();
+        $entry->methodVisibility['offsetexists'] = $pub;
+        $entry->methods['offsetunset'] = new ArrayIteratorOffsetUnset();
+        $entry->methodVisibility['offsetunset'] = $pub;
+        foreach ([
+            'asort' => true,
+            'ksort' => true,
+            'arsort' => true,
+            'krsort' => true,
+            'natsort' => false,
+            'natcasesort' => false,
+        ] as $lc => $acceptsFlags) {
+            $entry->methods[$lc] = new ArrayIteratorSortMethod($lc, $acceptsFlags);
+            $entry->methodVisibility[$lc] = $pub;
+        }
+        foreach (['uasort', 'uksort'] as $lc) {
+            $entry->methods[$lc] = new SplArrayUserSortMethod(self::CLASS_LC, $lc);
+            $entry->methodVisibility[$lc] = $pub;
+        }
+
+        SplLegacySerializableMethods::register($entry, self::CLASS_LC, 'ArrayIterator');
 
         $ctx->classes[self::CLASS_LC] = $entry;
     }
@@ -88,6 +139,11 @@ final class ArrayIteratorBuiltin
         return SplArrayStorage::iteratorKey($object);
     }
 
+    public static function seek(ObjectEntry $object, int $position): void
+    {
+        SplArrayStorage::seekIterator($object, $position);
+    }
+
     public static function count(ObjectEntry $object): int
     {
         return SplArrayStorage::count($object);
@@ -103,20 +159,24 @@ final class ArrayIteratorConstruct extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        if (\count($frame->calledArgs) < 2) {
-            throw new \LogicException('ArrayIterator::__construct() expects at least 1 argument');
-        }
-        $object = SplIteratorSupport::receiver(
+        $object = SplIteratorSupport::receiverIsA(
             $frame,
             ArrayIteratorBuiltin::CLASS_LC,
             'ArrayIterator::__construct()'
         );
-        $table = SplIteratorSupport::requireArrayArg(
-            $frame->calledArgs[1],
-            'ArrayIterator::__construct',
-            1
-        );
-        ArrayIteratorBuiltin::init($object, $table);
+        $table = new HashTable();
+        if (isset($frame->calledArgs[1])) {
+            $table = SplIteratorSupport::requireArrayArg(
+                $frame->calledArgs[1],
+                'ArrayIterator::__construct',
+                1
+            );
+        }
+        $flags = 0;
+        if (isset($frame->calledArgs[2])) {
+            $flags = $frame->calledArgs[2]->resolveIndirect()->toInt();
+        }
+        SplArrayStorage::init($object, $table, $flags);
     }
 }
 
@@ -135,6 +195,31 @@ final class ArrayIteratorRewind extends VmClassMethod
             'ArrayIterator::rewind()'
         );
         ArrayIteratorBuiltin::rewind($object);
+    }
+}
+
+final class ArrayIteratorSeek extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('seek');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiver(
+            $frame,
+            ArrayIteratorBuiltin::CLASS_LC,
+            'ArrayIterator::seek()'
+        );
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError(
+                'ArrayIterator::seek() expects exactly 1 argument, '
+                .(\count($frame->calledArgs) - 1).' given'
+            );
+        }
+        $offset = $frame->calledArgs[1]->resolveIndirect()->toInt();
+        ArrayIteratorBuiltin::seek($object, $offset);
     }
 }
 
@@ -260,6 +345,52 @@ final class ArrayIteratorGetArrayCopy extends VmClassMethod
     }
 }
 
+final class ArrayIteratorGetFlags extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getFlags');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiver(
+            $frame,
+            ArrayIteratorBuiltin::CLASS_LC,
+            'ArrayIterator::getFlags()'
+        );
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->int(SplArrayStorage::getFlags($object));
+    }
+}
+
+final class ArrayIteratorSetFlags extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('setFlags');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiver(
+            $frame,
+            ArrayIteratorBuiltin::CLASS_LC,
+            'ArrayIterator::setFlags()'
+        );
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError(
+                'ArrayIterator::setFlags() expects exactly 1 argument, '
+                .(\count($frame->calledArgs) - 1).' given'
+            );
+        }
+        $flags = $frame->calledArgs[1]->resolveIndirect()->toInt();
+        SplArrayStorage::setFlags($object, $flags);
+    }
+}
+
 final class ArrayIteratorAppend extends VmClassMethod
 {
     public function __construct()
@@ -281,5 +412,152 @@ final class ArrayIteratorAppend extends VmClassMethod
             );
         }
         SplArrayStorage::append($object, $frame->calledArgs[1]);
+    }
+}
+
+final class ArrayIteratorOffsetGet extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('offsetGet');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiver(
+            $frame,
+            ArrayIteratorBuiltin::CLASS_LC,
+            'ArrayIterator::offsetGet()'
+        );
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError(
+                'ArrayIterator::offsetGet() expects exactly 1 argument, '
+                .(\count($frame->calledArgs) - 1).' given'
+            );
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        SplIteratorSupport::copyReturnFrom(
+            $frame,
+            SplArrayStorage::offsetGet($object, $frame->calledArgs[1])
+        );
+    }
+}
+
+final class ArrayIteratorOffsetSet extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('offsetSet');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiver(
+            $frame,
+            ArrayIteratorBuiltin::CLASS_LC,
+            'ArrayIterator::offsetSet()'
+        );
+        if (\count($frame->calledArgs) < 3) {
+            throw new \ArgumentCountError(
+                'ArrayIterator::offsetSet() expects exactly 2 arguments, '
+                .(\count($frame->calledArgs) - 1).' given'
+            );
+        }
+        SplArrayStorage::offsetSet($object, $frame->calledArgs[1], $frame->calledArgs[2]);
+    }
+}
+
+final class ArrayIteratorOffsetExists extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('offsetExists');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiver(
+            $frame,
+            ArrayIteratorBuiltin::CLASS_LC,
+            'ArrayIterator::offsetExists()'
+        );
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError(
+                'ArrayIterator::offsetExists() expects exactly 1 argument, '
+                .(\count($frame->calledArgs) - 1).' given'
+            );
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->bool(SplArrayStorage::offsetExists($object, $frame->calledArgs[1]));
+    }
+}
+
+final class ArrayIteratorOffsetUnset extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('offsetUnset');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiver(
+            $frame,
+            ArrayIteratorBuiltin::CLASS_LC,
+            'ArrayIterator::offsetUnset()'
+        );
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError(
+                'ArrayIterator::offsetUnset() expects exactly 1 argument, '
+                .(\count($frame->calledArgs) - 1).' given'
+            );
+        }
+        SplArrayStorage::offsetUnset($object, $frame->calledArgs[1]);
+    }
+}
+
+/** @internal */
+final class ArrayIteratorSortMethod extends VmClassMethod
+{
+    public function __construct(
+        private readonly string $methodLc,
+        private readonly bool $acceptsFlags,
+    ) {
+        parent::__construct($methodLc);
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiver(
+            $frame,
+            ArrayIteratorBuiltin::CLASS_LC,
+            'ArrayIterator::'.$this->methodLc.'()'
+        );
+        $argc = \count($frame->calledArgs);
+        $method = 'ArrayIterator::'.$this->methodLc.'()';
+        if ($this->acceptsFlags) {
+            if ($argc > 2) {
+                throw new \ArgumentCountError(
+                    $method.' expects at most 1 argument, '.($argc - 1).' given'
+                );
+            }
+            $flags = StdlibConstants::SORT_REGULAR;
+            if ($argc >= 2) {
+                $flags = VmInternalCompare::resolveFrameSortFlags($frame, $method, 1);
+            }
+            SplArrayStorage::sortBacking($object, $this->methodLc, $flags);
+
+            return;
+        }
+        if ($argc > 1) {
+            throw new \ArgumentCountError(
+                $method.' expects exactly 0 arguments, '.($argc - 1).' given'
+            );
+        }
+        SplArrayStorage::sortBacking($object, $this->methodLc);
     }
 }

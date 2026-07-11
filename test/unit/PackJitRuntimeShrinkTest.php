@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\Test\Unit;
 
 use PHPCompiler\ext\standard\PackEngine;
+use PHPCompiler\ext\standard\PackJitEngine;
 use PHPCompiler\ext\standard\PackJitHelper;
 use PHPUnit\Framework\TestCase;
 
@@ -19,8 +20,8 @@ final class PackJitRuntimeShrinkTest extends TestCase
 
         $bridge = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringPack.php');
         $this->assertStringContainsString('PackJitHelper', $bridge);
-        $this->assertStringContainsString('PackEngine', (string) file_get_contents(__DIR__.'/../../ext/standard/PackJitHelper.php'));
-        $this->assertStringNotContainsString('emitPack', $bridge);
+        $this->assertStringNotContainsString('StringPackJit', $bridge);
+        $this->assertStringContainsString('PackJitEngine', (string) file_get_contents(__DIR__.'/../../ext/standard/PackJitHelper.php'));
     }
 
     public function testPackJitHelperMatchesPackEngine(): void
@@ -31,7 +32,7 @@ final class PackJitRuntimeShrinkTest extends TestCase
             PackJitHelper::packArgv('n', \chr(1).\pack('q', $value))
         );
         $this->assertSame(
-            PackEngine::pack('a3', ['hi']),
+            PackJitEngine::pack('a3', ['hi']),
             PackJitHelper::packArgv('a3', \chr(4).\pack('q', 2).'hi')
         );
     }

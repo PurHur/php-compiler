@@ -8,6 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPLLVM\Value;
 
 /**
@@ -32,14 +33,15 @@ final class parse_ini_file extends Internal
         if (null === $frame->returnVar) {
             return;
         }
+        InternalStrictArg::rejectNullString($frame->calledArgs[0], 'parse_ini_file', 'filename', 0, $frame);
         $filename = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'parse_ini_file', 0, 'filename');
         VmString::rejectEmptyBuiltinStringArg($filename, 'parse_ini_file', 0, 'filename');
         $processSections = false;
         $scannerMode = ParseIniEngine::SCANNER_NORMAL;
-        if ($argc >= 2) {
+        if (isset($frame->calledArgs[1])) {
             $processSections = VmParseIni::resolveProcessSections($frame->calledArgs[1], 'parse_ini_file');
         }
-        if (3 === $argc) {
+        if (isset($frame->calledArgs[2])) {
             $scannerMode = VmParseIni::resolveScannerMode($frame->calledArgs[2], 'parse_ini_file');
         }
         VmParseIni::assignParsedResult(

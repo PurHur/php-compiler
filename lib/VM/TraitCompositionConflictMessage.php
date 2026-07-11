@@ -24,4 +24,13 @@ final class TraitCompositionConflictMessage
             $className,
         );
     }
+
+    /** Class vs trait property conflict — Zend always names the class first (#11834). */
+    public static function incompatibleClassTraitProperty(
+        string $className,
+        string $traitName,
+        string $propertyName,
+    ): string {
+        return self::incompatibleProperty($className, $traitName, $propertyName, $className);
+    }
 }

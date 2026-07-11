@@ -11,7 +11,7 @@ use PHPCompiler\VM\HashTable;
  * multipart/form-data parsing for CGI superglobals (VM path).
  *
  * Bracket field names delegate to parse_str/VmParseStr merge semantics; AOT refresh
- * uses the same rules via StringParseStrJit LLVM helpers (#7302, #6013).
+ * uses the same rules via SuperglobalRefreshJitHelper PHP (#7302, #9907, #13429).
  *
  * php-src: main/rfc1867.c, main/php_variables.c
  */

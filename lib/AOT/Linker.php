@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\AOT;
 
 use PHPCompiler\JIT\AotDebugSymbols;
+use PHPCompiler\JIT\Builtin\OpensslSignRuntime;
 
 /**
  * Link an LLVM object file into a standalone executable using the bundled toolchain.
@@ -14,26 +15,27 @@ final class Linker
     /**
      * Bundled C runtime objects for AOT link.
      *
-     * phpc_progress.c is a frozen thin ABI only (#7146, #7360): async-signal-safe SIGSEGV handler
-     * that write(2)s phpc_last_progress globals filled by ProgressNoteRuntime.php.
-     * Do not add progress formatting or buffer writes in C — use lib/JIT/Builtin/ProgressNoteRuntime.php.
-     * Opt out via PHP_COMPILER_PROGRESS_ABI=0 (see runtimeCSources()).
+     * Runtime shrink target (#1492): keep this list empty. Any unavoidable ABI
+     * glue should be expressed as LLVM IR emitted from PHP lowering.
      *
      * @var list<string>
      */
     private const RUNTIME_C_SOURCES = [
-        __DIR__.'/runtime/phpc_progress.c',
     ];
 
     /** libz.so symlink is often absent without zlib1g-dev; link the versioned .so directly. */
-    private const RUNTIME_LINK_LIBS = '-lpcre2-8 -lcrypt -l:libz.so.1 -l:libzstd.so.1 -l:libbz2.so.1.0';
+    private const RUNTIME_LINK_LIBS = '-lpcre2-8 -lcrypt -l:libz.so.1 -l:libbz2.so.1.0';
+
+    /** Appended when OpensslSignJitHelper FFI is available at link time (#16454).
+     * libcrypto.so symlink is absent without libssl-dev (same trap as libz
+     * above); link the versioned .so directly — 22.04 pinned env ships OpenSSL 3. */
+    private const OPENSSL_LINK_LIB = '-l:libcrypto.so.3';
 
     /** Host multiarch lib dir for bundled LLVM ld (libz.so.1 lives here, not in LLVM sysroot). */
     private const HOST_LIB_SEARCH = '-L/usr/lib/x86_64-linux-gnu';
 
     /** Runtime units that need host libc headers layered on the LLVM sysroot (incomplete headers). */
     private const RUNTIME_HOST_LIBC_BASENAMES = [
-        'phpc_progress.c',
     ];
 
     private static function which(string $binary): ?string
@@ -65,6 +67,13 @@ final class Linker
     {
         $runtimeObjects = self::compileRuntimeObjects($objectFile);
         $vendorObjects = self::resolvePrelinkedVendorObjects();
+        // Split compilation (#15889): merge the cached helper-runtime TU. It
+        // carries duplicate ABI definitions by design; the script object is
+        // listed first and -z muldefs keeps the first definition, so runtime
+        // state stays single-copy while helper bodies resolve from the cache.
+        foreach (HelperRuntimeCache::linkObjects() as $helperObject) {
+            $vendorObjects[] = $helperObject;
+        }
         $llvmDir = getenv('PHP_COMPILER_LLVM_PATH');
         if (false === $llvmDir || '' === $llvmDir) {
             self::linkWithSystemCompiler($objectFile, $executable, $runtimeObjects, $vendorObjects);
@@ -97,6 +106,7 @@ final class Linker
             $cmd = implode(' ', [
                 escapeshellarg($ld),
                 AotDebugSymbols::linkFlag(),
+                self::helperMuldefsFlag('-z muldefs'),
                 '-dynamic-linker /lib64/ld-linux-x86-64.so.2',
                 escapeshellarg('/usr/lib/x86_64-linux-gnu/crt1.o'),
                 escapeshellarg($crtbegin),
@@ -105,7 +115,7 @@ final class Linker
                 '-lc',
                 '-lm',
                 self::HOST_LIB_SEARCH,
-                self::RUNTIME_LINK_LIBS,
+                self::runtimeLinkLibs(),
                 escapeshellarg($libgcc),
                 escapeshellarg($crtend),
                 escapeshellarg('/usr/lib/x86_64-linux-gnu/crtn.o'),
@@ -132,7 +142,7 @@ final class Linker
             // When linking with the bundled clang, ensure we can still resolve host libraries
             // (libpcre2-8, libcrypt, ...). Some bootstrap envs only ship the runtime .so/.a under
             // /usr/lib/x86_64-linux-gnu without a full sysroot lib tree.
-            $cmd = escapeshellarg($clang).' '.AotDebugSymbols::linkFlag().$objects.' '.self::HOST_LIB_SEARCH.' -lm '.self::RUNTIME_LINK_LIBS.' -o '.escapeshellarg($executable);
+            $cmd = escapeshellarg($clang).' '.AotDebugSymbols::linkFlag().self::helperMuldefsFlag(' -Wl,-z,muldefs').$objects.' '.self::HOST_LIB_SEARCH.' -lm '.self::runtimeLinkLibs().' -o '.escapeshellarg($executable);
             self::run($cmd, $env);
             self::unlinkIfTemp($runtimeObjects);
 
@@ -140,6 +150,12 @@ final class Linker
         }
 
         self::linkWithSystemCompiler($objectFile, $executable, $runtimeObjects, $vendorObjects);
+    }
+
+    /** -z muldefs is only injected while helper-runtime TUs are merged (#15889). */
+    private static function helperMuldefsFlag(string $flag): string
+    {
+        return [] !== HelperRuntimeCache::linkObjects() ? ' '.$flag.' ' : '';
     }
 
     /**
@@ -189,14 +205,17 @@ final class Linker
      */
     private static function runtimeCSources(): array
     {
-        if (self::progressAbiEnabled()) {
-            return self::RUNTIME_C_SOURCES;
+        return self::RUNTIME_C_SOURCES;
+    }
+
+    private static function runtimeLinkLibs(): string
+    {
+        $libs = self::RUNTIME_LINK_LIBS;
+        if (OpensslSignRuntime::opensslEvRuntimeAvailable()) {
+            $libs .= ' '.self::OPENSSL_LINK_LIB;
         }
 
-        return array_values(array_filter(
-            self::RUNTIME_C_SOURCES,
-            static fn (string $source): bool => !str_ends_with($source, 'phpc_progress.c')
-        ));
+        return $libs;
     }
 
     private static function progressAbiEnabled(): bool
@@ -259,6 +278,7 @@ final class Linker
         } else {
             $flags = self::runtimeCIncludeFlags();
         }
+
         return $flags;
     }
 
@@ -458,7 +478,7 @@ final class Linker
                 continue;
             }
             $cmd = escapeshellarg($path) . ' '
-                . AotDebugSymbols::linkFlag() . $objects . ' '.self::HOST_LIB_SEARCH.' -lm '.self::RUNTIME_LINK_LIBS.' -o ' . escapeshellarg($executable);
+                . AotDebugSymbols::linkFlag() . self::helperMuldefsFlag(' -Wl,-z,muldefs') . $objects . ' '.self::HOST_LIB_SEARCH.' -lm '.self::RUNTIME_LINK_LIBS.' -o ' . escapeshellarg($executable);
             $captured = self::runCaptured($cmd, null);
             if (0 === $captured['code']) {
                 self::unlinkIfTemp($runtimeObjects);

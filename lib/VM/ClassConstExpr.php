@@ -34,10 +34,20 @@ final class ClassConstExpr
             OpCode::TYPE_BITWISE_NOT,
             OpCode::TYPE_BOOLEAN_NOT,
             OpCode::TYPE_CONCAT,
+            OpCode::TYPE_SMALLER,
+            OpCode::TYPE_GREATER,
+            OpCode::TYPE_SMALLER_OR_EQUAL,
+            OpCode::TYPE_GREATER_OR_EQUAL,
+            OpCode::TYPE_EQUAL,
+            OpCode::TYPE_NOT_EQUAL,
+            OpCode::TYPE_IDENTICAL,
+            OpCode::TYPE_NOT_IDENTICAL,
+            OpCode::TYPE_LOGICAL_XOR,
             OpCode::TYPE_CONST_FETCH,
             OpCode::TYPE_CLASS_CONST_FETCH,
             OpCode::TYPE_ARRAY_DIM_FETCH,
-            OpCode::TYPE_PROPERTY_FETCH => true,
+            OpCode::TYPE_PROPERTY_FETCH,
+            OpCode::TYPE_PROPERTY_FETCH_WRITE => true,
             default => false,
         };
     }
@@ -80,6 +90,41 @@ final class ClassConstExpr
                     . $frame->scope[$op->arg3]->toString()
                 );
                 break;
+            case OpCode::TYPE_SMALLER:
+            case OpCode::TYPE_GREATER:
+            case OpCode::TYPE_SMALLER_OR_EQUAL:
+            case OpCode::TYPE_GREATER_OR_EQUAL:
+                $frame->scope[$op->arg1]->compareOp(
+                    $op->type,
+                    $frame->scope[$op->arg2],
+                    $frame->scope[$op->arg3]
+                );
+                break;
+            case OpCode::TYPE_IDENTICAL:
+                $frame->scope[$op->arg1]->bool(
+                    $frame->scope[$op->arg2]->identicalTo($frame->scope[$op->arg3])
+                );
+                break;
+            case OpCode::TYPE_NOT_IDENTICAL:
+                $frame->scope[$op->arg1]->bool(
+                    !$frame->scope[$op->arg2]->identicalTo($frame->scope[$op->arg3])
+                );
+                break;
+            case OpCode::TYPE_EQUAL:
+                $frame->scope[$op->arg1]->bool(
+                    $frame->scope[$op->arg2]->equals($frame->scope[$op->arg3])
+                );
+                break;
+            case OpCode::TYPE_NOT_EQUAL:
+                $frame->scope[$op->arg1]->bool(
+                    !$frame->scope[$op->arg2]->equals($frame->scope[$op->arg3])
+                );
+                break;
+            case OpCode::TYPE_LOGICAL_XOR:
+                $frame->scope[$op->arg1]->bool(
+                    $frame->scope[$op->arg2]->toBool() !== $frame->scope[$op->arg3]->toBool()
+                );
+                break;
             case OpCode::TYPE_CONST_FETCH:
                 self::executeConstFetch($context, $frame, $op);
                 break;
@@ -90,6 +135,7 @@ final class ClassConstExpr
                 self::executeArrayDimFetch($context, $frame, $block, $op);
                 break;
             case OpCode::TYPE_PROPERTY_FETCH:
+            case OpCode::TYPE_PROPERTY_FETCH_WRITE:
                 self::executePropertyFetch($context, $frame, $op);
                 break;
             default:
@@ -146,7 +192,7 @@ final class ClassConstExpr
         $constName = strtolower($constNameRaw);
 
         if ($lcClass === strtolower($entry->name)) {
-            self::fetchFromDeclaringClass($frame, $op, $entry, $constName);
+            self::fetchFromDeclaringClass($context, $frame, $op, $entry, $constName);
 
             return;
         }
@@ -164,6 +210,15 @@ final class ClassConstExpr
             }
         }
         if (!isset($context->classes[$lcClass])) {
+            if ('class' === $constName
+                && !\in_array(strtolower($className), ['self', 'static', 'parent'], true)) {
+                // X::class is a pure name literal — Zend resolves it without the
+                // class existing. Native 8.3+ names (DateException, …) reach here
+                // on the 8.2 reference profile before/without any declaration (#16828).
+                $frame->scope[$op->arg1]->string(ltrim($className, '\\'));
+
+                return;
+            }
             foreach (self::classNameCandidatesForConstFetch($className, $entry) as $candidate) {
                 if (self::tryFetchNativePhpClassConstant($candidate, $constNameRaw, $frame->scope[$op->arg1])) {
                     return;
@@ -174,7 +229,7 @@ final class ClassConstExpr
 
         $classEntry = $context->classes[$lcClass];
         if ('class' === $constName) {
-            $frame->scope[$op->arg1]->string($classEntry->name);
+            $frame->scope[$op->arg1]->string($className);
 
             return;
         }
@@ -184,7 +239,7 @@ final class ClassConstExpr
                     return;
                 }
             }
-            throw new \LogicException("Undefined class constant {$className}::{$constName}");
+            throw new \LogicException("Undefined constant {$className}::{$constName}");
         }
         if (EnumCaseSupport::tryMaterializeEnumCaseConstantFetch($classEntry, $constName, $frame->scope[$op->arg1])) {
             return;
@@ -193,6 +248,7 @@ final class ClassConstExpr
     }
 
     private static function fetchFromDeclaringClass(
+        Context $context,
         Frame $frame,
         OpCode $op,
         ClassEntry $entry,
@@ -204,6 +260,12 @@ final class ClassConstExpr
             return;
         }
         if (!isset($entry->constants[$constName])) {
+            $inherited = self::resolveInheritedConstantInDeclaringClass($context, $entry, $constName);
+            if (null !== $inherited) {
+                $frame->scope[$op->arg1]->copyFrom($inherited);
+
+                return;
+            }
             if (
                 null !== $entry->forwardDeclaredConstNames
                 && isset($entry->forwardDeclaredConstNames[$constName])
@@ -212,13 +274,50 @@ final class ClassConstExpr
             }
             $display = $entry->constNames[$constName] ?? $constName;
             throw new \LogicException(
-                "Undefined class constant {$entry->name}::{$display}"
+                "Undefined constant {$entry->name}::{$display}"
             );
         }
         if (EnumCaseSupport::tryMaterializeEnumCaseConstantFetch($entry, $constName, $frame->scope[$op->arg1])) {
             return;
         }
         $frame->scope[$op->arg1]->copyFrom($entry->constants[$constName]);
+    }
+
+    /**
+     * Resolve inherited class constants for {@code self::} in the declaring class (#13532, zend_constants.c).
+     */
+    private static function resolveInheritedConstantInDeclaringClass(
+        Context $context,
+        ClassEntry $entry,
+        string $constName
+    ): ?Variable {
+        foreach ($entry->interfaces as $ifaceLc) {
+            if (!isset($context->classes[$ifaceLc])) {
+                continue;
+            }
+            $iface = $context->classes[$ifaceLc];
+            if (isset($iface->constants[$constName])) {
+                return $iface->constants[$constName];
+            }
+            $fromIface = self::resolveInheritedConstantInDeclaringClass($context, $iface, $constName);
+            if (null !== $fromIface) {
+                return $fromIface;
+            }
+        }
+        if (null === $entry->parentLc || !isset($context->classes[$entry->parentLc])) {
+            return null;
+        }
+        $parent = $context->classes[$entry->parentLc];
+        if (isset($parent->constants[$constName])) {
+            $vis = $parent->constVisibility[$constName] ?? \PHPCfg\Func::FLAG_PUBLIC;
+            if (($vis & \PHPCfg\Func::FLAG_PRIVATE) !== 0) {
+                return self::resolveInheritedConstantInDeclaringClass($context, $parent, $constName);
+            }
+
+            return $parent->constants[$constName];
+        }
+
+        return self::resolveInheritedConstantInDeclaringClass($context, $parent, $constName);
     }
 
     private static function executePropertyFetch(Context $context, Frame $frame, OpCode $op): void

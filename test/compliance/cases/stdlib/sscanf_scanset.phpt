@@ -10,6 +10,8 @@ var_export(sscanf('abc123', '%[a-c]'));
 echo "\n";
 var_export(sscanf('xyz', '%[^0-9]'));
 echo "\n";
+var_export(sscanf('abc123', '%[a-z]%d'));
+echo "\n";
 --EXPECT--
 array (
   0 => 'abc',
@@ -19,4 +21,8 @@ array (
 )
 array (
   0 => 'xyz',
+)
+array (
+  0 => 'abc',
+  1 => 123,
 )

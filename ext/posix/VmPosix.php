@@ -5,19 +5,22 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\posix;
 
 use PHPCompiler\VM\EnumCaseSupport;
+use PHPCompiler\VM\HashTable;
 use PHPCompiler\ext\standard\VmDate;
+use PHPCompiler\ext\standard\VmFsAccessPure;
 use PHPCompiler\ext\standard\VmGetcwdNative;
+use PHPCompiler\ext\standard\VmProcessIdentityPure;
+use PHPCompiler\ext\standard\VmStatCache;
+use PHPCompiler\ext\standard\VmUnamePure;
 use PHPCompiler\VM\Variable;
 
 /**
  * VM helpers for posix builtins (php-src ext/posix/posix.c; #7271, #7376, #7177).
  *
- * Libc via FFI when available; no host \\posix_* delegation (M5 bootstrap path).
+ * Read paths use procfs SSOT; write syscalls delegate to *Pure helpers + {@see PosixLibcThinAbi}.
  */
 final class VmPosix
 {
-    private static ?\FFI $ffi = null;
-
     /** Last errno recorded by posix builtins (php-src posix_errno global). */
     private static int $lastError = 0;
 
@@ -28,9 +31,9 @@ final class VmPosix
 
     public static function getppid(): int
     {
-        $ffi = self::ffi();
-        if (null !== $ffi) {
-            return (int) $ffi->getppid();
+        $ppid = VmProcessIdentityPure::getppid();
+        if (null !== $ppid) {
+            return $ppid;
         }
 
         throw new \Error('posix_getppid() is not available in this compiler build');
@@ -38,19 +41,29 @@ final class VmPosix
 
     public static function geteuid(): int
     {
-        $ffi = self::ffi();
-        if (null !== $ffi) {
-            return (int) $ffi->geteuid();
+        $euid = VmProcessIdentityPure::geteuid();
+        if (null !== $euid) {
+            return $euid;
         }
 
         throw new \Error('posix_geteuid() is not available in this compiler build');
     }
 
+    public static function getgid(): int
+    {
+        $gid = VmProcessIdentityPure::getgid();
+        if (null !== $gid) {
+            return $gid;
+        }
+
+        throw new \Error('posix_getgid() is not available in this compiler build');
+    }
+
     public static function getegid(): int
     {
-        $ffi = self::ffi();
-        if (null !== $ffi) {
-            return (int) $ffi->getegid();
+        $egid = VmProcessIdentityPure::getegid();
+        if (null !== $egid) {
+            return $egid;
         }
 
         throw new \Error('posix_getegid() is not available in this compiler build');
@@ -62,35 +75,12 @@ final class VmPosix
     public static function getgroups(): array|false
     {
         self::$lastError = 0;
-        $ffi = self::ffi();
-        if (null === $ffi) {
-            throw new \Error('posix_getgroups() is not available in this compiler build');
+        $groups = VmProcessIdentityPure::getgroups();
+        if (null !== $groups) {
+            return $groups;
         }
 
-        $count = (int) $ffi->getgroups(0, null);
-        if ($count < 0) {
-            self::$lastError = self::readErrno($ffi);
-
-            return false;
-        }
-        if (0 === $count) {
-            return [];
-        }
-
-        $list = $ffi->new('gid_t['.$count.']');
-        $ngroups = (int) $ffi->getgroups($count, \FFI::addr($list[0]));
-        if ($ngroups < 0) {
-            self::$lastError = self::readErrno($ffi);
-
-            return false;
-        }
-
-        $groups = [];
-        for ($i = 0; $i < $ngroups; ++$i) {
-            $groups[] = (int) $list[$i];
-        }
-
-        return $groups;
+        throw new \Error('posix_getgroups() is not available in this compiler build');
     }
 
     /**
@@ -99,92 +89,73 @@ final class VmPosix
     public static function uname(): array|false
     {
         self::$lastError = 0;
-        $ffi = self::ffi();
-        if (null === $ffi) {
-            throw new \Error('posix_uname() is not available in this compiler build');
+        if (VmUnamePure::available()) {
+            return VmUnamePure::utsname();
         }
 
-        $buf = $ffi->new('struct utsname');
-        if (0 !== (int) $ffi->uname(\FFI::addr($buf))) {
-            self::$lastError = self::readErrno($ffi);
-
-            return false;
-        }
-
-        return [
-            'sysname' => \FFI::string($buf->sysname),
-            'nodename' => \FFI::string($buf->nodename),
-            'release' => \FFI::string($buf->release),
-            'version' => \FFI::string($buf->version),
-            'machine' => \FFI::string($buf->machine),
-            'domainname' => \FFI::string($buf->domainname),
-        ];
+        throw new \Error('posix_uname() is not available in this compiler build');
     }
 
     public static function strerror(int $errno): string
     {
-        $ffi = self::ffi();
-        if (null !== $ffi) {
-            $msgPtr = $ffi->strerror($errno);
-            if (null !== $msgPtr) {
-                $msg = \FFI::string($msgPtr);
-                if ('' !== $msg) {
-                    return $msg;
-                }
-            }
-        }
-
-        return 'Unknown error '.$errno;
+        return VmPosixStrerrorPure::message($errno);
     }
 
     public static function access(string $path, int $mode): bool
     {
         self::$lastError = 0;
-        $ffi = self::ffi();
-        if (null === $ffi) {
-            throw new \Error('posix_access() is not available in this compiler build');
-        }
-        if (0 !== (int) $ffi->access($path, $mode)) {
-            self::$lastError = self::readErrno($ffi);
+        if (str_contains($path, "\0")) {
+            self::$lastError = 2;
 
             return false;
         }
 
-        return true;
+        $stat = VmStatCache::stat($path);
+        if (false === $stat) {
+            self::$lastError = 2;
+
+            return false;
+        }
+
+        if (0 === $mode) {
+            return true;
+        }
+
+        if (VmFsAccessPure::access($path, $mode)) {
+            return true;
+        }
+
+        self::$lastError = 13;
+
+        return false;
     }
 
     public static function mknod(string $path, int $mode, int $major = 0, int $minor = 0): bool
     {
         self::$lastError = 0;
-        $ffi = self::ffi();
-        if (null === $ffi) {
+        $ok = VmPosixMknodPure::mknod($path, $mode, $major, $minor);
+        if (null === $ok) {
             throw new \Error('posix_mknod() is not available in this compiler build');
         }
-        $dev = self::makeDev($mode, $major, $minor);
-        if (0 !== (int) $ffi->mknod($path, $mode, $dev)) {
-            self::$lastError = self::readErrno($ffi);
-
-            return false;
+        if (!$ok) {
+            self::$lastError = VmPosixMknodPure::lastErrno();
         }
 
-        return true;
+        return $ok;
     }
 
     public static function mkfifo(string $path, int $mode): bool
     {
         self::$lastError = 0;
-        $ffi = self::ffi();
-        if (null === $ffi) {
+        $ok = VmPosixMknodPure::mkfifo($path, $mode);
+        if (null === $ok) {
             throw new \Error('posix_mkfifo() is not available in this compiler build');
         }
-        $fifoMode = $mode | PosixConstants::S_IFIFO;
-        if (0 !== (int) $ffi->mkfifo($path, $fifoMode)) {
-            self::$lastError = self::readErrno($ffi);
-
-            return false;
+        if (!$ok) {
+            self::$lastError = VmPosixMknodPure::lastErrno();
         }
 
-        return true;
+        return $ok;
     }
 
     public static function setuid(int $uid): bool
@@ -254,10 +225,9 @@ final class VmPosix
         self::$lastError = 0;
         $cwd = VmGetcwdNative::resolve();
         if (false === $cwd) {
-            $ffi = self::ffi();
-            if (null !== $ffi) {
-                self::$lastError = self::readErrno($ffi);
-            }
+            self::$lastError = PosixLibcThinAbi::available()
+                ? PosixLibcThinAbi::readErrno()
+                : 2;
 
             return false;
         }
@@ -267,16 +237,7 @@ final class VmPosix
 
     public static function ctermid(): string
     {
-        $ffi = self::ffi();
-        if (null === $ffi) {
-            return '';
-        }
-        $ptr = $ffi->ctermid(null);
-        if (null === $ptr) {
-            return '';
-        }
-
-        return \FFI::string($ptr);
+        return VmPosixCtermidPure::path();
     }
 
     public static function getLastError(): int
@@ -291,41 +252,33 @@ final class VmPosix
 
     public static function ffiAvailable(): bool
     {
-        return null !== self::ffi();
+        return PosixLibcThinAbi::available();
     }
 
     /**
-     * Resolve login name to uid via libc getpwnam(3) (#7917; JIT StringFsDirJit parity).
+     * Resolve login name to uid via /etc/passwd (#7917, #12454; JIT StringFsDirJit parity).
      */
     public static function uidForName(string $name): ?int
     {
-        $ffi = self::ffi();
-        if (null === $ffi) {
-            return null;
-        }
-        $pw = $ffi->getpwnam($name);
-        if (null === $pw) {
-            return null;
+        $uid = VmProcessIdentityPure::uidForName($name);
+        if (null !== $uid) {
+            return $uid;
         }
 
-        return (int) $pw->pw_uid;
+        return null;
     }
 
     /**
-     * Resolve group name to gid via libc getgrnam(3) (#7917; JIT StringFsDirJit parity).
+     * Resolve group name to gid via /etc/group (#7917; JIT StringFsDirJit parity).
      */
     public static function gidForName(string $name): ?int
     {
-        $ffi = self::ffi();
-        if (null === $ffi) {
-            return null;
-        }
-        $gr = $ffi->getgrnam($name);
-        if (null === $gr) {
-            return null;
+        $gid = VmProcessIdentityPure::gidForName($name);
+        if (null !== $gid) {
+            return $gid;
         }
 
-        return (int) $gr->gr_gid;
+        return null;
     }
 
     /**
@@ -335,26 +288,31 @@ final class VmPosix
      */
     public static function times(): array
     {
-        $ffi = self::ffi();
-        if (null === $ffi) {
-            throw new \Error('posix_times() is not available in this compiler build');
+        $pure = VmPosixTimesPure::times();
+        if (null !== $pure) {
+            return $pure;
         }
 
-        $tms = $ffi->new('struct tms');
-        $ticks = (int) $ffi->times(\FFI::addr($tms));
-        if (-1 === $ticks) {
-            self::$lastError = self::readErrno($ffi);
+        throw new \Error('posix_times() is not available in this compiler build');
+    }
 
-            throw new \Error('posix_times() failed');
+    /**
+     * @param array{ticks: int, utime: int, stime: int, cutime: int, cstime: int} $raw
+     */
+    public static function timesToHashTable(array $raw): HashTable
+    {
+        $ht = new HashTable();
+        foreach ($raw as $key => $value) {
+            $slot = new Variable();
+            $slot->int((int) $value);
+            if (\is_int($key)) {
+                $ht->addIndex($key, $slot);
+            } else {
+                $ht->add((string) $key, $slot);
+            }
         }
 
-        return [
-            'ticks' => $ticks,
-            'utime' => (int) $tms->tms_utime,
-            'stime' => (int) $tms->tms_stime,
-            'cutime' => (int) $tms->tms_cutime,
-            'cstime' => (int) $tms->tms_cstime,
-        ];
+        return $ht;
     }
 
     /**
@@ -364,57 +322,37 @@ final class VmPosix
      */
     public static function getrlimit(): array
     {
-        $ffi = self::ffi();
-        if (null === $ffi) {
-            throw new \Error('posix_getrlimit() is not available in this compiler build');
+        $pure = VmPosixRlimitPure::getrlimit();
+        if (null !== $pure) {
+            return $pure;
         }
 
-        $out = [];
-        foreach (self::rlimitResources() as $resource => $name) {
-            $rlim = $ffi->new('struct rlimit');
-            if (0 !== (int) $ffi->getrlimit($resource, \FFI::addr($rlim))) {
-                self::$lastError = self::readErrno($ffi);
-
-                throw new \Error('posix_getrlimit() failed');
-            }
-            $out['soft '.$name] = self::formatRlimitValue((int) $rlim->rlim_cur);
-            $out['hard '.$name] = self::formatRlimitValue((int) $rlim->rlim_max);
-        }
-
-        return $out;
+        throw new \Error('posix_getrlimit() is not available in this compiler build');
     }
 
     public static function setrlimit(int $resource, int $softLimit, int $hardLimit): bool
     {
         self::$lastError = 0;
-        $ffi = self::ffi();
-        if (null === $ffi) {
+        $ok = VmPosixRlimitPure::setrlimit($resource, $softLimit, $hardLimit);
+        if (null === $ok) {
             throw new \Error('posix_setrlimit() is not available in this compiler build');
         }
-
-        $rlim = $ffi->new('struct rlimit');
-        $rlim->rlim_cur = self::parseRlimitInput($softLimit);
-        $rlim->rlim_max = self::parseRlimitInput($hardLimit);
-        if (0 !== (int) $ffi->setrlimit($resource, \FFI::addr($rlim))) {
-            self::$lastError = self::readErrno($ffi);
-
-            return false;
+        if (!$ok) {
+            self::$lastError = VmPosixRlimitPure::lastErrno();
         }
 
-        return true;
+        return $ok;
     }
 
     public static function setsid(): int
     {
         self::$lastError = 0;
-        $ffi = self::ffi();
-        if (null === $ffi) {
+        $sid = VmPosixSessionPure::setsid();
+        if (null === $sid) {
             throw new \Error('posix_setsid() is not available in this compiler build');
         }
-
-        $sid = (int) $ffi->setsid();
         if ($sid < 0) {
-            self::$lastError = self::readErrno($ffi);
+            self::$lastError = VmPosixSessionPure::lastErrno();
         }
 
         return $sid;
@@ -423,14 +361,9 @@ final class VmPosix
     public static function getsid(int $pid): int|false
     {
         self::$lastError = 0;
-        $ffi = self::ffi();
-        if (null === $ffi) {
-            throw new \Error('posix_getsid() is not available in this compiler build');
-        }
-
-        $sid = (int) $ffi->getsid($pid);
-        if ($sid < 0) {
-            self::$lastError = self::readErrno($ffi);
+        $sid = VmPosixSessionPure::getsid($pid);
+        if (null === $sid) {
+            self::$lastError = 3;
 
             return false;
         }
@@ -441,14 +374,9 @@ final class VmPosix
     public static function getpgid(int $pid): int|false
     {
         self::$lastError = 0;
-        $ffi = self::ffi();
-        if (null === $ffi) {
-            throw new \Error('posix_getpgid() is not available in this compiler build');
-        }
-
-        $pgid = (int) $ffi->getpgid($pid);
-        if ($pgid < 0) {
-            self::$lastError = self::readErrno($ffi);
+        $pgid = VmPosixSessionPure::getpgid($pid);
+        if (null === $pgid) {
+            self::$lastError = 3;
 
             return false;
         }
@@ -459,180 +387,55 @@ final class VmPosix
     public static function setpgid(int $pid, int $pgid): bool
     {
         self::$lastError = 0;
-        $ffi = self::ffi();
-        if (null === $ffi) {
+        $ok = VmPosixSessionPure::setpgid($pid, $pgid);
+        if (null === $ok) {
             throw new \Error('posix_setpgid() is not available in this compiler build');
         }
-        if (0 !== (int) $ffi->setpgid($pid, $pgid)) {
-            self::$lastError = self::readErrno($ffi);
+        if (!$ok) {
+            self::$lastError = VmPosixSessionPure::lastErrno();
+        }
+
+        return $ok;
+    }
+
+    public static function kill(int $pid, int $sig): bool
+    {
+        self::$lastError = 0;
+        if ($pid === self::getpid() && \PHPCompiler\ext\pcntl\VmPcntl::hasHandler($sig)) {
+            \PHPCompiler\ext\pcntl\VmPcntl::markPending($sig);
+
+            return true;
+        }
+        if (!PosixLibcThinAbi::available()) {
+            self::$lastError = 38;
 
             return false;
         }
+        $rc = PosixLibcThinAbi::kill($pid, $sig);
+        if (0 !== $rc) {
+            self::$lastError = PosixLibcThinAbi::readErrno();
+        }
 
-        return true;
+        return 0 === $rc;
     }
 
     private static function setId(string $fn, int $id): bool
     {
         self::$lastError = 0;
-        $ffi = self::ffi();
-        if (null === $ffi) {
+        $ok = match ($fn) {
+            'setuid' => VmPosixIdentityWritePure::setuid($id),
+            'setgid' => VmPosixIdentityWritePure::setgid($id),
+            'seteuid' => VmPosixIdentityWritePure::seteuid($id),
+            'setegid' => VmPosixIdentityWritePure::setegid($id),
+            default => null,
+        };
+        if (null === $ok) {
             throw new \Error('posix_'.$fn.'() is not available in this compiler build');
         }
-        if (0 !== (int) $ffi->$fn($id)) {
-            self::$lastError = self::readErrno($ffi);
-
-            return false;
+        if (!$ok) {
+            self::$lastError = VmPosixIdentityWritePure::lastErrno();
         }
 
-        return true;
-    }
-
-    private static function readErrno(\FFI $ffi): int
-    {
-        $loc = $ffi->__errno_location();
-
-        return (int) $loc[0];
-    }
-
-    private static function makeDev(int $mode, int $major, int $minor): int
-    {
-        $type = $mode & PosixConstants::S_IFMT;
-        if ($type !== PosixConstants::S_IFCHR && $type !== PosixConstants::S_IFBLK) {
-            return 0;
-        }
-
-        return (($major & 0x00000fff) << 8)
-            | ($minor & 0x000000ff)
-            | (($major & 0xfffff000) << 32)
-            | (($minor & 0xffffff00) << 12);
-    }
-
-    /**
-     * @return array<int, string>
-     */
-    private static function rlimitResources(): array
-    {
-        return [
-            PosixConstants::RLIMIT_CORE => 'core',
-            PosixConstants::RLIMIT_DATA => 'data',
-            PosixConstants::RLIMIT_STACK => 'stack',
-            PosixConstants::RLIMIT_AS => 'totalmem',
-            PosixConstants::RLIMIT_RSS => 'rss',
-            PosixConstants::RLIMIT_NPROC => 'maxproc',
-            PosixConstants::RLIMIT_MEMLOCK => 'memlock',
-            PosixConstants::RLIMIT_CPU => 'cpu',
-            PosixConstants::RLIMIT_FSIZE => 'filesize',
-            PosixConstants::RLIMIT_NOFILE => 'openfiles',
-        ];
-    }
-
-    /**
-     * @return int|string php-src prints "unlimited" for RLIM_INFINITY
-     */
-    private static function formatRlimitValue(int $raw): int|string
-    {
-        if ($raw < 0 || $raw > \PHP_INT_MAX) {
-            return 'unlimited';
-        }
-
-        return $raw;
-    }
-
-    private static function parseRlimitInput(int $value): int
-    {
-        if (PosixConstants::RLIMIT_INFINITY === $value) {
-            return -1;
-        }
-
-        return $value;
-    }
-
-    private static function ffi(): ?\FFI
-    {
-        if (null !== self::$ffi) {
-            return self::$ffi;
-        }
-        if (!\class_exists(\FFI::class, false)) {
-            return null;
-        }
-
-        $cdef = <<<'CDEF'
-typedef int pid_t;
-typedef unsigned int mode_t;
-typedef unsigned long long dev_t;
-typedef unsigned int uid_t;
-typedef unsigned int gid_t;
-pid_t getppid(void);
-uid_t geteuid(void);
-gid_t getegid(void);
-int getgroups(int size, gid_t *list);
-struct utsname {
-    char sysname[65];
-    char nodename[65];
-    char release[65];
-    char version[65];
-    char machine[65];
-    char domainname[65];
-};
-int uname(struct utsname *buf);
-char *strerror(int errnum);
-int access(const char *pathname, int mode);
-int mknod(const char *pathname, mode_t mode, dev_t dev);
-int mkfifo(const char *pathname, mode_t mode);
-int setuid(uid_t uid);
-int setgid(gid_t gid);
-int seteuid(uid_t uid);
-int setegid(gid_t gid);
-struct passwd {
-    char *pw_name;
-    char *pw_passwd;
-    uid_t pw_uid;
-    gid_t pw_gid;
-    char *pw_gecos;
-    char *pw_dir;
-    char *pw_shell;
-};
-struct group {
-    char *gr_name;
-    char *gr_passwd;
-    gid_t gr_gid;
-    char **gr_mem;
-};
-struct passwd *getpwnam(const char *name);
-struct group *getgrnam(const char *name);
-int *__errno_location(void);
-char *ctermid(char *s);
-typedef long clock_t;
-struct tms {
-    clock_t tms_utime;
-    clock_t tms_stime;
-    clock_t tms_cutime;
-    clock_t tms_cstime;
-};
-clock_t times(struct tms *buf);
-typedef unsigned long rlim_t;
-struct rlimit {
-    rlim_t rlim_cur;
-    rlim_t rlim_max;
-};
-int getrlimit(int resource, struct rlimit *rlim);
-int setrlimit(int resource, const struct rlimit *rlim);
-pid_t setsid(void);
-pid_t getsid(pid_t pid);
-pid_t getpgid(pid_t pid);
-int setpgid(pid_t pid, pid_t pgid);
-CDEF;
-
-        foreach (['libc.so.6', 'libc.so'] as $lib) {
-            try {
-                self::$ffi = \FFI::cdef($cdef, $lib);
-
-                return self::$ffi;
-            } catch (\Throwable) {
-            }
-        }
-
-        return null;
+        return $ok;
     }
 }

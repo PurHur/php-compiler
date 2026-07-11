@@ -13,7 +13,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
-use PHPCompiler\JIT\ArrayBuiltinHelper;
+use PHPCompiler\JIT\Builtin\ArraySpliceRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\JitIntdiv;
@@ -29,15 +29,22 @@ final class array_splice extends Internal
     public function execute(Frame $frame): void
     {
         $argc = \count($frame->calledArgs);
-        if ($argc < 2 || $argc > 4) {
-            throw new \LogicException('array_splice() requires two to four arguments in this compiler build');
+        if ($argc < 2) {
+            throw new \ArgumentCountError(\sprintf(
+                'array_splice() expects at least 2 arguments, %d given',
+                $argc
+            ));
+        }
+        if ($argc > 4) {
+            throw new \ArgumentCountError(\sprintf(
+                'array_splice() expects at most 4 arguments, %d given',
+                $argc
+            ));
         }
         $arrayArg = $frame->calledArgs[0];
+        VmArray::requireArrayParam($arrayArg, 'array_splice', 1, 'array');
         $arrayArg->separateArrayForWrite();
         $array = $arrayArg->resolveIndirect();
-        if (Variable::TYPE_ARRAY !== $array->type) {
-            throw new \LogicException('array_splice() first argument must be an array in this compiler build');
-        }
         $offsetInt = VmMath::parseIntBuiltinArgForFrame($frame, 1, 'array_splice', 2, 'offset');
 
         $length = null;
@@ -70,8 +77,17 @@ final class array_splice extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         $argc = \count($args);
-        if ($argc < 2 || $argc > 4) {
-            throw new \LogicException('array_splice() requires two to four arguments in this compiler build');
+        if ($argc < 2) {
+            throw new \ArgumentCountError(\sprintf(
+                'array_splice() expects at least 2 arguments, %d given',
+                $argc
+            ));
+        }
+        if ($argc > 4) {
+            throw new \ArgumentCountError(\sprintf(
+                'array_splice() expects at most 4 arguments, %d given',
+                $argc
+            ));
         }
         $i64 = $context->getTypeFromString('int64');
         $i1 = $context->getTypeFromString('int1');
@@ -91,7 +107,7 @@ final class array_splice extends Internal
         }
         $replacement = 4 === $argc ? $args[3] : null;
 
-        return ArrayBuiltinHelper::buildSpliceArray(
+        return ArraySpliceRuntime::splice(
             $context,
             $args[0],
             $offset,

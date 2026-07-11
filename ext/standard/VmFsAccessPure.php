@@ -32,10 +32,6 @@ final class VmFsAccessPure
     /** php-src S_IXROOT — root execute traverse mask */
     private const S_IXROOT = self::S_IRUSR | self::S_IWUSR | self::S_IXUSR | self::S_IXGRP | self::S_IROTH | self::S_IXOTH;
 
-    private static ?\FFI $groupsFfi = null;
-
-    private static bool $groupsFfiUnavailable = false;
-
     public static function isReadable(string $path): bool
     {
         return self::access($path, VmFsAccessNative::R_OK);
@@ -128,73 +124,11 @@ final class VmFsAccessPure
 
     private static function gidInSupplementaryGroups(int $gid): bool
     {
-        $ffi = self::groupsFfi();
-        if (null === $ffi) {
+        $groups = VmProcessIdentityNative::getgroups();
+        if (null === $groups) {
             return false;
         }
 
-        try {
-            $count = (int) $ffi->getgroups(0, null);
-            if ($count <= 0) {
-                return false;
-            }
-            $list = $ffi->new('gid_t['.$count.']');
-            $ngroups = (int) $ffi->getgroups($count, \FFI::addr($list[0]));
-            if ($ngroups <= 0) {
-                return false;
-            }
-            for ($i = 0; $i < $ngroups; ++$i) {
-                if ($gid === (int) $list[$i]) {
-                    return true;
-                }
-            }
-        } catch (\Throwable) {
-            return false;
-        }
-
-        return false;
-    }
-
-    private static function groupsFfi(): ?\FFI
-    {
-        if (self::$groupsFfiUnavailable) {
-            return null;
-        }
-        if (null !== self::$groupsFfi) {
-            return self::$groupsFfi;
-        }
-        if (!self::ffiEnabled() || !\extension_loaded('ffi')) {
-            self::$groupsFfiUnavailable = true;
-
-            return null;
-        }
-
-        $cdef = <<<'CDEF'
-typedef unsigned int gid_t;
-int getgroups(int size, gid_t *list);
-CDEF;
-
-        foreach (['libc.so.6', 'libc.so'] as $lib) {
-            try {
-                self::$groupsFfi = \FFI::cdef($cdef, $lib);
-
-                return self::$groupsFfi;
-            } catch (\Throwable) {
-            }
-        }
-
-        self::$groupsFfiUnavailable = true;
-
-        return null;
-    }
-
-    private static function ffiEnabled(): bool
-    {
-        $v = getenv('PHP_COMPILER_DISABLE_FFI');
-        if (false !== $v && '' !== $v && '0' !== $v && 'false' !== strtolower($v)) {
-            return false;
-        }
-
-        return true;
+        return \in_array($gid, $groups, true);
     }
 }

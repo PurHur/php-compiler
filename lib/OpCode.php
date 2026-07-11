@@ -39,6 +39,8 @@ class OpCode {
     const TYPE_GREATER = 23;
     const TYPE_DECLARE_PROPERTY = 24;
     const TYPE_PROPERTY_FETCH = 25;
+    /** Property fetch for assign/ref lvalues and AssignRef RHS (#13559, Zend FETCH_OBJ_W). */
+    const TYPE_PROPERTY_FETCH_WRITE = 128;
     const TYPE_UNARY_MINUS = 26;
     const TYPE_UNARY_PLUS = 27;
     const TYPE_BITWISE_NOT = 28;
@@ -211,6 +213,17 @@ class OpCode {
     const TYPE_EMPTY_OBJECT_PROPERTY = 126;
     /** `(void)` cast — evaluate operand, result is null (#7346). */
     const TYPE_CAST_VOID = 127;
+    /** empty($container[$dim]): ArrayAccess checks offsetGet truthiness, not isset alone (#14798). */
+    const TYPE_EMPTY_DIMENSION = 129;
+
+    /** declare(ticks=N) — enter scope and push previous interval (#3343). */
+    const TYPE_TICK_SCOPE_ENTER = 130;
+
+    /** declare(ticks=N) — update interval within an open tick scope (#3343). */
+    const TYPE_TICK_SCOPE_SET = 131;
+
+    /** End declare(ticks=N) block scope — restore previous interval (#3343). */
+    const TYPE_TICK_SCOPE_LEAVE = 132;
 
     /** `['k' => $v, ...$tail] = $arr` string keys already assigned; empty = numeric spread only (#4889). */
     public array $listSpreadExcludedKeys = [];
@@ -252,6 +265,8 @@ class OpCode {
 
     /** TYPE_DECLARE_PROPERTY: property is readonly (#3149, #3432). */
     public bool $propertyReadonly = false;
+    /** TYPE_DECLARE_PROPERTY: PHP 8.4 lazy modifier — deferred default init (#16813). */
+    public bool $propertyLazy = false;
     /** TYPE_DECLARE_PROPERTY: constructor promotion (#4758, #5091). */
     public bool $propertyFromConstructorPromotion = false;
     /** TYPE_DECLARE_PROPERTY: PHPCfg visibility flags (#145). */
@@ -280,6 +295,8 @@ class OpCode {
     public bool $propertyHookCoalesceRead = false;
     /** TYPE_PROPERTY_FETCH in a ?-> fetch arm must read typed slots (#5361, zend_object_handlers.c). */
     public bool $nullsafeFetchPropertyRead = false;
+    /** ?-> fetch arm: uninitialized nullable typed slot → null not Error (#5220, #13747). */
+    public bool $nullsafeUninitNullableToNull = false;
     /**
      * Trait use adaptation entries for TYPE_TRAIT_USE_ADAPTATION (#3238).
      *
@@ -293,6 +310,8 @@ class OpCode {
     public int $propertySetVisibility = 0;
     /** Asymmetric get visibility on TYPE_DECLARE_PROPERTY (#5059); 0 = symmetric with write. */
     public int $propertyGetVisibility = 0;
+    /** Explicit read modifier before asymmetric set in source (#15995). */
+    public bool $propertyAsymmetricExplicitRead = false;
     /** TYPE_CLASS_CONST_FETCH: `::class` on a runtime expression operand (must be object, #4241). */
     public bool $classConstFetchOnObject = false;
     /** TYPE_DECLARE_CLASS_CONST: PHPCfg visibility flags (#4651). */
@@ -301,6 +320,8 @@ class OpCode {
     public bool $isEnumCaseDeclare = false;
     /** TYPE_STATICCALL_INIT: source was `parent::` (php-cfg may lower class operand to fqcn). */
     public bool $staticCallParentScope = false;
+    /** TYPE_FROM_CALLABLE: `parent::instanceMethod(...)` bound closure (#17655, zend_compile.c). */
+    public bool $fromCallableParentScope = false;
 
     /** TYPE_INCLUDE: include/require + once/non-once semantics (issue #4426). */
     public int $includeKind = self::INCLUDE_KIND_INCLUDE_ONCE;

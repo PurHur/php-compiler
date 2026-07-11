@@ -22,6 +22,6 @@ echo var_export($o, true), "\n";
 --EXPECT--
 OK
 OK
-Hooked::__set_state(array (
+\Hooked::__set_state(array(
   'x' => 'secret',
 ))

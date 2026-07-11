@@ -35,6 +35,8 @@ Repository defaults live in [`script/ci-defaults.env`](../script/ci-defaults.env
 | Single PHPUnit filter | Append args: `./script/ci-fast.sh --filter VMTest` | Same inside Docker wrappers |
 | User release readiness (quick) | `./script/release-readiness.sh --json` | `./script/docker-exec.sh -- bash -lc './script/release-readiness.sh --json'` |
 | User release readiness (full) | `./script/release-readiness.sh --full --json` | `./script/docker-exec.sh -- bash -lc './script/release-readiness.sh --full --json'` |
+| Bootstrap dev (gen-1+ daily) | See [bootstrap-dev-workflow.md](bootstrap-dev-workflow.md) | `make north-star5-verify-fast`; spine PR: `make bootstrap-gen0-refresh-sidecar` |
+| GHA bootstrap spine gate | — | [`.github/workflows/bootstrap-spine-gate.yml`](../.github/workflows/bootstrap-spine-gate.yml) on spine/gen-0 path changes |
 
 ### Release readiness (`release-readiness.sh`, #8737)
 
@@ -46,7 +48,9 @@ Daily v1.1.0 release review presenter — aggregates user-facing gates without t
 | Quick + CI doc slice | Set `RELEASE_READINESS_CI_FAST=1` — adds wave3/examples/development-status/spine-count/capability-matrix sync checks | ~minutes |
 | Full (`--full`) | Quick + `capability-matrix.php --check`, `examples-aot-smoke.sh`, `examples-web-smoke.sh`, `CHANGELOG.md` v1.1.0 stub | LLVM + HTTP when available |
 
-Machine output: `./script/release-readiness.sh [--full] --json` → `{"user_release_ready":"yes"|"no","mode":"quick"|"full","gates":[...]}`.
+Machine output: `./script/release-readiness.sh [--full] --json` → `{"user_release_ready":"yes"|"no","mode":"quick"|"full","gates":[...],"honest_compile":{"status":"yes"|"no"|"skip"|"unknown","message":"...","gate_available":true}}`.
+
+**honest_compile metric (#15603):** Quick `--json` runs `bootstrap-honest-compile-metric.sh --check` (wiring only, `status=unknown`). Full `--json` runs the inventory argv sidecar probe when LLVM is available (`status=yes|no|skip`). Informational only — does not flip `user_release_ready`.
 
 **bootstrap-inventory gate (#10531):** `release-readiness.sh` requires `vendor/` (runs `composer install` if missing) and treats `--check` as green only when stdout contains `OK N/N`. A bare `php script/bootstrap-inventory.php --check` without `vendor/` exits **1** — do not rely on a silent skip. File-list drift: `php script/bootstrap-inventory.php`. Optional construct-flag refresh after a self-host probe only: `docs/bootstrap-inventory-live-probe.md` (not required for new vm.php-path files; see #10368).
 
@@ -481,6 +485,14 @@ Harness hosts and contributors without host PHP/LLVM should use the **22.04 dev 
 | Publish (maintainer) | `docker login ghcr.io` then `./script/docker-publish-dev.sh --push` or `make docker-publish-dev` |
 
 `make docker-build-22` tags both `php-compiler:22.04-dev` and `ghcr.io/PurHur/php-compiler:dev`. CI wrappers default to the local tag unless `PHP_COMPILER_DEV_IMAGE` is set.
+
+## AOT build smoke (`AOT_BUILD_SMOKE_GATE`, #16010/#16072)
+
+`AOT_BUILD_SMOKE_GATE=1` (default) runs `script/check-aot-build-smoke.sh` after the LLVM status report in `ci-fast`/`ci-local`: builds a variable-using script with `./phpc build`, executes the binary, and diffs its output against `bin/vm.php` (tier 1, enforced ~3 s). Tier 2 reports known-broken builtins (#15642) without failing. Would have caught all three of the 2026-07 week's master AOT breakages at merge time. `AOT_BUILD_SMOKE_GATE=0` opts out.
+
+## Gen-0 manifest sync (`BOOTSTRAP_GEN0_MANIFEST_SYNC_GATE`, #8713)
+
+`BOOTSTRAP_GEN0_MANIFEST_SYNC_GATE=1` (default) runs `script/check-bootstrap-gen0-manifest-sync.php` in `ci-fast`: verifies `prelinked/bootstrap-gen0/manifest.json` matches the committed gen-0 argv driver and compiler_lib sidecar byte sizes, so a sidecar refresh cannot land half-synced. `BOOTSTRAP_GEN0_MANIFEST_SYNC_GATE=0` opts out.
 
 ## Related issues
 

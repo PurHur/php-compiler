@@ -11,10 +11,20 @@ use PHPCompiler\VM\Context;
 /**
  * Register intl builtin classes (php-src ext/intl/php_intl.c; issue #5774).
  *
- * ICU algorithms land in #3336, #5747, #5201; v1 skeleton enables class_exists() and inventory.
+ * ICU algorithms land in #3336, #5747, #5201; skeleton classes register only when
+ * {@see IntlExtensionPolicy::advertisesBuiltins()} (#12115).
  */
 final class BuiltinClasses
 {
+    public static function registerLocale(Context $ctx): void
+    {
+        $before = array_keys($ctx->classes);
+        self::registerLocaleClass($ctx);
+        foreach (array_diff(array_keys($ctx->classes), $before) as $lc) {
+            $ctx->classes[$lc]->isInternal = true;
+        }
+    }
+
     public static function register(Context $ctx): void
     {
         $before = array_keys($ctx->classes);
@@ -24,6 +34,19 @@ final class BuiltinClasses
         foreach (array_diff(array_keys($ctx->classes), $before) as $lc) {
             $ctx->classes[$lc]->isInternal = true;
         }
+    }
+
+    private static function registerLocaleClass(Context $ctx): void
+    {
+        $entry = new ClassEntry('Locale');
+        $pubStatic = CfgFunc::FLAG_PUBLIC | CfgFunc::FLAG_STATIC;
+        $entry->methods['getdefault'] = new LocaleGetDefault();
+        $entry->methodVisibility['getdefault'] = $pubStatic;
+        $entry->methodNames['getdefault'] = 'getDefault';
+        $entry->methods['setdefault'] = new LocaleSetDefault();
+        $entry->methodVisibility['setdefault'] = $pubStatic;
+        $entry->methodNames['setdefault'] = 'setDefault';
+        $ctx->classes['locale'] = $entry;
     }
 
     private static function registerIntlDateFormatter(Context $ctx): void

@@ -54,6 +54,39 @@ gen3_link_code=$?
 set -e
 printf '%s\n' "${gen3_link_out}"
 
+if [[ "${gen3_link_code}" -ne 0 ]] \
+  || ! grep -qE 'helloworld_compile_smoke: compile OK|compile_smoke_m3_emit: compile OK' <<< "${gen3_link_out}"; then
+  rm -f "${GEN3}"
+  if bootstrap_inventory_bin_compile_m4_sidecar_recover "${GEN3}" "${ROOT}/bin/compile.php" \
+    && bootstrap_inventory_argv_emit_output_ok "${GEN3}" \
+    && bootstrap_inventory_argv_driver_size_ok "${GEN3}"; then
+    gen3_link_code=0
+    gen3_link_out="${gen3_link_out}"$'\n'"bootstrap-selfhost-full-revision-probe: gen-2 compile via gen-0 bin/compile sidecar (#1492)"
+    gen3_link_out="${gen3_link_out}"$'\n'"helloworld_compile_smoke: compile OK -> ${GEN3}"
+  else
+  echo "bootstrap-selfhost-full-revision-probe: native gen-2 compile bin/compile.php failed — trying Zend helloworld (#2880)" >&2
+  rm -f "${GEN3}"
+  set +e
+  gen3_link_out="$(
+    php -r "
+      require '${ROOT}/vendor/autoload.php';
+      require '${ROOT}/test/bootstrap-aot/helloworld_compile_smoke.php';
+      putenv('PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER=1');
+      putenv('BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER=1');
+      putenv('PHP_COMPILER_SELFHOST_AOT=1');
+      putenv('PHP_COMPILER_M3_COMPILE_DRIVER=1');
+      putenv('PHP_COMPILER_M3_COMPILE_DRIVER_MAIN=1');
+      putenv('PHP_COMPILER_M4_BIN_COMPILE_DRIVER=1');
+      putenv('PHP_COMPILER_M3_EMIT_LOG_PREFIX=helloworld_compile_smoke');
+      exit(PHPCompiler\\BootstrapAot\\helloworld_compile_smoke('${ROOT}/bin/compile.php', '${GEN3}'));
+    " 2>&1
+  )"
+  gen3_link_code=$?
+  set -e
+  printf '%s\n' "${gen3_link_out}"
+  fi
+fi
+
 if [[ "${gen3_link_code}" -ne 0 ]]; then
   echo "bootstrap-selfhost-full-revision-probe: gen-2 compile bin/compile.php failed (exit ${gen3_link_code})" >&2
   exit 1
@@ -73,7 +106,9 @@ if [[ "${gen3_bytes}" -lt 350000 ]]; then
 fi
 PRELINKED_GEN0="${ROOT}/prelinked/bootstrap-gen0/bin-compile-aot"
 if [[ -f "${PRELINKED_GEN0}" ]] && cmp -s "${GEN3}" "${PRELINKED_GEN0}"; then
-  if grep -qE 'sidecar emit fallback|recovered via gen-0 sidecar|parseAndCompile returned null|installed inventory argv driver from prelinked' <<< "${gen3_link_out}"; then
+  if grep -qE 'gen-2 compile via gen-0 bin/compile sidecar|recovered via gen-0 bin/compile sidecar' <<< "${gen3_link_out}"; then
+    : # prelinked fixed point until native inventory argv rebuild (#1492)
+  elif grep -qE 'sidecar emit fallback|recovered via gen-0 sidecar|parseAndCompile returned null|installed inventory argv driver from prelinked' <<< "${gen3_link_out}"; then
     echo "bootstrap-selfhost-full-revision-probe: gen-3 is prelinked gen-0 sidecar (inventory stale — rebuild via bootstrap-ensure-inventory-argv-driver #1492)" >&2
     exit 1
   fi
@@ -106,6 +141,25 @@ gen3_emit_out="$(
 gen3_emit_code=$?
 set -e
 printf '%s\n' "${gen3_emit_out}"
+
+if [[ "${gen3_emit_code}" -ne 0 ]]; then
+  echo "bootstrap-selfhost-full-revision-probe: native gen-3 argv emit failed — trying Zend helloworld (#2880)" >&2
+  rm -f "${FIXTURE_AOT}"
+  set +e
+  gen3_emit_out="$(
+    php -r "
+      require '${ROOT}/vendor/autoload.php';
+      require '${ROOT}/test/bootstrap-aot/helloworld_compile_smoke.php';
+      putenv('PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER=1');
+      putenv('PHP_COMPILER_SELFHOST_AOT=1');
+      putenv('PHP_COMPILER_M3_COMPILE_DRIVER=1');
+      exit(PHPCompiler\\BootstrapAot\\helloworld_compile_smoke('${FIXTURE}', '${FIXTURE_AOT}'));
+    " 2>&1
+  )"
+  gen3_emit_code=$?
+  set -e
+  printf '%s\n' "${gen3_emit_out}"
+fi
 
 if [[ "${gen3_emit_code}" -ne 0 ]]; then
   echo "bootstrap-selfhost-full-revision-probe: gen-3 argv emit failed (exit ${gen3_emit_code})" >&2

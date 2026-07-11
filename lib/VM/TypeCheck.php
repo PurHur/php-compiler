@@ -23,6 +23,7 @@ final class TypeCheck
     {
         return isset($block->paramNeverSlots[$slot])
             || isset($block->paramIterableSlots[$slot])
+            || isset($block->paramCallableSlots[$slot])
             || isset($block->paramVariadicElementTypeConstraints[$slot])
             || isset($block->paramVariadicElementGenericArrayTypeSpecs[$slot])
             || isset($block->paramVariadicElementIntersectionConstraints[$slot])
@@ -288,6 +289,12 @@ final class TypeCheck
         if (null !== $value) {
             throw new \TypeError('A void function must not return a value');
         }
+    }
+
+    /** php-src zend_verify_return_error — bare `return;` in a typed non-void function (#16117). */
+    public static function assertReturnValueProvided(): void
+    {
+        throw new \Error('A function with return type must return a value');
     }
 
     public static function assertNeverReturn(?string $functionName = null): void
@@ -584,26 +591,15 @@ final class TypeCheck
             case Variable::TYPE_BOOLEAN:
                 return $value->toBool() ? 1 : 0;
             case Variable::TYPE_FLOAT:
-                $f = $value->toFloat();
-                if ($f !== (float) (int) $f) {
-                    throw new \TypeError("{$kind} must be of type int, float given");
-                }
-
-                return (int) $f;
+                // Zend weak mode: truncate toward zero (zend_types.c, #12347).
+                return (int) $value->toFloat();
             case Variable::TYPE_STRING:
                 $s = $value->toString();
-                if (!is_numeric($s) || ((string) (int) $s) !== $s && ((string) (float) $s) !== $s) {
-                    throw new \TypeError("{$kind} must be of type int, string given");
-                }
-                if (((string) (int) $s) === $s) {
-                    return (int) $s;
-                }
-                $f = (float) $s;
-                if ($f !== (float) (int) $f) {
+                if (!is_numeric($s)) {
                     throw new \TypeError("{$kind} must be of type int, string given");
                 }
 
-                return (int) $f;
+                return (int) (float) $s;
         }
         throw new \TypeError("{$kind} must be of type int");
     }

@@ -40,10 +40,16 @@ final class FsDirJitHelper
     public static function tempnam(string $directory, string $prefix): ?string
     {
         self::$tempnamPendingNotice = false;
-        if ('' === $directory) {
-            return null;
-        }
         $pfx = VmFsTempnam::normalizePrefix($prefix);
+        if ('' === $directory) {
+            $fallback = VmSysGetTempDirNative::resolve();
+            if ('' === $fallback) {
+                return null;
+            }
+            $path = VmFsTempnamNative::mkstemp($fallback, $pfx);
+
+            return false !== $path ? $path : null;
+        }
         $path = VmFsTempnamNative::mkstemp($directory, $pfx);
         if (false !== $path) {
             return $path;

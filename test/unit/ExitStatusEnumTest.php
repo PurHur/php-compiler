@@ -5,14 +5,18 @@ declare(strict_types=1);
 namespace PHPCompiler\Test\Unit;
 
 use PHPCompiler\Runtime;
+use PHPCompiler\Test\Support\BuiltinStubEnumTestSkip;
 use PHPCompiler\VM\ScriptExit;
 use PHPUnit\Framework\TestCase;
 
 /** @covers issue #7294 */
 final class ExitStatusEnumTest extends TestCase
 {
+    use BuiltinStubEnumTestSkip;
+
     public function testExitStatusBuiltinEnumExists(): void
     {
+        $this->skipUnlessBuiltinStubEnumsEnabled();
         $runtime = new Runtime();
         $code = <<<'PHP'
 <?php
@@ -31,6 +35,7 @@ PHP;
 
     public function testExitAcceptsExitStatusEnumCase(): void
     {
+        $this->skipUnlessBuiltinStubEnumsEnabled();
         $runtime = new Runtime();
         ob_start();
         try {
@@ -44,6 +49,7 @@ PHP;
 
     public function testDieAcceptsExitStatusEnumCase(): void
     {
+        $this->skipUnlessBuiltinStubEnumsEnabled();
         $runtime = new Runtime();
         ob_start();
         try {

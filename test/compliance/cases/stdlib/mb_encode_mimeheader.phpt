@@ -12,6 +12,8 @@ echo mb_encode_mimeheader("hello", "UTF-8"), "\n";
 echo mb_decode_mimeheader("hello"), "\n";
 echo mb_encode_mimeheader("Hello 世界", "UTF-8"), "\n";
 echo mb_decode_mimeheader(mb_encode_mimeheader("Hello 世界", "UTF-8")), "\n";
+echo mb_encode_mimeheader("über", "UTF-8"), "\n";
+echo mb_decode_mimeheader(mb_encode_mimeheader("über", "UTF-8")), "\n";
 echo mb_encode_mimeheader("", "UTF-8") === "" ? "empty ok\n" : "empty fail\n";
 $q = mb_encode_mimeheader($s, "UTF-8", "Q");
 echo mb_decode_mimeheader($q), "\n";
@@ -24,5 +26,7 @@ hello
 hello
 Hello =?UTF-8?B?5LiW55WM?=
 Hello 世界
+=?UTF-8?B?w7xiZXI=?=
+über
 empty ok
 日本語

@@ -37,6 +37,7 @@ final class checkdnsrr extends Internal
             throw new \LogicException($fn.'() requires one or two arguments in this compiler build');
         }
         $hostname = VmString::coerceStringBuiltinArg($frame->calledArgs[0], $fn, 0, 'hostname');
+        VmString::rejectEmptyBuiltinStringArg($hostname, $fn, 0, 'hostname');
         $type = 'MX';
         if ($argc >= 2) {
             $typeVar = $frame->calledArgs[1]->resolveIndirect();
@@ -60,6 +61,12 @@ final class checkdnsrr extends Internal
         }
 
         $hostname = JitStringBuiltinArg::lower($context, $args[0], $fn, 0, 'hostname');
+        JitStringBuiltinArg::rejectEmpty(
+            $context,
+            $args[0],
+            $hostname,
+            $fn.'(): Argument #1 ($hostname) cannot be empty'
+        );
         if ($argc >= 2) {
             if (JITVariable::TYPE_HASHTABLE === $args[1]->type) {
                 TypeErrorRaise::registerDeclarations($context);

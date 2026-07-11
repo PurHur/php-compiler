@@ -20,27 +20,58 @@ final class VmFs
     /** @var array<int, string> stream URI/path at open time (StreamMetaJit phpc_stream_paths parity; #7908) */
     private static array $handlePaths = [];
 
+    /** @var array<int, string> user fopen mode at open time (stream_get_meta_data mode; #13021) */
+    private static array $handleModes = [];
+
+    /** @var array<int, bool> stream blocking flag for stream_get_meta_data blocked key (#13724) */
+    private static array $handleBlocked = [];
+
     /** @var array<int, int> stream handle => dup(2) socket fd from VmStreamSocketNative (#8202) */
     private static array $handleSocketFds = [];
 
     /** @var array<int, true> popen() handles — pclose() vs fclose() at libc layer in JIT/AOT */
     private static array $popenHandles = [];
 
-    /** @var array<int, \FFI\CData> libc FILE* for VmPopenNative handles (#8250) */
+    /** @var array<int, string> unread bytes after scanf over-read on non-seekable streams (#15992) */
+    private static array $readPushback = [];
+
+    /** @var array<int, int> pclose tokens from VmPopenPure (#8250, #12266) */
     private static array $popenNativeFiles = [];
 
-    /** @var array<int, true> gz* stream placeholders — I/O via VmGzStreamNative libz FFI (#8220) */
+    /** @var array<int, true> gz* stream placeholders — I/O via VmGzStreamPure (#8936, #8220) */
     private static array $gzNativePlaceholders = [];
+
+    /** @var array<int, true> bz* stream placeholders — I/O via VmBz2StreamPure (#17301) */
+    private static array $bzNativePlaceholders = [];
 
     /** @var array<int, int> host stream identity => outstanding VM handle ids (#3384 pfsockopen persistent) */
     private static array $hostResourceRefcounts = [];
 
     private static int $nextHandleId = 0;
 
+    /** @var array<int, true> bogus stream resources after invalid mode on built-in wrappers (#13401) */
+    private static array $failedStreamHandles = [];
+
     /** Single VM stream handle namespace (php-src php_stream_alloc; fixes #10556 id collisions). */
     public static function allocateStreamHandleId(): int
     {
         return ++self::$nextHandleId;
+    }
+
+    /**
+     * Zend fopen on registered wrapper with invalid $mode — non-false resource sentinel (#13401).
+     */
+    public static function allocateFailedStreamHandle(): int
+    {
+        $id = self::allocateStreamHandleId();
+        self::$failedStreamHandles[$id] = true;
+
+        return $id;
+    }
+
+    public static function isFailedStreamHandle(int $handle): bool
+    {
+        return isset(self::$failedStreamHandles[$handle]);
     }
 
     /**
@@ -191,11 +222,7 @@ final class VmFs
      * @return HashTable|false
      */
     public static function fstat(int $handle) {
-        $fp = self::lookup($handle);
-        if (null === $fp) {
-            return false;
-        }
-        $raw = @fstat($fp);
+        $raw = VmStreamFstat::forHandle($handle);
         if (false === $raw) {
             return false;
         }
@@ -281,6 +308,21 @@ final class VmFs
 
     public static function chmod(string $path, int $permissions): bool
     {
+        $modeVar = new Variable();
+        $modeVar->int($permissions);
+        $wrapperOk = VmStreamWrapperMetadata::tryInvoke(
+            $path,
+            VmStreamSupports::STREAM_META_ACCESS,
+            $modeVar
+        );
+        if (null !== $wrapperOk) {
+            if ($wrapperOk) {
+                VmStatCache::invalidatePath($path);
+            }
+
+            return $wrapperOk;
+        }
+
         $ok = VmFsDirNative::chmod($path, $permissions);
         if ($ok) {
             VmStatCache::invalidatePath($path);
@@ -325,9 +367,30 @@ final class VmFs
 
     public static function chown(string $path, Variable $user): bool
     {
+        $user = $user->resolveIndirect();
+        if (Variable::TYPE_STRING === $user->type) {
+            $wrapperOk = VmStreamWrapperMetadata::tryInvoke(
+                $path,
+                VmStreamSupports::STREAM_META_OWNER_NAME,
+                $user
+            );
+            if (null !== $wrapperOk) {
+                return $wrapperOk;
+            }
+        }
         $uid = self::resolveUserUid($user);
         if (null === $uid) {
             return false;
+        }
+        $uidVar = new Variable();
+        $uidVar->int($uid);
+        $wrapperOk = VmStreamWrapperMetadata::tryInvoke(
+            $path,
+            VmStreamSupports::STREAM_META_OWNER,
+            $uidVar
+        );
+        if (null !== $wrapperOk) {
+            return $wrapperOk;
         }
 
         return VmFsDirNative::chown($path, $uid);
@@ -345,9 +408,30 @@ final class VmFs
 
     public static function chgrp(string $path, Variable $group): bool
     {
+        $group = $group->resolveIndirect();
+        if (Variable::TYPE_STRING === $group->type) {
+            $wrapperOk = VmStreamWrapperMetadata::tryInvoke(
+                $path,
+                VmStreamSupports::STREAM_META_GROUP_NAME,
+                $group
+            );
+            if (null !== $wrapperOk) {
+                return $wrapperOk;
+            }
+        }
         $gid = self::resolveGroupGid($group);
         if (null === $gid) {
             return false;
+        }
+        $gidVar = new Variable();
+        $gidVar->int($gid);
+        $wrapperOk = VmStreamWrapperMetadata::tryInvoke(
+            $path,
+            VmStreamSupports::STREAM_META_GROUP,
+            $gidVar
+        );
+        if (null !== $wrapperOk) {
+            return $wrapperOk;
         }
 
         return VmFsDirNative::chgrp($path, $gid);
@@ -442,6 +526,10 @@ final class VmFs
 
     public static function copy(string $from, string $to): bool
     {
+        if (self::pathRequiresStreamOpen($from) || self::pathRequiresStreamOpen($to)) {
+            return self::copyViaStreamOpen($from, $to);
+        }
+
         $ok = VmFsPathNative::copy($from, $to);
         if ($ok) {
             VmStatCache::invalidatePath($to);
@@ -450,8 +538,55 @@ final class VmFs
         return $ok;
     }
 
+    private static function pathRequiresStreamOpen(string $path): bool
+    {
+        return VmDataUri::isDataUri($path)
+            || VmPhpMemoryStream::isSupportedUri($path)
+            || VmPhpInputOutputStream::isSupportedUri($path)
+            || VmFsStdio::isStdioUri($path)
+            || VmPhpFilterStream::isSupportedUri($path)
+            || VmHttpLastResponseHeaders::isHttpUrl($path)
+            || VmStreamWrapperRegistry::isCustomProtocol($path);
+    }
+
+    private static function copyViaStreamOpen(string $from, string $to): bool
+    {
+        $src = self::fopen($from, 'rb');
+        if (false === $src) {
+            return false;
+        }
+        $dst = self::fopen($to, 'wb');
+        if (false === $dst) {
+            self::fclose($src);
+
+            return false;
+        }
+        $copied = self::streamCopyToStream($src, $dst);
+        self::fclose($src);
+        self::fclose($dst);
+        if (false === $copied) {
+            return false;
+        }
+        VmStatCache::invalidatePath($to);
+
+        return true;
+    }
+
     public static function touch(string $path, ?int $mtime = null, ?int $atime = null): bool
     {
+        $wrapperOk = VmStreamWrapperMetadata::tryInvoke(
+            $path,
+            VmStreamSupports::STREAM_META_TOUCH,
+            VmStreamWrapperMetadata::touchValue($mtime, $atime)
+        );
+        if (null !== $wrapperOk) {
+            if ($wrapperOk) {
+                VmStatCache::invalidatePath($path);
+            }
+
+            return $wrapperOk;
+        }
+
         $ok = VmFsTouchNative::touch($path, $mtime, $atime);
         if ($ok) {
             VmStatCache::invalidatePath($path);
@@ -500,6 +635,28 @@ final class VmFs
             }
 
             return VmString::byteSlice($body, $offset, $length);
+        }
+        if (VmPhpMemoryStream::isSupportedUri($path)) {
+            $data = self::readPathContentsViaOpen($path, $ctx);
+            if (false === $data) {
+                return false;
+            }
+            if (0 !== $offset || null !== $length) {
+                return VmString::byteSlice($data, $offset, $length);
+            }
+
+            return $data;
+        }
+        if (VmPhpFilterStream::isSupportedUri($path)) {
+            $data = self::readPathContentsViaOpen($path, $ctx);
+            if (false === $data) {
+                return false;
+            }
+            if (0 !== $offset || null !== $length) {
+                return VmString::byteSlice($data, $offset, $length);
+            }
+
+            return $data;
         }
         if (VmDataUri::isDataUri($path)) {
             $data = VmDataUri::decode($path);
@@ -584,16 +741,14 @@ final class VmFs
      */
     private static function readFileLines(string $path, int $flags): array|false
     {
-        $content = VmFsReadNative::read($path);
+        $content = self::pathRequiresStreamOpen($path)
+            ? self::readPathContentsViaOpen($path)
+            : VmFsReadNative::read($path);
         if (false === $content) {
             return false;
         }
         if ('' === $content) {
-            if (0 !== ($flags & StdlibConstants::FILE_SKIP_EMPTY_LINES)) {
-                return [];
-            }
-
-            return [''];
+            return [];
         }
 
         $lines = [];
@@ -632,16 +787,55 @@ final class VmFs
     }
 
     /**
+     * Read full path via php_stream_open_wrapper parity (fopen + stream_get_contents + fclose).
+     *
+     * Use for highlight_file() and other builtins that must open wrapper URIs without
+     * bare filesystem reads (php-src ext/standard/url.c; #12095).
+     *
+     * @return string|false false when open fails
+     */
+    public static function readPathContentsViaOpen(string $path, ?\PHPCompiler\VM\Context $ctx = null): string|false
+    {
+        $handle = self::fopen($path, 'rb', $ctx);
+        if (false === $handle) {
+            return false;
+        }
+        $data = self::streamGetContents($handle);
+        self::fclose($handle);
+
+        return $data;
+    }
+
+    /**
      * @param string|list<string> $data
      */
     public static function filePutContents(string $path, $data, int $flags = 0) {
         if (\is_array($data)) {
             $data = implode('', $data);
         }
+        if (VmPhpMemoryStream::isSupportedUri($path)) {
+            return self::filePutContentsViaOpen($path, $data, $flags);
+        }
 
         $written = VmFsWriteNative::write($path, $data, $flags);
         if (false !== $written) {
             VmStatCache::invalidatePath($path);
+        }
+
+        return $written;
+    }
+
+    private static function filePutContentsViaOpen(string $path, string $data, int $flags): int|false
+    {
+        $mode = (0 !== ($flags & StdlibConstants::FILE_APPEND)) ? 'ab' : 'wb';
+        $handle = self::fopen($path, $mode);
+        if (false === $handle) {
+            return false;
+        }
+        $written = self::fwrite($handle, $data);
+        self::fclose($handle);
+        if (false === $written) {
+            return false;
         }
 
         return $written;
@@ -653,22 +847,36 @@ final class VmFs
                 return false;
             }
 
-            return VmUserStream::open($ctx->runtime->vm, $ctx, $path, $mode);
+            return self::finalizeStreamOpen(
+                VmUserStream::open($ctx->runtime->vm, $ctx, $path, $mode),
+                $mode
+            );
         }
         if (VmFsStdio::isStdioUri($path)) {
-            return VmFsStdio::open($path, $mode);
+            return self::finalizeStreamOpen(VmFsStdio::open($path, $mode), $mode);
         }
         if (VmPhpMemoryStream::isSupportedUri($path)) {
-            return VmPhpMemoryStream::open($path, $mode);
+            if (!VmPhpMemoryStream::isValidMode($mode)) {
+                return self::allocateFailedStreamHandle();
+            }
+
+            return self::finalizeStreamOpen(VmPhpMemoryStream::open($path, $mode), $mode);
+        }
+        if (VmDataStream::isSupportedUri($path)) {
+            return self::finalizeStreamOpen(VmDataStream::open($path, $mode), $mode);
         }
         if (VmPhpInputOutputStream::isSupportedUri($path)) {
-            return VmPhpInputOutputStream::open($path, $mode);
+            if (!VmPhpInputOutputStream::isValidMode($path, $mode)) {
+                return self::allocateFailedStreamHandle();
+            }
+
+            return self::finalizeStreamOpen(VmPhpInputOutputStream::open($path, $mode), $mode);
         }
         if (VmPhpFilterStream::isSupportedUri($path)) {
-            return VmPhpFilterStream::open($path, $mode, $ctx);
+            return self::finalizeStreamOpen(VmPhpFilterStream::open($path, $mode, $ctx), $mode);
         }
         if (VmPhpFdStream::isFdUri($path)) {
-            return VmPhpFdStream::openFromUri($path, $mode);
+            return self::finalizeStreamOpen(VmPhpFdStream::openFromUri($path, $mode), $mode);
         }
         if (\str_starts_with($path, 'php://')) {
             return false;
@@ -677,12 +885,25 @@ final class VmFs
             return false;
         }
 
-        return VmFsOpenNative::open($path, $mode);
+        return self::finalizeStreamOpen(VmFsOpenNative::open($path, $mode), $mode);
     }
 
     /**
-     * popen() — open pipe to subprocess (php-src ext/standard/exec.c; #6211, #8244).
-     * VmPopenNative (libc FFI) only — no host \\popen() fallback.
+     * @return int|false
+     */
+    private static function finalizeStreamOpen(int|false $handle, string $userMode): int|false
+    {
+        if (false !== $handle) {
+            VmStreamContext::ensureDefaultForStreamOpen();
+            self::registerStreamMode($handle, $userMode);
+        }
+
+        return $handle;
+    }
+
+    /**
+     * popen() — open pipe to subprocess (php-src ext/standard/exec.c; #6211, #8244, #8951).
+     * VmPopenPure SSOT via VmPopenNative (#6211, #8244, #8951, #12266).
      *
      * @return int|false stream handle id
      */
@@ -696,6 +917,7 @@ final class VmFs
             $id = $opened['handle'];
             self::$popenHandles[$id] = true;
             self::$popenNativeFiles[$id] = $opened['file'];
+            self::registerStreamMode($id, $mode);
 
             return $id;
         }
@@ -708,12 +930,21 @@ final class VmFs
      */
     public static function pclose(int $handle): int
     {
-        if (!VmPhpFdStream::isValidHandle($handle)) {
-            return -1;
+        if (!isset(self::$popenHandles[$handle])) {
+            // php-src ext/standard/exec.c — non-popen stream: release handle, return 0 (#13305).
+            if (self::isValidHandle($handle)) {
+                self::fclose($handle);
+            }
+
+            return 0;
         }
         $nativeFile = self::$popenNativeFiles[$handle] ?? null;
         unset(self::$popenHandles[$handle], self::$popenNativeFiles[$handle]);
-        VmPhpFdStream::close($handle);
+        if (VmPhpFdStream::isValidHandle($handle)) {
+            VmPhpFdStream::close($handle);
+        } else {
+            self::fclose($handle);
+        }
         if (null !== $nativeFile) {
             return VmPopenNative::pclose($nativeFile);
         }
@@ -773,7 +1004,47 @@ final class VmFs
         unset(self::$gzNativePlaceholders[$handle]);
         if (VmPhpMemoryStream::isValidHandle($handle)) {
             VmPhpMemoryStream::close($handle);
-            unset(self::$handlePaths[$handle]);
+            unset(self::$handlePaths[$handle], self::$handleModes[$handle], self::$handleBlocked[$handle]);
+
+            return;
+        }
+        $fp = self::detachStreamHandle($handle);
+        if (\is_resource($fp)) {
+            @fclose($fp);
+        }
+    }
+
+    /**
+     * Register a VM stream handle for bz2 stream I/O (#17301).
+     *
+     * @return int|false
+     */
+    public static function adoptBzNativePlaceholder(string $uri)
+    {
+        $id = VmPhpMemoryStream::open('php://memory', 'r+b');
+        if (false === $id) {
+            return false;
+        }
+        self::$handlePaths[$id] = $uri;
+        self::$bzNativePlaceholders[$id] = true;
+
+        return $id;
+    }
+
+    public static function isBzNativePlaceholder(int $handle): bool
+    {
+        return isset(self::$bzNativePlaceholders[$handle]);
+    }
+
+    public static function releaseBzNativePlaceholder(int $handle): void
+    {
+        if (!isset(self::$bzNativePlaceholders[$handle])) {
+            return;
+        }
+        unset(self::$bzNativePlaceholders[$handle]);
+        if (VmPhpMemoryStream::isValidHandle($handle)) {
+            VmPhpMemoryStream::close($handle);
+            unset(self::$handlePaths[$handle], self::$handleModes[$handle], self::$handleBlocked[$handle]);
 
             return;
         }
@@ -793,49 +1064,90 @@ final class VmFs
         return self::$handleSocketFds[$handle] ?? null;
     }
 
+    public static function findHandleIdForSocketFd(int $fd): ?int
+    {
+        foreach (self::$handleSocketFds as $handle => $socketFd) {
+            if ($socketFd === $fd) {
+                return $handle;
+            }
+        }
+
+        return null;
+    }
+
     /** @return int|false */
     public static function tmpfile()
     {
-        return VmTmpfileNative::open();
+        $handle = VmTmpfileNative::open();
+        if (false !== $handle) {
+            self::registerStreamMode($handle, 'r+b');
+        }
+
+        return $handle;
+    }
+
+    /** Push back bytes after scanf over-read — php-src stream read buffer (#15992). */
+    public static function pushbackUnread(int $handle, string $bytes): void
+    {
+        if ('' === $bytes) {
+            return;
+        }
+        self::$readPushback[$handle] = (self::$readPushback[$handle] ?? '').$bytes;
+    }
+
+    private static function takeReadPushback(int $handle, int $length): string
+    {
+        $pending = self::$readPushback[$handle] ?? '';
+        if ('' === $pending) {
+            return '';
+        }
+        $take = min($length, \strlen($pending));
+        if ($take < \strlen($pending)) {
+            self::$readPushback[$handle] = \substr($pending, $take);
+        } else {
+            unset(self::$readPushback[$handle]);
+        }
+
+        return \substr($pending, 0, $take);
     }
 
     public static function fread(int $handle, int $length) {
         if ($length <= 0) {
             throw new \ValueError('fread(): Argument #2 ($length) must be greater than 0');
         }
+        $fromPushback = self::takeReadPushback($handle, $length);
+        if (\strlen($fromPushback) === $length) {
+            return VmStreamFilterChain::applyReadFilters($handle, $fromPushback);
+        }
+        $length -= \strlen($fromPushback);
         if (VmUserStream::isValidHandle($handle)) {
-            return VmUserStream::read($handle, $length);
+            return self::freadMergePushback($handle, $fromPushback, VmUserStream::read($handle, $length));
         }
         if (VmPhpMemoryStream::isValidHandle($handle)) {
-            $data = VmPhpMemoryStream::read($handle, $length);
-            if (false === $data) {
-                return false;
-            }
-
-            return VmStreamFilterChain::applyReadFilters($handle, $data);
+            return self::freadMergePushback($handle, $fromPushback, VmPhpMemoryStream::read($handle, $length));
         }
         if (VmPhpInputOutputStream::isValidHandle($handle)) {
-            return VmPhpInputOutputStream::read($handle, $length);
+            return self::freadMergePushback($handle, $fromPushback, VmPhpInputOutputStream::read($handle, $length));
         }
         if (VmPhpFdStream::isValidHandle($handle)) {
-            $data = VmPhpFdStream::read($handle, $length);
-            if (false === $data) {
-                return false;
-            }
-
-            return VmStreamFilterChain::applyReadFilters($handle, $data);
+            return self::freadMergePushback($handle, $fromPushback, VmPhpFdStream::read($handle, $length));
         }
         $fp = self::lookup($handle);
         if (null === $fp) {
-            return false;
+            return '' !== $fromPushback ? VmStreamFilterChain::applyReadFilters($handle, $fromPushback) : false;
         }
 
-        $data = @fread($fp, $length);
+        return self::freadMergePushback($handle, $fromPushback, @fread($fp, $length));
+    }
+
+    /** @return string|false */
+    private static function freadMergePushback(int $handle, string $fromPushback, string|false $data)
+    {
         if (false === $data) {
-            return false;
+            return '' !== $fromPushback ? VmStreamFilterChain::applyReadFilters($handle, $fromPushback) : false;
         }
 
-        return VmStreamFilterChain::applyReadFilters($handle, $data);
+        return VmStreamFilterChain::applyReadFilters($handle, $fromPushback.$data);
     }
 
     public static function fpassthru(int $handle) {
@@ -929,11 +1241,12 @@ final class VmFs
 
     public static function fclose(int $handle): bool
     {
+        unset(self::$readPushback[$handle]);
         if (VmUserStream::isValidHandle($handle)) {
             return VmUserStream::close($handle);
         }
         if (VmPhpMemoryStream::isValidHandle($handle)) {
-            unset(self::$handlePaths[$handle]);
+            unset(self::$handlePaths[$handle], self::$handleModes[$handle], self::$handleBlocked[$handle]);
 
             return VmPhpMemoryStream::close($handle);
         }
@@ -951,7 +1264,7 @@ final class VmFs
             return false;
         }
         VmStreamFilterChain::clearStream($handle);
-        unset(self::$handles[$handle], self::$handlePaths[$handle], self::$handleSocketFds[$handle]);
+        unset(self::$handles[$handle], self::$handlePaths[$handle], self::$handleModes[$handle], self::$handleBlocked[$handle], self::$handleSocketFds[$handle]);
         if (!self::releaseHostResourceRef($fp)) {
             return true;
         }
@@ -1120,6 +1433,9 @@ final class VmFs
      * @return int|false previous buffer size
      */
     public static function streamSetWriteBuffer(int $handle, int $buffer) {
+        if (VmPhpMemoryStream::isValidHandle($handle)) {
+            return VmPhpMemoryStream::setWriteBuffer($handle, $buffer);
+        }
         $fp = self::lookup($handle);
         if (null === $fp) {
             return false;
@@ -1138,6 +1454,9 @@ final class VmFs
      * @return int|false previous buffer size
      */
     public static function streamSetReadBuffer(int $handle, int $buffer) {
+        if (VmPhpMemoryStream::isValidHandle($handle)) {
+            return VmPhpMemoryStream::setReadBuffer($handle, $buffer);
+        }
         $fp = self::lookup($handle);
         if (null === $fp) {
             return false;
@@ -1191,13 +1510,17 @@ final class VmFs
         }
         $uri = self::handleUri($handle);
         $fp = self::lookup($handle);
+        $reportedMode = VmStreamMeta::userFacingMode($uri, self::handleMode($handle));
+        $blocked = self::handleBlocked($handle);
         if (null !== $fp) {
-            $meta = VmStreamMeta::buildMetaArray($uri, $fp);
+            $meta = VmStreamMeta::buildMetaArray($uri, $fp, null, $reportedMode, $blocked);
         } else {
             $meta = VmStreamMeta::buildMetaArray(
                 $uri,
                 null,
-                VmStreamMeta::eofForNativeHandle($handle)
+                VmStreamMeta::eofForNativeHandle($handle),
+                $reportedMode,
+                $blocked
             );
         }
 
@@ -1212,18 +1535,35 @@ final class VmFs
         if (VmPhpMemoryStream::isValidHandle($handle)
             || VmPhpInputOutputStream::isValidHandle($handle)
             || VmUserStream::isValidHandle($handle)) {
+            self::setHandleBlocked($handle, $mode);
+
             return true;
         }
         $fd = self::socketFdForHandle($handle);
         if (null !== $fd) {
-            return VmStreamBlockingNative::setBlocking($fd, $mode);
+            $ok = VmStreamBlockingNative::setBlocking($fd, $mode);
+            if ($ok) {
+                self::setHandleBlocked($handle, $mode);
+                if ($mode) {
+                    VmProcessProcOpenNative::resumeChildForPipeHandle($handle);
+                }
+            }
+
+            return $ok;
         }
         $fp = self::lookup($handle);
         if (null === $fp) {
             return false;
         }
+        $ok = VmStreamBlockingNative::setBlockingForHostResource($fp, $mode);
+        if ($ok) {
+            self::setHandleBlocked($handle, $mode);
+            if ($mode) {
+                VmProcessProcOpenNative::resumeChildForPipeHandle($handle);
+            }
+        }
 
-        return VmStreamBlockingNative::setBlockingForHostResource($fp, $mode);
+        return $ok;
     }
 
     /**
@@ -1261,6 +1601,9 @@ final class VmFs
         }
         switch ($feature) {
             case VmStreamSupports::STREAM_LOCK:
+                if (VmPhpFdStream::isValidHandle($handle)) {
+                    return VmPhpFdStream::available();
+                }
                 $fp = self::lookup($handle);
                 if (null === $fp) {
                     return false;
@@ -1270,6 +1613,12 @@ final class VmFs
             case VmStreamSupports::STREAM_META_SEEKABLE:
             case VmStreamSupports::STREAM_FILTER:
                 return self::streamSupportsSeekable($handle);
+            case VmStreamSupports::STREAM_SUPPORT_TELL:
+                return self::streamSupportsTell($handle);
+            case VmStreamSupports::STREAM_SUPPORT_READ:
+                return self::streamSupportsRead($handle);
+            case VmStreamSupports::STREAM_SUPPORT_WRITE:
+                return self::streamSupportsWrite($handle);
             case VmStreamSupports::STREAM_META_TOUCH:
             case VmStreamSupports::STREAM_META_OWNER_NAME:
             case VmStreamSupports::STREAM_META_OWNER:
@@ -1292,9 +1641,65 @@ final class VmFs
         return VmStreamMeta::supportsSeekable(self::handleUri($handle));
     }
 
+    private static function streamSupportsTell(int $handle): bool
+    {
+        return VmStreamMeta::supportsTell(self::handleUri($handle));
+    }
+
+    private static function streamSupportsRead(int $handle): bool
+    {
+        if (!self::isValidHandle($handle)) {
+            return false;
+        }
+
+        return VmStreamMeta::supportsRead(
+            self::handleUri($handle),
+            self::handleMode($handle) ?? 'rb'
+        );
+    }
+
+    private static function streamSupportsWrite(int $handle): bool
+    {
+        if (!self::isValidHandle($handle)) {
+            return false;
+        }
+
+        return VmStreamMeta::supportsWrite(
+            self::handleUri($handle),
+            self::handleMode($handle) ?? 'wb'
+        );
+    }
+
     private static function streamSupportsMetadata(int $handle): bool
     {
         return VmStreamMeta::supportsMetadata(self::handleUri($handle));
+    }
+
+    /** Host PHP stream resource for adopted handles, or null for VM-native streams. */
+    public static function hostStreamResource(int $handle): mixed
+    {
+        return self::lookup($handle);
+    }
+
+    /**
+     * stream_socket_enable_crypto() — php-src ext/standard/streamsfuncs.c (#4610).
+     */
+    public static function streamSocketEnableCrypto(
+        int $handle,
+        bool $enable,
+        ?int $cryptoMethod = null,
+        ?int $sessionHandle = null,
+        ?string $capturePeerCert = null,
+        ?string $passphrase = null
+    ): bool {
+        return VmStreamEnableCrypto::invoke(
+            $handle,
+            $enable,
+            $cryptoMethod,
+            $sessionHandle,
+            $capturePeerCert,
+            $passphrase
+        );
     }
 
     /**
@@ -1316,6 +1721,12 @@ final class VmFs
 
     public static function ftruncate(int $handle, int $size): bool
     {
+        if (VmPhpMemoryStream::isValidHandle($handle)) {
+            return VmPhpMemoryStream::truncate($handle, $size);
+        }
+        if (VmPhpInputOutputStream::isValidHandle($handle)) {
+            return false;
+        }
         $fp = self::lookup($handle);
         if (null === $fp) {
             return false;
@@ -1349,77 +1760,48 @@ final class VmFs
     public static function fgetc(int $handle) {
         if (VmPhpMemoryStream::isValidHandle($handle)) {
             $byte = VmPhpMemoryStream::read($handle, 1);
-            if (false === $byte) {
-                return false;
-            }
-            if ('' === $byte) {
-                return VmPhpMemoryStream::eof($handle) ? '' : false;
-            }
-
-            return $byte;
-        }
-        if (VmPhpInputOutputStream::isValidHandle($handle)) {
+        } elseif (VmPhpInputOutputStream::isValidHandle($handle)) {
             $byte = VmPhpInputOutputStream::read($handle, 1);
-            if (false === $byte) {
-                return false;
-            }
-            if ('' === $byte) {
-                return VmPhpInputOutputStream::eof($handle) ? '' : false;
-            }
-
-            return $byte;
-        }
-        if (VmPhpFdStream::isValidHandle($handle)) {
+        } elseif (VmPhpFdStream::isValidHandle($handle)) {
             $byte = VmPhpFdStream::read($handle, 1);
-            if (false === $byte) {
+        } else {
+            $fp = self::lookup($handle);
+            if (null === $fp) {
                 return false;
             }
-            if ('' === $byte) {
-                return VmPhpFdStream::eof($handle) ? '' : false;
-            }
-
-            return $byte;
+            $byte = @\fgetc($fp);
         }
-        $fp = self::lookup($handle);
-        if (null === $fp) {
-            return false;
-        }
-        $byte = @\fgetc($fp);
-        if (false === $byte) {
-            if (\feof($fp)) {
-                return '';
-            }
-
+        if (false === $byte || '' === $byte) {
             return false;
         }
 
-        return $byte;
+        return VmStreamFilterChain::applyReadFilters($handle, $byte);
     }
 
     public static function fgets(int $handle, ?int $length = null) {
         if (VmPhpMemoryStream::isValidHandle($handle)) {
-            return VmPhpMemoryStream::fgets($handle, $length);
-        }
-        if (VmPhpFdStream::isValidHandle($handle)) {
-            return VmPhpFdStream::fgets($handle, $length);
-        }
-        $fp = self::lookup($handle);
-        if (null === $fp) {
-            return false;
-        }
-        if (null === $length) {
-            $line = @\fgets($fp);
+            $line = VmPhpMemoryStream::fgets($handle, $length);
+        } elseif (VmPhpFdStream::isValidHandle($handle)) {
+            $line = VmPhpFdStream::fgets($handle, $length);
         } else {
-            if ($length <= 0) {
+            $fp = self::lookup($handle);
+            if (null === $fp) {
                 return false;
             }
-            $line = @\fgets($fp, $length);
+            if (null === $length) {
+                $line = @\fgets($fp);
+            } else {
+                if ($length <= 0) {
+                    return false;
+                }
+                $line = @\fgets($fp, $length);
+            }
         }
         if (false === $line) {
             return false;
         }
 
-        return $line;
+        return VmStreamFilterChain::applyReadFilters($handle, $line);
     }
 
     /**
@@ -2006,6 +2388,9 @@ final class VmFs
         if (VmUserStream::isValidHandle($handle)) {
             return VmUserStream::protocolForHandle($handle);
         }
+        if (isset(self::$bzNativePlaceholders[$handle])) {
+            return 'bzip2';
+        }
         if (VmPhpMemoryStream::isValidHandle($handle)) {
             return 'stream';
         }
@@ -2021,6 +2406,10 @@ final class VmFs
 
     public static function isValidHandle(int $handle): bool
     {
+        if (self::isFailedStreamHandle($handle)) {
+            return false;
+        }
+
         return isset(self::$handles[$handle])
             || VmUserStream::isValidHandle($handle)
             || VmPhpMemoryStream::isValidHandle($handle)
@@ -2064,6 +2453,14 @@ final class VmFs
             $ht->addIndex($index, $value);
             ++$index;
         }
+        if (null === $type) {
+            foreach (VmStreamContext::activeContextVariables() as $contextVar) {
+                $value = new Variable();
+                $value->copyFrom($contextVar);
+                $ht->addIndex($index, $value);
+                ++$index;
+            }
+        }
 
         return $ht;
     }
@@ -2104,7 +2501,14 @@ final class VmFs
             return null;
         }
         VmStreamFilterChain::clearStream($handle);
-        unset(self::$handles[$handle], self::$handlePaths[$handle], self::$handleSocketFds[$handle], self::$popenHandles[$handle]);
+        unset(
+            self::$handles[$handle],
+            self::$handlePaths[$handle],
+            self::$handleModes[$handle],
+            self::$handleBlocked[$handle],
+            self::$handleSocketFds[$handle],
+            self::$popenHandles[$handle]
+        );
         self::releaseHostResourceRef($fp);
         VmPersistentSocket::forgetResource($fp);
 
@@ -2147,6 +2551,44 @@ final class VmFs
         unset(self::$handlePaths[$handle]);
     }
 
+    /** Record user fopen mode for stream_get_meta_data() ({@see StreamModeJitHelper}, #13021). */
+    public static function registerStreamMode(int $handle, string $mode): void
+    {
+        if ($handle > 0 && '' !== $mode) {
+            self::$handleModes[$handle] = $mode;
+        }
+    }
+
+    public static function clearStreamMode(int $handle): void
+    {
+        unset(self::$handleModes[$handle]);
+    }
+
+    public static function handleMode(int $handle): ?string
+    {
+        return self::$handleModes[$handle] ?? null;
+    }
+
+    public static function setHandleBlocked(int $handle, bool $blocked): void
+    {
+        if ($handle > 0) {
+            self::$handleBlocked[$handle] = $blocked;
+        }
+    }
+
+    public static function handleBlocked(int $handle): bool
+    {
+        if (VmPhpMemoryStream::isValidHandle($handle)) {
+            $uri = VmPhpMemoryStream::uriForHandle($handle);
+            // php-src php_stream_memory: blocking flag stays true regardless of stream_set_blocking (#17928).
+            if ('php://memory' === $uri || \str_starts_with($uri, 'php://fd/')) {
+                return true;
+            }
+        }
+
+        return self::$handleBlocked[$handle] ?? true;
+    }
+
     public static function tempDir(): string
     {
         return VmSysGetTempDirNative::resolve();
@@ -2168,7 +2610,9 @@ final class VmFs
      */
     public static function diskFreeSpace(?string $path)
     {
-        $path = $path ?? '.';
+        if (null === $path) {
+            return false;
+        }
 
         return VmFsDiskNative::diskFreeSpace($path);
     }
@@ -2180,7 +2624,9 @@ final class VmFs
      */
     public static function diskTotalSpace(?string $path)
     {
-        $path = $path ?? '.';
+        if (null === $path) {
+            return false;
+        }
 
         return VmFsDiskNative::diskTotalSpace($path);
     }

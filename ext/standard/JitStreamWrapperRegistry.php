@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\JIT\ReflectionBuiltinHelper;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
@@ -28,6 +31,7 @@ final class JitStreamWrapperRegistry
                 'stream_wrapper_register() protocol and class must be compile-time string literals in this compiler build (issue #3383)'
             );
         }
+        self::requireValidWrapperClassLiteral($context, $classLit);
 
         return self::materializeBool($context, VmStreamWrapperRegistry::register($protoLit, $classLit));
     }
@@ -75,6 +79,25 @@ final class JitStreamWrapperRegistry
         }
 
         return true;
+    }
+
+    private static function requireValidWrapperClassLiteral(Context $context, string $className): void
+    {
+        $exists = ReflectionBuiltinHelper::classExistsLiteral($context, $className);
+        $i1 = $context->getTypeFromString('int1');
+        $missing = $context->builder->icmp(Builder::INT_EQ, $exists, $i1->constInt(0, false));
+        $okBlock = BasicBlockHelper::append($context, 'stream_wrapper_reg_class_ok');
+        $errBlock = BasicBlockHelper::append($context, 'stream_wrapper_reg_class_err');
+        $context->builder->branchIf($missing, $errBlock, $okBlock);
+        $context->builder->positionAtEnd($errBlock);
+        ExceptionBridge::emitTypeErrorAndAbort(
+            $context,
+            \sprintf(
+                'stream_wrapper_register(): Argument #2 ($class) must be a valid class name, %s given',
+                $className
+            )
+        );
+        $context->builder->positionAtEnd($okBlock);
     }
 
     private static function materializeBool(Context $context, bool $value): Value

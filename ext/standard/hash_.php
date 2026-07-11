@@ -37,8 +37,8 @@ final class hash_ extends Internal
                 $argc
             ));
         }
-        $algo = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'hash', 0, 'algo');
-        $data = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'hash', 1, 'data');
+        $algo = VmString::stringBuiltinArgForFrame($frame, 0, 'hash', 0, 'algo');
+        $data = VmString::stringBuiltinArgForFrame($frame, 1, 'hash', 1, 'data');
         $raw = false;
         if (3 === $argc) {
             $raw = VmMath::parseBoolBuiltinArg($frame->calledArgs[2], 'hash', 3, 'binary');
@@ -70,8 +70,8 @@ final class hash_ extends Internal
         }
         return JitHash::hash(
             $context,
-            JitStringBuiltinArg::lower($context, $args[0], 'hash', 0, 'algo'),
-            JitStringBuiltinArg::lower($context, $args[1], 'hash', 1, 'data'),
+            JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'hash', 0, 'algo'),
+            JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[1], 'hash', 1, 'data'),
             $raw
         );
     }

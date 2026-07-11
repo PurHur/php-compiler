@@ -4,16 +4,21 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
-use PHPCompiler\JIT\ArrayBuiltinHelper;
+use PHPCompiler\JIT\Builtin\ArrayPadRuntime;
+use PHPCompiler\JIT\Builtin\ArrayPadTypeJit;
+use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * array_pad() for packed list arrays (subset of PHP; LLVM via ArrayBuiltinHelper).
+ * array_pad() for packed list arrays (subset of PHP; JIT via ArrayPadRuntime PHP bridge).
+ *
+ * PHP 8.4+ optional 4th $pad_type + ARRAY_PAD_* constants (#14993).
  */
 final class array_pad extends Internal
 {
@@ -24,40 +29,72 @@ final class array_pad extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (3 !== \count($frame->calledArgs)) {
-            throw new \LogicException('array_pad() requires exactly three arguments');
+        $argc = \count($frame->calledArgs);
+        $supportsPadType = CompilerVersion::supportsArrayPadPadType();
+        if ($supportsPadType) {
+            if ($argc < 3 || $argc > 4) {
+                throw new \ArgumentCountError(\sprintf(
+                    'array_pad() expects between 3 and 4 arguments, %d given',
+                    $argc
+                ));
+            }
+        } elseif (3 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'array_pad() expects exactly 3 arguments, %d given',
+                $argc
+            ));
         }
-        $array = $frame->calledArgs[0]->resolveIndirect();
-        $length = $frame->calledArgs[1]->resolveIndirect();
-        $value = $frame->calledArgs[2]->resolveIndirect();
         if (null === $frame->returnVar) {
             return;
         }
-        if (Variable::TYPE_ARRAY !== $array->type) {
-            throw new \LogicException('array_pad() argument #1 must be an array in this compiler build');
+        $ht = VmArray::requireArrayParam($frame->calledArgs[0], 'array_pad', 1, 'array');
+        $lengthInt = VmMath::parseIntBuiltinArgForFrame($frame, 1, 'array_pad', 2, 'length');
+        $value = $frame->calledArgs[2]->resolveIndirect();
+        $padType = null;
+        if (4 === $argc) {
+            $padType = VmArray::resolvePadTypeArg($frame->calledArgs[3]);
         }
-        $lengthInt = VmMath::parseIntBuiltinArg($length, 'array_pad', 2, 'length');
         $frame->returnVar->array(
-            VmArray::pad($array->toArray(), $lengthInt, $value)
+            VmArray::pad($ht, $lengthInt, $value, $padType)
         );
     }
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (3 !== \count($args)) {
-            throw new \LogicException('array_pad() requires exactly three arguments');
+        $argc = \count($args);
+        $supportsPadType = CompilerVersion::supportsArrayPadPadType();
+        if ($supportsPadType) {
+            if ($argc < 3 || $argc > 4) {
+                throw new \ArgumentCountError(\sprintf(
+                    'array_pad() expects between 3 and 4 arguments, %d given',
+                    $argc
+                ));
+            }
+        } elseif (3 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'array_pad() expects exactly 3 arguments, %d given',
+                $argc
+            ));
         }
-        if (JITVariable::TYPE_HASHTABLE !== $args[0]->type
-            && !($args[0]->type & JITVariable::IS_NATIVE_ARRAY)) {
-            throw new \LogicException('array_pad() argument #1 must be an array in this compiler build');
-        }
+        TypeErrorRaise::ensureLinked($context);
+        JitArrayElem::requireArrayParam($context, $args[0], 'array_pad', 1, 'array');
         foreach ($args as $i => $arg) {
             if (JITVariable::TYPE_STRING === $arg->type || JITVariable::TYPE_VALUE === $arg->type) {
                 $this->jitString($context, $arg, 'array_pad() argument #'.((int) $i + 1));
             }
         }
-        $length = JitIntdiv::lowerIntBuiltinArg($context, $args[1], 'array_pad', 2, 'length');
+        $length = JitIntdiv::lowerIntBuiltinArgForCaller($context, $args[1], 'array_pad', 2, 'length');
+        if (4 === $argc) {
+            $padTypeLiteral = ArrayPadTypeJit::compileTimePadType($context, $args[3]);
+            if (null !== $padTypeLiteral) {
+                $padType = $context->getTypeFromString('int64')->constInt($padTypeLiteral, false);
+            } else {
+                $padType = JitLongArg::lower($context, $args[3], 'array_pad() pad type');
+            }
 
-        return ArrayBuiltinHelper::pad($context, $args[0], $length, $args[2]);
+            return ArrayPadRuntime::padWithType($context, $args[0], $length, $args[2], $padType);
+        }
+
+        return ArrayPadRuntime::pad($context, $args[0], $length, $args[2]);
     }
 }

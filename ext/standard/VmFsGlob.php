@@ -4,195 +4,61 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\Frame;
+use PHPCompiler\VM\ErrorReporter;
+
 /**
- * glob() for VM — libc glob(3) via FFI or pure-PHP fallback (#4859, #7314, #7906).
+ * glob() for VM — pure PHP via {@see VmFsGlobPure} (#4859, #7314, #12208).
  *
  * php-src: ext/standard/dir.c — PHP_FUNCTION(glob)
  * JIT/AOT: StringFsGlobVecJit.php (LLVM from PHP, no injected C runtime)
- *
- * Libc FFI or pure-PHP fallback only — no host glob builtin (bootstrap/M5, #7906).
  */
 final class VmFsGlob
 {
-    private const GLOB_NOMATCH = 3;
+    public const INVALID_FLAGS_WARNING =
+        'glob(): At least one of the passed flags is invalid or not supported on this platform';
 
-    private static ?\FFI $ffi = null;
+    public static function available(): bool
+    {
+        return VmFsGlobPure::available();
+    }
+
+    public static function hasInvalidFlags(int $flags): bool
+    {
+        return 0 !== ($flags & ~StdlibConstants::GLOB_AVAILABLE_FLAGS);
+    }
 
     /**
      * @return list<string>|false
      */
-    public static function glob(string $pattern, int $flags = 0)
+    public static function glob(string $pattern, int $flags = 0, ?Frame $frame = null)
     {
-        $onlyDir = 0 !== ($flags & StdlibConstants::GLOB_ONLYDIR);
-        $libcFlags = $flags & StdlibConstants::GLOB_AVAILABLE_FLAGS & ~StdlibConstants::GLOB_ONLYDIR;
-
-        if (self::ffiEnabled()) {
-            $libc = self::libcGlob($pattern, $libcFlags, $onlyDir);
-            if (null !== $libc) {
-                return $libc;
-            }
-        }
-
-        return self::globFallback($pattern, $libcFlags, $onlyDir);
-    }
-
-    private static function ffiEnabled(): bool
-    {
-        $v = getenv('PHP_COMPILER_DISABLE_FFI');
-        if (false !== $v && '' !== $v && '0' !== $v && 'false' !== strtolower($v)) {
-            return false;
-        }
-
-        return true;
-    }
-
-    /**
-     * @return list<string>|false|null null when FFI/libc path unavailable (use fallback)
-     */
-    private static function libcGlob(string $pattern, int $libcFlags, bool $onlyDir): array|false|null
-    {
-        if (!self::ffiEnabled() || !\extension_loaded('ffi')) {
-            return null;
-        }
-        try {
-            $ffi = self::ffi();
-        } catch (\Throwable) {
-            return null;
-        }
-
-        $glob = $ffi->new('glob_t');
-        $rc = (int) $ffi->glob($pattern, $libcFlags, null, \FFI::addr($glob));
-        if (self::GLOB_NOMATCH === $rc) {
-            $ffi->globfree(\FFI::addr($glob));
-
-            return [];
-        }
-        if (0 !== $rc) {
-            $ffi->globfree(\FFI::addr($glob));
+        if (self::hasInvalidFlags($flags)) {
+            self::warnInvalidFlags($frame);
 
             return false;
         }
 
-        $matches = [];
-        $count = (int) $glob->gl_pathc;
-        for ($i = 0; $i < $count; ++$i) {
-            $path = \FFI::string($glob->gl_pathv[$i]);
-            if ($onlyDir && !self::pathIsDir($path)) {
-                continue;
-            }
-            $matches[] = $path;
-        }
-        $ffi->globfree(\FFI::addr($glob));
-
-        return $matches;
+        return VmFsGlobPure::glob($pattern, $flags);
     }
 
-    private static function ffi(): \FFI
+    public static function warnInvalidFlags(?Frame $frame): void
     {
-        if (null !== self::$ffi) {
-            return self::$ffi;
+        if (null !== $frame && null !== $frame->vmContext) {
+            $frame->vmContext->errors->triggerError(
+                self::INVALID_FLAGS_WARNING,
+                ErrorReporter::E_WARNING,
+                '' !== $frame->scriptPath ? $frame->scriptPath : null,
+                $frame->vmContext,
+                $frame,
+                $frame->callSiteLine
+            );
+
+            return;
         }
 
-        $cdef = <<<'CDEF'
-typedef struct {
-    size_t gl_pathc;
-    char **gl_pathv;
-    size_t gl_offs;
-    int gl_flags;
-    void *gl_closedir;
-    void *gl_readdir;
-    void *gl_opendir;
-    void *gl_lstat;
-    void *gl_stat;
-} glob_t;
-
-int glob(const char *pattern, int flags, int (*errfunc)(const char *epath, int eerrno), glob_t *pglob);
-void globfree(glob_t *pglob);
-CDEF;
-
-        foreach (['libc.so.6', 'libc.so'] as $lib) {
-            try {
-                self::$ffi = \FFI::cdef($cdef, $lib);
-
-                return self::$ffi;
-            } catch (\Throwable) {
-            }
+        if (\function_exists('compiler_language_warning')) {
+            compiler_language_warning(self::INVALID_FLAGS_WARNING);
         }
-
-        throw new \RuntimeException('libc glob FFI unavailable');
-    }
-
-    /**
-     * Pure-PHP fallback when libc FFI is absent.
-     *
-     * @return list<string>|false
-     */
-    private static function globFallback(string $pattern, int $libcFlags, bool $onlyDir)
-    {
-        if (str_contains($pattern, '{') || str_contains($pattern, '}')) {
-            return false;
-        }
-
-        $dirEnd = strrpos($pattern, '/');
-        if (false === $dirEnd) {
-            $dir = '.';
-            $filePattern = $pattern;
-        } else {
-            $dir = substr($pattern, 0, $dirEnd);
-            if ('' === $dir) {
-                $dir = '/';
-            }
-            $filePattern = substr($pattern, $dirEnd + 1);
-        }
-
-        if (!self::pathIsDir($dir) && '.' !== $dir) {
-            return false;
-        }
-
-        $entries = VmDirNative::listSorted($dir);
-        if (false === $entries) {
-            return false;
-        }
-
-        $matches = [];
-        foreach ($entries as $entry) {
-            if ('.' === $entry || '..' === $entry) {
-                continue;
-            }
-            if (!VmFnmatch::match($filePattern, $entry, self::fnmatchFlagsFromGlob($libcFlags))) {
-                continue;
-            }
-            $full = ('.' === $dir) ? $entry : ($dir.'/'.$entry);
-            if ($onlyDir && !self::pathIsDir($full)) {
-                continue;
-            }
-            $matches[] = $full;
-        }
-
-        if (0 === ($libcFlags & StdlibConstants::GLOB_NOSORT)) {
-            sort($matches, SORT_STRING);
-        }
-
-        return $matches;
-    }
-
-    private static function fnmatchFlagsFromGlob(int $libcFlags): int
-    {
-        $fnm = 0;
-        if (0 !== ($libcFlags & StdlibConstants::GLOB_NOESCAPE)) {
-            $fnm |= VmFnmatch::FNM_NOESCAPE;
-        }
-
-        return $fnm;
-    }
-
-    private static function pathIsDir(string $path): bool
-    {
-        $stat = VmStatCache::stat($path);
-        if (false === $stat) {
-            return false;
-        }
-
-        return ($stat['mode'] & 0xF000) === 0x4000;
     }
 }

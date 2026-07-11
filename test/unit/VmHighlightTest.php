@@ -36,6 +36,15 @@ final class VmHighlightTest extends TestCase
         $this->assertSame($zend, $html);
     }
 
+    public function testHighlightEngineUsesBrBetweenLines(): void
+    {
+        $code = "<?php\nline1\nline2\n";
+        $html = HighlightEngine::render($code);
+        $this->assertGreaterThanOrEqual(2, substr_count($html, '<br'));
+        $this->assertStringNotContainsString("line1\n", $html);
+        $this->assertStringContainsString('<code>', $html);
+    }
+
     public function testVmHighlightReturnMode(): void
     {
         $html = VmHighlight::highlightString('<?php echo 1; ?>', true);

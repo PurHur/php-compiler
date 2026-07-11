@@ -1,4 +1,5 @@
 vendor
+_site
 .llvm
 .llvm14
 test.*
@@ -22,6 +23,10 @@ build/full-main-copy*
 build/helloworld-compile-bin-aot
 build/selfhost-*
 build/bootstrap-driver-smoke-*
+# Per-file lint result cache (bin/lint.php --bootstrap-inventory, #16077)
+build/lint-cache
+# Per-unit split-compilation cache (#15889); committed variant lives in prelinked/helper-runtime
+build/helper-runtime-cache
 build/.m3_*
 build/.last-jit-*
 build/.bootstrap-*

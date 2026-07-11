@@ -13,6 +13,7 @@ use PHPLLVM\Value;
 final class HtmlEntityDecodeJit
 {
     private const HELPER_LOGICAL = 'PHPCompiler\\ext\\standard\\HtmlEntityDecodeJitHelper::decode';
+    private const HELPER_ENCODING_LOGICAL = 'PHPCompiler\\ext\\standard\\HtmlEntityDecodeJitHelper::decodeWithEncoding';
     private const DISPATCH = '__compiler_html_entity_decode_dispatch';
 
     public static function decode(Context $context, Value $strPtr, Value $flags): Value
@@ -24,6 +25,22 @@ final class HtmlEntityDecodeJit
             $strPtr,
             $flags
         );
+    }
+
+    public static function decodeWithEncoding(
+        Context $context,
+        Value $strPtr,
+        Value $flags,
+        Value $encodingPtr
+    ): Value {
+        self::ensureEncodingHelperCompiled($context);
+        $lc = strtolower(self::HELPER_ENCODING_LOGICAL);
+        $fn = $context->functions[$lc] ?? null;
+        if (null === $fn) {
+            throw new \LogicException('HtmlEntityDecodeJitHelper::decodeWithEncoding missing after compile (#11653)');
+        }
+
+        return $context->builder->call($fn, $strPtr, $flags, $encodingPtr);
     }
 
     private static function ensureDispatch(Context $context): void
@@ -108,6 +125,18 @@ final class HtmlEntityDecodeJit
         $jit->compile($block);
         if (!isset($context->functions[$lc])) {
             throw new \LogicException('HtmlEntityDecodeJitHelper::decode was not compiled for JIT (#4130)');
+        }
+    }
+
+    private static function ensureEncodingHelperCompiled(Context $context): void
+    {
+        $lc = strtolower(self::HELPER_ENCODING_LOGICAL);
+        if (isset($context->functions[$lc])) {
+            return;
+        }
+        self::ensureJitHelperCompiled($context);
+        if (!isset($context->functions[$lc])) {
+            throw new \LogicException('HtmlEntityDecodeJitHelper::decodeWithEncoding was not compiled for JIT (#11653)');
         }
     }
 }

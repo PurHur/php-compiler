@@ -1,5 +1,5 @@
 --TEST--
-JIT: rmdir() via libc rmdir(2)
+JIT: rmdir() via RmdirJitHelper PHP (#15481)
 --FILE--
 <?php
 $base = 'test/compliance/cases/stdlib/rmdir_fixture';
@@ -30,7 +30,9 @@ if (rmdir('/no/such/phpc-rmdir-path')) {
 } else {
     echo "nogone\n";
 }
---EXPECT--
+--EXPECTF--
+PHP Warning:  rmdir(%s): No such file or directory in %s on line %d
+PHP Warning:  rmdir(/no/such/phpc-rmdir-path): No such file or directory in %s on line %d
 ok
 gone
 nogone

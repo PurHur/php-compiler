@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\Test\Unit\JIT;
 
 use PHPCompiler\Runtime;
+use PHPCompiler\Test\Support\PropertyHookTestSkip;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -15,7 +16,15 @@ use PHPUnit\Framework\TestCase;
  */
 final class PropertyHookJitCompileTest extends TestCase
 {
-    public function testPropertyHookScriptCompilesForJit(): void
+        use PropertyHookTestSkip;
+
+    protected function setUp(): void
+    {
+        $this->skipUnlessPropertyHooksEnabled();
+    }
+
+
+public function testPropertyHookScriptCompilesForJit(): void
     {
         $src = <<<'PHP'
 <?php

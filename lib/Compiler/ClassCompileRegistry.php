@@ -112,6 +112,19 @@ final class ClassCompileRegistry
         return isset($this->registeredInterfaces[self::lc($lcName)]);
     }
 
+    public function parentDisplayName(?string $classLc): ?string
+    {
+        if (null === $classLc || '' === $classLc) {
+            return null;
+        }
+        $parentLc = $this->parents[self::lc($classLc)] ?? null;
+        if (null === $parentLc || '' === $parentLc) {
+            return null;
+        }
+
+        return $this->displayNames[$parentLc] ?? $parentLc;
+    }
+
     public function hasOverridableMethod(
         ?string $parentLc,
         array $interfaceLcs,

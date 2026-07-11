@@ -29,6 +29,35 @@ final class TriggerErrorJitHelper
         self::recordAndMaybePrint(ErrorReporter::E_WARNING, "Undefined array key {$key}");
     }
 
+    public static function warning(string $message): void
+    {
+        self::recordAndMaybePrint(ErrorReporter::E_WARNING, $message);
+    }
+
+    public static function nonVariableByRef(): void
+    {
+        self::recordAndMaybePrint(ErrorReporter::E_NOTICE, 'Only variables should be passed by reference');
+    }
+
+    /**
+     * @return bool LLVM i1 ABI — whether stderr print is allowed (error_reporting / @ silence)
+     */
+    public static function shouldPrintTrigger(int $level): bool
+    {
+        return ErrorSilenceJitHelper::shouldDisplayCliError($level);
+    }
+
+    public static function recordTriggerError(int $level, string $message, string $file, int $line): void
+    {
+        if ('' === $message) {
+            return;
+        }
+        if ($line < 0) {
+            $line = 0;
+        }
+        ErrorLastJitHelper::record($level, $message, $file, $line);
+    }
+
     /**
      * Record last error and report whether dispatch/print should proceed.
      *
@@ -44,13 +73,13 @@ final class TriggerErrorJitHelper
         }
         ErrorLastJitHelper::record($level, $message, $file, $line);
 
-        return ErrorSilenceJitHelper::isErrorLevelEnabled($level);
+        return ErrorSilenceJitHelper::shouldDisplayCliError($level);
     }
 
     private static function recordAndMaybePrint(int $level, string $message): void
     {
         ErrorLastJitHelper::record($level, $message, '', 0);
-        if (!ErrorSilenceJitHelper::isErrorLevelEnabled($level)) {
+        if (!ErrorSilenceJitHelper::shouldDisplayCliError($level)) {
             return;
         }
         self::stderrPrintCliError($level, $message, '', 0);

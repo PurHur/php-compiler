@@ -8,6 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\VM\OutputBuffer;
 use PHPLLVM\Value;
 
@@ -16,6 +17,8 @@ use PHPLLVM\Value;
  */
 final class ob_flush extends Internal
 {
+    public const NO_BUFFER_NOTICE = 'ob_flush(): Failed to flush buffer. No buffer to flush';
+
     public function __construct()
     {
         parent::__construct('ob_flush');
@@ -23,8 +26,14 @@ final class ob_flush extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (\count($frame->calledArgs) > 0) {
-            throw new \LogicException('ob_flush() takes no arguments');
+        $this->requireExactArgCount($frame, 'ob_flush', 0);
+        if (0 === OutputBuffer::getLevel()) {
+            self::emitNoBufferNotice($frame);
+            if (null !== $frame->returnVar) {
+                $frame->returnVar->bool(false);
+            }
+
+            return;
         }
         if (null === $frame->returnVar) {
             OutputBuffer::flushBuffer();
@@ -32,6 +41,21 @@ final class ob_flush extends Internal
             return;
         }
         $frame->returnVar->bool(OutputBuffer::flushBuffer());
+    }
+
+    private static function emitNoBufferNotice(Frame $frame): void
+    {
+        if (null === $frame->vmContext) {
+            return;
+        }
+        $frame->vmContext->errors->triggerError(
+            self::NO_BUFFER_NOTICE,
+            ErrorReporter::E_NOTICE,
+            '' !== $frame->scriptPath ? $frame->scriptPath : null,
+            $frame->vmContext,
+            $frame,
+            $frame->callSiteLine
+        );
     }
 
     public function call(Context $context, JITVariable ...$args): Value

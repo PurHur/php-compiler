@@ -25,11 +25,16 @@ final class mb_strcut extends Internal
 
     public function execute(Frame $frame): void
     {
-        $argc = \count($frame->calledArgs);
-        if ($argc < 2 || $argc > 4) {
+        if (!isset($frame->calledArgs[0]) || !isset($frame->calledArgs[1])) {
             throw new \ArgumentCountError(sprintf(
                 'mb_strcut() expects at least 2 arguments, %d given',
-                $argc
+                \count($frame->calledArgs)
+            ));
+        }
+        if (isset($frame->calledArgs[4])) {
+            throw new \ArgumentCountError(sprintf(
+                'mb_strcut() expects at most 4 arguments, %d given',
+                max(\array_keys($frame->calledArgs)) + 1
             ));
         }
         $string = VmString::coerceStringBuiltinArg(
@@ -41,12 +46,12 @@ final class mb_strcut extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $start = VmMbstring::coerceStartArg($frame->calledArgs[1], 'mb_strcut', 1);
+        $start = VmMbstring::coerceStartArg($frame, 'mb_strcut', 1);
         $length = null;
-        if ($argc >= 3) {
-            $length = VmMbstring::coerceOptionalLengthArg($frame->calledArgs[2], 'mb_strcut', 2);
+        if (isset($frame->calledArgs[2])) {
+            $length = VmMbstring::coerceOptionalLengthArg($frame, 'mb_strcut', 2);
         }
-        $encoding = $argc >= 4
+        $encoding = isset($frame->calledArgs[3])
             ? VmMbstring::coerceEncodingArg($frame->calledArgs[3], 'mb_strcut', 3)
             : 'UTF-8';
         BuiltinExecute::writeReturn(

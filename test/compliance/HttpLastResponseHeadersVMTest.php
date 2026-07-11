@@ -13,6 +13,10 @@ final class HttpLastResponseHeadersVMTest extends BaseTest
 
     public static function providePHPTests(): \Generator
     {
+        if (!CompilerVersion::supportsHttpLastResponseHeaders()) {
+            return;
+        }
+
         yield 'http_get_last_response_headers_empty.phpt' => self::parsePHPT(
             __DIR__.'/cases/stdlib/http_get_last_response_headers_empty.phpt',
             'http_get_last_response_headers_empty.phpt'

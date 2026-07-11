@@ -3,7 +3,7 @@ Language: asymmetric visibility — catchable Error on illegal external write (#
 --FILE--
 <?php
 class PrivateSet {
-    private(set) string $name = 'x';
+    public (private(set)) string $name = 'x';
 }
 $p = new PrivateSet();
 try {
@@ -13,5 +13,5 @@ try {
 }
 echo $p->name, "\n";
 --EXPECT--
-Error: Cannot modify private(set) property PrivateSet::$name from global scope
+Error: Cannot modify public private(set) property PrivateSet::$name from global scope
 x

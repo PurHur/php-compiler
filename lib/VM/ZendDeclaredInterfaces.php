@@ -36,6 +36,9 @@ final class ZendDeclaredInterfaces
         $entry = new ClassEntry($name);
         $entry->isInterface = true;
         $entry->interfaces = $parentLcs;
+        if ('seekableiterator' === $lc) {
+            BuiltinClasses::registerBuiltinInterfaceMethods($entry, ['seek']);
+        }
         $ctx->classes[$lc] = $entry;
     }
 }

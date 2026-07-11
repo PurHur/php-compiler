@@ -39,11 +39,11 @@ final class iptcembed extends Internal
             0,
             'iptcdata'
         );
-        $jpegPath = VmString::coerceStringBuiltinArg(
+        $jpegPath = VmString::coercePathBuiltinArg(
             $frame->calledArgs[1],
             'iptcembed',
             1,
-            'jpeg_file_name'
+            'filename'
         );
         $spool = 0;
         if (3 === $argc) {

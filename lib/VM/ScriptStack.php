@@ -64,4 +64,17 @@ final class ScriptStack
 
         return $path;
     }
+
+    /**
+     * Synthetic CLI compile units are not listed by get_included_files() (#10279).
+     *
+     * php-src: ext/standard/basic_functions.c — zend_get_included_files() skips eval/-r TUs
+     */
+    public static function isVirtualCompileUnit(string $path): bool
+    {
+        return '' === $path
+            || '-' === $path
+            || 'Standard input code' === $path
+            || 'Command line code' === $path;
+    }
 }

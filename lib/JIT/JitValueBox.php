@@ -268,9 +268,14 @@ final class JitValueBox
 
                 return;
             case Variable::TYPE_STRING:
+                // Fresh concat/allocation passes a runtime __string__* in KIND_VALUE; do not
+                // lowerDominating through compileTimeLiteral (standalone AOT strlen→0, #15642).
+                $strPtr = Variable::KIND_VALUE === $value->kind && null !== $value->value
+                    ? $value->value
+                    : JitStringArg::lowerDominating($context, $value, 'value box assign');
                 $owned = $context->builder->call(
                     $context->lookupFunction('__string__separate'),
-                    JitStringArg::lowerDominating($context, $value, 'value box assign')
+                    $strPtr
                 );
                 $context->builder->call(
                     $context->lookupFunction('__value__writeString'),
@@ -566,10 +571,11 @@ final class JitValueBox
             $i8->constInt(Variable::TYPE_NATIVE_BOOL, false),
             $context->builder->structGep($ptr, $map['type'])
         );
-        $boolTy = $context->getStringFromType($bool->typeOf());
-        $boolByte = ('int1' === $boolTy || 'bool' === $boolTy)
-            ? $context->builder->zExt($bool, $i8)
-            : $context->builder->truncOrBitCast($bool, $i8);
+        $i1 = $context->getTypeFromString('int1');
+        $boolByte = $context->builder->zExt(
+            $context->builder->truncOrBitCast($bool, $i1),
+            $i8
+        );
         $valueField = $context->builder->structGep($ptr, $map['value']);
         $i32 = $context->getTypeFromString('int32');
         $i64 = $context->getTypeFromString('int64');
@@ -587,7 +593,9 @@ final class JitValueBox
     public static function valuePtrFromNativeVariable(Context $context, Variable $var): Value
     {
         $slot = self::alloc($context);
-        $native = $context->builder->load($var->value);
+        $native = Variable::KIND_VALUE === $var->kind
+            ? $var->value
+            : $context->builder->load($var->value);
         switch ($var->type) {
             case Variable::TYPE_NATIVE_LONG:
                 self::writeLong($context, $slot, $native);

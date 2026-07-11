@@ -26,23 +26,38 @@ final class class_implements_ extends Internal
     public function execute(Frame $frame): void
     {
         $argc = \count($frame->calledArgs);
-        if ($argc < 1 || $argc > 2) {
-            throw new \LogicException('class_implements() requires one or two arguments in this compiler build');
+        if ($argc < 1) {
+            throw new \ArgumentCountError(\sprintf(
+                'class_implements() expects at least 1 argument, %d given',
+                $argc
+            ));
+        }
+        if ($argc > 2) {
+            throw new \ArgumentCountError(\sprintf(
+                'class_implements() expects at most 2 arguments, %d given',
+                $argc
+            ));
         }
         if (null === $frame->returnVar) {
             return;
         }
         $ctx = VmReflection::requireContext($frame);
+        VmClassHas::requireObjectOrClass($frame->calledArgs[0], 'class_implements', 'object_or_class');
         $autoload = true;
         if ($argc >= 2) {
-            $flag = $frame->calledArgs[1]->resolveIndirect();
-            if (Variable::TYPE_BOOLEAN !== $flag->type) {
-                throw new \LogicException('class_implements() autoload flag must be a boolean in this compiler build');
-            }
-            $autoload = $flag->toBool();
+            $autoload = VmMath::parseBoolBuiltinArg(
+                $frame->calledArgs[1],
+                'class_implements',
+                2,
+                'autoload'
+            );
         }
         $entry = VmReflection::resolveClassForClassImplements($ctx, $frame->calledArgs[0], $autoload);
         if (null === $entry) {
+            $operand = $frame->calledArgs[0]->resolveIndirect();
+            if (Variable::TYPE_STRING === $operand->type) {
+                VmReflection::warnClassOperandNotFound($frame, 'class_implements', $operand->toString(), $autoload);
+            }
             $frame->returnVar->bool(false);
 
             return;
@@ -52,8 +67,18 @@ final class class_implements_ extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (\count($args) < 1 || \count($args) > 2) {
-            throw new \LogicException('class_implements() requires one or two arguments in this compiler build');
+        $argc = \count($args);
+        if ($argc < 1) {
+            throw new \ArgumentCountError(\sprintf(
+                'class_implements() expects at least 1 argument, %d given',
+                $argc
+            ));
+        }
+        if ($argc > 2) {
+            throw new \ArgumentCountError(\sprintf(
+                'class_implements() expects at most 2 arguments, %d given',
+                $argc
+            ));
         }
         $autoload = true;
         if (\count($args) >= 2) {

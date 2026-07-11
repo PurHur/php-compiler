@@ -6,11 +6,10 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
-use PHPCompiler\JIT\ArrayBuiltinHelper;
+use PHPCompiler\JIT\Builtin\ArrayIntersectRuntime;
+use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\HashTable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
@@ -24,70 +23,38 @@ final class array_intersect extends Internal
         if ($argc < 1) {
             throw new \ArgumentCountError('array_intersect() expects at least 1 argument, 0 given');
         }
-        $first = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_ARRAY !== $first->type) {
-            throw new \LogicException('array_intersect() first argument must be an array in this compiler build');
-        }
-        $firstHt = $first->toArray();
+        $firstHt = VmArray::requireArrayArgNum(
+            $frame->calledArgs[0]->resolveIndirect(),
+            'array_intersect',
+            1
+        );
         $operandTables = [$firstHt];
         if (1 === $argc) {
             VmArray::rejectEnumCaseSetOpOperands($frame, $firstHt);
             if (null !== $frame->returnVar) {
-                $frame->returnVar->array($firstHt->replaceCopy());
+                $frame->returnVar->array(VmArray::intersectSingleArgumentCopy($firstHt));
             }
 
             return;
         }
         $others = [];
         for ($i = 1, $n = $argc; $i < $n; ++$i) {
-            $arg = $frame->calledArgs[$i]->resolveIndirect();
-            if (Variable::TYPE_ARRAY !== $arg->type) {
-                throw new \LogicException('array_intersect() arguments must be arrays in this compiler build');
-            }
-            $others[] = $arg->toArray();
+            $others[] = VmArray::requireArrayArgNum(
+                $frame->calledArgs[$i]->resolveIndirect(),
+                'array_intersect',
+                $i + 1
+            );
             $operandTables[] = $others[\count($others) - 1];
         }
         VmArray::rejectEnumCaseSetOpOperands($frame, ...$operandTables);
         if (null === $frame->returnVar) {
             return;
         }
-        $out = new HashTable();
-        foreach ($firstHt->iterateKeyed(true) as [$key, $value]) {
-            if (!self::valueInAllArrays($value, $others)) {
-                continue;
-            }
-            $stored = new Variable();
-            $stored->copyFrom($value);
-            if (Variable::TYPE_INTEGER === $key->type) {
-                $out->addIndex($key->toInt(), $stored);
-            } else {
-                $out->add($key->toString(), $stored);
-            }
+        $result = VmArray::intersectSingleArgumentCopy($firstHt);
+        foreach ($others as $other) {
+            $result = VmArray::intersectTwo($result, $other);
         }
-        $frame->returnVar->array($out);
-    }
-
-    /**
-     * @param list<HashTable> $arrays
-     */
-    private static function valueInAllArrays(Variable $needle, array $arrays): bool
-    {
-        $needle = $needle->resolveIndirect();
-        foreach ($arrays as $haystack) {
-            $found = false;
-            foreach ($haystack->iterate(true) as $value) {
-                $stored = $value->resolveIndirect();
-                if (in_array::looseEquals($needle, $stored)) {
-                    $found = true;
-                    break;
-                }
-            }
-            if (!$found) {
-                return false;
-            }
-        }
-
-        return true;
+        $frame->returnVar->array($result);
     }
 
     public Context $context;
@@ -98,12 +65,14 @@ final class array_intersect extends Internal
             throw new \ArgumentCountError('array_intersect() expects at least 1 argument, 0 given');
         }
 
+        TypeErrorRaise::ensureLinked($context);
         foreach ($args as $i => $arg) {
             if (JITVariable::TYPE_STRING === $arg->type || JITVariable::TYPE_VALUE === $arg->type) {
                 $this->jitString($context, $arg, 'array_intersect() argument #'.((int) $i + 1));
             }
+            JitArrayElem::requireArrayArgNum($context, $arg, 'array_intersect', $i + 1);
         }
 
-        return ArrayBuiltinHelper::arrayIntersect($context, ...$args);
+        return ArrayIntersectRuntime::intersect($context, $args[0], ...\array_slice($args, 1));
     }
 }

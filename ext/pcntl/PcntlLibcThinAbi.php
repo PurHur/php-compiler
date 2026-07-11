@@ -1,0 +1,243 @@
+<?php
+
+declare(strict_types=1);
+
+namespace PHPCompiler\ext\pcntl;
+
+/** Thin libc ABI for pcntl signal registration (php-src ext/pcntl/pcntl.c; issue #6680). */
+final class PcntlLibcThinAbi
+{
+    private static ?\FFI $ffi = null;
+
+    private static bool $unavailable = false;
+
+    /** @var \Closure|null */
+    private static $signalCallback = null;
+
+    public static function available(): bool
+    {
+        return null !== self::ffi();
+    }
+
+    public static function supportsNativeDispatch(): bool
+    {
+        return self::available() && \method_exists(\FFI::class, 'callback');
+    }
+
+    public static function installHandler(int $signo): bool
+    {
+        if (!self::supportsNativeDispatch()) {
+            return false;
+        }
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return false;
+        }
+        if (null === self::$signalCallback) {
+            self::$signalCallback = static function (int $signo): void {
+                VmPcntl::markPending($signo);
+            };
+        }
+        $handler = \FFI::callback('void(int)', self::$signalCallback);
+        $ffi->signal($signo, $handler);
+
+        return true;
+    }
+
+    public static function restoreDefault(int $signo): bool
+    {
+        if (!self::supportsNativeDispatch()) {
+            return false;
+        }
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return false;
+        }
+        $ffi->signal($signo, $ffi->cast('sighandler_t', 0));
+
+        return true;
+    }
+
+    public static function installDisposition(int $signo, int $disposition): bool
+    {
+        if (!self::supportsNativeDispatch()) {
+            return false;
+        }
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return false;
+        }
+        $handlerVal = PcntlConstants::SIG_IGN === $disposition ? 1 : 0;
+        $ffi->signal($signo, $ffi->cast('sighandler_t', $handlerVal));
+
+        return true;
+    }
+
+    public static function sigprocmaskAvailable(): bool
+    {
+        return null !== self::ffi();
+    }
+
+    /**
+     * @param list<int> $signals
+     * @param list<int> $old
+     */
+    public static function sigprocmask(int $mode, array $signals, array &$old): bool
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return false;
+        }
+        $set = $ffi->new('uint64_t');
+        foreach ($signals as $signo) {
+            $set->cdata |= 1 << ((int) $signo - 1);
+        }
+        $oldSet = $ffi->new('uint64_t');
+        $rc = (int) $ffi->sigprocmask($mode, \FFI::addr($set), \FFI::addr($oldSet));
+        if (0 !== $rc) {
+            return false;
+        }
+        $old = self::decodeSignalSet((int) $oldSet->cdata);
+
+        return true;
+    }
+
+    public static function waitidAvailable(): bool
+    {
+        return null !== self::ffi();
+    }
+
+    /**
+     * @param array<string, int> $info
+     */
+    public static function waitid(int $idtype, int $id, array &$info, int $options): bool
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return false;
+        }
+        if (!\method_exists($ffi, 'waitid')) {
+            return false;
+        }
+        $siginfo = $ffi->new('int[128]');
+        $rc = (int) $ffi->waitid($idtype, $id, \FFI::addr($siginfo), $options);
+        if (0 !== $rc) {
+            return false;
+        }
+        $info = [
+            'signo' => (int) $siginfo[0],
+            'errno' => (int) $siginfo[1],
+            'code' => (int) $siginfo[2],
+        ];
+
+        return true;
+    }
+
+    /**
+     * @return list<int>
+     */
+    private static function decodeSignalSet(int $mask): array
+    {
+        $signals = [];
+        for ($signo = 1; $signo < PcntlConstants::NSIG; ++$signo) {
+            if (0 !== ($mask & (1 << ($signo - 1)))) {
+                $signals[] = $signo;
+            }
+        }
+
+        return $signals;
+    }
+
+    public static function processAvailable(): bool
+    {
+        return null !== self::ffi();
+    }
+
+    public static function fork(): int
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return -1;
+        }
+
+        return (int) $ffi->fork();
+    }
+
+    public static function waitpid(int $pid, int &$status, int $options): int
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return -1;
+        }
+        $statusVar = $ffi->new('int');
+        $rc = (int) $ffi->waitpid($pid, \FFI::addr($statusVar), $options);
+        $status = (int) $statusVar->cdata;
+
+        return $rc;
+    }
+
+    public static function wifexited(int $status): bool
+    {
+        return 0 === ($status & 0x7f);
+    }
+
+    public static function wexitstatus(int $status): int
+    {
+        return ($status >> 8) & 0xff;
+    }
+
+    private static function ffi(): ?\FFI
+    {
+        if (!self::ffiEnabled()) {
+            return null;
+        }
+        if (self::$unavailable) {
+            return null;
+        }
+        if (null !== self::$ffi) {
+            return self::$ffi;
+        }
+        if (!\class_exists(\FFI::class, false)) {
+            self::$unavailable = true;
+
+            return null;
+        }
+
+        $cdef = <<<'CDEF'
+typedef int pid_t;
+typedef void (*sighandler_t)(int);
+typedef unsigned long sigset_t;
+sighandler_t signal(int signum, sighandler_t handler);
+int sigprocmask(int how, const sigset_t *set, sigset_t *oldset);
+pid_t fork(void);
+pid_t waitpid(pid_t pid, int *status, int options);
+typedef int idtype_t;
+typedef unsigned int id_t;
+typedef struct { int si_signo; int si_errno; int si_code; } siginfo_t;
+int waitid(idtype_t idtype, id_t id, siginfo_t *infop, int options);
+CDEF;
+
+        foreach (['libc.so.6', 'libc.so'] as $lib) {
+            try {
+                self::$ffi = \FFI::cdef($cdef, $lib);
+
+                return self::$ffi;
+            } catch (\Throwable) {
+            }
+        }
+
+        self::$unavailable = true;
+
+        return null;
+    }
+
+    private static function ffiEnabled(): bool
+    {
+        $v = \getenv('PHP_COMPILER_DISABLE_FFI');
+        if (false !== $v && '' !== $v && '0' !== $v && 'false' !== \strtolower($v)) {
+            return false;
+        }
+
+        return true;
+    }
+}

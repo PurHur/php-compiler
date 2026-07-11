@@ -7,7 +7,6 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -19,13 +18,14 @@ final class fileperms extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('fileperms() requires exactly one argument in this compiler build');
         }
-        $path = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'fileperms', 0, 'filename');
+        $filenameArg = $frame->calledArgs[0];
+        $path = VmFilestatArg::filenameArgForFrame($frame, 0, 'fileperms');
         if (null === $frame->returnVar) {
             return;
         }
         $mode = VmFs::filePerms($path);
         if (false === $mode) {
-            VmFilestatFailure::warnPathStatFailed($frame, 'fileperms', $path, false);
+            VmFilestatArg::warnPathStatFailedForFilenameArg($frame, $filenameArg, 'fileperms', $path, false);
             $frame->returnVar->bool(false);
         } else {
             $frame->returnVar->int($mode);
@@ -37,7 +37,7 @@ final class fileperms extends Internal
         if (1 !== \count($args)) {
             throw new \LogicException('fileperms() requires exactly one argument in this compiler build');
         }
-        $path = JitStringBuiltinArg::lower($context, $args[0], 'fileperms', 0, 'filename');
+        $path = JitFilestatArg::lowerFilename($context, $args[0], 'fileperms');
 
         return JitFileperms::invoke($context, $path);
     }

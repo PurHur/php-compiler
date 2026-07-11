@@ -367,13 +367,17 @@ final class PropertyHookDispatchLlvm
         $readVis = $staticProperty
             ? $objectType->staticPropertyVisibility($classId, $propertyName)
             : $objectType->propertyVisibility($classId, $propertyName);
+        $getVis = $staticProperty
+            ? $objectType->staticPropertyGetVisibility($classId, $propertyName)
+            : $objectType->propertyGetVisibility($classId, $propertyName);
+        $effectiveRead = PropertyVisibility::effectiveGetVisibility($readVis, $getVis);
         $setVis = PropertyVisibility::effectiveSetVisibility(
             $readVis,
             $staticProperty
                 ? $objectType->staticPropertySetVisibility($classId, $propertyName)
                 : $objectType->propertySetVisibility($classId, $propertyName)
         );
-        if ($setVis === MethodVisibility::mask($readVis)) {
+        if ($setVis === MethodVisibility::mask($effectiveRead)) {
             return false;
         }
         $declaringLc = strtolower(ltrim($className, '\\'));
@@ -391,7 +395,11 @@ final class PropertyHookDispatchLlvm
                     $objectType,
                     $child,
                     $parent
-                )
+                ),
+                MethodVisibility::mask($effectiveRead),
+                $staticProperty
+                    ? $objectType->staticPropertyAsymmetricExplicitRead($classId, $propertyName)
+                    : $objectType->propertyAsymmetricExplicitRead($classId, $propertyName)
             );
         } catch (\LogicException $e) {
             $message = $e->getMessage();

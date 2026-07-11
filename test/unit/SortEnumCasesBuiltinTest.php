@@ -40,7 +40,7 @@ echo implode(',', array_map(fn($v) => $v->name.':'.(int) ($v instanceof EUnit), 
 PHP, 'sort_unit_enum.php'));
         $output = ob_get_clean();
 
-        $this->assertSame('A:1,B:1', $output);
+        $this->assertSame('B:1,A:1', $output);
         $this->assertStringNotContainsString(':0', $output);
     }
 
@@ -78,5 +78,39 @@ PHP, 'arsort_backed_enum.php'));
         $output = ob_get_clean();
 
         $this->assertSame('B,A', $output);
+    }
+
+    /** @covers issue #5691 */
+    public function testStringBackedEnumSortUsesObjectHandleOrder(): void
+    {
+        ob_start();
+        $runtime = new Runtime();
+        $runtime->run($runtime->parseAndCompile(<<<'PHP'
+<?php
+enum EStr: string { case A = 'b'; case B = 'a'; }
+$a = [EStr::B, EStr::A];
+sort($a);
+echo $a[0]->name, ',', $a[1]->name;
+PHP, 'sort_string_backed_enum.php'));
+        $output = ob_get_clean();
+
+        $this->assertSame('A,B', $output);
+    }
+
+    /** @covers issue #5691 */
+    public function testIntBackedEnumSortUsesDeclarationHandleNotBackingValue(): void
+    {
+        ob_start();
+        $runtime = new Runtime();
+        $runtime->run($runtime->parseAndCompile(<<<'PHP'
+<?php
+enum EOrder: int { case C = 3; case A = 1; case B = 2; }
+$a = [EOrder::B, EOrder::C, EOrder::A];
+sort($a);
+echo implode(',', array_map(fn($v) => $v->name, $a));
+PHP, 'sort_enum_declaration_order.php'));
+        $output = ob_get_clean();
+
+        $this->assertSame('C,A,B', $output);
     }
 }

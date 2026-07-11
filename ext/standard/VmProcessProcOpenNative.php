@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\CompilerVersion;
+
 /**
  * VM proc_open()/proc_close()/proc_get_status()/proc_terminate() — libc FFI, no host proc_* (#8652, #8889).
  *
- * Mirrors JIT {@see \PHPCompiler\JIT\Builtin\ProcessOpenJit} and {@see VmProcessExecCaptureNative}.
+ * SSOT for compiled JIT/AOT via {@see ProcessOpenJitHelper}; mirrors {@see VmProcessExecCaptureNative}.
  * php-src: ext/standard/proc_open.c
  */
 final class VmProcessProcOpenNative
@@ -18,7 +20,12 @@ final class VmProcessProcOpenNative
 
     private const WNOHANG = 1;
 
-    /** @var array<int, array{pid: int, command: string, statusKnown: bool, status: int, active: bool}> */
+    /** Linux SIGCONT / SIGSTOP — pause child until parent pipe setup completes (php-src proc_open race). */
+    private const SIGCONT = 18;
+
+    private const SIGSTOP = 19;
+
+    /** @var array<int, array{pid: int, command: string, statusKnown: bool, status: int, active: bool, pipeHandles: list<int>, childPaused: bool, pendingSignals?: list<int>}> */
     private static array $slots = [];
 
     private static int $nextHandleId = 0;
@@ -32,9 +39,20 @@ final class VmProcessProcOpenNative
         return null !== self::ffi();
     }
 
+    /** @internal {@see ProcessSlotJitHelper} embed slot table (#9408) */
+    public static function sharedFfi(): ?\FFI
+    {
+        return self::ffi();
+    }
+
     public static function isValidHandle(int $handle): bool
     {
         return isset(self::$slots[$handle]) && self::$slots[$handle]['active'];
+    }
+
+    public static function hasHandle(int $handle): bool
+    {
+        return isset(self::$slots[$handle]);
     }
 
     /**
@@ -54,7 +72,8 @@ final class VmProcessProcOpenNative
             return false;
         }
 
-        $commandLabel = implode(' ', $argv);
+        // php-src: proc_get_status()['command'] is argv[0], not the joined command line.
+        $commandLabel = $argv[0];
 
         $ffi = self::ffi();
         if (null === $ffi) {
@@ -89,6 +108,7 @@ final class VmProcessProcOpenNative
             }
 
             if (0 === $pid) {
+                $ffi->raise(self::SIGSTOP);
                 self::closePipeWrite($ffi, $stdinPipe);
                 self::closePipeRead($ffi, $stdoutPipe);
                 self::closePipeRead($ffi, $stderrPipe);
@@ -101,10 +121,7 @@ final class VmProcessProcOpenNative
                 if (null !== $cwd && '' !== $cwd) {
                     $ffi->chdir($cwd);
                 }
-                if (null !== $env) {
-                    self::applyEnv($ffi, $env);
-                }
-                self::execArgv($ffi, $argv);
+                self::execArgv($ffi, $argv, $env);
                 $ffi->_exit(self::EXIT_127);
             }
 
@@ -162,6 +179,8 @@ final class VmProcessProcOpenNative
                 'statusKnown' => false,
                 'status' => 0,
                 'active' => true,
+                'pipeHandles' => array_values($pipeHandles),
+                'childPaused' => true,
             ];
 
             return [$slot, $pipeHandles];
@@ -221,6 +240,7 @@ final class VmProcessProcOpenNative
             }
 
             if (0 === $pid) {
+                $ffi->raise(self::SIGSTOP);
                 self::closePipeWrite($ffi, $stdinPipe);
                 self::closePipeRead($ffi, $stdoutPipe);
                 self::closePipeRead($ffi, $stderrPipe);
@@ -233,10 +253,7 @@ final class VmProcessProcOpenNative
                 if (null !== $cwd && '' !== $cwd) {
                     $ffi->chdir($cwd);
                 }
-                if (null !== $env) {
-                    self::applyEnv($ffi, $env);
-                }
-                $ffi->execl('/bin/sh', 'sh', '-c', $command, null);
+                self::execArgv($ffi, ['sh', '-c', $command], $env);
                 $ffi->_exit(self::EXIT_127);
             }
 
@@ -294,6 +311,8 @@ final class VmProcessProcOpenNative
                 'statusKnown' => false,
                 'status' => 0,
                 'active' => true,
+                'pipeHandles' => array_values($pipeHandles),
+                'childPaused' => true,
             ];
 
             return [$slot, $pipeHandles];
@@ -317,24 +336,29 @@ final class VmProcessProcOpenNative
         }
 
         $slot['active'] = false;
-        self::$slots[$handle] = $slot;
+        self::closeRemainingPipeHandles($slot);
+        self::resumeChildIfPaused($ffi, $slot);
 
         if ($slot['statusKnown']) {
-            $status = $slot['status'];
-            self::releaseSlot($handle);
+            // php-src: proc_close() after proc_get_status() already reaped child — return -1 (#16968).
+            self::$slots[$handle] = $slot;
 
-            return self::exitCodeFromStatus($status);
+            return -1;
         }
 
         try {
             $status = $ffi->new('int');
             $waitRc = (int) $ffi->waitpid($slot['pid'], \FFI::addr($status), 0);
-            self::releaseSlot($handle);
             if (-1 === $waitRc) {
+                self::releaseSlot($handle);
+
                 return -1;
             }
+            $slot['statusKnown'] = true;
+            $slot['status'] = (int) $status->cdata;
+            self::$slots[$handle] = $slot;
 
-            return self::exitCodeFromStatus((int) $status->cdata);
+            return self::exitCodeFromStatus($slot['status']);
         } catch (\Throwable) {
             self::releaseSlot($handle);
 
@@ -348,7 +372,10 @@ final class VmProcessProcOpenNative
     public static function getStatus(int $handle): array|false
     {
         $slot = self::$slots[$handle] ?? null;
-        if (null === $slot || !$slot['active']) {
+        if (null === $slot) {
+            return false;
+        }
+        if (!$slot['active']) {
             return false;
         }
 
@@ -364,20 +391,18 @@ final class VmProcessProcOpenNative
             $statusVal = $slot['status'];
             $running = false;
         } else {
-            try {
-                $status = $ffi->new('int');
-                $waitRc = (int) $ffi->waitpid($slot['pid'], \FFI::addr($status), self::WNOHANG);
-                if ($waitRc > 0) {
-                    $statusVal = (int) $status->cdata;
-                    $slot['status'] = $statusVal;
-                    $slot['statusKnown'] = true;
-                    self::$slots[$handle] = $slot;
-                    $running = false;
-                } elseif (-1 === $waitRc) {
+            self::pollChildExitStatus($ffi, $slot);
+            self::$slots[$handle] = $slot;
+            if ($slot['statusKnown']) {
+                $statusVal = $slot['status'];
+                $running = false;
+            } else {
+                // php-src: waitpid(WNOHANG) in proc_get_status; reap only when child already exited (#13079, #15647).
+                try {
                     $running = 0 === (int) $ffi->kill($slot['pid'], 0);
+                } catch (\Throwable) {
+                    return false;
                 }
-            } catch (\Throwable) {
-                return false;
             }
         }
 
@@ -385,15 +410,153 @@ final class VmProcessProcOpenNative
         $exited = 0 === $lowByte;
         $stopped = 0x7f === $lowByte;
         $signaled = $lowByte > 0 && !$stopped;
+        $signals = self::termsigStopsigFromWaitStatus($statusVal);
 
-        return [
-            'command' => $slot['command'],
-            'pid' => $slot['pid'],
+        $pendingSignals = self::resolvePendingSignals($slot, $signaled, $stopped, $signals['termsig']);
+        self::$slots[$handle] = $slot;
+
+        return self::buildProcStatusArray(
+            $slot['command'],
+            $slot['pid'],
+            $running,
+            $signaled,
+            $stopped,
+            $running ? -1 : ($exited ? (($statusVal >> 8) & 0xff) : -1),
+            $signals['termsig'],
+            $signals['stopsig'],
+            $pendingSignals,
+            $slot['statusKnown'],
+        );
+    }
+
+    /**
+     * @param array{pid: int, command: string, statusKnown: bool, status: int, active: bool, pipeHandles?: list<int>, childPaused?: bool, pendingSignals?: list<int>} $slot
+     *
+     * @return array<string, mixed>|false
+     */
+    public static function statusFromClosedSlotForEmbed(array $slot): array|false
+    {
+        return self::statusFromClosedSlot($slot);
+    }
+
+    /**
+     * php-src: proc_get_status() on proc_close()d handle — cached exit snapshot, running=false (#16863).
+     *
+     * @param array{pid: int, command: string, statusKnown: bool, status: int, active: bool, pipeHandles?: list<int>, childPaused?: bool, pendingSignals?: list<int>} $slot
+     *
+     * @return array<string, mixed>|false
+     */
+    private static function statusFromClosedSlot(array $slot): array|false
+    {
+        if (!$slot['statusKnown']) {
+            return false;
+        }
+
+        $statusVal = $slot['status'];
+        $lowByte = $statusVal & 0xff;
+        $exited = 0 === $lowByte;
+        $stopped = 0x7f === $lowByte;
+        $signaled = $lowByte > 0 && !$stopped;
+        $signals = self::termsigStopsigFromWaitStatus($statusVal);
+        $pendingSignals = self::resolvePendingSignals($slot, $signaled, $stopped, $signals['termsig']);
+
+        return self::buildProcStatusArray(
+            $slot['command'],
+            $slot['pid'],
+            false,
+            $signaled,
+            $stopped,
+            $exited ? (($statusVal >> 8) & 0xff) : -1,
+            $signals['termsig'],
+            $signals['stopsig'],
+            $pendingSignals,
+            true,
+        );
+    }
+
+    /**
+     * php-src ext/standard/exec.c — PHP_FUNCTION(proc_get_status) array insertion order (#13210, #16707).
+     *
+     * @param list<int> $pendingSignals
+     *
+     * @return array<string, mixed>
+     */
+    public static function buildProcStatusArray(
+        string $command,
+        int $pid,
+        bool $running,
+        bool $signaled,
+        bool $stopped,
+        int $exitcode,
+        int $termsig,
+        int $stopsig,
+        array $pendingSignals = [],
+        bool $cached = false,
+    ): array {
+        $status = [
+            'command' => $command,
+            'pid' => $pid,
             'running' => $running,
-            'exitcode' => $running ? -1 : ($exited ? (($statusVal >> 8) & 0xff) : -1),
             'signaled' => $signaled,
             'stopped' => $stopped,
+            'exitcode' => $exitcode,
+            'termsig' => $termsig,
+            'stopsig' => $stopsig,
         ];
+        if (CompilerVersion::supportsProcGetStatusCached()) {
+            $status['cached'] = $cached;
+        }
+        if (CompilerVersion::supportsProcGetStatusPendingSignals()) {
+            $status['pending_signals'] = $pendingSignals;
+        }
+
+        return $status;
+    }
+
+    /**
+     * Signals sent via proc_terminate() but not yet delivered to the child (php-src proc_open.c, #16707).
+     *
+     * @param array{pid: int, command: string, statusKnown: bool, status: int, active: bool, pipeHandles?: list<int>, childPaused?: bool, pendingSignals?: list<int>} $slot
+     *
+     * @return list<int>
+     */
+    public static function resolvePendingSignals(array &$slot, bool $signaled, bool $stopped, int $termsig): array
+    {
+        if (!CompilerVersion::supportsProcGetStatusPendingSignals()) {
+            return [];
+        }
+
+        $pending = $slot['pendingSignals'] ?? [];
+        if ($signaled && $termsig > 0) {
+            $pending = array_values(array_filter(
+                $pending,
+                static fn (int $signal): bool => $signal !== $termsig,
+            ));
+        }
+        if (!$stopped && !$signaled) {
+            $pending = [];
+        }
+        $slot['pendingSignals'] = $pending;
+
+        return $pending;
+    }
+
+    /**
+     * WTERMSIG / WSTOPSIG parity for proc_get_status() (php-src ext/standard/proc_open.c).
+     *
+     * @return array{termsig: int, stopsig: int}
+     */
+    public static function termsigStopsigFromWaitStatus(int $statusVal): array
+    {
+        $lowByte = $statusVal & 0xff;
+        if (0x7f === $lowByte) {
+            return ['termsig' => 0, 'stopsig' => ($statusVal >> 8) & 0xff];
+        }
+        if ($lowByte > 0) {
+            return ['termsig' => $lowByte, 'stopsig' => 0];
+        }
+
+        return ['termsig' => 0, 'stopsig' => 0];
     }
 
     public static function terminate(int $handle, int $signal = 15): bool
@@ -408,6 +571,8 @@ final class VmProcessProcOpenNative
             return false;
         }
 
+        self::resumeChildIfPaused($ffi, $slot);
+
         try {
             return 0 === (int) $ffi->kill($slot['pid'], $signal);
         } catch (\Throwable) {
@@ -417,24 +582,59 @@ final class VmProcessProcOpenNative
 
     private static function exitCodeFromStatus(int $statusVal): int
     {
-        if (0 === ($statusVal & 0xff)) {
+        $lowByte = $statusVal & 0xff;
+        if (0 === $lowByte) {
             return ($statusVal >> 8) & 0xff;
         }
+        if (0x7f === $lowByte) {
+            return -1;
+        }
 
-        return self::EXIT_127;
+        return $lowByte;
     }
 
     /**
-     * @param array<string, string> $env
+     * php-src proc_open_rsrc_dtor — close pipe streams before waitpid (ext/standard/proc_open.c).
+     *
+     * @param array{pid: int, command: string, statusKnown: bool, status: int, active: bool, pipeHandles?: list<int>, childPaused?: bool} $slot
      */
-    private static function applyEnv(\FFI $ffi, array $env): void
+    private static function closeRemainingPipeHandles(array &$slot): void
     {
-        foreach ($env as $key => $value) {
-            if (!\is_string($key) || !\is_string($value)) {
+        foreach ($slot['pipeHandles'] ?? [] as $pipeHandle) {
+            if (!\is_int($pipeHandle) || !VmPhpFdStream::isValidHandle($pipeHandle)) {
                 continue;
             }
-            $ffi->setenv($key, $value, 1);
+            VmFs::fclose($pipeHandle);
         }
+        $slot['pipeHandles'] = [];
+    }
+
+    /**
+     * php-src php_array_to_envp() — KEY=value pairs for execvpe (ext/standard/proc_open.c).
+     *
+     * @param array<string, string> $env
+     */
+    private static function buildEnvp(\FFI $ffi, array $env): \FFI\CData
+    {
+        $pairs = [];
+        foreach ($env as $key => $value) {
+            if (!\is_string($key) || !\is_string($value) || '' === $key || '' === $value) {
+                continue;
+            }
+            $pairs[] = $key.'='.$value;
+        }
+        $count = \count($pairs);
+        $envp = $ffi->new('char*['.($count + 1).']');
+        foreach ($pairs as $i => $pair) {
+            $len = \strlen($pair);
+            $buf = $ffi->new('char['.($len + 1).']', false);
+            \FFI::memcpy($buf, $pair, $len);
+            $buf[$len] = "\0";
+            $envp[$i] = \FFI::cast('char*', $buf);
+        }
+        $envp[$count] = null;
+
+        return $envp;
     }
 
     private static function allocateSlot(): ?int
@@ -487,8 +687,92 @@ final class VmProcessProcOpenNative
         $ffi->waitpid($pid, \FFI::addr($status), 0);
     }
 
-    /** @param list<string> $argv */
-    private static function execArgv(\FFI $ffi, array $argv): void
+    /** Last proc pipe closed — resume paused child so short-lived commands can exit (#15647). */
+    public static function onPipeHandleClosed(int $pipeHandle): void
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return;
+        }
+        foreach (self::$slots as $handle => &$slot) {
+            if (!$slot['active']) {
+                continue;
+            }
+            $pipes = $slot['pipeHandles'] ?? [];
+            $idx = array_search($pipeHandle, $pipes, true);
+            if (false === $idx) {
+                continue;
+            }
+            unset($pipes[$idx]);
+            $slot['pipeHandles'] = array_values($pipes);
+            if ([] === $slot['pipeHandles']) {
+                self::resumeChildIfPaused($ffi, $slot);
+            }
+            self::$slots[$handle] = $slot;
+
+            return;
+        }
+    }
+
+    /** Resume paused child when parent performs blocking I/O on a proc pipe (#14685, #15084). */
+    public static function resumeChildForPipeHandle(int $pipeHandle): void
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return;
+        }
+        foreach (self::$slots as &$slot) {
+            if (!$slot['active']) {
+                continue;
+            }
+            if (!\in_array($pipeHandle, $slot['pipeHandles'] ?? [], true)) {
+                continue;
+            }
+            self::resumeChildIfPaused($ffi, $slot);
+
+            return;
+        }
+    }
+
+    /**
+     * Non-blocking waitpid — reap exited child and cache status for proc_close() (#15647).
+     *
+     * @param array{pid: int, command: string, statusKnown: bool, status: int, active: bool, pipeHandles?: list<int>, childPaused?: bool} $slot
+     */
+    private static function pollChildExitStatus(\FFI $ffi, array &$slot): void
+    {
+        if ($slot['statusKnown']) {
+            return;
+        }
+        try {
+            $status = $ffi->new('int');
+            $waitRc = (int) $ffi->waitpid($slot['pid'], \FFI::addr($status), self::WNOHANG);
+            if ($waitRc === $slot['pid']) {
+                $slot['statusKnown'] = true;
+                $slot['status'] = (int) $status->cdata;
+            }
+        } catch (\Throwable) {
+        }
+    }
+
+    /** Child raises SIGSTOP at fork; resume on blocking pipe I/O or proc_close() (#14685, #15035). */
+    private static function resumeChildIfPaused(\FFI $ffi, array &$slot): void
+    {
+        if (!($slot['childPaused'] ?? false)) {
+            return;
+        }
+        $pid = $slot['pid'];
+        if ($pid > 0) {
+            $ffi->kill($pid, self::SIGCONT);
+        }
+        $slot['childPaused'] = false;
+    }
+
+    /**
+     * @param list<string> $argv
+     * @param array<string, string>|null $env
+     */
+    private static function execArgv(\FFI $ffi, array $argv, ?array $env = null): void
     {
         $argc = \count($argv);
         $argvPtr = $ffi->new('char*['.($argc + 1).']');
@@ -505,7 +789,13 @@ final class VmProcessProcOpenNative
             }
         }
         $argvPtr[$argc] = null;
-        $ffi->execvp($filePtr, $argvPtr);
+        if (null === $env) {
+            $ffi->execvp($filePtr, $argvPtr);
+
+            return;
+        }
+        $envp = self::buildEnvp($ffi, $env);
+        $ffi->execvpe($filePtr, $argvPtr, $envp);
     }
 
     private static function ffiEnabled(): bool
@@ -547,9 +837,11 @@ int chdir(const char *path);
 int setenv(const char *name, const char *value, int overwrite);
 int execl(const char *path, const char *arg, ...);
 int execvp(const char *file, char *const argv[]);
+int execvpe(const char *file, char *const argv[], char *const envp[]);
 void _exit(int status);
 pid_t waitpid(pid_t pid, int *status, int options);
 int kill(pid_t pid, int sig);
+int raise(int sig);
 CDEF;
 
         foreach (['libc.so.6', 'libc.so'] as $lib) {

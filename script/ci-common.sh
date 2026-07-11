@@ -86,7 +86,12 @@ ci_run_capability_syntax_check() {
     return 0
   fi
   echo "capability-syntax: stale check (CAPABILITY_SYNTAX_CHECK=1 default, issue #803)..."
-  "$PHP_BIN" "${PHP_OPTS[@]}" script/capability-syntax.php --check
+  if ! "$PHP_BIN" "${PHP_OPTS[@]}" script/capability-syntax.php --check; then
+    # Auto-heal like capability-matrix above (#765/#16415 pattern, #16508).
+    echo "Auto-healing stale docs/capabilities-syntax.md via capability-syntax.php..."
+    "$PHP_BIN" "${PHP_OPTS[@]}" script/capability-syntax.php
+    "$PHP_BIN" "${PHP_OPTS[@]}" script/capability-syntax.php --check
+  fi
 }
 
 ci_run_wave3_roadmap_sync_check() {
@@ -94,6 +99,15 @@ ci_run_wave3_roadmap_sync_check() {
     return 0
   fi
   echo "Wave 3 roadmap sync (WAVE3_ROADMAP_SYNC_GATE=1, issue #1802)..."
+  if "$PHP_BIN" "${PHP_OPTS[@]}" script/check-wave3-roadmap-sync.php; then
+    return 0
+  fi
+  # Footnote pairs are generated text that goes stale every time the fleet
+  # grows the inventory (#1802); auto-heal like the #765 doc regen instead of
+  # failing every ci run on the box that didn't cause the growth. Real spine
+  # gaps (bundle edits, sidecar) still fail below after the rewrite.
+  echo "Auto-healing stale spine footnotes via spine-sync --footnotes-only (#1802)..."
+  ./script/spine-sync.sh --footnotes-only
   "$PHP_BIN" "${PHP_OPTS[@]}" script/check-wave3-roadmap-sync.php
 }
 
@@ -349,7 +363,15 @@ ci_run_bootstrap_inventory_triage_sync_check() {
     return 0
   fi
   echo "Bootstrap inventory triage snapshot sync (BOOTSTRAP_INVENTORY_TRIAGE_SYNC_GATE=1, issue #2265)..."
-  "$PHP_BIN" "${PHP_OPTS[@]}" script/check-bootstrap-inventory-triage-sync.php
+  if ! "$PHP_BIN" "${PHP_OPTS[@]}" script/check-bootstrap-inventory-triage-sync.php; then
+    # Generated snapshot goes stale on every fleet inventory growth; regen is
+    # ~0.5s warm since the lint cache (#16394) — auto-heal like the other
+    # generated docs (#765/#16415/#16572 pattern, #16508).
+    echo "Auto-healing stale docs/bootstrap-inventory-triage-top50.json..."
+    "$PHP_BIN" "${PHP_OPTS[@]}" script/bootstrap-inventory-triage.php --json --top 50 \
+      > docs/bootstrap-inventory-triage-top50.json
+    "$PHP_BIN" "${PHP_OPTS[@]}" script/check-bootstrap-inventory-triage-sync.php
+  fi
 }
 
 ci_run_stdlib_jit_deferred_sync_check() {
@@ -374,6 +396,14 @@ ci_run_docs_harness_hygiene_check() {
   fi
   echo "Docs harness hygiene (DOCS_HARNESS_HYGIENE_GATE=1, issue #2485)..."
   "$PHP_BIN" "${PHP_OPTS[@]}" script/check-docs-harness-hygiene.php
+}
+
+ci_run_github_pages_config_check() {
+  if [[ "${GITHUB_PAGES_CONFIG_GATE:-1}" != "1" ]]; then
+    return 0
+  fi
+  echo "GitHub Pages config (GITHUB_PAGES_CONFIG_GATE=1)..."
+  "$PHP_BIN" "${PHP_OPTS[@]}" script/check-github-pages-config.php
 }
 
 ci_run_selfhost_m4_gen2_sync_check() {
@@ -510,7 +540,14 @@ ci_run_inventory_checks() {
   ci_run_init_selfhostprobe_parity_check
   ci_run_init_fastcgiweb_parity_check
   ci_run_init_apijson_parity_check
-  "$PHP_BIN" "${PHP_OPTS[@]}" script/capability-matrix.php --check
+  if ! "$PHP_BIN" "${PHP_OPTS[@]}" script/capability-matrix.php --check; then
+    # Generated doc: auto-heal like bootstrap-inventory (#765) and wave3
+    # footnotes (#16415) — fleet merges add builtins hourly and a stale
+    # matrix should not fail every other agent's run (#16508).
+    echo "Auto-healing stale docs/capabilities.md via capability-matrix.php..."
+    "$PHP_BIN" "${PHP_OPTS[@]}" script/capability-matrix.php
+    "$PHP_BIN" "${PHP_OPTS[@]}" script/capability-matrix.php --check
+  fi
   ci_run_capability_syntax_check
   ci_ensure_generated_doc script/generate-pages-capability-comparison.php capability-comparison.html
   ci_ensure_generated_doc script/bootstrap-inventory.php docs/bootstrap-inventory.md
@@ -555,6 +592,7 @@ ci_run_inventory_checks() {
   ci_run_stdlib_jit_deferred_sync_check
   ci_run_doctor_gates_matrix_sync_check
   ci_run_docs_harness_hygiene_check
+  ci_run_github_pages_config_check
 }
 
 ci_llvm_dir() {

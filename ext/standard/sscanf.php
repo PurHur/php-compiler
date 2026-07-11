@@ -8,6 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPLLVM\Value;
 
 /**
@@ -24,9 +25,13 @@ final class sscanf extends Internal
     {
         $argc = \count($frame->calledArgs);
         if ($argc < 2) {
-            throw new \LogicException('sscanf() requires at least two arguments');
+            throw new \ArgumentCountError(\sprintf(
+                'sscanf() expects at least 2 arguments, %d given',
+                $argc
+            ));
         }
-        $input = VmString::requireStringBuiltinArg($frame->calledArgs[0], 'sscanf', 0, 'string');
+        InternalStrictArg::rejectNullString($frame->calledArgs[0], 'sscanf', 'string', 0, $frame);
+        $input = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'sscanf', 0, 'string');
         $format = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'sscanf', 1, 'format');
         $outVars = [];
         for ($i = 2; $i < $argc; ++$i) {

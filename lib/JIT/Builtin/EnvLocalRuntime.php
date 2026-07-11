@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT;
-use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPCompiler\JIT\Variable;
 use PHPLLVM\Builder;
@@ -14,9 +14,10 @@ use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_env_local_* via EnvLocalJitHelper PHP (#9814).
+ * JIT/AOT link for __compiler_env_local_* via EnvLocalJitHelper PHP (#9814, #13431).
  *
- * Replaces {@see StringEnvLocal} LLVM overlay table (phpc_env_local_entries).
+ * JIT embed and AOT standalone compile {@see \PHPCompiler\ext\standard\EnvLocalJitHelper}; thin LLVM bridges
+ * forward the ABI. Replaces {@see StringEnvLocal} LLVM overlay table (phpc_env_local_entries).
  * SSOT: {@see \PHPCompiler\ext\standard\GetenvJitHelper}
  * php-src: ext/standard/basic_functions.c — zif_putenv, zif_getenv
  */
@@ -28,13 +29,10 @@ final class EnvLocalRuntime
 
     private const REGISTER_HELPER = 'PHPCompiler\\ext\\standard\\EnvLocalJitHelper::registerPutenv';
 
-    private const MERGE_HELPER = 'PHPCompiler\\ext\\standard\\EnvLocalJitHelper::mergeOverlay';
-
     /** @var list<string> */
     private const COMPILED_HELPERS = [
         self::LOOKUP_HELPER,
         self::REGISTER_HELPER,
-        self::MERGE_HELPER,
     ];
 
     /** @var list<string> */
@@ -57,34 +55,12 @@ final class EnvLocalRuntime
             return;
         }
 
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            EnvLocalStandaloneLlvm::implement($context);
-            self::registerLinkedRuntime($context);
-
-            return;
-        }
-
         self::ensureLibc($context);
         self::ensureJitHelperCompiled($context);
         self::implementLookupBridge($context);
         self::implementRegisterBridge($context);
         self::registerLinkedRuntime($context);
         $context->builder->clearInsertionPosition();
-    }
-
-    public static function emitMergeOverlay(Context $context, Value $ht): void
-    {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            EnvLocalStandaloneLlvm::emitMergeOverlay($context, $ht);
-
-            return;
-        }
-
-        self::ensureJitHelperCompiled($context);
-        $context->builder->call(
-            self::helperFunction($context, self::MERGE_HELPER),
-            $ht
-        );
     }
 
     private static function implementLookupBridge(Context $context): void
@@ -103,19 +79,16 @@ final class EnvLocalRuntime
             ? $probe
             : $context->module->addFunction($abiName, $ft);
 
+        $null = $i8p->constNull();
         $entry = $fn->appendBasicBlock('el_lookup_entry');
         $context->builder->positionAtEnd($entry);
 
         $nameCstr = $fn->getParam(0);
-        $i8 = $context->getTypeFromString('int8');
         $i64 = $context->getTypeFromString('int64');
-        $strMap = $context->structFieldMap['__string__'];
-        $valMap = $context->structFieldMap['__value__'];
-        $null = $i8p->constNull();
 
-        $nameNull = $context->builder->icmp(Builder::INT_EQ, $nameCstr, $null);
         $missBb = $fn->appendBasicBlock('el_lookup_miss');
         $bodyBb = $fn->appendBasicBlock('el_lookup_body');
+        $nameNull = $context->builder->icmp(Builder::INT_EQ, $nameCstr, $null);
         $context->builder->branchIf($nameNull, $missBb, $bodyBb);
 
         $context->builder->positionAtEnd($bodyBb);
@@ -128,48 +101,24 @@ final class EnvLocalRuntime
             $nameLenI64,
             $nameCstr
         );
-        $overlayBox = $context->builder->call(
+        $overlayRaw = JitNestedHelperCoerce::callHelper(
+            $context,
             self::helperFunction($context, self::LOOKUP_HELPER),
-            $nameStr
+            [$nameStr]
         );
-        $overlayType = $context->builder->load(
-            $context->builder->structGep($overlayBox, $valMap['type'])
-        );
-        $isMiss = $context->builder->icmp(
-            Builder::INT_EQ,
-            $overlayType,
-            $i8->constInt(Variable::TYPE_NATIVE_BOOL, false)
-        );
+        $isMiss = JitNestedHelperCoerce::isHelperResultNull($context, $overlayRaw);
         $hitBb = $fn->appendBasicBlock('el_lookup_hit');
         $context->builder->branchIf($isMiss, $missBb, $hitBb);
 
         $context->builder->positionAtEnd($hitBb);
+        $overlayPtr = JitNestedHelperCoerce::valueBoxPtrFromHelperResult($context, $overlayRaw);
         $valueStr = $context->builder->call(
             $context->lookupFunction('__value__readString'),
-            $overlayBox
+            $overlayPtr
         );
-        $valueLen = $context->builder->load(
-            $context->builder->structGep($valueStr, $strMap['length'])
-        );
-        $valueBytes = $context->builder->structGep($valueStr, $strMap['value']);
-        $bufLen = $context->builder->add($valueLen, $i64->constInt(1, false));
-        $dup = $context->builder->call($context->lookupFunction('malloc'), $bufLen);
-        $dupNull = $context->builder->icmp(Builder::INT_EQ, $dup, $null);
-        $dupFailBb = $fn->appendBasicBlock('el_lookup_dup_fail');
-        $dupOkBb = $fn->appendBasicBlock('el_lookup_dup_ok');
+        $dup = self::dupCstrFromStringStruct($context, $valueStr);
         $doneBb = $fn->appendBasicBlock('el_lookup_done');
-        $context->builder->branchIf($dupNull, $dupFailBb, $dupOkBb);
-
-        $context->builder->positionAtEnd($dupOkBb);
-        $context->intrinsic->memcpy($dup, $valueBytes, $valueLen, false);
-        $context->builder->store(
-            $i8->constInt(0, false),
-            $context->builder->inBoundsGEP($dup, $valueLen)
-        );
         $context->builder->branch($doneBb);
-
-        $context->builder->positionAtEnd($dupFailBb);
-        $context->builder->branch($missBb);
 
         $context->builder->positionAtEnd($missBb);
         $context->builder->returnValue($null);
@@ -228,15 +177,48 @@ final class EnvLocalRuntime
         $context->registerFunction($abiName, $fn);
     }
 
+    /** Duplicate __string__ payload bytes into a malloc'd C string (#12910). */
+    private static function dupCstrFromStringStruct(Context $context, Value $src): Value
+    {
+        $strMap = $context->structFieldMap['__string__'];
+        $valueBytes = $context->builder->structGep($src, $strMap['value']);
+
+        return self::dupCstrBytes($context, $valueBytes);
+    }
+
+    private static function dupCstrBytes(Context $context, Value $src): Value
+    {
+        $i8 = $context->getTypeFromString('int8');
+        $i8p = $context->getTypeFromString('int8*');
+        $sizeT = $context->getTypeFromString('size_t');
+        $len = $context->builder->call($context->lookupFunction('strlen'), $src);
+        $buf = $context->builder->call(
+            $context->lookupFunction('malloc'),
+            $context->builder->add($len, $sizeT->constInt(1, false))
+        );
+        $dest = $context->builder->pointerCast($buf, $i8p);
+        $context->builder->call($context->lookupFunction('memcpy'), $dest, $src, $len);
+        $context->builder->store(
+            $i8->constInt(0, false),
+            $context->builder->inBoundsGEP($dest, $len)
+        );
+
+        return $dest;
+    }
+
     private static function ensureLibc(Context $context): void
     {
         $i8p = $context->getTypeFromString('int8*');
         $i64 = $context->getTypeFromString('int64');
         $voidPtr = $context->getTypeFromString('void*');
+        $voidTy = $context->getTypeFromString('void');
+        $sizeT = $context->getTypeFromString('size_t');
+        $i8 = $context->getTypeFromString('int8');
 
         foreach ([
             ['strlen', $i64, [$i8p]],
-            ['malloc', $voidPtr, [$i64]],
+            ['malloc', $voidPtr, [$sizeT]],
+            ['memcpy', $voidPtr, [$voidPtr, $voidPtr, $sizeT]],
             ['__string__init', $context->getTypeFromString('__string__*'), [$i64, $i8p]],
             ['__value__readString', $context->getTypeFromString('__string__*'), [$context->getTypeFromString('__value__*')]],
         ] as [$name, $ret, $params]) {

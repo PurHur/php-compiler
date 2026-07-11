@@ -13,12 +13,10 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
-use PHPCompiler\JIT\ArrayBuiltinHelper;
+use PHPCompiler\JIT\Builtin\ArrayDiffRuntime;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\HashTable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
@@ -41,7 +39,7 @@ final class array_diff extends Internal
         if (1 === $argc) {
             VmArray::rejectEnumCaseSetOpOperands($frame, $firstHt);
             if (null !== $frame->returnVar) {
-                $frame->returnVar->array($firstHt->replaceCopy());
+                $frame->returnVar->array(VmArray::diffSingleArgumentCopy($firstHt));
             }
 
             return;
@@ -59,38 +57,11 @@ final class array_diff extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $out = new HashTable();
-        foreach ($firstHt->iterateKeyed(true) as [$key, $value]) {
-            if (self::valueInArrays($value, $others)) {
-                continue;
-            }
-            $stored = new Variable();
-            $stored->copyFrom($value);
-            if (Variable::TYPE_INTEGER === $key->type) {
-                $out->addIndex($key->toInt(), $stored);
-            } else {
-                $out->add($key->toString(), $stored);
-            }
+        $result = VmArray::diffSingleArgumentCopy($firstHt);
+        foreach ($others as $other) {
+            $result = VmArray::diffTwo($result, $other);
         }
-        $frame->returnVar->array($out);
-    }
-
-    /**
-     * @param list<\PHPCompiler\VM\HashTable> $arrays
-     */
-    private static function valueInArrays(Variable $needle, array $arrays): bool
-    {
-        $needle = $needle->resolveIndirect();
-        foreach ($arrays as $haystack) {
-            foreach ($haystack->iterate(true) as $value) {
-                $stored = $value->resolveIndirect();
-                if (in_array::looseEquals($needle, $stored)) {
-                    return true;
-                }
-            }
-        }
-
-        return false;
+        $frame->returnVar->array($result);
     }
 
     public Context $context;
@@ -109,6 +80,6 @@ final class array_diff extends Internal
             JitArrayElem::requireArrayArgNum($context, $arg, 'array_diff', $i + 1);
         }
 
-        return ArrayBuiltinHelper::arrayDiff($context, ...$args);
+        return ArrayDiffRuntime::diff($context, $args[0], ...\array_slice($args, 1));
     }
 }

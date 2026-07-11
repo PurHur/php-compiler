@@ -79,12 +79,98 @@ final class VmInternalCompare
      */
     public static function resolveFrameSortFlags(Frame $frame, string $function, int $argIndex = 1): int
     {
-        $flagsArg = $frame->calledArgs[$argIndex]->resolveIndirect();
+        return self::resolveFrameSortFlagsOperand(
+            $frame->calledArgs[$argIndex]->resolveIndirect(),
+            $function,
+            $argIndex + 1,
+            '$flags',
+            false
+        );
+    }
+
+    /**
+     * sort()/rsort() flags + optional SortDirection (#9947, PHP 8.4 Sorting / SortDirection).
+     */
+    public static function resolveSortFunctionFlags(Frame $frame, string $function): int
+    {
+        $flags = StdlibConstants::SORT_REGULAR;
+        if (isset($frame->calledArgs[1])) {
+            $flags = self::resolveFrameSortFlagsOperand(
+                $frame->calledArgs[1]->resolveIndirect(),
+                $function,
+                2,
+                '$flags',
+                true
+            );
+        } elseif (isset($frame->calledArgs[2])) {
+            $order = VmArraySort::trySortDirectionOrderInt($frame->calledArgs[2]->resolveIndirect());
+            if (null !== $order) {
+                return $order;
+            }
+        }
+        if (isset($frame->calledArgs[2])) {
+            $flags = VmArraySort::applySortDirectionToFlags($flags, $frame->calledArgs[2], $function);
+        }
+
+        return $flags;
+    }
+
+    /**
+     * @throws \LogicException when $allowSortingEnum is false and operand is not int
+     * @throws \TypeError when $allowSortingEnum is true and operand is not int|Sorting
+     */
+    public static function resolveFrameSortFlagsOperand(
+        Variable $flagsArg,
+        string $function,
+        int $argNum,
+        string $paramName,
+        bool $allowSortingEnum
+    ): int {
+        if ($allowSortingEnum) {
+            $fromEnum = VmArraySort::trySortingOrderInt($flagsArg);
+            if (null !== $fromEnum) {
+                return $fromEnum;
+            }
+            if (EnumCaseSupport::isEnumCaseVariable($flagsArg)) {
+                throw new \TypeError(sprintf(
+                    '%s(): Argument #%d (%s) must be of type int|Sorting, %s given',
+                    $function,
+                    $argNum,
+                    $paramName,
+                    EnumCaseSupport::typeNameForVariable($flagsArg)
+                ));
+            }
+            if (Variable::TYPE_INTEGER !== $flagsArg->type) {
+                throw new \TypeError(sprintf(
+                    '%s(): Argument #%d (%s) must be of type int|Sorting, %s given',
+                    $function,
+                    $argNum,
+                    $paramName,
+                    self::vmSortFlagsTypeName($flagsArg->type)
+                ));
+            }
+
+            return $flagsArg->toInt();
+        }
         if (Variable::TYPE_INTEGER !== $flagsArg->type) {
             throw new \LogicException($function.'() flags must be an integer in this compiler build');
         }
 
         return $flagsArg->toInt();
+    }
+
+    public static function vmSortFlagsTypeName(int $type): string
+    {
+        return match ($type) {
+            Variable::TYPE_INTEGER => 'int',
+            Variable::TYPE_FLOAT => 'float',
+            Variable::TYPE_BOOLEAN => 'bool',
+            Variable::TYPE_STRING => 'string',
+            Variable::TYPE_NULL => 'null',
+            Variable::TYPE_ARRAY => 'array',
+            Variable::TYPE_OBJECT => 'object',
+            default => 'mixed',
+        };
     }
 
     /**
@@ -254,15 +340,16 @@ final class VmInternalCompare
             );
         }
 
-        return self::compareKeys($a, $b);
+        return self::compareRegularOperands($a, $b, 0 !== $caseFlag);
     }
 
     /** Compare array values for asort/arsort packed lists with SORT_NUMERIC (php-src). */
-    public static function compareValuesForSortFlags(Variable $a, Variable $b, int $flags): int
+    public static function compareValuesForSortFlags(Variable $a, Variable $b, int $flags, bool $descending = false): int
     {
+        $caseFlag = $flags & StdlibConstants::SORT_FLAG_CASE;
         $sortType = $flags & ~StdlibConstants::SORT_FLAG_CASE;
         if (StdlibConstants::SORT_NUMERIC === $sortType) {
-            return self::compareNumericOperandsForSort($a, $b);
+            return self::compareNumericOperandsForSort($a, $b, $descending);
         }
         if (StdlibConstants::SORT_LOCALE_STRING === $sortType) {
             return self::invoke(
@@ -281,20 +368,84 @@ final class VmInternalCompare
                 self::coerceForStringSort($b)
             );
         }
+        if (StdlibConstants::SORT_REGULAR === $sortType) {
+            return self::compareRegularOperands($a, $b, 0 !== $caseFlag, $descending);
+        }
 
         return self::compareValuesForSort($a, $b);
     }
 
-    /** php-src zend_compare numeric sort — non-numeric strings compare as 0. */
-    private static function compareNumericOperandsForSort(Variable $a, Variable $b): int
+    /**
+     * php-src zend_compare for SORT_REGULAR — numeric strings compare numerically (#13028).
+     */
+    public static function compareRegularOperands(Variable $a, Variable $b, bool $caseInsensitive = false, bool $descending = false): int
     {
-        $av = self::numericSortScalar($a);
-        $bv = self::numericSortScalar($b);
-        if (\is_float($av) || \is_float($bv)) {
-            return (float) $av <=> (float) $bv;
+        $a = $a->resolveIndirect();
+        $b = $b->resolveIndirect();
+        if (Variable::TYPE_STRING === $a->type && Variable::TYPE_STRING === $b->type) {
+            $as = $a->toString();
+            $bs = $b->toString();
+            if ('' !== $as && '' !== $bs && \is_numeric($as) && \is_numeric($bs)) {
+                return self::compareNumericOperandsForSort($a, $b, $descending);
+            }
+            $cmp = $caseInsensitive ? strcasecmp($as, $bs) : strcmp($as, $bs);
+
+            return $cmp < 0 ? -1 : ($cmp > 0 ? 1 : 0);
+        }
+        if (
+            (Variable::TYPE_INTEGER === $a->type || Variable::TYPE_FLOAT === $a->type)
+            && (Variable::TYPE_INTEGER === $b->type || Variable::TYPE_FLOAT === $b->type)
+        ) {
+            return self::compareNumericOperandsForSort($a, $b, $descending);
         }
 
-        return (int) $av <=> (int) $bv;
+        return Variable::compareSpaceship($a, $b);
+    }
+
+    /** php-src zend_compare numeric sort — non-numeric strings compare as 0. */
+    private static function compareNumericOperandsForSort(Variable $a, Variable $b, bool $descending = false): int
+    {
+        return self::compareNumericScalarsForSort(
+            self::numericSortScalar($a),
+            self::numericSortScalar($b),
+            $descending
+        );
+    }
+
+    /**
+     * php-src array sort NaN branch — NaN compares less than finite numbers (#10144, ext/standard/array.c).
+     * Differs from {@see Variable::spaceshipNumeric()} (<=> always returns 1 when NaN is involved).
+     * Descending sort keeps NaN slots stable (spaceship-style +1 when NaN is involved).
+     *
+     * @param int|float $left
+     * @param int|float $right
+     */
+    public static function compareNumericScalarsForSort(int|float $left, int|float $right, bool $descending = false): int
+    {
+        if (\is_float($left) && \is_nan($left)) {
+            if (\is_float($right) && \is_nan($right)) {
+                return 0;
+            }
+
+            return $descending ? 1 : -1;
+        }
+        if (\is_float($right) && \is_nan($right)) {
+            return 1;
+        }
+        if (\is_float($left) || \is_float($right)) {
+            $lf = (float) $left;
+            $rf = (float) $right;
+            if ($lf < $rf) {
+                return -1;
+            }
+            if ($lf > $rf) {
+                return 1;
+            }
+
+            return 0;
+        }
+
+        return (int) $left <=> (int) $right;
     }
 
     private static function numericSortScalar(Variable $value): int|float
@@ -428,7 +579,7 @@ final class VmInternalCompare
         for ($i = 1; $i < $n; ++$i) {
             $j = $i;
             while ($j > 0) {
-                $cmp = self::compareValuesForSortFlags($values[$j - 1], $values[$j], $flags);
+                $cmp = self::compareValuesForSortFlags($values[$j - 1], $values[$j], $flags, true);
                 if ($cmp >= 0) {
                     break;
                 }
@@ -614,17 +765,41 @@ final class VmInternalCompare
      */
     public static function sortKeyedPairsByKeyWithCompare(array &$pairs, Internal $compare): void
     {
+        self::sortKeyedPairsByKeyWithCompareOrdered($pairs, $compare, false);
+    }
+
+    /**
+     * @param list<array{0: Variable, 1: Variable}> $pairs
+     */
+    public static function sortKeyedPairsByKeyWithCompareDesc(array &$pairs, Internal $compare): void
+    {
+        self::sortKeyedPairsByKeyWithCompareOrdered($pairs, $compare, true);
+    }
+
+    /**
+     * @param list<array{0: Variable, 1: Variable}> $pairs
+     */
+    private static function sortKeyedPairsByKeyWithCompareOrdered(
+        array &$pairs,
+        Internal $compare,
+        bool $descending
+    ): void {
         $n = \count($pairs);
         for ($i = 1; $i < $n; ++$i) {
             $j = $i;
-            while (
-                $j > 0
-                && self::invoke(
+            while ($j > 0) {
+                $cmp = self::invoke(
                     $compare,
                     self::coerceForStringSort($pairs[$j - 1][0]),
                     self::coerceForStringSort($pairs[$j][0])
-                ) > 0
-            ) {
+                );
+                if ($descending) {
+                    if ($cmp >= 0) {
+                        break;
+                    }
+                } elseif ($cmp <= 0) {
+                    break;
+                }
                 $tmp = $pairs[$j - 1];
                 $pairs[$j - 1] = $pairs[$j];
                 $pairs[$j] = $tmp;
@@ -676,7 +851,7 @@ final class VmInternalCompare
         $a = $a->resolveIndirect();
         $b = $b->resolveIndirect();
         if (Variable::TYPE_STRING === $a->type && Variable::TYPE_STRING === $b->type) {
-            return self::invoke(self::resolveStringCallback('strcmp'), $a, $b);
+            return self::compareRegularOperands($a, $b);
         }
         if (Variable::TYPE_INTEGER === $a->type && Variable::TYPE_INTEGER === $b->type) {
             return $a->toInt() <=> $b->toInt();
@@ -723,7 +898,7 @@ final class VmInternalCompare
         for ($i = 1; $i < $n; ++$i) {
             $j = $i;
             while ($j > 0) {
-                $cmp = self::compareValuesForSortFlags($pairs[$j - 1][1], $pairs[$j][1], $flags);
+                $cmp = self::compareValuesForSortFlags($pairs[$j - 1][1], $pairs[$j][1], $flags, true);
                 if ($cmp >= 0) {
                     break;
                 }

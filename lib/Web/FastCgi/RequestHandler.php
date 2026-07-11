@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\Web\FastCgi;
 
+use PHPCompiler\ext\standard\VmFastCgi;
 use PHPCompiler\Web\CgiAotDriver;
 use PHPCompiler\Web\CgiDriver;
 use PHPCompiler\Web\DevServer;
@@ -59,6 +60,16 @@ final class RequestHandler
     }
 
     private function dispatchRequest($stream, Request $request): void
+    {
+        VmFastCgi::markFastCgiRequestActive();
+        try {
+            $this->dispatchRequestBody($stream, $request);
+        } finally {
+            VmFastCgi::clearFastCgiRequestActive();
+        }
+    }
+
+    private function dispatchRequestBody($stream, Request $request): void
     {
         Environment::apply($request->params);
         Environment::applyRequestBody($request->params, $request->stdinBody);

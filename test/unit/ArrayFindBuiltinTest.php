@@ -37,9 +37,9 @@ echo array_all([], fn ($v) => true) ? 'y' : 'n', "\n";
 
 echo array_find($a, 'gt2'), "\n";
 
-echo array_all([1, 2, 3], 'is_int') ? 'y' : 'n', "\n";
-echo array_any([1, 2, 3], 'is_string') ? 'y' : 'n', "\n";
-echo array_find([1, 2, 3], 'is_int'), "\n";
+echo array_all([1, 2, 3], fn ($v) => is_int($v)) ? 'y' : 'n', "\n";
+echo array_any([1, 2, 3], fn ($v) => is_string($v)) ? 'y' : 'n', "\n";
+echo array_find([1, 2, 3], fn ($v) => is_int($v)), "\n";
 PHP;
 
     private const EXPECT = <<<'TXT'
@@ -61,6 +61,9 @@ TXT;
 
     public function testVmMatchesSubset(): void
     {
+        if (!CompilerVersion::supportsPhp84ArraySearchFunctions()) {
+            $this->markTestSkipped('array_find family withheld on PHP 8.2 reference profile (#14505)');
+        }
         $this->assertOutputMatches($this->runBin('bin/vm.php'));
     }
 
@@ -70,6 +73,9 @@ TXT;
      */
     public function testJitMatchesSubset(): void
     {
+        if (!CompilerVersion::supportsPhp84ArraySearchFunctions()) {
+            $this->markTestSkipped('array_find family withheld on PHP 8.2 reference profile (#14505)');
+        }
         if (!LlvmToolchain::isReady(dirname(__DIR__, 2))) {
             $this->markTestSkipped('LLVM 9 toolchain not available');
         }
@@ -90,6 +96,9 @@ TXT;
      */
     public function testAotLintCompilesSubset(): void
     {
+        if (!CompilerVersion::supportsPhp84ArraySearchFunctions()) {
+            $this->markTestSkipped('array_find family withheld on PHP 8.2 reference profile (#14505)');
+        }
         if (!LlvmToolchain::isReady(dirname(__DIR__, 2))) {
             $this->markTestSkipped('LLVM 9 toolchain not available');
         }

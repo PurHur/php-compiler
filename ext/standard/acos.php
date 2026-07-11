@@ -13,6 +13,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\MathAcos;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
@@ -36,7 +37,7 @@ final class acos extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $frame->returnVar->float(\acos($num));
+        $frame->returnVar->float(VmMath::acos($num));
     }
 
     public Context $context;
@@ -48,9 +49,8 @@ final class acos extends Internal
             throw new \LogicException('acos() requires exactly one argument');
         }
         $asFloat = JitFdiv::lowerSingleOperand($context, $args[0], 1, 'num', 'acos', 'float');
-        $fn = $context->lookupFunction('acos');
 
-        return $context->builder->call($fn, $asFloat);
+        return MathAcos::invoke($context, $asFloat);
     }
 
 }

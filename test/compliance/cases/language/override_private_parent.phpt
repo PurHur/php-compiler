@@ -1,5 +1,11 @@
 --TEST--
 Language: #[\Override] on method colliding with private parent — compile-time fatal (#6919)
+--SKIPIF--
+<?php
+if (!PHPCompiler\CompilerVersion::supportsOverrideAttribute()) {
+    echo "skip — Override validation disabled on reference profile\n";
+}
+?>
 --FILE--
 <?php
 class Base {

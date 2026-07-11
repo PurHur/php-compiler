@@ -19,7 +19,642 @@ class JITTest extends BaseTest {
     {
         foreach (parent::providePHPTests() as $name => $case) {
             if (!CompilerVersion::supportsStrIncrement()
-                && (str_contains($name, 'str_increment') || str_contains($name, 'str_decrement'))) {
+                && (str_contains($name, 'str_increment') || str_contains($name, 'str_decrement'))
+                && !str_contains($name, 'str_increment_phantom')) {
+                continue;
+            }
+            if (CompilerVersion::supportsStrIncrement()
+                && str_contains($name, 'str_increment_phantom')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsGetObjectId()
+                && str_contains($name, 'get_object_id')
+                && !str_contains($name, 'get_object_id_phantom')
+                && !str_contains($name, 'get_object_id_function_exists_forward')) {
+                continue;
+            }
+            if (CompilerVersion::supportsGetObjectId()
+                && str_contains($name, 'get_object_id_phantom')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsClamp()
+                && str_contains($name, 'clamp')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsHex2binStrict()
+                && str_contains($name, 'hex2bin_strict')
+                && !str_contains($name, 'hex2bin_strict_arity_reference_profile')
+                && !str_contains($name, 'hex2bin_strict_named_reference_profile')) {
+                continue;
+            }
+            if (CompilerVersion::supportsHex2binStrict()
+                && (str_contains($name, 'hex2bin_strict_arity_reference_profile')
+                    || str_contains($name, 'hex2bin_strict_named_reference_profile'))) {
+                continue;
+            }
+            if (!CompilerVersion::supportsFpow()
+                && (str_contains($name, 'fpow') || str_contains($name, 'fmin') || str_contains($name, 'fmax')
+                    || str_contains($name, 'fadd') || str_contains($name, 'fsub') || str_contains($name, 'fmul'))
+                && !str_contains($name, 'php84_math_string_builtins_phantom')
+                && !str_contains($name, 'fpow_function_exists_forward_profile')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsNextafter()
+                && str_contains($name, 'nextafter')
+                && !str_contains($name, 'php84_math_string_builtins_phantom')
+                && !str_contains($name, 'nextafter_profile')) {
+                continue;
+            }
+            if (CompilerVersion::supportsNextafter()
+                && str_contains($name, 'nextafter_profile')) {
+                continue;
+            }
+            if (CompilerVersion::supportsNextafter()
+                && !CompilerVersion::advertisesNextafter()
+                && str_contains($name, 'nextafter')
+                && !str_contains($name, 'nextafter_profile')
+                && !str_contains($name, 'php84_math_string_builtins_phantom')
+                && !str_contains($name, 'forward_profile_phantom_introspection')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsRoundingModeEnum()
+                && (str_contains($name, 'rounding_mode') || str_contains($name, 'bcround'))
+                && !str_contains($name, 'rounding_mode_reference_profile')) {
+                continue;
+            }
+            if (CompilerVersion::supportsRoundingModeEnum()
+                && str_contains($name, 'rounding_mode_reference_profile')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsRoundingModeEnum()
+                && str_contains($name, 'round_invalid_mode_84')) {
+                continue;
+            }
+            if (CompilerVersion::supportsRoundingModeEnum()
+                && 'round_invalid_mode.phpt' === $name) {
+                continue;
+            }
+            if (!CompilerVersion::supportsNumberFormatNegativeDecimals()
+                && str_contains($name, 'number_format_negative_decimals')
+                && !str_contains($name, 'number_format_negative_decimals_84')) {
+                continue;
+            }
+            if (CompilerVersion::supportsNumberFormatNegativeDecimals()
+                && 'number_format_negative_decimals.phpt' === $name) {
+                continue;
+            }
+            if (!CompilerVersion::supportsRandomIntervalBoundary()
+                && str_contains($name, 'random_interval_boundary')
+                && !str_contains($name, 'random_interval_boundary_reference_profile')) {
+                continue;
+            }
+            if (CompilerVersion::supportsRandomIntervalBoundary()
+                && str_contains($name, 'random_interval_boundary_reference_profile')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsGetDeclaredExcludeDeprecated()
+                && (str_contains($name, 'get_declared_exclude_deprecated')
+                    || str_contains($name, 'classes_exclude_deprecated'))
+                && !str_contains($name, 'get_declared_exclude_deprecated_reference_profile')) {
+                continue;
+            }
+            if (CompilerVersion::supportsGetDeclaredExcludeDeprecated()
+                && str_contains($name, 'get_declared_exclude_deprecated_reference_profile')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsGetClassAllowString()
+                && str_contains($name, 'get_class_allow_string')
+                && !str_contains($name, 'get_class_allow_string_reference_profile')) {
+                continue;
+            }
+            if (CompilerVersion::supportsGetClassAllowString()
+                && str_contains($name, 'get_class_allow_string_reference_profile')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsGetDeclaredExcludeDeprecated()
+                && str_contains($name, 'get_declared_argument_count_error')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsGetDefinedFunctionsExcludeDisabled()
+                && str_contains($name, 'get_defined_functions_exclude_disabled')
+                && !str_contains($name, 'get_defined_functions_exclude_disabled_reference_profile')) {
+                continue;
+            }
+            if (CompilerVersion::supportsGetDefinedFunctionsExcludeDisabled()
+                && str_contains($name, 'get_defined_functions_exclude_disabled_reference_profile')) {
+                continue;
+            }
+            if ((CompilerVersion::supportsStrIncrement() || CompilerVersion::supportsFpow() || CompilerVersion::supportsNextafter())
+                && str_contains($name, 'php84_math_string_builtins_phantom')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsZendThreadId()
+                && str_contains($name, 'zend_thread_id')
+                && !str_contains($name, 'zend_thread_id_phantom')
+                && !str_contains($name, 'zend_thread_id_function_exists_forward_profile')) {
+                continue;
+            }
+            if (CompilerVersion::supportsZendThreadId()
+                && str_contains($name, 'zend_thread_id_phantom')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsClassUsesRecursive()
+                && str_contains($name, 'class_uses_recursive')
+                && !str_contains($name, 'class_uses_recursive_phantom')) {
+                continue;
+            }
+            if (CompilerVersion::supportsClassUsesRecursive()
+                && str_contains($name, 'class_uses_recursive_phantom')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsPhp84ReflectionProbeBuiltins()
+                && (str_contains($name, 'attribute_exists')
+                    || str_contains($name, 'class_meth_exists')
+                    || str_contains($name, 'unitenum_exists')
+                    || str_contains($name, 'nodiscard_class_exists'))
+                && !str_contains($name, 'reflection_probe_builtins_phantom')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsGetmygrgid()
+                && str_contains($name, 'getmygrgid')
+                && !str_contains($name, 'getmygrgid_phantom')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsCrc32c()
+                && str_contains($name, 'crc32c')
+                && !str_contains($name, 'crc32c_phantom')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsHebrevc()
+                && str_contains($name, 'hebrevc')
+                && !str_contains($name, 'hebrevc_phantom')) {
+                continue;
+            }
+            if (CompilerVersion::supportsHebrevc()
+                && str_contains($name, 'hebrevc_phantom')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsMbStrPad()
+                && str_contains($name, 'mb_str_pad')
+                && !str_contains($name, 'mb_str_pad_phantom')) {
+                continue;
+            }
+            if (CompilerVersion::supportsMbStrPad()
+                && str_contains($name, 'mb_str_pad_phantom')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsMbUcfirstLcfirst()
+                && (str_contains($name, 'mb_ucfirst') || str_contains($name, 'mb_lcfirst'))
+                && !str_contains($name, 'mb_ucfirst_lcfirst_phantom')) {
+                continue;
+            }
+            if (CompilerVersion::supportsMbUcfirstLcfirst()
+                && str_contains($name, 'mb_ucfirst_lcfirst_phantom')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsSortingEnum()
+                && str_contains($name, 'sort_sorting_enum')
+                && !str_contains($name, 'sorting_enum_phantom')) {
+                continue;
+            }
+            if (CompilerVersion::supportsSortingEnum()
+                && str_contains($name, 'sorting_enum_phantom')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsRange()
+                && str_contains($name, 'range_from_84')
+                && !str_contains($name, 'range_phantom')) {
+                continue;
+            }
+            if (CompilerVersion::supportsRange()
+                && str_contains($name, 'range_phantom')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsBuiltinStubEnums()
+                && (str_contains($name, 'pad_type_enum')
+                    || str_contains($name, 'string_trim_mode')
+                    || str_contains($name, 'memory_usage_enum')
+                    || str_contains($name, 'session_status_enum')
+                    || str_contains($name, 'requestmethod_enum')
+                    || str_contains($name, 'phpinfo_infoview')
+                    || str_contains($name, 'http_response_code_enum')
+                    || str_contains($name, 'filter_input_phpinputfilter')
+                    || str_contains($name, 'connection_status_enum')
+                    || str_contains($name, 'connection_status_cli')
+                    || str_contains($name, 'parse_url_enum')
+                    || str_contains($name, 'property_hook_type_enum')
+                    || str_contains($name, 'exit_status_enum')
+                    || str_contains($name, 'socket_type_enum')
+                    || str_contains($name, 'ftp_connection_class')
+                    || str_contains($name, 'trim_named_mode'))
+                && !str_contains($name, 'builtin_stub_enums_phantom')) {
+                continue;
+            }
+            if (CompilerVersion::supportsBuiltinStubEnums()
+                && str_contains($name, 'builtin_stub_enums_phantom')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsPhp83ArrayKeyFunctions()
+                && (str_contains($name, 'array_first_key') || str_contains($name, 'array_last_key') || str_contains($name, 'array_first_last_key'))
+                && !str_contains($name, 'array_first_last_key_phantom')
+                && !str_contains($name, 'array_first_last_key_forward_84')) {
+                continue;
+            }
+            if (CompilerVersion::supportsPhp83ArrayKeyFunctions()
+                && str_contains($name, 'array_first_last_key_phantom')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsPhp84ArraySearchFunctions()
+                && (str_contains($name, 'array_find')
+                    || str_contains($name, 'array_any')
+                    || str_contains($name, 'array_all')
+                    || (str_contains($name, 'array_first') && !str_contains($name, 'array_first_key') && !str_contains($name, 'array_first_last_key'))
+                    || (str_contains($name, 'array_last') && !str_contains($name, 'array_last_key') && !str_contains($name, 'array_first_last_key')))
+                && !str_contains($name, 'php84_array_search_phantom')
+                && !str_contains($name, 'array_any_key_forward_84')) {
+                continue;
+            }
+            if (CompilerVersion::supportsPhp84ArraySearchFunctions()
+                && str_contains($name, 'php84_array_search_phantom')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsGeneratorToArray()
+                && str_contains($name, 'generator_to_array')
+                && !str_contains($name, 'php84_generator_to_array_phantom')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsDateTimeMicrosecond()
+                && (str_contains($name, 'datetime_microsecond')
+                    || str_contains($name, 'datetime_create_from_interface')
+                    || str_contains($name, 'datetime_immutable_create_from_mutable')
+                    || str_contains($name, 'datetime_create_from_immutable'))
+                && !str_contains($name, 'datetime_microsecond_phantom')) {
+                continue;
+            }
+            if (CompilerVersion::supportsDateTimeMicrosecond()
+                && str_contains($name, 'datetime_microsecond_phantom')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsArrayReplaceKey()
+                && str_contains($name, 'array_replace_key')
+                && !str_contains($name, 'array_replace_key_phantom')) {
+                continue;
+            }
+            if (CompilerVersion::supportsArrayReplaceKey()
+                && str_contains($name, 'array_replace_key_phantom')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsClosureGetCurrent()
+                && str_contains($name, 'closure_get_current')
+                && !str_contains($name, 'closure_get_current_phantom')
+                && !str_contains($name, 'closure_get_current_profile')
+                && !str_contains($name, 'closure_get_current_forward_84')
+                && !str_contains($name, 'closure_get_current_nested_84')) {
+                continue;
+            }
+            if (CompilerVersion::supportsClosureGetCurrent()
+                && (str_contains($name, 'closure_get_current_phantom')
+                    || str_contains($name, 'closure_get_current_profile'))) {
+                continue;
+            }
+            if (!CompilerVersion::supportsClosureFromStatic()
+                && str_contains($name, 'closure_from_static')
+                && !str_contains($name, 'closure_from_static_profile')) {
+                continue;
+            }
+            if (CompilerVersion::supportsClosureFromStatic()
+                && str_contains($name, 'closure_from_static_profile')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsClosureGetUsedVariables()
+                && str_contains($name, 'closure_get_used_variables')
+                && !str_contains($name, 'closure_get_used_variables_phantom')) {
+                continue;
+            }
+            if (CompilerVersion::supportsClosureGetUsedVariables()
+                && str_contains($name, 'closure_get_used_variables_phantom')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsReflectionParameterIsSensitiveParameter()
+                && str_contains($name, 'reflection_parameter_is_sensitive_parameter')
+                && !str_contains($name, 'reflection_parameter_is_sensitive_parameter_phantom')) {
+                continue;
+            }
+            if (CompilerVersion::supportsReflectionParameterIsSensitiveParameter()
+                && str_contains($name, 'reflection_parameter_is_sensitive_parameter_phantom')) {
+                continue;
+            }
+            // JIT: method_exists(Closure::class, …) segfaults; phantom/profile introspection is VM-only (#14504, #16989).
+            if (str_contains($name, 'closure_get_current_phantom')
+                || str_contains($name, 'closure_get_current_profile')) {
+                continue;
+            }
+            // JIT: method_exists(ReflectionParameter::class, …) segfaults; phantom is VM-only (#16130).
+            if (str_contains($name, 'reflection_parameter_is_sensitive_parameter_phantom')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsMbTrimFunctions()
+                && str_contains($name, 'mb_trim')
+                && !str_contains($name, 'mb_trim_phantom')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsStreamSupports()
+                && (('stdlib/stream_supports' === $name)
+                    || str_contains($name, 'stream_support_constants')
+                    || str_contains($name, 'stream_supports_string_feature')
+                    || str_contains($name, 'stream_meta_seekable'))
+                && !str_contains($name, 'stream_supports_phantom')) {
+                continue;
+            }
+            if (CompilerVersion::supportsStreamSupports()
+                && str_contains($name, 'stream_supports_phantom')) {
+                continue;
+            }
+            // STREAM_SUPPORT_READ/WRITE PHP 8.4 constants; forward profile only (#16846).
+            if (!CompilerVersion::supportsStreamSupportReadWriteConstants()
+                && str_contains($name, 'stream_support_read_write_constants')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsClockGettime()
+                && (str_contains($name, 'clock_gettime')
+                    || str_contains($name, 'hrtime_nsec_precision'))
+                && !str_contains($name, 'clock_gettime_phantom')) {
+                continue;
+            }
+            if (CompilerVersion::supportsClockGettime()
+                && str_contains($name, 'clock_gettime_phantom')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsReadonlyBuiltin()
+                && (preg_match('#(?:^|/)readonly_function$#', $name)
+                    || str_contains($name, 'readonly_function_jit'))
+                && !str_contains($name, 'readonly_phantom')) {
+                continue;
+            }
+            if (CompilerVersion::supportsReadonlyBuiltin()
+                && str_contains($name, 'readonly_phantom')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsReadonlyFunction()
+                && (str_contains($name, 'readonly_function/')
+                    || str_contains($name, 'readonly_function_84'))) {
+                continue;
+            }
+            if (CompilerVersion::supportsReadonlyFunction()
+                && (str_contains($name, 'readonly_function_decl')
+                    || str_contains($name, 'readonly_function_reject')
+                    || str_contains($name, 'readonly_function_mutable_capture'))) {
+                continue;
+            }
+            if (!CompilerVersion::supportsStreamContextSetOptions()
+                && str_contains($name, 'stream_context_set_options')
+                && !str_contains($name, 'stream_context_set_options_phantom')) {
+                continue;
+            }
+            if (CompilerVersion::supportsStreamContextSetOptions()
+                && str_contains($name, 'stream_context_set_options_phantom')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsClassConstants()
+                && str_contains($name, 'class_constants')
+                && !str_contains($name, 'class_constants_phantom')) {
+                continue;
+            }
+            if (CompilerVersion::supportsClassConstants()
+                && str_contains($name, 'class_constants_phantom')) {
+                continue;
+            }
+            $usesHeaderList = str_contains($name, 'header_list')
+                || str_contains($name, 'header_remove')
+                || str_contains($name, 'setcookie')
+                || str_contains($name, 'setrawcookie')
+                || str_contains($name, 'session_cookie');
+            if (!CompilerVersion::supportsHeaderList()
+                && $usesHeaderList
+                && !str_contains($name, 'header_list_phantom')) {
+                continue;
+            }
+            if (CompilerVersion::supportsHeaderList()
+                && str_contains($name, 'header_list_phantom')) {
+                continue;
+            }
+            $usesHttpLastResponseHeaders = str_contains($name, 'http_get_last_response_headers')
+                || str_contains($name, 'get_last_response_headers')
+                || str_contains($name, 'http_clear_last_response_headers');
+            if (!CompilerVersion::supportsHttpLastResponseHeaders()
+                && $usesHttpLastResponseHeaders
+                && !str_contains($name, 'http_last_response_headers_phantom')) {
+                continue;
+            }
+            if (CompilerVersion::supportsHttpLastResponseHeaders()
+                && str_contains($name, 'http_last_response_headers_phantom')) {
+                continue;
+            }
+            if (!CompilerVersion::advertisesOverrideAttributeClass()
+                && str_contains($name, 'override_class_exists')) {
+                continue;
+            }
+            if (CompilerVersion::advertisesOverrideAttributeClass()
+                && str_contains($name, 'override_class_phantom')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsLazyPropertyModifier()
+                && (str_contains($name, 'lazy_property_modifier')
+                    || str_contains($name, 'reflection_lazy_modifier_property_names')
+                    || str_contains($name, 'lazy_property_init_once'))) {
+                continue;
+            }
+            if (!CompilerVersion::supportsLazyObjectFactories()
+                && (str_contains($name, 'create_lazy_ghost')
+                    || str_contains($name, 'create_lazy_proxy')
+                    || str_contains($name, 'lazy_ghost_create')
+                    || str_contains($name, 'lazy_ghost_trait')
+                    || str_contains($name, 'class_has_lazy_object_initializer')
+                    || str_contains($name, 'class_has_lazy_object_uninitializer')
+                    || str_contains($name, 'is_uninitialized_lazy_object')
+                    || str_contains($name, 'reflection_lazy_property')
+                    || str_contains($name, 'reflection_property_set_raw_without_lazy')
+                    || str_contains($name, 'reflection_property_skip_lazy'))
+                && !str_contains($name, 'lazy_object_factories_phantom')) {
+                continue;
+            }
+            if (CompilerVersion::supportsLazyObjectFactories()
+                && str_contains($name, 'lazy_object_factories_phantom')) {
+                continue;
+            }
+            // 8.2 reference profile: #[\Override] parent validation off (#11559, #12201).
+            if (!CompilerVersion::supportsOverrideAttribute()
+                && (str_contains($name, 'override_attribute_invalid')
+                    || str_contains($name, 'override_attribute_fatal')
+                    || str_contains($name, 'override_attribute_invalid_target')
+                    || str_contains($name, 'override_signature_mismatch')
+                    || str_contains($name, 'override_private_parent')
+                    || str_contains($name, 'override_class_constant_invalid')
+                    || str_contains($name, 'override_property_invalid'))) {
+                continue;
+            }
+            if (CompilerVersion::supportsOverrideAttribute()
+                && (str_contains($name, 'override_attribute_82_no_validate')
+                    || str_contains($name, 'override_missing_parent_reference_profile'))) {
+                continue;
+            }
+            if (!CompilerVersion::advertisesDeprecatedAttributeClass()
+                && str_contains($name, 'deprecated_attribute_class')
+                && !str_contains($name, 'deprecated_attribute_class_forward_84')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsDeprecatedAttributeRuntimeNotices()
+                && 'deprecated_attribute.phpt' === $name) {
+                continue;
+            }
+            if (CompilerVersion::supportsDeprecatedAttributeRuntimeNotices()
+                && 'deprecated_attribute_profile.phpt' === $name) {
+                continue;
+            }
+            if (!CompilerVersion::advertisesNoDiscardAttributeClass()
+                && str_contains($name, 'nodiscard_class_exists')) {
+                continue;
+            }
+            if (!CompilerVersion::advertisesEnumCasesAttributeClass()
+                && str_contains($name, 'enumcases_class_exists')) {
+                continue;
+            }
+            if (CompilerVersion::advertisesNoDiscardAttributeClass()
+                && str_contains($name, 'nodiscard_class_phantom')) {
+                continue;
+            }
+            if (CompilerVersion::advertisesEnumCasesAttributeClass()
+                && str_contains($name, 'enumcases_class_phantom')) {
+                continue;
+            }
+            if (!CompilerVersion::advertisesDateExceptionHierarchy()
+                && (str_contains($name, 'dateexception')
+                    || str_contains($name, 'dateerror')
+                    || str_contains($name, 'date_malformed')
+                    || str_contains($name, 'datetimezone_invalid'))
+                && !str_contains($name, 'reference_profile')) {
+                continue;
+            }
+            if (CompilerVersion::advertisesDateExceptionHierarchy()
+                && str_contains($name, 'dateexception_reference_profile')) {
+                continue;
+            }
+            if (CompilerVersion::advertisesDateExceptionHierarchy()
+                && str_contains($name, 'date_interval_malformed_exception_class_reference_profile')) {
+                continue;
+            }
+            if (CompilerVersion::advertisesDateExceptionHierarchy()
+                && str_contains($name, 'datetime_bad_spec_reference_profile')) {
+                continue;
+            }
+            if (CompilerVersion::advertisesDateExceptionHierarchy()
+                && str_contains($name, 'date_malformed_exceptions_phantom_reference_profile')) {
+                continue;
+            }
+            if (!CompilerVersion::advertisesRequestParseBodyExceptionClass()
+                && str_contains($name, 'request_parse_body_exception')
+                && !str_contains($name, 'reference_profile')) {
+                continue;
+            }
+            if (CompilerVersion::advertisesRequestParseBodyExceptionClass()
+                && str_contains($name, 'request_parse_body_exception_reference_profile')) {
+                continue;
+            }
+            if ((!CompilerVersion::advertisesDelayedTargetValidationAttributeClass()
+                    || !CompilerVersion::advertisesCompileTimeAttributeClass()
+                    || !CompilerVersion::advertisesNoDiscardAttributeClass())
+                && str_contains($name, 'builtin_attribute_classes_84')) {
+                continue;
+            }
+            if (!\PHPCompiler\ext\intl\IntlExtensionPolicy::runsGraphemeCompliance($name)
+                && str_contains($name, 'grapheme_')
+                && !str_contains($name, 'grapheme_phantom')) {
+                continue;
+            }
+            if (!\PHPCompiler\ext\intl\IntlExtensionPolicy::advertisesLocale()
+                && str_contains($name, 'locale_get_default')
+                && !str_contains($name, 'locale_gated')) {
+                continue;
+            }
+            if (!\PHPCompiler\ext\intl\IntlExtensionPolicy::runsLocaleParserCompliance($name)
+                && str_contains($name, 'locale_get_parts')
+                && !str_contains($name, 'locale_gated')) {
+                continue;
+            }
+            // locale_get_default()/locale_get_*: JIT lowering deferred when ext/intl loaded (#9576, #5125).
+            if (str_contains($name, 'locale_get_default') || str_contains($name, 'locale_get_parts')) {
+                continue;
+            }
+            if (!\PHPCompiler\ext\curl\CurlExtensionPolicy::advertisesBuiltins()
+                && str_contains($name, 'curl_escape')
+                && !str_contains($name, 'curl_escape_phantom')) {
+                continue;
+            }
+            if (\PHPCompiler\ext\curl\CurlExtensionPolicy::advertisesBuiltins()
+                && str_contains($name, 'curl_escape_phantom')) {
+                continue;
+            }
+            if (!\PHPCompiler\ext\ldap\LdapExtensionPolicy::advertisesBuiltins()
+                && str_contains($name, 'ldap_escape')
+                && !str_contains($name, 'ldap_escape_phantom')) {
+                continue;
+            }
+            if (\PHPCompiler\ext\ldap\LdapExtensionPolicy::advertisesBuiltins()
+                && str_contains($name, 'ldap_escape_phantom')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsBz2()
+                && (str_contains($name, 'bz2') || str_contains($name, 'bzcompress'))
+                && !str_contains($name, 'bz2_phantom')) {
+                continue;
+            }
+            if (CompilerVersion::supportsBz2()
+                && str_contains($name, 'bz2_phantom')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsBrotli()
+                && (str_contains($name, 'brotli') || str_contains($name, 'brotli_'))
+                && !str_contains($name, 'brotli_phantom')) {
+                continue;
+            }
+            if (CompilerVersion::supportsBrotli()
+                && str_contains($name, 'brotli_phantom')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsUri()
+                && str_contains($name, 'uri_rfc3986')
+                && !str_contains($name, 'uri_phantom')) {
+                continue;
+            }
+            if (CompilerVersion::supportsUri()
+                && str_contains($name, 'uri_phantom')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsBcmath()
+                && (str_contains($name, 'bcadd')
+                    || str_contains($name, 'bcsub')
+                    || str_contains($name, 'bcmul')
+                    || str_contains($name, 'bcdiv')
+                    || str_contains($name, 'bcmod')
+                    || str_contains($name, 'bcpow')
+                    || str_contains($name, 'bcsqrt')
+                    || str_contains($name, 'bcscale')
+                    || str_contains($name, 'bccomp')
+                    || str_contains($name, 'bcround')
+                    || str_contains($name, 'bcceil')
+                    || str_contains($name, 'bcfloor')
+                    || str_contains($name, 'bcpowmod')
+                    || str_contains($name, 'bcdivmod')
+                    || str_contains($name, 'bcmath_number'))
+                && !str_contains($name, 'bcmath_phantom')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsConvertCyrString()
+                && str_contains($name, 'convert_cyr_string')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsStrxfrm()
+                && str_contains($name, 'strxfrm')) {
                 continue;
             }
             // 8.2-target reject gate; skipped when CompilerVersion 8.3+ enables typed trait constants (#5993).
@@ -27,14 +662,385 @@ class JITTest extends BaseTest {
                 && str_contains($name, 'trait_typed_const_reject')) {
                 continue;
             }
-            // 8.4-target reject gate; skipped when CompilerVersion 8.4.0+ enables final global typed constants (#10324).
+            // 8.2-target reject gate; skipped when CompilerVersion 8.4.0+ enables typed class constants (#12798).
+            if (CompilerVersion::supportsTypedClassConstants()
+                && (str_contains($name, 'typed_class_const_reject')
+                    || str_contains($name, 'typed_class_const_reference_profile'))) {
+                continue;
+            }
+            // 8.2-target reject gate; skipped when CompilerVersion 8.4.0+ enables class const `new` (#12940, #14123, #15693).
+            if (CompilerVersion::supportsClassConstObjectExpressions()) {
+                if (str_contains($name, 'class_const_new_rejected')
+                    || str_contains($name, 'class_const_new_reject')
+                    || str_contains($name, 'class_const_new_expr')
+                    || str_contains($name, 'class_const_new_reference_profile')
+                    || str_contains($name, 'new_in_class_constant_reject')
+                    || str_contains($name, 'new_in_constant')
+                    || (str_contains($name, 'const_expr_new') && !str_contains($name, 'reject'))
+                    || (str_contains($name, 'class_const_new_expression') && !str_contains($name, '_run'))
+                    || (str_contains($name, 'class_const_new_object') && !str_contains($name, '_run'))
+                    || (str_contains($name, 'class_const_object') && !str_contains($name, '_run'))
+                    || str_contains($name, 'class_const_object_jit')) {
+                    continue;
+                }
+            }
+            if (!CompilerVersion::supportsClassConstObjectExpressions()
+                && (str_contains($name, 'class_const_new_expression_run')
+                    || str_contains($name, 'class_const_new_object_run')
+                    || str_contains($name, 'class_const_new_stdclass')
+                    || str_ends_with($name, 'class_const_new'))) {
+                continue;
+            }
+            if (!CompilerVersion::supportsTypedClassConstants()
+                && (str_contains($name, 'typed_class_const')
+                    || str_contains($name, 'typed_enum_class_const')
+                    || str_contains($name, 'enum_typed_class_const')
+                    || str_contains($name, 'match_typed_class_const')
+                    || str_contains($name, 'reflection_class_constant_get_type'))
+                && !str_contains($name, 'typed_class_const_reject')
+                && !str_contains($name, 'typed_class_const_reference_profile')) {
+                continue;
+            }
+            // 8.4-target reject gate; skipped when exit()/die() function form enabled (#12413, #12435).
+            if (CompilerVersion::supportsExitFunctionForm()
+                && (str_contains($name, 'exit_named_status_reference_profile')
+                    || str_contains($name, 'die_named_message_reference_profile'))) {
+                continue;
+            }
+            if (!CompilerVersion::supportsExitFunctionForm()
+                && (str_contains($name, 'exit_function_php84')
+                    || str_contains($name, 'exit_function_strict_types')
+                    || str_contains($name, 'exit_die_two_args')
+                    || str_contains($name, 'exit_type_error')
+                    || str_contains($name, 'exit_status_named')
+                    || (str_contains($name, 'exit_named_status')
+                        && !str_contains($name, 'exit_named_status_reference_profile'))
+                    || str_contains($name, 'die_status_named')
+                    || (str_contains($name, 'die_named_message')
+                        && !str_contains($name, 'die_named_message_reference_profile')))) {
+                continue;
+            }
+            // 8.4-target reject gate; skipped when asymmetric visibility enabled (#12508).
+            if (CompilerVersion::supportsAsymmetricVisibility()
+                && (str_contains($name, 'private_set_reference_profile')
+                    || str_contains($name, 'asymmetric_double_modifier_reference_profile')
+                    || str_contains($name, 'asymmetric_visibility_reference_profile')
+                    || str_contains($name, 'asymmetric_visibility_profile_gate')
+                    || str_contains($name, 'asymmetric_visibility_public_protected_set_compile_error')
+                    || str_contains($name, 'asymmetric_visibility_promoted_public_protected_set_compile_error')
+                    || str_contains($name, 'asymmetric_visibility_promoted_public_private_set_compile_error'))) {
+                continue;
+            }
+            if (CompilerVersion::supportsParenthesizedAsymmetricSetModifier()
+                && str_contains($name, 'asymmetric_visibility_paren_reference_profile')) {
+                continue;
+            }
+            if (CompilerVersion::supportsParenthesizedAsymmetricSetModifier()
+                && str_contains($name, 'asymmetric_visibility_bare_set_reject')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsParenthesizedAsymmetricSetModifier()
+                && str_contains($name, 'asymmetric_visibility_bare_private_set_forward')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsParenthesizedAsymmetricSetModifier()
+                && str_contains($name, 'asymmetric_visibility_paren_syntax')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsAsymmetricVisibility()
+                && (str_contains($name, 'asymmetric')
+                    || str_contains($name, 'property_hook_private_set')
+                    || str_contains($name, 'reflection_property_asymmetric')
+                    || str_contains($name, 'promoted_private_set'))
+                && !str_contains($name, 'private_set_reference_profile')
+                && !str_contains($name, 'asymmetric_double_modifier_reference_profile')
+                && !str_contains($name, 'asymmetric_visibility_reference_profile')
+                && !str_contains($name, 'asymmetric_visibility_profile_gate')
+                && !str_contains($name, 'asymmetric_visibility_forward_84')) {
+                continue;
+            }
+            // 8.4-target reject gate; skipped when property hooks enabled (#12574, #14432).
+            if (CompilerVersion::supportsPropertyHooks()
+                && str_contains($name, 'property_hook')
+                && str_contains($name, 'reference_profile')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsPropertyHooks()
+                && (str_contains($name, 'property_hook')
+                    || str_contains($name, 'property_magic_const'))
+                && !str_contains($name, 'reference_profile')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsPropertyHooks()
+                && (str_contains($name, 'asymmetric_get_only_hook_compile')
+                    || str_contains($name, 'asymmetric_get_only_hook_write'))) {
+                continue;
+            }
+            if (CompilerVersion::supportsPropertyHooks()
+                && str_contains($name, 'asymmetric_get_only_hook_reference_profile')) {
+                continue;
+            }
+            // 8.4-target reject gate; skipped when bare rethrow enabled (#3508, #14239, #15357).
+            if (CompilerVersion::supportsBareRethrow()
+                && str_contains($name, 'bare_throw_reference_profile')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsBareRethrow()
+                && (str_contains($name, 'bare_throw') || str_contains($name, 'throw_rethrow'))
+                && !str_contains($name, 'bare_throw_reference_profile')) {
+                continue;
+            }
+            // gc_status PHP 8.4 schema; forward profile only (#15784, ext/standard/php_gc.c).
+            if (!CompilerVersion::supportsGcStatusPhp84Schema()
+                && str_contains($name, 'gc_status')
+                && !str_contains($name, 'gc_status_reference_profile')) {
+                continue;
+            }
+            if (CompilerVersion::supportsGcStatusPhp84Schema()
+                && str_contains($name, 'gc_status_reference_profile')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsDatePeriodCreateFromISO8601String()
+                && str_contains($name, 'date_period_create_from_iso8601')
+                && !str_contains($name, 'date_period_create_from_iso8601_phantom')) {
+                continue;
+            }
+            if (CompilerVersion::supportsDatePeriodCreateFromISO8601String()
+                && str_contains($name, 'date_period_create_from_iso8601_phantom')) {
+                continue;
+            }
+            // JIT/AOT runtime object dispatch for materialized DatePeriod still segfaults (#16796).
+            if (str_contains($name, 'date_period_create_from_iso8601')
+                && !str_contains($name, 'date_period_create_from_iso8601_phantom')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsDomElementInsertAdjacentHtml()
+                && str_contains($name, 'dom_element_insert_adjacent_html')
+                && !str_contains($name, 'insert_adjacent_html_phantom')) {
+                continue;
+            }
+            if (CompilerVersion::supportsDomElementInsertAdjacentHtml()
+                && str_contains($name, 'insert_adjacent_html_phantom')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsDomElementInsertAdjacentElement()
+                && str_contains($name, 'dom_element_insert_adjacent_element')
+                && !str_contains($name, 'insert_adjacent_element_phantom')) {
+                continue;
+            }
+            if (CompilerVersion::supportsDomElementInsertAdjacentElement()
+                && str_contains($name, 'insert_adjacent_element_phantom')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsDomElementInsertAdjacentText()
+                && str_contains($name, 'dom_element_insert_adjacent_text')
+                && !str_contains($name, 'insert_adjacent_text_phantom')) {
+                continue;
+            }
+            if (CompilerVersion::supportsDomElementInsertAdjacentText()
+                && str_contains($name, 'insert_adjacent_text_phantom')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsDomElementInnerOuterHtml()
+                && str_contains($name, 'dom_element_inner_outer_html')
+                && !str_contains($name, 'inner_outer_html_phantom')) {
+                continue;
+            }
+            if (CompilerVersion::supportsDomElementInnerOuterHtml()
+                && str_contains($name, 'inner_outer_html_phantom')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsDomElementToggleAttribute()
+                && str_contains($name, 'dom_element_toggle_attribute')
+                && !str_contains($name, 'toggle_attribute_phantom')) {
+                continue;
+            }
+            if (CompilerVersion::supportsDomElementToggleAttribute()
+                && str_contains($name, 'toggle_attribute_phantom')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsDomElementGetAttributeNames()
+                && str_contains($name, 'dom_element_get_attribute_names')
+                && !str_contains($name, 'get_attribute_names_phantom')) {
+                continue;
+            }
+            if (CompilerVersion::supportsDomElementGetAttributeNames()
+                && str_contains($name, 'get_attribute_names_phantom')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsDomNodeContains()
+                && str_contains($name, 'dom_node_contains')
+                && !str_contains($name, 'dom_node_contains_phantom')) {
+                continue;
+            }
+            if (CompilerVersion::supportsDomNodeContains()
+                && str_contains($name, 'dom_node_contains_phantom')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsDomNodeCompareDocumentPosition()
+                && str_contains($name, 'dom_node_compare_document_position')
+                && !str_contains($name, 'compare_document_position_phantom')) {
+                continue;
+            }
+            if (CompilerVersion::supportsDomNodeCompareDocumentPosition()
+                && str_contains($name, 'compare_document_position_phantom')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsDomNodeGetRootNode()
+                && str_contains($name, 'dom_node_get_root_node')
+                && !str_contains($name, 'get_root_node_phantom')) {
+                continue;
+            }
+            if (CompilerVersion::supportsDomNodeGetRootNode()
+                && str_contains($name, 'get_root_node_phantom')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsDomNodeIsEqualNode()
+                && str_contains($name, 'dom_node_is_equal_node')
+                && !str_contains($name, 'is_equal_node_phantom')) {
+                continue;
+            }
+            if (CompilerVersion::supportsDomNodeIsEqualNode()
+                && str_contains($name, 'is_equal_node_phantom')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsDomNodeReplaceChildren()
+                && str_contains($name, 'dom_node_replace_children')
+                && !str_contains($name, 'replace_children_phantom')) {
+                continue;
+            }
+            if (CompilerVersion::supportsDomNodeReplaceChildren()
+                && str_contains($name, 'replace_children_phantom')) {
+                continue;
+            }
+            // DOMElement::getAttributeNames() multi-element array return segfaults under JIT (#16823); VM-only for now.
+            if (str_contains($name, 'dom_element_get_attribute_names')
+                && !str_contains($name, 'get_attribute_names_phantom')) {
+                continue;
+            }
+            // DOMTokenList / DOMElement::$classList — VM ext/dom method dispatch; JIT VM-only (#16876).
+            if (str_contains($name, 'dom_token_list')) {
+                continue;
+            }
+            // 8.4-target reject gate; skipped when encapsed ?? interpolation enabled (#14063).
+            if (CompilerVersion::supportsEncapsedCoalesce()
+                && str_contains($name, 'encapsed_coalesce_parse_error')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsEncapsedCoalesce()
+                && str_contains($name, 'encapsed_coalesce_interpolation')) {
+                continue;
+            }
+            // 8.4-target reject gate; skipped when clone-with syntax enabled (#12987).
+            if (CompilerVersion::supportsCloneWithSyntax()
+                && str_contains($name, 'clone_with_reference_profile')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsCloneWithSyntax()
+                && str_contains($name, 'clone_with')
+                && !str_contains($name, 'clone_with_reference_profile')
+                && !str_contains($name, 'clone_with_forward_profile')) {
+                continue;
+            }
+            // 8.3-target reject gate; skipped when new readonly class enabled (#16255).
+            if (CompilerVersion::supportsReadonlyAnonymousClass()
+                && str_contains($name, 'readonly_anonymous_class_reference_profile')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsReadonlyAnonymousClass()
+                && str_contains($name, 'readonly_anonymous_class')
+                && !str_contains($name, 'readonly_anonymous_class_reference_profile')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsReadonlyAnonymousClass()
+                && str_contains($name, 'readonly_anonymous_defaults')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsReadonlyAnonymousClass()
+                && str_contains($name, 'anonymous_readonly_class_forward_84')) {
+                continue;
+            }
+            // 8.3-target reject gate; skipped when typed function-local static enabled (#16512, #9998).
+            if (CompilerVersion::supportsTypedFunctionStatic()
+                && str_contains($name, 'typed_function_static_reference_profile')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsTypedFunctionStatic()
+                && str_contains($name, 'typed_function_static')
+                && !str_contains($name, 'typed_function_static_reference_profile')) {
+                continue;
+            }
+            // 8.3-target reject gate; skipped when file/namespace typed constants enabled (#16651, #7081).
+            if (CompilerVersion::supportsGlobalTypedConstants()
+                && str_contains($name, 'typed_top_level_const_82')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsGlobalTypedConstants()
+                && str_contains($name, 'global_typed_const')
+                && !str_contains($name, 'typed_top_level_const_82')
+                && !str_contains($name, 'final_global_typed_constant_reject')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsGlobalDeprecatedConstAttributes()
+                && str_contains($name, 'global_deprecated_const')
+                && !str_contains($name, 'reference_profile')) {
+                continue;
+            }
+            if (CompilerVersion::supportsGlobalDeprecatedConstAttributes()
+                && str_contains($name, 'global_deprecated_const_reference_profile')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsFinalGlobalTypedConstants()
+                && str_contains($name, 'final_global_typed_const')
+                && !str_contains($name, 'final_global_typed_constant_reject')) {
+                continue;
+            }
             if (CompilerVersion::supportsFinalGlobalTypedConstants()
                 && str_contains($name, 'final_global_typed_constant_reject')) {
                 continue;
             }
-            if (!CompilerVersion::supportsFinalGlobalTypedConstants()
-                && str_contains($name, 'final_global_typed_constant')
-                && !str_contains($name, 'final_global_typed_constant_reject')) {
+            // 8.3-target reject gate; skipped when class const brace deref enabled (#16597).
+            if (CompilerVersion::supportsClassConstBraceDeref()
+                && str_contains($name, 'class_const_brace_deref')
+                && !str_contains($name, '_forward')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsClassConstBraceDeref()
+                && str_contains($name, 'class_const_brace_deref_forward')) {
+                continue;
+            }
+            // 8.3-target reject gate; skipped when dynamic class const fetch enabled (#17863).
+            if (CompilerVersion::supportsDynamicClassConstFetch()
+                && str_contains($name, 'class_const_dynamic_fetch_profile')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsDynamicClassConstFetch()
+                && str_contains($name, 'class_const_dynamic_fetch_forward')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsDynamicClassConstFetch()
+                && str_contains($name, 'class_const_dynamic_fetch_no_warnings')) {
+                continue;
+            }
+            // 8.4-target reject gate; skipped when parenthesized DNF intersection types enabled (#14904).
+            if (CompilerVersion::supportsParenthesizedDnfIntersectionTypes()
+                && str_contains($name, 'dnf_paren_intersection_reference_profile')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsParenthesizedDnfIntersectionTypes()
+                && str_contains($name, 'dnf_paren_intersection')
+                && !str_contains($name, 'dnf_paren_intersection_reference_profile')
+                && !str_contains($name, 'dnf_paren_union_only')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsClassHasFunctions()
+                && str_contains($name, 'class_has_')
+                && !str_contains($name, 'class_has_lazy_object')
+                && !str_contains($name, 'class_has_functions_phantom')) {
+                continue;
+            }
+            if (CompilerVersion::supportsClassHasFunctions()
+                && str_contains($name, 'class_has_functions_phantom')) {
                 continue;
             }
             // ?-> LLVM lowering verified in NullsafeJitCompileTest (#3219); MCJIT execute needs jit-runtime-probe (#98).
@@ -57,7 +1063,7 @@ class JITTest extends BaseTest {
                 continue;
             }
             // preserve_keys=true: VM + JIT/AOT via ArrayBuiltinHelper (#3524).
-            // array_merge_recursive(): VM + JIT via ArrayBuiltinHelper overlay (#3297, #6177).
+            // array_merge_recursive(): VM + JIT via ArrayMergeRecursiveJitHelper PHP (#3297, #10183).
             if (str_contains(strtolower($case[0]), 'array_merge_recursive')) {
                 continue;
             }
@@ -106,7 +1112,7 @@ class JITTest extends BaseTest {
                 continue;
             }
             // gc_collect_cycles() MCJIT execute unstable (#3160); compile: GcCollectCyclesJitCompileTest.
-            if (str_contains($name, 'gc_collect_cycles')) {
+            if (str_contains($name, 'gc_collect_cycles') && !str_contains($name, 'argcount')) {
                 continue;
             }
             // set_exception_handler() / restore_exception_handler() VM-only (#3146).
@@ -135,6 +1141,10 @@ class JITTest extends BaseTest {
             }
             // var_export() on enum case arrays: VM (#5583); MCJIT enum literal layout deferred.
             if (str_contains($name, 'array_spread_enum_cases')) {
+                continue;
+            }
+            // var_export(StaticCall::__set_state([]), true): inline StaticCall producer wiring (#11896); VM only.
+            if (str_contains($name, 'var_export_set_state_inline')) {
                 continue;
             }
             // count() on Countable objects is VM-only until JIT object dispatch (#3364).
@@ -267,8 +1277,37 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'reflection_property_asymmetric')) {
                 continue;
             }
+            // ReflectionProperty::{isReadable,isWritable} profile gates: VM-only (#15664).
+            if (str_contains($name, 'reflection_property_isreadable')) {
+                continue;
+            }
+            // ReflectionProperty::isDynamic profile gates: VM-only (#15676).
+            if (str_contains($name, 'reflection_property_isdynamic')) {
+                continue;
+            }
+            // ReflectionEnumUnitCase::isDeprecated profile gates: VM-only (#15767).
+            if (str_contains($name, 'reflection_enum_unit_case_is_deprecated')) {
+                continue;
+            }
+            // ReflectionClassConstant::isDeprecated profile gates: VM-only (#17104).
+            if (str_contains($name, 'reflection_class_constant_is_deprecated')) {
+                continue;
+            }
+            // ReflectionFunction::isDeprecated profile gates: VM-only (#9760).
+            if (str_contains($name, 'reflection_function_is_deprecated')) {
+                continue;
+            }
+            // Reflection createFrom* factory profile gates: VM-only (#16724).
+            if (str_contains($name, 'reflection_create_from_callable')
+                || str_contains($name, 'reflection_function_create_from')) {
+                continue;
+            }
             // Reflection docblock/source getters are VM-only (#7358).
             if (str_contains($name, 'reflection_docblock_source')) {
+                continue;
+            }
+            // ReflectionClass::getExtension() / ReflectionExtension are VM-only (#11462).
+            if (str_contains($name, 'reflection_extension_class')) {
                 continue;
             }
             // uasort() closure comparators are VM-only (#3582).
@@ -277,6 +1316,14 @@ class JITTest extends BaseTest {
             }
             // utf8_encode/decode TypeError in try/catch: VM + AOT (#4317); MCJIT JitStringBuiltinArg assert IR (#98).
             if (str_contains($name, 'utf8_encode_decode_scalar') && !str_contains($name, '_jit')) {
+                continue;
+            }
+            // printf()/sprintf() null format TypeError getMessage in try/catch: VM + AOT (#16042); MCJIT pending TypeError introspection (#98).
+            if (str_contains($name, 'printf_null_format_typeerror') && !str_contains($name, '_jit')) {
+                continue;
+            }
+            // addcslashes() null characters TypeError getMessage in try/catch under strict_types: VM + AOT (#17829); MCJIT pending TypeError introspection (#98).
+            if (str_contains($name, 'addcslashes_null_characters_strict_typeerror') && !str_contains($name, '_jit')) {
                 continue;
             }
             // dl() TypeError in try/catch: VM + bin/jit.php (#3591); MCJIT JitStringBuiltinArg abort IR (#98).
@@ -473,6 +1520,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'static_typed_property_typeerror')) {
                 continue;
             }
+            // isset() on uninitialized static typed property: VM (#15112); MCJIT file-scope declare segfault (#4908).
+            if (str_contains($name, 'isset_static_typed_uninit')) {
+                continue;
+            }
             // Scalar union static properties: VM + TYPE_VALUE lowering (#8726); MCJIT declare/echo segfault until stable (#98).
             if (str_contains($name, 'static_property_union_type')) {
                 continue;
@@ -565,6 +1616,10 @@ class JITTest extends BaseTest {
             }
             // dirname() $levels Z_PARAM_LONG TypeError in try/catch: VM + AOT (#4715); MCJIT execute LLVM verify/segfault like chunk_split_type_error.
             if (str_contains($name, 'path_functions_type_error')) {
+                continue;
+            }
+            // preg_match() float offset: VM + AOT (#13818); MCJIT stderr deprecation merged before stdout.
+            if (str_contains($name, 'preg_match_float_offset') && !str_contains($name, '_jit')) {
                 continue;
             }
             yield $name => $case;

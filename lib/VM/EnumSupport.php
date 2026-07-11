@@ -11,6 +11,27 @@ use PHPCompiler\VM\Builtin\EnumCases;
 /** Helpers for user enum runtime (#1356, #3308). */
 final class EnumSupport
 {
+    /** php-src Zend/zend_enum.c — UnitEnum/BackedEnum reserved for enums (#15447). */
+    private const BUILTIN_ENUM_INTERFACES = [
+        'unitenum' => 'UnitEnum',
+        'backedenum' => 'BackedEnum',
+    ];
+
+    public static function rejectsNonEnumImplementationLc(string $ifaceLc): bool
+    {
+        return isset(self::BUILTIN_ENUM_INTERFACES[strtolower(ltrim($ifaceLc, '\\'))]);
+    }
+
+    public static function nonEnumImplementationForbiddenMessage(string $classDisplay, string $ifaceLc): ?string
+    {
+        $iface = self::BUILTIN_ENUM_INTERFACES[strtolower(ltrim($ifaceLc, '\\'))] ?? null;
+        if (null === $iface) {
+            return null;
+        }
+
+        return sprintf('Non-enum class %s cannot implement interface %s', $classDisplay, $iface);
+    }
+
     public static function ensureBuiltinCasesMethod(ClassEntry $entry): void
     {
         if (!$entry->isEnum) {

@@ -38,6 +38,9 @@ class Context {
     private ?RunStackEntry $runStack = null;
     public array $constants = [];
 
+    /** @var array<string, \PHPCompiler\Compiler\DeprecatedMetadata> */
+    public array $globalConstDeprecated = [];
+
     /** @var array<string, Variable> */
     private array $superglobalVars = [];
 
@@ -58,6 +61,15 @@ class Context {
 
     public Runtime $runtime;
 
+    /** Active declare(ticks=N) interval; 0 disables tick dispatch (#3343). */
+    public int $tickInterval = 0;
+
+    /** Countdown to next tick callback invocation (#3343). */
+    public int $tickCounter = 0;
+
+    /** @var list<int> Saved tick intervals for nested declare blocks (#3343). */
+    public array $tickIntervalStack = [];
+
     /**
      * Property-hook virtual/backing metadata from {@see \PHPCompiler\SourcePreprocessor\PropertyHooks} (#4687).
      *
@@ -74,8 +86,36 @@ class Context {
     /** Catch frame for throw/TypeError during nested property-hook invoke; bubble to caller (#7301, #9503). */
     public ?Frame $propertyHookExternalCatchFrame = null;
 
+    /** True while {@see VM::invokeUserDestructor} runs on an isolated run stack (#12070). */
+    public bool $isolatedDestructorInvoke = false;
+
+    /** True while user __clone() runs on an isolated run stack (#12068, zend_object_handlers.c). */
+    public bool $invokingCloneMagic = false;
+
+    /** True while serialize/unserialize magic hooks run on an isolated stack (#12069). */
+    public bool $isolatedPhpFunctionInvoke = false;
+
+    /**
+     * When true, bubble uncaught user throwables as native \Throwable to the embedding host (PHPUnit,
+     * library API) instead of emitting a Zend-style fatal block and terminating the VM with ScriptExit.
+     *
+     * CLI entrypoints should leave this false and handle ScriptExit status codes.
+     */
+    public bool $bubbleUncaughtToNative = false;
+
+    /**
+     * Isolated closure invoke from stdlib callbacks — defer user catch to outer runFrames (#14104).
+     */
+    public bool $deferBuiltinCallbackCatchToOuterRunFrames = false;
+
+    /** Catch frame for throw during nested __clone(); bubble to clone opcode caller (#12068). */
+    public ?Frame $cloneMagicExternalCatchFrame = null;
+
     /** Active object-to-string coercion via __toString (issue #4284). */
     public bool $coercingObjectToString = false;
+
+    /** count() on Countable — php-src zval_get_long, skip interface return check (#12867). */
+    public int $suppressReturnTypeCheckDepth = 0;
 
     /** Ghost object currently running its lazy initializer (#6531, Zend/zend_lazy_objects.c). */
     public ?ObjectEntry $lazyGhostInitializing = null;
@@ -304,16 +344,16 @@ class Context {
                 if (!\PHPCompiler\ext\standard\VmPasswordNative::argon2Available()) {
                     return null;
                 }
-                $var = new Variable(Variable::TYPE_STRING);
-                $var->string(\PHPCompiler\ext\standard\StdlibConstants::PASSWORD_ARGON2I);
+                $var = new Variable(Variable::TYPE_INTEGER);
+                $var->int(\PHPCompiler\ext\standard\VmPassword::PASSWORD_ARGON2I);
 
                 return $var;
             case 'password_argon2id':
                 if (!\PHPCompiler\ext\standard\VmPasswordNative::argon2Available()) {
                     return null;
                 }
-                $var = new Variable(Variable::TYPE_STRING);
-                $var->string(\PHPCompiler\ext\standard\StdlibConstants::PASSWORD_ARGON2ID);
+                $var = new Variable(Variable::TYPE_INTEGER);
+                $var->int(\PHPCompiler\ext\standard\VmPassword::PASSWORD_ARGON2ID);
 
                 return $var;
             case 'crypt_std_des':
@@ -336,59 +376,28 @@ class Context {
                 $var->int(\PHPCompiler\ext\standard\VmPassword::CRYPT_BLOWFISH);
 
                 return $var;
-            case 'filter_validate_int':
+            case 'crypt_sha256':
                 $var = new Variable(Variable::TYPE_INTEGER);
-                $var->int(\PHPCompiler\ext\filter\VmFilter::FILTER_VALIDATE_INT);
+                $var->int(\PHPCompiler\ext\standard\VmPassword::CRYPT_SHA256);
 
                 return $var;
-            case 'filter_validate_email':
+            case 'crypt_sha512':
                 $var = new Variable(Variable::TYPE_INTEGER);
-                $var->int(\PHPCompiler\ext\filter\VmFilter::FILTER_VALIDATE_EMAIL);
-
-                return $var;
-            case 'filter_validate_regexp':
-                $var = new Variable(Variable::TYPE_INTEGER);
-                $var->int(\PHPCompiler\ext\filter\VmFilter::FILTER_VALIDATE_REGEXP);
-
-                return $var;
-            case 'filter_null_on_failure':
-                $var = new Variable(Variable::TYPE_INTEGER);
-                $var->int(\PHPCompiler\ext\filter\VmFilter::FILTER_NULL_ON_FAILURE);
-
-                return $var;
-            case 'input_get':
-                $var = new Variable(Variable::TYPE_INTEGER);
-                $var->int(\PHPCompiler\ext\filter\VmFilter::INPUT_GET);
-
-                return $var;
-            case 'input_post':
-                $var = new Variable(Variable::TYPE_INTEGER);
-                $var->int(\PHPCompiler\ext\filter\VmFilter::INPUT_POST);
-
-                return $var;
-            case 'input_cookie':
-                $var = new Variable(Variable::TYPE_INTEGER);
-                $var->int(\PHPCompiler\ext\filter\VmFilter::INPUT_COOKIE);
-
-                return $var;
-            case 'input_env':
-                $var = new Variable(Variable::TYPE_INTEGER);
-                $var->int(\PHPCompiler\ext\filter\VmFilter::INPUT_ENV);
-
-                return $var;
-            case 'input_server':
-                $var = new Variable(Variable::TYPE_INTEGER);
-                $var->int(\PHPCompiler\ext\filter\VmFilter::INPUT_SERVER);
-
-                return $var;
-            case 'input_session':
-                $var = new Variable(Variable::TYPE_INTEGER);
-                $var->int(\PHPCompiler\ext\filter\VmFilter::INPUT_SESSION);
+                $var->int(\PHPCompiler\ext\standard\VmPassword::CRYPT_SHA512);
 
                 return $var;
         }
+        $filterVar = \PHPCompiler\ext\filter\FilterConstants::variableForName($name);
+        if (null !== $filterVar) {
+            return $filterVar;
+        }
         $stdlibInt = \PHPCompiler\ext\standard\StdlibConstants::CORE_INT_BY_NAME[strtolower($name)] ?? null;
         if (null !== $stdlibInt) {
+            $lc = strtolower($name);
+            if (str_starts_with($lc, 'array_pad_')
+                && !\PHPCompiler\CompilerVersion::supportsArrayPadPadType()) {
+                return null;
+            }
             $var = new Variable(Variable::TYPE_INTEGER);
             $var->int($stdlibInt);
 
@@ -398,6 +407,13 @@ class Context {
         if (null !== $stdlibFloat) {
             $var = new Variable(Variable::TYPE_FLOAT);
             $var->float($stdlibFloat);
+
+            return $var;
+        }
+        $dateStr = \PHPCompiler\ext\standard\DateConstants::CORE_STRING_BY_NAME[strtolower($name)] ?? null;
+        if (null !== $dateStr) {
+            $var = new Variable(Variable::TYPE_STRING);
+            $var->string($dateStr);
 
             return $var;
         }
@@ -510,9 +526,28 @@ class Context {
                 return false;
             }
         }
-        $this->constants[$name] = clone $value;
+        $this->constants[$name] = EnumCaseSupport::materializeConstantValue($this, $value);
 
         return true;
+    }
+
+    /** True when a live user constant still holds the given object id (#17676). */
+    public function userConstantReferencesObjectId(int $objectId): bool
+    {
+        foreach ($this->constants as $constVar) {
+            $resolved = $constVar->resolveIndirect();
+            if (Variable::TYPE_OBJECT !== $resolved->type) {
+                continue;
+            }
+            try {
+                if ($resolved->toObject()->id === $objectId) {
+                    return true;
+                }
+            } catch (\LogicException) {
+            }
+        }
+
+        return false;
     }
 
     public function declareFunction(Func $func): void {
@@ -545,21 +580,45 @@ class Context {
      *
      * php-src: zend_register_class_alias_ex — resolves alias-of-alias to canonical class (#11639).
      */
-    public function registerClassAlias(string $original, string $alias, bool $autoload = true): bool
+    public function registerClassAlias(string $original, string $alias, bool $autoload = true, ?\PHPCompiler\Frame $frame = null): bool
     {
         $aliasLc = strtolower($alias);
         $originalLc = strtolower($original);
 
         if (isset($this->classes[$aliasLc]) || isset($this->classAliases[$aliasLc]) || isset($this->enums[$aliasLc])) {
+            $this->errors->triggerError(
+                \sprintf('Cannot declare class %s, because the name is already in use', $alias),
+                ErrorReporter::E_WARNING,
+                null,
+                $this,
+                $frame
+            );
+
             return false;
         }
 
         if (!isset($this->classes[$originalLc])) {
             if (!$autoload || !$this->autoloadClass($original)) {
+                $this->errors->triggerError(
+                    \sprintf('Class "%s" not found', $original),
+                    ErrorReporter::E_WARNING,
+                    null,
+                    $this,
+                    $frame
+                );
+
                 return false;
             }
         }
         if (!isset($this->classes[$originalLc])) {
+            $this->errors->triggerError(
+                \sprintf('Class "%s" not found', $original),
+                ErrorReporter::E_WARNING,
+                null,
+                $this,
+                $frame
+            );
+
             return false;
         }
 
@@ -568,6 +627,11 @@ class Context {
         }
 
         $entry = $this->classes[$originalLc];
+        if ($entry->isInternal) {
+            throw new \ValueError(
+                'class_alias(): Argument #1 ($class) must be a user-defined class name, internal class name given'
+            );
+        }
         $this->classes[$aliasLc] = $entry;
         $this->classAliases[$aliasLc] = $originalLc;
         if ($entry->isEnum) {
@@ -600,7 +664,7 @@ class Context {
     public function recordIncludedFile(string $path): void
     {
         $normalized = ScriptStack::normalize($path);
-        if ('' !== $normalized) {
+        if ('' !== $normalized && !ScriptStack::isVirtualCompileUnit($normalized)) {
             $this->includedFiles[] = $normalized;
         }
     }
@@ -659,6 +723,14 @@ class Context {
         $this->syncGlobalEntryInGlobalsTable($name, $this->globalVars[$name]);
 
         return $this->globalVars[$name];
+    }
+
+    /** @param callable(Variable): void $visitVar */
+    public function visitGlobalVariables(callable $visitVar): void
+    {
+        foreach ($this->globalVars as $global) {
+            $visitVar($global);
+        }
     }
 
     /** True when $var is the canonical storage cell for a script global (#5089). */
@@ -823,6 +895,29 @@ class Context {
         return !$global->isUndefined() && Variable::TYPE_NULL !== $global->type;
     }
 
+    /**
+     * empty($GLOBALS['name']) — symbol probe then value truthiness (#14798).
+     */
+    public function globalsTableOffsetIsEmpty(Variable $index): bool
+    {
+        if (Variable::TYPE_STRING !== $index->type) {
+            $table = $this->ensureGlobalsTable()->toArray();
+            if (!$table->keyExists($index)) {
+                return true;
+            }
+            $stored = $table->findVariable($index, false);
+
+            return !\PHPCompiler\ext\standard\boolval::isTruthy($stored->resolveIndirect());
+        }
+        $name = $index->toString();
+        if (!isset($this->globalVars[$name])) {
+            return true;
+        }
+        $global = $this->globalVars[$name]->resolveIndirect();
+
+        return !\PHPCompiler\ext\standard\boolval::isTruthy($global);
+    }
+
     private function syncGlobalEntryInGlobalsTable(string $name, Variable $global): void
     {
         if (null === $this->globalsSuperglobal) {
@@ -851,6 +946,11 @@ class Context {
         }
 
         return $this->functionStaticVars[$storageKey];
+    }
+
+    public function peekFunctionStatic(string $storageKey): ?Variable
+    {
+        return $this->functionStaticVars[$storageKey] ?? null;
     }
 
     public function isFunctionStaticInitialized(string $storageKey): bool
@@ -999,6 +1099,8 @@ class Context {
             CycleCollector::markFrameRoots($stack->frame, $visitVar);
             $stack = $stack->prev;
         }
+        $this->exceptionHandlers->visitGcRoots($visitVar);
+        $this->errors->visitGcRoots($visitVar);
     }
 }
 

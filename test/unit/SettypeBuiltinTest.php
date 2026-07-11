@@ -83,6 +83,32 @@ final class SettypeBuiltinTest extends TestCase
         $this->assertSame('ok', $var->resolveIndirect()->toString());
     }
 
+    /** Issue #10293: settype($array,'string') — Array to string conversion warning (ext/standard/type.c). */
+    public function testSettypeArrayToStringEmitsWarning(): void
+    {
+        $ctx = new Context(new Runtime());
+        BuiltinClasses::register($ctx);
+        $frame = $this->getMockBuilder(Frame::class)->disableOriginalConstructor()->getMock();
+        $frame->vmContext = $ctx;
+        $frame->scriptPath = 'test.php';
+        $frame->callSiteLine = 3;
+        $frame->parent = null;
+
+        $var = new VMVariable();
+        $var->array(new \PHPCompiler\VM\HashTable());
+        VmSettype::apply($var, 'string', $frame);
+
+        $this->assertSame('Array', $var->resolveIndirect()->toString());
+        $last = $ctx->errors->getLastErrorVariable()->resolveIndirect();
+        $this->assertSame(VMVariable::TYPE_ARRAY, $last->type);
+        $msg = $last->toArray()->find('message');
+        $this->assertNotNull($msg);
+        $this->assertStringContainsString(
+            'Array to string conversion',
+            $msg->resolveIndirect()->toString()
+        );
+    }
+
     /** Issue #10690: settype($obj, 'int') on plain object — E_WARNING + 1 (ext/standard/type.c). */
     public function testSettypePlainObjectToIntEmitsWarningAndOne(): void
     {

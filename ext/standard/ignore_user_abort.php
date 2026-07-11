@@ -8,6 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPLLVM\Value;
 
 /** ignore_user_abort() — continue after client disconnect (ext/standard/basic_functions.c; #3242, JIT #8078). */
@@ -31,12 +32,25 @@ final class ignore_user_abort extends Internal
         }
         $setting = null;
         if (1 === $argc) {
-            $setting = VmMath::parseBoolBuiltinArg(
-                $frame->calledArgs[0]->resolveIndirect(),
-                'ignore_user_abort',
-                1,
-                'value'
-            );
+            $arg = $frame->calledArgs[0];
+            $callerStrict = null !== $frame->parent
+                && null !== $frame->parent->block
+                && $frame->parent->block->strictTypes;
+            if ($callerStrict) {
+                $setting = InternalStrictArg::parseBuiltinNullableBoolArg(
+                    $arg,
+                    'ignore_user_abort',
+                    0,
+                    'enable'
+                );
+            } else {
+                $setting = InternalStrictArg::parseBuiltinNullableBoolArgCoerceInt(
+                    $arg,
+                    'ignore_user_abort',
+                    0,
+                    'enable'
+                );
+            }
         }
         if (null === $frame->returnVar) {
             return;

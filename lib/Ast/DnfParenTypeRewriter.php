@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace PHPCompiler\Ast;
 
+use PHPCompiler\CompilerVersion;
+use PHPCompiler\ReferenceProfileTokenScan;
+
 /**
  * Unwrap parenthesized DNF type leaves for nikic/php-parser 4.x (#9733, #3094).
  *
@@ -11,15 +14,81 @@ namespace PHPCompiler\Ast;
  * parenthesized intersection-only leaves unless followed by `|` or `&`.
  * Parenthesized union-only leaves such as `(A|B) $param` are a Zend parse error (#9968) —
  * do not unwrap them into `A|B`.
- * `(I1&I2)|null` and `(A|B)&C` must keep their parens — only unwrap bare intersection-only
- * leaves when the closing `)` is not part of a larger DNF type.
+ * `(I1&I2)|null`, `A|(B&C)`, and `(A|B)&C` must keep their parens — only unwrap bare
+ * intersection-only leaves when the closing `)` is not part of a larger DNF type.
+ * php-parser accepts `A|(B&C)` but not the unwrapped `A|B&C` (#11745).
  *
  * php-src: Zend/zend_compile.c — zend_compile_type / DNF normalization.
  */
 final class DnfParenTypeRewriter
 {
+    /**
+     * @return array{line: int, message: string}|null
+     */
+    public static function referenceProfileSyntaxError(string $source): ?array
+    {
+        if (ReferenceProfileTokenScan::exceedsTokenScanBudget($source)) {
+            return null;
+        }
+        if (!str_contains($source, '(')) {
+            return null;
+        }
+
+        $tokens = token_get_all($source);
+        $n = \count($tokens);
+        $i = 0;
+
+        while ($i < $n) {
+            $tok = $tokens[$i];
+            if ('(' !== self::tokenText($tok)) {
+                ++$i;
+                continue;
+            }
+
+            $close = self::findMatchingCloseParen($tokens, $i);
+            if (null === $close) {
+                ++$i;
+                continue;
+            }
+
+            $inner = \array_slice($tokens, $i + 1, $close - $i - 1);
+            if (!self::isTypeExpressionTokens($inner) || !self::hasTopLevelIntersection($inner)) {
+                ++$i;
+                continue;
+            }
+
+            $after = self::skipIgnorable($tokens, $close + 1, $n);
+            if ($after < $n && ('|' === self::tokenText($tokens[$after]) || '&' === self::tokenText($tokens[$after]))) {
+                ++$i;
+                continue;
+            }
+
+            if (self::isPrecededByTypeUnionOperator($tokens, $i)) {
+                ++$i;
+                continue;
+            }
+
+            if (self::isCatchTypeParenContext($tokens, $i)) {
+                ++$i;
+                continue;
+            }
+
+            $unexpected = self::unexpectedTokenAfterIntersectionParen($tokens, $after, $n);
+
+            return [
+                'line' => self::tokenLineAt($tokens, $unexpected['index']),
+                'message' => $unexpected['message'],
+            ];
+        }
+
+        return null;
+    }
+
     public static function rewrite(string $source): string
     {
+        if (!CompilerVersion::supportsParenthesizedDnfIntersectionTypes()) {
+            return $source;
+        }
         if (!str_contains($source, '(')) {
             return $source;
         }
@@ -68,6 +137,13 @@ final class DnfParenTypeRewriter
                 continue;
             }
 
+            // Union RHS intersection arms: `A|(B&C)` must keep parens — unwrapping breaks php-parser (#11745).
+            if (self::isPrecededByTypeUnionOperator($tokens, $i)) {
+                $out .= self::tokenText($tok);
+                ++$i;
+                continue;
+            }
+
             // catch (A|B) requires parens for php-parser; unwrap breaks non-capturing union (#9766).
             if (self::isCatchTypeParenContext($tokens, $i)) {
                 $out .= self::tokenText($tok);
@@ -82,6 +158,23 @@ final class DnfParenTypeRewriter
         }
 
         return $out;
+    }
+
+    /**
+     * @param list<array{0: int, 1: string, 2: int}|string> $tokens
+     */
+    private static function isPrecededByTypeUnionOperator(array $tokens, int $open): bool
+    {
+        for ($i = $open - 1; $i >= 0; --$i) {
+            $tok = $tokens[$i];
+            if (\is_array($tok) && self::isIgnorable($tok[0])) {
+                continue;
+            }
+
+            return '|' === self::tokenText($tok);
+        }
+
+        return false;
     }
 
     /**
@@ -307,5 +400,57 @@ final class DnfParenTypeRewriter
     private static function tokenText(array|string $tok): string
     {
         return \is_array($tok) ? $tok[1] : $tok;
+    }
+
+    /**
+     * @param list<array{0: int, 1: string, 2: int}|string> $tokens
+     *
+     * @return array{index: int, message: string}
+     */
+    private static function unexpectedTokenAfterIntersectionParen(array $tokens, int $after, int $n): array
+    {
+        $index = self::skipIgnorable($tokens, $after, $n);
+        if ($index >= $n) {
+            return [
+                'index' => max(0, $n - 1),
+                'message' => 'syntax error, unexpected end of file, expecting "|"',
+            ];
+        }
+
+        $tok = $tokens[$index];
+        if (\is_array($tok) && T_VARIABLE === $tok[0]) {
+            return [
+                'index' => $index,
+                'message' => sprintf('syntax error, unexpected variable "%s", expecting "|"', $tok[1]),
+            ];
+        }
+
+        $text = self::tokenText($tok);
+        if ('{' === $text) {
+            return [
+                'index' => $index,
+                'message' => 'syntax error, unexpected token "{", expecting "|"',
+            ];
+        }
+
+        return [
+            'index' => $index,
+            'message' => sprintf('syntax error, unexpected token "%s", expecting "|"', $text),
+        ];
+    }
+
+    /**
+     * @param list<array{0: int, 1: string, 2: int}|string> $tokens
+     */
+    private static function tokenLineAt(array $tokens, int $index): int
+    {
+        for ($i = $index; $i >= 0; --$i) {
+            $tok = $tokens[$i];
+            if (\is_array($tok)) {
+                return max(1, $tok[2]);
+            }
+        }
+
+        return 1;
     }
 }

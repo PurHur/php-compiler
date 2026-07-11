@@ -15,4 +15,9 @@ final class HtmlEntityDecodeJitHelper
     {
         return VmString::html_entity_decode($string, $flags);
     }
+
+    public static function decodeWithEncoding(string $string, int $flags, string $encoding): string
+    {
+        return VmString::html_entity_decode($string, $flags, $encoding);
+    }
 }

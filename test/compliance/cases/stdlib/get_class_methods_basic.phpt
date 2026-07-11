@@ -20,6 +20,6 @@ echo in_array('a', $byObject, true) ? '1' : '0';
 echo get_class_methods('MissingClass') ? '1' : '0';
 echo "\n";
 --EXPECT--
-3
-1113
+1
+1001
 10

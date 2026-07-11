@@ -67,17 +67,24 @@ final class RuntimeShrinkCloseoutTest extends TestCase
     {
         $checks = [
             'ext/standard/JitSettype.php' => 'JitSettype',
+            'ext/standard/SettypeJitHelper.php' => 'SettypeJitHelper',
+            'lib/JIT/Builtin/SettypeRuntime.php' => 'SettypeRuntime',
             'ext/standard/VmSerialize.php' => 'resolveEnumCaseVariable',
             'ext/standard/VmUnserializeFormat.php' => 'decodePayload',
-            'lib/JIT/Builtin/StringUnserializeJit.php' => '__compiler_unserialize',
+            'lib/JIT/Builtin/StringUnserialize.php' => 'UnserializeJitHelper',
             'lib/JIT/Builtin/IniRuntime.php' => 'IniJitHelper',
             'lib/JIT/Builtin/IniIntrospectionRuntime.php' => 'IniIntrospectionJitHelper',
-            'lib/JIT/Builtin/StringJsonDecodeJit.php' => '__compiler_json_decode',
+            'lib/JIT/Builtin/StringJsonDecode.php' => 'JsonDecodeJitHelper',
             'lib/JIT/Builtin/PasswordCryptoRuntime.php' => 'password_hash',
             'lib/JIT/Builtin/StringHashCryptoPhp.php' => 'HashCryptoJitHelper',
-            'lib/JIT/Builtin/StringDirJit.php' => 'phpc_dir',
+            'lib/JIT/Builtin/StringDirRuntime.php' => 'DirHandleJitHelper',
+            'lib/JIT/Builtin/PregMatchRuntime.php' => 'PregJitHelper',
+            'lib/JIT/Builtin/StringPregMatchJit.php' => 'PregMatchRuntime',
+            'lib/JIT/Builtin/GzStreamRuntime.php' => 'GzStreamJitHelper',
+            'ext/standard/GzStreamJitHelper.php' => 'VmGzStream',
             'lib/JIT/Builtin/StringFsDirJit.php' => 'StringFsDirJit',
             'ext/standard/stripcslashes.php' => 'VmString',
+            'lib/JIT/Builtin/OpensslSignRuntime.php' => 'OpensslSignJitHelper',
         ];
 
         foreach ($checks as $relativePath => $needle) {
@@ -88,15 +95,13 @@ final class RuntimeShrinkCloseoutTest extends TestCase
         }
     }
 
-    public function testOnlyProgressAbiRemainsInAotRuntime(): void
+    public function testNoAotRuntimeCSourcesRemain(): void
     {
         $runtimeDir = $this->repoRoot.'/lib/AOT/runtime';
         $cFiles = glob($runtimeDir.'/*.c') ?: [];
         sort($cFiles);
-        $this->assertSame(
-            [$runtimeDir.'/phpc_progress.c'],
-            $cFiles,
-            'Only phpc_progress.c (frozen SIGSEGV ABI) may remain under lib/AOT/runtime/'
-        );
+        $this->assertSame([], $cFiles, 'No hand-written C runtime TUs may remain under lib/AOT/runtime/');
+        $this->assertFileDoesNotExist($runtimeDir.'/openssl_ev.c', 'openssl_ev.c deleted — OpensslSignJitHelper PHP (#16454)');
+        $this->assertFileDoesNotExist($this->repoRoot.'/lib/JIT/Builtin/runtime/openssl_ev.c');
     }
 }

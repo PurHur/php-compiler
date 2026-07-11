@@ -15,8 +15,10 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Builtin\PadTypeJit;
+use PHPCompiler\JIT\Builtin\StringStrPad;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
+use PHPCompiler\JIT\NamedOptionalCallArgs;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\Variable;
@@ -24,6 +26,8 @@ use PHPLLVM\Value;
 
 /**
  * str_pad() for strings (STR_PAD_LEFT, STR_PAD_RIGHT, STR_PAD_BOTH).
+ *
+ * VM: {@see VmString::strPad()}; JIT/AOT: {@see StringStrPad} + {@see StrPadJitHelper}.
  */
 final class str_pad extends Internal
 {
@@ -41,7 +45,7 @@ final class str_pad extends Internal
         );
         $padLength = VmMath::parseIntBuiltinArgForFrame($frame, 1, 'str_pad', 2, 'length');
         $padString = ' ';
-        if ($argc >= 3) {
+        if (isset($frame->calledArgs[2])) {
             $padString = VmString::coerceStringBuiltinArg(
                 $frame->calledArgs[2],
                 'str_pad',
@@ -51,7 +55,7 @@ final class str_pad extends Internal
         }
         // Compiler convention: 0 = STR_PAD_LEFT, 1 = STR_PAD_RIGHT (default).
         $padType = 1;
-        if (4 === $argc) {
+        if (isset($frame->calledArgs[3])) {
             $padType = VmString::resolveStrPadTypeArg($frame->calledArgs[3]);
         }
         $result = VmString::strPad($input, $padLength, $padString, $padType);
@@ -72,12 +76,12 @@ final class str_pad extends Internal
         }
         $input = JitStringBuiltinArg::lower($context, $args[0], 'str_pad', 0, 'string');
         $padLength = JitIntdiv::lowerIntBuiltinArg($context, $args[1], 'str_pad', 2, 'length');
-        if ($argc >= 3) {
+        if (isset($args[2]) && !NamedOptionalCallArgs::isOmittedOptional($args[2])) {
             $padString = JitStringBuiltinArg::lower($context, $args[2], 'str_pad', 2, 'pad_string');
         } else {
             $padString = $context->builder->load($context->constantStringFromString(' '));
         }
-        if (4 === $argc) {
+        if (isset($args[3]) && !NamedOptionalCallArgs::isOmittedOptional($args[3])) {
             $padTypeLiteral = PadTypeJit::compileTimePadType($context, $args[3]);
             if (null !== $padTypeLiteral) {
                 $padType = $context->getTypeFromString('int64')->constInt($padTypeLiteral, false);
@@ -87,8 +91,14 @@ final class str_pad extends Internal
         } else {
             $padType = $context->getTypeFromString('int64')->constInt(1, false);
         }
-        JitStrPad::emitRuntimeEmptyPadStringGuard($context, $padString);
+        StringStrPad::ensureLinked($context);
 
-        return JitStrPad::pad($context, $input, $padLength, $padString, $padType);
+        return $context->builder->call(
+            $context->lookupFunction('__compiler_str_pad'),
+            $input,
+            $padLength,
+            $padString,
+            $padType
+        );
     }
 }

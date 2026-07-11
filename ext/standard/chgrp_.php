@@ -25,7 +25,7 @@ final class chgrp_ extends Internal
             throw new \LogicException('chgrp() requires exactly two arguments in this compiler build');
         }
         $path = VmFilestatArg::coerceFilenameArg($frame->calledArgs[0], 'chgrp');
-        $groupVar = VmFilestatArg::requireIntOrStringArg($frame->calledArgs[1], 'chgrp', 1, 'group');
+        $groupVar = VmFilestatArg::requireIntOrStringArgForFrame($frame, 1, 'chgrp', 'group');
         if (null === $frame->returnVar) {
             return;
         }

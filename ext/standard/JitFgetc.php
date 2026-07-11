@@ -14,7 +14,7 @@ use PHPLLVM\Value;
 final class JitFgetc
 {
     /** @return Value
-     * (single-character string, empty string at EOF, or boolean false on failure) */
+     * (single-character string or boolean false at EOF / on failure) */
     public static function invoke(Context $context, Value $handleLong): Value
     {
         $contents = $context->builder->call(

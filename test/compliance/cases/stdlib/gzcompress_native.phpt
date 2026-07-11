@@ -1,5 +1,5 @@
 --TEST--
-stdlib gzcompress/gzuncompress via VmZlibNative FFI without host ext-zlib (#6356)
+stdlib gzcompress/gzuncompress via VmZlibCore pure PHP without host ext-zlib (#6356, #8837)
 --FILE--
 <?php
 $plain = 'hello bootstrap';

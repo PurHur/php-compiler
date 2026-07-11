@@ -1001,6 +1001,48 @@ restart:
                         break;
                 }
             }
+            if (Variable::TYPE_NATIVE_DOUBLE === $rightType) {
+                if (OpCode::TYPE_IDENTICAL === $opcode->type) {
+                    $result = JitValueCompare::identicalToNative($this->context, $left, $right);
+                    goto return_bool;
+                }
+                if (OpCode::TYPE_NOT_IDENTICAL === $opcode->type) {
+                    $result = JitValueCompare::notIdenticalToNative($this->context, $left, $right);
+                    goto return_bool;
+                }
+                $leftDouble = $this->context->builder->call(
+                    $this->context->lookupFunction('__value__readDouble'),
+                    JitValueBox::valuePtrFromVariable($this->context, $left)
+                );
+                switch ($opcode->type) {
+                    case OpCode::TYPE_PLUS:
+                        $result = $this->context->builder->add($leftDouble, $rightValue);
+                        goto return_double;
+                    case OpCode::TYPE_MINUS:
+                        $result = $this->context->builder->sub($leftDouble, $rightValue);
+                        goto return_double;
+                    case OpCode::TYPE_MUL:
+                        $result = $this->context->builder->mul($leftDouble, $rightValue);
+                        goto return_double;
+                    case OpCode::TYPE_DIV:
+                        $result = $this->context->builder->div($leftDouble, $rightValue);
+                        goto return_double;
+                    case OpCode::TYPE_EQUAL:
+                        $result = JitValueCompare::looseEqualValueToNativeDouble(
+                            $this->context,
+                            $left,
+                            $rightValue
+                        );
+                        goto return_bool;
+                    case OpCode::TYPE_NOT_EQUAL:
+                        $result = JitValueCompare::notLooseEqualValueToNativeDouble(
+                            $this->context,
+                            $left,
+                            $rightValue
+                        );
+                        goto return_bool;
+                }
+            }
             if (Variable::TYPE_NATIVE_LONG === $rightType && self::isOrderedCompareOpcode($opcode->type)) {
                 $result = JitValueCompare::orderedValueToNativeLong(
                     $this->context,
@@ -1097,6 +1139,48 @@ restart:
                             goto return_bool;
                         }
                         break;
+                }
+            }
+            if (Variable::TYPE_NATIVE_DOUBLE === $leftType) {
+                if (OpCode::TYPE_IDENTICAL === $opcode->type) {
+                    $result = JitValueCompare::identicalNativeToValue($this->context, $left, $right);
+                    goto return_bool;
+                }
+                if (OpCode::TYPE_NOT_IDENTICAL === $opcode->type) {
+                    $result = JitValueCompare::notIdenticalNativeToValue($this->context, $left, $right);
+                    goto return_bool;
+                }
+                $rightDouble = $this->context->builder->call(
+                    $this->context->lookupFunction('__value__readDouble'),
+                    JitValueBox::valuePtrFromVariable($this->context, $right)
+                );
+                switch ($opcode->type) {
+                    case OpCode::TYPE_PLUS:
+                        $result = $this->context->builder->add($leftValue, $rightDouble);
+                        goto return_double;
+                    case OpCode::TYPE_MINUS:
+                        $result = $this->context->builder->sub($leftValue, $rightDouble);
+                        goto return_double;
+                    case OpCode::TYPE_MUL:
+                        $result = $this->context->builder->mul($leftValue, $rightDouble);
+                        goto return_double;
+                    case OpCode::TYPE_DIV:
+                        $result = $this->context->builder->div($leftValue, $rightDouble);
+                        goto return_double;
+                    case OpCode::TYPE_EQUAL:
+                        $result = JitValueCompare::looseEqualNativeDoubleToValue(
+                            $this->context,
+                            $leftValue,
+                            $right
+                        );
+                        goto return_bool;
+                    case OpCode::TYPE_NOT_EQUAL:
+                        $result = JitValueCompare::notLooseEqualNativeDoubleToValue(
+                            $this->context,
+                            $leftValue,
+                            $right
+                        );
+                        goto return_bool;
                 }
             }
             if (Variable::TYPE_NATIVE_LONG === $leftType && self::isOrderedCompareOpcode($opcode->type)) {
@@ -1838,6 +1922,31 @@ return_bool:
                 }
 
                 return $valuePtr;
+            }
+
+            if (Variable::TYPE_NATIVE_LONG === $variable->objectPropertyType) {
+                $nativePtr = $this->context->builder->pointerCast(
+                    $loaded,
+                    $this->context->getTypeFromString('int64*')
+                );
+
+                return $this->context->builder->load($nativePtr);
+            }
+            if (Variable::TYPE_NATIVE_BOOL === $variable->objectPropertyType) {
+                $nativePtr = $this->context->builder->pointerCast(
+                    $loaded,
+                    $this->context->getTypeFromString('int1*')
+                );
+
+                return $this->context->builder->load($nativePtr);
+            }
+            if (Variable::TYPE_NATIVE_DOUBLE === $variable->objectPropertyType) {
+                $nativePtr = $this->context->builder->pointerCast(
+                    $loaded,
+                    $this->context->getTypeFromString('double*')
+                );
+
+                return $this->context->builder->load($nativePtr);
             }
 
             $llvmType = Variable::getStringType($variable->objectPropertyType);

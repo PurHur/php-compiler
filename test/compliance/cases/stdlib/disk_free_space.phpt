@@ -19,7 +19,7 @@ if ($aliasFree === false || $aliasTotal === false) {
 }
 $nullFree = disk_free_space(null);
 $dotFree = disk_free_space('.');
-if ($nullFree === false || $dotFree === false) {
+if ($nullFree !== false || $dotFree === false) {
     echo 'null_bad', "\n";
 } else {
     echo 'null_ok', "\n";

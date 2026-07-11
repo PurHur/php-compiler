@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\CompilerVersion;
+
 /**
  * Single source of truth for VM/JIT Throwable class hierarchy (#6736).
  *
@@ -55,6 +57,8 @@ final class ThrowableManifest
 
     public const LC_DATE_MALFORMED_INTERVAL_EXCEPTION = 'datemalformedintervalexception';
 
+    public const LC_DATE_MALFORMED_STRING = 'datemalformedstring';
+
     public const LC_DATE_MALFORMED_PERIOD_EXCEPTION = 'datemalformedperiodexception';
 
     public const LC_DATE_ERROR = 'dateerror';
@@ -89,6 +93,10 @@ final class ThrowableManifest
 
     public const LC_JSON_EXCEPTION = 'jsonexception';
 
+    public const LC_DOM_EXCEPTION = 'domexception';
+
+    public const LC_SODIUM_EXCEPTION = 'sodiumexception';
+
     /**
      * Parent map in registration order: child => parent name, or null when implementing Throwable directly.
      *
@@ -115,8 +123,11 @@ final class ThrowableManifest
         'RequestParseBodyException' => 'Exception',
         'DateException' => 'Exception',
         'DateInvalidTimeZoneException' => 'DateException',
+        'DateInvalidOperationException' => 'DateException',
+        'DateMalformedStringException' => 'DateException',
         'DateMalformedIntervalException' => 'DateException',
         'DateMalformedPeriodException' => 'DateException',
+        'DateMalformedPeriodStringException' => 'DateException',
         'Error' => null,
         'DateError' => 'Error',
         'DateObjectError' => 'DateError',
@@ -133,6 +144,9 @@ final class ThrowableManifest
         'DivisionByZeroError' => 'ArithmeticError',
         'AssertionError' => 'Error',
         'JsonException' => 'Exception',
+        'DOMException' => 'Exception',
+        'SodiumException' => 'Exception',
+        'SQLite3Exception' => 'Exception',
     ];
 
     /** @var array<string, class-string> */
@@ -154,7 +168,8 @@ final class ThrowableManifest
         'ErrorException' => \ErrorException::class,
         'ReflectionException' => \ReflectionException::class,
         'ClosedGeneratorException' => \ClosedGeneratorException::class,
-        'DateException' => \DateException::class,
+        // Literal FQCN — DateException absent on PHP 8.2 compile hosts (#16828).
+        'DateException' => 'DateException',
         'Error' => \Error::class,
         'TypeError' => \TypeError::class,
         'ValueError' => \ValueError::class,
@@ -166,12 +181,35 @@ final class ThrowableManifest
         'DivisionByZeroError' => \DivisionByZeroError::class,
         'AssertionError' => \AssertionError::class,
         'JsonException' => \JsonException::class,
+        'DOMException' => \DOMException::class,
+        'SodiumException' => \SodiumException::class,
+        'SQLite3Exception' => 'SQLite3Exception',
     ];
 
     /** @return list<string> */
     public static function registrationOrder(): array
     {
         return array_keys(self::PARENTS);
+    }
+
+    /** Whether a Throwable class should be registered for the active version profile (#13118, #13124). */
+    public static function isAdvertised(string $className): bool
+    {
+        return match ($className) {
+            'DateException',
+            'DateInvalidTimeZoneException',
+            'DateInvalidOperationException',
+            'DateMalformedStringException',
+            'DateMalformedIntervalException',
+            'DateMalformedPeriodException',
+            'DateMalformedPeriodStringException',
+            'DateError',
+            'DateObjectError',
+            'DateRangeError' => CompilerVersion::advertisesDateExceptionHierarchy(),
+            'RequestParseBodyException' => CompilerVersion::advertisesRequestParseBodyExceptionClass(),
+            'SQLite3Exception' => \PHPCompiler\ext\sqlite3\Sqlite3ExtensionPolicy::advertisesExceptionClass(),
+            default => true,
+        };
     }
 
     public static function lcKey(string $className): string

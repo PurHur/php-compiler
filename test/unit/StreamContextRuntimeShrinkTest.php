@@ -16,20 +16,23 @@ final class StreamContextRuntimeShrinkTest extends TestCase
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StreamContextRuntime.php');
         $this->assertStringContainsString('StreamContextJitHelper', $source);
+        $this->assertStringNotContainsString('StreamContextStandaloneLlvm', $source);
         $this->assertStringNotContainsString('implementMergeOptions', $source);
         $this->assertStringNotContainsString('mergeScalar', $source);
         $this->assertStringNotContainsString("GLOBAL_DEFAULT = 'phpc_stream_context_default'", $source);
         $this->assertStringNotContainsString("GLOBAL_NEXT_ID = 'phpc_stream_context_next_id'", $source);
         $this->assertStringNotContainsString('__hashtable__setStringKeyLong', $source);
         $this->assertLessThan(280, \substr_count($source, "\n") + 1);
+
+        $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StreamContextStandaloneLlvm.php');
     }
 
     public function testJitStreamContextGetDefaultUsesHelperForEmbed(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/JitStreamContextGetDefault.php');
         $this->assertStringContainsString('StreamContextJitHelper::getDefault', $source);
-        $this->assertStringContainsString('invokeStandalone', $source);
-        $this->assertStringContainsString('invokeEmbed', $source);
+        $this->assertStringNotContainsString('invokeStandalone', $source);
+        $this->assertStringNotContainsString('phpc_stream_context_default', $source);
     }
 
     public function testStreamContextJitHelperUsesHashTableNativePath(): void

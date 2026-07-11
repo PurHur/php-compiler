@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT;
-use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\NestedJitCompileScope;
@@ -16,8 +15,7 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
 /**
  * JIT/AOT link for __compiler_unserialize via UnserializeJitHelper PHP (#9163).
  *
- * JIT/normal modules use compiled {@see UnserializeJitHelper}; AOT standalone keeps
- * {@see StringUnserializeJit} until native link can host compiled VmUnserializeFormat reliably.
+ * JIT/normal modules and standalone AOT use compiled {@see UnserializeJitHelper} (#13312).
  * php-src: ext/standard/var_unserializer.c
  */
 final class StringUnserialize
@@ -41,20 +39,35 @@ final class StringUnserialize
 
     public static function ensureStandaloneBodies(Context $context): void
     {
+        if (StreamIoRuntime::shouldDeferHeavyStreamIoEmitters($context)) {
+            self::ensureDeferredStubsForInventoryEmit($context);
+
+            return;
+        }
         self::implement($context);
+    }
+
+    /** Inventory argv emit: link unserialize ABI without nested UnserializeJitHelper JIT (#13322). */
+    public static function ensureDeferredStubsForInventoryEmit(Context $context): void
+    {
+        if (!StreamIoRuntime::shouldDeferHeavyStreamIoEmitters($context)) {
+            return;
+        }
+        self::implementDeferredInventoryStubs($context);
     }
 
     public static function implement(Context $context): void
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            StringUnserializeJit::implement($context);
+        $probe = $context->module->getNamedFunction('__compiler_unserialize');
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            self::registerLinkedRuntime($context);
 
             return;
         }
 
-        $probe = $context->module->getNamedFunction('__compiler_unserialize');
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            self::registerLinkedRuntime($context);
+        if (StreamIoRuntime::shouldDeferHeavyStreamIoEmitters($context)) {
+            self::ensureRuntimeHelpers($context);
+            self::implementDeferredInventoryStubs($context);
 
             return;
         }
@@ -223,5 +236,46 @@ final class StringUnserialize
             }
             $context->registerFunction($name, $fn);
         }
+    }
+
+    /** No-op / empty hashtable — inventory emit only needs linkable ABI symbols (#13322). */
+    private static function implementDeferredInventoryStubs(Context $context): void
+    {
+        $voidTy = $context->getTypeFromString('void');
+        $strPtr = $context->getTypeFromString('__string__*');
+        $valuePtr = $context->getTypeFromString('__value__*');
+        $htPtr = $context->getTypeFromString('__hashtable__*');
+
+        $unserProbe = $context->module->getNamedFunction('__compiler_unserialize');
+        if (null === $unserProbe || 0 === $unserProbe->countBasicBlocks()) {
+            $ft = $context->context->functionType($voidTy, false, $strPtr, $valuePtr);
+            $fn = null !== $unserProbe
+                ? $unserProbe
+                : $context->module->addFunction('__compiler_unserialize', $ft);
+            $entry = $fn->appendBasicBlock('unser_inv_stub');
+            $context->builder->positionAtEnd($entry);
+            $context->builder->returnVoid();
+            $context->registerFunction('__compiler_unserialize', $fn);
+        } else {
+            $context->registerFunction('__compiler_unserialize', $unserProbe);
+        }
+
+        $sessionProbe = $context->module->getNamedFunction('phpc_session_decode_payload');
+        if (null === $sessionProbe || 0 === $sessionProbe->countBasicBlocks()) {
+            $i8p = $context->getTypeFromString('int8*');
+            $sizeT = $context->getTypeFromString('size_t');
+            $ft = $context->context->functionType($htPtr, false, $i8p, $sizeT);
+            $fn = null !== $sessionProbe
+                ? $sessionProbe
+                : $context->module->addFunction('phpc_session_decode_payload', $ft);
+            $entry = $fn->appendBasicBlock('session_unser_inv_stub');
+            $context->builder->positionAtEnd($entry);
+            $context->builder->returnValue($context->builder->call($context->lookupFunction('__hashtable__alloc')));
+            $context->registerFunction('phpc_session_decode_payload', $fn);
+        } else {
+            $context->registerFunction('phpc_session_decode_payload', $sessionProbe);
+        }
+
+        $context->builder->clearInsertionPosition();
     }
 }

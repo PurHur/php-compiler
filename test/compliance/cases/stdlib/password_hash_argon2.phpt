@@ -1,5 +1,5 @@
 --TEST--
-stdlib password_hash() PASSWORD_ARGON2ID — VM host Argon2 delegation (#4149)
+stdlib password_hash() PASSWORD_ARGON2ID — VM libargon2 FFI without host delegation (#4149, #8731)
 --SKIPIF--
 <?php if (!defined('PASSWORD_ARGON2ID')) { die('skip argon2 unavailable on host'); }
 --FILE--
@@ -16,7 +16,8 @@ echo ($info['algoName'] ?? '') === 'argon2id' ? "info_ok\n" : "info_fail\n";
 
 $algos = password_algos();
 echo in_array('argon2id', $algos, true) ? "algos_argon2id\n" : "algos_missing\n";
-echo password_needs_rehash($hash, PASSWORD_ARGON2ID, ['memory_cost' => 1 << 20]) ? "rehash_yes\n" : "rehash_no\n";
+$algo = PASSWORD_ARGON2ID;
+echo password_needs_rehash($hash, $algo, ['memory_cost' => 1 << 20]) ? "rehash_yes\n" : "rehash_no\n";
 
 $hash2 = password_hash('other', 'argon2i');
 echo str_starts_with($hash2, '$argon2i$') ? "string_algo_ok\n" : "string_algo_fail\n";

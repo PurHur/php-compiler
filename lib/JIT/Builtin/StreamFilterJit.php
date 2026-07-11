@@ -69,6 +69,12 @@ final class StreamFilterJit
             return;
         }
 
+        if (StreamIoRuntime::shouldDeferHeavyStreamIoEmitters($context)) {
+            self::implementDeferredInventoryStubs($context);
+
+            return;
+        }
+
         self::ensureJitHelperCompiled($context);
         self::implementAppendBridge($context);
         self::implementPrependBridge($context);
@@ -288,5 +294,56 @@ final class StreamFilterJit
             }
             $context->registerFunction($name, $fn);
         }
+    }
+
+    /** Inventory argv emit: link stream_filter ABI without nested helper JIT (#13245). */
+    public static function ensureDeferredStubsForInventoryEmit(Context $context): void
+    {
+        if (!StreamIoRuntime::shouldDeferHeavyStreamIoEmitters($context)) {
+            return;
+        }
+        self::implementDeferredInventoryStubs($context);
+    }
+
+    private static function implementDeferredInventoryStubs(Context $context): void
+    {
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $strPtr = $context->getTypeFromString('__string__*');
+        $zero = $i32->constInt(0, false);
+        $minusOne = $i32->constInt(-1, true);
+
+        foreach (self::ABI_FUNCTIONS as $abiName) {
+            if (self::bridgeAlreadyImplemented($context, $abiName)) {
+                continue;
+            }
+            if ('__compiler_is_stream_filter_resource' === $abiName) {
+                $ft = $context->context->functionType($i32, false, $i64);
+                $fn = self::declareOrReuse($context, $abiName, $ft);
+                $entry = $fn->appendBasicBlock('stream_filter_is_inv_stub');
+                $context->builder->positionAtEnd($entry);
+                $context->builder->returnValue($zero);
+                $context->registerFunction($abiName, $fn);
+                continue;
+            }
+            if ('__compiler_stream_filter_register' === $abiName) {
+                $ft = $context->context->functionType($i32, false, $strPtr, $strPtr);
+                $fn = self::declareOrReuse($context, $abiName, $ft);
+                $entry = $fn->appendBasicBlock('stream_filter_reg_inv_stub');
+                $context->builder->positionAtEnd($entry);
+                $context->builder->returnValue($minusOne);
+                $context->registerFunction($abiName, $fn);
+                continue;
+            }
+            $ft = $context->context->functionType($i32, false, $i64);
+            $fn = self::declareOrReuse($context, $abiName, $ft);
+            $entry = $fn->appendBasicBlock('stream_filter_inv_stub');
+            $context->builder->positionAtEnd($entry);
+            $context->builder->returnValue($zero);
+            $context->registerFunction($abiName, $fn);
+        }
+
+        self::registerLinkedRuntime($context);
+        $context->builder->clearInsertionPosition();
     }
 }

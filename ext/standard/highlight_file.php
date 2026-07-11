@@ -29,21 +29,26 @@ final class highlight_file extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException($functionName.'() expects 1 or 2 arguments in this compiler build');
         }
-        $path = VmString::coerceStringBuiltinArg(
-            $frame->calledArgs[0],
-            $functionName,
+        $path = VmStreamPath::coerceNonEmptyPathArgForFrame(
+            $frame,
             0,
+            $functionName,
             'filename'
         );
         $return = false;
         if ($argc >= 2) {
             $return = VmHighlight::resolveReturnFlag($frame->calledArgs[1], $functionName);
         }
-        $contents = VmFs::fileGetContents($path);
+        $contents = VmFs::readPathContentsViaOpen($path, $frame->vmContext);
         if (false === $contents) {
             VmStreamOpenFailure::warnFailedToOpen($frame, $functionName, $path);
             VmStreamOpenFailure::warnHighlightFailedOpening($frame, $functionName, $path);
             if (null === $frame->returnVar) {
+                return;
+            }
+            if ($return) {
+                $frame->returnVar->bool(false);
+
                 return;
             }
             $frame->returnVar->bool(false);

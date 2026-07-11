@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\VM;
 
-use PHPCompiler\Func;
+use PHPCompiler\ext\standard\VmCallable;
 use PHPCompiler\ext\standard\VmClosureCall;
 
 /**
@@ -62,18 +62,6 @@ final class ShutdownQueue
 
             return;
         }
-        if (Variable::TYPE_STRING === $callable->type) {
-            $name = strtolower($callable->toString());
-            $fn = $context->functions[$name] ?? null;
-            if ($fn instanceof Func\PHP) {
-                $context->runtime->vm->invokePhpFunction($fn, ...$args);
-            }
-
-            return;
-        }
-
-        throw new \LogicException(
-            'register_shutdown_function() callback must be a closure or function name string in this compiler build'
-        );
+        VmCallable::invoke($context, $callable, ...$args);
     }
 }

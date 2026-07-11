@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\VM;
 
+use PHPCompiler\ext\spl\SplDualIteratorStorage;
 use PHPCompiler\Frame;
 use PHPCompiler\RuntimeStrictness;
 
@@ -32,6 +33,10 @@ final class EnumCaseSupport
         if (!self::tryMaterializeEnumCaseConstantFetch($enum, $memberLc, $dest)) {
             return false;
         }
+        $resolved = $dest->resolveIndirect();
+        if (Variable::TYPE_OBJECT === $resolved->type && self::isEnumCase($resolved->toObject())) {
+            return true;
+        }
         $dest->copyFrom(self::materializeConstantValue($context, $dest));
 
         return true;
@@ -53,19 +58,20 @@ final class EnumCaseSupport
             EnumSupport::ensureBackedEnumValuesUnique($enum);
         }
         $stored = $enum->constants[$memberLc]->resolveIndirect();
+        if (Variable::TYPE_OBJECT === $stored->type && self::isEnumCase($stored->toObject())) {
+            $dest->copyFrom($enum->constants[$memberLc]);
+
+            return true;
+        }
+        if (Variable::TYPE_ENUM_CASE === $stored->type) {
+            $dest->copyFrom($enum->constants[$memberLc]);
+
+            return true;
+        }
         $backing = new Variable(Variable::TYPE_NULL);
         $backing->null();
         if (null !== $enum->backedType) {
-            if (Variable::TYPE_OBJECT === $stored->type && self::isEnumCase($stored->toObject())) {
-                $caseValue = $stored->toObject()->enumCaseValue;
-                if (null !== $caseValue) {
-                    $backing->copyFrom($caseValue);
-                }
-            } elseif (Variable::TYPE_ENUM_CASE === $stored->type) {
-                $backing->copyFrom($stored->toEnumCase()->backingValue);
-            } else {
-                $backing->copyFrom($enum->constants[$memberLc]);
-            }
+            $backing->copyFrom($enum->constants[$memberLc]);
         }
         $dest->enumCase(new EnumCaseEntry($enum, $canonical, $backing));
 
@@ -306,9 +312,10 @@ final class EnumCaseSupport
     }
 
     /**
-     * Transitive ordering for sort()/asort() on enum case arrays (#5546, php-src array.c php_array_compare_transitive).
+     * Transitive ordering for sort()/asort() on enum case arrays (#5546, #5691, php-src array.c).
      *
-     * Backed enums: backing scalar spaceship. Unit enums: object handle (spl_object_id order).
+     * php-src SORT_REGULAR uses stable object-handle order for enum zvals, not backing scalars
+     * (php_array_data_compare_unstable_i / php_array_compare_transitive, PR #20517).
      */
     public static function compareEnumCasesForSort(Variable $left, Variable $right): int
     {
@@ -323,23 +330,37 @@ final class EnumCaseSupport
         if ($leftName === $rightName) {
             return 0;
         }
-        if (null !== $leftClass->backedType) {
-            return Variable::spaceshipCompare(
-                self::backingValueForMinMax($left),
-                self::backingValueForMinMax($right)
-            );
+        // Unit enums: incomparable cases — stable sort preserves input order (php-src array.c, #16905).
+        if (null === $leftClass->backedType) {
+            return 0;
         }
 
         return self::objectIdForEnumSort($left) <=> self::objectIdForEnumSort($right);
     }
 
     /**
-     * Stable object handle for get_object_id() on enum case operands (#5837, ext/standard/basic_functions.c).
+     * Stable object handle for get_object_id() / spl_object_id() on enum case operands (#5837, #8941).
+     *
+     * Const fetches materialize TYPE_ENUM_CASE with a compile-time ClassEntry stub; resolve the live
+     * enum entry before reading the canonical singleton from {@see ClassEntry::$constants}.
      */
-    public static function objectIdForVariable(Variable $value): int
+    public static function objectIdForVariable(Variable $value, ?Context $context = null): int
     {
         if (!self::isEnumCaseVariable($value)) {
             throw new \LogicException('objectIdForVariable requires enum case variable');
+        }
+        $value = $value->resolveIndirect();
+        if (Variable::TYPE_OBJECT === $value->type && self::isEnumCase($value->toObject())) {
+            return $value->toObject()->id;
+        }
+        $entry = self::enumCaseEntryForVariable($value);
+        if (null === $entry) {
+            throw new \LogicException('objectIdForVariable requires enum case variable');
+        }
+        $runtime = EnumSupport::resolveRuntimeEnumClass($context, $entry->enumClass);
+        $caseVar = EnumSupport::materializeCaseForCasesList($runtime, $entry->caseName)->resolveIndirect();
+        if (Variable::TYPE_OBJECT === $caseVar->type && self::isEnumCase($caseVar->toObject())) {
+            return $caseVar->toObject()->id;
         }
 
         return self::receiverForInstanceMethod($value)->toObject()->id;
@@ -696,6 +717,42 @@ final class EnumCaseSupport
     }
 
     /**
+     * Runtime script-scope / $GLOBALS assign — keep live object identity (#17722).
+     *
+     * Deep detach via {@see materializeConstantValue()} is for define()/class const (#17676).
+     */
+    public static function materializeGlobalVariableValue(Context $context, Variable $src): Variable
+    {
+        if ($src->is(Variable::TYPE_INDIRECT) || $src->is(Variable::TYPE_PROPERTY_HOOK_REF)) {
+            $out = new Variable();
+            $out->copyFrom($src);
+
+            return $out;
+        }
+        $src = $src->resolveIndirect();
+        if ($src->is(Variable::TYPE_OBJECT)) {
+            $out = new Variable();
+            $out->copyFrom($src);
+
+            return $out;
+        }
+        if ($src->is(Variable::TYPE_ARRAY)) {
+            if (self::arrayContainsRuntimeRefs($src)) {
+                $out = new Variable();
+                $out->copyFrom($src);
+
+                return $out;
+            }
+
+            return ClassConstMaterializer::detachConstantValue(
+                self::materializeConstantArrayDeep($context, $src)
+            );
+        }
+
+        return self::materializeConstantValue($context, $src);
+    }
+
+    /**
      * Store const/define/class-const values as immortal enum case objects (#5738, zend_constants.c).
      *
      * Converts legacy backing scalars from enum case constant tables to canonical singletons.
@@ -709,6 +766,23 @@ final class EnumCaseSupport
             return $out;
         }
         $src = $src->resolveIndirect();
+        if ($src->is(Variable::TYPE_OBJECT)) {
+            $object = $src->toObject();
+            if (null !== $object->closureState) {
+                // Closures are live callables — must not immortalize/detach (#17723, zend_closures.c).
+                $out = new Variable();
+                $out->copyFrom($src);
+
+                return $out;
+            }
+            if (SplDualIteratorStorage::hasStateFor($object)) {
+                // SPL iterator wrappers keep sidecar state keyed by object id (#17721).
+                $out = new Variable();
+                $out->copyFrom($src);
+
+                return $out;
+            }
+        }
         if ($src->is(Variable::TYPE_ARRAY)) {
             if (self::arrayContainsRuntimeRefs($src)) {
                 $out = new Variable();
@@ -769,12 +843,15 @@ final class EnumCaseSupport
             return false;
         }
 
-        foreach ($arrayVar->toArray()->iterate(true) as $element) {
-            $resolved = $element->resolveIndirect();
+        foreach ($arrayVar->toArray()->iterate(false) as $element) {
             if (
                 $element->is(Variable::TYPE_INDIRECT)
-                || $resolved->is(Variable::TYPE_PROPERTY_HOOK_REF)
+                || $element->is(Variable::TYPE_PROPERTY_HOOK_REF)
             ) {
+                return true;
+            }
+            $resolved = $element->resolveIndirect();
+            if ($resolved->is(Variable::TYPE_PROPERTY_HOOK_REF)) {
                 return true;
             }
         }
@@ -845,34 +922,6 @@ final class EnumCaseSupport
         }
 
         return null;
-    }
-
-    /**
-     * pack() numeric operand — TypeError under php-src-strict (#8816, #6267); else E_WARNING + backing scalar (#5713).
-     *
-     * @throws \TypeError when $value is an enum case and php-src-strict is active
-     */
-    public static function packRejectNumericOperand(
-        Variable $value,
-        int $valueArgIndexZeroBased,
-        string $expectedType
-    ): void {
-        if (!RuntimeStrictness::isPhpSrcStrict()) {
-            return;
-        }
-        $entry = self::enumCaseEntryForVariable($value);
-        if (null === $entry) {
-            return;
-        }
-        $argNum = $valueArgIndexZeroBased + 2;
-        $given = $entry->enumClass->name;
-
-        throw new \TypeError(sprintf(
-            'pack(): Argument #%d ($values) must be of type %s, %s given',
-            $argNum,
-            $expectedType,
-            $given
-        ));
     }
 
     /**

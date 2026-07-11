@@ -180,6 +180,26 @@ final class ReflectionSetup
         return [$safe, $lenSafe];
     }
 
+    public static function integerPropertyAsI64(
+        Context $context,
+        Value $obj,
+        string $className,
+        string $propName
+    ): Value {
+        $propVar = $context->type->object->propertyFetch($obj, $className, $propName);
+        if (Variable::TYPE_NATIVE_LONG === $propVar->type) {
+            return $context->helper->loadValue($propVar);
+        }
+        $valuePtr = Variable::KIND_VARIABLE === $propVar->kind
+            ? JitValueBox::pointer($context, $propVar->value)
+            : $propVar->value;
+
+        return $context->builder->call(
+            $context->lookupFunction('__value__readLong'),
+            $valuePtr
+        );
+    }
+
     /**
      * @return array{0: Value, 1: Value} cstr pointer and byte length (size_t)
      */
@@ -202,5 +222,39 @@ final class ReflectionSetup
         $lenSafe = $context->builder->select($isNull, $sizeT->constInt(0, false), $context->builder->zExt($len, $sizeT));
 
         return [$safe, $lenSafe];
+    }
+
+    /**
+     * Unqualified class name from a native cstr (ReflectionClass::getShortName).
+     *
+     * @return array{cstr: Value, len: Value}
+     */
+    public static function shortNameFromCstr(Context $context, Value $cstr, Value $len): array
+    {
+        $i8p = $context->getTypeFromString('int8*');
+        $i32 = $context->getTypeFromString('int32');
+        $sizeT = $context->getTypeFromString('size_t');
+        $i64 = $context->getTypeFromString('int64');
+        $backslash = $i32->constInt(ord('\\'), false);
+        $slashPtr = $context->builder->call($context->lookupFunction('strrchr'), $cstr, $backslash);
+        $nullPtr = $i8p->constNull();
+        $hasSlash = $context->builder->icmp(Builder::INT_NE, $slashPtr, $nullPtr);
+        $shortCstr = $context->builder->select(
+            $hasSlash,
+            $context->builder->gep($slashPtr, $i32->constInt(1, false)),
+            $cstr
+        );
+        $slashOffset = $context->builder->ptrToInt($slashPtr, $i64);
+        $baseOffset = $context->builder->ptrToInt($cstr, $i64);
+        $skip = $context->builder->sub($slashOffset, $baseOffset);
+        $skipWithSep = $context->builder->add($skip, $i64->constInt(1, false));
+        $skip64 = $context->builder->zExt($skipWithSep, $sizeT);
+        $shortLen = $context->builder->select(
+            $hasSlash,
+            $context->builder->sub($len, $skip64),
+            $len
+        );
+
+        return ['cstr' => $shortCstr, 'len' => $shortLen];
     }
 }

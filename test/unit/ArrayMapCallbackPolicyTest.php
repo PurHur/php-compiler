@@ -61,15 +61,26 @@ final class ArrayMapCallbackPolicyTest extends TestCase
         $this->assertFalse(ArrayMapCallbackPolicy::isVmSupportedType(VMVariable::TYPE_ARRAY));
     }
 
+    public function testPhpSrcInvalidCallbackTypes(): void
+    {
+        $this->assertTrue(ArrayMapCallbackPolicy::isPhpSrcInvalidCallbackType(VMVariable::TYPE_INTEGER));
+        $this->assertFalse(ArrayMapCallbackPolicy::isPhpSrcInvalidCallbackType(VMVariable::TYPE_OBJECT));
+        $this->assertTrue(ArrayMapCallbackPolicy::isJitPhpSrcInvalidCallbackType(JITVariable::TYPE_NATIVE_LONG));
+        $this->assertStringContainsString(
+            'valid callback',
+            ArrayMapCallbackPolicy::invalidCallbackTypeError()
+        );
+    }
+
     public function testRejectionMessagesMentionDeferredKinds(): void
     {
-        $this->assertStringContainsString('closures', ArrayMapCallbackPolicy::jitRejectionMessage());
+        $this->assertStringContainsString('closure', ArrayMapCallbackPolicy::jitRejectionMessage());
         $this->assertStringContainsString('array callables', ArrayMapCallbackPolicy::vmRejectionMessage());
     }
 
     public function testDeferredNoteDocumentsSubset(): void
     {
-        $this->assertStringContainsString('closures', SelfHostBuiltinPolicy::ARRAY_MAP_CALLBACK_DEFERRED_NOTE);
+        $this->assertStringContainsString('closure', SelfHostBuiltinPolicy::ARRAY_MAP_CALLBACK_DEFERRED_NOTE);
         $this->assertStringContainsString('string builtin', SelfHostBuiltinPolicy::ARRAY_MAP_CALLBACK_DEFERRED_NOTE);
     }
 

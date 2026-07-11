@@ -50,6 +50,7 @@ bootstrap_vm_driver_execute_probe_passes() {
 }
 
 # --- Fast path: native env probe only (no compile/link, no php-env vendor patches) ---
+fast_probe_failed=0
 if [[ -x "${OUT}" ]]; then
   set +e
   probe_out="$(bootstrap_vm_driver_execute_probe_run)"
@@ -59,6 +60,7 @@ if [[ -x "${OUT}" ]]; then
     echo "bootstrap-selfhost-vm-driver-execute-probe: OK ${OUT}"
     exit 0
   fi
+  fast_probe_failed=1
 fi
 
 # shellcheck source=bootstrap-gen0-install-prelinked-driver.sh
@@ -71,6 +73,9 @@ fi
 
 relink=0
 if [[ ! -x "${OUT}" ]]; then
+  relink=1
+elif [[ "${fast_probe_failed}" == "1" ]]; then
+  echo "bootstrap-selfhost-vm-driver-execute-probe: fast path probe failed — seeding from prelinked gen-0 or relinking" >&2
   relink=1
 elif [[ "${ENTRY}" -nt "${OUT}" ]]; then
   relink=1
@@ -91,9 +96,9 @@ if [[ "${relink}" == "1" ]]; then
       echo "bootstrap-selfhost-vm-driver-execute-probe: OK ${OUT}"
       exit 0
     fi
-    echo "bootstrap-selfhost-vm-driver-execute-probe: prelinked seed failed VM probe; need full link or BOOTSTRAP_VM_DRIVER_EXECUTE_PROBE_FULL_LINK=1" >&2
+    echo "bootstrap-selfhost-vm-driver-execute-probe: prelinked seed failed VM probe; falling back to full spine link" >&2
     printf '%s\n' "${probe_out}" >&2
-    exit 1
+    rm -f "${OUT}"
   fi
   # shellcheck source=php-env.sh
   source "$(dirname "$0")/php-env.sh"

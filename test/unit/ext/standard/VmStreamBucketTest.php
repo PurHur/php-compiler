@@ -45,4 +45,10 @@ final class VmStreamBucketTest extends TestCase
         $out = VmStreamBucket::makeWriteable($this->runtime->vmContext, $brigadeId);
         self::assertSame('first', $out->toObject()->getProperty('data')->toString());
     }
+
+    public function testNewBucketObjectIsStdClass(): void
+    {
+        $bucket = VmStreamBucket::newBucketObject($this->runtime->vmContext, 0, 'payload');
+        self::assertSame('stdClass', $bucket->toObject()->class->name);
+    }
 }

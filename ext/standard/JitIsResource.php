@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\StreamBucket;
+use PHPCompiler\JIT\Builtin\StreamLifecycleRuntime;
 use PHPCompiler\JIT\Builtin\StreamFilter as StreamFilterBuiltin;
 use PHPCompiler\JIT\Context;
 use PHPLLVM\Builder;
@@ -16,7 +17,17 @@ final class JitIsResource
 {
     public static function invoke(Context $context, Value $handleLong): Value
     {
+        $restoreBlock = BasicBlockHelper::tryGetInsertBlock($context);
         StreamBucket::ensureLinked($context);
+        $probe = $context->module->getNamedFunction('__compiler_is_resource');
+        if (null === $probe || 0 === $probe->countBasicBlocks()) {
+            StreamLifecycleRuntime::ensureLinked($context);
+        }
+        if (null !== $restoreBlock) {
+            BasicBlockHelper::restoreInsertBlock($context, $restoreBlock);
+        } else {
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'is_resource_restore_cont');
+        }
 
         $i32 = $context->getTypeFromString('int32');
         $i64 = $context->getTypeFromString('int64');
@@ -26,6 +37,8 @@ final class JitIsResource
 
         $bucketBase = $i64->constInt(\PHPCompiler\JIT\Builtin\StreamBucketRuntime::BUCKET_HANDLE_BASE, false);
         $filterBase = $i64->constInt(StreamFilterJitHelper::HANDLE_BASE, false);
+        $trueVal = $context->constantFromBool(true);
+        $falseVal = $context->constantFromBool(false);
         $isBucketRange = $context->builder->icmp(Builder::INT_SGE, $handleLong, $bucketBase);
         $bucketProbe = BasicBlockHelper::append($context, 'is_resource_bucket_probe');
         $filterProbe = BasicBlockHelper::append($context, 'is_resource_filter_probe');
@@ -39,7 +52,13 @@ final class JitIsResource
         $context->builder->branchIf($isFilterRange, $filterCheck, $streamProbe);
 
         $context->builder->positionAtEnd($filterCheck);
+        $beforeFilterLink = BasicBlockHelper::tryGetInsertBlock($context);
         StreamFilterBuiltin::ensureLinked($context);
+        if (null !== $beforeFilterLink) {
+            BasicBlockHelper::restoreInsertBlock($context, $beforeFilterLink);
+        } else {
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'is_resource_filter_restore_cont');
+        }
         $isFilter = $context->builder->call(
             $context->lookupFunction('__compiler_is_stream_filter_resource'),
             $handleLong
@@ -85,17 +104,16 @@ final class JitIsResource
             $handleLong
         );
         $streamOk = $context->builder->icmp(Builder::INT_EQ, $ret, $oneI32);
+        $streamResult = $context->builder->select($streamOk, $trueVal, $falseVal);
         $streamEnd = $context->builder->getInsertBlock();
         $context->builder->branch($done);
 
         $context->builder->positionAtEnd($done);
         $phi = $context->builder->phi($i1, 'is_resource_phi');
-        $trueVal = $context->constantFromBool(true);
-        $falseVal = $context->constantFromBool(false);
         $phi->addIncoming($trueVal, $bucketEnd);
         $phi->addIncoming($trueVal, $brigadeEnd);
         $phi->addIncoming($trueVal, $filterEnd);
-        $phi->addIncoming($context->builder->select($streamOk, $trueVal, $falseVal), $streamEnd);
+        $phi->addIncoming($streamResult, $streamEnd);
 
         return $phi;
     }

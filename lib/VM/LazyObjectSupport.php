@@ -204,7 +204,10 @@ final class LazyObjectSupport
             }
             $result = $result->resolveIndirect();
             if (!$result->isUndefined() && Variable::TYPE_NULL !== $result->type) {
-                throw new \LogicException('Lazy object initializer must return NULL or no value');
+                // php-src ignores object returns from ghost initializers (#12309, zend_lazy_objects.c).
+                if (Variable::TYPE_OBJECT !== $result->type) {
+                    throw new \LogicException('Lazy object initializer must return NULL or no value');
+                }
             }
             $object->constructed = true;
             $object->lazyPending = false;
@@ -218,6 +221,21 @@ final class LazyObjectSupport
         $proxyArg->object($object);
         $result = $vm->invokeClosure($initializer, $proxyArg);
         $result = $result->resolveIndirect();
+        if ($result->isUndefined() || Variable::TYPE_NULL === $result->type) {
+            // Concrete lazy proxies may mutate the placeholder in place (#12310, zend_lazy_objects.c ghost parity).
+            if ($object->class->isInterface) {
+                throw new \TypeError(
+                    'Lazy proxy factory must return an instance of a class compatible with '
+                    .$object->class->name.', null returned'
+                );
+            }
+            $object->constructed = true;
+            $object->lazyPending = false;
+            $object->lazyInitException = null;
+            self::clearLazyRawInitializedProperties($object);
+
+            return;
+        }
         if (Variable::TYPE_OBJECT !== $result->type) {
             throw new \LogicException('Lazy object initializer must return an object');
         }
@@ -282,6 +300,22 @@ final class LazyObjectSupport
         return $object->lazyPending;
     }
 
+    /** class_has_lazy_object_initializer() — ghost with pending initializer (#6052). */
+    public static function hasLazyObjectInitializer(ObjectEntry $object): bool
+    {
+        return $object->lazyGhost
+            && $object->lazyPending
+            && null !== $object->lazyInitializer;
+    }
+
+    /** class_has_lazy_object_uninitializer() — proxy with pending factory (#6097). */
+    public static function hasLazyObjectUninitializer(ObjectEntry $object): bool
+    {
+        return !$object->lazyGhost
+            && $object->lazyPending
+            && null !== $object->lazyInitializer;
+    }
+
     /** Zend zend_lazy_object_get_instance — proxy real instance or ghost shell (#7054, #9999). */
     public static function getLazyInstance(ObjectEntry $object): ObjectEntry
     {
@@ -295,6 +329,9 @@ final class LazyObjectSupport
      */
     public static function isPropertyLazy(ObjectEntry $object, string $propertyName): bool
     {
+        if (LazyPropertySupport::isDeclarativeLazyProperty($object, $propertyName)) {
+            return true;
+        }
         if (isset($object->lazyRawInitializedProperties[$propertyName])) {
             return false;
         }

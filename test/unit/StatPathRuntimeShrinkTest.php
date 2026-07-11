@@ -28,6 +28,8 @@ final class StatPathRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('StatPathJitHelper', $source);
         $this->assertStringContainsString('StatFieldsJitHelper', $source);
         $this->assertStringContainsString('NestedJitCompileScope', $source);
+        $this->assertStringNotContainsString('StatPathRuntimeLibc', $source);
+        $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StatPathRuntimeLibc.php');
     }
 
     public function testStatPathJitHelperDelegatesToVmStatPath(): void

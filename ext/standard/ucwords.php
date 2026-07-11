@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\StringUcwords;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
@@ -58,6 +59,7 @@ final class ucwords extends Internal
             throw new \LogicException('ucwords() requires one or two arguments');
         }
         JitInternalStrictArg::rejectNullString($context, $args[0], 'ucwords', 'string', 1);
+        StringUcwords::ensureLinked($context);
         $str = JitStringBuiltinArg::lower($context, $args[0], 'ucwords', 0, 'string');
         if (1 === $argc) {
             return $context->builder->call(

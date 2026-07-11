@@ -35,4 +35,10 @@ final class VmStreamTransports
 
         return $all;
     }
+
+    /** php-src registration order for phpinfo() / stream_get_transports() (#16551). */
+    public static function getRegistrationOrderTransports(): array
+    {
+        return self::BUILTIN_TRANSPORTS;
+    }
 }

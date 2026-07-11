@@ -15,8 +15,12 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\ArrayMapCallbackPolicy;
+use PHPCompiler\JIT\Builtin\ArrayMapRuntime;
+use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -25,7 +29,7 @@ use PHPLLVM\Value;
  * array_map() — null zip, string builtins, and closure callbacks (ext/standard/array.c; #4539).
  *
  * JIT/AOT: null, compile-time string builtins, and closure/arrow callbacks with native int/double
- * returns are lowered (issue #142). [class, method] and invokable object callables deferred (#1154).
+ * returns are lowered (issue #142). [class, method] callables deferred (#1154); invokable objects VM-only (#16228).
  */
 final class array_map extends Internal
 {
@@ -88,17 +92,17 @@ final class array_map extends Internal
 
     private static function lowerSingleArrayMap(Context $context, JITVariable $callback, JITVariable $array): Value
     {
-        if (!ArrayMapCallbackPolicy::isJitLowerable($callback)) {
-            throw new \LogicException(ArrayMapCallbackPolicy::jitRejectionMessage());
-        }
-        if (ArrayMapCallbackPolicy::isClosureJitLowerable($callback)) {
-            return ArrayBuiltinHelper::buildMapArrayWithClosure($context, $callback, $array);
+        if (ArrayMapCallbackPolicy::isJitPhpSrcInvalidCallbackType($callback->type)) {
+            TypeErrorRaise::ensureLinked($context);
+            TypeErrorRaise::emitRaise($context, ArrayMapCallbackPolicy::invalidCallbackTypeError());
+
+            return JitValueBox::pointer($context, JitValueBox::alloc($context));
         }
         if (JITVariable::TYPE_STRING === $callback->type || JITVariable::TYPE_VALUE === $callback->type) {
             (new self())->jitString($context, $callback, 'array_map() callback');
         }
 
-        return ArrayBuiltinHelper::buildMapArray($context, $callback, $array);
+        return ArrayMapRuntime::mapSingle($context, $callback, $array);
     }
 
     private static function mapSingleArray(Frame $frame, Variable $callback, HashTable $src): HashTable
@@ -109,19 +113,21 @@ final class array_map extends Internal
 
             return $out;
         }
-        if (VmClosureCall::isClosure($callback)) {
+        if (self::isVmCallableCallback($callback)) {
             if (null === $frame->vmContext) {
                 throw new \LogicException('array_map() requires VM context in this compiler build');
             }
-            $closure = VmClosureCall::resolve($callback);
             foreach ($src->iterateKeyed(true) as [$key, $value]) {
-                $mapped = VmClosureCall::invokeOne($frame->vmContext, $closure, $value);
+                $mapped = VmCallable::invoke($frame->vmContext, $callback, $value);
                 self::appendKeyed($out, $key, $mapped);
             }
 
             return $out;
         }
         if (!ArrayMapCallbackPolicy::isVmSupportedType($callback->type)) {
+            if (ArrayMapCallbackPolicy::isPhpSrcInvalidCallbackType($callback->type)) {
+                throw new \TypeError(ArrayMapCallbackPolicy::invalidCallbackTypeError());
+            }
             throw new \LogicException(ArrayMapCallbackPolicy::vmRejectionMessage());
         }
         $fn = VmInternalCall::resolveStringCallback($callback->toString());
@@ -152,18 +158,27 @@ final class array_map extends Internal
 
                 continue;
             }
-            if (VmClosureCall::isClosure($callback)) {
+            if (self::isVmCallableCallback($callback)) {
                 if (null === $frame->vmContext) {
                     throw new \LogicException('array_map() requires VM context in this compiler build');
                 }
-                $closure = VmClosureCall::resolve($callback);
-                $mapped = VmClosureCall::invoke($frame->vmContext, $closure, ...$rowArgs);
+                $mapped = VmCallable::invoke($frame->vmContext, $callback, ...$rowArgs);
+                $out->addIndex($destIdx++, $mapped);
+
+                continue;
+            }
+            if (Variable::TYPE_STRING === $callback->type) {
+                if (ArrayMapCallbackPolicy::isPhpSrcInvalidCallbackType($callback->type)) {
+                    throw new \TypeError(ArrayMapCallbackPolicy::invalidCallbackTypeError());
+                }
+                $fn = VmInternalCall::resolveStringCallback($callback->toString());
+                $mapped = VmInternalCall::invoke($fn, ...$rowArgs);
                 $out->addIndex($destIdx++, $mapped);
 
                 continue;
             }
             throw new \LogicException(
-                'array_map() with multiple arrays requires a null or closure callback in this compiler build'
+                'array_map() with multiple arrays requires a null, closure, invokable object, or string builtin callback in this compiler build'
             );
         }
 
@@ -211,18 +226,15 @@ final class array_map extends Internal
         return $result;
     }
 
+    private static function isVmCallableCallback(Variable $callback): bool
+    {
+        return VmClosureCall::isClosure($callback)
+            || Variable::TYPE_OBJECT === $callback->type;
+    }
+
     private static function typeLabel(Variable $var): string
     {
-        return match ($var->type) {
-            Variable::TYPE_NULL => 'null',
-            Variable::TYPE_BOOLEAN => 'bool',
-            Variable::TYPE_INTEGER => 'int',
-            Variable::TYPE_FLOAT => 'float',
-            Variable::TYPE_STRING => 'string',
-            Variable::TYPE_ARRAY => 'array',
-            Variable::TYPE_OBJECT => 'object',
-            default => 'mixed',
-        };
+        return EnumCaseSupport::typeNameForVariable($var);
     }
 
     private static function copyKeyed(HashTable $src, HashTable $out): void

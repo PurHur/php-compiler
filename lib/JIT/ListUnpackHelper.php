@@ -23,33 +23,22 @@ final class ListUnpackHelper
 
     public static function emitCallUnpackOperandCheck(Context $context, Variable $operand): void
     {
-        TypeErrorRaise::registerDeclarations($context);
-        TypeErrorRaise::ensureLinked($context);
-        $isArray = self::isArrayValue($context, $operand);
-        $failBb = BasicBlockHelper::append($context, 'call_unpack_non_array_fail');
-        $okBb = BasicBlockHelper::append($context, 'call_unpack_non_array_ok');
-        $context->builder->branchIf($isArray, $okBb, $failBb);
-        $context->builder->positionAtEnd($failBb);
-        TypeErrorRaise::emitRaise($context, self::CALL_UNPACK_NON_ARRAY_MESSAGE);
-        $context->builder->call($context->lookupFunction('abort'));
-        $context->llvm->lib->LLVMBuildUnreachable($context->builder->builder);
-        $context->builder->positionAtEnd($okBb);
+        TypeErrorRaise::emitBranchOrAbortOnFailure(
+            $context,
+            self::isArrayValue($context, $operand),
+            'call_unpack_non_array',
+            self::CALL_UNPACK_NON_ARRAY_MESSAGE
+        );
     }
 
     public static function emitCheck(Context $context, Variable $array): void
     {
-        TypeErrorRaise::registerDeclarations($context);
-        TypeErrorRaise::ensureLinked($context);
-        $isList = JitArrayIsList::invoke($context, $array);
-        $failBb = BasicBlockHelper::append($context, 'list_unpack_fail');
-        $okBb = BasicBlockHelper::append($context, 'list_unpack_ok');
-        $context->builder->branchIf($isList, $okBb, $failBb);
-        $context->builder->positionAtEnd($failBb);
-        TypeErrorRaise::emitRaise($context, self::TYPE_ERROR_MESSAGE);
-        $context->builder->call($context->lookupFunction('abort'));
-        $context->llvm->lib->LLVMBuildUnreachable($context->builder->builder);
-        $context->builder->positionAtEnd($okBb);
-        $context->builder->positionAtEnd($okBb);
+        TypeErrorRaise::emitBranchOrAbortOnFailure(
+            $context,
+            JitArrayIsList::invoke($context, $array),
+            'list_unpack',
+            self::TYPE_ERROR_MESSAGE
+        );
     }
 
     /**
@@ -149,17 +138,13 @@ final class ListUnpackHelper
         if (self::isDefinitelyNonArrayAtCompileTime($context, $array)) {
             return;
         }
-        TypeErrorRaise::registerDeclarations($context);
-        TypeErrorRaise::ensureLinked($context);
-        $isList = JitArrayIsList::invoke($context, $array);
-        $failBb = BasicBlockHelper::append($context, 'list_unpack_fail');
-        $assignBb = BasicBlockHelper::append($context, 'list_unpack_assign');
-        $context->builder->branchIf($isList, $assignBb, $failBb);
-        $context->builder->positionAtEnd($failBb);
-        TypeErrorRaise::emitRaise($context, self::TYPE_ERROR_MESSAGE);
-        $context->builder->call($context->lookupFunction('abort'));
-        $context->llvm->lib->LLVMBuildUnreachable($context->builder->builder);
-        $context->builder->positionAtEnd($assignBb);
+        TypeErrorRaise::emitBranchOrAbortOnFailure(
+            $context,
+            JitArrayIsList::invoke($context, $array),
+            'list_unpack',
+            self::TYPE_ERROR_MESSAGE,
+            'assign'
+        );
     }
 
     public static function isArrayValue(Context $context, Variable $var): \PHPLLVM\Value

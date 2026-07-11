@@ -4,5 +4,3 @@ class C {
         get => $this->label;
     }
 }
-$c = new C();
-echo var_export($c->label, true), "\n";

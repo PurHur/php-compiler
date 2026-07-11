@@ -7,9 +7,8 @@ namespace PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 
 /**
- * JIT/AOT link for __compiler_pack via PackJitHelper PHP (#9133).
+ * JIT/AOT link for __compiler_pack via PackJitHelper PHP (#9133, #13062).
  *
- * Replaces LLVM {@see StringPackJit} for JIT modules; standalone keeps StringPackJit.
  * SSOT: {@see \PHPCompiler\ext\standard\PackEngine}.
  */
 final class PackJitRuntime

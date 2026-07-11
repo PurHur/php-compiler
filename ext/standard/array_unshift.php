@@ -13,12 +13,9 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
-use PHPCompiler\JIT\ArrayBuiltinHelper;
+use PHPCompiler\JIT\Builtin\ArrayUnshiftRuntime;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitReferencableCheck;
-use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
@@ -31,26 +28,20 @@ final class array_unshift extends Internal
         if (\count($frame->calledArgs) < 1) {
             throw new \LogicException('array_unshift() requires at least one argument');
         }
-        $array = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_ARRAY !== $array->type) {
-            throw new \LogicException('array_unshift() first argument must be an array in this compiler build');
-        }
-        $ht = $array->toArray();
+        $ht = VmArray::requireArrayParam($frame->calledArgs[0], 'array_unshift', 1, 'array');
         if (\count($frame->calledArgs) < 2) {
             if (null === $frame->returnVar) {
                 return;
             }
-            $frame->returnVar->int($ht->getNumElements());
+            $frame->returnVar->int(ArrayUnshiftJitHelper::countElements($ht));
 
             return;
         }
         $values = [];
         for ($i = 1, $n = \count($frame->calledArgs); $i < $n; ++$i) {
-            $copy = new Variable();
-            $copy->copyFrom($frame->calledArgs[$i]->resolveIndirect());
-            $values[] = $copy;
+            $values[] = $frame->calledArgs[$i]->resolveIndirect();
         }
-        $count = $ht->unshiftPrepend(...$values);
+        $count = ArrayUnshiftJitHelper::unshift($ht, ...$values);
         if (null === $frame->returnVar) {
             return;
         }
@@ -64,9 +55,7 @@ final class array_unshift extends Internal
         if (\count($args) < 1) {
             throw new \LogicException('array_unshift() requires at least one argument');
         }
-        if (!JitReferencableCheck::guardArrayMutatorByRefArg($context, 'array_unshift', $args[0])) {
-            return $context->constantFromInteger(0, 'int64');
-        }
+        JitArrayElem::requireArrayParam($context, $args[0], 'array_unshift', 1, 'array');
         $array = $args[0];
         $values = \array_slice($args, 1);
 
@@ -76,6 +65,6 @@ final class array_unshift extends Internal
             }
         }
 
-        return ArrayBuiltinHelper::unshift($context, $array, ...$values);
+        return ArrayUnshiftRuntime::unshift($context, $array, ...$values);
     }
 }

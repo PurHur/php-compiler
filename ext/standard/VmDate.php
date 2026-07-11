@@ -3,16 +3,17 @@
 declare(strict_types=1);
 
 /**
- * VM date/time helpers without host Zend time()/date() (issue #5045).
+ * VM date/time helpers via VmDatePure host builtins (#13765, #5045).
  *
  * php-src: ext/date/php_date.c — time, date, gmdate, microtime, getdate.
- * JIT/AOT: JitDate.php, StringMicrotime/StringGettimeofday LLVM, StringDateTime (__compiler_format_datetime).
+ * JIT/AOT: JitDate.php, FormatDatetimeJitHelper/MicrotimeJitHelper/GettimeofdayJitHelper PHP.
  */
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\HashTable;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 
 final class VmDate
@@ -27,16 +28,9 @@ final class VmDate
 
     private const FORMAT_OUT_BYTES = 256;
 
-    private static ?\FFI $ffi = null;
-
     public static function time(): int
     {
-        $ffi = self::ffi();
-        if (null === $ffi) {
-            return 0;
-        }
-
-        return (int) $ffi->time(null);
+        return VmDatePure::time();
     }
 
     public static function getmypid(): int
@@ -294,36 +288,50 @@ final class VmDate
      */
     public static function strptime(string $date, string $format): HashTable|false
     {
-        $ffi = self::ffi();
-        if (null === $ffi) {
-            return false;
-        }
-        $tm = $ffi->new('struct tm');
-        $tm->tm_sec = 0;
-        $tm->tm_min = 0;
-        $tm->tm_hour = 0;
-        $tm->tm_mday = 0;
-        $tm->tm_mon = 0;
-        $tm->tm_year = 0;
-        $tm->tm_wday = 0;
-        $tm->tm_yday = 0;
-        $tm->tm_isdst = 0;
-        $rest = $ffi->strptime($date, $format, \FFI::addr($tm));
-        if (null === $rest) {
+        $parsed = VmDatePure::strptimeArray($date, $format);
+        if (false === $parsed) {
             return false;
         }
         $ht = new HashTable();
-        self::hashSetLong($ht, 'tm_sec', (int) $tm->tm_sec);
-        self::hashSetLong($ht, 'tm_min', (int) $tm->tm_min);
-        self::hashSetLong($ht, 'tm_hour', (int) $tm->tm_hour);
-        self::hashSetLong($ht, 'tm_mday', (int) $tm->tm_mday);
-        self::hashSetLong($ht, 'tm_mon', (int) $tm->tm_mon);
-        self::hashSetLong($ht, 'tm_year', (int) $tm->tm_year);
-        self::hashSetLong($ht, 'tm_wday', (int) $tm->tm_wday);
-        self::hashSetLong($ht, 'tm_yday', (int) $tm->tm_yday);
-        self::hashSetString($ht, 'unparsed', \FFI::string($rest));
+        foreach (['tm_sec', 'tm_min', 'tm_hour', 'tm_mday', 'tm_mon', 'tm_year', 'tm_wday', 'tm_yday'] as $key) {
+            if (\array_key_exists($key, $parsed)) {
+                self::hashSetLong($ht, $key, (int) $parsed[$key]);
+            }
+        }
+        if (isset($parsed['unparsed']) && \is_string($parsed['unparsed'])) {
+            self::hashSetString($ht, 'unparsed', $parsed['unparsed']);
+        }
 
         return $ht;
+    }
+
+    /**
+     * Coerce optional ?int timestamp with caller strict_types (ext/date/php_date.c, #14892).
+     *
+     * @throws \TypeError when strict_types rejects float or operand is not int|null
+     */
+    public static function coerceNullableTimestampArgForFrame(
+        Frame $frame,
+        int $argIndex,
+        string $function,
+        int $userArgIndex,
+        string $paramName = 'timestamp'
+    ): ?int {
+        $var = $frame->calledArgs[$argIndex];
+        $resolved = $var->resolveIndirect();
+        if (Variable::TYPE_NULL === $resolved->type) {
+            return null;
+        }
+        if (InternalStrictArg::isCallerStrict($frame)) {
+            InternalStrictArg::requireNullableInt($frame, $argIndex, $function, $paramName);
+
+            return $resolved->toInt();
+        }
+        if (Variable::TYPE_FLOAT === $resolved->type && null !== $frame->vmContext) {
+            VmMath::warnFloatToIntPrecisionLoss($resolved->toFloat(), $frame->vmContext, $frame);
+        }
+
+        return self::coerceNullableTimestampArg($var, $function, $userArgIndex, $paramName);
     }
 
     /**
@@ -342,6 +350,9 @@ final class VmDate
             return null;
         }
         if (Variable::TYPE_INTEGER === $var->type) {
+            return $var->toInt();
+        }
+        if (Variable::TYPE_FLOAT === $var->type) {
             return $var->toInt();
         }
         if (EnumCaseSupport::isEnumCaseVariable($var)) {
@@ -403,7 +414,7 @@ final class VmDate
     }
 
     /**
-     * @return int|array{0: int, 1: int}
+     * @return float|array{0: int, 1: int}
      */
     public static function hrtime(bool $asNumber = false)
     {
@@ -425,18 +436,18 @@ final class VmDate
             return false;
         }
 
-        $sec = (int) $tm->tm_sec;
-        $min = (int) $tm->tm_min;
-        $hour = (int) $tm->tm_hour;
-        $mday = (int) $tm->tm_mday;
-        $mon = (int) $tm->tm_mon + 1;
-        $year = (int) $tm->tm_year + 1900;
-        $wday = (int) $tm->tm_wday;
-        $yday = (int) $tm->tm_yday;
-        $isdst = (int) $tm->tm_isdst;
+        $sec = self::tmInt($tm, 'tm_sec');
+        $min = self::tmInt($tm, 'tm_min');
+        $hour = self::tmInt($tm, 'tm_hour');
+        $mday = self::tmInt($tm, 'tm_mday');
+        $mon = self::tmInt($tm, 'tm_mon') + 1;
+        $year = self::tmInt($tm, 'tm_year') + 1900;
+        $wday = self::tmInt($tm, 'tm_wday');
+        $yday = self::tmInt($tm, 'tm_yday');
+        $isdst = self::tmInt($tm, 'tm_isdst');
 
         return match ($formatChar) {
-            'B' => self::swatchBeat($hour, $min, $sec, $wday),
+            'B' => self::swatchBeat($timestamp),
             'd', 'j' => $mday,
             'h', 'g' => self::hour12($hour),
             'H' => $hour,
@@ -471,15 +482,15 @@ final class VmDate
         }
 
         $values = [
-            (int) $tm->tm_sec,
-            (int) $tm->tm_min,
-            (int) $tm->tm_hour,
-            (int) $tm->tm_mday,
-            (int) $tm->tm_mon,
-            (int) $tm->tm_year,
-            (int) $tm->tm_wday,
-            (int) $tm->tm_yday,
-            (int) $tm->tm_isdst,
+            self::tmInt($tm, 'tm_sec'),
+            self::tmInt($tm, 'tm_min'),
+            self::tmInt($tm, 'tm_hour'),
+            self::tmInt($tm, 'tm_mday'),
+            self::tmInt($tm, 'tm_mon'),
+            self::tmInt($tm, 'tm_year'),
+            self::tmInt($tm, 'tm_wday'),
+            self::tmInt($tm, 'tm_yday'),
+            self::tmInt($tm, 'tm_isdst'),
         ];
         $keys = [
             'tm_sec',
@@ -562,6 +573,18 @@ final class VmDate
         self::hashSetLong($ht, 'warning_count', $result['warning_count']);
         self::hashSetLong($ht, 'error_count', $result['error_count']);
         self::hashSetBool($ht, 'is_localtime', $result['is_localtime']);
+        if (isset($result['zone_type'])) {
+            self::hashSetLong($ht, 'zone_type', $result['zone_type']);
+        }
+        if (isset($result['zone'])) {
+            self::hashSetLong($ht, 'zone', $result['zone']);
+        }
+        if (isset($result['is_dst'])) {
+            self::hashSetBool($ht, 'is_dst', $result['is_dst']);
+        }
+        if (isset($result['tz_id'])) {
+            self::hashSetString($ht, 'tz_id', $result['tz_id']);
+        }
 
         $warnings = new HashTable();
         foreach ($result['warnings'] as $pos => $message) {
@@ -578,6 +601,16 @@ final class VmDate
         $errorsVar = new Variable();
         $errorsVar->array($errors);
         $ht->add('errors', $errorsVar);
+
+        if (isset($result['relative']) && \is_array($result['relative'])) {
+            $relative = new HashTable();
+            foreach (['year', 'month', 'day', 'hour', 'minute', 'second', 'weekday'] as $relKey) {
+                self::hashSetLong($relative, $relKey, (int) $result['relative'][$relKey]);
+            }
+            $relativeVar = new Variable();
+            $relativeVar->array($relative);
+            $ht->add('relative', $relativeVar);
+        }
 
         return $ht;
     }
@@ -672,38 +705,31 @@ final class VmDate
             if (null === $tm) {
                 return false;
             }
-            $minute = (int) $tm->tm_min;
-            $second = (int) $tm->tm_sec;
-            $month = (int) $tm->tm_mon + 1;
-            $day = (int) $tm->tm_mday;
-            $year = (int) $tm->tm_year + 1900;
+            $minute = self::tmInt($tm, 'tm_min');
+            $second = self::tmInt($tm, 'tm_sec');
+            $month = self::tmInt($tm, 'tm_mon') + 1;
+            $day = self::tmInt($tm, 'tm_mday');
+            $year = self::tmInt($tm, 'tm_year') + 1900;
         } else {
-            $second ??= 0;
-            $month ??= 0;
-            $day ??= 0;
-            $year ??= 0;
+            $tm = self::localtime(self::time());
+            if (null === $tm) {
+                return false;
+            }
+            if (null === $second) {
+                $second = self::tmInt($tm, 'tm_sec');
+            }
+            if (null === $month) {
+                $month = self::tmInt($tm, 'tm_mon') + 1;
+            }
+            if (null === $day) {
+                $day = self::tmInt($tm, 'tm_mday');
+            }
+            if (null === $year) {
+                $year = self::tmInt($tm, 'tm_year') + 1900;
+            }
         }
 
-        $ffi = self::ffi();
-        if (null === $ffi) {
-            return false;
-        }
-
-        $tmStruct = $ffi->new('struct tm');
-        $tmStruct->tm_sec = $second;
-        $tmStruct->tm_min = $minute;
-        $tmStruct->tm_hour = $hour;
-        $tmStruct->tm_mday = $day;
-        $tmStruct->tm_mon = $month - 1;
-        $tmStruct->tm_year = $year - 1900;
-        $tmStruct->tm_isdst = -1;
-
-        $result = (int) $ffi->mktime(\FFI::addr($tmStruct));
-        if (-1 === $result) {
-            return false;
-        }
-
-        return $result;
+        return VmDatePure::mktime($hour, $minute, $second, $month, $day, $year);
     }
 
     /**
@@ -722,38 +748,31 @@ final class VmDate
             if (null === $tm) {
                 return false;
             }
-            $minute = (int) $tm->tm_min;
-            $second = (int) $tm->tm_sec;
-            $month = (int) $tm->tm_mon + 1;
-            $day = (int) $tm->tm_mday;
-            $year = (int) $tm->tm_year + 1900;
+            $minute = self::tmInt($tm, 'tm_min');
+            $second = self::tmInt($tm, 'tm_sec');
+            $month = self::tmInt($tm, 'tm_mon') + 1;
+            $day = self::tmInt($tm, 'tm_mday');
+            $year = self::tmInt($tm, 'tm_year') + 1900;
         } else {
-            $second ??= 0;
-            $month ??= 0;
-            $day ??= 0;
-            $year ??= 0;
+            $tm = self::gmtime(self::time());
+            if (null === $tm) {
+                return false;
+            }
+            if (null === $second) {
+                $second = self::tmInt($tm, 'tm_sec');
+            }
+            if (null === $month) {
+                $month = self::tmInt($tm, 'tm_mon') + 1;
+            }
+            if (null === $day) {
+                $day = self::tmInt($tm, 'tm_mday');
+            }
+            if (null === $year) {
+                $year = self::tmInt($tm, 'tm_year') + 1900;
+            }
         }
 
-        $ffi = self::ffi();
-        if (null === $ffi) {
-            return false;
-        }
-
-        $tmStruct = $ffi->new('struct tm');
-        $tmStruct->tm_sec = $second;
-        $tmStruct->tm_min = $minute;
-        $tmStruct->tm_hour = $hour;
-        $tmStruct->tm_mday = $day;
-        $tmStruct->tm_mon = $month - 1;
-        $tmStruct->tm_year = $year - 1900;
-        $tmStruct->tm_isdst = 0;
-
-        $result = (int) $ffi->timegm(\FFI::addr($tmStruct));
-        if (-1 === $result) {
-            return false;
-        }
-
-        return $result;
+        return VmDatePure::gmmktime($hour, $minute, $second, $month, $day, $year);
     }
 
     private static function dateBreakdown(?int $timestamp, bool $gmt): HashTable
@@ -765,16 +784,16 @@ final class VmDate
             return $ht;
         }
 
-        self::hashSetLong($ht, 'seconds', (int) $tm->tm_sec);
-        self::hashSetLong($ht, 'minutes', (int) $tm->tm_min);
-        self::hashSetLong($ht, 'hours', (int) $tm->tm_hour);
-        self::hashSetLong($ht, 'mday', (int) $tm->tm_mday);
-        self::hashSetLong($ht, 'wday', (int) $tm->tm_wday);
-        self::hashSetLong($ht, 'mon', (int) $tm->tm_mon + 1);
-        self::hashSetLong($ht, 'year', (int) $tm->tm_year + 1900);
-        self::hashSetLong($ht, 'yday', (int) $tm->tm_yday);
-        self::hashSetString($ht, 'weekday', self::weekdayName((int) $tm->tm_wday));
-        self::hashSetString($ht, 'month', self::monthName((int) $tm->tm_mon));
+        self::hashSetLong($ht, 'seconds', self::tmInt($tm, 'tm_sec'));
+        self::hashSetLong($ht, 'minutes', self::tmInt($tm, 'tm_min'));
+        self::hashSetLong($ht, 'hours', self::tmInt($tm, 'tm_hour'));
+        self::hashSetLong($ht, 'mday', self::tmInt($tm, 'tm_mday'));
+        self::hashSetLong($ht, 'wday', self::tmInt($tm, 'tm_wday'));
+        self::hashSetLong($ht, 'mon', self::tmInt($tm, 'tm_mon') + 1);
+        self::hashSetLong($ht, 'year', self::tmInt($tm, 'tm_year') + 1900);
+        self::hashSetLong($ht, 'yday', self::tmInt($tm, 'tm_yday'));
+        self::hashSetString($ht, 'weekday', self::weekdayName(self::tmInt($tm, 'tm_wday')));
+        self::hashSetString($ht, 'month', self::monthName(self::tmInt($tm, 'tm_mon')));
         $ht->addIndex(0, self::intVariable($ts));
 
         return $ht;
@@ -788,7 +807,7 @@ final class VmDate
     }
 
     /**
-     * Wall-clock sec/usec for uniqid() and other builtins — libc FFI only (#8402, pairs #6722).
+     * Wall-clock sec/usec for uniqid() and other builtins (#8402, #13765).
      *
      * @return array{sec: int, usec: int}
      */
@@ -799,29 +818,12 @@ final class VmDate
 
     public static function gettimeofdayArray(): HashTable
     {
-        $ffi = self::ffi();
+        $parts = VmDatePure::gettimeofdayParts();
         $ht = new HashTable();
-        if (null === $ffi) {
-            foreach (['sec', 'usec', 'minuteswest', 'dsttime'] as $key) {
-                self::hashSetLong($ht, $key, 0);
-            }
-
-            return $ht;
-        }
-
-        $tv = $ffi->new('struct timeval');
-        $tz = $ffi->new('struct timezone');
-        if (0 !== (int) $ffi->gettimeofday(\FFI::addr($tv), \FFI::addr($tz))) {
-            $tv->tv_sec = 0;
-            $tv->tv_usec = 0;
-            $tz->tz_minuteswest = 0;
-            $tz->tz_dsttime = 0;
-        }
-
-        self::hashSetLong($ht, 'sec', (int) $tv->tv_sec);
-        self::hashSetLong($ht, 'usec', (int) $tv->tv_usec);
-        self::hashSetLong($ht, 'minuteswest', (int) $tz->tz_minuteswest);
-        self::hashSetLong($ht, 'dsttime', (int) $tz->tz_dsttime);
+        self::hashSetLong($ht, 'sec', $parts['sec']);
+        self::hashSetLong($ht, 'usec', $parts['usec']);
+        self::hashSetLong($ht, 'minuteswest', $parts['minuteswest']);
+        self::hashSetLong($ht, 'dsttime', $parts['dsttime']);
 
         return $ht;
     }
@@ -840,25 +842,25 @@ final class VmDate
     }
 
     /**
-     * @param \FFI\CData $tm struct tm from localtime_r/gmtime_r
+     * @param array<string, int>|\FFI\CData $tm struct tm from localtime_r/gmtime_r or VmDatePure
      */
     public static function formatDateTimeFromTm(
         string $format,
         int $timestamp,
         int $microsecond,
-        \FFI\CData $tm,
+        array|\FFI\CData $tm,
         int $offsetSeconds,
         string $tzName
     ): string {
-        $year = (int) $tm->tm_year + 1900;
-        $month = (int) $tm->tm_mon + 1;
-        $day = (int) $tm->tm_mday;
-        $hour = (int) $tm->tm_hour;
-        $minute = (int) $tm->tm_min;
-        $second = (int) $tm->tm_sec;
-        $wday = (int) $tm->tm_wday;
-        $yday = (int) $tm->tm_yday;
-        $isdst = (int) $tm->tm_isdst;
+        $year = self::tmInt($tm, 'tm_year') + 1900;
+        $month = self::tmInt($tm, 'tm_mon') + 1;
+        $day = self::tmInt($tm, 'tm_mday');
+        $hour = self::tmInt($tm, 'tm_hour');
+        $minute = self::tmInt($tm, 'tm_min');
+        $second = self::tmInt($tm, 'tm_sec');
+        $wday = self::tmInt($tm, 'tm_wday');
+        $yday = self::tmInt($tm, 'tm_yday');
+        $isdst = self::tmInt($tm, 'tm_isdst');
         $hour12 = self::hour12($hour);
         $isoWeek = self::isoWeek($year, $month, $day);
         $isoYear = self::isoYear($year, $month, $day);
@@ -970,7 +972,7 @@ final class VmDate
 
                     break;
                 case 'B':
-                    $out .= (string) self::swatchBeat($hour, $minute, $second, $wday);
+                    $out .= self::padInt(self::swatchBeat($timestamp), 3);
 
                     break;
                 case 'I':
@@ -1019,7 +1021,7 @@ final class VmDate
 
                     break;
                 case 'T':
-                    $out .= self::timezoneAbbreviation($tzName, $timestamp, $isdst);
+                    $out .= self::timezoneAbbreviation($tzName, $timestamp, $offsetSeconds);
 
                     break;
                 case 'Z':
@@ -1106,13 +1108,36 @@ final class VmDate
         return $sign.self::padInt($hours, 2).':'.self::padInt($minutes, 2);
     }
 
-    private static function timezoneAbbreviation(string $tzName, int $timestamp, int $isdst): string
+    private static function timezoneAbbreviation(string $tzName, int $timestamp, int $offsetSeconds): string
     {
         if ('UTC' === $tzName) {
             return 'UTC';
         }
 
+        if (null !== VmDateTimeNative::parseNumericTimezoneOffset($tzName)) {
+            return self::formatGmtOffsetAbbreviation($offsetSeconds);
+        }
+
+        $abbr = self::libcStrftime('%Z', $timestamp, false);
+        if ('' !== $abbr) {
+            return $abbr;
+        }
+
         return $tzName;
+    }
+
+    /** php-src timelib offset-zone abbreviation (e.g. GMT+0400 for +04:00). */
+    private static function formatGmtOffsetAbbreviation(int $offsetSeconds): string
+    {
+        if (0 === $offsetSeconds) {
+            return 'GMT';
+        }
+        $sign = $offsetSeconds >= 0 ? '+' : '-';
+        $abs = \abs($offsetSeconds);
+        $hours = intdiv($abs, 3600);
+        $minutes = intdiv($abs % 3600, 60);
+
+        return 'GMT'.$sign.self::padInt($hours, 2).self::padInt($minutes, 2);
     }
 
     private static function hour12(int $hour): int
@@ -1140,13 +1165,17 @@ final class VmDate
         return $days[$month - 1];
     }
 
-    private static function swatchBeat(int $hour, int $minute, int $second, int $wday): int
+    /**
+     * Swatch Internet Time beats (php-src ext/date/php_date.c format 'B').
+     */
+    private static function swatchBeat(int $timestamp): int
     {
-        $seconds = ($hour * 3600) + ($minute * 60) + $second;
-        $daysFromMonday = ($wday + 6) % 7;
-        $total = $seconds + ($daysFromMonday * 86400);
+        $retval = ($timestamp - ($timestamp - ((($timestamp % 86400) + 3600) % 86400))) * 10;
+        if ($retval < 0) {
+            $retval += 864000;
+        }
 
-        return (int) \floor($total / 86.4);
+        return intdiv($retval, 864) % 1000;
     }
 
     /** ISO-8601 week number (php-src timelib_isoweek_from_date subset). */
@@ -1225,68 +1254,40 @@ final class VmDate
      */
     private static function readTimeval(): array
     {
-        $ffi = self::ffi();
-        if (null === $ffi) {
-            return ['sec' => 0, 'usec' => 0];
-        }
-        $tv = $ffi->new('struct timeval');
-        if (0 !== (int) $ffi->gettimeofday(\FFI::addr($tv), null)) {
-            return ['sec' => 0, 'usec' => 0];
-        }
-
-        return ['sec' => (int) $tv->tv_sec, 'usec' => (int) $tv->tv_usec];
+        return VmDatePure::readTimeval();
     }
 
     private static function libcStrftime(string $format, int $timestamp, bool $gmt): string
     {
-        $ffi = self::ffi();
-        if (null === $ffi) {
-            return '';
-        }
-        $tm = $gmt ? self::gmtime($timestamp) : self::localtime($timestamp);
-        if (null === $tm) {
-            return '';
-        }
-        $buf = $ffi->new('char['.self::FORMAT_OUT_BYTES.']');
-        $len = (int) $ffi->strftime(
-            \FFI::addr($buf[0]),
-            self::FORMAT_OUT_BYTES,
-            $format,
-            \FFI::addr($tm)
-        );
-        if ($len <= 0) {
-            return '';
-        }
-
-        return \FFI::string($buf, $len);
+        return VmDatePure::strftime($format, $timestamp, $gmt);
     }
 
-    private static function localtime(int $timestamp): ?\FFI\CData
+    /**
+     * @return array<string, int>|null
+     */
+    private static function localtime(int $timestamp): ?array
     {
-        $ffi = self::ffi();
-        if (null === $ffi) {
-            return null;
-        }
-        $ts = $ffi->new('time_t');
-        $ts->cdata = $timestamp;
-        $buf = $ffi->new('struct tm');
-        $tm = $ffi->localtime_r(\FFI::addr($ts), \FFI::addr($buf));
-
-        return null === $tm ? null : $buf;
+        return VmDatePure::localtime($timestamp);
     }
 
-    private static function gmtime(int $timestamp): ?\FFI\CData
+    /**
+     * @return array<string, int>|null
+     */
+    private static function gmtime(int $timestamp): ?array
     {
-        $ffi = self::ffi();
-        if (null === $ffi) {
-            return null;
-        }
-        $ts = $ffi->new('time_t');
-        $ts->cdata = $timestamp;
-        $buf = $ffi->new('struct tm');
-        $tm = $ffi->gmtime_r(\FFI::addr($ts), \FFI::addr($buf));
+        return VmDatePure::gmtime($timestamp);
+    }
 
-        return null === $tm ? null : $buf;
+    /**
+     * @param array<string, int>|\FFI\CData $tm
+     */
+    private static function tmInt(array|\FFI\CData $tm, string $field): int
+    {
+        if ($tm instanceof \FFI\CData) {
+            return (int) $tm->$field;
+        }
+
+        return (int) ($tm[$field] ?? 0);
     }
 
     private static function weekdayName(int $wday): string
@@ -1349,57 +1350,5 @@ final class VmDate
         $var->int($value);
 
         return $var;
-    }
-
-    private static function ffi(): ?\FFI
-    {
-        if (null !== self::$ffi) {
-            return self::$ffi;
-        }
-        if (!\extension_loaded('ffi')) {
-            return null;
-        }
-        $cdef = <<<'CDEF'
-typedef long time_t;
-typedef unsigned long size_t;
-struct timeval {
-    time_t tv_sec;
-    long tv_usec;
-};
-struct timezone {
-    int tz_minuteswest;
-    int tz_dsttime;
-};
-struct tm {
-    int tm_sec;
-    int tm_min;
-    int tm_hour;
-    int tm_mday;
-    int tm_mon;
-    int tm_year;
-    int tm_wday;
-    int tm_yday;
-    int tm_isdst;
-};
-time_t time(time_t *tloc);
-int gettimeofday(struct timeval *tv, struct timezone *tz);
-struct tm *localtime_r(const time_t *timep, struct tm *result);
-struct tm *gmtime_r(const time_t *timep, struct tm *result);
-time_t timegm(struct tm *tm);
-time_t mktime(struct tm *tm);
-size_t strftime(char *s, size_t max, const char *format, const struct tm *tm);
-char *strptime(const char *s, const char *format, struct tm *tm);
-CDEF;
-
-        foreach (['libc.so.6', 'libc.so'] as $lib) {
-            try {
-                self::$ffi = \FFI::cdef($cdef, $lib);
-
-                return self::$ffi;
-            } catch (\Throwable) {
-            }
-        }
-
-        return null;
     }
 }

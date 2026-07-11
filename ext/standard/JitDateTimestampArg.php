@@ -31,6 +31,18 @@ final class JitDateTimestampArg
         if (JITVariable::TYPE_NATIVE_LONG === $arg->type) {
             return $context->helper->loadValue($arg);
         }
+        if (JITVariable::TYPE_NATIVE_DOUBLE === $arg->type) {
+            if ($context->callerStrictTypes) {
+                self::emitTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'float');
+
+                return $whenNull;
+            }
+
+            return $context->builder->fpToSi(
+                $context->helper->loadValue($arg),
+                $context->getTypeFromString('int64')
+            );
+        }
         if (($arg->type & JITVariable::IS_NATIVE_ARRAY) || JITVariable::TYPE_HASHTABLE === $arg->type) {
             self::emitTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'array');
 
@@ -83,12 +95,14 @@ final class JitDateTimestampArg
         $objectTy = $i8->constInt(VmVariable::TYPE_OBJECT, false);
         $enumCaseTy = $i8->constInt(VmVariable::TYPE_ENUM_CASE, false);
         $intTy = $i8->constInt(VmVariable::TYPE_INTEGER, false);
+        $floatTy = $i8->constInt(VmVariable::TYPE_FLOAT, false);
 
         $nullBlock = BasicBlockHelper::append($context, 'date_ts_null');
         $notNullBlock = BasicBlockHelper::append($context, 'date_ts_not_null');
         $arrayBlock = BasicBlockHelper::append($context, 'date_ts_array');
         $rejectBlock = BasicBlockHelper::append($context, 'date_ts_reject');
         $intBlock = BasicBlockHelper::append($context, 'date_ts_int');
+        $floatBlock = BasicBlockHelper::append($context, 'date_ts_float');
         $mergeBlock = BasicBlockHelper::append($context, 'date_ts_merge');
 
         $isNull = $context->builder->icmp(Builder::INT_EQ, $typeByte, $nullTy);
@@ -123,8 +137,11 @@ final class JitDateTimestampArg
 
         $context->builder->positionAtEnd($classifyBlock);
         $isInt = $context->builder->icmp(Builder::INT_EQ, $typeByte, $intTy);
+        $isFloat = $context->builder->icmp(Builder::INT_EQ, $typeByte, $floatTy);
+        $isNumeric = $context->builder->or($isInt, $isFloat);
         $badBlock = BasicBlockHelper::append($context, 'date_ts_bad');
-        $context->builder->branchIf($isInt, $intBlock, $badBlock);
+        $numericBlock = BasicBlockHelper::append($context, 'date_ts_numeric');
+        $context->builder->branchIf($isNumeric, $numericBlock, $badBlock);
 
         $context->builder->positionAtEnd($badBlock);
         self::emitTypeErrorAndAbort(
@@ -135,6 +152,9 @@ final class JitDateTimestampArg
             JitOperandTypeLabel::givenLabel($context, $arg)
         );
 
+        $context->builder->positionAtEnd($numericBlock);
+        $context->builder->branchIf($isInt, $intBlock, $floatBlock);
+
         $context->builder->positionAtEnd($intBlock);
         $longVal = $context->builder->call(
             $context->lookupFunction('__value__readLong'),
@@ -142,10 +162,24 @@ final class JitDateTimestampArg
         );
         $context->builder->branch($mergeBlock);
 
+        $context->builder->positionAtEnd($floatBlock);
+        if ($context->callerStrictTypes) {
+            self::emitTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'float');
+            $floatLong = $whenNull;
+        } else {
+            $doubleVal = $context->builder->call(
+                $context->lookupFunction('__value__readDouble'),
+                $valuePtr
+            );
+            $floatLong = $context->builder->fpToSi($doubleVal, $context->getTypeFromString('int64'));
+        }
+        $context->builder->branch($mergeBlock);
+
         $context->builder->positionAtEnd($mergeBlock);
         $phi = $context->builder->phi($context->getTypeFromString('int64'));
         $phi->addIncoming($whenNull, $nullBlock);
         $phi->addIncoming($longVal, $intBlock);
+        $phi->addIncoming($floatLong, $floatBlock);
 
         return $phi;
     }

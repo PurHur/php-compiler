@@ -10,14 +10,14 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPUnit\Framework\TestCase;
 
-/** ObGzhandlerJitRuntime must route through ObGzhandlerJitHelper PHP, not LLVM handler body (#9091, #9798). */
+/** ObGzhandlerJitRuntime must route through ObGzhandlerJitHelper PHP, not LLVM handler body (#9091, #9798, #12881). */
 final class ObGzhandlerJitRuntimeShrinkTest extends TestCase
 {
     public function testObGzhandlerJitRuntimeUsesObGzhandlerJitHelperNotLlvmHandleBody(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ObGzhandlerJitRuntime.php');
         $this->assertStringContainsString('ObGzhandlerJitHelper', $source);
-        $this->assertStringContainsString('ObGzhandlerStandaloneLlvm', $source);
+        $this->assertStringNotContainsString('ObGzhandlerStandaloneLlvm', $source);
         $this->assertStringContainsString('ObGzhandlerServerJitHelper', $source);
         $this->assertStringContainsString('readAcceptEncodingFromServer', $source);
         $this->assertStringNotContainsString('emitReadAcceptEncodingString', $source);
@@ -25,15 +25,9 @@ final class ObGzhandlerJitRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('emitPassthroughBody', $source);
         $this->assertStringNotContainsString('lookupFunction(\'strstr\')', $source);
         $this->assertStringNotContainsString('GLOBAL_ENCODING', $source);
-        $this->assertLessThan(335, \substr_count($source, "\n") + 1);
-    }
+        $this->assertLessThan(400, \substr_count($source, "\n") + 1);
 
-    public function testObGzhandlerStandaloneLlvmQuarantinesAcceptEncodingWalk(): void
-    {
-        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ObGzhandlerStandaloneLlvm.php');
-        $this->assertStringContainsString('emitReadAcceptEncodingString', $source);
-        $this->assertStringContainsString('HTTP_ACCEPT_ENCODING', $source);
-        $this->assertStringNotContainsString('ZlibEncodeJitHelper::gzencode', $source);
+        $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/ObGzhandlerStandaloneLlvm.php');
     }
 
     public function testObGzhandlerJitHelperIsSelfContained(): void

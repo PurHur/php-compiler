@@ -2,7 +2,7 @@
 declare(strict_types=1);
 
 class A {
-    private(set) string $x = 'hi';
+    public (private(set)) string $x = 'hi';
 }
 $a = new A();
 echo $a->x, "\n";

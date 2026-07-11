@@ -12,6 +12,10 @@ final class TryCatchComplianceTest extends TestCase
     /** Issue #10016 / #3508: bare `throw;` rethrows active catch exception to outer handler. */
     public function testBareThrowRethrowNestedCatchPrintsMessage(): void
     {
+        if (!CompilerVersion::supportsBareRethrow()) {
+            self::markTestSkipped('bare rethrow disabled on reference profile (#15719)');
+        }
+
         $this->assertVmOutput(
             <<<'PHP'
 <?php
@@ -33,6 +37,10 @@ PHP
     /** Issue #10016: same-line throw expr + bare rethrow must not treat `throw new` as rethrow. */
     public function testBareThrowRethrowSameLineAsThrowExpression(): void
     {
+        if (!CompilerVersion::supportsBareRethrow()) {
+            self::markTestSkipped('bare rethrow disabled on reference profile (#15719)');
+        }
+
         $this->assertVmOutput(
             <<<'PHP'
 <?php
@@ -380,6 +388,40 @@ try {
 ',
             "caught:x\ncaught:y\n"
         );
+    }
+
+    /** Issue #15872: try/finally must not read undefined TryCatch::$else during compile. */
+    public function testTryFinallyReturnNoCompileWarning(): void
+    {
+        $warnings = [];
+        set_error_handler(static function (int $errno, string $errstr) use (&$warnings): bool {
+            $warnings[] = $errstr;
+
+            return true;
+        });
+        try {
+            $runtime = new Runtime();
+            $block = $runtime->parseAndCompile(
+                '<?php
+function test(): int {
+    try { return 1; } finally { echo "f"; }
+}
+echo test();
+',
+                'test.php'
+            );
+            ob_start();
+            try {
+                $runtime->run($block);
+            } catch (VM\ScriptExit $e) {
+            }
+            $this->assertSame('f1', ob_get_clean());
+            foreach ($warnings as $warning) {
+                $this->assertStringNotContainsString('TryCatch::$else', $warning);
+            }
+        } finally {
+            restore_error_handler();
+        }
     }
 
     public function testUncaughtThrowNonZeroExit(): void

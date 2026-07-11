@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\Block;
 use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPCompiler\JIT\ScriptMagic;
+use PHPCompiler\OpCode;
 use PHPLLVM\Value;
 
 /** JIT/AOT link for getmypid/getmyuid/getmygid/get_current_user via ProcessIdentityJitHelper PHP (#9017). */
@@ -50,7 +53,13 @@ final class ProcessIdentityJit
     {
         self::ensureJitHelperCompiled($context);
         $helperFn = self::helperFunction($context, self::GET_CURRENT_USER);
-        $nameStr = $context->builder->call($helperFn);
+        $path = '';
+        $block = $context->jitEnclosingBlock;
+        if ($block instanceof Block) {
+            $path = ScriptMagic::stringForBlock($block, OpCode::SCRIPT_MAGIC_FILE);
+        }
+        $pathStr = $context->builder->load($context->constantStringFromString($path));
+        $nameStr = $context->builder->call($helperFn, $pathStr);
 
         $slot = JitValueBox::alloc($context);
         $ptr = JitValueBox::pointer($context, $slot);

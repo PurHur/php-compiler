@@ -197,6 +197,9 @@ final class Variable {
     /** Top-level script / $GLOBALS symbol slot — skip valueDelref on scope exit (#4423). */
     public bool $scriptGlobalSlot = false;
 
+    /** Inline `[]` literal with no elements yet at JIT emit time (#11729). */
+    public bool $compileTimeEmptyArrayLiteral = false;
+
     private static int $lvalueCounter = 0;
     public int $nextFreeElement = 0;
 
@@ -815,9 +818,10 @@ final class Variable {
     public function dimFetch(self $dim, ?Type $expectedType = null, bool $forWrite = false): Variable {
         switch ($this->type) {
             case self::TYPE_STRING:
+                $str = $this->context->helper->loadValue($this);
                 $charPtr = StringOffsetHelper::dimFetch(
                     $this->context,
-                    $this->value,
+                    $str,
                     $dim
                 );
                 if ($forWrite) {
@@ -901,10 +905,19 @@ final class Variable {
                     );
                 }
                 if (self::TYPE_OBJECT === $dim->type) {
-                    $keyObj = $this->context->helper->loadValue($dim);
                     if ($forWrite) {
-                        return HashTableHelper::writableObjectKeyValueBox($this->context, $ht, $keyObj);
+                        HashTableHelper::emitIllegalOffsetType($this->context);
+                        $this->context->builder->call($this->context->lookupFunction('abort'));
+                        $this->context->builder->clearInsertionPosition();
+
+                        return new Variable(
+                            $this->context,
+                            self::TYPE_NULL,
+                            self::KIND_VALUE,
+                            $this->context->getTypeFromString('__value__*')->constNull()
+                        );
                     }
+                    $keyObj = $this->context->helper->loadValue($dim);
 
                     return HashTableHelper::readObjectKeyToValueBox($this->context, $ht, $keyObj);
                 }

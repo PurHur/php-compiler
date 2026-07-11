@@ -28,29 +28,32 @@ final class preg_match_all extends Internal
         }
         $pattern = VmReflection::stringArg($frame->calledArgs[0], 'preg_match_all() pattern', 0);
         $subject = VmReflection::stringArg($frame->calledArgs[1], 'preg_match_all() subject', 1);
+        VmPregFailure::warnPatternCompileFailure($frame, 'preg_match_all', $pattern);
 
         $flags = 0;
         $offset = 0;
-        $hasMatches = $argc >= 3;
-        if ($argc >= 4) {
+        $hasMatches = isset($frame->calledArgs[2]);
+        if (isset($frame->calledArgs[3])) {
             $flagsVar = $frame->calledArgs[3]->resolveIndirect();
             if (Variable::TYPE_INTEGER !== $flagsVar->type) {
                 throw new \LogicException('preg_match_all() flags must be an integer in this compiler build');
             }
             $flags = $flagsVar->toInt();
         }
-        if ($argc >= 5) {
-            $offsetVar = $frame->calledArgs[4]->resolveIndirect();
-            if (Variable::TYPE_INTEGER !== $offsetVar->type) {
-                throw new \LogicException('preg_match_all() offset must be an integer in this compiler build');
-            }
-            $offset = $offsetVar->toInt();
+        if (isset($frame->calledArgs[4])) {
+            $offset = VmMath::parseIntBuiltinArgForFrame(
+                $frame,
+                4,
+                'preg_match_all',
+                5,
+                'offset'
+            );
         }
 
         $hostMatches = [];
         $result = VmPreg::pregMatchAll($pattern, $subject, $hostMatches, $flags, $offset);
 
-        if ($hasMatches) {
+        if ($hasMatches && false !== $result) {
             $target = $frame->calledArgs[2]->resolveIndirect();
             $ht = VmPregMatches::hostMatchAllToHashTable($hostMatches, $flags);
             $target->array($ht);

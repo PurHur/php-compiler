@@ -58,14 +58,15 @@ final class DateTimeSupport
         Variable $var,
         string $label,
         ?int $argNum = null,
-        ?string $argName = null
+        ?string $argName = null,
+        ?Context $ctx = null
     ): ObjectEntry {
         $var = $var->resolveIndirect();
         if (Variable::TYPE_OBJECT !== $var->type) {
             throw self::dateTimeTypeError($label, $argNum, $argName, $var);
         }
         $obj = $var->toObject();
-        if (self::CLASS_DATETIME !== strtolower($obj->class->name)) {
+        if (!self::objectIsMutableDateTime($obj, $ctx)) {
             throw self::dateTimeTypeError($label, $argNum, $argName, $var, $obj->class->name);
         }
 
@@ -97,18 +98,51 @@ final class DateTimeSupport
         Variable $var,
         string $label,
         ?int $argNum = null,
-        ?string $argName = null
+        ?string $argName = null,
+        ?Context $ctx = null
     ): ObjectEntry {
         $var = $var->resolveIndirect();
         if (Variable::TYPE_OBJECT !== $var->type) {
             throw self::dateTimeImmutableTypeError($label, $argNum, $argName, $var);
         }
         $obj = $var->toObject();
-        if (self::CLASS_DATETIMEIMMUTABLE !== strtolower($obj->class->name)) {
+        if (!self::objectIsImmutableDateTime($obj, $ctx)) {
             throw self::dateTimeImmutableTypeError($label, $argNum, $argName, $var, $obj->class->name);
         }
 
         return $obj;
+    }
+
+    /** php-src instanceof DateTime — mutable class or subclass (#16204, #7276). */
+    private static function objectIsMutableDateTime(ObjectEntry $obj, ?Context $ctx): bool
+    {
+        if (self::isDateTimeImmutable($obj)) {
+            return false;
+        }
+        $lc = strtolower($obj->class->name);
+        if (self::CLASS_DATETIME === $lc) {
+            return true;
+        }
+        if (null !== $ctx) {
+            return InterfaceCheck::entryIsInstanceOf($obj->class, self::CLASS_DATETIME, $ctx)
+                && !InterfaceCheck::entryIsInstanceOf($obj->class, self::CLASS_DATETIMEIMMUTABLE, $ctx);
+        }
+
+        return self::CLASS_DATETIME === $obj->class->parentLc;
+    }
+
+    /** php-src instanceof DateTimeImmutable — immutable class or subclass (#16204). */
+    private static function objectIsImmutableDateTime(ObjectEntry $obj, ?Context $ctx): bool
+    {
+        $lc = strtolower($obj->class->name);
+        if (self::CLASS_DATETIMEIMMUTABLE === $lc) {
+            return true;
+        }
+        if (null !== $ctx) {
+            return InterfaceCheck::entryIsInstanceOf($obj->class, self::CLASS_DATETIMEIMMUTABLE, $ctx);
+        }
+
+        return self::CLASS_DATETIMEIMMUTABLE === $obj->class->parentLc;
     }
 
     private static function dateTimeImmutableTypeError(
@@ -163,6 +197,10 @@ final class DateTimeSupport
 
     public static function timezoneName(ObjectEntry $zone): string
     {
+        if (null !== $zone->dateTimeZoneName && '' !== $zone->dateTimeZoneName) {
+            return $zone->dateTimeZoneName;
+        }
+
         return self::requireStringProperty($zone, self::TZ_NAME_PROPERTY, 'DateTimeZone')->toString();
     }
 
@@ -215,6 +253,17 @@ final class DateTimeSupport
         return VmDateTimeNative::timezoneOffsetSeconds(self::timezoneName($zone), $timestamp);
     }
 
+    /** php-src PHP_FUNCTION(date_offset_get) — getOffset(getTimezone()) (#11876). */
+    public static function dateOffsetGet(ObjectEntry $datetime): int
+    {
+        $label = self::classLabel($datetime);
+        self::requireInitializedDateTimeLike($datetime, 'date_offset_get()');
+        $tzName = self::requireStringProperty($datetime, self::TZ_PROPERTY, $label)->toString();
+        $timestamp = self::requireIntProperty($datetime, self::TS_PROPERTY, $label)->toInt();
+
+        return VmDateTimeNative::timezoneOffsetSeconds($tzName, $timestamp);
+    }
+
     /** php-src zim_DateTimeZone_getLocation (#7131). */
     public static function timezoneLocationInto(ObjectEntry $zone, Variable $returnVar): void
     {
@@ -241,6 +290,39 @@ final class DateTimeSupport
         $returnVar->array($ht);
     }
 
+    /**
+     * php-src zim_DateTimeZone_getTransitions / timezone_transitions_get (#6041, #11211).
+     *
+     * @param list<array{ts: int, time: string, offset: int, isdst: bool, abbr: string}>|false $transitions
+     */
+    public static function timezoneTransitionsInto(array|false $transitions, Variable $returnVar): void
+    {
+        if (false === $transitions) {
+            $returnVar->bool(false);
+
+            return;
+        }
+        $ht = new HashTable();
+        foreach ($transitions as $index => $transition) {
+            $row = new HashTable();
+            foreach ($transition as $key => $value) {
+                $cell = new Variable();
+                if (\is_int($value)) {
+                    $cell->int($value);
+                } elseif (\is_bool($value)) {
+                    $cell->bool($value);
+                } else {
+                    $cell->string((string) $value);
+                }
+                $row->addNew((string) $key, $cell);
+            }
+            $entry = new Variable();
+            $entry->array($row);
+            $ht->addNew((string) $index, $entry);
+        }
+        $returnVar->array($ht);
+    }
+
     public static function initDateTimeZone(ObjectEntry $zone, string $timezone): void
     {
         try {
@@ -249,6 +331,7 @@ final class DateTimeSupport
             self::throwDateInvalidTimeZoneException($timezone);
         }
         self::requireStringProperty($zone, self::TZ_NAME_PROPERTY, 'DateTimeZone')->string($name);
+        $zone->dateTimeZoneName = $name;
         $zone->constructed = true;
     }
 
@@ -334,6 +417,7 @@ final class DateTimeSupport
 
             return null;
         }
+        $effectiveTz = $parsed['timezone'] ?? $tzName;
         $components = VmDateTimeNative::parseFromFormatComponents($format, $time);
         if ($components['warning_count'] > 0) {
             self::$createFromFormatLastErrors = [
@@ -346,7 +430,7 @@ final class DateTimeSupport
             self::clearCreateFromFormatLastErrors();
         }
         $entry = new ObjectEntry($class);
-        self::applyParsedState($entry, $parsed, $tzName);
+        self::applyParsedState($entry, $parsed, $effectiveTz);
         $entry->constructed = true;
         self::markDateTimeLikeInitialized($entry);
         $var = new Variable(Variable::TYPE_OBJECT);
@@ -369,6 +453,18 @@ final class DateTimeSupport
     private static function recordCreateFromFormatFailure(string $format, string $time): void
     {
         $components = VmDateTimeNative::parseFromFormatComponents($format, $time);
+        self::$createFromFormatLastErrors = [
+            'warning_count' => $components['warning_count'],
+            'warnings' => $components['warnings'],
+            'error_count' => $components['error_count'],
+            'errors' => $components['errors'],
+        ];
+    }
+
+    /** php-src ext/date/php_date.c — date_create() failure populates getLastErrors() without E_WARNING (#16488). */
+    private static function recordDateTimeParseFailure(string $time): void
+    {
+        $components = VmDateTimeNative::parseDate($time);
         self::$createFromFormatLastErrors = [
             'warning_count' => $components['warning_count'],
             'warnings' => $components['warnings'],
@@ -400,6 +496,8 @@ final class DateTimeSupport
             VmDateTimeNative::validateTimezoneId($tzName);
             $parsed = VmDateTimeNative::parseDateTime($time, $tzName);
         } catch (NativeDateInvalidTimeZoneException|NativeDateMalformedStringException) {
+            self::recordDateTimeParseFailure($time);
+
             return null;
         }
         self::applyParsedState($entry, $parsed, $tzName);
@@ -470,13 +568,15 @@ final class DateTimeSupport
         } catch (NativeDateMalformedStringException $e) {
             self::throwDateMalformedStringException($e->getMessage());
         }
-        self::applyParsedState($dt, $parsed, $tzName);
+        $effectiveTz = $parsed['timezone'] ?? $tzName;
+        unset($parsed['timezone']);
+        self::applyParsedState($dt, $parsed, $effectiveTz);
         $dt->constructed = true;
         self::markDateTimeLikeInitialized($dt);
     }
 
-    /** php-src zim_DateTime_createFromTimestamp / zim_DateTimeImmutable_createFromTimestamp (#5973). */
-    public static function initDateTimeFromTimestamp(ObjectEntry $dt, int $timestamp): void
+    /** php-src zim_DateTime_createFromTimestamp / zim_DateTimeImmutable_createFromTimestamp (#5973, #9984). */
+    public static function initDateTimeFromTimestamp(ObjectEntry $dt, int|float $timestamp): void
     {
         $tzName = VmDate::defaultTimezoneGet();
         try {
@@ -484,14 +584,47 @@ final class DateTimeSupport
         } catch (NativeDateInvalidTimeZoneException) {
             self::throwDateInvalidTimeZoneException($tzName);
         }
+        $parts = self::splitTimestampNumber($timestamp);
+        $seconds = $parts['timestamp'];
         if (4 === \PHP_INT_SIZE) {
-            if ($timestamp > \PHP_INT_MAX || $timestamp < \PHP_INT_MIN) {
+            if ($seconds > \PHP_INT_MAX || $seconds < \PHP_INT_MIN) {
                 self::throwDateRangeError('Epoch doesn\'t fit in a PHP integer');
             }
         }
-        self::applyParsedState($dt, ['timestamp' => $timestamp, 'microsecond' => 0], $tzName);
+        self::applyParsedState(
+            $dt,
+            ['timestamp' => $seconds, 'microsecond' => $parts['microsecond']],
+            $tzName
+        );
         $dt->constructed = true;
         self::markDateTimeLikeInitialized($dt);
+    }
+
+    /**
+     * php-src ext/date/php_date.c — float timestamp → epoch seconds + usec (#9984).
+     *
+     * @return array{timestamp: int, microsecond: int}
+     */
+    public static function splitTimestampNumber(int|float $timestamp): array
+    {
+        if (\is_int($timestamp)) {
+            return ['timestamp' => $timestamp, 'microsecond' => 0];
+        }
+        if (!\is_finite($timestamp)) {
+            throw new \ValueError('Invalid timestamp');
+        }
+        $seconds = (int) $timestamp;
+        $fraction = $timestamp - $seconds;
+        $microsecond = (int) \round($fraction * 1_000_000);
+        if (1_000_000 === $microsecond) {
+            $seconds += $timestamp >= 0.0 ? 1 : -1;
+            $microsecond = 0;
+        } elseif ($microsecond < 0) {
+            --$seconds;
+            $microsecond += 1_000_000;
+        }
+
+        return ['timestamp' => $seconds, 'microsecond' => $microsecond];
     }
 
     public static function initDateTimeFromFormat(
@@ -514,7 +647,8 @@ final class DateTimeSupport
                 'DateTimeImmutable::createFromFormat(): Failed to parse time string ('.$time.')'
             );
         }
-        self::applyParsedState($dt, $parsed, $tzName);
+        $effectiveTz = $parsed['timezone'] ?? $tzName;
+        self::applyParsedState($dt, $parsed, $effectiveTz);
         $dt->constructed = true;
         self::markDateTimeLikeInitialized($dt);
     }
@@ -542,6 +676,57 @@ final class DateTimeSupport
         return $epoch;
     }
 
+    /** php-src zim_DateTime_getTimezone — returns DateTimeZone for stored tz id (#10946). */
+    public static function getTimezoneObject(ObjectEntry $dt, Context $ctx): ObjectEntry
+    {
+        $label = self::classLabel($dt);
+        self::requireInitializedDateTimeLike($dt, "{$label}::getTimezone()");
+        $tzName = self::requireStringProperty($dt, self::TZ_PROPERTY, $label)->toString();
+
+        return self::newDateTimeZoneVariable($ctx, $tzName)->toObject();
+    }
+
+    /** php-src zim_DateTime_setTimestamp — mutable in-place (#10946). */
+    public static function setTimestamp(ObjectEntry $dt, int $timestamp): void
+    {
+        $label = self::classLabel($dt);
+        self::requireInitializedDateTimeLike($dt, "{$label}::setTimestamp()");
+        if (4 === \PHP_INT_SIZE) {
+            if ($timestamp > \PHP_INT_MAX || $timestamp < \PHP_INT_MIN) {
+                self::throwDateRangeError('Epoch doesn\'t fit in a PHP integer');
+            }
+        }
+        self::requireIntProperty($dt, self::TS_PROPERTY, $label)->int($timestamp);
+        self::requireIntProperty($dt, self::MICROSECOND_PROPERTY, $label)->int(0);
+    }
+
+    /** php-src zim_DateTimeImmutable_setTimestamp — returns new instance (#10946). */
+    public static function withTimestamp(ObjectEntry $dt, int $timestamp): ObjectEntry
+    {
+        $clone = self::cloneDateTimeObject($dt);
+        self::setTimestamp($clone, $timestamp);
+
+        return $clone;
+    }
+
+    /** php-src zim_DateTimeImmutable_add — returns new instance (#10946). */
+    public static function withAddInterval(ObjectEntry $dt, ObjectEntry $interval): ObjectEntry
+    {
+        $clone = self::cloneDateTimeObject($dt);
+        self::addInterval($clone, $interval);
+
+        return $clone;
+    }
+
+    /** php-src zim_DateTimeImmutable_sub — returns new instance (#10946). */
+    public static function withSubInterval(ObjectEntry $dt, ObjectEntry $interval): ObjectEntry
+    {
+        $clone = self::cloneDateTimeObject($dt);
+        self::subInterval($clone, $interval);
+
+        return $clone;
+    }
+
     public static function getMicrosecond(ObjectEntry $dt): int
     {
         return self::requireIntProperty($dt, self::MICROSECOND_PROPERTY, self::classLabel($dt))->toInt();
@@ -553,6 +738,75 @@ final class DateTimeSupport
         self::validateMicrosecond($microsecond);
         self::requireIntProperty($dt, self::MICROSECOND_PROPERTY, self::classLabel($dt))
             ->int($microsecond);
+    }
+
+    /** php-src zim_DateTime_setDate — mutable in-place (#12469). */
+    public static function setDate(ObjectEntry $dt, int $year, int $month, int $day): void
+    {
+        $label = self::classLabel($dt);
+        self::requireInitializedDateTimeLike($dt, "{$label}::setDate()");
+        $tzName = self::requireStringProperty($dt, self::TZ_PROPERTY, $label)->toString();
+        $timestamp = self::requireIntProperty($dt, self::TS_PROPERTY, $label)->toInt();
+        $microsecond = self::requireIntProperty($dt, self::MICROSECOND_PROPERTY, $label)->toInt();
+        $updated = VmDateTimeNative::replaceDateComponents(
+            $timestamp,
+            $microsecond,
+            $tzName,
+            $year,
+            $month,
+            $day
+        );
+        self::requireIntProperty($dt, self::TS_PROPERTY, $label)->int($updated['timestamp']);
+        self::requireIntProperty($dt, self::MICROSECOND_PROPERTY, $label)->int($updated['microsecond']);
+    }
+
+    /** php-src zim_DateTimeImmutable_setDate — returns new instance (#12469). */
+    public static function withDate(ObjectEntry $dt, int $year, int $month, int $day): ObjectEntry
+    {
+        $clone = self::cloneDateTimeObject($dt);
+        self::setDate($clone, $year, $month, $day);
+
+        return $clone;
+    }
+
+    /** php-src zim_DateTime_setTime — mutable in-place (#12469). */
+    public static function setTime(
+        ObjectEntry $dt,
+        int $hour,
+        int $minute,
+        int $second = 0,
+        int $microsecond = 0
+    ): void {
+        $label = self::classLabel($dt);
+        self::requireInitializedDateTimeLike($dt, "{$label}::setTime()");
+        $tzName = self::requireStringProperty($dt, self::TZ_PROPERTY, $label)->toString();
+        $timestamp = self::requireIntProperty($dt, self::TS_PROPERTY, $label)->toInt();
+        $currentMicrosecond = self::requireIntProperty($dt, self::MICROSECOND_PROPERTY, $label)->toInt();
+        $updated = VmDateTimeNative::replaceTimeComponents(
+            $timestamp,
+            $currentMicrosecond,
+            $tzName,
+            $hour,
+            $minute,
+            $second,
+            $microsecond
+        );
+        self::requireIntProperty($dt, self::TS_PROPERTY, $label)->int($updated['timestamp']);
+        self::requireIntProperty($dt, self::MICROSECOND_PROPERTY, $label)->int($updated['microsecond']);
+    }
+
+    /** php-src zim_DateTimeImmutable_setTime — returns new instance (#12469). */
+    public static function withTime(
+        ObjectEntry $dt,
+        int $hour,
+        int $minute,
+        int $second = 0,
+        int $microsecond = 0
+    ): ObjectEntry {
+        $clone = self::cloneDateTimeObject($dt);
+        self::setTime($clone, $hour, $minute, $second, $microsecond);
+
+        return $clone;
     }
 
     /** php-src zim_DateTimeImmutable_setMicrosecond — returns new instance (#7082). */
@@ -704,7 +958,8 @@ final class DateTimeSupport
             $immutableArg,
             'DateTime::createFromImmutable()',
             1,
-            'object'
+            'object',
+            $ctx
         );
         self::requireInitializedDateTimeLike($immutable, 'DateTimeImmutable');
         $class = $ctx->classes[self::CLASS_DATETIME] ?? null;
@@ -726,7 +981,8 @@ final class DateTimeSupport
             $mutableArg,
             'DateTimeImmutable::createFromMutable()',
             1,
-            'object'
+            'object',
+            $ctx
         );
         self::requireInitializedDateTimeLike($mutable, 'DateTime');
         $class = $ctx->classes[self::CLASS_DATETIMEIMMUTABLE] ?? null;
@@ -797,6 +1053,22 @@ final class DateTimeSupport
         return $clone;
     }
 
+    /** Clone DateTime/DateTimeImmutable for DatePeriod iteration (#14228). */
+    public static function cloneDateTimeLike(ObjectEntry $source): ObjectEntry
+    {
+        return self::cloneDateTimeObject($source);
+    }
+
+    public static function readTimestamp(ObjectEntry $dt): int
+    {
+        return self::requireIntProperty($dt, self::TS_PROPERTY, self::classLabel($dt))->toInt();
+    }
+
+    public static function readMicrosecond(ObjectEntry $dt): int
+    {
+        return self::requireIntProperty($dt, self::MICROSECOND_PROPERTY, self::classLabel($dt))->toInt();
+    }
+
     private static function copyDateTimeState(ObjectEntry $source, ObjectEntry $target): void
     {
         $sourceLabel = self::classLabel($source);
@@ -845,47 +1117,73 @@ final class DateTimeSupport
         return $var;
     }
 
-    /** php-src php_date_serialize — Zend `date` / `timezone_type` / `timezone` wire (#10710). */
-    public static function encodeZendSerializeWire(ObjectEntry $dt): string
+    /**
+     * php-src ext/json/php_json.c — DateTime/DateTimeImmutable json encode wire (#14143).
+     *
+     * @return array{date: string, timezone_type: int, timezone: string}
+     */
+    public static function exportZendJsonWireDateTimeLike(ObjectEntry $dt): array
     {
         self::requireInitializedDateTimeLike($dt, self::classLabel($dt));
         $className = self::classLabel($dt);
         $timestamp = self::requireIntProperty($dt, self::TS_PROPERTY, $className)->toInt();
         $microsecond = self::requireIntProperty($dt, self::MICROSECOND_PROPERTY, $className)->toInt();
         $tzName = self::requireStringProperty($dt, self::TZ_PROPERTY, $className)->toString();
-        $dateWire = VmDateTimeNative::formatZendDateWire($timestamp, $microsecond, $tzName);
 
-        return VmSerialize::encodeExportedPropertyBag($className, [
-            'date' => $dateWire,
+        return [
+            'date' => VmDateTimeNative::formatZendDateWire($timestamp, $microsecond, $tzName),
             'timezone_type' => 3,
             'timezone' => $tzName,
-        ]);
+        ];
+    }
+
+    /**
+     * php-src ext/json/php_json.c — DateTimeZone json encode wire (#14143).
+     *
+     * @return array{timezone_type: int, timezone: string}
+     */
+    public static function exportZendJsonWireDateTimeZone(ObjectEntry $zone): array
+    {
+        return [
+            'timezone_type' => 3,
+            'timezone' => self::timezoneName($zone),
+        ];
+    }
+
+    /** php-src php_date_serialize — Zend `date` / `timezone_type` / `timezone` wire (#10710). */
+    public static function encodeZendSerializeWire(ObjectEntry $dt): string
+    {
+        return VmSerialize::encodeExportedPropertyBag(
+            self::classLabel($dt),
+            self::exportZendJsonWireDateTimeLike($dt)
+        );
     }
 
     /**
      * @param array<string, mixed> $data Zend DateTime unserialize payload
      */
-    public static function restoreFromZendSerialize(Context $ctx, string $classKey, array $data): ?ObjectEntry
+    public static function restoreFromZendSerialize(Context $ctx, string $classKey, array $data): ObjectEntry
     {
         $dateWire = $data['date'] ?? null;
-        if (!\is_string($dateWire)) {
-            return null;
+        $timezoneType = $data['timezone_type'] ?? null;
+        $timezone = $data['timezone'] ?? null;
+        if (!\is_string($dateWire)
+            || !\is_int($timezoneType)
+            || !\is_string($timezone)) {
+            throw new \Error('Invalid serialization data for DateTime object');
         }
-        $tzName = isset($data['timezone']) && \is_string($data['timezone'])
-            ? $data['timezone']
-            : VmDate::defaultTimezoneGet();
         try {
-            VmDateTimeNative::validateTimezoneId($tzName);
-            $parsed = VmDateTimeNative::parseDateTime($dateWire, $tzName);
+            VmDateTimeNative::validateTimezoneId($timezone);
+            $parsed = VmDateTimeNative::parseDateTime($dateWire, $timezone);
         } catch (NativeDateInvalidTimeZoneException|NativeDateMalformedStringException) {
-            return null;
+            throw new \Error('Invalid serialization data for DateTime object');
         }
         $class = $ctx->classes[$classKey] ?? null;
         if (null === $class) {
-            return null;
+            throw new \Error('Invalid serialization data for DateTime object');
         }
         $entry = new ObjectEntry($class);
-        self::applyParsedState($entry, $parsed, $tzName);
+        self::applyParsedState($entry, $parsed, $timezone);
         $entry->constructed = true;
         self::markDateTimeLikeInitialized($entry);
 

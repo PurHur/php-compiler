@@ -7,7 +7,7 @@ namespace PHPCompiler;
 use PHPUnit\Framework\TestCase;
 
 /**
- * array_find family passes (value, key) to callbacks — PHP 8.4 ext/standard/array.c.
+ * array_find family php-src callbacks pass (value, key); forward-profile *_key variants use (key, value) (#17599).
  */
 final class ArrayFindCallbackKeyTest extends TestCase
 {
@@ -17,7 +17,7 @@ echo array_find($a, fn ($v, $k) => $k === 'y'), "\n";
 echo array_find_key($a, fn ($v, $k) => $v === 20), "\n";
 echo array_any($a, fn ($v, $k) => $k === 'x') ? 'y' : 'n', "\n";
 echo array_all($a, fn ($v, $k) => is_int($v)) ? 'y' : 'n', "\n";
-echo array_find_key([1, 2, 3], fn ($v, $k) => $k === 1), "\n";
+echo array_find_key([1, 2, 3], fn ($v, $k) => $v === 2), "\n";
 PHP;
 
     private const EXPECT = <<<'TXT'
@@ -30,6 +30,9 @@ TXT;
 
     public function testVmCallbackKey(): void
     {
+        if (!CompilerVersion::supportsPhp84ArraySearchFunctions()) {
+            $this->markTestSkipped('array_find family withheld on PHP 8.2 reference profile (#14505)');
+        }
         $this->assertOutputMatches($this->runBin('bin/vm.php'));
     }
 
@@ -39,6 +42,9 @@ TXT;
      */
     public function testJitCallbackKey(): void
     {
+        if (!CompilerVersion::supportsPhp84ArraySearchFunctions()) {
+            $this->markTestSkipped('array_find family withheld on PHP 8.2 reference profile (#14505)');
+        }
         if (!LlvmToolchain::isReady(dirname(__DIR__, 2))) {
             $this->markTestSkipped('LLVM 9 toolchain not available');
         }
@@ -51,6 +57,9 @@ TXT;
      */
     public function testAotLintCallbackKey(): void
     {
+        if (!CompilerVersion::supportsPhp84ArraySearchFunctions()) {
+            $this->markTestSkipped('array_find family withheld on PHP 8.2 reference profile (#14505)');
+        }
         if (!LlvmToolchain::isReady(dirname(__DIR__, 2))) {
             $this->markTestSkipped('LLVM 9 toolchain not available');
         }

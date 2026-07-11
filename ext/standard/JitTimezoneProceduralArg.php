@@ -64,6 +64,61 @@ final class JitTimezoneProceduralArg
         );
     }
 
+    public static function readDateTimeTimezoneNameProp(
+        Context $context,
+        ObjectBuiltin $object,
+        Value $objPtr
+    ): Value {
+        $map = $context->structFieldMap['__object__'];
+        $classId = $context->builder->load(
+            $context->builder->structGep($objPtr, $map['class_id'])
+        );
+        $i64 = $context->getTypeFromString('int64');
+        $dtId = $object->lookup('DateTime');
+        $dtiId = $object->lookup('DateTimeImmutable');
+        $isDt = $context->builder->icmp(
+            Builder::INT_EQ,
+            $classId,
+            $i64->constInt($dtId, false)
+        );
+        $dtBlock = BasicBlockHelper::append($context, 'tzproc_tzname_dt');
+        $dtiBlock = BasicBlockHelper::append($context, 'tzproc_tzname_dti');
+        $doneBlock = BasicBlockHelper::append($context, 'tzproc_tzname_done');
+        $context->builder->branchIf($isDt, $dtBlock, $dtiBlock);
+
+        $context->builder->positionAtEnd($dtBlock);
+        $dtName = self::readStringProp($context, $object, $objPtr, 'DateTime', DateTimeSupport::TZ_PROPERTY);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($dtiBlock);
+        $isDti = $context->builder->icmp(
+            Builder::INT_EQ,
+            $classId,
+            $i64->constInt($dtiId, false)
+        );
+        $failBlock = BasicBlockHelper::append($context, 'tzproc_tzname_fail');
+        $readBlock = BasicBlockHelper::append($context, 'tzproc_tzname_read_dti');
+        $context->builder->branchIf($isDti, $readBlock, $failBlock);
+
+        $context->builder->positionAtEnd($failBlock);
+        self::emitTypeErrorAndAbort(
+            $context,
+            'date_offset_get(): Argument #1 ($object) must be of type DateTimeInterface, object given'
+        );
+
+        $context->builder->positionAtEnd($readBlock);
+        $dtiName = self::readStringProp($context, $object, $objPtr, 'DateTimeImmutable', DateTimeSupport::TZ_PROPERTY);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+        $stringType = $context->getTypeFromString('char*');
+        $phi = $context->builder->phi($stringType);
+        $phi->addIncoming($dtName, $dtBlock);
+        $phi->addIncoming($dtiName, $readBlock);
+
+        return $phi;
+    }
+
     public static function readTimestampProp(Context $context, ObjectBuiltin $object, Value $objPtr): Value
     {
         $map = $context->structFieldMap['__object__'];

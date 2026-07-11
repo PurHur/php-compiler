@@ -75,6 +75,18 @@ final class VmPhpMemoryStreamRuntimeShrinkTest extends TestCase
         VmPhpMemoryStream::close($handle);
     }
 
+    public function testFeofTrueAfterFreadPastEndInOneCall(): void
+    {
+        $handle = VmFs::fopen('php://memory', 'r+');
+        $this->assertNotFalse($handle);
+        VmFs::fwrite($handle, 'hello');
+        VmFs::rewind($handle);
+        $this->assertFalse(VmFs::feof($handle));
+        VmFs::fread($handle, 9999);
+        $this->assertTrue(VmFs::feof($handle));
+        VmFs::fclose($handle);
+    }
+
     public function testFeofFalseUntilReadPastEnd(): void
     {
         $handle = VmPhpMemoryStream::open('php://memory', 'r+');
@@ -100,6 +112,26 @@ final class VmPhpMemoryStreamRuntimeShrinkTest extends TestCase
         $this->assertFalse(VmFs::feof($handle));
         $this->assertSame('x', VmFs::fgetc($handle));
         $this->assertFalse(VmFs::feof($handle));
+        VmFs::fclose($handle);
+    }
+
+    public function testFtellPastEofOnEmptyMemoryStreamReturnsFalse(): void
+    {
+        $handle = VmFs::fopen('php://memory', 'r+');
+        $this->assertNotFalse($handle);
+        $this->assertSame(0, VmFs::fseek($handle, 99));
+        $this->assertFalse(VmFs::ftell($handle));
+        $this->assertSame(0, VmFs::fseek($handle, 0));
+        $this->assertSame(0, VmFs::ftell($handle));
+        VmFs::fclose($handle);
+    }
+
+    public function testFgetcAtEofOnEmptyMemoryStreamReturnsFalse(): void
+    {
+        $handle = VmFs::fopen('php://memory', 'r+');
+        $this->assertNotFalse($handle);
+        $this->assertFalse(VmFs::fgetc($handle));
+        $this->assertTrue(VmFs::feof($handle));
         VmFs::fclose($handle);
     }
 }

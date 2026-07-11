@@ -9,7 +9,7 @@ use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Issue #5344 / #6340: AOT standalone must define pending header helpers without phpc_pending_headers.c.
+ * Issue #5344 / #6340 / #12898: AOT standalone pending header helpers via PendingHeadersJitHelper PHP.
  *
  * @group aot-lint
  */
@@ -21,31 +21,37 @@ final class PendingHeadersRuntimeStandaloneTest extends TestCase
         $linker = (string) file_get_contents(__DIR__.'/../../../lib/AOT/Linker.php');
         $this->assertStringNotContainsString('phpc_pending_headers.c', $linker);
         $runtime = (string) file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/PendingHeadersRuntime.php');
-        $this->assertStringContainsString('appendSetcookieExpires', $runtime);
-        $this->assertStringContainsString('gmtime', $runtime);
+        $this->assertStringContainsString('PendingHeadersJitBridge::implement', $runtime);
+        $this->assertStringNotContainsString('PendingHeadersStandaloneLlvm', $runtime);
+        $this->assertFileDoesNotExist(__DIR__.'/../../../lib/JIT/Builtin/PendingHeadersStandaloneLlvm.php');
     }
 
     public function testEnsureLinkedDefinesPendingHeadersForStandalone(): void
     {
-        $runtime = new Runtime(Runtime::MODE_AOT);
-        $ctx = new Context($runtime, Builtin::LOAD_TYPE_STANDALONE);
-        PendingHeadersRuntime::ensureLinked($ctx);
+        putenv('PHP_COMPILER_AOT_USER_SCRIPT=1');
+        try {
+            $runtime = new Runtime(Runtime::MODE_AOT);
+            $ctx = new Context($runtime, Builtin::LOAD_TYPE_STANDALONE);
+            PendingHeadersRuntime::ensureLinked($ctx);
 
-        foreach (
-            [
-                '__phpc_pending_header_reset',
-                '__phpc_header_queue_enable',
-                '__phpc_pending_header_add',
-                '__phpc_pending_header_remove',
-                '__phpc_pending_header_list',
-                '__phpc_response_headers_flush',
-                '__phpc_setcookie_add',
-                '__phpc_headers_sent',
-            ] as $name
-        ) {
-            $fn = $ctx->lookupFunction($name);
-            $this->assertNotNull($fn);
-            $this->assertGreaterThan(0, $fn->countBasicBlocks());
+            foreach (
+                [
+                    '__phpc_pending_header_reset',
+                    '__phpc_header_queue_enable',
+                    '__phpc_pending_header_add',
+                    '__phpc_pending_header_remove',
+                    '__phpc_pending_header_list',
+                    '__phpc_response_headers_flush',
+                    '__phpc_setcookie_add',
+                    '__phpc_headers_sent',
+                ] as $name
+            ) {
+                $fn = $ctx->lookupFunction($name);
+                $this->assertNotNull($fn);
+                $this->assertGreaterThan(0, $fn->countBasicBlocks());
+            }
+        } finally {
+            putenv('PHP_COMPILER_AOT_USER_SCRIPT');
         }
     }
 }

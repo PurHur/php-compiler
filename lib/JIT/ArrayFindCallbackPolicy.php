@@ -30,18 +30,47 @@ final class ArrayFindCallbackPolicy
 
     public static function isJitLowerable(JITVariable $callback): bool
     {
+        if (JITVariable::TYPE_NULL === $callback->type || $callback->isNullConstant) {
+            return false;
+        }
         if (self::isClosureJitLowerable($callback)) {
             return true;
         }
-        if (ArrayMapCallbackPolicy::isJitLowerableScalar(
-            $callback->type,
-            $callback->isNullConstant,
-            $callback->compileTimeString
-        )) {
+        if (JITVariable::TYPE_STRING === $callback->type && null !== $callback->compileTimeString) {
             return true;
         }
 
         return ArrayReduceCallbackPolicy::isJitLowerable($callback);
+    }
+
+    public static function isJitNullCallback(JITVariable $callback): bool
+    {
+        return JITVariable::TYPE_NULL === $callback->type || $callback->isNullConstant;
+    }
+
+    /**
+     * Zend array_find-family invalid callback TypeError (#17133, ext/standard/array.c).
+     */
+    public static function invalidCallbackTypeError(string $function, int $argNum = 2): string
+    {
+        return \sprintf(
+            '%s(): Argument #%d ($callback) must be a valid callback, no array or string given',
+            $function,
+            $argNum
+        );
+    }
+
+    /**
+     * Zend undefined string callback TypeError (#17133).
+     */
+    public static function invalidStringCallbackTypeError(string $function, string $name, int $argNum = 2): string
+    {
+        return \sprintf(
+            '%s(): Argument #%d ($callback) must be a valid callback, function "%s" not found or invalid function name',
+            $function,
+            $argNum,
+            $name
+        );
     }
 
     public static function isVmSupportedType(int $type): bool

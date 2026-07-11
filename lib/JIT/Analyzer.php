@@ -206,6 +206,22 @@ class Analyzer
                     return null;
                 }
                 $size = max($size, $newSize);
+            } elseif ($op instanceof Op\Phi) {
+                $phiSize = null;
+                foreach ($op->vars as $var) {
+                    $branchSize = $this->computeStaticArraySize($var, $seen);
+                    if (null === $branchSize) {
+                        return null;
+                    }
+                    if (null === $phiSize) {
+                        $phiSize = $branchSize;
+                    } elseif ($phiSize !== $branchSize) {
+                        return null;
+                    }
+                }
+                if (null !== $phiSize) {
+                    $size = max($size, $phiSize);
+                }
             } elseif ($op instanceof Op\Expr\Cast\Array_
                 || $op instanceof Op\Expr\Cast\Object_
                 || $op instanceof Op\Expr\Cast\Unset_

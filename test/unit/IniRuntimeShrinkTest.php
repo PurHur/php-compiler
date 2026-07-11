@@ -15,6 +15,18 @@ final class IniRuntimeShrinkTest extends TestCase
         $source = (string) \file_get_contents(__DIR__.'/../../ext/standard/IniJitHelper.php');
         $this->assertStringContainsString('VmIni::', $source);
         $this->assertStringContainsString('ErrorSilenceJitHelper', $source);
+        // Cross-class array const fetch breaks inventory argv AOT compile (#12178 regression).
+        $this->assertStringContainsString('EMPTY_STRING_INI_KEYS', $source);
+        $this->assertStringNotContainsString('VmIni::EMPTY_STRING_INI_KEYS', $source);
+    }
+
+    public function testIniJitHelperEmptyStringIniKeysParity(): void
+    {
+        $this->assertSame('', IniJitHelper::iniGet('auto_prepend_file'));
+        $this->assertSame('', IniJitHelper::iniGet('error_log'));
+        $this->assertSame('', IniJitHelper::iniGet('disable_functions'));
+        $this->assertSame('', IniJitHelper::iniGet('open_basedir'));
+        $this->assertSame('.user.ini', IniJitHelper::iniGet('user_ini.filename'));
     }
 
     public function testIniRuntimeUsesJitHelperNotLlvmKeyWalk(): void
@@ -43,5 +55,16 @@ final class IniRuntimeShrinkTest extends TestCase
     public function testIniJitHelperUnknownKeyReturnsNull(): void
     {
         $this->assertNull(IniJitHelper::iniGet('bogus_ini_key'));
+    }
+
+    public function testIniJitHelperDefaultCharsetRoundTrip(): void
+    {
+        $orig = IniJitHelper::iniGet('default_charset');
+        $this->assertSame('UTF-8', $orig);
+        $old = IniJitHelper::iniSet('default_charset', 'ISO-8859-1');
+        $this->assertSame('UTF-8', $old);
+        $this->assertSame('ISO-8859-1', IniJitHelper::iniGet('default_charset'));
+        IniJitHelper::iniRestore('default_charset');
+        $this->assertSame('UTF-8', IniJitHelper::iniGet('default_charset'));
     }
 }

@@ -1,20 +1,15 @@
 <?php
-/**
- * Maintainer repro for #10310 — clone-with property list reinitializes defaults.
- */
+
 declare(strict_types=1);
 
-class W {
-    public int $a = 1;
-    public readonly int $b;
+/** Issue #12987 — clone-with rejected on Zend 8.2 reference profile. */
 
-    public function __construct() {
-        $this->b = 2;
-    }
+class Point
+{
+    public int $x = 1;
+    public int $y = 2;
 }
 
-$w = new W();
-$w->a = 99;
-$w2 = clone($w, ['a']);
-var_export([$w->a, $w->b, $w2->a, $w2->b]);
-echo "\n";
+$p = new Point();
+$q = clone ($p, with: ['x' => 9]);
+echo $q->x, ',', $q->y, "\n";

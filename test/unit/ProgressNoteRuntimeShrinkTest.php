@@ -25,6 +25,8 @@ final class ProgressNoteRuntimeShrinkTest extends TestCase
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ProgressNoteRuntime.php');
         $this->assertStringContainsString('ensureStandaloneBodies', $source);
-        $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $source);
+        $this->assertStringContainsString('implementRememberBridge', $source);
+        $this->assertStringContainsString('__phpc_progress_remember', $source);
+        $this->assertStringContainsString('ProgressJitHelper', $source);
     }
 }

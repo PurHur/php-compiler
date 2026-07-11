@@ -21,12 +21,31 @@ final class JitTypedClassConstCompileTest extends TestCase
 {
     private string $repoRoot;
 
+    /** @var string|false|null */
+    private $savedCompilerProfile = null;
+
     protected function setUp(): void
     {
         $this->repoRoot = dirname(__DIR__, 2);
         if (!LlvmToolchain::isReady($this->repoRoot)) {
             $reason = LlvmToolchain::readyFailureReason() ?? 'LLVM 9 toolchain not available';
             $this->markTestSkipped($reason.' — typed class const JIT compile test needs LLVM (#4900)');
+        }
+        if (!CompilerVersion::supportsTypedClassConstants()) {
+            $this->savedCompilerProfile = getenv('PHP_COMPILER_PROFILE');
+            putenv('PHP_COMPILER_PROFILE=8.3');
+        }
+    }
+
+    protected function tearDown(): void
+    {
+        if (null !== $this->savedCompilerProfile) {
+            if (false === $this->savedCompilerProfile) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$this->savedCompilerProfile);
+            }
+            $this->savedCompilerProfile = null;
         }
     }
 
@@ -35,6 +54,9 @@ final class JitTypedClassConstCompileTest extends TestCase
      */
     public function testTypedClassConstModuleVerify(string $fixture): void
     {
+        if (!CompilerVersion::supportsTypedClassConstants()) {
+            $this->markTestSkipped('typed class constants require CompilerVersion 8.4.0+');
+        }
         $runtime = new Runtime();
         $code = $this->phptFixtureCode($fixture);
         $block = $runtime->parseAndCompile($code, $fixture);

@@ -82,7 +82,7 @@ final class JitEnv
                 $cStr
             );
 
-            return $context->builder->constInt(1, false, $context->getTypeFromString('int1'));
+            return $context->getTypeFromString('int1')->constInt(1, false);
         }
 
         return $context->builder->call(
@@ -91,6 +91,20 @@ final class JitEnv
                 'PHPCompiler\\ext\\standard\\GetenvJitHelper::putenv'
             ),
             $assignmentStr
+        );
+    }
+
+    public static function apacheSetenv(Context $context, Value $variableStr, Value $valueStr): Value
+    {
+        StringGetenv::ensureLinked($context);
+
+        return $context->builder->call(
+            StringGetenv::helperFunction(
+                $context,
+                'PHPCompiler\\ext\\standard\\GetenvJitHelper::apacheSetenv'
+            ),
+            $variableStr,
+            $valueStr
         );
     }
 

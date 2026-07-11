@@ -17,11 +17,11 @@ try {
 }
 
 try {
-    var_export(attribute_exists(Demo::class, E::B));
+    var_export(attribute_exists('AllowDynamicProperties', 42));
     echo "uncaught\n";
 } catch (TypeError $e) {
     echo $e->getMessage(), "\n";
 }
 --EXPECT--
-attribute_exists(): Argument #1 ($class) must be of type string, E given
-attribute_exists(): Argument #2 ($attribute) must be of type string, E given
+attribute_exists(): Argument #1 ($attribute) must be of type string, E given
+attribute_exists(): Argument #2 ($object) must be of type object|string, int given

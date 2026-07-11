@@ -29,7 +29,7 @@ final class file_ extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('file() requires one or two arguments in this compiler build');
         }
-        $path = VmStreamPath::coerceNonEmptyPathArg($frame->calledArgs[0], 'file');
+        $path = VmStreamPath::coerceNonEmptyPathArgForFrame($frame, 0, 'file', 'filename');
         $flags = 0;
         if (2 === $argc) {
             $flags = VmMath::parseIntBuiltinArg($frame->calledArgs[1], 'file', 1, 'flags');

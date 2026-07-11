@@ -53,7 +53,7 @@ final class crc32 extends Internal
 
     private static function vmStringArg(Frame $frame, int $argIndex): string
     {
-        if (null !== $frame->parent && $frame->parent->block->strictTypes) {
+        if (InternalStrictArg::isCallerStrict($frame)) {
             return InternalStrictArg::requireString($frame, $argIndex, 'crc32', 'string')->toString();
         }
 

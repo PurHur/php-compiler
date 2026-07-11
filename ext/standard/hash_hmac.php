@@ -33,20 +33,14 @@ final class hash_hmac extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $algo = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'hash_hmac', 0, 'algo');
-        $data = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'hash_hmac', 1, 'data');
-        $key = VmString::coerceStringBuiltinArg($frame->calledArgs[2], 'hash_hmac', 2, 'key');
+        $algo = VmString::stringBuiltinArgForFrame($frame, 0, 'hash_hmac', 0, 'algo');
+        $data = VmString::stringBuiltinArgForFrame($frame, 1, 'hash_hmac', 1, 'data');
+        $key = VmString::stringBuiltinArgForFrame($frame, 2, 'hash_hmac', 2, 'key');
         $raw = false;
         if (4 === $argc) {
             $raw = VmMath::parseBoolBuiltinArg($frame->calledArgs[3], 'hash_hmac', 4, 'binary');
         }
-        $result = VmHash::hashHmac($algo, $data, $key, $raw);
-        if (false === $result) {
-            $frame->returnVar->bool(false);
-
-            return;
-        }
-        $frame->returnVar->string($result);
+        $frame->returnVar->string(VmHash::hashHmac($algo, $data, $key, $raw));
     }
 
     public function call(Context $context, JITVariable ...$args): Value
@@ -70,9 +64,9 @@ final class hash_hmac extends Internal
         }
         return JitHash::hashHmac(
             $context,
-            JitStringBuiltinArg::lower($context, $args[0], 'hash_hmac', 0, 'algo'),
-            JitStringBuiltinArg::lower($context, $args[1], 'hash_hmac', 1, 'data'),
-            JitStringBuiltinArg::lower($context, $args[2], 'hash_hmac', 2, 'key'),
+            JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'hash_hmac', 0, 'algo'),
+            JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[1], 'hash_hmac', 1, 'data'),
+            JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[2], 'hash_hmac', 2, 'key'),
             $raw
         );
     }

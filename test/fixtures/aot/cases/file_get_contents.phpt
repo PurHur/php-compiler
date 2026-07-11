@@ -1,5 +1,7 @@
 --TEST--
 AOT: file_get_contents() reads a file into a string
+--ENV--
+REQUEST_METHOD=
 --FILE--
 <?php
 $path = 'test/compliance/cases/stdlib/readfile_fixture/data.txt';

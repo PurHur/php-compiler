@@ -306,6 +306,7 @@ function syntaxRowDefinitions(): array
             'notes' => [
                 'Compile-time literal fold for array/scalar const values; typed mismatch is compile-time TypeError; JIT lowers immutable array constants (#3592)',
                 'Typed trait constants enabled on 8.3+ target (#5993); rejected on 8.2 (Zend parse error parity, #5212)',
+                'Typed class constants on classes/enums enabled on 8.3+ forward profile (#12994); trait typed constants (#5993)',
             ],
             'probe' => 'class C { public const array X = [1, 2]; } echo C::X[0];',
         ],
@@ -316,7 +317,7 @@ function syntaxRowDefinitions(): array
             'issue' => 7081,
             'notes' => [
                 'GlobalTypedConstRewriter + PHPCfg marker for nikic/php-parser 4.x; compile-time type check reuses class-const path',
-                'PHP 8.4 `final const` at file scope enabled on 8.4+ target (#9909); rejected below 8.4 like Zend parse error (#10324)',
+                'file-scope `final const` on PHP 8.4+ forward profile (#15165, #16859); rejected below 8.4 (#10324, #15185)',
             ],
             'probe' => 'const string X = "a"; echo X;',
         ],
@@ -332,12 +333,12 @@ function syntaxRowDefinitions(): array
         ],
         [
             'id' => 'class_const_object',
-            'construct' => 'Class constants with `new` object expressions (PHP 8.3+)',
+            'construct' => 'Class constants with `new` object expressions',
             'opcodes' => ['TYPE_DECLARE_CLASS_CONST', 'TYPE_NEW'],
-            'issue' => 9850,
+            'issue' => 15608,
             'notes' => [
-                'Zend zend_compile_const_expr allows top-level `new Class(...)` in class constants on 8.3+ (#9850)',
-                'NewWithoutParensCompileCheck rejects bare `new` without `()` and `new` nested in arrays; VM ClassConstMaterializer + JIT immortal singleton (#3196)',
+                'PHP 8.3+ class constant `new` initializers (#12940, #15693, Zend/zend_compile.c)',
+                'Enabled on stable 8.4.0+ or PHP_COMPILER_PROFILE=8.3/8.4; property defaults still rejected',
             ],
             'probe' => 'class C { public const X = new stdClass(); } var_export(C::X);',
         ],
@@ -509,6 +510,7 @@ function syntaxRowDefinitions(): array
         ],
         [
             'id' => 'typed_function_static',
+            'profile' => '8.3',
             'construct' => 'PHP 8.3+ typed function-local static (`static T $var`)',
             'opcodes' => ['TYPE_DECLARE_FUNCTION_STATIC', 'TYPE_ASSIGN'],
             'issue' => 9998,
@@ -597,10 +599,11 @@ function syntaxRowDefinitions(): array
             'construct' => 'PHP 8.5 pipe operator (`|>`)',
             'opcodes' => ['TYPE_FUNCCALL_INIT', 'TYPE_FUNCCALL_EXEC_RETURN'],
             'issue' => 7219,
+            'aot' => false,
             'notes' => [
                 'Ast\\PipeOperatorDesugar before php-parser (#3243); lowers $lhs |> f(...) to f($lhs, ...)',
                 'Bare callable names: $lhs |> strlen → strlen($lhs) (#7219)',
-                'PHP 8.5 errata: arrow-fn RHS must be parenthesized — $lhs |> (fn($p) => expr) (#7219, php-src #19533)',
+                'Arrow-fn RHS: $lhs |> fn($p) => expr and parenthesized form (#7219, #11858)',
                 'Chained pipes and parenthesized-callable LHS (#6705, #7219)',
                 'Zend/zend_compile.c pipe expression; requires first-class callable (#1363)',
             ],
@@ -819,6 +822,7 @@ function syntaxRowDefinitions(): array
         ],
         [
             'id' => 'asymmetric_visibility',
+            'profile' => '8.4',
             'construct' => 'PHP 8.4 asymmetric property visibility (private(set), protected(set), etc.)',
             'opcodes' => ['TYPE_DECLARE_PROPERTY', 'TYPE_PROPERTY_FETCH', 'TYPE_ASSIGN'],
             'issue' => 3165,
@@ -826,8 +830,9 @@ function syntaxRowDefinitions(): array
             'notes' => [
                 'Ast\\AsymmetricVisibilityRewriter normalizes private(set) for php-parser 4.x; VM/JIT enforce set visibility with catchable Error (#3165, #4020)',
                 'php-src: Zend/zend_compile.c ZEND_ACC_*_SET; AsymmetricVisibilityGuard + AsymmetricVisibilityJitCompileTest (#4020)',
+                'AOT: native typed property fetch/store + write guard (#16354); asymmetric_visibility_public_private_set_int.phpt',
             ],
-            'probe' => 'class D { private(set) string $n = "x"; } $d = new D(); echo $d->n; $d->n = "y";',
+            'probe' => 'class D { public (private(set)) string $n = "x"; } $d = new D(); echo $d->n; try { $d->n = "y"; } catch (Error $e) {}',
         ],
         [
             'id' => 'class_destruct',
@@ -974,6 +979,16 @@ function collectSyntaxCapabilities(string $root, array $definitions, array $hand
     $rows = [];
 
     foreach ($definitions as $def) {
+        // Profile-gated features (typed statics 8.3+, asymmetric visibility
+        // 8.4) parse-fail on the bare 8.4.0-dev reference profile since the
+        // function_exists/reference gating tightened; probe them under the
+        // profile they target, then restore (#16508).
+        $probeProfile = $def['profile'] ?? null;
+        $prevProfile = null;
+        if (null !== $probeProfile) {
+            $prevProfile = getenv('PHP_COMPILER_PROFILE');
+            putenv('PHP_COMPILER_PROFILE=' . $probeProfile);
+        }
         $opcodeDriven = $def['opcodes'] !== [];
         $vm = $opcodeDriven
             ? opcodesSupported($handlers['vm'], $def['opcodes'])
@@ -991,6 +1006,11 @@ function collectSyntaxCapabilities(string $root, array $definitions, array $hand
             $aot = probeAotCompile($def['probe']);
         } else {
             $aot = $jit;
+        }
+        if (null !== $probeProfile) {
+            putenv(false === $prevProfile || '' === $prevProfile
+                ? 'PHP_COMPILER_PROFILE'
+                : 'PHP_COMPILER_PROFILE=' . $prevProfile);
         }
         $notes = $def['notes'];
         foreach ($phpt[$def['id']] ?? [] as $tag) {
@@ -1183,6 +1203,10 @@ function builtinCapabilityCurations(): array
             'aot' => 'yes',
             'notes' => [$persistenceNote],
         ],
+        'session_commit' => [
+            'aot' => 'yes',
+            'notes' => [$persistenceNote, 'alias of session_write_close() (#12544)'],
+        ],
         'session_abort' => [
             'aot' => 'yes',
             'notes' => [$persistenceNote, 'lifecycle API (#6002)'],
@@ -1213,6 +1237,171 @@ function builtinCapabilityCurations(): array
  *
  * @return array<string, array{vm: bool, jit: bool, aot: bool|string, notes: list<string>, module: string}>
  */
+/**
+ * Builtins with PHP implementations gated off the active advertisement profile (#11842, #11904).
+ *
+ * @return list<array{names: list<string>, gate: callable(): bool, since: string, module: string, relPath: string}>
+ */
+function withheldBuiltinGateDefinitions(): array
+{
+    return [
+        [
+            'names' => ['fpow', 'fmin', 'fmax', 'fadd', 'fsub', 'fmul'],
+            'gate' => [PHPCompiler\CompilerVersion::class, 'supportsFpow'],
+            'since' => '8.4.0',
+            'module' => 'standard',
+            'relPath' => 'ext/standard/fpow.php',
+        ],
+        [
+            'names' => ['nextafter'],
+            'gate' => [PHPCompiler\CompilerVersion::class, 'supportsNextafter'],
+            'since' => '8.4.0',
+            'module' => 'standard',
+            'relPath' => 'ext/standard/nextafter.php',
+        ],
+        [
+            'names' => ['strxfrm'],
+            'gate' => [PHPCompiler\CompilerVersion::class, 'supportsStrxfrm'],
+            'since' => '8.3.0',
+            'module' => 'standard',
+            'relPath' => 'ext/standard/strxfrm.php',
+        ],
+        [
+            'names' => ['convert_cyr_string'],
+            'gate' => [PHPCompiler\CompilerVersion::class, 'supportsConvertCyrString'],
+            'since' => '8.3.0',
+            'module' => 'standard',
+            'relPath' => 'ext/standard/convert_cyr_string.php',
+        ],
+        [
+            'names' => ['class_uses_recursive'],
+            'gate' => [PHPCompiler\CompilerVersion::class, 'supportsClassUsesRecursive'],
+            'since' => '8.3.0',
+            'module' => 'standard',
+            'relPath' => 'ext/standard/class_uses_recursive.php',
+        ],
+        [
+            'names' => ['attribute_exists', 'class_meth_exists', 'unitenum_exists'],
+            'gate' => [PHPCompiler\CompilerVersion::class, 'supportsPhp84ReflectionProbeBuiltins'],
+            'since' => '8.4.0',
+            'module' => 'standard',
+            'relPath' => 'ext/standard/attribute_exists_.php',
+        ],
+        [
+            'names' => ['readonly'],
+            'gate' => [PHPCompiler\CompilerVersion::class, 'supportsReadonlyBuiltin'],
+            'since' => '8.4.0',
+            'module' => 'standard',
+            'relPath' => 'ext/standard/readonly_.php',
+        ],
+        [
+            'names' => ['stream_supports'],
+            'gate' => [PHPCompiler\CompilerVersion::class, 'supportsStreamSupports'],
+            'since' => '8.3.0',
+            'module' => 'standard',
+            'relPath' => 'ext/standard/stream_supports.php',
+        ],
+        [
+            'names' => ['zend_thread_id'],
+            'gate' => [PHPCompiler\CompilerVersion::class, 'supportsZendThreadId'],
+            'since' => '8.4.0',
+            'module' => 'standard',
+            'relPath' => 'ext/standard/zend_thread_id.php',
+        ],
+        [
+            'names' => ['getmygrgid'],
+            'gate' => [PHPCompiler\CompilerVersion::class, 'supportsGetmygrgid'],
+            'since' => '8.3.0',
+            'module' => 'standard',
+            'relPath' => 'ext/standard/getmygrgid.php',
+        ],
+        [
+            'names' => ['crc32c'],
+            'gate' => [PHPCompiler\CompilerVersion::class, 'supportsCrc32c'],
+            'since' => '8.3.0',
+            'module' => 'standard',
+            'relPath' => 'ext/standard/crc32c.php',
+        ],
+        [
+            'names' => ['mb_str_pad'],
+            'gate' => [PHPCompiler\CompilerVersion::class, 'supportsMbStrPad'],
+            'since' => '8.4.0',
+            'module' => 'mbstring',
+            'relPath' => 'ext/mbstring/mb_str_pad.php',
+        ],
+        [
+            'names' => ['mb_ucfirst', 'mb_lcfirst'],
+            'gate' => [PHPCompiler\CompilerVersion::class, 'supportsMbUcfirstLcfirst'],
+            'since' => '8.3.0',
+            'module' => 'mbstring',
+            'relPath' => 'ext/mbstring/mb_ucfirst.php',
+        ],
+        [
+            'names' => ['mb_trim', 'mb_ltrim', 'mb_rtrim'],
+            'gate' => [PHPCompiler\CompilerVersion::class, 'supportsMbTrimFunctions'],
+            'since' => '8.4.0',
+            'module' => 'mbstring',
+            'relPath' => 'ext/mbstring/mb_trim.php',
+        ],
+        [
+            'names' => ['generator_to_array'],
+            'gate' => [PHPCompiler\CompilerVersion::class, 'supportsGeneratorToArray'],
+            'since' => '8.4.0',
+            'module' => 'standard',
+            'relPath' => 'ext/standard/generator_to_array.php',
+        ],
+    ];
+}
+
+/**
+ * Align matrix VM column with function_exists() and document withheld builtins (#11904).
+ *
+ * @param array<string, array{vm: bool, jit: bool, aot: bool|string, notes: list<string>, module: string}> $capabilities
+ *
+ * @return array<string, array{vm: bool, jit: bool, aot: bool|string, notes: list<string>, module: string}>
+ */
+function applyBuiltinAdvertisementParity(array $capabilities, string $root): array
+{
+    $runtime = new PHPCompiler\Runtime();
+    $ctx = $runtime->vmContext;
+    $refProfile = PHPCompiler\CompilerVersion::builtinAdvertisementVersion();
+
+    foreach ($capabilities as $name => &$row) {
+        $registered = isset($ctx->functions[$name]);
+        if ($row['vm'] && !$registered) {
+            $row['vm'] = false;
+            $row['notes'][] = 'gated ('.$refProfile.' ref)';
+        }
+    }
+    unset($row);
+
+    foreach (withheldBuiltinGateDefinitions() as $def) {
+        if (($def['gate'])()) {
+            continue;
+        }
+        if (!is_file($root.'/'.$def['relPath'])) {
+            continue;
+        }
+        $note = 'impl present; gated ('.$refProfile.' ref, since '.$def['since'].')';
+        foreach ($def['names'] as $name) {
+            if (isset($capabilities[$name]) || isset($ctx->functions[$name])) {
+                continue;
+            }
+            $capabilities[$name] = [
+                'vm' => false,
+                'jit' => false,
+                'aot' => false,
+                'notes' => [$note],
+                'module' => $def['module'],
+            ];
+        }
+    }
+
+    ksort($capabilities, SORT_STRING);
+
+    return $capabilities;
+}
+
 function applyBuiltinCapabilityCurations(array $capabilities): array
 {
     foreach (builtinCapabilityCurations() as $name => $patch) {

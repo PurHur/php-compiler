@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\Frame;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\Variable;
 
@@ -128,9 +129,9 @@ final class VmArraySort
         $fromEnum = self::trySortingOrderInt($arg);
         if (null !== $fromEnum) {
             if (0 === $parseState[self::PARSE_ORDER]) {
-                throw new \TypeError(sprintf(
-                    'array_multisort(): Argument #%d must be an array or a sort flag that has not already been specified',
-                    $argIndex + 1
+                throw new \TypeError(self::multisortOperandTypeError(
+                    $argIndex,
+                    ' that has not already been specified'
                 ));
             }
             $sortOrder = $fromEnum;
@@ -139,16 +140,10 @@ final class VmArraySort
             return;
         }
         if (EnumCaseSupport::isEnumCaseVariable($arg)) {
-            throw new \TypeError(sprintf(
-                'array_multisort(): Argument #%d must be an array or a sort flag',
-                $argIndex + 1
-            ));
+            throw new \TypeError(self::multisortOperandTypeError($argIndex));
         }
         if (Variable::TYPE_INTEGER !== $arg->type) {
-            throw new \TypeError(sprintf(
-                'array_multisort(): Argument #%d must be an array or a sort flag',
-                $argIndex + 1
-            ));
+            throw new \TypeError(self::multisortOperandTypeError($argIndex));
         }
 
         $val = $arg->toInt();
@@ -157,9 +152,9 @@ final class VmArraySort
             case StdlibConstants::SORT_ASC:
             case StdlibConstants::SORT_DESC:
                 if (0 === $parseState[self::PARSE_ORDER]) {
-                    throw new \TypeError(sprintf(
-                        'array_multisort(): Argument #%d must be an array or a sort flag that has not already been specified',
-                        $argIndex + 1
+                    throw new \TypeError(self::multisortOperandTypeError(
+                        $argIndex,
+                        ' that has not already been specified'
                     ));
                 }
                 $sortOrder = $masked;
@@ -172,9 +167,9 @@ final class VmArraySort
             case StdlibConstants::SORT_NATURAL:
             case StdlibConstants::SORT_LOCALE_STRING:
                 if (0 === $parseState[self::PARSE_TYPE]) {
-                    throw new \TypeError(sprintf(
-                        'array_multisort(): Argument #%d must be an array or a sort flag that has not already been specified',
-                        $argIndex + 1
+                    throw new \TypeError(self::multisortOperandTypeError(
+                        $argIndex,
+                        ' that has not already been specified'
                     ));
                 }
                 $sortType = $val;
@@ -192,5 +187,140 @@ final class VmArraySort
     private static function isSortingEnum(string $className): bool
     {
         return 0 === strcasecmp(ltrim($className, '\\'), 'Sorting');
+    }
+
+    private static function isSortDirectionEnum(string $className): bool
+    {
+        return 0 === strcasecmp(ltrim($className, '\\'), 'SortDirection');
+    }
+
+    /**
+     * SortDirection pure enum → SORT_ASC / SORT_DESC (#7261, #9947).
+     */
+    public static function trySortDirectionOrderInt(Variable $var): ?int
+    {
+        if (!EnumCaseSupport::isEnumCaseVariable($var)) {
+            return null;
+        }
+        $enumClass = EnumCaseSupport::enumClassForCaseVariable($var);
+        if (null === $enumClass || !self::isSortDirectionEnum($enumClass->name)) {
+            return null;
+        }
+        $entry = EnumCaseSupport::enumCaseEntryForVariable($var);
+        if (null === $entry) {
+            throw new \LogicException('SortDirection case missing');
+        }
+
+        return match ($entry->caseName) {
+            'Ascending' => StdlibConstants::SORT_ASC,
+            'Descending' => StdlibConstants::SORT_DESC,
+            default => throw new \ValueError('Invalid SortDirection enum value'),
+        };
+    }
+
+    /**
+     * usort/uasort/uksort optional SortDirection (#17429, ext/standard/array.c php_usort).
+     *
+     * @return bool true when descending order is requested
+     */
+    public static function resolveUserSortDescending(Frame $frame, string $function): bool
+    {
+        if (!isset($frame->calledArgs[2])) {
+            return false;
+        }
+        $directionArg = $frame->calledArgs[2]->resolveIndirect();
+        $order = self::trySortDirectionOrderInt($directionArg);
+        if (null !== $order) {
+            return StdlibConstants::SORT_DESC === $order;
+        }
+        if (EnumCaseSupport::isEnumCaseVariable($directionArg)) {
+            throw new \TypeError(sprintf(
+                '%s(): Argument #3 ($direction) must be of type SortDirection, %s given',
+                $function,
+                EnumCaseSupport::typeNameForVariable($directionArg)
+            ));
+        }
+        throw new \TypeError(sprintf(
+            '%s(): Argument #3 ($direction) must be of type SortDirection, %s given',
+            $function,
+            VmInternalCompare::vmSortFlagsTypeName($directionArg->type)
+        ));
+    }
+
+    public static function maxUserSortArgCount(): int
+    {
+        return \PHPCompiler\CompilerVersion::supportsSortingEnum() ? 3 : 2;
+    }
+
+    public static function assertUserSortArgCount(Frame $frame, string $function): void
+    {
+        $argc = \count($frame->calledArgs);
+        $max = self::maxUserSortArgCount();
+        if ($argc < 2 || $argc > $max) {
+            if ($max > 2) {
+                throw new \LogicException($function.'() requires two to three arguments');
+            }
+            throw new \LogicException($function.'() requires exactly two arguments');
+        }
+    }
+
+    /**
+     * Merge optional SortDirection into sort-family flags (php-src basic_functions.c).
+     */
+    public static function applySortDirectionToFlags(int $flags, Variable $directionArg, string $function): int
+    {
+        $directionArg = $directionArg->resolveIndirect();
+        $order = self::trySortDirectionOrderInt($directionArg);
+        if (null === $order) {
+            if (EnumCaseSupport::isEnumCaseVariable($directionArg)) {
+                throw new \TypeError(sprintf(
+                    '%s(): Argument #3 ($direction) must be of type SortDirection, %s given',
+                    $function,
+                    EnumCaseSupport::typeNameForVariable($directionArg)
+                ));
+            }
+            throw new \TypeError(sprintf(
+                '%s(): Argument #3 ($direction) must be of type SortDirection, %s given',
+                $function,
+                VmInternalCompare::vmSortFlagsTypeName($directionArg->type)
+            ));
+        }
+
+        $caseFlag = $flags & StdlibConstants::SORT_FLAG_CASE;
+        $typeMask = StdlibConstants::SORT_REGULAR
+            | StdlibConstants::SORT_NUMERIC
+            | StdlibConstants::SORT_STRING
+            | StdlibConstants::SORT_NATURAL
+            | StdlibConstants::SORT_LOCALE_STRING;
+        $type = $flags & $typeMask;
+        if (StdlibConstants::SORT_DESC === $order) {
+            if (StdlibConstants::SORT_REGULAR === $type) {
+                return StdlibConstants::SORT_DESC | $caseFlag;
+            }
+
+            return $type | StdlibConstants::SORT_DESC | $caseFlag;
+        }
+        if (StdlibConstants::SORT_DESC === $type) {
+            $type = StdlibConstants::SORT_REGULAR;
+        }
+        if (StdlibConstants::SORT_REGULAR === $type) {
+            return StdlibConstants::SORT_ASC | $caseFlag;
+        }
+
+        return $type | $caseFlag;
+    }
+
+    public static function multisortOperandTypeError(int $argIndex, string $extra = ''): string
+    {
+        $argNum = $argIndex + 1;
+        if (1 === $argNum) {
+            return 'array_multisort(): Argument #1 ($array) must be an array or a sort flag'.$extra;
+        }
+
+        return sprintf(
+            'array_multisort(): Argument #%d must be an array or a sort flag%s',
+            $argNum,
+            $extra
+        );
     }
 }

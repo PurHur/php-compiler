@@ -11,6 +11,18 @@ use PHPUnit\Framework\TestCase;
 /** ftok() JIT routes through FtokJitHelper PHP not StringFsDirJit LLVM (#9585). */
 final class FtokRuntimeShrinkTest extends TestCase
 {
+    public function testVmFtokUsesPureBackendWithoutLibcFfi(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/VmFtok.php');
+        $this->assertStringContainsString('VmFtokPure::invoke', $source);
+        $this->assertStringNotContainsString('\\FFI', $source);
+        $this->assertStringNotContainsString('$ffi->ftok', $source);
+
+        $pure = (string) file_get_contents(__DIR__.'/../../ext/standard/VmFtokPure.php');
+        $this->assertStringContainsString('VmStatNative::stat', $pure);
+        $this->assertStringNotContainsString('\\FFI', $pure);
+    }
+
     public function testFtokJitHelperDelegatesToVmFtok(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/FtokJitHelper.php');
@@ -36,7 +48,7 @@ final class FtokRuntimeShrinkTest extends TestCase
     public function testFtokJitHelperMatchesVmFtok(): void
     {
         if (!VmFtok::available()) {
-            $this->markTestSkipped('VmFtok FFI unavailable on this host');
+            $this->markTestSkipped('VmFtok stat backend unavailable on this host');
         }
         $path = tempnam(sys_get_temp_dir(), 'phpc_ftok_');
         $this->assertNotFalse($path);

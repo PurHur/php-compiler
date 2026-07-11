@@ -22,29 +22,48 @@ final class CallArgv
     /** @var Value|null */
     public static $htGlobal = null;
 
+    /** @var object|null LLVM module identity — static Value must not leak across Context instances */
+    private static $htModule = null;
+
+    public static function ensureGlobal(Context $context): Value
+    {
+        $module = $context->module;
+        if (null !== self::$htGlobal && self::$htModule === $module) {
+            return self::$htGlobal;
+        }
+
+        $existing = $module->getNamedGlobal(self::GLOBAL_HT);
+        if (null !== $existing) {
+            self::$htGlobal = $existing;
+            self::$htModule = $module;
+
+            return self::$htGlobal;
+        }
+
+        $htPtr = $context->getTypeFromString('__hashtable__*');
+        self::$htGlobal = $module->addGlobal($htPtr, self::GLOBAL_HT);
+        self::$htGlobal->setInitializer($htPtr->constNull());
+        self::$htModule = $module;
+
+        return self::$htGlobal;
+    }
+
+    /** @deprecated use ensureGlobal() */
     public static function implement(Context $context): void
     {
-        if (null !== self::$htGlobal) {
-            return;
-        }
-        $htPtr = $context->getTypeFromString('__hashtable__*');
-        self::$htGlobal = $context->module->addGlobal($htPtr, self::GLOBAL_HT);
-        self::$htGlobal->setInitializer($htPtr->constNull());
+        self::ensureGlobal($context);
     }
 
     public static function emitStore(Context $context, Variable $packedArgv): void
     {
-        self::implement($context);
         $context->builder->store(
             $context->helper->loadValue($packedArgv),
-            self::$htGlobal
+            self::ensureGlobal($context)
         );
     }
 
     public static function load(Context $context): Value
     {
-        self::implement($context);
-
-        return $context->builder->load(self::$htGlobal);
+        return $context->builder->load(self::ensureGlobal($context));
     }
 }

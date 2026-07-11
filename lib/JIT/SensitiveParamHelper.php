@@ -25,9 +25,12 @@ final class SensitiveParamHelper
         }
 
         $sensitive = $block->paramSensitive;
-        $sizeT = $context->getTypeFromString('size_t');
         $index = 0;
         foreach (array_keys($block->paramNames) as $paramIdx) {
+            $paramName = $block->paramNames[$paramIdx];
+            if ('this' === $paramName) {
+                continue;
+            }
             $slot = $context->constantFromInteger($index, 'size_t');
             ++$index;
             if (SensitiveParamSupport::compileTimeParamIsSensitive($sensitive, $paramIdx)) {
@@ -35,7 +38,6 @@ final class SensitiveParamHelper
 
                 continue;
             }
-            $paramName = $block->paramNames[$paramIdx];
             $binding = VarFetchHelper::bindingByName($context, $block, $paramName);
             if (null === $binding) {
                 continue;

@@ -4,8 +4,9 @@ declare(strict_types=1);
 
 namespace PHPCompiler\VM;
 
-use PHPCfg\Op\Type as CfgType;
+use PHPCfg\Operand;
 use PHPCfg\Operand\Literal;
+use PHPCfg\Op\Type as CfgType;
 
 /**
  * Build ReflectionNamedType / ReflectionUnionType / ReflectionIntersectionType (#3355).
@@ -32,9 +33,20 @@ final class ReflectionTypeSupport
     public static function buildTypeObject(Context $ctx, CfgType $type): ObjectEntry
     {
         if ($type instanceof CfgType\Nullable) {
+            $subtype = $type->subtype;
+            if (
+                $subtype instanceof CfgType\Literal
+                || $subtype instanceof CfgType\Reference
+                || $subtype instanceof CfgType\Mixed_
+            ) {
+                $inner = self::cfgTypeString($subtype);
+
+                return self::buildNamedObject($ctx, $subtype, '?'.$inner, true);
+            }
+
             return self::buildUnionObject(
                 $ctx,
-                [$type->subtype, new CfgType\Literal('null')],
+                [$subtype, new CfgType\Literal('null')],
                 self::cfgTypeString($type)
             );
         }
@@ -233,17 +245,22 @@ final class ReflectionTypeSupport
         return $obj;
     }
 
-    private static function buildNamedObject(Context $ctx, CfgType $type, string $typeString): ObjectEntry
-    {
+    private static function buildNamedObject(
+        Context $ctx,
+        CfgType $type,
+        string $typeString,
+        ?bool $allowsNullOverride = null,
+    ): ObjectEntry {
         $class = self::requireClass($ctx, ReflectionSupport::REFLECTION_NAMED_TYPE);
         $obj = new ObjectEntry($class);
         $obj->constructed = true;
-        $name = $type instanceof CfgType\Literal
-            ? $type->name
-            : self::referenceTypeName($type);
-        self::storeCommonTypeProps($obj, $typeString, self::allowsNullFromCfg($type));
+        $name = self::cfgTypeString($type);
+        $allowsNull = $allowsNullOverride ?? self::allowsNullFromCfg($type);
+        self::storeCommonTypeProps($obj, $typeString, $allowsNull);
         $obj->getProperty(ReflectionSupport::PROP_TYPE_NAME)->string($name);
         $obj->getProperty(ReflectionSupport::PROP_TYPE_BUILTIN)->bool(self::isBuiltinTypeName($name));
+        // Named types have no member list; empty array keeps var_export/get_object_vars off uninitialized slots (#9873).
+        $obj->getProperty(ReflectionSupport::PROP_TYPE_MEMBERS)->newArray();
 
         return $obj;
     }
@@ -271,11 +288,24 @@ final class ReflectionTypeSupport
 
     private static function referenceTypeName(CfgType\Reference $type): string
     {
-        if ($type->declaration instanceof Literal && is_string($type->declaration->value)) {
-            return ltrim($type->declaration->value, '\\');
+        $name = self::staticNameFromOperand($type->declaration);
+        if (null === $name || '' === $name) {
+            throw new \LogicException('Unsupported reference type for reflection');
         }
 
-        throw new \LogicException('Unsupported reference type for reflection');
+        return ltrim($name, '\\');
+    }
+
+    private static function staticNameFromOperand(Operand $op): ?string
+    {
+        if ($op instanceof Literal && is_string($op->value)) {
+            return $op->value;
+        }
+        if ($op instanceof Operand\Variable) {
+            return self::staticNameFromOperand($op->name);
+        }
+
+        return null;
     }
 
     private static function isBuiltinTypeName(string $name): bool

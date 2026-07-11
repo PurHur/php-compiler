@@ -1,11 +1,10 @@
 --TEST--
-Language: property hook duplicate backing property name — compile fatal (#10393, zend_compile.c)
+Language: property hook virtual get + detached same-name field — compile fatal (#10393, zend_compile.c)
 --FILE--
 <?php
 class C {
     public int $x {
-        get => $this->x;
-        set => $this->x = $value;
+        get => 1;
     }
     public string $y = 'a';
     private int $x = 1;

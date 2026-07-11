@@ -28,8 +28,19 @@ final class VmMimeTest extends TestCase
         $this->assertSame('image/png', VmMime::detectFromBytes("\x89PNG\r\n\x1a\n\x00\x00"));
     }
 
-    public function testDetectFromBytesUnknown(): void
+    public function testDetectFromBytesPlainText(): void
     {
-        $this->assertSame('application/octet-stream', VmMime::detectFromBytes('not a known format'));
+        $this->assertSame('text/plain', VmMime::detectFromBytes('not a known format'));
+        $this->assertSame('text/plain', VmMime::detectFromBytes("127.0.0.1 localhost\n"));
+    }
+
+    public function testDetectFromBytesBinary(): void
+    {
+        $this->assertSame('application/octet-stream', VmMime::detectFromBytes("\x00binary"));
+    }
+
+    public function testDetectFromBytesEmpty(): void
+    {
+        $this->assertSame('application/x-empty', VmMime::detectFromBytes(''));
     }
 }

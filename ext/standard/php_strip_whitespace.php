@@ -33,13 +33,20 @@ final class php_strip_whitespace extends Internal
             return;
         }
 
-        $path = VmString::coerceStringBuiltinArg(
-            $frame->calledArgs[0],
-            'php_strip_whitespace',
+        $path = VmStreamPath::coerceNonEmptyPathArgForFrame(
+            $frame,
             0,
-            'file_name'
+            'php_strip_whitespace',
+            'filename'
         );
-        $frame->returnVar->string(VmStripWhitespace::stripFile($path));
+        $contents = VmFs::fileGetContents($path);
+        if (false === $contents) {
+            VmStreamOpenFailure::warnFailedToOpen($frame, 'php_strip_whitespace', $path);
+            $frame->returnVar->string('');
+
+            return;
+        }
+        $frame->returnVar->string(VmStripWhitespace::stripSource($contents));
     }
 
     public function call(Context $context, JITVariable ...$args): Value

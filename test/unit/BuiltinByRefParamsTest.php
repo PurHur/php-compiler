@@ -26,6 +26,12 @@ final class BuiltinByRefParamsTest extends TestCase
         $this->assertSame([0], BuiltinByRefParams::forFunction('array_walk'));
     }
 
+    public function testArraySpliceFirstArgument(): void
+    {
+        $this->assertSame([0], BuiltinByRefParams::forFunction('array_splice'));
+        $this->assertSame([0], BuiltinByRefParams::forFunction('ARRAY_SPLICE'));
+    }
+
     public function testArrayMultisortVariadicByRef(): void
     {
         $this->assertSame(0, BuiltinByRefParams::variadicByRefFromIndex('array_multisort'));
@@ -40,11 +46,20 @@ final class BuiltinByRefParamsTest extends TestCase
 
         $this->assertTrue(BuiltinByRefParams::isByRefArg('array_multisort', 0, $array));
         $this->assertFalse(BuiltinByRefParams::isByRefArg('array_multisort', 1, $flag));
+        $null = new \PHPCompiler\VM\Variable();
+        $null->null();
+        $this->assertFalse(BuiltinByRefParams::isByRefArg('array_multisort', 0, $null));
     }
 
     public function testOpensslRandomPseudoBytesSecondArgument(): void
     {
         $this->assertSame([1], BuiltinByRefParams::forFunction('openssl_random_pseudo_bytes'));
+    }
+
+    public function testOpensslSignSignatureArgument(): void
+    {
+        $this->assertSame([1], BuiltinByRefParams::forFunction('openssl_sign'));
+        $this->assertSame([1], BuiltinByRefParams::forFunction('OPENSSL_SIGN'));
     }
 
     public function testIsCallableThirdArgument(): void
@@ -61,8 +76,11 @@ final class BuiltinByRefParamsTest extends TestCase
 
     public function testArrayPointerFirstArgument(): void
     {
-        foreach (['next', 'prev', 'reset', 'end', 'current', 'key'] as $fn) {
+        foreach (['next', 'prev', 'reset', 'end'] as $fn) {
             $this->assertSame([0], BuiltinByRefParams::forFunction($fn), $fn);
+        }
+        foreach (['current', 'key'] as $fn) {
+            $this->assertSame([], BuiltinByRefParams::forFunction($fn), $fn);
         }
     }
 
@@ -78,11 +96,31 @@ final class BuiltinByRefParamsTest extends TestCase
         $this->assertSame([1, 2], BuiltinByRefParams::forFunction('getmxrr'));
         $this->assertSame([1, 2], BuiltinByRefParams::forFunction('dns_get_mx'));
         $this->assertSame([1, 2], BuiltinByRefParams::forFunction('GETMXRR'));
+        $this->assertSame(
+            ['hostname', 'mxhosts', 'weight'],
+            BuiltinParamNames::forFunction('getmxrr')
+        );
+        $this->assertSame(
+            ['hostname', 'mxhosts', 'weight'],
+            BuiltinParamNames::forFunction('dns_get_mx')
+        );
     }
 
     public function testProcOpenPipesByRef(): void
     {
         $this->assertSame([2], BuiltinByRefParams::forFunction('proc_open'));
         $this->assertSame([2], BuiltinByRefParams::forFunction('PROC_OPEN'));
+    }
+
+    public function testStreamSocketAcceptPeerByRef(): void
+    {
+        $this->assertSame([2], BuiltinByRefParams::forFunction('stream_socket_accept'));
+        $this->assertSame([2], BuiltinByRefParams::forFunction('STREAM_SOCKET_ACCEPT'));
+    }
+
+    public function testStreamSocketServerErrnoErrstrByRef(): void
+    {
+        $this->assertSame([1, 2], BuiltinByRefParams::forFunction('stream_socket_server'));
+        $this->assertSame([1, 2], BuiltinByRefParams::forFunction('STREAM_SOCKET_SERVER'));
     }
 }

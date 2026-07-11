@@ -6,7 +6,9 @@ namespace PHPCompiler\ext\sockets;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\Variable;
@@ -45,6 +47,18 @@ final class socket_atmark extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \Error('socket_atmark() is not implemented for JIT in this compiler build (issue #6544)');
+        $argc = \count($args);
+        if (1 !== $argc) {
+            TypeErrorRaise::ensureLinked($context);
+            TypeErrorRaise::emitArgumentCountError(
+                $context,
+                'socket_atmark() expects exactly 1 argument, '.$argc.' given'
+            );
+            $slot = JitValueBox::alloc($context);
+
+            return JitValueBox::pointer($context, $slot);
+        }
+
+        return JitSocketAtmark::invoke($context, $args[0]);
     }
 }

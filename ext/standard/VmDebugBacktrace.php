@@ -6,6 +6,8 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\OpCode;
+use PHPCompiler\VM\FatalSite;
+use PHPCompiler\VM\OutputBuffer;
 use PHPCfg\Func;
 use PHPCompiler\VM\SensitiveParamSupport;
 use PHPCompiler\VM\Variable;
@@ -69,7 +71,7 @@ final class VmDebugBacktrace
             if (null === $line) {
                 continue;
             }
-            echo $line;
+            OutputBuffer::append($line);
             ++$index;
             ++$printed;
             if ($limit > 0 && $printed >= $limit) {
@@ -190,6 +192,61 @@ final class VmDebugBacktrace
         }
 
         return $frames;
+    }
+
+    /**
+     * Generator resume throw-site row — Zend labels user generator as internal (#14992, zend_generators.c).
+     */
+    public static function internalFunctionFrameEntry(string $functionName): Variable
+    {
+        $entry = new Variable();
+        $entry->newArray();
+        $fnVar = new Variable(Variable::TYPE_STRING);
+        $fnVar->string($functionName);
+        $entry->toArray()->add('function', $fnVar);
+
+        return $entry;
+    }
+
+    /**
+     * Synthetic trace row for an internal builtin throw (Zend zend_exceptions.c, #11677).
+     */
+    public static function builtinInvokeFrameEntry(
+        Frame $callerFrame,
+        string $builtinName,
+        string $className = '',
+        string $callType = '',
+    ): Variable {
+        $entry = new Variable();
+        $entry->newArray();
+        $ht = $entry->toArray();
+
+        $file = self::frameFile($callerFrame);
+        if ('' !== $file) {
+            $fileVar = new Variable(Variable::TYPE_STRING);
+            $fileVar->string($file);
+            $ht->add('file', $fileVar);
+
+            $lineVar = new Variable(Variable::TYPE_INTEGER);
+            $lineVar->int(self::frameLine($callerFrame));
+            $ht->add('line', $lineVar);
+        }
+
+        if ('' !== $className) {
+            $classVar = new Variable(Variable::TYPE_STRING);
+            $classVar->string($className);
+            $ht->add('class', $classVar);
+
+            $typeVar = new Variable(Variable::TYPE_STRING);
+            $typeVar->string('' !== $callType ? $callType : '->');
+            $ht->add('type', $typeVar);
+        }
+
+        $fnVar = new Variable(Variable::TYPE_STRING);
+        $fnVar->string($builtinName);
+        $ht->add('function', $fnVar);
+
+        return $entry;
     }
 
     private static function frameEntry(
@@ -342,39 +399,15 @@ final class VmDebugBacktrace
 
     private static function frameLine(Frame $frame): int
     {
+        // Zend: frame line is where the function was invoked (parent call site), not decl/opline (#14238).
+        if (null !== $frame->parent && $frame->parent->callSiteLine > 0) {
+            return $frame->parent->callSiteLine;
+        }
         if ($frame->callSiteLine > 0) {
             return $frame->callSiteLine;
         }
-        if (null === $frame->block) {
-            return 0;
-        }
-        $block = $frame->block;
-        $pos = $frame->pos;
-        if ($pos >= $block->nOpCodes) {
-            $pos = max(0, $block->nOpCodes - 1);
-        }
-        for ($i = $pos; $i >= 0; --$i) {
-            $op = $block->opCodes[$i] ?? null;
-            if (null === $op) {
-                continue;
-            }
-            if (
-                OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type
-                || OpCode::TYPE_FUNCCALL_EXEC_NORETURN === $op->type
-            ) {
-                $line = OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type
-                    ? (int) ($op->arg2 ?? 0)
-                    : (int) ($op->arg1 ?? 0);
-                if ($line > 0) {
-                    return $line;
-                }
-            }
-            if (null !== $op->sourceLocation && $op->sourceLocation->startLine > 0) {
-                return $op->sourceLocation->startLine;
-            }
-        }
 
-        return 0;
+        return FatalSite::lineFromOpcodes($frame);
     }
 
     private static function formatFlatFrame(int $index, Frame $frame, bool $includeArgs): ?string

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\Frame;
+use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 
@@ -37,30 +39,6 @@ final class VmImage
     public const IMAGETYPE_AVIF = 19;
     public const IMAGETYPE_HEIF = 20;
     public const IMAGETYPE_COUNT = 21;
-
-    /** @var array<int, string> MIME type per IMAGE_FILETYPE_* (php_image_type_to_mime_type) */
-    private const MIME_TYPES = [
-        self::IMAGETYPE_GIF => 'image/gif',
-        self::IMAGETYPE_JPEG => 'image/jpeg',
-        self::IMAGETYPE_PNG => 'image/png',
-        self::IMAGETYPE_SWF => 'application/x-shockwave-flash',
-        self::IMAGETYPE_SWC => 'application/x-shockwave-flash',
-        self::IMAGETYPE_PSD => 'image/psd',
-        self::IMAGETYPE_BMP => 'image/bmp',
-        self::IMAGETYPE_TIFF_II => 'image/tiff',
-        self::IMAGETYPE_TIFF_MM => 'image/tiff',
-        self::IMAGETYPE_IFF => 'image/iff',
-        self::IMAGETYPE_WBMP => 'image/vnd.wap.wbmp',
-        self::IMAGETYPE_JPC => 'application/octet-stream',
-        self::IMAGETYPE_JP2 => 'image/jp2',
-        self::IMAGETYPE_XBM => 'image/xbm',
-        self::IMAGETYPE_ICO => 'image/vnd.microsoft.icon',
-        self::IMAGETYPE_WEBP => 'image/webp',
-        self::IMAGETYPE_AVIF => 'image/avif',
-        self::IMAGETYPE_HEIF => 'image/heif',
-    ];
-
-    private const MIME_TYPE_UNKNOWN = 'application/octet-stream';
 
     /** @var array<int, string> dotted extension per IMAGE_FILETYPE_* */
     private const EXTENSIONS = [
@@ -137,7 +115,7 @@ final class VmImage
      */
     public static function imageTypeToMimeType(int $imageType): string
     {
-        return self::MIME_TYPES[$imageType] ?? self::MIME_TYPE_UNKNOWN;
+        return ImageTypeToMimeTypeJitHelper::mimeArgv($imageType);
     }
 
     /**
@@ -175,6 +153,54 @@ final class VmImage
         }
 
         return $parsed;
+    }
+
+    /**
+     * php-src php_getimagesize_from_any() — E_NOTICE only for data: URIs, not regular files (#16434).
+     */
+    public static function shouldEmitImageReadNoticeForPath(string $filename): bool
+    {
+        return VmDataUri::isDataUri($filename);
+    }
+
+    /**
+     * php-src getimagesizefromstring() — E_NOTICE on any parse/read failure (#12930, #17961).
+     *
+     * Unlike getimagesize() on regular files (#16434), getimagesizefromstring() always emits
+     * "Error reading from {data}!" when decode fails (ext/standard/image.c).
+     */
+    public static function shouldEmitImageReadNoticeForBytes(string $data): bool
+    {
+        return true;
+    }
+
+    /**
+     * php-src ext/standard/image.c php_getimagesize_from_any() — E_NOTICE on read/parse failure.
+     */
+    public static function emitImageReadNotice(Frame $frame, string $function, string $source): void
+    {
+        if (null === $frame->vmContext) {
+            return;
+        }
+        $frame->vmContext->errors->triggerError(
+            \sprintf('%s(): Error reading from %s!', $function, $source),
+            ErrorReporter::E_NOTICE,
+            '' !== $frame->scriptPath ? $frame->scriptPath : null,
+            $frame->vmContext,
+            $frame
+        );
+    }
+
+    /**
+     * True when payload bytes were readable but image header parse failed (vs stream open failure).
+     */
+    public static function pathPayloadReadable(string $filename): bool
+    {
+        if (VmDataUri::isDataUri($filename)) {
+            return false !== VmDataUri::decode($filename);
+        }
+
+        return is_file($filename) && is_readable($filename);
     }
 
     /** @param array<string, string> $imageinfo */
@@ -279,13 +305,19 @@ final class VmImage
      */
     private static function parseGif(string $data)
     {
+        if (\strlen($data) < 11) {
+            return false;
+        }
         $width = self::readUint16Le($data, 6);
         $height = self::readUint16Le($data, 8);
         if ($width <= 0 || $height <= 0) {
             return false;
         }
+        $packed = \ord($data[10]);
+        $bits = (($packed >> 4) & 0x07) + 1;
+        $channels = (0 !== ($packed & 0x80)) ? 3 : null;
 
-        return self::buildImageSizeResult($width, $height, self::IMAGETYPE_GIF, 8, 3);
+        return self::buildImageSizeResult($width, $height, self::IMAGETYPE_GIF, $bits, $channels);
     }
 
     /**
@@ -305,7 +337,8 @@ final class VmImage
             if (0xD9 === $marker) {
                 break;
             }
-            if ($marker <= 0xD0 || ($marker >= 0xD1 && $marker <= 0xD7)) {
+            // RSTn markers (0xD0–0xD7) have no length field — php-src ext/standard/image.c php_parsejpeg.
+            if ($marker >= 0xD0 && $marker <= 0xD7) {
                 $pos += 2;
 
                 continue;
@@ -411,7 +444,7 @@ final class VmImage
 
     private static function shouldIncludeChannels(int $type, int $channels): bool
     {
-        if (self::IMAGETYPE_JPEG === $type) {
+        if (\in_array($type, [self::IMAGETYPE_JPEG, self::IMAGETYPE_GIF], true)) {
             return true;
         }
 

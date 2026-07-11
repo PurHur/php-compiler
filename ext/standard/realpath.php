@@ -7,11 +7,10 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** realpath() — canonical path when the target exists (VM: VmString; JIT: libc via JitRealpath). */
+/** realpath() — canonical path when the target exists (VM + JIT: VmString via RealpathJitHelper #15323). */
 final class realpath extends Internal
 {
     public function execute(Frame $frame): void
@@ -19,7 +18,7 @@ final class realpath extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('realpath() requires exactly one argument');
         }
-        $path = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'realpath', 0, 'path');
+        $path = VmFilestatArg::filenameArgForFrame($frame, 0, 'realpath', 'path');
         if (null === $frame->returnVar) {
             return;
         }
@@ -39,7 +38,7 @@ final class realpath extends Internal
             throw new \LogicException('realpath() requires exactly one argument');
         }
 
-        $path = JitStringBuiltinArg::lower($context, $args[0], 'realpath', 0, 'path');
+        $path = JitFilestatArg::lowerFilename($context, $args[0], 'realpath');
 
         return JitRealpath::resolve($context, $path);
     }

@@ -1,0 +1,62 @@
+--- vendor/ircmaxell/php-cfg/lib/PHPCfg/Operand.php
++++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Operand.php
+@@ -27,6 +27,11 @@
+     /** Spread/unpack at call site (...$expr) (issue #141). */
+     public $callArgUnpack = false;
+ 
++    /** O(1) membership for usages/ops — linear dedup went quadratic on 30k-line files (#16077). */
++    private $usageIds = [];
++
++    private $writeOpIds = [];
++
+     public function getType(): string
+     {
+         return strtr(substr(rtrim(get_class($this), '_'), strlen(__CLASS__) + 1), '\\', '_');
+@@ -34,11 +39,11 @@
+ 
+     public function addUsage(Op $op): self
+     {
+-        foreach ($this->usages as $test) {
+-            if ($test === $op) {
+-                return $this;
+-            }
++        $id = spl_object_id($op);
++        if (isset($this->usageIds[$id])) {
++            return $this;
+         }
++        $this->usageIds[$id] = true;
+         $this->usages[] = $op;
+ 
+         return $this;
+@@ -46,11 +51,11 @@
+ 
+     public function addWriteOp(Op $op): self
+     {
+-        foreach ($this->ops as $test) {
+-            if ($test === $op) {
+-                return $this;
+-            }
++        $id = spl_object_id($op);
++        if (isset($this->writeOpIds[$id])) {
++            return $this;
+         }
++        $this->writeOpIds[$id] = true;
+         $this->ops[] = $op;
+ 
+         return $this;
+@@ -66,6 +71,7 @@
+                 break;
+             }
+         } while (true);
++        unset($this->writeOpIds[spl_object_id($op)]);
+ 
+         return $this;
+     }
+@@ -80,6 +86,7 @@
+                 break;
+             }
+         } while (true);
++        unset($this->usageIds[spl_object_id($op)]);
+         $this->removeUsageFromOp($op);
+ 
+         return $this;

@@ -9,7 +9,7 @@ use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Issue #5348: process helpers LLVM replaces phpc_process.c.
+ * Issue #5348 / #12950: process helpers LLVM replaces phpc_process.c; standalone uses ProcessJitHelper bridges.
  */
 final class ProcessRuntimeStandaloneTest extends TestCase
 {
@@ -20,9 +20,10 @@ final class ProcessRuntimeStandaloneTest extends TestCase
         $this->assertStringNotContainsString('phpc_process.c', $linker);
         $runtime = (string) file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/ProcessRuntime.php');
         $this->assertStringContainsString('__compiler_shell_exec', $runtime);
-        $this->assertStringContainsString('__compiler_escapeshellarg', $runtime);
-        $this->assertStringContainsString('__compiler_escapeshellcmd', $runtime);
-        $this->assertStringContainsString('__compiler_phpc_run_command', $runtime);
+        $this->assertStringContainsString('ProcessJitHelper', $runtime);
+        $this->assertStringNotContainsString('ProcessStandaloneLlvm', $runtime);
+        $this->assertStringNotContainsString('emitShellExec', $runtime);
+        $this->assertFileDoesNotExist(__DIR__.'/../../../lib/JIT/Builtin/ProcessStandaloneLlvm.php');
     }
 
     /**
@@ -33,6 +34,7 @@ final class ProcessRuntimeStandaloneTest extends TestCase
         $runtime = new Runtime(Runtime::MODE_AOT);
         $ctx = new Context($runtime, Builtin::LOAD_TYPE_STANDALONE);
         ProcessRuntime::ensureLinked($ctx);
+        ProcessRuntime::ensurePhpcRunCommandLinked($ctx);
 
         foreach (
             [

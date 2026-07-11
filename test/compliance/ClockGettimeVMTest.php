@@ -13,6 +13,9 @@ final class ClockGettimeVMTest extends BaseTest
 
     public static function providePHPTests(): \Generator
     {
+        if (!CompilerVersion::supportsClockGettime()) {
+            return;
+        }
         yield 'clock_gettime.phpt' => self::parsePHPT(
             __DIR__.'/cases/stdlib/clock_gettime.phpt',
             'clock_gettime.phpt'

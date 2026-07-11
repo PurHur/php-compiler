@@ -22,6 +22,7 @@ final class StreamContextJitHelper
 
     public static function create(?HashTable $options, ?HashTable $params): HashTable
     {
+        VmStreamContextOptions::validateOptionsHashTable($options, 'stream_context_create');
         $out = new HashTable();
         if (null !== $options) {
             self::mergeOptions($out, $options);
@@ -34,11 +35,15 @@ final class StreamContextJitHelper
         return $out;
     }
 
-    public static function mergeOptions(HashTable $dest, ?HashTable $src): void
-    {
+    public static function mergeOptions(
+        HashTable $dest,
+        ?HashTable $src,
+        string $functionName = 'stream_context_set_options'
+    ): void {
         if (null === $src) {
             return;
         }
+        VmStreamContextOptions::validateOptionsHashTable($src, $functionName);
         VmParseStr::mergeInto($dest, self::exportTable($src));
     }
 
@@ -77,7 +82,7 @@ final class StreamContextJitHelper
     {
         $context = self::ensureDefault();
         if (null !== $options) {
-            self::mergeOptions($context, $options);
+            self::mergeOptions($context, $options, 'stream_context_get_default');
         }
 
         return $context;
@@ -86,7 +91,7 @@ final class StreamContextJitHelper
     public static function setDefault(HashTable $options): HashTable
     {
         $context = self::ensureDefault();
-        self::mergeOptions($context, $options);
+        self::mergeOptions($context, $options, 'stream_context_set_default');
 
         return $context;
     }

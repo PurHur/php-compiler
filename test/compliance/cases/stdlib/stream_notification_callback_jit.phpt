@@ -1,24 +1,9 @@
 --TEST--
-JIT: stream_notification_callback() global notifier (#6055)
+JIT: stream_notification_callback() — not advertised (php-src parity, #13750)
 --FILE--
 <?php
-var_export(function_exists('stream_notification_callback'));
-echo "\n";
-$seen = 0;
-stream_notification_callback(function (int $code) use (&$seen): void {
-    if (STREAM_NOTIFY_COMPLETED === $code) {
-        ++$seen;
-    }
-});
-$src = fopen('php://memory', 'r+');
-$dst = fopen('php://memory', 'w+');
-fwrite($src, 'ab');
-rewind($src);
-stream_copy_to_stream($src, $dst);
-fclose($src);
-fclose($dst);
-stream_notification_callback(null);
-echo $seen, "\n";
+declare(strict_types=1);
+
+echo function_exists('stream_notification_callback') ? "fail\n" : "ok\n";
 --EXPECT--
-true
-1
+ok

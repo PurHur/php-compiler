@@ -39,7 +39,7 @@ final class is_callable extends Internal
         }
         $nameOut = ($argc >= 3) ? $frame->calledArgs[2] : null;
         $frame->returnVar->bool(
-            VmCallable::isCallable($ctx, $frame->calledArgs[0], $syntaxOnly, $nameOut)
+            VmCallable::isCallable($ctx, $frame->calledArgs[0], $syntaxOnly, $nameOut, $frame)
         );
     }
 

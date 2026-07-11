@@ -13,17 +13,16 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
-use PHPCompiler\JIT\ArrayBuiltinHelper;
+use PHPCompiler\JIT\Builtin\ArrayFlipRuntime;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * array_flip() for arrays with int or string keys and values (subset of PHP; JIT via ArrayBuiltinHelper).
+ * array_flip() for arrays with int or string keys and values (subset of PHP; JIT via ArrayFlipRuntime).
  *
- * VM: {@see VmArray::flip()}; JIT/AOT: {@see ArrayBuiltinHelper::buildFlipArray()}.
+ * VM: {@see VmArray::flip()}; JIT/AOT: {@see ArrayFlipRuntime::flip()}.
  */
 final class array_flip extends Internal
 {
@@ -32,14 +31,11 @@ final class array_flip extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('array_flip() requires exactly one argument');
         }
-        $array = $frame->calledArgs[0]->resolveIndirect();
         if (null === $frame->returnVar) {
             return;
         }
-        if (Variable::TYPE_ARRAY !== $array->type) {
-            throw new \LogicException('array_flip() argument must be an array in this compiler build');
-        }
-        $frame->returnVar->array(VmArray::flip($array->toArray(), $frame));
+        $ht = VmArray::requireArrayParam($frame->calledArgs[0], 'array_flip', 1, 'array');
+        $frame->returnVar->array(VmArray::flip($ht, $frame));
     }
 
     public Context $context;
@@ -49,10 +45,8 @@ final class array_flip extends Internal
         if (1 !== \count($args)) {
             throw new \LogicException('array_flip() requires exactly one argument');
         }
-        if (JITVariable::TYPE_HASHTABLE !== $args[0]->type
-            && !($args[0]->type & JITVariable::IS_NATIVE_ARRAY)) {
-            throw new \LogicException('array_flip() argument must be an array in this compiler build');
-        }
+        TypeErrorRaise::ensureLinked($context);
+        JitArrayElem::requireArrayParam($context, $args[0], 'array_flip', 1, 'array');
 
         foreach ($args as $i => $arg) {
             if (JITVariable::TYPE_STRING === $arg->type || JITVariable::TYPE_VALUE === $arg->type) {
@@ -61,6 +55,6 @@ final class array_flip extends Internal
         }
         TypeErrorRaise::ensureLinked($context);
 
-        return ArrayBuiltinHelper::buildFlipArray($context, $args[0]);
+        return ArrayFlipRuntime::flip($context, $args[0]);
     }
 }

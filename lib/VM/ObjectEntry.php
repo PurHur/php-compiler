@@ -9,6 +9,7 @@
 
 namespace PHPCompiler\VM;
 
+use PHPCompiler\ext\standard\VmReflection;
 use PHPCompiler\Func;
 // Bug in phan: https://github.com/phan/phan/issues/2661
 // @phan-suppress-next-line PhanUnreferencedUseNormal
@@ -19,6 +20,11 @@ class ObjectEntry {
     private static int $counter = 0;
     public ClassEntry $class;
     public int $id;
+
+    public static function maxId(): int
+    {
+        return self::$counter;
+    }
     /** @var array<string, Variable> */
     private array $properties = [];
 
@@ -38,6 +44,9 @@ class ObjectEntry {
 
     /** User generator instance state (issue #167). */
     public ?GeneratorState $generatorState = null;
+
+    /** DatePeriod Iterator cursor (#14228). */
+    public ?DatePeriodIteratorState $datePeriodIterator = null;
 
     /** Anonymous function / closure body (issue #72). */
     public ?ClosureState $closureState = null;
@@ -85,6 +94,15 @@ class ObjectEntry {
     /** PHP 8.1 fiber callback state (issue #3130). */
     public ?FiberState $fiberState = null;
 
+    /** Canonical IANA id for DateTimeZone instances — survives scope temp clobber (#6041). */
+    public ?string $dateTimeZoneName = null;
+
+    /** Enum class on ReflectionEnumUnitCase / ReflectionEnumBackedCase — survives scope temp clobber (#16331, #6041). */
+    public ?string $reflectionEnumClassName = null;
+
+    /** Case name on ReflectionEnumUnitCase / ReflectionEnumBackedCase — survives scope temp clobber (#16331, #6041). */
+    public ?string $reflectionEnumCaseName = null;
+
     /** PHP 8.4 Resource object handle payload (#7073). */
     public ?ResourceState $resourceState = null;
 
@@ -130,6 +148,9 @@ class ObjectEntry {
     public function destroyForGc(): void
     {
         foreach ($this->properties as $prop) {
+            if (TypedPropertyCheck::isUninitialized($prop)) {
+                continue;
+            }
             ObjectLifetime::releaseDirectObject($prop);
             if (Variable::TYPE_INDIRECT === $prop->type) {
                 $prop->resolveIndirect()->null();
@@ -138,6 +159,7 @@ class ObjectEntry {
             }
         }
         $this->generatorState = null;
+        $this->datePeriodIterator = null;
         $this->closureState = null;
         $this->lazyInitializer = null;
         $this->lazyPending = false;
@@ -150,6 +172,25 @@ class ObjectEntry {
 
     public function hasProperty(string $name): bool
     {
+        if ($this->isEnumCase) {
+            return EnumCaseSupport::propertyExistsOnCase($this->class, $name);
+        }
+        if (\PHPCompiler\ext\dom\DomNodePropertySupport::isManagedProperty($this, $name)) {
+            return true;
+        }
+        if (\PHPCompiler\ext\dom\DomDocumentPropertySupport::isManagedProperty($this, $name)) {
+            return true;
+        }
+        if (\PHPCompiler\ext\dom\DomTokenListPropertySupport::isManagedProperty($this, $name)) {
+            return true;
+        }
+        if (\PHPCompiler\ext\dom\DomHtmlDocumentPropertySupport::isManagedProperty($this, $name)) {
+            return true;
+        }
+        if (\PHPCompiler\ext\xmlreader\XmlReaderPropertySupport::isManagedProperty($this, $name)) {
+            return true;
+        }
+
         return isset($this->properties[$name]);
     }
 
@@ -166,6 +207,21 @@ class ObjectEntry {
     public function getProperty(string $name): Variable {
         if ($this->isEnumCase) {
             return EnumCaseSupport::getProperty($this, $name);
+        }
+        if (\PHPCompiler\ext\dom\DomNodePropertySupport::isManagedProperty($this, $name)) {
+            return \PHPCompiler\ext\dom\DomNodePropertySupport::getProperty($this, $name);
+        }
+        if (\PHPCompiler\ext\dom\DomDocumentPropertySupport::isManagedProperty($this, $name)) {
+            return \PHPCompiler\ext\dom\DomDocumentPropertySupport::getProperty($this, $name);
+        }
+        if (\PHPCompiler\ext\dom\DomTokenListPropertySupport::isManagedProperty($this, $name)) {
+            return \PHPCompiler\ext\dom\DomTokenListPropertySupport::getProperty($this, $name);
+        }
+        if (\PHPCompiler\ext\dom\DomHtmlDocumentPropertySupport::isManagedProperty($this, $name)) {
+            return \PHPCompiler\ext\dom\DomHtmlDocumentPropertySupport::getProperty($this, $name);
+        }
+        if (\PHPCompiler\ext\xmlreader\XmlReaderPropertySupport::isManagedProperty($this, $name)) {
+            return \PHPCompiler\ext\xmlreader\XmlReaderPropertySupport::getProperty($this, $name);
         }
         if (!isset($this->properties[$name])) {
             throw new \LogicException('Undefined property access');
@@ -202,7 +258,8 @@ class ObjectEntry {
 
             return;
         }
-        $slot->null();
+        // Dynamic property unset → remove slot (Zend zend_std_unset_property; #15750).
+        unset($this->properties[$name]);
     }
 
     /** @return array<string, Variable> */
@@ -315,16 +372,24 @@ class ObjectEntry {
     }
 
     /**
-     * Zend object property internal pointer — key() (ext/standard/array.c; #11196).
+     * Zend object property internal pointer — key() (ext/standard/array.c; #11196, #3312).
      */
-    public function pointerKey(): ?Variable
+    public function pointerKey(?Context $ctx = null): ?Variable
     {
         if (!$this->propertyPointerIsValid()) {
             return null;
         }
         $names = $this->propertyNameList();
+        $name = $names[$this->propertyInternalPointer];
+        $displayName = $name;
+        if (null !== $ctx) {
+            $meta = VmReflection::findClassProperty($this->class, $name, $ctx);
+            if (null !== $meta) {
+                $displayName = VmReflection::manglePropertyKey($meta, $ctx);
+            }
+        }
         $key = new Variable(Variable::TYPE_STRING);
-        $key->string($names[$this->propertyInternalPointer]);
+        $key->string($displayName);
 
         return $key;
     }
@@ -380,10 +445,7 @@ class ObjectEntry {
             return null;
         }
         if ($this->propertyInternalPointer >= $count) {
-            $last = $count - 1;
-            $this->propertyInternalPointer = $last;
-
-            return $this->propertyValueAt($last);
+            return null;
         }
         if (self::INVALID_PROPERTY_POINTER === $this->propertyInternalPointer) {
             return null;
@@ -456,8 +518,35 @@ class ObjectEntry {
         if (!isset($names[$index])) {
             return null;
         }
+        $name = $names[$index];
         $result = new Variable();
-        $result->copyFrom($this->properties[$names[$index]]->resolveIndirect());
+        foreach ($this->class->properties as $property) {
+            if ($property->name !== $name) {
+                continue;
+            }
+            if (!$this->hasProperty($name)) {
+                $result->copyFrom($property->getVariable());
+
+                return $result;
+            }
+            $resolved = $this->getProperty($name)->resolveIndirect();
+            if (
+                Variable::TYPE_NULL === $resolved->type
+                || $resolved->isUndefined()
+                || TypedPropertyCheck::isUninitialized($resolved)
+            ) {
+                $result->copyFrom($property->getVariable());
+
+                return $result;
+            }
+            $result->copyFrom($resolved);
+
+            return $result;
+        }
+        if (!isset($this->properties[$name])) {
+            return null;
+        }
+        $result->copyFrom($this->properties[$name]->resolveIndirect());
 
         return $result;
     }

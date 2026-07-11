@@ -41,7 +41,7 @@ if (!function_exists('php_compiler_cli_dispatch')) {
     function php_compiler_cli_note_progress(string $msg): void
     {
         try {
-            if (!class_exists(\PHPCompiler\JIT\Progress::class)) {
+            if (!class_exists('PHPCompiler\\JIT\\Progress', false)) {
                 return;
             }
             \PHPCompiler\JIT\Progress::noteFunction($msg);
@@ -233,12 +233,9 @@ if (!function_exists('php_compiler_cli_dispatch')) {
                     $execCode = '<?php '.$argv[$i];
                     ++$i;
                     $execFile = php_compiler_cli_command_line_code_filename();
+                    $options['--script-name'] = php_compiler_cli_standard_input_code_filename();
                     // Zend CLI: $argv[0] is "Command line code" for -r; args after "--" are user args (not "--" itself).
-                    $rest = array_slice($argv, $i);
-                    if (isset($rest[0]) && '--' === $rest[0]) {
-                        $rest = array_slice($rest, 1);
-                    }
-                    $scriptArgv = array_merge([$execFile], $rest);
+                    $scriptArgv = array_merge([$execFile], php_compiler_cli_user_script_argv_tail($argv, $i));
                     // Do not parse trailing args as compiler options; they belong to user code.
                     $i = $argc;
 
@@ -283,8 +280,9 @@ if (!function_exists('php_compiler_cli_dispatch')) {
                         if (strlen($opt) === 1) {
                             $execFile = '-';
                             $execCode = stream_get_contents(\STDIN);
+                            $options['--script-name'] = php_compiler_cli_standard_input_code_filename();
                             // Mirror Zend CLI stdin: $argv[0] is "-" and remaining args follow.
-                            $scriptArgv = array_merge([$execFile], array_slice($argv, $i));
+                            $scriptArgv = array_merge([$execFile], php_compiler_cli_user_script_argv_tail($argv, $i));
                             // Do not parse trailing args as compiler options; they belong to user code.
                             $i = $argc;
 
@@ -304,8 +302,9 @@ if (!function_exists('php_compiler_cli_dispatch')) {
                         }
                     }
                     $execFile = realpath($scriptPath) ?: $scriptPath;
+                    $options['--script-name'] = $opt;
                     // Allow arbitrary user script args after the script path (Zend CLI parity, #4139).
-                    $scriptArgv = array_merge([$execFile], array_slice($argv, $i));
+                    $scriptArgv = array_merge([$execFile], php_compiler_cli_user_script_argv_tail($argv, $i));
                     // Stop parsing: remaining args are for the user script.
                     $i = $argc;
             }
@@ -315,7 +314,8 @@ if (!function_exists('php_compiler_cli_dispatch')) {
         if (empty($execCode)) {
             $execFile = '-';
             $execCode = stream_get_contents(\STDIN);
-            $scriptArgv = array_merge([$execFile], array_slice($argv, $i));
+            $options['--script-name'] = php_compiler_cli_standard_input_code_filename();
+            $scriptArgv = array_merge([$execFile], php_compiler_cli_user_script_argv_tail($argv, $i));
         }
         if (null === $scriptArgv) {
             // Fallback: ensure user code sees $argv/$argc even if no args were parsed.

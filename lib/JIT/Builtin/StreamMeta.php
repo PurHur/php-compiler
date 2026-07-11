@@ -11,6 +11,7 @@ final class StreamMeta
 {
     public static function ensureLinked(Context $context): void
     {
+        StreamModeRuntime::ensureLinked($context);
         StreamMetaJit::implement($context);
     }
 

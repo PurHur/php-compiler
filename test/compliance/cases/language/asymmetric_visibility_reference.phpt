@@ -3,8 +3,8 @@ PHP 8.4 asymmetric visibility: reference bind and array append follow set visibi
 --FILE--
 <?php
 class C {
-    private(set) int $x = 1;
-    private(set) array $arr = [];
+    public (private(set)) int $x = 1;
+    public (private(set)) array $arr = [];
 }
 
 $c = new C();
@@ -26,5 +26,5 @@ try {
 }
 --EXPECT--
 before ref bind: 1
-Error: Cannot modify private(set) property C::$x from global scope
-Error: Cannot modify private(set) property C::$arr from global scope
+Error: Cannot modify public private(set) property C::$x from global scope
+Error: Cannot modify public private(set) property C::$arr from global scope

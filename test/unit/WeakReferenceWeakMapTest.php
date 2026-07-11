@@ -10,6 +10,21 @@ use PHPUnit\Framework\TestCase;
 /** @covers issue #1366 */
 final class WeakReferenceWeakMapTest extends TestCase
 {
+    public function testWeakReferenceGetNullAfterAssignNull(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+$o = new stdClass();
+$r = WeakReference::create($o);
+$o = null;
+echo $r->get() === null ? '1' : '0';
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'weakref_assign_null.php'));
+        $this->assertSame('1', ob_get_clean());
+    }
+
     public function testWeakReferenceGetNullAfterUnset(): void
     {
         $runtime = new Runtime();
@@ -214,6 +229,21 @@ PHP;
         $this->assertSame('err', ob_get_clean());
     }
 
+    public function testWeakReferenceGetNullAfterInlineNew(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+$ref = WeakReference::create(new stdClass());
+echo $ref->get() === null ? '1' : '0';
+echo "\n";
+echo get_debug_type($ref->get());
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'weakref_inline_new.php'));
+        $this->assertSame("1\nnull", ob_get_clean());
+    }
+
     public function testWeakReferenceGetNullAfterGcCollect(): void
     {
         $runtime = new Runtime();
@@ -247,5 +277,87 @@ PHP;
         ob_start();
         $runtime->run($runtime->parseAndCompile($code, 'weakmap_gc.php'));
         $this->assertSame('0', ob_get_clean());
+    }
+
+    /** Zend clears weak-map keys when the last strong ref drops — no gc_collect_cycles() (#14103). */
+    public function testWeakMapEntryRemovedImmediatelyOnKeyNull(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+$k = new stdClass();
+$wm = new WeakMap();
+$wm[$k] = 42;
+$k = null;
+echo count($wm);
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'weakmap_immediate_gc.php'));
+        $this->assertSame('0', ob_get_clean());
+    }
+
+    /** probe_weakreference: get() in if() must not leak a strong ref to the referent (#14103). */
+    public function testWeakReferenceClearedAfterIfGetComparison(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+$o = new stdClass();
+$wr = WeakReference::create($o);
+if ($wr->get() !== $o) {
+    fwrite(STDERR, "live referent mismatch\n");
+    exit(1);
+}
+$o = null;
+if (null !== $wr->get()) {
+    fwrite(STDERR, "collected referent must be null\n");
+    exit(1);
+}
+echo "ok\n";
+PHP;
+        ob_start();
+        try {
+            $runtime->run($runtime->parseAndCompile($code, 'probe_weakreference.php'));
+        } catch (\PHPCompiler\VM\ScriptExit $e) {
+            $this->fail('probe_weakreference must not exit: '.$e->getMessage());
+        }
+        $this->assertSame("ok\n", ob_get_clean());
+    }
+
+    /** WeakMap offset read inside closure must see live key (#14132, Zend/zend_weakrefs.c). */
+    public function testWeakMapOffsetGetInsideClosure(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+$read = (function (): int {
+    $wm = new WeakMap();
+    $o = new stdClass();
+    $wm[$o] = 9;
+    return $wm[$o];
+})();
+echo $read === 9 ? 'ok' : 'fail';
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'weakmap_closure_offsetget.php'));
+        $this->assertSame('ok', ob_get_clean());
+    }
+
+    /** WeakReference::get() inside closure must return referent (#14132). */
+    public function testWeakReferenceGetInsideClosure(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+$alive = (function (): bool {
+    $o = new stdClass();
+    $wr = WeakReference::create($o);
+    return $wr->get() === $o;
+})();
+echo $alive ? 'ok' : 'fail';
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'weakreference_closure_get.php'));
+        $this->assertSame('ok', ob_get_clean());
     }
 }

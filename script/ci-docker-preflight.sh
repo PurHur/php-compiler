@@ -121,6 +121,7 @@ ci_docker_acquire_single_ci_lock() {
     fi
   fi
   echo "ci-docker-preflight: wait for the other run to finish, or stop its container, then retry" >&2
+  echo "ci-docker-preflight: do not run host vendor/bin/phpunit while waiting — use ./script/phpunit.sh after the lock clears" >&2
   echo "ci-docker-preflight: safe cleanup (only if you're sure nothing is running): rm -f ${lockfile}" >&2
   echo "ci-docker-preflight: opt-out (not recommended): PHP_COMPILER_CI_SINGLE_CONTAINER=0" >&2
   exit 1

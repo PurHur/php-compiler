@@ -19,9 +19,14 @@ final class BuiltinClasses
     {
         $before = array_keys($ctx->classes);
         self::registerCurlFile($ctx);
-        self::registerCurlHandle($ctx);
-        self::registerCurlMultiHandle($ctx);
-        self::registerCurlShareHandle($ctx);
+        if (CurlExtensionPolicy::advertisesBuiltins()) {
+            CurlStringFileBuiltin::register($ctx);
+        }
+        if (CurlExtensionPolicy::advertisesHandleClasses()) {
+            self::registerCurlHandle($ctx);
+            self::registerCurlMultiHandle($ctx);
+            self::registerCurlShareHandle($ctx);
+        }
         foreach (array_diff(array_keys($ctx->classes), $before) as $lc) {
             $ctx->classes[$lc]->isInternal = true;
         }
@@ -29,6 +34,12 @@ final class BuiltinClasses
 
     private static function registerCurlFile(Context $ctx): void
     {
+        if (CurlExtensionPolicy::advertisesBuiltins()) {
+            CurlFileBuiltin::register($ctx);
+
+            return;
+        }
+
         if (isset($ctx->classes['curlfile'])) {
             return;
         }

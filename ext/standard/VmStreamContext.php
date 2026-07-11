@@ -22,8 +22,40 @@ final class VmStreamContext
 
     private static int $nextId = 0;
 
+    /** @var array<int, HashTable> live stream-context handles for get_resources() (#11104) */
+    private static array $activeById = [];
+
     /** Process-wide default context (php-src php_stream_context_get(), #6367). */
     private static ?Variable $defaultContext = null;
+
+    /**
+     * php-src ext/standard/streams.c — first stream open materializes default context (#11104).
+     */
+    public static function ensureDefaultForStreamOpen(): void
+    {
+        self::ensureDefaultContext();
+    }
+
+    /**
+     * @return list<Variable>
+     */
+    public static function activeContextVariables(): array
+    {
+        $out = [];
+        foreach (self::$activeById as $ht) {
+            $var = new Variable();
+            $var->array($ht);
+            $out[] = $var;
+        }
+
+        return $out;
+    }
+
+    private static function registerActive(int $id, HashTable $ht): void
+    {
+        $ht->addRef();
+        self::$activeById[$id] = $ht;
+    }
 
     /**
      * Build a VM stream-context array from caller options (issue #1377, #2457, #6815).
@@ -36,40 +68,40 @@ final class VmStreamContext
         $hostOptions = [];
         if (null !== $optionsVar) {
             $resolved = $optionsVar->resolveIndirect();
-            if (Variable::TYPE_ARRAY !== $resolved->type) {
-                throw new \LogicException(
-                    'stream_context_create() argument #1 must be an array in this compiler build'
-                );
+            if (Variable::TYPE_NULL === $resolved->type) {
+                // php-src: null options → default empty context (ext/standard/streams.c, #13356)
+            } elseif (Variable::TYPE_ARRAY !== $resolved->type) {
+                self::throwCreateArrayTypeError(1, 'options', $resolved);
+            } else {
+                VmStreamContextOptions::validateOptionsVariable($optionsVar, 'stream_context_create');
+                $exported = VmHttpBuildQuery::export($resolved);
+                if (!\is_array($exported)) {
+                    self::throwCreateArrayTypeError(1, 'options', $resolved);
+                }
+                $hostOptions = $exported;
             }
-            $exported = VmHttpBuildQuery::export($resolved);
-            if (!\is_array($exported)) {
-                throw new \LogicException(
-                    'stream_context_create() argument #1 must be an array in this compiler build'
-                );
-            }
-            $hostOptions = $exported;
         }
 
         $hostParams = [];
         if (null !== $paramsVar) {
             $resolvedParams = $paramsVar->resolveIndirect();
-            if (Variable::TYPE_ARRAY !== $resolvedParams->type) {
-                throw new \LogicException(
-                    'stream_context_create() argument #2 must be an array in this compiler build'
-                );
+            if (Variable::TYPE_NULL === $resolvedParams->type) {
+                // php-src: null params → omitted (#13356)
+            } elseif (Variable::TYPE_ARRAY !== $resolvedParams->type) {
+                self::throwCreateArrayTypeError(2, 'params', $resolvedParams);
+            } else {
+                $exportedParams = VmHttpBuildQuery::export($resolvedParams);
+                if (!\is_array($exportedParams)) {
+                    self::throwCreateArrayTypeError(2, 'params', $resolvedParams);
+                }
+                $hostParams = $exportedParams;
             }
-            $exportedParams = VmHttpBuildQuery::export($resolvedParams);
-            if (!\is_array($exportedParams)) {
-                throw new \LogicException(
-                    'stream_context_create() argument #2 must be an array in this compiler build'
-                );
-            }
-            $hostParams = $exportedParams;
         }
 
         $id = ++self::$nextId;
 
-        $ht = null !== $optionsVar && Variable::TYPE_ARRAY === $optionsVar->resolveIndirect()->type
+        $optionsType = null !== $optionsVar ? $optionsVar->resolveIndirect()->type : Variable::TYPE_NULL;
+        $ht = Variable::TYPE_ARRAY === $optionsType
             ? $optionsVar->resolveIndirect()->toArray()->duplicate()
             : new HashTable();
         $marker = new Variable(Variable::TYPE_INTEGER);
@@ -79,6 +111,7 @@ final class VmStreamContext
             self::attachParamsHashTable($ht, $hostParams);
         }
         $ht->markResourceLikeHandle();
+        self::registerActive($id, $ht);
 
         return $ht;
     }
@@ -100,6 +133,7 @@ final class VmStreamContext
             self::attachParamsHashTable($ht, $params);
         }
         $ht->markResourceLikeHandle();
+        self::registerActive($id, $ht);
 
         return $ht;
     }
@@ -146,6 +180,36 @@ final class VmStreamContext
         }
 
         return $resolved;
+    }
+
+    /** Optional stream-context parameter on copy/rename/unlink (ext/standard/file.c). */
+    public static function validateOptionalContextArg(
+        Variable $var,
+        string $functionName,
+        int $argNum
+    ): void {
+        $resolved = $var->resolveIndirect();
+        if (Variable::TYPE_NULL === $resolved->type) {
+            return;
+        }
+        if (!self::isRepresentation($resolved)) {
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #%d ($context) must be of type resource or null, %s given',
+                $functionName,
+                $argNum,
+                VmStreamArg::debugTypeName($resolved)
+            ));
+        }
+    }
+
+    private static function throwCreateArrayTypeError(int $argNum, string $label, Variable $resolved): void
+    {
+        throw new \TypeError(\sprintf(
+            'stream_context_create(): Argument #%d ($%s) must be of type ?array, %s given',
+            $argNum,
+            $label,
+            VmStreamArg::debugTypeName($resolved)
+        ));
     }
 
     public static function requireOptionsArray(
@@ -230,8 +294,8 @@ final class VmStreamContext
     public static function setOptions(Variable $context, Variable $options): bool
     {
         $context = self::requireRepresentation($context, 'stream_context_set_options');
-        $context->separateArrayForWrite();
         $options = self::requireOptionsArray($options, 'stream_context_set_options');
+        VmStreamContextOptions::validateOptionsVariable($options, 'stream_context_set_options');
 
         $exported = VmHttpBuildQuery::export($options);
         if (!\is_array($exported)) {
@@ -241,6 +305,7 @@ final class VmStreamContext
             );
         }
 
+        $context->separateArrayForWrite();
         VmParseStr::mergeInto($context->toArray(), $exported);
 
         return true;

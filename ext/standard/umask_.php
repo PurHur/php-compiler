@@ -10,7 +10,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** umask() — process file-creation mask (VM host; JIT/AOT via libc umask(2), #3226). */
+/** umask() — process file-creation mask (VM host; JIT/AOT via UmaskJitHelper PHP, #3226, #15497). */
 final class umask_ extends Internal
 {
     public function __construct()
@@ -32,8 +32,9 @@ final class umask_ extends Internal
 
             return;
         }
-        $mask = VmMath::parseIntBuiltinArg(
-            $frame->calledArgs[0]->resolveIndirect(),
+        $mask = VmMath::parseNullableIntBuiltinArgForFrame(
+            $frame,
+            0,
             'umask',
             1,
             'mask'
@@ -48,7 +49,7 @@ final class umask_ extends Internal
         }
         $mask = null;
         if (isset($args[0])) {
-            $mask = JitSleep::zParamLong($context, $args[0], 'umask', 1, 'mask');
+            $mask = JitSleep::zParamNullableLong($context, $args[0], 'umask', 1, 'mask');
         }
 
         return JitUmask::invoke($context, $mask);

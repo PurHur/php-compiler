@@ -45,6 +45,9 @@ final class set_exception_handler extends Internal
         if (null !== JitOperandTypeLabel::compileTimeEnumClassName($context, $args[0])) {
             throw new \TypeError(ExceptionHandlerCallbackPolicy::invalidCallbackTypeError());
         }
+        if (ExceptionHandlerCallbackPolicy::isJitPhpSrcInvalidCallbackType($args[0])) {
+            throw new \TypeError(ExceptionHandlerCallbackPolicy::invalidCallbackTypeError());
+        }
         if (!ExceptionHandlerCallbackPolicy::isJitLowerable($args[0])) {
             throw new \LogicException(ExceptionHandlerCallbackPolicy::jitRejectionMessage());
         }

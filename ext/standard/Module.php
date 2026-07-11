@@ -13,6 +13,9 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\CompilerVersion;
 use PHPCompiler\JIT;
+use PHPCompiler\JIT\Builtin\StringCaseCompare;
+use PHPCompiler\JIT\Builtin\StringStrcoll;
+use PHPCompiler\JIT\Builtin\StringStrpbrk;
 use PHPCompiler\ModuleAbstract;
 use PHPCompiler\Runtime;
 use PHPCompiler\VM;
@@ -21,7 +24,7 @@ class Module extends ModuleAbstract
 {
     public function getAdditionalExtensionNames(): array
     {
-        return ['json', 'date', 'pcre', 'zlib'];
+        return ['json', 'date', 'pcre', 'zlib', 'readline'];
     }
 
     /**
@@ -40,104 +43,54 @@ class Module extends ModuleAbstract
     {
         parent::init($runtime);
         \PHPCompiler\VM\OutputBufferHandlers::register(
-            static fn (string $content, string $handlerName, ?\PHPCompiler\VM\Context $ctx): string => VmObOutput::processHandler(
+            static fn (string $content, null|string|\PHPCompiler\VM\Variable|\PHPCompiler\VM\ClosureState $handler, ?\PHPCompiler\VM\Context $ctx): string => VmObOutput::processHandler(
                 $ctx ?? $runtime->vmContext,
-                $handlerName,
+                $handler,
                 $content
             )
         );
         BuiltinAttributes::register($runtime->vmContext);
         BuiltinEnums::register($runtime->vmContext);
         BuiltinClasses::register($runtime->vmContext);
-        foreach ([
-            'LOCK_SH' => 1,
-            'LOCK_EX' => 2,
-            'LOCK_UN' => 3,
-            'LOCK_NB' => 4,
-            'DEBUG_BACKTRACE_PROVIDE_OBJECT' => VmDebugBacktrace::PROVIDE_OBJECT,
-            'DEBUG_BACKTRACE_IGNORE_ARGS' => VmDebugBacktrace::IGNORE_ARGS,
-            'DEBUG_BACKTRACE_IGNORE_STATIC_ARGS' => VmDebugBacktrace::IGNORE_STATIC_ARGS,
-            'CONNECTION_NORMAL' => VmConnection::NORMAL,
-            'CONNECTION_ABORTED' => VmConnection::ABORTED,
-            'CONNECTION_TIMEOUT' => VmConnection::TIMEOUT,
-            'INFO_GENERAL' => VmInfo::INFO_GENERAL,
-            'INFO_CREDITS' => VmInfo::INFO_CREDITS,
-            'INFO_CONFIGURATION' => VmInfo::INFO_CONFIGURATION,
-            'INFO_MODULES' => VmInfo::INFO_MODULES,
-            'INFO_ENVIRONMENT' => VmInfo::INFO_ENVIRONMENT,
-            'INFO_VARIABLES' => VmInfo::INFO_VARIABLES,
-            'INFO_LICENSE' => VmInfo::INFO_LICENSE,
-            'INFO_ALL' => VmInfo::INFO_ALL,
-            'CREDITS_GROUP' => VmInfo::CREDITS_GROUP,
-            'CREDITS_GENERAL' => VmInfo::CREDITS_GENERAL,
-            'CREDITS_SAPI' => VmInfo::CREDITS_SAPI,
-            'CREDITS_MODULES' => VmInfo::CREDITS_MODULES,
-            'CREDITS_DOCS' => VmInfo::CREDITS_DOCS,
-            'CREDITS_FULLPAGE' => VmInfo::CREDITS_FULLPAGE,
-            'CREDITS_QA' => VmInfo::CREDITS_QA,
-            'CREDITS_ALL' => VmInfo::CREDITS_ALL,
-            'PHP_QUERY_RFC1738' => VmHttpBuildQuery::ENCODING_RFC1738,
-            'PHP_QUERY_RFC3986' => VmHttpBuildQuery::ENCODING_RFC3986,
-            'PHP_URL_SCHEME' => VmParseUrl::PHP_URL_SCHEME,
-            'PHP_URL_HOST' => VmParseUrl::PHP_URL_HOST,
-            'PHP_URL_PORT' => VmParseUrl::PHP_URL_PORT,
-            'PHP_URL_USER' => VmParseUrl::PHP_URL_USER,
-            'PHP_URL_PASS' => VmParseUrl::PHP_URL_PASS,
-            'PHP_URL_PATH' => VmParseUrl::PHP_URL_PATH,
-            'PHP_URL_QUERY' => VmParseUrl::PHP_URL_QUERY,
-            'PHP_URL_FRAGMENT' => VmParseUrl::PHP_URL_FRAGMENT,
-            'SUNFUNCS_RET_STRING' => VmDate::SUNFUNCS_RET_STRING,
-            'SUNFUNCS_RET_DOUBLE' => VmDate::SUNFUNCS_RET_DOUBLE,
-            'SUNFUNCS_RET_TIMESTAMP' => VmDate::SUNFUNCS_RET_TIMESTAMP,
-            'LOG_EMERG' => StdlibConstants::LOG_EMERG,
-            'LOG_ALERT' => StdlibConstants::LOG_ALERT,
-            'LOG_CRIT' => StdlibConstants::LOG_CRIT,
-            'LOG_ERR' => StdlibConstants::LOG_ERR,
-            'LOG_WARNING' => StdlibConstants::LOG_WARNING,
-            'LOG_NOTICE' => StdlibConstants::LOG_NOTICE,
-            'LOG_INFO' => StdlibConstants::LOG_INFO,
-            'LOG_DEBUG' => StdlibConstants::LOG_DEBUG,
-            'LOG_PID' => StdlibConstants::LOG_PID,
-            'LOG_CONS' => StdlibConstants::LOG_CONS,
-            'LOG_ODELAY' => StdlibConstants::LOG_ODELAY,
-            'LOG_NDELAY' => StdlibConstants::LOG_NDELAY,
-            'LOG_NOWAIT' => StdlibConstants::LOG_NOWAIT,
-            'LOG_PERROR' => StdlibConstants::LOG_PERROR,
-            'LOG_KERN' => StdlibConstants::LOG_KERN,
-            'LOG_USER' => StdlibConstants::LOG_USER,
-            'LOG_MAIL' => StdlibConstants::LOG_MAIL,
-            'LOG_DAEMON' => StdlibConstants::LOG_DAEMON,
-            'LOG_AUTH' => StdlibConstants::LOG_AUTH,
-            'LOG_SYSLOG' => StdlibConstants::LOG_SYSLOG,
-            'LOG_LPR' => StdlibConstants::LOG_LPR,
-            'LOG_NEWS' => StdlibConstants::LOG_NEWS,
-            'LOG_UUCP' => StdlibConstants::LOG_UUCP,
-            'LOG_CRON' => StdlibConstants::LOG_CRON,
-            'LOG_AUTHPRIV' => StdlibConstants::LOG_AUTHPRIV,
-            'LOG_FTP' => StdlibConstants::LOG_FTP,
-            'LOG_LOCAL0' => StdlibConstants::LOG_LOCAL0,
-            'LOG_LOCAL1' => StdlibConstants::LOG_LOCAL1,
-            'LOG_LOCAL2' => StdlibConstants::LOG_LOCAL2,
-            'LOG_LOCAL3' => StdlibConstants::LOG_LOCAL3,
-            'LOG_LOCAL4' => StdlibConstants::LOG_LOCAL4,
-            'LOG_LOCAL5' => StdlibConstants::LOG_LOCAL5,
-            'LOG_LOCAL6' => StdlibConstants::LOG_LOCAL6,
-            'LOG_LOCAL7' => StdlibConstants::LOG_LOCAL7,
-            ...VmLocale::lcConstants(),
-            ...VmLocale::nlLanginfoConstants(),
-            'ZLIB_ENCODING_RAW' => -15,
-            'ZLIB_ENCODING_DEFLATE' => 15,
-            'ZLIB_ENCODING_GZIP' => 31,
-            'STREAM_PF_UNIX' => StdlibConstants::STREAM_PF_UNIX,
-            'STREAM_PF_INET' => StdlibConstants::STREAM_PF_INET,
-            'STREAM_SOCK_STREAM' => StdlibConstants::STREAM_SOCK_STREAM,
-            'STREAM_SOCK_DGRAM' => StdlibConstants::STREAM_SOCK_DGRAM,
-            'STREAM_IPPROTO_IP' => StdlibConstants::STREAM_IPPROTO_IP,
-        ] + VmStreamSupports::constants() + VmStreamNotification::constants() + VmImage::constants() + VmJsonFlags::constants() as $name => $value) {
+        VmStdStreamConstants::register($runtime->vmContext);
+        foreach (StdlibModuleConstants::bootstrapIntConstants() as $name => $value) {
             $var = new VM\Variable();
             $var->int($value);
             $runtime->vmContext->defineConstant($name, $var);
         }
+        foreach (StdlibModuleConstants::bootstrapStringConstants() as $name => $value) {
+            $var = new VM\Variable();
+            $var->string($value);
+            $runtime->vmContext->defineConstant($name, $var);
+        }
+        foreach (StdlibModuleConstants::bootstrapFloatConstants() as $name => $value) {
+            $var = new VM\Variable();
+            $var->float($value);
+            $runtime->vmContext->defineConstant($name, $var);
+        }
+        foreach (PcreConstants::registeredConstants() as $name => $value) {
+            self::defineModuleConstant($runtime, $name, $value);
+        }
+        foreach (ReadlineConstants::registeredConstants() as $name => $value) {
+            self::defineModuleConstant($runtime, $name, $value);
+        }
+        foreach (XslConstants::registeredConstants() as $name => $value) {
+            self::defineModuleConstant($runtime, $name, $value);
+        }
+    }
+
+    /**
+     * @param int|string $value
+     */
+    private static function defineModuleConstant(Runtime $runtime, string $name, int|string $value): void
+    {
+        $var = new VM\Variable();
+        if (\is_int($value)) {
+            $var->int($value);
+        } else {
+            $var->string($value);
+        }
+        $runtime->vmContext->defineConstant($name, $var);
     }
 
     public function getFunctions(): array
@@ -182,7 +135,9 @@ class Module extends ModuleAbstract
             new ldexp(),
             new frexp(),
             new fdiv(),
-            ...(CompilerVersion::supportsFpow() ? [new fpow()] : []),
+            ...(CompilerVersion::supportsFpow() ? [new fpow(), new fmin(), new fmax(), new fadd(), new fsub(), new fmul()] : []),
+            ...(CompilerVersion::supportsClamp() ? [new clamp()] : []),
+            ...(CompilerVersion::supportsNextafter() ? [new nextafter()] : []),
             new intval(),
             new floatval(),
             new doubleval(),
@@ -213,13 +168,14 @@ class Module extends ModuleAbstract
             new chr(),
             new strcmp(),
             new strcoll(),
-            new strxfrm(),
+            ...(CompilerVersion::supportsStrxfrm() ? [new strxfrm()] : []),
             new levenshtein(),
             new similar_text(),
             new soundex(),
             new metaphone(),
             new hebrev(),
-            new convert_cyr_string(),
+            ...(CompilerVersion::supportsHebrevc() ? [new hebrevc()] : []),
+            ...(CompilerVersion::supportsConvertCyrString() ? [new convert_cyr_string()] : []),
             new strnatcmp(),
             new strnatcasecmp(),
             new strcasecmp(),
@@ -284,6 +240,7 @@ class Module extends ModuleAbstract
             new array_key_exists('key_exists'),
             new array_key_first(),
             new array_key_last(),
+            ...(CompilerVersion::supportsPhp83ArrayKeyFunctions() ? [new array_first_key(), new array_last_key()] : []),
             new key(),
             new current(),
             new pos(),
@@ -291,10 +248,8 @@ class Module extends ModuleAbstract
             new prev(),
             new reset_(),
             new end_(),
-            new array_first(),
-            new array_last(),
+            ...(CompilerVersion::supportsPhp84ArraySearchFunctions() ? [new array_first(), new array_last()] : []),
             new array_is_list(),
-            new array_is_assoc(),
             new in_array(),
             new array_push(),
             new array_pop(),
@@ -387,29 +342,33 @@ class Module extends ModuleAbstract
             new array_uintersect_assoc(),
             new array_uintersect_uassoc(),
             new iterator_to_array(),
-            new generator_to_array(),
+            ...(CompilerVersion::supportsGeneratorToArray() ? [new generator_to_array()] : []),
             new iterator_count(),
             new iterator_apply(),
             new array_replace(),
             new array_replace_recursive(),
-            new array_replace_key(),
+            ...(CompilerVersion::supportsArrayReplaceKey() ? [new array_replace_key()] : []),
             new array_fill(),
             new array_fill_keys(),
             new array_pad(),
             new array_combine(),
             new array_map(),
             new array_filter(),
-            new array_find(),
-            new array_find_key(),
-            new array_any(),
-            new array_all(),
+            ...(CompilerVersion::supportsPhp84ArraySearchFunctions() ? [
+                new array_find(),
+                new array_find_key(),
+                new array_any(),
+                new array_any_key(),
+                new array_all(),
+                new array_all_key(),
+            ] : []),
             new array_walk(),
             new array_walk_recursive(),
             new array_reduce(),
             new range(),
             new bin2hex(),
             new crc32(),
-            new crc32c(),
+            ...(CompilerVersion::supportsCrc32c() ? [new crc32c()] : []),
             new hex2bin(),
             new base64_encode(),
             new base64_decode(),
@@ -435,9 +394,15 @@ class Module extends ModuleAbstract
             new random_bytes(),
             new openssl_random_pseudo_bytes(),
             new random_int(),
+            new rand_(),
+            new mt_rand(),
+            new mt_srand(),
+            new srand(),
+            new getrandmax(),
+            new mt_getrandmax(),
+            new lcg_value(),
             new uniqid(),
             new str_pad(),
-            ...(CompilerVersion::supportsStrPadded() ? [new str_padded()] : []),
             new str_split(),
             new chunk_split(),
             new wordwrap(),
@@ -456,19 +421,31 @@ class Module extends ModuleAbstract
             new header_(),
             new headers_sent(),
             new connection_status(),
+            ...(VmFastCgi::registersFinishRequestFunction() ? [new fastcgi_finish_request()] : []),
             new header_register_callback(),
             new register_shutdown_function(),
-            new readonly_(),
+            new register_tick_function(),
+            new unregister_tick_function(),
+            ...(CompilerVersion::supportsReadonlyBuiltin() ? [new readonly_()] : []),
             new setcookie(),
             new setrawcookie(),
             new header_remove(),
-            new header_list(),
+            ...(CompilerVersion::supportsHeaderList() ? [new header_list()] : []),
             new headers_list(),
-            new getallheaders_(),
-            new getallheaders_('apache_request_headers'),
-            new http_get_last_response_headers(),
-            new get_last_response_headers(),
-            new http_clear_last_response_headers(),
+            ...(VmHead::registersRequestHeaderFunctions() ? [
+                new apache_response_headers(),
+                new getallheaders_(),
+                new getallheaders_('apache_request_headers'),
+                new apache_getenv_(),
+                new apache_setenv_(),
+                new apache_note(),
+                new apache_get_version(),
+            ] : []),
+            ...(CompilerVersion::supportsHttpLastResponseHeaders() ? [
+                new http_get_last_response_headers(),
+                new get_last_response_headers(),
+                new http_clear_last_response_headers(),
+            ] : []),
             new get_headers(),
             new ob_start(),
             new ob_gzhandler(),
@@ -490,7 +467,7 @@ class Module extends ModuleAbstract
             new output_reset_rewrite_vars(),
             new json_encode(),
             new json_decode(),
-            new json_validate(),
+            ...(CompilerVersion::supportsJsonValidate() ? [new json_validate()] : []),
             new serialize(),
             new unserialize(),
             new json_last_error_(),
@@ -501,6 +478,7 @@ class Module extends ModuleAbstract
             new urlencode(),
             new rawurlencode(),
             new http_build_query(),
+            ...(CompilerVersion::supportsRequestParseBody() ? [new request_parse_body()] : []),
             new parse_str(),
             new urldecode(),
             new rawurldecode(),
@@ -514,6 +492,7 @@ class Module extends ModuleAbstract
             new file_get_contents(),
             new readfile(),
             new mime_content_type(),
+            new mail(),
             new file_(),
             new readline(),
             new readline_info(),
@@ -551,6 +530,7 @@ class Module extends ModuleAbstract
             new is_dir(),
             new is_readable(),
             new is_writable(),
+            new is_writable('is_writeable'),
             new is_executable(),
             new is_link(),
             new readlink(),
@@ -577,12 +557,14 @@ class Module extends ModuleAbstract
             new stream_context_get_default(),
             new stream_context_set_default(),
             new stream_context_get_options(),
-            new stream_context_set_options(),
+            ...(CompilerVersion::supportsStreamContextSetOptions() ? [new stream_context_set_options()] : []),
             new stream_context_set_params(),
-            new stream_notification_callback(),
             new stream_socket_client(),
             new stream_socket_server(),
+            new stream_socket_accept(),
             new stream_socket_pair(),
+            new stream_socket_get_name(),
+            new stream_socket_enable_crypto(),
             new fsockopen(),
             new pfsockopen(),
             new stream_set_chunk_size_(),
@@ -590,7 +572,7 @@ class Module extends ModuleAbstract
             new stream_set_write_buffer_(),
             new stream_set_read_buffer_(),
             new set_file_buffer(),
-            new stream_supports(),
+            ...(CompilerVersion::supportsStreamSupports() ? [new stream_supports()] : []),
             new stream_supports_lock(),
             new stream_is_local(),
             new stream_isatty(),
@@ -654,6 +636,19 @@ class Module extends ModuleAbstract
             new escapeshellarg(),
             new escapeshellcmd(),
             new phpc_run_command(),
+            new phpc_gc_native_child_at(),
+            new phpc_gc_native_object_refcount(),
+            new phpc_gc_native_free_object(),
+            new phpc_destruct_try_invoke_native(),
+            new phpc_object_release_storage_native(),
+            new phpc_weakref_null_slot(),
+            new phpc_weakref_unset_map_key(),
+            new phpc_native_ht_alloc(),
+            new phpc_native_ht_set_string_key(),
+            new phpc_native_ht_set_string_key_ht(),
+            new phpc_native_ht_set_string_at(),
+            new phpc_native_ht_set_hashtable_at(),
+            new phpc_native_ht_set_string_key_long(),
             new sys_get_temp_dir(),
             new sys_getloadavg(),
             new openlog(),
@@ -664,7 +659,6 @@ class Module extends ModuleAbstract
             new getcwd_(),
             new get_include_path(),
             new set_include_path(),
-            new restore_include_path(),
             new stream_resolve_include_path(),
             new gethostname(),
             new net_get_interfaces(),
@@ -700,7 +694,7 @@ class Module extends ModuleAbstract
             new define_(),
             new defined_(),
             new constant_(),
-            new class_constants_(),
+            ...(CompilerVersion::supportsClassConstants() ? [new class_constants_()] : []),
             new get_defined_constants_(),
             new get_defined_vars_(),
             new get_declared_variables_(),
@@ -717,14 +711,18 @@ class Module extends ModuleAbstract
             new get_debug_backtrace(),
             new class_exists_(),
             new class_alias(),
-            new create_lazy_ghost(),
-            new create_lazy_proxy(),
+            ...(CompilerVersion::supportsLazyObjectFactories() ? [
+                new create_lazy_ghost(),
+                new create_lazy_proxy(),
+                new class_has_lazy_object_initializer(),
+                new class_has_lazy_object_uninitializer(),
+            ] : []),
             new enum_exists_(),
-            new unitenum_exists_(),
+            ...(CompilerVersion::supportsPhp84ReflectionProbeBuiltins() ? [new unitenum_exists_()] : []),
             new interface_exists_(),
             new trait_exists_(),
             new class_uses_(),
-            new class_uses_recursive(),
+            ...(CompilerVersion::supportsClassUsesRecursive() ? [new class_uses_recursive()] : []),
             new class_implements_(),
             new class_parents_(),
             new function_exists(),
@@ -735,17 +733,17 @@ class Module extends ModuleAbstract
             new func_get_args(),
             new func_num_args(),
             new method_exists_(),
-            new class_meth_exists_(),
+            ...(CompilerVersion::supportsPhp84ReflectionProbeBuiltins() ? [new class_meth_exists_()] : []),
             ...(CompilerVersion::supportsClassHasFunctions() ? [
                 new class_has_method_(),
                 new class_has_property_(),
                 new class_has_constant_(),
             ] : []),
             new property_exists_(),
-            new attribute_exists_(),
+            ...(CompilerVersion::supportsPhp84ReflectionProbeBuiltins() ? [new attribute_exists_()] : []),
             new get_object_vars_(),
             new get_mangled_object_vars_(),
-            new get_object_id(),
+            ...(CompilerVersion::supportsGetObjectId() ? [new get_object_id()] : []),
             new spl_object_id(),
             new spl_object_hash(),
             new get_class_(),
@@ -762,14 +760,22 @@ class Module extends ModuleAbstract
             new compiler_language_warning_(),
             new set_error_handler_(),
             new restore_error_handler_(),
+            ...(CompilerVersion::supportsGetHandlerIntrospection() ? [
+                new get_error_handler_(),
+            ] : []),
             new set_exception_handler(),
             new restore_exception_handler(),
+            ...(CompilerVersion::supportsGetHandlerIntrospection() ? [
+                new get_exception_handler(),
+            ] : []),
             new error_get_last(),
             new error_clear_last(),
             new exif_tagname(),
             new eval_(),
             new phpc_deploy_path(),
             new compiler_is_superglobal_name(),
+            new __compiler_libcrypt(),
+            new __compiler_password_random_bytes(),
             new phpc_match_unhandled_operand_is_object(),
             new phpc_clone_with_begin(),
             new phpc_clone_with_end(),
@@ -778,6 +784,7 @@ class Module extends ModuleAbstract
             new compact_(),
             new scandir(),
             new opendir(),
+            new dir_(),
             new readdir(),
             new closedir(),
             new rewinddir(),
@@ -790,14 +797,24 @@ class Module extends ModuleAbstract
             new gzuncompress(),
             new gzopen(),
             new gzwrite(),
+            new gzputs(),
             new gzread(),
             new gzgets(),
+            new gzseek(),
+            new gztell(),
+            new gzrewind(),
+            new gzeof(),
             new gzclose(),
             new readgzfile(),
             new gzfile(),
             new gzpassthru(),
             new zlib_encode(),
             new zlib_decode(),
+            new deflate_init(),
+            new deflate_add(),
+            new inflate_init(),
+            new inflate_add(),
+            new zlib_get_coding_type(),
             new fnmatch(),
             new time(),
             new getmypid(),
@@ -807,8 +824,8 @@ class Module extends ModuleAbstract
             new get_cfg_var(),
             new php_ini_loaded_file(),
             new php_ini_scanned_files(),
-            new zend_thread_id(),
-            new getmygrgid(),
+            ...(CompilerVersion::supportsZendThreadId() ? [new zend_thread_id()] : []),
+            ...(CompilerVersion::supportsGetmygrgid() ? [new getmygrgid()] : []),
             new getmyinode(),
             new getlastmod(),
             new getrusage(),
@@ -821,7 +838,7 @@ class Module extends ModuleAbstract
             new microtime(),
             new gettimeofday(),
             new hrtime(),
-            new clock_gettime(),
+            ...(CompilerVersion::supportsClockGettime() ? [new clock_gettime()] : []),
             new phpversion(),
             new php_sapi_name(),
             new getopt(),
@@ -836,8 +853,20 @@ class Module extends ModuleAbstract
             new date(),
             new timezone_version_get(),
             new timezone_identifiers_list(),
+            new timezone_abbreviations_list(),
+            new timezone_name_from_abbr(),
             new timezone_open(),
+            new timezone_name_get(),
             new timezone_offset_get(),
+            new date_offset_get(),
+            new date_format(),
+            new date_timestamp_get(),
+            new date_timestamp_set(),
+            new date_date_set(),
+            new date_time_set(),
+            new date_timezone_get(),
+            new date_timezone_set(),
+            new date_get_last_errors(),
             new timezone_location_get(),
             new timezone_transitions_get(),
             new gmdate(),
@@ -900,15 +929,6 @@ class Module extends ModuleAbstract
             $context->registerFunction('strcmp', $fn);
         }
         try {
-            $context->lookupFunction('strcoll');
-        } catch (\Throwable $e) {
-            $i8p = $context->getTypeFromString('int8*');
-            $i32 = $context->getTypeFromString('int32');
-            $ft = $context->context->functionType($i32, false, $i8p, $i8p);
-            $fn = $context->module->addFunction('strcoll', $ft);
-            $context->registerFunction('strcoll', $fn);
-        }
-        try {
             $context->lookupFunction('nl_langinfo');
         } catch (\Throwable $e) {
             $i8p = $context->getTypeFromString('int8*');
@@ -917,14 +937,16 @@ class Module extends ModuleAbstract
             $fn = $context->module->addFunction('nl_langinfo', $ft);
             $context->registerFunction('nl_langinfo', $fn);
         }
-        try {
-            $context->lookupFunction('strxfrm');
-        } catch (\Throwable $e) {
-            $i8p = $context->getTypeFromString('int8*');
-            $sizeT = $context->getTypeFromString('size_t');
-            $ft = $context->context->functionType($sizeT, false, $i8p, $i8p, $sizeT);
-            $fn = $context->module->addFunction('strxfrm', $ft);
-            $context->registerFunction('strxfrm', $fn);
+        if (CompilerVersion::supportsStrxfrm()) {
+            try {
+                $context->lookupFunction('strxfrm');
+            } catch (\Throwable $e) {
+                $i8p = $context->getTypeFromString('int8*');
+                $sizeT = $context->getTypeFromString('size_t');
+                $ft = $context->context->functionType($sizeT, false, $i8p, $i8p, $sizeT);
+                $fn = $context->module->addFunction('strxfrm', $ft);
+                $context->registerFunction('strxfrm', $fn);
+            }
         }
         try {
             $context->lookupFunction('memcmp');
@@ -946,25 +968,9 @@ class Module extends ModuleAbstract
             $fn = $context->module->addFunction('strncmp', $ft);
             $context->registerFunction('strncmp', $fn);
         }
-        try {
-            $context->lookupFunction('strcasecmp');
-        } catch (\Throwable $e) {
-            $i8p = $context->getTypeFromString('int8*');
-            $i32 = $context->getTypeFromString('int32');
-            $ft = $context->context->functionType($i32, false, $i8p, $i8p);
-            $fn = $context->module->addFunction('strcasecmp', $ft);
-            $context->registerFunction('strcasecmp', $fn);
-        }
-        try {
-            $context->lookupFunction('strncasecmp');
-        } catch (\Throwable $e) {
-            $i8p = $context->getTypeFromString('int8*');
-            $sizeT = $context->getTypeFromString('size_t');
-            $i32 = $context->getTypeFromString('int32');
-            $ft = $context->context->functionType($i32, false, $i8p, $i8p, $sizeT);
-            $fn = $context->module->addFunction('strncasecmp', $ft);
-            $context->registerFunction('strncasecmp', $fn);
-        }
+        StringCaseCompare::ensureStrcasecmpLinked($context);
+        StringCaseCompare::ensureStrncasecmpLinked($context);
+        StringStrcoll::ensureLinked($context);
         try {
             $context->lookupFunction('substr_compare');
         } catch (\Throwable $e) {
@@ -986,30 +992,7 @@ class Module extends ModuleAbstract
                 $context->registerFunction($name, $fn);
             }
         }
-        try {
-            $context->lookupFunction('strpbrk');
-        } catch (\Throwable $e) {
-            $i8p = $context->getTypeFromString('int8*');
-            $ft = $context->context->functionType($i8p, false, $i8p, $i8p);
-            $fn = $context->module->addFunction('strpbrk', $ft);
-            $context->registerFunction('strpbrk', $fn);
-        }
-        try {
-            $context->lookupFunction('strstr');
-        } catch (\Throwable $e) {
-            $i8p = $context->getTypeFromString('int8*');
-            $ft = $context->context->functionType($i8p, false, $i8p, $i8p);
-            $fn = $context->module->addFunction('strstr', $ft);
-            $context->registerFunction('strstr', $fn);
-        }
-        try {
-            $context->lookupFunction('strcasestr');
-        } catch (\Throwable $e) {
-            $i8p = $context->getTypeFromString('int8*');
-            $ft = $context->context->functionType($i8p, false, $i8p, $i8p);
-            $fn = $context->module->addFunction('strcasestr', $ft);
-            $context->registerFunction('strcasestr', $fn);
-        }
+        StringStrpbrk::ensureLinked($context);
         try {
             $context->lookupFunction('strrchr');
         } catch (\Throwable $e) {
@@ -1152,14 +1135,6 @@ class Module extends ModuleAbstract
             $context->registerFunction('chmod', $fn);
         }
         try {
-            $context->lookupFunction('umask');
-        } catch (\Throwable $e) {
-            $i32 = $context->getTypeFromString('int32');
-            $ft = $context->context->functionType($i32, false, $i32);
-            $fn = $context->module->addFunction('umask', $ft);
-            $context->registerFunction('umask', $fn);
-        }
-        try {
             $context->lookupFunction('nice');
         } catch (\Throwable $e) {
             $i32 = $context->getTypeFromString('int32');
@@ -1184,33 +1159,6 @@ class Module extends ModuleAbstract
             $ft = $context->context->functionType($i32, false, $i8p, $i8p, $i32);
             $fn = $context->module->addFunction('fnmatch', $ft);
             $context->registerFunction('fnmatch', $fn);
-        }
-        try {
-            $context->lookupFunction('rename');
-        } catch (\Throwable $e) {
-            $i8p = $context->getTypeFromString('int8*');
-            $i32 = $context->getTypeFromString('int32');
-            $ft = $context->context->functionType($i32, false, $i8p, $i8p);
-            $fn = $context->module->addFunction('rename', $ft);
-            $context->registerFunction('rename', $fn);
-        }
-        try {
-            $context->lookupFunction('linkat');
-        } catch (\Throwable $e) {
-            $i8p = $context->getTypeFromString('int8*');
-            $i32 = $context->getTypeFromString('int32');
-            $ft = $context->context->functionType($i32, false, $i32, $i8p, $i32, $i8p, $i32);
-            $fn = $context->module->addFunction('linkat', $ft);
-            $context->registerFunction('linkat', $fn);
-        }
-        try {
-            $context->lookupFunction('symlinkat');
-        } catch (\Throwable $e) {
-            $i8p = $context->getTypeFromString('int8*');
-            $i32 = $context->getTypeFromString('int32');
-            $ft = $context->context->functionType($i32, false, $i8p, $i32, $i8p);
-            $fn = $context->module->addFunction('symlinkat', $ft);
-            $context->registerFunction('symlinkat', $fn);
         }
         try {
             $context->lookupFunction('chdir');

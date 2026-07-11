@@ -1,0 +1,50 @@
+<?php
+
+declare(strict_types=1);
+
+namespace PHPCompiler\JIT;
+
+use PHPCompiler\JIT\Builtin\StreamIoRuntime;
+
+/**
+ * Nested JIT lowering for {@see \PHPCompiler\VM\HashTable} instance helpers (#14601).
+ *
+ * JitHelper PHP receives {@see __hashtable__*} bitcast as HashTable; method bodies must
+ * lower to LLVM — not compile lib/VM/HashTable.php in nested scope (#12910 pattern).
+ */
+final class NestedVmHashTableMethodLlvm
+{
+    /** @var array<string, class-string<Call>> */
+    private const METHOD_HANDLERS = [
+        'getnumelements' => Call\HashTableGetNumElements::class,
+        'padcopy' => Call\HashTablePadCopy::class,
+        'valuescopy' => Call\HashTableValuesCopy::class,
+        'keyscopy' => Call\HashTableKeysCopy::class,
+        'keysmatchingcopy' => Call\HashTableKeysMatchingCopy::class,
+        'exportkeyvaluepairs' => Call\HashTableExportKeyValuePairs::class,
+    ];
+
+    public static function ensureMethod(Context $context, string $methodLc): bool
+    {
+        if (StreamIoRuntime::shouldDeferHeavyStreamIoEmitters($context)
+            && ('keyscopy' === $methodLc || 'valuescopy' === $methodLc)) {
+            return false;
+        }
+        $handler = self::METHOD_HANDLERS[$methodLc] ?? null;
+        if (null === $handler) {
+            return false;
+        }
+        $proxyName = 'phpcompiler\\vm\\hashtable::'.$methodLc;
+        if ($context->functionIsRegistered($proxyName)) {
+            return true;
+        }
+        $context->functionProxies[$proxyName] = new $handler();
+
+        return true;
+    }
+
+    public static function isNestedHashTableMethod(string $methodLc): bool
+    {
+        return isset(self::METHOD_HANDLERS[$methodLc]);
+    }
+}

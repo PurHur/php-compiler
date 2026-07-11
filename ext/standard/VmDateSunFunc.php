@@ -34,7 +34,7 @@ final class VmDateSunFunc
             );
         }
 
-        $timestamp = VmMath::parseIntBuiltinArg($frame->calledArgs[0], $function, 1, 'timestamp');
+        $timestamp = VmMath::parseIntBuiltinArgForFrame($frame, 0, $function, 1, 'timestamp');
         $returnFormat = VmDate::SUNFUNCS_RET_STRING;
         $latitude = null;
         $longitude = null;

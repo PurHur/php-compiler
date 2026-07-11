@@ -7,9 +7,11 @@ namespace PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 
 /**
- * JIT/AOT link for __compiler_sscanf* (issue #7330, #9134).
+ * JIT/AOT link for __compiler_sscanf* (issue #7330, #9134, #12467, #13149).
  *
- * Two-arg array return uses {@see SscanfJitHelper} PHP; standalone keeps {@see SscanfJit} LLVM.
+ * Array return, by-ref assignment, and vfscanf use {@see SscanfJitHelper} /
+ * {@see VfscanfJitHelper} PHP on JIT embed and standalone AOT.
+ * php-src: ext/standard/formatted_io.c
  */
 final class Sscanf
 {
@@ -20,18 +22,13 @@ final class Sscanf
 
     public static function ensureStandaloneBodies(Context $context): void
     {
-        SscanfJit::implement($context);
+        self::implement($context);
     }
 
     public static function implement(Context $context): void
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            SscanfJit::implement($context);
-
-            return;
-        }
-
         StringSscanfArray::implement($context);
-        SscanfJit::implement($context);
+        StringSscanfByRef::implement($context);
+        StringVfscanf::implement($context);
     }
 }

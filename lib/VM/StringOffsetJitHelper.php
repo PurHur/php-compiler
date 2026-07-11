@@ -14,6 +14,8 @@ final class StringOffsetJitHelper
 {
     public const INCDEC_ERROR = 'Cannot increment/decrement string offsets';
 
+    public const EMPTY_ASSIGN_ERROR = 'Cannot assign an empty string to a string offset';
+
     /**
      * Zend-style byte index: negative offsets count from the end (PHP 7.1+).
      *
@@ -31,6 +33,11 @@ final class StringOffsetJitHelper
     public static function incDecErrorMessage(): string
     {
         return self::INCDEC_ERROR;
+    }
+
+    public static function emptyAssignErrorMessage(): string
+    {
+        return self::EMPTY_ASSIGN_ERROR;
     }
 
     public static function byteFromLong(int $value): int

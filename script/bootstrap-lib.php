@@ -812,6 +812,36 @@ function bootstrapDiffInventoryReport(array $committed, array $liveReport): arra
 }
 
 /**
+ * Diff lines that require regenerating docs/bootstrap-inventory.md (file-list / summary / CFG).
+ * Per-file construct-flag drift is informational only — see docs/local-ci-matrix.md (#10368).
+ *
+ * @param array<string, mixed> $liveReport from bootstrapCollectInventoryReport()
+ *
+ * @return list<string>
+ */
+function bootstrapStructuralDiffLines(array $committed, array $liveReport): array
+{
+    $all = bootstrapDiffInventoryReport($committed, $liveReport);
+    $out = [];
+    $inConstruct = false;
+    foreach ($all as $line) {
+        if ('Per-file construct flags:' === $line) {
+            $inConstruct = true;
+            continue;
+        }
+        if ($inConstruct) {
+            if (str_starts_with($line, '  …')) {
+                $inConstruct = false;
+            }
+            continue;
+        }
+        $out[] = $line;
+    }
+
+    return $out;
+}
+
+/**
  * Ignore line-number-only drift in per-file warning rows (#3048).
  */
 function bootstrapNormalizeInventoryLineNumbers(string $content): string

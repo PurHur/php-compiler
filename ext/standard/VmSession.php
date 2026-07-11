@@ -31,9 +31,41 @@ final class VmSession
 
     public const DEFAULT_NAME = 'PHPSESSID';
 
+    public const EMPTY_NAME_WARNING = 'session.name "%s" cannot be numeric or empty';
+
+    public const ACTIVE_ID_CHANGE_WARNING = 'session_id(): Session ID cannot be changed when a session is active';
+
+    public const ACTIVE_NAME_CHANGE_WARNING = 'session_name(): Session name cannot be changed when a session is active';
+
+    public const HEADERS_SENT_NAME_CHANGE_WARNING = 'session_name(): Session name cannot be changed after headers have already been sent';
+
     public const DEFAULT_MODULE = 'files';
 
     public const MAX_MODULE_LEN = 32;
+
+    /** php-src ext/session/session.c — PS(cache_expire) / session.cache_expire default (minutes). */
+    public const DEFAULT_CACHE_EXPIRE = 180;
+
+    /** php-src ext/session/session.c — PS(cache_limiter) / session.cache_limiter default. */
+    public const DEFAULT_CACHE_LIMITER = 'nocache';
+
+    public const ACTIVE_CACHE_LIMITER_WARNING = 'Session cache limiter cannot be changed when a session is active';
+
+    public const HEADERS_SENT_CACHE_LIMITER_WARNING = 'Session cache limiter cannot be changed after headers have already been sent';
+
+    public const ACTIVE_COOKIE_PARAMS_WARNING = 'Session cookie parameters cannot be changed when a session is active';
+
+    public const HEADERS_SENT_COOKIE_PARAMS_WARNING = 'Session cookie parameters cannot be changed after headers have already been sent';
+
+    public const ACTIVE_SAVE_PATH_WARNING = 'Session save path cannot be changed when a session is active';
+
+    public const HEADERS_SENT_SAVE_PATH_WARNING = 'Session save path cannot be changed after headers have already been sent';
+
+    /** php-src ext/session/session.c — php_session_start() when SG(headers_sent). */
+    public const HEADERS_SENT_START_WARNING = 'session_start(): Session cannot be started after headers have already been sent';
+
+    /** php-src ext/session/session.c — PG(session_save_path) default on Linux CLI. */
+    public const DEFAULT_SAVE_PATH = '/var/lib/php/sessions';
 
     private static bool $active = false;
 
@@ -43,12 +75,180 @@ final class VmSession
 
     private static string $moduleName = self::DEFAULT_MODULE;
 
+    private static int $cacheExpire = self::DEFAULT_CACHE_EXPIRE;
+
+    private static string $cacheLimiter = self::DEFAULT_CACHE_LIMITER;
+
+    private static int $cookieLifetime = 0;
+
+    private static string $cookiePath = '/';
+
+    private static string $cookieDomain = '';
+
+    private static bool $cookieSecure = false;
+
+    private static bool $cookieHttponly = false;
+
+    private static string $cookieSamesite = '';
+
     public static function reset(): void
     {
         self::$active = false;
         self::$name = self::DEFAULT_NAME;
         self::$id = '';
         self::$moduleName = self::DEFAULT_MODULE;
+        self::$cacheExpire = self::DEFAULT_CACHE_EXPIRE;
+        self::$cacheLimiter = self::DEFAULT_CACHE_LIMITER;
+        self::resetCookieParams();
+    }
+
+    public static function resetCookieParams(): void
+    {
+        self::$cookieLifetime = 0;
+        self::$cookiePath = '/';
+        self::$cookieDomain = '';
+        self::$cookieSecure = false;
+        self::$cookieHttponly = false;
+        self::$cookieSamesite = '';
+    }
+
+    /**
+     * @return array{
+     *     lifetime: int,
+     *     path: string,
+     *     domain: string,
+     *     secure: bool,
+     *     httponly: bool,
+     *     samesite: string,
+     * }
+     */
+    public static function getCookieParams(): array
+    {
+        return [
+            'lifetime' => self::$cookieLifetime,
+            'path' => self::$cookiePath,
+            'domain' => self::$cookieDomain,
+            'secure' => self::$cookieSecure,
+            'httponly' => self::$cookieHttponly,
+            'samesite' => self::$cookieSamesite,
+        ];
+    }
+
+    public static function cookieParamsHashTable(): HashTable
+    {
+        $ht = new HashTable();
+        $params = self::getCookieParams();
+        $lifetime = new Variable(Variable::TYPE_INTEGER);
+        $lifetime->int($params['lifetime']);
+        $ht->add('lifetime', $lifetime);
+        $path = new Variable(Variable::TYPE_STRING);
+        $path->string($params['path']);
+        $ht->add('path', $path);
+        $domain = new Variable(Variable::TYPE_STRING);
+        $domain->string($params['domain']);
+        $ht->add('domain', $domain);
+        $secure = new Variable(Variable::TYPE_BOOLEAN);
+        $secure->bool($params['secure']);
+        $ht->add('secure', $secure);
+        $httponly = new Variable(Variable::TYPE_BOOLEAN);
+        $httponly->bool($params['httponly']);
+        $ht->add('httponly', $httponly);
+        $samesite = new Variable(Variable::TYPE_STRING);
+        $samesite->string($params['samesite']);
+        $ht->add('samesite', $samesite);
+
+        return $ht;
+    }
+
+    /**
+     * @param array{
+     *     lifetime: int,
+     *     path: string,
+     *     domain: string,
+     *     secure: bool,
+     *     httponly: bool,
+     *     samesite: string,
+     * } $params
+     */
+    public static function applyCookieParams(?Frame $frame, array $params): bool
+    {
+        if (!self::canChangeCookieParams($frame)) {
+            return false;
+        }
+        self::$cookieLifetime = $params['lifetime'];
+        self::$cookiePath = $params['path'];
+        self::$cookieDomain = $params['domain'];
+        self::$cookieSecure = $params['secure'];
+        self::$cookieHttponly = $params['httponly'];
+        self::$cookieSamesite = $params['samesite'];
+
+        return true;
+    }
+
+    public static function canChangeCookieParams(?Frame $frame): bool
+    {
+        if (self::$active) {
+            self::triggerSessionWarning($frame, self::ACTIVE_COOKIE_PARAMS_WARNING);
+
+            return false;
+        }
+        if (SapiOutput::headersSent()) {
+            self::triggerSessionWarning($frame, self::HEADERS_SENT_COOKIE_PARAMS_WARNING);
+
+            return false;
+        }
+
+        return true;
+    }
+
+    public static function getCacheExpire(): int
+    {
+        return self::$cacheExpire;
+    }
+
+    public static function setCacheExpire(int $minutes): void
+    {
+        if ($minutes < 0) {
+            throw new \ValueError(
+                'session_cache_expire(): Argument #1 ($new_cache_expire) must be greater than or equal to 0'
+            );
+        }
+        self::$cacheExpire = $minutes;
+    }
+
+    public static function getCacheLimiter(): string
+    {
+        return self::$cacheLimiter;
+    }
+
+    /**
+     * @return string|false previous limiter on success, or false when change is rejected
+     */
+    public static function setCacheLimiter(?Frame $frame, string $newLimiter): string|false
+    {
+        if (!self::canChangeCacheLimiter($frame)) {
+            return false;
+        }
+        $previous = self::$cacheLimiter;
+        self::$cacheLimiter = $newLimiter;
+
+        return $previous;
+    }
+
+    public static function canChangeCacheLimiter(?Frame $frame): bool
+    {
+        if (self::$active) {
+            self::triggerSessionWarning($frame, self::ACTIVE_CACHE_LIMITER_WARNING);
+
+            return false;
+        }
+        if (SapiOutput::headersSent()) {
+            self::triggerSessionWarning($frame, self::HEADERS_SENT_CACHE_LIMITER_WARNING);
+
+            return false;
+        }
+
+        return true;
     }
 
     public static function isActive(): bool
@@ -99,6 +299,39 @@ final class VmSession
         return self::$moduleName;
     }
 
+    public static function getSavePath(): string
+    {
+        return VmIni::getSessionSavePath();
+    }
+
+    public static function canChangeSavePath(?Frame $frame): bool
+    {
+        if (self::$active) {
+            self::triggerSessionWarning($frame, self::ACTIVE_SAVE_PATH_WARNING);
+
+            return false;
+        }
+        if (SapiOutput::headersSent()) {
+            self::triggerSessionWarning($frame, self::HEADERS_SENT_SAVE_PATH_WARNING);
+
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * @return string|false previous save path on success, or false when change is rejected
+     */
+    public static function setSavePath(?Frame $frame, string $newPath): string|false
+    {
+        if (!self::canChangeSavePath($frame)) {
+            return false;
+        }
+
+        return VmIni::setSessionSavePathValue($newPath);
+    }
+
     public static function isSupportedModule(string $module): bool
     {
         return self::DEFAULT_MODULE === strtolower($module);
@@ -107,7 +340,7 @@ final class VmSession
     public static function canChangeSaveHandler(?Frame $frame): bool
     {
         if (self::$active) {
-            self::triggerSaveHandlerWarning(
+            self::triggerSessionWarning(
                 $frame,
                 'Session save handler cannot be changed when a session is active'
             );
@@ -115,10 +348,26 @@ final class VmSession
             return false;
         }
         if (SapiOutput::headersSent()) {
-            self::triggerSaveHandlerWarning(
+            self::triggerSessionWarning(
                 $frame,
                 'Session save handler cannot be changed after headers have already been sent'
             );
+
+            return false;
+        }
+
+        return true;
+    }
+
+    public static function canChangeName(?Frame $frame): bool
+    {
+        if (self::$active) {
+            self::triggerSessionWarning($frame, self::ACTIVE_NAME_CHANGE_WARNING);
+
+            return false;
+        }
+        if (SapiOutput::headersSent()) {
+            self::triggerSessionWarning($frame, self::HEADERS_SENT_NAME_CHANGE_WARNING);
 
             return false;
         }
@@ -141,7 +390,7 @@ final class VmSession
         return $previous;
     }
 
-    private static function triggerSaveHandlerWarning(?Frame $frame, string $message): void
+    private static function triggerSessionWarning(?Frame $frame, string $message): void
     {
         if (null === $frame || null === $frame->vmContext) {
             return;
@@ -156,15 +405,25 @@ final class VmSession
     }
 
     /**
+     * php-src: ext/session/session.c — session.name must be non-empty and non-numeric.
+     */
+    public static function isRejectedSessionName(string $name): bool
+    {
+        return '' === $name || is_numeric($name);
+    }
+
+    public static function rejectedSessionNameMessage(string $name): string
+    {
+        return \sprintf(self::EMPTY_NAME_WARNING, $name);
+    }
+
+    /**
      * @return string|false
      * previous name, or false when session is active
      */
     public static function setName(string $name) {
-        if (self::$active) {
-            return false;
-        }
-        if ('' === $name) {
-            return false;
+        if (self::isRejectedSessionName($name)) {
+            return self::$name;
         }
         $previous = self::$name;
         self::$name = $name;
@@ -179,9 +438,12 @@ final class VmSession
 
     /**
      * @return string|false
-     * previous id, or false when $id is empty
+     * previous id, or false when $id is invalid (non-empty but sanitizes to empty)
      */
     public static function setId(string $id) {
+        if ('' === $id) {
+            return self::$id;
+        }
         $sanitized = self::sanitizeId($id);
         if ('' === $sanitized) {
             return false;
@@ -200,10 +462,11 @@ final class VmSession
         $incomingId = self::readCookieId($ctx);
         if ('' !== $incomingId) {
             self::$id = $incomingId;
-        } else {
+        } elseif ('' === self::$id) {
+            // php-src ext/session/session.c — reuse PS(id) after session_write_close() in-request.
             self::$id = self::generateId();
             ResponseContext::addHeader(
-                SetcookieLine::build(self::$name, self::$id, 0, '/'),
+                self::buildSessionSetCookieLine(self::$id),
                 false
             );
         }
@@ -257,7 +520,7 @@ final class VmSession
         }
         self::$id = self::generateId();
         ResponseContext::addHeader(
-            SetcookieLine::build(self::$name, self::$id, 0, '/'),
+            self::buildSessionSetCookieLine(self::$id),
             false
         );
 
@@ -410,6 +673,25 @@ final class VmSession
         return $deleted;
     }
 
+    private static function buildSessionSetCookieLine(string $sessionId): string
+    {
+        $expires = 0;
+        if (self::$cookieLifetime > 0) {
+            $expires = time() + self::$cookieLifetime;
+        }
+
+        return SetcookieLine::build(
+            self::$name,
+            $sessionId,
+            $expires,
+            self::$cookiePath,
+            self::$cookieDomain,
+            self::$cookieSecure,
+            self::$cookieHttponly,
+            self::$cookieSamesite
+        );
+    }
+
     private static function readCookieId(Context $ctx): string
     {
         $cookieVar = $ctx->getSuperglobal('_COOKIE');
@@ -444,13 +726,9 @@ final class VmSession
 
             return;
         }
-        $decoded = VmUnserializeFormat::decodePayload($raw);
-        if (!is_array($decoded)) {
+        if (!VmSessionSerializer::decodePhp($ctx, $raw)) {
             $sessionVar->array(new HashTable());
-
-            return;
         }
-        $sessionVar->array(self::importArray($decoded));
     }
 
     private static function saveSession(Context $ctx): void
@@ -459,32 +737,18 @@ final class VmSession
             return;
         }
         $sessionVar = $ctx->getSuperglobal('_SESSION');
-        if (null === $sessionVar) {
+        if (null === $sessionVar || Variable::TYPE_ARRAY !== $sessionVar->type) {
             return;
         }
-        $exported = VmJson::export($sessionVar);
-        $payload = serialize($exported);
+        $payload = VmSessionSerializer::encodePhp($ctx, $sessionVar->toArray());
+        if (false === $payload) {
+            return;
+        }
         $dir = SessionFileStorage::storageDir();
         if (!VmStatPath::isDir($dir)) {
             VmFs::mkdir($dir, 0700, true);
         }
         VmFs::filePutContents(SessionFileStorage::storagePath(self::$id), $payload, \LOCK_EX);
-    }
-
-    private static function importArray(array $decoded): HashTable
-    {
-        $ht = new HashTable();
-        $isList = array_is_list($decoded);
-        foreach ($decoded as $key => $item) {
-            $slot = VmJson::import($item);
-            if ($isList) {
-                $ht->addIndex((int) $key, $slot);
-            } else {
-                $ht->add((string) $key, $slot);
-            }
-        }
-
-        return $ht;
     }
 
     private static function generateId(): string

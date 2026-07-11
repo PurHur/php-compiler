@@ -4,14 +4,23 @@ declare(strict_types=1);
 
 namespace PHPCompiler\Test\Unit;
 
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
 /** @covers issue #7261 */
 final class SortDirectionEnumTest extends TestCase
 {
+    private function requireSortingEnum(): void
+    {
+        if (!CompilerVersion::supportsSortingEnum()) {
+            $this->markTestSkipped('SortDirection enum withheld on reference profile');
+        }
+    }
+
     public function testSortDirectionBuiltinEnumExists(): void
     {
+        $this->requireSortingEnum();
         $runtime = new Runtime();
         $code = <<<'PHP'
 <?php
@@ -31,6 +40,7 @@ PHP;
 
     public function testSortDirectionEnumAotLint(): void
     {
+        $this->requireSortingEnum();
         $root = dirname(__DIR__, 2);
         $bin = realpath($root.'/bin/compile.php');
         $this->assertNotFalse($bin);

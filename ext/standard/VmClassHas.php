@@ -98,6 +98,22 @@ final class VmClassHas
         ));
     }
 
+    /** php-src ext/standard/class.c — get_parent_class() operand (#12689). */
+    public static function requireObjectOrValidClassName(Variable $objectOrClass, string $function): void
+    {
+        $objectOrClass = $objectOrClass->resolveIndirect();
+        if (Variable::TYPE_STRING === $objectOrClass->type
+            || Variable::TYPE_OBJECT === $objectOrClass->type
+            || Variable::TYPE_ENUM_CASE === $objectOrClass->type) {
+            return;
+        }
+        throw new \TypeError(\sprintf(
+            '%s(): Argument #1 ($object_or_class) must be an object or a valid class name, %s given',
+            $function,
+            self::vmTypeName($objectOrClass->type)
+        ));
+    }
+
     public static function vmTypeName(int $type): string
     {
         switch ($type) {

@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
-use PHPCompiler\JIT\Builtin\StreamContextRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -18,16 +17,13 @@ final class JitStreamContextRepresentation
 {
     public static function markerKeyLiteral(Context $context): Value
     {
-        return $context->builder->call(
-            $context->lookupFunction('__string__literal'),
+        return $context->builder->load(
             $context->constantStringFromString(VmStreamContext::MARKER_KEY)
         );
     }
 
     public static function isRepresentation(Context $context, Value $htPtr): Value
     {
-        StreamContextRuntime::ensureLinked($context);
-
         return $context->builder->call(
             $context->lookupFunction('__hashtable__offsetIsSetStringKey'),
             $htPtr,
@@ -90,7 +86,6 @@ final class JitStreamContextRepresentation
 
     public static function readMarkerId(Context $context, Value $htPtr): Value
     {
-        StreamContextRuntime::ensureLinked($context);
         $valuePtr = $context->builder->call(
             $context->lookupFunction('__hashtable__readStringKeyValue'),
             $htPtr,

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\Builtin\ObGzhandler;
+use PHPCompiler\JIT\Builtin\ObOutputRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -16,6 +17,8 @@ final class JitObStart
     /** @return Value */
     public static function invoke(Context $context, JITVariable ...$args): Value
     {
+        ObOutputRuntime::ensureObStackLinked($context);
+
         if (1 === \count($args)) {
             $literal = JitStringArg::compileTimeLiteral($args[0]);
             if ('ob_gzhandler' === $literal) {

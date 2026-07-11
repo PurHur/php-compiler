@@ -8,6 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -30,7 +31,28 @@ final class time_sleep_until extends Internal
             return;
         }
         $timestamp = self::requireFloat($frame->calledArgs[0]);
+        if (VmSleepPure::isTimestampInPast($timestamp)) {
+            self::emitPastTimestampWarning($frame);
+            $frame->returnVar->bool(false);
+
+            return;
+        }
         $frame->returnVar->bool(VmSleep::timeSleepUntil($timestamp));
+    }
+
+    private static function emitPastTimestampWarning(Frame $frame): void
+    {
+        if (null === $frame->vmContext) {
+            return;
+        }
+        $frame->vmContext->errors->triggerError(
+            VmSleepPure::PAST_TIMESTAMP_WARNING,
+            ErrorReporter::E_WARNING,
+            '' !== $frame->scriptPath ? $frame->scriptPath : null,
+            $frame->vmContext,
+            $frame,
+            $frame->callSiteLine
+        );
     }
 
     public function call(Context $context, JITVariable ...$args): Value

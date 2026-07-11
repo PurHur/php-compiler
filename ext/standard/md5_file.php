@@ -28,7 +28,7 @@ final class md5_file extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $path = VmFilestatArg::coerceFilenameArg($frame->calledArgs[0], 'md5_file');
+        $path = VmFilestatArg::coerceFilenameArg($frame->calledArgs[0], 'md5_file', 0, 'filename', $frame);
         $raw = false;
         if (2 === $argc) {
             $rawArg = $frame->calledArgs[1]->resolveIndirect();
@@ -56,7 +56,7 @@ final class md5_file extends Internal
         if (isset($args[1])) {
             $raw = JitBoolArg::lower($context, $args[1], 'md5_file() raw_output');
         }
-        $path = JitFilestatArg::lowerFilename($context, $args[0], 'md5_file');
+        $path = JitStreamPath::lowerNonEmptyPath($context, $args[0], 'md5_file');
 
         return JitHashFile::md5($context, $path, $raw);
     }

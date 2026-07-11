@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\StreamReadRuntime;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
@@ -239,6 +240,7 @@ final class JitStreamGetContents
         Value $maxlengthLong,
         Value $offsetLong,
     ): Value {
+        StreamReadRuntime::ensureLinked($context);
         $contents = $context->builder->call(
             $context->lookupFunction('__compiler_stream_get_contents'),
             $handleLong,

@@ -7,10 +7,8 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\JitBoolArg;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\InternalStrictArg;
 use PHPLLVM\Value;
 
 /** microtime() — sub-second clock (VM VmDate; JIT/AOT StringMicrotime LLVM, #6110/#5045/#2186). */
@@ -32,13 +30,7 @@ final class microtime extends Internal
         }
         $asFloat = false;
         if (1 === $argc) {
-            InternalStrictArg::rejectNullBool($frame->calledArgs[0], 'microtime', 'as_float', 0);
-            $asFloat = VmMath::parseBoolBuiltinArg(
-                $frame->calledArgs[0],
-                'microtime',
-                1,
-                'as_float'
-            );
+            $asFloat = VmMath::parseBoolBuiltinArgForFrame($frame, 0, 'microtime', 1, 'as_float');
         }
         if ($asFloat) {
             $frame->returnVar->float(VmDate::microtime(true));
@@ -55,8 +47,7 @@ final class microtime extends Internal
         }
         $asFloat = $context->constantFromBool(false);
         if (isset($args[0])) {
-            JitInternalStrictArg::rejectNullBool($context, $args[0], 'microtime', 'as_float', 1);
-            $asFloat = JitBoolArg::lower($context, $args[0], 'microtime(): Argument #1 ($as_float)');
+            $asFloat = JitBoolArg::lowerZParamBool($context, $args[0], 'microtime', 'as_float', 1);
         }
 
         return JitDate::microtime($context, $asFloat);

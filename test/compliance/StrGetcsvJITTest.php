@@ -28,6 +28,10 @@ final class StrGetcsvJITTest extends BaseTest
             __DIR__.'/cases/stdlib/str_getcsv_newline_jit.phpt',
             'str_getcsv_newline_jit.phpt'
         );
+        yield 'str_getcsv_null_separator_jit.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/str_getcsv_null_separator_jit.phpt',
+            'str_getcsv_null_separator_jit.phpt'
+        );
     }
 
     public function setUp(): void

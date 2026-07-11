@@ -6,7 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
-use PHPCompiler\JIT\ArrayBuiltinHelper;
+use PHPCompiler\JIT\Builtin\UsortRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\UsortCallbackPolicy;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -28,16 +28,13 @@ final class usort_ extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (2 !== \count($frame->calledArgs)) {
-            throw new \LogicException('usort() requires exactly two arguments');
-        }
+        VmArraySort::assertUserSortArgCount($frame, 'usort');
+        $descending = VmArraySort::resolveUserSortDescending($frame, 'usort');
+        $ht = VmArray::requireArray($frame->calledArgs[0], 'usort');
         $array = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_ARRAY !== $array->type) {
-            throw new \LogicException('usort() first argument must be an array in this compiler build');
-        }
         $callback = $frame->calledArgs[1]->resolveIndirect();
         VmArraySortCallback::requireCallback($callback, 'usort');
-        $ht = $array->toArray();
+        VmArraySortCallback::rejectInvalidStringCallback($frame, $callback, 'usort');
         if ($ht->getNumElements() < 2) {
             if (null !== $frame->returnVar) {
                 $frame->returnVar->bool(true);
@@ -58,7 +55,8 @@ final class usort_ extends Internal
             VmClosureCall::sortVariableValues(
                 $frame->vmContext,
                 $values,
-                VmClosureCall::resolve($callback)
+                VmClosureCall::resolve($callback),
+                $descending
             );
         } else {
             if (!UsortCallbackPolicy::isVmSupportedType($callback->type)) {
@@ -69,7 +67,11 @@ final class usort_ extends Internal
                 throw new \LogicException(UsortCallbackPolicy::vmRejectionMessage());
             }
             $compare = VmInternalCompare::resolveStringCallback($name);
-            VmInternalCompare::sortVariableValues($values, $compare);
+            if ($descending) {
+                VmInternalCompare::sortVariableValuesDesc($values, $compare);
+            } else {
+                VmInternalCompare::sortVariableValues($values, $compare);
+            }
         }
         $array->separateArrayForWrite();
         $ht = $array->resolveIndirect()->toArray();
@@ -90,15 +92,6 @@ final class usort_ extends Internal
         if (2 !== \count($args)) {
             throw new \LogicException('usort() requires exactly two arguments');
         }
-        if (!UsortCallbackPolicy::isJitLowerable($args[1])) {
-            throw new \LogicException(UsortCallbackPolicy::jitRejectionMessage());
-        }
-        if (UsortCallbackPolicy::isClosureJitLowerable($args[1])) {
-            ArrayBuiltinHelper::sortPackedWithClosure($context, $args[0], $args[1]);
-        } else {
-            ArrayBuiltinHelper::sortPacked($context, $args[0]);
-        }
-
-        return $context->getTypeFromString('int1')->constInt(1, false);
+        return UsortRuntime::usortPacked($context, $args[0], $args[1]);
     }
 }

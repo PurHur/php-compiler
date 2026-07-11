@@ -36,6 +36,7 @@ final class get_class_methods_ extends Internal
             return;
         }
         $ctx = VmReflection::requireContext($frame);
+        VmClassHas::requireObjectOrClass($frame->calledArgs[0], 'get_class_methods', 'object_or_class');
         $entry = VmReflection::resolveClassForGetClassMethods($ctx, $frame->calledArgs[0]);
         if (null === $entry) {
             $frame->returnVar->bool(false);
@@ -43,7 +44,7 @@ final class get_class_methods_ extends Internal
             return;
         }
         $frame->returnVar->copyFrom(
-            VmReflection::classMethodsArray($entry, VmReflection::METHOD_FILTER_DEFAULT)
+            VmReflection::classMethodsArray($entry, VmReflection::METHOD_FILTER_DEFAULT, $ctx)
         );
     }
 

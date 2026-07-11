@@ -9,9 +9,12 @@
 
 namespace PHPCompiler\ext\types;
 
+use PHPCompiler\ext\standard\JitStreamContextRepresentation;
+use PHPCompiler\ext\standard\VmStreamContext;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\Frame;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitResourceArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\TypedPropertyUninitGuard;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -31,17 +34,25 @@ class is_type extends Internal {
     }
 
     public function execute(Frame $frame): void {
-        if (count($frame->calledArgs) !== 1) {
-            throw new \LogicException("Expecting exactly a single argument to {$this->name}()");
-        }
+        $this->requireExactArgCount($frame, $this->name, 1);
         $var = $frame->calledArgs[0]->resolveIndirect();
         TypedPropertyCheck::assertReadable($var);
         if (!is_null($frame->returnVar)) {
             if (Variable::TYPE_OBJECT === $this->type) {
-                // Zend is_object(): enum case operands are objects (zend_enum.c, #5448).
+                // Zend is_object(): enum cases yes; VM resources no (ext/standard/type.c, #12302).
                 $frame->returnVar->bool(
-                    Variable::TYPE_OBJECT === $var->type
-                    || Variable::TYPE_ENUM_CASE === $var->type
+                    !$var->isVmResource()
+                    && (Variable::TYPE_OBJECT === $var->type
+                        || Variable::TYPE_ENUM_CASE === $var->type)
+                );
+
+                return;
+            }
+            if (Variable::TYPE_ARRAY === $this->type) {
+                // Zend is_array(): stream-context resources are not arrays (ext/standard/type.c, #14631).
+                $frame->returnVar->bool(
+                    Variable::TYPE_ARRAY === $var->type
+                    && !VmStreamContext::isRepresentation($var)
                 );
 
                 return;
@@ -54,8 +65,8 @@ class is_type extends Internal {
 
     public function call(Context $context, JITVariable ... $args): Value {
         $this->context = $context;
-        if (count($args) !== 1) {
-            throw new \LogicException('Too few args passed to ' . $this->name . '()');
+        if (!$this->requireExactJitArgCount($context, $args, $this->name, 1)) {
+            return $context->constantFromBool(false);
         }
         if (JITVariable::TYPE_VALUE === $args[0]->type) {
             TypedPropertyUninitGuard::emitBeforeRead($context, $args[0]);
@@ -75,7 +86,16 @@ class is_type extends Internal {
             case JITVariable::TYPE_NULL:
                 return $this->context->constantFromBool($this->type === Variable::TYPE_NULL);
             case JITVariable::TYPE_HASHTABLE:
-                return $this->context->constantFromBool($this->type === Variable::TYPE_ARRAY);
+                if (Variable::TYPE_ARRAY !== $this->type) {
+                    return $this->context->constantFromBool(false);
+                }
+
+                return $context->builder->not(
+                    JitStreamContextRepresentation::isRepresentation(
+                        $context,
+                        $context->helper->loadValue($args[0])
+                    )
+                );
             case JITVariable::TYPE_OBJECT:
                 if (Variable::TYPE_NULL === $this->type) {
                     $ptr = JITVariable::KIND_VALUE === $args[0]->kind
@@ -114,8 +134,13 @@ class is_type extends Internal {
                 if (Variable::TYPE_OBJECT === $this->type) {
                     $enumCaseTy = $i8->constInt(Variable::TYPE_ENUM_CASE, false);
                     $matchEnum = $context->builder->icmp(Builder::INT_EQ, $typeByte, $enumCaseTy);
+                    $isObjType = $context->builder->or($matchFull, $matchEnum);
+                    \PHPCompiler\JIT\Builtin\StringDir::ensureLinked($context);
+                    $streamCtx = JitStreamContextRepresentation::isRepresentationArg($context, $args[0]);
+                    $handleRes = JitResourceArg::lowerIsResource($context, $args[0]);
+                    $isRes = $context->builder->or($streamCtx, $handleRes);
 
-                    return $context->builder->or($matchFull, $matchEnum);
+                    return $context->builder->and($isObjType, $context->builder->not($isRes));
                 }
                 if (Variable::TYPE_STRING === $this->type) {
                     $tag = $context->builder->and($typeByte, $i8->constInt(0x7f, false));
@@ -126,6 +151,11 @@ class is_type extends Internal {
                     );
 
                     return $context->builder->or($matchFull, $matchTag);
+                }
+                if (Variable::TYPE_ARRAY === $this->type) {
+                    $streamCtx = JitStreamContextRepresentation::isRepresentationArg($context, $args[0]);
+
+                    return $context->builder->and($matchFull, $context->builder->not($streamCtx));
                 }
 
                 return $matchFull;

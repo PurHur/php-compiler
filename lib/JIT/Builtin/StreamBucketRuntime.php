@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\ext\standard\JitStreamBucket;
 use PHPCompiler\JIT;
 use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
@@ -262,47 +263,7 @@ final class StreamBucketRuntime
 
         $bucketHandle = $fn->getParam(0);
         $dataStr = $fn->getParam(1);
-        $objectType = $context->type->object;
-        $classId = $objectType->lookup('StreamBucket');
-
-        $obj = $objectType->allocate($classId);
-        $objectType->markObjectConstructed($obj);
-
-        $bucketVar = new JITVariable(
-            $context,
-            JITVariable::TYPE_NATIVE_LONG,
-            JITVariable::KIND_VALUE,
-            $bucketHandle
-        );
-        $objectType->propertyStore(
-            $objectType->propertySlotFor($obj, 'StreamBucket', 'bucket'),
-            $bucketVar,
-            JITVariable::TYPE_NATIVE_LONG
-        );
-
-        $owned = $context->builder->call(
-            $context->lookupFunction('__string__separate'),
-            $dataStr
-        );
-        $dataVar = new JITVariable(
-            $context,
-            JITVariable::TYPE_STRING,
-            JITVariable::KIND_VALUE,
-            $owned
-        );
-        $objectType->propertyStore(
-            $objectType->propertySlotFor($obj, 'StreamBucket', 'data'),
-            $dataVar,
-            JITVariable::TYPE_STRING
-        );
-
-        $slot = JitValueBox::alloc($context);
-        $ptr = JitValueBox::pointer($context, $slot);
-        $context->builder->call(
-            $context->lookupFunction('__value__writeObject'),
-            $ptr,
-            $obj
-        );
+        $ptr = JitStreamBucket::buildStdClassBucketValue($context, $bucketHandle, $dataStr);
         $context->builder->returnValue($ptr);
     }
 
@@ -375,6 +336,52 @@ final class StreamBucketRuntime
 
             return;
         }
+        $context->builder->clearInsertionPosition();
+    }
+
+    public static function shouldDeferInventoryEmitStubs(Context $context): bool
+    {
+        return StreamIoRuntime::shouldDeferHeavyStreamIoEmitters($context);
+    }
+
+    public static function ensureDeferredStubsForInventoryEmit(Context $context): void
+    {
+        if (!self::shouldDeferInventoryEmitStubs($context)) {
+            return;
+        }
+        self::implementDeferredResourceProbeStubs($context);
+    }
+
+    public static function implementDeferredResourceProbeStubs(Context $context): void
+    {
+        $restore = self::captureInsertBlock($context);
+        $i32 = $context->getTypeFromString('int32');
+        $zero = $i32->constInt(0, false);
+        foreach (['__compiler_is_bucket_resource', '__compiler_is_brigade_resource'] as $name) {
+            self::implementI32I64RetStub($context, $name, $zero);
+        }
+        self::registerLinkedRuntime($context);
+        self::restoreInsertBlock($context, $restore);
+    }
+
+    private static function implementI32I64RetStub(Context $context, string $name, Value $ret): void
+    {
+        $probe = $context->module->getNamedFunction($name);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction($name, $probe);
+
+            return;
+        }
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $fn = $probe ?? $context->module->addFunction(
+            $name,
+            $context->context->functionType($i32, false, $i64)
+        );
+        $entry = $fn->appendBasicBlock('stream_bucket_probe_stub');
+        $context->builder->positionAtEnd($entry);
+        $context->builder->returnValue($ret);
+        $context->registerFunction($name, $fn);
         $context->builder->clearInsertionPosition();
     }
 }

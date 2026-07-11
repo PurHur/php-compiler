@@ -12,13 +12,7 @@ final class VmGetopt
 {
     public static function validateRestIndexByRef(Variable $var, string $fn, int $argIndex): void
     {
-        if (!$var->isReference()) {
-            throw new \Error(\sprintf(
-                '%s(): Argument #%d ($rest_index) could not be passed by reference',
-                $fn,
-                $argIndex + 1
-            ));
-        }
+        // By-ref lvalue is validated at call site via ReferencableCheck::assertOutgoingCallArgs.
         $target = $var->resolveIndirect();
         if (EnumCaseSupport::isEnumCaseVariable($target)) {
             throw new \TypeError(\sprintf(

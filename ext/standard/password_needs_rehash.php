@@ -7,7 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitStringBuiltinArg;
+use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -23,8 +23,17 @@ final class password_needs_rehash extends Internal
     public function execute(Frame $frame): void
     {
         $argc = \count($frame->calledArgs);
-        if ($argc < 2 || $argc > 3) {
-            throw new \LogicException('password_needs_rehash() requires two or three arguments');
+        if ($argc < 2) {
+            throw new \ArgumentCountError(\sprintf(
+                'password_needs_rehash() expects at least 2 arguments, %d given',
+                $argc
+            ));
+        }
+        if ($argc > 3) {
+            throw new \ArgumentCountError(\sprintf(
+                'password_needs_rehash() expects at most 3 arguments, %d given',
+                $argc
+            ));
         }
         $hash = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'password_needs_rehash', 0, 'hash');
         $algo = VmPassword::resolveAlgo($frame->calledArgs[1], 'password_needs_rehash', 1, 'algo');
@@ -51,8 +60,17 @@ final class password_needs_rehash extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         $argc = \count($args);
-        if ($argc < 2 || $argc > 3) {
-            throw new \LogicException('password_needs_rehash() requires two or three arguments');
+        if ($argc < 2) {
+            throw new \ArgumentCountError(\sprintf(
+                'password_needs_rehash() expects at least 2 arguments, %d given',
+                $argc
+            ));
+        }
+        if ($argc > 3) {
+            throw new \ArgumentCountError(\sprintf(
+                'password_needs_rehash() expects at most 3 arguments, %d given',
+                $argc
+            ));
         }
         $options = null;
         if (3 === $argc) {
@@ -61,7 +79,7 @@ final class password_needs_rehash extends Internal
 
         return JitPasswordNeedsRehash::invoke(
             $context,
-            JitStringBuiltinArg::lower($context, $args[0], 'password_needs_rehash', 0, 'hash'),
+            JitStringArg::lowerDominating($context, $args[0], 'password_needs_rehash() hash'),
             $args[1],
             $options
         );

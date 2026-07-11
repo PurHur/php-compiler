@@ -18,9 +18,9 @@ final class JitHashAlgos
 
         $slot = JitValueBox::alloc($context);
         $ptr = JitValueBox::pointer($context, $slot);
-        // Same digest set as hash_hmac_algos() for VmHashNative-supported algorithms.
+        // Full ext/hash registry (issue #11463); distinct from hash_hmac_algos HMAC subset.
         $raw = $context->builder->call(
-            $context->lookupFunction('__compiler_hash_hmac_algos')
+            $context->lookupFunction('__compiler_hash_algos')
         );
         $context->builder->call(
             $context->lookupFunction('__value__writeHashtable'),

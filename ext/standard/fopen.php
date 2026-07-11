@@ -20,13 +20,13 @@ final class fopen extends Internal
         $argc = \count($frame->calledArgs);
         if ($argc < 2 || $argc > 4) {
             throw new \ArgumentCountError(
-                'fopen() expects at least 2 arguments, '.\max(0, $argc - 2).' given'
+                'fopen() expects at least 2 arguments, '.$argc.' given'
             );
         }
         if (null === $frame->returnVar) {
             return;
         }
-        $path = VmStreamPath::coerceNonEmptyPathArg($frame->calledArgs[0], 'fopen');
+        $path = VmStreamPath::coerceNonEmptyPathArgForFrame($frame, 0, 'fopen', 'filename');
         $mode = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'fopen', 1, 'mode');
 
         $useIncludePath = false;
@@ -68,13 +68,13 @@ final class fopen extends Internal
         $argc = \count($args);
         if ($argc < 2 || $argc > 4) {
             throw new \ArgumentCountError(
-                'fopen() expects at least 2 arguments, '.\max(0, $argc - 2).' given'
+                'fopen() expects at least 2 arguments, '.$argc.' given'
             );
         }
 
         return JitFopen::invoke(
             $context,
-            JitStreamPath::lowerNonEmptyPath($context, $args[0], 'fopen'),
+            JitStreamPath::lowerNonEmptyPath($context, $args[0], 'fopen', 0, 'filename'),
             JitStringBuiltinArg::lower($context, $args[1], 'fopen', 1, 'mode')
         );
     }

@@ -5,30 +5,41 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\CompilerVersion;
+use PHPCompiler\VM\HashTable;
 
 /**
- * phpversion/php_uname/extension introspection for compiled JIT/AOT modules (#9148, php-in-PHP).
+ * phpversion/php_uname/extension introspection for compiled JIT/AOT modules (#9148, #13803, php-in-PHP).
  *
  * VM SSOT: {@see VmInfo} / {@see ModuleRegistry}
  * php-src: ext/standard/info.c
  */
 final class InfoJitHelper
 {
-    private static string $extensionFuncsExtension = '';
-
     public static function phpversion(?string $extension): string
     {
+        $runtimeVersion = CompilerVersion::reportedPhpVersion();
         if (null === $extension || '' === $extension) {
-            return CompilerVersion::VERSION;
+            return $runtimeVersion;
         }
         if (VmInfo::isEngineExtensionName($extension) || VmInfo::isBundledExtensionName($extension)) {
-            return CompilerVersion::VERSION;
+            return $runtimeVersion;
         }
         if (!ModuleRegistry::extensionLoaded($extension)) {
             return '';
         }
 
-        return ModuleRegistry::getExtensionVersion($extension) ?? CompilerVersion::VERSION;
+        return ModuleRegistry::getExtensionVersion($extension) ?? $runtimeVersion;
+    }
+
+    /** ABI: unknown extension version → null {@see __string__*} (#13803). */
+    public static function phpversionArgv(?string $extension): ?string
+    {
+        if (null === $extension) {
+            return CompilerVersion::reportedPhpVersion();
+        }
+        $v = self::phpversion($extension);
+
+        return '' === $v ? null : $v;
     }
 
     public static function php_sapi_name(): string
@@ -38,7 +49,7 @@ final class InfoJitHelper
 
     public static function zend_version(): string
     {
-        return '4.4.0';
+        return CompilerVersion::zendVersion();
     }
 
     public static function php_uname(?string $mode): string
@@ -57,48 +68,32 @@ final class InfoJitHelper
         return ModuleRegistry::extensionLoaded($name);
     }
 
-    public static function countLoadedExtensions(int $zendExtensions): int
+    /** ABI: null/empty name → 0 (#13803). */
+    public static function extensionLoadedArgv(?string $name): int
     {
-        if (0 !== $zendExtensions) {
+        if (null === $name || '' === $name) {
             return 0;
         }
 
-        return \count(ModuleRegistry::getLoadedExtensions());
+        return self::extension_loaded($name) ? 1 : 0;
     }
 
-    public static function loadedExtensionAt(int $index): string
+    public static function getLoadedExtensionsArgv(int $zendExtensions): HashTable
     {
-        return ModuleRegistry::getLoadedExtensions()[$index];
+        return VmInfo::get_loaded_extensions(0 !== $zendExtensions);
     }
 
-    public static function prepareGetExtensionFuncs(string $name): int
+    public static function getExtensionFuncsArgv(?string $extension): ?HashTable
     {
-        if ('' === $name) {
-            self::$extensionFuncsExtension = '';
-
-            return 0;
+        if (null === $extension) {
+            return null;
         }
-        $funcs = ModuleRegistry::getExtensionFunctions($name);
-        if (null === $funcs) {
-            self::$extensionFuncsExtension = '';
+        $result = VmInfo::get_extension_funcs($extension);
 
-            return 0;
-        }
-        self::$extensionFuncsExtension = $name;
-
-        return \count($funcs);
+        return false === $result ? null : $result;
     }
 
-    public static function extensionFuncAt(int $index): string
-    {
-        $funcs = ModuleRegistry::getExtensionFunctions(self::$extensionFuncsExtension);
-        if (null === $funcs) {
-            return '';
-        }
-
-        return $funcs[$index];
-    }
-
+    /** Scalar JIT helpers for posix_uname() bridge — HashTable foreach over utsname() SIGSEGV in AOT (#15633). */
     public static function posixUnameAvailable(): int
     {
         return VmUnamePure::available() ? 1 : 0;
@@ -119,9 +114,13 @@ final class InfoJitHelper
         };
     }
 
-    /** @internal test reset */
-    public static function resetForTest(): void
+    /** @deprecated LLVM loop helper — use {@see getLoadedExtensionsArgv()} (#13803) */
+    public static function countLoadedExtensions(int $zendExtensions): int
     {
-        self::$extensionFuncsExtension = '';
+        if (0 !== $zendExtensions) {
+            return 0;
+        }
+
+        return \count(ModuleRegistry::getLoadedExtensions());
     }
 }

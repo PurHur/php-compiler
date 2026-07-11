@@ -4,7 +4,7 @@ PHP 8.4 asymmetric visibility on interface properties: JIT (#4876)
 --FILE--
 <?php
 interface I {
-    private(set) string $slug;
+    public (private(set)) string $slug;
 }
 class C implements I {
     public string $slug = 'b';
@@ -19,4 +19,4 @@ try {
 }
 --EXPECT--
 b
-Cannot modify private(set) property C::$slug from global scope
+Cannot modify public private(set) property C::$slug from global scope

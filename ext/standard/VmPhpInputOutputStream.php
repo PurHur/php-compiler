@@ -208,6 +208,14 @@ final class VmPhpInputOutputStream
     /**
      * @return array{canRead: bool, canWrite: bool}|null
      */
+    public static function isValidMode(string $uri, string $mode): bool
+    {
+        return null !== self::parseMode($uri, $mode);
+    }
+
+    /**
+     * @return array{canRead: bool, canWrite: bool}|null
+     */
     private static function parseMode(string $uri, string $mode): ?array
     {
         $mode = \strtolower($mode);

@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\StringUniqid;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitBoolArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
@@ -13,7 +14,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/** uniqid() — time-based unique string (VmString; JIT via JitUniqid, no phpc_uniqid.c, #2219 #5233). */
+/** uniqid() — time-based unique string (VmString; JIT/AOT via StringUniqid + UniqidJitHelper, #2219 #5233). */
 final class uniqid extends Internal
 {
     public function __construct()
@@ -69,6 +70,12 @@ final class uniqid extends Internal
             );
         }
 
-        return JitUniqid::uniqid($context, $prefix, $moreEntropy);
+        StringUniqid::ensureLinked($context);
+
+        return $context->builder->call(
+            $context->lookupFunction('__compiler_uniqid'),
+            $prefix,
+            $moreEntropy
+        );
     }
 }

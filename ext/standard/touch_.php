@@ -8,6 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -30,17 +31,19 @@ final class touch_ extends Internal
         if ($argc < 1 || $argc > 3) {
             throw new \LogicException('touch() requires one to three arguments in this compiler build');
         }
-        $path = VmFilestatArg::coerceFilenameArg($frame->calledArgs[0], self::FUNCTION);
+        $path = VmFilestatArg::coercePathArg($frame->calledArgs[0], self::FUNCTION);
         $mtime = null;
         if ($argc >= 2) {
-            $mtime = self::parseNullableLong($frame->calledArgs[1]->resolveIndirect(), 2, 'mtime');
+            $mtime = self::parseNullableLong($frame, $frame->calledArgs[1]->resolveIndirect(), 2, 'mtime');
         }
         $atime = null;
         if (3 === $argc) {
-            $atime = self::parseNullableLong($frame->calledArgs[2]->resolveIndirect(), 3, 'atime');
+            $atime = self::parseNullableLong($frame, $frame->calledArgs[2]->resolveIndirect(), 3, 'atime');
         }
         $ok = VmFs::touch($path, $mtime, $atime);
-        if (!$ok) {
+        // php-src filestat.c php_touch — empty path returns false without E_WARNING (#13343).
+        // Custom wrapper URLs without stream_metadata also fail silently (userspace.c).
+        if (!$ok && '' !== $path && !VmStreamWrapperRegistry::isCustomProtocol($path)) {
             VmFilestatFailure::warnTouchCreateFailed($frame, $path);
         }
         if (null !== $frame->returnVar) {
@@ -54,7 +57,7 @@ final class touch_ extends Internal
         if ($argc < 1 || $argc > 3) {
             throw new \LogicException('touch() requires one to three arguments in this compiler build');
         }
-        $path = JitFilestatArg::lowerFilename($context, $args[0], self::FUNCTION);
+        $path = JitFilestatArg::lowerPath($context, $args[0], self::FUNCTION);
         $i64 = $context->getTypeFromString('int64');
         $omit = $i64->constInt(self::TOUCH_TIME_OMIT, true);
         $mtime = $omit;
@@ -72,7 +75,7 @@ final class touch_ extends Internal
     /**
      * php-src: Z_PARAM_LONG_OR_NULL (ext/standard/filestat.c — php_touch).
      */
-    private static function parseNullableLong(Variable $var, int $argIndex, string $paramName): ?int
+    private static function parseNullableLong(Frame $frame, Variable $var, int $argIndex, string $paramName): ?int
     {
         $var = $var->resolveIndirect();
         if (Variable::TYPE_NULL === $var->type) {
@@ -92,6 +95,9 @@ final class touch_ extends Internal
             case Variable::TYPE_FLOAT:
                 return (int) $var->toFloat();
             case Variable::TYPE_STRING:
+                if (InternalStrictArg::isCallerStrict($frame)) {
+                    throw new \TypeError(self::nullableLongTypeError($argIndex, $paramName, 'string'));
+                }
                 $s = $var->toString();
                 if ('' === $s || !is_numeric($s)) {
                     throw new \TypeError(self::nullableLongTypeError($argIndex, $paramName, 'string'));

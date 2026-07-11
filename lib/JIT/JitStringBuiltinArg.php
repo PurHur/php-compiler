@@ -18,6 +18,41 @@ use PHPLLVM\Value;
  */
 final class JitStringBuiltinArg
 {
+    /**
+     * Z_PARAM_STR with caller strict_types parity (#12276, #12274).
+     */
+    public static function lowerStrictOrCoercible(
+        Context $context,
+        Variable $arg,
+        string $function,
+        int $argIndex,
+        string $paramName,
+        string $expectedType = 'string',
+        ?string $arrayExpectedType = null
+    ): Value {
+        if ($context->callerStrictTypes) {
+            if (Variable::TYPE_VALUE === $arg->type || Variable::TYPE_OBJECT === $arg->type) {
+                return self::lowerRequiredString($context, $arg, $function, $argIndex, $paramName);
+            }
+            if (Variable::TYPE_STRING !== $arg->type) {
+                JitNativeString::ensureInsertBlock($context);
+                self::emitTypeErrorAndAbort(
+                    $context,
+                    $function,
+                    $argIndex,
+                    $paramName,
+                    JitOperandTypeLabel::givenLabel($context, $arg)
+                );
+
+                return self::unreachableStringPtr($context);
+            }
+
+            return JitStringArg::lower($context, $arg, "{$function}() argument #" . ($argIndex + 1));
+        }
+
+        return self::lower($context, $arg, $function, $argIndex, $paramName, $expectedType, $arrayExpectedType);
+    }
+
     public static function lower(
         Context $context,
         Variable $arg,
@@ -49,6 +84,12 @@ final class JitStringBuiltinArg
             return self::unreachableStringPtr($context);
         }
         if (Variable::TYPE_OBJECT === $arg->type) {
+            if ('string' !== $expectedType) {
+                $magic = MagicMethodDispatch::coerceObjectToString($context, $arg);
+                if (null !== $magic) {
+                    return $context->helper->loadValue($magic);
+                }
+            }
             self::emitRejectTypeError($context, $arg, $function, $argIndex, $paramName, $expectedType);
 
             return self::unreachableStringPtr($context);
@@ -63,6 +104,72 @@ final class JitStringBuiltinArg
     }
 
     /**
+     * Z_PARAM_STR_OR_NULL — null passes through; enum case rejects with ?string TypeError (#17196, ext/standard/info.c).
+     */
+    public static function lowerNullableString(
+        Context $context,
+        Variable $arg,
+        string $function,
+        int $argIndex,
+        string $paramName
+    ): Value {
+        JitNativeString::ensureInsertBlock($context);
+        if (Variable::TYPE_NULL === $arg->type || $arg->isNullConstant) {
+            return $context->getTypeFromString('__string__*')->constNull();
+        }
+
+        return self::lower($context, $arg, $function, $argIndex, $paramName, '?string');
+    }
+
+    /**
+     * Z_PARAM_PATH — null coerces to "" when caller is not strict; TypeError under strict_types (#13419).
+     */
+    public static function lowerPath(
+        Context $context,
+        Variable $arg,
+        string $function,
+        int $argIndex,
+        string $paramName,
+        string $expectedType = 'string',
+        ?string $arrayExpectedType = null
+    ): Value {
+        if (Variable::TYPE_NULL === $arg->type || $arg->isNullConstant) {
+            JitNativeString::ensureInsertBlock($context);
+            if ($context->callerStrictTypes) {
+                self::emitTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'null', $expectedType);
+
+                return self::unreachableStringPtr($context);
+            }
+
+            return $context->builder->load($context->constantStringFromString(''));
+        }
+
+        return self::lower($context, $arg, $function, $argIndex, $paramName, $expectedType, $arrayExpectedType);
+    }
+
+    /**
+     * Lower typed string builtin operands (php-src IS_STRING; rejects null, #12640).
+     */
+    public static function lowerTypedString(
+        Context $context,
+        Variable $arg,
+        string $function,
+        int $argIndex,
+        string $paramName,
+        string $expectedType = 'string',
+        ?string $arrayExpectedType = null
+    ): Value {
+        JitNativeString::ensureInsertBlock($context);
+        if (Variable::TYPE_NULL === $arg->type || $arg->isNullConstant) {
+            self::emitTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'null', $expectedType);
+
+            return self::unreachableStringPtr($context);
+        }
+
+        return self::lower($context, $arg, $function, $argIndex, $paramName, $expectedType, $arrayExpectedType);
+    }
+
+    /**
      * Lower Z_PARAM_STR operands with __toString coercion when caller is not strict (#11398, ext/standard/string.c).
      */
     public static function lowerCoercible(
@@ -72,7 +179,8 @@ final class JitStringBuiltinArg
         int $argIndex,
         string $paramName,
         string $expectedType = 'string',
-        ?string $arrayExpectedType = null
+        ?string $arrayExpectedType = null,
+        bool $allowStringableUnderStrict = false
     ): Value {
         JitNativeString::ensureInsertBlock($context);
         $arrayExpected = $arrayExpectedType ?? $expectedType;
@@ -96,7 +204,7 @@ final class JitStringBuiltinArg
             return self::unreachableStringPtr($context);
         }
         if (Variable::TYPE_OBJECT === $arg->type) {
-            if ($context->callerStrictTypes) {
+            if ($context->callerStrictTypes && !$allowStringableUnderStrict) {
                 self::emitRejectTypeError($context, $arg, $function, $argIndex, $paramName, $expectedType);
 
                 return self::unreachableStringPtr($context);
@@ -113,7 +221,8 @@ final class JitStringBuiltinArg
                 $argIndex,
                 $paramName,
                 $expectedType,
-                $arrayExpected
+                $arrayExpected,
+                $allowStringableUnderStrict
             );
         }
 
@@ -127,7 +236,8 @@ final class JitStringBuiltinArg
         int $argIndex,
         string $paramName,
         string $expectedType,
-        string $arrayExpectedType
+        string $arrayExpectedType,
+        bool $allowStringableUnderStrict = false
     ): Value {
         TypeErrorRaise::registerDeclarations($context);
         TypeErrorRaise::ensureLinked($context);
@@ -173,7 +283,7 @@ final class JitStringBuiltinArg
             $expectedType
         );
         $context->builder->positionAtEnd($objectRejectBlock);
-        if ($context->callerStrictTypes) {
+        if ($context->callerStrictTypes && !$allowStringableUnderStrict) {
             self::emitRuntimeBoxedObjectReject(
                 $context,
                 $valuePtr,
@@ -246,13 +356,14 @@ final class JitStringBuiltinArg
         Variable $arg,
         string $function,
         int $argIndex,
-        string $paramName
+        string $paramName,
+        string $expectedType = 'string'
     ): Value {
         if (Variable::TYPE_HASHTABLE === $arg->type || Variable::TYPE_OBJECT === $arg->type) {
-            return self::lower($context, $arg, $function, $argIndex, $paramName);
+            return self::lower($context, $arg, $function, $argIndex, $paramName, $expectedType);
         }
         if (Variable::TYPE_VALUE === $arg->type) {
-            return self::lowerRequiredBoxed($context, $arg, $function, $argIndex, $paramName);
+            return self::lowerRequiredBoxed($context, $arg, $function, $argIndex, $paramName, $expectedType);
         }
         if (Variable::TYPE_STRING !== $arg->type) {
             $errBlock = BasicBlockHelper::append($context, 'str_req_scalar_err');
@@ -263,7 +374,8 @@ final class JitStringBuiltinArg
                 $function,
                 $argIndex,
                 $paramName,
-                JitOperandTypeLabel::givenLabel($context, $arg)
+                JitOperandTypeLabel::givenLabel($context, $arg),
+                $expectedType
             );
 
             return self::unreachableStringPtr($context);
@@ -277,7 +389,8 @@ final class JitStringBuiltinArg
         Variable $arg,
         string $function,
         int $argIndex,
-        string $paramName
+        string $paramName,
+        string $expectedType = 'string'
     ): Value {
         TypeErrorRaise::registerDeclarations($context);
         TypeErrorRaise::ensureLinked($context);
@@ -292,7 +405,17 @@ final class JitStringBuiltinArg
         $objectTy = $i8->constInt(Variable::TYPE_OBJECT & 0x7f, false);
         $enumCaseTy = $i8->constInt(VmVariable::TYPE_ENUM_CASE, false);
         $stringTy = $i8->constInt(VmVariable::TYPE_STRING, false);
+        $nullTy = $i8->constInt(VmVariable::TYPE_NULL, false);
 
+        $nullBlock = BasicBlockHelper::append($context, 'str_req_null');
+        $afterNull = BasicBlockHelper::append($context, 'str_req_after_null');
+        $isNull = $context->builder->icmp(Builder::INT_EQ, $typeKind, $nullTy);
+        $context->builder->branchIf($isNull, $nullBlock, $afterNull);
+
+        $context->builder->positionAtEnd($nullBlock);
+        self::emitTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'null', $expectedType);
+
+        $context->builder->positionAtEnd($afterNull);
         $arrayBlock = BasicBlockHelper::append($context, 'str_req_array');
         $rejectBlock = BasicBlockHelper::append($context, 'str_req_reject');
         $stringBlock = BasicBlockHelper::append($context, 'str_req_string');
@@ -303,7 +426,7 @@ final class JitStringBuiltinArg
         $context->builder->branchIf($isArray, $arrayBlock, $okBlock);
 
         $context->builder->positionAtEnd($arrayBlock);
-        self::emitTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'array');
+        self::emitTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'array', $expectedType);
 
         $context->builder->positionAtEnd($okBlock);
         $isObject = $context->builder->icmp(Builder::INT_EQ, $typeKind, $objectTy);
@@ -321,7 +444,8 @@ final class JitStringBuiltinArg
             $valuePtr,
             $function,
             $argIndex,
-            $paramName
+            $paramName,
+            $expectedType
         );
         $context->builder->positionAtEnd($objectRejectBlock);
         self::emitRuntimeBoxedObjectReject(
@@ -329,12 +453,24 @@ final class JitStringBuiltinArg
             $valuePtr,
             $function,
             $argIndex,
-            $paramName
+            $paramName,
+            $expectedType
         );
 
         $context->builder->positionAtEnd($scalarBlock);
         $isString = $context->builder->icmp(Builder::INT_EQ, $typeKind, $stringTy);
-        $context->builder->branchIf($isString, $stringBlock, $rejectBlock);
+        $scalarErrBlock = BasicBlockHelper::append($context, 'str_req_scalar_err');
+        $context->builder->branchIf($isString, $stringBlock, $scalarErrBlock);
+
+        $context->builder->positionAtEnd($scalarErrBlock);
+        self::emitRuntimeBoxedNonStringScalarReject(
+            $context,
+            $typeKind,
+            $function,
+            $argIndex,
+            $paramName,
+            $expectedType
+        );
 
         $context->builder->positionAtEnd($stringBlock);
 
@@ -509,6 +645,50 @@ final class JitStringBuiltinArg
         self::emitRuntimeBoxedObjectReject($context, $valuePtr, 'strlen', 0, 'string', 'string');
     }
 
+    private static function emitRuntimeBoxedNonStringScalarReject(
+        Context $context,
+        Value $typeKind,
+        string $function,
+        int $argIndex,
+        string $paramName,
+        string $expectedType = 'string'
+    ): void {
+        $i8 = $context->getTypeFromString('int8');
+        $longTy = $i8->constInt(VmVariable::TYPE_INTEGER & 0x7f, false);
+        $doubleTy = $i8->constInt(VmVariable::TYPE_FLOAT & 0x7f, false);
+        $boolTy = $i8->constInt(VmVariable::TYPE_BOOLEAN & 0x7f, false);
+
+        $intErrBlock = BasicBlockHelper::append($context, 'str_req_scalar_int');
+        $afterInt = BasicBlockHelper::append($context, 'str_req_after_int');
+        $floatErrBlock = BasicBlockHelper::append($context, 'str_req_scalar_float');
+        $afterFloat = BasicBlockHelper::append($context, 'str_req_after_float');
+        $boolErrBlock = BasicBlockHelper::append($context, 'str_req_scalar_bool');
+        $mixedErrBlock = BasicBlockHelper::append($context, 'str_req_scalar_mixed');
+
+        $isInt = $context->builder->icmp(Builder::INT_EQ, $typeKind, $longTy);
+        $context->builder->branchIf($isInt, $intErrBlock, $afterInt);
+
+        $context->builder->positionAtEnd($intErrBlock);
+        self::emitTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'int', $expectedType);
+
+        $context->builder->positionAtEnd($afterInt);
+        $isFloat = $context->builder->icmp(Builder::INT_EQ, $typeKind, $doubleTy);
+        $context->builder->branchIf($isFloat, $floatErrBlock, $afterFloat);
+
+        $context->builder->positionAtEnd($floatErrBlock);
+        self::emitTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'float', $expectedType);
+
+        $context->builder->positionAtEnd($afterFloat);
+        $isBool = $context->builder->icmp(Builder::INT_EQ, $typeKind, $boolTy);
+        $context->builder->branchIf($isBool, $boolErrBlock, $mixedErrBlock);
+
+        $context->builder->positionAtEnd($boolErrBlock);
+        self::emitTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'bool', $expectedType);
+
+        $context->builder->positionAtEnd($mixedErrBlock);
+        self::emitTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'mixed', $expectedType);
+    }
+
     private static function emitRuntimeBoxedObjectReject(
         Context $context,
         Value $valuePtr,
@@ -649,8 +829,6 @@ final class JitStringBuiltinArg
             return;
         }
 
-        TypeErrorRaise::registerDeclarations($context);
-        TypeErrorRaise::ensureLinked($context);
         $map = $context->structFieldMap['__string__'];
         $len = $context->builder->load(
             $context->builder->structGep($loweredStr, $map['length'])
@@ -658,12 +836,11 @@ final class JitStringBuiltinArg
         $i64 = $context->getTypeFromString('int64');
         $zero = $i64->constInt(0, false);
         $empty = $context->builder->icmp(Builder::INT_EQ, $len, $zero);
-        $failBlock = BasicBlockHelper::append($context, 'str_empty_fail');
-        $okBlock = BasicBlockHelper::append($context, 'str_empty_ok');
-        $context->builder->branchIf($empty, $failBlock, $okBlock);
-        $context->builder->positionAtEnd($failBlock);
-        TypeErrorRaise::emitValueError($context, $errorMessage);
-        $context->builder->call($context->lookupFunction('abort'));
-        $context->builder->positionAtEnd($okBlock);
+        TypeErrorRaise::emitBranchOrAbortOnValueErrorFailure(
+            $context,
+            $context->builder->not($empty),
+            'str_empty',
+            $errorMessage
+        );
     }
 }

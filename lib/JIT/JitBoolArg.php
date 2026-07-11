@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT;
 
+use PHPCompiler\ext\standard\boolval;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\VM\Variable as VmVariable;
 use PHPLLVM\Builder;
@@ -11,6 +12,23 @@ use PHPLLVM\Value;
 
 final class JitBoolArg
 {
+    /** Z_PARAM_BOOL with caller strict_types parity (php-src basic_functions.c microtime/hrtime; #17025). */
+    public static function lowerZParamBool(
+        Context $context,
+        Variable $arg,
+        string $function,
+        string $paramName,
+        int $argNumber
+    ): Value {
+        InternalStrictArg::requireBool($context, $arg, $function, $paramName, $argNumber);
+
+        return self::lower(
+            $context,
+            $arg,
+            sprintf('%s(): Argument #%d ($%s)', $function, $argNumber, $paramName)
+        );
+    }
+
     public static function lower(Context $context, Variable $arg, string $contextLabel = 'argument'): Value
     {
         $literal = JitStringArg::compileTimeLiteral($arg);
@@ -49,6 +67,94 @@ final class JitBoolArg
         self::emitTypeErrorAndAbort($context, $contextLabel, 'mixed');
 
         return $context->constantFromBool(false);
+    }
+
+    /**
+     * Builtin typed bool — reject int/string coercion (php-src ZEND_ARG_INFO IS_BOOL; #12585, #12586).
+     */
+    public static function lowerBuiltinTyped(
+        Context $context,
+        Variable $arg,
+        string $function,
+        string $paramName,
+        int $argNumber,
+        string $expectedType = 'bool'
+    ): Value {
+        $contextLabel = sprintf('%s(): Argument #%d ($%s)', $function, $argNumber, $paramName);
+        $literal = JitStringArg::compileTimeLiteral($arg);
+        if (null !== $literal) {
+            self::emitTypeErrorAndAbort($context, $contextLabel, 'string', $expectedType);
+        }
+        if (Variable::TYPE_NATIVE_BOOL === $arg->type) {
+            return $context->helper->loadValue($arg);
+        }
+        if (Variable::TYPE_NATIVE_LONG === $arg->type) {
+            self::emitTypeErrorAndAbort($context, $contextLabel, 'int', $expectedType);
+        }
+        if (Variable::TYPE_STRING === $arg->type) {
+            self::emitTypeErrorAndAbort($context, $contextLabel, 'string', $expectedType);
+        }
+        if (Variable::TYPE_VALUE === $arg->type) {
+            return self::lowerBoxedStrict($context, $arg, $contextLabel, $expectedType);
+        }
+        if (Variable::TYPE_NULL === $arg->type) {
+            self::emitTypeErrorAndAbort($context, $contextLabel, 'null', $expectedType);
+        }
+        if (Variable::TYPE_HASHTABLE === $arg->type || ($arg->type & Variable::IS_NATIVE_ARRAY)) {
+            self::emitTypeErrorAndAbort($context, $contextLabel, 'array', $expectedType);
+        }
+        if (Variable::TYPE_OBJECT === $arg->type) {
+            self::emitTypeErrorAndAbort($context, $contextLabel, 'object', $expectedType);
+        }
+
+        self::emitTypeErrorAndAbort($context, $contextLabel, 'mixed', $expectedType);
+
+        return $context->constantFromBool(false);
+    }
+
+    private static function lowerBoxedStrict(
+        Context $context,
+        Variable $arg,
+        string $contextLabel,
+        string $expectedType = 'bool'
+    ): Value {
+        TypeErrorRaise::registerDeclarations($context);
+        TypeErrorRaise::ensureLinked($context);
+        $valuePtr = JitValueBox::valuePtrFromVariable($context, $arg);
+        $map = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($valuePtr, $map['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $i1 = $context->getTypeFromString('int1');
+
+        foreach (
+            [
+                [VmVariable::TYPE_ARRAY, 'array'],
+                [VmVariable::TYPE_OBJECT, 'object'],
+                [VmVariable::TYPE_NULL, 'null'],
+                [VmVariable::TYPE_STRING, 'string'],
+                [VmVariable::TYPE_INTEGER, 'int'],
+                [VmVariable::TYPE_FLOAT, 'float'],
+            ] as [$vmType, $label]
+        ) {
+            $check = $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt($vmType, false));
+            $ok = BasicBlockHelper::append($context, 'jit_bool_strict_ok_'.$label);
+            $bad = BasicBlockHelper::append($context, 'jit_bool_strict_bad_'.$label);
+            $context->builder->branchIf($check, $bad, $ok);
+            $context->builder->positionAtEnd($bad);
+            self::emitTypeErrorAndAbort($context, $contextLabel, $label, $expectedType);
+            $context->builder->positionAtEnd($ok);
+        }
+
+        $valueField = $context->builder->structGep($valuePtr, $map['value']);
+        $firstByte = $context->builder->inBoundsGEP(
+            $valueField,
+            $context->getTypeFromString('int32')->constInt(0, false),
+            $context->getTypeFromString('int64')->constInt(0, false)
+        );
+
+        return $context->castToBool($context->builder->load($firstByte));
     }
 
     private static function lowerBoxed(Context $context, Variable $arg, string $contextLabel): Value
@@ -100,11 +206,7 @@ final class JitBoolArg
         $boolBlock = BasicBlockHelper::append($context, 'jit_bool_vbox_bool');
         $longBlock = BasicBlockHelper::append($context, 'jit_bool_vbox_long');
         $mergeBlock = BasicBlockHelper::append($context, 'jit_bool_vbox_merge');
-        $isBool = $context->builder->icmp(
-            Builder::INT_EQ,
-            $typeByte,
-            $i8->constInt(Variable::TYPE_NATIVE_BOOL, false)
-        );
+        $isBool = boolval::isBoxedBoolTypeTag($context, $typeByte);
         $context->builder->branchIf($isBool, $boolBlock, $longBlock);
 
         $context->builder->positionAtEnd($boolBlock);
@@ -114,11 +216,7 @@ final class JitBoolArg
             $context->getTypeFromString('int32')->constInt(0, false),
             $context->getTypeFromString('int64')->constInt(0, false)
         );
-        $boolVal = $context->builder->icmp(
-            Builder::INT_NE,
-            $context->builder->load($firstByte),
-            $i8->constInt(0, false)
-        );
+        $boolVal = $context->castToBool($context->builder->load($firstByte));
         $boolEnd = $context->builder->getInsertBlock();
         $context->builder->branch($mergeBlock);
 
@@ -153,27 +251,32 @@ final class JitBoolArg
         throw new \LogicException(self::typeErrorMessage($contextLabel, 'string'));
     }
 
-    private static function emitTypeErrorAndAbort(Context $context, string $contextLabel, string $given): void
-    {
+    private static function emitTypeErrorAndAbort(
+        Context $context,
+        string $contextLabel,
+        string $given,
+        string $expectedType = 'bool'
+    ): void {
         TypeErrorRaise::registerDeclarations($context);
         TypeErrorRaise::ensureLinked($context);
-        TypeErrorRaise::emitRaise($context, self::typeErrorMessage($contextLabel, $given));
+        TypeErrorRaise::emitRaise($context, self::typeErrorMessage($contextLabel, $given, $expectedType));
         $context->builder->call($context->lookupFunction('abort'));
     }
 
-    private static function typeErrorMessage(string $contextLabel, string $given): string
+    private static function typeErrorMessage(string $contextLabel, string $given, string $expectedType = 'bool'): string
     {
         if (preg_match('/^(.+\(\)): Argument #(\d+) \(\$([^)]+)\)$/', $contextLabel, $m)) {
             return sprintf(
-                '%s(): Argument #%s ($%s) must be of type bool, %s given',
+                '%s(): Argument #%s ($%s) must be of type %s, %s given',
                 $m[1],
                 $m[2],
                 $m[3],
+                $expectedType,
                 $given
             );
         }
 
-        return "{$contextLabel} must be of type bool, {$given} given";
+        return "{$contextLabel} must be of type {$expectedType}, {$given} given";
     }
 
     private static function compileTimeEnumGivenLabel(Context $context, Variable $arg): string

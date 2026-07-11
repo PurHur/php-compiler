@@ -24,6 +24,18 @@ final class VmPhpCoreConstants
         'PATH_SEPARATOR',
     ];
 
+    /** Zend Core bucket upload error codes (main/main.c). */
+    private const UPLOAD_ERR_VALUES = [
+        'UPLOAD_ERR_OK' => 0,
+        'UPLOAD_ERR_INI_SIZE' => 1,
+        'UPLOAD_ERR_FORM_SIZE' => 2,
+        'UPLOAD_ERR_PARTIAL' => 3,
+        'UPLOAD_ERR_NO_FILE' => 4,
+        'UPLOAD_ERR_NO_TMP_DIR' => 6,
+        'UPLOAD_ERR_CANT_WRITE' => 7,
+        'UPLOAD_ERR_EXTENSION' => 8,
+    ];
+
     private const CORE_NAMES = [
         'PHP_VERSION',
         'PHP_MAJOR_VERSION',
@@ -122,6 +134,48 @@ final class VmPhpCoreConstants
                 $entries[$canonical] = $var;
             }
         }
+        foreach (self::categorizedCoreScalarEntries() as $name => $var) {
+            $entries[$name] = $var;
+        }
+
+        return $entries;
+    }
+
+    /**
+     * Zend get_defined_constants(true)['Core'] entries — excludes ext/standard module constants (#4840).
+     *
+     * @return array<string, Variable>
+     */
+    public static function categorizedCoreEntries(): array
+    {
+        $entries = self::categorizedCoreScalarEntries();
+        foreach (self::UPLOAD_ERR_VALUES as $name => $value) {
+            $var = self::fromPhpValue($value);
+            if (null !== $var) {
+                $entries[$name] = $var;
+            }
+        }
+        $entries['DEFAULT_INCLUDE_PATH'] = self::fromPhpValue(self::defaultIncludePath());
+        $entries['PEAR_INSTALL_DIR'] = self::fromPhpValue(self::pearInstallDir());
+        $entries['PEAR_EXTENSION_DIR'] = self::fromPhpValue(self::pearExtensionDir());
+        $zts = self::fromPhpValue((bool) (self::compilerVersionConstantExact('PHP_ZTS') ?? 0));
+        if (null !== $zts) {
+            $entries['ZEND_THREAD_SAFE'] = $zts;
+        }
+        $debug = self::fromPhpValue((bool) (self::compilerVersionConstantExact('PHP_DEBUG') ?? 0));
+        if (null !== $debug) {
+            $entries['ZEND_DEBUG_BUILD'] = $debug;
+        }
+
+        return $entries;
+    }
+
+    /**
+     * @return array<string, Variable>
+     */
+    private static function categorizedCoreScalarEntries(): array
+    {
+        $entries = [];
         foreach (self::CORE_NAMES as $canonical) {
             $value = self::compilerVersionConstantExact($canonical);
             if (null === $value && \defined($canonical)) {
@@ -137,6 +191,43 @@ final class VmPhpCoreConstants
         }
 
         return $entries;
+    }
+
+    public static function pathSeparatorValue(): string
+    {
+        return self::pathConstantValue('PATH_SEPARATOR') ?? (self::isWindowsPlatform() ? ';' : ':');
+    }
+
+    public static function directorySeparatorValue(): string
+    {
+        return self::pathConstantValue('DIRECTORY_SEPARATOR') ?? (self::isWindowsPlatform() ? '\\' : '/');
+    }
+
+    private static function defaultIncludePath(): string
+    {
+        if (\defined('DEFAULT_INCLUDE_PATH')) {
+            return (string) \constant('DEFAULT_INCLUDE_PATH');
+        }
+
+        return '.:'.self::pearInstallDir();
+    }
+
+    private static function pearInstallDir(): string
+    {
+        if (\defined('PEAR_INSTALL_DIR')) {
+            return (string) \constant('PEAR_INSTALL_DIR');
+        }
+
+        return '/usr/share/php';
+    }
+
+    private static function pearExtensionDir(): string
+    {
+        if (\defined('PEAR_EXTENSION_DIR')) {
+            return (string) \constant('PEAR_EXTENSION_DIR');
+        }
+
+        return self::pearInstallDir().'/ext';
     }
 
     private static function pathConstantValue(string $name): ?string
@@ -217,12 +308,12 @@ final class VmPhpCoreConstants
     private static function compilerVersionConstantExact(string $canonical): mixed
     {
         return match ($canonical) {
-            'PHP_VERSION' => CompilerVersion::VERSION,
-            'PHP_MAJOR_VERSION' => CompilerVersion::MAJOR_VERSION,
-            'PHP_MINOR_VERSION' => CompilerVersion::MINOR_VERSION,
-            'PHP_RELEASE_VERSION' => CompilerVersion::RELEASE_VERSION,
-            'PHP_EXTRA_VERSION' => CompilerVersion::EXTRA_VERSION,
-            'PHP_VERSION_ID' => CompilerVersion::VERSION_ID,
+            'PHP_VERSION' => CompilerVersion::reportedPhpVersion(),
+            'PHP_MAJOR_VERSION' => CompilerVersion::reportedPhpMajorVersion(),
+            'PHP_MINOR_VERSION' => CompilerVersion::reportedPhpMinorVersion(),
+            'PHP_RELEASE_VERSION' => CompilerVersion::reportedPhpReleaseVersion(),
+            'PHP_EXTRA_VERSION' => CompilerVersion::reportedPhpExtraVersion(),
+            'PHP_VERSION_ID' => CompilerVersion::reportedPhpVersionId(),
             default => null,
         };
     }

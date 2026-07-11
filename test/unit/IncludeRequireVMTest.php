@@ -91,6 +91,17 @@ if ((@include $missing) === false) {
 } else {
     echo "bad-missing-include\n";
 }
+$missingAbs = '/tmp/no_such_'.getmypid().'.php';
+if ('false' === var_export(@include $missingAbs, true)) {
+    echo "ok-suppress-include-expr\n";
+} else {
+    echo "bad-suppress-include-expr\n";
+}
+if ('false' === var_export(@include_once $missingAbs, true)) {
+    echo "ok-suppress-include-once-expr\n";
+} else {
+    echo "bad-suppress-include-once-expr\n";
+}
 try {
     require $missing;
     echo "unreachable\n";
@@ -118,6 +129,8 @@ PHP
             "ok-fn\n".
             "ok-class\n".
             "ok-missing-include\n".
+            "ok-suppress-include-expr\n".
+            "ok-suppress-include-once-expr\n".
             "Error\n",
             $out
         );

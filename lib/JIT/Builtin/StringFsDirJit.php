@@ -30,6 +30,7 @@ final class StringFsDirJit
     {
         $probe = $context->module->getNamedFunction('__compiler_copy');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            StatArrayRuntime::ensureLinked($context);
             self::registerLinkedRuntime($context);
 
             return;

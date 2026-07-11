@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\VM\EnumCaseSupport;
+use PHPCompiler\VM\ResourceState;
 use PHPCompiler\VM\ResourceSupport;
 use PHPCompiler\VM\Variable;
 
@@ -14,7 +15,7 @@ final class VmDirArg
     public static function invalidDirTypeError(string $functionName): \TypeError
     {
         return new \TypeError(\sprintf(
-            '%s(): supplied resource is not a valid directory resource',
+            '%s(): supplied resource is not a valid Directory resource',
             $functionName
         ));
     }
@@ -22,6 +23,10 @@ final class VmDirArg
     public static function requireDirHandle(Variable $v, string $functionName, int $argNum = 1): int
     {
         $v = $v->resolveIndirect();
+        if (Variable::TYPE_NULL === $v->type) {
+            // php-src ext/standard/dir.c — _php_stream_free() on null handle
+            throw new \TypeError('No resource supplied');
+        }
         if (EnumCaseSupport::isEnumCaseVariable($v)) {
             throw new \TypeError(\sprintf(
                 '%s(): Argument #%d ($dir_handle) must be of type resource, %s given',
@@ -36,6 +41,10 @@ final class VmDirArg
                 return $handle;
             }
 
+            throw self::invalidDirTypeError($functionName);
+        }
+        $state = ResourceSupport::stateFromVariable($v);
+        if (null !== $state && ResourceState::KIND_DIR === $state->kind) {
             throw self::invalidDirTypeError($functionName);
         }
 

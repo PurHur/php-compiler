@@ -12,6 +12,7 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\InterfaceCheck;
 use PHPCompiler\VM\ResourceSupport;
 use PHPCompiler\VM\Variable;
+use PHPCompiler\VM\VmNumericCoercion;
 
 /** VM array helpers (no PHP internal wrappers in compiled paths). */
 final class VmArray
@@ -26,7 +27,16 @@ final class VmArray
      */
     public static function shouldSkipNumericArrayFoldElement(Variable $value): bool
     {
-        return EnumCaseSupport::isEnumCaseVariable($value);
+        if (EnumCaseSupport::isEnumCaseVariable($value)) {
+            return true;
+        }
+        $value = $value->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $value->type) {
+            return false;
+        }
+
+        // Case singletons may lack isEnumCase on legacy materialization paths (#8828, #5578).
+        return $value->toObject()->class->isEnum;
     }
 
     /**
@@ -198,7 +208,8 @@ final class VmArray
     }
 
     /**
-     * natsort/natcasesort natural compare requires string operands — Zend rejects enum cases (#5607).
+     * natsort/natcasesort natural compare requires string operands — Zend rejects enum cases (#5607)
+     * and objects (#12244).
      */
     public static function rejectEnumCaseNaturalSortValue(Variable $value): void
     {
@@ -206,6 +217,11 @@ final class VmArray
         if (EnumCaseSupport::isEnumCaseVariable($value)) {
             throw new \Error(
                 'Object of class '.EnumCaseSupport::typeNameForVariable($value).' could not be converted to string'
+            );
+        }
+        if (Variable::TYPE_OBJECT === $value->type) {
+            throw new \Error(
+                'Object of class '.$value->toObject()->class->name.' could not be converted to string'
             );
         }
     }
@@ -419,6 +435,244 @@ final class VmArray
         return $out;
     }
 
+    /**
+     * array_diff() with one source array — copy keys/values (php-src array.c, issue #1206).
+     */
+    public static function diffSingleArgumentCopy(HashTable $first): HashTable
+    {
+        return $first->replaceCopy();
+    }
+
+    /**
+     * array_diff() two-array step — remove from $first values found in $other (loose compare).
+     */
+    public static function diffTwo(HashTable $first, HashTable $other): HashTable
+    {
+        $out = new HashTable();
+        foreach ($first->iterateKeyed(true) as [$key, $value]) {
+            if (self::looseValueInHashTable($value, $other)) {
+                continue;
+            }
+            $stored = new Variable();
+            $stored->copyFrom($value);
+            if (Variable::TYPE_INTEGER === $key->type) {
+                $out->addIndex($key->toInt(), $stored);
+            } else {
+                $out->add($key->toString(), $stored);
+            }
+        }
+
+        return $out;
+    }
+
+    private static function looseValueInHashTable(Variable $needle, HashTable $haystack): bool
+    {
+        $needle = $needle->resolveIndirect();
+        foreach ($haystack->iterate(true) as $value) {
+            if (self::looseValuesEqualForArraySetOps($needle, $value->resolveIndirect())) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Loose value compare for array_diff/array_intersect (php-src zend_hash_compare NaN branch).
+     */
+    private static function looseValuesEqualForArraySetOps(Variable $left, Variable $right): bool
+    {
+        if (Variable::TYPE_FLOAT === $left->type
+            && Variable::TYPE_FLOAT === $right->type
+            && \is_nan($left->toFloat())
+            && \is_nan($right->toFloat())) {
+            return true;
+        }
+
+        return in_array::looseEquals($left, $right);
+    }
+
+    /**
+     * array_intersect() with one source array — copy keys/values (php-src array.c, issue #1207).
+     */
+    public static function intersectSingleArgumentCopy(HashTable $first): HashTable
+    {
+        return $first->replaceCopy();
+    }
+
+    /**
+     * array_intersect() two-array step — keep values from $first found in $other (loose compare).
+     */
+    public static function intersectTwo(HashTable $first, HashTable $other): HashTable
+    {
+        $out = new HashTable();
+        foreach ($first->iterateKeyed(true) as [$key, $value]) {
+            if (!self::looseValueInHashTable($value, $other)) {
+                continue;
+            }
+            $stored = new Variable();
+            $stored->copyFrom($value);
+            if (Variable::TYPE_INTEGER === $key->type) {
+                $out->addIndex($key->toInt(), $stored);
+            } else {
+                $out->add($key->toString(), $stored);
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * array_intersect_key() with one source array — copy keys/values (php-src array.c, #12551).
+     */
+    public static function intersectKeySingleArgumentCopy(HashTable $first): HashTable
+    {
+        return $first->replaceCopy();
+    }
+
+    /**
+     * array_intersect_key() two-array step — keep entries whose keys exist in $other.
+     */
+    public static function intersectKeyTwo(HashTable $first, HashTable $other): HashTable
+    {
+        $out = new HashTable();
+        foreach ($first->iterateKeyed(true) as [$key, $value]) {
+            if (!self::keyExistsInHashTable($key, $other)) {
+                continue;
+            }
+            $stored = new Variable();
+            $stored->copyFrom($value);
+            if (Variable::TYPE_INTEGER === $key->type) {
+                $out->addIndex($key->toInt(), $stored);
+            } else {
+                $out->add($key->toString(), $stored);
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * array_diff_assoc() with one source array — copy keys/values (php-src array.c, #12552).
+     */
+    public static function diffAssocSingleArgumentCopy(HashTable $first): HashTable
+    {
+        return $first->replaceCopy();
+    }
+
+    /**
+     * array_diff_assoc() two-array step — remove entries whose key+value pair exists in $other.
+     */
+    public static function diffAssocTwo(HashTable $first, HashTable $other): HashTable
+    {
+        $out = new HashTable();
+        foreach ($first->iterateKeyed(true) as [$key, $value]) {
+            if (self::pairInHashTable($key, $value, $other)) {
+                continue;
+            }
+            $stored = new Variable();
+            $stored->copyFrom($value);
+            if (Variable::TYPE_INTEGER === $key->type) {
+                $out->addIndex($key->toInt(), $stored);
+            } else {
+                $out->add($key->toString(), $stored);
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * array_intersect_assoc() with one source array — copy keys/values (php-src array.c, #12636).
+     */
+    public static function intersectAssocSingleArgumentCopy(HashTable $first): HashTable
+    {
+        return $first->replaceCopy();
+    }
+
+    /**
+     * array_intersect_assoc() two-array step — keep entries whose key+value pair exists in $other.
+     */
+    public static function intersectAssocTwo(HashTable $first, HashTable $other): HashTable
+    {
+        $out = new HashTable();
+        foreach ($first->iterateKeyed(true) as [$key, $value]) {
+            if (!self::pairInHashTable($key, $value, $other)) {
+                continue;
+            }
+            $stored = new Variable();
+            $stored->copyFrom($value);
+            if (Variable::TYPE_INTEGER === $key->type) {
+                $out->addIndex($key->toInt(), $stored);
+            } else {
+                $out->add($key->toString(), $stored);
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * array_diff_key() with one source array — copy keys/values (php-src array.c, #12553).
+     */
+    public static function diffKeySingleArgumentCopy(HashTable $first): HashTable
+    {
+        return $first->replaceCopy();
+    }
+
+    /**
+     * array_diff_key() two-array step — remove entries whose keys exist in $other.
+     */
+    public static function diffKeyTwo(HashTable $first, HashTable $other): HashTable
+    {
+        $out = new HashTable();
+        foreach ($first->iterateKeyed(true) as [$key, $value]) {
+            if (self::keyExistsInHashTable($key, $other)) {
+                continue;
+            }
+            $stored = new Variable();
+            $stored->copyFrom($value);
+            if (Variable::TYPE_INTEGER === $key->type) {
+                $out->addIndex($key->toInt(), $stored);
+            } else {
+                $out->add($key->toString(), $stored);
+            }
+        }
+
+        return $out;
+    }
+
+    private static function keyExistsInHashTable(Variable $key, HashTable $table): bool
+    {
+        return null !== self::valueAtKeyInHashTable($key, $table);
+    }
+
+    private static function pairInHashTable(Variable $key, Variable $value, HashTable $haystack): bool
+    {
+        $stored = self::valueAtKeyInHashTable($key, $haystack);
+        if (null === $stored) {
+            return false;
+        }
+
+        return $value->resolveIndirect()->equals($stored->resolveIndirect());
+    }
+
+    private static function valueAtKeyInHashTable(Variable $key, HashTable $table): ?Variable
+    {
+        $key = $key->resolveIndirect();
+        if (Variable::TYPE_INTEGER === $key->type) {
+            return $table->findIndex($key->toInt());
+        }
+        if (Variable::TYPE_FLOAT === $key->type) {
+            return $table->findIndex($key->toInt());
+        }
+        if (Variable::TYPE_STRING === $key->type) {
+            return $table->find($key->toString());
+        }
+
+        return null;
+    }
+
     /** @param list<HashTable> $others */
     private static function allLists(array $others): bool
     {
@@ -519,6 +773,18 @@ final class VmArray
     }
 
     /**
+     * array_find() / array_find_key() — empty haystack ValueError (php-src array.c, #12519).
+     *
+     * @throws \ValueError
+     */
+    public static function requireNonEmptyFindArray(HashTable $ht, string $fn): void
+    {
+        if (0 === $ht->getNumElements()) {
+            throw new \ValueError(\sprintf('%s(): Argument #1 ($array) must not be empty', $fn));
+        }
+    }
+
+    /**
      * Variadic array builtins whose Zend messages omit ($param) — e.g. array_merge().
      *
      * @throws \TypeError when {@param $value} is not an array
@@ -542,10 +808,170 @@ final class VmArray
 
     /**
      * array_pad() — pad packed list {@param $array} to abs({@param $length}) with {@param $value}.
+     *
+     * Padding direction follows the sign of {@param $length} (php-src ext/standard/array.c), or
+     * optional {@param $padType} when PHP 8.4+ 4-arg form is used (#14993).
      */
-    public static function pad(HashTable $array, int $length, Variable $value): HashTable
+    public static function pad(HashTable $array, int $length, Variable $value, ?int $padType = null): HashTable
     {
-        return $array->padCopy($length, $value);
+        return $array->padCopy($length, $value, $padType);
+    }
+
+    /**
+     * ArrayPadType pure enum → ARRAY_PAD_RIGHT / ARRAY_PAD_LEFT (#17240).
+     */
+    public static function tryArrayPadTypeInt(Variable $var): ?int
+    {
+        if (!EnumCaseSupport::isEnumCaseVariable($var)) {
+            return null;
+        }
+        $enumClass = EnumCaseSupport::enumClassForCaseVariable($var);
+        if (null === $enumClass || !self::isArrayPadTypeEnum($enumClass->name)) {
+            return null;
+        }
+        $entry = EnumCaseSupport::enumCaseEntryForVariable($var);
+        if (null === $entry) {
+            throw new \LogicException('ArrayPadType case missing');
+        }
+
+        return match ($entry->caseName) {
+            'Positive' => StdlibConstants::ARRAY_PAD_RIGHT,
+            'Negative' => StdlibConstants::ARRAY_PAD_LEFT,
+            default => throw new \ValueError('Invalid ArrayPadType enum value'),
+        };
+    }
+
+    private static function isArrayPadTypeEnum(string $className): bool
+    {
+        return 0 === strcasecmp(ltrim($className, '\\'), 'ArrayPadType');
+    }
+
+    /**
+     * array_pad() 4th parameter pad type (PHP 8.4+, ext/standard/array.c, #14993).
+     */
+    public static function resolvePadTypeArg(Variable $var): int
+    {
+        $var = $var->resolveIndirect();
+        $padFromEnum = self::tryArrayPadTypeInt($var);
+        if (null !== $padFromEnum) {
+            return $padFromEnum;
+        }
+        if (EnumCaseSupport::isEnumCaseVariable($var)) {
+            throw new \TypeError(\sprintf(
+                'array_pad(): Argument #4 ($pad_type) must be of type ArrayPadType|int, %s given',
+                EnumCaseSupport::typeNameForVariable($var)
+            ));
+        }
+        if (Variable::TYPE_INTEGER !== $var->type) {
+            throw new \LogicException('array_pad() pad type must be an integer in this compiler build');
+        }
+        $padType = $var->toInt();
+        if (!\in_array($padType, [
+            StdlibConstants::ARRAY_PAD_LEFT,
+            StdlibConstants::ARRAY_PAD_RIGHT,
+            StdlibConstants::ARRAY_PAD_BOTH,
+        ], true)) {
+            throw new \ValueError(
+                'array_pad(): Argument #4 ($pad_type) must be ARRAY_PAD_LEFT, ARRAY_PAD_RIGHT, or ARRAY_PAD_BOTH'
+            );
+        }
+
+        return $padType;
+    }
+
+    /**
+     * array_key_exists() / key_exists() — key present regardless of null value (#13735).
+     */
+    public static function keyExists(Variable $key, HashTable $table): bool
+    {
+        $key = $key->resolveIndirect();
+        if (Variable::TYPE_NULL === $key->type) {
+            $empty = new Variable();
+            $empty->string('');
+
+            return null !== self::valueAtKeyInHashTable($empty, $table);
+        }
+        if (Variable::TYPE_BOOLEAN === $key->type) {
+            $intKey = new Variable();
+            $intKey->int($key->toBool() ? 1 : 0);
+
+            return null !== self::valueAtKeyInHashTable($intKey, $table);
+        }
+
+        return null !== self::valueAtKeyInHashTable($key, $table);
+    }
+
+    /**
+     * in_array() — scan {@param $haystack} for {@param $needle} (ext/standard/array.c).
+     */
+    public static function contains(Variable $needle, HashTable $haystack, bool $strict): bool
+    {
+        $needle = $needle->resolveIndirect();
+        $vm = \PHPCompiler\VM::running();
+        foreach ($haystack->iterate(true) as $value) {
+            $stored = $value->resolveIndirect();
+            if ($strict ? $needle->identicalTo($stored) : $needle->equals($stored, $vm)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * array_search() — first matching key or false (ext/standard/array.c).
+     */
+    public static function searchKey(
+        Variable $needle,
+        HashTable $haystack,
+        bool $strict,
+        ?\PHPCompiler\VM $vm = null
+    ): Variable {
+        $needle = $needle->resolveIndirect();
+        foreach ($haystack->iterateKeyed(true) as [$key, $value]) {
+            if ($strict ? $needle->identicalTo($value) : $needle->equals($value, $vm)) {
+                $result = new Variable();
+                $result->copyFrom($key);
+
+                return $result;
+            }
+        }
+        $false = new Variable();
+        $false->bool(false);
+
+        return $false;
+    }
+
+    /**
+     * array_combine() — keys from {@param $keys}, values from {@param $values} (ext/standard/array.c).
+     *
+     * @throws \ValueError when operand lengths differ (non-empty mismatch)
+     */
+    public static function combine(HashTable $keys, HashTable $values, ?Frame $frame = null): HashTable
+    {
+        $keyList = [];
+        foreach ($keys->iterateKeyed(true) as [, $key]) {
+            $keyList[] = $key;
+        }
+        $valList = [];
+        foreach ($values->iterateKeyed(true) as [, $value]) {
+            $valList[] = $value;
+        }
+        if (0 === \count($keyList) && 0 === \count($valList)) {
+            return new HashTable();
+        }
+        if (\count($keyList) !== \count($valList)) {
+            throw new \ValueError(array_combine::LENGTH_MISMATCH_ERROR);
+        }
+        $ht = new HashTable();
+        $n = \count($keyList);
+        for ($i = 0; $i < $n; ++$i) {
+            $stored = new Variable();
+            $stored->copyFrom($valList[$i]);
+            self::storeCombineKey($ht, $keyList[$i], $stored, $frame);
+        }
+
+        return $ht;
     }
 
     /**
@@ -600,10 +1026,10 @@ final class VmArray
         return self::hashTableFromSortedPairs($pairs);
     }
 
-    /** asort() — return array sorted by value ascending; packed lists are unchanged (handled in-place). */
+    /** asort() — return array sorted by value ascending, preserving keys (#11991). */
     public static function asortCopy(HashTable $ht, int $flags = StdlibConstants::SORT_REGULAR): HashTable
     {
-        if ($ht->getNumElements() < 2 || self::isList($ht)) {
+        if ($ht->getNumElements() < 2) {
             return $ht;
         }
         $pairs = self::copyKeyedPairs($ht);
@@ -657,10 +1083,10 @@ final class VmArray
         return self::hashTableFromSortedPairs($pairs);
     }
 
-    /** arsort() — return array sorted by value descending; packed lists are unchanged (handled in-place). */
+    /** arsort() — return array sorted by value descending, preserving keys (#11991). */
     public static function arsortCopy(HashTable $ht, int $flags = StdlibConstants::SORT_REGULAR): HashTable
     {
-        if ($ht->getNumElements() < 2 || self::isList($ht)) {
+        if ($ht->getNumElements() < 2) {
             return $ht;
         }
         $pairs = self::copyKeyedPairs($ht);
@@ -676,6 +1102,16 @@ final class VmArray
      */
     public static function shufflePacked(HashTable $ht): void
     {
+        self::shufflePackedWithPicker($ht, static fn (int $upper): int => self::randomIndexBelow($upper));
+    }
+
+    /**
+     * Fisher–Yates shuffle using a caller-supplied index picker (Random\Randomizer::shuffleArray()).
+     *
+     * {@param $pickIndex} receives the exclusive upper bound and returns an index in [0, upper).
+     */
+    public static function shufflePackedWithPicker(HashTable $ht, callable $pickIndex): void
+    {
         $n = $ht->getNumElements();
         if ($n < 2) {
             return;
@@ -686,7 +1122,7 @@ final class VmArray
             $copy->copyFrom($value);
             $values[] = $copy;
         }
-        self::fisherYatesShuffleVariables($values);
+        self::fisherYatesShuffleVariablesWithPicker($values, $pickIndex);
         if (self::isList($ht)) {
             $ht->replacePackedValues($values);
         } else {
@@ -694,44 +1130,93 @@ final class VmArray
         }
     }
 
+    /** sort() on packed list — reindex 0..n-1 (#12769, php-src php_array_sort). */
+    public static function sortPackedInPlace(HashTable $ht, int $flags = StdlibConstants::SORT_REGULAR): void
+    {
+        if ($ht->getNumElements() < 2) {
+            return;
+        }
+        $values = self::copyPackedValues($ht);
+        self::sortPackedValues($values, $flags, 'sort()', false);
+        $ht->replacePackedValues($values);
+    }
+
+    /** rsort() on packed list — reindex descending (#12769). */
+    public static function sortPackedReverseInPlace(HashTable $ht, int $flags = StdlibConstants::SORT_REGULAR): void
+    {
+        if ($ht->getNumElements() < 2) {
+            return;
+        }
+        $values = self::copyPackedValues($ht);
+        self::sortPackedValues($values, $flags, 'rsort()', true);
+        $ht->replacePackedValues($values);
+    }
+
     /**
-     * array_rand() — pick {@param $num} unique keys (CSPRNG; issue #2321, #4460).
+     * array_rand() — pick {@param $num} unique keys (php-src php_array_pick_keys / MT19937; #2321, #14271).
      */
     public static function arrayRandPacked(HashTable $ht, int $num): Variable
     {
-        $n = $ht->getNumElements();
-        if (0 === $n) {
+        $numAvail = $ht->getNumElements();
+        if (0 === $numAvail) {
             throw new \ValueError('array_rand(): Argument #1 ($array) cannot be empty');
         }
-        if ($num < 1 || $num > $n) {
+        if ($num < 1 || $num > $numAvail) {
             throw new \ValueError(
                 'array_rand(): Argument #2 ($num) must be between 1 and the number of elements in argument #1 ($array)'
             );
         }
+
         $keys = [];
         foreach ($ht->iterateKeyed() as $pair) {
             $keyCopy = new Variable();
             $keyCopy->copyFrom($pair[0]);
             $keys[] = $keyCopy;
         }
-        for ($i = 0; $i < $num; ++$i) {
-            $j = $i + (self::randomIndexBelow($n - $i));
-            $tmp = $keys[$i];
-            $keys[$i] = $keys[$j];
-            $keys[$j] = $tmp;
-        }
-        $picked = \array_slice($keys, 0, $num);
-        $result = new Variable();
+
         if (1 === $num) {
-            $result->copyFrom($picked[0]);
+            $idx = VmMt19937::range(0, $numAvail - 1);
+            $result = new Variable();
+            $result->copyFrom($keys[$idx]);
 
             return $result;
         }
+
+        $numReq = $num;
+        $negativeBitset = false;
+        if ($numReq > ($numAvail >> 1)) {
+            $negativeBitset = true;
+            $numReq = $numAvail - $numReq;
+        }
+
+        /** @var list<bool> $bitset */
+        $bitset = \array_fill(0, $numAvail, false);
+        $remaining = $numReq;
+        $failures = 0;
+        while ($remaining > 0) {
+            $randval = VmMt19937::range(0, $numAvail - 1);
+            if ($bitset[$randval]) {
+                if (++$failures > 50) {
+                    throw new \Random\BrokenRandomEngineError(
+                        'Failed to generate an acceptable random number in 50 attempts'
+                    );
+                }
+                continue;
+            }
+            $bitset[$randval] = true;
+            --$remaining;
+            $failures = 0;
+        }
+
+        $result = new Variable();
         $arr = new HashTable();
-        foreach ($picked as $pos => $key) {
-            $v = new Variable();
-            $v->copyFrom($key);
-            $arr->addIndex($pos, $v);
+        $outIdx = 0;
+        for ($i = 0; $i < $numAvail; ++$i) {
+            if ($bitset[$i] xor $negativeBitset) {
+                $v = new Variable();
+                $v->copyFrom($keys[$i]);
+                $arr->addIndex($outIdx++, $v);
+            }
         }
         $result->array($arr);
 
@@ -743,9 +1228,20 @@ final class VmArray
      */
     private static function fisherYatesShuffleVariables(array &$values): void
     {
+        self::fisherYatesShuffleVariablesWithPicker(
+            $values,
+            static fn (int $upper): int => self::randomIndexBelow($upper)
+        );
+    }
+
+    /**
+     * @param list<Variable> $values
+     */
+    private static function fisherYatesShuffleVariablesWithPicker(array &$values, callable $pickIndex): void
+    {
         $n = \count($values);
         for ($i = $n - 1; $i > 0; --$i) {
-            $j = self::randomIndexBelow($i + 1);
+            $j = $pickIndex($i + 1);
             $tmp = $values[$i];
             $values[$i] = $values[$j];
             $values[$j] = $tmp;
@@ -780,11 +1276,30 @@ final class VmArray
      */
     public static function countRecursive(HashTable $ht, ?Frame $frame = null, ?\SplObjectStorage $visited = null): int
     {
+        return self::countRecursiveWalk($ht, $frame, $visited, false);
+    }
+
+    /** count(COUNT_RECURSIVE) for compiled JIT/AOT — warnings via compiler_language_warning (#13274). */
+    public static function countRecursiveForCompiled(HashTable $ht, ?\SplObjectStorage $visited = null): int
+    {
+        return self::countRecursiveWalk($ht, null, $visited, true);
+    }
+
+    private static function countRecursiveWalk(
+        HashTable $ht,
+        ?Frame $frame,
+        ?\SplObjectStorage $visited,
+        bool $compiledWarning
+    ): int {
         if (null === $visited) {
             $visited = new \SplObjectStorage();
         }
         if ($visited->contains($ht)) {
-            self::countRecursiveWarning($frame);
+            if ($compiledWarning) {
+                compiler_language_warning(self::COUNT_RECURSIVE_WARNING);
+            } else {
+                self::countRecursiveWarning($frame);
+            }
 
             return 0;
         }
@@ -793,7 +1308,7 @@ final class VmArray
             $count = $ht->getNumElements();
             foreach ($ht->iterate(true) as $value) {
                 if (Variable::TYPE_ARRAY === $value->type) {
-                    $count += self::countRecursive($value->toArray(), $frame, $visited);
+                    $count += self::countRecursiveWalk($value->toArray(), $frame, $visited, $compiledWarning);
                 }
             }
 
@@ -971,7 +1486,7 @@ final class VmArray
     /**
      * count() for arrays and Countable objects (Zend php_count parity, #3364).
      */
-    public static function countValue(Context $ctx, Variable $value): int
+    public static function countValue(Context $ctx, Variable $value, string $fn = 'count'): int
     {
         $v = $value->resolveIndirect();
         if (Variable::TYPE_ARRAY === $v->type) {
@@ -981,23 +1496,20 @@ final class VmArray
             $entry = $v->toObject()->class;
             if (!InterfaceCheck::entryImplements($entry, 'countable', $ctx)) {
                 throw new \TypeError(
-                    'count(): Argument #1 ($value) must be of type Countable|array, '
+                    $fn.'(): Argument #1 ($value) must be of type Countable|array, '
                     . $entry->name . ' given'
                 );
             }
-            $result = $ctx->runtime->vm->invokeInstanceMethod($v->toObject(), 'count')->resolveIndirect();
-            if (Variable::TYPE_INTEGER !== $result->type) {
-                throw new \TypeError(
-                    'Return value of ' . $entry->name . '::count() must be of type int, '
-                    . self::valueTypeLabel($result) . ' returned'
-                );
-            }
+            $result = $ctx->runtime->vm->invokeInstanceMethodWithoutReturnCheck(
+                $v->toObject(),
+                'count'
+            )->resolveIndirect();
 
-            return $result->toInt();
+            return VmNumericCoercion::zvalGetLong($result);
         }
 
         throw new \TypeError(
-            'count(): Argument #1 ($value) must be of type Countable|array, '
+            $fn.'(): Argument #1 ($value) must be of type Countable|array, '
             . self::valueTypeLabel($v) . ' given'
         );
     }
@@ -1027,6 +1539,107 @@ final class VmArray
             default:
                 return 'mixed';
         }
+    }
+
+    /**
+     * @return list<Variable>
+     */
+    private static function copyPackedValues(HashTable $ht): array
+    {
+        $values = [];
+        foreach ($ht->iterate(true) as $value) {
+            $copy = new Variable();
+            $copy->copyFrom($value);
+            $values[] = $copy;
+        }
+
+        return $values;
+    }
+
+    /**
+     * @param list<Variable> $values
+     */
+    private static function sortPackedValues(array &$values, int $flags, string $function, bool $desc): void
+    {
+        if (\count($values) < 2) {
+            return;
+        }
+        $first = $values[0]->resolveIndirect();
+        $sortType = $flags & ~StdlibConstants::SORT_FLAG_CASE;
+        if (Variable::TYPE_STRING === $first->type) {
+            if (
+                StdlibConstants::SORT_STRING === $sortType
+                && VmInternalCompare::valuesShareScalarType($values, Variable::TYPE_STRING)
+            ) {
+                $cmp = VmInternalCompare::stringCompareForSortFlags($flags);
+                if ($desc) {
+                    VmInternalCompare::sortVariableValuesDesc($values, $cmp);
+                } else {
+                    VmInternalCompare::sortVariableValues($values, $cmp);
+                }
+            } else {
+                if ($desc) {
+                    VmInternalCompare::sortVariableValuesWithFlagsDesc($values, $flags);
+                } else {
+                    VmInternalCompare::sortVariableValuesWithFlags($values, $flags);
+                }
+            }
+        } elseif (Variable::TYPE_INTEGER === $first->type) {
+            if (
+                StdlibConstants::SORT_REGULAR === $sortType
+                && VmInternalCompare::valuesShareScalarType($values, Variable::TYPE_INTEGER)
+            ) {
+                $n = \count($values);
+                for ($i = 1; $i < $n; ++$i) {
+                    $j = $i;
+                    while ($j > 0) {
+                        $a = $values[$j - 1]->resolveIndirect();
+                        $b = $values[$j]->resolveIndirect();
+                        $ordered = $desc ? ($a->toInt() >= $b->toInt()) : ($a->toInt() <= $b->toInt());
+                        if ($ordered) {
+                            break;
+                        }
+                        $tmp = $values[$j - 1];
+                        $values[$j - 1] = $values[$j];
+                        $values[$j] = $tmp;
+                        --$j;
+                    }
+                }
+            } else {
+                if ($desc) {
+                    VmInternalCompare::sortVariableValuesWithFlagsDesc($values, $flags);
+                } else {
+                    VmInternalCompare::sortVariableValuesWithFlags($values, $flags);
+                }
+            }
+        } elseif (Variable::TYPE_OBJECT === $first->type || EnumCaseSupport::isEnumCaseVariable($first)) {
+            VmInternalCompare::assertHomogeneousEnumOrObjectValues($values, $function);
+            if (!self::packedObjectSortUsesSpaceship($flags)) {
+                throw new \LogicException(
+                    $function.' flags are not supported for object arrays in this compiler build'
+                );
+            }
+            if ($desc) {
+                VmInternalCompare::sortVariableValuesBySpaceshipDesc($values);
+            } else {
+                VmInternalCompare::sortVariableValuesBySpaceship($values);
+            }
+        } else {
+            if ($desc) {
+                VmInternalCompare::sortVariableValuesWithFlagsDesc($values, $flags);
+            } else {
+                VmInternalCompare::sortVariableValuesWithFlags($values, $flags);
+            }
+        }
+    }
+
+    /** php-src php_array_sort — SORT_REGULAR uses zend_compare on object zvals. */
+    private static function packedObjectSortUsesSpaceship(int $flags): bool
+    {
+        $sortType = $flags & ~StdlibConstants::SORT_FLAG_CASE;
+
+        return StdlibConstants::SORT_REGULAR === $sortType
+            || StdlibConstants::SORT_NUMERIC === $sortType;
     }
 
     /**

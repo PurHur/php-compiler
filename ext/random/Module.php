@@ -10,7 +10,7 @@ use PHPCompiler\Runtime;
 /**
  * random extension module entry (php-src ext/random/random.c; issue #7102).
  *
- * Randomizer behavior tracked in #3722; v1 skeleton enables class_exists() and inventory.
+ * Randomizer OOP API — Random\Randomizer + Random\Engine\Mt19937 (#13191, #3722).
  */
 class Module extends ModuleAbstract
 {
@@ -18,5 +18,10 @@ class Module extends ModuleAbstract
     {
         parent::init($runtime);
         BuiltinClasses::register($runtime->vmContext);
+        foreach (RandomConstants::registeredConstants() as $name => $value) {
+            $var = new \PHPCompiler\VM\Variable();
+            $var->int($value);
+            $runtime->vmContext->defineConstant($name, $var);
+        }
     }
 }

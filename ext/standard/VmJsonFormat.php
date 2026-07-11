@@ -14,11 +14,11 @@ final class VmJsonFormat
     /**
      * @param array<mixed>|bool|float|int|null|string $exported VmJson::export shape
      */
-    public static function encodeExported(mixed $exported, int $flags = 0): string|false
+    public static function encodeExported(mixed $exported, int $flags = 0, int $maxDepth = 512): string|false
     {
         VmJson::setLastError(0);
         try {
-            return self::encodeValue($exported, $flags);
+            return self::encodeValue($exported, $flags, 0, $maxDepth);
         } catch (VmJsonExportException $e) {
             VmJson::setLastError($e->errorCode);
             if (VmJsonFlags::throwsOnError($flags)) {
@@ -50,20 +50,16 @@ final class VmJsonFormat
 
             return null;
         }
-        $parser = new VmJsonParser($json, $maxDepth, $assoc);
+        $parser = new VmJsonParser($json, $maxDepth, $assoc, $flags);
         $value = $parser->parseTop();
         if (VmJson::lastError() !== 0) {
-            if (VmJsonFlags::throwsOnError($flags)) {
-                throw new \JsonException(VmJson::lastErrorMsg(), VmJson::lastError());
-            }
+            self::applyDecodeLastError($json, $flags);
 
             return null;
         }
         if (!$parser->atEnd()) {
             VmJson::setLastError(4);
-            if (VmJsonFlags::throwsOnError($flags)) {
-                throw new \JsonException(VmJson::lastErrorMsg(), 4);
-            }
+            self::applyDecodeLastError($json, $flags);
 
             return null;
         }
@@ -72,9 +68,25 @@ final class VmJsonFormat
     }
 
     /**
+     * php-src ext/json/php_json.c — JSON_INVALID_UTF8_* still reports JSON_ERROR_UTF8 (5)
+     * when the input buffer contains malformed UTF-8 and decode fails (#14145).
+     */
+    private static function applyDecodeLastError(string $json, int $flags): void
+    {
+        $code = VmJson::lastError();
+        if (4 === $code && VmJsonFlags::ignoreInvalidUtf8($flags) && !VmJsonUtf8::isValidUtf8($json)) {
+            VmJson::setLastError(5);
+            $code = 5;
+        }
+        if (VmJsonFlags::throwsOnError($flags)) {
+            throw new \JsonException(VmJson::lastErrorMsg(), $code);
+        }
+    }
+
+    /**
      * @param array<mixed>|bool|float|int|null|string $value
      */
-    private static function encodeValue(mixed $value, int $flags, int $depth = 0): string
+    private static function encodeValue(mixed $value, int $flags, int $depth, int $maxDepth): string
     {
         if (null === $value) {
             return 'null';
@@ -92,22 +104,31 @@ final class VmJsonFormat
             return self::encodeStringValue($value, $flags);
         }
         if ($value instanceof \stdClass) {
+            $nestedDepth = $depth + 1;
+            if ($nestedDepth > $maxDepth) {
+                throw new VmJsonExportException(VmJson::ERROR_DEPTH);
+            }
             $props = get_object_vars($value);
             if ([] === $props) {
                 return self::wrapObject('{}', $flags, $depth);
             }
             $parts = [];
             foreach ($props as $key => $item) {
-                if (!\is_string($key)) {
-                    throw new \LogicException('json_encode() only supports string keys in this compiler build');
+                if (!\is_string($key) && !\is_int($key)) {
+                    throw new \LogicException('json_encode() only supports string or integer keys in this compiler build');
                 }
-                $parts[] = '"'.self::escapeString($key, $flags).'"'.self::keyValueSeparator($flags)
-                    .self::encodePairValue($item, $flags, $depth);
+                $keyStr = \is_int($key) ? (string) $key : $key;
+                $parts[] = '"'.self::escapeString($keyStr, $flags).'"'.self::keyValueSeparator($flags)
+                    .self::encodePairValue($item, $flags, $nestedDepth, $maxDepth);
             }
 
             return self::wrapObject('{'.self::joinParts($parts, $flags, $depth).'}', $flags, $depth);
         }
         if (\is_array($value)) {
+            $nestedDepth = $depth + 1;
+            if ($nestedDepth > $maxDepth) {
+                throw new VmJsonExportException(VmJson::ERROR_DEPTH);
+            }
             $encodeAsObject = !array_is_list($value) || self::forceObject($flags);
             if ([] === $value) {
                 $empty = $encodeAsObject ? '{}' : '[]';
@@ -117,7 +138,7 @@ final class VmJsonFormat
             if (!$encodeAsObject) {
                 $parts = [];
                 foreach ($value as $item) {
-                    $parts[] = self::encodePairValue($item, $flags, $depth);
+                    $parts[] = self::encodePairValue($item, $flags, $nestedDepth, $maxDepth);
                 }
 
                 return self::wrapContainer('['.self::joinParts($parts, $flags, $depth).']', $flags, $depth);
@@ -131,7 +152,7 @@ final class VmJsonFormat
                 }
                 $keyStr = \is_int($key) ? (string) $key : $key;
                 $parts[] = '"'.self::escapeString($keyStr, $flags).'"'.self::keyValueSeparator($flags)
-                    .self::encodePairValue($item, $flags, $depth);
+                    .self::encodePairValue($item, $flags, $nestedDepth, $maxDepth);
             }
 
             return self::wrapObject('{'.self::joinParts($parts, $flags, $depth).'}', $flags, $depth);
@@ -171,9 +192,9 @@ final class VmJsonFormat
     /**
      * @param array<mixed>|bool|float|int|null|string $value
      */
-    private static function encodePairValue(mixed $value, int $flags, int $depth): string
+    private static function encodePairValue(mixed $value, int $flags, int $depth, int $maxDepth): string
     {
-        return self::encodeValue($value, $flags, $depth + 1);
+        return self::encodeValue($value, $flags, $depth, $maxDepth);
     }
 
     private static function indent(int $depth): string
@@ -193,6 +214,7 @@ final class VmJsonFormat
 
     private static function encodeStringValue(string $value, int $flags): string
     {
+        $value = self::prepareUtf8StringForEncode($value, $flags);
         if (0 !== ($flags & VmJsonFlags::NUMERIC_CHECK)) {
             $numeric = self::tryEncodeNumericStringValue($value, $flags);
             if (null !== $numeric) {
@@ -241,6 +263,10 @@ final class VmJsonFormat
         $preserveZero = 0 !== ($flags & VmJsonFlags::PRESERVE_ZERO_FRACTION);
         $isWhole = (float) (int) $num === $num && abs($num) < 1.0e15;
         if ($isWhole && !$preserveZero) {
+            if (self::isNegativeZero($num)) {
+                return '-0';
+            }
+
             return (string) (int) $num;
         }
 
@@ -257,8 +283,30 @@ final class VmJsonFormat
         return str_contains($text, '.') || str_contains($text, 'E') || str_contains($text, 'e');
     }
 
+    /** php-src ext/json/php_json_encoder.c — preserve IEEE754 negative zero sign. */
+    private static function isNegativeZero(float $num): bool
+    {
+        return 0.0 == $num && 0.0 !== \atan2(0.0, $num);
+    }
+
+    /**
+     * php-src ext/json/php_json_encoder.c — reject malformed UTF-8 unless JSON_INVALID_UTF8_* (#9205).
+     */
+    private static function prepareUtf8StringForEncode(string $value, int $flags): string
+    {
+        if (VmJsonUtf8::isValidUtf8($value)) {
+            return $value;
+        }
+        if (VmJsonFlags::substitutesInvalidUtf8($flags)) {
+            return VmJsonUtf8::substituteInvalidUtf8($value);
+        }
+
+        throw new VmJsonExportException(5);
+    }
+
     private static function escapeString(string $value, int $flags): string
     {
+        $value = self::prepareUtf8StringForEncode($value, $flags);
         $unescapedUnicode = 0 !== ($flags & VmJsonFlags::UNESCAPED_UNICODE);
         $unescapedSlashes = 0 !== ($flags & VmJsonFlags::UNESCAPED_SLASHES);
         $out = '';
@@ -270,6 +318,16 @@ final class VmJsonFormat
                 $run = self::utf8RunLength($value, $i);
                 if ($run > 0) {
                     $out .= \substr($value, $i, $run);
+                    $i += $run - 1;
+
+                    continue;
+                }
+            }
+            if (!$unescapedUnicode && $ord >= 0x80) {
+                $decoded = self::utf8CodePointAt($value, $i);
+                if (null !== $decoded) {
+                    [$cp, $run] = $decoded;
+                    $out .= self::escapeUnicodeCodePoint($cp);
                     $i += $run - 1;
 
                     continue;
@@ -330,5 +388,43 @@ final class VmJsonFormat
         }
 
         return $need;
+    }
+
+    /** @return array{0: int, 1: int}|null Unicode code point and UTF-8 byte length. */
+    private static function utf8CodePointAt(string $value, int $offset): ?array
+    {
+        $run = self::utf8RunLength($value, $offset);
+        if ($run <= 0) {
+            return null;
+        }
+        $b0 = \ord($value[$offset]);
+        $cp = match ($run) {
+            2 => (($b0 & 0x1F) << 6) | (\ord($value[$offset + 1]) & 0x3F),
+            3 => (($b0 & 0x0F) << 12)
+                | ((\ord($value[$offset + 1]) & 0x3F) << 6)
+                | (\ord($value[$offset + 2]) & 0x3F),
+            4 => (($b0 & 0x07) << 18)
+                | ((\ord($value[$offset + 1]) & 0x3F) << 12)
+                | ((\ord($value[$offset + 2]) & 0x3F) << 6)
+                | (\ord($value[$offset + 3]) & 0x3F),
+            default => null,
+        };
+        if (null === $cp || $cp > 0x10FFFF) {
+            return null;
+        }
+
+        return [$cp, $run];
+    }
+
+    private static function escapeUnicodeCodePoint(int $cp): string
+    {
+        if ($cp <= 0xFFFF) {
+            return \sprintf('\\u%04x', $cp);
+        }
+        $cp -= 0x10000;
+        $high = 0xD800 | ($cp >> 10);
+        $low = 0xDC00 | ($cp & 0x3FF);
+
+        return \sprintf('\\u%04x\\u%04x', $high, $low);
     }
 }

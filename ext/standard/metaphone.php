@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\StringMetaphone;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
@@ -17,7 +18,7 @@ use PHPLLVM\Value;
 /**
  * metaphone() — phonetic string encoding (subset of PHP; issue #2423).
  *
- * VM: {@see VmString::metaphone()}; JIT/AOT: {@see JitMetaphone}.
+ * VM: {@see VmString::metaphone()}; JIT/AOT: {@see StringMetaphone} + {@see MetaphoneJitHelper}.
  */
 final class metaphone extends Internal
 {
@@ -68,8 +69,10 @@ final class metaphone extends Internal
             $maxPhonemes = $this->jitLong($context, $args[1], 'metaphone() max phonemes');
         }
 
-        return JitMetaphone::invoke(
-            $context,
+        StringMetaphone::ensureLinked($context);
+
+        return $context->builder->call(
+            $context->lookupFunction('__compiler_metaphone'),
             self::jitStringArg($context, $args[0], 1, 'string'),
             $maxPhonemes
         );

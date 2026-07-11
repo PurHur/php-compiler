@@ -9,6 +9,7 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPLLVM\Value;
 
 /** chdir() — VM via VmChdirNative (libc); JIT/AOT via JitChdir (#8180). */
@@ -24,11 +25,16 @@ final class chdir_ extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('chdir() requires exactly one argument in this compiler build');
         }
+        InternalStrictArg::rejectNullString($frame->calledArgs[0], 'chdir', 'directory', 0, $frame);
         $path = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'chdir', 0, 'directory');
+        $ok = VmFs::chdir($path);
+        if (!$ok) {
+            VmFilestatFailure::warnChdirFailed($frame, $path);
+        }
         if (null === $frame->returnVar) {
             return;
         }
-        $frame->returnVar->bool(VmFs::chdir($path));
+        $frame->returnVar->bool($ok);
     }
 
     public function call(Context $context, JITVariable ...$args): Value

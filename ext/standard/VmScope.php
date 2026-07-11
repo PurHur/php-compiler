@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
+use PHPCompiler\VM\Context;
+use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
@@ -19,6 +21,18 @@ final class VmScope
 
     /** PHP EXTR_SKIP — do not overwrite variables that already hold a value (php_array.h). */
     public const EXTR_SKIP = StdlibConstants::EXTR_SKIP;
+
+    public const EXTR_PREFIX_SAME = StdlibConstants::EXTR_PREFIX_SAME;
+
+    public const EXTR_PREFIX_ALL = StdlibConstants::EXTR_PREFIX_ALL;
+
+    public const EXTR_PREFIX_INVALID = StdlibConstants::EXTR_PREFIX_INVALID;
+
+    public const EXTR_PREFIX_IF_EXISTS = StdlibConstants::EXTR_PREFIX_IF_EXISTS;
+
+    public const EXTR_IF_EXISTS = StdlibConstants::EXTR_IF_EXISTS;
+
+    public const EXTR_REFS = StdlibConstants::EXTR_REFS;
 
     public static function requireCaller(Frame $frame): Frame
     {
@@ -64,16 +78,15 @@ final class VmScope
 
     public static function extract(Frame $frame): int
     {
-        if (\count($frame->calledArgs) < 1 || \count($frame->calledArgs) > 2) {
-            throw new \LogicException('extract() requires one or two arguments in this compiler build');
+        $argc = \count($frame->calledArgs);
+        if ($argc < 1 || $argc > 3) {
+            throw new \LogicException('extract() requires one to three arguments in this compiler build');
         }
         $caller = self::requireCaller($frame);
-        $array = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_ARRAY !== $array->type) {
-            throw new \LogicException('extract() first argument must be an array in this compiler build');
-        }
+        $ht = VmArray::requireArray($frame->calledArgs[0], 'extract');
+
         $flags = self::EXTR_OVERWRITE;
-        if (2 === \count($frame->calledArgs)) {
+        if ($argc >= 2) {
             $flagsArg = $frame->calledArgs[1]->resolveIndirect();
             if (Variable::TYPE_INTEGER !== $flagsArg->type) {
                 throw new \LogicException('extract() flags must be an integer in this compiler build');
@@ -81,49 +94,140 @@ final class VmScope
             $flags = $flagsArg->toInt();
         }
 
-        return self::extractIntoCaller($caller, $array->toArray(), $flags, $frame);
+        $refs = 0 !== ($flags & self::EXTR_REFS);
+        $extractType = $flags & 0xFF;
+        if ($extractType < self::EXTR_OVERWRITE || $extractType > self::EXTR_IF_EXISTS) {
+            throw new \ValueError('extract(): Argument #2 ($flags) must be a valid extract type');
+        }
+
+        $prefix = null;
+        if ($extractType > self::EXTR_SKIP && $extractType <= self::EXTR_PREFIX_IF_EXISTS) {
+            if ($argc < 3) {
+                self::extractWarning($frame, 'specified extract type requires the prefix parameter');
+
+                return 0;
+            }
+            $prefix = VmString::requireStringBuiltinArg($frame->calledArgs[2], 'extract', 2, 'prefix');
+            if ('' !== $prefix && !self::isValidVarName($prefix)) {
+                self::extractWarning($frame, 'prefix is not a valid identifier');
+
+                return 0;
+            }
+        }
+
+        return self::extractIntoCaller($caller, $ht, $extractType, $refs, $prefix, $frame);
     }
 
-    private static function extractIntoCaller(Frame $caller, HashTable $table, int $flags, Frame $builtinFrame): int
-    {
+    /**
+     * php-src: ext/standard/array.c — php_extract / ZEND_HASH_FOREACH_KEY_VAL_IND.
+     */
+    private static function extractIntoCaller(
+        Frame $caller,
+        HashTable $table,
+        int $extractType,
+        bool $refs,
+        ?string $prefix,
+        Frame $builtinFrame,
+    ): int {
         $imported = 0;
         foreach ($table->iterateKeyed(true) as [$keyVar, $valueVar]) {
-            if (Variable::TYPE_STRING !== $keyVar->type) {
+            $keyResolved = $keyVar->resolveIndirect();
+            $stringKey = null;
+            if (Variable::TYPE_STRING === $keyResolved->type) {
+                $stringKey = $keyResolved->toString();
+            } elseif (Variable::TYPE_INTEGER === $keyResolved->type) {
+                if (self::EXTR_PREFIX_ALL !== $extractType && self::EXTR_PREFIX_INVALID !== $extractType) {
+                    continue;
+                }
+                $stringKey = (string) $keyResolved->toInt();
+            } else {
                 continue;
             }
-            $name = $keyVar->toString();
-            if (null !== $caller->block) {
-                $slotHandled = false;
-                foreach ($caller->block->eachNamedScopeSlot() as [$slotName, $slot]) {
-                    if ($slotName !== $name) {
-                        continue;
-                    }
-                    $slotHandled = true;
-                    if (!isset($caller->scope[$slot])) {
-                        $caller->scope[$slot] = new Variable();
-                    }
-                    if (self::EXTR_SKIP === ($flags & self::EXTR_SKIP) && self::callerVarIsSet($caller->scope[$slot])) {
-                        continue;
-                    }
-                    $caller->scope[$slot]->copyFrom($valueVar);
-                    $caller->initializedSlots[$slot] = true;
-                    self::markGlobalEverAssignedForSlot($caller, $slot, $builtinFrame);
-                    ++$imported;
-                }
-                if ($slotHandled) {
+
+            if ('' === $stringKey) {
+                continue;
+            }
+
+            $varExists = self::callerNameExists($caller, $stringKey);
+            $finalName = self::resolveExtractFinalName($stringKey, $varExists, $extractType, $prefix);
+            if (null === $finalName || !self::isValidVarName($finalName)) {
+                continue;
+            }
+
+            if (self::EXTR_OVERWRITE === $extractType || self::EXTR_IF_EXISTS === $extractType) {
+                if ('GLOBALS' === $finalName) {
                     continue;
                 }
             }
-            $target = self::ensureCallerVariable($caller, $name);
-            if (self::EXTR_SKIP === ($flags & self::EXTR_SKIP) && self::callerVarIsSet($target)) {
-                continue;
+
+            $target = self::ensureCallerVariable($caller, $finalName);
+            if ($refs) {
+                $target->indirect($valueVar);
+            } else {
+                $target->copyFrom($valueVar);
             }
-            $target->copyFrom($valueVar);
-            self::markCallerVariableInitialized($caller, $name, $builtinFrame);
+            self::markCallerVariableInitialized($caller, $finalName, $builtinFrame);
             ++$imported;
         }
 
         return $imported;
+    }
+
+    /** php-src: php_prefix_varname — prefix and key joined by underscore. */
+    public static function prefixVarName(string $prefix, string $key): string
+    {
+        return ScopeBuiltinJitHelper::prefixVarName($prefix, $key);
+    }
+
+    /**
+     * @see ext/standard/array.c switch (extract_type) in php_extract
+     */
+    private static function resolveExtractFinalName(
+        string $key,
+        bool $varExists,
+        int $extractType,
+        ?string $prefix,
+    ): ?string {
+        return ScopeBuiltinJitHelper::resolveExtractFinalName($key, $varExists, $extractType, $prefix);
+    }
+
+    private static function callerNameExists(Frame $caller, string $name): bool
+    {
+        $slot = self::slotForName($caller, $name);
+        if (null !== $slot) {
+            if (!isset($caller->scope[$slot])) {
+                return false;
+            }
+
+            return isset($caller->initializedSlots[$slot]) || self::callerVarIsSet($caller->scope[$slot]);
+        }
+        $var = self::callerVariable($caller, $name);
+        if (null === $var) {
+            return false;
+        }
+
+        return !$var->resolveIndirect()->isUndefined();
+    }
+
+    private static function isValidVarName(string $name): bool
+    {
+        return ScopeBuiltinJitHelper::isValidVarName($name);
+    }
+
+    private static function extractWarning(Frame $frame, string $message): void
+    {
+        if (null === $frame->vmContext) {
+            return;
+        }
+        [$file, $line] = self::compactCallSite($frame);
+        $frame->vmContext->errors->triggerError(
+            'extract(): '.$message,
+            ErrorReporter::E_WARNING,
+            $file,
+            $frame->vmContext,
+            $frame,
+            $line
+        );
     }
 
     /** Zend symbol-table import marks CVs initialized — no later undefined-variable warnings (#10590). */
@@ -172,8 +276,16 @@ final class VmScope
     private static function resolveCompactVariable(Frame $frame, Frame $caller, string $name): ?Variable
     {
         $value = self::callerVariable($caller, $name);
-        if (null !== $value) {
+        // Zend zif_compact: CV slots exist before first assign but must warn+skip (#10164).
+        if (null !== $value && self::callerNameExists($caller, $name)) {
             return $value;
+        }
+        if (null !== $frame->vmContext) {
+            $key = new Variable(Variable::TYPE_STRING);
+            $key->string($name);
+            if ($frame->vmContext->globalsTableOffsetIsSet($key)) {
+                return $frame->vmContext->ensureGlobal($name);
+            }
         }
         if (!Superglobals::isSuperglobalName($name) || null === $frame->vmContext) {
             return null;
@@ -226,16 +338,7 @@ final class VmScope
 
     private static function compactInvalidArgTypeName(Variable $var): string
     {
-        return match ($var->type) {
-            Variable::TYPE_NULL => 'null',
-            Variable::TYPE_INTEGER => 'int',
-            Variable::TYPE_FLOAT => 'float',
-            Variable::TYPE_BOOLEAN => 'bool',
-            Variable::TYPE_STRING => 'string',
-            Variable::TYPE_ARRAY => 'array',
-            Variable::TYPE_OBJECT => 'object',
-            default => 'unknown type',
-        };
+        return EnumCaseSupport::typeNameForVariable($var);
     }
 
     private static function compactUndefinedVariableWarning(Frame $frame, string $name): void
@@ -284,7 +387,7 @@ final class VmScope
         $caller = self::requireCaller($frame);
         $result = new HashTable();
         foreach ($caller->block->eachNamedScopeSlot() as [$name, $slot]) {
-            if ('this' === $name || Superglobals::isSuperglobalName($name)) {
+            if ('this' === $name) {
                 continue;
             }
             if (!isset($caller->scope[$slot])) {
@@ -299,7 +402,89 @@ final class VmScope
             $result->add($name, $copy);
         }
 
+        self::appendCallerDynamicLocals($caller, $result);
+
+        if ($caller->block->isMainScript()) {
+            self::appendFileScopeAutoGlobals($frame->vmContext, $result);
+        }
+
         return $result;
+    }
+
+    /**
+     * extract() / variable-variables may allocate runtime-only locals (#4517, #4826).
+     *
+     * @see php/php-src Zend/zend_builtin_functions.c — zend_get_defined_vars symbol table
+     */
+    private static function appendCallerDynamicLocals(Frame $caller, HashTable $result): void
+    {
+        if ([] === $caller->dynamicLocals) {
+            return;
+        }
+        $present = [];
+        foreach ($result->iterateKeyed(true) as [$keyVar]) {
+            $present[$keyVar->resolveIndirect()->toString()] = true;
+        }
+        foreach ($caller->dynamicLocals as $name => $var) {
+            if ('this' === $name || isset($present[$name])) {
+                continue;
+            }
+            if (!self::callerVarIsSet($var)) {
+                continue;
+            }
+            $copy = new Variable();
+            $copy->copyFrom($var->resolveIndirect());
+            $result->add($name, $copy);
+        }
+    }
+
+    /**
+     * php-src active symbol table auto-globals at compile/file scope (#10934).
+     */
+    public const FILE_SCOPE_DEFINED_VAR_AUTO_NAMES = [
+        '_GET',
+        '_POST',
+        '_COOKIE',
+        '_FILES',
+        '_SERVER',
+        'argv',
+        'argc',
+    ];
+
+    private static function appendFileScopeAutoGlobals(?Context $ctx, HashTable $result): void
+    {
+        if (null === $ctx) {
+            return;
+        }
+        $present = [];
+        foreach ($result->iterateKeyed(true) as [$keyVar]) {
+            $present[$keyVar->resolveIndirect()->toString()] = true;
+        }
+        foreach (self::FILE_SCOPE_DEFINED_VAR_AUTO_NAMES as $name) {
+            if (isset($present[$name])) {
+                continue;
+            }
+            $source = Superglobals::isSuperglobalName($name)
+                ? $ctx->ensureSuperglobal($name)
+                : self::scriptGlobalForDefinedVars($ctx, $name);
+            if (null === $source || !self::callerVarIsSet($source)) {
+                continue;
+            }
+            $copy = new Variable();
+            $copy->copyFrom($source->resolveIndirect());
+            $result->add($name, $copy);
+        }
+    }
+
+    private static function scriptGlobalForDefinedVars(Context $ctx, string $name): ?Variable
+    {
+        $key = new Variable(Variable::TYPE_STRING);
+        $key->string($name);
+        if (!$ctx->globalsTableOffsetIsSet($key)) {
+            return null;
+        }
+
+        return $ctx->ensureGlobal($name);
     }
 
     /** get_declared_variables() — caller local names only (php-src: php_get_defined_vars names). */
@@ -316,6 +501,19 @@ final class VmScope
                 continue;
             }
             if (!self::callerVarIsSet($caller->scope[$slot])) {
+                continue;
+            }
+            $entry = new Variable();
+            $entry->string($name);
+            $result->addIndex($index, $entry);
+            ++$index;
+        }
+
+        foreach ($caller->dynamicLocals as $name => $var) {
+            if ('this' === $name || Superglobals::isSuperglobalName($name)) {
+                continue;
+            }
+            if (!self::callerVarIsSet($var)) {
                 continue;
             }
             $entry = new Variable();

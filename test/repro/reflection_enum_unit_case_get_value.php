@@ -5,11 +5,9 @@ enum E {
 }
 
 $r = new ReflectionEnumUnitCase(E::class, 'A');
-try {
-    var_dump($r->getValue());
-} catch (\Throwable $e) {
-    echo get_class($e), ': ', $e->getMessage(), "\n";
-}
+var_export($r->getValue());
+echo "\n";
+echo $r->getValue()->name, "\n";
 
 enum B: string {
     case A = 'x';

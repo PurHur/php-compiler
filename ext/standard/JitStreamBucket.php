@@ -211,8 +211,20 @@ final class JitStreamBucket
             );
         }
 
+        return self::buildStdClassBucketValue($context, $bucketHandle, $dataStr);
+    }
+
+    public static function buildStdClassBucketValue(Context $context, Value $bucketHandle, Value $dataStr): Value
+    {
         $objectType = $context->type->object;
-        $classId = $objectType->lookup('StreamBucket');
+        $className = 'stdClass';
+        $classId = $objectType->lookup($className);
+        if (!$objectType->hasProperty($classId, 'bucket')) {
+            $objectType->defineProperty($classId, 'bucket', JITVariable::TYPE_NATIVE_LONG);
+        }
+        if (!$objectType->hasProperty($classId, 'data')) {
+            $objectType->defineProperty($classId, 'data', JITVariable::TYPE_STRING);
+        }
 
         $obj = $objectType->allocate($classId);
         $objectType->markObjectConstructed($obj);
@@ -224,7 +236,7 @@ final class JitStreamBucket
             $bucketHandle
         );
         $objectType->propertyStore(
-            $objectType->propertySlotFor($obj, 'StreamBucket', 'bucket'),
+            $objectType->propertySlotFor($obj, $className, 'bucket'),
             $bucketVar,
             JITVariable::TYPE_NATIVE_LONG
         );
@@ -240,7 +252,7 @@ final class JitStreamBucket
             $owned
         );
         $objectType->propertyStore(
-            $objectType->propertySlotFor($obj, 'StreamBucket', 'data'),
+            $objectType->propertySlotFor($obj, $className, 'data'),
             $dataVar,
             JITVariable::TYPE_STRING
         );
@@ -264,7 +276,7 @@ final class JitStreamBucket
         if (JITVariable::TYPE_OBJECT !== $arg->type) {
             TypeErrorRaise::emitRaise(
                 $context,
-                $function.'(): Argument #2 ($bucket) must be of type StreamBucket, '
+                $function.'(): Argument #2 ($bucket) must be of type object, '
                 .self::typeLabel($context, $arg).' given'
             );
             $context->builder->call($context->lookupFunction('abort'));
@@ -273,12 +285,11 @@ final class JitStreamBucket
         }
 
         $obj = $context->helper->loadValue($arg);
-        $bucketProp = $context->type->object->propertyFetch($obj, 'StreamBucket', 'bucket');
+        $bucketProp = $context->type->object->propertyFetch($obj, 'stdClass', 'bucket');
         if (JITVariable::TYPE_NATIVE_LONG !== $bucketProp->type) {
             TypeErrorRaise::emitRaise(
                 $context,
-                $function.'(): Argument #2 ($bucket) must be of type StreamBucket, '
-                .self::typeLabel($context, $arg).' given'
+                $function.'(): Argument #2 ($bucket) must be an object that has a "bucket" property'
             );
             $context->builder->call($context->lookupFunction('abort'));
         }

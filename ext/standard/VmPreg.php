@@ -4,15 +4,19 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\Frame;
 use PHPCompiler\RuntimeStrictness;
+use PHPCompiler\VM;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\HashTable;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 
 /**
  * VM preg_match() — native PCRE via VmPregNative (issue #4874).
  *
- * JIT/AOT use {@see StringPregMatchJit} (libpcre2 via LLVM externals, issue #5289).
+ * JIT/AOT use {@see PregMatchRuntime} + {@see PregJitHelper} (embed) or
+ * {@see PregMatchRuntime} + {@see PregJitHelper} (JIT/AOT embed, #9542, #13736).
  */
 final class VmPreg
 {
@@ -54,9 +58,7 @@ final class VmPreg
     {
         $allowed = self::PREG_MATCH_ALLOWED_FLAGS;
         if (0 !== ($flags & ~$allowed)) {
-            throw new \LogicException(
-                'preg_match() flags must be a combination of PREG_OFFSET_CAPTURE and PREG_UNMATCHED_AS_NULL in this compiler build'
-            );
+            throw new \ValueError('preg_match(): Argument #4 ($flags) must be a PREG_* constant');
         }
     }
 
@@ -66,9 +68,7 @@ final class VmPreg
             | StdlibConstants::PREG_PATTERN_ORDER
             | StdlibConstants::PREG_SET_ORDER;
         if (0 !== ($flags & ~$allowed)) {
-            throw new \LogicException(
-                'preg_match_all() flags must be a combination of PREG_PATTERN_ORDER, PREG_SET_ORDER, PREG_OFFSET_CAPTURE, and PREG_UNMATCHED_AS_NULL in this compiler build'
-            );
+            throw new \ValueError('preg_match_all(): Argument #4 ($flags) must be a PREG_* constant');
         }
     }
 
@@ -86,6 +86,62 @@ final class VmPreg
         int $argIndex = 2,
         string $paramName = 'subject'
     ): Variable {
+        return self::requireStringOrArrayArg($var, $function, $argIndex, $paramName);
+    }
+
+    /**
+     * Z_PARAM_STR_OR_ARR on preg and str replace $subject with null to empty string (#11938).
+     *
+     * @throws \TypeError
+     */
+    public static function resolveStringOrArraySubject(
+        Frame $frame,
+        Variable $var,
+        string $function,
+        int $argIndex = 2,
+        string $paramName = 'subject'
+    ): Variable {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_NULL === $var->type) {
+            if (InternalStrictArg::isCallerStrict($frame)) {
+                throw new \TypeError(
+                    self::stringOrArraySubjectTypeError($function, $argIndex, $paramName, 'null')
+                );
+            }
+            $empty = new Variable();
+            $empty->string('');
+
+            return $empty;
+        }
+
+        return self::requireStringOrArrayArg($var, $function, $argIndex, $paramName);
+    }
+
+    /**
+     * Z_PARAM_STR_OR_ARR on preg_replace() $replacement — null coerces to '' (delete match) outside strict_types (#17871).
+     *
+     * @throws \TypeError
+     */
+    public static function resolveStringOrArrayReplacement(
+        Frame $frame,
+        Variable $var,
+        string $function,
+        int $argIndex = 1,
+        string $paramName = 'replacement'
+    ): Variable {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_NULL === $var->type) {
+            if (InternalStrictArg::isCallerStrict($frame)) {
+                throw new \TypeError(
+                    self::stringOrArraySubjectTypeError($function, $argIndex, $paramName, 'null')
+                );
+            }
+            $empty = new Variable();
+            $empty->string('');
+
+            return $empty;
+        }
+
         return self::requireStringOrArrayArg($var, $function, $argIndex, $paramName);
     }
 
@@ -113,6 +169,16 @@ final class VmPreg
         }
         if (Variable::TYPE_STRING === $var->type || Variable::TYPE_ARRAY === $var->type) {
             return $var;
+        }
+        if (Variable::TYPE_OBJECT === $var->type) {
+            $vm = VM::running();
+            $object = $var->toObject();
+            if (null !== $vm && $vm->hasInstanceMethod($object->class, '__tostring')) {
+                $coerced = new Variable();
+                $coerced->string($vm->coerceVariableToString($var));
+
+                return $coerced;
+            }
         }
 
         throw new \TypeError(
@@ -204,13 +270,13 @@ final class VmPreg
         string $replacement,
         string|array $subject,
         int $limit = -1,
-        int $flags = 0
+        ?int &$count = null
     ) {
         if (strlen($pattern) > self::MAX_PATTERN_BYTES) {
             return false;
         }
 
-        $result = VmPregNative::pregFilter($pattern, $replacement, $subject, $limit, $flags);
+        $result = VmPregNative::pregFilter($pattern, $replacement, $subject, $limit, $count);
         self::syncLastErrorFromNative();
         if (false === $result) {
             return false;
@@ -224,7 +290,7 @@ final class VmPreg
      * @param string|list<string>        $replacement
      * @param string|list<string>        $subject
      *
-     * @return string|list<string>|false
+     * @return string|list<string>|false|null
      */
     public static function pregReplace(
         string|array $pattern,
@@ -251,9 +317,6 @@ final class VmPreg
 
         $result = VmPregNative::pregReplace($pattern, $replacement, $subject, $limit, $count);
         self::syncLastErrorFromNative();
-        if (null === $result) {
-            return false;
-        }
 
         return $result;
     }
@@ -293,6 +356,17 @@ final class VmPreg
                 if (false === $replaced) {
                     return false;
                 }
+                if (null === $replaced) {
+                    if (StdlibConstants::PREG_BAD_UTF8_ERROR === self::lastError()) {
+                        if (null !== $count) {
+                            $count = $totalCount;
+                        }
+
+                        return $out;
+                    }
+
+                    return null;
+                }
                 $out[$key] = $replaced;
                 $totalCount += $elemCount;
             }
@@ -313,8 +387,19 @@ final class VmPreg
             $stepCount = 0;
             $step = VmPregNative::pregReplace($pat, $repl, $result, $limit, $stepCount);
             self::syncLastErrorFromNative();
-            if (false === $step || null === $step) {
+            if (false === $step) {
                 return false;
+            }
+            if (null === $step) {
+                if (StdlibConstants::PREG_BAD_UTF8_ERROR === self::lastError()) {
+                    if (null !== $count) {
+                        $count = $totalCount;
+                    }
+
+                    return $result;
+                }
+
+                return null;
             }
             $result = $step;
             $totalCount += $stepCount;

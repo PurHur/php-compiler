@@ -87,6 +87,16 @@ final class JitArrayColumnArg
         if (Variable::TYPE_VALUE === $arg->type) {
             return self::guardValueBoxOperand($context, $arg, $function, $argIndex, $paramName);
         }
+        if (Variable::TYPE_NATIVE_DOUBLE === $arg->type) {
+            self::emitStrIntNullTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'float');
+
+            return false;
+        }
+        if (Variable::TYPE_NATIVE_BOOL === $arg->type) {
+            self::emitStrIntNullTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'bool');
+
+            return false;
+        }
         if (Variable::TYPE_OBJECT === $arg->type) {
             self::emitStrIntNullTypeErrorAndAbort(
                 $context,
@@ -159,8 +169,20 @@ final class JitArrayColumnArg
                     return false;
                 }
             }
+            if (VmVariable::TYPE_STRING === $constantType
+                || VmVariable::TYPE_INTEGER === $constantType
+                || VmVariable::TYPE_NULL === $constantType) {
+                return true;
+            }
+            self::emitStrIntNullTypeErrorAndAbort(
+                $context,
+                $function,
+                $argIndex,
+                $paramName,
+                VmArrayColumnArg::vmTypeName($constantType)
+            );
 
-            return true;
+            return false;
         }
 
         self::emitRuntimeValueBoxReject($context, $arg, $function, $argIndex, $paramName);

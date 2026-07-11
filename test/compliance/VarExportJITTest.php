@@ -20,6 +20,10 @@ final class VarExportJITTest extends BaseTest
             __DIR__.'/cases/stdlib/var_export_jit.phpt',
             'var_export_jit.phpt'
         );
+        yield 'var_export_mangled_array_keys_jit.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/var_export_mangled_array_keys_jit.phpt',
+            'var_export_mangled_array_keys_jit.phpt'
+        );
     }
 
     public function setUp(): void

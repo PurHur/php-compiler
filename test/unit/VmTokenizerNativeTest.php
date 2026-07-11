@@ -67,6 +67,37 @@ final class VmTokenizerNativeTest extends TestCase
         self::assertSame('T_ECHO', $frame->returnVar->toString());
     }
 
+    public function test_token_name_unknown_id_returns_unknown(): void
+    {
+        $runtime = new Runtime();
+        $fn = new \PHPCompiler\ext\tokenizer\token_name();
+        $frame = $fn->getFrame($runtime->vmContext);
+        $type = new \PHPCompiler\VM\Variable();
+        $type->int(101);
+        $frame->calledArgs = [$type];
+        $frame->returnVar = new \PHPCompiler\VM\Variable();
+        $fn->execute($frame);
+        self::assertSame('UNKNOWN', $frame->returnVar->toString());
+    }
+
+    public function test_issue_13896_null_byte_after_dollar(): void
+    {
+        $src = "<?php \$\0 = 1;";
+        $tokens = LanguageScanner::tokenize($src);
+        self::assertSame('$', $tokens[1]);
+        self::assertTrue(\is_array($tokens[2]));
+        self::assertSame(TokenConstantsData::nameToId()['T_BAD_CHARACTER'], $tokens[2][0]);
+    }
+
+    public function test_bare_dollar_before_number_is_literal(): void
+    {
+        $tokens = LanguageScanner::tokenize('<?php $123;');
+        self::assertSame('$', $tokens[1]);
+        self::assertTrue(\is_array($tokens[2]));
+        self::assertSame(TokenConstantsData::nameToId()['T_LNUMBER'], $tokens[2][0]);
+        self::assertSame('123', $tokens[2][1]);
+    }
+
     public function test_vm_token_get_all_issue_repro(): void
     {
         $runtime = new Runtime();

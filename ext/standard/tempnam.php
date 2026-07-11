@@ -7,11 +7,11 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitStringArg;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** tempnam() — VM via VmFs; JIT/AOT via libc tempnam(3) (issue #1201). */
+/** tempnam() — VM via VmFs; JIT/AOT via TempnamJitHelper PHP (#15685). */
 final class tempnam extends Internal
 {
     public function __construct()
@@ -27,7 +27,7 @@ final class tempnam extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $dir = VmString::coercePathBuiltinArg($frame->calledArgs[0], 'tempnam', 0, 'directory');
+        $dir = VmFsTempnam::resolveDirectoryArg($frame->calledArgs[0]);
         $prefix = VmString::coercePathBuiltinArg($frame->calledArgs[1], 'tempnam', 1, 'prefix');
         $path = VmFsTempnam::invoke($dir, $prefix, $frame);
         if (false === $path) {
@@ -45,8 +45,8 @@ final class tempnam extends Internal
 
         return JitTempnam::invoke(
             $context,
-            JitStringArg::lower($context, $args[0], 'tempnam() directory'),
-            JitStringArg::lower($context, $args[1], 'tempnam() prefix')
+            JitTempnam::lowerDirectory($context, $args[0]),
+            JitStringBuiltinArg::lowerPath($context, $args[1], 'tempnam', 1, 'prefix')
         );
     }
 }

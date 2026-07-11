@@ -64,6 +64,64 @@ final class JitDateParseMaterializer
         self::setNestedMessages($context, $ht, 'warnings', $result['warnings']);
         self::setNestedMessages($context, $ht, 'errors', $result['errors']);
 
+        if (isset($result['relative']) && \is_array($result['relative'])) {
+            $relative = HashTableHelper::alloc($context);
+            foreach (['year', 'month', 'day', 'hour', 'minute', 'second', 'weekday'] as $relKey) {
+                $keyStr = $context->builder->load($context->constantStringFromString($relKey));
+                $context->builder->call(
+                    $context->lookupFunction('__hashtable__setStringKeyLong'),
+                    $relative,
+                    $keyStr,
+                    $i64->constInt((int) $result['relative'][$relKey], false)
+                );
+            }
+            $keyStr = $context->builder->load($context->constantStringFromString('relative'));
+            $context->builder->call(
+                $context->lookupFunction('__hashtable__setStringKeyHashtable'),
+                $ht,
+                $keyStr,
+                $relative
+            );
+        }
+
+        if (isset($result['zone_type'])) {
+            $keyStr = $context->builder->load($context->constantStringFromString('zone_type'));
+            $context->builder->call(
+                $context->lookupFunction('__hashtable__setStringKeyLong'),
+                $ht,
+                $keyStr,
+                $i64->constInt($result['zone_type'], false)
+            );
+        }
+        if (isset($result['zone'])) {
+            $keyStr = $context->builder->load($context->constantStringFromString('zone'));
+            $context->builder->call(
+                $context->lookupFunction('__hashtable__setStringKeyLong'),
+                $ht,
+                $keyStr,
+                $i64->constInt($result['zone'], false)
+            );
+        }
+        if (isset($result['is_dst'])) {
+            $keyStr = $context->builder->load($context->constantStringFromString('is_dst'));
+            $context->builder->call(
+                $context->lookupFunction('__hashtable__setStringKeyBool'),
+                $ht,
+                $keyStr,
+                $i1->constInt($result['is_dst'] ? 1 : 0, false)
+            );
+        }
+        if (isset($result['tz_id'])) {
+            $keyStr = $context->builder->load($context->constantStringFromString('tz_id'));
+            $tzStr = $context->builder->load($context->constantStringFromString($result['tz_id']));
+            $context->builder->call(
+                $context->lookupFunction('__hashtable__setStringKeyString'),
+                $ht,
+                $keyStr,
+                $tzStr
+            );
+        }
+
         return $ht;
     }
 

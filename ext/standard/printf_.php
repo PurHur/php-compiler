@@ -26,19 +26,14 @@ final class printf_ extends Internal
 
     public function execute(Frame $frame): void
     {
+        $this->requireAtLeastArgCount($frame, 'printf', 1);
+        $format = VmString::requireStringBuiltinArg($frame->calledArgs[0], 'printf', 0, 'format');
         $argc = \count($frame->calledArgs);
-        if ($argc < 1) {
-            throw new \LogicException('printf() requires at least one argument');
-        }
-        $fmtVar = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_STRING !== $fmtVar->type) {
-            throw new \LogicException('printf() format must be a string in this compiler build');
-        }
         $values = [];
         for ($i = 1; $i < $argc; ++$i) {
             $values[] = $frame->calledArgs[$i]->resolveIndirect();
         }
-        $out = VmSprintf::format($fmtVar->toString(), $values, $frame);
+        $out = VmSprintf::format($format, $values, $frame);
         OutputBuffer::append($out);
         if (null !== $frame->returnVar) {
             $frame->returnVar->int(VmString::byteLength($out));
@@ -47,6 +42,10 @@ final class printf_ extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
+        if (!$this->requireAtLeastJitArgCount($context, $args, 'printf', 1)) {
+            return $context->constantFromInteger(0, 'int64');
+        }
+
         return JitPrintf::format($context, ...$args);
     }
 }

@@ -1,5 +1,5 @@
 --TEST--
-language: clone __clone cannot assign readonly property (issue #4245)
+language: clone __clone may reinit readonly property once (issue #4245, PHP 8.3+ #15365)
 --FILE--
 <?php
 class Point {
@@ -11,5 +11,5 @@ class Point {
 $p = new Point(1);
 $c = clone $p;
 echo $c->x, "\n";
---EXPECT_EXIT--
-255
+--EXPECT--
+2

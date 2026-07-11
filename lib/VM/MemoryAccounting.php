@@ -11,10 +11,15 @@ namespace PHPCompiler\VM;
  */
 final class MemoryAccounting
 {
-    /** Zend MM per-request cache bucket (zend_alloc.c — typical gc_mem_caches first call). */
-    private const INITIAL_MM_CACHE = 65536;
+    /** Zend MM page size (zend_alloc.c ZEND_MM_PAGE_SIZE). */
+    private const ZEND_MM_PAGE_SIZE = 4096;
 
-    private static int $mmCacheRemaining = self::INITIAL_MM_CACHE;
+    /** Fallback when host Zend probe unavailable (zend_alloc.c 15-page bucket). */
+    private const FALLBACK_MM_CACHE = 15 * self::ZEND_MM_PAGE_SIZE;
+
+    private static ?int $initialMmCacheResolved = null;
+
+    private static int $mmCacheRemaining = 0;
 
     private static int $currentEmalloc = 0;
 
@@ -108,12 +113,61 @@ final class MemoryAccounting
         $var->releaseTrackedMemory();
     }
 
-    /** Seed Zend MM cache bucket at request start (php_gc.c gc_mem_caches parity, #9160). */
+    /** Seed Zend MM cache bucket at request start (php_gc.c gc_mem_caches parity, #9160, #12921). */
     public static function beginRequest(): void
     {
-        self::$mmCacheRemaining = self::INITIAL_MM_CACHE;
+        self::$mmCacheRemaining = self::initialMmCache();
         self::resetPeakToCurrent();
         self::$hasPeakQueryEmalloc = false;
+    }
+
+    /** Host-aligned first-call bucket (php_gc.c gc_mem_caches / zend_mm_gc, #12921). */
+    public static function initialMmCache(): int
+    {
+        if (null === self::$initialMmCacheResolved) {
+            self::$initialMmCacheResolved = self::resolveInitialMmCache();
+        }
+
+        return self::$initialMmCacheResolved;
+    }
+
+    private static function resolveInitialMmCache(): int
+    {
+        $override = getenv('PHP_COMPILER_MM_CACHE_INITIAL');
+        if (false !== $override && '' !== $override) {
+            return (int) $override;
+        }
+        $probed = self::probeHostZendMmCache();
+
+        return null !== $probed ? $probed : self::FALLBACK_MM_CACHE;
+    }
+
+    /** Probe fresh host Zend gc_mem_caches() (ext/standard/php_gc.c). */
+    private static function probeHostZendMmCache(): ?int
+    {
+        $binary = \defined('PHP_BINARY') ? PHP_BINARY : 'php';
+        $descriptorSpec = [
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ];
+        $proc = @proc_open(
+            [$binary, '-n', '-r', 'echo gc_mem_caches();'],
+            $descriptorSpec,
+            $pipes
+        );
+        if (!\is_resource($proc)) {
+            return null;
+        }
+        $stdout = (string) stream_get_contents($pipes[1]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        proc_close($proc);
+        $stdout = trim($stdout);
+        if ('' === $stdout || !ctype_digit($stdout)) {
+            return null;
+        }
+
+        return (int) $stdout;
     }
 
     /** Release VM allocator caches (php_gc.c gc_mem_caches / zend_mm_gc parity, #9160). */

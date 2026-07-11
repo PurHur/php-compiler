@@ -20,7 +20,9 @@ final class IniJitHelper
         'error_reporting',
         'display_errors',
         'memory_limit',
+        'precision',
         'serialize_precision',
+        'unserialize_max_depth',
         'unserialize_callback_func',
         'session.gc_maxlifetime',
         'session.save_path',
@@ -30,6 +32,12 @@ final class IniJitHelper
         'zend.enable_gc',
         'max_execution_time',
         'default_charset',
+        'date.timezone',
+        'cfg_file_path',
+        'user_agent',
+        'pcre.backtrack_limit',
+        'pcre.jit',
+        'pcre.recursion_limit',
         'zend.assertions',
         'assert.active',
         'assert.bail',
@@ -46,31 +54,93 @@ final class IniJitHelper
     ];
 
     private const READONLY_BOOL_DEFAULTS = [
+        'enable_dl' => false,
         'short_open_tag' => false,
-        'register_argc_argv' => true,
         'zend.enable_gc' => true,
+        'session.use_cookies' => true,
+        'session.use_only_cookies' => true,
+        'allow_url_fopen' => true,
+        'allow_url_include' => false,
     ];
 
     private const READONLY_STRING_DEFAULTS = [
-        'max_execution_time' => '0',
-        'default_charset' => 'UTF-8',
+        'session.save_handler' => 'files',
+        'user_ini.filename' => '.user.ini',
+        'realpath_cache_size' => '4096K',
+        'realpath_cache_ttl' => '120',
+        'post_max_size' => '8M',
+        'upload_max_filesize' => '2M',
+        'default_socket_timeout' => '60',
+        'auto_detect_line_endings' => '0',
+        'default_mimetype' => 'text/html',
+        'variables_order' => 'GPCS',
+        'request_order' => 'GP',
+        'arg_separator.output' => '&',
+    ];
+
+    private const CFG_MAX_EXECUTION_TIME = '0';
+
+    private const CFG_DEFAULT_CHARSET = 'UTF-8';
+
+    /** Unset string ini directives return '' — mirror VmIni empty-string key list for JIT compile. */
+    private const EMPTY_STRING_INI_KEYS = [
+        'auto_prepend_file',
+        'auto_append_file',
+        'browscap',
+        'error_log',
+        'doc_root',
+        'user_dir',
+        'disable_functions',
+        'disable_classes',
+        'open_basedir',
+        'mail.add_x_header',
+        'error_append_string',
+        'error_prepend_string',
+        'upload_tmp_dir',
+        'sys_temp_dir',
+    ];
+
+    /** get_cfg_var() compile-time keys that return '' when unset (#12543, #17881). */
+    private const CFG_EMPTY_STRING_KEYS = [
+        'auto_prepend_file',
+        'auto_append_file',
+        'doc_root',
+        'user_dir',
+        'disable_functions',
+        'disable_classes',
+        'mail.add_x_header',
     ];
 
     private const CFG_DISPLAY_ERRORS = '';
 
     private const CFG_MEMORY_LIMIT = '-1';
 
+    private const CFG_PRECISION = '14';
+
     private const CFG_SERIALIZE_PRECISION = '-1';
+
+    private const CFG_UNSERIALIZE_MAX_DEPTH = '4096';
 
     private const CFG_SESSION_GC_MAXLIFETIME = '1440';
 
     private const CFG_SESSION_SAVE_PATH = '/var/lib/php/sessions';
 
+    private const CFG_PCRE_BACKTRACK_LIMIT = '1000000';
+
+    private const CFG_PCRE_RECURSION_LIMIT = '100000';
+
     private static bool $displayErrors = false;
+
+    /** Raw ini_set() value; null uses php.ini default formatting (#11835). */
+    private static ?string $displayErrorsLocalValue = null;
 
     private static string $memoryLimit = self::CFG_MEMORY_LIMIT;
 
+    private static int $precision = 14;
+
     private static int $serializePrecision = -1;
+
+    private static int $unserializeMaxDepth = 4096;
 
     private static string $unserializeCallbackFunc = '';
 
@@ -78,9 +148,48 @@ final class IniJitHelper
 
     private static string $sessionSavePath = self::CFG_SESSION_SAVE_PATH;
 
+    private static string $userAgent = '';
+
+    private static string $defaultCharset = self::CFG_DEFAULT_CHARSET;
+
+    private static int $pcreBacktrackLimit = 1_000_000;
+
+    private static bool $pcreJit = true;
+
+    private static int $pcreRecursionLimit = 100_000;
+
+    private static string $maxExecutionTime = self::CFG_MAX_EXECUTION_TIME;
+
+    private static bool $registerArgcArgv = true;
+
+    public static function syncRegisterArgcArgv(bool $enabled): void
+    {
+        self::$registerArgcArgv = $enabled;
+    }
+
+    public static function registerArgcArgvEnabled(): bool
+    {
+        return self::$registerArgcArgv;
+    }
+
+    public static function getUserAgent(): string
+    {
+        return self::$userAgent;
+    }
+
     public static function getSerializePrecisionInt(): int
     {
         return self::$serializePrecision;
+    }
+
+    public static function getUnserializeMaxDepthInt(): int
+    {
+        return self::$unserializeMaxDepth;
+    }
+
+    public static function syncMaxExecutionTime(int $seconds): void
+    {
+        self::$maxExecutionTime = (string) $seconds;
     }
 
     private static function parseSerializePrecisionIni(string $newValue): int
@@ -103,9 +212,19 @@ final class IniJitHelper
         return \sprintf('%d', self::$serializePrecision);
     }
 
+    private static function precisionAsIniString(): string
+    {
+        return \sprintf('%d', self::$precision);
+    }
+
     private static function sessionGcMaxlifetimeAsIniString(): string
     {
         return \sprintf('%d', self::$sessionGcMaxlifetime);
+    }
+
+    private static function unserializeMaxDepthAsIniString(): string
+    {
+        return \sprintf('%d', self::$unserializeMaxDepth);
     }
 
     /** @return string|null null when ini_get() is false */
@@ -121,6 +240,13 @@ final class IniJitHelper
         if (in_array($key, self::ASSERT_INI_KEYS, true)) {
             return self::assertIniGet($key);
         }
+        if (in_array($key, self::EMPTY_STRING_INI_KEYS, true)) {
+            return '';
+        }
+        $mirrored = VmIniIntrospection::mirroredHostIniGet($key);
+        if (null !== $mirrored) {
+            return $mirrored;
+        }
         if (!in_array($key, self::SUPPORTED_KEYS, true)) {
             return null;
         }
@@ -129,13 +255,19 @@ final class IniJitHelper
             return ErrorSilenceJitHelper::iniGetErrorReporting();
         }
         if ('display_errors' === $key) {
-            return VmIni::formatBoolIniGet(self::$displayErrors);
+            return self::displayErrorsIniString();
         }
         if ('memory_limit' === $key) {
             return self::$memoryLimit;
         }
+        if ('precision' === $key) {
+            return self::precisionAsIniString();
+        }
         if ('serialize_precision' === $key) {
             return self::serializePrecisionAsIniString();
+        }
+        if ('unserialize_max_depth' === $key) {
+            return self::unserializeMaxDepthAsIniString();
         }
         if ('unserialize_callback_func' === $key) {
             return self::$unserializeCallbackFunc;
@@ -148,6 +280,30 @@ final class IniJitHelper
         }
         if ('include_path' === $key) {
             return IncludePathJitHelper::get();
+        }
+        if ('default_charset' === $key) {
+            return self::$defaultCharset;
+        }
+        if ('date.timezone' === $key) {
+            return VmDate::defaultTimezoneGet();
+        }
+        if ('user_agent' === $key) {
+            return self::$userAgent;
+        }
+        if ('pcre.backtrack_limit' === $key) {
+            return (string) self::$pcreBacktrackLimit;
+        }
+        if ('pcre.jit' === $key) {
+            return VmIni::formatBoolIniGet(self::$pcreJit);
+        }
+        if ('pcre.recursion_limit' === $key) {
+            return (string) self::$pcreRecursionLimit;
+        }
+        if ('max_execution_time' === $key) {
+            return self::$maxExecutionTime;
+        }
+        if ('register_argc_argv' === $key) {
+            return VmIni::formatRegisterArgcArgvIniGet(self::$registerArgcArgv);
         }
 
         return null;
@@ -176,8 +332,14 @@ final class IniJitHelper
         if ('memory_limit' === $key) {
             return self::setMemoryLimit($newValue);
         }
+        if ('precision' === $key) {
+            return self::setPrecision($newValue);
+        }
         if ('serialize_precision' === $key) {
             return self::setSerializePrecision($newValue);
+        }
+        if ('unserialize_max_depth' === $key) {
+            return self::setUnserializeMaxDepth($newValue);
         }
         if ('unserialize_callback_func' === $key) {
             return self::setUnserializeCallbackFunc($newValue);
@@ -191,6 +353,30 @@ final class IniJitHelper
         if ('include_path' === $key) {
             return IncludePathJitHelper::push($newValue);
         }
+        if ('default_charset' === $key) {
+            return self::setDefaultCharset($newValue);
+        }
+        if ('date.timezone' === $key) {
+            return self::setDateTimezone($newValue);
+        }
+        if ('user_agent' === $key) {
+            return self::setUserAgent($newValue);
+        }
+        if ('pcre.backtrack_limit' === $key) {
+            return self::setPcreBacktrackLimit($newValue);
+        }
+        if ('pcre.jit' === $key) {
+            return self::setPcreJit($newValue);
+        }
+        if ('pcre.recursion_limit' === $key) {
+            return self::setPcreRecursionLimit($newValue);
+        }
+        if ('max_execution_time' === $key) {
+            return self::setMaxExecutionTime($newValue);
+        }
+        if ('register_argc_argv' === $key) {
+            return null;
+        }
 
         return null;
     }
@@ -199,6 +385,26 @@ final class IniJitHelper
     public static function iniCfgGet(string $option): ?string
     {
         $key = strtolower($option);
+        if (in_array($key, self::CFG_EMPTY_STRING_KEYS, true)) {
+            return '';
+        }
+        if (isset(self::READONLY_BOOL_DEFAULTS[$key])) {
+            return VmIni::formatBoolIniGet(self::READONLY_BOOL_DEFAULTS[$key]);
+        }
+        if (isset(self::READONLY_STRING_DEFAULTS[$key])) {
+            return self::READONLY_STRING_DEFAULTS[$key];
+        }
+        if ('engine' === $key) {
+            return '1';
+        }
+        if ('zend.exception_ignore_args' === $key) {
+            return '1';
+        }
+        if (in_array($key, VmAssertState::SUPPORTED_INI_KEYS, true)) {
+            $value = VmAssertState::iniGet($option);
+
+            return false === $value ? null : $value;
+        }
         if (!in_array($key, self::SUPPORTED_KEYS, true)) {
             return null;
         }
@@ -212,8 +418,14 @@ final class IniJitHelper
         if ('memory_limit' === $key) {
             return self::CFG_MEMORY_LIMIT;
         }
+        if ('precision' === $key) {
+            return self::CFG_PRECISION;
+        }
         if ('serialize_precision' === $key) {
             return self::CFG_SERIALIZE_PRECISION;
+        }
+        if ('unserialize_max_depth' === $key) {
+            return self::CFG_UNSERIALIZE_MAX_DEPTH;
         }
         if ('unserialize_callback_func' === $key) {
             return '';
@@ -225,13 +437,30 @@ final class IniJitHelper
             return self::CFG_SESSION_SAVE_PATH;
         }
         if ('max_execution_time' === $key) {
-            return self::READONLY_STRING_DEFAULTS['max_execution_time'];
+            return self::CFG_MAX_EXECUTION_TIME;
         }
         if ('default_charset' === $key) {
-            return self::READONLY_STRING_DEFAULTS['default_charset'];
+            return self::CFG_DEFAULT_CHARSET;
         }
-        if (isset(self::READONLY_BOOL_DEFAULTS[$key])) {
-            return VmIni::formatBoolIniGet(self::READONLY_BOOL_DEFAULTS[$key]);
+        if ('cfg_file_path' === $key) {
+            $path = VmIniIntrospection::loadedFile();
+
+            return false === $path ? null : $path;
+        }
+        if ('user_agent' === $key) {
+            return '';
+        }
+        if ('pcre.backtrack_limit' === $key) {
+            return self::CFG_PCRE_BACKTRACK_LIMIT;
+        }
+        if ('pcre.jit' === $key) {
+            return '1';
+        }
+        if ('pcre.recursion_limit' === $key) {
+            return self::CFG_PCRE_RECURSION_LIMIT;
+        }
+        if ('register_argc_argv' === $key) {
+            return VmIni::formatRegisterArgcArgvIniGet(self::$registerArgcArgv);
         }
 
         return null;
@@ -249,13 +478,21 @@ final class IniJitHelper
                 ErrorSilenceJitHelper::iniRestoreErrorReporting();
                 break;
             case 'display_errors':
+                self::$displayErrorsLocalValue = null;
                 self::$displayErrors = VmIni::parseBoolIni(self::CFG_DISPLAY_ERRORS);
+                ErrorSilenceJitHelper::setDisplayErrors(self::$displayErrors);
                 break;
             case 'memory_limit':
                 self::$memoryLimit = self::CFG_MEMORY_LIMIT;
                 break;
+            case 'precision':
+                self::$precision = VmIni::parsePrecision(self::CFG_PRECISION);
+                break;
             case 'serialize_precision':
                 self::$serializePrecision = self::parseSerializePrecisionIni(self::CFG_SERIALIZE_PRECISION);
+                break;
+            case 'unserialize_max_depth':
+                self::$unserializeMaxDepth = (int) self::CFG_UNSERIALIZE_MAX_DEPTH;
                 break;
             case 'unserialize_callback_func':
                 self::$unserializeCallbackFunc = '';
@@ -265,6 +502,28 @@ final class IniJitHelper
                 break;
             case 'session.save_path':
                 self::$sessionSavePath = self::CFG_SESSION_SAVE_PATH;
+                break;
+            case 'user_agent':
+                self::$userAgent = '';
+                break;
+            case 'default_charset':
+                self::$defaultCharset = self::CFG_DEFAULT_CHARSET;
+                break;
+            case 'pcre.backtrack_limit':
+                self::$pcreBacktrackLimit = (int) self::CFG_PCRE_BACKTRACK_LIMIT;
+                break;
+            case 'pcre.jit':
+                self::$pcreJit = true;
+                break;
+            case 'pcre.recursion_limit':
+                self::$pcreRecursionLimit = (int) self::CFG_PCRE_RECURSION_LIMIT;
+                break;
+            case 'max_execution_time':
+                self::$maxExecutionTime = self::CFG_MAX_EXECUTION_TIME;
+                ExecutionLimitsJitHelper::applyMaxExecutionTime((int) self::CFG_MAX_EXECUTION_TIME);
+                break;
+            case 'register_argc_argv':
+                self::$registerArgcArgv = true;
                 break;
         }
     }
@@ -279,10 +538,21 @@ final class IniJitHelper
 
     private static function setDisplayErrors(string $newValue): string
     {
-        $old = VmIni::formatBoolIniGet(self::$displayErrors);
+        $old = self::displayErrorsIniString();
+        self::$displayErrorsLocalValue = $newValue;
         self::$displayErrors = VmIni::parseBoolIni($newValue);
+        ErrorSilenceJitHelper::setDisplayErrors(self::$displayErrors);
 
         return $old;
+    }
+
+    private static function displayErrorsIniString(): string
+    {
+        if (null !== self::$displayErrorsLocalValue) {
+            return self::$displayErrorsLocalValue;
+        }
+
+        return VmIni::formatBoolIniGet(self::$displayErrors);
     }
 
     private static function setMemoryLimit(string $newValue): string
@@ -293,10 +563,31 @@ final class IniJitHelper
         return $old;
     }
 
+    private static function setPrecision(string $newValue): string
+    {
+        $old = self::precisionAsIniString();
+        self::$precision = VmIni::parsePrecision($newValue);
+
+        return $old;
+    }
+
     private static function setSerializePrecision(string $newValue): string
     {
         $old = self::serializePrecisionAsIniString();
         self::$serializePrecision = self::parseSerializePrecisionIni($newValue);
+
+        return $old;
+    }
+
+    /** @return string|null null when ini_set rejected the value */
+    private static function setUnserializeMaxDepth(string $newValue): ?string
+    {
+        $parsed = (int) trim($newValue);
+        if ($parsed <= 0) {
+            return null;
+        }
+        $old = self::unserializeMaxDepthAsIniString();
+        self::$unserializeMaxDepth = $parsed;
 
         return $old;
     }
@@ -327,6 +618,74 @@ final class IniJitHelper
     {
         $old = self::$sessionSavePath;
         self::$sessionSavePath = $newValue;
+
+        return $old;
+    }
+
+    private static function setUserAgent(string $newValue): string
+    {
+        $old = self::$userAgent;
+        self::$userAgent = $newValue;
+
+        return $old;
+    }
+
+    private static function setDefaultCharset(string $newValue): string
+    {
+        $old = self::$defaultCharset;
+        self::$defaultCharset = $newValue;
+
+        return $old;
+    }
+
+    /** @return string|null null when timezone id is invalid */
+    private static function setDateTimezone(string $newValue): ?string
+    {
+        $old = VmDate::defaultTimezoneGet();
+        if (!VmDate::tryDefaultTimezoneSet($newValue)) {
+            return null;
+        }
+
+        return $old;
+    }
+
+    private static function setPcreBacktrackLimit(string $newValue): ?string
+    {
+        $parsed = (int) $newValue;
+        if ($parsed < 0) {
+            return null;
+        }
+        $old = (string) self::$pcreBacktrackLimit;
+        self::$pcreBacktrackLimit = $parsed;
+
+        return $old;
+    }
+
+    private static function setPcreJit(string $newValue): string
+    {
+        $old = VmIni::formatBoolIniGet(self::$pcreJit);
+        self::$pcreJit = VmIni::parseBoolIni($newValue);
+
+        return $old;
+    }
+
+    private static function setPcreRecursionLimit(string $newValue): ?string
+    {
+        $parsed = (int) $newValue;
+        if ($parsed < 0) {
+            return null;
+        }
+        $old = (string) self::$pcreRecursionLimit;
+        self::$pcreRecursionLimit = $parsed;
+
+        return $old;
+    }
+
+    private static function setMaxExecutionTime(string $newValue): string
+    {
+        $parsed = (int) trim($newValue);
+        $old = self::$maxExecutionTime;
+        ExecutionLimitsJitHelper::applyMaxExecutionTime($parsed);
 
         return $old;
     }

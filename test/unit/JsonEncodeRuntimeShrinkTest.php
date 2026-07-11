@@ -6,17 +6,18 @@ namespace PHPCompiler\Test\Unit;
 
 use PHPUnit\Framework\TestCase;
 
-/** json_encode() JIT routes through JsonEncodeJitHelper PHP not StringJsonEncodeJit LLVM (#9267). */
+/** json_encode() JIT routes through JsonEncodeJitHelper PHP not StringJsonEncodeJit LLVM (#9267, #13239). */
 final class JsonEncodeRuntimeShrinkTest extends TestCase
 {
     public function testStringJsonEncodeUsesJitHelperNotLlvmWalker(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringJsonEncode.php');
         $this->assertStringContainsString('JsonEncodeJitHelper', $source);
-        $this->assertStringContainsString('StringJsonEncodeJit', $source);
+        $this->assertStringNotContainsString('StringJsonEncodeJit', $source);
         $this->assertStringNotContainsString('implementValue', $source);
         $this->assertStringNotContainsString('implementArray', $source);
-        $this->assertLessThan(170, \substr_count($source, "\n") + 1);
+        $this->assertLessThan(250, \substr_count($source, "\n") + 1);
+        $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StringJsonEncodeJit.php');
     }
 
     public function testJsonEncodeJitHelperDelegatesToVmJson(): void
@@ -24,12 +25,24 @@ final class JsonEncodeRuntimeShrinkTest extends TestCase
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/JsonEncodeJitHelper.php');
         $this->assertStringContainsString('VmJson::export', $source);
         $this->assertStringContainsString('VmJsonFormat::encodeExported', $source);
+        $this->assertStringContainsString('runStackFrames', $source);
     }
 
-    public function testStringJsonEncodeJitRetainsStandaloneLlvm(): void
+    public function testStandaloneUsesSamePhpBridgeAsEmbed(): void
     {
-        $jitMonolith = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringJsonEncodeJit.php');
-        $this->assertGreaterThan(500, \substr_count($jitMonolith, "\n"), 'StringJsonEncodeJit retains standalone LLVM');
-        $this->assertStringContainsString('implementValue', $jitMonolith);
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringJsonEncode.php');
+        $this->assertStringContainsString('ensureStandaloneBodies', $source);
+        $this->assertStringContainsString('self::implement($context)', $source);
+        $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $source);
+        $this->assertStringContainsString('BasicBlockHelper::tryGetInsertBlock', $source);
+    }
+
+    public function testUserScriptAotFoldsInlineArrayLiterals(): void
+    {
+        $this->assertFileExists(__DIR__.'/../../ext/standard/JitJsonEncodeCompileTime.php');
+        $encode = (string) file_get_contents(__DIR__.'/../../ext/standard/json_encode.php');
+        $this->assertStringContainsString('JitJsonEncodeCompileTime::tryEncode', $encode);
+        $jit = (string) file_get_contents(__DIR__.'/../../lib/JIT.php');
+        $this->assertStringContainsString('jitJsonEncodeValueOperand', $jit);
     }
 }

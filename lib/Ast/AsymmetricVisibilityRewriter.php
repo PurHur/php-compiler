@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace PHPCompiler\Ast;
 
+use PHPCompiler\CompilerVersion;
+
 /**
  * Rewrite PHP 8.4 asymmetric property visibility for nikic/php-parser 4.x (#3165).
  *
@@ -14,20 +16,175 @@ final class AsymmetricVisibilityRewriter
 {
     private const MARKER_PREFIX_SET = 'phpc-asymmetric-set:';
     private const MARKER_PREFIX_GET = 'phpc-asymmetric-get:';
+    private const MARKER_PREFIX_EXPLICIT_READ = 'phpc-asymmetric-explicit-read';
+
+    /** @internal Marker when source declares an explicit read modifier before set (#15995). */
+    public const EXPLICIT_READ_MARKER_PATTERN = '/\/\*\s*phpc-asymmetric-explicit-read\s*\*\//i';
+
+    /** Self-host parser rejects bare asymmetric modifier tokens outside declarations (#1492). */
+    private const SET_MODIFIER_NEEDLE = '('.'set'.')';
+    private const GET_MODIFIER_NEEDLE = '('.'get'.')';
 
     /** php-src: Zend/zend_compile.c — zend_add_member_modifier() duplicate PPP / PPP_SET (#6774). */
     public const MULTIPLE_MODIFIERS_MESSAGE = 'Multiple access type modifiers are not allowed';
+
+    /** Actionable DX when asymmetric visibility syntax is rejected on the reference profile (#17695). */
+    public const REFERENCE_PROFILE_ASYMMETRIC_VISIBILITY_HINT = 'Asymmetric visibility requires PHP_COMPILER_PROFILE=8.4 (PHP 8.4 forward profile)';
+
+    /** php-src: Zend/zend_language_scanner.l — invalid set/read modifier ordering on reference profile (#15446). */
+    public const BARE_SET_WITHOUT_READ_MESSAGE = 'syntax error, unexpected token ")", expecting variable';
+
+    /** php-src: Zend/zend_language_parser.y — parenthesized `(private(set))` on promoted params gated to 8.4+ (#16495). */
+    public const PROMOTED_PARENTHESIZED_SET_MESSAGE = 'syntax error, unexpected token "%s"';
 
     /**
      * @internal Marker embedded in source for PHPCfg to recover set visibility.
      */
     public const MARKER_PATTERN = '/\/\*\s*phpc-asymmetric-set:(public|protected|private)\s*\*\//i';
 
-    /** @internal Marker for asymmetric read (get) visibility (#5059). */
+    /** @internal Marker for asymmetric read visibility (#5059). */
     public const GET_MARKER_PATTERN = '/\/\*\s*phpc-asymmetric-get:(public|protected|private)\s*\*\//i';
+
+    public static function containsAsymmetricVisibilitySyntax(string $source): bool
+    {
+        return self::hasAsymmetricVisibilitySyntax($source);
+    }
+
+    /**
+     * 1-based source line of the first multiple-access-modifier violation, or 0 when none (#12576).
+     *
+     * Used on the Zend 8.2 reference profile where asymmetric set syntax is otherwise rejected with a generic
+     * parser message — explicit read plus set visibility must still match Zend compile fatal.
+     */
+    public static function findMultipleAccessModifierLine(string $source): int
+    {
+        $lineNum = 0;
+        foreach (explode("\n", $source) as $line) {
+            ++$lineNum;
+            if (!self::isInspectableAsymmetricLine($line, self::SET_MODIFIER_NEEDLE)) {
+                continue;
+            }
+            if (self::lineViolatesMultipleSetModifierRulesForReferenceProfile($line)) {
+                return $lineNum;
+            }
+            if (self::lineViolatesStaticAsymmetricSetRules($line)) {
+                return $lineNum;
+            }
+        }
+
+        if (!preg_match('/\b__construct\b/i', $source) || !preg_match('/\(\s*set\s*\)/i', $source)) {
+            return 0;
+        }
+
+        $offset = 0;
+        while (preg_match('/\bfunction\s+__construct\s*\(/i', $source, $m, PREG_OFFSET_CAPTURE, $offset)) {
+            $openPos = $m[0][1] + strlen($m[0][0]) - 1;
+            $paramsText = self::extractBalancedParenContent($source, $openPos);
+            if (null !== $paramsText && self::paramsViolateMultipleSetModifierRulesForReferenceProfile($paramsText)) {
+                $constructLine = substr_count(substr($source, 0, $openPos), "\n") + 1;
+                $relative = self::offsetOfMultipleSetModifierInParams($paramsText);
+                if ($relative >= 0) {
+                    return $constructLine + substr_count(substr($paramsText, 0, $relative), "\n");
+                }
+
+                return $constructLine;
+            }
+            $offset = $openPos + 1;
+        }
+
+        return 0;
+    }
+
+    /** 1-based line of first bare `(set)` without explicit read visibility, or 0 (#15446). */
+    public static function findBareSetModifierLine(string $source): int
+    {
+        $lineNum = 0;
+        foreach (explode("\n", $source) as $line) {
+            ++$lineNum;
+            if (!self::isInspectableAsymmetricLine($line, self::SET_MODIFIER_NEEDLE)) {
+                continue;
+            }
+            if (self::lineIsHookBlockSetModifier($line)) {
+                continue;
+            }
+            if (self::lineHasBareSetModifierWithoutRead($line)) {
+                return $lineNum;
+            }
+        }
+
+        if (!preg_match('/\b__construct\b/i', $source) || !preg_match('/\(\s*set\s*\)/i', $source)) {
+            return 0;
+        }
+
+        $offset = 0;
+        while (preg_match('/\bfunction\s+__construct\s*\(/i', $source, $m, PREG_OFFSET_CAPTURE, $offset)) {
+            $openPos = $m[0][1] + strlen($m[0][0]) - 1;
+            $paramsText = self::extractBalancedParenContent($source, $openPos);
+            if (null !== $paramsText) {
+                $relative = self::offsetOfBareSetModifierInParams($paramsText);
+                if ($relative >= 0) {
+                    return substr_count(substr($source, 0, $openPos), "\n") + 1
+                        + substr_count(substr($paramsText, 0, $relative), "\n");
+                }
+            }
+            $offset = $openPos + 1;
+        }
+
+        return 0;
+    }
+
+    /**
+     * Reference-profile reject message for multiple-modifier detection (#12576, #17832).
+     *
+     * php-src-strict: Zend 8.2 treats unparenthesized `public private(set)` as duplicate access
+     * modifiers — same fatal as `public protected private` etc. Profile gate hints apply only when
+     * syntax is otherwise valid on the forward profile but blocked by {@see CompilerVersion}.
+     */
+    public static function referenceProfileMultipleModifierMessage(string $source, int $line): string
+    {
+        return self::MULTIPLE_MODIFIERS_MESSAGE;
+    }
+
+    private static function sourceLineAt(string $source, int $line): string
+    {
+        if ($line < 1) {
+            return '';
+        }
+        $lines = explode("\n", $source);
+
+        return $lines[$line - 1] ?? '';
+    }
+
+    /**
+     * First parenthesized asymmetric set modifier `(private(set))` for Zend-aligned diagnostics (#16452).
+     *
+     * @return array{line: int, token: string}|null
+     */
+    public static function findParenthesizedAsymmetricSetModifierError(string $source): ?array
+    {
+        if (!preg_match(
+            '/\(\s*(?<token>private|protected|public)\s*\(\s*set\s*\)\s*\)/i',
+            $source,
+            $match,
+            PREG_OFFSET_CAPTURE
+        )) {
+            return null;
+        }
+
+        $token = strtolower($match['token'][0]);
+        $tokenPos = $match['token'][1];
+
+        return [
+            'line' => substr_count(substr($source, 0, $tokenPos), "\n") + 1,
+            'token' => $token,
+        ];
+    }
 
     public static function rewrite(string $source): string
     {
+        if (!CompilerVersion::supportsAsymmetricVisibility()) {
+            return $source;
+        }
         [$masked, $map] = self::maskLiteralsAndComments($source);
         if (!self::hasAsymmetricVisibilitySyntax($masked)) {
             return $source;
@@ -41,8 +198,8 @@ final class AsymmetricVisibilityRewriter
 
     private static function hasAsymmetricVisibilitySyntax(string $source): bool
     {
-        return false !== stripos($source, '(set)')
-            || false !== stripos($source, '(get)');
+        return false !== stripos($source, self::SET_MODIFIER_NEEDLE)
+            || false !== stripos($source, self::GET_MODIFIER_NEEDLE);
     }
 
     /**
@@ -93,27 +250,40 @@ final class AsymmetricVisibilityRewriter
 
         self::rejectExplicitPublicBeforeSetModifier($source);
         self::rejectExplicitPublicAfterSetModifier($source);
+        self::rejectPromotedParamParenthesizedAsymmetricSet($source);
         self::rejectPromotedParamMultipleAccessModifiers($source);
         self::rejectAsymmetricSetOnStaticProperty($source);
+        self::rejectBareSetModifierWithoutRead($source);
 
-        $source = (string) preg_replace_callback(
-            '/(?P<prefix>(?:\/\*(?:[^*]|\*(?!\/))*\*\/\s*)*)(?P<attrs>(?:#\[[^\]]*\]\s*)*)'
-            .'(?P<readBefore>(?:(?:public|protected|private)\s+)?)'
-            .'(?P<static>(?:static\s+)?)'
-            .'\(\s*(?P<set>public|protected|private)\s*\(\s*set\s*\)\s*\)\s*/i',
-            static function (array $m): string {
-                $set = strtolower($m['set']);
-                $readBefore = trim($m['readBefore']);
-                if ('' !== $readBefore) {
-                    $readPrefix = $readBefore.' ';
-                } else {
-                    $readPrefix = 'public ';
-                }
+        $hasUnsupportedPropertyParenSet = !CompilerVersion::supportsParenthesizedAsymmetricSetModifier()
+            && null !== self::findParenthesizedAsymmetricSetModifierError($source);
 
-                return $m['prefix'].$m['attrs'].'/*'.self::MARKER_PREFIX_SET.$set.'*/ '.$readPrefix.$m['static'];
-            },
-            $source
-        );
+        if (CompilerVersion::supportsParenthesizedAsymmetricSetModifier()) {
+            $source = (string) preg_replace_callback(
+                '/(?P<prefix>(?:\/\*(?:[^*]|\*(?!\/))*\*\/\s*)*)(?P<attrs>(?:#\[[^\]]*\]\s*)*)'
+                .'(?P<readBefore>(?:(?:public|protected|private)\s+)?)'
+                .'(?P<static>(?:static\s+)?)'
+                .'\(\s*(?P<set>public|protected|private)\s*\(\s*set\s*\)\s*\)\s*/i',
+                static function (array $m): string {
+                    $set = strtolower($m['set']);
+                    $readBefore = trim($m['readBefore']);
+                    $explicitReadMarker = '';
+                    if ('' !== $readBefore) {
+                        $readPrefix = $readBefore.' ';
+                        $explicitReadMarker = '/*'.self::MARKER_PREFIX_EXPLICIT_READ.'*/ ';
+                    } else {
+                        $readPrefix = self::implicitReadPrefixForBareSetModifier($set);
+                    }
+
+                    return $m['prefix'].$m['attrs'].'/*'.self::MARKER_PREFIX_SET.$set.'*/ '.$explicitReadMarker.$readPrefix.$m['static'];
+                },
+                $source
+            );
+        }
+
+        if ($hasUnsupportedPropertyParenSet) {
+            return $source;
+        }
 
         return (string) preg_replace_callback(
             '/(?P<prefix>(?:\/\*(?:[^*]|\*(?!\/))*\*\/\s*)*)(?P<attrs>(?:#\[[^\]]*\]\s*)*)'
@@ -124,64 +294,178 @@ final class AsymmetricVisibilityRewriter
                 $set = strtolower($m['set']);
                 $readBefore = trim($m['readBefore']);
                 $readAfter = trim($m['readAfter']);
+                $explicitReadMarker = '';
                 if ('' !== $readAfter) {
                     $readPrefix = $readAfter.' ';
+                    $explicitReadMarker = '/*'.self::MARKER_PREFIX_EXPLICIT_READ.'*/ ';
                 } elseif ('' !== $readBefore) {
                     $readPrefix = $readBefore.' ';
+                    $explicitReadMarker = '/*'.self::MARKER_PREFIX_EXPLICIT_READ.'*/ ';
                 } else {
-                    $readPrefix = 'public ';
+                    $readPrefix = self::implicitReadPrefixForBareSetModifier($set);
                 }
 
-                return $m['prefix'].$m['attrs'].'/*'.self::MARKER_PREFIX_SET.$set.'*/ '.$readPrefix;
+                return $m['prefix'].$m['attrs'].'/*'.self::MARKER_PREFIX_SET.$set.'*/ '.$explicitReadMarker.$readPrefix;
             },
             $source
         );
     }
 
     /**
-     * Duplicate read+set visibility on the same keyword is a compile fatal (#6774, #9806).
-     *
-     * php-src: Zend/zend_compile.c — zend_add_member_modifier(); `public public(set)` is fatal
-     * (`Multiple access type modifiers are not allowed`). PHP 8.4 accepts explicit read+set pairs
-     * such as `public private(set)` (#11546, php.net/manual asymmetric visibility).
+     * Duplicate set modifier on the same visibility is a compile fatal (#6774, #11656).
      */
     private static function rejectExplicitPublicBeforeSetModifier(string $source): void
     {
         self::eachPropertyDeclarationLine($source, static function (string $line): void {
-            if (preg_match(
-                '/(?<![a-zA-Z0-9_])(public|protected|private)\s+\1\s*\(\s*set\s*\)/i',
-                $line
-            )) {
+            if (self::lineViolatesMultipleSetModifierRules($line)) {
                 throw new \CompileError(self::MULTIPLE_MODIFIERS_MESSAGE);
             }
         });
     }
 
-    /** Explicit read `public` after `public(set)` duplicates implicit public read (#6589, #6774). */
+    /** Explicit read public after public-set duplicates implicit public read (#6589, #6774). */
     private static function rejectExplicitPublicAfterSetModifier(string $source): void
     {
         self::eachPropertyDeclarationLine($source, static function (string $line): void {
-            if (preg_match(
-                '/(?<![a-zA-Z0-9_])public\s*\(\s*set\s*\)\s*public\b/i',
-                $line
-            )) {
-                throw new \CompileError(self::MULTIPLE_MODIFIERS_MESSAGE);
-            }
-            if (preg_match(
-                '/(?<![a-zA-Z0-9_])public\s+\(\s*public\s*\(\s*set\s*\)\s*\)/i',
-                $line
-            )) {
+            if (self::lineViolatesMultipleSetModifierRules($line)) {
                 throw new \CompileError(self::MULTIPLE_MODIFIERS_MESSAGE);
             }
         });
     }
 
+
+    private static function lineIsHookBlockSetModifier(string $line): bool
+    {
+        return 1 === preg_match('/\b(?:private|protected|public)\s*\(\s*set\s*\)\s*;/i', $line);
+    }
+
+    private static function lineHasBareSetModifierWithoutRead(string $line): bool
+    {
+        if (!preg_match('/\(\s*set\s*\)/i', $line)) {
+            return false;
+        }
+
+        if (preg_match(
+            '/(?<![a-zA-Z0-9_])(public|protected|private)\s+(?:static\s+)?(?:'
+            .'\((?:public|protected|private)\s*\(\s*set\s*\)\)|'
+            .'(?:public|protected|private)\s*\(\s*set\s*\)'
+            .')/i',
+            $line
+        )) {
+            return false;
+        }
+
+        if (preg_match(
+            '/(?<![a-zA-Z0-9_])(private|protected)\s*\(\s*set\s*\)/i',
+            $line
+        )) {
+            return true;
+        }
+
+        return 1 === preg_match(
+            '/(?<![a-zA-Z0-9_])\(\s*(private|protected)\s*\(\s*set\s*\)\s*\)/i',
+            $line
+        );
+    }
+
+    private static function offsetOfBareSetModifierInParams(string $paramsText): int
+    {
+        $offset = 0;
+        $len = strlen($paramsText);
+        while ($offset < $len) {
+            $nextComma = self::findTopLevelComma($paramsText, $offset);
+            $segment = false === $nextComma
+                ? substr($paramsText, $offset)
+                : substr($paramsText, $offset, $nextComma - $offset);
+            if (self::lineHasBareSetModifierWithoutRead($segment)) {
+                return $offset;
+            }
+            if (false === $nextComma) {
+                break;
+            }
+            $offset = $nextComma + 1;
+        }
+
+        return -1;
+    }
+
+    private static function findTopLevelComma(string $text, int $start): int|false
+    {
+        $depth = 0;
+        $len = strlen($text);
+        for ($i = $start; $i < $len; ++$i) {
+            $char = $text[$i];
+            if ('(' === $char || '[' === $char) {
+                ++$depth;
+            } elseif (')' === $char || ']' === $char) {
+                --$depth;
+            } elseif (',' === $char && 0 === $depth) {
+                return $i;
+            }
+        }
+
+        return false;
+    }
+
     /**
-     * Promoted constructor parameters reject duplicate read+set modifiers (#10237, PHP 8.4 zend_compile.c).
+     * Bare `private(set)` / `protected(set)` without explicit read visibility is a parse error on reference profile (#16313).
      *
-     * php-src: `public public(set) int $x` in `__construct` is fatal. `public private(set) int $x` is
-     * valid PHP 8.4 promoted asymmetric visibility (#11546). Set-only `private(set) int $x` remains valid (#9877).
+     * PHP 8.4+ treats bare set modifiers as shorthand (private(set) ≡ public private(set); #16924).
+     * php-src: Zend/zend_language_parser.y — property modifier grammar; Zend/zend_compile.c.
      */
+    private static function rejectBareSetModifierWithoutRead(string $source): void
+    {
+        if (CompilerVersion::supportsParenthesizedAsymmetricSetModifier()) {
+            return;
+        }
+
+        $line = self::findBareSetModifierLine($source);
+        if ($line > 0) {
+            throw new \CompileError(self::BARE_SET_WITHOUT_READ_MESSAGE);
+        }
+    }
+
+    /** Default read visibility when a bare `(set)` modifier omits an explicit read modifier (#16924). */
+    private static function implicitReadPrefixForBareSetModifier(string $set): string
+    {
+        return 'protected' === strtolower($set) ? 'protected ' : 'public ';
+    }
+
+    /**
+     * Promoted constructor parameters reject parenthesized asymmetric set modifiers on reference profile.
+     *
+     * php-src: Zend/zend_language_parser.y — 8.4+ accepts `public (private(set))` on promoted params (#16495);
+     * reference profile still rejects like Zend 8.2 (#16436).
+     */
+    private static function rejectPromotedParamParenthesizedAsymmetricSet(string $source): void
+    {
+        if (CompilerVersion::supportsParenthesizedAsymmetricSetModifier()) {
+            return;
+        }
+
+        if (!preg_match('/\b__construct\b/i', $source) || !preg_match('/\(\s*set\s*\)/i', $source)) {
+            return;
+        }
+
+        $offset = 0;
+        while (preg_match('/\bfunction\s+__construct\s*\(/i', $source, $m, PREG_OFFSET_CAPTURE, $offset)) {
+            $openPos = $m[0][1] + strlen($m[0][0]) - 1;
+            $paramsText = self::extractBalancedParenContent($source, $openPos);
+            if (null !== $paramsText && preg_match(
+                '/\(\s*(?<token>private|protected|public)\s*\(\s*set\s*\)\s*\)/i',
+                $paramsText,
+                $tokenMatch
+            )) {
+                throw new \CompileError(sprintf(
+                    self::PROMOTED_PARENTHESIZED_SET_MESSAGE,
+                    strtolower($tokenMatch['token'])
+                ));
+            }
+            $offset = $openPos + 1;
+        }
+    }
+
+    /** Promoted constructor parameters reject duplicate set modifiers (#10237, #11656, #12088). */
     private static function rejectPromotedParamMultipleAccessModifiers(string $source): void
     {
         if (!preg_match('/\b__construct\b/i', $source) || !preg_match('/\(\s*set\s*\)/i', $source)) {
@@ -224,24 +508,75 @@ final class AsymmetricVisibilityRewriter
 
     private static function rejectDoubleVisibilityInPromotedParams(string $paramsText): void
     {
-        if (preg_match(
-            '/(?<![a-zA-Z0-9_])(public|protected|private)\s+\1\s*\(\s*set\s*\)/i',
-            $paramsText
-        )) {
+        if (self::paramsViolateMultipleSetModifierRules($paramsText)) {
             throw new \CompileError(self::MULTIPLE_MODIFIERS_MESSAGE);
         }
     }
 
-    /**
-     * Static properties do not support asymmetric visibility with an explicit read modifier (#7013).
-     *
-     * php-src: Zend/zend_compile.c — zend_add_member_modifier(); `public private(set) static` is fatal
-     * (`Multiple access type modifiers are not allowed`). `private(set) static` alone remains valid (#6769).
-     */
-    private static function rejectAsymmetricSetOnStaticProperty(string $source): void
+    private static function paramsViolateMultipleSetModifierRules(string $paramsText): bool
     {
-        if (!preg_match('/\bstatic\b/i', $source) || !preg_match('/\(\s*set\s*\)/i', $source)) {
-            return;
+        return self::lineViolatesMultipleSetModifierRules($paramsText);
+    }
+
+    private static function lineViolatesMultipleSetModifierRules(string $line): bool
+    {
+        if (self::lineViolatesDuplicateSetModifierRules($line)) {
+            return true;
+        }
+        // php-src 8.4+: unparenthesized `public private(set)` is valid when asymmetric visibility is enabled (#16858, #17114).
+        if (CompilerVersion::supportsAsymmetricVisibility()) {
+            return false;
+        }
+
+        return self::lineHasExplicitReadPlusSetModifier($line);
+    }
+
+    /**
+     * Zend 8.2 reference profile: explicit read + set is the same multiple-modifier fatal (#12576, #13960).
+     */
+    private static function lineViolatesMultipleSetModifierRulesForReferenceProfile(string $line): bool
+    {
+        return self::lineViolatesDuplicateSetModifierRules($line)
+            || self::lineHasExplicitReadPlusSetModifier($line);
+    }
+
+    private static function lineViolatesDuplicateSetModifierRules(string $line): bool
+    {
+        return 1 === preg_match(
+            '/(?<![a-zA-Z0-9_])(public|protected|private)\s+\1\s*\(\s*set\s*\)/i',
+            $line
+        )
+            || 1 === preg_match(
+                '/(?<![a-zA-Z0-9_])(public|protected|private)\s+\(\s*\1\s*\(\s*set\s*\)\s*\)/i',
+                $line
+            )
+            || 1 === preg_match(
+                '/(?<![a-zA-Z0-9_])public\s*\(\s*set\s*\)\s*public\b/i',
+                $line
+            )
+            || 1 === preg_match(
+                '/(?<![a-zA-Z0-9_])public\s+\(\s*public\s*\(\s*set\s*\)\s*\)/i',
+                $line
+            );
+    }
+
+    private static function lineHasExplicitReadPlusSetModifier(string $line): bool
+    {
+        return 1 === preg_match(
+            '/(?<![a-zA-Z0-9_])(public|protected|private)\s+(?!\()(public|protected|private)\s*\(\s*set\s*\)/i',
+            $line
+        );
+    }
+
+    private static function paramsViolateMultipleSetModifierRulesForReferenceProfile(string $paramsText): bool
+    {
+        return self::lineViolatesMultipleSetModifierRulesForReferenceProfile($paramsText);
+    }
+
+    private static function lineViolatesStaticAsymmetricSetRules(string $line): bool
+    {
+        if (!preg_match('/\bstatic\b/i', $line) || !preg_match('/\(\s*set\s*\)/i', $line)) {
+            return false;
         }
 
         $modifier = '(?:public|protected|private)';
@@ -257,15 +592,46 @@ final class AsymmetricVisibilityRewriter
             '/'.$staticWord.'\s+(?<![a-zA-Z0-9_])'.$modifier.'\s+'.$setModifier.'/i',
             '/'.$staticWord.'\s+(?<![a-zA-Z0-9_])'.$modifier.'\s+'.$parenthesizedSet.'/i',
         ];
-
-        self::eachPropertyDeclarationLine($source, static function (string $line) use ($patterns): void {
-            if (!preg_match('/\bstatic\b/i', $line) || !preg_match('/\(\s*set\s*\)/i', $line)) {
-                return;
+        foreach ($patterns as $pattern) {
+            if (preg_match($pattern, $line)) {
+                return true;
             }
-            foreach ($patterns as $pattern) {
-                if (preg_match($pattern, $line)) {
-                    throw new \CompileError(self::MULTIPLE_MODIFIERS_MESSAGE);
-                }
+        }
+
+        return false;
+    }
+
+    private static function offsetOfMultipleSetModifierInParams(string $paramsText): int
+    {
+        $patterns = [
+            '/(?<![a-zA-Z0-9_])(public|protected|private)\s+\1\s*\(\s*set\s*\)/i',
+            '/(?<![a-zA-Z0-9_])(public|protected|private)\s+(?!\()(public|protected|private)\s*\(\s*set\s*\)/i',
+            '/(?<![a-zA-Z0-9_])(public|protected|private)\s+\(\s*\1\s*\(\s*set\s*\)\s*\)/i',
+        ];
+        foreach ($patterns as $pattern) {
+            if (preg_match($pattern, $paramsText, $m, PREG_OFFSET_CAPTURE)) {
+                return (int) $m[0][1];
+            }
+        }
+
+        return -1;
+    }
+
+    /**
+     * Static properties do not support asymmetric visibility with an explicit read modifier (#7013).
+     *
+     * php-src: Zend/zend_compile.c — zend_add_member_modifier(); public read with private set on static is fatal
+     * (Multiple access type modifiers are not allowed). private set on static alone remains valid (#6769).
+     */
+    private static function rejectAsymmetricSetOnStaticProperty(string $source): void
+    {
+        if (!preg_match('/\bstatic\b/i', $source) || !preg_match('/\(\s*set\s*\)/i', $source)) {
+            return;
+        }
+
+        self::eachPropertyDeclarationLine($source, static function (string $line): void {
+            if (self::lineViolatesStaticAsymmetricSetRules($line)) {
+                throw new \CompileError(self::MULTIPLE_MODIFIERS_MESSAGE);
             }
         });
     }
@@ -274,29 +640,38 @@ final class AsymmetricVisibilityRewriter
      * Run compile-time checks on single source lines only — concatenated self-host bundles and
      * docblocks must not match property-modifier patterns across lines (#1492 spine compile).
      */
-    private static function eachPropertyDeclarationLine(string $source, callable $fn, string $needle = '(set)'): void
+    private static function eachPropertyDeclarationLine(string $source, callable $fn, string $needle = self::SET_MODIFIER_NEEDLE): void
     {
         foreach (explode("\n", $source) as $line) {
-            if (false === stripos($line, $needle)) {
-                continue;
-            }
-            $trimmed = ltrim($line);
-            if ('' === $trimmed) {
-                continue;
-            }
-            if (str_starts_with($trimmed, '//') || str_starts_with($trimmed, '*') || str_starts_with($trimmed, '/*')) {
-                continue;
-            }
-            if (preg_match('/^\s*[\x27\x22]/', $line)) {
+            if (!self::isInspectableAsymmetricLine($line, $needle)) {
                 continue;
             }
             $fn($line);
         }
     }
 
+    private static function isInspectableAsymmetricLine(string $line, string $needle): bool
+    {
+        if (false === stripos($line, $needle)) {
+            return false;
+        }
+        $trimmed = ltrim($line);
+        if ('' === $trimmed) {
+            return false;
+        }
+        if (str_starts_with($trimmed, '//') || str_starts_with($trimmed, '*') || str_starts_with($trimmed, '/*')) {
+            return false;
+        }
+        if (preg_match('/^\s*[\x27\x22]/', $line)) {
+            return false;
+        }
+
+        return true;
+    }
+
     private static function rewriteGetModifiers(string $source): string
     {
-        if (false === stripos($source, '(get)')) {
+        if (false === stripos($source, self::GET_MODIFIER_NEEDLE)) {
             return $source;
         }
 
@@ -341,7 +716,7 @@ final class AsymmetricVisibilityRewriter
             )) {
                 throw new \CompileError(self::MULTIPLE_MODIFIERS_MESSAGE);
             }
-        }, '(get)');
+        }, self::GET_MODIFIER_NEEDLE);
     }
 
     private static function rejectExplicitPublicAfterGetModifier(string $source): void
@@ -353,7 +728,7 @@ final class AsymmetricVisibilityRewriter
             )) {
                 throw new \CompileError(self::MULTIPLE_MODIFIERS_MESSAGE);
             }
-        }, '(get)');
+        }, self::GET_MODIFIER_NEEDLE);
     }
 
     public static function visibilityFromMarker(string $text): int
@@ -443,24 +818,67 @@ final class AsymmetricVisibilityRewriter
     public static function setModifierLabel(int $setVisibilityFlags): string
     {
         if (($setVisibilityFlags & \PHPCfg\Func::FLAG_PRIVATE) !== 0) {
-            return 'private(set)';
+            return 'private'.self::SET_MODIFIER_NEEDLE;
         }
         if (($setVisibilityFlags & \PHPCfg\Func::FLAG_PROTECTED) !== 0) {
-            return 'protected(set)';
+            return 'protected'.self::SET_MODIFIER_NEEDLE;
         }
 
-        return 'public(set)';
+        return 'public'.self::SET_MODIFIER_NEEDLE;
+    }
+
+    /** php-src: zend_object_handlers.c — asymmetric write errors include explicit read modifier (#15995). */
+    public static function writeModifierLabel(int $readVisibilityFlags, int $setVisibilityFlags, bool $explicitReadModifier): string
+    {
+        $setLabel = self::setModifierLabel($setVisibilityFlags);
+        if (!$explicitReadModifier) {
+            return $setLabel;
+        }
+        $readLabel = match (true) {
+            ($readVisibilityFlags & \PHPCfg\Func::FLAG_PRIVATE) !== 0 => 'private',
+            ($readVisibilityFlags & \PHPCfg\Func::FLAG_PROTECTED) !== 0 => 'protected',
+            default => 'public',
+        };
+
+        return $readLabel.' '.$setLabel;
+    }
+
+    /** @param array<string, mixed> $attributes */
+    public static function hasExplicitReadModifierFromAttributes(array $attributes): bool
+    {
+        $chunks = [];
+        if (isset($attributes['comments']) && is_array($attributes['comments'])) {
+            foreach ($attributes['comments'] as $comment) {
+                if (is_object($comment) && method_exists($comment, 'getText')) {
+                    $chunks[] = $comment->getText();
+                } elseif (is_string($comment)) {
+                    $chunks[] = $comment;
+                }
+            }
+        }
+        if (isset($attributes['docComment']) && is_object($attributes['docComment'])
+            && method_exists($attributes['docComment'], 'getText')) {
+            $chunks[] = $attributes['docComment']->getText();
+        }
+
+        foreach ($chunks as $chunk) {
+            if (preg_match(self::EXPLICIT_READ_MARKER_PATTERN, $chunk)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public static function getModifierLabel(int $getVisibilityFlags): string
     {
         if (($getVisibilityFlags & \PHPCfg\Func::FLAG_PRIVATE) !== 0) {
-            return 'private(get)';
+            return 'private'.self::GET_MODIFIER_NEEDLE;
         }
         if (($getVisibilityFlags & \PHPCfg\Func::FLAG_PROTECTED) !== 0) {
-            return 'protected(get)';
+            return 'protected'.self::GET_MODIFIER_NEEDLE;
         }
 
-        return 'public(get)';
+        return 'public'.self::GET_MODIFIER_NEEDLE;
     }
 }

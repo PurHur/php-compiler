@@ -29,7 +29,7 @@ final class strftime extends Internal
         $format = self::vmFormatArg($frame);
         $timestamp = null;
         if (2 === $argc) {
-            $timestamp = VmDate::coerceNullableTimestampArg($frame->calledArgs[1], 'strftime', 2, 'timestamp');
+            $timestamp = VmDate::coerceNullableTimestampArgForFrame($frame, 1, 'strftime', 2, 'timestamp');
         }
         $frame->returnVar->string(VmDate::strftime($format, $timestamp));
     }

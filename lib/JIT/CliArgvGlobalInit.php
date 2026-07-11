@@ -13,7 +13,11 @@ use PHPLLVM\Value;
 final class CliArgvGlobalInit
 {
     public static ?Value $global = null;
+
     public static ?Value $argcGlobal = null;
+
+    /** @var object|null LLVM module identity — static Value must not leak across Context instances */
+    private static ?object $module = null;
 
     public static function initialize(Context $context): void
     {
@@ -21,11 +25,23 @@ final class CliArgvGlobalInit
             && Builtin::LOAD_TYPE_EMBED !== $context->loadType) {
             return;
         }
+        $module = $context->module;
+        if (null !== self::$global && self::$module === $module) {
+            return;
+        }
+
         $valueTy = $context->getTypeFromString('__value__');
-        self::$global = $context->module->addGlobal($valueTy, 'jit_global_argv');
+        $existingArgv = $module->getNamedGlobal('jit_global_argv');
+        self::$global = null !== $existingArgv
+            ? $existingArgv
+            : $module->addGlobal($valueTy, 'jit_global_argv');
         self::$global->setInitializer($valueTy->constNull());
-        self::$argcGlobal = $context->module->addGlobal($valueTy, 'jit_global_argc');
+        $existingArgc = $module->getNamedGlobal('jit_global_argc');
+        self::$argcGlobal = null !== $existingArgc
+            ? $existingArgc
+            : $module->addGlobal($valueTy, 'jit_global_argc');
         self::$argcGlobal->setInitializer($valueTy->constNull());
+        self::$module = $module;
     }
 
     public static function emitRefreshAfterStoreArgv(Context $context): void

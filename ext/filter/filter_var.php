@@ -8,13 +8,15 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\ErrorReporter;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** filter_var() subset — FILTER_VALIDATE_INT/BOOLEAN/FLOAT/REGEXP/EMAIL (#104, #4742, #5020, #6028). */
+/** filter_var() subset — FILTER_VALIDATE_INT/BOOLEAN/FLOAT/REGEXP/EMAIL/URL/IP/MAC (#104, #4742, #5020, #6028, #4403, #17411). */
 final class filter_var extends Internal
 {
     public function execute(Frame $frame): void
@@ -27,10 +29,7 @@ final class filter_var extends Internal
             return;
         }
         $value = $frame->calledArgs[0]->resolveIndirect();
-        $filter = $frame->calledArgs[1]->resolveIndirect();
-        if (Variable::TYPE_INTEGER !== $filter->type) {
-            throw new \LogicException('filter_var() filter must be an integer in this compiler build');
-        }
+        $filter = InternalStrictArg::requireBuiltinTypedInt($frame, 1, 'filter_var', 'filter');
         $options = null;
         if (3 === $argc) {
             $options = $frame->calledArgs[2]->resolveIndirect();
@@ -67,6 +66,7 @@ final class filter_var extends Internal
         if (\count($args) < 2 || \count($args) > 3) {
             throw new \LogicException('filter_var() requires two or three arguments in this compiler build');
         }
+        JitInternalStrictArg::requireBuiltinTypedInt($context, $args[1], 'filter_var', 'filter', 2);
         $optionsArg = \count($args) > 2 ? $args[2] : null;
         if (null !== $optionsArg
             && JITVariable::TYPE_NULL !== $optionsArg->type
@@ -101,6 +101,11 @@ final class filter_var extends Internal
             $filterVal,
             $i64->constInt(VmFilter::FILTER_VALIDATE_FLOAT, false)
         );
+        $isDomain = $context->builder->icmp(
+            Builder::INT_EQ,
+            $filterVal,
+            $i64->constInt(VmFilter::FILTER_VALIDATE_DOMAIN, false)
+        );
         $isEmail = $context->builder->icmp(
             Builder::INT_EQ,
             $filterVal,
@@ -111,6 +116,16 @@ final class filter_var extends Internal
             $filterVal,
             $i64->constInt(VmFilter::FILTER_VALIDATE_URL, false)
         );
+        $isIp = $context->builder->icmp(
+            Builder::INT_EQ,
+            $filterVal,
+            $i64->constInt(VmFilter::FILTER_VALIDATE_IP, false)
+        );
+        $isMac = $context->builder->icmp(
+            Builder::INT_EQ,
+            $filterVal,
+            $i64->constInt(VmFilter::FILTER_VALIDATE_MAC, false)
+        );
 
         $intBlock = BasicBlockHelper::append($context, 'filter_var_int');
         $otherBlock = BasicBlockHelper::append($context, 'filter_var_other');
@@ -118,15 +133,24 @@ final class filter_var extends Internal
         $boolOtherBlock = BasicBlockHelper::append($context, 'filter_var_bool_other');
         $floatBlock = BasicBlockHelper::append($context, 'filter_var_float');
         $floatOtherBlock = BasicBlockHelper::append($context, 'filter_var_float_other');
+        $domainBlock = BasicBlockHelper::append($context, 'filter_var_domain');
+        $domainOtherBlock = BasicBlockHelper::append($context, 'filter_var_domain_other');
         $emailBlock = BasicBlockHelper::append($context, 'filter_var_email');
         $emailOtherBlock = BasicBlockHelper::append($context, 'filter_var_email_other');
         $urlBlock = BasicBlockHelper::append($context, 'filter_var_url');
+        $urlOtherBlock = BasicBlockHelper::append($context, 'filter_var_url_other');
+        $ipBlock = BasicBlockHelper::append($context, 'filter_var_ip');
+        $macCheckBlock = BasicBlockHelper::append($context, 'filter_var_mac_check');
+        $macBlock = BasicBlockHelper::append($context, 'filter_var_mac');
+        $sanitizeCheckBlock = BasicBlockHelper::append($context, 'filter_var_sanitize_check');
+        $sanitizeBlock = BasicBlockHelper::append($context, 'filter_var_sanitize');
         $failBlock = BasicBlockHelper::append($context, 'filter_var_fail');
         $doneBlock = BasicBlockHelper::append($context, 'filter_var_done');
         $context->builder->branchIf($isInt, $intBlock, $otherBlock);
 
         $context->builder->positionAtEnd($intBlock);
-        $intResult = JitFilter::validateInt($context, $value);
+        $flags = JitFilter::loadFilterFlags($context, $optionsArg);
+        $intResult = JitFilter::validateInt($context, $value, $flags);
         if (null !== $optionsArg && JITVariable::TYPE_NULL !== $optionsArg->type) {
             $intResult = JitFilter::applyNullOnFailure($context, $intResult, $nullOnFailure);
         }
@@ -137,10 +161,7 @@ final class filter_var extends Internal
         $context->builder->branchIf($isBool, $boolBlock, $boolOtherBlock);
 
         $context->builder->positionAtEnd($boolBlock);
-        $boolResult = JitFilter::validateBoolean($context, $value);
-        if (null !== $optionsArg && JITVariable::TYPE_NULL !== $optionsArg->type) {
-            $boolResult = JitFilter::applyNullOnFailure($context, $boolResult, $nullOnFailure);
-        }
+        $boolResult = JitFilter::validateBoolean($context, $value, $nullOnFailure);
         $boolTail = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);
 
@@ -156,6 +177,17 @@ final class filter_var extends Internal
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($floatOtherBlock);
+        $context->builder->branchIf($isDomain, $domainBlock, $domainOtherBlock);
+
+        $context->builder->positionAtEnd($domainBlock);
+        $domainResult = JitFilter::validateDomain($context, $value);
+        if (null !== $optionsArg && JITVariable::TYPE_NULL !== $optionsArg->type) {
+            $domainResult = JitFilter::applyNullOnFailure($context, $domainResult, $nullOnFailure);
+        }
+        $domainTail = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($domainOtherBlock);
         $context->builder->branchIf($isEmail, $emailBlock, $emailOtherBlock);
 
         $context->builder->positionAtEnd($emailBlock);
@@ -167,7 +199,7 @@ final class filter_var extends Internal
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($emailOtherBlock);
-        $context->builder->branchIf($isUrl, $urlBlock, $failBlock);
+        $context->builder->branchIf($isUrl, $urlBlock, $urlOtherBlock);
 
         $context->builder->positionAtEnd($urlBlock);
         $urlResult = JitFilter::validateUrl($context, $value);
@@ -175,6 +207,38 @@ final class filter_var extends Internal
             $urlResult = JitFilter::applyNullOnFailure($context, $urlResult, $nullOnFailure);
         }
         $urlTail = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($urlOtherBlock);
+        $context->builder->branchIf($isIp, $ipBlock, $macCheckBlock);
+
+        $context->builder->positionAtEnd($macCheckBlock);
+        $context->builder->branchIf($isMac, $macBlock, $sanitizeCheckBlock);
+
+        $context->builder->positionAtEnd($sanitizeCheckBlock);
+        $isSanitize = JitFilter::isSanitizeFilterId($context, $filterVal);
+        $context->builder->branchIf($isSanitize, $sanitizeBlock, $failBlock);
+
+        $context->builder->positionAtEnd($ipBlock);
+        $ipResult = JitFilter::validateIp($context, $value);
+        if (null !== $optionsArg && JITVariable::TYPE_NULL !== $optionsArg->type) {
+            $ipResult = JitFilter::applyNullOnFailure($context, $ipResult, $nullOnFailure);
+        }
+        $ipTail = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($macBlock);
+        $macResult = JitFilter::validateMac($context, $value);
+        if (null !== $optionsArg && JITVariable::TYPE_NULL !== $optionsArg->type) {
+            $macResult = JitFilter::applyNullOnFailure($context, $macResult, $nullOnFailure);
+        }
+        $macTail = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($sanitizeBlock);
+        $flags = JitFilter::loadFilterFlags($context, $optionsArg);
+        $sanitizeResult = JitFilter::sanitize($context, $value, $filterVal, $flags);
+        $sanitizeTail = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($failBlock);
@@ -187,8 +251,12 @@ final class filter_var extends Internal
         $phi->addIncoming($intResult, $intTail);
         $phi->addIncoming($boolResult, $boolTail);
         $phi->addIncoming($floatResult, $floatTail);
+        $phi->addIncoming($domainResult, $domainTail);
         $phi->addIncoming($emailResult, $emailTail);
         $phi->addIncoming($urlResult, $urlTail);
+        $phi->addIncoming($ipResult, $ipTail);
+        $phi->addIncoming($macResult, $macTail);
+        $phi->addIncoming($sanitizeResult, $sanitizeTail);
         $phi->addIncoming($falseResult, $failTail);
 
         return $phi;

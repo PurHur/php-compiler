@@ -49,6 +49,31 @@ PHP;
         $runtime->run($runtime->parseAndCompile($code, 'readonly_prop_after.php'));
     }
 
+    /** @covers issue #14838 */
+    public function testReadonlyClassRejectsReassignInsideConstruct(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+readonly class C {
+    public int $x;
+    public function __construct() {
+        $this->x = 1;
+        try {
+            $this->x = 2;
+            echo "no error\n";
+        } catch (\Error $e) {
+            echo $e->getMessage(), "\n";
+        }
+    }
+}
+new C();
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'readonly_class_ctor_reassign.php'));
+        $this->assertSame('Cannot modify readonly property C::$x' . "\n", ob_get_clean());
+    }
+
     public function testReadonlyPropertyRejectsAssignThroughReferenceAfterConstruct(): void
     {
         $runtime = new Runtime();

@@ -70,7 +70,7 @@ final class JitClassConstants
         foreach ($object->classConstantsForId($classId) as [$key, $_entry]) {
             $displayName = $object->classConstDisplayName($classId, $key);
             $keyStr = $context->builder->load($context->constantStringFromString($displayName));
-            $jit = $object->classConstFetch($classId, $key);
+            $jit = $object->classConstFetch($classId, $key, null, $className);
             HashTableHelper::setAtStringKey($context, $ht, $keyStr, $jit);
         }
 

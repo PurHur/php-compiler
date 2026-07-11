@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT;
-use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitNativeString;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Value\Function_ as LlvmFunction;
@@ -14,8 +14,8 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
 /**
  * JIT/AOT link for password_hash/verify/crypt/get_info via PasswordJitHelper PHP (#9908).
  *
- * Replaces {@see StringPasswordCryptoStandaloneLlvm} on JIT embed; standalone keeps LLVM
- * until PasswordJitHelper compiles in native standalone nested link (#9908).
+ * JIT embed and AOT standalone compile {@see \PHPCompiler\ext\standard\PasswordJitHelper}; thin LLVM
+ * bridges forward the ABI (#9908, #12869).
  * SSOT: {@see \PHPCompiler\ext\standard\VmPassword}
  * php-src: ext/standard/password.c
  */
@@ -69,13 +69,8 @@ final class PasswordCryptoRuntime
     {
         $probe = $context->module->getNamedFunction('__compiler_password_hash');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            self::registerLinkedRuntime($context);
-
-            return;
-        }
-
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            StringPasswordCryptoStandaloneLlvm::implement($context);
+            LibcryptThinRuntime::ensureLinked($context);
+            PasswordRandomBytesRuntime::ensureLinked($context);
             self::registerLinkedRuntime($context);
 
             return;
@@ -87,6 +82,8 @@ final class PasswordCryptoRuntime
         } catch (\Throwable) {
         }
 
+        LibcryptThinRuntime::ensureLinked($context);
+        PasswordRandomBytesRuntime::ensureLinked($context);
         self::ensureJitHelperCompiled($context);
         self::implementIfMissing($context, '__compiler_password_hash', self::implementHashBridge(...));
         self::implementIfMissing($context, '__compiler_password_verify', self::implementVerifyBridge(...));
@@ -97,10 +94,16 @@ final class PasswordCryptoRuntime
         self::registerLinkedRuntime($context);
 
         if (null !== $savedBlock) {
-            $context->builder->positionAtEnd($savedBlock);
+            try {
+                $context->builder->positionAtEnd($savedBlock);
+            } catch (\Throwable) {
+                JitNativeString::ensureInsertBlock($context);
+            }
         } else {
-            $context->builder->clearInsertionPosition();
+            JitNativeString::ensureInsertBlock($context);
         }
+        // Nested helper compile swaps builders; stale intrinsic emits cross-block (#9275, #2967).
+        $context->intrinsic->builder = $context->builder;
     }
 
     /**

@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPLLVM;
+use PHPLLVM\Value;
 
 /**
  * Pending TypeError for JIT/AOT intersection and strict checks (#3077).
@@ -73,6 +75,76 @@ final class TypeErrorRaise
     public static function emitValueError(Context $context, string $message): void
     {
         self::emitPendingMessage($context, $message, '__compiler_jit_raise_value_error');
+    }
+
+    /**
+     * Branch to $okSuffix when $successCondition is true; otherwise raise TypeError and abort (#15726).
+     */
+    public static function emitBranchOrAbortOnFailure(
+        Context $context,
+        Value $successCondition,
+        string $blockPrefix,
+        string $errorMessage,
+        string $okSuffix = 'ok',
+        string $failSuffix = 'fail'
+    ): void {
+        self::emitBranchOrAbortOnErrorFailure(
+            $context,
+            $successCondition,
+            $blockPrefix,
+            $errorMessage,
+            static function (Context $ctx, string $msg): void {
+                self::emitRaise($ctx, $msg);
+            },
+            $okSuffix,
+            $failSuffix
+        );
+    }
+
+    /** Branch to $okSuffix when $successCondition is true; otherwise raise ValueError and abort (#15741). */
+    public static function emitBranchOrAbortOnValueErrorFailure(
+        Context $context,
+        Value $successCondition,
+        string $blockPrefix,
+        string $errorMessage,
+        string $okSuffix = 'ok',
+        string $failSuffix = 'fail'
+    ): void {
+        self::emitBranchOrAbortOnErrorFailure(
+            $context,
+            $successCondition,
+            $blockPrefix,
+            $errorMessage,
+            static function (Context $ctx, string $msg): void {
+                self::emitValueError($ctx, $msg);
+            },
+            $okSuffix,
+            $failSuffix
+        );
+    }
+
+    /**
+     * @param callable(Context, string): void $emitError
+     */
+    private static function emitBranchOrAbortOnErrorFailure(
+        Context $context,
+        Value $successCondition,
+        string $blockPrefix,
+        string $errorMessage,
+        callable $emitError,
+        string $okSuffix,
+        string $failSuffix
+    ): void {
+        self::registerDeclarations($context);
+        self::ensureLinked($context);
+        $failBb = BasicBlockHelper::append($context, $blockPrefix.'_'.$failSuffix);
+        $okBb = BasicBlockHelper::append($context, $blockPrefix.'_'.$okSuffix);
+        $context->builder->branchIf($successCondition, $okBb, $failBb);
+        $context->builder->positionAtEnd($failBb);
+        $emitError($context, $errorMessage);
+        $context->builder->call($context->lookupFunction('abort'));
+        $context->llvm->lib->LLVMBuildUnreachable($context->builder->builder);
+        $context->builder->positionAtEnd($okBb);
     }
 
     private static function emitPendingMessage(Context $context, string $message, string $callee): void

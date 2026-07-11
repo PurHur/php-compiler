@@ -7,7 +7,7 @@ namespace PHPCompiler\ext\standard;
 /**
  * pack() for compiled JIT/AOT modules via PackEngine PHP (#9133, php-in-PHP).
  *
- * SSOT: {@see PackEngine}; VM path uses the same engine via {@see VmPack}.
+ * SSOT: {@see PackJitEngine} (JIT/AOT) and {@see PackEngine} (VM).
  * php-src: ext/standard/pack.c — php_pack()
  */
 final class PackJitHelper
@@ -22,12 +22,32 @@ final class PackJitHelper
 
     private const TAG_STRING = 4;
 
+    private const TAG_ARRAY = 5;
+
+    /** Internal marker decoded from {@see self::TAG_ARRAY} argv slots (#13598). */
+    public static function packedArrayMarker(): PackedArgvArrayMarker
+    {
+        static $marker = null;
+
+        return $marker ??= new PackedArgvArrayMarker();
+    }
+
     /**
      * @param string $packedArgs length-prefixed argv blob from LLVM bridge
      */
     public static function packArgv(string $format, string $packedArgs): string
     {
-        return PackEngine::pack($format, self::unpackArgv($packedArgs));
+        return PackJitEngine::pack($format, self::unpackArgv($packedArgs));
+    }
+
+    /**
+     * Decode argv blob from {@see PackArgvSerialize} for other JIT helpers (#9131).
+     *
+     * @return list<int|float|bool|string|null>
+     */
+    public static function decodePackedArgv(string $packed): array
+    {
+        return self::unpackArgv($packed);
     }
 
     /**
@@ -77,6 +97,9 @@ final class PackJitHelper
                     $args[] = \substr($packed, $pos, $sl);
                     $pos += $sl;
                     break;
+                case self::TAG_ARRAY:
+                    $args[] = self::packedArrayMarker();
+                    break;
                 default:
                     break 2;
             }
@@ -84,4 +107,9 @@ final class PackJitHelper
 
         return $args;
     }
+}
+
+/** @internal argv blob marker for array operands in sprintf JIT bridge (#13598). */
+final class PackedArgvArrayMarker
+{
 }

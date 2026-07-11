@@ -58,6 +58,8 @@ class ClassEntry {
     public array $constants = [];
     /** @var array<string, string> constant name (lowercase) => declared casing (#5385) */
     public array $constNames = [];
+    /** @var array<string, string> constant name (lowercase) => declaring class lc (#4479) */
+    public array $constDeclaringClassLc = [];
     /** @var array<string, int> constant name (lowercase) => PHPCfg visibility flags (#4651) */
     public array $constVisibility = [];
     /** @var array<string, string> constant name (lowercase) => trait FQCN when imported via use Trait */
@@ -76,6 +78,8 @@ class ClassEntry {
     public array $staticPropertySetVisibility = [];
     /** @var array<string, int> static property name (lowercase) => asymmetric get visibility (#6769) */
     public array $staticPropertyGetVisibility = [];
+    /** @var array<string, bool> static property name (lowercase) => explicit read before set (#15995) */
+    public array $staticPropertyAsymmetricExplicitRead = [];
     /** @var array<string, string> static property name (lowercase) => declaring class lc (#6785) */
     public array $staticPropertyDeclaringClassLc = [];
     /** @var array<string, array{get?: string, set?: string}> static prop (lowercase) => hook method lc (#4751) */

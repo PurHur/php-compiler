@@ -8,6 +8,6 @@ echo htmlspecialchars_decode('a&quot;b&#039;c', 3), "\n";
 echo htmlspecialchars_decode('&#39;x', 3), "\n";
 --EXPECT--
 a&quot;b&#039;c
-a"b'c
+a"b&#039;c
 a"b'c
 'x

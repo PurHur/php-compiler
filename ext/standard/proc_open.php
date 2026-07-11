@@ -37,14 +37,14 @@ final class proc_open extends Internal
         $command = self::parseCommand($frame->calledArgs[0], 'proc_open', 1);
         $descriptorSpec = self::parseDescriptorSpec($frame->calledArgs[1], 'proc_open', 2);
         $cwd = null;
-        if ($argc >= 4) {
+        if (\array_key_exists(3, $frame->calledArgs)) {
             $cwdVar = $frame->calledArgs[3]->resolveIndirect();
             if (Variable::TYPE_NULL !== $cwdVar->type) {
                 $cwd = VmString::coerceStringBuiltinArg($cwdVar, 'proc_open', 4, 'cwd');
             }
         }
         $env = null;
-        if ($argc >= 5) {
+        if (\array_key_exists(4, $frame->calledArgs)) {
             $env = self::parseEnv($frame->calledArgs[4], 'proc_open', 5);
         }
 
@@ -80,7 +80,10 @@ final class proc_open extends Internal
     {
         $arg = $arg->resolveIndirect();
         if (Variable::TYPE_STRING === $arg->type) {
-            return $arg->toString();
+            $command = $arg->toString();
+            VmString::rejectEmptyBuiltinStringArg($command, $functionName, $argNum - 1, 'command');
+
+            return $command;
         }
         if (Variable::TYPE_ARRAY === $arg->type) {
             $parts = [];
@@ -92,6 +95,13 @@ final class proc_open extends Internal
                     $argNum,
                     'command'
                 );
+            }
+            if ([] === $parts) {
+                throw new \ValueError(\sprintf(
+                    '%s(): Argument #%d ($command) must have at least one element',
+                    $functionName,
+                    $argNum
+                ));
             }
 
             return $parts;

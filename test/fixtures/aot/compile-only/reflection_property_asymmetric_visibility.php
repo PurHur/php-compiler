@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 class C
 {
-    private(set) string $name = 'x';
-    private(set) static int $sx = 1;
+    public (private(set)) string $name = 'x';
+    public (private(set)) static int $sx = 1;
 }
 
 $r = new ReflectionProperty(C::class, 'name');

@@ -27,7 +27,9 @@ final class ob_end_clean extends Internal
     public function execute(Frame $frame): void
     {
         if (\count($frame->calledArgs) > 0) {
-            throw new \LogicException('ob_end_clean() takes no arguments');
+            throw new \ArgumentCountError(
+                'ob_end_clean() expects exactly 0 arguments, '.\count($frame->calledArgs).' given'
+            );
         }
         if (0 === OutputBuffer::getLevel()) {
             self::emitNoBufferNotice($frame);

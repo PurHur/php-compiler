@@ -40,6 +40,12 @@ final class JitSetcookieOptions
         }
 
         $namePtr = JitStringBuiltinArg::lower($context, $args[0], $function, 0, 'name');
+        JitStringBuiltinArg::rejectEmpty(
+            $context,
+            $args[0],
+            $namePtr,
+            $function.'(): Argument #1 ($name) cannot be empty'
+        );
         $valuePtr = JitStringBuiltinArg::lower($context, $args[1], $function, 1, 'value');
         $optionsHt = self::loadOptionsArray($context, $args[2], $function);
 

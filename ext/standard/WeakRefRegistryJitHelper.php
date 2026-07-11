@@ -11,8 +11,8 @@ namespace PHPCompiler\ext\standard;
  * {@see \PHPCompiler\VM\WeakRefRegistry} for interpreted code.
  * php-src: Zend/zend_weakrefs.c
  *
- * Guards and scan loops live in {@see \PHPCompiler\JIT\Builtin\WeakRefRegistryRuntime} LLVM
- * bridges — this file only exposes append/accessors safe for nested JIT (#11437).
+ * Register/unregister guards live here; {@see \PHPCompiler\JIT\Builtin\WeakRefRegistryRuntime}
+ * emits thin pointerCast + helper-call bridges (#9191, #15955).
  */
 final class WeakRefRegistryJitHelper
 {
@@ -52,7 +52,31 @@ final class WeakRefRegistryJitHelper
         self::$mapKey = [];
     }
 
-    /** @internal LLVM bridge checks non-zero pointers and capacity */
+    /** Register weakref slot when pointers are valid and capacity allows (#15955). */
+    public static function registerRef(int $targetPtr, int $slotPtr): void
+    {
+        if (0 === $targetPtr || 0 === $slotPtr) {
+            return;
+        }
+        if (self::$refCount >= self::MAX_REFS) {
+            return;
+        }
+        self::appendRefEntry($targetPtr, $slotPtr);
+    }
+
+    /** Register weakmap entry when pointers/key are valid and capacity allows (#15955). */
+    public static function registerMap(int $targetPtr, int $htPtr, string $key): void
+    {
+        if (0 === $targetPtr || 0 === $htPtr || '' === $key) {
+            return;
+        }
+        if (self::$mapCount >= self::MAX_MAPS) {
+            return;
+        }
+        self::appendMapEntry($targetPtr, $htPtr, $key);
+    }
+
+    /** @internal storage append after guard checks */
     public static function appendRefEntry(int $targetPtr, int $slotPtr): void
     {
         $idx = self::$refCount;
@@ -61,7 +85,7 @@ final class WeakRefRegistryJitHelper
         self::$refCount = self::$refCount + 1;
     }
 
-    /** @internal LLVM bridge checks non-zero pointers, non-empty key, and capacity */
+    /** @internal storage append after guard checks */
     public static function appendMapEntry(int $targetPtr, int $htPtr, string $key): void
     {
         $idx = self::$mapCount;
@@ -197,6 +221,37 @@ final class WeakRefRegistryJitHelper
         self::$mapTargetPtr[$index] = 0;
         self::$mapHtPtr[$index] = 0;
         self::$mapKey[$index] = '';
+    }
+
+    /** Clear weakref slots and weakmap keys targeting a freed object (#15968). */
+    public static function clearObject(int $targetPtr): void
+    {
+        if ($targetPtr <= 0) {
+            return;
+        }
+        $refCount = self::$refCount;
+        for ($i = 0; $i < $refCount; ++$i) {
+            if (!isset(self::$refTargetPtr[$i]) || self::$refTargetPtr[$i] !== $targetPtr) {
+                continue;
+            }
+            $slot = self::$refSlotPtr[$i] ?? 0;
+            if (0 !== $slot) {
+                phpc_weakref_null_slot($slot);
+                self::clearRefEntry($i);
+            }
+        }
+        $mapCount = self::$mapCount;
+        for ($i = 0; $i < $mapCount; ++$i) {
+            if (!isset(self::$mapTargetPtr[$i]) || self::$mapTargetPtr[$i] !== $targetPtr) {
+                continue;
+            }
+            $ht = self::$mapHtPtr[$i] ?? 0;
+            $key = self::$mapKey[$i] ?? '';
+            if (0 !== $ht && '' !== $key) {
+                phpc_weakref_unset_map_key($ht, $key);
+                self::clearMapEntry($i);
+            }
+        }
     }
 
     private static function storeMapKey(string $key): string

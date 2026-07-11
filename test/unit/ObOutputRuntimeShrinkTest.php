@@ -1,0 +1,80 @@
+<?php
+
+declare(strict_types=1);
+
+namespace PHPCompiler\Test\Unit;
+
+use PHPCompiler\ext\standard\ObOutputJitHelper;
+use PHPUnit\Framework\TestCase;
+
+/** ObOutputRuntime routes standalone + embed through ObOutputJitHelper PHP, not LLVM buffer globals (#9268, #12951). */
+final class ObOutputRuntimeShrinkTest extends TestCase
+{
+    public function testObOutputRuntimeUsesHelperNotLlvmStack(): void
+    {
+        $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ObOutputRuntime.php');
+        $this->assertStringContainsString('ObOutputJitBridge::implement', $runtime);
+        $this->assertStringNotContainsString('ObOutputStandaloneLlvm', $runtime);
+        $runtimeLines = \substr_count($runtime, "\n") + 1;
+        $this->assertLessThan(60, $runtimeLines);
+
+        $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/ObOutputStandaloneLlvm.php');
+
+        $bridge = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ObOutputJitBridge.php');
+        $this->assertStringContainsString('ObOutputJitHelper', $bridge);
+        $this->assertStringContainsString('NestedJitCompileScope', $bridge);
+        $this->assertStringContainsString('ObOutputEchoJitEmit::implementAll', $bridge);
+        $this->assertStringContainsString('ObOutputUserScriptLlvm::shouldUse', $bridge);
+        $this->assertStringNotContainsString('ObStorageGlobals::ensureGlobals', $bridge);
+        $this->assertStringNotContainsString('GLOBAL_STORAGE', $bridge);
+        $this->assertStringNotContainsString('implementPopBuffer', $bridge);
+        $this->assertStringNotContainsString('ObOutputStandaloneLlvm', $bridge);
+        $this->assertStringContainsString('ensureEchoAbiDeclared', $bridge);
+        $bridgeLines = \substr_count($bridge, "\n") + 1;
+        $this->assertLessThan(820, $bridgeLines, 'ObOutputJitBridge LOC (#12999 echo ABI forward declare)');
+        // #12974: list-spread destructuring in foreach breaks self-host parseAndCompile.
+        $this->assertDoesNotMatchRegularExpression(
+            '/as\s+\$[a-zA-Z_]+\s*=>\s*\[\$[a-zA-Z_]+,\s*\$[a-zA-Z_]+,\s*\.\.\.\$/',
+            $bridge
+        );
+        $execCaptureRuntime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ObOutputExecCaptureRuntime.php');
+        $this->assertStringContainsString('UserScriptAotDeferNestedJit::shouldDefer', $execCaptureRuntime);
+        $this->assertStringContainsString('ObOutputExecCaptureLlvm::ensureLinked', $execCaptureRuntime);
+        $execCaptureLlvm = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ObOutputExecCaptureLlvm.php');
+        $this->assertStringContainsString('implementGetContents', $execCaptureLlvm);
+        $this->assertStringContainsString('ensureReadApiLinked', $execCaptureLlvm);
+
+        $userScript = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ObOutputUserScriptLlvm.php');
+        $this->assertStringContainsString('ObOutputEchoJitEmit::implementAll', $userScript);
+        $this->assertStringNotContainsString('EmbedObEchoBridge::implementAll', $userScript);
+
+        $helper = (string) file_get_contents(__DIR__.'/../../ext/standard/ObOutputJitHelper.php');
+        $this->assertStringNotContainsString('use PHPCompiler\VM\ObStackLimits', $helper);
+        $this->assertStringNotContainsString('ObStackLimits::BUF_SIZE', $helper);
+    }
+
+    public function testObOutputJitHelperStackSemantics(): void
+    {
+        ObOutputJitHelper::reset();
+        $this->assertSame(0, ObOutputJitHelper::getLevel());
+        ObOutputJitHelper::start();
+        ObOutputJitHelper::appendString('hello');
+        $this->assertSame(1, ObOutputJitHelper::getLevel());
+        $this->assertSame('hello', ObOutputJitHelper::getContents());
+        $this->assertSame(5, ObOutputJitHelper::getLength());
+        $this->assertSame(1, ObOutputJitHelper::endClean());
+        $this->assertSame(0, ObOutputJitHelper::getLevel());
+    }
+
+    public function testObOutputJitHelperNestedBuffers(): void
+    {
+        ObOutputJitHelper::reset();
+        ObOutputJitHelper::start();
+        ObOutputJitHelper::start();
+        ObOutputJitHelper::appendString('x');
+        $this->assertSame(2, ObOutputJitHelper::getLevel());
+        $this->assertSame(1, ObOutputJitHelper::endFlush());
+        $this->assertSame(1, ObOutputJitHelper::getLevel());
+        $this->assertSame('x', ObOutputJitHelper::getContents());
+    }
+}

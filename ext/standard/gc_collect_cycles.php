@@ -6,7 +6,9 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\CycleCollector;
 use PHPLLVM\Value;
@@ -25,8 +27,9 @@ final class gc_collect_cycles extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (\count($frame->calledArgs) > 0) {
-            throw new \LogicException('gc_collect_cycles() takes no arguments');
+        $argc = \count($frame->calledArgs);
+        if ($argc > 0) {
+            throw new \ArgumentCountError('gc_collect_cycles() expects exactly 0 arguments, '.$argc.' given');
         }
         $ctx = $frame->vmContext;
         if (null === $ctx) {
@@ -40,8 +43,16 @@ final class gc_collect_cycles extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (\count($args) > 0) {
-            throw new \LogicException('gc_collect_cycles() takes no arguments');
+        $argc = \count($args);
+        if ($argc > 0) {
+            TypeErrorRaise::ensureLinked($context);
+            TypeErrorRaise::emitArgumentCountError(
+                $context,
+                'gc_collect_cycles() expects exactly 0 arguments, '.$argc.' given'
+            );
+            $slot = JitValueBox::alloc($context);
+
+            return JitValueBox::pointer($context, $slot);
         }
 
         return JitGcCollectCycles::invoke($context);

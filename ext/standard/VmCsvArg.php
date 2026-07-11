@@ -14,27 +14,39 @@ final class VmCsvArg
         string $enclosure,
         string $escape,
     ): void {
-        self::requireSingleChar($separator, 3, 'separator');
-        self::requireSingleChar($enclosure, 4, 'enclosure');
-        self::requireEmptyOrSingleChar($escape, 5, 'escape');
+        self::requireSingleChar('fputcsv', $separator, 3, 'separator');
+        self::requireSingleChar('fputcsv', $enclosure, 4, 'enclosure');
+        self::requireEmptyOrSingleChar('fputcsv', $escape, 5, 'escape');
     }
 
-    public static function requireSingleChar(string $value, int $argNum, string $paramName): void
+    public static function validateFgetcsvOptions(
+        string $separator,
+        string $enclosure,
+        string $escape,
+    ): void {
+        self::requireSingleChar('fgetcsv', $separator, 3, 'separator');
+        self::requireSingleChar('fgetcsv', $enclosure, 4, 'enclosure');
+        self::requireEmptyOrSingleChar('fgetcsv', $escape, 5, 'escape');
+    }
+
+    public static function requireSingleChar(string $function, string $value, int $argNum, string $paramName): void
     {
         if (1 !== \strlen($value)) {
             throw new \ValueError(\sprintf(
-                'fputcsv(): Argument #%d ($%s) must be a single character',
+                '%s(): Argument #%d ($%s) must be a single character',
+                $function,
                 $argNum,
                 $paramName
             ));
         }
     }
 
-    public static function requireEmptyOrSingleChar(string $value, int $argNum, string $paramName): void
+    public static function requireEmptyOrSingleChar(string $function, string $value, int $argNum, string $paramName): void
     {
         if (\strlen($value) > 1) {
             throw new \ValueError(\sprintf(
-                'fputcsv(): Argument #%d ($%s) must be empty or a single character',
+                '%s(): Argument #%d ($%s) must be empty or a single character',
+                $function,
                 $argNum,
                 $paramName
             ));

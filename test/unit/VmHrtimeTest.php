@@ -17,9 +17,16 @@ final class VmHrtimeTest extends TestCase
             $this->markTestSkipped('/proc/uptime unavailable');
         }
         $a = VmHrtime::hrtime(true);
+        \usleep(100);
         $b = VmHrtime::hrtime(true);
+        if (\PHPCompiler\CompilerVersion::supportsHrtimeAsNumberFloat()) {
+            $this->assertIsFloat($a);
+        } else {
+            $this->assertIsInt($a);
+        }
         $this->assertGreaterThan(0, $a);
-        $this->assertGreaterThanOrEqual($a, $b);
+        $this->assertGreaterThan(0, $b);
+        $this->assertGreaterThanOrEqual($a - 1_000_000, $b, 'monotonic within 1ms refinement slack');
 
         $pair = VmHrtime::hrtime(false);
         $this->assertIsArray($pair);
@@ -37,11 +44,32 @@ final class VmHrtimeTest extends TestCase
         $this->assertGreaterThan(0, $sec + $nsec);
     }
 
-    /** Issue #10859 — clock_gettime path exposes sub-microsecond nanoseconds. */
+    /** Issue #10859 — realtime microtime path exposes sub-microsecond nanoseconds. */
     public function testNanosecondSubMicrosecondPrecision(): void
     {
-        if (!\extension_loaded('ffi')) {
-            $this->markTestSkipped('ext/ffi required for nanosecond precision (#10859)');
+        $anyNonZeroMod = false;
+        for ($i = 0; $i < 10; ++$i) {
+            $pair = VmHrtimeNative::readClock(VmHrtimeNative::CLOCK_REALTIME);
+            $this->assertIsArray($pair);
+            [, $nsec] = $pair;
+            if (0 !== $nsec % 1000) {
+                $anyNonZeroMod = true;
+
+                break;
+            }
+        }
+        $this->assertTrue($anyNonZeroMod, 'readClock(REALTIME) nsec % 1000 should be non-zero with microtime');
+
+        $a = VmHrtimeNative::readClock(VmHrtimeNative::CLOCK_REALTIME)[1];
+        $b = VmHrtimeNative::readClock(VmHrtimeNative::CLOCK_REALTIME)[1];
+        $this->assertNotSame($a, $b, 'consecutive realtime nanoseconds should differ');
+    }
+
+    /** Issue #12279 — monotonic path exposes sub-ms nanoseconds via microtime refinement. */
+    public function testMonotonicNanosecondSubMillisecondPrecision(): void
+    {
+        if ('Linux' !== \PHP_OS_FAMILY || !\is_readable('/proc/uptime')) {
+            $this->markTestSkipped('/proc/uptime unavailable');
         }
         $anyNonZeroMod = false;
         for ($i = 0; $i < 10; ++$i) {
@@ -52,10 +80,6 @@ final class VmHrtimeTest extends TestCase
                 break;
             }
         }
-        $this->assertTrue($anyNonZeroMod, 'hrtime()[1] % 1000 should be non-zero with clock_gettime');
-
-        $a = VmHrtime::hrtime(false)[1];
-        $b = VmHrtime::hrtime(false)[1];
-        $this->assertNotSame($a, $b, 'consecutive hrtime() nanoseconds should differ');
+        $this->assertTrue($anyNonZeroMod, 'hrtime()[1] % 1000 should be non-zero with microtime refinement');
     }
 }

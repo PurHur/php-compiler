@@ -46,17 +46,13 @@ final class HttpResponseJitHelper
     }
 
     /**
-     * http_response_code($code) setter — -1 invalid, -2 first-set true, else previous status.
-     * Code 0 triggers getter semantics (#9306).
+     * http_response_code($code) setter — -1 invalid (unused), -2 first-set true, else previous status.
+     * Code 0 triggers getter semantics (#9306). php-src accepts any other int (#12153).
      */
     public static function applySetLong(int $code): int
     {
-        if ($code < 100 || $code > 599) {
-            if (0 === $code) {
-                return self::applyGetSentinel();
-            }
-
-            return -1;
+        if (0 === $code) {
+            return self::applyGetSentinel();
         }
         $previous = self::$status;
         self::$status = $code;

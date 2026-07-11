@@ -9,11 +9,21 @@ use PHPCompiler\VM\AbstractPropertyHookCheck;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\ClassProperty;
 use PHPCompiler\VM\Variable;
+use PHPCompiler\Test\Support\PropertyHookTestSkip;
 use PHPUnit\Framework\TestCase;
 
 final class AbstractPropertyHookCheckTest extends TestCase
 {
-    public function testIsAbstractHookPropertyOnDeclaringClass(): void
+        use PropertyHookTestSkip;
+
+    protected function setUp(): void
+    {
+        $this->skipUnlessPropertyHooksEnabled();
+    }
+
+
+
+public function testIsAbstractHookPropertyOnDeclaringClass(): void
     {
         $ctx = (new Runtime())->vmContext;
         $a = new ClassEntry('A');

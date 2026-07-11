@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitStringArg;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -18,9 +18,12 @@ final class JitPrintf
     {
         $argc = \count($args);
         if ($argc < 1) {
-            throw new \LogicException('printf() requires at least one argument');
+            throw new \ArgumentCountError(\sprintf(
+                'printf() expects at least 1 argument, %d given',
+                $argc
+            ));
         }
-        $fmt = JitStringArg::lower($context, $args[0], 'printf() format');
+        $fmt = JitStringBuiltinArg::lowerRequiredString($context, $args[0], 'printf', 0, 'format');
         $numArgs = $argc - 1;
         if (0 === $numArgs) {
             $nullArgv = $context->builder->pointerCast(

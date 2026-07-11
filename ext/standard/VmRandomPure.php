@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * VM random_bytes() without libc getrandom/open FFI (#8921).
+ * VM random_bytes() without libc getrandom/open FFI (#8921, #12181).
  *
- * Reads /dev/urandom via {@see VmFsReadNative} when FFI is available, otherwise
- * host fopen/fread bootstrap path (pairs {@see VmUnamePure} file probe fallback).
+ * Reads /dev/urandom via {@see VmFsReadNative} / {@see VmFsReadPure} stream paths;
+ * host fopen/fread bootstrap when compiled I/O unavailable (pairs {@see VmUnamePure}).
  *
  * php-src: ext/standard/random.c — php_random_bytes()
  */

@@ -11,10 +11,16 @@ echo abs($log - 2.30258509299404568402) < 1e-10 ? "log_ok\n" : "log_bad\n";
 try {
     pow([], 1);
 } catch (TypeError $e) {
-    echo get_class($e), "\n";
+    echo $e->getMessage(), "\n";
+}
+try {
+    pow(new stdClass(), 1);
+} catch (TypeError $e) {
+    echo $e->getMessage(), "\n";
 }
 --EXPECT--
 8
 2.0
 log_ok
-TypeError
+Unsupported operand types: array ** int
+Unsupported operand types: stdClass ** int

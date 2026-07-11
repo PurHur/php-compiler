@@ -8,6 +8,10 @@ var_export(output_add_rewrite_var('NAME', 'value'));
 echo "\n";
 var_export(output_add_rewrite_var('NAME', 'replaced'));
 echo "\n";
+var_export(ob_list_handlers());
+echo "\n";
+var_export(1 === count(ob_get_status(true)));
+echo "\n";
 var_export(output_reset_rewrite_vars());
 echo "\n";
 try {
@@ -20,6 +24,9 @@ try {
 add:yes
 reset:yes
 true
+array (
+  0 => 'URL-Rewriter',
+)
 true
 true
 array: TypeError

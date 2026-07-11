@@ -28,7 +28,7 @@ final class VmConstants
             return self::lookupClassConstant($ctx, $name);
         }
 
-        return $ctx->constantFetchBuiltin($name);
+        return $ctx->constantFetchBuiltin(VmReflection::normalizeGlobalIntrospectionName($name));
     }
 
     /**
@@ -40,7 +40,7 @@ final class VmConstants
             return self::isClassConstantDefined($ctx, $name);
         }
 
-        return $ctx->constantDefinedBuiltin($name);
+        return $ctx->constantDefinedBuiltin(VmReflection::normalizeGlobalIntrospectionName($name));
     }
 
     /**
@@ -193,12 +193,10 @@ final class VmConstants
                 'crypt_ext_des',
                 'crypt_md5',
                 'crypt_blowfish',
-                'filter_validate_int',
-                'filter_validate_regexp',
-                'filter_validate_email',
-                'input_get',
-                'input_post',
+                'crypt_sha256',
+                'crypt_sha512',
             ],
+            array_keys(DateConstants::CORE_STRING_BY_NAME),
             Context::errorReportingConstantFetchNames(),
             StdlibConstants::CORE_FETCH_NAMES,
         );
@@ -213,6 +211,42 @@ final class VmConstants
         }
 
         return self::buildFlat($ctx);
+    }
+
+    /**
+     * PHP 8.4+ category filter — flat map for one extension category (#12947, basic_functions.c).
+     */
+    public static function getDefinedConstantsForCategory(Context $ctx, string $category): HashTable
+    {
+        $categorized = self::buildCategorized($ctx);
+        foreach ($categorized->iterateKeyed(true) as [$keyVar, $valueVar]) {
+            $key = $keyVar->resolveIndirect();
+            if (Variable::TYPE_STRING !== $key->type) {
+                continue;
+            }
+            if (0 !== strcasecmp($key->toString(), $category)) {
+                continue;
+            }
+            $resolved = $valueVar->resolveIndirect();
+            if (Variable::TYPE_ARRAY !== $resolved->type) {
+                return new HashTable();
+            }
+            $out = new HashTable();
+            foreach ($resolved->toArray()->iterateKeyed(true) as [$constKeyVar, $constVar]) {
+                $copy = new Variable();
+                $copy->copyFrom($constVar);
+                $constKey = $constKeyVar->resolveIndirect();
+                if (Variable::TYPE_STRING === $constKey->type) {
+                    $out->add($constKey->toString(), $copy);
+                } elseif (Variable::TYPE_INTEGER === $constKey->type) {
+                    $out->addIndex($constKey->toInt(), $copy);
+                }
+            }
+
+            return $out;
+        }
+
+        return new HashTable();
     }
 
     private static function buildFlat(Context $ctx): HashTable
@@ -236,24 +270,110 @@ final class VmConstants
     {
         $result = new HashTable();
         $core = new HashTable();
-        foreach (self::coreConstantEntries($ctx, true) as $name => $value) {
+        foreach (self::categorizedCoreConstantEntries($ctx) as $name => $value) {
             $copy = new Variable();
             $copy->copyFrom($value);
             $core->add($name, $copy);
         }
         $result->add('Core', self::wrapArray($core));
 
+        foreach (ExtensionConstantGroups::groups() as $extension => $registered) {
+            $bucket = self::extensionConstantBucket($registered, $ctx);
+            if ($bucket->getNumElements() > 0) {
+                $result->add($extension, self::wrapArray($bucket));
+            }
+        }
+
         if ([] !== $ctx->constants) {
             $user = new HashTable();
             foreach ($ctx->constants as $name => $value) {
+                if (ExtensionConstantGroups::isExtensionConstantName($name)) {
+                    continue;
+                }
                 $copy = new Variable();
                 $copy->copyFrom($value);
                 $user->add($name, $copy);
             }
-            $result->add('user', self::wrapArray($user));
+            if ($user->getNumElements() > 0) {
+                $result->add('user', self::wrapArray($user));
+            }
         }
 
         return $result;
+    }
+
+    /**
+     * @return array<string, Variable>
+     */
+    private static function categorizedCoreConstantEntries(Context $ctx): array
+    {
+        $entries = VmPhpCoreConstants::categorizedCoreEntries();
+        foreach (['true', 'false', 'null'] as $fetchName) {
+            $value = $ctx->constantFetch($fetchName);
+            if (null === $value) {
+                continue;
+            }
+            $outName = match ($fetchName) {
+                'true' => 'TRUE',
+                'false' => 'FALSE',
+                'null' => 'NULL',
+                default => strtoupper($fetchName),
+            };
+            $entries[$outName] = $value;
+        }
+        foreach (Context::errorReportingConstantFetchNames() as $fetchName) {
+            $value = $ctx->constantFetch($fetchName);
+            if (null === $value) {
+                continue;
+            }
+            $entries[strtoupper($fetchName)] = $value;
+        }
+        foreach (ExtensionConstantGroups::coreBucketNames() as $name) {
+            if (!isset($ctx->constants[$name])) {
+                continue;
+            }
+            $entries[$name] = $ctx->constants[$name];
+        }
+        foreach (['STDIN', 'STDOUT', 'STDERR'] as $name) {
+            if (!isset($ctx->constants[$name])) {
+                continue;
+            }
+            $entries[$name] = $ctx->constants[$name];
+        }
+
+        return $entries;
+    }
+
+    /**
+     * @param array<string, int> $registered
+     */
+    private static function extensionConstantBucket(array $registered, Context $ctx): HashTable
+    {
+        $bucket = new HashTable();
+        foreach ($registered as $name => $fallback) {
+            $value = $ctx->constants[$name] ?? null;
+            if (null === $value && \is_int($fallback)) {
+                $var = new Variable(Variable::TYPE_INTEGER);
+                $var->int($fallback);
+                $value = $var;
+            } elseif (null === $value && \is_float($fallback)) {
+                $var = new Variable(Variable::TYPE_FLOAT);
+                $var->float($fallback);
+                $value = $var;
+            } elseif (null === $value && \is_string($fallback)) {
+                $var = new Variable(Variable::TYPE_STRING);
+                $var->string($fallback);
+                $value = $var;
+            }
+            if (null === $value) {
+                continue;
+            }
+            $copy = new Variable();
+            $copy->copyFrom($value);
+            $bucket->add($name, $copy);
+        }
+
+        return $bucket;
     }
 
     /**

@@ -1101,9 +1101,6 @@
         "ext/standard/JitHebrev.php": [
             "Cannot use PHPCompiler\\JIT\\Context as Context because the name is already in use on line 8"
         ],
-        "ext/standard/JitHex2bin.php": [
-            "Cannot use PHPCompiler\\JIT\\BasicBlockHelper as BasicBlockHelper because the name is already in use on line 14"
-        ],
         "ext/standard/JitHighlight.php": [
             "Cannot use PHPCompiler\\JIT\\BasicBlockHelper as BasicBlockHelper because the name is already in use on line 7"
         ],
@@ -1257,9 +1254,7 @@
         "ext/standard/JitNetworkServices.php": [
             "Cannot use PHPCompiler\\JIT\\BasicBlockHelper as BasicBlockHelper because the name is already in use on line 7"
         ],
-        "ext/standard/JitNl2br.php": [
-            "Cannot use PHPCompiler\\JIT\\Context as Context because the name is already in use on line 11"
-        ],
+        "ext/standard/Nl2brJitHelper.php": [],
         "ext/standard/JitNlLanginfo.php": [
             "Cannot use PHPCompiler\\JIT\\BasicBlockHelper as BasicBlockHelper because the name is already in use on line 7"
         ],
@@ -4629,9 +4624,6 @@
         "lib/JIT/AsymmetricVisibilityGuard.php": [
             "Cannot use PHPCompiler\\Block as Block because the name is already in use on line 7"
         ],
-        "lib/JIT/AttributeNewInstanceHelper.php": [
-            "Cannot use PHPCompiler\\JIT\\Builtin\\ErrorRaise as ErrorRaise because the name is already in use on line 7"
-        ],
         "lib/JIT/BackedEnumFromJit.php": [
             "Cannot use PHPCompiler\\JIT\\Builtin\\TypeErrorRaise as TypeErrorRaise because the name is already in use on line 8"
         ],
@@ -4755,7 +4747,7 @@
         "lib/JIT/Builtin/GzStreamIo.php": [
             "Cannot use PHPCompiler\\JIT\\Context as Context because the name is already in use on line 7"
         ],
-        "lib/JIT/Builtin/GzStreamIoJit.php": [
+        "lib/JIT/Builtin/GzStreamRuntime.php": [
             "Cannot use PHPCompiler\\JIT\\Context as Context because the name is already in use on line 7"
         ],
         "lib/JIT/Builtin/Hebrev.php": [
@@ -4971,9 +4963,6 @@
         "lib/JIT/Builtin/Sscanf.php": [
             "Cannot use PHPCompiler\\JIT\\Context as Context because the name is already in use on line 7"
         ],
-        "lib/JIT/Builtin/SscanfJit.php": [
-            "Cannot use PHPCompiler\\JIT\\BasicBlockHelper as BasicBlockHelper because the name is already in use on line 7"
-        ],
         "lib/JIT/Builtin/Stats.php": [
             "Cannot use PHPCompiler\\JIT\\Context as Context because the name is already in use on line 7"
         ],
@@ -5115,9 +5104,6 @@
         "lib/JIT/Builtin/StringFormat.php": [
             "Cannot use PHPCompiler\\JIT\\Context as Context because the name is already in use on line 7"
         ],
-        "lib/JIT/Builtin/StringFormatJit.php": [
-            "Cannot use PHPCompiler\\JIT\\BasicBlockHelper as BasicBlockHelper because the name is already in use on line 7"
-        ],
         "lib/JIT/Builtin/StringFsDir.php": [
             "Cannot use PHPCompiler\\JIT\\Context as Context because the name is already in use on line 7"
         ],
@@ -5243,9 +5229,6 @@
         ],
         "lib/JIT/Builtin/StringParseStr.php": [
             "Cannot use PHPCompiler\\JIT\\Context as Context because the name is already in use on line 7"
-        ],
-        "lib/JIT/Builtin/StringParseStrJit.php": [
-            "Cannot use PHPCompiler\\JIT\\BasicBlockHelper as BasicBlockHelper because the name is already in use on line 8"
         ],
         "lib/JIT/Builtin/StringPasswordCrypto.php": [
             "Cannot use PHPCompiler\\JIT\\Context as Context because the name is already in use on line 7"

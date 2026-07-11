@@ -31,7 +31,7 @@ final class bindec extends Internal
         if (1 !== count($frame->calledArgs)) {
             throw new \LogicException('bindec() requires exactly one argument');
         }
-        $binaryString = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'bindec', 0, 'binary_string');
+        $binaryString = VmString::stringBuiltinArgForFrame($frame, 0, 'bindec', 0, 'binary_string');
         VmMath::assignRadixToReturn($frame->returnVar, $binaryString, 2);
     }
 
@@ -48,7 +48,7 @@ final class bindec extends Internal
             $context,
             $this->stringDataPtr(
                 $context,
-                JitStringBuiltinArg::lower($context, $args[0], 'bindec', 0, 'binary_string')
+                JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'bindec', 0, 'binary_string')
             ),
             2
         );

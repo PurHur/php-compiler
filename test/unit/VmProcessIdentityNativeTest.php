@@ -81,7 +81,17 @@ final class VmProcessIdentityNativeTest extends TestCase
             $this->assertSame($pid, VmDate::getmypid());
         }
         $user = VmProcessIdentity::getCurrentUser();
-        $this->assertSame($name, $user);
-        $this->assertNotSame('Unknown', $user);
+        $this->assertSame('', $user);
+
+        $ownerUid = \PHPCompiler\ext\standard\VmFs::fileOwner(__FILE__);
+        if (false !== $ownerUid) {
+            $ownerName = VmProcessIdentityNative::getpwuidName($ownerUid);
+            if (null !== $ownerName) {
+                $this->assertSame(
+                    $ownerName,
+                    VmProcessIdentity::getCurrentUserForScript(__FILE__)
+                );
+            }
+        }
     }
 }

@@ -18,15 +18,7 @@ final class SessionStorageJitHelper
 {
     public static function mergeHashTables(HashTable $dest, HashTable $src): void
     {
-        foreach ($src->iterateKeyed(true) as [$keyVar, $valueVar]) {
-            $keyVar = $keyVar->resolveIndirect();
-            if (Variable::TYPE_STRING !== $keyVar->type) {
-                continue;
-            }
-            $slot = new Variable();
-            $slot->copyFrom($valueVar);
-            $dest->add($keyVar->toString(), $slot);
-        }
+        $dest->mergeStringKeysFrom($src, true);
     }
 
     public static function loadFromDisk(string $sessionId, HashTable $dest): void
@@ -78,19 +70,15 @@ final class SessionStorageJitHelper
         if ('' === $sessionName || null === $cookies) {
             return '';
         }
-        foreach ($cookies->iterateKeyed(true) as [$keyVar, $valueVar]) {
-            $keyVar = $keyVar->resolveIndirect();
-            if (Variable::TYPE_STRING !== $keyVar->type || $keyVar->toString() !== $sessionName) {
-                continue;
-            }
-            $val = $valueVar->resolveIndirect();
-            if (Variable::TYPE_STRING !== $val->type) {
-                return '';
-            }
-
-            return SessionFileStorage::sanitizeId($val->toString());
+        $val = $cookies->find($sessionName);
+        if (null === $val) {
+            return '';
+        }
+        $val = $val->resolveIndirect();
+        if (Variable::TYPE_STRING !== $val->type) {
+            return '';
         }
 
-        return '';
+        return SessionFileStorage::sanitizeId($val->toString());
     }
 }

@@ -60,4 +60,12 @@ if (false === $pos) {
     exit(1);
 }
 file_put_contents($spineMain, substr($existing, 0, $pos).$block.$marker.substr($existing, $pos + strlen($marker)));
+$repair = $root.'/script/bootstrap-spine-repair-main.php';
+if (is_readable($repair)) {
+    passthru('php '.escapeshellarg($repair), $repairExit);
+    if (0 !== $repairExit) {
+        fwrite(STDERR, "bootstrap-spine-append-missing: repair failed (exit {$repairExit})\n");
+        exit($repairExit);
+    }
+}
 fwrite(STDOUT, 'bootstrap-spine-append-missing: added '.count($batch)." files (".count($missing)." still missing)\n");

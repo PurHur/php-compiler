@@ -12,14 +12,15 @@ final class ErrorHandlerJitHelperTest extends TestCase
 {
     protected function tearDown(): void
     {
-        while (ErrorHandlerJitHelper::restoreApply()) {
+        for ($i = 0; $i < 8; ++$i) {
+            ErrorHandlerJitHelper::restoreApply();
         }
         parent::tearDown();
     }
 
     public function testSetApplyReturnsPreviousAndResolveHandlerAddr(): void
     {
-        $this->assertNull(ErrorHandlerJitHelper::setApply(0x1000, \E_USER_WARNING, 'h1'));
+        $this->assertSame('', ErrorHandlerJitHelper::setApply(0x1000, \E_USER_WARNING, 'h1'));
         $this->assertSame(0x1000, ErrorHandlerJitHelper::resolveHandlerAddr(\E_USER_WARNING));
         $this->assertSame(0, ErrorHandlerJitHelper::resolveHandlerAddr(\E_NOTICE));
 
@@ -33,6 +34,15 @@ final class ErrorHandlerJitHelperTest extends TestCase
         ErrorHandlerJitHelper::setApply(0x1000, \E_ALL, 'h1');
         $this->assertTrue(ErrorHandlerJitHelper::restoreApply());
         $this->assertSame(0, ErrorHandlerJitHelper::resolveHandlerAddr(\E_ALL));
-        $this->assertFalse(ErrorHandlerJitHelper::restoreApply());
+        $this->assertTrue(ErrorHandlerJitHelper::restoreApply());
+    }
+
+    public function testGetTopNameReflectsActiveHandler(): void
+    {
+        $this->assertSame('', ErrorHandlerJitHelper::getTopName());
+        ErrorHandlerJitHelper::setApply(0x1000, \E_ALL, 'h1');
+        $this->assertSame('h1', ErrorHandlerJitHelper::getTopName());
+        $this->assertTrue(ErrorHandlerJitHelper::restoreApply());
+        $this->assertSame('', ErrorHandlerJitHelper::getTopName());
     }
 }

@@ -15,7 +15,7 @@ final class VmStreamMeta
     /**
      * @param resource|null $fp host FILE* for plainfile streams; null for VmPhpMemoryStream et al.
      */
-    public static function buildMetaArray(string $uri, $fp = null, ?bool $eofOverride = null): array
+    public static function buildMetaArray(string $uri, $fp = null, ?bool $eofOverride = null, ?string $mode = null, ?bool $blocked = null): array
     {
         $isPhp = \str_starts_with($uri, 'php://');
         $isPhpMemory = \str_starts_with($uri, 'php://memory')
@@ -23,19 +23,81 @@ final class VmStreamMeta
             || \str_starts_with($uri, 'php://fd/');
 
         $socketType = self::streamTypeForUri($uri);
+        $phpNativeStreamType = self::phpNativeStreamType($uri);
         $eof = null !== $eofOverride ? $eofOverride : \feof($fp);
+        $reportedMode = null !== $mode ? $mode : self::defaultReportedMode($uri, $isPhpMemory);
 
+        // php-src php_stream_temp — no timed_out/blocked/eof keys (main/streams/php_stream_temp.c; #17928).
+        if (\str_starts_with($uri, 'php://temp')) {
+            return [
+                'wrapper_type' => 'PHP',
+                'stream_type' => $socketType ?? $phpNativeStreamType ?? 'TEMP',
+                'mode' => $reportedMode,
+                'unread_bytes' => 0,
+                'seekable' => self::supportsSeekable($uri),
+                'uri' => $uri,
+            ];
+        }
+
+        // php-src ext/standard/streams.c — array_add_next insertion order (#17428).
         return [
             'timed_out' => false,
-            'blocked' => true,
+            'blocked' => $blocked ?? true,
             'eof' => $eof,
-            'unread_bytes' => 0,
-            'stream_type' => $socketType ?? ($isPhpMemory ? 'MEMORY' : ($isPhp ? 'STDIO' : 'STDIO')),
-            'mode' => $isPhpMemory ? 'w+b' : 'r+b',
-            'seekable' => true,
-            'uri' => $uri,
             'wrapper_type' => $isPhp ? 'PHP' : 'plainfile',
+            'stream_type' => $socketType ?? $phpNativeStreamType ?? ($isPhp ? 'STDIO' : 'STDIO'),
+            'mode' => $reportedMode,
+            'unread_bytes' => 0,
+            'seekable' => self::supportsSeekable($uri),
+            'uri' => $uri,
         ];
+    }
+
+    /**
+     * User-facing stream_get_meta_data()['mode'] — php-src php_stream mode normalization (#13021).
+     */
+    public static function userFacingMode(string $uri, ?string $userMode): string
+    {
+        if (null === $userMode || '' === $userMode) {
+            return self::defaultReportedMode($uri, self::isPhpMemoryUri($uri));
+        }
+        if (self::isPhpMemoryUri($uri)) {
+            return self::memoryStreamReportedMode($userMode);
+        }
+
+        return $userMode;
+    }
+
+    private static function isPhpMemoryUri(string $uri): bool
+    {
+        return \str_starts_with($uri, 'php://memory')
+            || \str_starts_with($uri, 'php://temp')
+            || \str_starts_with($uri, 'php://fd/');
+    }
+
+    private static function defaultReportedMode(string $uri, bool $isPhpMemory): string
+    {
+        return $isPhpMemory ? 'w+b' : 'r+b';
+    }
+
+    /**
+     * php-src php_stream_memory metadata mode mapping (main/streams/php_stream_memory.c).
+     */
+    private static function memoryStreamReportedMode(string $userMode): string
+    {
+        $lower = \strtolower(\strtr($userMode, ['t' => '']));
+        $stripped = \strtr($lower, ['b' => '']);
+        if (\str_contains($stripped, 'a')) {
+            return 'a+b';
+        }
+        if (\str_contains($stripped, 'w') || \str_contains($stripped, '+')) {
+            return 'w+b';
+        }
+        if ('r' === $stripped) {
+            return 'rb';
+        }
+
+        return \str_contains($userMode, 'b') ? 'w+b' : 'rb';
     }
 
     /** EOF for VM-native stream handles without host FILE* (php://memory, php://input, user streams). */
@@ -84,7 +146,9 @@ final class VmStreamMeta
         $lower = \strtolower($uri);
         if (\str_starts_with($lower, 'php://input')
             || \str_starts_with($lower, 'php://output')
-            || 'php://stdin' === $lower) {
+            || 'php://stdin' === $lower
+            || 'php://stdout' === $lower
+            || 'php://stderr' === $lower) {
             return false;
         }
         if (self::isSocketTransport($uri)) {
@@ -92,6 +156,55 @@ final class VmStreamMeta
         }
 
         return true;
+    }
+
+    /** stream_supports(..., STREAM_SUPPORT_TELL) — php-src php_stream_tell (issue #11702). */
+    public static function supportsTell(string $uri): bool
+    {
+        $lower = \strtolower($uri);
+        if (\str_starts_with($lower, 'php://input')
+            || \str_starts_with($lower, 'php://output')
+            || 'php://stdin' === $lower) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /** stream_supports(..., 'read') — php-src read op probe (PHP 8.4, issue #16329). */
+    public static function supportsRead(string $uri, string $mode): bool
+    {
+        $lower = \strtolower($uri);
+        if ('php://output' === $lower) {
+            return false;
+        }
+
+        return self::modeAllowsRead($mode);
+    }
+
+    /** stream_supports(..., 'write') — php-src write op probe (PHP 8.4, issue #16329). */
+    public static function supportsWrite(string $uri, string $mode): bool
+    {
+        $lower = \strtolower($uri);
+        if (\str_starts_with($lower, 'php://input') || 'php://stdin' === $lower) {
+            return false;
+        }
+
+        return self::modeAllowsWrite($mode);
+    }
+
+    private static function modeAllowsRead(string $mode): bool
+    {
+        $stripped = \strtr(\strtolower($mode), ['b' => '', 't' => '']);
+
+        return \str_contains($stripped, 'r') || \str_contains($stripped, '+') || \str_contains($stripped, 'a');
+    }
+
+    private static function modeAllowsWrite(string $mode): bool
+    {
+        $stripped = \strtr(\strtolower($mode), ['b' => '', 't' => '']);
+
+        return \str_contains($stripped, 'w') || \str_contains($stripped, '+') || \str_contains($stripped, 'a');
     }
 
     public static function supportsMetadata(string $uri): bool
@@ -106,6 +219,21 @@ final class VmStreamMeta
     public static function isSocketTransport(string $uri): bool
     {
         return null !== self::streamTypeForUri($uri);
+    }
+
+    /**
+     * php-src stream_type for php://memory / php://temp / php://fd (main/streams/php_stream_memory.c, php_stream_temp.c).
+     */
+    public static function phpNativeStreamType(string $uri): ?string
+    {
+        if (\str_starts_with($uri, 'php://temp')) {
+            return 'TEMP';
+        }
+        if (\str_starts_with($uri, 'php://memory') || \str_starts_with($uri, 'php://fd/')) {
+            return 'MEMORY';
+        }
+
+        return null;
     }
 
     /**

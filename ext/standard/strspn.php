@@ -13,7 +13,7 @@ use PHPCompiler\VM\InternalStrictArg;
 use PHPLLVM\Value;
 
 /**
- * strspn() — length of initial segment matching a character mask (LLVM via JitStrspn).
+ * strspn() — length of initial segment matching a character mask (JIT via StrspnJitHelper PHP).
  *
  * PHP 8.4 (GH-12592): empty $characters returns 0; strcspn() returns full byte length instead.
  */
@@ -30,11 +30,11 @@ final class strspn extends Internal
         $mask = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'strspn', 1, 'characters');
         $offset = 0;
         if ($argc >= 3) {
-            $offset = VmMath::parseIntBuiltinArg($frame->calledArgs[2], 'strspn', 3, 'offset');
+            $offset = VmMath::parseIntBuiltinArgForFrame($frame, 2, 'strspn', 3, 'offset');
         }
         $length = null;
         if (4 === $argc) {
-            $length = VmMath::parseIntBuiltinArg($frame->calledArgs[3], 'strspn', 4, 'length');
+            $length = VmMath::parseIntBuiltinArgForFrame($frame, 3, 'strspn', 4, 'length');
         }
         if (null === $frame->returnVar) {
             return;
@@ -52,6 +52,6 @@ final class strspn extends Internal
         }
         JitInternalStrictArg::rejectNullString($context, $args[0], 'strspn', 'string', 1);
 
-        return JitStrspn::extended($context, $args, true, 'strspn');
+        return SpnJitLowering::extended($context, $args, true, 'strspn');
     }
 }

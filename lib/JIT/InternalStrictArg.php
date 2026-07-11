@@ -7,6 +7,7 @@ namespace PHPCompiler\JIT;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\JitNativeString;
 use PHPCompiler\VM\Variable as VmVariable;
 use PHPLLVM\Builder;
 
@@ -33,6 +34,64 @@ final class InternalStrictArg
 
             return;
         }
+        JitNativeString::ensureInsertBlock($context);
+        self::raiseTypeErrorAndAbort(
+            $context,
+            self::message($context, $function, $argNumber, $paramName, 'int', $arg)
+        );
+    }
+
+    public static function requireNullableInt(
+        Context $context,
+        Variable $arg,
+        string $function,
+        string $paramName,
+        int $argNumber
+    ): void {
+        if (!$context->callerStrictTypes) {
+            return;
+        }
+        if (Variable::TYPE_NATIVE_LONG === $arg->type || Variable::TYPE_NULL === $arg->type) {
+            return;
+        }
+        if (Variable::TYPE_VALUE === $arg->type) {
+            self::enforceNullableIntValueBox($context, $arg, $function, $paramName, $argNumber);
+
+            return;
+        }
+        JitNativeString::ensureInsertBlock($context);
+        self::raiseTypeErrorAndAbort(
+            $context,
+            self::message($context, $function, $argNumber, $paramName, '?int', $arg)
+        );
+    }
+
+    /**
+     * Builtin signature int — always reject non-int operands (php-src ZEND_ARG_INFO IS_LONG; #12215).
+     */
+    public static function requireBuiltinTypedInt(
+        Context $context,
+        Variable $arg,
+        string $function,
+        string $paramName,
+        int $argNumber
+    ): void {
+        if (Variable::TYPE_NATIVE_LONG === $arg->type) {
+            return;
+        }
+        if (Variable::TYPE_VALUE === $arg->type) {
+            self::enforceExactValueBox(
+                $context,
+                $arg,
+                VmVariable::TYPE_INTEGER,
+                $function,
+                $paramName,
+                $argNumber,
+                'int'
+            );
+
+            return;
+        }
         self::raiseTypeErrorAndAbort(
             $context,
             self::message($context, $function, $argNumber, $paramName, 'int', $arg)
@@ -50,10 +109,10 @@ final class InternalStrictArg
         if (!$context->callerStrictTypes) {
             return;
         }
-        if (JITVariable::TYPE_NATIVE_LONG === $arg->type || JITVariable::TYPE_NATIVE_DOUBLE === $arg->type) {
+        if (Variable::TYPE_NATIVE_LONG === $arg->type || Variable::TYPE_NATIVE_DOUBLE === $arg->type) {
             return;
         }
-        if (JITVariable::TYPE_VALUE === $arg->type) {
+        if (Variable::TYPE_VALUE === $arg->type) {
             self::enforceFloatValueBox($context, $arg, $function, $paramName, $argNumber);
 
             return;
@@ -61,6 +120,31 @@ final class InternalStrictArg
         self::raiseTypeErrorAndAbort(
             $context,
             self::message($context, $function, $argNumber, $paramName, 'float', $arg)
+        );
+    }
+
+    /** int|float builtin args under caller strict_types (php-src math.c Z_PARAM_NUMBER; #16410). */
+    public static function requireNumber(
+        Context $context,
+        Variable $arg,
+        string $function,
+        string $paramName,
+        int $argNumber
+    ): void {
+        if (!$context->callerStrictTypes) {
+            return;
+        }
+        if (Variable::TYPE_NATIVE_LONG === $arg->type || Variable::TYPE_NATIVE_DOUBLE === $arg->type) {
+            return;
+        }
+        if (Variable::TYPE_VALUE === $arg->type) {
+            self::enforceNumberValueBox($context, $arg, $function, $paramName, $argNumber);
+
+            return;
+        }
+        self::raiseTypeErrorAndAbort(
+            $context,
+            self::message($context, $function, $argNumber, $paramName, 'int|float', $arg)
         );
     }
 
@@ -80,7 +164,13 @@ final class InternalStrictArg
         if (Variable::TYPE_NULL === $arg->type || $arg->isNullConstant) {
             self::raiseTypeErrorAndAbort(
                 $context,
-                self::message($context, $function, $argNumber, $paramName, 'string', $arg)
+                sprintf(
+                    '%s(): Argument #%d ($%s) must be of type %s, null given',
+                    $function,
+                    $argNumber,
+                    $paramName,
+                    'string'
+                )
             );
 
             return;
@@ -110,7 +200,13 @@ final class InternalStrictArg
         $context->builder->positionAtEnd($failBlock);
         self::raiseTypeErrorAndAbort(
             $context,
-            self::message($context, $function, $argNumber, $paramName, 'string', $arg)
+            sprintf(
+                '%s(): Argument #%d ($%s) must be of type %s, null given',
+                $function,
+                $argNumber,
+                $paramName,
+                'string'
+            )
         );
         $context->builder->positionAtEnd($okBlock);
     }
@@ -268,6 +364,38 @@ final class InternalStrictArg
         $context->builder->positionAtEnd($okBlock);
     }
 
+    /**
+     * Builtin signature bool — always reject non-bool operands (php-src ZEND_ARG_INFO IS_BOOL; #12585, #12586).
+     */
+    public static function requireBuiltinTypedBool(
+        Context $context,
+        Variable $arg,
+        string $function,
+        string $paramName,
+        int $argNumber
+    ): void {
+        if (Variable::TYPE_NATIVE_BOOL === $arg->type) {
+            return;
+        }
+        if (Variable::TYPE_VALUE === $arg->type) {
+            self::enforceExactValueBox(
+                $context,
+                $arg,
+                VmVariable::TYPE_BOOLEAN,
+                $function,
+                $paramName,
+                $argNumber,
+                'bool'
+            );
+
+            return;
+        }
+        self::raiseTypeErrorAndAbort(
+            $context,
+            self::message($context, $function, $argNumber, $paramName, 'bool', $arg)
+        );
+    }
+
     public static function requireBool(
         Context $context,
         Variable $arg,
@@ -318,6 +446,7 @@ final class InternalStrictArg
 
             return;
         }
+        JitNativeString::ensureInsertBlock($context);
         self::raiseTypeErrorAndAbort(
             $context,
             self::message($context, $function, $argNumber, $paramName, 'string', $arg)
@@ -363,6 +492,43 @@ final class InternalStrictArg
         $context->builder->positionAtEnd($okBlock);
     }
 
+    private static function enforceNullableIntValueBox(
+        Context $context,
+        Variable $arg,
+        string $function,
+        string $paramName,
+        int $argNumber
+    ): void {
+        TypeErrorRaise::registerDeclarations($context);
+        TypeErrorRaise::ensureLinked($context);
+        $valuePtr = JitValueBox::valuePtrFromVariable($context, $arg);
+        $map = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($valuePtr, $map['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $nullTy = $i8->constInt(VmVariable::TYPE_NULL, false);
+        $intTy = $i8->constInt(VmVariable::TYPE_INTEGER, false);
+        $isNull = $context->builder->icmp(Builder::INT_EQ, $typeByte, $nullTy);
+        $isInt = $context->builder->icmp(Builder::INT_EQ, $typeByte, $intTy);
+        $ok = $context->builder->or($isNull, $isInt);
+        $okBlock = BasicBlockHelper::append($context, 'internal_strict_nullable_int_ok');
+        $failBlock = BasicBlockHelper::append($context, 'internal_strict_nullable_int_fail');
+        $context->builder->branchIf($ok, $okBlock, $failBlock);
+        $context->builder->positionAtEnd($failBlock);
+        ExceptionBridge::emitTypeErrorAndAbort(
+            $context,
+            sprintf(
+                '%s(): Argument #%d ($%s) must be of type ?int, %s given',
+                $function,
+                $argNumber,
+                $paramName,
+                'mixed'
+            )
+        );
+        $context->builder->positionAtEnd($okBlock);
+    }
+
     private static function enforceFloatValueBox(
         Context $context,
         Variable $arg,
@@ -397,6 +563,49 @@ final class InternalStrictArg
             $context,
             sprintf(
                 '%s(): Argument #%d ($%s) must be of type float, %s given',
+                $function,
+                $argNumber,
+                $paramName,
+                'mixed'
+            )
+        );
+        $context->builder->positionAtEnd($okBlock);
+    }
+
+    private static function enforceNumberValueBox(
+        Context $context,
+        Variable $arg,
+        string $function,
+        string $paramName,
+        int $argNumber
+    ): void {
+        TypeErrorRaise::registerDeclarations($context);
+        TypeErrorRaise::ensureLinked($context);
+        $valuePtr = JitValueBox::valuePtrFromVariable($context, $arg);
+        $map = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($valuePtr, $map['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $okBlock = BasicBlockHelper::append($context, 'internal_strict_number_ok');
+        $failBlock = BasicBlockHelper::append($context, 'internal_strict_number_fail');
+        $isInt = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(VmVariable::TYPE_INTEGER, false)
+        );
+        $isFloat = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(VmVariable::TYPE_FLOAT, false)
+        );
+        $isOk = $context->builder->or($isInt, $isFloat);
+        $context->builder->branchIf($isOk, $okBlock, $failBlock);
+        $context->builder->positionAtEnd($failBlock);
+        ExceptionBridge::emitTypeErrorAndAbort(
+            $context,
+            sprintf(
+                '%s(): Argument #%d ($%s) must be of type int|float, %s given',
                 $function,
                 $argNumber,
                 $paramName,

@@ -7,7 +7,9 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\StringChunkSplit;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
@@ -34,12 +36,7 @@ final class chunk_split extends Internal
         );
         $length = 76;
         if ($argc >= 2) {
-            $length = VmMath::parseIntBuiltinArg(
-                $frame->calledArgs[1]->resolveIndirect(),
-                'chunk_split',
-                2,
-                'length'
-            );
+            $length = VmMath::parseIntBuiltinArgForFrame($frame, 1, 'chunk_split', 2, 'length');
         }
         $separator = "\r\n";
         if (3 === $argc) {
@@ -66,10 +63,13 @@ final class chunk_split extends Internal
         $workBlock = BasicBlockHelper::append($context, 'chunksplit_call_work');
         $context->builder->branch($workBlock);
         $context->builder->positionAtEnd($workBlock);
+        StringChunkSplit::ensureLinked($context);
+        $context->builder->positionAtEnd($workBlock);
         $input = JitChunkSplit::lowerStringSubject($context, $args[0]);
         $i64 = $context->getTypeFromString('int64');
         $chunkLen = $i64->constInt(76, false);
         if ($argc >= 2) {
+            JitInternalStrictArg::requireInt($context, $args[1], 'chunk_split', 'length', 2);
             $chunkLen = JitChunkSplit::lowerLengthArg($context, $args[1]);
             JitChunkSplit::emitRuntimeLengthGuard($context, $chunkLen);
         }
@@ -79,6 +79,11 @@ final class chunk_split extends Internal
             $separator = $context->builder->load($context->constantStringFromString("\r\n"));
         }
 
-        return JitChunkSplit::split($context, $input, $chunkLen, $separator);
+        return $context->builder->call(
+            $context->lookupFunction('__compiler_chunk_split'),
+            $input,
+            $chunkLen,
+            $separator
+        );
     }
 }

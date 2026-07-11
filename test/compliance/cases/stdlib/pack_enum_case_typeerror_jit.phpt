@@ -1,5 +1,5 @@
 --TEST--
-stdlib pack() JIT — backed enum case numeric operand TypeError (#8816)
+stdlib pack() JIT — backed enum case numeric operand warns + packs backing int (#16397)
 --JIT--
 --FILE--
 <?php
@@ -9,19 +9,15 @@ enum E: int {
     case A = 1;
 }
 
-try {
-    pack('c', E::A);
-    echo "c uncaught\n";
-} catch (TypeError $e) {
-    echo $e->getMessage(), "\n";
-}
+$data = @pack('c', E::A);
+echo 'c ', bin2hex($data), "\n";
+@pack('c', E::A);
+$err = error_get_last();
+echo 'warning: ', isset($err['message']) ? $err['message'] : '', "\n";
 
-try {
-    pack('i', E::A);
-    echo "i uncaught\n";
-} catch (TypeError $e) {
-    echo $e->getMessage(), "\n";
-}
+$data2 = @pack('i', E::A);
+echo 'i ', strlen($data2), "\n";
 --EXPECT--
-pack(): Argument #2 ($values) must be of type int, E given
-pack(): Argument #2 ($values) must be of type int, E given
+c 01
+warning: Object of class E could not be converted to int
+i 4

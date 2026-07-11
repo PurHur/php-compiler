@@ -6,9 +6,9 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\MathLog10;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /** log10() base-10 logarithm (ext/standard/math.c, issue #3578). */
@@ -23,7 +23,7 @@ final class log10 extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $frame->returnVar->float(\log10(VmMath::parseDoubleBuiltinArg($v, 'log10', 1, 'num')));
+        $frame->returnVar->float(VmMath::log10(VmMath::parseDoubleBuiltinArg($v, 'log10', 1, 'num')));
     }
 
     public Context $context;
@@ -34,9 +34,8 @@ final class log10 extends Internal
         if (1 !== \count($args)) {
             throw new \LogicException('log10() requires exactly one argument');
         }
-        $double = $context->getTypeFromString('double');
-        $asFloat = pow::toJitDouble($context, $args[0], $double);
+        $asFloat = JitFdiv::lowerSingleOperand($context, $args[0], 1, 'num', 'log10', 'float');
 
-        return $context->builder->call($context->lookupFunction('log10'), $asFloat);
+        return MathLog10::invoke($context, $asFloat);
     }
 }

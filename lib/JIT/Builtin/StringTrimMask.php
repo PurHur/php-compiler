@@ -5,16 +5,28 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\Context;
-use PHPLLVM\Builder;
-use PHPLLVM\Value;
+use PHPCompiler\JIT\JitVmHelperLink;
 
 /**
- * LLVM implementation of __phpc_char_in_mask for trim/ltrim/rtrim masks (#3709, #4646).
+ * JIT/AOT link for __phpc_char_in_mask via CharInMaskJitHelper PHP (#14908).
  *
- * php-src: ext/standard/string.c php_charmask subset (literal mask bytes).
+ * Replaces ~109 LOC inline LLVM char-mask scan.
+ * SSOT: {@see \PHPCompiler\ext\standard\VmString}
+ * php-src: ext/standard/string.c — php_charmask()
  */
 final class StringTrimMask
 {
+    private const ABI_CHAR_IN_MASK = '__phpc_char_in_mask';
+
+    private const HELPER_PATH = '/ext/standard/CharInMaskJitHelper.php';
+
+    private const CHAR_IN_MASK_HELPER = 'PHPCompiler\\ext\\standard\\CharInMaskJitHelper::charInMaskArgv';
+
+    /** @var list<string> */
+    private const COMPILED_HELPERS = [
+        self::CHAR_IN_MASK_HELPER,
+    ];
+
     public static function ensureLinked(Context $context): void
     {
         self::implement($context);
@@ -22,88 +34,18 @@ final class StringTrimMask
 
     public static function implement(Context $context): void
     {
-        $probe = $context->module->getNamedFunction('__phpc_char_in_mask');
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            self::registerLinkedRuntime($context);
-
-            return;
-        }
-
         $i32 = $context->getTypeFromString('int32');
         $strPtrTy = $context->getTypeFromString('__string__*');
-        $ft = $context->context->functionType($i32, false, $i32, $strPtrTy);
-        $fn = $context->module->addFunction('__phpc_char_in_mask', $ft);
-        self::implementCharInMask($context, $fn);
-        self::registerLinkedRuntime($context);
-    }
-
-    private static function implementCharInMask(Context $context, Value $fn): void
-    {
-        $entry = $fn->appendBasicBlock('char_in_mask_entry');
-        $context->builder->positionAtEnd($entry);
-
-        $ch = $fn->getParam(0);
-        $mask = $fn->getParam(1);
-        $map = $context->structFieldMap['__string__'];
-        $i64 = $context->getTypeFromString('int64');
-        $i8 = $context->getTypeFromString('int8');
-        $i32 = $context->getTypeFromString('int32');
-        $zeroI64 = $i64->constInt(0, false);
-        $zeroI32 = $i32->constInt(0, false);
-        $oneI32 = $i32->constInt(1, false);
-
-        $emptyBlock = $fn->appendBasicBlock('char_in_mask_empty');
-        $loopHead = $fn->appendBasicBlock('char_in_mask_head');
-        $loopBody = $fn->appendBasicBlock('char_in_mask_body');
-        $loopInc = $fn->appendBasicBlock('char_in_mask_inc');
-        $foundBlock = $fn->appendBasicBlock('char_in_mask_found');
-        $notFoundBlock = $fn->appendBasicBlock('char_in_mask_miss');
-        $oneI64 = $i64->constInt(1, false);
-
-        $maskLen = $context->builder->load($context->builder->structGep($mask, $map['length']));
-        $iSlot = $context->builder->alloca($i64, 1, 'char_in_mask_i');
-        $context->builder->store($zeroI64, $iSlot);
-        $maskChars = $context->builder->structGep($mask, $map['value']);
-        $chByte = $context->builder->trunc($ch, $i8);
-        $nonPositive = $context->builder->icmp(Builder::INT_SLE, $maskLen, $zeroI64);
-        $context->builder->branchIf($nonPositive, $emptyBlock, $loopHead);
-
-        $context->builder->positionAtEnd($emptyBlock);
-        $context->builder->returnValue($zeroI32);
-        $context->builder->clearInsertionPosition();
-
-        $context->builder->positionAtEnd($loopHead);
-        $i = $context->builder->load($iSlot);
-        $atEnd = $context->builder->icmp(Builder::INT_SGE, $i, $maskLen);
-        $context->builder->branchIf($atEnd, $notFoundBlock, $loopBody);
-
-        $context->builder->positionAtEnd($loopBody);
-        $maskByte = $context->builder->load($context->builder->gep($maskChars, $i));
-        $matches = $context->builder->icmp(Builder::INT_EQ, $maskByte, $chByte);
-        $context->builder->branchIf($matches, $foundBlock, $loopInc);
-
-        $context->builder->positionAtEnd($loopInc);
-        $context->builder->store(
-            $context->builder->addNoSignedWrap($i, $oneI64),
-            $iSlot
+        JitVmHelperLink::ensureBridge(
+            $context,
+            self::ABI_CHAR_IN_MASK,
+            'char_in_mask_bridge_entry',
+            [$i32, $strPtrTy],
+            $i32,
+            self::CHAR_IN_MASK_HELPER,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#14908'
         );
-        $context->builder->branch($loopHead);
-
-        $context->builder->positionAtEnd($foundBlock);
-        $context->builder->returnValue($oneI32);
-        $context->builder->clearInsertionPosition();
-
-        $context->builder->positionAtEnd($notFoundBlock);
-        $context->builder->returnValue($zeroI32);
-        $context->builder->clearInsertionPosition();
-    }
-
-    private static function registerLinkedRuntime(Context $context): void
-    {
-        $fn = $context->module->getNamedFunction('__phpc_char_in_mask');
-        if (null === $fn) {
-            throw new \LogicException('__phpc_char_in_mask missing after trim mask LLVM implement');
-        }
-        $context->registerFunction('__phpc_char_in_mask', $fn);
     }
 }

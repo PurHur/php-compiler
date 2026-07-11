@@ -1,0 +1,94 @@
+<?php
+
+declare(strict_types=1);
+
+namespace PHPCompiler\Test\Unit;
+
+use PHPCompiler\ext\standard\CaseCompareJitHelper;
+use PHPCompiler\ext\standard\VmString;
+use PHPUnit\Framework\TestCase;
+
+/** strcasecmp()/strncasecmp() JIT routes through CaseCompareJitHelper PHP not libc LLVM (#15225). */
+final class StrcasecmpRuntimeShrinkTest extends TestCase
+{
+    public function testStrcasecmpUsesPhpBridgeNotLibcOnly(): void
+    {
+        $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/strcasecmp.php');
+        $this->assertStringContainsString('StringStrcasecmp::ensureLinked', $builtin);
+
+        $bridge = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringCaseCompare.php');
+        $this->assertStringContainsString('CaseCompareJitHelper', $bridge);
+        $this->assertStringContainsString('strcasecmpArgv', $bridge);
+    }
+
+    public function testStrncasecmpUsesPhpBridgeNotLibcOnly(): void
+    {
+        $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/strncasecmp.php');
+        $this->assertStringContainsString('StringStrncasecmp::ensureLinked', $builtin);
+
+        $bridge = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringCaseCompare.php');
+        $this->assertStringContainsString('strncasecmpArgv', $bridge);
+    }
+
+    public function testJitHelpersDelegateToVmString(): void
+    {
+        $this->assertSame(VmString::strcasecmp('A', 'a'), CaseCompareJitHelper::strcasecmpArgv('A', 'a'));
+        $this->assertSame(VmString::strncasecmp('Ab', 'ab', 1), CaseCompareJitHelper::strncasecmpArgv('Ab', 'ab', 1));
+    }
+
+    public function testSpineBundleIncludesCaseCompareJitHelper(): void
+    {
+        $spine = (string) file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
+        $this->assertStringContainsString('CaseCompareJitHelper.php', $spine);
+        $this->assertStringContainsString('StringCaseCompare.php', $spine);
+    }
+
+    /** @return list<string> */
+    private function introspectionJitEmitters(): array
+    {
+        return [
+            'ext/standard/JitClassExists.php',
+            'ext/standard/JitInterfaceExists.php',
+            'ext/standard/JitTraitExists.php',
+            'ext/standard/JitGetClassMethods.php',
+            'ext/standard/JitIniGetAll.php',
+            'ext/filter/JitFilterId.php',
+            'lib/JIT/InstanceOfHelper.php',
+            'lib/JIT/ClassConstFetchHelper.php',
+            'lib/JIT/Builtin/ClassConstFetchRuntime.php',
+            'lib/JIT/Builtin/ReflectionEnumJitHelper.php',
+            'lib/JIT/Builtin/SessionModuleName.php',
+        ];
+    }
+
+    public function testIntrospectionJitEmittersLinkCaseCompareBeforeStrcasecmp(): void
+    {
+        foreach ($this->introspectionJitEmitters() as $relativePath) {
+            $source = (string) file_get_contents(__DIR__.'/../../'.$relativePath);
+            $this->assertStringContainsString(
+                'ensureStrcasecmpLinked',
+                $source,
+                "{$relativePath} must link CaseCompareJitHelper before strcasecmp lookup (#15256)"
+            );
+            $this->assertStringNotContainsString(
+                "addFunction('strcasecmp'",
+                $source,
+                "{$relativePath} must not declare empty strcasecmp LLVM stub (#15256)"
+            );
+        }
+    }
+
+    public function testModulePhpLinksCaseCompareNotEmptyStrcasecmpStub(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/Module.php');
+        $this->assertStringContainsString('StringCaseCompare::ensureStrcasecmpLinked', $source);
+        $this->assertStringNotContainsString("addFunction('strcasecmp'", $source);
+    }
+
+    public function testObjectTypeRoutesStrncasecmpThroughCaseCompare(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type/Object_.php');
+        $this->assertStringContainsString('StringCaseCompare::ensureStrncasecmpLinked', $source);
+        $this->assertStringNotContainsString("addFunction('strncasecmp'", $source);
+    }
+}

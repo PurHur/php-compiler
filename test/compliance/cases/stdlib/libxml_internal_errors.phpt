@@ -28,7 +28,7 @@ echo (int) $prev2, "\n";
 1110
 0
 1
-2
+3
 msg
 LibXMLError
 0

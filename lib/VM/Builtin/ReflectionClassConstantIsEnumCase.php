@@ -6,6 +6,7 @@ namespace PHPCompiler\VM\Builtin;
 
 use PHPCompiler\ext\standard\VmReflection;
 use PHPCompiler\Frame;
+use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\EnumSupport;
 use PHPCompiler\VM\ReflectionSupport;
 
@@ -34,6 +35,12 @@ final class ReflectionClassConstantIsEnumCase extends VmClassMethod
             );
         }
         if (null !== $frame->returnVar) {
+            $stored = $entry->constants[$key]->resolveIndirect();
+            if (EnumCaseSupport::isEnumCaseVariable($stored)) {
+                $frame->returnVar->bool(true);
+
+                return;
+            }
             $frame->returnVar->bool(null !== EnumSupport::enumCaseNameForConstantMember($entry, $key));
         }
     }

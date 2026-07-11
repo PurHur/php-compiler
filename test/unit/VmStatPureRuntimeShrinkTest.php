@@ -8,16 +8,20 @@ use PHPCompiler\ext\standard\VmStatNative;
 use PHPCompiler\ext\standard\VmStatPure;
 use PHPUnit\Framework\TestCase;
 
-/** VmStatPure — stat()/lstat() without libc stat(2) FFI (#8903). */
+/** VmStatPure — stat()/lstat()/fstat/realpath without libc stat(2) FFI (#8903, #12265). */
 final class VmStatPureRuntimeShrinkTest extends TestCase
 {
-    public function testVmStatNativeDelegatesToPureWhenFfiDisabled(): void
+    public function testVmStatNativeDelegatesToPureWithoutFfi(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/VmStatNative.php');
         $this->assertStringContainsString('VmStatPure::stat', $source);
         $this->assertStringContainsString('VmStatPure::lstat', $source);
+        $this->assertStringContainsString('VmStatPure::fstatFd', $source);
+        $this->assertStringContainsString('VmStatPure::realpath', $source);
         $this->assertStringContainsString('VmStatPure::available()', $source);
-        $this->assertStringContainsString('VmStatPure::normalize', $source);
+        $this->assertStringNotContainsString('FFI::cdef', $source);
+        $this->assertDoesNotMatchRegularExpression('/\$ffi->stat/', $source);
+        $this->assertDoesNotMatchRegularExpression('/\$ffi->realpath/', $source);
     }
 
     public function testVmStatPureDoesNotUseStatFfi(): void

@@ -45,4 +45,109 @@ PHP;
         $rt->run($block);
         $this->assertSame("ok\n", ob_get_clean());
     }
+
+    /** Regression: inline closure bindTo($obj, null) must send null scope not receiver (#14893). */
+    public function testVmInlineClosureBindToNullScope(): void
+    {
+        $code = <<<'PHP'
+<?php
+declare(strict_types=1);
+class C { public int $p = 9; }
+$c = new C();
+$readPublic = (function (): int { return $this->p; })->bindTo($c, null);
+echo $readPublic(), "\n";
+PHP;
+        $rt = new PHPCompiler\Runtime();
+        $block = $rt->parseAndCompile($code, 'test.php');
+        ob_start();
+        $rt->run($block);
+        $this->assertSame("9\n", ob_get_clean());
+    }
+
+    /** Regression: bindTo(null, ClassName::class) on static closure — scope not misbound as $newThis (#15899). */
+    public function testVmStaticClosureBindToNullClassScope(): void
+    {
+        $code = <<<'PHP'
+<?php
+declare(strict_types=1);
+class C { public static int $x = 1; }
+$fn = static function (): int { return self::$x; };
+echo ($fn->bindTo(null, C::class))(), "\n";
+PHP;
+        $rt = new PHPCompiler\Runtime();
+        $block = $rt->parseAndCompile($code, 'test.php');
+        ob_start();
+        $rt->run($block);
+        $this->assertSame("1\n", ob_get_clean());
+    }
+
+    /** Regression: bindTo(new C(), null) must bind inline new object not receiver (#15900). */
+    public function testVmInlineClosureBindToInlineNewObject(): void
+    {
+        $code = <<<'PHP'
+<?php
+declare(strict_types=1);
+class C { public int $x = 1; }
+echo (function (): int { return $this->x; })->bindTo(new C(), null)(), "\n";
+$o = new C();
+echo (function (): int { return $this->x; })->bindTo($o, null)(), "\n";
+PHP;
+        $rt = new PHPCompiler\Runtime();
+        $block = $rt->parseAndCompile($code, 'test.php');
+        ob_start();
+        $rt->run($block);
+        $this->assertSame("1\n1\n", ob_get_clean());
+    }
+
+    /** Regression: Closure::bind(inline closure, enum case, Enum::class) — arg #0 closure not scope (#16722). */
+    public function testVmClosureBindStaticEnumCase(): void
+    {
+        $code = <<<'PHP'
+<?php
+declare(strict_types=1);
+enum E: int { case A = 1; public function m(): int { return $this->value; } }
+$c = Closure::bind(function (): int { return $this->value; }, E::A, E::class);
+echo $c(), "\n";
+PHP;
+        $rt = new PHPCompiler\Runtime();
+        $block = $rt->parseAndCompile($code, 'test.php');
+        ob_start();
+        $rt->run($block);
+        $this->assertSame("1\n", ob_get_clean());
+    }
+
+    /** Regression: Closure::bind(inline closure, new C(), Scope::class) — arg #0 closure not newThis (#17633). */
+    public function testVmClosureBindStaticInlineNewPrivateMethod(): void
+    {
+        $code = <<<'PHP'
+<?php
+declare(strict_types=1);
+class A { private function f(): string { return 'ok'; } }
+$c = Closure::bind(function (): string { return $this->f(); }, new A(), A::class);
+echo $c(), "\n";
+PHP;
+        $rt = new PHPCompiler\Runtime();
+        $block = $rt->parseAndCompile($code, 'test.php');
+        ob_start();
+        $rt->run($block);
+        $this->assertSame("ok\n", ob_get_clean());
+    }
+
+    /** Regression: global $f = closure() must keep closureState after materialize (#17723). */
+    public function testMaterializeConstantValuePreservesClosureState(): void
+    {
+        $code = <<<'PHP'
+<?php
+declare(strict_types=1);
+$f = function (): int {
+    return 42;
+};
+echo $f(), "\n";
+PHP;
+        $rt = new PHPCompiler\Runtime();
+        $block = $rt->parseAndCompile($code, 'test.php');
+        ob_start();
+        $rt->run($block);
+        $this->assertSame("42\n", ob_get_clean());
+    }
 }

@@ -15,12 +15,12 @@ final class GethostbyaddrRuntimeShrinkTest extends TestCase
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/GethostbyaddrRuntime.php');
         $this->assertStringContainsString('GethostbyaddrJitHelper', $source);
-        $this->assertStringContainsString('GethostbyaddrLibcBridge', $source);
+        $this->assertStringNotContainsString('GethostbyaddrLibcBridge', $source);
         $this->assertStringNotContainsString("lookupFunction('gethostbyaddr')", $source);
         $this->assertStringNotContainsString("lookupFunction('inet_pton')", $source);
+        $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $source);
         $this->assertLessThan(200, substr_count($source, "\n"));
-        $libc = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/GethostbyaddrLibcBridge.php');
-        $this->assertStringContainsString("lookupFunction('gethostbyaddr')", $libc);
+        $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/GethostbyaddrLibcBridge.php');
     }
 
     public function testGethostbyaddrJitHelperDelegatesToVmDns(): void
@@ -45,6 +45,26 @@ final class GethostbyaddrRuntimeShrinkTest extends TestCase
         $expected = VmDns::gethostbyaddr('127.0.0.1');
         $this->assertIsString($expected);
         $this->assertSame($expected, GethostbyaddrJitHelper::resolve('127.0.0.1'));
+        $this->assertSame('10.0.0.1', GethostbyaddrJitHelper::resolve('10.0.0.1'));
         $this->assertSame('', GethostbyaddrJitHelper::resolve('not-an-ip'));
+    }
+
+    public function testIpv4ToInAddrArpaBuildsReverseZone(): void
+    {
+        $this->assertSame('8.8.8.8.in-addr.arpa', VmDns::ipv4ToInAddrArpa('8.8.8.8'));
+        $this->assertNull(VmDns::ipv4ToInAddrArpa('not-an-ip'));
+    }
+
+    /** @group network */
+    public function testGethostbyaddrResolvesPublicPtrWhenNetworkAvailable(): void
+    {
+        $error = VmDns::ERR_NONE;
+        $result = VmDns::gethostbyaddr('8.8.8.8', $error);
+        if (false === $result || '8.8.8.8' === $result) {
+            $this->markTestSkipped('PTR lookup for 8.8.8.8 unavailable in this environment');
+        }
+        $this->assertIsString($result);
+        $this->assertNotSame('8.8.8.8', $result);
+        $this->assertStringContainsString('.', $result);
     }
 }

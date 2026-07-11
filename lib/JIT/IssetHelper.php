@@ -9,6 +9,7 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT;
 
 use PHPCfg\Operand;
+use PHPCfg\Operand\Literal;
 use PHPLLVM\Value;
 
 final class IssetHelper
@@ -28,6 +29,21 @@ final class IssetHelper
             $dimOp,
             $containerOp,
             $issetOnProperty
+        );
+    }
+
+    public static function compileStaticProperty(
+        Context $context,
+        Operand $classOp,
+        ?Operand $nameOp
+    ): Value {
+        if (!$nameOp instanceof Literal || !is_string($nameOp->value)) {
+            throw new \LogicException('isset() on static property with dynamic name is not supported in JIT');
+        }
+
+        return $context->type->object->compileStaticPropertyIsSet(
+            $context->type->object->resolveClassId($classOp),
+            $nameOp->value
         );
     }
 }

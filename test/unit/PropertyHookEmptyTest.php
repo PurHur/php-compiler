@@ -5,12 +5,21 @@ declare(strict_types=1);
 namespace PHPCompiler\Test\Unit;
 
 use PHPCompiler\Runtime;
+use PHPCompiler\Test\Support\PropertyHookTestSkip;
 use PHPUnit\Framework\TestCase;
 
 /** empty() on property hooks — get hook runs when present; set-only probes backing (#10680, #9832). */
 final class PropertyHookEmptyTest extends TestCase
 {
-    public function testVmEmptyOnVirtualGetHookInvokesGet(): void
+        use PropertyHookTestSkip;
+
+    protected function setUp(): void
+    {
+        $this->skipUnlessPropertyHooksEnabled();
+    }
+
+
+public function testVmEmptyOnVirtualGetHookInvokesGet(): void
     {
         $code = <<<'PHP'
 <?php
@@ -49,5 +58,27 @@ PHP;
         ob_start();
         $rt->run($block);
         self::assertSame("get runs for empty\nbool(false)\n", ob_get_clean());
+    }
+
+    /** empty() on same-name backing must invoke get hook, not read storage directly (#13055). */
+    public function testVmEmptyOnSameNameBackingInvokesGetHook(): void
+    {
+        $code = <<<'PHP'
+<?php
+class C {
+    public int $x {
+        get { echo "GET\n"; return $this->x; }
+        set => $this->x = $value;
+    }
+    private int $x = 0;
+}
+$c = new C();
+var_dump(empty($c->x));
+PHP;
+        $rt = new Runtime();
+        $block = $rt->parseAndCompile($code, 'test.php');
+        ob_start();
+        $rt->run($block);
+        self::assertSame("GET\nbool(true)\n", ob_get_clean());
     }
 }

@@ -1,5 +1,5 @@
 --TEST--
-stdlib intl Collator/IntlDateFormatter skeleton stubs (issue #5925)
+stdlib intl Collator/IntlDateFormatter skeleton stubs (issue #5925, superseded by #12115 phantom guard)
 --FILE--
 <?php
 echo 'collator=', var_export(class_exists('Collator', false), true), "\n";
@@ -18,7 +18,7 @@ try {
 }
 ?>
 --EXPECT--
-collator=true
-formatter=true
-Error: Collator::create() is not implemented in this compiler build (issue #5747)
-Error: IntlDateFormatter::create() is not implemented in this compiler build (issue #5201)
+collator=false
+formatter=false
+Error: Class "Collator" not found
+Error: Class "IntlDateFormatter" not found

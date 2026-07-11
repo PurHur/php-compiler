@@ -1,9 +1,8 @@
 --TEST--
-stdlib parse_url() invalid component returns full array (#10645)
+stdlib parse_url() negative component returns full array (#10645, ext/standard/url.c)
 --FILE--
 <?php
-$url = 'http://example.com/path';
-var_export(parse_url($url, -1));
+var_export(parse_url('http://example.com/path', -1));
 echo "\n";
 ?>
 --EXPECT--

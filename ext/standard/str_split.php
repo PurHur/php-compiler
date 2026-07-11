@@ -38,12 +38,7 @@ final class str_split extends Internal
         );
         $length = 1;
         if (2 === $argc) {
-            $length = VmMath::parseIntBuiltinArg(
-                $frame->calledArgs[1],
-                'str_split',
-                2,
-                'length'
-            );
+            $length = VmMath::parseIntBuiltinArgForFrame($frame, 1, 'str_split', 2, 'length');
         }
         $parts = VmString::strSplit($string, $length);
         if (null === $frame->returnVar) {
@@ -67,7 +62,10 @@ final class str_split extends Internal
             throw new \LogicException('str_split() requires one or two arguments');
         }
         $literal = $args[0]->compileTimeString ?? null;
-        if (null !== $literal) {
+        $skipLiteralFastPath = 2 === $argc
+            && $context->callerStrictTypes
+            && JITVariable::TYPE_NATIVE_DOUBLE === $args[1]->type;
+        if (null !== $literal && !$skipLiteralFastPath) {
             $chunkLenInt = 1;
             if (2 === $argc) {
                 $chunkLenInt = JitStrSplit::compileTimeLong($context, $args[1]);
@@ -77,7 +75,7 @@ final class str_split extends Internal
         }
         $chunkLen = $context->constantFromInteger(1, 'int64');
         if (2 === $argc) {
-            $chunkLen = JitIntdiv::lowerIntBuiltinArg($context, $args[1], 'str_split', 2, 'length');
+            $chunkLen = JitIntdiv::lowerIntBuiltinArgForCaller($context, $args[1], 'str_split', 2, 'length');
             JitStrSplit::emitRuntimeLengthGuard($context, $chunkLen);
         }
 

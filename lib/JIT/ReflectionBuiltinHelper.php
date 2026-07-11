@@ -42,7 +42,8 @@ final class ReflectionBuiltinHelper
             $entry = $context->runtime->vmContext->classes[$lc] ?? null;
             $exists = null !== $entry
                 && !$entry->isInterface
-                && !$entry->isTrait;
+                && !$entry->isTrait
+                && !\PHPCompiler\VM\ResourceSupport::isHiddenPseudoClassEntry($entry);
         }
         $i1 = $context->getTypeFromString('int1');
 
@@ -85,8 +86,11 @@ final class ReflectionBuiltinHelper
     public static function enumExistsLiteral(Context $context, string $enumName): Value
     {
         $lc = strtolower($enumName);
-        $exists = self::objectBuiltin($context)->hasUserDeclaredEnum($enumName)
-            || (null !== $context->runtime->vmContext && isset($context->runtime->vmContext->enums[$lc]));
+        $exists = self::objectBuiltin($context)->hasUserDeclaredEnum($enumName);
+        if (!$exists && null !== $context->runtime->vmContext) {
+            $entry = $context->runtime->vmContext->classes[$lc] ?? null;
+            $exists = null !== $entry && $entry->isEnum;
+        }
         $i1 = $context->getTypeFromString('int1');
 
         return $i1->constInt($exists ? 1 : 0, false);
@@ -315,9 +319,53 @@ final class ReflectionBuiltinHelper
         return $context->builder->select($isObject, $nameWhenObject, $falseStr);
     }
 
+    public static function getDebugTypeClassName(Context $context, Variable $object): Value
+    {
+        if (Variable::TYPE_OBJECT !== $object->type && Variable::TYPE_VALUE !== $object->type) {
+            throw new \LogicException('get_debug_type() argument must be an object in this compiler build');
+        }
+        $objBuiltin = self::objectBuiltin($context);
+        $objMap = $context->structFieldMap['__object__'];
+        $i64 = $context->getTypeFromString('int64');
+        $strPtr = $context->getTypeFromString('__string__*');
+
+        if (Variable::TYPE_OBJECT === $object->type) {
+            $obj = $context->helper->loadValue($object);
+            $classId = $context->builder->load(
+                $context->builder->structGep($obj, $objMap['class_id'])
+            );
+
+            return self::debugTypeClassNameFromId($context, $classId);
+        }
+
+        $valuePtr = JitValueBox::valuePtrFromVariable($context, $object);
+        $obj = $context->builder->call(
+            $context->lookupFunction('__value__readObject'),
+            $valuePtr
+        );
+        $objType = $context->getTypeFromString('__object__*');
+        $isObject = $context->builder->icmp(
+            Builder::INT_NE,
+            $obj,
+            $objType->constNull()
+        );
+        $classId = $context->builder->load(
+            $context->builder->structGep($obj, $objMap['class_id'])
+        );
+        $nameWhenObject = self::debugTypeClassNameFromId($context, $classId);
+        $unknownStr = $context->builder->load($context->constantStringFromString('unknown'));
+
+        return $context->builder->select($isObject, $nameWhenObject, $unknownStr);
+    }
+
     public static function classNameStringFromClassId(Context $context, Value $classId): Value
     {
         return self::classNameFromId($context, $classId);
+    }
+
+    public static function debugTypeClassNameFromClassId(Context $context, Value $classId): Value
+    {
+        return self::debugTypeClassNameFromId($context, $classId);
     }
 
     private static function classNameFromId(Context $context, Value $classId): Value
@@ -326,6 +374,16 @@ final class ReflectionBuiltinHelper
 
         return $context->builder->call(
             $context->lookupFunction('__phpc_class_name_from_id'),
+            $classId
+        );
+    }
+
+    private static function debugTypeClassNameFromId(Context $context, Value $classId): Value
+    {
+        GetClassRuntime::ensureDebugTypeLinked($context);
+
+        return $context->builder->call(
+            $context->lookupFunction('__phpc_debug_type_class_name_from_id'),
             $classId
         );
     }

@@ -6,6 +6,7 @@ namespace PHPCompiler\VM;
 
 use PHPCompiler\ext\standard\VmReflection;
 use PHPCompiler\Frame;
+use PHPCompiler\VM\ObjectEntry;
 
 /**
  * ReflectionProperty PHP 8.4 hook introspection (#7295, ext/reflection/php_reflection.c).
@@ -25,6 +26,9 @@ final class ReflectionPropertyHookSupport
             throw new \LogicException('ReflectionProperty refers to unknown class in this compiler build');
         }
         $property = ReflectionSupport::propertyNameFromReflection($receiver);
+        if (ReflectionSupport::isDynamicReflectionProperty($receiver)) {
+            return [$ctx, $entry, null, $className, $property];
+        }
         $meta = VmReflection::findClassProperty($entry, $property, $ctx);
         if (null === $meta && null === VmReflection::findStaticPropertyKey($entry, $property, $ctx)) {
             ReflectionSupport::throwReflectionException(
@@ -53,15 +57,13 @@ final class ReflectionPropertyHookSupport
         return is_array($propMeta) && !empty($propMeta['virtual']);
     }
 
-    public static function isDynamic(): bool
-    {
-        return false;
-    }
-
     public static function getMangledName(ClassEntry $entry, ?ClassProperty $meta, string $property, Context $ctx): string
     {
         if (null !== $meta) {
             return VmReflection::manglePropertyKey($meta, $ctx);
+        }
+        if (null === VmReflection::findStaticPropertyKey($entry, $property, $ctx)) {
+            return $property;
         }
         $propLc = strtolower($property);
         $visibility = $entry->staticPropertyVisibility[$propLc] ?? \PHPCfg\Func::FLAG_PUBLIC;
@@ -71,6 +73,22 @@ final class ReflectionPropertyHookSupport
         $stub->declaringClassLc = $declaringLc;
 
         return VmReflection::manglePropertyKey($stub, $ctx);
+    }
+
+    public static function hasHooks(
+        ClassEntry $entry,
+        ?ClassProperty $meta,
+        string $property,
+        Context $ctx
+    ): bool {
+        if (null !== $meta) {
+            return null !== $meta->getHookMethodLc
+                || null !== $meta->setHookMethodLc
+                || $meta->propertyHookVirtual;
+        }
+        $hooks = $entry->staticPropertyHooks[strtolower($property)] ?? [];
+
+        return [] !== $hooks;
     }
 
     public static function hasHook(
@@ -92,30 +110,65 @@ final class ReflectionPropertyHookSupport
     }
 
     /**
-     * @return array<int, Variable> PropertyHookType backing value => Closure
+     * @return array<string, Variable> hook kind (get/set) => Closure
      */
     public static function getHooks(ClassEntry $entry, ?ClassProperty $meta, string $property, Context $ctx): array
     {
         $result = [];
-        if (null !== $meta) {
-            if (null !== $meta->getHookMethodLc) {
-                $result[0] = self::hookClosure($ctx, $entry, $meta->getHookMethodLc);
+        foreach (['get', 'set'] as $hookKind) {
+            $methodLc = self::hookMethodLc($entry, $meta, $property, $hookKind);
+            if (null !== $methodLc) {
+                $result[$hookKind] = self::hookClosure($ctx, $entry, $methodLc);
             }
-            if (null !== $meta->setHookMethodLc) {
-                $result[1] = self::hookClosure($ctx, $entry, $meta->setHookMethodLc);
-            }
-
-            return $result;
-        }
-        $hooks = $entry->staticPropertyHooks[strtolower($property)] ?? [];
-        if (isset($hooks['get'])) {
-            $result[0] = self::hookClosure($ctx, $entry, $hooks['get']);
-        }
-        if (isset($hooks['set'])) {
-            $result[1] = self::hookClosure($ctx, $entry, $hooks['set']);
         }
 
         return $result;
+    }
+
+    /**
+     * php-src ReflectionProperty::getHook — ReflectionMethod for $prop::get|$prop::set (#4806).
+     */
+    public static function hookReflectionMethod(
+        Context $ctx,
+        ClassEntry $entry,
+        ?ClassProperty $meta,
+        string $property,
+        string $hookKind
+    ): ?Variable {
+        $methodLc = self::hookMethodLc($entry, $meta, $property, $hookKind);
+        if (null === $methodLc || !isset($entry->methods[$methodLc])) {
+            return null;
+        }
+        $rmClass = $ctx->classes[ReflectionSupport::REFLECTION_METHOD] ?? null;
+        if (null === $rmClass) {
+            throw new \LogicException('ReflectionMethod is not registered in this compiler build');
+        }
+        $rm = new ObjectEntry($rmClass);
+        $rm->constructed = true;
+        $rm->getProperty(ReflectionSupport::PROP_CLASS_NAME)->string($entry->name);
+        $rm->getProperty(ReflectionSupport::PROP_METHOD_NAME)->string('$'.$property.'::'.$hookKind);
+        $out = new Variable(Variable::TYPE_OBJECT);
+        $out->object($rm);
+
+        return $out;
+    }
+
+    private static function hookMethodLc(
+        ClassEntry $entry,
+        ?ClassProperty $meta,
+        string $property,
+        string $hookKind
+    ): ?string {
+        if (null !== $meta) {
+            return match ($hookKind) {
+                'get' => $meta->getHookMethodLc,
+                'set' => $meta->setHookMethodLc,
+                default => null,
+            };
+        }
+        $hooks = $entry->staticPropertyHooks[strtolower($property)] ?? [];
+
+        return $hooks[$hookKind] ?? null;
     }
 
     public static function parsePropertyHookTypeArg(Variable $arg, string $function): string

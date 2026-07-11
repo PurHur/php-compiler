@@ -9,7 +9,7 @@ use PHPCompiler\ext\standard\VmRandomPure;
 use PHPCompiler\ext\standard\VmString;
 use PHPUnit\Framework\TestCase;
 
-/** VmRandomPure — random_bytes without libc getrandom FFI (#8921). */
+/** VmRandomPure — random_bytes without libc getrandom FFI (#8921, #12181). */
 final class VmRandomPureRuntimeShrinkTest extends TestCase
 {
     public function testVmRandomNativeDelegatesToPureWhenFfiDisabled(): void

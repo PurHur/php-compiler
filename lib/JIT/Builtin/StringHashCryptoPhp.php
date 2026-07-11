@@ -6,7 +6,9 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
@@ -82,12 +84,7 @@ final class StringHashCryptoPhp
 
         $entry = $fn->appendBasicBlock('hc_hash_bridge_entry');
         $context->builder->positionAtEnd($entry);
-        $result = $context->builder->call(
-            self::helperFunction($context, self::HASH_HELPER),
-            $fn->getParam(0),
-            $fn->getParam(1),
-            $fn->getParam(2)
-        );
+        $result = self::callHelperBridge($context, $fn, self::HASH_HELPER);
         $context->builder->returnValue($result);
         $context->registerFunction($abiName, $fn);
         $context->builder->clearInsertionPosition();
@@ -114,13 +111,7 @@ final class StringHashCryptoPhp
 
         $entry = $fn->appendBasicBlock('hc_hmac_bridge_entry');
         $context->builder->positionAtEnd($entry);
-        $result = $context->builder->call(
-            self::helperFunction($context, self::HMAC_HELPER),
-            $fn->getParam(0),
-            $fn->getParam(1),
-            $fn->getParam(2),
-            $fn->getParam(3)
-        );
+        $result = self::callHelperBridge($context, $fn, self::HMAC_HELPER);
         $context->builder->returnValue($result);
         $context->registerFunction($abiName, $fn);
         $context->builder->clearInsertionPosition();
@@ -148,15 +139,7 @@ final class StringHashCryptoPhp
 
         $entry = $fn->appendBasicBlock('hc_pbkdf2_bridge_entry');
         $context->builder->positionAtEnd($entry);
-        $result = $context->builder->call(
-            self::helperFunction($context, self::PBKDF2_HELPER),
-            $fn->getParam(0),
-            $fn->getParam(1),
-            $fn->getParam(2),
-            $fn->getParam(3),
-            $fn->getParam(4),
-            $fn->getParam(5)
-        );
+        $result = self::callHelperBridge($context, $fn, self::PBKDF2_HELPER);
         $context->builder->returnValue($result);
         $context->registerFunction($abiName, $fn);
         $context->builder->clearInsertionPosition();
@@ -183,17 +166,25 @@ final class StringHashCryptoPhp
 
         $entry = $fn->appendBasicBlock('hc_hkdf_bridge_entry');
         $context->builder->positionAtEnd($entry);
-        $result = $context->builder->call(
-            self::helperFunction($context, self::HKDF_HELPER),
-            $fn->getParam(0),
-            $fn->getParam(1),
-            $fn->getParam(2),
-            $fn->getParam(3),
-            $fn->getParam(4)
-        );
+        $result = self::callHelperBridge($context, $fn, self::HKDF_HELPER);
         $context->builder->returnValue($result);
         $context->registerFunction($abiName, $fn);
         $context->builder->clearInsertionPosition();
+    }
+
+    private static function callHelperBridge(Context $context, LlvmFunction $abiFn, string $helperLogical): Value
+    {
+        $helperFn = self::helperFunction($context, $helperLogical);
+        $args = [];
+        for ($i = 0, $n = $abiFn->countParams(); $i < $n; ++$i) {
+            $args[] = JitNestedHelperCoerce::coerceArgForHelper(
+                $context,
+                $abiFn->getParam($i),
+                $helperFn->getParam($i)->typeOf()
+            );
+        }
+
+        return $context->builder->call($helperFn, ...$args);
     }
 
     private static function helperFunction(Context $context, string $logical): LlvmFunction

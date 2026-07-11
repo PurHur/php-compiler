@@ -15,11 +15,13 @@ class Module extends ModuleAbstract
     {
         return [
             new gettext(),
+            new _(),
             new bindtextdomain(),
             new textdomain(),
             new dgettext(),
             new dcgettext(),
             new dngettext(),
+            new ngettext(),
             new dcngettext(),
             new bind_textdomain_codeset(),
         ];

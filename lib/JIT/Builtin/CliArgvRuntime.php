@@ -8,6 +8,7 @@ use PHPCompiler\JIT;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPCompiler\JIT\Progress;
 use PHPLLVM\Builder;
@@ -17,8 +18,7 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
 /**
  * JIT/AOT link for CLI $argc/$argv via CliArgvJitHelper + VmCliArgv PHP (#9439).
  *
- * Embed: hashtable materialization via compiled {@see \PHPCompiler\ext\standard\CliArgvJitHelper}.
- * Standalone: quarantined LLVM in {@see CliArgvStandaloneLlvm} (#11142).
+ * Embed and standalone: hashtable materialization via compiled {@see \PHPCompiler\ext\standard\CliArgvJitHelper}.
  * php-src: ext/standard/basic_functions.c — $argc / $argv in CLI SAPI
  */
 final class CliArgvRuntime
@@ -52,27 +52,29 @@ final class CliArgvRuntime
 
     public static function ensureStandaloneBodies(Context $context): void
     {
+        if (StreamIoRuntime::shouldDeferHeavyStreamIoEmitters($context)) {
+            self::ensureUserScriptMainStubs($context);
+
+            return;
+        }
         self::implement($context);
     }
 
-    public static function implement(Context $context): void
+    /** User-script standalone main(): argv ABI stubs without nested JIT (#13571). */
+    public static function ensureUserScriptMainStubs(Context $context): void
     {
-        $probe = $context->module->getNamedFunction('__phpc_cli_refresh_argv_global');
+        if (Builtin::LOAD_TYPE_STANDALONE !== $context->loadType) {
+            return;
+        }
+        $probe = $context->module->getNamedFunction('__phpc_cli_store_argv');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);
 
             return;
         }
 
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            CliArgvStandaloneLlvm::implement($context);
-
-            return;
-        }
-
         self::ensureGlobals($context);
         self::ensureExternals($context);
-        self::ensureJitHelperCompiled($context);
 
         self::implementStoreArgv($context, self::declareAbi($context, '__phpc_cli_store_argv', $context->context->functionType(
             $context->getTypeFromString('void'),
@@ -95,6 +97,67 @@ final class CliArgvRuntime
             $context->getTypeFromString('int8*'),
             $context->getTypeFromString('int8*')
         )));
+
+        $voidTy = $context->getTypeFromString('void');
+        $valuePtr = $context->getTypeFromString('__value__*');
+        $refreshFn = self::declareAbi($context, '__phpc_cli_refresh_argv_global', $context->context->functionType(
+            $voidTy,
+            false,
+            $valuePtr
+        ));
+        if (0 === $refreshFn->countBasicBlocks()) {
+            $entry = $refreshFn->appendBasicBlock('cli_refresh_stub');
+            $context->builder->positionAtEnd($entry);
+            $context->builder->returnVoid();
+            $context->builder->clearInsertionPosition();
+        }
+
+        self::registerLinkedRuntime($context);
+        $context->builder->clearInsertionPosition();
+    }
+
+    public static function implement(Context $context): void
+    {
+        if (NestedJitCompileScope::isActive()) {
+            return;
+        }
+
+        $probe = $context->module->getNamedFunction('__phpc_cli_refresh_argv_global');
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            self::registerLinkedRuntime($context);
+
+            return;
+        }
+
+        self::ensureGlobals($context);
+        self::ensureExternals($context);
+
+        // Thin CLI argv ABI before nested CliArgvJitHelper compile — nested JIT during
+        // bridge emission corrupts the parent insert block (LLVM 9; #8559, #14470).
+        self::implementStoreArgv($context, self::declareAbi($context, '__phpc_cli_store_argv', $context->context->functionType(
+            $context->getTypeFromString('void'),
+            false,
+            $context->getTypeFromString('int32'),
+            $context->getTypeFromString('int8**')
+        )));
+        self::implementArgc($context, self::declareAbi($context, '__phpc_cli_argc', $context->context->functionType(
+            $context->getTypeFromString('int64'),
+            false
+        )));
+        self::implementArgvCstr($context, self::declareAbi($context, '__phpc_cli_argv_cstr', $context->context->functionType(
+            $context->getTypeFromString('int8*'),
+            false,
+            $context->getTypeFromString('int32')
+        )));
+        self::implementStrEq($context, self::declareAbi($context, '__phpc_cli_str_eq', $context->context->functionType(
+            $context->getTypeFromString('int32'),
+            false,
+            $context->getTypeFromString('int8*'),
+            $context->getTypeFromString('int8*')
+        )));
+
+        self::ensureJitHelperCompiled($context);
+
         self::implementRefreshArgvGlobal($context, self::declareAbi($context, '__phpc_cli_refresh_argv_global', $context->context->functionType(
             $context->getTypeFromString('void'),
             false,
@@ -109,10 +172,6 @@ final class CliArgvRuntime
     public static function buildArgvHashtable(Context $context): Value
     {
         self::ensureLinked($context);
-
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            return CliArgvStandaloneLlvm::buildArgvHashtable($context);
-        }
 
         return self::emitFillArgvTableFromGlobals($context, BasicBlockHelper::parentFunction($context));
     }
@@ -317,7 +376,8 @@ final class CliArgvRuntime
         $i32 = $context->getTypeFromString('int32');
         $i64 = $context->getTypeFromString('int64');
         $sizeT = $context->getTypeFromString('size_t');
-        $ht = $context->builder->call(self::helperFunction($context, self::CREATE_TABLE_HELPER));
+        $htRaw = $context->builder->call(self::helperFunction($context, self::CREATE_TABLE_HELPER));
+        $ht = JitNestedHelperCoerce::coerceToHashtablePtr($context, $htRaw);
 
         $argc = $context->builder->load(self::globalPtr($context, self::G_ARGC, $i32));
         $iSlot = $context->builder->alloca($i32, 1, 'cli_argv_i');

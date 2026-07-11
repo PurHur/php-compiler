@@ -1,9 +1,9 @@
 --TEST--
-PHP 8.4 asymmetric property visibility: private(set) (#3165)
+PHP 8.4 asymmetric property visibility: public (private(set)) (#3165)
 --FILE--
 <?php
 class Demo {
-    private(set) string $name = 'x';
+    public (private(set)) string $name = 'x';
 
     public function mutate(): void {
         $this->name = 'y';

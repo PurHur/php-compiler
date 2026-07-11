@@ -2,22 +2,15 @@
 
 declare(strict_types=1);
 
-/**
- * This file is part of PHP-Compiler, a PHP CFG Compiler for PHP code
- *
- * @copyright 2015 Anthony Ferrara. All rights reserved
- * @license MIT See LICENSE at the root of the project for more info
- */
-
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\MathAbs;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
-use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 final class abs extends Internal
@@ -31,7 +24,8 @@ final class abs extends Internal
             $frame->calledArgs[0]->resolveIndirect(),
             'abs',
             1,
-            'num'
+            'num',
+            $frame
         );
         if (null === $frame->returnVar) {
             return;
@@ -65,11 +59,8 @@ final class abs extends Internal
         }
         if (JITVariable::TYPE_NATIVE_DOUBLE === $args[0]->type) {
             $v = $context->helper->loadValue($args[0]);
-            $zero = $v->typeOf()->constReal(0.0);
-            $isNeg = $context->builder->fcmp(Builder::REAL_OLT, $v, $zero);
-            $negated = $context->builder->fNegate($v);
 
-            return $context->builder->select($isNeg, $negated, $v);
+            return MathAbs::invokeDouble($context, $v);
         }
         if (JITVariable::TYPE_NATIVE_LONG === $args[0]->type) {
             if (JITVariable::KIND_VALUE === $args[0]->kind) {
@@ -79,17 +70,11 @@ final class abs extends Internal
                 }
             }
             $v = JitLongArg::lower($context, $args[0], 'abs() argument #1');
-            $zero = $v->typeOf()->constInt(0, false);
-            $isNeg = $context->builder->icmp(Builder::INT_SLT, $v, $zero);
-            $negated = $context->builder->negate($v);
 
-            return $context->builder->select($isNeg, $negated, $v);
+            return MathAbs::invokeLong($context, $v);
         }
         $asFloat = JitMathNumberArg::lowerToDouble($context, $args[0], 'abs', 1, 'num');
-        $zero = $asFloat->typeOf()->constReal(0.0);
-        $isNeg = $context->builder->fcmp(Builder::REAL_OLT, $asFloat, $zero);
-        $negated = $context->builder->fNegate($asFloat);
 
-        return $context->builder->select($isNeg, $negated, $asFloat);
+        return MathAbs::invokeDouble($context, $asFloat);
     }
 }

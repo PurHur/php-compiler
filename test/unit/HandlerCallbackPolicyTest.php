@@ -25,4 +25,24 @@ final class HandlerCallbackPolicyTest extends TestCase
             SplAutoloadCallbackPolicy::invalidCallbackTypeError()
         );
     }
+
+    public function testExceptionHandlerPhpSrcInvalidCallbackType(): void
+    {
+        $this->assertTrue(
+            ExceptionHandlerCallbackPolicy::isPhpSrcInvalidCallbackType(\PHPCompiler\VM\Variable::TYPE_INTEGER)
+        );
+        $this->assertFalse(
+            ExceptionHandlerCallbackPolicy::isPhpSrcInvalidCallbackType(\PHPCompiler\VM\Variable::TYPE_STRING)
+        );
+    }
+
+    public function testSplAutoloadPhpSrcInvalidCallbackType(): void
+    {
+        $this->assertTrue(
+            SplAutoloadCallbackPolicy::isPhpSrcInvalidCallbackType(\PHPCompiler\VM\Variable::TYPE_INTEGER)
+        );
+        $this->assertFalse(
+            SplAutoloadCallbackPolicy::isPhpSrcInvalidCallbackType(\PHPCompiler\VM\Variable::TYPE_STRING)
+        );
+    }
 }

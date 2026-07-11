@@ -5,14 +5,23 @@ declare(strict_types=1);
 namespace PHPCompiler\Test\Unit;
 
 use PHPCompiler\Ast\CloneWithDesugar;
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
 /** PHP 8.3+ clone with { } desugar (#4513). */
 final class CloneWithTest extends TestCase
 {
+    private function skipUnlessCloneWithEnabled(): void
+    {
+        if (!CompilerVersion::supportsCloneWithSyntax()) {
+            $this->markTestSkipped('clone-with syntax disabled on reference profile (#12987)');
+        }
+    }
+
     public function testDesugarRewritesCloneWith(): void
     {
+        $this->skipUnlessCloneWithEnabled();
         $input = '<?php $d = clone $c with { x: 2, y: "b" };';
         $expected = '<?php $d = (function ($__phpc_o) { $__phpc_r = clone $__phpc_o;phpc_clone_with_begin($__phpc_r, \'x\', \'y\');$__phpc_r->x = 2;$__phpc_r->y = "b";phpc_clone_with_end($__phpc_r);return $__phpc_r; })($c);';
         $this->assertSame($expected, CloneWithDesugar::desugar($input));
@@ -21,6 +30,7 @@ final class CloneWithTest extends TestCase
     /** Issue #9743 — PHP 8.4+ clone($obj, ['prop']) functional syntax. */
     public function testDesugarRewritesCloneCallWithPropertyList(): void
     {
+        $this->skipUnlessCloneWithEnabled();
         $input = '<?php $d = clone($c, [\'a\']);';
         $expected = '<?php $d = (function ($__phpc_o) { $__phpc_r = clone $__phpc_o;phpc_clone_with_begin($__phpc_r, \'a\');phpc_clone_with_reinit($__phpc_r, \'a\');phpc_clone_with_end($__phpc_r);return $__phpc_r; })($c);';
         $this->assertSame($expected, CloneWithDesugar::desugar($input));
@@ -28,14 +38,53 @@ final class CloneWithTest extends TestCase
 
     public function testDesugarRewritesCloneCallWithAssociativeArray(): void
     {
+        $this->skipUnlessCloneWithEnabled();
         $input = '<?php $d = clone($c, [\'x\' => 2]);';
         $expected = '<?php $d = (function ($__phpc_o) { $__phpc_r = clone $__phpc_o;phpc_clone_with_begin($__phpc_r, \'x\');$__phpc_r->x = 2;phpc_clone_with_end($__phpc_r);return $__phpc_r; })($c);';
         $this->assertSame($expected, CloneWithDesugar::desugar($input));
     }
 
+    /** Issue #12939 — PHP 8.4+ `clone ($obj, with: ['prop' => $val])` named argument form. */
+    public function testDesugarRewritesCloneCallWithNamedWithArg(): void
+    {
+        $this->skipUnlessCloneWithEnabled();
+        $input = '<?php $d = clone ($c, with: [\'x\' => 2]);';
+        $expected = '<?php $d = (function ($__phpc_o) { $__phpc_r = clone $__phpc_o;phpc_clone_with_begin($__phpc_r, \'x\');$__phpc_r->x = 2;phpc_clone_with_end($__phpc_r);return $__phpc_r; })($c);';
+        $this->assertSame($expected, CloneWithDesugar::desugar($input));
+    }
+
+    public function testDesugarRewritesCloneCallWithNamedWithReinitList(): void
+    {
+        $this->skipUnlessCloneWithEnabled();
+        $input = '<?php $d = clone ($c, with: [\'a\']);';
+        $expected = '<?php $d = (function ($__phpc_o) { $__phpc_r = clone $__phpc_o;phpc_clone_with_begin($__phpc_r, \'a\');phpc_clone_with_reinit($__phpc_r, \'a\');phpc_clone_with_end($__phpc_r);return $__phpc_r; })($c);';
+        $this->assertSame($expected, CloneWithDesugar::desugar($input));
+    }
+
+    public function testVmCloneCallWithNamedWithArg(): void
+    {
+        $this->skipUnlessCloneWithEnabled();
+        $code = <<<'PHP'
+<?php
+class Point {
+    public int $x = 1;
+    public int $y = 2;
+}
+$p = new Point();
+$q = clone ($p, with: ['x' => 9]);
+echo $q->x, ',', $q->y, "\n";
+PHP;
+        $rt = new Runtime();
+        $block = $rt->parseAndCompile($code, 'test.php');
+        ob_start();
+        $rt->run($block);
+        $this->assertSame("9,2\n", ob_get_clean());
+    }
+
     /** Issue #9995 — PHP 8.4+ `clone $obj with ['prop']` keyword array syntax. */
     public function testDesugarRewritesCloneWithKeywordArray(): void
     {
+        $this->skipUnlessCloneWithEnabled();
         $input = '<?php $d = clone $c with [\'a\'];';
         $expected = '<?php $d = (function ($__phpc_o) { $__phpc_r = clone $__phpc_o;phpc_clone_with_begin($__phpc_r, \'a\');phpc_clone_with_reinit($__phpc_r, \'a\');phpc_clone_with_end($__phpc_r);return $__phpc_r; })($c);';
         $this->assertSame($expected, CloneWithDesugar::desugar($input));
@@ -43,6 +92,7 @@ final class CloneWithTest extends TestCase
 
     public function testDesugarRewritesCloneWithKeywordAssociativeArray(): void
     {
+        $this->skipUnlessCloneWithEnabled();
         $input = '<?php $d = clone $c with [\'x\' => 2];';
         $expected = '<?php $d = (function ($__phpc_o) { $__phpc_r = clone $__phpc_o;phpc_clone_with_begin($__phpc_r, \'x\');$__phpc_r->x = 2;phpc_clone_with_end($__phpc_r);return $__phpc_r; })($c);';
         $this->assertSame($expected, CloneWithDesugar::desugar($input));
@@ -51,6 +101,7 @@ final class CloneWithTest extends TestCase
     /** Issue #10496 — PHP 8.4+ `(clone $obj) with [...]` parenthesized operand. */
     public function testDesugarRewritesParenCloneWithKeywordArray(): void
     {
+        $this->skipUnlessCloneWithEnabled();
         $input = '<?php $d = (clone $c) with [\'a\'];';
         $expected = '<?php $d = (function ($__phpc_o) { $__phpc_r = clone $__phpc_o;phpc_clone_with_begin($__phpc_r, \'a\');phpc_clone_with_reinit($__phpc_r, \'a\');phpc_clone_with_end($__phpc_r);return $__phpc_r; })($c);';
         $this->assertSame($expected, CloneWithDesugar::desugar($input));
@@ -58,6 +109,7 @@ final class CloneWithTest extends TestCase
 
     public function testDesugarRewritesParenCloneWithAssociativeArray(): void
     {
+        $this->skipUnlessCloneWithEnabled();
         $input = '<?php $d = (clone $c) with [\'x\' => 2];';
         $expected = '<?php $d = (function ($__phpc_o) { $__phpc_r = clone $__phpc_o;phpc_clone_with_begin($__phpc_r, \'x\');$__phpc_r->x = 2;phpc_clone_with_end($__phpc_r);return $__phpc_r; })($c);';
         $this->assertSame($expected, CloneWithDesugar::desugar($input));
@@ -65,6 +117,7 @@ final class CloneWithTest extends TestCase
 
     public function testDesugarRewritesParenCloneWithBlock(): void
     {
+        $this->skipUnlessCloneWithEnabled();
         $input = '<?php $d = (clone $c) with { x: 2 };';
         $expected = '<?php $d = (function ($__phpc_o) { $__phpc_r = clone $__phpc_o;phpc_clone_with_begin($__phpc_r, \'x\');$__phpc_r->x = 2;phpc_clone_with_end($__phpc_r);return $__phpc_r; })($c);';
         $this->assertSame($expected, CloneWithDesugar::desugar($input));
@@ -72,6 +125,7 @@ final class CloneWithTest extends TestCase
 
     public function testVmParenCloneWithKeywordArrayValueOverrides(): void
     {
+        $this->skipUnlessCloneWithEnabled();
         $code = <<<'PHP'
 <?php
 class C {
@@ -92,6 +146,7 @@ PHP;
 
     public function testVmCloneWithKeywordArrayReadonlyReinit(): void
     {
+        $this->skipUnlessCloneWithEnabled();
         $code = <<<'PHP'
 <?php
 class W {
@@ -112,6 +167,7 @@ PHP;
 
     public function testVmCloneWithKeywordArrayValueOverrides(): void
     {
+        $this->skipUnlessCloneWithEnabled();
         $code = <<<'PHP'
 <?php
 class C {
@@ -132,6 +188,7 @@ PHP;
 
     public function testVmCloneCallSyntaxReadonlyReinit(): void
     {
+        $this->skipUnlessCloneWithEnabled();
         $code = <<<'PHP'
 <?php
 class W {
@@ -152,6 +209,7 @@ PHP;
 
     public function testVmCloneCallSyntaxWithValueOverrides(): void
     {
+        $this->skipUnlessCloneWithEnabled();
         $code = <<<'PHP'
 <?php
 class C {
@@ -172,6 +230,7 @@ PHP;
 
     public function testVmCloneWithReadonlyReinit(): void
     {
+        $this->skipUnlessCloneWithEnabled();
         $code = <<<'PHP'
 <?php
 class C {
@@ -191,6 +250,7 @@ PHP;
 
     public function testJitCloneWithReadonlyReinit(): void
     {
+        $this->skipUnlessCloneWithEnabled();
         if (!\getenv('PHP_COMPILER_LLVM_PATH') && !\is_dir(__DIR__.'/../../.llvm')) {
             $this->markTestSkipped('LLVM not available');
         }
@@ -223,6 +283,7 @@ PHP;
 
     public function testVmCloneWithMatchesZend(): void
     {
+        $this->skipUnlessCloneWithEnabled();
         $code = <<<'PHP'
 <?php
 class C {
@@ -243,6 +304,7 @@ PHP;
     /** Issue #10310 — property list without value reinitializes defaults, not source values. */
     public function testVmCloneWithPropertyListReinitializesDefault(): void
     {
+        $this->skipUnlessCloneWithEnabled();
         $code = <<<'PHP'
 <?php
 declare(strict_types=1);
@@ -271,6 +333,7 @@ PHP;
     /** Issue #10165 — clone-with overrides apply after __clone(); closure IIFE must receive object. */
     public function testVmCloneWithOverrideAfterCloneMagic(): void
     {
+        $this->skipUnlessCloneWithEnabled();
         $code = <<<'PHP'
 <?php
 declare(strict_types=1);

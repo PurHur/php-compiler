@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
+use PHPCompiler\OpCode;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\VM\InternalStrictArg;
@@ -82,10 +83,29 @@ final class VmMath
     }
 
     /**
-     * Z_PARAM_BOOL-style coercion for bool-only builtins (php-src basic_functions.c; #6149 microtime/hrtime).
+     * Z_PARAM_BOOL with caller strict_types parity (php-src basic_functions.c microtime/hrtime; #17025).
      *
-     * @throws \TypeError when the operand cannot be converted like Zend PHP 8.x
+     * @throws \TypeError when strict_types rejects null/non-bool operands
      */
+    public static function parseBoolBuiltinArgForFrame(
+        Frame $frame,
+        int $argIndex,
+        string $function,
+        int $userArgIndex,
+        string $paramName
+    ): bool {
+        if (InternalStrictArg::isCallerStrict($frame)) {
+            return InternalStrictArg::requireBool($frame, $argIndex, $function, $paramName)->toBool();
+        }
+
+        return self::parseBoolBuiltinArg(
+            $frame->calledArgs[$argIndex],
+            $function,
+            $userArgIndex,
+            $paramName
+        );
+    }
+
     public static function parseBoolBuiltinArg(
         Variable $var,
         string $function,
@@ -129,6 +149,48 @@ final class VmMath
     }
 
     /**
+     * IS_BOOL internal params without coercion (php-src ZEND_ARG_INFO; #12585, #14763 array_slice preserve_keys).
+     *
+     * @throws \TypeError when operand is not boolean
+     */
+    public static function requireBuiltinBoolArg(
+        Variable $var,
+        string $function,
+        int $argIndex,
+        string $paramName
+    ): bool {
+        $var = $var->resolveIndirect();
+        self::rejectEnumCaseBoolBuiltinArg($var, $function, $argIndex, $paramName);
+        if (Variable::TYPE_BOOLEAN !== $var->type) {
+            $given = Variable::TYPE_OBJECT === $var->type
+                ? $var->toObject()->class->name
+                : self::vmTypeName($var->type);
+            throw new \TypeError(self::boolBuiltinTypeError($function, $argIndex, $paramName, $given));
+        }
+
+        return $var->toBool();
+    }
+
+    /**
+     * ?bool internal params that coerce like Z_PARAM_BOOL (php-src basic_functions.c; #12677).
+     *
+     * @throws \TypeError when the operand cannot be converted like Zend PHP 8.x
+     */
+    public static function parseNullableBoolBuiltinArg(
+        Variable $var,
+        string $function,
+        int $argIndex,
+        string $paramName
+    ): ?bool {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_NULL === $var->type) {
+            return null;
+        }
+
+        return self::parseBoolBuiltinArg($var, $function, $argIndex, $paramName);
+    }
+
+    /**
      * Z_PARAM_NUMBER-style coercion for int|float builtins (php-src math.c abs/ceil/floor/round; #5613).
      *
      * @throws \TypeError when the operand cannot be converted like Zend PHP 8.x
@@ -137,7 +199,8 @@ final class VmMath
         Variable $var,
         string $function,
         int $argIndex,
-        string $paramName
+        string $paramName,
+        ?Frame $frame = null
     ): int|float {
         $var = $var->resolveIndirect();
         self::rejectEnumCaseNumberBuiltinArg($var, $function, $argIndex, $paramName);
@@ -164,6 +227,11 @@ final class VmMath
             return $var->toBool() ? 1 : 0;
         }
         if (Variable::TYPE_NULL === $var->type) {
+            if (null !== $frame && InternalStrictArg::isCallerStrict($frame)) {
+                throw new \TypeError(self::numberBuiltinTypeError($function, $argIndex, $paramName, 'null'));
+            }
+            VmNullNumberParamDeprecation::emit($frame, $function, $argIndex, $paramName);
+
             return 0;
         }
         if (Variable::TYPE_STRING === $var->type) {
@@ -208,7 +276,12 @@ final class VmMath
             throw new \TypeError(self::nullableIntBuiltinTypeError($function, $argIndex, $paramName, 'array'));
         }
         if (Variable::TYPE_OBJECT === $var->type) {
-            throw new \TypeError(self::nullableIntBuiltinTypeError($function, $argIndex, $paramName, 'object'));
+            throw new \TypeError(self::nullableIntBuiltinTypeError(
+                $function,
+                $argIndex,
+                $paramName,
+                EnumCaseSupport::typeNameForVariable($var)
+            ));
         }
         if (Variable::TYPE_FLOAT === $var->type) {
             $f = $var->toFloat();
@@ -234,7 +307,12 @@ final class VmMath
             throw new \TypeError(self::intBuiltinTypeError($function, $argIndex, $paramName, 'array'));
         }
         if (Variable::TYPE_OBJECT === $var->type) {
-            throw new \TypeError(self::intBuiltinTypeError($function, $argIndex, $paramName, 'object'));
+            throw new \TypeError(self::intBuiltinTypeError(
+                $function,
+                $argIndex,
+                $paramName,
+                EnumCaseSupport::typeNameForVariable($var)
+            ));
         }
         if (Variable::TYPE_FLOAT === $var->type) {
             $f = $var->toFloat();
@@ -288,9 +366,9 @@ final class VmMath
             return null;
         }
         if (InternalStrictArg::isCallerStrict($frame)) {
-            InternalStrictArg::requireInt($frame, $argIndex, $function, $paramName);
+            InternalStrictArg::requireNullableInt($frame, $argIndex, $function, $paramName);
 
-            return $resolved->toInt();
+            return Variable::TYPE_NULL === $resolved->type ? null : $resolved->toInt();
         }
         if (Variable::TYPE_FLOAT === $resolved->type && null !== $frame->vmContext) {
             self::warnFloatToIntPrecisionLoss($resolved->toFloat(), $frame->vmContext, $frame);
@@ -318,7 +396,12 @@ final class VmMath
             throw new \TypeError(self::intBuiltinTypeError($function, $argIndex, $paramName, 'array'));
         }
         if (Variable::TYPE_OBJECT === $var->type) {
-            throw new \TypeError(self::intBuiltinTypeError($function, $argIndex, $paramName, 'object'));
+            throw new \TypeError(self::intBuiltinTypeError(
+                $function,
+                $argIndex,
+                $paramName,
+                EnumCaseSupport::typeNameForVariable($var)
+            ));
         }
         if (Variable::TYPE_FLOAT === $var->type) {
             return self::floatToZendLong($var->toFloat());
@@ -678,25 +761,13 @@ final class VmMath
     }
 
     /**
-     * pow() return typing — int when both operands are int with integral result (php-src math.c, issue #3678).
+     * pow() — delegate to {@see Variable::numericOp()} ** semantics (php-src math.c / zend_operators.c; #3678, #4888).
      */
-    public static function applyPow(Variable $returnVar, Variable $base, Variable $exp): void
+    public static function applyPow(Variable $returnVar, Variable $base, Variable $exp, ?Frame $frame = null): void
     {
         $returnVar->reset();
-        $baseNum = self::parseNumberBuiltinArg($base, 'pow', 1, 'num');
-        $expNum = self::parseNumberBuiltinArg($exp, 'pow', 2, 'exponent');
-        if (\is_int($baseNum) && \is_int($expNum)) {
-            $result = self::powInt($baseNum, $expNum);
-            if (\is_int($result)) {
-                $returnVar->int($result);
-
-                return;
-            }
-            $returnVar->float($result);
-
-            return;
-        }
-        $returnVar->float(\pow((float) $baseNum, (float) $expNum));
+        $vm = null !== $frame && null !== $frame->vmContext ? $frame->vmContext->runtime->vm : null;
+        $returnVar->numericOp(OpCode::TYPE_POW, $base, $exp, $vm, $frame);
     }
 
     /**
@@ -705,6 +776,243 @@ final class VmMath
     public static function fpow(float $num, float $exponent): float
     {
         return \pow($num, $exponent);
+    }
+
+    /** fadd() — IEEE-754 float addition (php-src ext/standard/math.c zend_fadd; #17290). */
+    public static function fadd(float $num1, float $num2): float
+    {
+        if (\function_exists('fadd')) {
+            return \fadd($num1, $num2);
+        }
+
+        return $num1 + $num2;
+    }
+
+    /** fsub() — IEEE-754 float subtraction (php-src ext/standard/math.c zend_fsub; #17290). */
+    public static function fsub(float $num1, float $num2): float
+    {
+        if (\function_exists('fsub')) {
+            return \fsub($num1, $num2);
+        }
+
+        return $num1 - $num2;
+    }
+
+    /** fmul() — IEEE-754 float multiplication (php-src ext/standard/math.c zend_fmul; #17290). */
+    public static function fmul(float $num1, float $num2): float
+    {
+        if (\function_exists('fmul')) {
+            return \fmul($num1, $num2);
+        }
+
+        return $num1 * $num2;
+    }
+
+    /** fmod() — floating-point remainder (php-src ext/standard/math.c). */
+    public static function fmod(float $num1, float $num2): float
+    {
+        return \fmod($num1, $num2);
+    }
+
+    /** hypot() — sqrt(x² + y²) without overflow (php-src ext/standard/math.c). */
+    public static function hypot(float $x, float $y): float
+    {
+        return \hypot($x, $y);
+    }
+
+    /** sin() — sine (php-src ext/standard/math.c). */
+    public static function sin(float $num): float
+    {
+        return \sin($num);
+    }
+
+    /** cos() — cosine (php-src ext/standard/math.c). */
+    public static function cos(float $num): float
+    {
+        return \cos($num);
+    }
+
+    /** tan() — tangent (php-src ext/standard/math.c). */
+    public static function tan(float $num): float
+    {
+        return \tan($num);
+    }
+
+    /** cosh() — hyperbolic cosine (php-src ext/standard/math.c). */
+    public static function cosh(float $num): float
+    {
+        return \cosh($num);
+    }
+
+    /** sinh() — hyperbolic sine (php-src ext/standard/math.c). */
+    public static function sinh(float $num): float
+    {
+        return \sinh($num);
+    }
+
+    /** tanh() — hyperbolic tangent (php-src ext/standard/math.c). */
+    public static function tanh(float $num): float
+    {
+        return \tanh($num);
+    }
+
+    /** asinh() — inverse hyperbolic sine (php-src ext/standard/math.c). */
+    public static function asinh(float $num): float
+    {
+        return \asinh($num);
+    }
+
+    /** acosh() — inverse hyperbolic cosine (php-src ext/standard/math.c). */
+    public static function acosh(float $num): float
+    {
+        return \acosh($num);
+    }
+
+    /** atanh() — inverse hyperbolic tangent (php-src ext/standard/math.c). */
+    public static function atanh(float $num): float
+    {
+        return \atanh($num);
+    }
+
+    /** exp() — natural exponential (php-src ext/standard/math.c). */
+    public static function exp(float $num): float
+    {
+        return \exp($num);
+    }
+
+    /** sqrt() — square root (php-src ext/standard/math.c). */
+    public static function sqrt(float $num): float
+    {
+        return \sqrt($num);
+    }
+
+    /** log() — natural logarithm (php-src ext/standard/math.c). */
+    public static function log(float $num): float
+    {
+        return \log($num);
+    }
+
+    /** log10() — base-10 logarithm (php-src ext/standard/math.c). */
+    public static function log10(float $num): float
+    {
+        return \log10($num);
+    }
+
+    /** log1p() — log(1+x) (php-src ext/standard/math.c). */
+    public static function log1p(float $num): float
+    {
+        return \log1p($num);
+    }
+
+    /** expm1() — exp(x)-1 (php-src ext/standard/math.c). */
+    public static function expm1(float $num): float
+    {
+        return \expm1($num);
+    }
+
+    /** floor() — round toward negative infinity (php-src ext/standard/math.c). */
+    public static function floor(float $num): float
+    {
+        return \floor($num);
+    }
+
+    /** ceil() — round toward positive infinity (php-src ext/standard/math.c). */
+    public static function ceil(float $num): float
+    {
+        return \ceil($num);
+    }
+
+    /** asin() — arc sine (php-src ext/standard/math.c). */
+    public static function asin(float $num): float
+    {
+        return \asin($num);
+    }
+
+    /** acos() — arc cosine (php-src ext/standard/math.c). */
+    public static function acos(float $num): float
+    {
+        return \acos($num);
+    }
+
+    /** atan() — arc tangent (php-src ext/standard/math.c). */
+    public static function atan(float $num): float
+    {
+        return \atan($num);
+    }
+
+    /** deg2rad() — degrees to radians (php-src ext/standard/math.c). */
+    public static function deg2rad(float $num): float
+    {
+        return (\M_PI / 180.0) * $num;
+    }
+
+    /** rad2deg() — radians to degrees (php-src ext/standard/math.c). */
+    public static function rad2deg(float $num): float
+    {
+        return (180.0 / \M_PI) * $num;
+    }
+
+    /** atan2() — arc tangent of y/x (php-src ext/standard/math.c). */
+    public static function atan2(float $y, float $x): float
+    {
+        return \atan2($y, $x);
+    }
+
+    /**
+     * nextafter() — IEEE next representable float toward $next (php-src ext/standard/math.c; #9241).
+     */
+    public static function nextafter(float $num, float $next): float
+    {
+        if (\is_nan($num)) {
+            return $num;
+        }
+        if (\is_nan($next)) {
+            return $next;
+        }
+        if ($num === $next) {
+            return $next;
+        }
+        if (0.0 === $num || -0.0 === $num) {
+            if ($next > 0.0) {
+                return \unpack('d', \pack('P', 1))[1];
+            }
+
+            return \unpack('d', \pack('P', 0x8000000000000001))[1];
+        }
+        $bits = \unpack('P', \pack('d', $num))[1];
+        if (($num > 0.0) === ($next > $num)) {
+            ++$bits;
+        } else {
+            --$bits;
+        }
+
+        return \unpack('d', \pack('P', $bits))[1];
+    }
+
+    /** IEEE fmin pair (php-src ext/standard/math.c zend_fmin; #11728). */
+    public static function fminPair(float $a, float $b): float
+    {
+        if (\is_nan($a)) {
+            return $b;
+        }
+        if (\is_nan($b)) {
+            return $a;
+        }
+
+        return $a < $b ? $a : $b;
+    }
+
+    /** IEEE fmax pair (php-src ext/standard/math.c zend_fmax; #11728). */
+    public static function fmaxPair(float $a, float $b): float
+    {
+        if (\is_nan($a)) {
+            return $b;
+        }
+        if (\is_nan($b)) {
+            return $a;
+        }
+
+        return $a > $b ? $a : $b;
     }
 
     /** @return float fractional part; writes integer part to $intPart (php-src modf). */
@@ -876,20 +1184,49 @@ final class VmMath
 
     /**
      * Parse a radix string as float when integer range is exhausted (php-src strtod overflow path).
+     *
+     * Chunked digit accumulation preserves IEEE mantissa for values > PHP_INT_MAX (#10452).
      */
     private static function baseToZvalFloat(string $str, int $start, int $end, int $base): float
     {
+        $chunkDigits = self::maxFloatParseChunkDigits($base);
         $fnum = 0.0;
-
-        for ($i = $start; $i < $end; ++$i) {
-            $digit = self::radixDigit($str[$i], $base);
-            if (null === $digit) {
+        $i = $start;
+        while ($i < $end) {
+            $chunk = 0;
+            $count = 0;
+            while ($i < $end && $count < $chunkDigits) {
+                $digit = self::radixDigit($str[$i], $base);
+                ++$i;
+                if (null === $digit) {
+                    continue;
+                }
+                $chunk = $chunk * $base + $digit;
+                ++$count;
+            }
+            if (0 === $count) {
                 continue;
             }
-            $fnum = $fnum * $base + $digit;
+            for ($k = 0; $k < $count; ++$k) {
+                $fnum *= $base;
+            }
+            $fnum += $chunk;
         }
 
         return $fnum;
+    }
+
+    /** Max digits per chunk so base^digits fits in signed int (#10452). */
+    private static function maxFloatParseChunkDigits(int $base): int
+    {
+        $digits = 1;
+        $power = $base;
+        while ($power <= intdiv(\PHP_INT_MAX, $base)) {
+            $power *= $base;
+            ++$digits;
+        }
+
+        return $digits;
     }
 
     private static function radixDigit(string $c, int $base): ?int
@@ -970,5 +1307,43 @@ final class VmMath
         }
 
         return $negative ? '-'.$buf : $buf;
+    }
+
+    /**
+     * clamp() — PHP 8.3 (ext/standard/math.c php_math_clamp).
+     */
+    public static function clamp(
+        Variable $value,
+        Variable $min,
+        Variable $max,
+        Variable $result,
+        string $function = 'clamp'
+    ): void {
+        $value = $value->resolveIndirect();
+        $min = $min->resolveIndirect();
+        $max = $max->resolveIndirect();
+
+        if (Variable::TYPE_FLOAT === $min->type && \is_nan($min->toFloat())) {
+            throw new \ValueError($function.'(): Argument #2 ($min) must not be NAN');
+        }
+        if (Variable::TYPE_FLOAT === $max->type && \is_nan($max->toFloat())) {
+            throw new \ValueError($function.'(): Argument #3 ($max) must not be NAN');
+        }
+        if (Variable::spaceshipCompare($max, $min) < 0) {
+            throw new \ValueError(
+                $function.'(): Argument #2 ($min) must be smaller than or equal to argument #3 ($max)'
+            );
+        }
+        if (Variable::spaceshipCompare($max, $value) < 0) {
+            $result->copyFrom($max);
+
+            return;
+        }
+        if (Variable::spaceshipCompare($value, $min) < 0) {
+            $result->copyFrom($min);
+
+            return;
+        }
+        $result->copyFrom($value);
     }
 }

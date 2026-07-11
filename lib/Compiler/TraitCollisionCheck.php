@@ -16,17 +16,31 @@ use PHPCfg\Script;
  */
 final class TraitCollisionCheck
 {
-    /** @var array<string, array{display: string, methods: array<string, true>, promotedProperties: array<string, true>}> */
+    /** @var array<string, array{display: string, methods: array<string, true>, promotedProperties: array<string, true>, instanceProperties: array<string, true>, staticProperties: array<string, true>}> */
     private array $traits = [];
 
-    /** @var array<string, array{display: string, extends: ?string, ownMethods: array<string, true>, ownProperties: array<string, true>, traitUses: list<list<string>>}> */
+    /** @var array<string, array{display: string, extends: ?string, ownMethods: array<string, true>, ownProperties: array<string, true>, ownStaticProperties: array<string, true>, traitUses: list<list<string>>}> */
     private array $classes = [];
 
-    public static function validate(Script $script): void
+    /** @var array<string, array<string, array<string, mixed>>> lcClass => prop => meta */
+    private array $propertyHookRegistry;
+
+    /**
+     * @param array<string, array<string, array<string, mixed>>> $propertyHookRegistry
+     */
+    public static function validate(Script $script, array $propertyHookRegistry = []): void
     {
-        $check = new self();
+        $check = new self($propertyHookRegistry);
         $check->collect($script);
         $check->verify();
+    }
+
+    /**
+     * @param array<string, array<string, array<string, mixed>>> $propertyHookRegistry
+     */
+    private function __construct(array $propertyHookRegistry = [])
+    {
+        $this->propertyHookRegistry = $propertyHookRegistry;
     }
 
     private function collect(Script $script): void
@@ -50,6 +64,8 @@ final class TraitCollisionCheck
             'display' => $this->operandDisplayName($trait->name, $lc),
             'methods' => $this->collectConcreteMethods($trait->stmts->children),
             'promotedProperties' => $this->collectPromotedPropertyNames($trait->stmts->children),
+            'instanceProperties' => $this->collectInstancePropertyNames($trait->stmts->children),
+            'staticProperties' => $this->collectStaticPropertyNames($trait->stmts->children),
         ];
     }
 
@@ -89,6 +105,7 @@ final class TraitCollisionCheck
             'extends' => $parentLc,
             'ownMethods' => $this->collectConcreteMethods($class->stmts->children),
             'ownProperties' => $this->collectInstancePropertyNames($class->stmts->children),
+            'ownStaticProperties' => $this->collectStaticPropertyNames($class->stmts->children),
             'traitUses' => $traitUses,
         ];
     }
@@ -168,22 +185,105 @@ final class TraitCollisionCheck
         return $names;
     }
 
+    /**
+     * @param list<Op> $members
+     *
+     * @return array<string, true>
+     */
+    private function collectStaticPropertyNames(array $members): array
+    {
+        $names = [];
+        foreach ($members as $member) {
+            if (!$member instanceof Op\Stmt\Property || !$member->static) {
+                continue;
+            }
+            if ($member->name instanceof Operand\Literal && is_string($member->name->value)) {
+                $names[strtolower($member->name->value)] = true;
+            }
+        }
+
+        return $names;
+    }
+
     private function isPromotedParam(Op\Expr\Param $param): bool
     {
         return property_exists($param, 'promotionFlags') && 0 !== $param->promotionFlags;
     }
 
+    /**
+     * Class concrete property hooks may satisfy trait semicolon hook stubs (#7316, zend_compile.c).
+     *
+     * @param array{display: string, extends: ?string, ownMethods: array<string, true>, ownProperties: array<string, true>, ownStaticProperties: array<string, true>, traitUses: list<list<string>>} $class
+     */
+    private function classSatisfiesTraitAbstractPropertyHook(string $traitLc, string $propLc, string $classLc): bool
+    {
+        $traitMeta = $this->propertyHookRegistry[$traitLc][$propLc]
+            ?? $this->propertyHookRegistry[$traitLc][strtolower($propLc)]
+            ?? null;
+        if (!is_array($traitMeta)) {
+            return false;
+        }
+        $required = [];
+        if (!empty($traitMeta['requiresGet'])) {
+            $required[] = 'get';
+        }
+        if (!empty($traitMeta['requiresSet'])) {
+            $required[] = 'set';
+        }
+        if (!empty($traitMeta['requiresUnset'])) {
+            $required[] = 'unset';
+        }
+        if ([] === $required) {
+            return false;
+        }
+        $provided = $this->classProvidedPropertyHooks($classLc);
+        foreach ($required as $kind) {
+            if (empty($provided[$propLc][$kind])) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * @return array<string, array<string, true>> lcProp => hook kind => true
+     */
+    private function classProvidedPropertyHooks(string $classLc): array
+    {
+        $provided = [];
+        if (!isset($this->classes[$classLc])) {
+            return $provided;
+        }
+        foreach ($this->propertyHookRegistry[$classLc] ?? [] as $prop => $meta) {
+            if (!is_array($meta)) {
+                continue;
+            }
+            $propLc = strtolower($prop);
+            if (!isset($provided[$propLc])) {
+                $provided[$propLc] = [];
+            }
+            foreach (['get', 'set', 'unset'] as $kind) {
+                if (!empty($meta[$kind])) {
+                    $provided[$propLc][$kind] = true;
+                }
+            }
+        }
+
+        return $provided;
+    }
+
     private function verify(): void
     {
-        foreach ($this->classes as $class) {
-            $this->verifyClass($class);
+        foreach ($this->classes as $classLc => $class) {
+            $this->verifyClass($classLc, $class);
         }
     }
 
     /**
-     * @param array{display: string, extends: ?string, ownMethods: array<string, true>, ownProperties: array<string, true>, traitUses: list<list<string>>} $class
+     * @param array{display: string, extends: ?string, ownMethods: array<string, true>, ownProperties: array<string, true>, ownStaticProperties: array<string, true>, traitUses: list<list<string>>} $class
      */
-    private function verifyClass(array $class): void
+    private function verifyClass(string $classLc, array $class): void
     {
         $excluded = $class['ownMethods'];
         $current = $class['extends'];
@@ -203,6 +303,8 @@ final class TraitCollisionCheck
         $traitSources = [];
         /** @var array<string, string> property lc => trait display */
         $traitPropertySources = [];
+        /** @var array<string, string> static property lc => trait display */
+        $traitStaticPropertySources = [];
         /** @var array<string, true> trait lc => already applied (php-src dedupes duplicate use entries) */
         $appliedTraits = [];
         foreach ($class['traitUses'] as $useGroup) {
@@ -230,9 +332,11 @@ final class TraitCollisionCheck
                 }
                 foreach ($trait['promotedProperties'] as $propLc => $_) {
                     if (isset($class['ownProperties'][$propLc])) {
-                        throw new \CompileError(
-                            sprintf('Cannot redeclare %s::$%s', $class['display'], $propLc)
-                        );
+                        throw new \CompileError(TraitCompositionConflictMessage::incompatibleClassTraitProperty(
+                            $class['display'],
+                            $trait['display'],
+                            $propLc
+                        ));
                     }
                     if (isset($traitPropertySources[$propLc])) {
                         throw new \CompileError(TraitCompositionConflictMessage::incompatibleProperty(
@@ -243,6 +347,45 @@ final class TraitCollisionCheck
                         ));
                     }
                     $traitPropertySources[$propLc] = $trait['display'];
+                }
+                foreach ($trait['instanceProperties'] as $propLc => $_) {
+                    if (isset($class['ownProperties'][$propLc])) {
+                        if ($this->classSatisfiesTraitAbstractPropertyHook($traitLc, $propLc, $classLc)) {
+                            continue;
+                        }
+                        throw new \CompileError(TraitCompositionConflictMessage::incompatibleClassTraitProperty(
+                            $class['display'],
+                            $trait['display'],
+                            $propLc
+                        ));
+                    }
+                    if (isset($traitPropertySources[$propLc])) {
+                        throw new \CompileError(TraitCompositionConflictMessage::incompatibleProperty(
+                            $traitPropertySources[$propLc],
+                            $trait['display'],
+                            $propLc,
+                            $class['display']
+                        ));
+                    }
+                    $traitPropertySources[$propLc] = $trait['display'];
+                }
+                foreach ($trait['staticProperties'] as $propLc => $_) {
+                    if (isset($class['ownStaticProperties'][$propLc])) {
+                        throw new \CompileError(TraitCompositionConflictMessage::incompatibleClassTraitProperty(
+                            $class['display'],
+                            $trait['display'],
+                            $propLc
+                        ));
+                    }
+                    if (isset($traitStaticPropertySources[$propLc])) {
+                        throw new \CompileError(TraitCompositionConflictMessage::incompatibleProperty(
+                            $traitStaticPropertySources[$propLc],
+                            $trait['display'],
+                            $propLc,
+                            $class['display']
+                        ));
+                    }
+                    $traitStaticPropertySources[$propLc] = $trait['display'];
                 }
             }
         }

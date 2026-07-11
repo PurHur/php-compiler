@@ -10,35 +10,26 @@ use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\Variable;
 use PHPLLVM\Value;
 
-/**
- * JIT/AOT link for list/spread unpack guards via ListUnpackJitHelper PHP (#10221, #10266).
- *
- * SSOT: {@see \PHPCompiler\VM\ListUnpackJitHelper}
- */
+/** JIT/AOT link for list/spread unpack guards via ListUnpackJitHelper PHP (#10221, #10266). */
 final class ListUnpackRuntime
 {
     private static bool $implementing = false;
 
     private const HELPER_PATH = '/VM/ListUnpackJitHelper.php';
 
-    private const VALUE_BOX_IS_ARRAY = 'PHPCompiler\\VM\\ListUnpackJitHelper::valueBoxIsArray';
+    private const H_ARRAY = 'PHPCompiler\\VM\\ListUnpackJitHelper::valueBoxIsArray';
 
-    private const VALUE_BOX_IS_STRING = 'PHPCompiler\\VM\\ListUnpackJitHelper::valueBoxIsString';
+    private const H_STRING = 'PHPCompiler\\VM\\ListUnpackJitHelper::valueBoxIsString';
 
-    private const VALUE_BOX_IS_UNPACKABLE = 'PHPCompiler\\VM\\ListUnpackJitHelper::valueBoxIsListDestructUnpackable';
+    private const H_UNPACK = 'PHPCompiler\\VM\\ListUnpackJitHelper::valueBoxIsListDestructUnpackable';
 
-    /** @var list<string> */
-    private const COMPILED_HELPERS = [
-        self::VALUE_BOX_IS_ARRAY,
-        self::VALUE_BOX_IS_STRING,
-        self::VALUE_BOX_IS_UNPACKABLE,
-    ];
+    private const COMPILED = [self::H_ARRAY, self::H_STRING, self::H_UNPACK];
 
-    private const ABI_IS_ARRAY = '__list_unpack__valueBoxIsArray';
+    private const ABI_ARRAY = '__list_unpack__valueBoxIsArray';
 
-    private const ABI_IS_STRING = '__list_unpack__valueBoxIsString';
+    private const ABI_STRING = '__list_unpack__valueBoxIsString';
 
-    private const ABI_IS_UNPACKABLE = '__list_unpack__valueBoxIsListDestructUnpackable';
+    private const ABI_UNPACK = '__list_unpack__valueBoxIsListDestructUnpackable';
 
     public static function ensureLinked(Context $context): void
     {
@@ -47,13 +38,9 @@ final class ListUnpackRuntime
 
     public static function implement(Context $context): void
     {
-        if (self::$implementing) {
+        if (self::$implementing || self::bridgesReady($context)) {
             return;
         }
-        if (self::bridgesReady($context)) {
-            return;
-        }
-
         self::$implementing = true;
         $savedBlock = null;
         try {
@@ -63,40 +50,9 @@ final class ListUnpackRuntime
         try {
             $i8 = $context->getTypeFromString('int8');
             $i1 = $context->getTypeFromString('int1');
-
-            JitVmHelperLink::ensureBridge(
-            $context,
-            self::ABI_IS_ARRAY,
-            'list_unpack_value_box_is_array_entry',
-            [$i8],
-            $i1,
-            self::VALUE_BOX_IS_ARRAY,
-            self::HELPER_PATH,
-            self::COMPILED_HELPERS,
-            '#10266'
-        );
-        JitVmHelperLink::ensureBridge(
-            $context,
-            self::ABI_IS_STRING,
-            'list_unpack_value_box_is_string_entry',
-            [$i8],
-            $i1,
-            self::VALUE_BOX_IS_STRING,
-            self::HELPER_PATH,
-            self::COMPILED_HELPERS,
-            '#10266'
-        );
-        JitVmHelperLink::ensureBridge(
-            $context,
-            self::ABI_IS_UNPACKABLE,
-            'list_unpack_value_box_is_unpackable_entry',
-            [$i8, $i1],
-            $i1,
-            self::VALUE_BOX_IS_UNPACKABLE,
-            self::HELPER_PATH,
-            self::COMPILED_HELPERS,
-            '#10266'
-        );
+            JitVmHelperLink::ensureBridge($context, self::ABI_ARRAY, 'list_unpack_is_array', [$i8], $i1, self::H_ARRAY, self::HELPER_PATH, self::COMPILED, '#10266');
+            JitVmHelperLink::ensureBridge($context, self::ABI_STRING, 'list_unpack_is_string', [$i8], $i1, self::H_STRING, self::HELPER_PATH, self::COMPILED, '#10266');
+            JitVmHelperLink::ensureBridge($context, self::ABI_UNPACK, 'list_unpack_is_unpackable', [$i8, $i1], $i1, self::H_UNPACK, self::HELPER_PATH, self::COMPILED, '#10266');
         } finally {
             if (null !== $savedBlock) {
                 $context->builder->positionAtEnd($savedBlock);
@@ -109,26 +65,12 @@ final class ListUnpackRuntime
 
     public static function callValueBoxIsArray(Context $context, Value $typeByte): Value
     {
-        self::ensureLinked($context);
-        $fn = $context->lookupFunction(self::ABI_IS_ARRAY);
-        $i8 = $context->getTypeFromString('int8');
-
-        return $context->builder->call(
-            $fn,
-            $context->builder->trunc($typeByte, $i8)
-        );
+        return self::callBridge($context, self::ABI_ARRAY, $typeByte);
     }
 
     public static function callValueBoxIsString(Context $context, Value $typeByte): Value
     {
-        self::ensureLinked($context);
-        $fn = $context->lookupFunction(self::ABI_IS_STRING);
-        $i8 = $context->getTypeFromString('int8');
-
-        return $context->builder->call(
-            $fn,
-            $context->builder->trunc($typeByte, $i8)
-        );
+        return self::callBridge($context, self::ABI_STRING, $typeByte);
     }
 
     public static function callValueBoxIsListDestructUnpackable(
@@ -137,12 +79,11 @@ final class ListUnpackRuntime
         Value $implementsArrayAccess
     ): Value {
         self::ensureLinked($context);
-        $fn = $context->lookupFunction(self::ABI_IS_UNPACKABLE);
         $i8 = $context->getTypeFromString('int8');
         $i1 = $context->getTypeFromString('int1');
 
         return $context->builder->call(
-            $fn,
+            $context->lookupFunction(self::ABI_UNPACK),
             $context->builder->trunc($typeByte, $i8),
             $context->builder->trunc($implementsArrayAccess, $i1)
         );
@@ -153,18 +94,26 @@ final class ListUnpackRuntime
         $valuePtr = JitValueBox::valuePtrFromVariable($context, $var);
 
         return $context->builder->load(
-            $context->builder->structGep(
-                $valuePtr,
-                $context->structFieldMap['__value__']['type']
-            )
+            $context->builder->structGep($valuePtr, $context->structFieldMap['__value__']['type'])
+        );
+    }
+
+    private static function callBridge(Context $context, string $abi, Value $typeByte): Value
+    {
+        self::ensureLinked($context);
+        $i8 = $context->getTypeFromString('int8');
+
+        return $context->builder->call(
+            $context->lookupFunction($abi),
+            $context->builder->trunc($typeByte, $i8)
         );
     }
 
     private static function bridgesReady(Context $context): bool
     {
-        foreach ([self::ABI_IS_ARRAY, self::ABI_IS_STRING, self::ABI_IS_UNPACKABLE] as $abiName) {
+        foreach ([self::ABI_ARRAY, self::ABI_STRING, self::ABI_UNPACK] as $abi) {
             try {
-                $context->lookupFunction($abiName);
+                $context->lookupFunction($abi);
             } catch (\Throwable) {
                 return false;
             }

@@ -4,18 +4,15 @@ declare(strict_types=1);
 
 namespace PHPCompiler;
 
+use PHPCompiler\ext\zstd\VmZstdCore;
 use PHPCompiler\ext\zstd\VmZstdNative;
 use PHPUnit\Framework\TestCase;
 
-/** @covers issue #6387 */
+/** VmZstdCore — zstd round-trip without libzstd FFI (#8869). */
 final class VmZstdNativeTest extends TestCase
 {
     public function testRoundTripWithoutHostZstd(): void
     {
-        if (!VmZstdNative::available()) {
-            $this->markTestSkipped('libzstd FFI unavailable in this environment');
-        }
-
         $plain = 'hello zstd bootstrap';
         $compressed = VmZstdNative::compress($plain);
         $this->assertIsString($compressed);
@@ -25,12 +22,20 @@ final class VmZstdNativeTest extends TestCase
 
     public function testEmptyStringRoundTrip(): void
     {
-        if (!VmZstdNative::available()) {
-            $this->markTestSkipped('libzstd FFI unavailable in this environment');
-        }
-
         $compressed = VmZstdNative::compress('');
         $this->assertIsString($compressed);
         $this->assertSame('', VmZstdNative::decompress($compressed));
+    }
+
+    public function testAlwaysAvailableWithoutFfi(): void
+    {
+        $this->assertTrue(VmZstdNative::available());
+        $this->assertTrue(VmZstdCore::available());
+    }
+
+    public function testInvalidLevelReturnsFalse(): void
+    {
+        $this->assertFalse(VmZstdCore::compress('x', 0));
+        $this->assertFalse(VmZstdCore::compress('x', 23));
     }
 }

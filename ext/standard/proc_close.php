@@ -6,7 +6,9 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\ResourceSupport;
 use PHPLLVM\Value;
@@ -25,8 +27,11 @@ final class proc_close extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (1 !== \count($frame->calledArgs)) {
-            throw new \LogicException('proc_close() requires exactly one argument in this compiler build');
+        $argc = \count($frame->calledArgs);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(
+                'proc_close() expects exactly 1 argument, '.$argc.' given'
+            );
         }
         if (null === $frame->returnVar) {
             return;
@@ -38,8 +43,16 @@ final class proc_close extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (1 !== \count($args)) {
-            throw new \LogicException('proc_close() requires exactly one argument in this compiler build');
+        $argc = \count($args);
+        if (1 !== $argc) {
+            TypeErrorRaise::ensureLinked($context);
+            TypeErrorRaise::emitArgumentCountError(
+                $context,
+                'proc_close() expects exactly 1 argument, '.$argc.' given'
+            );
+            $slot = JitValueBox::alloc($context);
+
+            return JitValueBox::pointer($context, $slot);
         }
 
         return JitProcClose::invoke($context, $args[0]);
@@ -48,7 +61,7 @@ final class proc_close extends Internal
     public static function requireProcessHandle(\PHPCompiler\VM\Variable $v, string $functionName): int
     {
         $v = $v->resolveIndirect();
-        if (!$v->isProcessResource()) {
+        if (!ResourceSupport::isProcessResourceRepresentation($v)) {
             throw new \TypeError(\sprintf(
                 '%s(): Argument #1 ($process) must be of type resource, %s given',
                 $functionName,
@@ -64,5 +77,10 @@ final class proc_close extends Internal
         }
 
         return $handle;
+    }
+
+    public static function requireProcessHandleForGetStatus(\PHPCompiler\VM\Variable $v, string $functionName): int
+    {
+        return self::requireProcessHandle($v, $functionName);
     }
 }

@@ -30,8 +30,8 @@ final class InterfaceCheck
             throw new \TypeError("{$kind} must be of type {$expected}, {$given} given");
         }
         $entry = $target->toObject()->class;
-        foreach ($interfaceLcs as $ifaceLc) {
-            if (!self::entryImplements($entry, $ifaceLc, $context)) {
+        foreach ($interfaceLcs as $memberLc) {
+            if (!self::entrySatisfiesIntersectionMember($entry, $memberLc, $context)) {
                 $given = $entry->name;
 
                 throw new \TypeError(
@@ -39,6 +39,23 @@ final class InterfaceCheck
                 );
             }
         }
+    }
+
+    /**
+     * Intersection member satisfaction: instanceof for classes, implements for interfaces (zend_verify_arg_intersection_type).
+     */
+    public static function entrySatisfiesIntersectionMember(
+        ClassEntry $entry,
+        string $memberLc,
+        Context $context
+    ): bool {
+        $memberLc = self::resolveClassAliasLc(strtolower(ltrim($memberLc, '\\')), $context);
+        $memberEntry = $context->classes[$memberLc] ?? null;
+        if (null !== $memberEntry && $memberEntry->isInterface) {
+            return self::entryImplements($entry, $memberLc, $context);
+        }
+
+        return self::entryIsInstanceOf($entry, $memberLc, $context);
     }
 
     public static function entryImplements(ClassEntry $entry, string $ifaceLc, Context $context): bool
@@ -89,6 +106,10 @@ final class InterfaceCheck
             }
             $visited[$lc] = true;
             if ($lc === $classLc) {
+                if (ResourceSupport::isHiddenPseudoClassEntry($current)) {
+                    return false;
+                }
+
                 return true;
             }
             $wantEntry = $context->classes[$classLc] ?? null;

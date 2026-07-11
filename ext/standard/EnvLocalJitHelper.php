@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\VM\HashTable;
-use PHPCompiler\VM\Variable;
 
 /**
  * putenv()/getenv() local overlay for compiled JIT/AOT modules (#9814, php-in-PHP).
@@ -25,12 +24,8 @@ final class EnvLocalJitHelper
         return GetenvJitHelper::putenv($assignment);
     }
 
-    public static function mergeOverlay(HashTable $ht): void
+    public static function mergeLocalOverlayInto(HashTable $ht): void
     {
-        foreach (GetenvJitHelper::getAllEnvironmentMap() as $name => $value) {
-            $slot = new Variable();
-            $slot->string($value);
-            $ht->add($name, $slot);
-        }
+        GetenvJitHelper::mergeLocalOverlayInto($ht);
     }
 }

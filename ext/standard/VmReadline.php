@@ -19,9 +19,17 @@ final class VmReadline
 
     private static string $lineBuffer = '';
 
+    private static int $point = 0;
+
+    /** readline_info('end') — independent of line_buffer length until explicitly set (#16365). */
+    private static int $end = 0;
+
     private static string $readlineName = 'php';
 
     private static int $attemptedCompletionOver = 0;
+
+    /** readline_info() library_version — GNU readline reports rl_library_version (#15262). */
+    private static string $libraryVersion = '';
 
     public static function read(?string $prompt): string|false
     {
@@ -117,8 +125,11 @@ final class VmReadline
         if (null === $varname) {
             return self::assocArrayToHashTable([
                 'line_buffer' => self::$lineBuffer,
+                'point' => self::$point,
+                'end' => self::$end,
                 'readline_name' => self::$readlineName,
                 'attempted_completion_over' => self::$attemptedCompletionOver,
+                'library_version' => self::$libraryVersion,
             ]);
         }
 
@@ -132,6 +143,40 @@ final class VmReadline
             }
 
             return self::$lineBuffer;
+        }
+        if ('point' === $key) {
+            if ($hasNewvalue) {
+                $old = self::$point;
+                self::$point = (int) $newvalue;
+
+                return $old;
+            }
+
+            return self::$point;
+        }
+        if ('end' === $key) {
+            if ($hasNewvalue) {
+                $old = self::$end;
+                self::$end = (int) $newvalue;
+                self::$lineBuffer = \substr(self::$lineBuffer, 0, self::$end);
+                if (self::$point > self::$end) {
+                    self::$point = self::$end;
+                }
+
+                return $old;
+            }
+
+            return self::$end;
+        }
+        if ('library_version' === $key) {
+            if ($hasNewvalue) {
+                $old = self::$libraryVersion;
+                self::$libraryVersion = \is_string($newvalue) ? $newvalue : (string) $newvalue;
+
+                return $old;
+            }
+
+            return self::$libraryVersion;
         }
         if ('readline_name' === $key) {
             if ($hasNewvalue) {
@@ -197,13 +242,6 @@ final class VmReadline
 
     private static function readStdinFallback(?string $prompt): string|false
     {
-        if (null !== $prompt && '' !== $prompt) {
-            echo $prompt;
-            if (\defined('STDOUT') && (\is_resource(\STDOUT) || \STDOUT instanceof \Socket)) {
-                \fflush(\STDOUT);
-            }
-        }
-
         if (!\defined('STDIN')) {
             return false;
         }
@@ -211,6 +249,18 @@ final class VmReadline
         $stdin = \STDIN;
         if (!\is_resource($stdin) && !($stdin instanceof \Socket)) {
             return false;
+        }
+
+        // Zend readline.c — no prompt echo when stdin is not a TTY (#12301).
+        if (!\stream_isatty($stdin)) {
+            return false;
+        }
+
+        if (null !== $prompt && '' !== $prompt) {
+            echo $prompt;
+            if (\defined('STDOUT') && (\is_resource(\STDOUT) || \STDOUT instanceof \Socket)) {
+                \fflush(\STDOUT);
+            }
         }
 
         $line = \fgets($stdin);
@@ -224,6 +274,11 @@ final class VmReadline
         if (\str_ends_with($line, "\r")) {
             $line = \substr($line, 0, -1);
         }
+
+        $len = \strlen($line);
+        self::$lineBuffer = $line;
+        self::$point = $len;
+        self::$end = $len;
 
         return $line;
     }

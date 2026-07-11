@@ -32,6 +32,45 @@ final class StrGetcsvBuiltinTest extends TestCase
         $this->assertSame(['a', 'b', 'c'], $vals);
     }
 
+    /** Issue #4318 — Z_PARAM_STR coerces int/float/bool operands (ext/standard/file.c). */
+    public function testScalarCoercion(): void
+    {
+        $runtime = new Runtime();
+        $fn = new str_getcsv();
+        $frame = $fn->getFrame($runtime->vmContext);
+        $frame->returnVar = new VMVariable();
+
+        $intArg = new VMVariable();
+        $intArg->int(123);
+        $frame->calledArgs = [$intArg];
+        $fn->execute($frame);
+        $vals = [];
+        foreach ($frame->returnVar->toArray()->iterate(true) as $v) {
+            $vals[] = $v->resolveIndirect()->toString();
+        }
+        $this->assertSame(['123'], $vals);
+
+        $floatArg = new VMVariable();
+        $floatArg->float(1.5);
+        $frame->calledArgs = [$floatArg];
+        $fn->execute($frame);
+        $vals = [];
+        foreach ($frame->returnVar->toArray()->iterate(true) as $v) {
+            $vals[] = $v->resolveIndirect()->toString();
+        }
+        $this->assertSame(['1.5'], $vals);
+
+        $boolArg = new VMVariable();
+        $boolArg->bool(true);
+        $frame->calledArgs = [$boolArg];
+        $fn->execute($frame);
+        $vals = [];
+        foreach ($frame->returnVar->toArray()->iterate(true) as $v) {
+            $vals[] = $v->resolveIndirect()->toString();
+        }
+        $this->assertSame(['1'], $vals);
+    }
+
     public function testQuotedFields(): void
     {
         $runtime = new Runtime();
@@ -48,6 +87,31 @@ final class StrGetcsvBuiltinTest extends TestCase
             $vals[] = $v->resolveIndirect()->toString();
         }
         $this->assertSame(['hello', 'world'], $vals);
+    }
+
+    /** Issue #9303 — escape=enclosure uses doubled-quote unescaping only (php-src file.c). */
+    public function testEscapeEqualsEnclosureDoubledQuotes(): void
+    {
+        $runtime = new Runtime();
+        $fn = new str_getcsv();
+        $frame = $fn->getFrame($runtime->vmContext);
+        $arg = new VMVariable();
+        $arg->string('a,"b""c",d');
+        $sep = new VMVariable();
+        $sep->string(',');
+        $enc = new VMVariable();
+        $enc->string('"');
+        $esc = new VMVariable();
+        $esc->string('"');
+        $frame->calledArgs = [$arg, $sep, $enc, $esc];
+        $frame->returnVar = new VMVariable();
+        $fn->execute($frame);
+        $ht = $frame->returnVar->toArray();
+        $vals = [];
+        foreach ($ht->iterate(true) as $v) {
+            $vals[] = $v->resolveIndirect()->toString();
+        }
+        $this->assertSame(['a', 'b"c', 'd'], $vals);
     }
 
     public function testEnumCaseOperandTypeError(): void
@@ -69,7 +133,7 @@ final class StrGetcsvBuiltinTest extends TestCase
         $fn->execute($frame);
     }
 
-    public function testNullOperandTypeError(): void
+    public function testNullCoercesWithoutStrict(): void
     {
         $runtime = new Runtime();
         $fn = new str_getcsv();
@@ -79,9 +143,80 @@ final class StrGetcsvBuiltinTest extends TestCase
         $frame = $fn->getFrame($runtime->vmContext);
         $frame->calledArgs = [$arg];
         $frame->returnVar = new VMVariable();
-        $this->expectException(\TypeError::class);
-        $this->expectExceptionMessage('str_getcsv(): Argument #1 ($string) must be of type string, null given');
         $fn->execute($frame);
+        $ht = $frame->returnVar->toArray();
+        $this->assertSame(1, $ht->getNumElements());
+        $vals = [];
+        foreach ($ht->iterate(true) as $v) {
+            $vals[] = $v->resolveIndirect()->type;
+        }
+        $this->assertSame([VMVariable::TYPE_NULL], $vals);
+    }
+
+    public function testNullSeparatorUsesDefault(): void
+    {
+        $runtime = new Runtime();
+        $fn = new str_getcsv();
+        $input = new VMVariable();
+        $input->string('a,b');
+        $separator = new VMVariable();
+        $separator->null();
+
+        $frame = $fn->getFrame($runtime->vmContext);
+        $frame->calledArgs = [$input, $separator];
+        $frame->returnVar = new VMVariable();
+        $fn->execute($frame);
+        $vals = [];
+        foreach ($frame->returnVar->toArray()->iterate(true) as $v) {
+            $vals[] = $v->resolveIndirect()->toString();
+        }
+        $this->assertSame(['a', 'b'], $vals);
+    }
+
+    public function testNullEnclosureUsesDefault(): void
+    {
+        $runtime = new Runtime();
+        $fn = new str_getcsv();
+        $input = new VMVariable();
+        $input->string('a,b');
+        $sep = new VMVariable();
+        $sep->string(',');
+        $enclosure = new VMVariable();
+        $enclosure->null();
+
+        $frame = $fn->getFrame($runtime->vmContext);
+        $frame->calledArgs = [$input, $sep, $enclosure];
+        $frame->returnVar = new VMVariable();
+        $fn->execute($frame);
+        $vals = [];
+        foreach ($frame->returnVar->toArray()->iterate(true) as $v) {
+            $vals[] = $v->resolveIndirect()->toString();
+        }
+        $this->assertSame(['a', 'b'], $vals);
+    }
+
+    public function testNullEscapeUsesDefault(): void
+    {
+        $runtime = new Runtime();
+        $fn = new str_getcsv();
+        $input = new VMVariable();
+        $input->string('a,b');
+        $sep = new VMVariable();
+        $sep->string(',');
+        $enc = new VMVariable();
+        $enc->string('"');
+        $escape = new VMVariable();
+        $escape->null();
+
+        $frame = $fn->getFrame($runtime->vmContext);
+        $frame->calledArgs = [$input, $sep, $enc, $escape];
+        $frame->returnVar = new VMVariable();
+        $fn->execute($frame);
+        $vals = [];
+        foreach ($frame->returnVar->toArray()->iterate(true) as $v) {
+            $vals[] = $v->resolveIndirect()->toString();
+        }
+        $this->assertSame(['a', 'b'], $vals);
     }
 
     /** @dataProvider newlineOnlyProvider */

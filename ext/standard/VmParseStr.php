@@ -20,18 +20,40 @@ final class VmParseStr
      */
     public static function importIntoCaller(Frame $caller, array $params): void
     {
+        $mainScriptGlobals = null !== $caller->block
+            && $caller->block->isMainScript()
+            && null !== $caller->vmContext;
         foreach ($params as $key => $value) {
             if (!\is_string($key) && !\is_int($key)) {
                 continue;
             }
             $name = (string) $key;
-            $target = $caller->block->ensureVariableByRuntimeName($name, $caller);
+            if (null === $caller->block) {
+                continue;
+            }
+            $idx = $caller->block->slotIndexForVariableName($name);
+            if (null !== $idx) {
+                if (!isset($caller->scope[$idx])) {
+                    $caller->scope[$idx] = new Variable();
+                }
+                $target = $caller->scope[$idx];
+            } else {
+                $target = $caller->block->ensureVariableByRuntimeName($name, $caller);
+            }
             if (\is_array($value)) {
                 $parsed = new HashTable();
                 self::mergeInto($parsed, $value);
                 $replacement = new Variable(Variable::TYPE_ARRAY);
                 $replacement->array($parsed);
                 $target->copyFrom($replacement);
+                if (null !== $idx) {
+                    $caller->initializedSlots[$idx] = true;
+                }
+                if ($mainScriptGlobals) {
+                    $global = $caller->vmContext->ensureGlobal($name);
+                    $global->copyFrom($replacement);
+                    $caller->vmContext->markGlobalEverAssigned($name);
+                }
 
                 continue;
             }
@@ -49,6 +71,14 @@ final class VmParseStr
                 $replacement->string((string) $value);
             }
             $target->copyFrom($replacement);
+            if (null !== $idx) {
+                $caller->initializedSlots[$idx] = true;
+            }
+            if ($mainScriptGlobals) {
+                $global = $caller->vmContext->ensureGlobal($name);
+                $global->copyFrom($replacement);
+                $caller->vmContext->markGlobalEverAssigned($name);
+            }
         }
     }
 

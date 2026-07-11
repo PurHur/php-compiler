@@ -6,28 +6,42 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\VM\DateTimeZoneSupport;
 use PHPCompiler\VM\NativeDateMalformedStringException;
+use PHPCompiler\VM\Variable;
 
 /**
  * Native DateTime/DateTimeZone semantics without host Zend \\DateTime (issue #6164).
- * TZ switching via {@see VmEnv} libc FFI — no host Zend env builtins (#8086).
+ * TZ switching via {@see VmEnv} — no host Zend env builtins (#8086).
  * zone.tab reads via {@see VmFs::file()} / {@see VmFsReadNative} — no host \\file() (#8529).
  *
  * php-src ref: ext/date/php_datetime.c, ext/date/lib/timelib.c — parsing, formatting, offsets.
- * Thin libc FFI for mktime/localtime/timegm; timezone IDs validated via zoneinfo files.
+ * Time libc via {@see VmDatePure} host wrappers (#13765, #13857); timezone IDs validated via zoneinfo files.
  */
 final class VmDateTimeNative
 {
     private const ZONEINFO_ROOT = '/usr/share/zoneinfo';
 
-    private const FORMAT_OUT_BYTES = 256;
+    /** Day-scan fallback only for narrow windows; full-range uses TZif (#11069). */
+    private const TRANSITION_SCAN_MAX_SPAN = 86400 * 366 * 10;
 
-    private static ?\FFI $ffi = null;
+    private const FORMAT_OUT_BYTES = 256;
 
     /** @var list<string>|null */
     private static ?array $zoneIdentifiers = null;
 
     /** @var list<array{country: string, id: string}>|null */
     private static ?array $zoneTabEntries = null;
+
+    private static ?Variable $timezoneAbbreviationsCache = null;
+
+    private static int $withTimezoneDepth = 0;
+
+    /** @var string|false */
+    private static string|false $withTimezoneSavedVmEnvTz = false;
+
+    private static ?string $withTimezoneSavedHostTz = null;
+
+    /** Set when createFromFormat format is satisfied but time has trailing junk (#14173, #16196). */
+    private static bool $createFromFormatTrailingData = false;
 
     /**
      * timezone_identifiers_list() — Olson identifiers from zone.tab (ext/date/php_date.c, #3504).
@@ -76,11 +90,85 @@ final class VmDateTimeNative
         return $filtered;
     }
 
+    /**
+     * timezone_abbreviations_list() / DateTimeZone::listAbbreviations() — timelib precompiled map.
+     *
+     * php-src: ext/date/php_date.c — PHP_FUNCTION(timezone_abbreviations_list)
+     */
+    public static function timezoneAbbreviationsListVariable(): Variable
+    {
+        if (null === self::$timezoneAbbreviationsCache) {
+            /** @var array<string, list<array{dst: bool, offset: int, timezone_id: ?string}>> $data */
+            $data = require __DIR__.'/TimezoneAbbreviationsData.php';
+            self::$timezoneAbbreviationsCache = VmJson::import($data);
+        }
+        $copy = new Variable();
+        $copy->copyFrom(self::$timezoneAbbreviationsCache);
+
+        return $copy;
+    }
+
+    /**
+     * timezone_name_from_abbr() — timelib abbr_search + fallbackmap (ext/date/php_date.c, #10957).
+     *
+     * @return string|false
+     */
+    public static function timezoneNameFromAbbr(string $abbr, int $gmtoffset = -1, int $isdst = -1): string|false
+    {
+        if (0 === strcasecmp($abbr, 'utc') || 0 === strcasecmp($abbr, 'gmt')) {
+            return 'UTC';
+        }
+
+        /** @var array<string, list<array{dst: bool, offset: int, timezone_id: ?string}>> $data */
+        $data = require __DIR__.'/TimezoneAbbreviationsData.php';
+        $key = strtolower($abbr);
+
+        if (isset($data[$key])) {
+            $firstFound = null;
+            foreach ($data[$key] as $entry) {
+                $timezoneId = $entry['timezone_id'] ?? null;
+                if (!\is_string($timezoneId) || '' === $timezoneId) {
+                    continue;
+                }
+                if (null === $firstFound) {
+                    $firstFound = $timezoneId;
+                    if (-1 === $gmtoffset) {
+                        return $timezoneId;
+                    }
+                }
+                if ($entry['offset'] === $gmtoffset) {
+                    return $timezoneId;
+                }
+            }
+            if (null !== $firstFound) {
+                return $firstFound;
+            }
+        }
+
+        if (-1 === $gmtoffset || -1 === $isdst) {
+            return false;
+        }
+
+        /** @var list<array{dst: int, offset: int, timezone_id: string}> $fallback */
+        $fallback = require __DIR__.'/TimezoneFallbackData.php';
+        foreach ($fallback as $entry) {
+            if ($entry['offset'] === $gmtoffset && $entry['dst'] === $isdst) {
+                return $entry['timezone_id'];
+            }
+        }
+
+        return false;
+    }
+
     public static function validateTimezoneId(string $timezone): string
     {
         $timezone = trim($timezone);
         if ('' === $timezone) {
             self::throwInvalidTimezone($timezone);
+        }
+        $canonicalOffset = self::canonicalNumericTimezoneId($timezone);
+        if (null !== $canonicalOffset) {
+            return $canonicalOffset;
         }
         if (self::zoneinfoPath($timezone)) {
             return $timezone;
@@ -91,13 +179,53 @@ final class VmDateTimeNative
     /** php-src ext/date/php_date.c — date_default_timezone_set() validation without throwing. */
     public static function timezoneIdIsValid(string $timezone): bool
     {
-        return null !== self::zoneinfoPath(trim($timezone)) && '' !== trim($timezone);
+        $timezone = trim($timezone);
+        if ('' === $timezone) {
+            return false;
+        }
+        if (null !== self::canonicalNumericTimezoneId($timezone)) {
+            return true;
+        }
+
+        return null !== self::zoneinfoPath($timezone);
     }
 
     /**
-     * @return array{timestamp: int, microsecond: int}
+     * Fixed numeric offset from a timezone id (+0530 / +05:30), or null.
      */
-    public static function parseDateTime(string $time, string $tzName): array
+    public static function parseNumericTimezoneOffset(string $timezone): ?int
+    {
+        $timezone = trim($timezone);
+        if (1 !== preg_match('/^([+-])(\d{2}):?(\d{2})$/', $timezone, $matches)) {
+            return null;
+        }
+        $hours = (int) $matches[2];
+        $minutes = (int) $matches[3];
+        if ($hours > 18 || $minutes >= 60) {
+            return null;
+        }
+        $seconds = $hours * 3600 + $minutes * 60;
+
+        return '-' === $matches[1] ? -$seconds : $seconds;
+    }
+
+    /**
+     * php-src timelib canonical spelling (+HH:MM) for numeric offset ids.
+     */
+    public static function canonicalNumericTimezoneId(string $timezone): ?string
+    {
+        $offset = self::parseNumericTimezoneOffset($timezone);
+        if (null === $offset) {
+            return null;
+        }
+
+        return self::formatOffset($offset);
+    }
+
+    /**
+     * @return array{timestamp: int, microsecond: int, timezone?: string}
+     */
+    public static function parseDateTime(string $time, string $tzName, ?int $baseTimestamp = null): array
     {
         $time = trim($time);
         if ('' === $time) {
@@ -106,6 +234,158 @@ final class VmDateTimeNative
         if ('now' === strtolower($time)) {
             return self::readNow();
         }
+        $base = $baseTimestamp ?? self::readNow()['timestamp'];
+        $extended = self::tryParseExtendedDateTimeString($time, $tzName, $base);
+        if (null !== $extended) {
+            return $extended;
+        }
+
+        return self::parseDateTimeAbsolute($time, $tzName);
+    }
+
+    /**
+     * php-src timelib relative grammar — next weekday, first/last day of month, date + modifier (#11327).
+     *
+     * @return array{timestamp: int, microsecond: int, timezone?: string}|null
+     */
+    private static function tryParseExtendedDateTimeString(string $time, string $tzName, int $base): ?array
+    {
+        if (1 === preg_match(
+            '/^next\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday)$/i',
+            $time,
+            $matches
+        )) {
+            return self::weekdayParseResult('next', strtolower($matches[1]), $base, $tzName);
+        }
+        if (1 === preg_match(
+            '/^(last|previous|this)\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday)$/i',
+            $time,
+            $matches
+        )) {
+            return self::weekdayParseResult(strtolower($matches[1]), strtolower($matches[2]), $base, $tzName);
+        }
+        if (1 === preg_match(
+            '/^(monday|tuesday|wednesday|thursday|friday|saturday|sunday)$/i',
+            $time,
+            $matches
+        )) {
+            return self::weekdayParseResult('bare', strtolower($matches[1]), $base, $tzName);
+        }
+        if (1 === preg_match(
+            '/^(first|last)\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\s+of\s+([A-Za-z]+)\s+(\d{4})$/i',
+            $time,
+            $matches
+        )) {
+            return self::weekdayOfMonthParseResult(
+                strtolower($matches[1]),
+                strtolower($matches[2]),
+                $matches[3],
+                (int) $matches[4],
+                $tzName
+            );
+        }
+        if (1 === preg_match('/^midnight$/i', $time)) {
+            return self::timeOfDayOnBase($base, 0, 0, 0, $tzName);
+        }
+        if (1 === preg_match('/^noon$/i', $time)) {
+            return self::timeOfDayOnBase($base, 12, 0, 0, $tzName);
+        }
+        if (1 === preg_match('/^(today|tomorrow|yesterday)$/i', $time, $matches)) {
+            return self::dayWordMidnightParseResult(strtolower($matches[1]), $base, $tzName);
+        }
+        if (1 === preg_match('/^(today|tomorrow|yesterday)\s+(.+)$/i', $time, $matches)) {
+            return self::dayWordWithTimeParseResult(strtolower($matches[1]), trim($matches[2]), $base, $tzName);
+        }
+        if (1 === preg_match('/^last day of ([A-Za-z]+)\s+(\d{4})$/i', $time, $matches)) {
+            $month = self::englishMonthToNumber($matches[1]);
+            if (null === $month) {
+                return null;
+            }
+            $year = (int) $matches[2];
+
+            return [
+                'timestamp' => self::mktimeInTimezone(
+                    $year,
+                    $month,
+                    self::daysInMonth($year, $month),
+                    0,
+                    0,
+                    0,
+                    $tzName
+                ),
+                'microsecond' => 0,
+            ];
+        }
+        if (1 === preg_match('/^first day of ([A-Za-z]+)\s+(\d{4})$/i', $time, $matches)) {
+            $month = self::englishMonthToNumber($matches[1]);
+            if (null === $month) {
+                return null;
+            }
+            $year = (int) $matches[2];
+
+            return [
+                'timestamp' => self::mktimeInTimezone($year, $month, 1, 0, 0, 0, $tzName),
+                'microsecond' => 0,
+            ];
+        }
+        if (1 === preg_match('/^(first|last) day of (next|this|last) month$/i', $time, $matches)) {
+            return self::monthBoundaryParseResult(
+                strtolower($matches[1]),
+                strtolower($matches[2]),
+                $base,
+                $tzName
+            );
+        }
+        if (1 === preg_match('/^(next|last|this) month$/i', $time, $matches)) {
+            return self::monthOffsetParseResult(strtolower($matches[1]), $base, $tzName);
+        }
+        if (1 === preg_match('/^(last|next|this) year$/i', $time, $matches)) {
+            return self::yearOffsetParseResult(strtolower($matches[1]), $base, $tzName);
+        }
+        if (1 === preg_match('/^(.+?) (last|next|this) year$/i', $time, $matches)) {
+            return self::yearRelativeMonthDayParseResult(
+                strtolower($matches[2]),
+                trim($matches[1]),
+                $base,
+                $tzName
+            );
+        }
+        if (1 === preg_match('/^(last|next|this) year (.+)$/i', $time, $matches)) {
+            return self::yearRelativeMonthDayParseResult(
+                strtolower($matches[1]),
+                trim($matches[2]),
+                $base,
+                $tzName
+            );
+        }
+        if (1 === preg_match(
+            '/^(.+?)\s+([+-]\s*\d+\s+(?:second|seconds|minute|minutes|hour|hours|day|days|week|weeks|month|months|year|years))$/i',
+            $time,
+            $matches
+        )) {
+            try {
+                $parsed = self::parseDateTimeAbsolute(trim($matches[1]), $tzName);
+                $modifier = preg_replace('/\s+/', ' ', trim($matches[2])) ?? trim($matches[2]);
+                $timestamp = self::modifyRelative($parsed['timestamp'], $modifier, $tzName);
+                $result = ['timestamp' => $timestamp, 'microsecond' => $parsed['microsecond']];
+                if (isset($parsed['timezone'])) {
+                    $result['timezone'] = $parsed['timezone'];
+                }
+
+                return $result;
+            } catch (NativeDateMalformedStringException) {
+                return null;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @return array{timestamp: int, microsecond: int, timezone?: string}
+     */
+    private static function parseDateTimeAbsolute(string $time, string $tzName): array
+    {
         if (str_starts_with($time, '@')) {
             $unix = substr($time, 1);
             if ('' === $unix || !ctype_digit($unix)) {
@@ -118,7 +398,7 @@ final class VmDateTimeNative
             return ['timestamp' => (int) $time, 'microsecond' => 0];
         }
         if (1 === preg_match(
-            '/^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2}):(\d{2})(?:\.(\d+))?)?$/',
+            '/^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2}):(\d{2})(?:\.(\d+))?)?(?:Z|([+-]\d{2}:?\d{2}))?$/',
             $time,
             $matches
         )) {
@@ -129,6 +409,16 @@ final class VmDateTimeNative
             if (isset($matches[7]) && '' !== $matches[7]) {
                 $microsecond = (int) \str_pad(\substr($matches[7], 0, 6), 6, '0', STR_PAD_RIGHT);
             }
+            $useTz = $tzName;
+            if (str_ends_with($time, 'Z')) {
+                $useTz = 'UTC';
+            } elseif (isset($matches[8]) && '' !== $matches[8]) {
+                $embedded = self::canonicalNumericTimezoneId($matches[8]);
+                if (null === $embedded) {
+                    self::throwMalformedDateTime($time);
+                }
+                $useTz = $embedded;
+            }
 
             return [
                 'timestamp' => self::mktimeInTimezone(
@@ -138,9 +428,81 @@ final class VmDateTimeNative
                     $hour,
                     $minute,
                     $second,
-                    $tzName
+                    $useTz
                 ),
                 'microsecond' => $microsecond,
+                'timezone' => $useTz !== $tzName ? $useTz : null,
+                'utc_z' => str_ends_with($time, 'Z'),
+            ];
+        }
+        if (1 === preg_match(
+            '/^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2}):(\d{2})(?:\.(\d+))?)?\s+([A-Za-z][A-Za-z0-9_+\/-]*(?:\/[A-Za-z][A-Za-z0-9_+\/-]*)*)$/',
+            $time,
+            $matches
+        )) {
+            $hour = isset($matches[4]) ? (int) $matches[4] : 0;
+            $minute = isset($matches[5]) ? (int) $matches[5] : 0;
+            $second = isset($matches[6]) ? (int) $matches[6] : 0;
+            $microsecond = 0;
+            if (isset($matches[7]) && '' !== $matches[7]) {
+                $microsecond = (int) \str_pad(\substr($matches[7], 0, 6), 6, '0', STR_PAD_RIGHT);
+            }
+            try {
+                $useTz = self::validateTimezoneId($matches[8]);
+            } catch (\PHPCompiler\VM\NativeDateInvalidTimeZoneException) {
+                self::throwMalformedDateTime($time);
+            }
+
+            return [
+                'timestamp' => self::mktimeInTimezone(
+                    (int) $matches[1],
+                    (int) $matches[2],
+                    (int) $matches[3],
+                    $hour,
+                    $minute,
+                    $second,
+                    $useTz
+                ),
+                'microsecond' => $microsecond,
+                'timezone' => $useTz,
+            ];
+        }
+        if (1 === preg_match('/^(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})$/', $time, $matches)) {
+            $month = self::englishMonthToNumber($matches[2]);
+            if (null === $month) {
+                self::throwMalformedDateTime($time);
+            }
+
+            return [
+                'timestamp' => self::mktimeInTimezone(
+                    (int) $matches[3],
+                    $month,
+                    (int) $matches[1],
+                    0,
+                    0,
+                    0,
+                    $tzName
+                ),
+                'microsecond' => 0,
+            ];
+        }
+        if (1 === preg_match('/^([A-Za-z]+)\s+(\d{1,2}),\s+(\d{4})$/', $time, $matches)) {
+            $month = self::englishMonthToNumber($matches[1]);
+            if (null === $month) {
+                self::throwMalformedDateTime($time);
+            }
+
+            return [
+                'timestamp' => self::mktimeInTimezone(
+                    (int) $matches[3],
+                    $month,
+                    (int) $matches[2],
+                    0,
+                    0,
+                    0,
+                    $tzName
+                ),
+                'microsecond' => 0,
             ];
         }
 
@@ -225,6 +587,52 @@ final class VmDateTimeNative
             return self::parseResultFromTimestamp((int) $date, 0);
         }
         if (1 === preg_match(
+            '/^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2}):(\d{2})(?:\.(\d+))?)?\s+([A-Za-z][A-Za-z0-9_+\/-]*(?:\/[A-Za-z][A-Za-z0-9_+\/-]*)*)$/',
+            $date,
+            $matches
+        )) {
+            $hasTime = isset($matches[4]);
+            $fraction = false;
+            if ($hasTime) {
+                $fraction = 0.0;
+                if (isset($matches[7]) && '' !== $matches[7]) {
+                    $fraction = (float) ('0.'.\str_pad(\substr($matches[7], 0, 6), 6, '0', STR_PAD_RIGHT));
+                }
+            }
+            try {
+                $tzId = self::validateTimezoneId($matches[8]);
+            } catch (\PHPCompiler\VM\NativeDateInvalidTimeZoneException) {
+                return self::parseUnrecognizedDateString($date);
+            }
+            $result = self::finalizeParsedDateComponents([
+                'year' => (int) $matches[1],
+                'month' => (int) $matches[2],
+                'day' => (int) $matches[3],
+                'hour' => $hasTime ? (int) $matches[4] : false,
+                'minute' => $hasTime ? (int) $matches[5] : false,
+                'second' => $hasTime ? (int) $matches[6] : false,
+                'fraction' => $fraction,
+            ], $tzId);
+
+            return self::withNamedTimezoneMetadata($result, $tzId);
+        }
+        if (1 === preg_match('/^([A-Za-z]+)\s+(\d{1,2}),\s+(\d{4})$/', $date, $matches)) {
+            $month = self::englishMonthToNumber($matches[1]);
+            if (null === $month) {
+                return self::parseUnrecognizedDateString($date);
+            }
+
+            return self::finalizeParsedDateComponents([
+                'year' => (int) $matches[3],
+                'month' => $month,
+                'day' => (int) $matches[2],
+                'hour' => false,
+                'minute' => false,
+                'second' => false,
+                'fraction' => false,
+            ], $tzName);
+        }
+        if (1 === preg_match(
             '/^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2}):(\d{2})(?:\.(\d+))?)?$/',
             $date,
             $matches
@@ -249,13 +657,102 @@ final class VmDateTimeNative
             ], $tzName);
         }
 
+        $relativeWeekday = self::tryParseRelativeWeekdayForDateParse($date);
+        if (null !== $relativeWeekday) {
+            return $relativeWeekday;
+        }
+
         try {
             $parsed = self::parseDateTime($date, $tzName);
+            $result = self::parseResultFromTimestamp($parsed['timestamp'], $parsed['microsecond']);
 
-            return self::parseResultFromTimestamp($parsed['timestamp'], $parsed['microsecond']);
+            return self::applyParseTimezoneMetadata($result, $parsed, $date);
         } catch (NativeDateMalformedStringException) {
             return self::parseUnrecognizedDateString($date);
         }
+    }
+
+    /**
+     * php-src date_parse() — relative weekday modifiers keep false calendar fields (#14163).
+     *
+     * @return array{
+     *   year: int|false,
+     *   month: int|false,
+     *   day: int|false,
+     *   hour: int|false,
+     *   minute: int|false,
+     *   second: int|false,
+     *   fraction: float|false,
+     *   warning_count: int,
+     *   warnings: array<int, string>,
+     *   error_count: int,
+     *   errors: array<int, string>,
+     *   is_localtime: bool,
+     *   relative: array{
+     *     year: int,
+     *     month: int,
+     *     day: int,
+     *     hour: int,
+     *     minute: int,
+     *     second: int,
+     *     weekday: int
+     *   }
+     * }|null
+     */
+    private static function tryParseRelativeWeekdayForDateParse(string $date): ?array
+    {
+        $modifier = null;
+        $weekday = null;
+        if (1 === preg_match(
+            '/^next\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday)$/i',
+            $date,
+            $matches
+        )) {
+            $modifier = 'next';
+            $weekday = strtolower($matches[1]);
+        } elseif (1 === preg_match(
+            '/^(last|previous|this)\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday)$/i',
+            $date,
+            $matches
+        )) {
+            $modifier = strtolower($matches[1]);
+            $weekday = strtolower($matches[2]);
+        } elseif (1 === preg_match(
+            '/^(monday|tuesday|wednesday|thursday|friday|saturday|sunday)$/i',
+            $date,
+            $matches
+        )) {
+            $modifier = 'bare';
+            $weekday = strtolower($matches[1]);
+        }
+        if (null === $weekday) {
+            return null;
+        }
+        $weekdayNum = self::weekdayNameToNumber($weekday);
+        if ($weekdayNum < 0) {
+            return null;
+        }
+        $relativeDay = \in_array($modifier, ['last', 'previous'], true) ? -7 : 0;
+        $result = self::parseResultFromComponents([
+            'year' => false,
+            'month' => false,
+            'day' => false,
+            'hour' => false,
+            'minute' => false,
+            'second' => false,
+            'fraction' => false,
+        ]);
+        $result['relative'] = [
+            'year' => 0,
+            'month' => 0,
+            'day' => $relativeDay,
+            'hour' => 0,
+            'minute' => 0,
+            'second' => 0,
+            'weekday' => $weekdayNum,
+        ];
+
+        return $result;
     }
 
     /**
@@ -280,10 +777,9 @@ final class VmDateTimeNative
     {
         $matched = self::matchFormatComponents($format, $time);
         if (false === $matched) {
-            return self::failedParseResult([
-                0 => 'A four digit year could not be found',
-                3 => 'Not enough data available to satisfy format',
-            ]);
+            $failure = self::buildCreateFromFormatFailureErrors($format, $time);
+
+            return self::failedParseResult($failure['errors'], $failure['error_count']);
         }
         $normalized = self::warnInvalidCalendarComponents($matched);
         $result = self::parseResultFromComponents($normalized['components']);
@@ -296,7 +792,7 @@ final class VmDateTimeNative
     }
 
     /**
-     * @return array{timestamp: int, microsecond: int}|false
+     * @return array{timestamp: int, microsecond: int, timezone?: string}|false
      */
     public static function parseFromFormat(string $format, string $time, string $tzName): array|false
     {
@@ -315,20 +811,46 @@ final class VmDateTimeNative
         $hour = false === $matched['hour'] ? 0 : $matched['hour'];
         $minute = false === $matched['minute'] ? 0 : $matched['minute'];
         $second = false === $matched['second'] ? 0 : $matched['second'];
-        $microsecond = (int) \round(($matched['fraction'] ?? 0.0) * 1_000_000);
+        $fraction = $matched['fraction'] ?? false;
+        $microsecond = false === $fraction ? 0 : (int) \round($fraction * 1_000_000);
+        $useTz = isset($matched['timezone']) && \is_string($matched['timezone'])
+            ? $matched['timezone']
+            : $tzName;
+        if (!self::formatStringHasTimeTokens($format)) {
+            $now = self::readNow();
+            $nowTm = self::withTimezone($useTz, static function () use ($now): ?array {
+                return self::localtime($now['timestamp']);
+            });
+            if (null !== $nowTm) {
+                if (false === $matched['hour']) {
+                    $hour = self::tmInt($nowTm, 'tm_hour');
+                }
+                if (false === $matched['minute']) {
+                    $minute = self::tmInt($nowTm, 'tm_min');
+                }
+                if (false === $matched['second']) {
+                    $second = self::tmInt($nowTm, 'tm_sec');
+                }
+            }
+        }
 
         try {
-            return [
-                'timestamp' => self::mktimeInTimezone($year, $month, $day, $hour, $minute, $second, $tzName),
+            $result = [
+                'timestamp' => self::mktimeInTimezone($year, $month, $day, $hour, $minute, $second, $useTz),
                 'microsecond' => $microsecond,
             ];
+            if ($useTz !== $tzName) {
+                $result['timezone'] = $useTz;
+            }
+
+            return $result;
         } catch (NativeDateMalformedStringException) {
             return false;
         }
     }
 
     /**
-     * php-src PHP_FUNCTION(strtotime) — natural-language / relative timestamps (#10742).
+     * php-src PHP_FUNCTION(strtotime) — natural-language / relative timestamps (#10742, #11327).
      */
     public static function strtotime(string $time, ?int $now = null): int|false
     {
@@ -343,25 +865,28 @@ final class VmDateTimeNative
             return false;
         }
         $base = $now ?? self::readNow()['timestamp'];
-        if (1 === preg_match(
-            '/^next\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday)$/i',
-            $time,
-            $matches
-        )) {
-            return self::nextWeekdayTimestamp(strtolower($matches[1]), $base, $tzName);
+        if (str_starts_with($time, '+') || str_starts_with($time, '-')) {
+            $compound = self::tryApplyCompoundSignedRelativeDelta($base, $time, $tzName);
+            if (null !== $compound) {
+                return $compound;
+            }
         }
         if (1 === preg_match(
             '/^[+-]?\d+\s+(second|seconds|minute|minutes|hour|hours|day|days|week|weeks|month|months|year|years)$/i',
             $time
         )) {
+            $modifier = $time;
+            if (!preg_match('/^[+-]/', $modifier)) {
+                $modifier = '+'.$modifier;
+            }
             try {
-                return self::modifyRelative($base, $time, $tzName);
+                return self::modifyRelative($base, $modifier, $tzName);
             } catch (NativeDateMalformedStringException) {
                 return false;
             }
         }
         try {
-            $parsed = self::parseDateTime($time, $tzName);
+            $parsed = self::parseDateTime($time, $tzName, $base);
 
             return $parsed['timestamp'];
         } catch (NativeDateMalformedStringException) {
@@ -396,7 +921,10 @@ final class VmDateTimeNative
      *   is_localtime: bool
      * }
      */
-    private static function failedParseResult(array $errors): array
+    /**
+     * @param array<int, string> $errors
+     */
+    private static function failedParseResult(array $errors, ?int $errorCount = null): array
     {
         return [
             'year' => false,
@@ -408,10 +936,66 @@ final class VmDateTimeNative
             'fraction' => false,
             'warning_count' => 0,
             'warnings' => [],
-            'error_count' => \count($errors),
+            'error_count' => $errorCount ?? \count($errors),
             'errors' => $errors,
             'is_localtime' => false,
         ];
+    }
+
+    /**
+     * php-src ext/date/lib/parse_date.c — timelib_parse_from_format error accumulation (#14173).
+     *
+     * error_count is the number of recorded messages (not unique position keys).
+     *
+     * @return array{errors: array<int, string>, error_count: int}
+     */
+    private static function buildCreateFromFormatFailureErrors(string $format, string $time): array
+    {
+        if (self::$createFromFormatTrailingData) {
+            self::$createFromFormatTrailingData = false;
+
+            return ['errors' => [10 => 'Trailing data'], 'error_count' => 1];
+        }
+
+        /** @var list<array{0: int, 1: string}> $messages */
+        $messages = [];
+        $add = static function (int $position, string $message) use (&$messages): void {
+            $messages[] = [$position, $message];
+        };
+
+        $bare = \str_starts_with($format, '!') ? \substr($format, 1) : $format;
+        $timeLen = \strlen($time);
+        $primary = self::primaryCreateFromFormatFailureMessage($bare, $time);
+
+        if (\strlen($bare) > 1 && \preg_match('/[YymdHisuvGUeTOP]/', $bare)) {
+            $add(0, 'The format separator does not match');
+            $add(0, $primary);
+            $add($timeLen, 'Not enough data available to satisfy format');
+        } else {
+            if ($timeLen > 0) {
+                $add(0, 'Trailing data');
+            }
+            $add(0, $primary);
+        }
+
+        $errors = [];
+        foreach ($messages as [$position, $message]) {
+            $errors[$position] = $message;
+        }
+
+        return ['errors' => $errors, 'error_count' => \count($messages)];
+    }
+
+    private static function primaryCreateFromFormatFailureMessage(string $format, string $time): string
+    {
+        if (\str_contains($format, 'Y')) {
+            return 'A four digit year could not be found';
+        }
+        if (\str_contains($format, 'y')) {
+            return 'A two digit year could not be found';
+        }
+
+        return 'Not enough data available to satisfy format';
     }
 
     /**
@@ -438,12 +1022,12 @@ final class VmDateTimeNative
         }
 
         return self::parseResultFromComponents([
-            'year' => (int) $tm->tm_year + 1900,
-            'month' => (int) $tm->tm_mon + 1,
-            'day' => (int) $tm->tm_mday,
-            'hour' => (int) $tm->tm_hour,
-            'minute' => (int) $tm->tm_min,
-            'second' => (int) $tm->tm_sec,
+            'year' => (self::tmInt($tm, 'tm_year') + 1900),
+            'month' => (self::tmInt($tm, 'tm_mon') + 1),
+            'day' => self::tmInt($tm, 'tm_mday'),
+            'hour' => self::tmInt($tm, 'tm_hour'),
+            'minute' => self::tmInt($tm, 'tm_min'),
+            'second' => self::tmInt($tm, 'tm_sec'),
             'fraction' => $microsecond / 1_000_000,
         ]);
     }
@@ -493,6 +1077,23 @@ final class VmDateTimeNative
     }
 
     /**
+     * php-src timelib — named timezone suffix metadata for date_parse() (#13405).
+     *
+     * @param array{
+     *   year: int|false,
+     *   month: int|false,
+     *   day: int|false,
+     *   hour: int|false,
+     *   minute: int|false,
+     *   second: int|false,
+     *   fraction: float|false,
+     *   warning_count: int,
+     *   warnings: array<int, string>,
+     *   error_count: int,
+     *   errors: array<int, string>,
+     *   is_localtime: bool
+     * } $result
+     *
      * @return array{
      *   year: int|false,
      *   month: int|false,
@@ -500,11 +1101,72 @@ final class VmDateTimeNative
      *   hour: int|false,
      *   minute: int|false,
      *   second: int|false,
-     *   fraction: float
+     *   fraction: float|false,
+     *   warning_count: int,
+     *   warnings: array<int, string>,
+     *   error_count: int,
+     *   errors: array<int, string>,
+     *   is_localtime: bool,
+     *   zone_type: int,
+     *   tz_id: string
+     * }
+     */
+    private static function withNamedTimezoneMetadata(array $result, string $tzId): array
+    {
+        $result['is_localtime'] = true;
+        $result['zone_type'] = 3;
+        $result['tz_id'] = $tzId;
+
+        return $result;
+    }
+
+    private static function englishMonthToNumber(string $monthName): ?int
+    {
+        static $map = [
+            'january' => 1,
+            'february' => 2,
+            'march' => 3,
+            'april' => 4,
+            'may' => 5,
+            'june' => 6,
+            'july' => 7,
+            'august' => 8,
+            'september' => 9,
+            'october' => 10,
+            'november' => 11,
+            'december' => 12,
+            'jan' => 1,
+            'feb' => 2,
+            'mar' => 3,
+            'apr' => 4,
+            'jun' => 6,
+            'jul' => 7,
+            'aug' => 8,
+            'sep' => 9,
+            'sept' => 9,
+            'oct' => 10,
+            'nov' => 11,
+            'dec' => 12,
+        ];
+
+        return $map[strtolower($monthName)] ?? null;
+    }
+
+    /**
+     * @return array{
+     *   year: int|false,
+     *   month: int|false,
+     *   day: int|false,
+     *   hour: int|false,
+     *   minute: int|false,
+     *   second: int|false,
+     *   fraction: float|false,
+     *   timezone?: string
      * }|false
      */
     private static function matchFormatComponents(string $format, string $time): array|false
     {
+        self::$createFromFormatTrailingData = false;
         $bangReset = false;
         if (\str_starts_with($format, '!')) {
             $bangReset = true;
@@ -512,6 +1174,7 @@ final class VmDateTimeNative
         }
         $pos = 0;
         $timeLen = \strlen($time);
+        $formatHasFractionToken = false;
         $components = [
             'year' => false,
             'month' => false,
@@ -519,7 +1182,7 @@ final class VmDateTimeNative
             'hour' => false,
             'minute' => false,
             'second' => false,
-            'fraction' => 0.0,
+            'fraction' => false,
         ];
         $formatLen = \strlen($format);
         for ($i = 0; $i < $formatLen; ++$i) {
@@ -619,6 +1282,7 @@ final class VmDateTimeNative
 
                     break;
                 case 'u':
+                    $formatHasFractionToken = true;
                     $digits = self::readDigits($time, $pos, 1, 6);
                     if (false === $digits) {
                         return false;
@@ -635,12 +1299,44 @@ final class VmDateTimeNative
                     if (null === $tm) {
                         return false;
                     }
-                    $components['year'] = (int) $tm->tm_year + 1900;
-                    $components['month'] = (int) $tm->tm_mon + 1;
-                    $components['day'] = (int) $tm->tm_mday;
-                    $components['hour'] = (int) $tm->tm_hour;
-                    $components['minute'] = (int) $tm->tm_min;
-                    $components['second'] = (int) $tm->tm_sec;
+                    $components['year'] = (self::tmInt($tm, 'tm_year') + 1900);
+                    $components['month'] = (self::tmInt($tm, 'tm_mon') + 1);
+                    $components['day'] = self::tmInt($tm, 'tm_mday');
+                    $components['hour'] = self::tmInt($tm, 'tm_hour');
+                    $components['minute'] = self::tmInt($tm, 'tm_min');
+                    $components['second'] = self::tmInt($tm, 'tm_sec');
+
+                    break;
+                case 'e':
+                    $tzId = self::readFormatTimezoneIdentifier($time, $pos, $timeLen);
+                    if (false === $tzId) {
+                        return false;
+                    }
+                    $components['timezone'] = $tzId;
+
+                    break;
+                case 'T':
+                    $tzId = self::readFormatTimezoneAbbreviation($time, $pos, $timeLen);
+                    if (false === $tzId) {
+                        return false;
+                    }
+                    $components['timezone'] = $tzId;
+
+                    break;
+                case 'P':
+                    $tzId = self::readFormatTimezoneOffset($time, $pos, $timeLen, true);
+                    if (false === $tzId) {
+                        return false;
+                    }
+                    $components['timezone'] = $tzId;
+
+                    break;
+                case 'O':
+                    $tzId = self::readFormatTimezoneOffset($time, $pos, $timeLen, false);
+                    if (false === $tzId) {
+                        return false;
+                    }
+                    $components['timezone'] = $tzId;
 
                     break;
                 default:
@@ -651,6 +1347,8 @@ final class VmDateTimeNative
             }
         }
         if ($pos !== $timeLen) {
+            self::$createFromFormatTrailingData = true;
+
             return false;
         }
         if ($bangReset) {
@@ -667,6 +1365,9 @@ final class VmDateTimeNative
                 }
             }
         }
+        if (!$formatHasFractionToken) {
+            $components['fraction'] = false;
+        }
 
         return $components;
     }
@@ -679,10 +1380,10 @@ final class VmDateTimeNative
      *   hour: int|false,
      *   minute: int|false,
      *   second: int|false,
-     *   fraction: float
+     *   fraction: float|false
      * } $components
      *
-     * @return array{components: array<string, int|false|float>, warnings: array<int, string>}
+     * @return array{components: array<string, int|false|float|false>, warnings: array<int, string>}
      */
     private static function warnInvalidCalendarComponents(array $components): array
     {
@@ -706,10 +1407,10 @@ final class VmDateTimeNative
      *   hour: int|false,
      *   minute: int|false,
      *   second: int|false,
-     *   fraction: float
+     *   fraction: float|false
      * } $components
      *
-     * @return array{components: array<string, int|false|float>, warnings: array<int, string>}
+     * @return array{components: array<string, int|false|float|false>, warnings: array<int, string>}
      */
     private static function normalizeMatchedComponents(array $components): array
     {
@@ -828,7 +1529,7 @@ final class VmDateTimeNative
         if (!self::isValidCalendarDate($year, $month, $day)) {
             $result = self::parseResultFromComponents($components);
             $result['warning_count'] = 1;
-            $result['warnings'] = [11 => 'The parsed date was invalid'];
+            $result['warnings'] = [10 => 'The parsed date was invalid'];
 
             return $result;
         }
@@ -888,6 +1589,72 @@ final class VmDateTimeNative
         }
         $result['is_localtime'] = true;
 
+        return self::withZoneTypeZeroMetadata($result);
+    }
+
+    /**
+     * php-src timelib — numeric offset suffix metadata for date_parse() (#14806).
+     *
+     * @param array<string, mixed> $result
+     *
+     * @return array<string, mixed>
+     */
+    private static function withOffsetTimezoneMetadata(array $result, int $offsetSeconds): array
+    {
+        $result['zone_type'] = 1;
+        $result['zone'] = $offsetSeconds;
+        $result['is_dst'] = false;
+
+        return $result;
+    }
+
+    /**
+     * @param array<string, mixed> $result
+     *
+     * @return array<string, mixed>
+     */
+    private static function withUtcTimezoneMetadata(array $result): array
+    {
+        $result['zone_type'] = 2;
+        $result['zone'] = 0;
+        $result['is_dst'] = false;
+
+        return $result;
+    }
+
+    /**
+     * @param array<string, mixed> $result
+     *
+     * @return array<string, mixed>
+     */
+    private static function withZoneTypeZeroMetadata(array $result): array
+    {
+        $result['zone_type'] = 0;
+
+        return $result;
+    }
+
+    /**
+     * @param array<string, mixed> $result
+     * @param array{timestamp: int, microsecond: int, timezone?: string|null, utc_z?: bool} $parsed
+     *
+     * @return array<string, mixed>
+     */
+    private static function applyParseTimezoneMetadata(array $result, array $parsed, string $date): array
+    {
+        if (!empty($parsed['utc_z'])) {
+            return self::withUtcTimezoneMetadata($result);
+        }
+        $embedded = $parsed['timezone'] ?? null;
+        if (\is_string($embedded) && '' !== $embedded) {
+            $offset = self::parseNumericTimezoneOffset($embedded);
+            if (null !== $offset) {
+                return self::withOffsetTimezoneMetadata($result, $offset);
+            }
+
+            return self::withNamedTimezoneMetadata($result, $embedded);
+        }
+
         return $result;
     }
 
@@ -900,13 +1667,482 @@ final class VmDateTimeNative
         return $day <= self::daysInMonth($year, $month);
     }
 
-    private static function nextWeekdayTimestamp(string $weekday, int $base, string $tzName): int|false
+    /**
+     * @return array{timestamp: int, microsecond: int, timezone?: string}|null
+     */
+    private static function weekdayParseResult(string $modifier, string $weekday, int $base, string $tzName): ?array
     {
+        $timestamp = self::weekdayRelativeTimestamp($modifier, $weekday, $base, $tzName);
+        if (false === $timestamp) {
+            return null;
+        }
+        $tm = self::localtime($timestamp);
+        if (null === $tm) {
+            return null;
+        }
+
+        return [
+            'timestamp' => self::mktimeInTimezone(
+                self::tmInt($tm, 'tm_year') + 1900,
+                self::tmInt($tm, 'tm_mon') + 1,
+                self::tmInt($tm, 'tm_mday'),
+                0,
+                0,
+                0,
+                $tzName
+            ),
+            'microsecond' => 0,
+        ];
+    }
+
+    /**
+     * php-src timelib — first/last weekday of named month (#15058, ext/standard/parsdate.c).
+     *
+     * @return array{timestamp: int, microsecond: int}|null
+     */
+    private static function weekdayOfMonthParseResult(
+        string $which,
+        string $weekday,
+        string $monthName,
+        int $year,
+        string $tzName
+    ): ?array {
+        $month = self::englishMonthToNumber($monthName);
+        $target = self::weekdayNameToNumber($weekday);
+        if (null === $month || $target < 0) {
+            return null;
+        }
+        $day = self::weekdayInMonth($year, $month, $target, 'last' === $which);
+        if ($day < 1) {
+            return null;
+        }
+
+        return [
+            'timestamp' => self::mktimeInTimezone($year, $month, $day, 0, 0, 0, $tzName),
+            'microsecond' => 0,
+        ];
+    }
+
+    /**
+     * @return array{timestamp: int, microsecond: int}|null
+     */
+    private static function dayWordMidnightParseResult(string $dayWord, int $base, string $tzName): ?array
+    {
+        $offset = match ($dayWord) {
+            'today' => 0,
+            'tomorrow' => 1,
+            'yesterday' => -1,
+            default => 999,
+        };
+        if (999 === $offset) {
+            return null;
+        }
+        if (0 !== $offset) {
+            try {
+                $base = self::modifyRelative($base, ($offset > 0 ? '+' : '').$offset.' day', $tzName);
+            } catch (NativeDateMalformedStringException) {
+                return null;
+            }
+        }
+
+        return self::timeOfDayOnBase($base, 0, 0, 0, $tzName);
+    }
+
+    /**
+     * @return array{timestamp: int, microsecond: int}|null
+     */
+    private static function dayWordWithTimeParseResult(
+        string $dayWord,
+        string $timePart,
+        int $base,
+        string $tzName
+    ): ?array {
+        $clock = self::tryParseClockTime($timePart);
+        if (null === $clock) {
+            return null;
+        }
+        $offset = match ($dayWord) {
+            'today' => 0,
+            'tomorrow' => 1,
+            'yesterday' => -1,
+            default => 999,
+        };
+        if (999 === $offset) {
+            return null;
+        }
+        try {
+            $dayBase = self::modifyRelative($base, ($offset >= 0 ? '+' : '').$offset.' day', $tzName);
+        } catch (NativeDateMalformedStringException) {
+            return null;
+        }
+        $tm = self::localtime($dayBase);
+        if (null === $tm) {
+            return null;
+        }
+
+        return [
+            'timestamp' => self::mktimeInTimezone(
+                self::tmInt($tm, 'tm_year') + 1900,
+                self::tmInt($tm, 'tm_mon') + 1,
+                self::tmInt($tm, 'tm_mday'),
+                $clock[0],
+                $clock[1],
+                $clock[2],
+                $tzName
+            ),
+            'microsecond' => 0,
+        ];
+    }
+
+    /**
+     * @return array{timestamp: int, microsecond: int}
+     */
+    private static function timeOfDayOnBase(int $base, int $hour, int $minute, int $second, string $tzName): array
+    {
+        $tm = self::localtime($base);
+        if (null === $tm) {
+            return ['timestamp' => $base, 'microsecond' => 0];
+        }
+
+        return [
+            'timestamp' => self::mktimeInTimezone(
+                self::tmInt($tm, 'tm_year') + 1900,
+                self::tmInt($tm, 'tm_mon') + 1,
+                self::tmInt($tm, 'tm_mday'),
+                $hour,
+                $minute,
+                $second,
+                $tzName
+            ),
+            'microsecond' => 0,
+        ];
+    }
+
+    /** @return array{0: int, 1: int, 2: int}|null [hour, minute, second] */
+    private static function tryParseClockTime(string $time): ?array
+    {
+        $time = trim($time);
+        if (1 === preg_match('/^(\d{1,2})(?::(\d{2})(?::(\d{2}))?)?\s*(am|pm)$/i', $time, $matches)) {
+            $hour = (int) $matches[1];
+            $minute = isset($matches[2]) && '' !== $matches[2] ? (int) $matches[2] : 0;
+            $second = isset($matches[3]) && '' !== $matches[3] ? (int) $matches[3] : 0;
+            $ampm = strtolower($matches[4]);
+            if ($hour < 1 || $hour > 12 || $minute > 59 || $second > 59) {
+                return null;
+            }
+            if ('pm' === $ampm && $hour < 12) {
+                $hour += 12;
+            }
+            if ('am' === $ampm && 12 === $hour) {
+                $hour = 0;
+            }
+
+            return [$hour, $minute, $second];
+        }
+        if (1 === preg_match('/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/', $time, $matches)) {
+            $hour = (int) $matches[1];
+            $minute = (int) $matches[2];
+            $second = isset($matches[3]) && '' !== $matches[3] ? (int) $matches[3] : 0;
+            if ($hour > 23 || $minute > 59 || $second > 59) {
+                return null;
+            }
+
+            return [$hour, $minute, $second];
+        }
+
+        return null;
+    }
+
+    private static function weekdayInMonth(int $year, int $month, int $targetWday, bool $last): int
+    {
+        if ($last) {
+            for ($day = self::daysInMonth($year, $month); $day >= 1; --$day) {
+                $tm = self::localtime(self::mktimeInTimezone($year, $month, $day, 12, 0, 0, 'UTC'));
+                if (null !== $tm && self::tmInt($tm, 'tm_wday') === $targetWday) {
+                    return $day;
+                }
+            }
+
+            return 0;
+        }
+        $max = self::daysInMonth($year, $month);
+        for ($day = 1; $day <= $max; ++$day) {
+            $tm = self::localtime(self::mktimeInTimezone($year, $month, $day, 12, 0, 0, 'UTC'));
+            if (null !== $tm && self::tmInt($tm, 'tm_wday') === $targetWday) {
+                return $day;
+            }
+        }
+
+        return 0;
+    }
+
+    /**
+     * php-src timelib — compound signed relative modifiers (#15058).
+     */
+    private static function tryApplyCompoundSignedRelativeDelta(int $base, string $modifier, string $tzName): ?int
+    {
+        $modifier = trim($modifier);
+        if ('' === $modifier) {
+            return null;
+        }
+        $pos = 0;
+        $len = \strlen($modifier);
+        $timestamp = $base;
+        $matched = false;
+        $requireSign = true;
+        while ($pos < $len) {
+            while ($pos < $len && \ctype_space($modifier[$pos])) {
+                ++$pos;
+            }
+            if ($pos >= $len) {
+                break;
+            }
+            $tail = \substr($modifier, $pos);
+            $pattern = $requireSign
+                ? '/^([+-])\s*(\d+)\s+(second|seconds|minute|minutes|hour|hours|day|days|week|weeks|month|months|year|years)\b/i'
+                : '/^(\d+)\s+(second|seconds|minute|minutes|hour|hours|day|days|week|weeks|month|months|year|years)\b/i';
+            if (!preg_match($pattern, $tail, $matches)) {
+                return $matched ? $timestamp : null;
+            }
+            if ($requireSign) {
+                $chunk = ($matches[1] ?? '+').' '.($matches[2] ?? '').' '.($matches[3] ?? '');
+                $requireSign = false;
+            } else {
+                $chunk = '+'.($matches[1] ?? '').' '.($matches[2] ?? '');
+            }
+            $chunk = preg_replace('/\s+/', ' ', trim($chunk)) ?? trim($chunk);
+            $pos += \strlen($matches[0]);
+            try {
+                $timestamp = self::modifyRelative($timestamp, $chunk, $tzName);
+            } catch (NativeDateMalformedStringException) {
+                return null;
+            }
+            $matched = true;
+        }
+
+        return $matched ? $timestamp : null;
+    }
+
+    /**
+     * php-src timelib — first/last day of next|this|last month (#14326).
+     *
+     * @return array{timestamp: int, microsecond: int}|null
+     */
+    private static function monthBoundaryParseResult(string $which, string $when, int $base, string $tzName): ?array
+    {
+        $tm = self::localtime($base);
+        if (null === $tm) {
+            return null;
+        }
+        $year = self::tmInt($tm, 'tm_year') + 1900;
+        $month = self::tmInt($tm, 'tm_mon') + 1;
+        $monthDelta = match ($when) {
+            'next' => 1,
+            'last' => -1,
+            'this' => 0,
+            default => 999,
+        };
+        if (999 === $monthDelta) {
+            return null;
+        }
+        [$year, $month] = self::shiftYearMonth($year, $month, $monthDelta);
+        $day = 'first' === $which ? 1 : self::daysInMonth($year, $month);
+
+        return [
+            'timestamp' => self::mktimeInTimezone($year, $month, $day, 0, 0, 0, $tzName),
+            'microsecond' => 0,
+        ];
+    }
+
+    /**
+     * php-src timelib — next|last|this month preserving day/time (#14326).
+     *
+     * @return array{timestamp: int, microsecond: int}|null
+     */
+    private static function monthOffsetParseResult(string $when, int $base, string $tzName): ?array
+    {
+        $tm = self::localtime($base);
+        if (null === $tm) {
+            return null;
+        }
+        $year = self::tmInt($tm, 'tm_year') + 1900;
+        $month = self::tmInt($tm, 'tm_mon') + 1;
+        $day = self::tmInt($tm, 'tm_mday');
+        $hour = self::tmInt($tm, 'tm_hour');
+        $minute = self::tmInt($tm, 'tm_min');
+        $second = self::tmInt($tm, 'tm_sec');
+        $monthDelta = match ($when) {
+            'next' => 1,
+            'last' => -1,
+            'this' => 0,
+            default => 999,
+        };
+        if (999 === $monthDelta) {
+            return null;
+        }
+        [$year, $month] = self::shiftYearMonth($year, $month, $monthDelta);
+
+        return [
+            'timestamp' => self::mktimeInTimezone($year, $month, $day, $hour, $minute, $second, $tzName),
+            'microsecond' => 0,
+        ];
+    }
+
+    /**
+     * php-src parse_date.re — last|next|this year preserving calendar date/time (#17586).
+     *
+     * @return array{timestamp: int, microsecond: int}|null
+     */
+    private static function yearOffsetParseResult(string $when, int $base, string $tzName): ?array
+    {
+        $tm = self::localtime($base);
+        if (null === $tm) {
+            return null;
+        }
+        $yearDelta = match ($when) {
+            'next' => 1,
+            'last' => -1,
+            'this' => 0,
+            default => 999,
+        };
+        if (999 === $yearDelta) {
+            return null;
+        }
+        $year = self::tmInt($tm, 'tm_year') + 1900 + $yearDelta;
+        $month = self::tmInt($tm, 'tm_mon') + 1;
+        $day = self::tmInt($tm, 'tm_mday');
+        $hour = self::tmInt($tm, 'tm_hour');
+        $minute = self::tmInt($tm, 'tm_min');
+        $second = self::tmInt($tm, 'tm_sec');
+
+        return [
+            'timestamp' => self::mktimeInTimezone($year, $month, $day, $hour, $minute, $second, $tzName),
+            'microsecond' => 0,
+        ];
+    }
+
+    /**
+     * php-src parse_date.re — "last year January 1" / "March 15 last year" (#17586).
+     *
+     * @return array{timestamp: int, microsecond: int}|null
+     */
+    private static function yearRelativeMonthDayParseResult(
+        string $when,
+        string $datePart,
+        int $base,
+        string $tzName
+    ): ?array {
+        $monthDay = self::tryParseEnglishMonthDay($datePart);
+        if (null === $monthDay) {
+            return null;
+        }
+        $tm = self::localtime($base);
+        if (null === $tm) {
+            return null;
+        }
+        $yearDelta = match ($when) {
+            'next' => 1,
+            'last' => -1,
+            'this' => 0,
+            default => 999,
+        };
+        if (999 === $yearDelta) {
+            return null;
+        }
+        $year = self::tmInt($tm, 'tm_year') + 1900 + $yearDelta;
+
+        return [
+            'timestamp' => self::mktimeInTimezone(
+                $year,
+                $monthDay['month'],
+                $monthDay['day'],
+                0,
+                0,
+                0,
+                $tzName
+            ),
+            'microsecond' => 0,
+        ];
+    }
+
+    /** @return array{month: int, day: int}|null */
+    private static function tryParseEnglishMonthDay(string $fragment): ?array
+    {
+        $fragment = trim($fragment);
+        if (1 === preg_match('/^([A-Za-z]+)\s+(\d{1,2})$/', $fragment, $matches)) {
+            $month = self::englishMonthToNumber($matches[1]);
+            if (null === $month) {
+                return null;
+            }
+
+            return ['month' => $month, 'day' => (int) $matches[2]];
+        }
+        if (1 === preg_match('/^(\d{1,2})\s+([A-Za-z]+)$/', $fragment, $matches)) {
+            $month = self::englishMonthToNumber($matches[2]);
+            if (null === $month) {
+                return null;
+            }
+
+            return ['month' => $month, 'day' => (int) $matches[1]];
+        }
+
+        return null;
+    }
+
+    /** @return array{0: int, 1: int} */
+    private static function shiftYearMonth(int $year, int $month, int $monthDelta): array
+    {
+        $month += $monthDelta;
+        while ($month < 1) {
+            --$year;
+            $month += 12;
+        }
+        while ($month > 12) {
+            ++$year;
+            $month -= 12;
+        }
+
+        return [$year, $month];
+    }
+
+    /** php-src timelib relative weekday modifiers — next/last/this/bare (#14151). */
+    private static function weekdayRelativeTimestamp(
+        string $modifier,
+        string $weekday,
+        int $base,
+        string $tzName
+    ): int|false {
         $tm = self::localtime($base);
         if (null === $tm) {
             return false;
         }
-        $target = match ($weekday) {
+        $target = self::weekdayNameToNumber($weekday);
+        if ($target < 0) {
+            return false;
+        }
+        $current = self::tmInt($tm, 'tm_wday');
+        $days = match ($modifier) {
+            'next' => ($forward = ($target - $current + 7) % 7) === 0 ? 7 : $forward,
+            'last', 'previous' => -(($backward = ($current - $target + 7) % 7) === 0 ? 7 : $backward),
+            'this' => $current <= $target ? ($target - $current) : (7 - $current + $target),
+            'bare' => ($target - $current + 7) % 7,
+            default => -999,
+        };
+        if (-999 === $days) {
+            return false;
+        }
+        $sign = $days < 0 ? '-' : '+';
+        $abs = \abs($days);
+        try {
+            return self::modifyRelative($base, $sign.$abs.' day', $tzName);
+        } catch (NativeDateMalformedStringException) {
+            return false;
+        }
+    }
+
+    private static function weekdayNameToNumber(string $weekday): int
+    {
+        return match (strtolower($weekday)) {
             'sunday' => 0,
             'monday' => 1,
             'tuesday' => 2,
@@ -916,19 +2152,11 @@ final class VmDateTimeNative
             'saturday' => 6,
             default => -1,
         };
-        if ($target < 0) {
-            return false;
-        }
-        $current = (int) $tm->tm_wday;
-        $days = ($target - $current + 7) % 7;
-        if (0 === $days) {
-            $days = 7;
-        }
-        try {
-            return self::modifyRelative($base, '+'.$days.' day', $tzName);
-        } catch (NativeDateMalformedStringException) {
-            return false;
-        }
+    }
+
+    private static function nextWeekdayTimestamp(string $weekday, int $base, string $tzName): int|false
+    {
+        return self::weekdayRelativeTimestamp('next', $weekday, $base, $tzName);
     }
 
     private static function readDigits(string $time, int &$pos, int $min, ?int $max): string|false
@@ -952,7 +2180,80 @@ final class VmDateTimeNative
     }
 
     /**
-     * php-src date_modify() / timelib_strtotime relative branch — common signed units only (#6132).
+     * php-src timelib — parse timezone from createFromFormat input (#11487).
+     */
+    private static function readFormatTimezoneIdentifier(string $time, int &$pos, int $timeLen): string|false
+    {
+        while ($pos < $timeLen && \ctype_space($time[$pos])) {
+            ++$pos;
+        }
+        if ($pos >= $timeLen) {
+            return false;
+        }
+        $start = $pos;
+        while ($pos < $timeLen && (bool) preg_match('/[A-Za-z0-9_+\/-]/', $time[$pos])) {
+            ++$pos;
+        }
+        if ($start === $pos) {
+            return false;
+        }
+        $tzId = \substr($time, $start, $pos - $start);
+        try {
+            return self::validateTimezoneId($tzId);
+        } catch (\PHPCompiler\VM\NativeDateInvalidTimeZoneException) {
+            return false;
+        }
+    }
+
+    private static function readFormatTimezoneAbbreviation(string $time, int &$pos, int $timeLen): string|false
+    {
+        while ($pos < $timeLen && \ctype_space($time[$pos])) {
+            ++$pos;
+        }
+        if ($pos >= $timeLen) {
+            return false;
+        }
+        $start = $pos;
+        while ($pos < $timeLen && \ctype_alpha($time[$pos])) {
+            ++$pos;
+        }
+        if ($start === $pos) {
+            return false;
+        }
+        $resolved = self::timezoneNameFromAbbr(\substr($time, $start, $pos - $start));
+        if (false === $resolved) {
+            return false;
+        }
+
+        return $resolved;
+    }
+
+    private static function readFormatTimezoneOffset(string $time, int &$pos, int $timeLen, bool $withColon): string|false
+    {
+        while ($pos < $timeLen && \ctype_space($time[$pos])) {
+            ++$pos;
+        }
+        if ($pos >= $timeLen) {
+            return false;
+        }
+        $pattern = $withColon ? '/^([+-]\d{2}):(\d{2})/' : '/^([+-])(\d{2})(\d{2})/';
+        if (!preg_match($pattern, \substr($time, $pos), $matches)) {
+            return false;
+        }
+        $raw = $withColon
+            ? $matches[0]
+            : $matches[1].$matches[2].':'.$matches[3];
+        $canonical = self::canonicalNumericTimezoneId($raw);
+        if (null === $canonical) {
+            return false;
+        }
+        $pos += \strlen($matches[0]);
+
+        return $canonical;
+    }
+
+    /**
+     * php-src date_modify() / timelib_strtotime relative branch (#6132, #14326).
      */
     public static function modifyRelative(int $timestamp, string $modifier, string $tzName): int
     {
@@ -962,49 +2263,82 @@ final class VmDateTimeNative
         }
 
         return self::withTimezone($tzName, static function () use ($timestamp, $modifier, $tzName): int {
-            $tm = self::localtime($timestamp);
-            if (null === $tm) {
-                self::throwModifyMalformed($modifier);
-            }
-            $year = (int) $tm->tm_year + 1900;
-            $month = (int) $tm->tm_mon + 1;
-            $day = (int) $tm->tm_mday;
-            $hour = (int) $tm->tm_hour;
-            $minute = (int) $tm->tm_min;
-            $second = (int) $tm->tm_sec;
-            $delta = self::parseSignedRelativeDelta($modifier);
-            switch ($delta['unit']) {
-                case 'second':
-                    $second += $delta['amount'];
-                    break;
-                case 'minute':
-                    $minute += $delta['amount'];
-                    break;
-                case 'hour':
-                    $hour += $delta['amount'];
-                    break;
-                case 'day':
-                    $day += $delta['amount'];
-                    break;
-                case 'week':
-                    $day += 7 * $delta['amount'];
-                    break;
-                case 'month':
-                    $month += $delta['amount'];
-                    break;
-                case 'year':
-                    $year += $delta['amount'];
-                    break;
-                default:
-                    self::throwModifyMalformed($modifier);
+            $signed = self::tryApplySignedRelativeDelta($timestamp, $modifier, $tzName);
+            if (null !== $signed) {
+                return $signed;
             }
 
-            return self::mktimeInTimezone($year, $month, $day, $hour, $minute, $second, $tzName);
+            $extended = self::tryParseExtendedDateTimeString($modifier, $tzName, $timestamp);
+            if (null !== $extended) {
+                return $extended['timestamp'];
+            }
+
+            self::throwModifyMalformed($modifier);
         });
+    }
+
+    /**
+     * Signed unit deltas only (+1 day, -2 weeks, …) — fast path for date_modify().
+     */
+    private static function tryApplySignedRelativeDelta(int $timestamp, string $modifier, string $tzName): ?int
+    {
+        try {
+            $delta = self::parseSignedRelativeDelta($modifier);
+        } catch (NativeDateMalformedStringException) {
+            return null;
+        }
+
+        $tm = self::localtime($timestamp);
+        if (null === $tm) {
+            return null;
+        }
+        $year = (self::tmInt($tm, 'tm_year') + 1900);
+        $month = (self::tmInt($tm, 'tm_mon') + 1);
+        $day = self::tmInt($tm, 'tm_mday');
+        $hour = self::tmInt($tm, 'tm_hour');
+        $minute = self::tmInt($tm, 'tm_min');
+        $second = self::tmInt($tm, 'tm_sec');
+        switch ($delta['unit']) {
+            case 'second':
+                $second += $delta['amount'];
+                break;
+            case 'minute':
+                $minute += $delta['amount'];
+                break;
+            case 'hour':
+                $hour += $delta['amount'];
+                break;
+            case 'day':
+                $day += $delta['amount'];
+                break;
+            case 'week':
+                $day += 7 * $delta['amount'];
+                break;
+            case 'month':
+                $month += $delta['amount'];
+                break;
+            case 'year':
+                $year += $delta['amount'];
+                break;
+            default:
+                return null;
+        }
+
+        return self::mktimeInTimezone($year, $month, $day, $hour, $minute, $second, $tzName);
     }
 
     public static function format(int $timestamp, int $microsecond, string $tzName, string $format): string
     {
+        $fixed = self::parseNumericTimezoneOffset($tzName);
+        if (null !== $fixed) {
+            $tm = self::gmtime($timestamp + $fixed);
+            if (null === $tm) {
+                return '';
+            }
+
+            return VmDate::formatDateTimeFromTm($format, $timestamp, $microsecond, $tm, $fixed, $tzName);
+        }
+
         return self::withTimezone($tzName, static function () use ($timestamp, $microsecond, $format, $tzName): string {
             $tm = self::localtime($timestamp);
             if (null === $tm) {
@@ -1018,18 +2352,13 @@ final class VmDateTimeNative
 
     public static function timezoneOffsetSeconds(string $tzName, int $timestamp): int
     {
-        return self::withTimezone($tzName, static function () use ($timestamp): int {
-            $tm = self::localtime($timestamp);
-            if (null === $tm) {
-                return 0;
-            }
-            $ffi = self::ffi();
-            if (null === $ffi) {
-                return 0;
-            }
-            $asUtc = (int) $ffi->timegm(\FFI::addr($tm));
+        $fixed = self::parseNumericTimezoneOffset($tzName);
+        if (null !== $fixed) {
+            return $fixed;
+        }
 
-            return $asUtc - $timestamp;
+        return self::withTimezone($tzName, static function () use ($timestamp): int {
+            return self::offsetSecondsForTimestamp($timestamp);
         });
     }
 
@@ -1069,11 +2398,26 @@ final class VmDateTimeNative
      */
     public static function timezoneTransitions(string $tzName, int $begin, int $end): array|false
     {
-        if (!self::zoneinfoPath($tzName)) {
+        $path = self::zoneinfoPath($tzName);
+        if (null === $path) {
             return false;
         }
         if ($begin > $end) {
             return false;
+        }
+
+        $fixedOffset = self::parseNumericTimezoneOffset($tzName);
+        if (null !== $fixedOffset) {
+            return [self::buildTransitionRecord($tzName, $begin)];
+        }
+
+        $tzifTimes = self::readTzifTransitionTimes($path);
+        if (null !== $tzifTimes) {
+            return self::transitionsFromTzifTimes($tzName, $begin, $end, $tzifTimes);
+        }
+
+        if ($end - $begin > self::TRANSITION_SCAN_MAX_SPAN) {
+            return [self::buildTransitionRecord($tzName, $begin)];
         }
 
         $transitions = [self::buildTransitionRecord($tzName, $begin)];
@@ -1118,6 +2462,11 @@ final class VmDateTimeNative
         int $second,
         string $tzName
     ): int {
+        $fixedOffset = self::parseNumericTimezoneOffset($tzName);
+        if (null !== $fixedOffset) {
+            return self::mktimeUtc($year, $month, $day, $hour, $minute, $second) - $fixedOffset;
+        }
+
         return self::withTimezone($tzName, static function () use (
             $year,
             $month,
@@ -1126,20 +2475,8 @@ final class VmDateTimeNative
             $minute,
             $second
         ): int {
-            $ffi = self::ffi();
-            if (null === $ffi) {
-                self::throwMalformedDateTime("{$year}-{$month}-{$day}");
-            }
-            $tm = $ffi->new('struct tm');
-            $tm->tm_sec = $second;
-            $tm->tm_min = $minute;
-            $tm->tm_hour = $hour;
-            $tm->tm_mday = $day;
-            $tm->tm_mon = $month - 1;
-            $tm->tm_year = $year - 1900;
-            $tm->tm_isdst = -1;
-            $result = (int) $ffi->mktime(\FFI::addr($tm));
-            if (-1 === $result) {
+            $result = VmDatePure::mktime($hour, $minute, $second, $month, $day, $year);
+            if (false === $result) {
                 self::throwMalformedDateTime("{$year}-{$month}-{$day} {$hour}:{$minute}:{$second}");
             }
 
@@ -1147,34 +2484,71 @@ final class VmDateTimeNative
         });
     }
 
+    private static function mktimeUtc(
+        int $year,
+        int $month,
+        int $day,
+        int $hour,
+        int $minute,
+        int $second
+    ): int {
+        $result = VmDatePure::gmmktime($hour, $minute, $second, $month, $day, $year);
+        if (false === $result) {
+            self::throwMalformedDateTime("{$year}-{$month}-{$day} {$hour}:{$minute}:{$second}");
+        }
+
+        return $result;
+    }
+
     /**
      * @return array{timestamp: int, microsecond: int}
      */
     private static function readNow(): array
     {
-        $ffi = self::ffi();
-        if (null === $ffi) {
-            return ['timestamp' => 0, 'microsecond' => 0];
-        }
-        $tv = $ffi->new('struct timeval');
-        if (0 !== (int) $ffi->gettimeofday(\FFI::addr($tv), null)) {
-            return ['timestamp' => 0, 'microsecond' => 0];
-        }
+        $tv = VmDatePure::readTimeval();
 
-        return ['timestamp' => (int) $tv->tv_sec, 'microsecond' => (int) $tv->tv_usec];
+        return ['timestamp' => $tv['sec'], 'microsecond' => $tv['usec']];
     }
 
-    private static function localtime(int $timestamp): ?\FFI\CData
+    /**
+     * php-src timelib have_time — any H/G/i/s/u/U token in the format string (#16383).
+     */
+    private static function formatStringHasTimeTokens(string $format): bool
     {
-        $ffi = self::ffi();
-        if (null === $ffi) {
-            return null;
+        if (\str_starts_with($format, '!')) {
+            $format = \substr($format, 1);
         }
-        $ts = $ffi->new('time_t');
-        $ts->cdata = $timestamp;
-        $buf = $ffi->new('struct tm');
+        $len = \strlen($format);
+        for ($i = 0; $i < $len; ++$i) {
+            if ('\\' === $format[$i]) {
+                if ($i + 1 < $len) {
+                    ++$i;
+                }
 
-        return null === $ffi->localtime_r(\FFI::addr($ts), \FFI::addr($buf)) ? null : $buf;
+                continue;
+            }
+            if (\str_contains('HGiisuU', $format[$i])) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @return array{tm_sec:int,tm_min:int,tm_hour:int,tm_mday:int,tm_mon:int,tm_year:int,tm_wday:int,tm_yday:int,tm_isdst:int}|null
+     */
+    private static function localtime(int $timestamp): ?array
+    {
+        return VmDatePure::localtime($timestamp);
+    }
+
+    /**
+     * @return array{tm_sec:int,tm_min:int,tm_hour:int,tm_mday:int,tm_mon:int,tm_year:int,tm_wday:int,tm_yday:int,tm_isdst:int}|null
+     */
+    private static function gmtime(int $timestamp): ?array
+    {
+        return VmDatePure::gmtime($timestamp);
     }
 
     private static function formatOffset(int $offsetSeconds): string
@@ -1270,21 +2644,126 @@ final class VmDateTimeNative
     /**
      * @return array{offset: int, isdst: bool}
      */
+    /**
+     * @param list<int> $times sorted TZif transition timestamps
+     *
+     * @return list<array{ts: int, time: string, offset: int, isdst: bool, abbr: string}>
+     */
+    private static function transitionsFromTzifTimes(
+        string $tzName,
+        int $begin,
+        int $end,
+        array $times
+    ): array {
+        $transitions = [self::buildTransitionRecord($tzName, $begin)];
+        foreach ($times as $ts) {
+            if ($ts <= $begin) {
+                continue;
+            }
+            if ($ts > $end) {
+                break;
+            }
+            if (($transitions[\count($transitions) - 1]['ts'] ?? null) !== $ts) {
+                $transitions[] = self::buildTransitionRecord($tzName, $ts);
+            }
+        }
+
+        return $transitions;
+    }
+
+    /**
+     * @return list<int>|null
+     */
+    private static function readTzifTransitionTimes(string $path): ?array
+    {
+        $data = VmFs::fileGetContents($path);
+        if (!\is_string($data) || \strlen($data) < 44 || !\str_starts_with($data, 'TZif')) {
+            return null;
+        }
+        $pos = \strrpos($data, 'TZif');
+        if (false === $pos) {
+            return null;
+        }
+
+        return self::parseTzifBlockTransitionTimes($data, $pos);
+    }
+
+    /**
+     * @return list<int>|null
+     */
+    private static function parseTzifBlockTransitionTimes(string $data, int $pos): ?array
+    {
+        if ('TZif' !== \substr($data, $pos, 4)) {
+            return null;
+        }
+        $version = $data[$pos + 4];
+        $header = \unpack('Ntisut/Ntisgmt/Nleap/Ntime/Ntype/Nchar', \substr($data, $pos + 20, 24));
+        if (!\is_array($header)) {
+            return null;
+        }
+        $timecnt = (int) $header['time'];
+        if ($timecnt < 0) {
+            return null;
+        }
+        $offset = $pos + 44;
+        $timeSize = ($version >= '2') ? 8 : 4;
+        if ($offset + ($timecnt * $timeSize) > \strlen($data)) {
+            return null;
+        }
+        $times = [];
+        for ($i = 0; $i < $timecnt; ++$i) {
+            $times[] = 8 === $timeSize
+                ? self::readInt64BE($data, $offset + ($i * 8))
+                : self::readInt32BE($data, $offset + ($i * 4));
+        }
+
+        return $times;
+    }
+
+    private static function readInt32BE(string $data, int $off): int
+    {
+        $unpacked = \unpack('N', \substr($data, $off, 4));
+        if (!\is_array($unpacked)) {
+            return 0;
+        }
+        $u = (int) $unpacked[1];
+        if ($u > 0x7FFFFFFF) {
+            return $u - 0x100000000;
+        }
+
+        return $u;
+    }
+
+    private static function readInt64BE(string $data, int $off): int
+    {
+        $parts = \unpack('N2', \substr($data, $off, 8));
+        if (!\is_array($parts)) {
+            return 0;
+        }
+        $hi = (int) $parts[1];
+        $lo = (int) $parts[2];
+        if ($hi > 0x7FFFFFFF) {
+            $hi -= 0x100000000;
+        }
+
+        return (int) ($hi * 4294967296 + $lo);
+    }
+
     private static function transitionState(string $tzName, int $timestamp): array
     {
+        $fixed = self::parseNumericTimezoneOffset($tzName);
+        if (null !== $fixed) {
+            return ['offset' => $fixed, 'isdst' => false];
+        }
+
         return self::withTimezone($tzName, static function () use ($timestamp): array {
             $tm = self::localtime($timestamp);
             if (null === $tm) {
                 return ['offset' => 0, 'isdst' => false];
             }
-            $ffi = self::ffi();
-            $isdst = 1 === (int) $tm->tm_isdst;
-            if (null === $ffi) {
-                return ['offset' => 0, 'isdst' => $isdst];
-            }
-            $asUtc = (int) $ffi->timegm(\FFI::addr($tm));
+            $isdst = self::tmInt($tm, 'tm_isdst') > 0;
 
-            return ['offset' => $asUtc - $timestamp, 'isdst' => $isdst];
+            return ['offset' => self::offsetSecondsForTimestamp($timestamp), 'isdst' => $isdst];
         });
     }
 
@@ -1294,31 +2773,47 @@ final class VmDateTimeNative
     private static function buildTransitionRecord(string $tzName, int $timestamp): array
     {
         $state = self::transitionState($tzName, $timestamp);
+        $isdst = $state['isdst'];
+        if (!$isdst) {
+            // VmDatePure::localtime tm_isdst is unreliable at DST boundaries; infer from standard offset (#16291).
+            $standardOffset = self::standardOffsetForTimezone($tzName, $timestamp);
+            if ($state['offset'] !== $standardOffset) {
+                $isdst = $state['offset'] > $standardOffset;
+            }
+        }
 
         return [
             'ts' => $timestamp,
             'time' => self::format($timestamp, 0, $tzName, 'c'),
             'offset' => $state['offset'],
-            'isdst' => $state['isdst'],
+            'isdst' => $isdst,
             'abbr' => self::timezoneAbbreviation($tzName, $timestamp),
         ];
+    }
+
+    /** php-src timelib ttinfo tt_isdst — winter reference offset for DST inference (#16291). */
+    private static function standardOffsetForTimezone(string $tzName, int $timestamp): int
+    {
+        $fixed = self::parseNumericTimezoneOffset($tzName);
+        if (null !== $fixed) {
+            return $fixed;
+        }
+
+        return self::withTimezone($tzName, static function () use ($timestamp): int {
+            $year = (int) \date('Y', $timestamp);
+            $winter = VmDatePure::mktime(12, 0, 0, 1, 15, $year);
+            if (false === $winter) {
+                return self::offsetSecondsForTimestamp($timestamp);
+            }
+
+            return self::offsetSecondsForTimestamp($winter);
+        });
     }
 
     private static function timezoneAbbreviation(string $tzName, int $timestamp): string
     {
         return self::withTimezone($tzName, static function () use ($timestamp): string {
-            $ffi = self::ffi();
-            $tm = self::localtime($timestamp);
-            if (null === $ffi || null === $tm) {
-                return '';
-            }
-            $buf = $ffi->new('char[16]');
-            $len = (int) $ffi->strftime(\FFI::addr($buf[0]), 16, '%Z', \FFI::addr($tm));
-            if ($len <= 0) {
-                return '';
-            }
-
-            return \rtrim(\FFI::string($buf), "\0");
+            return VmDatePure::strftime('%Z', $timestamp, false);
         });
     }
 
@@ -1501,22 +2996,24 @@ final class VmDateTimeNative
      */
     private static function withTimezone(string $tzName, callable $fn): mixed
     {
-        $previous = VmEnv::getenv('TZ');
-        $ffi = self::ffi();
-        VmEnv::putenv('TZ='.$tzName);
-        if (null !== $ffi) {
-            $ffi->tzset();
+        if (0 === self::$withTimezoneDepth) {
+            self::$withTimezoneSavedVmEnvTz = VmEnv::getenv('TZ');
+            self::$withTimezoneSavedHostTz = VmDatePure::pushProcessTimezone($tzName);
         }
+        ++self::$withTimezoneDepth;
+        VmEnv::putenv('TZ='.$tzName);
         try {
             return $fn();
         } finally {
-            if (false === $previous || '' === $previous) {
-                VmEnv::putenv('TZ');
-            } else {
-                VmEnv::putenv('TZ='.$previous);
-            }
-            if (null !== $ffi) {
-                $ffi->tzset();
+            --self::$withTimezoneDepth;
+            if (0 === self::$withTimezoneDepth) {
+                if (false === self::$withTimezoneSavedVmEnvTz || '' === self::$withTimezoneSavedVmEnvTz) {
+                    VmEnv::putenv('TZ');
+                } else {
+                    VmEnv::putenv('TZ='.self::$withTimezoneSavedVmEnvTz);
+                }
+                VmDatePure::popProcessTimezone((string) self::$withTimezoneSavedHostTz);
+                self::$withTimezoneSavedHostTz = null;
             }
         }
     }
@@ -1541,6 +3038,79 @@ final class VmDateTimeNative
         throw new \PHPCompiler\VM\NativeDateMalformedStringException(
             'Failed to parse time string ('.$modifier.') at position 0 ('.$pos.'): Unexpected character'
         );
+    }
+
+    /**
+     * php-src date_object_set_date — replace Y-M-D, preserve time of day (#12469).
+     *
+     * @return array{timestamp: int, microsecond: int}
+     */
+    public static function replaceDateComponents(
+        int $timestamp,
+        int $microsecond,
+        string $tzName,
+        int $year,
+        int $month,
+        int $day
+    ): array {
+        return self::withTimezone($tzName, static function () use (
+            $timestamp,
+            $microsecond,
+            $tzName,
+            $year,
+            $month,
+            $day
+        ): array {
+            $tm = self::localtime($timestamp);
+            if (null === $tm) {
+                throw new \LogicException('Invalid timestamp for DateTime::setDate()');
+            }
+            $hour = self::tmInt($tm, 'tm_hour');
+            $minute = self::tmInt($tm, 'tm_min');
+            $second = self::tmInt($tm, 'tm_sec');
+
+            return [
+                'timestamp' => self::mktimeInTimezone($year, $month, $day, $hour, $minute, $second, $tzName),
+                'microsecond' => $microsecond,
+            ];
+        });
+    }
+
+    /**
+     * php-src date_object_set_time — replace H:i:s.u, preserve calendar date (#12469).
+     *
+     * @return array{timestamp: int, microsecond: int}
+     */
+    public static function replaceTimeComponents(
+        int $timestamp,
+        int $microsecond,
+        string $tzName,
+        int $hour,
+        int $minute,
+        int $second,
+        int $microsecondNew
+    ): array {
+        return self::withTimezone($tzName, static function () use (
+            $timestamp,
+            $tzName,
+            $hour,
+            $minute,
+            $second,
+            $microsecondNew
+        ): array {
+            $tm = self::localtime($timestamp);
+            if (null === $tm) {
+                throw new \LogicException('Invalid timestamp for DateTime::setTime()');
+            }
+            $year = (self::tmInt($tm, 'tm_year') + 1900);
+            $month = (self::tmInt($tm, 'tm_mon') + 1);
+            $day = self::tmInt($tm, 'tm_mday');
+
+            return [
+                'timestamp' => self::mktimeInTimezone($year, $month, $day, $hour, $minute, $second, $tzName),
+                'microsecond' => $microsecondNew,
+            ];
+        });
     }
 
     /**
@@ -1572,12 +3142,12 @@ final class VmDateTimeNative
             if (null === $tm) {
                 throw new \LogicException('Invalid timestamp for DateInterval application');
             }
-            $year = (int) $tm->tm_year + 1900;
-            $month = (int) $tm->tm_mon + 1;
-            $day = (int) $tm->tm_mday;
-            $hour = (int) $tm->tm_hour;
-            $minute = (int) $tm->tm_min;
-            $second = (int) $tm->tm_sec;
+            $year = (self::tmInt($tm, 'tm_year') + 1900);
+            $month = (self::tmInt($tm, 'tm_mon') + 1);
+            $day = self::tmInt($tm, 'tm_mday');
+            $hour = self::tmInt($tm, 'tm_hour');
+            $minute = self::tmInt($tm, 'tm_min');
+            $second = self::tmInt($tm, 'tm_sec');
 
             $year += $sign * $state['y'];
             $month += $sign * $state['m'];
@@ -1626,19 +3196,19 @@ final class VmDateTimeNative
                 throw new \LogicException('Invalid timestamp for date_diff()');
             }
 
-            $y1 = (int) $tm1->tm_year + 1900;
-            $m1 = (int) $tm1->tm_mon + 1;
-            $d1 = (int) $tm1->tm_mday;
-            $h1 = (int) $tm1->tm_hour;
-            $i1 = (int) $tm1->tm_min;
-            $s1 = (int) $tm1->tm_sec;
+            $y1 = self::tmInt($tm1, 'tm_year') + 1900;
+            $m1 = self::tmInt($tm1, 'tm_mon') + 1;
+            $d1 = self::tmInt($tm1, 'tm_mday');
+            $h1 = self::tmInt($tm1, 'tm_hour');
+            $i1 = self::tmInt($tm1, 'tm_min');
+            $s1 = self::tmInt($tm1, 'tm_sec');
 
-            $y2 = (int) $tm2->tm_year + 1900;
-            $m2 = (int) $tm2->tm_mon + 1;
-            $d2 = (int) $tm2->tm_mday;
-            $h2 = (int) $tm2->tm_hour;
-            $i2 = (int) $tm2->tm_min;
-            $s2 = (int) $tm2->tm_sec;
+            $y2 = self::tmInt($tm2, 'tm_year') + 1900;
+            $m2 = self::tmInt($tm2, 'tm_mon') + 1;
+            $d2 = self::tmInt($tm2, 'tm_mday');
+            $h2 = self::tmInt($tm2, 'tm_hour');
+            $i2 = self::tmInt($tm2, 'tm_min');
+            $s2 = self::tmInt($tm2, 'tm_sec');
 
             $s = $s2 - $s1;
             $i = $i2 - $i1;
@@ -1722,49 +3292,20 @@ final class VmDateTimeNative
         return ['amount' => $amount, 'unit' => $unit];
     }
 
-    private static function ffi(): ?\FFI
+    /**
+     * @param array{tm_sec:int,tm_min:int,tm_hour:int,tm_mday:int,tm_mon:int,tm_year:int,tm_wday:int,tm_yday:int,tm_isdst:int} $tm
+     */
+    private static function tmInt(array $tm, string $field): int
     {
-        if (null !== self::$ffi) {
-            return self::$ffi;
-        }
-        if (!\extension_loaded('ffi')) {
-            return null;
-        }
-        $cdef = <<<'CDEF'
-typedef long time_t;
-struct timeval {
-    time_t tv_sec;
-    long tv_usec;
-};
-struct tm {
-    int tm_sec;
-    int tm_min;
-    int tm_hour;
-    int tm_mday;
-    int tm_mon;
-    int tm_year;
-    int tm_wday;
-    int tm_yday;
-    int tm_isdst;
-};
-int setenv(const char *name, const char *value, int overwrite);
-void tzset(void);
-time_t mktime(struct tm *tm);
-time_t timegm(struct tm *tm);
-struct tm *localtime_r(const time_t *timep, struct tm *result);
-int gettimeofday(struct timeval *tv, void *tz);
-size_t strftime(char *s, size_t max, const char *format, const struct tm *tm);
-CDEF;
+        return (int) ($tm[$field] ?? 0);
+    }
 
-        foreach (['libc.so.6', 'libc.so'] as $lib) {
-            try {
-                self::$ffi = \FFI::cdef($cdef, $lib);
-
-                return self::$ffi;
-            } catch (\Throwable) {
-            }
+    private static function offsetSecondsForTimestamp(int $timestamp): int
+    {
+        if (!\function_exists('date')) {
+            return 0;
         }
 
-        return null;
+        return (int) \date('Z', $timestamp);
     }
 }

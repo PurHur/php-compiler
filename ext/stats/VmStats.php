@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\stats;
 
+use PHPCompiler\ext\standard\TriggerErrorJitHelper;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\VM\HashTable;
@@ -17,7 +18,7 @@ final class VmStats
     /**
      * @return list<float>
      */
-    public static function coerceNumericArray(HashTable $ht, Frame $frame): array
+    public static function coerceNumericArray(HashTable $ht, ?Frame $frame = null): array
     {
         $values = [];
         foreach ($ht->iterate(true) as $value) {
@@ -50,7 +51,7 @@ final class VmStats
      *
      * @return float|false
      */
-    public static function variance(array $values, bool $sample, Frame $frame, string $function)
+    public static function variance(array $values, bool $sample, ?Frame $frame, string $function)
     {
         $n = \count($values);
         if (0 === $n) {
@@ -78,7 +79,7 @@ final class VmStats
     /**
      * @return float|false
      */
-    public static function standardDeviation(array $values, bool $sample, Frame $frame, string $function)
+    public static function standardDeviation(array $values, bool $sample, ?Frame $frame, string $function)
     {
         $var = self::variance($values, $sample, $frame, $function);
         if (false === $var) {
@@ -91,7 +92,7 @@ final class VmStats
     /**
      * @return float|false
      */
-    public static function covariance(array $a, array $b, bool $sample, Frame $frame, string $function)
+    public static function covariance(array $a, array $b, bool $sample, ?Frame $frame, string $function)
     {
         $na = \count($a);
         $nb = \count($b);
@@ -122,17 +123,19 @@ final class VmStats
         return $carry / $divisor;
     }
 
-    private static function warning(Frame $frame, string $message): void
+    private static function warning(?Frame $frame, string $message): void
     {
-        if (null === $frame->vmContext) {
+        if (null !== $frame?->vmContext) {
+            $frame->vmContext->errors->triggerError(
+                $message,
+                ErrorReporter::E_WARNING,
+                '' !== $frame->scriptPath ? $frame->scriptPath : null,
+                $frame->vmContext,
+                $frame
+            );
+
             return;
         }
-        $frame->vmContext->errors->triggerError(
-            $message,
-            ErrorReporter::E_WARNING,
-            '' !== $frame->scriptPath ? $frame->scriptPath : null,
-            $frame->vmContext,
-            $frame
-        );
+        TriggerErrorJitHelper::warning($message);
     }
 }

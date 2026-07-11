@@ -7,8 +7,10 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Block;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\CallArgv;
+use PHPCompiler\JIT\Builtin\ErrorRaise;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -18,6 +20,23 @@ use PHPLLVM\Value;
 /** LLVM lowering for func_get_arg() / func_get_args() / func_num_args() (issues #197, #11614). */
 final class JitFuncArgs
 {
+    private static function isUserFunctionContext(Context $context): bool
+    {
+        $block = $context->jitEnclosingBlock;
+
+        return $block instanceof Block
+            && null !== $block->func
+            && !$block->isMainScript();
+    }
+
+    private static function emitGlobalScopeError(Context $context, string $message): void
+    {
+        ErrorRaise::registerDeclarations($context);
+        ErrorRaise::ensureLinked($context);
+        ErrorRaise::emitRaise($context, $message);
+        $context->builder->call($context->lookupFunction('abort'));
+    }
+
     private static function requireEnclosing(Context $context): Block
     {
         $block = $context->jitEnclosingBlock;
@@ -40,7 +59,11 @@ final class JitFuncArgs
 
     public static function getArgs(Context $context): JITVariable
     {
-        self::requireEnclosing($context);
+        if (!self::isUserFunctionContext($context)) {
+            self::emitGlobalScopeError($context, 'func_get_args() cannot be called from the global scope');
+
+            return self::callArgvHashtable($context);
+        }
 
         return self::callArgvHashtable($context);
     }
@@ -70,6 +93,7 @@ final class JitFuncArgs
         self::requireEnclosing($context);
         TypeErrorRaise::registerDeclarations($context);
         TypeErrorRaise::ensureLinked($context);
+        JitInternalStrictArg::requireInt($context, $positionArg, 'func_get_arg', 'position', 1);
 
         $i64 = $context->getTypeFromString('int64');
         $position = JitZendScalarCast::emitIntCast($context, $positionArg);

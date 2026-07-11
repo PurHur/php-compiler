@@ -5,6 +5,10 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\openssl;
 
 use PHPCompiler\ext\standard\VmHash;
+use PHPCompiler\ext\standard\VmHashNative;
+use PHPCompiler\Frame;
+use PHPCompiler\VM\Context;
+use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 
@@ -20,11 +24,11 @@ final class VmOpenssl
      *
      * @return int|false
      */
-    public static function cipher_iv_length(string $cipherAlgo): int|false
+    public static function cipher_iv_length(string $cipherAlgo, ?Frame $frame = null): int|false
     {
         $length = OpensslCipherRegistry::cipherIvLength($cipherAlgo);
         if (false === $length) {
-            trigger_error('openssl_cipher_iv_length(): Unknown cipher algorithm', E_USER_WARNING);
+            self::userWarning('openssl_cipher_iv_length(): Unknown cipher algorithm', $frame);
         }
 
         return $length;
@@ -35,11 +39,11 @@ final class VmOpenssl
      *
      * @return int|false
      */
-    public static function cipher_key_length(string $cipherAlgo): int|false
+    public static function cipher_key_length(string $cipherAlgo, ?Frame $frame = null): int|false
     {
         $length = OpensslCipherRegistry::cipherKeyLength($cipherAlgo);
         if (false === $length) {
-            trigger_error('openssl_cipher_key_length(): Unknown cipher algorithm', E_USER_WARNING);
+            self::userWarning('openssl_cipher_key_length(): Unknown cipher algorithm', $frame);
         }
 
         return $length;
@@ -60,20 +64,408 @@ final class VmOpenssl
      *
      * @return string|false
      */
-    public static function digest(string $data, string $method, bool $rawOutput = false): string|false
+    public static function digest(string $data, string $method, bool $rawOutput = false, ?Frame $frame = null): string|false
     {
         if (!OpensslCipherRegistry::digestImplemented($method)) {
-            trigger_error('openssl_digest(): Unknown digest algorithm', E_USER_WARNING);
+            self::userWarning('openssl_digest(): Unknown digest algorithm', $frame);
 
             return false;
         }
         try {
             return VmHash::hash(strtolower($method), $data, $rawOutput);
         } catch (\ValueError) {
-            trigger_error('openssl_digest(): Unknown digest algorithm', E_USER_WARNING);
+            self::userWarning('openssl_digest(): Unknown digest algorithm', $frame);
 
             return false;
         }
+    }
+
+    /**
+     * openssl_pbkdf2() — PKCS#5 PBKDF2 via VmHashNative (php-src ext/openssl/kdf.c; #6488).
+     *
+     * @return string|false raw key bytes
+     */
+    public static function pbkdf2(
+        string $password,
+        string $salt,
+        int $keyLength,
+        int $iterations,
+        string $digestAlgo = 'sha1',
+        ?Frame $frame = null
+    ): string|false {
+        if ($keyLength <= 0) {
+            throw new \ValueError('openssl_pbkdf2(): Argument #3 ($key_length) must be greater than 0');
+        }
+        if ($iterations <= 0) {
+            return false;
+        }
+        $method = strtolower($digestAlgo);
+        if (!OpensslCipherRegistry::digestImplemented($method)) {
+            self::userWarning('openssl_pbkdf2(): Unknown digest algorithm', $frame);
+
+            return false;
+        }
+        $derived = VmHashNative::hashPbkdf2($method, $password, $salt, $iterations, $keyLength, true);
+        if ('' === $derived) {
+            return false;
+        }
+
+        return $derived;
+    }
+
+    /**
+     * openssl_sign() — EVP_DigestSign via libcrypto FFI (#11535).
+     *
+     * @return string|false signature bytes
+     */
+    public static function sign(string $data, string $privateKeyPem, int|string $algorithm, ?Frame $frame = null): string|false
+    {
+        $digestName = self::resolveDigestName($algorithm, 'openssl_sign', $frame);
+        if (false === $digestName) {
+            return false;
+        }
+        if (!VmOpensslSignNative::available()) {
+            self::userWarning('openssl_sign(): OpenSSL signing is unavailable in this compiler build', $frame);
+
+            return false;
+        }
+
+        return VmOpensslSignNative::sign($data, $privateKeyPem, $digestName);
+    }
+
+    /**
+     * openssl_verify() — EVP_DigestVerify via libcrypto FFI (#11535).
+     *
+     * @return int 1 valid, 0 invalid, -1 error
+     */
+    public static function verify(string $data, string $signature, string $publicKeyPem, int|string $algorithm, ?Frame $frame = null): int
+    {
+        $digestName = self::resolveDigestName($algorithm, 'openssl_verify', $frame);
+        if (false === $digestName) {
+            return -1;
+        }
+        if (!VmOpensslSignNative::available()) {
+            self::userWarning('openssl_verify(): OpenSSL verification is unavailable in this compiler build', $frame);
+
+            return -1;
+        }
+
+        return VmOpensslSignNative::verify($data, $signature, $publicKeyPem, $digestName);
+    }
+
+    /**
+     * openssl_spki_new() — create Netscape SPKAC (php-src ext/openssl/openssl.c; #8690).
+     *
+     * @return string|false SPKAC=… encoded certificate request
+     */
+    public static function spkiNew(
+        Variable $keyArg,
+        string $challenge,
+        int|string $algorithm,
+        ?Frame $frame = null
+    ): string|false {
+        if (!VmOpensslSpkiNative::available()) {
+            self::userWarning('openssl_spki_new(): OpenSSL SPKI is unavailable in this compiler build', $frame);
+
+            return false;
+        }
+
+        $pem = self::coercePkeyPem($keyArg, 'openssl_spki_new', 0, 'private_key');
+        $digestName = self::resolveDigestName($algorithm, 'openssl_spki_new', $frame);
+        if (false === $digestName) {
+            return false;
+        }
+
+        $spkac = VmOpensslSpkiNative::spkiNew($pem, $challenge, $digestName);
+        if (false === $spkac) {
+            self::userWarning('openssl_spki_new(): Unable to create new SPKAC', $frame);
+
+            return false;
+        }
+
+        return $spkac;
+    }
+
+    /**
+     * openssl_spki_verify() — verify Netscape SPKAC (php-src ext/openssl/openssl.c; #8690).
+     */
+    public static function spkiVerify(string $spkac, ?Frame $frame = null): bool
+    {
+        if (!VmOpensslSpkiNative::available()) {
+            self::userWarning('openssl_spki_verify(): OpenSSL SPKI is unavailable in this compiler build', $frame);
+
+            return false;
+        }
+
+        $cleaned = VmOpensslSpkiNative::spkiCleanup($spkac);
+        if ('' === $cleaned) {
+            self::userWarning('openssl_spki_verify(): Invalid SPKAC', $frame);
+
+            return false;
+        }
+
+        $verified = VmOpensslSpkiNative::spkiVerify($spkac);
+        if (!$verified) {
+            self::userWarning('openssl_spki_verify(): Unable to decode supplied SPKAC', $frame);
+        }
+
+        return $verified;
+    }
+
+    /**
+     * openssl_pkey_derive() — ECDH/X25519 shared secret (EVP_PKEY_derive; issue #15428).
+     *
+     * @return string|false
+     */
+    public static function pkeyDerive(
+        string $publicKeyPem,
+        string $privateKeyPem,
+        int $keyLength = 0,
+        ?Frame $frame = null
+    ): string|false {
+        if (!VmOpensslPkeyDeriveNative::available()) {
+            self::userWarning(
+                'openssl_pkey_derive(): OpenSSL key derivation is unavailable in this compiler build',
+                $frame
+            );
+
+            return false;
+        }
+
+        return VmOpensslPkeyDeriveNative::derive($publicKeyPem, $privateKeyPem, $keyLength);
+    }
+
+    /**
+     * openssl_pkey_new() — generate asymmetric key pair (php-src ext/openssl/xp.c; #6295).
+     *
+     * @return \PHPCompiler\VM\Variable|false OpenSSLAsymmetricKey wrapper
+     */
+    public static function pkeyNew(?Variable $configVar, Context $ctx, ?Frame $frame = null): Variable|false
+    {
+        if (!VmOpensslPkeyNative::available()) {
+            self::userWarning('openssl_pkey_new(): OpenSSL key generation is unavailable in this compiler build', $frame);
+
+            return false;
+        }
+
+        $bits = 2048;
+        $type = OpensslConstants::OPENSSL_KEYTYPE_RSA;
+        if (null !== $configVar) {
+            $configVar = $configVar->resolveIndirect();
+            if (Variable::TYPE_ARRAY === $configVar->type) {
+                foreach ($configVar->toArray()->iterateKeyed(true) as [$keyVar, $valueVar]) {
+                    if (Variable::TYPE_STRING !== $keyVar->type) {
+                        continue;
+                    }
+                    $key = $keyVar->toString();
+                    $valueVar = $valueVar->resolveIndirect();
+                    if ('private_key_bits' === $key && Variable::TYPE_INTEGER === $valueVar->type) {
+                        $bits = $valueVar->toInt();
+                    }
+                    if ('private_key_type' === $key && Variable::TYPE_INTEGER === $valueVar->type) {
+                        $type = $valueVar->toInt();
+                    }
+                }
+            }
+        }
+
+        if (OpensslConstants::OPENSSL_KEYTYPE_RSA !== $type) {
+            self::userWarning('openssl_pkey_new(): Unknown private key type', $frame);
+
+            return false;
+        }
+
+        $pem = VmOpensslPkeyNative::generateRsa($bits);
+        if (false === $pem) {
+            self::userWarning('openssl_pkey_new(): Unable to generate key pair', $frame);
+
+            return false;
+        }
+
+        return VmOpensslObjects::wrapKey($ctx, $pem);
+    }
+
+    /**
+     * openssl_pkey_get_private() — load private key from PEM/path (php-src ext/openssl/xp.c; #6295).
+     *
+     * @return \PHPCompiler\VM\Variable|false
+     */
+    public static function pkeyGetPrivate(Variable $arg, ?string $passphrase, Context $ctx, ?Frame $frame = null): Variable|false
+    {
+        if (!VmOpensslPkeyNative::available()) {
+            self::userWarning('openssl_pkey_get_private(): OpenSSL is unavailable in this compiler build', $frame);
+
+            return false;
+        }
+
+        $arg = $arg->resolveIndirect();
+        if (Variable::TYPE_OBJECT === $arg->type && VmOpensslObjects::isAsymmetricKey($arg)) {
+            return VmOpensslObjects::wrapKey($ctx, VmOpensslObjects::keyPem($arg->toObject()));
+        }
+        if (Variable::TYPE_STRING !== $arg->type) {
+            throw new \TypeError(\sprintf(
+                'openssl_pkey_get_private(): Argument #1 ($private_key) must be of type OpenSSLAsymmetricKey|string, %s given',
+                match ($arg->type) {
+                    Variable::TYPE_NULL => 'null',
+                    Variable::TYPE_BOOLEAN => 'bool',
+                    Variable::TYPE_INTEGER => 'int',
+                    Variable::TYPE_FLOAT => 'float',
+                    Variable::TYPE_ARRAY => 'array',
+                    Variable::TYPE_OBJECT => $arg->toObject()->class->name,
+                    default => 'mixed',
+                }
+            ));
+        }
+
+        $material = $arg->toString();
+        if ('' !== $material && @\is_file($material)) {
+            $contents = @\file_get_contents($material);
+            if (false === $contents) {
+                self::userWarning('openssl_pkey_get_private(): Unable to read key file', $frame);
+
+                return false;
+            }
+            $material = $contents;
+        }
+
+        $pem = VmOpensslPkeyNative::normalizePrivateKeyPem($material, $passphrase);
+        if (false === $pem) {
+            self::userWarning('openssl_pkey_get_private(): Unable to load key', $frame);
+
+            return false;
+        }
+
+        return VmOpensslObjects::wrapKey($ctx, $pem);
+    }
+
+    /**
+     * openssl_pkey_export() — export OpenSSLAsymmetricKey to PEM (php-src ext/openssl/xp.c; #6295).
+     *
+     * @return string|false
+     */
+    public static function pkeyExportPem(Variable $keyArg, ?Variable $configVar, ?Frame $frame = null): string|false
+    {
+        if (!VmOpensslPkeyNative::available()) {
+            self::userWarning('openssl_pkey_export(): OpenSSL is unavailable in this compiler build', $frame);
+
+            return false;
+        }
+
+        $pem = self::coercePkeyPem($keyArg, 'openssl_pkey_export', 0, 'key');
+        $passphrase = null;
+        if (null !== $configVar) {
+            $configVar = $configVar->resolveIndirect();
+            if (Variable::TYPE_ARRAY === $configVar->type) {
+                foreach ($configVar->toArray()->iterateKeyed(true) as [$keyVar, $valueVar]) {
+                    if (Variable::TYPE_STRING !== $keyVar->type) {
+                        continue;
+                    }
+                    if ('passphrase' === $keyVar->toString()
+                        && Variable::TYPE_STRING === $valueVar->resolveIndirect()->type) {
+                        $passphrase = $valueVar->resolveIndirect()->toString();
+                    }
+                }
+            }
+        }
+
+        $exported = VmOpensslPkeyNative::exportPrivateKeyPem($pem, $passphrase);
+        if (false === $exported) {
+            self::userWarning('openssl_pkey_export(): Cannot export key', $frame);
+
+            return false;
+        }
+
+        return $exported;
+    }
+
+    public static function coercePkeyPem(Variable $var, string $function, int $argIndex, string $paramName): string
+    {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_STRING === $var->type) {
+            return $var->toString();
+        }
+        if (Variable::TYPE_OBJECT === $var->type) {
+            $pem = VmOpensslObjects::keyPem($var->toObject());
+            if ('' !== $pem) {
+                return $pem;
+            }
+        }
+
+        throw new \TypeError(\sprintf(
+            '%s(): Argument #%d ($%s) must be of type OpenSSLAsymmetricKey|string, %s given',
+            $function,
+            $argIndex + 1,
+            $paramName,
+            match ($var->type) {
+                Variable::TYPE_NULL => 'null',
+                Variable::TYPE_BOOLEAN => 'bool',
+                Variable::TYPE_INTEGER => 'int',
+                Variable::TYPE_FLOAT => 'float',
+                Variable::TYPE_ARRAY => 'array',
+                Variable::TYPE_OBJECT => $var->toObject()->class->name,
+                default => 'mixed',
+            }
+        ));
+    }
+
+    public static function coerceSignatureArg(Variable $var, string $function, int $argIndex, string $paramName): string
+    {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_STRING === $var->type) {
+            return $var->toString();
+        }
+
+        throw new \TypeError(\sprintf(
+            '%s(): Argument #%d ($%s) must be of type string, %s given',
+            $function,
+            $argIndex + 1,
+            $paramName,
+            match ($var->type) {
+                Variable::TYPE_NULL => 'null',
+                Variable::TYPE_BOOLEAN => 'bool',
+                Variable::TYPE_INTEGER => 'int',
+                Variable::TYPE_FLOAT => 'float',
+                Variable::TYPE_ARRAY => 'array',
+                Variable::TYPE_OBJECT => 'object',
+                default => 'mixed',
+            }
+        ));
+    }
+
+    /**
+     * @return string|false EVP digest name
+     */
+    public static function resolveDigestName(int|string $algorithm, string $function, ?Frame $frame = null): string|false
+    {
+        if (\is_int($algorithm)) {
+            $name = match ($algorithm) {
+                OpensslConstants::OPENSSL_ALGO_MD4 => 'md4',
+                OpensslConstants::OPENSSL_ALGO_MD5 => 'md5',
+                OpensslConstants::OPENSSL_ALGO_SHA1 => 'sha1',
+                OpensslConstants::OPENSSL_ALGO_SHA224 => 'sha224',
+                OpensslConstants::OPENSSL_ALGO_SHA256 => 'sha256',
+                OpensslConstants::OPENSSL_ALGO_SHA384 => 'sha384',
+                OpensslConstants::OPENSSL_ALGO_SHA512 => 'sha512',
+                OpensslConstants::OPENSSL_ALGO_RMD160 => 'ripemd160',
+                default => null,
+            };
+            if (null === $name) {
+                self::userWarning($function.'(): Unknown signature algorithm', $frame);
+
+                return false;
+            }
+
+            return $name;
+        }
+
+        $name = strtolower($algorithm);
+        if (!OpensslCipherRegistry::digestImplemented($name) && !\in_array($name, ['sha224', 'sha384', 'sha512', 'ripemd160', 'md4'], true)) {
+            self::userWarning($function.'(): Unknown signature algorithm', $frame);
+
+            return false;
+        }
+
+        return $name;
     }
 
     public static function coerceBoolArg(Variable $var, string $function, int $argIndex, string $paramName): bool
@@ -111,5 +503,21 @@ final class VmOpenssl
         }
 
         return $ht;
+    }
+
+    private static function userWarning(string $message, ?Frame $frame): void
+    {
+        if (null === $frame?->vmContext) {
+            trigger_error($message, E_USER_WARNING);
+
+            return;
+        }
+        $frame->vmContext->errors->triggerError(
+            $message,
+            ErrorReporter::E_USER_WARNING,
+            '' !== $frame->scriptPath ? $frame->scriptPath : null,
+            $frame->vmContext,
+            $frame
+        );
     }
 }

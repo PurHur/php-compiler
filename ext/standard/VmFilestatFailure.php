@@ -24,7 +24,7 @@ final class VmFilestatFailure
 
     public static function warnChmodFailed(Frame $frame, string $path): void
     {
-        self::triggerWarning($frame, \sprintf('chmod(): No such file or directory'));
+        self::triggerWarningWithHandlerFirst($frame, 'chmod(): No such file or directory');
     }
 
     public static function warnUnlinkFailed(Frame $frame, string $path): void
@@ -63,21 +63,37 @@ final class VmFilestatFailure
         self::triggerWarningWithHandlerFirst($frame, \sprintf('%s(): No such file or directory', $function));
     }
 
+    public static function warnInvalidArgument(Frame $frame, string $function): void
+    {
+        self::triggerWarningWithHandlerFirst($frame, \sprintf('%s(): Invalid argument', $function));
+    }
+
     public static function warnOpendirFailed(Frame $frame, string $path): void
+    {
+        self::warnPathOpenDirFailed($frame, 'opendir', $path);
+    }
+
+    /** php-src dir.c php_opendir — distinguish file vs missing path (#14861). */
+    public static function warnPathOpenDirFailed(Frame $frame, string $function, string $path): void
+    {
+        $reason = VmStatPath::isFile($path) ? 'Not a directory' : 'No such file or directory';
+        self::triggerWarningWithHandlerFirst(
+            $frame,
+            \sprintf('%s(%s): Failed to open directory: %s', $function, $path, $reason)
+        );
+    }
+
+    public static function warnChdirFailed(Frame $frame, string $path): void
     {
         self::triggerWarningWithHandlerFirst(
             $frame,
-            \sprintf('opendir(%s): Failed to open directory: No such file or directory', $path)
+            'chdir(): No such file or directory (errno 2)'
         );
     }
 
     public static function warnScandirFailed(Frame $frame, string $path): void
     {
-        self::triggerWarningWithHandlerFirst(
-            $frame,
-            \sprintf('scandir(%s): Failed to open directory: No such file or directory', $path)
-        );
-        self::triggerWarningWithHandlerFirst($frame, 'scandir(): (errno 2): No such file or directory');
+        self::warnPathOpenDirFailed($frame, 'scandir', $path);
     }
 
     public static function warnRmdirMissing(Frame $frame, string $path): void

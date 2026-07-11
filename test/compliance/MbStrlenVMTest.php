@@ -21,6 +21,10 @@ final class MbStrlenVMTest extends BaseTest
             __DIR__.'/cases/stdlib/mb_strlen_enum_typeerror.phpt',
             'mb_strlen_enum_typeerror.phpt'
         );
+        yield 'mb_strlen_encoding.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/mb_strlen_encoding.phpt',
+            'mb_strlen_encoding.phpt'
+        );
     }
 
     public function setUp(): void

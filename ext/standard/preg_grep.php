@@ -31,6 +31,7 @@ final class preg_grep extends Internal
             throw new \LogicException('preg_grep() requires two or three arguments in this compiler build');
         }
         $pattern = VmReflection::stringArg($frame->calledArgs[0], 'preg_grep() pattern', 0);
+        VmPregFailure::warnPatternCompileFailure($frame, 'preg_grep', $pattern);
         $array = $frame->calledArgs[1]->resolveIndirect();
         if (Variable::TYPE_ARRAY !== $array->type) {
             throw new \LogicException('preg_grep() second argument must be an array in this compiler build');
@@ -55,6 +56,9 @@ final class preg_grep extends Internal
             self::rejectNonStringHaystackValue($value);
             $match = VmPreg::pregMatch($pattern, $value->toString());
             if (false === $match) {
+                if (StdlibConstants::PREG_BAD_UTF8_ERROR === VmPreg::lastError()) {
+                    continue;
+                }
                 if (null !== $frame->returnVar) {
                     $frame->returnVar->bool(false);
                 }

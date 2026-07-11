@@ -10,6 +10,6 @@ echo http_response_code(999) ? 'true' : 'false', "\n";
 false
 true
 404
-false
+true
 --EXPECT_EXIT--
 0

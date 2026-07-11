@@ -1,0 +1,139 @@
+# Minimal bootstrap spine gate — fast PR feedback for gen-1+ workflow (#1492).
+#
+# Runs on spine / gen-0 / inventory path changes:
+#   inventory --check, spine coverage + sidecar sync, north-star5-verify-fast
+#
+# Optional full ladder (workflow_dispatch): bootstrap-loop-probe (~9 min).
+#
+# Re-enable note: first active workflow while other CI remains in workflows-disabled/
+# Parent: docs/bootstrap-dev-workflow.md
+name: Bootstrap spine gate
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'test/selfhost/compiler_lib_spine_smoke/**'
+      - 'prelinked/bootstrap-gen0/**'
+      - 'prelinked/bootstrap-vendor/**'
+      - 'docs/bootstrap-inventory.md'
+      - 'docs/bootstrap-profile.json'
+      - 'script/bootstrap-*.sh'
+      - 'script/bootstrap-*.php'
+      - 'script/north-star5-verify.sh'
+      - 'script/check-selfhost-spine-*.php'
+      - '.github/workflows/bootstrap-spine-gate.yml'
+  pull_request:
+    branches: [master]
+    paths:
+      - 'test/selfhost/compiler_lib_spine_smoke/**'
+      - 'prelinked/bootstrap-gen0/**'
+      - 'prelinked/bootstrap-vendor/**'
+      - 'docs/bootstrap-inventory.md'
+      - 'docs/bootstrap-profile.json'
+      - 'script/bootstrap-*.sh'
+      - 'script/bootstrap-*.php'
+      - 'script/north-star5-verify.sh'
+      - 'script/check-selfhost-spine-*.php'
+      - '.github/workflows/bootstrap-spine-gate.yml'
+  workflow_dispatch:
+    inputs:
+      run_bootstrap_loop:
+        description: 'Also run bootstrap-loop-probe (full gen-1→gen-3 ladder, ~9 min)'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
+      honest_compile_gate:
+        description: 'Fail bootstrap-loop on gen-0 sidecar recovery (BOOTSTRAP_HONEST_COMPILE_GATE=1, #15603)'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
+
+concurrency:
+  group: bootstrap-spine-gate-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  spine-gate:
+    name: Spine coverage + sidecar + M5 fast
+    runs-on: ubuntu-22.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build dev image
+        run: |
+          if ! docker image inspect php-compiler:22.04-dev >/dev/null 2>&1; then
+            docker build -f Docker/dev/ubuntu-22.04/Dockerfile -t php-compiler:22.04-dev .
+          fi
+
+      - name: Bootstrap spine gates (Docker)
+        run: |
+          docker run --rm -m 10g \
+            -e PHP_COMPILER_LLVM_PATH=/opt/llvm9 \
+            -e PHP_COMPILER_MEMORY_LIMIT=1536M \
+            -e PHP_COMPILER_LLVM_MEMORY_LIMIT=4096M \
+            -e PHP_COMPILER_CI_RAM_GB=8 \
+            -v "$PWD:/compiler" -w /compiler \
+            php-compiler:22.04-dev bash -lc '
+              set -euo pipefail
+              composer install --no-interaction --ignore-platform-reqs -q
+              script/apply-patches.sh
+
+              echo "=== bootstrap-inventory --check-spine ==="
+              php script/bootstrap-inventory.php --check-spine
+
+              echo "=== spine coverage sync ==="
+              php script/check-selfhost-spine-coverage-sync.php
+
+              echo "=== spine count doc sync ==="
+              php script/check-selfhost-spine-count-sync.php
+
+              echo "=== gen-0 sidecar stamp sync ==="
+              php script/check-selfhost-spine-sidecar-sync.php
+
+              echo "=== north-star5-verify-fast ==="
+              ./script/north-star5-verify.sh --fast
+            '
+
+  bootstrap-loop:
+    name: Full bootstrap-loop-probe
+    needs: spine-gate
+    if: >-
+      github.event_name == 'workflow_dispatch'
+      && github.event.inputs.run_bootstrap_loop == 'true'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build dev image
+        run: |
+          if ! docker image inspect php-compiler:22.04-dev >/dev/null 2>&1; then
+            docker build -f Docker/dev/ubuntu-22.04/Dockerfile -t php-compiler:22.04-dev .
+          fi
+
+      - name: bootstrap-loop-probe
+        run: |
+          HONEST_ARGS=""
+          if [[ "${{ github.event.inputs.honest_compile_gate }}" == "true" ]]; then
+            HONEST_ARGS="--honest-compile"
+          fi
+          docker run --rm -m 10g \
+            -e PHP_COMPILER_LLVM_PATH=/opt/llvm9 \
+            -e PHP_COMPILER_MEMORY_LIMIT=1536M \
+            -e PHP_COMPILER_LLVM_MEMORY_LIMIT=4096M \
+            -e PHP_COMPILER_CI_RAM_GB=8 \
+            -v "$PWD:/compiler" -w /compiler \
+            php-compiler:22.04-dev bash -lc "
+              set -euo pipefail
+              composer install --no-interaction --ignore-platform-reqs -q
+              script/apply-patches.sh
+              ./script/bootstrap-loop-probe.sh ${HONEST_ARGS}
+            "

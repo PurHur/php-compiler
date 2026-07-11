@@ -42,7 +42,7 @@ final class openssl_cipher_iv_length extends Internal
             0,
             'cipher_algo'
         );
-        $length = VmOpenssl::cipher_iv_length($cipher);
+        $length = VmOpenssl::cipher_iv_length($cipher, $frame);
         if (false === $length) {
             $frame->returnVar->bool(false);
 

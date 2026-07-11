@@ -31,6 +31,7 @@ final class shell_exec extends Internal
         }
         InternalStrictArg::rejectNullString($frame->calledArgs[0], 'shell_exec', 'command', 0, $frame);
         $command = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'shell_exec', 0, 'command');
+        VmString::rejectEmptyBuiltinStringArg($command, 'shell_exec', 0, 'command');
         $result = VmShellExecNative::shellExec($command);
         if (false === $result) {
             $frame->returnVar->bool(false);
@@ -49,9 +50,14 @@ final class shell_exec extends Internal
 
         JitInternalStrictArg::rejectNullString($context, $args[0], 'shell_exec', 'command', 1);
 
-        return JitShellExec::invoke(
+        $command = JitStringBuiltinArg::lower($context, $args[0], 'shell_exec', 0, 'command');
+        JitStringBuiltinArg::rejectEmpty(
             $context,
-            JitStringBuiltinArg::lower($context, $args[0], 'shell_exec', 0, 'command')
+            $args[0],
+            $command,
+            'shell_exec(): Argument #1 ($command) cannot be empty'
         );
+
+        return JitShellExec::invoke($context, $command);
     }
 }

@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace PHPCompiler\Compiler;
 
 use PHPCfg\Op;
+use PHPCompiler\CompilerVersion;
+use PhpParser\Comment;
 use PhpParser\Node;
 
 /**
@@ -20,15 +22,101 @@ final class DeprecatedMetadata
 
     public static function fromOp(Op $op): ?self
     {
-        if (!$op->hasAttribute('attrGroups')) {
-            return null;
+        if ($op->hasAttribute('phpcGlobalDeprecatedMetadata')) {
+            $meta = $op->getAttribute('phpcGlobalDeprecatedMetadata');
+            if ($meta instanceof self) {
+                return $meta;
+            }
         }
-        $groups = $op->getAttribute('attrGroups');
-        if (!\is_array($groups)) {
-            return null;
+        if ($op->hasAttribute('attrGroups')) {
+            $groups = $op->getAttribute('attrGroups');
+            if (\is_array($groups)) {
+                $fromAttr = self::fromAttrGroups($groups);
+                if (null !== $fromAttr) {
+                    return $fromAttr;
+                }
+            }
         }
 
-        return self::fromAttrGroups($groups);
+        return self::fromOpDocComment($op);
+    }
+
+    /**
+     * Recover @deprecated docblock on class constants (zend_compile.c, ext/reflection/php_reflection.c, #17647).
+     */
+    public static function fromOpDocComment(Op $op): ?self
+    {
+        foreach (self::commentTextChunksFromOp($op) as $chunk) {
+            $meta = self::fromDocCommentText($chunk);
+            if (null !== $meta) {
+                return $meta;
+            }
+        }
+
+        return null;
+    }
+
+    public static function fromDocCommentText(string $text): ?self
+    {
+        if (!preg_match('/@deprecated\b/i', $text)) {
+            return null;
+        }
+        if (preg_match('/@deprecated\s+(\S+)(?:\s+(.*))?\s*(?:\*\/|\*|$)/is', $text, $m)) {
+            $first = trim($m[1]);
+            $rest = isset($m[2]) ? trim($m[2]) : '';
+            $rest = rtrim($rest, "*/ \t\n\r");
+            if (preg_match('/^\d/', $first)) {
+                return new self('' !== $rest ? $rest : null, $first);
+            }
+
+            return new self(trim($first.('' !== $rest ? ' '.$rest : '')), null);
+        }
+
+        return new self(null, null);
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function commentTextChunksFromOp(Op $op): array
+    {
+        $chunks = [];
+        foreach (['comments', 'docComment', 'doccomment'] as $key) {
+            if (!$op->hasAttribute($key)) {
+                continue;
+            }
+            $value = $op->getAttribute($key);
+            if ('comments' === $key && \is_array($value)) {
+                foreach ($value as $comment) {
+                    $text = self::commentObjectText($comment);
+                    if (null !== $text) {
+                        $chunks[] = $text;
+                    }
+                }
+                continue;
+            }
+            $text = self::commentObjectText($value);
+            if (null !== $text) {
+                $chunks[] = $text;
+            }
+        }
+
+        return $chunks;
+    }
+
+    private static function commentObjectText(mixed $comment): ?string
+    {
+        if ($comment instanceof Comment) {
+            return $comment->getText();
+        }
+        if (\is_object($comment) && method_exists($comment, 'getText')) {
+            return $comment->getText();
+        }
+        if (\is_string($comment)) {
+            return $comment;
+        }
+
+        return null;
     }
 
     /**
@@ -49,6 +137,47 @@ final class DeprecatedMetadata
         return null;
     }
 
+    /**
+     * @param list<array{name: ?string, value: mixed}> $args
+     */
+    public static function fromAttributeArgs(array $args): self
+    {
+        $message = null;
+        $since = null;
+        $positional = 0;
+        foreach ($args as $arg) {
+            $name = $arg['name'] ?? null;
+            $value = $arg['value'];
+            $str = \is_string($value) || \is_int($value) || \is_float($value) ? (string) $value : null;
+            if (null === $name) {
+                if (0 === $positional) {
+                    $message = $str;
+                } elseif (1 === $positional) {
+                    $since = $str;
+                }
+                ++$positional;
+                continue;
+            }
+            $param = strtolower((string) $name);
+            if ('message' === $param) {
+                $message = $str;
+            } elseif ('since' === $param) {
+                $since = $str;
+            }
+        }
+
+        return new self($message, $since);
+    }
+
+    public static function fromAttributeEntry(AttributeEntry $entry): ?self
+    {
+        if (!self::isDeprecatedAttributeName($entry->name)) {
+            return null;
+        }
+
+        return self::fromAttributeArgs($entry->args);
+    }
+
     public function formatFunction(string $name): string
     {
         return 'Function '.$name.'() is deprecated'.$this->suffix();
@@ -62,6 +191,11 @@ final class DeprecatedMetadata
     public function formatConstant(string $class, string $constant): string
     {
         return 'Constant '.$class.'::'.$constant.' is deprecated'.$this->suffix();
+    }
+
+    public function formatGlobalConstant(string $constant): string
+    {
+        return 'Constant '.$constant.' is deprecated'.$this->suffix();
     }
 
     public function formatClass(string $name): string
@@ -92,6 +226,26 @@ final class DeprecatedMetadata
         return null !== $this->message || null !== $this->since;
     }
 
+    /**
+     * Whether #[\Deprecated] is active for Reflection*::isDeprecated() (ext/reflection/php_reflection.c, #9760, #16821, #16867).
+     *
+     * php-src compares `since` against the effective language profile version so
+     * `PHP_COMPILER_PROFILE=8.4` matches Zend 8.4 reflection while the 8.4.0-dev
+     * reference profile (no forward gate) stays below `since: '8.4'`.
+     */
+    public function isDeprecatedForReflection(): bool
+    {
+        if (null !== $this->since) {
+            return version_compare(
+                CompilerVersion::languageProfileVersion(),
+                self::normalizeSinceVersion($this->since),
+                '>='
+            );
+        }
+
+        return true;
+    }
+
     private function suffix(): string
     {
         if (null !== $this->since && null !== $this->message) {
@@ -109,7 +263,12 @@ final class DeprecatedMetadata
 
     private static function isDeprecatedAttribute(Node\Attribute $attr): bool
     {
-        $name = ltrim($attr->name->toString(), '\\');
+        return self::isDeprecatedAttributeName($attr->name->toString());
+    }
+
+    private static function isDeprecatedAttributeName(string $name): bool
+    {
+        $name = ltrim($name, '\\');
 
         return 'Deprecated' === $name || str_ends_with($name, '\\Deprecated');
     }
@@ -153,5 +312,17 @@ final class DeprecatedMetadata
         }
 
         return null;
+    }
+
+    private static function normalizeSinceVersion(string $since): string
+    {
+        if (preg_match('/^\d+\.\d+$/', $since)) {
+            return $since.'.0';
+        }
+        if (preg_match('/^\d+\.\d+\.\d+/', $since, $m)) {
+            return $m[0];
+        }
+
+        return $since;
     }
 }

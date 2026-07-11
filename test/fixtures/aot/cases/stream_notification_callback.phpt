@@ -1,13 +1,9 @@
 --TEST--
-AOT: stream_notification_callback() exists and clears notifier (#6055)
+AOT: stream_notification_callback() — not advertised (php-src parity, #13750)
 --FILE--
 <?php
+declare(strict_types=1);
+
 echo function_exists('stream_notification_callback') ? "yes\n" : "no\n";
-var_export(stream_notification_callback(null));
-echo "\n";
-var_export(stream_notification_callback(null));
-echo "\n";
 --EXPECT--
-yes
-NULL
-NULL
+no

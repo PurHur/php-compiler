@@ -21,9 +21,8 @@ final class BuiltinByRefParams
             case 'array_pop':
             case 'array_shift':
             case 'array_unshift':
-            case 'current':
+            case 'array_splice':
             case 'end':
-            case 'key':
             case 'next':
             case 'prev':
             case 'reset':
@@ -48,10 +47,16 @@ final class BuiltinByRefParams
                 return [1];
             case 'parse_str':
                 return [1];
+            case 'xml_parse_into_struct':
+                return [2, 3];
             case 'dns_get_mx':
             case 'getmxrr':
                 return [1, 2];
             case 'stream_socket_client':
+                return [1, 2];
+            case 'stream_socket_accept':
+                return [2];
+            case 'stream_socket_server':
                 return [1, 2];
             case 'fsockopen':
             case 'pfsockopen':
@@ -77,7 +82,12 @@ final class BuiltinByRefParams
             case 'is_callable':
                 return [2];
             case 'openssl_random_pseudo_bytes':
+            case 'openssl_sign':
+            case 'openssl_pkey_export':
                 return [1];
+            case 'stream_context_set_options':
+            case 'stream_context_set_params':
+                return [0];
             case 'exec':
                 return [1, 2];
             case 'passthru':
@@ -85,6 +95,12 @@ final class BuiltinByRefParams
                 return [1];
             case 'proc_open':
                 return [2];
+            case 'grapheme_extract':
+                return [4];
+            case 'sodium_crypto_secretstream_xchacha20poly1305_push':
+            case 'sodium_crypto_secretstream_xchacha20poly1305_pull':
+            case 'sodium_crypto_secretstream_xchacha20poly1305_rekey':
+                return [0];
         }
 
         return [];
@@ -110,19 +126,19 @@ final class BuiltinByRefParams
     public static function isByRefArg(string $name, int $argIndex, ?Variable $runtimeValue = null): bool
     {
         $lc = strtolower($name);
-        if (\in_array($argIndex, self::forFunction($lc), true)) {
-            return true;
-        }
-        $variadicFrom = self::variadicByRefFromIndex($lc);
-        if (null === $variadicFrom || $argIndex < $variadicFrom) {
-            return false;
-        }
         if ('array_multisort' === $lc) {
             if (null === $runtimeValue) {
                 return false;
             }
 
             return Variable::TYPE_ARRAY === $runtimeValue->resolveIndirect()->type;
+        }
+        if (\in_array($argIndex, self::forFunction($lc), true)) {
+            return true;
+        }
+        $variadicFrom = self::variadicByRefFromIndex($lc);
+        if (null === $variadicFrom || $argIndex < $variadicFrom) {
+            return false;
         }
 
         return true;

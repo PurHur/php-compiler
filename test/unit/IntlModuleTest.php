@@ -19,29 +19,30 @@ final class IntlModuleTest extends TestCase
         $runtime = new Runtime();
         $ctx = $runtime->vmContext;
 
-        self::assertTrue(VmReflection::classExists($ctx, 'IntlDateFormatter'));
-        self::assertTrue(VmReflection::classExists($ctx, 'Collator'));
-        self::assertTrue(VmReflection::classExists($ctx, 'IntlException'));
-        self::assertTrue(VmReflection::functionExists($ctx, 'intl_get_error_code'));
-        self::assertTrue(VmReflection::functionExists($ctx, 'grapheme_str_contains'));
+        self::assertFalse(VmReflection::classExists($ctx, 'IntlDateFormatter'));
+        self::assertFalse(VmReflection::classExists($ctx, 'Collator'));
+        self::assertFalse(VmReflection::classExists($ctx, 'IntlException'));
+        self::assertFalse(VmReflection::functionExists($ctx, 'intl_get_error_code'));
+        self::assertFalse(VmReflection::functionExists($ctx, 'grapheme_str_contains'));
 
         $code = <<<'PHP'
 <?php
 echo (int) class_exists('IntlDateFormatter', false);
 echo (int) class_exists('Collator', false);
 echo (int) function_exists('intl_get_error_code');
-echo intl_get_error_code();
 echo (int) function_exists('grapheme_str_contains');
-echo (int) grapheme_str_contains('café', 'é');
 PHP;
         $block = $runtime->parseAndCompile($code, 'intl_module.php');
         ob_start();
         $runtime->run($block);
-        self::assertSame('111011', ob_get_clean());
+        self::assertSame('0000', ob_get_clean());
     }
 
-    public function test_intl_skeleton_create_stubs_throw(): void
+    public function test_intl_skeleton_create_stubs_throw_when_advertised(): void
     {
+        if (!\PHPCompiler\ext\intl\IntlExtensionPolicy::advertisesBuiltins()) {
+            self::markTestSkipped('intl extension not advertised on reference profile');
+        }
         $runtime = new Runtime();
         $code = <<<'PHP'
 <?php

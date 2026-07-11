@@ -275,6 +275,10 @@ class String_ extends Type {
         $this->implementRealloc();
         $this->implementSeparate();
         $this->implementStrlen();
+        if (\PHPCompiler\JIT\Builtin::LOAD_TYPE_STANDALONE === $this->context->loadType) {
+            // User-script standalone AOT: defer nested-JIT stdlib helpers until ensureStandaloneBodies (#13571).
+            return;
+        }
         \PHPCompiler\JIT\Builtin\StringBitwiseNot::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringHtmlspecialchars::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringHtmlspecialcharsDecode::implement($this->context);
@@ -288,14 +292,11 @@ class String_ extends Type {
         \PHPCompiler\JIT\Builtin\StringNl2br::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringUcwords::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringRandomBytes::implement($this->context);
-        \PHPCompiler\JIT\Builtin\StringJsonEncode::implement($this->context);
-        \PHPCompiler\JIT\Builtin\StringJsonDecode::implement($this->context);
+        \PHPCompiler\JIT\Builtin\StringSodium::ensureLinked($this->context);
         \PHPCompiler\JIT\Builtin\StringSerialize::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringUnserialize::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringHttpBuildQuery::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringParseStr::implement($this->context);
-        \PHPCompiler\JIT\Builtin\StringGetenv::implement($this->context);
-        \PHPCompiler\JIT\Builtin\StringGetenvAll::implement($this->context);
         \PHPCompiler\JIT\Builtin\IniSet::implement($this->context);
         \PHPCompiler\JIT\Builtin\IniGet::implement($this->context);
         \PHPCompiler\JIT\Builtin\ErrorReporting::implement($this->context);
@@ -309,6 +310,7 @@ class String_ extends Type {
         \PHPCompiler\JIT\Builtin\StringDateTime::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringStrftime::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringStrptime::implement($this->context);
+        \PHPCompiler\JIT\Builtin\StringStrtotime::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringGetdate::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringGmgetdate::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringGmmktime::implement($this->context);

@@ -5,76 +5,31 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * libc getcwd for VM; falls back to {@see VmGetcwdPure} when FFI unavailable (#8955).
+ * getcwd for VM — /proc/self/cwd on Linux, else {@see VmGetcwdPure}; no libc FFI (#8955, #12154).
  *
  * php-src: ext/standard/dir.c — getcwd(2) / realpath fallback.
- * JIT/AOT: {@see JitGetcwd} via realpath(3) on ".".
+ * JIT/AOT: {@see JitChdir} via realpath(3) on ".".
  */
 final class VmGetcwdNative
 {
-    private const PATH_MAX = 4096;
-
-    private static ?\FFI $ffi = null;
-
-    private static bool $ffiUnavailable = false;
+    public static function available(): bool
+    {
+        return VmGetcwdPure::available() || 'Linux' === \PHP_OS_FAMILY;
+    }
 
     /**
      * @return string|false
      */
     public static function resolve()
     {
-        $viaGetcwd = self::resolveViaFfiGetcwd();
-        if (false !== $viaGetcwd) {
-            return $viaGetcwd;
-        }
-
-        $viaFfi = self::resolveViaFfiRealpath();
-        if (false !== $viaFfi) {
-            return self::validateCwd($viaFfi);
-        }
-
         if ('Linux' === \PHP_OS_FAMILY) {
             $viaProc = self::resolveLinuxProcCwd();
-            if (false === $viaProc) {
-                return VmGetcwdPure::resolve();
+            if (false !== $viaProc) {
+                return self::validateCwd($viaProc);
             }
-
-            return self::validateCwd($viaProc);
         }
 
         return VmGetcwdPure::resolve();
-    }
-
-    public static function available(): bool
-    {
-        return null !== self::ffi() || VmGetcwdPure::available() || 'Linux' === \PHP_OS_FAMILY;
-    }
-
-    /**
-     * @return string|false
-     */
-    private static function resolveViaFfiGetcwd()
-    {
-        $ffi = self::ffi();
-        if (null === $ffi) {
-            return false;
-        }
-
-        try {
-            $buf = $ffi->new('char['.self::PATH_MAX.']');
-            $result = $ffi->getcwd(\FFI::addr($buf[0]), self::PATH_MAX);
-            if (null === $result) {
-                return false;
-            }
-            $path = \FFI::string($result);
-            if ('' === $path) {
-                return false;
-            }
-
-            return self::validateCwd($path);
-        } catch (\Throwable) {
-            return false;
-        }
     }
 
     /**
@@ -95,36 +50,6 @@ final class VmGetcwdNative
     }
 
     /**
-     * @return string|false
-     */
-    private static function resolveViaFfiRealpath()
-    {
-        $ffi = self::ffi();
-        if (null === $ffi) {
-            return false;
-        }
-
-        try {
-            $dot = $ffi->new('char[2]');
-            $dot[0] = '.';
-            $dot[1] = "\0";
-            $resolved = $ffi->realpath(\FFI::addr($dot[0]), null);
-            if (null === $resolved) {
-                return false;
-            }
-            $path = \FFI::string($resolved);
-            $ffi->free($resolved);
-            if ('' === $path) {
-                return false;
-            }
-
-            return $path;
-        } catch (\Throwable) {
-            return false;
-        }
-    }
-
-    /**
      * Linux bootstrap without host getcwd: /proc/self/cwd symlink (issue #7287 pattern).
      *
      * @return string|false
@@ -135,94 +60,11 @@ final class VmGetcwdNative
             return false;
         }
 
-        $viaFfi = self::resolveViaFfiReadlink('/proc/self/cwd');
-        if (false !== $viaFfi) {
-            return $viaFfi;
-        }
-
         $target = @\readlink('/proc/self/cwd');
         if (false === $target || '' === $target) {
             return false;
         }
 
         return $target;
-    }
-
-    /**
-     * @return string|false
-     */
-    private static function resolveViaFfiReadlink(string $path)
-    {
-        $ffi = self::ffi();
-        if (null === $ffi) {
-            return false;
-        }
-
-        try {
-            $pathC = $ffi->new('char['.(\strlen($path) + 1).']', false);
-            \FFI::memcpy($pathC, $path, \strlen($path));
-            $pathC[\strlen($path)] = "\0";
-            $buf = $ffi->new('char['.self::PATH_MAX.']');
-            $len = (int) $ffi->readlink(
-                \FFI::addr($pathC[0]),
-                \FFI::addr($buf[0]),
-                self::PATH_MAX
-            );
-            if ($len < 0) {
-                return false;
-            }
-
-            return \FFI::string(\FFI::addr($buf[0]), $len);
-        } catch (\Throwable) {
-            return false;
-        }
-    }
-
-    private static function ffi(): ?\FFI
-    {
-        if (!self::ffiEnabled()) {
-            return null;
-        }
-        if (self::$ffiUnavailable) {
-            return null;
-        }
-        if (null !== self::$ffi) {
-            return self::$ffi;
-        }
-        if (!\extension_loaded('ffi')) {
-            self::$ffiUnavailable = true;
-
-            return null;
-        }
-
-        $cdef = <<<'CDEF'
-char *getcwd(char *buf, size_t size);
-char *realpath(const char *path, char *resolved_path);
-ssize_t readlink(const char *pathname, char *buf, size_t bufsiz);
-void free(void *ptr);
-CDEF;
-
-        foreach (['libc.so.6', 'libc.so'] as $lib) {
-            try {
-                self::$ffi = \FFI::cdef($cdef, $lib);
-
-                return self::$ffi;
-            } catch (\Throwable) {
-            }
-        }
-
-        self::$ffiUnavailable = true;
-
-        return null;
-    }
-
-    private static function ffiEnabled(): bool
-    {
-        $v = getenv('PHP_COMPILER_DISABLE_FFI');
-        if (false !== $v && '' !== $v && '0' !== $v && 'false' !== strtolower($v)) {
-            return false;
-        }
-
-        return true;
     }
 }

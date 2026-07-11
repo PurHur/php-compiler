@@ -4,12 +4,15 @@ declare(strict_types=1);
 
 namespace PHPCompiler;
 
+use PHPCompiler\ext\standard\VmExecNative;
+use PHPCompiler\ext\standard\VmFs;
 use PHPCompiler\ext\standard\VmPhpFdStream;
 use PHPCompiler\ext\standard\VmPopenNative;
+use PHPCompiler\ext\standard\VmPopenPure;
 use PHPCompiler\ext\standard\VmShellExecNative;
 use PHPUnit\Framework\TestCase;
 
-/** VM popen/pclose/shell_exec must not delegate to host PHP (#8250, #6211, #5348). */
+/** VM popen/pclose/shell_exec/exec must not delegate to host PHP wrappers (#8250, #6211, #5348, #8951). */
 final class VmPopenRuntimeShrinkTest extends TestCase
 {
     public function testVmFsPopenRoutesThroughVmPopenNativeFirst(): void
@@ -30,37 +33,82 @@ final class VmPopenRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('VmShellExecNative::shellExec', $source);
     }
 
-    public function testVmPopenNativeUsesLibcPopen(): void
+    public function testVmPopenNativeDelegatesToPureWithoutFfi(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/VmPopenNative.php');
-        $this->assertStringContainsString('$ffi->popen', $source);
-        $this->assertStringContainsString('$ffi->pclose', $source);
+        $this->assertStringContainsString('VmPopenPure::open', $source);
+        $this->assertStringContainsString('VmPopenPure::pclose', $source);
+        $this->assertStringContainsString('VmPopenPure::available()', $source);
+        $this->assertStringNotContainsString('FFI::cdef', $source);
+        $this->assertDoesNotMatchRegularExpression('/\$ffi->popen/', $source);
         $this->assertDoesNotMatchRegularExpression('/@\\\\popen\\(/', $source);
     }
 
-    public function testPopenRoundTripWhenFfiAvailable(): void
+    public function testVmPopenPureUsesProcOpenNotLibcFfi(): void
     {
-        if (!VmPopenNative::available()) {
-            $this->markTestSkipped('libc FFI unavailable');
+        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/VmPopenPure.php');
+        $this->assertStringContainsString('proc_open', $source);
+        $this->assertStringNotContainsString('FFI::cdef', $source);
+        $this->assertStringNotContainsString('popen(const char', $source);
+        $this->assertDoesNotMatchRegularExpression('/@\\\\popen\\(/', $source);
+    }
+
+    public function testPopenRoundTrip(): void
+    {
+        if (!VmPopenPure::available()) {
+            $this->markTestSkipped('host proc_open unavailable');
         }
 
         $opened = VmPopenNative::open('echo hello', 'r');
         $this->assertIsArray($opened);
         $this->assertIsInt($opened['handle']);
-        $output = VmPhpFdStream::streamGetContents($opened['handle']);
-        VmPhpFdStream::close($opened['handle']);
+        $this->assertIsInt($opened['file']);
+        $output = VmFs::streamGetContents($opened['handle']);
+        VmFs::fclose($opened['handle']);
         $status = VmPopenNative::pclose($opened['file']);
         $this->assertSame("hello\n", $output);
         $this->assertSame(0, $status);
     }
 
-    public function testShellExecCapturesOutputWhenFfiAvailable(): void
+    public function testShellExecCapturesOutputWhenFfiDisabled(): void
     {
-        if (!VmPopenNative::available()) {
-            $this->markTestSkipped('libc FFI unavailable');
+        if (!VmPopenPure::available()) {
+            $this->markTestSkipped('host proc_open unavailable');
         }
 
-        $result = VmShellExecNative::shellExec('echo hi');
-        $this->assertSame("hi\n", $result);
+        $prev = getenv('PHP_COMPILER_DISABLE_FFI');
+        putenv('PHP_COMPILER_DISABLE_FFI=1');
+        try {
+            $result = VmShellExecNative::shellExec('echo hi');
+            $this->assertSame("hi\n", $result);
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_DISABLE_FFI');
+            } else {
+                putenv('PHP_COMPILER_DISABLE_FFI='.$prev);
+            }
+        }
+    }
+
+    public function testExecCapturesOutputWhenFfiDisabled(): void
+    {
+        if (!VmPopenPure::available()) {
+            $this->markTestSkipped('host proc_open unavailable');
+        }
+
+        $prev = getenv('PHP_COMPILER_DISABLE_FFI');
+        putenv('PHP_COMPILER_DISABLE_FFI=1');
+        try {
+            $result = VmExecNative::run('printf "line1\nline2\n"');
+            $this->assertIsArray($result);
+            $this->assertSame(['line1', 'line2'], $result['lines']);
+            $this->assertSame(0, $result['status']);
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_DISABLE_FFI');
+            } else {
+                putenv('PHP_COMPILER_DISABLE_FFI='.$prev);
+            }
+        }
     }
 }

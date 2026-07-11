@@ -2868,11 +2868,12 @@ class Value extends Type {
         $value = $fn->getParam(0);
         $map = $this->context->structFieldMap['__value__'];
         $i8 = $this->context->getTypeFromString('int8');
-        $stringType = $i8->constInt(\PHPCompiler\JIT\Variable::TYPE_STRING & 0xff, false);
         $typeByte = $this->context->builder->load(
             $this->context->builder->structGep($value, $map['type'])
         );
-        $isString = $this->context->builder->icmp(\PHPLLVM\Builder::INT_EQ, $typeByte, $stringType);
+        $baseType = $this->context->builder->and($typeByte, $i8->constInt(0x7f, false));
+        $stringType = $i8->constInt(\PHPCompiler\JIT\Variable::TYPE_STRING & 0x7f, false);
+        $isString = $this->context->builder->icmp(\PHPLLVM\Builder::INT_EQ, $baseType, $stringType);
         $strPtrType = $this->context->getTypeFromString('__string__*');
         $nullStr = $strPtrType->constNull();
         $valueField = $this->context->builder->structGep($value, $map['value']);

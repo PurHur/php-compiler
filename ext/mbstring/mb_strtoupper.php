@@ -42,8 +42,8 @@ final class mb_strtoupper extends Internal
             return;
         }
         $encoding = $argc >= 2
-            ? VmMbstring::coerceEncodingArg($frame->calledArgs[1], 'mb_strtoupper', 1)
-            : 'UTF-8';
+            ? VmMbstring::coerceMbEncodingNameArg($frame->calledArgs[1], 'mb_strtoupper', 1)
+            : MbstringState::internalEncoding();
         BuiltinExecute::writeReturn(
             $frame,
             static fn (Variable $ret) => $ret->string(VmMbstring::strtoupper($string, $encoding))

@@ -7,12 +7,14 @@ foreach (['gc_status', 'gc_mem_caches'] as $fn) {
 }
 $st = gc_status();
 gc_mem_caches();
-echo 'runs=', $st['runs'], "\n";
-echo 'threshold=', $st['threshold'], "\n";
-echo 'roots=', $st['roots'], "\n";
+if (array_key_exists('runs', $st)) {
+    echo "skip — legacy gc_status schema on reference profile\n";
+    exit(0);
+}
+echo 'running=', $st['running'] ? '1' : '0', "\n";
+echo 'buffer_size=', $st['buffer_size'], "\n";
 --EXPECT--
 gc_status=yes
 gc_mem_caches=yes
-runs=0
-threshold=10001
-roots=0
+running=0
+buffer_size=131072

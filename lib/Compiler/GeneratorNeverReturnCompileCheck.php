@@ -11,13 +11,15 @@ use PHPCfg\Script;
 use PHPCompiler\Cfg\OpSubBlockAccess;
 
 /**
- * Compile-time check: generator functions cannot declare return type never (#7351).
+ * Compile-time check: generator functions cannot declare return type never (#7351) or void (#11666).
  *
  * php-src: Zend/zend_compile.c — generator return type must be a supertype of Generator
  */
 final class GeneratorNeverReturnCompileCheck
 {
     public const MESSAGE = 'Generator return type must be a supertype of Generator, never given';
+
+    public const VOID_MESSAGE = 'Generator return type must be a supertype of Generator, void given';
 
     public static function validate(Script $script): void
     {
@@ -34,7 +36,8 @@ final class GeneratorNeverReturnCompileCheck
 
     private function validateFunc(Func $func): void
     {
-        if (!$this->funcDeclReturnTypeIsNever($func)) {
+        $invalidType = $this->invalidGeneratorReturnTypeName($func);
+        if (null === $invalidType) {
             return;
         }
         if (!$this->cfgContainsYieldOpcode($func->cfg)) {
@@ -44,7 +47,7 @@ final class GeneratorNeverReturnCompileCheck
         throw new CompileFatal(
             $callable instanceof Op ? $callable->getFile() : 'unknown',
             $callable instanceof Op ? $callable->getLine() : 1,
-            self::MESSAGE
+            self::messageForInvalidReturnType($invalidType)
         );
     }
 
@@ -54,7 +57,8 @@ final class GeneratorNeverReturnCompileCheck
             if (!$member instanceof Op\Stmt\ClassMethod) {
                 continue;
             }
-            if (!$this->funcDeclReturnTypeIsNever($member->func)) {
+            $invalidType = $this->invalidGeneratorReturnTypeName($member->func);
+            if (null === $invalidType) {
                 continue;
             }
             if (!$this->methodIsGenerator($member)) {
@@ -63,7 +67,7 @@ final class GeneratorNeverReturnCompileCheck
             throw new CompileFatal(
                 $member->getFile(),
                 $member->getLine(),
-                self::MESSAGE
+                self::messageForInvalidReturnType($invalidType)
             );
         }
     }
@@ -73,17 +77,30 @@ final class GeneratorNeverReturnCompileCheck
         return $this->cfgContainsYieldOpcode($method->func->cfg);
     }
 
-    private function funcDeclReturnTypeIsNever(Func $func): bool
+    public static function messageForInvalidReturnType(string $typeName): string
+    {
+        return 'never' === $typeName
+            ? self::MESSAGE
+            : sprintf('Generator return type must be a supertype of Generator, %s given', $typeName);
+    }
+
+    private function invalidGeneratorReturnTypeName(Func $func): ?string
     {
         $returnType = $func->returnType;
         if ($returnType instanceof Op\Type\Never_) {
-            return true;
+            return 'never';
         }
         if ($returnType instanceof Op\Type\Literal && 'never' === strtolower($returnType->name)) {
-            return true;
+            return 'never';
+        }
+        if ($returnType instanceof Op\Type\Void_) {
+            return 'void';
+        }
+        if ($returnType instanceof Op\Type\Literal && 'void' === strtolower($returnType->name)) {
+            return 'void';
         }
 
-        return false;
+        return null;
     }
 
     private function cfgContainsYieldOpcode(?CfgBlock $entry): bool

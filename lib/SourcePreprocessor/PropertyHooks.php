@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\SourcePreprocessor;
 
 use PHPCompiler\Compiler\CompileFatal;
+use PHPCompiler\CompilerVersion;
 
 /**
  * Strip PHP 8.4 property-hook blocks for nikic/php-parser v4 and inject hook methods.
@@ -15,6 +16,21 @@ final class PropertyHooks
 {
     /** Legacy message retained for tests/docs; static hooks compile since #6931 (PHP 8.4, zend_property_hooks.c). */
     public const STATIC_HOOK_COMPILE_ERROR = 'Cannot declare hooks for static property';
+
+    /** php-src: Zend/zend_compile.c — `private(set)` decl + hook block requires set hook (#12203). */
+    public const ASYMMETRIC_DECL_SET_REQUIRES_SET_HOOK_MESSAGE = 'syntax error, unexpected token ")", expecting amp';
+
+    /** Zend 8.2 reference profile — default initializer + hook block (#12574). */
+    public const REFERENCE_PROFILE_UNEXPECTED_ARROW = 'syntax error, unexpected token "=>"';
+
+    /** Zend 8.2 reference profile — hook block after property name (#12574). */
+    public const REFERENCE_PROFILE_UNEXPECTED_BRACE = 'syntax error, unexpected token "{", expecting "," or ";"';
+
+    /** Actionable DX when property-hook syntax is rejected on the reference profile (#17610). */
+    public const REFERENCE_PROFILE_PROPERTY_HOOKS_HINT = 'Property hooks require PHP_COMPILER_PROFILE=8.4 (PHP 8.4 forward profile)';
+
+    /** php-src: zend_verify_hooked_property — virtual hooked property + explicit default (#16861, #12995). */
+    public const VIRTUAL_HOOKED_DEFAULT_COMPILE_ERROR = 'Cannot specify default value for virtual hooked property %s::$%s';
 
     private const SET_METHOD_PREFIX = '__phpc_property_set_';
     private const GET_METHOD_PREFIX = '__phpc_property_get_';
@@ -66,6 +82,202 @@ final class PropertyHooks
         }
 
         return [$code, $this->registry];
+    }
+
+    /**
+     * First property-hook syntax for Zend 8.2 reference-profile rejection (#12574).
+     *
+     * @return array{line: int, message: string}|null
+     */
+    public static function referenceProfileHookSyntaxError(string $code): ?array
+    {
+        return (new self())->locateReferenceProfileHookSyntaxError($code);
+    }
+
+    /**
+     * Default initializer + virtual hook block on forward profile; reference-profile parse errors (#12995, #16861).
+     *
+     * @return array{line: int, message: string}|null
+     */
+    public static function defaultInitializerWithHookBlockSyntaxError(string $code): ?array
+    {
+        return (new self())->locateDefaultInitializerWithHookBlockSyntaxError($code);
+    }
+
+    public static function virtualHookedDefaultCompileError(string $className, string $propName): string
+    {
+        return sprintf(self::VIRTUAL_HOOKED_DEFAULT_COMPILE_ERROR, $className, $propName);
+    }
+
+    /** Reference-profile reject with forward-profile env hint (#17610). */
+    public static function referenceProfileHookRejectMessage(string $zendSyntaxDetail): string
+    {
+        return CompilerVersion::supportsPropertyHooks()
+            ? $zendSyntaxDetail
+            : self::REFERENCE_PROFILE_PROPERTY_HOOKS_HINT;
+    }
+
+    private function locateReferenceProfileHookSyntaxError(string $code): ?array
+    {
+        $offset = 0;
+        $len = strlen($code);
+        while ($offset < $len) {
+            $decl = $this->findNextDeclarable($code, $offset);
+            if (null === $decl) {
+                break;
+            }
+            [$declPos, , ] = $decl;
+            $braceOpen = strpos($code, '{', $declPos);
+            if (false === $braceOpen) {
+                break;
+            }
+            $span = $this->matchingBraceSpan($code, $braceOpen);
+            if (null === $span) {
+                $offset = $braceOpen + 1;
+                continue;
+            }
+            [$bodyStart, $bodyEnd] = $span;
+            $body = substr($code, $bodyStart + 1, $bodyEnd - $bodyStart - 1);
+            $error = $this->locateHookSyntaxErrorInBody($code, $bodyStart + 1, $body);
+            if (null !== $error) {
+                return $error;
+            }
+            $offset = $bodyEnd + 1;
+        }
+
+        return null;
+    }
+
+    private function locateDefaultInitializerWithHookBlockSyntaxError(string $code): ?array
+    {
+        $offset = 0;
+        $len = strlen($code);
+        while ($offset < $len) {
+            $decl = $this->findNextDeclarable($code, $offset);
+            if (null === $decl) {
+                break;
+            }
+            [$declPos, , $declName] = $decl;
+            $braceOpen = strpos($code, '{', $declPos);
+            if (false === $braceOpen) {
+                break;
+            }
+            $span = $this->matchingBraceSpan($code, $braceOpen);
+            if (null === $span) {
+                $offset = $braceOpen + 1;
+                continue;
+            }
+            [$bodyStart, $bodyEnd] = $span;
+            $body = substr($code, $bodyStart + 1, $bodyEnd - $bodyStart - 1);
+            $error = $this->locateHookSyntaxErrorInBody($code, $bodyStart + 1, $body, true, $declName);
+            if (null !== $error) {
+                return $error;
+            }
+            $offset = $bodyEnd + 1;
+        }
+
+        return null;
+    }
+
+    /**
+     * @return array{line: int, message: string}|null
+     */
+    private function locateHookSyntaxErrorInBody(
+        string $fullCode,
+        int $bodyOffsetInFull,
+        string $body,
+        bool $defaultInitializerOnly = false,
+        string $declName = ''
+    ): ?array {
+        $offset = 0;
+        $len = strlen($body);
+        while ($offset < $len) {
+            $hook = $this->findNextPropertyHookDecl($body, $offset);
+            if (null === $hook) {
+                return null;
+            }
+            [$prop, $varStart, $hookOpen] = $hook;
+            $afterVar = $varStart + 1 + strlen($prop);
+            $between = substr($body, $afterVar, $hookOpen - $afterVar);
+            $hasDefault = str_contains($between, '=');
+            $absHookOpen = $bodyOffsetInFull + $hookOpen;
+            if ($defaultInitializerOnly && !$hasDefault) {
+                $hookSpan = $this->matchingBraceSpan($body, $hookOpen);
+                $offset = null === $hookSpan ? $hookOpen + 1 : $hookSpan[1] + 1;
+                continue;
+            }
+            if ($hasDefault) {
+                $hookSpan = $this->matchingBraceSpan($body, $hookOpen);
+                if (null === $hookSpan) {
+                    return [
+                        'line' => self::lineAtOffset($fullCode, $absHookOpen),
+                        'message' => self::referenceProfileHookRejectMessage(self::REFERENCE_PROFILE_UNEXPECTED_BRACE),
+                    ];
+                }
+                [$open, $close] = $hookSpan;
+                $hookSource = substr($body, $open + 1, $close - $open - 1);
+                if ($defaultInitializerOnly && CompilerVersion::supportsPropertyHooks()) {
+                    $declPrefix = substr($body, max(0, $varStart - 200), $varStart - max(0, $varStart - 200));
+                    $isStatic = (bool) preg_match('/\bstatic\b/', $declPrefix);
+                    [, $usesBacking] = $this->lowerHooks($hookSource, $prop, 'c', $isStatic, true);
+                    if ($usesBacking) {
+                        $offset = $close + 1;
+                        continue;
+                    }
+
+                    return [
+                        'line' => self::lineAtOffset($fullCode, $absHookOpen),
+                        'message' => self::virtualHookedDefaultCompileError($declName, $prop),
+                    ];
+                }
+                $arrowRel = $this->findFirstFatArrowOffset($hookSource);
+                if (null !== $arrowRel) {
+                    $absArrow = $bodyOffsetInFull + $open + 1 + $arrowRel;
+
+                    return [
+                        'line' => self::lineAtOffset($fullCode, $absArrow),
+                        'message' => self::referenceProfileHookRejectMessage(self::REFERENCE_PROFILE_UNEXPECTED_ARROW),
+                    ];
+                }
+            }
+
+            return [
+                'line' => self::lineAtOffset($fullCode, $absHookOpen),
+                'message' => self::referenceProfileHookRejectMessage(self::REFERENCE_PROFILE_UNEXPECTED_BRACE),
+            ];
+        }
+
+        return null;
+    }
+
+    private function findFirstFatArrowOffset(string $code): ?int
+    {
+        $len = strlen($code);
+        $inString = false;
+        $stringChar = '';
+        for ($i = 0; $i + 1 < $len; ++$i) {
+            $ch = $code[$i];
+            if ($inString) {
+                if ('\\' === $ch) {
+                    ++$i;
+                    continue;
+                }
+                if ($ch === $stringChar) {
+                    $inString = false;
+                }
+                continue;
+            }
+            if ('"' === $ch || '\'' === $ch) {
+                $inString = true;
+                $stringChar = $ch;
+                continue;
+            }
+            if ('=' === $ch && '>' === $code[$i + 1]) {
+                return $i;
+            }
+        }
+
+        return null;
     }
 
     /**
@@ -366,7 +578,101 @@ final class PropertyHooks
     }
 
 
+    /** Body whose comment intervals are cached in $commentIntervals (#16077). */
+    private string $commentScanBody = "\0none";
+
+    /** @var list<array{0: int, 1: int}> sorted disjoint [first, last] offsets inside comments */
+    private array $commentIntervals = [];
+
     private function isOffsetInComment(string $body, int $offset): bool
+    {
+        // findNextPropertyHookDecl probes every `$var` occurrence; rescanning
+        // the body from byte 0 per probe was O(vars x body) — the top lint
+        // hotspot on lib/VM.php (#16077). Scan once per body, then binary
+        // search. The interval builder replicates the legacy state machine's
+        // exact boundary semantics (loop ran strictly below $offset).
+        if ('1' === getenv('PHP_COMPILER_COMMENT_SCAN_LEGACY')) {
+            return $this->isOffsetInCommentScan($body, $offset);
+        }
+        if ($body !== $this->commentScanBody) {
+            $this->commentScanBody = $body;
+            $this->commentIntervals = $this->buildCommentIntervals($body);
+        }
+        $lo = 0;
+        $hi = \count($this->commentIntervals) - 1;
+        while ($lo <= $hi) {
+            $mid = ($lo + $hi) >> 1;
+            [$first, $last] = $this->commentIntervals[$mid];
+            if ($offset < $first) {
+                $hi = $mid - 1;
+            } elseif ($offset > $last) {
+                $lo = $mid + 1;
+            } else {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @return list<array{0: int, 1: int}>
+     */
+    private function buildCommentIntervals(string $body): array
+    {
+        $len = strlen($body);
+        $intervals = [];
+        $inString = false;
+        $stringChar = '';
+        for ($i = 0; $i < $len; ++$i) {
+            $ch = $body[$i];
+            $next = $i + 1 < $len ? $body[$i + 1] : '';
+            if ($inString) {
+                if ('\\' === $ch) {
+                    ++$i;
+                    continue;
+                }
+                if ($ch === $stringChar) {
+                    $inString = false;
+                }
+                continue;
+            }
+            if ('"' === $ch || '\'' === $ch) {
+                $inString = true;
+                $stringChar = $ch;
+                continue;
+            }
+            if ('/' === $ch && '/' === $next) {
+                $lineEnd = strpos($body, "\n", $i);
+                if (false === $lineEnd) {
+                    $lineEnd = $len;
+                }
+                // Legacy: true for $offset with $i < $offset < $lineEnd.
+                if ($i + 1 <= $lineEnd - 1) {
+                    $intervals[] = [$i + 1, $lineEnd - 1];
+                }
+                $i = $lineEnd;
+                continue;
+            }
+            if ('/' === $ch && '*' === $next) {
+                $start = $i;
+                $end = strpos($body, '*/', $i + 2);
+                if (false === $end) {
+                    // Unterminated: legacy stays in-block to end of body.
+                    $intervals[] = [$start + 1, $len];
+                    break;
+                }
+                // Legacy: true for $start < $offset <= position of '*' in '*/'.
+                $intervals[] = [$start + 1, $end];
+                $i = $end + 1;
+            }
+        }
+
+        return $intervals;
+    }
+
+    /** Legacy per-offset scan, selectable via PHP_COMPILER_COMMENT_SCAN_LEGACY=1. */
+    private function isOffsetInCommentScan(string $body, int $offset): bool
     {
         $len = strlen($body);
         $inString = false;
@@ -697,13 +1003,18 @@ final class PropertyHooks
             }
             [$open, $close] = $span;
             $hookSource = substr($body, $open + 1, $close - $open - 1);
-            $declPrefix = substr($body, $offset, $declStart - $offset);
+            $declPrefix = $this->copyBodySegment($body, $offset, $declStart, $removeSpans);
             $propDeclHead = rtrim(substr($body, $declStart, $hookOpen - $declStart));
             $isAbstractHook = (bool) preg_match('/\babstract\b/', $declPrefix.$propDeclHead);
+            $isFinalProperty = (bool) preg_match('/\bfinal\b/', $declPrefix.$propDeclHead);
             $isInterfaceHook = 'interface' === $declKind;
             if ($isAbstractHook) {
                 $declPrefix = preg_replace('/\babstract\s+/', '', $declPrefix) ?? $declPrefix;
                 $propDeclHead = preg_replace('/\babstract\s+/', '', $propDeclHead) ?? $propDeclHead;
+            }
+            if ($isFinalProperty) {
+                $declPrefix = preg_replace('/\bfinal\s+/', '', $declPrefix) ?? $declPrefix;
+                $propDeclHead = preg_replace('/\bfinal\s+/', '', $propDeclHead) ?? $propDeclHead;
             }
             $isStatic = (bool) preg_match('/\bstatic\b/', $declPrefix.$propDeclHead);
             $isPromotedCtorParam = $this->isPromotedConstructorParam(
@@ -729,8 +1040,20 @@ final class PropertyHooks
                 $skipSemicolonRequiredHooks,
                 $propertyType
             );
+            $this->rejectAsymmetricDeclSetWithoutSetHook(
+                $declPrefix.$propDeclHead,
+                $hookSource,
+                $lcClass,
+                $prop,
+                $filename,
+                $fullCode,
+                $bodyOffsetInFile + $declStart
+            );
             if (null !== $asymmetricSetVis) {
                 $marker = '/*phpc-asymmetric-set:'.$asymmetricSetVis.'*/ ';
+                if (preg_match('/\b(public|protected|private)\b/i', $declPrefix.$propDeclHead)) {
+                    $marker .= '/*phpc-asymmetric-explicit-read*/ ';
+                }
                 if (preg_match('/^(\s*)/', $declPrefix, $indentM)) {
                     $declPrefix = $indentM[1].$marker.ltrim($declPrefix);
                 } else {
@@ -746,9 +1069,13 @@ final class PropertyHooks
                     $backingDecl = $this->consumeSameNameBackingFieldDecl($body, $nextOffset, $prop);
                     if (null !== $backingDecl) {
                         [$nextOffset, $initializer] = $backingDecl;
+                    } else {
+                        $detachedBacking = $this->findDetachedSameNameBackingFieldDecl($body, $nextOffset, $prop);
+                        if (null !== $detachedBacking) {
+                            [$detachedStart, $detachedEnd, $initializer] = $detachedBacking;
+                            $removeSpans[] = [$detachedStart, $detachedEnd];
+                        }
                     }
-                    // Detached same-name fields are duplicate declarations — only adjacent
-                    // backing merges (#7031). Non-adjacent must fail compile (#10393, zend_compile.c).
                 }
                 $mergedDecl = rtrim($propDeclHead);
                 if ('' !== $initializer) {
@@ -781,6 +1108,12 @@ final class PropertyHooks
                 if ([] === $methods || !$usesBacking || $isInterfaceHook || $isSemicolonOnlyHook) {
                     $this->registry[$lcClass][$prop]['virtual'] = true;
                 }
+            }
+            if ($isFinalProperty) {
+                if (!isset($this->registry[$lcClass][$prop])) {
+                    $this->registry[$lcClass][$prop] = [];
+                }
+                $this->registry[$lcClass][$prop]['finalProperty'] = true;
             }
             $injections = array_merge($injections, $methods);
             $offset = $nextOffset;
@@ -830,48 +1163,41 @@ final class PropertyHooks
         $rest = trim($hookSource);
         while ('' !== $rest) {
             $rest = ltrim($rest);
+            $hookFinal = $this->consumeHookFinalPrefix($rest);
             if (preg_match('/^get\s*;/s', $rest)) {
                 if (!$skipSemicolonRequiredHooks) {
-                    $this->registerRequiredHook($lcClass, $prop, 'requiresGet');
+                    $this->registerRequiredHook($lcClass, $prop, 'requiresGet', $hookFinal);
                 }
                 $rest = preg_replace('/^get\s*;/', '', $rest, 1) ?? $rest;
                 continue;
             }
+            // php-src: asymmetric set visibility only — not an abstract set hook obligation (#9872, #17337).
             if (preg_match('/^(public|protected|private)\s+set\s*;/s', $rest, $asymM)) {
                 $asymmetricSetVisibility = strtolower($asymM[1]);
-                if (!$skipSemicolonRequiredHooks) {
-                    $this->registerRequiredHook($lcClass, $prop, 'requiresSet');
-                }
                 $rest = preg_replace('/^(public|protected|private)\s+set\s*;/i', '', $rest, 1) ?? $rest;
                 continue;
             }
             // php-src: Zend/zend_compile.c — `private(set);` in hook block (#9872, PHP 8.4 asymmetric visibility).
             if (preg_match('/^(public|protected|private)\s*\(\s*set\s*\)\s*;/s', $rest, $asymM)) {
                 $asymmetricSetVisibility = strtolower($asymM[1]);
-                if (!$skipSemicolonRequiredHooks) {
-                    $this->registerRequiredHook($lcClass, $prop, 'requiresSet');
-                }
                 $rest = preg_replace('/^(public|protected|private)\s*\(\s*set\s*\)\s*;/i', '', $rest, 1) ?? $rest;
                 continue;
             }
             if (preg_match('/^set\s*;/s', $rest)) {
                 if (!$skipSemicolonRequiredHooks) {
-                    $this->registerRequiredHook($lcClass, $prop, 'requiresSet');
+                    $this->registerRequiredHook($lcClass, $prop, 'requiresSet', $hookFinal);
                 }
                 $rest = preg_replace('/^set\s*;/', '', $rest, 1) ?? $rest;
                 continue;
             }
             if (preg_match('/^set\s*\(\s*(public|protected|private)\s*\)\s*;/s', $rest, $asymM)) {
                 $asymmetricSetVisibility = strtolower($asymM[1]);
-                if (!$skipSemicolonRequiredHooks) {
-                    $this->registerRequiredHook($lcClass, $prop, 'requiresSet');
-                }
                 $rest = preg_replace('/^set\s*\(\s*(public|protected|private)\s*\)\s*;/i', '', $rest, 1) ?? $rest;
                 continue;
             }
             if (preg_match('/^unset\s*;/s', $rest)) {
                 if (!$skipSemicolonRequiredHooks) {
-                    $this->registerRequiredHook($lcClass, $prop, 'requiresUnset');
+                    $this->registerRequiredHook($lcClass, $prop, 'requiresUnset', $hookFinal);
                 }
                 $rest = preg_replace('/^unset\s*;/', '', $rest, 1) ?? $rest;
                 continue;
@@ -884,16 +1210,18 @@ final class PropertyHooks
                 $body = '{ return '.$expr.'; }';
                 $method = self::GET_METHOD_PREFIX.$prop;
                 $methods[] = $this->hookMethodDecl($isStatic, $method, '', $body, $propertyType);
-                $this->registerHook($lcClass, $prop, 'get', $method, $isStatic);
+                $this->registerHook($lcClass, $prop, 'get', $method, $isStatic, $hookFinal);
                 continue;
             }
             if (preg_match('/^get\s*\{/s', $rest)) {
                 $rest = preg_replace('/^get\s*/', '', $rest, 1) ?? $rest;
                 [$body, $rest] = $this->takeBraceBody($rest);
                 $usesBacking = $usesBacking || $this->hookTouchesBacking($body, $prop, $isStatic);
+                $this->registerHookBackingFromBody($lcClass, $prop, 'get', $body, $isStatic);
+                $this->registerGetHookReadBackingFromBody($lcClass, $prop, $body, $isStatic);
                 $method = self::GET_METHOD_PREFIX.$prop;
                 $methods[] = $this->hookMethodDecl($isStatic, $method, '', $body, $propertyType);
-                $this->registerHook($lcClass, $prop, 'get', $method, $isStatic);
+                $this->registerHook($lcClass, $prop, 'get', $method, $isStatic, $hookFinal);
                 continue;
             }
             if (preg_match('/^set\s*=>\s*/s', $rest)) {
@@ -901,7 +1229,7 @@ final class PropertyHooks
                 [$expr, $rest] = $this->takeUntilSemicolon($rest);
                 $methods = array_merge(
                     $methods,
-                    $this->lowerSetArrowHook($lcClass, $prop, $isStatic, rtrim($expr), $usesBacking, $propertyType)
+                    $this->lowerSetArrowHook($lcClass, $prop, $isStatic, rtrim($expr), $usesBacking, $propertyType, $hookFinal)
                 );
                 continue;
             }
@@ -911,7 +1239,7 @@ final class PropertyHooks
                 [$expr, $rest] = $this->takeUntilSemicolon($rest);
                 $methods = array_merge(
                     $methods,
-                    $this->lowerSetArrowHook($lcClass, $prop, $isStatic, rtrim($expr), $usesBacking, $propertyType)
+                    $this->lowerSetArrowHook($lcClass, $prop, $isStatic, rtrim($expr), $usesBacking, $propertyType, $hookFinal)
                 );
                 continue;
             }
@@ -921,7 +1249,7 @@ final class PropertyHooks
                 [$expr, $rest] = $this->takeUntilSemicolon($rest);
                 $methods = array_merge(
                     $methods,
-                    $this->lowerSetArrowHook($lcClass, $prop, $isStatic, rtrim($expr), $usesBacking, $propertyType)
+                    $this->lowerSetArrowHook($lcClass, $prop, $isStatic, rtrim($expr), $usesBacking, $propertyType, $hookFinal)
                 );
                 continue;
             }
@@ -936,7 +1264,7 @@ final class PropertyHooks
                 [$body, $rest] = $this->takeBraceBody($rest);
                 $methods = array_merge(
                     $methods,
-                    $this->lowerSetBlockHook($lcClass, $prop, $isStatic, $params, $body, $usesBacking, $propertyType)
+                    $this->lowerSetBlockHook($lcClass, $prop, $isStatic, $params, $body, $usesBacking, $propertyType, $hookFinal)
                 );
                 continue;
             }
@@ -946,13 +1274,23 @@ final class PropertyHooks
                 [$body, $rest] = $this->takeBraceBody($rest);
                 $methods = array_merge(
                     $methods,
-                    $this->lowerSetBlockHook($lcClass, $prop, $isStatic, '$value', $body, $usesBacking, $propertyType)
+                    $this->lowerSetBlockHook($lcClass, $prop, $isStatic, '$value', $body, $usesBacking, $propertyType, $hookFinal)
                 );
                 continue;
             }
             if (preg_match('/^(public|protected|private)\s+set\s*\(/s', $rest, $asymM)) {
                 $asymmetricSetVisibility = strtolower($asymM[1]);
                 $rest = preg_replace('/^(public|protected|private)\s+set\s*/i', '', $rest, 1) ?? $rest;
+                if (preg_match('/^\(([^)]*)\)\s*=>\s*/s', $rest, $pm)) {
+                    $params = trim($pm[1]);
+                    $rest = substr($rest, strlen($pm[0])) ?? $rest;
+                    [$expr, $rest] = $this->takeUntilSemicolon($rest);
+                    $methods = array_merge(
+                        $methods,
+                        $this->lowerSetArrowHook($lcClass, $prop, $isStatic, rtrim($expr), $usesBacking, $propertyType, $hookFinal, $params)
+                    );
+                    continue;
+                }
                 if (!preg_match('/^\(([^)]*)\)\s*\{/s', $rest, $pm)) {
                     break;
                 }
@@ -961,7 +1299,7 @@ final class PropertyHooks
                 [$body, $rest] = $this->takeBraceBody($rest);
                 $methods = array_merge(
                     $methods,
-                    $this->lowerSetBlockHook($lcClass, $prop, $isStatic, $params, $body, $usesBacking, $propertyType)
+                    $this->lowerSetBlockHook($lcClass, $prop, $isStatic, $params, $body, $usesBacking, $propertyType, $hookFinal)
                 );
                 continue;
             }
@@ -971,12 +1309,23 @@ final class PropertyHooks
                 [$body, $rest] = $this->takeBraceBody($rest);
                 $methods = array_merge(
                     $methods,
-                    $this->lowerSetBlockHook($lcClass, $prop, $isStatic, '$value', $body, $usesBacking, $propertyType)
+                    $this->lowerSetBlockHook($lcClass, $prop, $isStatic, '$value', $body, $usesBacking, $propertyType, $hookFinal)
                 );
                 continue;
             }
             if (preg_match('/^set\s*\(/s', $rest)) {
                 $rest = preg_replace('/^set\s*/', '', $rest, 1) ?? $rest;
+                // php-src: Zend/zend_compile.c — `set($param) => expr` fat-arrow (#17329, PHP 8.4).
+                if (preg_match('/^\(([^)]*)\)\s*=>\s*/s', $rest, $pm)) {
+                    $params = trim($pm[1]);
+                    $rest = substr($rest, strlen($pm[0])) ?? $rest;
+                    [$expr, $rest] = $this->takeUntilSemicolon($rest);
+                    $methods = array_merge(
+                        $methods,
+                        $this->lowerSetArrowHook($lcClass, $prop, $isStatic, rtrim($expr), $usesBacking, $propertyType, $hookFinal, $params)
+                    );
+                    continue;
+                }
                 if (!preg_match('/^\(([^)]*)\)\s*\{/s', $rest, $pm)) {
                     break;
                 }
@@ -985,7 +1334,7 @@ final class PropertyHooks
                 [$body, $rest] = $this->takeBraceBody($rest);
                 $methods = array_merge(
                     $methods,
-                    $this->lowerSetBlockHook($lcClass, $prop, $isStatic, $params, $body, $usesBacking, $propertyType)
+                    $this->lowerSetBlockHook($lcClass, $prop, $isStatic, $params, $body, $usesBacking, $propertyType, $hookFinal)
                 );
                 continue;
             }
@@ -994,7 +1343,7 @@ final class PropertyHooks
                 [$body, $rest] = $this->takeBraceBody($rest);
                 $methods = array_merge(
                     $methods,
-                    $this->lowerSetBlockHook($lcClass, $prop, $isStatic, '$value', $body, $usesBacking, $propertyType)
+                    $this->lowerSetBlockHook($lcClass, $prop, $isStatic, '$value', $body, $usesBacking, $propertyType, $hookFinal)
                 );
                 continue;
             }
@@ -1006,7 +1355,7 @@ final class PropertyHooks
                 $body = '{ '.$expr.'; }';
                 $method = self::UNSET_METHOD_PREFIX.$prop;
                 $methods[] = $this->hookMethodDecl($isStatic, $method, '', $body, $propertyType);
-                $this->registerHook($lcClass, $prop, 'unset', $method, $isStatic);
+                $this->registerHook($lcClass, $prop, 'unset', $method, $isStatic, $hookFinal);
                 continue;
             }
             if (preg_match('/^unset\s*\{/s', $rest)) {
@@ -1015,7 +1364,7 @@ final class PropertyHooks
                 $usesBacking = $usesBacking || $this->hookTouchesBacking($body, $prop, $isStatic);
                 $method = self::UNSET_METHOD_PREFIX.$prop;
                 $methods[] = $this->hookMethodDecl($isStatic, $method, '', $body, $propertyType);
-                $this->registerHook($lcClass, $prop, 'unset', $method, $isStatic);
+                $this->registerHook($lcClass, $prop, 'unset', $method, $isStatic, $hookFinal);
                 continue;
             }
             break;
@@ -1033,7 +1382,9 @@ final class PropertyHooks
         bool $isStatic,
         string $expr,
         bool &$usesBacking,
-        ?string $propertyType = null
+        ?string $propertyType = null,
+        bool $isFinal = false,
+        string $params = '$value'
     ): array {
         if ($this->setArrowExprUsesStatementForm($expr, $isStatic)) {
             $usesBacking = $usesBacking || $this->hookTouchesBacking($expr, $prop, $isStatic);
@@ -1045,9 +1396,9 @@ final class PropertyHooks
             $body = '{ '.$backing.' = ('.$expr.'); }';
         }
         $method = self::SET_METHOD_PREFIX.$prop;
-        $this->registerHook($lcClass, $prop, 'set', $method, $isStatic);
+        $this->registerHook($lcClass, $prop, 'set', $method, $isStatic, $isFinal);
 
-        return [$this->hookMethodDecl($isStatic, $method, '$value', $body, $propertyType)];
+        return [$this->hookMethodDecl($isStatic, $method, $params, $body, $propertyType)];
     }
 
     /**
@@ -1060,14 +1411,28 @@ final class PropertyHooks
         string $params,
         string $body,
         bool &$usesBacking,
-        ?string $propertyType = null
+        ?string $propertyType = null,
+        bool $isFinal = false
     ): array {
         $usesBacking = $usesBacking || $this->hookTouchesBacking($body, $prop, $isStatic);
         $this->registerHookBackingFromBody($lcClass, $prop, 'set', $body, $isStatic);
         $method = self::SET_METHOD_PREFIX.$prop;
-        $this->registerHook($lcClass, $prop, 'set', $method, $isStatic);
+        $this->registerHook($lcClass, $prop, 'set', $method, $isStatic, $isFinal);
 
         return [$this->hookMethodDecl($isStatic, $method, $params, $body, $propertyType)];
+    }
+
+    /**
+     * PHP 8.4: `final get` / `final set` hook modifier (Zend/zend_compile.c, #16799).
+     */
+    private function consumeHookFinalPrefix(string &$rest): bool
+    {
+        if (!preg_match('/^final\b/s', $rest)) {
+            return false;
+        }
+        $rest = preg_replace('/^final\s+/', '', $rest, 1) ?? $rest;
+
+        return true;
     }
 
     /**
@@ -1080,7 +1445,7 @@ final class PropertyHooks
 
     /**
      * When hooks read/write `$this->prop`, merge only the immediately following same-name
-     * field decl (#7031). Detached duplicates fail at compile (#10393, zend_compile.c).
+     * field decl (#7031).
      *
      * @return array{0: int, 1: string}|null [offset after decl, initializer including `=`]
      */
@@ -1100,6 +1465,32 @@ final class PropertyHooks
         $initializer = isset($m[1]) ? trim($m[1]) : '';
 
         return [$offset + strlen($m[0]), $initializer];
+    }
+
+    /**
+     * Same-name backing field separated by other class members — merge like adjacent (#16936, re-#9673).
+     *
+     * @return array{0: int, 1: int, 2: string}|null [span start, span end, initializer including `=`]
+     */
+    private function findDetachedSameNameBackingFieldDecl(string $body, int $searchStart, string $prop): ?array
+    {
+        $remainder = substr($body, $searchStart);
+        if (!preg_match(
+            '/(?:(?:public|protected|private|static|readonly)\s+)+'
+            .'(?:[\w\\\\|]+(?:\s*\[\s*\])?\s+)+'
+            .'\$'.preg_quote($prop, '/').'\s*(=\s*[^;]+)?;/',
+            $remainder,
+            $m,
+            PREG_OFFSET_CAPTURE
+        )) {
+            return null;
+        }
+
+        $matchStart = $searchStart + $m[0][1];
+        $matchEnd = $matchStart + strlen($m[0][0]);
+        $initializer = isset($m[1]) ? trim($m[1][0]) : '';
+
+        return [$matchStart, $matchEnd, $initializer];
     }
 
     /**
@@ -1199,7 +1590,7 @@ final class PropertyHooks
     private function propertyTypeFromDeclHead(string $propDeclHead): ?string
     {
         $s = preg_replace(
-            '/\b(public|protected|private|static|readonly|abstract)\s+/',
+            '/\b(public|protected|private|static|readonly|abstract|final)\s+/',
             '',
             $propDeclHead
         ) ?? $propDeclHead;
@@ -1215,18 +1606,22 @@ final class PropertyHooks
     /**
      * @param 'requiresGet'|'requiresSet'|'requiresUnset' $flag
      */
-    private function registerRequiredHook(string $lcClass, string $prop, string $flag): void
+    private function registerRequiredHook(string $lcClass, string $prop, string $flag, bool $isFinal = false): void
     {
         if (!isset($this->registry[$lcClass][$prop])) {
             $this->registry[$lcClass][$prop] = [];
         }
         $this->registry[$lcClass][$prop][$flag] = true;
+        if ($isFinal) {
+            $kind = 'requiresGet' === $flag ? 'get' : ('requiresSet' === $flag ? 'set' : 'unset');
+            $this->registry[$lcClass][$prop]['final'.ucfirst($kind)] = true;
+        }
     }
 
     /**
      * @param 'get'|'set'|'unset' $kind
      */
-    private function registerHook(string $lcClass, string $prop, string $kind, string $method, bool $isStatic): void
+    private function registerHook(string $lcClass, string $prop, string $kind, string $method, bool $isStatic, bool $isFinal = false): void
     {
         if (!isset($this->registry[$lcClass][$prop])) {
             $this->registry[$lcClass][$prop] = [];
@@ -1234,6 +1629,9 @@ final class PropertyHooks
         $this->registry[$lcClass][$prop][$kind] = $method;
         if ($isStatic) {
             $this->registry[$lcClass][$prop]['static'] = true;
+        }
+        if ($isFinal) {
+            $this->registry[$lcClass][$prop]['final'.ucfirst($kind)] = true;
         }
     }
 
@@ -1286,6 +1684,27 @@ final class PropertyHooks
         if (preg_match('/\$this->(\w+)\s*=/', $body, $m) && strcasecmp($m[1], $prop) !== 0) {
             $key = 'get' === $kind ? 'getBacking' : 'setBacking';
             $this->registry[$lcClass][$prop][$key] = $m[1];
+        }
+    }
+
+    /**
+     * Record `$this->field` read targets from get { } bodies (#17330, #6635).
+     */
+    private function registerGetHookReadBackingFromBody(
+        string $lcClass,
+        string $prop,
+        string $body,
+        bool $isStatic
+    ): void {
+        if ($isStatic) {
+            if (preg_match('/\bself::\$(\w+)\b/', $body, $m) && strcasecmp($m[1], $prop) !== 0) {
+                $this->registry[$lcClass][$prop]['getBacking'] = $m[1];
+            }
+
+            return;
+        }
+        if (preg_match('/\$this->(\w+)\b/', $body, $m) && strcasecmp($m[1], $prop) !== 0) {
+            $this->registry[$lcClass][$prop]['getBacking'] = $m[1];
         }
     }
 
@@ -1397,5 +1816,44 @@ final class PropertyHooks
     private static function lineAtOffset(string $code, int $offset): int
     {
         return substr_count(substr($code, 0, max(0, $offset)), "\n") + 1;
+    }
+
+    /**
+     * php-src: Zend/zend_compile.c — asymmetric `(set)` on the property decl requires a set hook
+     * (`get; private set;`, `set =>`, …) unless the block is get-only with an implemented get hook
+     * (`get =>`, `get { }`) — PHP 8.4 (#13983, zend_property_hooks.c).
+     */
+    private function rejectAsymmetricDeclSetWithoutSetHook(
+        string $declHead,
+        string $hookSource,
+        string $lcClass,
+        string $prop,
+        string $filename,
+        string $fullCode,
+        int $declOffsetInFile
+    ): void {
+        if (!$this->declHeadHasAsymmetricSetVisibility($declHead)) {
+            return;
+        }
+        $propMeta = $this->registry[$lcClass][$prop] ?? [];
+        $hasSetHook = isset($propMeta['set'])
+            || !empty($propMeta['requiresSet'])
+            || $this->isImplicitAsymmetricBackingHookSource($hookSource);
+        if ($hasSetHook) {
+            return;
+        }
+        if (isset($propMeta['get'])) {
+            return;
+        }
+        throw new CompileFatal(
+            $filename,
+            self::lineAtOffset($fullCode, $declOffsetInFile),
+            self::ASYMMETRIC_DECL_SET_REQUIRES_SET_HOOK_MESSAGE
+        );
+    }
+
+    private function declHeadHasAsymmetricSetVisibility(string $declHead): bool
+    {
+        return (bool) preg_match('/\b(public|protected|private)\s*\(\s*set\s*\)/i', $declHead);
     }
 }

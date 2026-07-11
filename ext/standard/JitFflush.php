@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\JIT\Builtin\StreamLifecycleRuntime;
 use PHPCompiler\JIT\Context;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -14,6 +15,7 @@ final class JitFflush
     /** @return Value */
     public static function invoke(Context $context, Value $handleLong): Value
     {
+        StreamLifecycleRuntime::ensureLinked($context);
         $ret = $context->builder->call($context->lookupFunction('__compiler_fflush'), $handleLong);
         $i32 = $context->getTypeFromString('int32');
 

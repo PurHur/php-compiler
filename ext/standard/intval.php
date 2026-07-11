@@ -18,6 +18,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\TypedPropertyCheck;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -31,15 +32,14 @@ final class intval extends Internal
 {
     public function execute(Frame $frame): void
     {
+        $this->requireArgCountRange($frame, 'intval', 1, 2);
         $argc = \count($frame->calledArgs);
-        if ($argc < 1 || $argc > 2) {
-            throw new \LogicException('intval() requires between 1 and 2 arguments');
-        }
         $base = 10;
         if (2 === $argc) {
             $base = self::parseBase($frame->calledArgs[1]->resolveIndirect());
         }
         $v = $frame->calledArgs[0]->resolveIndirect();
+        TypedPropertyCheck::assertReadable($v);
         if (null === $frame->returnVar) {
             return;
         }
@@ -103,8 +103,8 @@ final class intval extends Internal
     {
         $this->context = $context;
         $argc = \count($args);
-        if ($argc < 1 || $argc > 2) {
-            throw new \LogicException('intval() requires between 1 and 2 arguments');
+        if (!$this->requireArgCountRangeJit($context, $args, 'intval', 1, 2)) {
+            return $context->getTypeFromString('int64')->constInt(0, false);
         }
         $i64 = $context->getTypeFromString('int64');
         $baseVal = 2 === $argc

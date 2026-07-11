@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 /** @var string $title */
 /** @var string $appName */
-$scriptBase = $_SERVER['SCRIPT_NAME'] ?? '/index.php';
 echo '<!DOCTYPE html>', "\n";
 echo '<html>', "\n";
 echo '<head>', "\n";
@@ -13,6 +12,7 @@ echo '    <title>', htmlspecialchars($title), ' — ', htmlspecialchars($appName
 echo '    <link rel="stylesheet" href="/assets/style.css">', "\n";
 echo '</head>', "\n";
 echo '<body>', "\n";
+$scriptBase = $_SERVER['SCRIPT_NAME'] ?? '/index.php';
 echo '<nav>', "\n";
 echo '    <a href="', htmlspecialchars($scriptBase), '">Home</a>', "\n";
 echo '    <a href="', htmlspecialchars($scriptBase), '/hello?name=Dev">Hello</a>', "\n";

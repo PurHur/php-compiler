@@ -35,7 +35,8 @@ final class date_sub extends Internal
             $frame->calledArgs[0],
             'date_sub()',
             1,
-            'object'
+            'object',
+            $frame->vmContext
         );
         $interval = DateIntervalSupport::requireDateInterval(
             $frame->calledArgs[1],

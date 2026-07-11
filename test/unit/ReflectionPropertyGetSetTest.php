@@ -48,4 +48,38 @@ PHP;
             ob_get_clean()
         );
     }
+
+    /** @covers issue #15540 */
+    public function testDynamicStdClassPropertyIntrospection(): void
+    {
+        if (!\PHPCompiler\CompilerVersion::supportsReflectionPropertyIsDynamic()) {
+            $this->markTestSkipped('ReflectionProperty::isDynamic() requires PHP 8.4 forward profile');
+        }
+
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+declare(strict_types=1);
+
+$o = new stdClass();
+$o->x = 42;
+
+$p = new ReflectionProperty($o, 'x');
+echo $p->getName(), "\n";
+echo $p->getValue($o), "\n";
+echo var_export($p->isDynamic(), true), "\n";
+echo var_export($p->isPublic(), true), "\n";
+
+$p->setValue($o, 99);
+echo $o->x, "\n";
+
+try {
+    new ReflectionProperty(stdClass::class, 'missing');
+} catch (ReflectionException $e) {
+}
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'reflection_property_dynamic.php'));
+        $this->assertSame("x\n42\ntrue\ntrue\n99\n", ob_get_clean());
+    }
 }

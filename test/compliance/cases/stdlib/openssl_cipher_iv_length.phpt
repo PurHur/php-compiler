@@ -5,7 +5,8 @@ stdlib openssl_cipher_iv_length() — AES-256-CBC IV length (#7331, ext/openssl/
 echo function_exists('openssl_cipher_iv_length') ? "exists\n" : "missing\n";
 var_dump(openssl_cipher_iv_length('aes-256-cbc'));
 var_dump(openssl_cipher_iv_length('not-a-real-cipher-method'));
---EXPECT--
+--EXPECTF--
+PHP Warning:  openssl_cipher_iv_length(): Unknown cipher algorithm in %s on line %d
 exists
 int(16)
 bool(false)

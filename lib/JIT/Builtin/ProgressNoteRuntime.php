@@ -17,7 +17,7 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
 /**
  * JIT/AOT link for __phpc_progress_note via ProgressJitHelper PHP (#9521, #9795).
  *
- * SIGSEGV breadcrumb buffer (phpc_last_progress) stays in thin LLVM + phpc_progress.c ABI;
+ * SIGSEGV breadcrumb buffer (phpc_last_progress) stays in thin LLVM ABI;
  * env-file writes delegate to compiled {@see ProgressJitHelper} on JIT embed and AOT standalone.
  */
 final class ProgressNoteRuntime
@@ -40,12 +40,20 @@ final class ProgressNoteRuntime
         self::ENTRY_HELPER,
     ];
 
-    /** Must match phpc_progress.c extern buffer size. */
+    /** Stable breadcrumb buffer size (kept tiny; used by SIGSEGV handler). */
     private const BUFFER_SIZE = 256;
 
     private const GLOBAL_BUF = 'phpc_last_progress';
 
     private const GLOBAL_LEN = 'phpc_last_progress_len';
+
+    /**
+     * Keep the handler self-contained and async-signal-safe:
+     * - Linux SIGSEGV is 11 (we emit IR, no libc headers/macros available).
+     * - Exit status 139 matches the old C thin runtime (_exit(139)).
+     */
+    private const SIGSEGV = 11;
+    private const SEGV_EXIT = 139;
 
     private static int $blockSuffix = 0;
 
@@ -100,6 +108,7 @@ final class ProgressNoteRuntime
         self::$lenGlobal = null;
         self::ensureProgressGlobals($context);
         self::ensureBufferExternals($context);
+        self::ensureSegvHandlerLinked($context);
         // Compile ProgressJitHelper before bridge emission — nested JIT during pn_bridge_body
         // corrupts the parent insert block (LLVM 9 getInsertBlock null — #8559 spine emit).
         self::ensureValueStringHelpers($context);
@@ -424,6 +433,136 @@ final class ProgressNoteRuntime
             $context,
             'memcpy',
             $context->context->functionType($voidPtr, false, $voidPtr, $voidPtr, $sizeT)
+        );
+    }
+
+    /**
+     * Emit an async-signal-safe SIGSEGV handler (write(2)+_exit) in LLVM IR and
+     * install it during __init__ emission. This removes the last bundled C TU
+     * without growing C runtime surface (#1492).
+     */
+    private static function ensureSegvHandlerLinked(Context $context): void
+    {
+        $flag = getenv('PHP_COMPILER_PROGRESS_ABI');
+        if (false !== $flag && '' !== $flag && ('0' === $flag || 'false' === strtolower($flag))) {
+            return;
+        }
+
+        self::ensureSegvExternals($context);
+
+        $handlerName = 'phpc_segv_handler';
+        $probe = $context->module->getNamedFunction($handlerName);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            self::installSegvHandlerInInit($context, $probe);
+
+            return;
+        }
+
+        $i32 = $context->getTypeFromString('int32');
+        $voidTy = $context->getTypeFromString('void');
+        $ft = $context->context->functionType($voidTy, false, $i32);
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction($handlerName, $ft);
+
+        $entry = $fn->appendBasicBlock('segv_entry');
+        $hasProgress = $fn->appendBasicBlock('segv_has_progress');
+        $noProgress = $fn->appendBasicBlock('segv_no_progress');
+        $done = $fn->appendBasicBlock('segv_done');
+
+        $savedBuilder = $context->builder;
+        $context->builder = $context->context->builderCreate();
+        $context->builder->positionAtEnd($entry);
+
+        $sizeT = $context->getTypeFromString('size_t');
+        $zero = $sizeT->constInt(0, false);
+        $len = $context->builder->load(self::$lenGlobal);
+        $has = $context->builder->icmp(Builder::INT_UGT, $len, $zero);
+        $context->builder->branchIf($has, $hasProgress, $noProgress);
+
+        $context->builder->positionAtEnd($hasProgress);
+        self::emitWriteConst($context, "phpc: fatal signal (segfault) after ");
+        $bufPtr = self::bufBasePtr($context);
+        self::emitWrite($context, $context->getTypeFromString('int32')->constInt(2, false), $context->bytePtr($bufPtr), $len);
+        self::emitWriteConst($context, "\n");
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($noProgress);
+        self::emitWriteConst($context, "phpc: fatal signal (segfault)\n");
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($done);
+        $context->builder->call(
+            $context->lookupFunction('_exit'),
+            $context->getTypeFromString('int32')->constInt(self::SEGV_EXIT, false)
+        );
+        $context->builder->returnVoid();
+
+        $context->builder = $savedBuilder;
+
+        self::installSegvHandlerInInit($context, $fn);
+    }
+
+    private static function ensureSegvExternals(Context $context): void
+    {
+        $i32 = $context->getTypeFromString('int32');
+        $sizeT = $context->getTypeFromString('size_t');
+        $voidTy = $context->getTypeFromString('void');
+        $voidPtr = $context->getTypeFromString('void*');
+        $i8p = $context->getTypeFromString('int8*');
+
+        self::ensureExternal(
+            $context,
+            'write',
+            $context->context->functionType($context->getTypeFromString('int64'), false, $i32, $i8p, $sizeT)
+        );
+        self::ensureExternal(
+            $context,
+            '_exit',
+            $context->context->functionType($voidTy, false, $i32)
+        );
+
+        $handlerTy = $context->context->functionType($voidTy, false, $i32);
+        $handlerPtrTy = $handlerTy->pointerType(0);
+        self::ensureExternal(
+            $context,
+            'signal',
+            $context->context->functionType($voidPtr, false, $i32, $handlerPtrTy)
+        );
+    }
+
+    private static function installSegvHandlerInInit(Context $context, LlvmFunction $handler): void
+    {
+        $i32 = $context->getTypeFromString('int32');
+        $sig = $i32->constInt(self::SIGSEGV, false);
+        $context->emitInInit(static function (Context $ctx) use ($sig, $handler): void {
+            $ctx->builder->call($ctx->lookupFunction('signal'), $sig, $handler);
+        });
+    }
+
+    private static function emitWriteConst(Context $context, string $s): void
+    {
+        $len = strlen($s);
+        if (0 === $len) {
+            return;
+        }
+        $sizeT = $context->getTypeFromString('size_t');
+        $fd = $context->getTypeFromString('int32')->constInt(2, false);
+        self::emitWrite(
+            $context,
+            $fd,
+            $context->bytePtr($context->constantFromString($s)),
+            $sizeT->constInt($len, false)
+        );
+    }
+
+    private static function emitWrite(Context $context, Value $fd, Value $buf, Value $len): void
+    {
+        $context->builder->call(
+            $context->lookupFunction('write'),
+            $fd,
+            $context->builder->pointerCast($buf, $context->getTypeFromString('int8*')),
+            $len
         );
     }
 

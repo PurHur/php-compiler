@@ -4,7 +4,17 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\spl;
 
+use PHPCompiler\ext\standard\array_map;
+use PHPCompiler\ext\standard\KeySortJitHelper;
+use PHPCompiler\ext\standard\NaturalSortJitHelper;
+use PHPCompiler\ext\standard\StdlibConstants;
+use PHPCompiler\ext\standard\ValueSortJitHelper;
+use PHPCompiler\ext\standard\VmArraySortCallback;
+use PHPCompiler\ext\standard\VmClosureCall;
+use PHPCompiler\ext\standard\VmInternalCompare;
 use PHPCompiler\ext\standard\VmJson;
+use PHPCompiler\Frame;
+use PHPCompiler\JIT\UsortCallbackPolicy;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\ObjectEntry;
@@ -15,6 +25,10 @@ use PHPCompiler\VM\Variable;
  */
 final class SplArrayStorage
 {
+    public const FLAG_STD_PROP_LIST = 1;
+
+    public const FLAG_ARRAY_AS_PROPS = 2;
+
     /**
      * @var array<int, array{
      *   flags: int,
@@ -65,6 +79,16 @@ final class SplArrayStorage
     public static function nextIterator(ObjectEntry $object): void
     {
         ++self::$store[$object->id]['pos'];
+    }
+
+    /** php-src spl_array_seek — position by numeric offset into iterator key list. */
+    public static function seekIterator(ObjectEntry $object, int $position): void
+    {
+        $keyCount = \count(self::iteratorKeys($object));
+        if ($position < 0 || $position >= $keyCount) {
+            throw new \OutOfBoundsException('Seek position '.$position.' is out of range');
+        }
+        self::$store[$object->id]['pos'] = $position;
     }
 
     /** @return list<int|string> */
@@ -125,6 +149,16 @@ final class SplArrayStorage
         return self::state($object)['table']->duplicate();
     }
 
+    /** php-src spl_array_object_exchange_array — replace backing array, return previous (#12964). */
+    public static function exchangeArray(ObjectEntry $object, HashTable $input): HashTable
+    {
+        $old = self::state($object)['table']->duplicate();
+        self::$store[$object->id]['table'] = $input->duplicate();
+        self::$store[$object->id]['pos'] = 0;
+
+        return $old;
+    }
+
     /** php-src spl_array_getIteratorClass — default ArrayIterator (#10639). */
     public static function getIteratorClass(ObjectEntry $object): string
     {
@@ -147,6 +181,56 @@ final class SplArrayStorage
     public static function setFlags(ObjectEntry $object, int $flags): void
     {
         self::$store[$object->id]['flags'] = $flags;
+    }
+
+    public static function isArrayObject(ObjectEntry $object): bool
+    {
+        return ArrayObjectBuiltin::CLASS_LC === strtolower(ltrim($object->class->name, '\\'));
+    }
+
+    /** php-src SPL_ARRAY_AS_PROPS — backing array keys as object properties (spl_array.c). */
+    public static function hasArrayAsProps(ObjectEntry $object): bool
+    {
+        return self::hasState($object)
+            && 0 !== (self::getFlags($object) & self::FLAG_ARRAY_AS_PROPS);
+    }
+
+    /**
+     * php-src spl_array_get_properties — internal storage keys as object properties for json_encode (#13924).
+     *
+     * @return array<string, Variable>
+     */
+    public static function collectJsonEncodeProperties(ObjectEntry $object): array
+    {
+        if (!self::hasState($object)) {
+            return [];
+        }
+        $state = self::state($object);
+        if (0 !== ($state['flags'] & self::FLAG_ARRAY_AS_PROPS)) {
+            /** @var array<string, Variable> $result */
+            $result = [];
+            foreach ($state['propList'] as $name => $value) {
+                if ($value instanceof Variable) {
+                    $copy = new Variable();
+                    $copy->copyFrom($value);
+                    $result[(string) $name] = $copy;
+                }
+            }
+
+            return $result;
+        }
+        /** @var array<string, Variable> $result */
+        $result = [];
+        foreach ($state['table']->iterateKeyed(true) as [$keyVar, $valVar]) {
+            $name = Variable::TYPE_INTEGER === $keyVar->type
+                ? (string) $keyVar->toInt()
+                : $keyVar->toString();
+            $copy = new Variable();
+            $copy->copyFrom($valVar);
+            $result[$name] = $copy;
+        }
+
+        return $result;
     }
 
     public static function createIterator(Context $ctx, ObjectEntry $object): Variable
@@ -189,6 +273,11 @@ final class SplArrayStorage
 
     public static function offsetSet(ObjectEntry $object, Variable $offset, Variable $value): void
     {
+        if (Variable::TYPE_NULL === $offset->resolveIndirect()->type) {
+            self::append($object, $value);
+
+            return;
+        }
         $table = self::state($object)['table'];
         $resolved = $value->resolveIndirect();
         [$keyVar, $isInt] = self::offsetKeyVar($offset);
@@ -222,6 +311,129 @@ final class SplArrayStorage
     }
 
     /** php-src spl_array_method_append — push with next numeric index. */
+    /** php-src spl_array_object_sort — in-place sort on backing array (#13141). */
+    public static function sortBacking(
+        ObjectEntry $object,
+        string $kind,
+        int $flags = StdlibConstants::SORT_REGULAR
+    ): void {
+        $table = self::state($object)['table'];
+        match ($kind) {
+            'asort' => ValueSortJitHelper::asortByValue($table, $flags),
+            'arsort' => ValueSortJitHelper::arsortByValue($table, $flags),
+            'ksort' => KeySortJitHelper::ksortByKey($table, $flags),
+            'krsort' => KeySortJitHelper::krsortByKey($table, $flags),
+            'natsort' => NaturalSortJitHelper::natsortByValue($table),
+            'natcasesort' => NaturalSortJitHelper::natcasesortByValue($table),
+            default => throw new \LogicException('Unsupported SPL array sort: '.$kind),
+        };
+        self::rewindIterator($object);
+    }
+
+    /** php-src spl_array_object_uasort — in-place user value sort (#9356). */
+    public static function uasortBacking(
+        ObjectEntry $object,
+        Frame $frame,
+        Variable $callbackArg,
+        string $function = 'uasort'
+    ): bool {
+        $table = self::state($object)['table'];
+        $callback = $callbackArg->resolveIndirect();
+        VmArraySortCallback::requireCallback($callback, $function);
+        VmArraySortCallback::rejectInvalidStringCallback($frame, $callback, $function);
+        if ($table->getNumElements() < 2) {
+            return true;
+        }
+        $pairs = [];
+        foreach ($table->iterateKeyed(true) as [$key, $value]) {
+            $keyCopy = new Variable();
+            $keyCopy->duplicateFrom($key);
+            $valCopy = new Variable();
+            $valCopy->duplicateFrom($value);
+            $pairs[] = [$keyCopy, $valCopy];
+        }
+        if (VmClosureCall::isClosure($callback)) {
+            if (null === $frame->vmContext) {
+                throw new \LogicException($function.'() requires VM context in this compiler build');
+            }
+            VmClosureCall::sortKeyedPairsByValue(
+                $frame->vmContext,
+                $pairs,
+                VmClosureCall::resolve($callback)
+            );
+        } else {
+            if (!UsortCallbackPolicy::isVmSupportedType($callback->type)) {
+                throw new \LogicException(UsortCallbackPolicy::vmRejectionMessage());
+            }
+            $name = $callback->toString();
+            if (!UsortCallbackPolicy::isVmSupportedName($name)) {
+                throw new \LogicException(UsortCallbackPolicy::vmRejectionMessage());
+            }
+            $compare = VmInternalCompare::resolveStringCallback($name);
+            VmInternalCompare::sortKeyedPairsByValue($pairs, $compare);
+        }
+        $sorted = new HashTable();
+        foreach ($pairs as [$key, $value]) {
+            array_map::appendKeyedCopy($sorted, $key, $value);
+        }
+        self::$store[$object->id]['table'] = $sorted;
+        self::rewindIterator($object);
+
+        return true;
+    }
+
+    /** php-src spl_array_object_uksort — in-place user key sort (#9356). */
+    public static function uksortBacking(
+        ObjectEntry $object,
+        Frame $frame,
+        Variable $callbackArg,
+        string $function = 'uksort'
+    ): bool {
+        $table = self::state($object)['table'];
+        $callback = $callbackArg->resolveIndirect();
+        VmArraySortCallback::requireCallback($callback, $function);
+        VmArraySortCallback::rejectInvalidStringCallback($frame, $callback, $function);
+        if ($table->getNumElements() < 2) {
+            return true;
+        }
+        $pairs = [];
+        foreach ($table->iterateKeyed(true) as [$key, $value]) {
+            $keyCopy = new Variable();
+            $keyCopy->duplicateFrom($key);
+            $valCopy = new Variable();
+            $valCopy->duplicateFrom($value);
+            $pairs[] = [$keyCopy, $valCopy];
+        }
+        if (VmClosureCall::isClosure($callback)) {
+            if (null === $frame->vmContext) {
+                throw new \LogicException($function.'() requires VM context in this compiler build');
+            }
+            VmClosureCall::sortKeyedPairsByKey(
+                $frame->vmContext,
+                $pairs,
+                VmClosureCall::resolve($callback)
+            );
+        } else {
+            if (!UsortCallbackPolicy::isVmSupportedType($callback->type)) {
+                throw new \LogicException(UsortCallbackPolicy::vmRejectionMessage());
+            }
+            $name = $callback->toString();
+            if (!UsortCallbackPolicy::isVmSupportedName($name)) {
+                throw new \LogicException(UsortCallbackPolicy::vmRejectionMessage());
+            }
+            $compare = VmInternalCompare::resolveStringCallback($name);
+            VmInternalCompare::sortKeyedPairsByKeyWithCompare($pairs, $compare);
+        }
+        $sorted = new HashTable();
+        foreach ($pairs as [$key, $value]) {
+            array_map::appendKeyedCopy($sorted, $key, $value);
+        }
+        self::$store[$object->id]['table'] = $sorted;
+        self::rewindIterator($object);
+
+        return true;
+    }
+
     public static function append(ObjectEntry $object, Variable $value): void
     {
         $resolved = $value->resolveIndirect();
@@ -255,17 +467,17 @@ final class SplArrayStorage
 
             return [$key, false];
         }
-        if (Variable::TYPE_DOUBLE === $resolved->type) {
-            $key = new Variable(Variable::TYPE_INTEGER);
-            $key->int((int) $resolved->toDouble());
-
-            return [$key, true];
-        }
         if (Variable::TYPE_NULL === $resolved->type) {
             $key = new Variable(Variable::TYPE_STRING);
             $key->string('');
 
             return [$key, false];
+        }
+        if (Variable::TYPE_FLOAT === $resolved->type) {
+            $key = new Variable(Variable::TYPE_INTEGER);
+            $key->int((int) $resolved->toFloat());
+
+            return [$key, true];
         }
 
         throw new \TypeError('Array access offset must be of type int or string');

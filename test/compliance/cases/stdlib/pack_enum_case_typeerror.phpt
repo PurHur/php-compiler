@@ -1,5 +1,5 @@
 --TEST--
-stdlib pack() — backed enum case numeric operand TypeError (#8816, ext/standard/pack.c)
+stdlib pack() — backed enum case numeric operand warns + packs backing int (#16397, ext/standard/pack.c)
 --FILE--
 <?php
 declare(strict_types=1);
@@ -9,23 +9,22 @@ enum E: int {
     case B = 42;
 }
 
-try {
-    pack('c', E::A);
-    echo "c uncaught\n";
-} catch (TypeError $e) {
-    echo $e->getMessage(), "\n";
-}
+$data = @pack('c', E::A);
+echo 'c ', bin2hex($data), "\n";
+$data2 = @pack('c', E::B);
+echo 'c42 ', bin2hex($data2), "\n";
+@pack('c', E::A);
+$err = error_get_last();
+echo 'warning: ', isset($err['message']) ? $err['message'] : '', "\n";
 
-try {
-    pack('i', E::B);
-    echo "i uncaught\n";
-} catch (TypeError $e) {
-    echo $e->getMessage(), "\n";
-}
+$data3 = @pack('i', E::A);
+echo 'i ', strlen($data3), "\n";
 
-$data = pack('i', 1);
-echo 'ok ', strlen($data), "\n";
+$r = unpack('c', $data);
+echo 'roundtrip ', $r[1], "\n";
 --EXPECT--
-pack(): Argument #2 ($values) must be of type int, E given
-pack(): Argument #2 ($values) must be of type int, E given
-ok 4
+c 01
+c42 2a
+warning: Object of class E could not be converted to int
+i 4
+roundtrip 1

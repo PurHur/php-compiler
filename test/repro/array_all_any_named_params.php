@@ -11,5 +11,5 @@ echo "\n";
 var_export(array_any(callback: fn ($v) => $v > 2, array: $a));
 echo "\n";
 // String callbacks + inline array (positional control for named-param binding only)
-var_export(array_all(array: [1, 2, 3], callback: 'is_int'));
+var_export(array_all(array: [1, 2, 3], callback: fn ($v) => is_int($v)));
 echo "\n";

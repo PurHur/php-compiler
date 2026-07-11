@@ -14,8 +14,15 @@ final class GethostbyaddrJitHelper
 {
     public static function resolve(string $ipAddress): string
     {
-        $result = VmDns::gethostbyaddr($ipAddress);
+        $error = 0;
+        $result = VmDns::gethostbyaddr($ipAddress, $error);
+        if (false !== $result) {
+            return $result;
+        }
+        if (2 === $error) {
+            return $ipAddress;
+        }
 
-        return false === $result ? '' : $result;
+        return '';
     }
 }

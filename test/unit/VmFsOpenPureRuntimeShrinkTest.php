@@ -14,18 +14,20 @@ use PHPUnit\Framework\TestCase;
 /** VmFsOpenPure / VmFsWritePure — fopen and file_put_contents without libc FFI (#8950). */
 final class VmFsOpenPureRuntimeShrinkTest extends TestCase
 {
-    public function testVmFsOpenNativeDelegatesToPureWhenFfiDisabled(): void
+    public function testVmFsOpenNativeDelegatesToPureWithoutFfi(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/VmFsOpenNative.php');
-        $this->assertStringContainsString('VmFsOpenPure::', $source);
+        $this->assertStringContainsString('VmFsOpenPure::open', $source);
         $this->assertStringContainsString('VmFsOpenPure::available()', $source);
+        $this->assertStringNotContainsString('FFI::cdef', $source);
     }
 
-    public function testVmFsWriteNativeDelegatesToPureWhenFfiDisabled(): void
+    public function testVmFsWriteNativeDelegatesToPureWithoutFfi(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/VmFsWriteNative.php');
-        $this->assertStringContainsString('VmFsWritePure::', $source);
+        $this->assertStringContainsString('VmFsWritePure::write', $source);
         $this->assertStringContainsString('VmFsWritePure::available()', $source);
+        $this->assertStringNotContainsString('FFI::cdef', $source);
     }
 
     public function testVmFsOpenPureDoesNotUseLibcFfi(): void

@@ -39,11 +39,22 @@ final class getenv_ extends Internal
 
             return;
         }
+        $arg0 = $frame->calledArgs[0]->resolveIndirect();
+        if (1 === $argc && Variable::TYPE_NULL === $arg0->type) {
+            $frame->returnVar->array(VmEnv::getAllEnvironmentTable());
+
+            return;
+        }
         $localOnly = false;
         if (2 === $argc) {
             $localOnly = $frame->calledArgs[1]->resolveIndirect()->toBool();
         }
-        $name = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'getenv', 0, 'name');
+        $name = VmString::coerceTypedNullableStringBuiltinArg($frame->calledArgs[0], 'getenv', 0, 'name');
+        if (null === $name) {
+            $frame->returnVar->array(VmEnv::getAllEnvironmentTable());
+
+            return;
+        }
         $result = VmEnv::getenv($name, $localOnly);
         if (false === $result) {
             $frame->returnVar->bool(false);
@@ -61,6 +72,9 @@ final class getenv_ extends Internal
         if (0 === $argc) {
             return JitEnv::getenvAll($context);
         }
+        if (1 === $argc && (JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false))) {
+            return JitEnv::getenvAll($context);
+        }
         $i8 = $context->getTypeFromString('int8');
         $localOnlyI8 = $i8->constInt(0, false);
         if (2 === $argc) {
@@ -72,7 +86,7 @@ final class getenv_ extends Internal
 
         return JitEnv::getenv(
             $context,
-            JitStringBuiltinArg::lower($context, $args[0], 'getenv', 0, 'name'),
+            JitStringBuiltinArg::lowerRequiredString($context, $args[0], 'getenv', 0, 'name', '?string'),
             $localOnlyI8
         );
     }

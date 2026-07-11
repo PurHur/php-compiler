@@ -9,9 +9,13 @@ use PHPCompiler\Func\Internal as FuncInternal;
 use PHPCompiler\Func\PHP as PhpFunc;
 use PHPCompiler\MethodVisibility;
 use PHPCompiler\VM\BackedEnum;
+use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\Context;
 use PHPCompiler\ext\spl\SplArraySerializeSupport;
+use PHPCompiler\ext\spl\SplDllistSerializeSupport;
+use PHPCompiler\ext\spl\SplFixedArraySerializeSupport;
+use PHPCompiler\ext\spl\SplObjectStorageSerializeSupport;
 use PHPCompiler\VM\DateIntervalSupport;
 use PHPCompiler\VM\DateTimeSupport;
 use PHPCompiler\VM\EnumCaseSupport;
@@ -29,6 +33,9 @@ use PHPCompiler\VM\Variable;
  */
 final class VmSerialize
 {
+    private const CLASS_INCOMPLETE = '__php_incomplete_class';
+    private const INCOMPLETE_CLASS_NAME_PROP = '__PHP_Incomplete_Class_Name';
+
     public static function serializeValue(Context $ctx, Variable $value, ?Frame $frame = null): string
     {
         $value = $value->resolveIndirect();
@@ -45,6 +52,7 @@ final class VmSerialize
                 throw new \Exception("Serialization of 'Closure' is not allowed");
             }
             $entry = $value->toObject();
+            self::rejectAnonymousClassSerialization($entry);
             $lcClass = strtolower($entry->class->name);
             if (DateTimeSupport::CLASS_DATETIME === $lcClass || DateTimeSupport::CLASS_DATETIMEIMMUTABLE === $lcClass) {
                 return DateTimeSupport::encodeZendSerializeWire($entry);
@@ -55,14 +63,30 @@ final class VmSerialize
             if (SplArraySerializeSupport::isSplArrayClass($lcClass)) {
                 return SplArraySerializeSupport::encodeZendSerializeWire($entry);
             }
+            if (SplFixedArraySerializeSupport::isSplFixedArrayClass($lcClass)) {
+                return SplFixedArraySerializeSupport::encodeZendSerializeWire($entry);
+            }
+            if (SplDllistSerializeSupport::isSplDllistClass($lcClass)) {
+                return SplDllistSerializeSupport::encodeZendSerializeWire($entry);
+            }
+            if (SplObjectStorageSerializeSupport::isSplObjectStorageClass($lcClass)) {
+                return SplObjectStorageSerializeSupport::encodeZendSerializeWire(
+                    $ctx,
+                    $entry,
+                    new VmSerializeRefState(),
+                    $frame
+                );
+            }
+            if (self::CLASS_INCOMPLETE === $lcClass) {
+                return self::encodeIncompleteObjectWire($ctx, $entry, null, $frame);
+            }
             if (self::hasInstanceMethod($entry->class, '__serialize')) {
                 $data = self::invokeSerialize($ctx, $entry);
-                $exported = VmJson::export($data->resolveIndirect());
-                if (!\is_array($exported)) {
+                if (Variable::TYPE_ARRAY !== $data->type) {
                     self::throwSerializeMustReturnArray($entry->class->name);
                 }
 
-                return self::encodeCustomObject($entry->class->name, $exported);
+                return self::encodeMagicSerializeObject($ctx, $entry, $data, null, $frame);
             }
             if (self::implementsLegacySerializable($entry->class)) {
                 $payload = self::invokeLegacySerializableSerialize($ctx, $entry);
@@ -70,10 +94,14 @@ final class VmSerialize
                 return self::encodeSerializableObject($entry->class->name, $payload);
             }
             if (self::hasInstanceMethod($entry->class, '__sleep')) {
-                return self::encodeSleepObject($ctx, $entry);
+                return self::encodeSleepObject($ctx, $entry, $frame);
             }
 
-            return self::encodePlainObject($ctx, $entry, $frame);
+            return self::encodePlainObjectWire($ctx, $entry, $frame);
+        }
+
+        if (Variable::TYPE_ARRAY === $value->type) {
+            return self::encodeWireArray($ctx, $value, new VmSerializeRefState(), $frame);
         }
 
         return self::serializeExported(self::exportForSerialize($ctx, $value));
@@ -136,28 +164,51 @@ final class VmSerialize
         }
 
         if (str_starts_with($payload, 'O:')) {
+            $header = self::parseObjectWireHeader($payload);
+            if (null === $header) {
+                return false;
+            }
+            [$className] = $header;
+            if (0 === strcasecmp($className, 'Closure')) {
+                throw new \Exception("Unserialization of 'Closure' is not allowed");
+            }
+            if (!self::isClassAllowedForUnserialize($className, $options)) {
+                $parsed = self::parseCustomObjectPayload($payload);
+                if (null === $parsed || !\is_array($parsed[1])) {
+                    return false;
+                }
+
+                return self::instantiateIncompleteObject($ctx, $className, $parsed[1]);
+            }
+            $lcEarly = strtolower($className);
+            if (SplObjectStorageSerializeSupport::isSplObjectStorageClass($lcEarly)) {
+                $restored = SplObjectStorageSerializeSupport::restoreFromWire($ctx, $payload, $options, $frame);
+                if (null === $restored) {
+                    return false;
+                }
+                $var = new Variable(Variable::TYPE_OBJECT);
+                $var->object($restored);
+
+                return $var;
+            }
+            $class = self::resolveClassEntryForUnserialize($ctx, $className);
+            if (null !== $class && self::hasInstanceMethod($class, '__unserialize')) {
+                $magicData = self::decodeMagicSerializePropertyBag($ctx, $payload, $options, $frame);
+                if (false === $magicData) {
+                    return false;
+                }
+
+                return self::instantiateWithUnserializeData($ctx, $class, $magicData);
+            }
             $parsed = self::parseCustomObjectPayload($payload);
             if (null === $parsed) {
                 return false;
             }
             [$className, $data] = $parsed;
-            if (0 === strcasecmp($className, 'Closure')) {
-                throw new \Exception("Unserialization of 'Closure' is not allowed");
-            }
-            if (!self::isClassAllowedForUnserialize($className, $options)) {
-                if (!\is_array($data)) {
-                    return false;
-                }
-
-                return self::instantiateIncompleteObject($ctx, $className, $data);
-            }
             $lcClass = strtolower($className);
             if (\is_array($data)
                 && (DateTimeSupport::CLASS_DATETIME === $lcClass || DateTimeSupport::CLASS_DATETIMEIMMUTABLE === $lcClass)) {
                 $restored = DateTimeSupport::restoreFromZendSerialize($ctx, $lcClass, $data);
-                if (null === $restored) {
-                    return false;
-                }
                 $var = new Variable(Variable::TYPE_OBJECT);
                 $var->object($restored);
 
@@ -183,20 +234,42 @@ final class VmSerialize
 
                 return $var;
             }
-            $class = self::resolveClassEntryForUnserialize($ctx, $className);
+            if (\is_array($data) && SplFixedArraySerializeSupport::isSplFixedArrayClass($lcClass)) {
+                $restored = SplFixedArraySerializeSupport::restoreFromZendSerialize($ctx, $data);
+                if (null === $restored) {
+                    return false;
+                }
+                $var = new Variable(Variable::TYPE_OBJECT);
+                $var->object($restored);
+
+                return $var;
+            }
+            if (\is_array($data) && SplDllistSerializeSupport::isSplDllistClass($lcClass)) {
+                $restored = SplDllistSerializeSupport::restoreFromZendSerialize($ctx, $lcClass, $data);
+                if (null === $restored) {
+                    return false;
+                }
+                $var = new Variable(Variable::TYPE_OBJECT);
+                $var->object($restored);
+
+                return $var;
+            }
+            if (\is_array($data) && SplObjectStorageSerializeSupport::isSplObjectStorageClass($lcClass)) {
+                $restored = SplObjectStorageSerializeSupport::restoreFromWire($ctx, $payload, $options, $frame);
+                if (null === $restored) {
+                    return false;
+                }
+                $var = new Variable(Variable::TYPE_OBJECT);
+                $var->object($restored);
+
+                return $var;
+            }
             if (null === $class) {
                 if (!\is_array($data)) {
                     return false;
                 }
 
                 return self::instantiateIncompleteObject($ctx, $className, $data);
-            }
-            if (self::hasInstanceMethod($class, '__unserialize')) {
-                if (!\is_array($data)) {
-                    return false;
-                }
-
-                return self::instantiateWithUnserialize($ctx, $class, $data);
             }
             if (self::hasInstanceMethod($class, '__wakeup')) {
                 if (!\is_array($data)) {
@@ -212,10 +285,17 @@ final class VmSerialize
                 return false;
             }
 
+            if (\preg_match('/^O:(\d+):"((?:[^"\\\\]|\\\\.)*)":(\d+):\{(.*)\}$/s', $payload, $m)) {
+                $inner = $m[4];
+                $propCount = (int) $m[3];
+
+                return VmUnserializeFormat::decodeObjectPropertyBag($ctx, $class, $propCount, $inner, $frame);
+            }
+
             return self::instantiatePlainObject($ctx, $class, $data, $frame);
         }
 
-        return VmUnserializeFormat::decodePayload($payload, $options);
+        return VmUnserializeFormat::decodeToVariableWithContext($ctx, $payload, $options, $frame);
     }
 
     /**
@@ -259,6 +339,199 @@ final class VmSerialize
         return 'O:'.$len.':"'.$className.'":'.\substr($inner, 2);
     }
 
+    /**
+     * __serialize() wire encoding with object reference markers (php-src ext/standard/var.c, #11903).
+     */
+    private static function encodeMagicSerializeObject(
+        Context $ctx,
+        ObjectEntry $entry,
+        Variable $data,
+        ?VmSerializeRefState $state = null,
+        ?Frame $frame = null
+    ): string {
+        $isRoot = null === $state;
+        if ($isRoot) {
+            $state = new VmSerializeRefState();
+            $state->reserveRootSlot();
+        }
+
+        $body = '';
+        $count = 0;
+        foreach ($data->toArray()->iterateKeyed(true) as [$key, $value]) {
+            $body .= self::encodeWireKey($key);
+            $body .= self::encodeWireVariable($ctx, $value, $state, $frame);
+            ++$count;
+        }
+        $className = $entry->class->name;
+        $classLen = \strlen($className);
+
+        return 'O:'.$classLen.':"'.$className.'":'.$count.':{'.$body.'}';
+    }
+
+    private static function encodeWireKey(Variable $key): string
+    {
+        $key = $key->resolveIndirect();
+        if (Variable::TYPE_STRING === $key->type) {
+            return VmSerializeFormat::encodeStringLiteral($key->toString());
+        }
+        if (Variable::TYPE_INTEGER === $key->type) {
+            return 'i:'.$key->toInt().';';
+        }
+
+        throw new \LogicException(
+            'serialize() only supports string or integer keys in this compiler build'
+        );
+    }
+
+    private static function encodeWireVariable(
+        Context $ctx,
+        Variable $value,
+        VmSerializeRefState $state,
+        ?Frame $frame = null,
+        ?Variable $containerArray = null
+    ): string {
+        if ($value->isIndirect()) {
+            $existingRef = $state->lookupRefCellIndex($value);
+            if (null !== $existingRef) {
+                return 'R:'.$existingRef.';';
+            }
+            $target = $value->resolveIndirect();
+            $targetExisting = $state->lookupVariableIndex($target);
+            if (null !== $targetExisting
+                && null !== $containerArray
+                && Variable::TYPE_ARRAY === $target->type
+                && $target->resolveIndirect() === $containerArray->resolveIndirect()
+            ) {
+                $state->assignRefCellIndex($value);
+
+                return self::encodeWireArray($ctx, $target, $state, $frame, $containerArray);
+            }
+            if (null !== $targetExisting) {
+                $state->assignRefCellIndex($value, $targetExisting);
+
+                return 'R:'.$targetExisting.';';
+            }
+            $refIndex = $state->assignRefCellIndex($value);
+            $state->assignVariableIndexWithIndex($target, $refIndex);
+            $value = $target;
+        } else {
+            $value = $value->resolveIndirect();
+            if (Variable::TYPE_OBJECT !== $value->type) {
+                $existing = $state->lookupVariableIndex($value);
+                if (null !== $existing) {
+                    return 'R:'.$existing.';';
+                }
+                $state->assignVariableIndex($value);
+            }
+        }
+        $resourceWire = self::serializeResourceWire($value);
+        if (null !== $resourceWire) {
+            return $resourceWire;
+        }
+        $enumRef = self::enumCaseRefFromVariable($value);
+        if (null !== $enumRef) {
+            return self::encodeEnumCaseLiteral($enumRef->className, $enumRef->caseName);
+        }
+        if (Variable::TYPE_OBJECT === $value->type) {
+            return self::encodeWireObject($ctx, $value->toObject(), $state, $frame);
+        }
+        if (Variable::TYPE_ARRAY === $value->type) {
+            return self::encodeWireArray($ctx, $value, $state, $frame);
+        }
+
+        return VmSerializeFormat::encodeExported(VmJson::export($value, $ctx, $ctx->runtime->vm));
+    }
+
+    /** Public wrapper for SPL/custom serializers embedding nested values (#14164). */
+    public static function encodeVariableWire(
+        Context $ctx,
+        Variable $value,
+        VmSerializeRefState $state,
+        ?Frame $frame = null
+    ): string {
+        return self::encodeWireVariable($ctx, $value, $state, $frame);
+    }
+
+    private static function encodeWireArray(
+        Context $ctx,
+        Variable $value,
+        VmSerializeRefState $state,
+        ?Frame $frame = null,
+        ?Variable $containerArray = null
+    ): string {
+        $value = $value->resolveIndirect();
+        if (null === $state->lookupVariableIndex($value)) {
+            $state->assignVariableIndex($value);
+        }
+        $body = '';
+        $count = 0;
+        foreach ($value->toArray()->iterateKeyed(false) as [$key, $elem]) {
+            $body .= self::encodeWireKey($key);
+            $body .= self::encodeWireVariable($ctx, $elem, $state, $frame, $value);
+            ++$count;
+        }
+
+        return 'a:'.$count.':{'.$body.'}';
+    }
+
+    private static function encodeWireObject(
+        Context $ctx,
+        ObjectEntry $entry,
+        VmSerializeRefState $state,
+        ?Frame $frame = null
+    ): string {
+        if (0 === strcasecmp($entry->class->name, 'Closure')) {
+            throw new \Exception("Serialization of 'Closure' is not allowed");
+        }
+        self::rejectAnonymousClassSerialization($entry);
+        $existing = $state->lookupObjectIndex($entry);
+        if (null !== $existing) {
+            return 'r:'.$existing.';';
+        }
+        $state->assignObjectIndex($entry);
+
+        $lcClass = strtolower($entry->class->name);
+        if (DateTimeSupport::CLASS_DATETIME === $lcClass || DateTimeSupport::CLASS_DATETIMEIMMUTABLE === $lcClass) {
+            return DateTimeSupport::encodeZendSerializeWire($entry);
+        }
+        if (DateIntervalSupport::CLASS_DATEINTERVAL === $lcClass) {
+            return DateIntervalSupport::encodeZendSerializeWire($entry);
+        }
+        if (SplArraySerializeSupport::isSplArrayClass($lcClass)) {
+            return SplArraySerializeSupport::encodeZendSerializeWire($entry);
+        }
+        if (SplFixedArraySerializeSupport::isSplFixedArrayClass($lcClass)) {
+            return SplFixedArraySerializeSupport::encodeZendSerializeWire($entry);
+        }
+        if (SplDllistSerializeSupport::isSplDllistClass($lcClass)) {
+            return SplDllistSerializeSupport::encodeZendSerializeWire($entry);
+        }
+        if (SplObjectStorageSerializeSupport::isSplObjectStorageClass($lcClass)) {
+            return SplObjectStorageSerializeSupport::encodeZendSerializeWire($ctx, $entry, $state, $frame);
+        }
+        if (self::CLASS_INCOMPLETE === $lcClass) {
+            return self::encodeIncompleteObjectWire($ctx, $entry, $state, $frame);
+        }
+        if (self::hasInstanceMethod($entry->class, '__serialize')) {
+            $magicData = self::invokeSerialize($ctx, $entry);
+            if (Variable::TYPE_ARRAY !== $magicData->type) {
+                self::throwSerializeMustReturnArray($entry->class->name);
+            }
+
+            return self::encodeMagicSerializeObject($ctx, $entry, $magicData, $state, $frame);
+        }
+        if (self::implementsLegacySerializable($entry->class)) {
+            $payload = self::invokeLegacySerializableSerialize($ctx, $entry);
+
+            return self::encodeSerializableObject($entry->class->name, $payload);
+        }
+        if (self::hasInstanceMethod($entry->class, '__sleep')) {
+            return self::encodeSleepObject($ctx, $entry, $frame);
+        }
+
+        return self::encodePlainObjectWire($ctx, $entry, $frame, $state);
+    }
+
     /** Zend Serializable custom object format: C:len:"Class":datalen:{payload} */
     public static function encodeSerializableObject(string $className, string $payload): string
     {
@@ -266,6 +539,23 @@ final class VmSerialize
         $dataLen = \strlen($payload);
 
         return 'C:'.$classLen.':"'.$className.'":'.$dataLen.':{'.$payload.'}';
+    }
+
+    /**
+     * @return array{0: string, 1: int, 2: string}|null
+     */
+    public static function parseObjectWireHeader(string $payload): ?array
+    {
+        if (!\preg_match('/^O:(\d+):"((?:[^"\\\\]|\\\\.)*)":(\d+):\{(.*)\}$/s', $payload, $m)) {
+            return null;
+        }
+        $declaredLen = (int) $m[1];
+        $className = self::unescapeSerializedClassName($m[2]);
+        if (\strlen($className) !== $declaredLen) {
+            return null;
+        }
+
+        return [$className, (int) $m[3], $m[4]];
     }
 
     /**
@@ -277,7 +567,7 @@ final class VmSerialize
             return null;
         }
         $declaredLen = (int) $m[1];
-        $className = stripcslashes($m[2]);
+        $className = self::unescapeSerializedClassName($m[2]);
         if (\strlen($className) !== $declaredLen) {
             return null;
         }
@@ -291,6 +581,14 @@ final class VmSerialize
     }
 
     /**
+     * Unescape O:/C: class names without stripping namespace separators (php-src var.c; #13296).
+     */
+    private static function unescapeSerializedClassName(string $wire): string
+    {
+        return str_replace(['\\\\', '\\"'], ['\\', '"'], $wire);
+    }
+
+    /**
      * @return array{0: string, 1: string}|null
      */
     public static function parseSerializableObjectPayload(string $payload): ?array
@@ -299,7 +597,7 @@ final class VmSerialize
             return null;
         }
         $declaredLen = (int) $m[1];
-        $className = stripcslashes($m[2]);
+        $className = self::unescapeSerializedClassName($m[2]);
         if (\strlen($className) !== $declaredLen) {
             return null;
         }
@@ -317,19 +615,52 @@ final class VmSerialize
         ClassEntry $class,
         array $data
     ): Variable {
+        return self::instantiateWithUnserializeData($ctx, $class, VmJson::import($data));
+    }
+
+    public static function instantiateWithUnserializeData(
+        Context $ctx,
+        ClassEntry $class,
+        Variable $dataVar
+    ): Variable {
         $method = $class->methods['__unserialize'] ?? null;
+        $entry = new ObjectEntry($class);
+        $recv = new Variable();
+        $recv->object($entry);
+        if ($method instanceof VmClassMethod) {
+            self::invokeBuiltinClassMethod($ctx, $method, $entry, $dataVar);
+
+            return $recv;
+        }
         if (!$method instanceof PhpFunc) {
             throw new \LogicException(
                 'Class '.$class->name.'::__unserialize() must be a user method in this compiler build'
             );
         }
-        $entry = new ObjectEntry($class);
-        $recv = new Variable();
-        $recv->object($entry);
-        $dataVar = VmJson::import($data);
-        $ctx->runtime->vm->invokePhpFunction($method, $recv, $dataVar);
+        $ctx->runtime->vm->invokePhpFunctionIsolated($method, $recv, $dataVar);
 
         return $recv;
+    }
+
+    /**
+     * Decode O: wire whose class uses __serialize() — nested objects need Context (#13476).
+     *
+     * @param array<string, mixed>|null $options
+     */
+    public static function decodeMagicSerializePropertyBag(
+        Context $ctx,
+        string $payload,
+        ?array $options = null,
+        ?Frame $frame = null
+    ): Variable|false {
+        $header = self::parseObjectWireHeader($payload);
+        if (null === $header) {
+            return false;
+        }
+        [, $propCount, $inner] = $header;
+        $arrayPayload = 'a:'.$propCount.':{'.$inner.'}';
+
+        return VmUnserializeFormat::decodeToVariableWithContext($ctx, $arrayPayload, $options, $frame);
     }
 
     /**
@@ -367,7 +698,7 @@ final class VmSerialize
         }
         $recv = new Variable();
         $recv->object($entry);
-        $ctx->runtime->vm->invokePhpFunction($method, $recv);
+        $ctx->runtime->vm->invokePhpFunctionIsolated($method, $recv);
 
         return $recv;
     }
@@ -530,9 +861,12 @@ final class VmSerialize
         return null;
     }
 
-    private static function encodeSleepObject(Context $ctx, ObjectEntry $entry): string
+    private static function encodeSleepObject(Context $ctx, ObjectEntry $entry, ?Frame $frame = null): string
     {
-        $names = self::invokeSleep($ctx, $entry);
+        $names = self::collectSleepPropertyNames($ctx, $entry, $frame);
+        if (null === $names) {
+            return 'N;';
+        }
         $props = [];
         foreach ($names as $name) {
             $props[$name] = $entry->getProperty($name)->resolveIndirect();
@@ -542,16 +876,127 @@ final class VmSerialize
     }
 
     /**
-     * Zend php_var_serialize() plain object branch — public properties + dynamic props (#3621, var.c).
-     * Private/protected mangling deferred to #3497.
+     * @return list<string>|null null when __sleep() did not return an array (php-src var.c; #13378)
+     */
+    private static function collectSleepPropertyNames(Context $ctx, ObjectEntry $entry, ?Frame $frame = null): ?array
+    {
+        $method = $entry->class->methods['__sleep'] ?? null;
+        if (!$method instanceof PhpFunc) {
+            throw new \LogicException(
+                'Class '.$entry->class->name.'::__sleep() must be a user method in this compiler build'
+            );
+        }
+        $recv = new Variable();
+        $recv->object($entry);
+        $result = $ctx->runtime->vm->invokePhpFunction($method, $recv);
+        if (Variable::TYPE_ARRAY !== $result->type) {
+            $ctx->errors->triggerError(
+                'serialize(): '.$entry->class->name.'::__sleep() should return an array only containing the names of instance-variables to serialize',
+                ErrorReporter::E_WARNING,
+                null,
+                $ctx,
+                $frame
+            );
+
+            return null;
+        }
+        $names = [];
+        foreach ($result->toArray()->iterateKeyed(true) as [, $elem]) {
+            $elem = $elem->resolveIndirect();
+            if (Variable::TYPE_STRING !== $elem->type) {
+                throw new \LogicException('__sleep() must return an array of strings');
+            }
+            $names[] = $elem->toString();
+        }
+
+        return $names;
+    }
+
+    /**
+     * Zend php_var_serialize() for __PHP_Incomplete_Class — emit original class name (var.c, #10765).
+     */
+    private static function encodeIncompleteObjectWire(
+        Context $ctx,
+        ObjectEntry $entry,
+        ?VmSerializeRefState $state = null,
+        ?Frame $frame = null
+    ): string {
+        if (!$entry->hasProperty(self::INCOMPLETE_CLASS_NAME_PROP)) {
+            throw new \LogicException(
+                '__PHP_Incomplete_Class object missing '.self::INCOMPLETE_CLASS_NAME_PROP.' property'
+            );
+        }
+        $originalClass = $entry->getProperty(self::INCOMPLETE_CLASS_NAME_PROP)->resolveIndirect()->toString();
+
+        $isRoot = null === $state;
+        if ($isRoot) {
+            $state = new VmSerializeRefState();
+            $state->objectIndex[$entry] = 1;
+            $state->nextIndex = 2;
+        } elseif (null === $state->lookupObjectIndex($entry)) {
+            $state->assignObjectIndex($entry);
+        }
+
+        $body = '';
+        $count = 0;
+        foreach ($entry->getRawProperties() as $name => $prop) {
+            if (self::INCOMPLETE_CLASS_NAME_PROP === $name) {
+                continue;
+            }
+            $value = $prop->resolveIndirect();
+            if (TypedPropertyCheck::omitFromSerialize($value)) {
+                continue;
+            }
+            $keyVar = new Variable();
+            $keyVar->string($name);
+            $body .= self::encodeWireKey($keyVar);
+            $body .= self::encodeWireVariable($ctx, $value, $state, $frame);
+            ++$count;
+        }
+        $classLen = \strlen($originalClass);
+
+        return 'O:'.$classLen.':"'.$originalClass.'":'.$count.':{'.$body.'}';
+    }
+
+    /**
+     * Zend plain object wire with object-reference markers (ext/standard/var.c, #12082).
+     */
+    private static function encodePlainObjectWire(
+        Context $ctx,
+        ObjectEntry $entry,
+        ?Frame $frame = null,
+        ?VmSerializeRefState $state = null
+    ): string {
+        $isRoot = null === $state;
+        if ($isRoot) {
+            $state = new VmSerializeRefState();
+            $state->objectIndex[$entry] = 1;
+            $state->nextIndex = 2;
+        } elseif (null === $state->lookupObjectIndex($entry)) {
+            $state->assignObjectIndex($entry);
+        }
+
+        $body = '';
+        $count = 0;
+        foreach (self::collectPlainObjectSerializeProperties($ctx, $entry, $frame) as $name => $value) {
+            $keyVar = new Variable();
+            $keyVar->string($name);
+            $body .= self::encodeWireKey($keyVar);
+            $body .= self::encodeWireVariable($ctx, $value, $state, $frame);
+            ++$count;
+        }
+        $className = $entry->class->name;
+        $classLen = \strlen($className);
+
+        return 'O:'.$classLen.':"'.$className.'":'.$count.':{'.$body.'}';
+    }
+
+    /**
+     * Zend php_var_serialize() plain object branch — all declared props + dynamic props (#3621, #15751, var.c).
      */
     private static function encodePlainObject(Context $ctx, ObjectEntry $entry, ?Frame $frame = null): string
     {
-        return self::encodeObjectPropertyBag(
-            $ctx,
-            $entry->class->name,
-            self::collectPlainObjectSerializeProperties($ctx, $entry, $frame)
-        );
+        return self::encodePlainObjectWire($ctx, $entry, $frame);
     }
 
     /**
@@ -563,7 +1008,7 @@ final class VmSerialize
         ?Frame $frame = null
     ): array {
         if (null !== $frame) {
-            return $ctx->runtime->vm()->collectPublicPropertiesForSerialize($entry, $frame);
+            return $ctx->runtime->vm()->collectObjectPropertiesForSerialize($entry, $frame);
         }
 
         /** @var array<string, Variable> $props */
@@ -577,19 +1022,16 @@ final class VmSerialize
                     continue;
                 }
                 $seenLc[$lc] = true;
-                if (!MethodVisibility::isPublic($meta->visibility)) {
-                    continue;
-                }
                 if (!$entry->hasProperty($meta->name)) {
                     continue;
                 }
                 $value = $entry->getProperty($meta->name)->resolveIndirect();
-                if (TypedPropertyCheck::omitFromPropertyEnumeration($value)) {
+                if (TypedPropertyCheck::omitFromSerialize($value)) {
                     continue;
                 }
                 $copy = new Variable();
                 $copy->copyFrom($value);
-                $props[$meta->name] = $copy;
+                $props[VmReflection::manglePropertyKey($meta, $ctx)] = $copy;
             }
         }
         foreach ($entry->getRawProperties() as $name => $prop) {
@@ -597,7 +1039,7 @@ final class VmSerialize
                 continue;
             }
             $value = $prop->resolveIndirect();
-            if (TypedPropertyCheck::omitFromPropertyEnumeration($value)) {
+            if (TypedPropertyCheck::omitFromSerialize($value)) {
                 continue;
             }
             $copy = new Variable();
@@ -778,6 +1220,14 @@ final class VmSerialize
     private static function invokeSerialize(Context $ctx, ObjectEntry $entry): Variable
     {
         $method = $entry->class->methods['__serialize'] ?? null;
+        if ($method instanceof VmClassMethod) {
+            $result = self::invokeBuiltinClassMethod($ctx, $method, $entry);
+            if (Variable::TYPE_ARRAY !== $result->type) {
+                self::throwSerializeMustReturnArray($entry->class->name);
+            }
+
+            return $result;
+        }
         if (!$method instanceof PhpFunc) {
             throw new \LogicException(
                 'Class '.$entry->class->name.'::__serialize() must be a user method in this compiler build'
@@ -793,31 +1243,22 @@ final class VmSerialize
         return $result;
     }
 
-    /** @return list<string> */
-    private static function invokeSleep(Context $ctx, ObjectEntry $entry): array
-    {
-        $method = $entry->class->methods['__sleep'] ?? null;
-        if (!$method instanceof PhpFunc) {
-            throw new \LogicException(
-                'Class '.$entry->class->name.'::__sleep() must be a user method in this compiler build'
-            );
-        }
+    private static function invokeBuiltinClassMethod(
+        Context $ctx,
+        VmClassMethod $method,
+        ObjectEntry $entry,
+        Variable ...$extraArgs
+    ): Variable {
         $recv = new Variable();
         $recv->object($entry);
-        $result = $ctx->runtime->vm->invokePhpFunction($method, $recv);
-        if (Variable::TYPE_ARRAY !== $result->type) {
-            throw new \LogicException('__sleep() must return an array');
-        }
-        $names = [];
-        foreach ($result->toArray()->iterateKeyed(true) as [, $elem]) {
-            $elem = $elem->resolveIndirect();
-            if (Variable::TYPE_STRING !== $elem->type) {
-                throw new \LogicException('__sleep() must return an array of strings');
-            }
-            $names[] = $elem->toString();
-        }
+        $frame = $method->getFrame($ctx, null);
+        $frame->vmContext = $ctx;
+        $frame->calledArgs = [$recv, ...$extraArgs];
+        $out = new Variable();
+        $frame->returnVar = $out;
+        $method->execute($frame);
 
-        return $names;
+        return $out;
     }
 
     private static function invokeLegacySerializableSerialize(Context $ctx, ObjectEntry $entry): string
@@ -847,6 +1288,14 @@ final class VmSerialize
         return isset($class->methods['serialize'], $class->methods['unserialize']);
     }
 
+    /** php-src ext/standard/var.c — reject class@anonymous before __serialize/__sleep. */
+    private static function rejectAnonymousClassSerialization(ObjectEntry $entry): void
+    {
+        if (str_contains($entry->class->name, '@anonymous')) {
+            throw new \Exception("Serialization of 'class@anonymous' is not allowed");
+        }
+    }
+
     private static function hasInstanceMethod(ClassEntry $class, string $methodName): bool
     {
         return isset($class->methods[strtolower($methodName)]);
@@ -856,6 +1305,103 @@ final class VmSerialize
     private static function throwSerializeMustReturnArray(string $className): never
     {
         throw new \TypeError($className.'::__serialize() must return an array');
+    }
+}
+
+/**
+ * Object reference indices for serialize() wire format (php-src var.c php_add_var_hash).
+ *
+ * Root __serialize O: occupies stream index 1; nested object refs start at 2 (#11903).
+ */
+final class VmSerializeRefState
+{
+    public int $nextIndex = 1;
+
+    /** @var \SplObjectStorage<ObjectEntry, int> */
+    public \SplObjectStorage $objectIndex;
+
+    /** @var \SplObjectStorage<Variable, int> */
+    public \SplObjectStorage $variableIndex;
+
+    /** @var \SplObjectStorage<Variable, int> */
+    public \SplObjectStorage $refCellIndex;
+
+    public function __construct()
+    {
+        $this->objectIndex = new \SplObjectStorage();
+        $this->variableIndex = new \SplObjectStorage();
+        $this->refCellIndex = new \SplObjectStorage();
+    }
+
+    public function reserveRootSlot(): void
+    {
+        $this->nextIndex = 2;
+    }
+
+    public function assignObjectIndex(ObjectEntry $object): int
+    {
+        $index = $this->nextIndex++;
+        $this->objectIndex[$object] = $index;
+
+        return $index;
+    }
+
+    public function lookupObjectIndex(ObjectEntry $object): ?int
+    {
+        if (!$this->objectIndex->contains($object)) {
+            return null;
+        }
+
+        return $this->objectIndex[$object];
+    }
+
+    /** php-src var_hash — shared scalar/array refs emit R: (var.c php_var_serialize). */
+    public function assignVariableIndex(Variable $variable): int
+    {
+        $index = $this->nextIndex++;
+        $this->variableIndex[$variable] = $index;
+
+        return $index;
+    }
+
+    public function lookupVariableIndex(Variable $variable): ?int
+    {
+        if (!$this->variableIndex->contains($variable)) {
+            return null;
+        }
+
+        return $this->variableIndex[$variable];
+    }
+
+    /** php-src ISREF zval identity — R: markers keyed by ref cell, not target (#12825). */
+    public function assignRefCellIndex(Variable $refCell, ?int $index = null): int
+    {
+        if (null !== $index) {
+            $this->refCellIndex[$refCell] = $index;
+
+            return $index;
+        }
+        $index = $this->nextIndex++;
+        $this->refCellIndex[$refCell] = $index;
+
+        return $index;
+    }
+
+    public function lookupRefCellIndex(Variable $refCell): ?int
+    {
+        if (!$this->refCellIndex->contains($refCell)) {
+            return null;
+        }
+
+        return $this->refCellIndex[$refCell];
+    }
+
+    public function assignVariableIndexWithIndex(Variable $variable, int $index): void
+    {
+        $this->variableIndex[$variable] = $index;
+        if ($index >= $this->nextIndex) {
+            $this->nextIndex = $index + 1;
+        }
     }
 }
 

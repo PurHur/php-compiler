@@ -9,17 +9,17 @@ use PHPCompiler\ext\standard\VmNetInterfacesNative;
 use PHPCompiler\ext\standard\VmNetInterfacesPure;
 use PHPUnit\Framework\TestCase;
 
-/** VmNetInterfacesPure /sys path without getifaddrs FFI (#8988). */
+/** VmNetInterfacesPure /sys path without getifaddrs FFI (#8988, #12353). */
 final class VmNetInterfacesRuntimeShrinkTest extends TestCase
 {
-    public function testVmNetInterfacesNativePrefersPurePath(): void
+    public function testVmNetInterfacesNativeDelegatesToPureWithoutFfi(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/VmNetInterfacesNative.php');
         $this->assertStringContainsString('VmNetInterfacesPure::collect()', $source);
-        $this->assertMatchesRegularExpression(
-            '/public static function collect\(\)[^{]*\{[^}]*VmNetInterfacesPure::collect/s',
-            $source
-        );
+        $this->assertStringContainsString('VmNetInterfacesPure::available()', $source);
+        $this->assertStringNotContainsString('FFI::cdef', $source);
+        $this->assertDoesNotMatchRegularExpression('/\$ffi->getifaddrs/', $source);
+        $this->assertDoesNotMatchRegularExpression('/\$ffi->freeifaddrs/', $source);
     }
 
     public function testStringNetInterfacesJitUsesHelperBridge(): void
@@ -52,6 +52,9 @@ final class VmNetInterfacesRuntimeShrinkTest extends TestCase
             }
             $this->assertTrue($found);
 
+            $this->assertTrue(VmNetInterfacesNative::available());
+            $this->assertSame($raw, VmNetInterfacesNative::collect());
+
             $ht = VmNetInterfaces::get();
             $this->assertNotFalse($ht);
         } finally {
@@ -63,18 +66,16 @@ final class VmNetInterfacesRuntimeShrinkTest extends TestCase
         }
     }
 
-    public function testPureCollectMatchesNativeOnLinux(): void
+    public function testNativeCollectMatchesPureOnLinux(): void
     {
-        if (!VmNetInterfacesNative::available() || !VmNetInterfacesPure::available()) {
-            $this->markTestSkipped('net interfaces paths unavailable');
+        if (!VmNetInterfacesPure::available()) {
+            $this->markTestSkipped('net interfaces pure path unavailable');
         }
 
         $pure = VmNetInterfacesPure::collect();
         $native = VmNetInterfacesNative::collect();
         $this->assertIsArray($pure);
-        $this->assertIsArray($native);
+        $this->assertSame($pure, $native);
         $this->assertArrayHasKey('lo', $pure);
-        $this->assertArrayHasKey('lo', $native);
-        $this->assertSame($native['lo']['up'], $pure['lo']['up']);
     }
 }

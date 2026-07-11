@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\MathLdexp;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -44,6 +45,6 @@ final class ldexp extends Internal
         $expRaw = JitLongArg::lower($context, $args[1], 'ldexp() argument #2');
         $exp = $context->builder->trunc($expRaw, $i32);
 
-        return $context->builder->call($context->lookupFunction('ldexp'), $num, $exp);
+        return MathLdexp::invoke($context, $num, $exp);
     }
 }

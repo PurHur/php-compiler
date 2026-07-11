@@ -13,7 +13,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
-use PHPCompiler\JIT\ArrayBuiltinHelper;
+use PHPCompiler\JIT\Builtin\SortRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\EnumCaseSupport;
@@ -35,14 +35,14 @@ final class sort_ extends Internal
     public function execute(Frame $frame): void
     {
         $argc = \count($frame->calledArgs);
-        if ($argc < 1 || $argc > 2) {
-            throw new \LogicException('sort() requires one or two arguments');
+        if ($argc < 1 || $argc > 3) {
+            throw new \LogicException('sort() requires one to three arguments');
         }
         $array = $frame->calledArgs[0]->resolveIndirect();
         $ht = VmArray::requireArray($frame->calledArgs[0], 'sort');
         $flags = StdlibConstants::SORT_REGULAR;
-        if (2 === $argc) {
-            $flags = VmInternalCompare::resolveFrameSortFlags($frame, 'sort');
+        if ($argc > 1) {
+            $flags = VmInternalCompare::resolveSortFunctionFlags($frame, 'sort');
         }
         if ($ht->getNumElements() < 2) {
             if (null !== $frame->returnVar) {
@@ -60,27 +60,28 @@ final class sort_ extends Internal
         $first = $values[0]->resolveIndirect();
         $sortType = $flags & ~StdlibConstants::SORT_FLAG_CASE;
         if (Variable::TYPE_STRING === $first->type) {
-            if (StdlibConstants::SORT_NUMERIC === $sortType) {
-                VmInternalCompare::sortVariableValuesWithFlags($values, $flags);
-            } else {
+            if (
+                StdlibConstants::SORT_STRING === $sortType
+                && VmInternalCompare::valuesShareScalarType($values, Variable::TYPE_STRING)
+            ) {
                 VmInternalCompare::sortVariableValues(
                     $values,
                     VmInternalCompare::stringCompareForSortFlags($flags)
                 );
+            } else {
+                VmInternalCompare::sortVariableValuesWithFlags($values, $flags);
             }
         } elseif (Variable::TYPE_INTEGER === $first->type) {
-            if (StdlibConstants::SORT_REGULAR === $sortType) {
+            if (
+                StdlibConstants::SORT_REGULAR === $sortType
+                && VmInternalCompare::valuesShareScalarType($values, Variable::TYPE_INTEGER)
+            ) {
                 $n = \count($values);
                 for ($i = 1; $i < $n; ++$i) {
                     $j = $i;
                     while ($j > 0) {
                         $a = $values[$j - 1]->resolveIndirect();
                         $b = $values[$j]->resolveIndirect();
-                        if (Variable::TYPE_INTEGER !== $a->type || Variable::TYPE_INTEGER !== $b->type) {
-                            throw new \LogicException(
-                                'sort() only supports homogeneous string or integer arrays in this compiler build'
-                            );
-                        }
                         if ($a->toInt() <= $b->toInt()) {
                             break;
                         }
@@ -103,9 +104,7 @@ final class sort_ extends Internal
                 );
             }
         } else {
-            throw new \LogicException(
-                'sort() only supports homogeneous string or integer arrays in this compiler build'
-            );
+            VmInternalCompare::sortVariableValuesWithFlags($values, $flags);
         }
         $array->separateArrayForWrite();
         $array->resolveIndirect()->toArray()->replacePackedValues($values);
@@ -124,7 +123,7 @@ final class sort_ extends Internal
         }
         JitArrayKey::requireArrayArg($context, $args[0], 'sort');
         if (1 === $argc) {
-            ArrayBuiltinHelper::sortPacked($context, $args[0]);
+            SortRuntime::sortPacked($context, $args[0]);
         } else {
             self::jitSortWithFlags($context, $args[0], VmInternalCompare::resolveJitSortFlags($context, $args[1], 'sort'));
         }
@@ -139,15 +138,15 @@ final class sort_ extends Internal
 
         if (StdlibConstants::SORT_NATURAL === $sortType) {
             if (0 !== $caseFlag) {
-                ArrayBuiltinHelper::sortPackedNaturalCase($context, $array);
+                SortRuntime::sortPackedNaturalCase($context, $array);
             } else {
-                ArrayBuiltinHelper::sortPackedNatural($context, $array);
+                SortRuntime::sortPackedNatural($context, $array);
             }
 
             return;
         }
         if (StdlibConstants::SORT_LOCALE_STRING === $sortType) {
-            ArrayBuiltinHelper::sortPackedLocale($context, $array);
+            SortRuntime::sortPackedLocale($context, $array);
 
             return;
         }
@@ -156,7 +155,7 @@ final class sort_ extends Internal
             || StdlibConstants::SORT_STRING === $sortType
             || StdlibConstants::SORT_NUMERIC === $sortType
         ) {
-            ArrayBuiltinHelper::sortPacked($context, $array);
+            SortRuntime::sortPacked($context, $array);
 
             return;
         }

@@ -4,8 +4,6 @@ stdlib RoundingMode enum + round() mode (#5934)
 <?php
 var_export(enum_exists('RoundingMode', false));
 echo "\n";
-var_export(unitenum_exists('RoundingMode'));
-echo "\n";
 echo round(2.5, 0, RoundingMode::HalfAwayFromZero), "\n";
 echo round(2.5, 0, RoundingMode::TowardsZero), "\n";
 echo round(1.7, 0, RoundingMode::PositiveInfinity), "\n";
@@ -25,10 +23,9 @@ try {
 }
 --EXPECT--
 true
-true
 3
 2
 2
 -2
-LogicException
+ArgumentCountError
 round(): Argument #3 ($mode) must be of type RoundingMode|int, Es given

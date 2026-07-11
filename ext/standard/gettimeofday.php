@@ -12,7 +12,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * gettimeofday() — wall-clock array or float (VM VmDate; JIT/AOT StringGettimeofday LLVM, #6110/#3208).
+ * gettimeofday() — wall-clock array or float (VM VmDate; JIT GettimeofdayJitHelper PHP, #13764).
  */
 final class gettimeofday extends Internal
 {
@@ -32,12 +32,7 @@ final class gettimeofday extends Internal
         }
         $asFloat = false;
         if (1 === $argc) {
-            $asFloat = VmMath::parseBoolBuiltinArg(
-                $frame->calledArgs[0],
-                'gettimeofday',
-                1,
-                'as_float'
-            );
+            $asFloat = VmMath::parseBoolBuiltinArgForFrame($frame, 0, 'gettimeofday', 1, 'as_float');
         }
         if ($asFloat) {
             $frame->returnVar->float(VmDate::gettimeofdayFloat());
@@ -54,7 +49,7 @@ final class gettimeofday extends Internal
         }
         $asFloat = $context->constantFromBool(false);
         if (isset($args[0])) {
-            $asFloat = JitBoolArg::lower($context, $args[0], 'gettimeofday(): Argument #1 ($as_float)');
+            $asFloat = JitBoolArg::lowerZParamBool($context, $args[0], 'gettimeofday', 'as_float', 1);
         }
 
         return JitGettimeofday::call($context, $asFloat);

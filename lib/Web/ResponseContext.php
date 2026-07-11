@@ -24,12 +24,15 @@ final class ResponseContext
     /** When false (CLI), header() does not queue lines for headers_list() — php-src head.c SAPI gate (#4037). */
     private static bool $headerQueueEnabled = false;
 
+    private static bool $fastCgiRequestFinished = false;
+
     public static function reset(): void
     {
         self::$status = 0;
         self::$headers = [];
         OutputRewriteVarsJitHelper::reset();
         self::$headerQueueEnabled = false;
+        self::$fastCgiRequestFinished = false;
     }
 
     /** Enable pending-header tracking for CGI/dev-server requests (issue #4037). */
@@ -82,15 +85,13 @@ final class ResponseContext
     }
 
     /**
-     * http_response_code($code) — true on first set, prior int on later sets, false when invalid.
+     * http_response_code($code) — true on first set, prior int on later sets.
+     * php-src head.c accepts any non-zero code; 0 is getter-only (#12153).
      *
-     * @return true|int|false
+     * @return true|int
      */
     public static function writeHttpResponseCode(int $code)
     {
-        if ($code < 100 || $code > 599) {
-            return false;
-        }
         $previous = self::$status;
         self::$status = $code;
 
@@ -122,6 +123,9 @@ final class ResponseContext
 
     public static function addHeader(string $line, bool $replace = true): void
     {
+        if ('' === $line) {
+            return;
+        }
         self::assertSafeHeaderLine($line);
         if (preg_match('#^HTTP/\d(?:\.\d)?\s+(\d{3})#', $line, $m)) {
             self::setStatus((int) $m[1]);
@@ -206,5 +210,16 @@ final class ResponseContext
     public static function listRewriteVars(): array
     {
         return VmOutputRewriteVars::list();
+    }
+
+    /** fastcgi_finish_request() flushed the response to the client (#3466). */
+    public static function markFastCgiRequestFinished(): void
+    {
+        self::$fastCgiRequestFinished = true;
+    }
+
+    public static function isFastCgiRequestFinished(): bool
+    {
+        return self::$fastCgiRequestFinished;
     }
 }

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\GzStreamRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPLLVM\Builder;
@@ -16,6 +17,7 @@ final class JitGzwrite
     /** @return Value */
     public static function invoke(Context $context, Value $handleLong, Value $dataStr, Value $lengthLong): Value
     {
+        GzStreamRuntime::ensureLinked($context);
         $bytes = $context->builder->call(
             $context->lookupFunction('__compiler_gzwrite'),
             $handleLong,

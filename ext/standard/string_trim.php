@@ -41,22 +41,16 @@ final class string_trim extends Internal
     public function execute(Frame $frame): void
     {
         $argc = \count($frame->calledArgs);
-        if ($argc < 1 || $argc > 2) {
-            throw new \LogicException('trim() requires one or two arguments');
+        if ($argc < 1 || $argc > 3) {
+            throw new \LogicException('trim() requires one to three arguments');
         }
         InternalStrictArg::rejectNullString($frame->calledArgs[0], 'trim', 'string', 0, $frame);
         $string = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'trim', 0, 'string');
-        $mask = VmString::TRIM_DEFAULT;
-        $mode = VmString::TRIM_SIDE_BOTH;
-        if (2 === $argc) {
-            [$mask, $mode] = VmString::resolveTrimOptionalArg(
-                $frame->calledArgs[1],
-                'trim',
-                1,
-                'characters',
-                VmString::TRIM_SIDE_BOTH
-            );
-        }
+        [$mask, $mode] = VmString::resolveTrimMaskAndMode(
+            \array_slice($frame->calledArgs, 1),
+            'trim',
+            VmString::TRIM_SIDE_BOTH
+        );
         if (null === $frame->returnVar) {
             return;
         }
@@ -69,14 +63,23 @@ final class string_trim extends Internal
     {
         $this->context = $context;
         $argc = \count($args);
-        if ($argc < 1 || $argc > 2) {
-            throw new \LogicException('trim() requires one or two arguments');
+        if ($argc < 1 || $argc > 3) {
+            throw new \LogicException('trim() requires one to three arguments');
         }
         JitInternalStrictArg::rejectNullString($context, $args[0], 'trim', 'string', 1);
         $literal = $args[0]->compileTimeString ?? null;
-        $modeLiteral = (2 === $argc) ? StringTrimModeJit::compileTimeModeBitmask($context, $args[1]) : null;
-        $maskLiteral = (2 === $argc && null === $modeLiteral) ? ($args[1]->compileTimeString ?? null) : null;
-        if (null !== $literal && (1 === $argc || null !== $maskLiteral || null !== $modeLiteral)) {
+        $optional = \array_slice($args, 1);
+        $optCount = \count($optional);
+        $modeLiteral = null;
+        $maskLiteral = null;
+        if (1 === $optCount) {
+            $modeLiteral = StringTrimModeJit::compileTimeModeBitmask($context, $optional[0]);
+            $maskLiteral = null === $modeLiteral ? ($optional[0]->compileTimeString ?? null) : null;
+        } elseif (2 === $optCount) {
+            $maskLiteral = $optional[0]->compileTimeString ?? null;
+            $modeLiteral = StringTrimModeJit::compileTimeModeBitmask($context, $optional[1]);
+        }
+        if (null !== $literal && (0 === $optCount || null !== $maskLiteral || null !== $modeLiteral)) {
             $mask = null !== $maskLiteral ? $maskLiteral : VmString::TRIM_DEFAULT;
             $mode = null !== $modeLiteral ? $modeLiteral : VmString::TRIM_SIDE_BOTH;
 
@@ -89,13 +92,20 @@ final class string_trim extends Internal
         }
         $mode = VmString::TRIM_SIDE_BOTH;
         $maskStr = null;
-        if (2 === $argc) {
-            $modeLiteral = StringTrimModeJit::compileTimeModeBitmask($context, $args[1]);
+        if (1 === $optCount) {
+            $modeLiteral = StringTrimModeJit::compileTimeModeBitmask($context, $optional[0]);
             if (null !== $modeLiteral) {
                 $mode = $modeLiteral;
             } else {
                 StringTrimMask::ensureLinked($context);
-                $maskStr = JitStringBuiltinArg::lower($context, $args[1], 'trim', 1, 'characters');
+                $maskStr = JitStringBuiltinArg::lower($context, $optional[0], 'trim', 1, 'characters');
+            }
+        } elseif (2 === $optCount) {
+            StringTrimMask::ensureLinked($context);
+            $maskStr = JitStringBuiltinArg::lower($context, $optional[0], 'trim', 1, 'characters');
+            $modeLiteral = StringTrimModeJit::compileTimeModeBitmask($context, $optional[1]);
+            if (null !== $modeLiteral) {
+                $mode = $modeLiteral;
             }
         }
         $str = JitStringBuiltinArg::lower($context, $args[0], 'trim', 0, 'string');

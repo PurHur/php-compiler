@@ -42,8 +42,8 @@ final class mb_strtolower extends Internal
             return;
         }
         $encoding = $argc >= 2
-            ? VmMbstring::coerceEncodingArg($frame->calledArgs[1], 'mb_strtolower', 1)
-            : 'UTF-8';
+            ? VmMbstring::coerceMbEncodingNameArg($frame->calledArgs[1], 'mb_strtolower', 1)
+            : MbstringState::internalEncoding();
         BuiltinExecute::writeReturn(
             $frame,
             static fn (Variable $ret) => $ret->string(VmMbstring::strtolower($string, $encoding))

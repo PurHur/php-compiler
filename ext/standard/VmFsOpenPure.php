@@ -23,7 +23,7 @@ final class VmFsOpenPure
      */
     public static function open(string $path, string $mode): int|false
     {
-        if (str_contains($path, "\0")) {
+        if ('' === $path || str_contains($path, "\0")) {
             return false;
         }
         $phpMode = self::phpStreamMode($mode);

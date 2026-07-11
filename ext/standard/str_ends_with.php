@@ -13,6 +13,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\StringStrContains;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
@@ -32,20 +33,8 @@ final class str_ends_with extends Internal
         $this->requireExactArgCount($frame, 'str_ends_with', 2);
         InternalStrictArg::rejectNullString($frame->calledArgs[0], 'str_ends_with', 'haystack', 0, $frame);
         InternalStrictArg::rejectNullString($frame->calledArgs[1], 'str_ends_with', 'needle', 1, $frame);
-        InternalStrictArg::requireString($frame, 0, 'str_ends_with', 'haystack');
-        InternalStrictArg::requireString($frame, 1, 'str_ends_with', 'needle');
-        $haystackStr = VmString::coerceStringBuiltinArg(
-            $frame->calledArgs[0],
-            'str_ends_with',
-            0,
-            'haystack'
-        );
-        $needleStr = VmString::coerceStringBuiltinArg(
-            $frame->calledArgs[1],
-            'str_ends_with',
-            1,
-            'needle'
-        );
+        $haystackStr = self::vmStringArg($frame, 0, 'haystack');
+        $needleStr = self::vmStringArg($frame, 1, 'needle');
         BuiltinExecute::writeReturn(
             $frame,
             static fn (Variable $ret) => $ret->bool(VmString::endsWith($haystackStr, $needleStr))
@@ -59,9 +48,14 @@ final class str_ends_with extends Internal
         }
         JitInternalStrictArg::rejectNullString($context, $args[0], 'str_ends_with', 'haystack', 1);
         JitInternalStrictArg::rejectNullString($context, $args[1], 'str_ends_with', 'needle', 2);
-        $hay = JitStringBuiltinArg::lowerCoercible($context, $args[0], 'str_ends_with', 0, 'haystack');
-        $needle = JitStringBuiltinArg::lowerCoercible($context, $args[1], 'str_ends_with', 1, 'needle');
+        $hay = JitStringBuiltinArg::lowerCoercible($context, $args[0], 'str_ends_with', 0, 'haystack', 'string', null, true);
+        $needle = JitStringBuiltinArg::lowerCoercible($context, $args[1], 'str_ends_with', 1, 'needle', 'string', null, true);
 
-        return JitStringSearch::endsWith($context, $hay, $needle);
+        return StringStrContains::invokeEndsWith($context, $hay, $needle);
+    }
+
+    private static function vmStringArg(Frame $frame, int $argIndex, string $paramName): string
+    {
+        return VmString::zParamStrWithStringableForFrame($frame, $argIndex, 'str_ends_with', $paramName);
     }
 }

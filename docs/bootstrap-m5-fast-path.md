@@ -45,7 +45,7 @@ Supporting fixes from #1402:
 | `Runtime::initVmContext` | **Native** via `RuntimeInitVmContext::emit` (allocate `VM\Context` + `ErrorReporter` + `ScriptStack`, wire `runtime` + `vmContext`); wired in `compileBlock()`; off deny list (#1494, #2126). PHP CFG `new VMContext` still LLVM 9 link crash when combined with ctor spine. |
 | `Runtime::loadJit` | `compileRuntimeLoadJitM3Native` — outer orchestration (#1495) |
 | `Runtime::createJit` / `jitContextForLoadJit` / `loadJitCompileModuleFuncs` | Separate FUNCDEFs via `compileRuntime*M3Native` → PHP CFG (#2847) |
-| `Runtime::noteParseCompileNullForScript` / `peekLastParseFailure` | On M3 allowlist; compile-driver diagnostics + last failure peek |
+| `Runtime::noteParseCompileNullForScript` / `peekLastParseFailure` / `detectFileStrictTypes` / `emitParseAndCompileNullDiagnostic` / `formatParseAndCompileNullDetail` / `recordLastParseFailure` / `resetParserNameResolverState` | On M3 allowlist; compile-driver diagnostics + last failure peek + strict_types detection + parser state reset |
 | `Block::slotIndexForVariableName` / `Block::slotForOperand` | PHP CFG via `isM3CompileDriverBlockPhpLoweringName` (#2910) |
 | `Compiler::compileFunc` | On M3 allowlist; CFG entry real-lowers on compile-driver link (#9228, #1402) |
 | `Runtime::standalone` | Compile-driver link OK (#1402, #1056) |

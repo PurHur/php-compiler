@@ -6,13 +6,14 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\StringStrpbrk;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/** strpbrk() for two strings (subset of PHP; LLVM via libc strpbrk + slice). */
+/** strpbrk() for two strings — VM SSOT VmString; JIT via StrpbrkJitHelper PHP (#14791). */
 final class strpbrk extends Internal
 {
     public function execute(Frame $frame): void
@@ -38,6 +39,8 @@ final class strpbrk extends Internal
         if (2 !== \count($args)) {
             throw new \LogicException('strpbrk() requires exactly two arguments in this compiler build');
         }
+
+        StringStrpbrk::ensureLinked($context);
 
         return JitStrpbrk::find(
             $context,

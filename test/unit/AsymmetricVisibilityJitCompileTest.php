@@ -21,6 +21,12 @@ final class AsymmetricVisibilityJitCompileTest extends TestCase
 
     protected function setUp(): void
     {
+        if (!CompilerVersion::supportsAsymmetricVisibility()) {
+            $this->markTestSkipped('asymmetric visibility disabled on reference profile (#12508)');
+        }
+        if (!CompilerVersion::supportsParenthesizedAsymmetricSetModifier()) {
+            $this->markTestSkipped('parenthesized asymmetric set modifier disabled on 8.4.0-dev reference profile (#16450)');
+        }
         $this->repoRoot = dirname(__DIR__, 2);
         if (!LlvmToolchain::isReady($this->repoRoot)) {
             $reason = LlvmToolchain::readyFailureReason() ?? 'LLVM 9 toolchain not available';
@@ -33,7 +39,7 @@ final class AsymmetricVisibilityJitCompileTest extends TestCase
         $this->assertModuleVerifies(<<<'PHP'
 <?php
 class Demo {
-    private(set) string $name = 'x';
+    public (private(set)) string $name = 'x';
 }
 $d = new Demo();
 echo $d->name, "\n";
@@ -41,13 +47,13 @@ $d->name = 'z';
 PHP);
     }
 
-    /** In-class writes on private(set) properties must compile (#4639). */
+    /** In-class writes on public (private(set)) properties must compile (#4639). */
     public function testAsymmetricVisibilityInClassWriteModuleVerify(): void
     {
         $this->assertModuleVerifies(<<<'PHP'
 <?php
 class Demo {
-    private(set) string $name = 'x';
+    public (private(set)) string $name = 'x';
     public function mutate(): void { $this->name = 'y'; }
 }
 $d = new Demo();

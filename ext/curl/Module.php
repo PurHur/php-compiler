@@ -9,16 +9,33 @@ use PHPCompiler\Runtime;
 use PHPCompiler\VM;
 
 /**
- * curl extension module entry (php-src ext/curl/interface.c; issue #6999).
+ * curl extension module entry (php-src ext/curl/interface.c; issue #6999, #16659).
  *
  * libcurl HTTP client parity tracked in #3325; curl_multi in #3721.
- * Register under {@see standard} so extension_loaded('curl') stays false until #3325 (#11627).
+ * Phase 2 registers introspection builtins + CURLStringFile via {@see VmCurlCore}.
  */
 class Module extends ModuleAbstract
 {
     public function getExtensionName(): string
     {
         return 'standard';
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function getAdditionalExtensionNames(): array
+    {
+        if (!CurlExtensionPolicy::advertisesExtension()) {
+            return [];
+        }
+
+        return ['curl'];
+    }
+
+    public function getExtensionVersion(): string
+    {
+        return VmCurlCore::LIBCURL_VERSION;
     }
 
     public function init(Runtime $runtime): void
@@ -30,8 +47,8 @@ class Module extends ModuleAbstract
             'CURLOPT_RETURNTRANSFER' => CurlConstants::CURLOPT_RETURNTRANSFER,
             'CURLOPT_POST' => CurlConstants::CURLOPT_POST,
             'CURLOPT_HTTPHEADER' => CurlConstants::CURLOPT_HTTPHEADER,
-            'CURLINFO_HTTP_CODE' => CurlConstants::CURLINFO_HTTP_CODE,
-            'CURLINFO_EFFECTIVE_URL' => CurlConstants::CURLINFO_EFFECTIVE_URL,
+            'CURLE_OK' => CurlConstants::CURLE_OK,
+            'CURLM_OK' => CurlConstants::CURLM_OK,
         ] as $name => $value) {
             $var = new VM\Variable();
             $var->int($value);
@@ -41,14 +58,18 @@ class Module extends ModuleAbstract
 
     public function getFunctions(): array
     {
+        if (!CurlExtensionPolicy::advertisesBuiltins()) {
+            return [];
+        }
+
         return [
-            new curl_init(),
-            new curl_setopt(),
-            new curl_exec(),
-            new curl_close(),
-            new curl_version(),
             new curl_escape(),
             new curl_unescape(),
+            new curl_version(),
+            new curl_strerror(),
+            new curl_multi_strerror(),
+            new curl_upkeep(),
+            new curl_file_create(),
         ];
     }
 }

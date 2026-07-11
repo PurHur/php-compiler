@@ -68,13 +68,23 @@ final class ExceptionHandlerJitHelper
     public static function restoreApply(): bool
     {
         if (self::$depth <= 0) {
-            return false;
+            return true;
         }
         --self::$depth;
         self::setFnAt(self::$depth, 0);
         self::setNameAt(self::$depth, null);
 
         return true;
+    }
+
+    /** Active handler name for get_exception_handler() JIT/AOT (#17668). */
+    public static function getCurrentName(): ?string
+    {
+        if (self::$depth <= 0) {
+            return null;
+        }
+
+        return self::nameAt(self::$depth - 1);
     }
 
     private static function popReturningName(): ?string

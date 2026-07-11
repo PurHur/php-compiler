@@ -13,6 +13,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\StringStrcasecmp;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
@@ -21,7 +22,7 @@ use PHPCompiler\VM\InternalStrictArg;
 use PHPLLVM\Value;
 
 /**
- * strcasecmp() for two strings (ASCII case fold subset; LLVM via libc).
+ * strcasecmp() for two strings (ASCII case fold subset; JIT via CaseCompareJitHelper PHP #15225).
  */
 final class strcasecmp extends Internal
 {
@@ -50,8 +51,9 @@ final class strcasecmp extends Internal
         }
         JitInternalStrictArg::rejectNullString($context, $args[0], 'strcasecmp', 'string1', 1);
         JitInternalStrictArg::rejectNullString($context, $args[1], 'strcasecmp', 'string2', 2);
-        $p0 = $this->stringDataPtr($context, JitStringBuiltinArg::lower($context, $args[0], 'strcasecmp', 0, 'string1'));
-        $p1 = $this->stringDataPtr($context, JitStringBuiltinArg::lower($context, $args[1], 'strcasecmp', 1, 'string2'));
+        StringStrcasecmp::ensureLinked($context);
+        $p0 = $this->stringDataPtr($context, JitStringBuiltinArg::lowerCoercible($context, $args[0], 'strcasecmp', 0, 'string1'));
+        $p1 = $this->stringDataPtr($context, JitStringBuiltinArg::lowerCoercible($context, $args[1], 'strcasecmp', 1, 'string2'));
         $fn = $context->lookupFunction('strcasecmp');
         $raw = $context->builder->call($fn, $p0, $p1);
         $i64 = $context->getTypeFromString('int64');

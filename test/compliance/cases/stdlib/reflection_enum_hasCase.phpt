@@ -13,6 +13,7 @@ echo "\n";
 var_export($r->isBacked());
 echo "\n";
 echo $r->getCase('A')->getName(), "\n";
+echo $r->getCase('A')->name, "\n";
 try {
     $r->getCase('Z');
     echo "no throw\n";
@@ -23,5 +24,6 @@ try {
 true
 false
 true
+A
 A
 Case E::Z does not exist

@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\StringStrWordCount;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -17,7 +18,7 @@ use PHPLLVM\Value;
  * str_word_count() — count words or return word list (subset of PHP; issue #2382, #3584).
  *
  * VM: all formats via {@see VmString::str_word_count()}.
- * JIT/AOT: all formats via {@see JitStrWordCount} LLVM lowering (#5516).
+ * JIT/AOT: {@see StringStrWordCount} → StrWordCountJitHelper PHP (#14651).
  */
 final class str_word_count extends Internal
 {
@@ -99,8 +100,10 @@ final class str_word_count extends Internal
                 return $context->constantFromInteger($result, 'int64');
             }
 
-            return JitStrWordCount::hashTableFromVmResult($context, $result, $format);
+            return StringStrWordCount::hashTableFromVmResult($context, $result, $format);
         }
+
+        StringStrWordCount::ensureLinked($context);
 
         $str = null !== $literal
             ? $context->builder->load($context->constantStringFromString($literal))
@@ -110,22 +113,26 @@ final class str_word_count extends Internal
             ? $context->getTypeFromString('int64')->constInt(0, false)
             : (null !== $formatCt
                 ? $context->getTypeFromString('int64')->constInt((int) $formatCt, false)
-                : JitStrWordCount::jitFormatArg($context, $args[1]));
+                : StringStrWordCount::jitFormatArg($context, $args[1]));
 
-        $charsVal = null;
-        if (3 === $argc) {
-            $charsVal = null !== $charsCt
-                ? $context->builder->load($context->constantStringFromString($charsCt))
-                : JitStringBuiltinArg::lower($context, $args[2], 'str_word_count', 2, 'chars');
+        if (1 === $argc || (null !== $formatCt && 0 === (int) $formatCt)) {
+            return $context->builder->call(
+                $context->lookupFunction('phpc_str_word_count_count'),
+                $str
+            );
         }
 
-        if (1 === $argc) {
-            return JitStrWordCount::count($context, $str);
-        }
-        if (null !== $formatCt && 0 === (int) $formatCt) {
-            return JitStrWordCount::count($context, $str);
-        }
+        $charsArg = null !== $charsCt
+            ? $context->builder->load($context->constantStringFromString($charsCt))
+            : (3 === $argc
+                ? JitStringBuiltinArg::lower($context, $args[2], 'str_word_count', 2, 'chars')
+                : $context->builder->load($context->constantStringFromString('')));
 
-        return JitStrWordCount::wordHashTable($context, $str, $formatVal, $charsVal);
+        return $context->builder->call(
+            $context->lookupFunction('phpc_str_word_count_words'),
+            $str,
+            $formatVal,
+            $charsArg
+        );
     }
 }

@@ -4,175 +4,153 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
-use PHPLLVM\Builder;
-use PHPLLVM\Value;
+use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPCompiler\JIT\UserScriptAotDeferNestedJit;
+use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * LLVM implementation of __string__stripslashes (mirrors VmString::stripslashes).
+ * JIT/AOT link for __string__stripslashes via StripslashesJitHelper PHP (#14742).
+ *
+ * Replaces ~178 LOC inline LLVM in StringStripslashes.php.
+ * SSOT: {@see \PHPCompiler\ext\standard\VmString}.
+ * php-src: ext/standard/stripslashes.c — PHP_FUNCTION(stripslashes)
  */
 final class StringStripslashes
 {
+    private const HELPER_PATH = '/ext/standard/StripslashesJitHelper.php';
+
+    private const STRIPSLASHES_HELPER = 'PHPCompiler\\ext\\standard\\StripslashesJitHelper::stripslashesArgv';
+
+    /** @var list<string> */
+    private const COMPILED_HELPERS = [
+        self::STRIPSLASHES_HELPER,
+    ];
+
+    /** @var list<string> */
+    private const ABI_FUNCTIONS = [
+        '__string__stripslashes',
+    ];
+
+    public static function ensureLinked(Context $context): void
+    {
+        self::implement($context);
+    }
+
+    public static function ensureStandaloneBodies(Context $context): void
+    {
+        self::implement($context);
+    }
+
     public static function implement(Context $context): void
     {
-        $fn = $context->lookupFunction('__string__stripslashes');
-        $entry = $fn->appendBasicBlock('main');
+        if (UserScriptAotDeferNestedJit::shouldDefer($context)) {
+            StringStripslashesLlvm::implement($context);
+
+            return;
+        }
+
+        $probe = $context->module->getNamedFunction('__string__stripslashes');
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            self::registerLinkedRuntime($context);
+
+            return;
+        }
+
+        $savedBlock = null;
+        try {
+            $savedBlock = $context->builder->getInsertBlock();
+        } catch (\Throwable) {
+        }
+
+        self::ensureJitHelperCompiled($context);
+        self::implementBridge($context);
+        self::registerLinkedRuntime($context);
+
+        if (null !== $savedBlock) {
+            $context->builder->positionAtEnd($savedBlock);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
+    }
+
+    private static function implementBridge(Context $context): void
+    {
+        $abiName = '__string__stripslashes';
+        $probe = $context->module->getNamedFunction($abiName);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
+
+        $strPtr = $context->getTypeFromString('__string__*');
+        $ft = $context->context->functionType($strPtr, false, $strPtr);
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction($abiName, $ft);
+
+        $entry = $fn->appendBasicBlock('stripslashes_bridge_entry');
         $context->builder->positionAtEnd($entry);
-
-        $string = $fn->getParam(0);
-
-        $map = $context->structFieldMap['__string__'];
-        $i64 = $context->getTypeFromString('int64');
-        $i8 = $context->getTypeFromString('int8');
-        $zero = $i64->constInt(0, false);
-        $one = $i64->constInt(1, false);
-        $two = $i64->constInt(2, false);
-        $backslash = $i8->constInt(92, false);
-        $zeroDigit = $i8->constInt(48, false);
-        $nulByte = $i8->constInt(0, false);
-
-        $src = $context->builder->call($context->lookupFunction('__string__separate'), $string);
-        $len = $context->builder->load($context->builder->structGep($src, $map['length']));
-        $srcChars = $context->builder->structGep($src, $map['value']);
-
-        $outLenSlot = $context->builder->alloca($i64, 1);
-        $context->builder->store($zero, $outLenSlot);
-        $iSlot = $context->builder->alloca($i64, 1);
-        $context->builder->store($zero, $iSlot);
-
-        self::countLoop($context, $fn, $srcChars, $len, $iSlot, $outLenSlot, $i64, $zero, $one, $two, $backslash);
-
-        $outLen = $context->builder->load($outLenSlot);
-        $dest = $context->builder->call($context->lookupFunction('__string__alloc'), $outLen);
-        $context->builder->store($outLen, $context->builder->structGep($dest, $map['length']));
-        $destChars = $context->builder->structGep($dest, $map['value']);
-
-        $posSlot = $context->builder->alloca($i64, 1);
-        $context->builder->store($zero, $posSlot);
-        $context->builder->store($zero, $iSlot);
-
-        self::writeLoop(
-            $context,
-            $fn,
-            $srcChars,
-            $len,
-            $destChars,
-            $iSlot,
-            $posSlot,
-            $i64,
-            $zero,
-            $one,
-            $two,
-            $backslash,
-            $zeroDigit,
-            $nulByte
+        $result = $context->builder->call(
+            self::helperFunction($context, self::STRIPSLASHES_HELPER),
+            $fn->getParam(0)
         );
-
-        $context->builder->returnValue($dest);
-        $context->builder->clearInsertionPosition();
+        $context->builder->returnValue($result);
+        $context->registerFunction($abiName, $fn);
     }
 
-    private static function countLoop(
-        Context $context,
-        Value $fn,
-        Value $srcChars,
-        Value $len,
-        Value $iSlot,
-        Value $outLenSlot,
-        $i64,
-        Value $zero,
-        Value $one,
-        Value $two,
-        Value $backslash
-    ): void {
-        $head = $fn->appendBasicBlock('stripslashes_count_head');
-        $body = $fn->appendBasicBlock('stripslashes_count_body');
-        $done = $fn->appendBasicBlock('stripslashes_count_done');
+    private static function helperFunction(Context $context, string $logical): LlvmFunction
+    {
+        self::ensureJitHelperCompiled($context);
+        $lc = \strtolower($logical);
+        $fn = $context->functions[$lc] ?? null;
+        if (null === $fn) {
+            throw new \LogicException($logical.' missing after StripslashesJitHelper compile (#14742)');
+        }
 
-        $context->builder->branch($head);
-
-        $context->builder->positionAtEnd($head);
-        $i = $context->builder->load($iSlot);
-        $atEnd = $context->builder->icmp(Builder::INT_SGE, $i, $len);
-        $context->builder->branchIf($atEnd, $done, $body);
-
-        $context->builder->positionAtEnd($body);
-        $ch = $context->builder->load($context->builder->gep($srcChars, $i));
-        $hasNext = $context->builder->icmp(Builder::INT_SLT, $context->builder->addNoSignedWrap($i, $one), $len);
-        $isBackslash = $context->builder->icmp(Builder::INT_EQ, $ch, $backslash);
-        $canUnescape = $context->builder->and($isBackslash, $hasNext);
-
-        $unescapeBlock = $fn->appendBasicBlock('stripslashes_count_unescape');
-        $plainBlock = $fn->appendBasicBlock('stripslashes_count_plain');
-        $context->builder->branchIf($canUnescape, $unescapeBlock, $plainBlock);
-
-        $context->builder->positionAtEnd($unescapeBlock);
-        $context->builder->store($context->builder->addNoSignedWrap($context->builder->load($outLenSlot), $one), $outLenSlot);
-        $context->builder->store($context->builder->addNoSignedWrap($i, $two), $iSlot);
-        $context->builder->branch($head);
-
-        $context->builder->positionAtEnd($plainBlock);
-        $context->builder->store($context->builder->addNoSignedWrap($context->builder->load($outLenSlot), $one), $outLenSlot);
-        $context->builder->store($context->builder->addNoSignedWrap($i, $one), $iSlot);
-        $context->builder->branch($head);
-
-        $context->builder->positionAtEnd($done);
+        return $fn;
     }
 
-    private static function writeLoop(
-        Context $context,
-        Value $fn,
-        Value $srcChars,
-        Value $len,
-        Value $destChars,
-        Value $iSlot,
-        Value $posSlot,
-        $i64,
-        Value $zero,
-        Value $one,
-        Value $two,
-        Value $backslash,
-        Value $zeroDigit,
-        Value $nulByte
-    ): void {
-        $head = $fn->appendBasicBlock('stripslashes_write_head');
-        $body = $fn->appendBasicBlock('stripslashes_write_body');
-        $done = $fn->appendBasicBlock('stripslashes_write_done');
+    private static function ensureJitHelperCompiled(Context $context): void
+    {
+        $missing = false;
+        foreach (self::COMPILED_HELPERS as $logical) {
+            if (!isset($context->functions[\strtolower($logical)])) {
+                $missing = true;
+                break;
+            }
+        }
+        if (!$missing) {
+            return;
+        }
 
-        $context->builder->branch($head);
+        $runtime = $context->runtime;
+        $path = \dirname(__DIR__, 3).self::HELPER_PATH;
+        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
+            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'StripslashesJitHelper.php');
+            if (null === $block) {
+                throw new \LogicException('StripslashesJitHelper.php parseAndCompile failed (#14742)');
+            }
+            $jit = new JIT($context);
+            $jit->compile($block);
+        });
+        foreach (self::COMPILED_HELPERS as $logical) {
+            if (!isset($context->functions[\strtolower($logical)])) {
+                throw new \LogicException($logical.' was not compiled for JIT (#14742)');
+            }
+        }
+    }
 
-        $context->builder->positionAtEnd($head);
-        $i = $context->builder->load($iSlot);
-        $atEnd = $context->builder->icmp(Builder::INT_SGE, $i, $len);
-        $context->builder->branchIf($atEnd, $done, $body);
-
-        $context->builder->positionAtEnd($body);
-        $ch = $context->builder->load($context->builder->gep($srcChars, $i));
-        $pos = $context->builder->load($posSlot);
-        $destAt = $context->builder->gep($destChars, $pos);
-        $hasNext = $context->builder->icmp(Builder::INT_SLT, $context->builder->addNoSignedWrap($i, $one), $len);
-        $isBackslash = $context->builder->icmp(Builder::INT_EQ, $ch, $backslash);
-        $canUnescape = $context->builder->and($isBackslash, $hasNext);
-
-        $unescapeBlock = $fn->appendBasicBlock('stripslashes_write_unescape');
-        $plainBlock = $fn->appendBasicBlock('stripslashes_write_plain');
-        $context->builder->branchIf($canUnescape, $unescapeBlock, $plainBlock);
-
-        $context->builder->positionAtEnd($unescapeBlock);
-        $nextCh = $context->builder->load($context->builder->gep($srcChars, $context->builder->addNoSignedWrap($i, $one)));
-        $isZeroDigit = $context->builder->icmp(Builder::INT_EQ, $nextCh, $zeroDigit);
-        $unescapedByte = $context->builder->select($isZeroDigit, $nulByte, $nextCh);
-        $context->builder->store($unescapedByte, $destAt);
-        $context->builder->store($context->builder->addNoSignedWrap($pos, $one), $posSlot);
-        $context->builder->store($context->builder->addNoSignedWrap($i, $two), $iSlot);
-        $context->builder->branch($head);
-
-        $context->builder->positionAtEnd($plainBlock);
-        $context->builder->store($ch, $destAt);
-        $context->builder->store($context->builder->addNoSignedWrap($pos, $one), $posSlot);
-        $context->builder->store($context->builder->addNoSignedWrap($i, $one), $iSlot);
-        $context->builder->branch($head);
-
-        $context->builder->positionAtEnd($done);
+    private static function registerLinkedRuntime(Context $context): void
+    {
+        foreach (self::ABI_FUNCTIONS as $name) {
+            $fn = $context->module->getNamedFunction($name);
+            if (null === $fn) {
+                throw new \LogicException($name.' missing after StringStripslashes bridge (#14742)');
+            }
+            $context->registerFunction($name, $fn);
+        }
     }
 }

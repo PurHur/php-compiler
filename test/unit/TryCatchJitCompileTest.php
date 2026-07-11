@@ -73,6 +73,10 @@ PHP,
 
     public function testBareThrowRethrowNestedModuleVerifies(): void
     {
+        if (!CompilerVersion::supportsBareRethrow()) {
+            self::markTestSkipped('bare rethrow disabled on reference profile (#15719)');
+        }
+
         $runtime = new Runtime();
         $block = $runtime->parseAndCompile(<<<'PHP'
 <?php

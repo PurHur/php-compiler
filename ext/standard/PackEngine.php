@@ -369,17 +369,55 @@ final class PackEngine
         foreach ($specs as $spec) {
             $code = $spec['code'];
             $arg = $spec['arg'];
-            $inc = match ($code) {
-                'h', 'H' => (int) (($arg / 2) + ($arg % 2)),
-                'a', 'A', 'Z', 'c', 'C', 'x' => $arg,
-                's', 'S', 'n', 'v' => $arg * 2,
-                'i', 'I' => $arg * self::PACK_INT_SIZE,
-                'l', 'L', 'N', 'V' => $arg * 4,
-                'q', 'Q', 'J', 'P' => $arg * 8,
-                'f', 'g', 'G' => $arg * 4,
-                'd', 'e', 'E' => $arg * 8,
-                default => 0,
-            };
+            switch ($code) {
+                case 'h':
+                case 'H':
+                    $inc = (int) (($arg / 2) + ($arg % 2));
+                    break;
+                case 'a':
+                case 'A':
+                case 'Z':
+                case 'c':
+                case 'C':
+                case 'x':
+                    $inc = $arg;
+                    break;
+                case 's':
+                case 'S':
+                case 'n':
+                case 'v':
+                    $inc = $arg * 2;
+                    break;
+                case 'i':
+                case 'I':
+                    $inc = $arg * self::PACK_INT_SIZE;
+                    break;
+                case 'l':
+                case 'L':
+                case 'N':
+                case 'V':
+                    $inc = $arg * 4;
+                    break;
+                case 'q':
+                case 'Q':
+                case 'J':
+                case 'P':
+                    $inc = $arg * 8;
+                    break;
+                case 'f':
+                case 'g':
+                case 'G':
+                    $inc = $arg * 4;
+                    break;
+                case 'd':
+                case 'e':
+                case 'E':
+                    $inc = $arg * 8;
+                    break;
+                default:
+                    $inc = 0;
+                    break;
+            }
 
             if ('X' === $code) {
                 $outputPos = $arg > $outputPos ? 0 : $outputPos - $arg;
@@ -436,6 +474,11 @@ final class PackEngine
             }
         }
 
+        // php-src ext/standard/pack.c: odd nibble count emits high/low nibble as one byte (#12217).
+        if (!$first) {
+            $out .= \chr($byte);
+        }
+
         return $out;
     }
 
@@ -457,13 +500,21 @@ final class PackEngine
 
     private static function putLong(int $value, int $size, bool $littleEndian): string
     {
-        $fmt = match ($size) {
-            1 => 'c',
-            2 => 's',
-            4 => 'l',
-            8 => 'q',
-            default => 'l',
-        };
+        switch ($size) {
+            case 1:
+                $fmt = 'c';
+                break;
+            case 2:
+                $fmt = 's';
+                break;
+            case 8:
+                $fmt = 'q';
+                break;
+            case 4:
+            default:
+                $fmt = 'l';
+                break;
+        }
         $bytes = \pack($fmt, $value);
 
         if (\strlen($bytes) > $size) {
@@ -563,7 +614,6 @@ final class PackEngine
     {
         if ($value instanceof Variable) {
             $resolved = $value->resolveIndirect();
-            EnumCaseSupport::packRejectNumericOperand($resolved, $valueArgIndex, 'int');
             $enumLong = EnumCaseSupport::packCoerceToLong($resolved, $frame?->vmContext, $frame);
             if (null !== $enumLong) {
                 return $enumLong;
@@ -606,7 +656,6 @@ final class PackEngine
     {
         if ($value instanceof Variable) {
             $resolved = $value->resolveIndirect();
-            EnumCaseSupport::packRejectNumericOperand($resolved, $valueArgIndex, 'float');
             $enumDouble = EnumCaseSupport::packCoerceToDouble($resolved, $frame?->vmContext, $frame);
             if (null !== $enumDouble) {
                 return $enumDouble;

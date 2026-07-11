@@ -30,6 +30,28 @@ final class ResourceSupport
             && null !== $object->resourceState;
     }
 
+    /** VM Resource wrapper — not a userland class (php-src-strict, #12840). */
+    public static function isHiddenPseudoClassLc(string $classLc): bool
+    {
+        return self::CLASS_LC === strtolower(ltrim($classLc, '\\'));
+    }
+
+    public static function isHiddenPseudoClassEntry(ClassEntry $entry): bool
+    {
+        return self::isHiddenPseudoClassLc($entry->name);
+    }
+
+    /** get_class() operand — Zend rejects legacy resources (#12840). */
+    public static function rejectsGetClassOperand(Variable $var): bool
+    {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_OBJECT === $var->type && self::isResourceObject($var->toObject())) {
+            return true;
+        }
+
+        return $var->isVmResource();
+    }
+
     public static function stateFromVariable(Variable $var): ?ResourceState
     {
         $var = $var->resolveIndirect();
@@ -116,17 +138,27 @@ final class ResourceSupport
         return $var->streamFilterResource && Variable::TYPE_INTEGER === $var->type;
     }
 
-    public static function isProcessResource(Variable $var): bool
+    /** Process handle zval shape — closed handles fail isValidHandle (php-src proc_get_status after proc_close, #16967). */
+    public static function isProcessResourceRepresentation(Variable $var): bool
     {
         $state = self::stateFromVariable($var);
         if (null !== $state) {
-            return ResourceState::KIND_PROCESS === $state->kind
-                && VmProcess::isValidHandle($state->handle);
+            return ResourceState::KIND_PROCESS === $state->kind;
         }
 
         $var = $var->resolveIndirect();
 
         return $var->procResource && Variable::TYPE_INTEGER === $var->type;
+    }
+
+    public static function isProcessResource(Variable $var): bool
+    {
+        if (!self::isProcessResourceRepresentation($var)) {
+            return false;
+        }
+        $handle = self::resolveHandle($var);
+
+        return null !== $handle && VmProcess::isValidHandle($handle);
     }
 
     /** VM stream-context array handles (ext/standard/streams.c, #6367, #8743). */
@@ -153,6 +185,11 @@ final class ResourceSupport
             return false;
         }
         if (self::isStreamResource($var)) {
+            $handle = self::resolveHandle($var);
+            if (null !== $handle && VmFs::isFailedStreamHandle($handle)) {
+                return false;
+            }
+
             return !self::isOpenStreamResource($var);
         }
         if (self::isDirResource($var)) {
@@ -175,7 +212,7 @@ final class ResourceSupport
 
             return null === $handle || !VmStreamFilterChain::isValidFilter($handle);
         }
-        if (self::isProcessResource($var)) {
+        if (self::isProcessResourceRepresentation($var)) {
             $handle = self::resolveHandle($var);
 
             return null === $handle || !VmProcess::isValidHandle($handle);
@@ -205,6 +242,9 @@ final class ResourceSupport
         }
         if (self::isStreamResource($var)) {
             $handle = self::resolveHandle($var);
+            if (null !== $handle && VmFs::isFailedStreamHandle($handle)) {
+                return 'resource (stream)';
+            }
             if (null === $handle) {
                 return 'Resource';
             }
@@ -232,7 +272,11 @@ final class ResourceSupport
 
             return null !== $type ? 'resource ('.$type.')' : 'Resource';
         }
-        if (self::isProcessResource($var)) {
+        if (self::isProcessResourceRepresentation($var)) {
+            if (self::isClosedVmResource($var)) {
+                return 'resource (closed)';
+            }
+
             return 'resource (process)';
         }
         if (self::isStreamContextResource($var)) {

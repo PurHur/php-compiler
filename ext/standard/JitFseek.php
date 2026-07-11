@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\JIT\Builtin\StreamReadRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPLLVM\Value;
@@ -15,6 +16,7 @@ final class JitFseek
      * (0 on success, -1 on failure) */
     public static function invoke(Context $context, Value $handleLong, Value $offsetLong, Value $whenceLong): Value
     {
+        StreamReadRuntime::ensureLinked($context);
         $result = $context->builder->call(
             $context->lookupFunction('__compiler_fseek'),
             $handleLong,

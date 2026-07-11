@@ -14,7 +14,7 @@ declare(strict_types=1);
  *
  * Uncaught throws surface as HTTP 500 from phpc serve ([#152](https://github.com/PurHur/php-compiler/issues/152)).
  */
-class ValidationError
+class ValidationError extends Exception
 {
 }
 

@@ -23,6 +23,7 @@ final class OutputRewriteVarsJitHelper
 
     public static function add(string $name, string $value): void
     {
+        VmUrlRewriterOb::ensureRegistered();
         $record = $name."\x1E".$value;
         if ('' === self::$blob) {
             self::$blob = $record;
@@ -34,5 +35,6 @@ final class OutputRewriteVarsJitHelper
     public static function reset(): void
     {
         self::$blob = '';
+        VmUrlRewriterOb::resetState();
     }
 }

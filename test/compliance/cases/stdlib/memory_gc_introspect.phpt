@@ -11,10 +11,17 @@ $p = memory_get_peak_usage(true);
 echo ($u > 0 && $p >= $u) ? "memory_ok\n" : "memory_bad\n";
 $st = gc_status();
 echo is_array($st) ? "status_array\n" : "status_not_array\n";
-echo array_key_exists('runs', $st) ? "runs_key\n" : "runs_missing\n";
-echo array_key_exists('collected', $st) ? "collected_key\n" : "collected_missing\n";
-echo array_key_exists('threshold', $st) ? "threshold_key\n" : "threshold_missing\n";
-echo array_key_exists('roots', $st) ? "roots_key\n" : "roots_missing\n";
+if (array_key_exists('runs', $st)) {
+    echo array_key_exists('runs', $st) ? "runs_key\n" : "runs_missing\n";
+    echo array_key_exists('collected', $st) ? "collected_key\n" : "collected_missing\n";
+    echo array_key_exists('threshold', $st) ? "threshold_key\n" : "threshold_missing\n";
+    echo array_key_exists('roots', $st) ? "roots_key\n" : "roots_missing\n";
+} else {
+    echo array_key_exists('running', $st) ? "running_key\n" : "running_missing\n";
+    echo array_key_exists('protected', $st) ? "protected_key\n" : "protected_missing\n";
+    echo array_key_exists('full', $st) ? "full_key\n" : "full_missing\n";
+    echo array_key_exists('buffer_size', $st) ? "buffer_size_key\n" : "buffer_size_missing\n";
+}
 gc_mem_caches();
 echo "mem_caches_ok\n";
 --EXPECT--
@@ -24,8 +31,8 @@ gc_status=yes
 gc_mem_caches=yes
 memory_ok
 status_array
-runs_key
-collected_key
-threshold_key
-roots_key
+running_key
+protected_key
+full_key
+buffer_size_key
 mem_caches_ok

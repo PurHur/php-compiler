@@ -18,6 +18,9 @@ final class ZendThreadIdJITTest extends BaseTest
 
     public static function providePHPTests(): \Generator
     {
+        if (!CompilerVersion::supportsZendThreadId()) {
+            return;
+        }
         yield 'zend_thread_id_jit.phpt' => self::parsePHPT(
             __DIR__.'/cases/stdlib/zend_thread_id_jit.phpt',
             'zend_thread_id_jit.phpt'

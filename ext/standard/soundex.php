@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\StringSoundex;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
@@ -16,7 +17,7 @@ use PHPLLVM\Value;
 /**
  * soundex() — phonetic encoding (subset of PHP; issue #2416).
  *
- * VM: {@see VmString::soundex()}; JIT/AOT: {@see JitSoundex}.
+ * VM: {@see VmString::soundex()}; JIT/AOT: {@see StringSoundex} + {@see SoundexJitHelper}.
  */
 final class soundex extends Internal
 {
@@ -46,8 +47,10 @@ final class soundex extends Internal
             throw new \LogicException('soundex() requires exactly one argument in this compiler build');
         }
 
-        return JitSoundex::invoke(
-            $context,
+        StringSoundex::ensureLinked($context);
+
+        return $context->builder->call(
+            $context->lookupFunction('__compiler_soundex'),
             self::jitStringArg($context, $args[0], 1, 'string')
         );
     }

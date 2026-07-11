@@ -33,7 +33,7 @@ final class func_get_arg extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $position = VmMath::parseIntBuiltinArg($frame->calledArgs[0], 'func_get_arg', 0, 'position');
+        $position = VmMath::parseIntBuiltinArgForFrame($frame, 0, 'func_get_arg', 1, 'position');
         if ($position < 0) {
             throw new \ValueError(self::VALUE_ERROR_NEGATIVE);
         }

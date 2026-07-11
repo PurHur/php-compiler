@@ -71,4 +71,22 @@ final class JitReferencableCheck
 
         return false;
     }
+
+    public static function emitNonVariableByRefNotice(Context $context): void
+    {
+        $message = \PHPCompiler\VM\ReferencableCheck::NON_VARIABLE_BY_REF_NOTICE_MESSAGE;
+        $i32 = $context->getTypeFromString('int32');
+        $i8p = $context->getTypeFromString('int8*');
+        $msgPtr = $context->builder->pointerCast($context->constantFromString($message), $i8p);
+        $msgLen = $context->builder->call($context->lookupFunction('strlen'), $msgPtr);
+        $emptyFile = $context->builder->pointerCast($context->constantFromString(''), $i8p);
+        $context->builder->call(
+            $context->lookupFunction('__compiler_trigger_error'),
+            $msgPtr,
+            $msgLen,
+            $i32->constInt(8, false),
+            $emptyFile,
+            $i32->constInt(0, false)
+        );
+    }
 }

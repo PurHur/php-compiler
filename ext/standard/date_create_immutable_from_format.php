@@ -10,7 +10,6 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\DateTimeSupport;
-use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -69,13 +68,7 @@ final class date_create_immutable_from_format extends Internal
             $timezone
         );
         if (null === $created) {
-            $frame->vmContext->errors->triggerError(
-                'date_create_immutable_from_format(): Failed to parse time string ('.$time.')',
-                ErrorReporter::E_WARNING,
-                '' !== $frame->scriptPath ? $frame->scriptPath : null,
-                $frame->vmContext,
-                $frame
-            );
+            // php-src ext/date/php_date.c — false on failure; getLastErrors() only (#10010).
             BuiltinExecute::writeReturn($frame, static function (Variable $ret): void {
                 $ret->bool(false);
             });

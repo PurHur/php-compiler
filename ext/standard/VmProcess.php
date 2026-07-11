@@ -19,31 +19,25 @@ final class VmProcess
      */
     public static function getrusage(int $who = 0)
     {
-        $raw = VmGetrusageNative::available()
-            ? VmGetrusageNative::getrusage($who)
-            : false;
-        if (false === $raw) {
-            $raw = VmGetrusagePure::getrusage($who);
-        }
+        $raw = VmGetrusageNative::getrusage($who);
         if (false === $raw) {
             return false;
         }
 
         $ht = new HashTable();
         foreach ($raw as $key => $value) {
+            if (\is_int($key)) {
+                continue;
+            }
             $slot = new Variable();
             $slot->int((int) $value);
-            if (\is_int($key)) {
-                $ht->addIndex($key, $slot);
-            } else {
-                $ht->add((string) $key, $slot);
-            }
+            $ht->add((string) $key, $slot);
         }
 
         return $ht;
     }
 
-    /** proc_nice() — libc nice(3) via FFI (php-src basic_functions.c; #5181, #7862). */
+    /** proc_nice() — /proc/self/autogroup pure path (php-src basic_functions.c; #5181, #12183). */
     public static function proc_nice(int $priority): bool
     {
         return VmProcNiceNative::proc_nice($priority);
@@ -52,6 +46,15 @@ final class VmProcess
     public static function isValidHandle(int $handle): bool
     {
         if (VmProcessProcOpenNative::isValidHandle($handle)) {
+            return true;
+        }
+
+        return isset(self::$legacyHostHandles[$handle]);
+    }
+
+    public static function hasProcessHandle(int $handle): bool
+    {
+        if (VmProcessProcOpenNative::hasHandle($handle)) {
             return true;
         }
 
@@ -151,9 +154,11 @@ final class VmProcess
     /**
      * stream_select() — multiplex stream handles (php-src ext/standard/streams.c; #3131).
      *
-     * @param list<resource> $read
-     * @param list<resource>|null $write
-     * @param list<resource>|null $except
+     * @param list<StreamSelectPair> $read
+     * @param list<StreamSelectPair>|null $write
+     * @param list<StreamSelectPair>|null $except
+     *
+     * @deprecated Use {@see VmStreamSelect::multiplex()} (#9216)
      */
     public static function streamSelect(
         array &$read,
@@ -162,64 +167,27 @@ final class VmProcess
         int $seconds,
         int $microseconds,
     ): int|false {
-        return @\stream_select($read, $write, $except, $seconds, $microseconds);
+        return VmStreamSelect::multiplex($read, $write, $except, $seconds, $microseconds);
     }
 
     /**
-     * Build host stream list from VM stream array variable.
+     * @deprecated Use {@see VmStreamSelect::pairsFromArray()} (#9216)
      *
-     * @return list<array{0: int, 1: resource}> [vmHandle, hostResource] pairs
+     * @return list<StreamSelectPair>
      */
     public static function hostStreamsFromArray(Variable $arrayVar): array
     {
-        $arrayVar = $arrayVar->resolveIndirect();
-        if (Variable::TYPE_ARRAY !== $arrayVar->type) {
-            return [];
-        }
-        $pairs = [];
-        foreach ($arrayVar->toArray()->iterateKeyed(true) as $pair) {
-            [, $streamVar] = $pair;
-            $streamVar = $streamVar->resolveIndirect();
-            if (!$streamVar->isStreamResource()) {
-                continue;
-            }
-            $handle = ResourceSupport::resolveHandle($streamVar);
-            if (null === $handle) {
-                continue;
-            }
-            $host = VmFs::lookupResource($handle);
-            if (!\is_resource($host)) {
-                continue;
-            }
-            $pairs[] = [$handle, $host];
-        }
-
-        return $pairs;
+        return VmStreamSelect::pairsFromArray($arrayVar);
     }
 
     /**
-     * Write stream_select() result back into a VM array by-ref argument.
+     * @deprecated Use {@see VmStreamSelect::writeBackStreamArray()} (#9216)
      *
-     * @param list<resource> $readyHosts
+     * @param list<int> $readyHandles
      */
-    public static function writeBackStreamArray(Variable $targetVar, array $readyHosts, \PHPCompiler\VM\Context $ctx): void
+    public static function writeBackStreamArray(Variable $targetVar, array $readyHandles, \PHPCompiler\VM\Context $ctx): void
     {
-        $targetVar = $targetVar->resolveIndirect();
-        $ht = new HashTable();
-        $index = 0;
-        foreach ($readyHosts as $host) {
-            $handle = VmFs::handleForHostResource($host);
-            if (null === $handle) {
-                continue;
-            }
-            $slot = new Variable();
-            $slot->streamHandle($handle, $ctx);
-            $ht->addIndex($index, $slot);
-            ++$index;
-        }
-        $replacement = new Variable();
-        $replacement->array($ht);
-        $targetVar->copyFrom($replacement);
+        VmStreamSelect::writeBackStreamArray($targetVar, $readyHandles, $ctx);
     }
 
     /** @var array<int, resource> legacy host proc_open handles (array command or FFI unavailable) */

@@ -28,9 +28,9 @@ final class HtmlspecialcharsDecodeBuiltinTest extends TestCase
         $this->assertSame('a&quot;b&#039;c', $this->runDecode('a&quot;b&#039;c', 0));
     }
 
-    public function testEntCompatDecodesQuotes(): void
+    public function testEntCompatDecodesDoubleQuotesOnly(): void
     {
-        $this->assertSame('a"b\'c', $this->runDecode('a&quot;b&#039;c', ENT_COMPAT));
+        $this->assertSame('a"b&#039;c', $this->runDecode('a&quot;b&#039;c', ENT_COMPAT));
     }
 
     private function runDecode(string $value, int $flags = ENT_QUOTES | ENT_SUBSTITUTE): string

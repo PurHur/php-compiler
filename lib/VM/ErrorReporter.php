@@ -132,11 +132,16 @@ final class ErrorReporter
     public function popHandler(): bool
     {
         if ([] === $this->handlerStack) {
-            return false;
+            return true;
         }
         array_pop($this->handlerStack);
 
         return true;
+    }
+
+    public function getActiveHandler(): ?Variable
+    {
+        return $this->activeHandlerCopy();
     }
 
     public function stringOffsetCastOccurred(
@@ -186,7 +191,29 @@ final class ErrorReporter
         ?Frame $frame = null,
         ?string $file = null
     ): void {
-        $this->emitWarning("Undefined variable \${$name}", $context, $frame, $file);
+        $this->emitWarning(self::undefinedVariableMessage($name), $context, $frame, $file);
+    }
+
+    public static function undefinedVariableMessage(string $name): string
+    {
+        return "Undefined variable \${$name}";
+    }
+
+    /**
+     * Zend E_WARNING for undefined $GLOBALS['name'] read (zend_execute.c, #17482).
+     */
+    public function undefinedGlobalVariable(
+        string $name,
+        ?Context $context = null,
+        ?Frame $frame = null,
+        ?string $file = null
+    ): void {
+        $this->emitWarning(self::undefinedGlobalVariableMessage($name), $context, $frame, $file);
+    }
+
+    public static function undefinedGlobalVariableMessage(string $name): string
+    {
+        return "Undefined global variable \${$name}";
     }
 
     public function undefinedArrayKey(
@@ -219,6 +246,24 @@ final class ErrorReporter
     ): void {
         $this->emitWarning(
             self::arrayOffsetOnNonContainerMessage($typeName),
+            $context,
+            $frame,
+            $file
+        );
+    }
+
+    /**
+     * Zend E_WARNING for undefined instance property read (zend_object_handlers.c, #14938).
+     */
+    public function undefinedPropertyRead(
+        string $className,
+        string $propertyName,
+        ?Context $context = null,
+        ?Frame $frame = null,
+        ?string $file = null
+    ): void {
+        $this->emitWarning(
+            sprintf('Undefined property: %s::$%s', $className, $propertyName),
             $context,
             $frame,
             $file
@@ -282,11 +327,14 @@ final class ErrorReporter
     ): void {
         [$file, $line] = $this->resolveDisplayLocation($frame, $file, $line);
         if (0 !== ($this->errorReporting & self::E_NOTICE)
-            && $this->dispatchUserHandler($context, $frame, self::E_NOTICE, $message, $file, $line)) {
-            return;
+            || [] !== $this->handlerStack) {
+            if ($this->dispatchUserHandler($context, $frame, self::E_NOTICE, $message, $file, $line)) {
+                return;
+            }
         }
+        // Zend records error_get_last() even when error_reporting(0) or @ silences display.
         $this->recordLastError(self::E_NOTICE, $message, $file, $line);
-        if (0 === ($this->errorReporting & self::E_NOTICE)) {
+        if (!$this->shouldWriteCliStderr(self::E_NOTICE)) {
             return;
         }
         $this->writeCliStderr(self::E_NOTICE, $message, $file, $line);
@@ -301,14 +349,43 @@ final class ErrorReporter
     ): void {
         [$file, $line] = $this->resolveDisplayLocation($frame, $file, $line);
         if (0 !== ($this->errorReporting & self::E_WARNING)
-            && $this->dispatchUserHandler($context, $frame, self::E_WARNING, $message, $file, $line)) {
-            return;
+            || [] !== $this->handlerStack) {
+            if ($this->dispatchUserHandler($context, $frame, self::E_WARNING, $message, $file, $line)) {
+                return;
+            }
         }
+        // Zend records error_get_last() even when error_reporting(0) or @ silences display.
         $this->recordLastError(self::E_WARNING, $message, $file, $line);
-        if (0 === ($this->errorReporting & self::E_WARNING)) {
+        if (!$this->shouldWriteCliStderr(self::E_WARNING)) {
             return;
         }
         $this->writeCliStderr(self::E_WARNING, $message, $file, $line);
+    }
+
+    /**
+     * Zend E_DEPRECATED from engine/builtins (zend_errors.c; #13139).
+     *
+     * Records {@see error_get_last()} even when {@see beginSilence()} (@) cleared error_reporting.
+     */
+    public function internalDeprecated(
+        string $message,
+        ?Context $context = null,
+        ?Frame $frame = null,
+        ?string $file = null,
+        int $line = 0
+    ): void {
+        [$file, $line] = $this->resolveDisplayLocation($frame, $file, $line);
+        if (0 !== ($this->errorReporting & self::E_DEPRECATED)
+            || [] !== $this->handlerStack) {
+            if ($this->dispatchUserHandler($context, $frame, self::E_DEPRECATED, $message, $file, $line)) {
+                return;
+            }
+        }
+        $this->recordLastError(self::E_DEPRECATED, $message, $file, $line);
+        if (!$this->shouldWriteCliStderr(self::E_DEPRECATED)) {
+            return;
+        }
+        $this->writeCliStderr(self::E_DEPRECATED, $message, $file, $line);
     }
 
     public function deprecatedDynamicProperty(
@@ -318,20 +395,17 @@ final class ErrorReporter
         ?Context $context = null,
         ?Frame $frame = null
     ): void {
-        $message = sprintf(
-            'Creation of dynamic property %s::$%s is deprecated',
-            $className,
-            $propertyName
+        $this->internalDeprecated(
+            sprintf(
+                'Creation of dynamic property %s::$%s is deprecated',
+                $className,
+                $propertyName
+            ),
+            $context,
+            $frame,
+            $file,
+            0
         );
-        if (0 !== ($this->errorReporting & self::E_DEPRECATED)
-            && $this->dispatchUserHandler($context, $frame, self::E_DEPRECATED, $message, $file, 0)) {
-            return;
-        }
-        $this->recordLastError(self::E_DEPRECATED, $message, $file, 0);
-        if (0 === ($this->errorReporting & self::E_DEPRECATED)) {
-            return;
-        }
-        $this->writeCliStderr(self::E_DEPRECATED, $message, $file, 0);
     }
 
     public function triggerError(
@@ -344,22 +418,41 @@ final class ErrorReporter
     ): void {
         [$file, $line] = $this->resolveDisplayLocation($frame, $file, $line);
         if (0 !== ($this->errorReporting & $level)
-            && $this->dispatchUserHandler($context, $frame, $level, $message, $file, $line)) {
-            if (self::E_USER_ERROR === $level) {
-                throw new \LogicException("Fatal error: {$message}");
-            }
+            || [] !== $this->handlerStack) {
+            if ($this->dispatchUserHandler($context, $frame, $level, $message, $file, $line)) {
+                if (self::E_USER_ERROR === $level) {
+                    $this->abortUserFatal($level, $message, $file, $line);
+                }
 
-            return;
+                return;
+            }
         }
         $this->recordLastError($level, $message, $file, $line);
-        if (0 === ($this->errorReporting & $level)) {
+        if (!$this->shouldWriteCliStderr($level)) {
+            if (self::E_USER_ERROR === $level) {
+                $this->abortUserFatal($level, $message, $file, $line);
+            }
+
             return;
         }
         $formatted = $this->formatCliError($level, $message, $file, $line);
         $this->writeCliStderr($level, $message, $file, $line);
         if (self::E_USER_ERROR === $level) {
-            throw new \LogicException(rtrim($formatted));
+            $this->abortUserFatal($level, $message, $file, $line);
         }
+    }
+
+    /**
+     * Zend E_USER_ERROR — non-recoverable user fatal; must not surface as catchable LogicException (#16747).
+     *
+     * @return never
+     */
+    private function abortUserFatal(int $level, string $message, ?string $file, int $line): void
+    {
+        if (!$this->shouldWriteCliStderr($level)) {
+            self::writeCliStderrLine($level, $message, $file, $line);
+        }
+        throw new ScriptExit(255);
     }
 
     /**
@@ -376,12 +469,23 @@ final class ErrorReporter
         [$file, $line] = $this->resolveDisplayLocation($frame, $file, $line);
         $this->recordLastError($level, $message, $file, $line);
         if ($this->dispatchUserHandler($context, $frame, $level, $message, $file, $line)) {
+            NativeLastError::clear();
+
             return;
         }
-        if (0 === ($this->errorReporting & $level)) {
+        if (!$this->shouldWriteCliStderr($level)) {
             return;
         }
         $this->writeCliStderr($level, $message, $file, $line);
+    }
+
+    /**
+     * php-src CLI php_error_cb: stderr when error_reporting includes the level
+     * (main/main.c; issues #13486, #13542). display_errors gates extra stdout copy only.
+     */
+    private function shouldWriteCliStderr(int $level): bool
+    {
+        return 0 !== ($this->errorReporting & $level);
     }
 
     /**
@@ -410,8 +514,8 @@ final class ErrorReporter
     }
 
     /**
-     * php-src CLI: diagnostics go to stderr when error_reporting includes the level,
-     * independent of display_errors (issue #10677; matches JIT __compiler_trigger_error).
+     * php-src CLI: diagnostics go to stderr when display_errors and error_reporting include the level
+     * (ext/standard/output.c / main/main.c php_error_cb; issue #13486).
      */
     public static function writeCliStderrLine(int $level, string $message, ?string $file, int $line): void
     {
@@ -425,7 +529,11 @@ final class ErrorReporter
 
     private function writeCliStderr(int $level, string $message, ?string $file, int $line): void
     {
-        self::writeCliStderrLine($level, $message, $file, $line);
+        $formatted = self::formatCliErrorLine($level, $message, $file, $line);
+        fwrite(STDERR, $formatted);
+        if ($this->displayErrors) {
+            echo $formatted;
+        }
     }
 
     /**
@@ -441,15 +549,33 @@ final class ErrorReporter
                 if ((null === $file || '' === $file) && '' !== $walk->scriptPath) {
                     $file = $walk->scriptPath;
                 }
-                if ($line <= 0 && $walk->callSiteLine > 0) {
-                    $line = $walk->callSiteLine;
-                }
-                if (null !== $file && '' !== $file && $line > 0) {
-                    break;
-                }
                 $walk = $walk->parent;
             }
+            if ($line <= 0) {
+                $walk = $frame;
+                while (null !== $walk) {
+                    if ($walk->callSiteLine > 0) {
+                        $line = $walk->callSiteLine;
+                        break;
+                    }
+                    $walk = $walk->parent;
+                }
+            }
+            if ($line <= 0) {
+                $walk = $frame;
+                while (null !== $walk) {
+                    if ('' !== $walk->scriptPath) {
+                        $opcodeLine = FatalSite::lineFromOpcodes($walk);
+                        if ($opcodeLine > 0) {
+                            $line = $opcodeLine;
+                            break;
+                        }
+                    }
+                    $walk = $walk->parent;
+                }
+            }
         }
+
         return [$file, $line];
     }
 
@@ -462,6 +588,16 @@ final class ErrorReporter
         $out->copyFrom($this->handlerStack[\count($this->handlerStack) - 1][0]);
 
         return $out;
+    }
+
+    /**
+     * @param callable(Variable): void $visitVar
+     */
+    public function visitGcRoots(callable $visitVar): void
+    {
+        foreach ($this->handlerStack as [$handler]) {
+            $visitVar($handler);
+        }
     }
 
     private function dispatchUserHandler(

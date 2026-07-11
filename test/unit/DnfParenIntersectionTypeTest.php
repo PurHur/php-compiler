@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\Test\Unit;
 
 use PHPCompiler\Ast\DnfParenTypeRewriter;
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
@@ -13,6 +14,9 @@ final class DnfParenIntersectionTypeTest extends TestCase
 {
     public function testRewriterUnwrapsParenthesizedIntersectionParamType(): void
     {
+        if (!CompilerVersion::supportsParenthesizedDnfIntersectionTypes()) {
+            $this->markTestSkipped('parenthesized DNF intersection types disabled on Zend 8.2 reference profile');
+        }
         $source = '<?php function f((I1&I2) $o): void {}';
         $rewritten = DnfParenTypeRewriter::rewrite($source);
         $this->assertSame('<?php function f(I1&I2 $o): void {}', $rewritten);
@@ -20,6 +24,9 @@ final class DnfParenIntersectionTypeTest extends TestCase
 
     public function testRewriterUnwrapsParenthesizedIntersectionReturnType(): void
     {
+        if (!CompilerVersion::supportsParenthesizedDnfIntersectionTypes()) {
+            $this->markTestSkipped('parenthesized DNF intersection types disabled on Zend 8.2 reference profile');
+        }
         $source = '<?php function f(): (I1&I2) {}';
         $rewritten = DnfParenTypeRewriter::rewrite($source);
         $this->assertSame('<?php function f(): I1&I2 {}', $rewritten);
@@ -30,6 +37,38 @@ final class DnfParenIntersectionTypeTest extends TestCase
         $source = '<?php function f((I1&I2)|null $o): void {}';
         $rewritten = DnfParenTypeRewriter::rewrite($source);
         $this->assertSame($source, $rewritten);
+    }
+
+    /** Issue #11745: union RHS intersection arms must keep parens — php-parser rejects unwrapped `A|B&C`. */
+    public function testRewriterKeepsParenthesizedIntersectionAfterUnion(): void
+    {
+        $source = '<?php function f(A|(B&C) $o): void {}';
+        $rewritten = DnfParenTypeRewriter::rewrite($source);
+        $this->assertSame($source, $rewritten);
+    }
+
+    public function testUnionRhsIntersectionParamCompileAndRun(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+declare(strict_types=1);
+
+interface PhpcDnfA {}
+interface PhpcDnfB {}
+interface PhpcDnfC {}
+class PhpcDnfBC implements PhpcDnfB, PhpcDnfC {}
+
+function phpc_dnf_probe(PhpcDnfA|(PhpcDnfB&PhpcDnfC) $arg): string {
+    return $arg::class;
+}
+
+var_export(phpc_dnf_probe(new PhpcDnfBC()));
+echo "\n";
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'dnf_union_rhs_intersection.php'));
+        $this->assertSame("'PhpcDnfBC'\n", ob_get_clean());
     }
 
     /** Issue #9968: union-only parenthesized leaves are a Zend parse error — do not unwrap. */
@@ -75,6 +114,9 @@ PHP;
 
     public function testParenthesizedIntersectionParamAndReturnCompileAndRun(): void
     {
+        if (!CompilerVersion::supportsParenthesizedDnfIntersectionTypes()) {
+            $this->markTestSkipped('parenthesized DNF intersection types disabled on Zend 8.2 reference profile');
+        }
         $runtime = new Runtime();
         $code = <<<'PHP'
 <?php
@@ -106,6 +148,9 @@ PHP;
 
     public function testParenthesizedIntersectionParamRejectsIncompatibleValue(): void
     {
+        if (!CompilerVersion::supportsParenthesizedDnfIntersectionTypes()) {
+            $this->markTestSkipped('parenthesized DNF intersection types disabled on Zend 8.2 reference profile');
+        }
         $runtime = new Runtime();
         $code = <<<'PHP'
 <?php

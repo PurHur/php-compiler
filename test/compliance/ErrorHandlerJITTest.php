@@ -34,6 +34,10 @@ final class ErrorHandlerJITTest extends BaseTest
             __DIR__.'/cases/stdlib/error_reporting_enum_typeerror_jit.phpt',
             'error_reporting_enum_typeerror_jit.phpt'
         );
+        yield 'error_reporting_bool_strict_jit.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/error_reporting_bool_strict_jit.phpt',
+            'error_reporting_bool_strict_jit.phpt'
+        );
     }
 
     public function setUp(): void

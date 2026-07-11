@@ -38,6 +38,58 @@ function phpc_compile_skip_aot_bundle_for_lint(string $normalized): bool
     return phpc_compile_skip_aot_bundle($normalized);
 }
 
+/**
+ * Content-keyed cache marker path for a self-host bundle lint, or null when
+ * the repo root / entry are unresolvable (#16508). Key covers the entry, its
+ * sibling bundle files, every lib/ext/src/bin/patches source, the patched
+ * vendor tree (mtime:size), and composer.lock — any source change misses.
+ */
+function phpc_bundle_lint_cache_path(string $filename, string $normalized): ?string
+{
+    $root = getenv('PHP_COMPILER_REPO_ROOT');
+    if (!is_string($root) || '' === $root || !is_dir($root.'/lib')) {
+        $root = dirname(__DIR__);
+    }
+    if (!is_file($filename) || !is_dir($root.'/lib')) {
+        return null;
+    }
+    $parts = ['entry:'.$normalized, 'entry-sha:'.sha1_file($filename)];
+    $scanDirs = ['lib', 'ext', 'src', 'bin', 'patches', 'vendor/ircmaxell'];
+    $bundleDir = dirname($filename);
+    foreach ($scanDirs as $dir) {
+        $base = $root.'/'.$dir;
+        if (!is_dir($base)) {
+            continue;
+        }
+        $rows = [];
+        $it = new RecursiveIteratorIterator(
+            new RecursiveDirectoryIterator($base, FilesystemIterator::SKIP_DOTS)
+        );
+        foreach ($it as $f) {
+            $p = $f->getPathname();
+            if (!str_ends_with($p, '.php') && !str_ends_with($p, '.patch')) {
+                continue;
+            }
+            $rows[] = substr($p, strlen($root) + 1).':'.$f->getMTime().':'.$f->getSize();
+        }
+        sort($rows, SORT_STRING);
+        $parts[] = $dir.":\n".implode("\n", $rows);
+    }
+    $siblings = glob($bundleDir.'/*.php') ?: [];
+    sort($siblings, SORT_STRING);
+    foreach ($siblings as $sibling) {
+        $parts[] = 'bundle:'.basename($sibling).':'.sha1_file($sibling);
+    }
+    $extras = [$root.'/composer.lock', $root.'/script/apply-patches.sh'];
+    foreach ($extras as $extra) {
+        $parts[] = basename($extra).':'.(is_file($extra) ? sha1_file($extra) : 'none');
+    }
+    $key = substr(hash('sha256', implode("\n", $parts)), 0, 20);
+    $slug = preg_replace('/[^A-Za-z0-9_.-]+/', '-', basename($bundleDir));
+
+    return $root.'/build/lint-cache/bundle-'.$slug.'-'.$key.'.ok';
+}
+
 function phpc_compile_is_user_script_aot(string $normalized): bool
 {
     if ('' === $normalized || '-' === $normalized
@@ -171,6 +223,9 @@ function run(string $filename, string $code, array $options): void
                 // bootstrap-aot-link: Runtime spine via self-host stubs; user FUNCDEF bodies stay real (#1492).
                 putenv('PHP_COMPILER_SELFHOST_AOT=1');
                 putenv('PHP_COMPILER_M3_COMPILE_DRIVER=1');
+                // Defer nested-JIT standalone bodies during inventory argv emit init (#14470).
+                putenv('PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER=1');
+                putenv('BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER=1');
             } else {
                 putenv('PHP_COMPILER_SELFHOST_AOT=0');
             }
@@ -180,6 +235,25 @@ function run(string $filename, string $code, array $options): void
         $selfhostAot = getenv('PHP_COMPILER_SELFHOST_AOT');
         if (false === $selfhostAot || '' === $selfhostAot) {
             putenv('PHP_COMPILER_SELFHOST_AOT=1');
+        }
+    }
+    $bundleLintCacheFile = null;
+    if (isset($options['-l']) && '' !== $normalized && str_contains($normalized, 'test/selfhost/')
+        && '0' !== getenv('PHP_COMPILER_BUNDLE_LINT_CACHE')) {
+        // Self-host bundle lints compile hundreds-to-thousands of units as one
+        // Script (21m+ for compiler_minimal; the spine bundle never finished a
+        // measured run) but are re-run verbatim by ci-fast on every invocation
+        // (#16508). Cache SUCCESS by content: entry + every lib/ext/src/bin
+        // source (mtime:size) + vendor identity. Any source change misses.
+        $bundleLintCacheFile = phpc_bundle_lint_cache_path($filename, $normalized);
+        if (null !== $bundleLintCacheFile && is_file($bundleLintCacheFile)) {
+            fwrite(STDERR, 'phpc lint: OK (bundle cache hit '.basename($bundleLintCacheFile).", #16508)\n");
+            exit(0);
+        }
+        // The mega-bundle compile needs ~2-4G; the 1536M default OOMs (#16508).
+        $bundleLimit = getenv('PHP_COMPILER_MEMORY_LIMIT');
+        if (false === $bundleLimit || '' === $bundleLimit || '1536M' === $bundleLimit || '2G' === $bundleLimit) {
+            ini_set('memory_limit', '6G');
         }
     }
     if ('' !== $normalized && str_contains($normalized, 'selfhost/') && str_contains($normalized, 'compile_driver.php') && !isset($options['-l'])) {
@@ -257,33 +331,34 @@ function run(string $filename, string $code, array $options): void
             $scriptFilename = $resolved;
         }
     }
+    $scriptName = \function_exists('php_compiler_cli_server_script_name')
+        ? php_compiler_cli_server_script_name($filename, $options)
+        : null;
     Superglobals::populateFromEnvironment(
         $runtime->vmContext,
         is_string($queryString) ? $queryString : null,
         is_string($postBody) ? $postBody : null,
-        $scriptFilename
+        $scriptFilename,
+        $scriptName
     );
     $prevUserScriptAot = getenv('PHP_COMPILER_AOT_USER_SCRIPT');
+    $prevHelperRuntimeO = getenv('PHP_COMPILER_HELPER_RUNTIME_O');
     $setUserScriptAot = phpc_compile_is_user_script_aot($normalized);
     if ($setUserScriptAot && \function_exists('putenv')) {
         putenv('PHP_COMPILER_AOT_USER_SCRIPT=1');
         $_ENV['PHP_COMPILER_AOT_USER_SCRIPT'] = '1';
         $_SERVER['PHP_COMPILER_AOT_USER_SCRIPT'] = '1';
-    }
-    try {
-        $block = $runtime->parseAndCompile($code, $filename);
-    } finally {
-        if ($setUserScriptAot && \function_exists('putenv')) {
-            if (false === $prevUserScriptAot || null === $prevUserScriptAot) {
-                putenv('PHP_COMPILER_AOT_USER_SCRIPT=');
-                unset($_ENV['PHP_COMPILER_AOT_USER_SCRIPT'], $_SERVER['PHP_COMPILER_AOT_USER_SCRIPT']);
-            } else {
-                putenv('PHP_COMPILER_AOT_USER_SCRIPT='.$prevUserScriptAot);
-                $_ENV['PHP_COMPILER_AOT_USER_SCRIPT'] = $prevUserScriptAot;
-                $_SERVER['PHP_COMPILER_AOT_USER_SCRIPT'] = $prevUserScriptAot;
-            }
+        // Default-on helper-runtime split compilation for user scripts (#15889).
+        $helperCache = getenv('PHP_COMPILER_HELPER_RUNTIME_O');
+        if (false === $helperCache || '' === (string) $helperCache) {
+            putenv('PHP_COMPILER_HELPER_RUNTIME_O=1');
+            $_ENV['PHP_COMPILER_HELPER_RUNTIME_O'] = '1';
+            $_SERVER['PHP_COMPILER_HELPER_RUNTIME_O'] = '1';
         }
     }
+    // Warm helper-unit cache once per core fingerprint so subsequent builds skip nested helper lowering (#15889).
+    \PHPCompiler\AOT\HelperRuntimeCache::warmForUserAotBuild();
+    $block = $runtime->parseAndCompile($code, $filename);
     if (null === $block) {
         if (! isset($options['-l'])) {
             $diag = \PHPCompiler\Runtime::getLastParseFailure();
@@ -333,8 +408,9 @@ function run(string $filename, string $code, array $options): void
             || '' === (string) $prevSelfHostAot
             || ($bootstrapAotFixture && '0' === (string) $prevSelfHostAot && !$isBootstrapAotLink)
         );
-        if ($setSelfHostAotForCompile) {
+        if ($setSelfHostAotForCompile && !$setUserScriptAot) {
             // Keep LLVM 9 stable during AOT compilation; some lowering paths are still sensitive (#2600).
+            // User-script AOT (examples/*) needs real refresh helpers — skip stubs (#15624).
             putenv('PHP_COMPILER_SELFHOST_AOT=1');
             $_ENV['PHP_COMPILER_SELFHOST_AOT'] = '1';
             $_SERVER['PHP_COMPILER_SELFHOST_AOT'] = '1';
@@ -343,6 +419,21 @@ function run(string $filename, string $code, array $options): void
             putenv('PHP_COMPILER_AOT_USER_SCRIPT=1');
             $_ENV['PHP_COMPILER_AOT_USER_SCRIPT'] = '1';
             $_SERVER['PHP_COMPILER_AOT_USER_SCRIPT'] = '1';
+            // Real CGI refresh helpers (multipart $_FILES) must not use self-host stubs (#15624).
+            putenv('PHP_COMPILER_SELFHOST_AOT=0');
+            $_ENV['PHP_COMPILER_SELFHOST_AOT'] = '0';
+            $_SERVER['PHP_COMPILER_SELFHOST_AOT'] = '0';
+            // Stale MCJIT cache can resurrect pre-#13031 superglobal refresh bodies (#15624).
+            putenv('PHP_COMPILER_CACHE=0');
+            $_ENV['PHP_COMPILER_CACHE'] = '0';
+            $_SERVER['PHP_COMPILER_CACHE'] = '0';
+        }
+        $prevBootstrapAotLink = getenv('PHP_COMPILER_BOOTSTRAP_AOT_LINK');
+        $setBootstrapAotLink = $bootstrapAotFixture && !$isBootstrapAotLink && \function_exists('putenv');
+        if ($setBootstrapAotLink) {
+            putenv('PHP_COMPILER_BOOTSTRAP_AOT_LINK=1');
+            $_ENV['PHP_COMPILER_BOOTSTRAP_AOT_LINK'] = '1';
+            $_SERVER['PHP_COMPILER_BOOTSTRAP_AOT_LINK'] = '1';
         }
         try {
             $runtime->standalone($block, $options['-o'], $code, $filename);
@@ -371,6 +462,42 @@ function run(string $filename, string $code, array $options): void
                     $_SERVER['PHP_COMPILER_SELFHOST_AOT'] = $prevSelfHostAot;
                 }
             }
+            if ($setBootstrapAotLink) {
+                if (false === $prevBootstrapAotLink || null === $prevBootstrapAotLink) {
+                    putenv('PHP_COMPILER_BOOTSTRAP_AOT_LINK=');
+                    unset($_ENV['PHP_COMPILER_BOOTSTRAP_AOT_LINK'], $_SERVER['PHP_COMPILER_BOOTSTRAP_AOT_LINK']);
+                } else {
+                    putenv('PHP_COMPILER_BOOTSTRAP_AOT_LINK='.$prevBootstrapAotLink);
+                    $_ENV['PHP_COMPILER_BOOTSTRAP_AOT_LINK'] = $prevBootstrapAotLink;
+                    $_SERVER['PHP_COMPILER_BOOTSTRAP_AOT_LINK'] = $prevBootstrapAotLink;
+                }
+            }
+        }
+    }
+    if (isset($options['-l']) && null !== $bundleLintCacheFile) {
+        // Reached only when parseAndCompile returned a Block (lint success).
+        @mkdir(dirname($bundleLintCacheFile), 0755, true);
+        @file_put_contents(
+            $bundleLintCacheFile,
+            $normalized."\nlinted-ok " . date('c') . "\n"
+        );
+    }
+    if ($setUserScriptAot && \function_exists('putenv')) {
+        if (false === $prevUserScriptAot || null === $prevUserScriptAot) {
+            putenv('PHP_COMPILER_AOT_USER_SCRIPT=');
+            unset($_ENV['PHP_COMPILER_AOT_USER_SCRIPT'], $_SERVER['PHP_COMPILER_AOT_USER_SCRIPT']);
+        } else {
+            putenv('PHP_COMPILER_AOT_USER_SCRIPT='.$prevUserScriptAot);
+            $_ENV['PHP_COMPILER_AOT_USER_SCRIPT'] = $prevUserScriptAot;
+            $_SERVER['PHP_COMPILER_AOT_USER_SCRIPT'] = $prevUserScriptAot;
+        }
+        if (false === $prevHelperRuntimeO || null === $prevHelperRuntimeO) {
+            putenv('PHP_COMPILER_HELPER_RUNTIME_O=');
+            unset($_ENV['PHP_COMPILER_HELPER_RUNTIME_O'], $_SERVER['PHP_COMPILER_HELPER_RUNTIME_O']);
+        } else {
+            putenv('PHP_COMPILER_HELPER_RUNTIME_O='.$prevHelperRuntimeO);
+            $_ENV['PHP_COMPILER_HELPER_RUNTIME_O'] = $prevHelperRuntimeO;
+            $_SERVER['PHP_COMPILER_HELPER_RUNTIME_O'] = $prevHelperRuntimeO;
         }
     }
 }

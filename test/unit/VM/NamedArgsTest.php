@@ -28,17 +28,17 @@ PHP;
 
     public function testDuplicateNamedParameterRejects(): void
     {
-        $runtime = new Runtime();
-        $code = <<<'PHP'
-<?php
-function f(int $a, int $b): int {
-    return $a + $b;
-}
-f(a: 1, a: 2);
-PHP;
-        $this->expectException(\CompileError::class);
+        $a = new Variable(Variable::TYPE_INTEGER);
+        $a->int(1);
+        $b = new Variable(Variable::TYPE_INTEGER);
+        $b->int(2);
+        $this->expectException(\Error::class);
         $this->expectExceptionMessage('Named parameter $a overwrites previous argument');
-        $runtime->parseAndCompile($code, 'named_args_duplicate.php');
+        NamedArgs::resolve(
+            [['n', 'a', $a], ['n', 'a', $b]],
+            ['a', 'b'],
+            null
+        );
     }
 
     public function testResolverReordersNamedArguments(): void
@@ -172,5 +172,22 @@ PHP;
         $this->assertSame(2, $resolved[1]->toInt());
         $packed = $resolved[0]->toArray();
         $this->assertSame(9, $packed->find('extra')?->toInt());
+    }
+
+    /** @covers issue #11844 — promoted ctor named args skip default slots (Zend/zend_compile.c) */
+    public function testPromotedConstructorNamedArgsSkipDefaultSlot(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class C {
+    public function __construct(public int $a, public int $b = 0, public int $c = 0) {}
+}
+$c = new C(c: 3, a: 1);
+echo ($c->a === 1 && $c->b === 0 && $c->c === 3) ? "ok\n" : "fail\n";
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'promoted_ctor_named_skip.php'));
+        $this->assertSame("ok\n", ob_get_clean());
     }
 }

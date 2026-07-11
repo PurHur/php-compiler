@@ -56,6 +56,9 @@ final class JitStreamContextCreate
 
     private static function loadArrayArg(Context $context, JITVariable $arg, int $position): Value
     {
+        if (JITVariable::TYPE_NULL === $arg->type || ($arg->isNullConstant ?? false)) {
+            return $context->getTypeFromString('__hashtable__*')->constNull();
+        }
         if (JITVariable::TYPE_HASHTABLE === $arg->type) {
             return $context->helper->loadValue($arg);
         }
@@ -69,8 +72,26 @@ final class JitStreamContextCreate
             );
         }
 
-        throw new \LogicException(
-            "stream_context_create() argument #{$position} must be an array in this compiler build"
+        throw new \TypeError(self::arrayTypeErrorMessage($position, $arg->type));
+    }
+
+    private static function arrayTypeErrorMessage(int $position, int $type): string
+    {
+        $label = 1 === $position ? 'options' : 'params';
+        $given = match ($type) {
+            JITVariable::TYPE_NATIVE_LONG => 'int',
+            JITVariable::TYPE_NATIVE_BOOL => 'bool',
+            JITVariable::TYPE_NATIVE_DOUBLE => 'float',
+            JITVariable::TYPE_STRING => 'string',
+            JITVariable::TYPE_OBJECT => 'object',
+            default => 'mixed',
+        };
+
+        return \sprintf(
+            'stream_context_create(): Argument #%d ($%s) must be of type ?array, %s given',
+            $position,
+            $label,
+            $given
         );
     }
 }

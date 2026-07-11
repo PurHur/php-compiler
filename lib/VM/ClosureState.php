@@ -6,6 +6,7 @@ namespace PHPCompiler\VM;
 
 use PHPCompiler\Block;
 use PHPCompiler\Compiler\SourceLocation;
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\Func;
 
 /**
@@ -42,6 +43,9 @@ final class ClosureState
 
     public int $definitionLine = 0;
 
+    /** Owning Closure object for Closure::getCurrent() (#13981, Zend/zend_closures.c). */
+    public ?ObjectEntry $ownerObject = null;
+
     /**
      * Per-closure static locals (Zend zend_closure static_variables; issue #4872).
      *
@@ -69,6 +73,11 @@ final class ClosureState
         }
 
         return $this->staticVars[$varName];
+    }
+
+    public function peekStatic(string $varName): ?Variable
+    {
+        return $this->staticVars[$varName] ?? null;
     }
 
     public function isStaticInitialized(string $varName): bool
@@ -248,9 +257,11 @@ final class ClosureState
         $entry->methods['fromcallable'] = new Builtin\ClosureFromCallable();
         $entry->methodVisibility['fromcallable'] = $pubStatic;
         $entry->methodNames['fromcallable'] = 'fromCallable';
-        $entry->methods['fromstatic'] = new Builtin\ClosureFromStatic();
-        $entry->methodVisibility['fromstatic'] = $pubStatic;
-        $entry->methodNames['fromstatic'] = 'fromStatic';
+        if (CompilerVersion::supportsClosureFromStatic()) {
+            $entry->methods['fromstatic'] = new Builtin\ClosureFromStatic();
+            $entry->methodVisibility['fromstatic'] = $pubStatic;
+            $entry->methodNames['fromstatic'] = 'fromStatic';
+        }
         $entry->methods['bind'] = new Builtin\ClosureBind();
         $entry->methodVisibility['bind'] = $pubStatic;
         $entry->methodNames['bind'] = 'bind';
@@ -264,9 +275,16 @@ final class ClosureState
         $entry->methods['__debuginfo'] = new Builtin\ClosureDebugInfo();
         $entry->methodVisibility['__debuginfo'] = \PHPCfg\Func::FLAG_PUBLIC;
         $entry->methodNames['__debuginfo'] = '__debugInfo';
-        $entry->methods['getusedvariables'] = new Builtin\ClosureGetUsedVariables();
-        $entry->methodVisibility['getusedvariables'] = \PHPCfg\Func::FLAG_PUBLIC;
-        $entry->methodNames['getusedvariables'] = 'getUsedVariables';
+        if (CompilerVersion::supportsClosureGetUsedVariables()) {
+            $entry->methods['getusedvariables'] = new Builtin\ClosureGetUsedVariables();
+            $entry->methodVisibility['getusedvariables'] = \PHPCfg\Func::FLAG_PUBLIC;
+            $entry->methodNames['getusedvariables'] = 'getUsedVariables';
+        }
+        if (CompilerVersion::supportsClosureGetCurrent()) {
+            $entry->methods['getcurrent'] = new Builtin\ClosureGetCurrent();
+            $entry->methodVisibility['getcurrent'] = $pubStatic;
+            $entry->methodNames['getcurrent'] = 'getCurrent';
+        }
         $ctx->classes['closure'] = $entry;
     }
 
@@ -275,6 +293,7 @@ final class ClosureState
         $entry = new ObjectEntry($ctx->classes['closure']);
         $entry->closureState = $this;
         $entry->constructed = true;
+        $this->ownerObject = $entry;
 
         return $entry;
     }

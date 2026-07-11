@@ -8,6 +8,9 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
+use PHPCompiler\JIT\JitOperandTypeLabel;
+use PHPCompiler\JIT\JitStringArg;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -20,21 +23,23 @@ final class file_put_contents extends Internal
         $argc = \count($frame->calledArgs);
         if ($argc < 2 || $argc > 4) {
             throw new \ArgumentCountError(
-                'file_put_contents() expects at least 2 arguments, '.\max(0, $argc - 2).' given'
+                'file_put_contents() expects at least 2 arguments, '.$argc.' given'
             );
         }
         $dataVar = $frame->calledArgs[1]->resolveIndirect();
         if (null === $frame->returnVar) {
             return;
         }
-        $path = VmFilestatArg::coerceFilenameArg($frame->calledArgs[0], 'file_put_contents');
+        $path = VmFilestatArg::filenameArgForFrame($frame, 0, 'file_put_contents');
         $flags = 0;
         if (isset($frame->calledArgs[2])) {
-            $flagsVar = $frame->calledArgs[2]->resolveIndirect();
-            if (Variable::TYPE_INTEGER !== $flagsVar->type) {
-                throw new \LogicException('file_put_contents() flags must be an integer in this compiler build');
-            }
-            $flags = $flagsVar->toInt();
+            $flags = VmMath::parseIntBuiltinArgForFrame(
+                $frame,
+                2,
+                'file_put_contents',
+                3,
+                'flags'
+            );
         }
         if (isset($frame->calledArgs[3])) {
             $contextVar = $frame->calledArgs[3]->resolveIndirect();
@@ -58,14 +63,12 @@ final class file_put_contents extends Internal
         $argc = \count($args);
         if ($argc < 2 || $argc > 4) {
             throw new \ArgumentCountError(
-                'file_put_contents() expects at least 2 arguments, '.\max(0, $argc - 2).' given'
+                'file_put_contents() expects at least 2 arguments, '.$argc.' given'
             );
         }
         $flags = 0;
         if ($argc >= 3) {
-            if (JITVariable::TYPE_NATIVE_LONG !== $args[2]->type) {
-                throw new \LogicException('file_put_contents() flags must be an integer in this compiler build');
-            }
+            self::assertFlagsJitArg($context, $args[2]);
             $flagsVal = $args[2]->compileTimeLong ?? null;
             if (null !== $flagsVal) {
                 self::assertSupportedFlags($flagsVal);
@@ -81,9 +84,40 @@ final class file_put_contents extends Internal
         return JitFilePutContents::invoke(
             $context,
             JitFilestatArg::lowerFilename($context, $args[0], 'file_put_contents'),
-            $context->helper->loadValue($args[1]),
+            self::lowerDataJitArg($context, $args[1]),
             $flags
         );
+    }
+
+    /** @return Value */
+    private static function lowerDataJitArg(Context $context, JITVariable $arg): Value
+    {
+        return JitStringBuiltinArg::lower($context, $arg, 'file_put_contents', 1, 'data');
+    }
+
+    private static function assertFlagsJitArg(Context $context, JITVariable $arg): void
+    {
+        $literal = JitStringArg::compileTimeLiteral($arg);
+        if (null !== $literal && ('' === $literal || !is_numeric($literal))) {
+            throw new \TypeError('file_put_contents(): Argument #3 ($flags) must be of type int, string given');
+        }
+        if (JITVariable::TYPE_NATIVE_LONG === $arg->type) {
+            return;
+        }
+        if (JITVariable::TYPE_STRING === $arg->type || JITVariable::TYPE_VALUE === $arg->type) {
+            return;
+        }
+        if (\in_array($arg->type, [
+            JITVariable::TYPE_NATIVE_BOOL,
+            JITVariable::TYPE_NATIVE_DOUBLE,
+            JITVariable::TYPE_NULL,
+        ], true)) {
+            return;
+        }
+        throw new \TypeError(\sprintf(
+            'file_put_contents(): Argument #3 ($flags) must be of type int, %s given',
+            JitOperandTypeLabel::givenLabel($context, $arg)
+        ));
     }
 
     /** Zend bitmask: FILE_APPEND (8) | LOCK_EX (2) only (#4275). */
@@ -103,6 +137,11 @@ final class file_put_contents extends Internal
     private static function coerceData(Variable $var)
     {
         $var = $var->resolveIndirect();
+        if (Variable::TYPE_NULL === $var->type) {
+            VmNullStringParamDeprecation::emit(null, 'file_put_contents', 1, 'data');
+
+            return '';
+        }
         if (Variable::TYPE_STRING === $var->type) {
             return $var->toString();
         }

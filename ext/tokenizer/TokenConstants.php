@@ -43,6 +43,11 @@ final class TokenConstants
 
         foreach (self::registeredConstants() as $name => $value) {
             if ($value === $id) {
+                // Id 1 is TOKEN_PARSE in userland but not a named lexer token (#14925).
+                if ('TOKEN_PARSE' === $name) {
+                    return null;
+                }
+
                 return $name;
             }
         }

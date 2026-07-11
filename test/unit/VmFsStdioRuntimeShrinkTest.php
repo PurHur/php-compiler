@@ -6,7 +6,7 @@ namespace PHPCompiler;
 
 use PHPUnit\Framework\TestCase;
 
-/** VM php://stdio wrappers use VmFsStdio libc path, not bare host @fopen on stdio URIs (#4648). */
+/** VM php://stdio wrappers use VmFsStdioPure, not libc dup FFI (#4648, #12252). */
 final class VmFsStdioRuntimeShrinkTest extends TestCase
 {
     public function testVmFsFopenRoutesStdioThroughVmFsStdio(): void
@@ -16,6 +16,19 @@ final class VmFsStdioRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('VmFsStdio::open', $source);
     }
 
+    public function testVmFsStdioNativeDelegatesToPureWithoutLibcFfi(): void
+    {
+        $native = (string) file_get_contents(__DIR__.'/../../ext/standard/VmFsStdioNative.php');
+        $this->assertStringContainsString('VmFsStdioPure::', $native);
+        $this->assertStringNotContainsString('FFI::cdef', $native);
+        $this->assertStringNotContainsString('\\FFI', $native);
+
+        $pure = (string) file_get_contents(__DIR__.'/../../ext/standard/VmFsStdioPure.php');
+        $this->assertStringContainsString('fopen', $pure);
+        $this->assertStringNotContainsString('FFI::cdef', $pure);
+        $this->assertStringNotContainsString('\\FFI', $pure);
+    }
+
     public function testVmFsStdioUsesNativeDupOnly(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/VmFsStdio.php');
@@ -23,10 +36,12 @@ final class VmFsStdioRuntimeShrinkTest extends TestCase
         $this->assertDoesNotMatchRegularExpression('/@fopen\\s*\\(/', $source);
     }
 
-    public function testStreamIoJitDefinesStdioHelper(): void
+    public function testStreamIoJitHelperOpensStdioViaVmFs(): void
     {
-        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StreamIoJit.php');
-        $this->assertStringContainsString('__phpc_try_fopen_stdio', $source);
-        $this->assertStringContainsString('php://stdin', $source);
+        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/StreamIoJitHelper.php');
+        $this->assertStringContainsString('VmFs::fopen', $source);
+
+        $pure = (string) file_get_contents(__DIR__.'/../../ext/standard/VmFsStdioPure.php');
+        $this->assertStringContainsString('php://stdin', $pure);
     }
 }

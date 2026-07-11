@@ -25,7 +25,7 @@ final class current extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \ArgumentCountError('current() expects exactly 1 argument, '.\count($frame->calledArgs).' given');
         }
-        $target = VmArrayPointer::requirePointerTarget($frame->calledArgs[0], 'current', false);
+        $target = VmArrayPointer::requirePointerTarget($frame->calledArgs[0], 'current', false, $frame->vmContext);
         VmArrayPointer::returnValue($frame, $target->pointerCurrent());
     }
 
@@ -33,6 +33,12 @@ final class current extends Internal
     {
         if (1 !== \count($args)) {
             throw new \ArgumentCountError('current() expects exactly 1 argument, '.\count($args).' given');
+        }
+
+        if (JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false)) {
+            JitArrayElem::requireArrayParam($context, $args[0], 'current', 1, 'array');
+
+            return JitValueBox::pointer($context, JitValueBox::alloc($context));
         }
 
         if (!JitReferencableCheck::guardArrayMutatorByRefArg($context, 'current', $args[0])) {

@@ -12,8 +12,8 @@ final class PhpinfoJitRuntimeShrinkTest extends TestCase
     public function testPhpinfoJitHelperDelegatesToVmInfo(): void
     {
         $source = (string) \file_get_contents(dirname(__DIR__, 2).'/ext/standard/PhpinfoJitHelper.php');
-        $this->assertStringContainsString('VmInfo::renderPhpinfoHtml', $source);
-        $this->assertStringContainsString('VmInfo::renderPhpcreditsHtml', $source);
+        $this->assertStringContainsString('VmInfo::renderPhpinfo', $source);
+        $this->assertStringContainsString('VmInfo::renderPhpcreditsText', $source);
     }
 
     public function testStringPhpinfoRuntimeRoutesThroughPhpinfoJitHelper(): void
@@ -31,8 +31,9 @@ final class PhpinfoJitRuntimeShrinkTest extends TestCase
     public function testVmInfoExposesRenderPhpinfoForSharedSsot(): void
     {
         $source = (string) \file_get_contents(dirname(__DIR__, 2).'/ext/standard/VmInfo.php');
-        $this->assertStringContainsString('public static function renderPhpinfoHtml', $source);
-        $this->assertStringContainsString('public static function renderPhpcreditsHtml', $source);
+        $this->assertStringContainsString('public static function renderPhpinfo', $source);
+        $this->assertStringContainsString('public static function renderPhpinfoText', $source);
+        $this->assertStringContainsString('public static function renderPhpcreditsText', $source);
     }
 
     public function testJitInfoRoutesThroughStringPhpinfoRuntime(): void

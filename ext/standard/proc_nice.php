@@ -8,6 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
@@ -31,8 +32,9 @@ final class proc_nice extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $priority = VmMath::parseIntBuiltinArg(
-            $frame->calledArgs[0]->resolveIndirect(),
+        $priority = VmMath::parseIntBuiltinArgForFrame(
+            $frame,
+            0,
             'proc_nice',
             1,
             'priority'
@@ -53,6 +55,8 @@ final class proc_nice extends Internal
 
             return JitValueBox::pointer($context, $slot);
         }
+
+        JitInternalStrictArg::requireInt($context, $args[0], 'proc_nice', 'priority', 1);
 
         return JitProcNice::invoke($context, $args[0]);
     }

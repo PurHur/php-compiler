@@ -4,9 +4,13 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin;
+use PHPCompiler\JIT\Builtin\RoundingModeJit;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitRoundModeArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\NamedOptionalCallArgs;
@@ -16,18 +20,47 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * LLVM JIT/AOT helper for number_format() (int/float/numeric string, 0–4 args; subset of PHP).
+ * LLVM JIT/AOT helper for number_format() (int/float/numeric string, 0–5 args; subset of PHP).
  *
- * php-src: ext/standard/number_format.c — Z_PARAM_LONG / Z_PARAM_STR
+ * php-src: ext/standard/number_format.c — Z_PARAM_LONG / Z_PARAM_STR / RoundingMode
  */
 final class JitNumberFormat
 {
+    private const MAX_ARGS = 4;
+
+    /**
+     * @param JITVariable ...$args
+     */
+    public static function assertArgCount(Context $context, JITVariable ...$args): void
+    {
+        $argc = \count($args);
+        if ($argc < 1) {
+            throw new \ArgumentCountError(\sprintf(
+                'number_format() expects at least 1 argument, %d given',
+                $argc
+            ));
+        }
+        if ($argc <= self::MAX_ARGS) {
+            return;
+        }
+        if (5 === $argc
+            && CompilerVersion::supportsRoundingModeEnum()
+            && isset($args[4])
+            && !NamedOptionalCallArgs::isOmittedOptional($args[4])
+            && null !== RoundingModeJit::compileTimeRoundMode($context, $args[4])) {
+            return;
+        }
+
+        throw new \ArgumentCountError(\sprintf(
+            'number_format() expects at most %d arguments, %d given',
+            self::MAX_ARGS,
+            $argc
+        ));
+    }
+
     public static function format(Context $context, JITVariable ...$args): Value
     {
-        $argc = count($args);
-        if ($argc < 1 || $argc > 4) {
-            throw new \LogicException('number_format() requires one to four arguments');
-        }
+        $argc = \count($args);
 
         if ($context->callerStrictTypes) {
             self::rejectNullNum($context, $args[0]);
@@ -38,19 +71,42 @@ final class JitNumberFormat
         $decimals = ($argc >= 2 && !NamedOptionalCallArgs::isOmittedOptional($args[1]))
             ? JitIntdiv::lowerIntBuiltinArg($context, $args[1], 'number_format', 2, 'decimals')
             : $i64->constInt(0, false);
+        if (version_compare(CompilerVersion::languageProfileVersion(), '8.4.0', '>=')) {
+            $negative = $context->builder->icmp(Builder::INT_SLT, $decimals, $i64->constInt(0, false));
+            $okBlock = BasicBlockHelper::append($context, 'number_format_decimals_ok');
+            $failBlock = BasicBlockHelper::append($context, 'number_format_decimals_fail');
+            $context->builder->branchIf($negative, $failBlock, $okBlock);
+            $context->builder->positionAtEnd($failBlock);
+            $message = 'number_format(): Argument #2 ($decimals) must be greater than or equal to 0';
+            TypeErrorRaise::registerDeclarations($context);
+            TypeErrorRaise::ensureLinked($context);
+            TypeErrorRaise::emitValueError($context, $message);
+            if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
+                $context->builder->call($context->lookupFunction('phpc_jit_abort_if_pending_type_error'));
+            } else {
+                $context->builder->call($context->lookupFunction('abort'));
+                $context->llvm->lib->LLVMBuildUnreachable($context->builder->builder);
+            }
+            $context->builder->positionAtEnd($okBlock);
+        }
         $decSep = ($argc >= 3 && !NamedOptionalCallArgs::isOmittedOptional($args[2]))
             ? JitStringBuiltinArg::lower($context, $args[2], 'number_format', 2, 'decimal_separator', '?string')
             : $context->builder->load($context->constantStringFromString('.'));
-        $thouSep = (4 === $argc && !NamedOptionalCallArgs::isOmittedOptional($args[3]))
+        $thouSep = ($argc >= 4 && !NamedOptionalCallArgs::isOmittedOptional($args[3]))
             ? JitStringBuiltinArg::lower($context, $args[3], 'number_format', 3, 'thousands_separator', '?string')
             : $context->builder->load($context->constantStringFromString(','));
+        $mode = $i64->constInt(StdlibConstants::PHP_ROUND_HALF_UP, false);
+        if (CompilerVersion::supportsRoundingModeEnum() && 5 === $argc && !NamedOptionalCallArgs::isOmittedOptional($args[4])) {
+            $mode = JitRoundModeArg::lower($context, $args[4], 'number_format', 'rounding_mode', 5);
+        }
 
         return $context->builder->call(
             $context->lookupFunction('__compiler_number_format'),
             $number,
             $decimals,
             $decSep,
-            $thouSep
+            $thouSep,
+            $mode
         );
     }
 

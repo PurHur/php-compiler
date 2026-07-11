@@ -16,7 +16,7 @@ final class JitExifTagname
 {
     public static function invoke(Context $context, JITVariable $indexArg): Value
     {
-        $index = JitImageTypeToExtension::lowerImageType(
+        $index = JitImageTypeArg::lowerImageType(
             $context,
             $indexArg,
             'exif_tagname',

@@ -70,7 +70,7 @@ final class ClassValidator
         $missing = [];
         foreach ($entry->interfaces as $ifaceLc) {
             foreach (self::collectInterfaceMethods($ifaceLc, $context) as $method) {
-                if (!isset($entry->methods[$method]) || isset($entry->abstractMethods[$method])) {
+                if (!self::classProvidesMethod($entry, $method, $context)) {
                     $missing[] = [$ifaceLc, $method];
                 }
             }
@@ -125,6 +125,28 @@ final class ClassValidator
             .(1 === $count ? '' : 's')
             ." and must therefore be declared abstract or implement the remaining methods ({$list})"
         );
+    }
+
+    /**
+     * Zend zend_class_implements_interface — concrete method on class or ancestor (#14756, #14757).
+     */
+    private static function classProvidesMethod(ClassEntry $entry, string $methodLc, Context $context): bool
+    {
+        $visited = [];
+        $current = $entry;
+        while (!isset($visited[strtolower($current->name)])) {
+            $visited[strtolower($current->name)] = true;
+            if (isset($current->methods[$methodLc]) && !isset($current->abstractMethods[$methodLc])) {
+                return true;
+            }
+            $parentLc = $current->parentLc;
+            if (null === $parentLc || '' === $parentLc || !isset($context->classes[$parentLc])) {
+                break;
+            }
+            $current = $context->classes[$parentLc];
+        }
+
+        return false;
     }
 
     /**

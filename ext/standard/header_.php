@@ -17,7 +17,6 @@ use PHPCompiler\JIT\Builtin\HttpResponseCode;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitBoolArg;
 use PHPCompiler\JIT\JitLongArg;
-use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\NamedOptionalCallArgs;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -45,6 +44,14 @@ final class header_ extends Internal
             throw new \LogicException('header() requires one to three arguments');
         }
         $line = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'header', 0, 'header');
+        if (VmSapiHeaderGuard::headersAlreadySent($frame)) {
+            VmSapiHeaderGuard::warnHeadersAlreadySent($frame);
+            if (null !== $frame->returnVar) {
+                $frame->returnVar->null();
+            }
+
+            return;
+        }
         $replace = true;
         $responseCode = 0;
         if (isset($frame->calledArgs[1])) {
@@ -53,23 +60,29 @@ final class header_ extends Internal
         if (isset($frame->calledArgs[2])) {
             $responseCode = VmMath::parseIntBuiltinArg($frame->calledArgs[2], 'header', 3, 'response_code');
         }
-        ResponseContext::assertSafeHeaderLine($line);
+        if (VmSapiHeaderGuard::headerLineContainsNewline($line)) {
+            VmSapiHeaderGuard::warnHeaderNewline($frame);
+            if (null !== $frame->returnVar) {
+                $frame->returnVar->null();
+            }
+
+            return;
+        }
         if (0 !== $responseCode) {
             ResponseContext::setStatus($responseCode);
         } elseif (0 === strncasecmp($line, 'Location:', 9) && ResponseContext::isHttpResponseCodeUnset()) {
             ResponseContext::setStatus(302);
         }
         ResponseContext::addHeader($line, $replace);
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->null();
+        }
     }
 
     public function call(Context $context, JITVariable ...$args): Value
     {
         if ([] === $args || \count($args) > 3) {
             throw new \LogicException('header() requires one to three arguments');
-        }
-        $literal = JitStringArg::compileTimeLiteral($args[0]);
-        if (null !== $literal) {
-            ResponseContext::assertSafeHeaderLine($literal);
         }
         $line = JitStringBuiltinArg::lower($context, $args[0], 'header', 0, 'header');
         if (isset($args[2]) && !NamedOptionalCallArgs::isOmittedOptional($args[2])) {

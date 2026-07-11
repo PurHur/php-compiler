@@ -11,6 +11,7 @@ use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable as VmVariable;
 use PHPLLVM\Builder;
@@ -60,11 +61,21 @@ final class JitFdiv
         string $function = self::FUNCTION,
         string $expectedType = 'float'
     ): Value {
+        if (JITVariable::TYPE_NULL === $arg->type) {
+            if ($context->callerStrictTypes) {
+                if ('number' === $expectedType) {
+                    JitInternalStrictArg::requireNumber($context, $arg, $function, $paramName, $argIndex);
+                } elseif ('float' === $expectedType) {
+                    JitInternalStrictArg::requireFloat($context, $arg, $function, $paramName, $argIndex);
+                }
+            } elseif ('number' === $expectedType) {
+                self::emitNullNumberDeprecation($context, $function, $argIndex, $paramName);
+            }
+
+            return $double->constReal(0.0);
+        }
         if ($context->callerStrictTypes && 'float' === $expectedType) {
             JitInternalStrictArg::requireFloat($context, $arg, $function, $paramName, $argIndex);
-        }
-        if (JITVariable::TYPE_NULL === $arg->type) {
-            return $double->constReal(0.0);
         }
         if (($arg->type & JITVariable::IS_NATIVE_ARRAY) || JITVariable::TYPE_HASHTABLE === $arg->type) {
             self::emitNumericTypeErrorAndAbort($context, $argIndex, $paramName, 'array', $function, $expectedType);
@@ -175,6 +186,11 @@ final class JitFdiv
         $context->builder->branchIf($isNull, $nullBlock, $afterNull);
 
         $context->builder->positionAtEnd($nullBlock);
+        if ($context->callerStrictTypes && 'number' === $expectedType) {
+            self::emitNumericTypeErrorAndAbort($context, $argIndex, $paramName, 'null', $function, $expectedType);
+        } elseif (!$context->callerStrictTypes && 'number' === $expectedType) {
+            self::emitNullNumberDeprecation($context, $function, $argIndex, $paramName);
+        }
         $context->builder->branch($mergeBlock);
 
         $context->builder->positionAtEnd($afterNull);
@@ -385,5 +401,20 @@ final class JitFdiv
             self::numericTypeError($argIndex, $paramName, $given, $function, $expectedType)
         );
         $context->builder->call($context->lookupFunction('abort'));
+    }
+
+    private static function emitNullNumberDeprecation(
+        Context $context,
+        string $function,
+        int $argIndex,
+        string $paramName
+    ): void {
+        if (NestedJitCompileScope::isActive()) {
+            return;
+        }
+        JitBuiltinWarning::emitDeprecated(
+            $context,
+            VmNullNumberParamDeprecation::message($function, $argIndex, $paramName)
+        );
     }
 }

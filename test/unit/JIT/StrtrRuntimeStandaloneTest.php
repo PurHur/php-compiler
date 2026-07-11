@@ -9,7 +9,7 @@ use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Issue #9392: AOT standalone strtr via StrtrTwoStringJitHelper PHP + array LLVM quarantine.
+ * Issue #9392 / #12908: AOT standalone strtr via Strtr*JitHelper PHP nested JIT.
  *
  * @group aot-lint
  */
@@ -27,15 +27,15 @@ final class StrtrRuntimeStandaloneTest extends TestCase
 
         $array = $ctx->lookupFunction('__compiler_strtr_array');
         $this->assertNotNull($array, '__compiler_strtr_array must be linked for standalone AOT');
-        $this->assertGreaterThan(0, $array->countBasicBlocks(), '__compiler_strtr_array must have LLVM body');
+        $this->assertGreaterThan(0, $array->countBasicBlocks(), '__compiler_strtr_array must have LLVM bridge body');
 
         $this->assertNotNull(
             $ctx->functions[\strtolower('PHPCompiler\\ext\\standard\\StrtrTwoStringJitHelper::strtrTwoString')] ?? null,
             'StrtrTwoStringJitHelper must be compiled into standalone module'
         );
-        $this->assertNull(
+        $this->assertNotNull(
             $ctx->functions[\strtolower('PHPCompiler\\ext\\standard\\StrtrArrayJitHelper::strtrArray')] ?? null,
-            'StrtrArrayJitHelper must not compile in standalone (LLVM quarantine)'
+            'StrtrArrayJitHelper must compile in standalone via nested JIT (#12908)'
         );
     }
 }

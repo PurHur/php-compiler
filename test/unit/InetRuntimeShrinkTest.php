@@ -16,13 +16,13 @@ final class InetRuntimeShrinkTest extends TestCase
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/InetRuntime.php');
         $this->assertStringContainsString('InetJitHelper', $source);
-        $this->assertStringContainsString('InetLibcBridge', $source);
+        $this->assertStringNotContainsString('InetLibcBridge', $source);
         $this->assertStringNotContainsString("lookupFunction('inet_pton')", $source);
         $this->assertStringNotContainsString("lookupFunction('inet_ntoa')", $source);
         $this->assertStringNotContainsString("lookupFunction('sscanf')", $source);
+        $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $source);
         $this->assertLessThan(360, \substr_count($source, "\n") + 1);
-        $libc = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/InetLibcBridge.php');
-        $this->assertStringContainsString("lookupFunction('inet_pton')", $libc);
+        $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/InetLibcBridge.php');
     }
 
     public function testInetJitHelperDelegatesToVmInet(): void

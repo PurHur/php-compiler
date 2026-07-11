@@ -6,6 +6,7 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\UserScriptAotDeferNestedJit;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
@@ -44,6 +45,18 @@ final class StringReadfile
             return;
         }
 
+        if (UserScriptAotDeferNestedJit::shouldDefer($context)) {
+            StringReadfileLibc::implement($context);
+
+            return;
+        }
+
+        $savedBlock = null;
+        try {
+            $savedBlock = $context->builder->getInsertBlock();
+        } catch (\Throwable) {
+        }
+
         $fn = null !== $probe
             ? $probe
             : $context->lookupFunction('__compiler_readfile');
@@ -58,7 +71,11 @@ final class StringReadfile
         );
         $context->builder->returnValue($result);
         $context->registerFunction('__compiler_readfile', $fn);
-        $context->builder->clearInsertionPosition();
+        if (null !== $savedBlock) {
+            $context->builder->positionAtEnd($savedBlock);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
     }
 
     private static function helperFunction(Context $context): LlvmFunction

@@ -15,7 +15,7 @@ use PHPLLVM\Value;
 /**
  * gethostbyaddr() — reverse DNS for IPv4 (ext/standard/dns.c parity, #5854).
  *
- * VM: VmDns (libc FFI getnameinfo + /etc/hosts). JIT/AOT: GethostbyaddrJitHelper PHP (#9474).
+ * VM: VmDns (/etc/hosts then UDP PTR via resolv.conf). JIT/AOT: GethostbyaddrJitHelper PHP (#9474).
  *
  * @see https://github.com/php/php-src/blob/master/ext/standard/dns.c PHP_FUNCTION(gethostbyaddr)
  */
@@ -51,15 +51,12 @@ final class gethostbyaddr extends Internal
                     $frame->vmContext,
                     $frame
                 );
-            } elseif (VmDns::ERR_NOT_FOUND === $error) {
-                $frame->vmContext->errors->triggerError(
-                    'Address '.$ip.' is not in the reverse hosts table',
-                    ErrorReporter::E_WARNING,
-                    '' !== $frame->scriptPath ? $frame->scriptPath : null,
-                    $frame->vmContext,
-                    $frame
-                );
             }
+        }
+        if (VmDns::ERR_NOT_FOUND === $error) {
+            $frame->returnVar->string($ip);
+
+            return;
         }
         $frame->returnVar->bool(false);
     }

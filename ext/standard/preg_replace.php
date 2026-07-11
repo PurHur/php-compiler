@@ -9,7 +9,6 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\JitLongArg;
-use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\HashTable;
@@ -59,8 +58,15 @@ final class preg_replace extends Internal
 
             return;
         }
-        $replacementVar = VmPreg::requireStringOrArrayArg($frame->calledArgs[1], 'preg_replace', 1, 'replacement');
-        $subjectVar = VmPreg::requireStringOrArraySubject(
+        $replacementVar = VmPreg::resolveStringOrArrayReplacement(
+            $frame,
+            $frame->calledArgs[1],
+            'preg_replace',
+            1,
+            'replacement'
+        );
+        $subjectVar = VmPreg::resolveStringOrArraySubject(
+            $frame,
             $frame->calledArgs[2],
             'preg_replace',
             2,
@@ -68,16 +74,11 @@ final class preg_replace extends Internal
         );
         $limit = -1;
         if (4 === $argc) {
-            $limitVar = $frame->calledArgs[3]->resolveIndirect();
-            if (Variable::TYPE_INTEGER !== $limitVar->type) {
-                throw new \LogicException(
-                    'preg_replace() limit must be an integer in this compiler build'
-                );
-            }
-            $limit = $limitVar->toInt();
+            $limit = VmMath::parseIntBuiltinArgForFrame($frame, 3, 'preg_replace', 4, 'limit');
         }
 
         $pattern = self::patternOrReplacementOperand($patternVar, $frame->calledArgs[0], 'preg_replace', 0, 'pattern');
+        VmPregFailure::warnPatternCompileFailureOperand($frame, 'preg_replace', $pattern);
         $replacement = self::patternOrReplacementOperand(
             $replacementVar,
             $frame->calledArgs[1],
@@ -112,6 +113,11 @@ final class preg_replace extends Internal
 
         if (false === $result) {
             $frame->returnVar->bool(false);
+
+            return;
+        }
+        if (null === $result) {
+            $frame->returnVar->null();
 
             return;
         }
@@ -172,14 +178,22 @@ final class preg_replace extends Internal
             'pattern',
             'array|string'
         );
-        $replacement = JitStringArg::lower($context, $args[1], 'preg_replace() replacement');
+        $replacement = JitStringBuiltinArg::lower(
+            $context,
+            $args[1],
+            'preg_replace',
+            1,
+            'replacement',
+            'array|string'
+        );
+        JitInternalStrictArg::rejectNullStringOrArray($context, $args[2], 'preg_replace', 'subject', 3);
         JitPregSubject::requireStringOrArray($context, $args[2], 'preg_replace', 2, 'subject');
-        if (JITVariable::TYPE_STRING === $args[2]->type) {
+        if (JitPregSubject::isStringOrCoercibleNullSubject($args[2])) {
             return JitPregReplace::invokeString(
                 $context,
                 $pattern,
                 $replacement,
-                JitStringArg::lower($context, $args[2], 'preg_replace() subject'),
+                JitStringBuiltinArg::lower($context, $args[2], 'preg_replace', 2, 'subject', 'array|string'),
                 $limit
             );
         }
@@ -194,17 +208,23 @@ final class preg_replace extends Internal
             return $context->constantFromInteger($lit, 'int64');
         }
 
-        return JitLongArg::lower($context, $arg, 'preg_replace() argument #4 ($limit)');
+        return JitIntdiv::lowerIntBuiltinArg($context, $arg, 'preg_replace', 4, 'limit');
     }
 
     private static function compileTimeLimit(JITVariable $arg): ?int
     {
-        if (JITVariable::TYPE_NATIVE_LONG !== $arg->type
-            || JITVariable::KIND_VALUE !== $arg->kind) {
-            return null;
+        if (JITVariable::TYPE_NATIVE_LONG === $arg->type
+            && JITVariable::KIND_VALUE === $arg->kind) {
+            if (null !== ($arg->compileTimeLong ?? null)) {
+                return (int) $arg->compileTimeLong;
+            }
         }
-        if (null !== ($arg->compileTimeLong ?? null)) {
-            return (int) $arg->compileTimeLong;
+        if (JITVariable::TYPE_NATIVE_DOUBLE === $arg->type
+            && JITVariable::KIND_VALUE === $arg->kind) {
+            $const = $arg->value;
+            if ($const instanceof Value && $const->isConstant()) {
+                return VmMath::floatToZendLong((float) $const->constDouble());
+            }
         }
 
         return null;

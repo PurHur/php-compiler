@@ -30,6 +30,8 @@ final class PackArgvSerialize
 
     private const TAG_STRING = 4;
 
+    private const TAG_ARRAY = 5;
+
     public static function ensureLinked(Context $context): void
     {
         $probe = $context->module->getNamedFunction('phpc_pack_argv_serialize');
@@ -150,6 +152,8 @@ final class PackArgvSerialize
         $boolBb = $fn->appendBasicBlock('pack_ser_val_bool');
         $checkStringBb = $fn->appendBasicBlock('pack_ser_val_check_string');
         $stringBb = $fn->appendBasicBlock('pack_ser_val_string');
+        $checkArrayBb = $fn->appendBasicBlock('pack_ser_val_check_array');
+        $arrayBb = $fn->appendBasicBlock('pack_ser_val_array');
         $coerceLongBb = $fn->appendBasicBlock('pack_ser_val_coerce_long');
         $after = $fn->appendBasicBlock('pack_ser_val_after');
 
@@ -170,7 +174,11 @@ final class PackArgvSerialize
 
         $context->builder->positionAtEnd($checkStringBb);
         $isString = $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(VmVariable::TYPE_STRING, false));
-        $context->builder->branchIf($isString, $stringBb, $coerceLongBb);
+        $context->builder->branchIf($isString, $stringBb, $checkArrayBb);
+
+        $context->builder->positionAtEnd($checkArrayBb);
+        $isArray = $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(VmVariable::TYPE_ARRAY, false));
+        $context->builder->branchIf($isArray, $arrayBb, $coerceLongBb);
 
         $context->builder->positionAtEnd($nullBb);
         self::writeTagByte($context, $buf, $posSlot, self::TAG_NULL);
@@ -202,16 +210,20 @@ final class PackArgvSerialize
         self::writeTagByte($context, $buf, $posSlot, self::TAG_STRING);
         self::writeI64Le($context, $buf, $posSlot, $slen);
         $pos = $context->builder->load($posSlot);
-        $context->builder->call(
-            $context->lookupFunction('memcpy'),
-            $context->builder->pointerCast($context->builder->gep($buf, $pos), $voidPtr),
-            $context->builder->pointerCast($sdata, $voidPtr),
+        self::memcpyCall(
+            $context,
+            $context->builder->gep($buf, $pos),
+            $sdata,
             $context->builder->truncOrBitCast($slen, $sizeT)
         );
         $context->builder->store(
             $context->builder->add($pos, $context->builder->truncOrBitCast($slen, $sizeT)),
             $posSlot
         );
+        $context->builder->branch($after);
+
+        $context->builder->positionAtEnd($arrayBb);
+        self::writeTagByte($context, $buf, $posSlot, self::TAG_ARRAY);
         $context->builder->branch($after);
 
         $context->builder->positionAtEnd($coerceLongBb);
@@ -221,6 +233,28 @@ final class PackArgvSerialize
         $context->builder->branch($after);
 
         $context->builder->positionAtEnd($after);
+    }
+
+    /**
+     * memcpy against WHATEVER signature the module already declares — the
+     * main script may have declared memcpy(i8*) before this runtime links
+     * (call-site-lazy StringFormat, #15642); casting to a fixed void* then
+     * fails module verify.
+     */
+    private static function memcpyCall(Context $context, Value $dest, Value $src, Value $size): void
+    {
+        $fn = $context->lookupFunction('memcpy');
+        $lib = $context->llvm->lib;
+        $ptrTy = $context->llvm->factory->type(
+            $context->context,
+            $lib->LLVMTypeOf($fn->getParam(0)->value)
+        );
+        $context->builder->call(
+            $fn,
+            $context->builder->pointerCast($dest, $ptrTy),
+            $context->builder->pointerCast($src, $ptrTy),
+            $size
+        );
     }
 
     private static function writeTagByte(Context $context, Value $buf, Value $posSlot, int $tag): void
@@ -241,10 +275,10 @@ final class PackArgvSerialize
         $pos = $context->builder->load($posSlot);
         $mem = BasicBlockHelper::entryAlloca($context, $i64);
         $context->builder->store($val, $mem);
-        $context->builder->call(
-            $context->lookupFunction('memcpy'),
-            $context->builder->pointerCast($context->builder->gep($buf, $pos), $voidPtr),
-            $context->builder->pointerCast($mem, $voidPtr),
+        self::memcpyCall(
+            $context,
+            $context->builder->gep($buf, $pos),
+            $mem,
             $sizeT->constInt(8, false)
         );
         $context->builder->store($context->builder->add($pos, $sizeT->constInt(8, false)), $posSlot);
@@ -258,10 +292,10 @@ final class PackArgvSerialize
         $pos = $context->builder->load($posSlot);
         $mem = BasicBlockHelper::entryAlloca($context, $double);
         $context->builder->store($val, $mem);
-        $context->builder->call(
-            $context->lookupFunction('memcpy'),
-            $context->builder->pointerCast($context->builder->gep($buf, $pos), $voidPtr),
-            $context->builder->pointerCast($mem, $voidPtr),
+        self::memcpyCall(
+            $context,
+            $context->builder->gep($buf, $pos),
+            $mem,
             $sizeT->constInt(8, false)
         );
         $context->builder->store($context->builder->add($pos, $sizeT->constInt(8, false)), $posSlot);

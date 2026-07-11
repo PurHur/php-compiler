@@ -13,6 +13,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\MathAtan2;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
@@ -42,7 +43,7 @@ final class atan2 extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $frame->returnVar->float(\atan2($y, $x));
+        $frame->returnVar->float(VmMath::atan2($y, $x));
     }
 
     public Context $context;
@@ -54,9 +55,8 @@ final class atan2 extends Internal
             throw new \LogicException('atan2() requires exactly two arguments');
         }
         [$y, $x] = JitFdiv::lowerOperands($context, $args[0], $args[1], 'atan2', 'y', 'x', 'float');
-        $fn = $context->lookupFunction('atan2');
 
-        return $context->builder->call($fn, $y, $x);
+        return MathAtan2::invoke($context, $y, $x);
     }
 
 

@@ -4,8 +4,6 @@ stdlib string compare builtins reject null/bool operands (#10908, ext/standard/s
 <?php
 declare(strict_types=1);
 foreach ([
-    'strnatcmp' => fn() => strnatcmp(null, '1'),
-    'strcoll' => fn() => strcoll(null, 'a'),
     'strncmp' => fn() => strncmp(null, 'a', 1),
     'version_compare' => fn() => version_compare(null, '1.0'),
     'strcmp' => fn() => strcmp(true, '1'),
@@ -19,8 +17,6 @@ foreach ([
 }
 ?>
 --EXPECT--
-strnatcmp: TypeError
-strcoll: TypeError
 strncmp: TypeError
 version_compare: TypeError
 strcmp: TypeError

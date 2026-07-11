@@ -35,7 +35,7 @@ final class BootstrapInventoryTriageSyncTest extends TestCase
 
     public function testTriageDiffDetectsRowDrift(): void
     {
-        require self::$root.'/script/bootstrap-inventory-lint-sync-lib.php';
+        require_once self::$root.'/script/bootstrap-inventory-lint-sync-lib.php';
         $live = [
             'scanned' => 100,
             'top' => 50,

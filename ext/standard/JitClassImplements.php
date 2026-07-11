@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\StringClassImplements;
+use PHPCompiler\JIT\Builtin\Type\Object_ as ObjectBuiltin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitStringArg;
@@ -13,51 +15,90 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** LLVM lowering for class_implements() (issue #3099). */
+/**
+ * JIT/AOT helper for class_implements() via ClassImplementsJitHelper PHP (#3099, #16960).
+ *
+ * Compile-time literal class names keep registry fast path; boxed/value operands route through PHP.
+ * php-src: ext/standard/basic_functions.c — PHP_FUNCTION(class_implements)
+ */
 final class JitClassImplements
 {
     private static int $seq = 0;
 
     public static function invoke(Context $context, JITVariable $whatArg, bool $autoload): Value
     {
+        $compileTimeEnum = $whatArg->compileTimeEnumCase ?? null;
+        if (\is_array($compileTimeEnum) && isset($compileTimeEnum['classId'])) {
+            $object = $context->type->object;
+            if ($object instanceof ObjectBuiltin) {
+                return self::invokeForClassName(
+                    $context,
+                    $object->classNameForId((int) $compileTimeEnum['classId']),
+                    $autoload
+                );
+            }
+        }
+
+        $literal = JitStringArg::compileTimeLiteral($whatArg);
+        if (null !== $literal) {
+            return self::invokeForClassName($context, $literal, $autoload);
+        }
+
         if (JITVariable::TYPE_OBJECT === $whatArg->type) {
             return self::invokeForObject($context, $whatArg, $autoload);
         }
 
-        $literal = JitStringArg::compileTimeLiteral($whatArg);
-        if (null === $literal) {
-            if (JITVariable::TYPE_VALUE === $whatArg->type) {
-                $valuePtr = JitValueBox::valuePtrFromVariable($context, $whatArg);
-                $obj = $context->builder->call(
-                    $context->lookupFunction('__value__readObject'),
-                    $valuePtr
-                );
-                $objType = $context->getTypeFromString('__object__*');
-                $isObject = $context->builder->icmp(
-                    Builder::INT_NE,
-                    $obj,
-                    $objType->constNull()
-                );
-                if (!$isObject) {
-                    throw new \LogicException(
-                        'class_implements() argument must be an object or class name string in this compiler build'
-                    );
-                }
-                $objVar = new JITVariable(
-                    $context,
-                    JITVariable::TYPE_OBJECT,
-                    JITVariable::KIND_VALUE,
-                    $obj
-                );
-
-                return self::invokeForObject($context, $objVar, $autoload);
-            }
-            throw new \LogicException(
-                'class_implements() class name must be a string literal in this compiler build'
+        if (JITVariable::TYPE_VALUE === $whatArg->type) {
+            $valuePtr = JitValueBox::valuePtrFromVariable($context, $whatArg);
+            $obj = $context->builder->call(
+                $context->lookupFunction('__value__readObject'),
+                $valuePtr
             );
+            $objVar = new JITVariable(
+                $context,
+                JITVariable::TYPE_OBJECT,
+                JITVariable::KIND_VALUE,
+                $obj
+            );
+
+            return self::invokeForObject($context, $objVar, $autoload);
         }
 
-        return self::invokeForClassName($context, $literal, $autoload);
+        return self::routeThroughPhpHelper($context, $whatArg, $autoload);
+    }
+
+    private static function routeThroughPhpHelper(
+        Context $context,
+        JITVariable $whatArg,
+        bool $autoload
+    ): Value {
+        $operandPtr = self::operandToValueBox($context, $whatArg);
+        $i1 = $context->getTypeFromString('int1');
+        $autoloadVal = $autoload ? $i1->constInt(1, false) : $i1->constInt(0, false);
+
+        return StringClassImplements::invoke($context, $operandPtr, $autoloadVal);
+    }
+
+    private static function operandToValueBox(Context $context, JITVariable $whatArg): Value
+    {
+        if (JITVariable::TYPE_VALUE === $whatArg->type) {
+            return JitValueBox::valuePtrFromVariable($context, $whatArg);
+        }
+        if (JITVariable::TYPE_STRING === $whatArg->type) {
+            $slot = JitValueBox::alloc($context);
+            $ptr = JitValueBox::pointer($context, $slot);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeString'),
+                $ptr,
+                $context->helper->loadValue($whatArg)
+            );
+
+            return $ptr;
+        }
+
+        throw new \LogicException(
+            'class_implements() operand must be a compile-time literal, object, or value box in this compiler build'
+        );
     }
 
     private static function invokeForObject(
@@ -65,9 +106,7 @@ final class JitClassImplements
         JITVariable $objectArg,
         bool $autoload
     ): Value {
-        $obj = JITVariable::TYPE_OBJECT === $objectArg->type
-            ? $context->helper->loadValue($objectArg)
-            : $objectArg->value;
+        $obj = $context->helper->loadValue($objectArg);
         $objMap = $context->structFieldMap['__object__'];
         $classId = $context->builder->load(
             $context->builder->structGep($obj, $objMap['class_id'])
@@ -144,6 +183,10 @@ final class JitClassImplements
                 $context,
                 array_values(VmReflection::classImplementsMap($entry, $vm))
             );
+        }
+
+        if (!$autoload) {
+            return self::returnFalse($context);
         }
 
         return self::returnFalse($context);

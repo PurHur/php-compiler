@@ -13,6 +13,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\MathFloor;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
@@ -31,12 +32,13 @@ final class floor extends Internal
             $frame->calledArgs[0]->resolveIndirect(),
             'floor',
             1,
-            'num'
+            'num',
+            $frame
         );
         if (null === $frame->returnVar) {
             return;
         }
-        $frame->returnVar->float(\floor((float) $num));
+        $frame->returnVar->float(VmMath::floor((float) $num));
     }
 
     public Context $context;
@@ -48,8 +50,7 @@ final class floor extends Internal
             throw new \LogicException('floor() requires exactly one argument');
         }
         $asFloat = JitMathNumberArg::lowerToDouble($context, $args[0], 'floor', 1, 'num');
-        $fn = $context->lookupFunction('floor');
 
-        return $context->builder->call($fn, $asFloat);
+        return MathFloor::invoke($context, $asFloat);
     }
 }

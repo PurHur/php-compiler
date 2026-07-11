@@ -53,6 +53,6 @@ final class PregReplaceCallbackPolicy
 
     public static function vmRejectionMessage(): string
     {
-        return 'preg_replace_callback(): Argument #2 ($callback) must be a valid callback';
+        return 'preg_replace_callback(): Argument #2 ($callback) must be a valid callback, no array or string given';
     }
 }

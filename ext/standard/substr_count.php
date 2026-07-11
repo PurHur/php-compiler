@@ -6,15 +6,17 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\StringSubstrCount;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\JIT\JitValueBox;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
  * substr_count() for two strings with optional offset and length (php-src ext/standard/string.c).
+ *
+ * VM: {@see VmString::substr_count()}; JIT/AOT: {@see StringSubstrCount} → SubstrCountJitHelper PHP (#14691).
  */
 final class substr_count extends Internal
 {
@@ -31,24 +33,11 @@ final class substr_count extends Internal
         $needle = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'substr_count', 1, 'needle');
         $offset = 0;
         if ($argc >= 3) {
-            $offset = VmMath::parseIntBuiltinArg(
-                $frame->calledArgs[2]->resolveIndirect(),
-                'substr_count',
-                3,
-                'offset'
-            );
+            $offset = VmMath::parseIntBuiltinArgForFrame($frame, 2, 'substr_count', 3, 'offset');
         }
         $length = null;
         if (4 === $argc) {
-            $lenVar = $frame->calledArgs[3]->resolveIndirect();
-            if (Variable::TYPE_NULL !== $lenVar->type) {
-                $length = VmMath::parseIntBuiltinArg(
-                    $lenVar,
-                    'substr_count',
-                    4,
-                    'length'
-                );
-            }
+            $length = VmMath::parseNullableIntBuiltinArgForFrame($frame, 3, 'substr_count', 4, 'length');
         }
         $frame->returnVar->int(
             VmString::substr_count($haystack, $needle, $offset, $length)
@@ -65,38 +54,58 @@ final class substr_count extends Internal
             throw new \LogicException('substr_count() requires two to four arguments in this compiler build');
         }
 
+        StringSubstrCount::ensureLinked($context);
+        $i64 = $context->getTypeFromString('int64');
+        $i32 = $context->getTypeFromString('int32');
+        $fn = $context->lookupFunction('phpc_substr_count');
         $hay = JitStringBuiltinArg::lower($context, $args[0], 'substr_count', 0, 'haystack');
         $needle = JitStringBuiltinArg::lower($context, $args[1], 'substr_count', 1, 'needle');
         $offset = $argc >= 3
-            ? $this->jitLong($context, $args[2], 'substr_count() argument #3 ($offset)')
-            : null;
+            ? JitIntdiv::lowerIntBuiltinArgForCaller($context, $args[2], 'substr_count', 3, 'offset')
+            : $i64->constInt(0, false);
 
         if (4 !== $argc) {
-            return JitSubstrCount::count($context, $hay, $needle, $offset, null);
+            return $context->builder->call(
+                $fn,
+                $hay,
+                $needle,
+                $offset,
+                $i64->constInt(0, false),
+                $i32->constInt(0, false)
+            );
         }
 
         if (JITVariable::TYPE_NATIVE_LONG === $args[3]->type
             || JITVariable::TYPE_STRING === $args[3]->type) {
-            $length = $this->jitLong($context, $args[3], 'substr_count() argument #4 ($length)');
+            $length = JitIntdiv::lowerNullableIntBuiltinArgForCaller($context, $args[3], 'substr_count', 4, 'length');
 
-            return JitSubstrCount::count($context, $hay, $needle, $offset, $length);
+            return $context->builder->call(
+                $fn,
+                $hay,
+                $needle,
+                $offset,
+                $length,
+                $i32->constInt(1, false)
+            );
         }
 
         if (JITVariable::TYPE_VALUE !== $args[3]->type) {
             throw new \LogicException('substr_count() length must be an integer or null in this compiler build');
         }
 
-        return $this->jitSubstrCountNullableLength($context, $hay, $needle, $offset, $args[3]);
+        return $this->jitSubstrCountNullableLength($context, $fn, $hay, $needle, $offset, $args[3]);
     }
 
     private function jitSubstrCountNullableLength(
         Context $context,
+        Value $fn,
         Value $hay,
         Value $needle,
-        ?Value $offset,
+        Value $offset,
         JITVariable $lengthArg
     ): Value {
         $i64 = $context->getTypeFromString('int64');
+        $i32 = $context->getTypeFromString('int32');
         $valuePtr = JitValueBox::valuePtrFromVariable($context, $lengthArg);
         $valueMap = $context->structFieldMap['__value__'];
         $typeByte = $context->builder->load($context->builder->structGep($valuePtr, $valueMap['type']));
@@ -113,17 +122,25 @@ final class substr_count extends Internal
         $context->builder->branchIf($isNull, $nullBlock, $lenBlock);
 
         $context->builder->positionAtEnd($nullBlock);
-        $nullResult = JitSubstrCount::count($context, $hay, $needle, $offset, null);
+        $nullResult = $context->builder->call(
+            $fn,
+            $hay,
+            $needle,
+            $offset,
+            $i64->constInt(0, false),
+            $i32->constInt(0, false)
+        );
         $nullEnd = $context->builder->getInsertBlock();
         $context->builder->branch($done);
 
         $context->builder->positionAtEnd($lenBlock);
-        $lenResult = JitSubstrCount::count(
-            $context,
+        $lenResult = $context->builder->call(
+            $fn,
             $hay,
             $needle,
             $offset,
-            $this->jitLong($context, $lengthArg, 'substr_count() argument #4 ($length)')
+            JitIntdiv::lowerNullableIntBuiltinArgForCaller($context, $lengthArg, 'substr_count', 4, 'length'),
+            $i32->constInt(1, false)
         );
         $lenEnd = $context->builder->getInsertBlock();
         $context->builder->branch($done);

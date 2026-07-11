@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\Type\Object_ as JitObjectType;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
@@ -13,11 +14,14 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** LLVM lowering for get_object_id() / spl_object_id() — object handle as ptrToInt (#3537, #3172, #5291). */
+/** LLVM lowering for get_object_id() / spl_object_id() — object handle as ptrToInt (#3537, #3172, #5291, #8941). */
 final class JitGetObjectId
 {
     public static function invoke(Context $context, JITVariable $arg, string $function = 'get_object_id'): Value
     {
+        if (null !== $arg->compileTimeEnumCase) {
+            return self::enumCaseSingletonHandle($context, $arg);
+        }
         if (JITVariable::TYPE_OBJECT === $arg->type) {
             return self::objectHandle($context, $context->helper->loadValue($arg));
         }
@@ -28,6 +32,24 @@ final class JitGetObjectId
         self::emitTypeErrorAndAbort($context, self::scalarTypeError($arg->type, $function));
 
         return $context->constantFromInteger(0, 'int64');
+    }
+
+    private static function enumCaseSingletonHandle(Context $context, JITVariable $arg): Value
+    {
+        $objectType = $context->type->object;
+        if (!$objectType instanceof JitObjectType) {
+            throw new \LogicException('enum case object id requires Object_ JIT helper');
+        }
+        $classId = (int) $arg->compileTimeEnumCase['classId'];
+        $caseKey = (string) $arg->compileTimeEnumCase['caseKey'];
+        $globalName = $objectType->ensureEnumCaseSingletonGlobal($classId, $caseKey);
+        $global = $context->module->getNamedGlobal($globalName);
+        if (null === $global) {
+            throw new \LogicException("Missing enum case singleton global: {$globalName}");
+        }
+        $obj = $context->builder->load($global);
+
+        return self::objectHandle($context, $obj);
     }
 
     public static function boxed(Context $context, JITVariable $arg, string $function = 'get_object_id'): Value

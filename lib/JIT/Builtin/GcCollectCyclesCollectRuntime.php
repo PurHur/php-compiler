@@ -31,6 +31,8 @@ final class GcCollectCyclesCollectRuntime
 
     private const IS_PROTECTED = 'PHPCompiler\\ext\\standard\\GcCollectCyclesJitHelper::isProtected';
 
+    private const COLLECT_EMBED = 'PHPCompiler\\ext\\standard\\GcCollectCyclesJitHelper::collectCyclesEmbed';
+
     /** @var list<string> */
     private const COMPILED_HELPERS = [
         self::RECORD_COLLECT,
@@ -38,7 +40,13 @@ final class GcCollectCyclesCollectRuntime
         self::TOTAL_COLLECTED,
         self::IS_RUNNING,
         self::IS_PROTECTED,
+        self::COLLECT_EMBED,
     ];
+
+    public static function ensureCollectHelperCompiled(Context $context): void
+    {
+        self::ensureJitHelperCompiled($context);
+    }
 
     public static function implementCollectBridge(Context $context): void
     {

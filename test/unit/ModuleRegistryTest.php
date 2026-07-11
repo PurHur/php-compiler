@@ -24,6 +24,9 @@ final class ModuleRegistryTest extends TestCase
         $this->assertTrue(VmInfo::extension_loaded('date'));
         $this->assertTrue(VmInfo::extension_loaded('pcre'));
         $this->assertTrue(VmInfo::extension_loaded('zlib'));
+        $this->assertTrue(VmInfo::extension_loaded('openssl'));
+        $this->assertFalse(VmInfo::extension_loaded('curl'));
+        $this->assertFalse(VmInfo::extension_loaded('sqlite3'));
         $this->assertFalse(VmInfo::extension_loaded('nonexistent_xyz'));
 
         $this->assertNotFalse(VmInfo::phpversion('zip'));
@@ -90,6 +93,11 @@ final class ModuleRegistryTest extends TestCase
         $this->assertNotContains('gzdeflate', ModuleRegistry::getExtensionFunctions('standard') ?? []);
 
         $this->assertNull(ModuleRegistry::getExtensionFunctions('missing_ext'));
+
+        $advertised = ModuleRegistry::advertisedInternalFunctionNames();
+        $this->assertContains('ctype_alnum', $advertised);
+        $this->assertContains('filter_var', $advertised);
+        $this->assertContains('strlen', $advertised);
 
         unset($runtime);
     }

@@ -7,6 +7,7 @@ echo session_start() ? 'again' : 'closed', "\n";
 session_write_close();
 echo session_start() ? 'reopened' : 'no', "\n";
 --EXPECT--
+PHP Notice:  session_start(): Ignoring session_start() because a session is already active in - on line 3
 started
-closed
+again
 reopened

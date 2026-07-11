@@ -20,6 +20,9 @@ final class VmPhpFdStream
 
     private const CHUNK = 8192;
 
+  /** Linux EAGAIN / EWOULDBLOCK — non-blocking read with no data (php-src streams.c). */
+    private const EAGAIN = 11;
+
     /** PHP LOCK_* operands (ext/standard/flock.c). */
     private const PHP_LOCK_SH = 1;
 
@@ -129,6 +132,46 @@ final class VmPhpFdStream
         return self::$streams[$handle]->fd ?? null;
     }
 
+    public static function ownsFd(int $fd): bool
+    {
+        foreach (self::$streams as $state) {
+            if ($state->fd === $fd) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public static function setBlockingOnFd(int $fd, bool $mode): bool
+    {
+        if ($fd < 0 || !self::ownsFd($fd)) {
+            return false;
+        }
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return false;
+        }
+
+        try {
+            $flags = (int) $ffi->fcntl($fd, 3, 0);
+            if (-1 === $flags) {
+                return false;
+            }
+            $nonBlockMask = ~2048;
+            $newFlags = $mode
+                ? ($flags & $nonBlockMask)
+                : ($flags | 2048);
+            if (-1 === (int) $ffi->fcntl($fd, 4, $newFlags)) {
+                return false;
+            }
+
+            return true;
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
     public static function uriForHandle(int $handle): string
     {
         return self::$streams[$handle]->uri ?? '';
@@ -139,6 +182,9 @@ final class VmPhpFdStream
         $state = self::$streams[$handle] ?? null;
         if (null === $state || !$state->canRead || $length < 0) {
             return false;
+        }
+        if (VmFs::handleBlocked($handle)) {
+            VmProcessProcOpenNative::resumeChildForPipeHandle($handle);
         }
         if (0 === $length) {
             return '';
@@ -160,6 +206,10 @@ final class VmPhpFdStream
                 $chunk = min(self::CHUNK, $remaining);
                 $n = (int) $ffi->read($state->fd, \FFI::addr($buf[0]), $chunk);
                 if ($n < 0) {
+                    if (!VmFs::handleBlocked($handle) && self::isWouldBlockErrno(self::readErrno())) {
+                        return '';
+                    }
+
                     return false;
                 }
                 if (0 === $n) {
@@ -181,6 +231,9 @@ final class VmPhpFdStream
         $state = self::$streams[$handle] ?? null;
         if (null === $state || !$state->canWrite) {
             return false;
+        }
+        if (VmFs::handleBlocked($handle)) {
+            VmProcessProcOpenNative::resumeChildForPipeHandle($handle);
         }
         if (null !== $length && $length < 0) {
             return 0;
@@ -348,6 +401,7 @@ final class VmPhpFdStream
         }
         unset(self::$streams[$handle]);
         self::closeFd($state->fd);
+        VmProcessProcOpenNative::onPipeHandleClosed($handle);
 
         return true;
     }
@@ -566,6 +620,18 @@ final class VmPhpFdStream
         }
     }
 
+    private static function readErrno(): int
+    {
+        $ffi = self::ffi();
+
+        return null !== $ffi ? (int) $ffi->errno : (int) \FFI::errno();
+    }
+
+    private static function isWouldBlockErrno(int $errno): bool
+    {
+        return self::EAGAIN === $errno;
+    }
+
     private static function ffiEnabled(): bool
     {
         $v = getenv('PHP_COMPILER_DISABLE_FFI');
@@ -605,6 +671,8 @@ int dup(int oldfd);
 int flock(int fd, int operation);
 int fsync(int fd);
 int fdatasync(int fd);
+int fcntl(int fd, int cmd, ...);
+extern int errno;
 CDEF;
 
         foreach (['libc.so.6', 'libc.so'] as $lib) {

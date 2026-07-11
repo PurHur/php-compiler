@@ -20,6 +20,8 @@ final class M3EmitTuCompileDriverGateTest extends TestCase
         $this->assertStringContainsString('m3EmitTuCompilerCompileChainLoweringSuffixes', $jit);
         $this->assertStringContainsString('isM3EmitTuRuntimeCompileDriverSpineLoweringName', $jit);
         $this->assertStringContainsString('shouldRealLowerInventoryArgvParseSpine', $jit);
+        $this->assertStringContainsString('shouldRealLowerInventoryArgvParseSpine())', $jit);
+        $this->assertStringContainsString('emitparseandcompilenulldiagnostic', $jit);
         $this->assertStringContainsString('shouldUseM4InventoryArgvNativeEmitRebuild', $jit);
         $this->assertStringContainsString('isLiteralIncludeDiscoveryRealLoweringMethod', $jit);
         $this->assertStringContainsString('isDeployRootRealLoweringMethod', $jit);
@@ -29,6 +31,7 @@ final class M3EmitTuCompileDriverGateTest extends TestCase
         $this->assertStringContainsString('exitWithStatus', $emit);
         $this->assertStringContainsString('return true;', $emit);
         $this->assertStringContainsString('contentMatchOnly', $aot);
+        $this->assertStringContainsString('!$objectOnlySidecar', $aot);
         $this->assertStringContainsString('COMPILER_LIB_SOURCE_PATH_NORM', $aot);
         $this->assertStringContainsString('COMPILER_LIB_SIDECAR_REL === $sidecarRel', $jit);
         $this->assertStringContainsString("memLimit = '8192M'", $jit);

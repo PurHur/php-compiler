@@ -39,6 +39,7 @@ final class preg_replace_callback extends Internal
         }
 
         $pattern = VmReflection::stringArg($frame->calledArgs[0], 'preg_replace_callback() pattern', 0);
+        VmPregFailure::warnPatternCompileFailure($frame, 'preg_replace_callback', $pattern);
         $callbackVar = $frame->calledArgs[1]->resolveIndirect();
         $subjectVar = VmPreg::requireStringOrArraySubject(
             $frame->calledArgs[2],

@@ -28,7 +28,7 @@ final class VmPregReplaceCallback
         }
         if (!VmCallableInvoke::isInvokable($callback)) {
             throw new \TypeError(
-                'preg_replace_callback(): Argument #2 ($callback) must be a valid callback'
+                'preg_replace_callback(): Argument #2 ($callback) must be a valid callback, no array or string given'
             );
         }
 

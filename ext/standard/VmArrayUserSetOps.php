@@ -67,9 +67,16 @@ final class VmArrayUserSetOps
     private static function runValueOp(Frame $frame, string $fn, bool $intersect): void
     {
         $argc = \count($frame->calledArgs);
-        if ($argc < 3) {
+        if ($argc < 2) {
             throw new \ArgumentCountError(
-                $fn.'() expects at least 3 arguments, '.$argc.' given'
+                $fn.'() expects at least 2 arguments, '.$argc.' given'
+            );
+        }
+        if ($argc < 3) {
+            VmArraySortCallback::requireUassocCallback(
+                $frame->calledArgs[$argc - 1],
+                $fn,
+                $argc
             );
         }
         $dataCompare = self::resolveCompareCallback($frame, $frame->calledArgs[$argc - 1], $fn, $argc);
@@ -98,22 +105,61 @@ final class VmArrayUserSetOps
         bool $dualCompare
     ): void {
         $argc = \count($frame->calledArgs);
-        $minArgs = $dualCompare ? 4 : 3;
-        if ($argc < $minArgs) {
-            throw new \ArgumentCountError(
-                $fn.'() expects at least '.$minArgs.' arguments, '.$argc.' given'
+        $arrayCount = self::countLeadingArrayArgs($frame->calledArgs);
+        $callbackCount = $argc - $arrayCount;
+
+        if ($dualCompare) {
+            if ($callbackCount < 2) {
+                if ($argc < 3) {
+                    throw new \ArgumentCountError(
+                        $fn.'() expects at least 3 arguments, '.$argc.' given'
+                    );
+                }
+                // php-src "+ff": missing key comparator → TypeError on arg #2 when 2+ arrays given.
+                if ($arrayCount >= 2) {
+                    VmArraySortCallback::requireUassocCallback(
+                        $frame->calledArgs[1],
+                        $fn,
+                        2
+                    );
+                } else {
+                    VmArraySortCallback::requireUassocCallback(
+                        $frame->calledArgs[$argc - 1],
+                        $fn,
+                        $argc + 1
+                    );
+                }
+
+                return;
+            }
+            $dataCompare = self::resolveCompareCallback(
+                $frame,
+                $frame->calledArgs[$arrayCount],
+                $fn,
+                $arrayCount + 1
             );
+            $keyCompare = self::resolveCompareCallback(
+                $frame,
+                $frame->calledArgs[$arrayCount + 1],
+                $fn,
+                $arrayCount + 2
+            );
+            $arrayEnd = $arrayCount;
+        } else {
+            if ($argc < 3) {
+                throw new \ArgumentCountError(
+                    $fn.'() expects at least 3 arguments, '.$argc.' given'
+                );
+            }
+            $keyCompare = self::resolveCompareCallback(
+                $frame,
+                $frame->calledArgs[$argc - 1],
+                $fn,
+                $argc
+            );
+            $dataCompare = null;
+            $arrayEnd = $argc - 1;
         }
-        $keyCompare = self::resolveCompareCallback(
-            $frame,
-            $frame->calledArgs[$argc - 1],
-            $fn,
-            $argc
-        );
-        $dataCompare = $dualCompare
-            ? self::resolveCompareCallback($frame, $frame->calledArgs[$argc - 2], $fn, $argc - 1)
-            : null;
-        $arrayEnd = $dualCompare ? $argc - 2 : $argc - 1;
         $first = VmArray::requireArrayParam($frame->calledArgs[0], $fn, 1, 'array');
         $others = self::collectOtherArrays($frame, $fn, 1, $arrayEnd);
         if (null === $frame->returnVar) {
@@ -153,7 +199,9 @@ final class VmArrayUserSetOps
                 $argc
             );
         }
-        $dataCompare = self::resolveCompareCallback($frame, $frame->calledArgs[$argc - 1], 'array_diff_uassoc', $argc);
+        // php-src: array_diff_uassoc — user key compare + internal data compare (ext/standard/array.c).
+        $keyCompare = self::resolveCompareCallback($frame, $frame->calledArgs[$argc - 1], 'array_diff_uassoc', $argc);
+        $dataCompare = self::internalDataCompareCallable();
         $first = VmArray::requireArrayParam($frame->calledArgs[0], 'array_diff_uassoc', 1, 'array');
         $others = self::collectOtherArrays($frame, 'array_diff_uassoc', 1, $argc - 1);
         if (null === $frame->returnVar) {
@@ -161,7 +209,7 @@ final class VmArrayUserSetOps
         }
         $out = new HashTable();
         foreach ($first->iterateKeyed(true) as [$key, $value]) {
-            if (self::exactPairInAnyOther($key, $value, $others, $dataCompare)) {
+            if (self::pairInAnyOther($key, $value, $others, $keyCompare, $dataCompare)) {
                 continue;
             }
             self::appendToOutput($out, $key, $value);
@@ -184,12 +232,14 @@ final class VmArrayUserSetOps
                 $argc
             );
         }
-        $dataCompare = self::resolveCompareCallback(
+        // php-src: array_intersect_uassoc — user key compare + internal data compare (ext/standard/array.c).
+        $keyCompare = self::resolveCompareCallback(
             $frame,
             $frame->calledArgs[$argc - 1],
             'array_intersect_uassoc',
             $argc
         );
+        $dataCompare = self::internalDataCompareCallable();
         $first = VmArray::requireArrayParam($frame->calledArgs[0], 'array_intersect_uassoc', 1, 'array');
         $others = self::collectOtherArrays($frame, 'array_intersect_uassoc', 1, $argc - 1);
         if (null === $frame->returnVar) {
@@ -197,7 +247,7 @@ final class VmArrayUserSetOps
         }
         $out = new HashTable();
         foreach ($first->iterateKeyed(true) as [$key, $value]) {
-            if (!self::exactPairInAllOthers($key, $value, $others, $dataCompare)) {
+            if (!self::pairInAllOthers($key, $value, $others, $keyCompare, $dataCompare)) {
                 continue;
             }
             self::appendToOutput($out, $key, $value);
@@ -276,7 +326,7 @@ final class VmArrayUserSetOps
             $closure = VmClosureCall::resolve($callback);
             $ctx = $frame->vmContext;
 
-            return static fn (Variable $a, Variable $b): int => VmClosureCall::invokeTwo($ctx, $closure, $a, $b);
+            return static fn (Variable $a, Variable $b): int => VmClosureCall::invokeTwoForUserCompare($ctx, $closure, $a, $b);
         }
         if (Variable::TYPE_STRING === $callback->type) {
             $name = $callback->toString();
@@ -313,7 +363,7 @@ final class VmArrayUserSetOps
         $needle = $needle->resolveIndirect();
         foreach ($others as $haystack) {
             foreach ($haystack->iterate(true) as $value) {
-                if (0 === $compare($needle, $value->resolveIndirect())) {
+                if (self::compareResultIsZero($compare($needle, $value->resolveIndirect()))) {
                     return true;
                 }
             }
@@ -334,7 +384,7 @@ final class VmArrayUserSetOps
             }
         }
 
-        return [] !== $others;
+        return true;
     }
 
     /**
@@ -351,11 +401,11 @@ final class VmArrayUserSetOps
     ): bool {
         foreach ($others as $haystack) {
             foreach ($haystack->iterateKeyed(true) as [$otherKey, $otherValue]) {
-                if (0 !== $keyCompare($key, $otherKey)) {
+                if (self::compareResultNonZero($keyCompare($key, $otherKey))) {
                     continue;
                 }
                 if (null !== $dataCompare) {
-                    if (0 === $dataCompare($value, $otherValue)) {
+                    if (self::compareResultIsZero($dataCompare($value, $otherValue))) {
                         return true;
                     }
                     continue;
@@ -387,7 +437,7 @@ final class VmArrayUserSetOps
             }
         }
 
-        return [] !== $others;
+        return true;
     }
 
     /**
@@ -405,7 +455,7 @@ final class VmArrayUserSetOps
             if (null === $otherValue) {
                 continue;
             }
-            if (0 === $dataCompare($value, $otherValue)) {
+            if (self::compareResultIsZero($dataCompare($value, $otherValue))) {
                 return true;
             }
         }
@@ -428,12 +478,12 @@ final class VmArrayUserSetOps
             if (null === $otherValue) {
                 return false;
             }
-            if (0 !== $dataCompare($value, $otherValue)) {
+            if (self::compareResultNonZero($dataCompare($value, $otherValue))) {
                 return false;
             }
         }
 
-        return [] !== $others;
+        return true;
     }
 
     /**
@@ -444,7 +494,7 @@ final class VmArrayUserSetOps
     {
         foreach ($others as $haystack) {
             foreach ($haystack->iterateKeyed(true) as [$otherKey, $_]) {
-                if (0 === $keyCompare($key, $otherKey)) {
+                if (self::compareResultIsZero($keyCompare($key, $otherKey))) {
                     return true;
                 }
             }
@@ -465,7 +515,7 @@ final class VmArrayUserSetOps
             }
         }
 
-        return [] !== $others;
+        return true;
     }
 
     private static function valueAtExactKey(HashTable $table, Variable $key): ?Variable
@@ -494,5 +544,47 @@ final class VmArrayUserSetOps
         } else {
             $out->add($key->toString(), $stored);
         }
+    }
+
+    /**
+     * php-src php_array_data_compare_string_unstable / zval_compare for uassoc value legs.
+     *
+     * @return callable(Variable, Variable): int
+     */
+    private static function internalDataCompareCallable(): callable
+    {
+        return static function (Variable $left, Variable $right): int {
+            return $left->resolveIndirect()->equals($right->resolveIndirect()) ? 0 : 1;
+        };
+    }
+
+    /**
+     * php-src compare_function treats bool callback results like loose int coercion (#11219).
+     */
+    private static function compareResultIsZero(mixed $result): bool
+    {
+        return 0 == $result;
+    }
+
+    private static function compareResultNonZero(mixed $result): bool
+    {
+        return !self::compareResultIsZero($result);
+    }
+
+    /**
+     * @param list<Variable> $args
+     */
+    private static function countLeadingArrayArgs(array $args): int
+    {
+        $count = 0;
+        foreach ($args as $arg) {
+            if (Variable::TYPE_ARRAY === $arg->resolveIndirect()->type) {
+                ++$count;
+            } else {
+                break;
+            }
+        }
+
+        return $count;
     }
 }

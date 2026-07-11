@@ -13,12 +13,9 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
-use PHPCompiler\JIT\ArrayBuiltinHelper;
+use PHPCompiler\JIT\Builtin\ArrayShiftRuntime;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitReferencableCheck;
-use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
@@ -31,18 +28,9 @@ final class array_shift extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('array_shift() requires exactly one argument');
         }
-        $array = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_ARRAY !== $array->type) {
-            throw new \LogicException('array_shift() argument must be an array in this compiler build');
-        }
-        $ht = $array->toArray();
-        $shifted = $ht->shiftFirst();
+        $ht = VmArray::requireArrayParam($frame->calledArgs[0], 'array_shift', 1, 'array');
+        $shifted = ArrayShiftJitHelper::shift($ht);
         if (null === $frame->returnVar) {
-            return;
-        }
-        if (null === $shifted) {
-            $frame->returnVar->null();
-
             return;
         }
         $frame->returnVar->copyFrom($shifted);
@@ -55,15 +43,13 @@ final class array_shift extends Internal
         if (1 !== \count($args)) {
             throw new \LogicException('array_shift() requires exactly one argument');
         }
-        if (!JitReferencableCheck::guardArrayMutatorByRefArg($context, 'array_shift', $args[0])) {
-            return JitValueBox::pointer($context, JitValueBox::alloc($context));
-        }
+        JitArrayElem::requireArrayParam($context, $args[0], 'array_shift', 1, 'array');
 
         foreach ($args as $i => $arg) {
             if (JITVariable::TYPE_STRING === $arg->type || JITVariable::TYPE_VALUE === $arg->type) {
                 $this->jitString($context, $arg, 'array_shift() argument #'.((int) $i + 1));
             }
         }
-        return ArrayBuiltinHelper::shiftFirst($context, $args[0]);
+        return ArrayShiftRuntime::shift($context, $args[0]);
     }
 }

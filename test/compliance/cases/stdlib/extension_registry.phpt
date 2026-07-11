@@ -27,7 +27,7 @@ echo phpversion('nonexistent_xyz_9050') === false ? "unknown_ver_ok\n" : "bad\n"
 --EXPECT--
 std_loaded
 spl_loaded
-ossl_loaded
+ossl_missing
 json_loaded
 pcre_loaded
 zlib_loaded

@@ -6,17 +6,16 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
-use PHPCompiler\JIT\ArrayBuiltinHelper;
+use PHPCompiler\JIT\Builtin\ShuffleRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
  * shuffle() — randomize array values in place (issue #2310, #4460).
  *
  * VM: Fisher–Yates via CSPRNG; associative arrays reindex to 0..n-1.
- * JIT/AOT: {@see ArrayBuiltinHelper::shufflePacked()}.
+ * JIT/AOT: {@see ShuffleRuntime::shufflePacked()}.
  */
 final class shuffle_ extends Internal
 {
@@ -30,11 +29,8 @@ final class shuffle_ extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('shuffle() requires exactly one argument');
         }
-        $array = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_ARRAY !== $array->type) {
-            throw new \LogicException('shuffle() argument must be an array in this compiler build');
-        }
-        VmArray::shufflePacked($array->toArray());
+        $ht = VmArray::requireArray($frame->calledArgs[0], 'shuffle');
+        VmArray::shufflePacked($ht);
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool(true);
         }
@@ -45,7 +41,8 @@ final class shuffle_ extends Internal
         if (1 !== \count($args)) {
             throw new \LogicException('shuffle() requires exactly one argument');
         }
-        ArrayBuiltinHelper::shufflePacked($context, $args[0]);
+        JitArrayElem::requireArrayArg($context, $args[0], 'shuffle');
+        ShuffleRuntime::shufflePacked($context, $args[0]);
 
         return $context->getTypeFromString('int1')->constInt(1, false);
     }

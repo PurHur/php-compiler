@@ -26,12 +26,7 @@ final class getrusage extends Internal
         }
         $who = 0;
         if (1 === $argc) {
-            $who = VmMath::parseIntBuiltinArg(
-                $frame->calledArgs[0]->resolveIndirect(),
-                'getrusage',
-                1,
-                'mode'
-            );
+            $who = VmGetrusageArg::parseMode($frame->calledArgs[0]);
         }
         if (null === $frame->returnVar) {
             return;

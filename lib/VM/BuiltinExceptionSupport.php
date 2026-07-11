@@ -24,11 +24,19 @@ final class BuiltinExceptionSupport
     public const CLASS_PARSE_ERROR = 'parseerror';
     public const CLASS_REFLECTION_EXCEPTION = 'reflectionexception';
     public const CLASS_JSON_EXCEPTION = 'jsonexception';
+    public const CLASS_DOM_EXCEPTION = 'domexception';
+    public const CLASS_SODIUM_EXCEPTION = 'sodiumexception';
     public const CLASS_EXCEPTION = 'exception';
     public const CLASS_LOGIC_EXCEPTION = 'logicexception';
+    public const CLASS_INVALID_ARGUMENT_EXCEPTION = 'invalidargumentexception';
+    public const CLASS_BAD_METHOD_CALL_EXCEPTION = 'badmethodcallexception';
+    public const CLASS_OUT_OF_BOUNDS_EXCEPTION = 'outofboundsexception';
     public const CLASS_DATE_INVALID_TIME_ZONE_EXCEPTION = 'dateinvalidtimezoneexception';
     public const CLASS_DATE_MALFORMED_INTERVAL_EXCEPTION = 'datemalformedintervalexception';
+    public const CLASS_DATE_MALFORMED_STRING_EXCEPTION = 'datemalformedstringexception';
+    public const CLASS_DATE_INVALID_OPERATION_EXCEPTION = 'dateinvalidoperationexception';
     public const CLASS_DATE_MALFORMED_PERIOD_EXCEPTION = 'datemalformedperiodexception';
+    public const CLASS_DATE_MALFORMED_PERIOD_STRING_EXCEPTION = 'datemalformedperiodstringexception';
     public const CLASS_DATE_ERROR = 'dateerror';
     public const CLASS_DATE_OBJECT_ERROR = 'dateobjecterror';
     public const CLASS_DATE_RANGE_ERROR = 'daterangeerror';
@@ -130,15 +138,81 @@ final class BuiltinExceptionSupport
         return $var;
     }
 
+    public static function materializeDomException(
+        Context $ctx,
+        string $message,
+        string $file = '',
+        int $line = 0,
+        int $code = 0
+    ): Variable {
+        $var = self::materializeThrowable($ctx, self::CLASS_DOM_EXCEPTION, $message, $file, $line);
+        $var->toObject()->getProperty(ExceptionSupport::PROP_CODE)->int($code);
+
+        return $var;
+    }
+
+    public static function materializeSodiumException(
+        Context $ctx,
+        string $message,
+        string $file = '',
+        int $line = 0
+    ): Variable {
+        return self::materializeThrowable($ctx, self::CLASS_SODIUM_EXCEPTION, $message, $file, $line);
+    }
+
     public static function materializeDateInvalidTimeZoneException(
         Context $ctx,
         string $message,
         string $file = '',
         int $line = 0
     ): Variable {
+        if (!isset($ctx->classes[self::CLASS_DATE_INVALID_TIME_ZONE_EXCEPTION])) {
+            return self::materializeException($ctx, $message, $file, $line);
+        }
+
         return self::materializeThrowable(
             $ctx,
             self::CLASS_DATE_INVALID_TIME_ZONE_EXCEPTION,
+            $message,
+            $file,
+            $line
+        );
+    }
+
+    /** php-src ext/date/php_date.c — malformed DateTime string (#7113, #16926). */
+    public static function materializeDateMalformedStringException(
+        Context $ctx,
+        string $message,
+        string $file = '',
+        int $line = 0
+    ): Variable {
+        if (!isset($ctx->classes[self::CLASS_DATE_MALFORMED_STRING_EXCEPTION])) {
+            return self::materializeException($ctx, $message, $file, $line);
+        }
+
+        return self::materializeThrowable(
+            $ctx,
+            self::CLASS_DATE_MALFORMED_STRING_EXCEPTION,
+            $message,
+            $file,
+            $line
+        );
+    }
+
+    /** php-src ext/date/php_date.c — illegal date mutation (#6048). */
+    public static function materializeDateInvalidOperationException(
+        Context $ctx,
+        string $message,
+        string $file = '',
+        int $line = 0
+    ): Variable {
+        if (!isset($ctx->classes[self::CLASS_DATE_INVALID_OPERATION_EXCEPTION])) {
+            return self::materializeException($ctx, $message, $file, $line);
+        }
+
+        return self::materializeThrowable(
+            $ctx,
+            self::CLASS_DATE_INVALID_OPERATION_EXCEPTION,
             $message,
             $file,
             $line
@@ -152,6 +226,10 @@ final class BuiltinExceptionSupport
         string $file = '',
         int $line = 0
     ): Variable {
+        if (!isset($ctx->classes[self::CLASS_DATE_MALFORMED_INTERVAL_EXCEPTION])) {
+            return self::materializeException($ctx, $message, $file, $line);
+        }
+
         return self::materializeThrowable(
             $ctx,
             self::CLASS_DATE_MALFORMED_INTERVAL_EXCEPTION,
@@ -168,9 +246,33 @@ final class BuiltinExceptionSupport
         string $file = '',
         int $line = 0
     ): Variable {
+        if (!isset($ctx->classes[self::CLASS_DATE_MALFORMED_PERIOD_EXCEPTION])) {
+            return self::materializeException($ctx, $message, $file, $line);
+        }
+
         return self::materializeThrowable(
             $ctx,
             self::CLASS_DATE_MALFORMED_PERIOD_EXCEPTION,
+            $message,
+            $file,
+            $line
+        );
+    }
+
+    /** php-src ext/date/php_date.c — malformed DatePeriod ISO8601 spec (#7296). */
+    public static function materializeDateMalformedPeriodStringException(
+        Context $ctx,
+        string $message,
+        string $file = '',
+        int $line = 0
+    ): Variable {
+        if (!isset($ctx->classes[self::CLASS_DATE_MALFORMED_PERIOD_STRING_EXCEPTION])) {
+            return self::materializeDateMalformedPeriodException($ctx, $message, $file, $line);
+        }
+
+        return self::materializeThrowable(
+            $ctx,
+            self::CLASS_DATE_MALFORMED_PERIOD_STRING_EXCEPTION,
             $message,
             $file,
             $line
@@ -183,6 +285,10 @@ final class BuiltinExceptionSupport
         string $file = '',
         int $line = 0
     ): Variable {
+        if (!isset($ctx->classes[self::CLASS_DATE_RANGE_ERROR])) {
+            return self::materializeError($ctx, $message, $file, $line);
+        }
+
         return self::materializeThrowable($ctx, self::CLASS_DATE_RANGE_ERROR, $message, $file, $line);
     }
 
@@ -192,6 +298,10 @@ final class BuiltinExceptionSupport
         string $file = '',
         int $line = 0
     ): Variable {
+        if (!isset($ctx->classes[self::CLASS_DATE_OBJECT_ERROR])) {
+            return self::materializeError($ctx, $message, $file, $line);
+        }
+
         return self::materializeThrowable($ctx, self::CLASS_DATE_OBJECT_ERROR, $message, $file, $line);
     }
 
@@ -212,6 +322,58 @@ final class BuiltinExceptionSupport
         int $line = 0
     ): Variable {
         return self::materializeThrowable($ctx, self::CLASS_LOGIC_EXCEPTION, $message, $file, $line);
+    }
+
+    public static function materializeInvalidArgumentException(
+        Context $ctx,
+        string $message,
+        string $file = '',
+        int $line = 0
+    ): Variable {
+        if (!isset($ctx->classes[self::CLASS_INVALID_ARGUMENT_EXCEPTION])) {
+            return self::materializeLogicException($ctx, $message, $file, $line);
+        }
+
+        return self::materializeThrowable($ctx, self::CLASS_INVALID_ARGUMENT_EXCEPTION, $message, $file, $line);
+    }
+
+    public static function materializeBadMethodCallException(
+        Context $ctx,
+        string $message,
+        string $file = '',
+        int $line = 0
+    ): Variable {
+        if (!isset($ctx->classes[self::CLASS_BAD_METHOD_CALL_EXCEPTION])) {
+            return self::materializeLogicException($ctx, $message, $file, $line);
+        }
+
+        return self::materializeThrowable($ctx, self::CLASS_BAD_METHOD_CALL_EXCEPTION, $message, $file, $line);
+    }
+
+    public static function materializeOutOfBoundsException(
+        Context $ctx,
+        string $message,
+        string $file = '',
+        int $line = 0
+    ): Variable {
+        if (!isset($ctx->classes[self::CLASS_OUT_OF_BOUNDS_EXCEPTION])) {
+            return self::materializeRuntimeException($ctx, $message, $file, $line);
+        }
+
+        return self::materializeThrowable($ctx, self::CLASS_OUT_OF_BOUNDS_EXCEPTION, $message, $file, $line);
+    }
+
+    public static function materializeRuntimeException(
+        Context $ctx,
+        string $message,
+        string $file = '',
+        int $line = 0
+    ): Variable {
+        if (!isset($ctx->classes['runtimeexception'])) {
+            return self::materializeException($ctx, $message, $file, $line);
+        }
+
+        return self::materializeThrowable($ctx, 'runtimeexception', $message, $file, $line);
     }
 
     public static function materializeNativeError(Context $ctx, \Error $error, string $file = '', int $line = 0): Variable

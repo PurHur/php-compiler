@@ -30,6 +30,10 @@ final class DebugBacktraceBuiltinTest extends BaseTest
             __DIR__.'/../compliance/cases/stdlib/debug_backtrace_limit_ignore_args.phpt',
             'debug_backtrace_limit_ignore_args.phpt'
         );
+        yield 'debug_backtrace_line_call_site.phpt' => self::parsePHPT(
+            __DIR__.'/../compliance/cases/stdlib/debug_backtrace_line_call_site.phpt',
+            'debug_backtrace_line_call_site.phpt'
+        );
         yield 'get_debug_backtrace_alias.phpt' => self::parsePHPT(
             __DIR__.'/../compliance/cases/stdlib/get_debug_backtrace_alias.phpt',
             'get_debug_backtrace_alias.phpt'
@@ -54,7 +58,7 @@ function outer() {
 }
 outer();
 PHP;
-        $this->assertSame("inner|outer\nkeys\n3\n", $this->runInline($code));
+        $this->assertSame("inner|outer\nkeys\n9\n", $this->runInline($code));
     }
 
     public function testVmDebugBacktraceIgnoreArgs(): void

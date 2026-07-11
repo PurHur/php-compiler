@@ -3,10 +3,10 @@ Language: asymmetric visibility — explicit read + set modifiers (#9724, PHP 8.
 --FILE--
 <?php
 class A {
-    private(set) string $x = 'a';
+    public (private(set)) string $x = 'a';
 }
 class B {
-    private(set) protected int $y = 2;
+    protected (private(set)) int $y = 2;
 }
 $a = new A();
 echo $a->x, "\n";

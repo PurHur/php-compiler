@@ -6,9 +6,11 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitStringArg;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -24,8 +26,15 @@ final class stream_get_line extends Internal
     public function execute(Frame $frame): void
     {
         $argc = \count($frame->calledArgs);
-        if ($argc < 2 || $argc > 3) {
-            throw new \LogicException('stream_get_line() requires two or three arguments in this compiler build');
+        if ($argc < 2) {
+            throw new \ArgumentCountError(
+                'stream_get_line() expects at least 2 arguments, '.$argc.' given'
+            );
+        }
+        if ($argc > 3) {
+            throw new \ArgumentCountError(
+                'stream_get_line() expects at most 3 arguments, '.$argc.' given'
+            );
         }
         $handleVar = $frame->calledArgs[0]->resolveIndirect();
         $maxLenVar = $frame->calledArgs[1]->resolveIndirect();
@@ -62,8 +71,23 @@ final class stream_get_line extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         $argc = \count($args);
-        if ($argc < 2 || $argc > 3) {
-            throw new \LogicException('stream_get_line() requires two or three arguments in this compiler build');
+        if ($argc < 2) {
+            TypeErrorRaise::ensureLinked($context);
+            TypeErrorRaise::emitArgumentCountError(
+                $context,
+                'stream_get_line() expects at least 2 arguments, '.$argc.' given'
+            );
+
+            return JitValueBox::pointer($context, JitValueBox::alloc($context));
+        }
+        if ($argc > 3) {
+            TypeErrorRaise::ensureLinked($context);
+            TypeErrorRaise::emitArgumentCountError(
+                $context,
+                'stream_get_line() expects at most 3 arguments, '.$argc.' given'
+            );
+
+            return JitValueBox::pointer($context, JitValueBox::alloc($context));
         }
         $i64 = $context->getTypeFromString('int64');
         $strPtr = $context->getTypeFromString('__string__*');

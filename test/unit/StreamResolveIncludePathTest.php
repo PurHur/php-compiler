@@ -42,6 +42,23 @@ final class StreamResolveIncludePathTest extends TestCase
         $fn->execute($frame);
     }
 
+    public function testSetIncludePathRejectsEmptyPath(): void
+    {
+        $runtime = new Runtime();
+        $set = new set_include_path();
+        $frame = $set->getFrame($runtime->vmContext);
+        $before = \PHPCompiler\ext\standard\IncludePathJitHelper::get();
+        $emptyArg = new VMVariable();
+        $emptyArg->string('');
+        $frame->calledArgs[] = $emptyArg;
+        $frame->returnVar = new VMVariable();
+        $set->execute($frame);
+        $result = $frame->returnVar->resolveIndirect();
+        $this->assertSame(VMVariable::TYPE_BOOLEAN, $result->type);
+        $this->assertFalse($result->toBool());
+        $this->assertSame($before, \PHPCompiler\ext\standard\IncludePathJitHelper::get());
+    }
+
     public function testResolvesFromIncludePath(): void
     {
         $dir = \sys_get_temp_dir().'/phpc_stream_resolve_'.\getmypid();
@@ -68,5 +85,26 @@ final class StreamResolveIncludePathTest extends TestCase
         $this->assertTrue(\is_file($result->toString()));
         @\unlink($file);
         @\rmdir($dir);
+    }
+
+    public function testDotAndEmptyResolveToCwd(): void
+    {
+        $cwd = \getcwd();
+        if (false === $cwd) {
+            $this->markTestSkipped('getcwd unavailable');
+        }
+        $runtime = new Runtime();
+        $resolve = new stream_resolve_include_path();
+        foreach (['.', ''] as $filename) {
+            $frame = $resolve->getFrame($runtime->vmContext);
+            $nameArg = new VMVariable();
+            $nameArg->string($filename);
+            $frame->calledArgs[] = $nameArg;
+            $frame->returnVar = new VMVariable();
+            $resolve->execute($frame);
+            $result = $frame->returnVar->resolveIndirect();
+            $this->assertSame(VMVariable::TYPE_STRING, $result->type);
+            $this->assertSame($cwd, $result->toString());
+        }
     }
 }

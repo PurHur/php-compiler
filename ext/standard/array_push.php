@@ -14,9 +14,9 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\ArrayBuiltinHelper;
+use PHPCompiler\JIT\Builtin\ArrayPushRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
@@ -24,42 +24,43 @@ use PHPLLVM\Value;
  */
 final class array_push extends Internal
 {
-    private const BY_REF_ERROR =
-        'array_push(): Argument #1 ($array) cannot be passed by reference';
-
     public function execute(Frame $frame): void
     {
-        if (\count($frame->calledArgs) < 1) {
-            throw new \LogicException('array_push() requires at least one argument');
+        $argc = \count($frame->calledArgs);
+        if ($argc < 1) {
+            throw new \ArgumentCountError(\sprintf(
+                'array_push() expects at least 1 argument, %d given',
+                $argc
+            ));
         }
-        $array = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_ARRAY !== $array->type) {
-            throw new \Error(self::BY_REF_ERROR);
-        }
-        $ht = $array->toArray();
+        $ht = VmArray::requireArrayParam($frame->calledArgs[0], 'array_push', 1, 'array');
+        $values = [];
         for ($i = 1, $n = \count($frame->calledArgs); $i < $n; ++$i) {
-            $value = $frame->calledArgs[$i]->resolveIndirect();
-            $copy = new Variable();
-            $copy->copyFrom($value);
-            $ht->append($copy);
+            $values[] = $frame->calledArgs[$i]->resolveIndirect();
         }
+        $count = ArrayPushJitHelper::push($ht, ...$values);
         if (null === $frame->returnVar) {
             return;
         }
-        $frame->returnVar->int($ht->getNumElements());
+        $frame->returnVar->int($count);
     }
 
     public Context $context;
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (\count($args) < 1) {
-            throw new \LogicException('array_push() requires at least one argument');
+        $argc = \count($args);
+        if ($argc < 1) {
+            throw new \ArgumentCountError(\sprintf(
+                'array_push() expects at least 1 argument, %d given',
+                $argc
+            ));
         }
         if (1 === \count($args) && JITVariable::TYPE_HASHTABLE === $args[0]->type) {
             return ArrayBuiltinHelper::pushMergedCallUnpack($context, $args[0]);
         }
         $array = $args[0];
+        JitArrayElem::requireArrayParam($context, $array, 'array_push', 1, 'array');
         if (!JitArrayPush::requireByRefArrayArg($context, $array)) {
             return $context->constantFromInteger(0, 'int64');
         }
@@ -73,7 +74,7 @@ final class array_push extends Internal
                     }
                 }
 
-                return ArrayBuiltinHelper::push($context, $array, ...$values);
+                return ArrayPushRuntime::push($context, $array, ...$values);
             }
             return JitArrayPush::pushWithValueBoxGuard(
                 $context,
@@ -86,7 +87,7 @@ final class array_push extends Internal
                         }
                     }
 
-                    return ArrayBuiltinHelper::push($context, $array, ...$values);
+                    return ArrayPushRuntime::push($context, $array, ...$values);
                 }
             );
         }
@@ -97,6 +98,6 @@ final class array_push extends Internal
             }
         }
 
-        return ArrayBuiltinHelper::push($context, $array, ...$values);
+        return ArrayPushRuntime::push($context, $array, ...$values);
     }
 }

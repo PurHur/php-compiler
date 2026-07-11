@@ -5,15 +5,18 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT;
+use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
  * JIT/AOT embed link for stream lifecycle ABI via StreamLifecycleJitHelper PHP (#9442).
  *
- * Standalone AOT keeps LLVM in {@see StreamLifecycleStandaloneLlvm}.
+ * JIT embed and AOT standalone compile {@see StreamLifecycleJitHelper}; thin LLVM bridges forward the ABI.
  * SSOT: {@see \PHPCompiler\ext\standard\VmFs}, {@see \PHPCompiler\ext\standard\StreamLifecycleJitHelper}
  * php-src: ext/standard/streamsfuncs.c
  */
@@ -65,6 +68,12 @@ final class StreamLifecycleRuntime
         self::implement($context);
     }
 
+    /** Real fclose/feof bridges for user-script stream lowering (#9142). */
+    public static function ensureLinkedForUserScriptLowering(Context $context): void
+    {
+        self::implementRealBridges($context);
+    }
+
     public static function implement(Context $context): void
     {
         $probe = $context->module->getNamedFunction('__compiler_is_resource');
@@ -74,11 +83,18 @@ final class StreamLifecycleRuntime
             return;
         }
 
-        $savedBlock = null;
-        try {
-            $savedBlock = $context->builder->getInsertBlock();
-        } catch (\Throwable) {
+        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
+            self::implementStandalone($context);
+
+            return;
         }
+
+        self::implementRealBridges($context);
+    }
+
+    private static function implementRealBridges(Context $context): void
+    {
+        $savedBlock = BasicBlockHelper::tryGetInsertBlock($context);
 
         self::ensureJitHelperCompiled($context);
         foreach (self::ABI_TO_HELPER as $abi => $helper) {
@@ -91,10 +107,82 @@ final class StreamLifecycleRuntime
         self::registerLinkedRuntime($context);
 
         if (null !== $savedBlock) {
-            $context->builder->positionAtEnd($savedBlock);
+            BasicBlockHelper::restoreInsertBlock($context, $savedBlock);
         } else {
             $context->builder->clearInsertionPosition();
         }
+    }
+
+    private static function implementStandalone(Context $context): void
+    {
+        $savedBlock = BasicBlockHelper::tryGetInsertBlock($context);
+        StreamGlobalsJit::implement($context);
+        self::implementStandaloneIsResource($context);
+        self::implementStandaloneFflush($context);
+        self::implementStandaloneI32RetZero($context, '__compiler_fclose');
+        self::implementStandaloneI32RetZero($context, '__compiler_feof');
+        self::implementStandaloneI32RetZero($context, '__compiler_pclose');
+        self::registerLinkedRuntime($context);
+        if (null !== $savedBlock) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedBlock);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
+    }
+
+    private static function implementStandaloneIsResource(Context $context): void
+    {
+        $abiName = '__compiler_is_resource';
+        $probe = $context->module->getNamedFunction($abiName);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
+
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction(
+                $abiName,
+                $context->context->functionType($i32, false, $i64)
+            );
+
+        $entry = $fn->appendBasicBlock('is_resource_standalone_entry');
+        $context->builder->positionAtEnd($entry);
+        $context->builder->returnValue($i32->constInt(0, false));
+        $context->registerFunction($abiName, $fn);
+        $context->builder->clearInsertionPosition();
+    }
+
+    private static function implementStandaloneFflush(Context $context): void
+    {
+        self::implementStandaloneI32RetZero($context, '__compiler_fflush');
+    }
+
+    private static function implementStandaloneI32RetZero(Context $context, string $abiName): void
+    {
+        $probe = $context->module->getNamedFunction($abiName);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
+
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction(
+                $abiName,
+                $context->context->functionType($i32, false, $i64)
+            );
+        $entry = $fn->appendBasicBlock('stream_lifecycle_standalone_zero');
+        $context->builder->positionAtEnd($entry);
+        $context->builder->returnValue($i32->constInt(0, false));
+        $context->registerFunction($abiName, $fn);
+        $context->builder->clearInsertionPosition();
     }
 
     private static function implementCloseBridge(Context $context, string $abiName, string $helperLogical): void
@@ -108,10 +196,12 @@ final class StreamLifecycleRuntime
 
         $i32 = $context->getTypeFromString('int32');
         $i64 = $context->getTypeFromString('int64');
-        $fn = $context->module->addFunction(
-            $abiName,
-            $context->context->functionType($i32, false, $i64)
-        );
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction(
+                $abiName,
+                $context->context->functionType($i32, false, $i64)
+            );
 
         $entry = $fn->appendBasicBlock('stream_lifecycle_close_bridge_entry');
         $context->builder->positionAtEnd($entry);
@@ -142,10 +232,12 @@ final class StreamLifecycleRuntime
 
         $i32 = $context->getTypeFromString('int32');
         $i64 = $context->getTypeFromString('int64');
-        $fn = $context->module->addFunction(
-            $abiName,
-            $context->context->functionType($i32, false, $i64)
-        );
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction(
+                $abiName,
+                $context->context->functionType($i32, false, $i64)
+            );
 
         $entry = $fn->appendBasicBlock('stream_lifecycle_bridge_entry');
         $context->builder->positionAtEnd($entry);
@@ -219,5 +311,51 @@ final class StreamLifecycleRuntime
             }
             $context->registerFunction($name, $fn);
         }
+    }
+
+    public static function shouldDeferInventoryEmitStubs(Context $context): bool
+    {
+        return StreamIoRuntime::shouldDeferHeavyStreamIoEmitters($context);
+    }
+
+    public static function ensureDeferredStubsForInventoryEmit(Context $context): void
+    {
+        if (!self::shouldDeferInventoryEmitStubs($context)) {
+            return;
+        }
+        self::implementDeferredStubs($context);
+    }
+
+    public static function implementDeferredStubs(Context $context): void
+    {
+        $i32 = $context->getTypeFromString('int32');
+        $zeroI32 = $i32->constInt(0, false);
+
+        foreach (self::RUNTIME_FUNCTIONS as $name) {
+            self::implementI32ParamStub($context, $name, $zeroI32);
+        }
+        self::registerLinkedRuntime($context);
+        $context->builder->clearInsertionPosition();
+    }
+
+    private static function implementI32ParamStub(Context $context, string $name, Value $ret): void
+    {
+        $probe = $context->module->getNamedFunction($name);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction($name, $probe);
+
+            return;
+        }
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $fn = $probe ?? $context->module->addFunction(
+            $name,
+            $context->context->functionType($i32, false, $i64)
+        );
+        $entry = $fn->appendBasicBlock('stream_lifecycle_stub_entry');
+        $context->builder->positionAtEnd($entry);
+        $context->builder->returnValue($ret);
+        $context->registerFunction($name, $fn);
+        $context->builder->clearInsertionPosition();
     }
 }

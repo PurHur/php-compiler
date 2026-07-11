@@ -10,6 +10,8 @@ source "$(dirname "$0")/php-env.sh"
 source "$(dirname "$0")/bootstrap-resolve-compile-invoke.sh"
 # shellcheck source=bootstrap-gen0-install-prelinked-driver.sh
 source "$(dirname "$0")/bootstrap-gen0-install-prelinked-driver.sh"
+# shellcheck source=bootstrap-honest-compile-lib.sh
+source "$(dirname "$0")/bootstrap-honest-compile-lib.sh"
 ci_apply_llvm_memory_env
 ci_ensure_vendor_patches
 
@@ -105,6 +107,7 @@ out="$(bootstrap_compile_invoke "${GEN3}" "${SOURCE}" env PHP_COMPILER_SELFHOST_
 code=$?
 set -e
 printf '%s\n' "${out}"
+bootstrap_honest_compile_gate_check "${out}" "gen-2→gen-3 spine recompile" || exit 2
 DRIVER="${BOOTSTRAP_COMPILE_DRIVER:-${DRIVER}}"
 print_segfault_context "${code}" "${DRIVER}" "${GEN3}" "${SOURCE}"
 if [[ "${code}" -ne 0 ]]; then

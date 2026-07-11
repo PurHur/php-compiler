@@ -20,7 +20,6 @@ $now = date_create();
 echo $now instanceof DateTime ? "now\n" : "bad\n";
 ?>
 --EXPECT--
-PHP Warning:  date_create(): Failed to parse time string (not-a-date)
 11
 2026-06-01
 2026-06-01 12:00:00

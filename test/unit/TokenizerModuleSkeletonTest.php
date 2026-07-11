@@ -77,4 +77,29 @@ PHP;
 
         self::assertSame('T_ECHO', $frame->returnVar->toString());
     }
+
+    /** Issue #6077 — PhpToken::{tokenize,is,getTokenName,isIgnorable} OOP API. */
+    public function test_phptoken_oop_api_issue_6077(): void
+    {
+        if (!\defined('T_ECHO')) {
+            self::markTestSkipped('T_ECHO not defined');
+        }
+
+        $code = <<<'PHP'
+<?php
+$tokens = PhpToken::tokenize('<?php echo 1;');
+echo (int) class_exists('PhpToken');
+echo (int) method_exists('PhpToken', 'tokenize');
+echo $tokens[1]->id;
+echo $tokens[1]->getTokenName();
+echo (int) $tokens[1]->is(T_ECHO);
+echo (int) $tokens[0]->isIgnorable();
+echo $tokens[1]->__toString();
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'phptoken_6077.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame('11291T_ECHO11echo', ob_get_clean());
+    }
 }

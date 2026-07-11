@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\mbstring;
 
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\ModuleAbstract;
 use PHPCompiler\Runtime;
 use PHPCompiler\VM;
@@ -31,10 +32,14 @@ class Module extends ModuleAbstract
     {
         return [
             new mb_check_encoding(),
+            new mb_list_encodings(),
             new mb_strlen(),
+            new mb_chr(),
+            new mb_ord(),
+            new mb_str_split(),
             new mb_strwidth(),
             new mb_strimwidth(),
-            new mb_str_pad(),
+            ...(CompilerVersion::supportsMbStrPad() ? [new mb_str_pad()] : []),
             new mb_substr(),
             new mb_strcut(),
             new mb_substr_count(),
@@ -43,17 +48,35 @@ class Module extends ModuleAbstract
             new mb_strtoupper(),
             new mb_convert_case(),
             new mb_convert_encoding(),
+            new mb_detect_encoding(),
+            new mb_convert_variables(),
             new mb_stripos(),
             new mb_strrpos(),
             new mb_strrichr(),
-            new mb_trim(),
-            new mb_ltrim(),
-            new mb_rtrim(),
+            ...(CompilerVersion::supportsMbTrimFunctions() ? [
+                new mb_trim(),
+                new mb_ltrim(),
+                new mb_rtrim(),
+            ] : []),
+            ...(CompilerVersion::supportsMbUcfirstLcfirst() ? [
+                new mb_ucfirst(),
+                new mb_lcfirst(),
+            ] : []),
             new mb_scrub(),
             new mb_encode_numericentity(),
             new mb_decode_numericentity(),
             new mb_encode_mimeheader(),
             new mb_decode_mimeheader(),
+            new mb_http_output(),
+            new mb_internal_encoding(),
+            new mb_language(),
+            new mb_http_input(),
+            new mb_detect_order(),
+            new mb_substitute_character(),
+            new mb_preferred_mime_name(),
+            new mb_encoding_aliases(),
+            new mb_convert_kana(),
+            new mb_split(),
         ];
     }
 }

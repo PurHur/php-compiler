@@ -29,6 +29,8 @@ final class Variable {
 
     /** @see Zend/zend_operators.c increment_function() / decrement_function() on TYPE_STRING offsets */
     public const STRING_OFFSET_INCDEC_ERROR = 'Cannot increment/decrement string offsets';
+    /** @see Zend/zend_execute.c zend_assign_to_string_offset() — empty/null RHS */
+    public const STRING_OFFSET_EMPTY_ASSIGN_ERROR = 'Cannot assign an empty string to a string offset';
     /** Zend enum case object for E::Case fetches (#3420, #3554). */
     const TYPE_ENUM_CASE = 9;
     /** Writable ArrayAccess dimension ($obj[$key] assignment, #3331). */
@@ -115,6 +117,11 @@ final class Variable {
 
     public ?string $magicSetName = null;
 
+    /** Lvalue proxy for ArrayObject::ARRAY_AS_PROPS property writes (#11893). */
+    public ?ObjectEntry $arrayAsPropsTarget = null;
+
+    public ?string $arrayAsPropsName = null;
+
     /** Temporary from __get; []= / dim-write must throw (#4673, zend_object_handlers.c). */
     public ?ObjectEntry $magicGetOverloadedTarget = null;
 
@@ -184,6 +191,12 @@ final class Variable {
     public function isIndirect(): bool
     {
         return self::TYPE_INDIRECT === $this->type;
+    }
+
+    /** ZEND_SEND_REF wrapper — inner lvalue for by-ref builtin writeback (#15151). */
+    public function byRefTarget(): self
+    {
+        return $this->isIndirect() ? $this->indirect : $this;
     }
 
     /**
@@ -543,6 +556,12 @@ final class Variable {
             case self::TYPE_ARRAY:
                 return $this->toArray()->getNumElements() > 0 ? 1.0 : 0.0;
             case self::TYPE_OBJECT:
+                if (ResourceSupport::isResourceObject($this->toObject())) {
+                    $handle = ResourceSupport::resolveHandle($this);
+                    if (null !== $handle) {
+                        return (float) $handle;
+                    }
+                }
                 if (EnumCaseSupport::isEnumCase($this->toObject())) {
                     $enumFloat = EnumCaseSupport::tryCastToFloat($this, $vm?->context);
                     if (null !== $enumFloat) {
@@ -704,6 +723,21 @@ final class Variable {
     public function null(): void {
         $this->reset();
         $this->type = self::TYPE_NULL;
+    }
+
+    /** Clear a WeakReference target slot without dropping a strong ref (#13474, zend_weakrefs.c). */
+    public function clearWeakTarget(): void
+    {
+        $this->releaseTrackedMemory();
+        $this->releaseArrayRef();
+        $this->resetScalars();
+        $this->type = self::TYPE_NULL;
+        $this->streamResource = false;
+        $this->dirResource = false;
+        $this->brigadeResource = false;
+        $this->bucketResource = false;
+        $this->streamFilterResource = false;
+        $this->procResource = false;
     }
     
     public function bool(bool $value): void {
@@ -903,6 +937,9 @@ final class Variable {
     public function reset(): void {
         $this->releaseTrackedMemory();
         if (self::TYPE_OBJECT === $this->type && isset($this->object)) {
+            if ($this->object->refCount <= 1) {
+                WeakRefRegistry::clearForObject($this->object->id);
+            }
             ObjectLifetime::releaseRef($this->object);
         }
         $this->releaseArrayRef();
@@ -1283,6 +1320,10 @@ final class Variable {
                 $this->staticPropertyClassLc = $staticClass;
                 break;
             case self::TYPE_UNDEFINED:
+                if ($var->hasDeclaredTypeConstraint()) {
+                    $this->copyUninitializedStaticPropertySlot($var);
+                    break;
+                }
                 $owner = $this->objectPropertyOwner;
                 $propName = $this->objectPropertyName;
                 $staticClass = $this->staticPropertyClassLc;
@@ -1359,7 +1400,7 @@ final class Variable {
         return $self->equals($other);
     }
 
-    public function equals(Variable $other): bool {
+    public function equals(Variable $other, ?\PHPCompiler\VM $vm = null): bool {
         $self = $this;
 restart:
         $pair = type_pair($self->type, $other->type);
@@ -1403,7 +1444,7 @@ restart:
                 } elseif (self::isEnumCaseOperand($self) || self::isEnumCaseOperand($other)) {
                     return false;
                 }
-                return $this->looseEqual($self, $other);
+                return $this->looseEqual($self, $other, $vm);
         }
         throw new \LogicException("Equals comparison between {$self->type} and {$other->type} not implemented");
     }
@@ -1618,7 +1659,11 @@ restart:
         return null;
     }
 
-    private function looseEqual(Variable $self, Variable $other): bool {
+    private function looseEqual(Variable $self, Variable $other, ?\PHPCompiler\VM $vm = null): bool {
+        $stringableEq = CompareStringableHelper::looseEqual($vm, $self, $other);
+        if (null !== $stringableEq) {
+            return $stringableEq;
+        }
         if ($self->type === self::TYPE_NULL) {
             switch ($other->type) {
                 case self::TYPE_NULL:
@@ -1638,7 +1683,7 @@ restart:
             }
         }
         if ($other->type === self::TYPE_NULL) {
-            return $this->looseEqual($other, $self);
+            return $this->looseEqual($other, $self, $vm);
         }
         // Zend: enum case loose == with backing scalar is false (#5798, #5819/#5835 switch labels).
         if (self::isEnumCaseOperand($self) || self::isEnumCaseOperand($other)) {
@@ -1761,10 +1806,10 @@ restart:
         throw new \TypeError("Object of class {$className} could not be converted to number");
     }
 
-    public function compareOp(int $opCode, Variable $left, Variable $right): void {
+    public function compareOp(int $opCode, Variable $left, Variable $right, ?\PHPCompiler\VM $vm = null): void {
         if ($this->type === self::TYPE_INDIRECT) {
             $result = new self();
-            $result->compareOp($opCode, $left, $right);
+            $result->compareOp($opCode, $left, $right, $vm);
             $this->indirect->copyFrom($result);
 
             return;
@@ -1823,6 +1868,11 @@ restart:
                 } elseif ($right->type === self::TYPE_INDIRECT) {
                     $right = $right->indirect;
                     goto restart;
+                } elseif (self::needsZendUnlikeKindCompare($left, $right)) {
+                    $this->bool($this->_compareFromSpaceship(
+                        $opCode,
+                        CompareJitHelper::zendUnlikeValueSpaceship($left, $right, $vm)
+                    ));
                 } else {
                     // Zend compare_function: unlike scalars use spaceship parity (#4681, #10243).
                     $this->bool($this->_compareFromSpaceship(
@@ -1831,6 +1881,27 @@ restart:
                     ));
                 }
         }
+    }
+
+    /** Unlike-kind compare that must not route through toNumeric() (#12033, zend_compare). */
+    private static function needsZendUnlikeKindCompare(Variable $left, Variable $right): bool
+    {
+        $left = $left->resolveIndirect();
+        $right = $right->resolveIndirect();
+        if ($left->type === $right->type) {
+            return false;
+        }
+        foreach ([self::TYPE_ARRAY, self::TYPE_OBJECT] as $kind) {
+            if ($left->type === $kind || $right->type === $kind) {
+                return true;
+            }
+        }
+        if ((self::TYPE_NULL === $left->type && self::TYPE_ARRAY === $right->type)
+            || (self::TYPE_ARRAY === $left->type && self::TYPE_NULL === $right->type)) {
+            return true;
+        }
+
+        return false;
     }
 
     private function _compareOp(int $opCode, $left, $right): bool {
@@ -1893,10 +1964,10 @@ restart:
         return $result->integer;
     }
 
-    public function spaceshipOp(Variable $left, Variable $right): void {
+    public function spaceshipOp(Variable $left, Variable $right, ?\PHPCompiler\VM $vm = null): void {
         if ($this->type === self::TYPE_INDIRECT) {
             $result = new self();
-            $result->spaceshipOp($left, $right);
+            $result->spaceshipOp($left, $right, $vm);
             $this->indirect->copyFrom($result);
 
             return;
@@ -1971,6 +2042,8 @@ restart:
                         // Zend compare_function: enum case vs non-case is always 1 (#4554).
                         $this->int(1);
                     }
+                } elseif (self::needsZendUnlikeKindCompare($leftCopy, $rightCopy)) {
+                    $this->int(CompareJitHelper::zendUnlikeValueSpaceship($leftCopy, $rightCopy, $vm));
                 } else {
                     $this->int(self::spaceshipMixedScalars($leftCopy, $rightCopy));
                 }
@@ -2742,19 +2815,26 @@ restart:
     private static function byteFromAssignValue(self $value): string
     {
         $value = $value->resolveIndirect();
+        if (self::TYPE_NULL === $value->type) {
+            throw new \Error(self::STRING_OFFSET_EMPTY_ASSIGN_ERROR);
+        }
         switch ($value->type) {
             case self::TYPE_STRING:
                 $s = $value->string;
+                if ('' === $s) {
+                    throw new \Error(self::STRING_OFFSET_EMPTY_ASSIGN_ERROR);
+                }
 
-                return '' === $s ? '' : $s[0];
+                return $s[0];
             case self::TYPE_INTEGER:
                 return chr($value->integer & 0xff);
-            case self::TYPE_NULL:
-                return "\0";
             default:
                 $s = $value->toString();
+                if ('' === $s) {
+                    throw new \Error(self::STRING_OFFSET_EMPTY_ASSIGN_ERROR);
+                }
 
-                return '' === $s ? '' : $s[0];
+                return $s[0];
         }
     }
 }

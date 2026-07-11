@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\VM\Context;
-use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPCompiler\Web\Superglobals;
 
@@ -39,14 +38,6 @@ final class JsonEncodeJitHelper
         }
 
         return $encoded;
-    }
-
-    public static function encodeArray(HashTable $ht, int $flags): ?string
-    {
-        $var = new Variable();
-        $var->array($ht);
-
-        return self::encodeValue($var, $flags);
     }
 
     private static function requireActiveContext(): Context

@@ -50,6 +50,9 @@ class Frame {
     /** Class used for the pending static call (set by STATICCALL_INIT / initStaticCallable). */
     public ?string $staticCallClass = null;
 
+    /** Qualified builtin callee for named-arg binding (e.g. DateTime::createFromFormat; #11785). */
+    public ?string $builtinCalleeQualifiedMethod = null;
+
     /** Active generator while executing a generator function body (issue #167). */
     public ?VM\GeneratorState $generatorState = null;
 
@@ -89,6 +92,12 @@ class Frame {
     public bool $suppressNextEcho = false;
 
     /**
+     * Merge block for an in-flight guarded list destructuring assign (#13932).
+     * While set, VM defers dead-temp release so nested dim-fetch temps stay alive.
+     */
+    public ?Block $listUnpackAssignMergeBlock = null;
+
+    /**
      * Foreach iterator container cache keyed by scope slot.
      * php-cfg SSA temps may alias (issue #1885); ITER_* must not rely on rereading the slot.
      *
@@ -105,6 +114,13 @@ class Frame {
 
     /** Scope slots that received a runtime value (assign/param/static/inc-dec write, #6800). */
     public array $initializedSlots = [];
+
+    /**
+     * Saved FUNCCALL_INIT state while TYPE_NEW runs for an inline `new` call arg (#15217).
+     *
+     * @var array{call: Func, callArgs: list<Variable>, callArgEntries: list<array{0: string, 1?: mixed, 2?: Variable}>, callSiteLine: int, builtinCalleeQualifiedMethod: ?string}|null
+     */
+    public ?array $pendingOutboundCallRestore = null;
 
     public function __construct(?Handler $handler, ?Block $block, ?Frame $parent, Variable ...$scope) {
         $this->handler = $handler;

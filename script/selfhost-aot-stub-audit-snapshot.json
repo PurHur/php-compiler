@@ -1,6 +1,6 @@
 {
     "compiler_skip_patterns": 48,
-    "m3_allow": 27,
+    "m3_allow": 32,
     "m3_deny": 1,
     "spine": {
         "m3_real": 30,

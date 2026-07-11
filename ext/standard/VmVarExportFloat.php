@@ -22,9 +22,31 @@ final class VmVarExportFloat
         if (\is_infinite($f)) {
             return $f < 0 ? '-INF' : 'INF';
         }
-        $s = (string) $f;
-        if (false === \strpos($s, '.')) {
+        // Shortest round-tripping decimal (php-src zend_print_flat_zval / %.*H dtoa, #15044).
+        $s = VmFloatDtoa::formatH($f);
+        if (false !== \stripos($s, 'e')) {
+            $abs = \abs($f);
+            if ($abs >= 1e-4 && $abs < 1e14) {
+                for ($precision = 0; $precision <= 14; ++$precision) {
+                    $decimal = VmFloatDtoa::formatSprintfF($f, $precision);
+                    if ($f === (float) $decimal) {
+                        $s = $decimal;
+                        break;
+                    }
+                }
+            }
+        }
+        if (false === \strpos($s, '.') && false === \stripos($s, 'e')) {
             return $s.'.0';
+        }
+        if (false === \strpos($s, '.') && \preg_match('/^(-?\d+)E([+-]?\d+)$/', $s, $m)) {
+            return $m[1].'.0E'.$m[2];
+        }
+
+        // php-src zend_print_flat_zval: prefer host var_export when dtoa picks a different round-trip (#15584).
+        $zend = \var_export($f, true);
+        if ($f === (float) $zend && $zend !== $s) {
+            return $zend;
         }
 
         return $s;

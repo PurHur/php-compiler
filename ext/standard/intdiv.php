@@ -31,14 +31,16 @@ final class intdiv extends Internal
         if (2 !== count($frame->calledArgs)) {
             throw new \LogicException('intdiv() requires exactly two arguments');
         }
-        $num1 = VmMath::parseIntBuiltinArg(
-            $frame->calledArgs[0]->resolveIndirect(),
+        $num1 = VmMath::parseIntBuiltinArgForFrame(
+            $frame,
+            0,
             self::FUNCTION,
             1,
             'num1'
         );
-        $num2 = VmMath::parseIntBuiltinArg(
-            $frame->calledArgs[1]->resolveIndirect(),
+        $num2 = VmMath::parseIntBuiltinArgForFrame(
+            $frame,
+            1,
             self::FUNCTION,
             2,
             'num2'

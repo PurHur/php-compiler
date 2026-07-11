@@ -51,7 +51,6 @@ final class BootstrapSelfhostBundleTest extends TestCase
         'ext/standard/StreamLifecycleJitHelper.php',
         'lib/JIT/Builtin/StreamLibcHandleRuntime.php',
         'lib/JIT/Builtin/StreamLifecycleRuntime.php',
-        'lib/JIT/Builtin/StreamLifecycleStandaloneLlvm.php',
         'lib/VM/WeakRefSupport.php',
         'lib/VM/InterfaceCheck.php',
         'lib/VM/ClassReadonly.php',
@@ -106,7 +105,6 @@ final class BootstrapSelfhostBundleTest extends TestCase
         'lib/JIT/Builtin/StringFunctionExists.php',
         'lib/JIT/Builtin/StringHttpBuildQuery.php',
         'lib/JIT/Builtin/StringSerialize.php',
-        'lib/JIT/Builtin/StringSerializeJit.php',
         'lib/JIT/Builtin/StringSuperglobalName.php',
         'lib/JIT/Builtin/SuperglobalNameRuntime.php',
         'ext/standard/SuperglobalNames.php',
@@ -124,23 +122,27 @@ final class BootstrapSelfhostBundleTest extends TestCase
         'lib/JIT/Builtin/Type/Object_.php',
         'lib/JIT/Builtin/StringParseStr.php',
         'lib/JIT/Builtin/StringPregMatch.php',
+        'ext/standard/PregJitHelper.php',
         'lib/JIT/Builtin/StringUnserialize.php',
         'lib/JIT/Builtin/StringUrldecode.php',
-        'ext/standard/JitAddslashes.php',
+        'ext/standard/AddslashesJitHelper.php',
         'ext/standard/JitBase64Encode.php',
-        'ext/standard/JitBin2hex.php',
+        'ext/standard/Base64JitHelper.php',
+        'ext/standard/Bin2hexJitHelper.php',
+        'ext/standard/ChunkSplitJitHelper.php',
+        'ext/standard/CountCharsJitHelper.php',
         'ext/standard/JitChunkSplit.php',
-        'ext/standard/JitCrcCore.php',
+        'ext/standard/Crc32JitHelper.php',
         'ext/standard/JitCrc32.php',
         'ext/standard/JitExplode.php',
+        'ext/standard/ChmodJitHelper.php',
         'ext/standard/JitChmod.php',
         'ext/standard/JitCopy.php',
         'ext/standard/JitDate.php',
         'ext/standard/JitImplode.php',
-        'ext/standard/JitNl2br.php',
-        'ext/standard/JitPregQuote.php',
-        'ext/standard/JitQuotemeta.php',
-        'ext/standard/JitStrRot13.php',
+        'ext/standard/Nl2brJitHelper.php',
+        'ext/standard/PregQuoteJitHelper.php',
+        'ext/standard/StrRot13JitHelper.php',
         'ext/standard/JitSessionId.php',
         'ext/standard/JitSessionName.php',
         'ext/standard/JitSessionStart.php',
@@ -168,7 +170,10 @@ final class BootstrapSelfhostBundleTest extends TestCase
         'ext/standard/JitFunctionExists.php',
         'ext/standard/JitGetcwd.php',
         'ext/standard/JitHash.php',
-        'ext/standard/JitHex2bin.php',
+        'ext/standard/Hex2binJitHelper.php',
+        'ext/standard/LevenshteinJitHelper.php',
+        'ext/standard/StrspnJitHelper.php',
+        'ext/standard/SpnJitLowering.php',
         'ext/standard/JitHtmlspecialchars.php',
         'ext/standard/JitIni.php',
         'ext/standard/JitIniGetAll.php',
@@ -181,27 +186,53 @@ final class BootstrapSelfhostBundleTest extends TestCase
         'ext/standard/JitRealpath.php',
         'ext/standard/JitSerialize.php',
         'ext/standard/JitSprintf.php',
-        'ext/standard/JitStrPad.php',
-        'ext/standard/JitStrRepeat.php',
+        'ext/standard/StrPadJitHelper.php',
+        'ext/standard/StrRepeatJitHelper.php',
         'ext/standard/JitStrReplace.php',
+        'ext/standard/StrReplaceJitHelper.php',
         'ext/standard/JitStrShuffle.php',
         'ext/standard/JitStrSplit.php',
         'ext/standard/JitStringConcat.php',
         'ext/standard/JitStringIndex.php',
         'ext/standard/JitStripTags.php',
-        'ext/standard/JitStripslashes.php',
+        'ext/standard/StripslashesJitHelper.php',
         'ext/standard/JitStrpbrk.php',
-        'ext/standard/JitStrpos.php',
+        'ext/standard/StrContainsJitHelper.php',
+        'ext/standard/StrposJitHelper.php',
+        'ext/standard/StrstrJitHelper.php',
+        'lib/JIT/Builtin/StringStrContains.php',
+        'lib/JIT/Builtin/StringStrpos.php',
+        'lib/JIT/Builtin/StringStrstr.php',
+        'lib/JIT/Builtin/StringStrReplace.php',
         'ext/standard/JitStrrchr.php',
-        'ext/standard/JitStrrpos.php',
+        'ext/standard/StrrposJitHelper.php',
         'ext/standard/JitStrstr.php',
-        'ext/standard/JitSubstrCount.php',
+        'ext/standard/SubstrCountJitHelper.php',
+        'lib/JIT/Builtin/StringSubstrCount.php',
+        'lib/JIT/Builtin/StringCountChars.php',
         'ext/standard/JitStrtr.php',
         'ext/standard/JitSuperglobalName.php',
         'ext/standard/JitTempnam.php',
         'ext/standard/JitUnserialize.php',
+        'ext/standard/UniqidJitHelper.php',
         'ext/standard/JitUrlencode.php',
-        'ext/standard/JitWordwrap.php',
+        'ext/standard/WordwrapJitHelper.php',
+        'lib/JIT/Builtin/StringWordwrap.php',
+        'lib/JIT/Builtin/StringBin2hex.php',
+        'lib/JIT/Builtin/StringBase64Encode.php',
+        'lib/JIT/Builtin/StringBase64Decode.php',
+        'lib/JIT/Builtin/StringChunkSplit.php',
+        'lib/JIT/Builtin/StringHex2bin.php',
+        'lib/JIT/Builtin/StringLevenshtein.php',
+        'lib/JIT/Builtin/StringStrspn.php',
+        'lib/JIT/Builtin/StringStrrev.php',
+        'lib/JIT/Builtin/StringStrPad.php',
+        'lib/JIT/Builtin/StringStrRot13.php',
+        'lib/JIT/Builtin/StringUniqid.php',
+        'lib/JIT/Builtin/StringStrRepeat.php',
+        'ext/standard/StrrevJitHelper.php',
+        'ext/standard/UrldecodeJitHelper.php',
+        'ext/standard/UrlencodeJitHelper.php',
         'ext/standard/JitFflush.php',
         'ext/standard/JitFilePutContents.php',
         'ext/standard/JitFilemtime.php',
@@ -389,6 +420,7 @@ final class BootstrapSelfhostBundleTest extends TestCase
         'ext/standard/substr.php',
         'ext/standard/substr_count.php',
         'ext/standard/ucfirst.php',
+        'ext/standard/UcwordsJitHelper.php',
         'ext/standard/ucwords.php',
         'ext/standard/urldecode.php',
         'ext/standard/urlencode.php',
@@ -423,6 +455,40 @@ final class BootstrapSelfhostBundleTest extends TestCase
         'lib/JIT/Call/ReflectionEnumHasCase.php',
         'lib/JIT/Call/ReflectionEnumIsBacked.php',
         'lib/JIT/Call/ReflectionEnumUnitCaseGetName.php',
+        'ext/standard/FstatJitHelper.php',
+        'ext/standard/JsonDecodeJitHelper.php',
+        'ext/standard/VmStreamFstat.php',
+        'ext/standard/timezone_abbreviations_list.php',
+        'lib/BuiltinTypeClassConstant.php',
+        'lib/JIT/Builtin/StreamFstat.php',
+        'lib/JIT/Builtin/StreamFstatRuntime.php',
+        'lib/VM/Builtin/DateTimeZoneListAbbreviations.php',
+        'lib/VM/Builtin/DateTimeZoneListIdentifiers.php',
+        'ext/standard/JitRand.php',
+        'ext/standard/LcgJitHelper.php',
+        'ext/standard/RandJitHelper.php',
+        'ext/standard/VmCombinedLcg.php',
+        'ext/standard/VmMt19937.php',
+        'ext/standard/getrandmax.php',
+        'ext/standard/mt_getrandmax.php',
+        'ext/standard/lcg_value.php',
+        'ext/standard/mt_rand.php',
+        'ext/standard/mt_srand.php',
+        'ext/standard/rand_.php',
+        'ext/standard/srand.php',
+        'lib/JIT/Builtin/Lcg.php',
+        'lib/JIT/Builtin/Rand.php',
+        'lib/JIT/HashTableReadLlvm.php',
+        'lib/JIT/HashTableWriteLlvm.php',
+        'lib/VM/HashTableJitHelper.php',
+        'ext/standard/ArrayReplaceJitHelper.php',
+        'ext/standard/ArraySearchJitHelper.php',
+        'lib/AsymmetricVisibilityRejector.php',
+        'lib/PropertyHookSyntaxRejector.php',
+        'lib/Ast/ListSpreadAssignSyntax.php',
+        'lib/ListSpreadAssignSyntaxRejector.php',
+        'lib/JIT/Builtin/ArrayReplaceRuntime.php',
+        'lib/JIT/Builtin/ArraySearchRuntime.php',
     ];
 
     public static function setUpBeforeClass(): void
@@ -445,7 +511,7 @@ final class BootstrapSelfhostBundleTest extends TestCase
         $this->assertFileExists($entry);
         $contents = (string) file_get_contents($entry);
         $count = bootstrap_spine_counts(self::$root)['spine'];
-        $this->assertSame(3132, $count, 'M2 spine require_once units track Phase A inventory (#8559, #9234, #11629)');
+        $this->assertSame(4482, $count, 'M2 spine require_once units track Phase A inventory (#8559, #9234, #11629)');
         foreach (self::LIB_SPINE_SMOKE_NEW_UNITS as $unit) {
             $this->assertStringContainsString(
                 "require_once __DIR__.'/../../../{$unit}';",
@@ -459,6 +525,7 @@ final class BootstrapSelfhostBundleTest extends TestCase
     {
         $entry = self::$root.'/test/selfhost/compiler_lib_spine_smoke/main.php';
         $lines = file($entry, FILE_IGNORE_NEW_LINES) ?: [];
+        $internalLine = null;
         $vmClassMethodLine = null;
         $firstExtenderLine = null;
         foreach ($lines as $i => $line) {
@@ -466,9 +533,16 @@ final class BootstrapSelfhostBundleTest extends TestCase
                 continue;
             }
             $rel = $m[1];
+            if ('lib/Func/Internal.php' === $rel) {
+                $internalLine = $i + 1;
+                continue;
+            }
             if ('lib/VM/Builtin/VmClassMethod.php' === $rel) {
                 $vmClassMethodLine = $i + 1;
-                break;
+                continue;
+            }
+            if (null !== $firstExtenderLine) {
+                continue;
             }
             $abs = self::$root.'/'.$rel;
             if (!is_file($abs)) {
@@ -477,10 +551,15 @@ final class BootstrapSelfhostBundleTest extends TestCase
             $src = (string) file_get_contents($abs);
             if (str_contains($src, 'extends VmClassMethod')) {
                 $firstExtenderLine = $i + 1;
-                break;
             }
         }
+        $this->assertNotNull($internalLine, 'Func/Internal.php must be in spine');
         $this->assertNotNull($vmClassMethodLine, 'VmClassMethod.php must be in spine');
+        $this->assertLessThan(
+            $vmClassMethodLine,
+            $internalLine,
+            'Func/Internal must load before VmClassMethod (base class for VmClassMethod extenders)'
+        );
         if (null !== $firstExtenderLine) {
             $this->assertLessThan(
                 $firstExtenderLine,

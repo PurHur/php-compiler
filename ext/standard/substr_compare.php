@@ -10,18 +10,20 @@ use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\StringSubstrCompare;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\JitOperandTypeLabel;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\EnumCaseSupport;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
  * substr_compare() — compare haystack slice to needle (subset of PHP; issue #2400).
- * JIT lowers via {@see StringSubstrCompareJit} (VmString parity; no phpc_substr_compare.c).
+ * JIT lowers via {@see StringSubstrCompare} + {@see SubstrCompareJitHelper} (VmString parity; no phpc_substr_compare.c).
  */
 final class substr_compare extends Internal
 {
@@ -36,8 +38,10 @@ final class substr_compare extends Internal
         if ($argc < 3 || $argc > 5) {
             throw new \LogicException('substr_compare() accepts three to five arguments in this compiler build');
         }
-        $haystack = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'substr_compare', 0, 'haystack');
-        $needle = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'substr_compare', 1, 'needle');
+        InternalStrictArg::rejectNullString($frame->calledArgs[0], 'substr_compare', 'haystack', 0, $frame);
+        InternalStrictArg::rejectNullString($frame->calledArgs[1], 'substr_compare', 'needle', 1, $frame);
+        $haystack = self::vmStringArg($frame, 0, 'haystack');
+        $needle = self::vmStringArg($frame, 1, 'needle');
         $offsetInt = self::requireIntArg($frame->calledArgs[2], 'substr_compare', 3, 'offset');
         $length = null;
         if ($argc >= 4) {
@@ -73,6 +77,8 @@ final class substr_compare extends Internal
         if ($argc < 3 || $argc > 5) {
             throw new \LogicException('substr_compare() accepts three to five arguments in this compiler build');
         }
+        JitInternalStrictArg::rejectNullString($context, $args[0], 'substr_compare', 'haystack', 1);
+        JitInternalStrictArg::rejectNullString($context, $args[1], 'substr_compare', 'needle', 2);
         $i64 = $context->getTypeFromString('int64');
         $i32 = $context->getTypeFromString('int32');
         $lengthVal = $i64->constInt(-1, false);
@@ -120,6 +126,20 @@ final class substr_compare extends Internal
         }
 
         return $var->toInt();
+    }
+
+    private static function vmStringArg(Frame $frame, int $argIndex, string $paramName): string
+    {
+        if (InternalStrictArg::isCallerStrict($frame)) {
+            return InternalStrictArg::requireString($frame, $argIndex, 'substr_compare', $paramName)->toString();
+        }
+
+        return VmString::coerceStringBuiltinArg(
+            $frame->calledArgs[$argIndex],
+            'substr_compare',
+            $argIndex,
+            $paramName
+        );
     }
 
     private static function lowerStrictIntArg(

@@ -2,17 +2,11 @@
 
 declare(strict_types=1);
 
-/**
- * This file is part of PHP-Compiler, a PHP CFG Compiler for PHP code
- *
- * @copyright 2015 Anthony Ferrara. All rights reserved
- * @license MIT See LICENSE at the root of the project for more info
- */
-
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\MathDeg2rad;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
@@ -22,8 +16,6 @@ use PHPLLVM\Value;
  */
 final class deg2rad extends Internal
 {
-    private const FACTOR = \M_PI / 180.0;
-
     public function execute(Frame $frame): void
     {
         if (1 !== count($frame->calledArgs)) {
@@ -38,7 +30,7 @@ final class deg2rad extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $frame->returnVar->float(self::FACTOR * $num);
+        $frame->returnVar->float(VmMath::deg2rad($num));
     }
 
     public Context $context;
@@ -49,11 +41,9 @@ final class deg2rad extends Internal
         if (1 !== count($args)) {
             throw new \LogicException('deg2rad() requires exactly one argument');
         }
-        $double = $context->getTypeFromString('double');
         $asFloat = JitFdiv::lowerSingleOperand($context, $args[0], 1, 'num', 'deg2rad', 'float');
-        $factor = $double->constReal(self::FACTOR);
 
-        return $context->builder->fMul($asFloat, $factor);
+        return MathDeg2rad::invoke($context, $asFloat);
     }
 
 }

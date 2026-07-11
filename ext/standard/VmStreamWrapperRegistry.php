@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\Frame;
+use PHPCompiler\VM\ErrorReporter;
+
 /**
  * User stream wrapper protocol registry (php-src main/streams; issues #3383, #6818).
  *
@@ -11,17 +14,17 @@ namespace PHPCompiler\ext\standard;
  */
 final class VmStreamWrapperRegistry
 {
-    /** @var list<string> Built-in schemes always reported by stream_get_wrappers(). */
+    /** @var list<string> Built-in schemes in php-src registration order (main/streams/streams.c). */
     private const BUILTIN_PROTOCOLS = [
-        'file',
-        'http',
         'https',
-        'ftp',
         'ftps',
-        'php',
         'compress.zlib',
-        'data',
+        'php',
+        'file',
         'glob',
+        'data',
+        'http',
+        'ftp',
         'phar',
     ];
 
@@ -30,6 +33,25 @@ final class VmStreamWrapperRegistry
 
     /** @var array<string, list<string|null>> protocol => stack of prior class names (null = removed) */
     private static array $restoreStack = [];
+
+    /** @var array<string, true> built-in protocols removed via stream_wrapper_unregister() */
+    private static array $removedBuiltins = [];
+
+    public const NOTICE_RESTORE_UNCHANGED = 'stream_wrapper_restore(): "%s" was never changed, nothing to restore';
+
+    /**
+     * php-src user_stream_register_wrapper — reject unknown class names (#12534).
+     */
+    public static function requireValidWrapperClass(Frame $frame, string $className): void
+    {
+        $ctx = VmReflection::requireContext($frame);
+        if (!VmReflection::classExists($ctx, $className)) {
+            throw new \TypeError(\sprintf(
+                'stream_wrapper_register(): Argument #2 ($class) must be a valid class name, %s given',
+                $className
+            ));
+        }
+    }
 
     public static function register(string $protocol, string $className): bool
     {
@@ -45,19 +67,37 @@ final class VmStreamWrapperRegistry
     public static function unregister(string $protocol): bool
     {
         $key = self::normalizeProtocol($protocol);
-        if ('' === $key || !isset(self::$custom[$key])) {
+        if ('' === $key) {
             return false;
         }
-        self::$restoreStack[$key][] = self::$custom[$key];
-        unset(self::$custom[$key]);
+        if (isset(self::$custom[$key])) {
+            self::$restoreStack[$key][] = self::$custom[$key];
+            unset(self::$custom[$key]);
+
+            return true;
+        }
+        if (!self::isBuiltin($key) || isset(self::$removedBuiltins[$key])) {
+            return false;
+        }
+        self::$restoreStack[$key][] = null;
+        self::$removedBuiltins[$key] = true;
 
         return true;
     }
 
-    public static function restore(string $protocol): bool
+    public static function restore(string $protocol, ?Frame $frame = null): bool
     {
         $key = self::normalizeProtocol($protocol);
-        if ('' === $key || !isset(self::$restoreStack[$key]) || [] === self::$restoreStack[$key]) {
+        if ('' === $key) {
+            return false;
+        }
+        if (!isset(self::$restoreStack[$key]) || [] === self::$restoreStack[$key]) {
+            if (self::isBuiltin($key) && !isset(self::$removedBuiltins[$key])) {
+                self::triggerRestoreUnchangedNotice($frame, $key);
+
+                return true;
+            }
+
             return false;
         }
         $prior = \array_pop(self::$restoreStack[$key]);
@@ -65,7 +105,7 @@ final class VmStreamWrapperRegistry
             unset(self::$restoreStack[$key]);
         }
         if (null === $prior) {
-            unset(self::$custom[$key]);
+            unset(self::$custom[$key], self::$removedBuiltins[$key]);
 
             return true;
         }
@@ -80,11 +120,15 @@ final class VmStreamWrapperRegistry
     /** @return list<string> */
     public static function getWrappers(): array
     {
-        $all = self::BUILTIN_PROTOCOLS;
+        $all = [];
+        foreach (self::BUILTIN_PROTOCOLS as $protocol) {
+            if (!isset(self::$removedBuiltins[$protocol])) {
+                $all[] = $protocol;
+            }
+        }
         foreach (\array_keys(self::$custom) as $protocol) {
             $all[] = $protocol;
         }
-        \sort($all);
 
         return $all;
     }
@@ -129,10 +173,31 @@ final class VmStreamWrapperRegistry
         return $protocol;
     }
 
+    private static function isBuiltin(string $protocol): bool
+    {
+        return \in_array($protocol, self::BUILTIN_PROTOCOLS, true);
+    }
+
+    private static function triggerRestoreUnchangedNotice(?Frame $frame, string $protocol): void
+    {
+        if (null === $frame || null === $frame->vmContext) {
+            return;
+        }
+        $frame->vmContext->errors->triggerError(
+            \sprintf(self::NOTICE_RESTORE_UNCHANGED, $protocol),
+            ErrorReporter::E_NOTICE,
+            '' !== $frame->scriptPath ? $frame->scriptPath : null,
+            $frame->vmContext,
+            $frame,
+            $frame->callSiteLine
+        );
+    }
+
     /** @internal PHPUnit isolation */
     public static function resetForTests(): void
     {
         self::$custom = [];
         self::$restoreStack = [];
+        self::$removedBuiltins = [];
     }
 }

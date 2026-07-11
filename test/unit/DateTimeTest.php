@@ -62,6 +62,24 @@ PHP;
         $this->assertSame('2020-01-02', ob_get_clean());
     }
 
+    public function testDateTimeSetDateAndSetTime(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+$dt = new DateTime('2020-01-15 10:30:45', new DateTimeZone('UTC'));
+$dt->setDate(2021, 6, 1);
+$dt->setTime(14, 5, 30);
+echo $dt->format('Y-m-d H:i:s'), "\n";
+$immutable = new DateTimeImmutable('2020-01-15 10:30:45', new DateTimeZone('UTC'));
+echo $immutable->setDate(2022, 1, 2)->format('Y-m-d'), "\n";
+echo $immutable->format('Y-m-d'), "\n";
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'datetime_setdate_settime.php'));
+        $this->assertSame("2021-06-01 14:05:30\n2022-01-02\n2020-01-15\n", ob_get_clean());
+    }
+
     public function testDateTimeInterfaceRegistration(): void
     {
         $runtime = new Runtime();
@@ -76,5 +94,28 @@ PHP;
         ob_start();
         $runtime->run($runtime->parseAndCompile($code, 'datetime_interface.php'));
         $this->assertSame("1\n1\nY-m-d\\TH:i:sP\n2026-06-07\n", ob_get_clean());
+    }
+
+    /** @covers issue #10946 */
+    public function testDateTimeAddSubGetTimezoneSetTimestamp(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+$dt = new DateTime('2020-01-01', new DateTimeZone('UTC'));
+echo $dt->getTimezone()->getName(), "\n";
+$dt->add(new DateInterval('P1D'));
+echo $dt->format('Y-m-d'), "\n";
+$dt->sub(new DateInterval('P1D'));
+echo $dt->format('Y-m-d'), "\n";
+$dt->setTimestamp(86400);
+echo $dt->getTimestamp(), "\n";
+$immutable = new DateTimeImmutable('2020-01-01', new DateTimeZone('UTC'));
+echo $immutable->add(new DateInterval('P1D'))->format('Y-m-d'), "\n";
+echo $immutable->format('Y-m-d'), "\n";
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'datetime_add_sub.php'));
+        $this->assertSame("UTC\n2020-01-02\n2020-01-01\n86400\n2020-01-02\n2020-01-01\n", ob_get_clean());
     }
 }

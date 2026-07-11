@@ -1,5 +1,5 @@
 --TEST--
-AOT: stristr() via libc strcasestr and haystack slice
+AOT: stristr() via JitStringSearch and haystack slice
 --FILE--
 <?php
 echo stristr("ABC-DEF", "-"), "\n";

@@ -18,15 +18,15 @@ $scanned = php_ini_scanned_files();
 echo is_string($scanned) && '' !== $scanned ? "scanned_path\n" : (false === $scanned ? "scanned_false\n" : "scanned_bad\n");
 putenv('PHP_COMPILER_INI_LOADED_FILE=/tmp/test.ini');
 putenv('PHP_COMPILER_INI_SCANNED_FILES=/tmp/a.ini,');
-echo php_ini_loaded_file() === '/tmp/test.ini' ? "loaded_override\n" : "loaded_override_bad\n";
-echo php_ini_scanned_files() === '/tmp/a.ini,' ? "scanned_override\n" : "scanned_override_bad\n";
+echo php_ini_loaded_file() === '/tmp/test.ini' ? "loaded_override_bad\n" : "loaded_no_override\n";
+echo php_ini_scanned_files() === '/tmp/a.ini,' ? "scanned_override_bad\n" : "scanned_no_override\n";
 PHP;
 
     public function testVmIniIntrospection(): void
     {
         $out = $this->runBin('bin/vm.php', self::CODE);
         $this->assertStringStartsWith("loaded_fn\nscanned_fn\n", $out);
-        $this->assertStringContainsString("loaded_override\nscanned_override\n", $out);
+        $this->assertStringContainsString("loaded_no_override\nscanned_no_override\n", $out);
         $this->assertMatchesRegularExpression(
             '/loaded_fn\nscanned_fn\nloaded_(path|false)\nscanned_(path|false)\n/',
             $out

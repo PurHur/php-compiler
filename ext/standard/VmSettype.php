@@ -12,6 +12,7 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\ResourceSupport;
 use PHPCompiler\VM\TypeCheck;
+use PHPCompiler\VM\TypedPropertyCheck;
 use PHPCompiler\VM\Variable;
 
 /**
@@ -21,8 +22,18 @@ final class VmSettype
 {
     public static function apply(Variable $slot, string $typeName, ?Frame $frame = null): void
     {
+        TypedPropertyCheck::assertWritableByReference($slot);
         $type = strtolower($typeName);
         $value = $slot->resolveIndirect();
+        if ('string' === $type && VmScalarType::isEnumCaseVariable($value)) {
+            $className = EnumCaseSupport::typeNameForVariable($value);
+            $empty = new Variable();
+            $empty->string('');
+            self::assignSettypeResult($slot, $empty, $type, $frame);
+            throw new \Error(
+                'Object of class '.$className.' could not be converted to string'
+            );
+        }
         $result = new Variable();
 
         switch ($type) {
@@ -64,28 +75,154 @@ final class VmSettype
                 throw new \ValueError('settype(): Argument #2 ($type) must be a valid type');
         }
 
-        self::assignSettypeResult($slot, $result, $frame);
+        self::assignSettypeResult($slot, $result, $type, $frame);
     }
 
     /**
-     * Zend php_settype on typed property references coerces to the declared type (type.c).
+     * Zend php_settype on typed property references: strict_types rejects incompatible
+     * target types; non-strict weak-coerces scalars (type.c, #11508, #14218).
      */
-    private static function assignSettypeResult(Variable $slot, Variable $result, ?Frame $frame): void
-    {
+    private static function assignSettypeResult(
+        Variable $slot,
+        Variable $result,
+        string $requestedType,
+        ?Frame $frame = null,
+    ): void {
         $typeMeta = self::resolveTypedPropertyMetadata($slot, $frame);
         if (null === $typeMeta) {
             $slot->copyFrom($result);
 
             return;
         }
+        $strict = self::callerStrictTypes($frame);
+        if ($strict && !self::settypeTargetMatchesDeclaredType($requestedType, $typeMeta)) {
+            throw self::settypeTypedPropertyReferenceError(
+                $slot,
+                $typeMeta,
+                self::settypeTypeLabel($requestedType),
+            );
+        }
         $probe = new Variable();
         $probe->copyFrom($result);
         self::bindPropertyTypeMetadata($probe, $typeMeta);
-        TypeCheck::coercePropertyWrite($probe, false);
+        try {
+            TypeCheck::coercePropertyWrite($probe, $strict);
+        } catch (\TypeError) {
+            throw self::settypeTypedPropertyReferenceError(
+                $slot,
+                $typeMeta,
+                self::valueTypeLabelForReference($result),
+            );
+        }
         if (null !== $typeMeta->dnfArms && null !== $frame?->vmContext) {
             DnfCheck::assertMatches($probe, $typeMeta->dnfArms, $frame->vmContext, 'Property', $typeMeta);
         }
         $slot->copyFrom($probe);
+    }
+
+    private static function callerStrictTypes(?Frame $frame): bool
+    {
+        if (null === $frame) {
+            return false;
+        }
+        if (isset($frame->parent) && null !== $frame->parent->block) {
+            return $frame->parent->block->strictTypes;
+        }
+        if (null !== $frame->block) {
+            return $frame->block->strictTypes;
+        }
+
+        return false;
+    }
+
+    private static function settypeTargetMatchesDeclaredType(string $requestedType, Variable $typeMeta): bool
+    {
+        $meta = $typeMeta->resolveIndirect();
+        $requested = strtolower($requestedType);
+        if (null !== $meta->classConstraint && '' !== $meta->classConstraint) {
+            return 'object' === $requested;
+        }
+        $constraint = $meta->typeConstraint;
+        if (null === $constraint) {
+            return true;
+        }
+
+        return match ($constraint) {
+            Variable::TYPE_INTEGER => \in_array($requested, ['int', 'integer'], true),
+            Variable::TYPE_FLOAT => \in_array($requested, ['float', 'double'], true),
+            Variable::TYPE_BOOLEAN => \in_array($requested, ['bool', 'boolean'], true),
+            Variable::TYPE_STRING => 'string' === $requested,
+            Variable::TYPE_ARRAY => 'array' === $requested,
+            Variable::TYPE_NULL => 'null' === $requested,
+            Variable::TYPE_OBJECT => 'object' === $requested,
+            default => false,
+        };
+    }
+
+    private static function settypeTypeLabel(string $typeName): string
+    {
+        return match (strtolower($typeName)) {
+            'integer', 'int' => 'int',
+            'double', 'float' => 'float',
+            'boolean', 'bool' => 'bool',
+            'string' => 'string',
+            'array' => 'array',
+            'null' => 'null',
+            'object' => 'object',
+            default => $typeName,
+        };
+    }
+
+    private static function valueTypeLabelForReference(Variable $value): string
+    {
+        $resolved = $value->resolveIndirect();
+        if (Variable::TYPE_ENUM_CASE === $resolved->type) {
+            return $resolved->toEnumCase()->enumClass->name;
+        }
+        if (Variable::TYPE_OBJECT === $resolved->type) {
+            return $resolved->toObject()->class->name;
+        }
+
+        return TypeCheck::typeNameForConstraint($resolved->type);
+    }
+
+    private static function settypeTypedPropertyReferenceError(
+        Variable $slot,
+        Variable $typeMeta,
+        string $assignedTypeLabel,
+    ): \TypeError {
+        $meta = $typeMeta->resolveIndirect();
+        $expected = $meta->declaredTypeLabel ?? TypeCheck::typeNameForConstraint(
+            $meta->typeConstraint ?? Variable::TYPE_INTEGER,
+            $meta->literalBoolType,
+        );
+        $resolved = $slot->resolveIndirect();
+        $propName = $slot->objectPropertyName ?? $resolved->objectPropertyName ?? 'property';
+        $classLc = $slot->staticPropertyClassLc ?? $resolved->staticPropertyClassLc;
+        if (null !== $classLc && null !== $propName) {
+            $classLabel = $classLc;
+            $vm = \PHPCompiler\VM::running();
+            if (null !== $vm && isset($vm->context->classes[$classLc])) {
+                $classLabel = $vm->context->classes[$classLc]->name;
+            }
+
+            return new \TypeError(sprintf(
+                'Cannot assign %s to reference held by property %s::$%s of type %s',
+                $assignedTypeLabel,
+                $classLabel,
+                $propName,
+                $expected,
+            ));
+        }
+        $owner = $slot->objectPropertyOwner ?? $resolved->objectPropertyOwner;
+
+        return new \TypeError(sprintf(
+            'Cannot assign %s to reference held by property %s::$%s of type %s',
+            $assignedTypeLabel,
+            $owner->class->name,
+            $propName,
+            $expected,
+        ));
     }
 
     private static function bindPropertyTypeMetadata(Variable $dest, Variable $typeMeta): void
@@ -193,6 +330,17 @@ final class VmSettype
             return;
         }
         if (Variable::TYPE_ARRAY === $v->type) {
+            $vm = $frame?->vmContext?->runtime?->vm;
+            $ctx = $frame?->vmContext;
+            if (null !== $ctx) {
+                $ctx->errors->languageWarning(
+                    'Array to string conversion',
+                    null,
+                    0,
+                    $ctx,
+                    $frame
+                );
+            }
             $result->string('Array');
 
             return;

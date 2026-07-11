@@ -6,7 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
-use PHPCompiler\JIT\ArrayBuiltinHelper;
+use PHPCompiler\JIT\Builtin\SortRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\UsortCallbackPolicy;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -29,16 +29,13 @@ final class uasort_ extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (2 !== \count($frame->calledArgs)) {
-            throw new \LogicException('uasort() requires exactly two arguments');
-        }
+        VmArraySort::assertUserSortArgCount($frame, 'uasort');
+        $descending = VmArraySort::resolveUserSortDescending($frame, 'uasort');
+        $ht = VmArray::requireArray($frame->calledArgs[0], 'uasort');
         $array = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_ARRAY !== $array->type) {
-            throw new \LogicException('uasort() first argument must be an array in this compiler build');
-        }
         $callback = $frame->calledArgs[1]->resolveIndirect();
         VmArraySortCallback::requireCallback($callback, 'uasort');
-        $ht = $array->toArray();
+        VmArraySortCallback::rejectInvalidStringCallback($frame, $callback, 'uasort');
         if ($ht->getNumElements() < 2) {
             if (null !== $frame->returnVar) {
                 $frame->returnVar->bool(true);
@@ -61,7 +58,8 @@ final class uasort_ extends Internal
             VmClosureCall::sortKeyedPairsByValue(
                 $frame->vmContext,
                 $pairs,
-                VmClosureCall::resolve($callback)
+                VmClosureCall::resolve($callback),
+                $descending
             );
         } else {
             if (!UsortCallbackPolicy::isVmSupportedType($callback->type)) {
@@ -72,7 +70,11 @@ final class uasort_ extends Internal
                 throw new \LogicException(UsortCallbackPolicy::vmRejectionMessage());
             }
             $compare = VmInternalCompare::resolveStringCallback($name);
-            VmInternalCompare::sortKeyedPairsByValue($pairs, $compare);
+            if ($descending) {
+                VmInternalCompare::sortKeyedPairsByValueDesc($pairs, $compare);
+            } else {
+                VmInternalCompare::sortKeyedPairsByValue($pairs, $compare);
+            }
         }
         $sorted = new HashTable();
         foreach ($pairs as [$key, $value]) {
@@ -94,7 +96,7 @@ final class uasort_ extends Internal
         if (!UsortCallbackPolicy::isJitLowerable($args[1])) {
             throw new \LogicException(UsortCallbackPolicy::jitRejectionMessage());
         }
-        ArrayBuiltinHelper::sortPacked($context, $args[0]);
+        SortRuntime::sortPacked($context, $args[0]);
 
         return $context->getTypeFromString('int1')->constInt(1, false);
     }

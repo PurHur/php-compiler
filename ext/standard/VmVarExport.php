@@ -73,7 +73,7 @@ final class VmVarExport
             return VmVarExportFloat::format($v->toFloat());
         }
         if (Variable::TYPE_STRING === $v->type) {
-            return "'".str_replace(["\\", "'"], ["\\\\", "\\'"], $v->toString())."'";
+            return self::formatExportString($v->toString());
         }
         if (Variable::TYPE_ARRAY === $v->type) {
             $ht = $v->toArray();
@@ -109,6 +109,19 @@ final class VmVarExport
         return '\\'.ltrim($enumClassName, '\\').'::'.$caseName;
     }
 
+    /** php-src var.c — enum case elements break onto the next indented line after {@code =>}. */
+    private static function exportValueNeedsLineBreakAfterArrow(Variable $v): bool
+    {
+        if (Variable::TYPE_ENUM_CASE === $v->type) {
+            return true;
+        }
+        if (Variable::TYPE_OBJECT === $v->type && EnumCaseSupport::isEnumCase($v->toObject())) {
+            return true;
+        }
+
+        return false;
+    }
+
     /**
      * @param \SplObjectStorage<int, true> $visited
      */
@@ -136,12 +149,13 @@ final class VmVarExport
             }
             $className = $object->class->name;
             $props = VmReflection::getVarExportObjectProperties($v, $frame);
-            $exported = self::formatArray($vm, $props->toArray(), $level, $frame, $visited, $warned);
+            // php-src var.c: __set_state / (object) use compact "array(" not "array (".
+            $exported = self::formatArray($vm, $props->toArray(), $level, $frame, $visited, $warned, true);
             if ('stdClass' === $className) {
                 return '(object) '.$exported;
             }
 
-            return $className.'::__set_state('.$exported.')';
+            return '\\'.ltrim($className, '\\').'::__set_state('.$exported.')';
         } finally {
             $visited->detach($object);
         }
@@ -156,27 +170,55 @@ final class VmVarExport
         int $level,
         ?Frame $frame,
         \SplObjectStorage $visited,
-        bool &$warned
+        bool &$warned,
+        bool $compactHeader = false
     ): string {
         $indent = str_repeat('  ', $level);
         $inner = str_repeat('  ', $level + 1);
-        $lines = ["array (\n"];
+        $lines = [$compactHeader ? "array(\n" : "array (\n"];
         foreach ($ht->iterateKeyed(true) as [$key, $value]) {
             $k = Variable::TYPE_INTEGER === $key->type
                 ? (string) $key->toInt()
-                : "'".str_replace(["\\", "'"], ["\\\\", "\\'"], $key->toString())."'";
-            $lines[] = $inner.$k.' => '.self::formatNested(
+                : self::formatExportStringKey($key->toString());
+            $resolved = $value->resolveIndirect();
+            $formatted = self::formatNested(
                 $vm,
-                $value->resolveIndirect(),
+                $resolved,
                 $level + 1,
                 $frame,
                 $visited,
                 $warned
-            ).",\n";
+            );
+            if (self::exportValueNeedsLineBreakAfterArrow($resolved)) {
+                $lines[] = $inner.$k.' => '."\n".$inner.$formatted.",\n";
+            } else {
+                $lines[] = $inner.$k.' => '.$formatted.",\n";
+            }
         }
         $lines[] = $indent.')';
 
         return implode('', $lines);
+    }
+
+    /**
+     * php-src var.c php_addcslashes — embedded NUL becomes concatenation form.
+     */
+    private static function formatExportString(string $str): string
+    {
+        $escaped = str_replace(["\\", "'"], ["\\\\", "\\'"], $str);
+        if (str_contains($escaped, "\0")) {
+            $escaped = str_replace("\0", "' . \"\\0\" . '", $escaped);
+        }
+
+        return "'".$escaped."'";
+    }
+
+    /**
+     * php-src var.c php_array_element_export — addcslashes then NUL → concatenation form.
+     */
+    private static function formatExportStringKey(string $key): string
+    {
+        return self::formatExportString($key);
     }
 
     private static function warnCircular(?Frame $frame, bool &$warned): void

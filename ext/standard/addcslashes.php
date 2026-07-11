@@ -12,6 +12,7 @@ use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\BuiltinExecute;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -29,11 +30,12 @@ final class addcslashes extends Internal
             0,
             'str'
         );
+        InternalStrictArg::rejectNullString($frame->calledArgs[1], 'addcslashes', 'characters', 1, $frame);
         $charlist = VmString::coerceStringBuiltinArg(
             $frame->calledArgs[1],
             'addcslashes',
             1,
-            'charlist'
+            'characters'
         );
         BuiltinExecute::writeReturn(
             $frame,
@@ -63,7 +65,7 @@ final class addcslashes extends Internal
                 $context->builder->load($context->constantStringFromString($charlistLit))
             );
         }
-        $charlist = JitStringBuiltinArg::lower($context, $args[1], 'addcslashes', 1, 'charlist');
+        $charlist = JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[1], 'addcslashes', 1, 'characters');
 
         return $context->builder->call(
             $context->lookupFunction('__compiler_addcslashes'),

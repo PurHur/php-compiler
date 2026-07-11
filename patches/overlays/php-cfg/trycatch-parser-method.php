@@ -18,6 +18,11 @@
                 : null;
         }
         $finallyBlock = null !== $node->finally ? new Block($this->block) : null;
+        $elseBlock = null;
+        $elseSource = $node->getAttribute(\PHPCompiler\Ast\TryCatchElseSupport::ATTRIBUTE);
+        if (is_string($elseSource) && '' !== $elseSource) {
+            $elseBlock = new Block($this->block);
+        }
 
         $this->block->children[] = new Op\Stmt\TryCatch(
             $tryBlock,
@@ -26,14 +31,15 @@
             $endBlock,
             $catchTypes,
             $catchVars,
-            $attrs
+            $attrs,
+            $elseBlock
         );
 
         $this->block->children[] = new Jump($tryBlock, $attrs);
         $tryBlock->addParent($this->block);
 
         $this->block = $this->parseNodes($node->stmts, $tryBlock);
-        $this->block->children[] = new Jump($endBlock, $attrs);
+        $this->block->children[] = new Jump($elseBlock ?? $endBlock, $attrs);
         $endBlock->addParent($this->block);
 
         foreach ($node->catches as $i => $catch) {
@@ -43,8 +49,28 @@
             $endBlock->addParent($this->block);
         }
 
+        if (null !== $elseBlock) {
+            $elseAst = $this->astParser->parse('<?php '.$elseSource);
+            $elseStmts = [];
+            foreach ($elseAst as $stmt) {
+                if ($stmt instanceof Stmt\InlineHTML) {
+                    continue;
+                }
+                $elseStmts[] = $stmt;
+            }
+            $this->block = $this->parseNodes($elseStmts, $elseBlock);
+            $this->block->children[] = new Jump($endBlock, $attrs);
+            $endBlock->addParent($this->block);
+        }
+
         if (null !== $finallyBlock) {
-            $this->block = $this->parseNodes($node->finally->stmts, $finallyBlock);
+            $finallyId = ++$this->ctx->gotoScopeId;
+            $this->ctx->gotoFinallyStack[] = $finallyId;
+            try {
+                $this->block = $this->parseNodes($node->finally->stmts, $finallyBlock);
+            } finally {
+                array_pop($this->ctx->gotoFinallyStack);
+            }
             $this->block->children[] = new Jump($endBlock, $attrs);
             $endBlock->addParent($this->block);
         }

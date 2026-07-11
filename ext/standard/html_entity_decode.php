@@ -14,7 +14,7 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * html_entity_decode() — decode HTML entities (subset; default ENT_COMPAT, issue #2472).
+ * html_entity_decode() — decode HTML entities; default ENT_QUOTES | ENT_SUBSTITUTE (php-src html.c).
  */
 final class html_entity_decode extends Internal
 {
@@ -26,8 +26,8 @@ final class html_entity_decode extends Internal
     public function execute(Frame $frame): void
     {
         $argc = \count($frame->calledArgs);
-        if ($argc < 1 || $argc > 2) {
-            throw new \LogicException('html_entity_decode() requires one or two arguments in this compiler build');
+        if ($argc < 1 || $argc > 3) {
+            throw new \LogicException('html_entity_decode() requires one to three arguments in this compiler build');
         }
         $string = VmString::coerceStringBuiltinArg(
             $frame->calledArgs[0],
@@ -38,7 +38,8 @@ final class html_entity_decode extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $flags = ENT_COMPAT;
+        $flags = ENT_QUOTES | ENT_SUBSTITUTE;
+        $encoding = 'UTF-8';
         if ($argc >= 2) {
             $flags = VmMath::parseIntBuiltinArg(
                 $frame->calledArgs[1],
@@ -47,7 +48,10 @@ final class html_entity_decode extends Internal
                 'flags'
             );
         }
-        $frame->returnVar->string(VmString::html_entity_decode($string, $flags));
+        if ($argc >= 3) {
+            $encoding = self::resolveEncodingVm($frame->calledArgs[2]->resolveIndirect());
+        }
+        $frame->returnVar->string(VmString::html_entity_decode($string, $flags, $encoding));
     }
 
     public Context $context;
@@ -56,12 +60,24 @@ final class html_entity_decode extends Internal
     {
         $this->context = $context;
         $argc = \count($args);
-        if ($argc < 1 || $argc > 2) {
-            throw new \LogicException('html_entity_decode() requires one or two arguments in this compiler build');
+        if ($argc < 1 || $argc > 3) {
+            throw new \LogicException('html_entity_decode() requires one to three arguments in this compiler build');
+        }
+
+        $effectiveArgc = self::jitEffectiveArgc($argc, $args);
+        if ($effectiveArgc >= 3) {
+            return JitHtmlEntityDecode::decodeWithEncoding(
+                $context,
+                JitStringBuiltinArg::lower($context, $args[0], 'html_entity_decode', 0, 'string'),
+                $argc >= 2
+                    ? JitLongArg::lower($context, $args[1], 'html_entity_decode() flags')
+                    : $context->getTypeFromString('int64')->constInt(ENT_QUOTES | ENT_SUBSTITUTE, false),
+                JitStringBuiltinArg::lower($context, $args[2], 'html_entity_decode', 2, 'encoding')
+            );
         }
 
         $literal = $args[0]->compileTimeString ?? null;
-        $flags = ENT_COMPAT;
+        $flags = ENT_QUOTES | ENT_SUBSTITUTE;
         $flagsKnown = $argc < 2;
         if ($argc >= 2) {
             $ct = self::tryCompileTimeFlags($context, $args[1]);
@@ -86,6 +102,51 @@ final class html_entity_decode extends Internal
         }
 
         return JitHtmlEntityDecode::decode($context, $str, $flagsVal);
+    }
+
+    private static function resolveEncodingVm(Variable $encVar): string
+    {
+        if (Variable::TYPE_NULL === $encVar->type) {
+            return 'UTF-8';
+        }
+        if (Variable::TYPE_STRING !== $encVar->type) {
+            throw new \TypeError(
+                'html_entity_decode(): Argument #3 ($encoding) must be of type ?string, '
+                .self::vmTypeName($encVar->type).' given'
+            );
+        }
+
+        return $encVar->toString();
+    }
+
+    /**
+     * @param list<JITVariable> $args
+     */
+    private static function jitEffectiveArgc(int $argc, array $args): int
+    {
+        if ($argc >= 3 && self::encodingArgIsNull($args[2])) {
+            return 2;
+        }
+
+        return $argc;
+    }
+
+    private static function encodingArgIsNull(JITVariable $var): bool
+    {
+        return JITVariable::TYPE_NULL === $var->type || $var->isNullConstant;
+    }
+
+    private static function vmTypeName(int $type): string
+    {
+        return match ($type) {
+            Variable::TYPE_INTEGER => 'int',
+            Variable::TYPE_FLOAT => 'float',
+            Variable::TYPE_BOOLEAN => 'bool',
+            Variable::TYPE_ARRAY => 'array',
+            Variable::TYPE_OBJECT => 'object',
+            Variable::TYPE_RESOURCE => 'resource',
+            default => 'unknown type',
+        };
     }
 
     private static function tryCompileTimeFlags(Context $context, JITVariable $arg): ?int

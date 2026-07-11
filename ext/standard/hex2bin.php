@@ -4,28 +4,41 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\StringHex2bin;
+use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/** hex2bin() for strings (subset of PHP; JIT/AOT via native LLVM lowering). */
+/** hex2bin() for strings (subset of PHP; JIT/AOT via Hex2binJitHelper PHP). */
 final class hex2bin extends Internal
 {
-    private const MSG_ODD_LENGTH = 'hex2bin(): Hexadecimal input string must have an even length';
+    private const MSG_ODD_LENGTH = 'Hexadecimal input string must have an even length';
 
-    private const MSG_INVALID_HEX = 'hex2bin(): Input string must be hexadecimal string';
+    private const MSG_INVALID_HEX = 'Input string must be hexadecimal string';
+
+    private const WARN_ODD_LENGTH = 'hex2bin(): '.self::MSG_ODD_LENGTH;
+
+    private const WARN_INVALID_HEX = 'hex2bin(): '.self::MSG_INVALID_HEX;
 
     public function execute(Frame $frame): void
     {
         $argc = \count($frame->calledArgs);
-        if ($argc < 1 || $argc > 2) {
-            throw new \LogicException('hex2bin() requires one or two arguments');
+        if ($argc < 1) {
+            throw new \ArgumentCountError('hex2bin() expects at least 1 argument, 0 given');
+        }
+        if ($argc > 2 || (2 === $argc && !CompilerVersion::supportsHex2binStrict())) {
+            throw new \ArgumentCountError(
+                \sprintf('hex2bin() expects exactly 1 argument, %d given', $argc)
+            );
         }
         $data = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'hex2bin', 0, 'string');
         $strict = false;
@@ -43,7 +56,7 @@ final class hex2bin extends Internal
             }
             if (null !== $frame->vmContext) {
                 $frame->vmContext->errors->triggerError(
-                    self::MSG_ODD_LENGTH,
+                    self::WARN_ODD_LENGTH,
                     ErrorReporter::E_WARNING,
                     '' !== $frame->scriptPath ? $frame->scriptPath : null,
                     $frame->vmContext,
@@ -63,7 +76,7 @@ final class hex2bin extends Internal
             }
             if ($len > 0 && null !== $frame->vmContext) {
                 $frame->vmContext->errors->triggerError(
-                    self::MSG_INVALID_HEX,
+                    self::WARN_INVALID_HEX,
                     ErrorReporter::E_WARNING,
                     '' !== $frame->scriptPath ? $frame->scriptPath : null,
                     $frame->vmContext,
@@ -84,19 +97,43 @@ final class hex2bin extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         $argc = \count($args);
-        if ($argc < 1 || $argc > 2) {
-            throw new \LogicException('hex2bin() requires one or two arguments');
+        if ($argc < 1) {
+            TypeErrorRaise::ensureLinked($context);
+            TypeErrorRaise::emitArgumentCountError(
+                $context,
+                'hex2bin() expects at least 1 argument, 0 given'
+            );
+            $slot = JitValueBox::alloc($context);
+
+            return JitValueBox::pointer($context, $slot);
         }
-        $strict = null;
+        if ($argc > 2 || (2 === $argc && !CompilerVersion::supportsHex2binStrict())) {
+            TypeErrorRaise::ensureLinked($context);
+            TypeErrorRaise::emitArgumentCountError(
+                $context,
+                \sprintf('hex2bin() expects exactly 1 argument, %d given', $argc)
+            );
+            $slot = JitValueBox::alloc($context);
+
+            return JitValueBox::pointer($context, $slot);
+        }
+        $strictI8 = null;
         if (2 === $argc) {
-            $strict = $this->jitBool($context, $args[1], 'hex2bin() argument #2 ($strict)');
+            $strictI8 = $this->jitBool($context, $args[1], 'hex2bin() argument #2 ($strict)');
+        } else {
+            $strictI8 = $context->getTypeFromString('int8')->constInt(0, false);
         }
 
-        return JitHex2bin::convert(
-            $context,
+        StringHex2bin::ensureLinked($context);
+        $slot = JitValueBox::alloc($context);
+        $outPtr = JitValueBox::pointer($context, $slot);
+        $context->builder->call(
+            $context->lookupFunction('__compiler_hex2bin'),
             JitStringBuiltinArg::lower($context, $args[0], 'hex2bin', 0, 'string'),
-            $strict
+            $strictI8,
+            $outPtr
         );
-    }
 
+        return $outPtr;
+    }
 }

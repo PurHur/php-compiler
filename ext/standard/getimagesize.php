@@ -25,20 +25,33 @@ final class getimagesize extends Internal
     public function execute(Frame $frame): void
     {
         $argc = \count($frame->calledArgs);
-        if ($argc < 1 || $argc > 2) {
-            throw new \LogicException('getimagesize() expects one or two arguments in this compiler build');
+        if ($argc < 1) {
+            throw new \ArgumentCountError(\sprintf(
+                'getimagesize() expects at least 1 argument, %d given',
+                $argc
+            ));
+        }
+        if ($argc > 2) {
+            throw new \ArgumentCountError(\sprintf(
+                'getimagesize() expects at most 2 arguments, %d given',
+                $argc
+            ));
         }
         if (null === $frame->returnVar) {
             return;
         }
-        $filename = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'getimagesize', 0, 'filename');
+        $filename = VmStreamPath::coerceNonEmptyPathArgForFrame($frame, 0, 'getimagesize', 'filename');
         $imageinfo = null;
         if (2 === $argc) {
             $imageinfo = [];
         }
         $result = VmImage::getImageSize($filename, $imageinfo);
         if (false === $result) {
-            VmStreamOpenFailure::warnFailedToOpen($frame, 'getimagesize', $filename);
+            if (!VmImage::pathPayloadReadable($filename)) {
+                VmStreamOpenFailure::warnFailedToOpen($frame, 'getimagesize', $filename);
+            } elseif (VmImage::shouldEmitImageReadNoticeForPath($filename)) {
+                VmImage::emitImageReadNotice($frame, 'getimagesize', $filename);
+            }
             $frame->returnVar->bool(false);
 
             return;

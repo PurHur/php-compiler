@@ -5,10 +5,11 @@ declare(strict_types=1);
 namespace PHPCompiler\Test\Unit;
 
 use PHPCompiler\Compiler\NewWithoutParensCompileCheck;
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
-/** `new` in property initializers and class constants rejected (#10391, #10693, Zend/zend_compile.c). */
+/** `new` in property initializers and class constants rejected (#10391, #12940, Zend/zend_compile.c). */
 final class NewWithoutParensCompileCheckTest extends TestCase
 {
     public function testClassConstNewWithoutParensCompileErrors(): void
@@ -85,6 +86,21 @@ PHP, 'promoted_new_with_parens.php');
 
     public function testClassConstNewWithParensCompileErrors(): void
     {
+        if (CompilerVersion::supportsClassConstObjectExpressions()) {
+            $runtime = new Runtime();
+            $block = $runtime->parseAndCompile(<<<'PHP'
+<?php
+class C {
+    public function __construct(public int $n = 0) {}
+}
+class Holder {
+    public const X = new C(1);
+}
+PHP, 'class_const_new_with_parens.php');
+            $this->assertNotNull($block);
+
+            return;
+        }
         $this->expectCompileError(<<<'PHP'
 <?php
 class C {
@@ -98,6 +114,18 @@ PHP);
 
     public function testClassConstNewEmptyArgsWithParensCompileErrors(): void
     {
+        if (CompilerVersion::supportsClassConstObjectExpressions()) {
+            $runtime = new Runtime();
+            $block = $runtime->parseAndCompile(<<<'PHP'
+<?php
+class C {
+    public const X = new stdClass();
+}
+PHP, 'class_const_new_stdclass.php');
+            $this->assertNotNull($block);
+
+            return;
+        }
         $this->expectCompileError(<<<'PHP'
 <?php
 class C {

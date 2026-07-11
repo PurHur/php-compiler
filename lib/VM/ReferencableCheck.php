@@ -4,18 +4,27 @@ declare(strict_types=1);
 
 namespace PHPCompiler\VM;
 
+use PHPCfg\Operand;
+use PHPCfg\Operand\Temporary;
+use PHPCfg\Op\Expr\Cast\Object_ as ObjectCastExpr;
 use PHPCompiler\Block;
 use PHPCompiler\BuiltinByRefParams;
 use PHPCompiler\BuiltinParamNames;
 use PHPCompiler\Frame;
 use PHPCompiler\Func;
+use PHPCompiler\OpCode;
 use PHPCompiler\VM\Builtin\VmClassMethod;
+use PHPCompiler\VM\ErrorReporter;
 
 /**
  * Whether a call argument may bind to an &-parameter (Zend zend_execute.c ZEND_SEND_REF).
  */
 final class ReferencableCheck
 {
+    private const NON_VARIABLE_BY_REF_NOTICE = 'Only variables should be passed by reference';
+
+    public const NON_VARIABLE_BY_REF_NOTICE_MESSAGE = self::NON_VARIABLE_BY_REF_NOTICE;
+
     /**
      * @param list<Variable> $calledArgs
      */
@@ -56,8 +65,29 @@ final class ReferencableCheck
         ) {
             $thisArgOffset = 1;
         }
+        $variadicByRefIdx = self::variadicByRefParamIndex($calleeBlock);
+        $variadicEndIdx = null;
+        if (null !== $variadicByRefIdx) {
+            $variadicEndIdx = self::variadicByRefEndArgIndex(
+                $calleeBlock,
+                $variadicByRefIdx,
+                $thisArgOffset,
+                $calledArgs
+            );
+        }
         foreach ($calleeBlock->paramByRef as $paramIdx => $_) {
             $idx = (int) $paramIdx;
+            if (null !== $variadicByRefIdx && $idx === $variadicByRefIdx) {
+                $start = $variadicByRefIdx + $thisArgOffset;
+                $paramName = $calleeBlock->paramNames[$idx] ?? 'param'.$idx;
+                for ($argIndex = $start; $argIndex <= $variadicEndIdx; ++$argIndex) {
+                    if (!array_key_exists($argIndex, $calledArgs)) {
+                        continue;
+                    }
+                    self::assertArgument($fn, $idx, $paramName, $calledArgs[$argIndex], $caller);
+                }
+                continue;
+            }
             $argIndex = $idx + $thisArgOffset;
             if (!array_key_exists($argIndex, $calledArgs)) {
                 continue;
@@ -65,6 +95,79 @@ final class ReferencableCheck
             $paramName = $calleeBlock->paramNames[$idx] ?? 'param'.$idx;
             self::assertArgument($fn, $idx, $paramName, $calledArgs[$argIndex], $caller);
         }
+    }
+
+    public static function variadicByRefParamIndex(Block $calleeBlock): ?int
+    {
+        $variadicIdx = $calleeBlock->variadicParamIndex;
+        if (null === $variadicIdx || !isset($calleeBlock->paramByRef[$variadicIdx])) {
+            return null;
+        }
+
+        return $variadicIdx;
+    }
+
+    /**
+     * @param array<int, Variable> $calledArgs
+     */
+    public static function variadicByRefEndArgIndex(
+        Block $calleeBlock,
+        int $variadicParamIdx,
+        int $thisArgOffset,
+        array $calledArgs
+    ): int {
+        $paramCount = \count($calleeBlock->paramNames);
+        $maxArgIdx = -1;
+        foreach (array_keys($calledArgs) as $argKey) {
+            if ($argKey > $maxArgIdx) {
+                $maxArgIdx = (int) $argKey;
+            }
+        }
+        $hasTrailingFixedAfterVariadic = $variadicParamIdx < $paramCount - 1;
+        if ($hasTrailingFixedAfterVariadic) {
+            $trailingCount = $paramCount - $variadicParamIdx - 1;
+            $numProvided = $maxArgIdx + 1;
+            $numToTrailing = min(
+                $trailingCount,
+                max(0, $numProvided - $variadicParamIdx - 1)
+            );
+
+            return $numProvided - $numToTrailing - 1;
+        }
+
+        return $maxArgIdx;
+    }
+
+    /**
+     * Whether $argIndex is in the variadic by-reference tail for a user call.
+     */
+    public static function outgoingUserArgNeedsVariadicByRef(
+        Block $calleeBlock,
+        int $argIndex,
+        int $thisArgOffset,
+        int $numProvidedAfterSend
+    ): bool {
+        $variadicByRefIdx = self::variadicByRefParamIndex($calleeBlock);
+        if (null === $variadicByRefIdx) {
+            return false;
+        }
+        $start = $variadicByRefIdx + $thisArgOffset;
+        if ($argIndex < $start) {
+            return false;
+        }
+        $paramCount = \count($calleeBlock->paramNames);
+        $hasTrailingFixedAfterVariadic = $variadicByRefIdx < $paramCount - 1;
+        if (!$hasTrailingFixedAfterVariadic) {
+            return true;
+        }
+        $trailingCount = $paramCount - $variadicByRefIdx - 1;
+        $numToTrailing = min(
+            $trailingCount,
+            max(0, $numProvidedAfterSend - $variadicByRefIdx - 1)
+        );
+        $variadicEndIdx = $numProvidedAfterSend - $numToTrailing - 1;
+
+        return $argIndex <= $variadicEndIdx;
     }
 
     /**
@@ -84,9 +187,61 @@ final class ReferencableCheck
             }
             if (
                 0 === $paramIdx
-                && self::allowsEphemeralArrayLiteralByRef($fn)
-                && self::isEphemeralArrayArg($calledArgs[$paramIdx], $caller)
+                && self::skipsByRefWhenNotArray($fn)
+                && !self::isArrayOperand($calledArgs[$paramIdx])
             ) {
+                // #13408 / #4333: null literal → by-ref Error before array type validation.
+                if (Variable::TYPE_NULL === $calledArgs[$paramIdx]->resolveIndirect()->type) {
+                    $paramName = $paramNames[$paramIdx] ?? 'param'.($paramIdx + 1);
+                    self::assertArgument($fn, $paramIdx, $paramName, $calledArgs[$paramIdx], $caller);
+                } elseif (!self::isReferenceable($calledArgs[$paramIdx], $caller)) {
+                    $paramName = $paramNames[$paramIdx] ?? 'param'.($paramIdx + 1);
+                    if (
+                        'array_splice' === strtolower($fn)
+                        && self::isEphemeralObjectCastArg($calledArgs[$paramIdx], $caller)
+                    ) {
+                        self::assertArgument($fn, $paramIdx, $paramName, $calledArgs[$paramIdx], $caller);
+                    } elseif (self::isObjectOperand($calledArgs[$paramIdx])) {
+                        // #15216 / #13435: ephemeral object operands — E_NOTICE then TypeError in builtin.
+                        self::emitNonVariableByRefNotice($caller);
+                    } else {
+                        // #4881 / #4333: scalar literals (int, string, …) → catchable Error, no notice.
+                        self::assertArgument($fn, $paramIdx, $paramName, $calledArgs[$paramIdx], $caller);
+                    }
+                }
+                continue;
+            }
+            if (
+                0 === $paramIdx
+                && self::allowsEphemeralArrayLiteralByRef($fn)
+                && (
+                    self::isEphemeralArrayArg($calledArgs[$paramIdx], $caller)
+                    || !self::isArrayOrObjectOperand($calledArgs[$paramIdx])
+                )
+            ) {
+                continue;
+            }
+            if (!BuiltinByRefParams::isByRefArg($fn, $paramIdx, $calledArgs[$paramIdx] ?? null)) {
+                continue;
+            }
+            if (
+                0 === $paramIdx
+                && self::allowsNonVariableObjectByRef($fn)
+                && !self::isReferenceable($calledArgs[$paramIdx], $caller)
+                && self::isArrayOrObjectOperand($calledArgs[$paramIdx])
+            ) {
+                if (self::isEphemeralObjectCastArg($calledArgs[$paramIdx], $caller)) {
+                    $paramName = $paramNames[$paramIdx] ?? 'param'.($paramIdx + 1);
+                    self::assertArgument($fn, $paramIdx, $paramName, $calledArgs[$paramIdx], $caller);
+                }
+                // Inline array literals must Error before callback validation (#10819, #16259).
+                if (self::isEphemeralArrayArg($calledArgs[$paramIdx], $caller)) {
+                    $paramName = $paramNames[$paramIdx] ?? 'param'.($paramIdx + 1);
+                    self::assertArgument($fn, $paramIdx, $paramName, $calledArgs[$paramIdx], $caller);
+                }
+                if (self::shouldEmitNonVariableObjectByRefNotice($calledArgs[$paramIdx], $caller)) {
+                    self::emitNonVariableByRefNotice($caller);
+                }
                 continue;
             }
             $paramName = $paramNames[$paramIdx] ?? 'param'.($paramIdx + 1);
@@ -101,6 +256,12 @@ final class ReferencableCheck
                 continue;
             }
             if (!BuiltinByRefParams::isByRefArg($fn, $paramIdx, $calledArgs[$paramIdx])) {
+                continue;
+            }
+            if (
+                self::allowsEphemeralArrayLiteralByRef($fn)
+                && self::isEphemeralArrayArg($calledArgs[$paramIdx], $caller)
+            ) {
                 continue;
             }
             $paramName = $paramNames[$paramIdx] ?? 'param'.($paramIdx + 1);
@@ -127,11 +288,191 @@ final class ReferencableCheck
     }
 
     /**
-     * Zend accepts inline array literals for current()/key() only (zend_compile.c ZEND_SEND_REF temp).
+     * Read-only pointer builtins may use materialized array literals (current/key/pos).
+     * Mutators (next/prev/reset/end) require an lvalue (#10557, #10295, #16594).
+     * array_multisort() also accepts inline arrays (zend_compile.c ZEND_SEND_REF).
+     * Also used when wiring hoisted pointer FuncCall siblings before var_export(..., true) (#13829, #16556).
      */
     public static function allowsEphemeralArrayLiteralByRef(string $fn): bool
     {
-        return \in_array(strtolower($fn), ['current', 'key'], true);
+        return self::isArrayInternalPointerReadBuiltin($fn) || 'array_multisort' === strtolower($fn);
+    }
+
+    /** current/key/pos — read-only internal pointer API (#4967, #11196). */
+    public static function isArrayInternalPointerReadBuiltin(string $fn): bool
+    {
+        return \in_array(strtolower($fn), ['current', 'key', 'pos'], true);
+    }
+
+    /** next/prev/reset/end — mutating internal pointer API (#4967, #16594). */
+    public static function isArrayInternalPointerMutatorBuiltin(string $fn): bool
+    {
+        return \in_array(strtolower($fn), ['next', 'prev', 'reset', 'end'], true);
+    }
+
+    /** reset/current/key/… — ext/standard/array.c internal pointer API (#4967, #11196). */
+    public static function isArrayInternalPointerBuiltin(string $fn): bool
+    {
+        return self::isArrayInternalPointerReadBuiltin($fn)
+            || self::isArrayInternalPointerMutatorBuiltin($fn);
+    }
+
+    /**
+     * Array sort mutators — non-array operands get TypeError in the builtin, not by-ref Error (#12675).
+     *
+     * @return list<string>
+     */
+    public static function arraySortMutatorFunctions(): array
+    {
+        return [
+            'sort', 'rsort', 'asort', 'arsort', 'ksort', 'krsort',
+            'usort', 'uasort', 'uksort', 'natsort', 'natcasesort',
+            'shuffle',
+        ];
+    }
+
+    /**
+     * array_pop/shift/unshift — non-array operands get TypeError in the builtin (#15216).
+     *
+     * @return list<string>
+     */
+    public static function arrayStackMutatorFunctions(): array
+    {
+        return ['array_pop', 'array_push', 'array_shift', 'array_unshift'];
+    }
+
+    public static function skipsByRefWhenNotArray(string $fn): bool
+    {
+        $lc = strtolower($fn);
+
+        return \in_array($lc, self::arraySortMutatorFunctions(), true)
+            || \in_array($lc, self::arrayStackMutatorFunctions(), true)
+            || 'array_splice' === $lc;
+    }
+
+    /** array_walk* accepts object operands — empty non-lvalue objects get E_NOTICE only (ext/standard/array.c, #13237). */
+    public static function allowsNonVariableObjectByRef(string $fn): bool
+    {
+        return \in_array(strtolower($fn), ['array_walk', 'array_walk_recursive'], true);
+    }
+
+    /** Runtime: notice only for ephemeral `new` objects, not inline (object) casts (#13237, #15948). */
+    public static function shouldEmitNonVariableObjectByRefNotice(Variable $arg, Frame $caller, ?Operand $operand = null): bool
+    {
+        if (self::isEphemeralObjectCastArg($arg, $caller)) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /** Compile-time: skip notice for inline (object) casts — emit by-ref Error instead (#15948). */
+    public static function shouldEmitNonVariableObjectByRefNoticeAtCompileTime(?Operand $operand, ?Block $block = null): bool
+    {
+        if (self::operandIsObjectCast($operand, $block)) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /** Inline (object) cast operand — by-ref Error on PHP 8.2+ (#15948, ext/standard/array.c). */
+    public static function isEphemeralObjectCastArg(Variable $arg, Frame $caller): bool
+    {
+        if ($arg->isIndirect()) {
+            return false;
+        }
+        $resolved = $arg->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $resolved->type) {
+            return false;
+        }
+        $slot = self::scopeSlotForVariable($caller, $arg);
+        if (null === $slot || null === $caller->block) {
+            return false;
+        }
+
+        return self::scopeSlotIsObjectCastResult($caller->block, $slot);
+    }
+
+    public static function scopeSlotIsObjectCastResult(Block $block, int $slot): bool
+    {
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_CAST_OBJECT === $op->type && (int) $op->arg1 === $slot) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public static function operandIsObjectCast(?Operand $operand, ?Block $block = null): bool
+    {
+        if (null === $operand) {
+            return false;
+        }
+        $current = $operand;
+        while ($current instanceof Temporary && null !== $current->original) {
+            $current = $current->original;
+        }
+        foreach ($current->usages as $usage) {
+            if ($usage instanceof ObjectCastExpr && $usage->result === $current) {
+                return true;
+            }
+        }
+        if (null !== $block) {
+            $slot = $block->slotForOperand($operand);
+            if (null !== $slot) {
+                return self::scopeSlotIsObjectCastResult($block, $slot);
+            }
+        }
+
+        return false;
+    }
+
+    /** Operand is array or object — other types get TypeError in the builtin (#11984). */
+    private static function isArrayOrObjectOperand(Variable $arg): bool
+    {
+        $resolved = $arg->resolveIndirect();
+
+        return Variable::TYPE_ARRAY === $resolved->type
+            || Variable::TYPE_OBJECT === $resolved->type;
+    }
+
+    private static function isArrayOperand(Variable $arg): bool
+    {
+        return Variable::TYPE_ARRAY === $arg->resolveIndirect()->type;
+    }
+
+    private static function isObjectOperand(Variable $arg): bool
+    {
+        return Variable::TYPE_OBJECT === $arg->resolveIndirect()->type;
+    }
+
+    private static function emitNonVariableByRefNotice(Frame $caller): void
+    {
+        $ctx = self::resolveVmContext($caller);
+        if (null === $ctx) {
+            return;
+        }
+        $ctx->errors->triggerError(
+            self::NON_VARIABLE_BY_REF_NOTICE,
+            ErrorReporter::E_NOTICE,
+            '' !== $caller->scriptPath ? $caller->scriptPath : null,
+            $ctx,
+            $caller,
+            $caller->callSiteLine
+        );
+    }
+
+    private static function resolveVmContext(Frame $caller): ?Context
+    {
+        for ($frame = $caller; null !== $frame; $frame = $frame->parent) {
+            if (null !== $frame->vmContext) {
+                return $frame->vmContext;
+            }
+        }
+
+        return null;
     }
 
     /** Inline array literal operand — not an lvalue, but allowed for read-only pointer builtins (#10654). */
@@ -178,20 +519,22 @@ final class ReferencableCheck
         if (null === $slot) {
             return false;
         }
-        if (isset($caller->block->constants[$slot])) {
-            // Named locals may share an initializer constant; still allow by-ref (#5593, #6689, #9700).
-            if ($caller->block->isNamedVariableSlot($slot)) {
-                return true;
-            }
-
-            return false;
+        // Assign-result / named CV slots are referenceable even without scope operand names (#12690).
+        if ($caller->block->isNamedVariableSlot($slot)) {
+            return true;
         }
         $operand = $caller->block->operandForScopeSlot($slot);
+        if (null !== $operand && null !== Block::resolveVariableName($operand)) {
+            return true;
+        }
+        if (isset($caller->block->constants[$slot])) {
+            return false;
+        }
         if (null === $operand) {
             return false;
         }
 
-        return null !== Block::resolveVariableName($operand);
+        return false;
     }
 
     private static function scopeSlotForVariable(Frame $frame, Variable $var): ?int

@@ -7,7 +7,8 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitIsFinite;
+use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
+use PHPCompiler\JIT\Builtin\MathIsFinite;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitOperandTypeLabel;
 use PHPCompiler\JIT\JitStringArg;
@@ -24,9 +25,25 @@ final class JitIntdiv
     public static function lowerOperands(Context $context, JITVariable $num1, JITVariable $num2): array
     {
         return [
-            self::lowerIntBuiltinArg($context, $num1, 'intdiv', 1, 'num1'),
-            self::lowerIntBuiltinArg($context, $num2, 'intdiv', 2, 'num2'),
+            self::lowerIntBuiltinArgForCaller($context, $num1, 'intdiv', 1, 'num1'),
+            self::lowerIntBuiltinArgForCaller($context, $num2, 'intdiv', 2, 'num2'),
         ];
+    }
+
+    /**
+     * Z_PARAM_LONG with caller strict_types parity (#12275 intdiv, #12273 dechex/decoct/decbin).
+     */
+    public static function lowerIntBuiltinArgForCaller(
+        Context $context,
+        JITVariable $arg,
+        string $function,
+        int $argIndex,
+        string $paramName,
+        bool $warnFloatPrecision = false
+    ): Value {
+        JitInternalStrictArg::requireInt($context, $arg, $function, $paramName, $argIndex);
+
+        return self::lowerIntBuiltinArg($context, $arg, $function, $argIndex, $paramName, $warnFloatPrecision);
     }
 
     /**
@@ -52,6 +69,19 @@ final class JitIntdiv
         string $paramName
     ): Value {
         return self::lowerIntOperand($context, $arg, $argIndex, $paramName, $function, true);
+    }
+
+    /** Z_PARAM_LONG_OR_NULL with caller strict_types parity (#13859, #13851). */
+    public static function lowerNullableIntBuiltinArgForCaller(
+        Context $context,
+        JITVariable $arg,
+        string $function,
+        int $argIndex,
+        string $paramName
+    ): Value {
+        JitInternalStrictArg::requireNullableInt($context, $arg, $function, $paramName, $argIndex);
+
+        return self::lowerNullableIntBuiltinArg($context, $arg, $function, $argIndex, $paramName);
     }
 
     /**
@@ -312,7 +342,7 @@ final class JitIntdiv
         bool $nullable = false,
         bool $warnFloatPrecision = false
     ): Value {
-        $isFinite = JitIsFinite::lower($context, $doubleVal);
+        $isFinite = MathIsFinite::invoke($context, $doubleVal);
         $okBlock = BasicBlockHelper::append($context, 'intdiv_dbl_ok');
         $errBlock = BasicBlockHelper::append($context, 'intdiv_dbl_err');
         $context->builder->branchIf($isFinite, $okBlock, $errBlock);

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\Test\Unit;
 
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\Runtime;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\TestCase;
@@ -12,6 +13,13 @@ use PHPUnit\Framework\TestCase;
 #[Group('LazyObject')]
 final class LazyObjectTest extends TestCase
 {
+    protected function setUp(): void
+    {
+        if (!CompilerVersion::supportsLazyObjectFactories()) {
+            $this->markTestSkipped('Lazy object factories require stable PHP 8.4+ profile (#12375)');
+        }
+    }
+
     public function testNewLazyProxyDefersConstructor(): void
     {
         $runtime = new Runtime();
@@ -75,6 +83,52 @@ echo "\n";
 PHP;
         ob_start();
         $runtime->run($runtime->parseAndCompile($code, 'lazy_object_is_uninitialized.php'));
+        $this->assertSame("true\nfalse\nfalse\n", ob_get_clean());
+    }
+
+    /** @covers issue #6052 */
+    public function testClassHasLazyObjectInitializer(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class Svc { public string $id = ''; }
+$ref = new ReflectionClass(Svc::class);
+$lazy = $ref->newLazyGhost(function (Svc $o) { $o->id = 'x'; });
+var_export(class_has_lazy_object_initializer($lazy));
+echo "\n";
+var_export(class_has_lazy_object_initializer(new Svc()));
+echo "\n";
+$ref->markLazyObjectAsInitialized($lazy);
+var_export(class_has_lazy_object_initializer($lazy));
+echo "\n";
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'class_has_lazy_object_initializer.php'));
+        $this->assertSame("true\nfalse\nfalse\n", ob_get_clean());
+    }
+
+    /** @covers issue #6097 */
+    public function testClassHasLazyObjectUninitializer(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class Svc {
+    public function __construct(public string $id = '') {}
+}
+$ref = new ReflectionClass(Svc::class);
+$lazy = $ref->newLazyProxy(static fn (): Svc => new Svc('proxy'));
+var_export(class_has_lazy_object_uninitializer($lazy));
+echo "\n";
+var_export(class_has_lazy_object_uninitializer(new Svc('eager')));
+echo "\n";
+$lazy->id;
+var_export(class_has_lazy_object_uninitializer($lazy));
+echo "\n";
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'class_has_lazy_object_uninitializer.php'));
         $this->assertSame("true\nfalse\nfalse\n", ob_get_clean());
     }
 
@@ -224,5 +278,45 @@ PHP;
             "methods=11\npending_factory=callable\nbefore=proxy\nrebound_before=rebound\nafter_rebound=rebound\nafter_mark_factory=null\n",
             ob_get_clean()
         );
+    }
+
+    /** @covers issue #12310 */
+    public function testCreateLazyProxyAcceptsVoidFactoryReturn(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class Svc {
+    public int $v = 0;
+}
+$proxy = createLazyProxy(Svc::class, function (Svc $o): void {
+    $o->v = 99;
+});
+echo $proxy->v, "\n";
+echo "ok\n";
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'create_lazy_proxy_void_factory.php'));
+        $this->assertSame("99\nok\n", ob_get_clean());
+    }
+
+    /** @covers issue #12309 */
+    public function testCreateLazyGhostIgnoresObjectReturnFromInitializer(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class Svc {
+    public int $v = 0;
+}
+$ghost = createLazyGhost(Svc::class, function (Svc $o) {
+    $o->v = 42;
+    return $o;
+});
+echo $ghost->v, "\n";
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'create_lazy_ghost_object_return.php'));
+        $this->assertSame("42\n", ob_get_clean());
     }
 }

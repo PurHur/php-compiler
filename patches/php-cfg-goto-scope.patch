@@ -176,22 +176,7 @@
          }
  
          if ($prevBlock && ! $prevBlock->dead) {
-@@ -819,7 +893,13 @@
-         }
- 
-         if (null !== $finallyBlock) {
--            $this->block = $this->parseNodes($node->finally->stmts, $finallyBlock);
-+            $finallyId = ++$this->ctx->gotoScopeId;
-+            $this->ctx->gotoFinallyStack[] = $finallyId;
-+            try {
-+                $this->block = $this->parseNodes($node->finally->stmts, $finallyBlock);
-+            } finally {
-+                array_pop($this->ctx->gotoFinallyStack);
-+            }
-             $this->block->children[] = new Jump($endBlock, $attrs);
-             $endBlock->addParent($this->block);
-         }
-@@ -855,7 +935,13 @@
+@@ -855,7 +929,13 @@
          $loopBody->addParent($this->block);
          $loopEnd->addParent($this->block);
  

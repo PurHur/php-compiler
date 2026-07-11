@@ -37,8 +37,9 @@ final class ReflectionEnumBackedCaseConstruct extends VmClassMethod
             );
         }
         $receiver = ReflectionSupport::requireReflectionEnumBackedCase($frame, $frame->calledArgs[0]);
-        $receiver->getProperty(ReflectionSupport::PROP_CLASS_NAME)->string($enumEntry->name);
-        $receiver->getProperty(ReflectionSupport::PROP_ENUM_CASE_NAME)->string(
+        ReflectionSupport::initReflectionEnumCaseMetadata(
+            $receiver,
+            $enumEntry->name,
             $enumEntry->enumCaseCanonicalNames[$caseLc]
         );
         $receiver->constructed = true;

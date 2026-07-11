@@ -42,6 +42,11 @@ final class assert_options extends Internal
 
             return;
         }
+        if (null === $result) {
+            $frame->returnVar->null();
+
+            return;
+        }
         if (\is_string($result)) {
             $frame->returnVar->string($result);
         } elseif (\is_bool($result)) {

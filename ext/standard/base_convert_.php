@@ -43,7 +43,7 @@ final class base_convert_ extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $numStr = VmString::coerceStringBuiltinArg($numVar, 'base_convert', 0, 'num');
+        $numStr = VmString::stringBuiltinArgForFrame($frame, 0, 'base_convert', 0, 'num');
         if (Variable::TYPE_INTEGER !== $fromVar->type || Variable::TYPE_INTEGER !== $toVar->type) {
             throw new \LogicException('base_convert() base arguments must be integers in this compiler build');
         }
@@ -66,7 +66,7 @@ final class base_convert_ extends Internal
         }
         $ptr = $this->stringDataPtr(
             $context,
-            JitStringBuiltinArg::lower($context, $args[0], 'base_convert', 0, 'num')
+            JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'base_convert', 0, 'num')
         );
         $fromBase = $this->jitLong($context, $args[1], 'base_convert() argument #2');
         $toBase = $this->jitLong($context, $args[2], 'base_convert() argument #3');

@@ -30,7 +30,9 @@ final class ReflectionFunctionConstruct extends VmClassMethod
             $receiver->reflectionClosureState = $state;
             $receiver->getProperty(ReflectionSupport::PROP_FUNC_NAME)->string($state->func->name);
         } else {
-            $name = VmReflection::stringArg($target, 'ReflectionFunction::__construct() name', 1);
+            $name = VmReflection::normalizeGlobalIntrospectionName(
+                VmReflection::stringArg($target, 'ReflectionFunction::__construct() name', 1)
+            );
             $func = ReflectionSupport::resolveFunctionForReflection($ctx, $name);
             $receiver->reflectionClosureState = null;
             $receiver->reflectionIsInternalFunction = $func instanceof \PHPCompiler\Func\Internal;

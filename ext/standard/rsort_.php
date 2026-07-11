@@ -6,7 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
-use PHPCompiler\JIT\ArrayBuiltinHelper;
+use PHPCompiler\JIT\Builtin\SortRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\EnumCaseSupport;
@@ -16,7 +16,7 @@ use PHPLLVM\Value;
 /**
  * rsort() — sort by value descending, reindex (subset of PHP; issue #2300, #9123).
  *
- * VM: homogeneous packed string or integer lists. JIT/AOT: __hashtable__sortPackedReverse.
+ * VM: homogeneous packed string or integer lists. JIT/AOT: SortJitHelper via SortRuntime.
  */
 final class rsort_ extends Internal
 {
@@ -28,14 +28,14 @@ final class rsort_ extends Internal
     public function execute(Frame $frame): void
     {
         $argc = \count($frame->calledArgs);
-        if ($argc < 1 || $argc > 2) {
-            throw new \LogicException('rsort() requires one or two arguments');
+        if ($argc < 1 || $argc > 3) {
+            throw new \LogicException('rsort() requires one to three arguments');
         }
         $array = $frame->calledArgs[0]->resolveIndirect();
         $ht = VmArray::requireArray($frame->calledArgs[0], 'rsort');
         $flags = StdlibConstants::SORT_REGULAR;
-        if (2 === $argc) {
-            $flags = VmInternalCompare::resolveFrameSortFlags($frame, 'rsort');
+        if ($argc > 1) {
+            $flags = VmInternalCompare::resolveSortFunctionFlags($frame, 'rsort');
         }
         if ($ht->getNumElements() < 2) {
             if (null !== $frame->returnVar) {
@@ -53,27 +53,28 @@ final class rsort_ extends Internal
         $first = $values[0]->resolveIndirect();
         $sortType = $flags & ~StdlibConstants::SORT_FLAG_CASE;
         if (Variable::TYPE_STRING === $first->type) {
-            if (StdlibConstants::SORT_NUMERIC === $sortType) {
-                VmInternalCompare::sortVariableValuesWithFlagsDesc($values, $flags);
-            } else {
+            if (
+                StdlibConstants::SORT_STRING === $sortType
+                && VmInternalCompare::valuesShareScalarType($values, Variable::TYPE_STRING)
+            ) {
                 VmInternalCompare::sortVariableValuesDesc(
                     $values,
                     VmInternalCompare::stringCompareForSortFlags($flags)
                 );
+            } else {
+                VmInternalCompare::sortVariableValuesWithFlagsDesc($values, $flags);
             }
         } elseif (Variable::TYPE_INTEGER === $first->type) {
-            if (StdlibConstants::SORT_REGULAR === $sortType) {
+            if (
+                StdlibConstants::SORT_REGULAR === $sortType
+                && VmInternalCompare::valuesShareScalarType($values, Variable::TYPE_INTEGER)
+            ) {
                 $n = \count($values);
                 for ($i = 1; $i < $n; ++$i) {
                     $j = $i;
                     while ($j > 0) {
                         $a = $values[$j - 1]->resolveIndirect();
                         $b = $values[$j]->resolveIndirect();
-                        if (Variable::TYPE_INTEGER !== $a->type || Variable::TYPE_INTEGER !== $b->type) {
-                            throw new \LogicException(
-                                'rsort() only supports homogeneous string or integer arrays in this compiler build'
-                            );
-                        }
                         if ($a->toInt() >= $b->toInt()) {
                             break;
                         }
@@ -96,9 +97,7 @@ final class rsort_ extends Internal
                 );
             }
         } else {
-            throw new \LogicException(
-                'rsort() only supports homogeneous string or integer arrays in this compiler build'
-            );
+            VmInternalCompare::sortVariableValuesWithFlagsDesc($values, $flags);
         }
         $array->separateArrayForWrite();
         $array->resolveIndirect()->toArray()->replacePackedValues($values);
@@ -115,7 +114,7 @@ final class rsort_ extends Internal
         }
         JitArrayKey::requireArrayArg($context, $args[0], 'rsort');
         if (1 === $argc) {
-            ArrayBuiltinHelper::sortPackedReverse($context, $args[0]);
+            SortRuntime::sortPackedReverse($context, $args[0]);
         } else {
             self::jitSortWithFlags($context, $args[0], VmInternalCompare::resolveJitSortFlags($context, $args[1], 'rsort'));
         }
@@ -142,7 +141,7 @@ final class rsort_ extends Internal
             || StdlibConstants::SORT_STRING === $sortType
             || StdlibConstants::SORT_NUMERIC === $sortType
         ) {
-            ArrayBuiltinHelper::sortPackedReverse($context, $array);
+            SortRuntime::sortPackedReverse($context, $array);
 
             return;
         }

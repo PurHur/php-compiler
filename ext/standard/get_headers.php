@@ -7,11 +7,13 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
+use PHPCompiler\JIT\JitBoolArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * get_headers() — libc HTTP HEAD via VmHttpFetchNative, no host get_headers() (#3309).
+ * get_headers() — HTTP HEAD via VmHttpFetchPure / VmStreamSocketNative, no host get_headers() (#3309, #8939).
  *
  * php-src: ext/standard/head.c — PHP_FUNCTION(get_headers)
  */
@@ -34,7 +36,7 @@ final class get_headers extends Internal
             return;
         }
 
-        $url = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'get_headers', 0, 'url');
+        $url = VmStreamPath::coerceNonEmptyPathArgForFrame($frame, 0, 'get_headers', 'url');
         $associative = false;
         if ($argc >= 2) {
             $associative = VmMath::parseBoolBuiltinArg(
@@ -64,6 +66,24 @@ final class get_headers extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('get_headers() is not supported in JIT/AOT in this compiler build');
+        $argc = \count($args);
+        if ($argc < 1 || $argc > 2) {
+            throw new \LogicException(
+                'get_headers() expects at least 1 argument, '.\max(0, $argc - 1).' given'
+            );
+        }
+
+        $url = JitStreamPath::lowerNonEmptyPath($context, $args[0], 'get_headers', 0, 'url');
+        $associative = $context->constantFromBool(false);
+        if ($argc >= 2) {
+            JitInternalStrictArg::requireBool($context, $args[1], 'get_headers', 'associative', 2);
+            $associative = JitBoolArg::lower(
+                $context,
+                $args[1],
+                'get_headers(): Argument #2 ($associative)'
+            );
+        }
+
+        return JitGetHeaders::invoke($context, $url, $associative);
     }
 }

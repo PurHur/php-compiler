@@ -22,7 +22,7 @@ final class HrtimeBuiltinTest extends TestCase
         $nsFrame->calledArgs = [$asNumber];
         $nsFrame->returnVar = new VMVariable();
         $fn->execute($nsFrame);
-        $this->assertGreaterThan(0, $nsFrame->returnVar->resolveIndirect()->toInt());
+        $this->assertGreaterThan(0, $nsFrame->returnVar->resolveIndirect()->toFloat());
 
         $pairFrame = $fn->getFrame($runtime->vmContext);
         $pairFrame->returnVar = new VMVariable();

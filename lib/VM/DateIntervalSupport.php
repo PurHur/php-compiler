@@ -179,9 +179,95 @@ final class DateIntervalSupport
         return $interval;
     }
 
+    /**
+     * @param array{y: int, m: int, d: int, h: int, i: int, s: int, f: float, invert: int} $parsed
+     */
+    public static function createFromDateString(Context $ctx, string $dateString, array $parsed): ObjectEntry
+    {
+        $interval = self::createFromState($ctx, [...$parsed, 'days' => false]);
+        self::markFromDateString($interval, $dateString);
+
+        return $interval;
+    }
+
+    public static function markFromDateString(ObjectEntry $interval, string $dateString): void
+    {
+        if ($interval->hasProperty('from_string')) {
+            $interval->getProperty('from_string')->resolveIndirect()->bool(true);
+        }
+        if ($interval->hasProperty('date_string')) {
+            $interval->getProperty('date_string')->resolveIndirect()->string($dateString);
+        } else {
+            $interval->allocateProperty('date_string')->string($dateString);
+        }
+    }
+
+    public static function isFromDateString(ObjectEntry $interval): bool
+    {
+        if (!$interval->hasProperty('from_string')) {
+            return false;
+        }
+        $fromString = $interval->getProperty('from_string')->resolveIndirect();
+
+        return Variable::TYPE_BOOLEAN === $fromString->type && $fromString->toBool();
+    }
+
+    public static function readDateString(ObjectEntry $interval): ?string
+    {
+        if (!$interval->hasProperty('date_string')) {
+            return null;
+        }
+        $dateString = $interval->getProperty('date_string')->resolveIndirect();
+        if (Variable::TYPE_STRING !== $dateString->type) {
+            return null;
+        }
+
+        return $dateString->toString();
+    }
+
+    /**
+     * php-src ext/json/php_json.c — DateInterval object json wire (#14144).
+     *
+     * @return array<string, mixed>
+     */
+    public static function exportZendJsonWireDateInterval(ObjectEntry $interval): array
+    {
+        $state = self::readState($interval);
+        $fromString = false;
+        if ($interval->hasProperty('from_string')) {
+            $fs = $interval->getProperty('from_string')->resolveIndirect();
+            if (Variable::TYPE_BOOLEAN === $fs->type) {
+                $fromString = $fs->toBool();
+            }
+        }
+
+        return [
+            'y' => $state['y'],
+            'm' => $state['m'],
+            'd' => $state['d'],
+            'h' => $state['h'],
+            'i' => $state['i'],
+            's' => $state['s'],
+            'f' => $state['f'],
+            'invert' => $state['invert'],
+            'days' => $state['days'],
+            'from_string' => $fromString,
+        ];
+    }
+
     /** php-src php_date_serialize — Zend DateInterval member order (#10692). */
     public static function encodeZendSerializeWire(ObjectEntry $interval): string
     {
+        if (self::isFromDateString($interval)) {
+            $dateString = self::readDateString($interval);
+            if (null !== $dateString) {
+                return VmSerialize::encodeExportedPropertyBag('DateInterval', [
+                    'from_string' => true,
+                    'date_string' => $dateString,
+                ]);
+            }
+        }
+
         $state = self::readState($interval);
         $fromString = false;
         if ($interval->hasProperty('from_string')) {
@@ -210,6 +296,17 @@ final class DateIntervalSupport
      */
     public static function restoreFromZendSerialize(Context $ctx, array $data): ?ObjectEntry
     {
+        if (isset($data['from_string']) && true === $data['from_string']
+            && isset($data['date_string']) && \is_string($data['date_string'])) {
+            $warning = null;
+            $parsed = VmDateInterval::parseFromDateString($data['date_string'], $warning);
+            if (null === $parsed) {
+                return null;
+            }
+
+            return self::createFromDateString($ctx, $data['date_string'], $parsed);
+        }
+
         $state = [
             'y' => isset($data['y']) && \is_int($data['y']) ? $data['y'] : 0,
             'm' => isset($data['m']) && \is_int($data['m']) ? $data['m'] : 0,

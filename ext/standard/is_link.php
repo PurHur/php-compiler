@@ -19,7 +19,7 @@ final class is_link extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('is_link() requires exactly one argument in this compiler build');
         }
-        $path = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'is_link', 0, 'filename');
+        $path = VmFilestatArg::filenameArgForFrame($frame, 0, 'is_link');
         if (null === $frame->returnVar) {
             return;
         }
@@ -31,7 +31,7 @@ final class is_link extends Internal
         if (1 !== \count($args)) {
             throw new \LogicException('is_link() requires exactly one argument in this compiler build');
         }
-        $path = JitStringBuiltinArg::lower($context, $args[0], 'is_link', 0, 'filename');
+        $path = JitStringBuiltinArg::lowerPath($context, $args[0], 'is_link', 0, 'filename');
 
         return JitStat::pathIsLink($context, $path);
     }

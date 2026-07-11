@@ -8,6 +8,7 @@ use PHPCompiler\Block;
 use PHPCompiler\JIT\Builtin\ErrorRaise;
 use PHPCompiler\VM\Variable as VMVariable;
 use PHPCompiler\JIT\Builtin\ExceptionHandlerJitRuntime;
+use PHPCompiler\JIT\Builtin\TryCatchRuntime;
 use PHPCompiler\JIT\Builtin\JitReturnPending;
 use PHPCompiler\JIT\Builtin\JitThrow;
 use PHPCompiler\JIT\Builtin\ScriptExit;
@@ -572,24 +573,14 @@ final class TryCatchHelper
             if ([] === $types || $singleArm) {
                 $builder->branch($catchSetupBb);
             } else {
-                $checkBb = $nextCatch;
-                $typeCount = count($types);
-                foreach ($types as $idx => $typeName) {
-                    $thrownVar = new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $pendingObj);
-                    $isInstance = ReflectionBuiltinHelper::emitInstanceOf($context, $thrownVar, $typeName);
-                    $isBool = Variable::TYPE_NATIVE_BOOL === $isInstance->type
-                        ? $isInstance->value
-                        : $context->helper->loadValue($isInstance);
-                    $isLast = $idx === $typeCount - 1;
-                    if ($isLast) {
-                        $builder->branchIf($isBool, $catchSetupBb, $noMatchBb);
-                    } else {
-                        $nextCheck = self::appendBlock($func, 'try_catch_type_next_'.$suffix);
-                        $builder->branchIf($isBool, $catchSetupBb, $nextCheck);
-                        $checkBb = $nextCheck;
-                        $builder->positionAtEnd($checkBb);
-                    }
-                }
+                $encoded = implode('|', $types);
+                $thrownVar = new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $pendingObj);
+                $classNameStr = ReflectionBuiltinHelper::getClassName($context, $thrownVar);
+                $encodedStr = $context->builder->load(
+                    $context->constantStringFromString($encoded)
+                );
+                $matches = TryCatchRuntime::callEncodedTypesMatch($context, $classNameStr, $encodedStr);
+                $builder->branchIf($matches, $catchSetupBb, $noMatchBb);
             }
 
             $builder->positionAtEnd($catchSetupBb);

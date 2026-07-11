@@ -30,6 +30,10 @@ final class CastSupport
             return $result;
         }
 
+        if (ResourceSupport::isVmResource($src)) {
+            return self::singletonArrayCast($src);
+        }
+
         if (Variable::TYPE_OBJECT === $src->type) {
             $obj = $src->toObject();
             if (EnumCaseSupport::isEnumCase($obj)) {
@@ -37,6 +41,9 @@ final class CastSupport
                 self::enumCaseObjectToArray($obj, $result->toArray());
 
                 return $result;
+            }
+            if (null !== $obj->closureState) {
+                return self::singletonArrayCast($src);
             }
             $result->newArray();
             self::objectToArray($obj, $result->toArray(), $classesByLc ?? []);
@@ -59,6 +66,26 @@ final class CastSupport
         $result->newArray();
         $copy = new Variable();
         $copy->copyFrom($src);
+        $result->toArray()->append($copy);
+
+        return $result;
+    }
+
+    /** Zend convert_to_array(IS_RESOURCE) — one-element array with live/closed resource at index 0 (#15012, #15013). */
+    public static function vmResourceArrayCast(Variable $src): Variable
+    {
+        return self::singletonArrayCast($src);
+    }
+
+    /**
+     * Zend convert_to_array — singleton array for resource/closure pseudo-objects (#15012, #15015).
+     */
+    private static function singletonArrayCast(Variable $src): Variable
+    {
+        $result = new Variable();
+        $result->newArray();
+        $copy = new Variable();
+        $copy->copyFrom($src->resolveIndirect());
         $result->toArray()->append($copy);
 
         return $result;

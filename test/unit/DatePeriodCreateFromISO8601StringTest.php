@@ -1,0 +1,83 @@
+<?php
+
+declare(strict_types=1);
+
+namespace PHPCompiler\Test\Unit;
+
+use PHPCompiler\CompilerVersion;
+use PHPCompiler\Runtime;
+use PHPUnit\Framework\TestCase;
+
+/** DatePeriod::createFromISO8601String() — #7296. */
+final class DatePeriodCreateFromISO8601StringTest extends TestCase
+{
+    public function testCreateFromISO8601StringOnForwardProfile(): void
+    {
+        if (!CompilerVersion::supportsDatePeriodCreateFromISO8601String()) {
+            self::markTestSkipped('requires PHP_COMPILER_PROFILE=8.4');
+        }
+
+        $code = <<<'PHP'
+<?php
+var_export(method_exists(DatePeriod::class, 'createFromISO8601String'));
+echo "\n";
+$p = DatePeriod::createFromISO8601String('2024-01-01T00:00:00/2024-01-03T00:00:00/P1D');
+foreach ($p as $d) {
+    echo $d->format('Y-m-d'), "\n";
+    break;
+}
+PHP;
+
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $runtime = new Runtime();
+            $block = $runtime->parseAndCompile($code, 'test.php');
+            ob_start();
+            $runtime->run($block);
+            $out = ob_get_clean();
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+
+        self::assertSame("true\n2024-01-01\n", $out);
+    }
+
+    public function testCreateFromISO8601StringZuluStartDurationEnd(): void
+    {
+        if (!CompilerVersion::supportsDatePeriodCreateFromISO8601String()) {
+            self::markTestSkipped('requires PHP_COMPILER_PROFILE=8.4');
+        }
+
+        $code = <<<'PHP'
+<?php
+$p = DatePeriod::createFromISO8601String('2020-01-01T00:00:00Z/P1D/2020-01-05T00:00:00Z');
+foreach ($p as $d) {
+    echo $d->format('Y-m-d'), "\n";
+    break;
+}
+PHP;
+
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $runtime = new Runtime();
+            $block = $runtime->parseAndCompile($code, 'test.php');
+            ob_start();
+            $runtime->run($block);
+            $out = ob_get_clean();
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+
+        self::assertSame("2020-01-01\n", $out);
+    }
+}

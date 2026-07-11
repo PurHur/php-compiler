@@ -23,20 +23,19 @@ final class VmFsWriteNativeRuntimeShrinkTest extends TestCase
         );
     }
 
-    public function testWriteNativeDeclaresLibcOpenWriteFlockClose(): void
+    public function testWriteNativeDelegatesToPureWithoutFfi(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/VmFsWriteNative.php');
-        $this->assertStringContainsString('VmFsWritePure', $source);
-        $this->assertStringContainsString('int open(const char *pathname', $source);
-        $this->assertStringContainsString('ssize_t write(int fd', $source);
-        $this->assertStringContainsString('int flock(int fd', $source);
-        $this->assertStringContainsString('int close(int fd)', $source);
+        $this->assertStringContainsString('VmFsWritePure::write', $source);
+        $this->assertStringContainsString('VmFsWritePure::available()', $source);
+        $this->assertStringNotContainsString('FFI::cdef', $source);
+        $this->assertStringNotContainsString('ssize_t write(int fd', $source);
     }
 
     public function testWriteRoundTrip(): void
     {
         if (!VmFsWriteNative::available() || !VmFsReadNative::available()) {
-            $this->markTestSkipped('ext/ffi required for VmFsWriteNative libc write');
+            $this->markTestSkipped('host file I/O unavailable for VmFsWritePure/VmFsReadPure');
         }
 
         $path = tempnam(sys_get_temp_dir(), 'phpc_write_');
@@ -53,7 +52,7 @@ final class VmFsWriteNativeRuntimeShrinkTest extends TestCase
     public function testWriteAppendAndLockEx(): void
     {
         if (!VmFsWriteNative::available() || !VmFsReadNative::available()) {
-            $this->markTestSkipped('ext/ffi required for VmFsWriteNative libc write');
+            $this->markTestSkipped('host file I/O unavailable for VmFsWritePure/VmFsReadPure');
         }
 
         $path = tempnam(sys_get_temp_dir(), 'phpc_fpc_');
@@ -100,7 +99,7 @@ final class VmFsWriteNativeRuntimeShrinkTest extends TestCase
     public function testZipEngineWriteRoundTrip(): void
     {
         if (!VmFsWriteNative::available() || !VmFsReadNative::available()) {
-            $this->markTestSkipped('ext/ffi required for VmFsWriteNative/VmFsReadNative');
+            $this->markTestSkipped('host file I/O unavailable for VmFsWritePure/VmFsReadPure');
         }
 
         $path = tempnam(sys_get_temp_dir(), 'phpc_zip_');

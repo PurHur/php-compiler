@@ -2,8 +2,8 @@
     {
         $attrs = $this->mapAttributes($node);
         $haltOffset = 0;
-        if ('' !== $this->parseSourceCode) {
-            $haltOffset = strlen($this->parseSourceCode) - strlen($node->remaining);
+        if ('' !== $this->sourceCode) {
+            $haltOffset = strlen($this->sourceCode) - strlen($node->remaining);
         }
         $this->block->children[] = new Op\Stmt\HaltCompiler(
             $node->remaining,

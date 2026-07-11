@@ -62,6 +62,10 @@ PHP
 
     public function testBareThrowRethrowNestedCatchExecutesViaMcjit(): void
     {
+        if (!CompilerVersion::supportsBareRethrow()) {
+            self::markTestSkipped('bare rethrow disabled on reference profile (#15719)');
+        }
+
         $this->assertMcjitOutput(<<<'PHP'
 <?php
 class Ex {}

@@ -9,6 +9,24 @@ use PHPUnit\Framework\TestCase;
 
 final class GlobalTypedConstRewriterTest extends TestCase
 {
+    /** @var string|false */
+    private $prevProfile = false;
+
+    protected function setUp(): void
+    {
+        $this->prevProfile = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.3');
+    }
+
+    protected function tearDown(): void
+    {
+        if (false === $this->prevProfile) {
+            putenv('PHP_COMPILER_PROFILE');
+        } else {
+            putenv('PHP_COMPILER_PROFILE='.$this->prevProfile);
+        }
+    }
+
     public function testRewritesFileScopeTypedConst(): void
     {
         $src = <<<'PHP'
@@ -42,45 +60,62 @@ PHP;
         self::assertStringContainsString('/*phpc-global-typed-const:string*/ const NS_NAME', preg_replace('/\s+/', ' ', $out));
     }
 
-    public function testRewritesFinalFileScopeTypedConst(): void
-    {
-        if (!\PHPCompiler\CompilerVersion::supportsFinalGlobalTypedConstants()) {
-            self::markTestSkipped('final global typed constants require PHP 8.4.0+ target');
-        }
-        $src = <<<'PHP'
-<?php
-final const string APP_NAME = 'alpha';
-PHP;
-        $out = GlobalTypedConstRewriter::rewrite($src);
-        self::assertStringContainsString('/*phpc-global-typed-const:final:string*/ const APP_NAME', preg_replace('/\s+/', ' ', $out));
-    }
-
-    public function testRewritesFinalNamespaceBlockTypedConst(): void
-    {
-        if (!\PHPCompiler\CompilerVersion::supportsFinalGlobalTypedConstants()) {
-            self::markTestSkipped('final global typed constants require PHP 8.4.0+ target');
-        }
-        $src = <<<'PHP'
-<?php
-namespace FinalTyped {
-    final const string NS_NAME = 'beta';
-}
-PHP;
-        $out = GlobalTypedConstRewriter::rewrite($src);
-        self::assertStringContainsString('/*phpc-global-typed-const:final:string*/ const NS_NAME', preg_replace('/\s+/', ' ', $out));
-    }
-
     public function testParseMarkerPayloadFinalPrefix(): void
     {
         self::assertSame(['string', true], GlobalTypedConstRewriter::parseMarkerPayload('final:string'));
         self::assertSame(['int', false], GlobalTypedConstRewriter::parseMarkerPayload('int'));
     }
 
-    public function testRejectsFinalGlobalTypedConstWhenGateOff(): void
+    public function testRewritesFinalGlobalTypedConstOn84Profile(): void
     {
-        if (\PHPCompiler\CompilerVersion::supportsFinalGlobalTypedConstants()) {
-            self::markTestSkipped('final global typed constants enabled on PHP 8.4+ target');
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $src = <<<'PHP'
+<?php
+final const string APP_NAME = 'alpha';
+PHP;
+            $out = GlobalTypedConstRewriter::rewrite($src);
+            self::assertStringContainsString(
+                '/*phpc-global-typed-const:final:string*/ const APP_NAME',
+                preg_replace('/\s+/', ' ', $out)
+            );
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
         }
+    }
+
+    public function testRewritesFinalNamespaceTypedConstOn84Profile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $src = <<<'PHP'
+<?php
+namespace N {
+    final const string NS_NAME = 'beta';
+}
+PHP;
+            $out = GlobalTypedConstRewriter::rewrite($src);
+            self::assertStringContainsString(
+                '/*phpc-global-typed-const:final:string*/ const NS_NAME',
+                preg_replace('/\s+/', ' ', $out)
+            );
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testRejectsFinalGlobalTypedConst(): void
+    {
         $src = <<<'PHP'
 <?php
 final const string APP_NAME = 'alpha';
@@ -90,11 +125,8 @@ PHP;
         GlobalTypedConstRewriter::rewrite($src);
     }
 
-    public function testRejectsFinalNamespaceTypedConstWhenGateOff(): void
+    public function testRejectsFinalNamespaceTypedConst(): void
     {
-        if (\PHPCompiler\CompilerVersion::supportsFinalGlobalTypedConstants()) {
-            self::markTestSkipped('final global typed constants enabled on PHP 8.4+ target');
-        }
         $src = <<<'PHP'
 <?php
 namespace N {
@@ -104,5 +136,48 @@ PHP;
         $this->expectException(\PhpParser\Error::class);
         $this->expectExceptionMessage(GlobalTypedConstRewriter::FINAL_GLOBAL_CONST_REJECT_MESSAGE);
         GlobalTypedConstRewriter::rewrite($src);
+    }
+
+    public function testReferenceProfileSyntaxErrorIntConst(): void
+    {
+        $src = <<<'PHP'
+<?php
+const int X = 7;
+PHP;
+        $error = GlobalTypedConstRewriter::referenceProfileSyntaxError($src);
+        self::assertNotNull($error);
+        self::assertSame('syntax error, unexpected identifier "X", expecting "="', $error['message']);
+    }
+
+    public function testReferenceProfileSyntaxErrorArrayConst(): void
+    {
+        $src = <<<'PHP'
+<?php
+const array A = [];
+PHP;
+        $error = GlobalTypedConstRewriter::referenceProfileSyntaxError($src);
+        self::assertNotNull($error);
+        self::assertSame('syntax error, unexpected token "array", expecting identifier', $error['message']);
+    }
+
+    public function testReferenceProfileSyntaxErrorIgnoresClassConst(): void
+    {
+        $src = <<<'PHP'
+<?php
+class C { public const string X = 'a'; }
+PHP;
+        self::assertNull(GlobalTypedConstRewriter::referenceProfileSyntaxError($src));
+    }
+
+    public function testReferenceProfileSyntaxErrorFinalGlobalTypedConst(): void
+    {
+        $src = <<<'PHP'
+<?php
+final const string APP_NAME = 'alpha';
+PHP;
+        $error = GlobalTypedConstRewriter::referenceProfileSyntaxError($src);
+        self::assertNotNull($error);
+        self::assertSame(GlobalTypedConstRewriter::FINAL_GLOBAL_CONST_REJECT_MESSAGE, $error['message']);
+        self::assertSame(2, $error['line']);
     }
 }

@@ -16,9 +16,15 @@ final class HighlightEngine
 {
     private const COLOR_DEFAULT = '#000000';
 
+    /** Zend highlight_file() on unreadable path with $return=true (ext/standard/url.c, #12032). */
+    public const EMPTY_HIGHLIGHT_HTML = '<code><span style="color: #000000">'."\n".'</span>'."\n".'</code>';
+
     private const COLOR_KEYWORD = '#007700';
 
     private const COLOR_HTML = '#0000BB';
+
+    /** php-src php_highlight.h — STRING_COLOR for T_CONSTANT_ENCAPSED_STRING (#12401). */
+    private const COLOR_STRING = '#DD0000';
 
     private const COLOR_COMMENT = '#FF8000';
 
@@ -27,8 +33,12 @@ final class HighlightEngine
 
     public static function render(string $code): string
     {
+        if ('' === $code) {
+            return self::EMPTY_HIGHLIGHT_HTML;
+        }
         $tokens = LanguageScanner::tokenize($code);
         $body = self::renderTokens($tokens);
+        $body = \str_replace("\n", '<br />'."\n", $body);
 
         // php-src ext/standard/php_highlight.h — outer wrapper newlines match Zend byte-for-byte (#10308).
         return '<code><span style="color: '.self::COLOR_DEFAULT.'">'."\n".$body."\n".'</span>'."\n".'</code>';
@@ -106,10 +116,12 @@ final class HighlightEngine
         if (\in_array($id, [$ids['T_COMMENT'], $ids['T_DOC_COMMENT']], true)) {
             return self::COLOR_COMMENT;
         }
+        if ($id === $ids['T_CONSTANT_ENCAPSED_STRING']) {
+            return self::COLOR_STRING;
+        }
         if (\in_array(
             $id,
             [
-                $ids['T_CONSTANT_ENCAPSED_STRING'],
                 $ids['T_ENCAPSED_AND_WHITESPACE'],
                 $ids['T_LNUMBER'],
                 $ids['T_DNUMBER'],
@@ -119,6 +131,9 @@ final class HighlightEngine
             return self::COLOR_HTML;
         }
         if ($id === $ids['T_VARIABLE']) {
+            return self::COLOR_DEFAULT;
+        }
+        if ($id === $ids['T_INLINE_HTML']) {
             return self::COLOR_DEFAULT;
         }
         if ($id >= 256) {
@@ -133,6 +148,8 @@ final class HighlightEngine
         $escaped = \htmlspecialchars($text, \ENT_QUOTES | \ENT_SUBSTITUTE, 'UTF-8');
         $escaped = \str_replace(' ', '&nbsp;', $escaped);
         $escaped = \str_replace("\t", '&nbsp;&nbsp;&nbsp;&nbsp;', $escaped);
+        // php-src ext/standard/php_highlight.h — line breaks inside spans become <br /> (#17557).
+        $escaped = \str_replace("\n", '<br />', $escaped);
 
         return $escaped;
     }

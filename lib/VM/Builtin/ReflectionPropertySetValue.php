@@ -29,6 +29,7 @@ final class ReflectionPropertySetValue extends VmClassMethod
         }
         $receiver = ReflectionSupport::requireReflectionProperty($frame, $frame->calledArgs[0]);
         $ctx = VmReflection::requireContext($frame);
+        ReflectionSupport::assertReflectionPropertyAccessible($ctx, $receiver);
         $className = ReflectionSupport::classNameFromReflection($receiver);
         $entry = VmReflection::resolveClassEntry($ctx, $className);
         if (null === $entry) {
@@ -56,6 +57,25 @@ final class ReflectionPropertySetValue extends VmClassMethod
         if (VmReflection::isEnumReflectionPseudoProperty($entry, $property)) {
             throw new \LogicException('Cannot set property on enum case');
         }
+        if (ReflectionSupport::isDynamicReflectionProperty($receiver)) {
+            $objectVar = $frame->calledArgs[1]->resolveIndirect();
+            if (Variable::TYPE_OBJECT !== $objectVar->type) {
+                throw new \TypeError(
+                    'ReflectionProperty::setValue(): Argument #1 ($object) must be of type ?object, '
+                    .EnumCaseSupport::typeNameForVariable($objectVar).' given'
+                );
+            }
+            if (!VmReflection::isInstanceOfObject($ctx, $objectVar, $className)) {
+                ReflectionSupport::throwReflectionException(
+                    'Given object is not an instance of the class this property was declared in'
+                );
+            }
+            // Fresh slot — dynamic props may alias VM temps cleared after getValue() (#15540).
+            $slot = $objectVar->toObject()->allocateProperty($property);
+            $slot->copyFrom($frame->calledArgs[2]->resolveIndirect());
+
+            return;
+        }
         $instanceName = VmReflection::findInstancePropertyName($entry, $property, $ctx);
         if (null === $instanceName) {
             ReflectionSupport::throwReflectionException(
@@ -79,7 +99,7 @@ final class ReflectionPropertySetValue extends VmClassMethod
             $objectVar->toObject(),
             $instanceName,
             $meta,
-            $frame->calledArgs[2]->resolveIndirect(),
+            $frame->calledArgs[2],
             VmReflection::reflectionCallerFrame($frame)
         );
     }

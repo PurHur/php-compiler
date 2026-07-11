@@ -9,7 +9,7 @@ use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Issue #5345 / #9814: AOT standalone must define env local helpers without phpc_env_local.c.
+ * Issue #5345 / #9814 / #12810: AOT standalone must define env local helpers via EnvLocalJitHelper PHP.
  *
  * @group aot-lint
  */
@@ -32,8 +32,8 @@ final class EnvLocalRuntimeStandaloneTest extends TestCase
             $this->assertGreaterThan(0, $fn->countBasicBlocks(), $name);
         }
 
-        $this->assertNotNull($ctx->module->getNamedGlobal('phpc_env_local_entries'));
-        $this->assertNotNull($ctx->module->getNamedGlobal('phpc_env_local_count'));
+        $this->assertNull($ctx->module->getNamedGlobal('phpc_env_local_entries'));
+        $this->assertNull($ctx->module->getNamedGlobal('phpc_env_local_count'));
     }
 
     public function testPhpcEnvLocalCRuntimeRemovedFromLinker(): void

@@ -433,6 +433,14 @@ final class LanguageScanner
 
             return;
         }
+        // php-src zend_language_scanner.l: bare '$' when not followed by a variable label start.
+        if ($this->pos >= $this->len || !$this->isLabelStart($this->source[$this->pos])) {
+            $this->pos = $start;
+            $this->pushChar('$');
+            ++$this->pos;
+
+            return;
+        }
         while ($this->pos < $this->len && $this->isLabelContinue($this->source[$this->pos])) {
             ++$this->pos;
         }

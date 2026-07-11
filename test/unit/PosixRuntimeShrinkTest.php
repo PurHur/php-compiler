@@ -28,13 +28,13 @@ final class PosixRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('posix_abi', $linker);
     }
 
-    public function testVmPosixStrerrorWhenFfiAvailable(): void
+    public function testVmPosixStrerrorUsesPureMap(): void
     {
-        if (!VmPosix::ffiAvailable()) {
-            $this->markTestSkipped('libc FFI unavailable on this host');
-        }
-        $msg = VmPosix::strerror(0);
-        $this->assertNotSame('', $msg);
-        $this->assertSame((string) \posix_strerror(0), $msg);
+        $msg = VmPosix::strerror(2);
+        $this->assertSame('No such file or directory', $msg);
+        $this->assertSame(
+            VmPosix::strerror(13),
+            'Permission denied'
+        );
     }
 }

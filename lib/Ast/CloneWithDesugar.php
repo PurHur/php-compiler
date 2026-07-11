@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace PHPCompiler\Ast;
 
+use PHPCompiler\CompilerVersion;
+
 /**
  * Desugar PHP 8.3+ `clone $obj with { prop: $value, ... }` and PHP 8.4+
- * `clone($obj, ['prop' => $value, ...])` / `clone $obj with ['prop', ...]`
- * before nikic/php-parser (#4513, #9743, #9995).
+ * `clone($obj, ['prop' => $value, ...])` / `clone ($obj, with: [...])` /
+ * `clone $obj with ['prop', ...]` before nikic/php-parser (#4513, #9743, #9995, #12939).
  *
  * Rewrites to an IIFE that clones then assigns properties — matches Zend/zend_compile.c lowering.
  * php-src: Zend/zend_language_parser.y clone_expr / with clause; zend_clones.c.
@@ -17,8 +19,46 @@ final class CloneWithDesugar
     /** Marker for clone-with property list entries without an explicit value (#10310). */
     public const REINIT_SENTINEL = '__phpc_reinit__';
 
+    /** Zend 8.2 profile message for `clone ($obj, with: [...])` / `clone($obj, [...])` (#12987). */
+    public const REFERENCE_PROFILE_UNEXPECTED_COMMA = 'syntax error, unexpected token ","';
+
+    /** Zend 8.2 profile message for `clone $obj with { }` / `clone $obj with [...]` (#12987). */
+    public const REFERENCE_PROFILE_UNEXPECTED_WITH = 'syntax error, unexpected identifier "with"';
+
+    /**
+     * @return array{line: int, message: string}|null
+     */
+    public static function referenceProfileSyntaxError(string $code): ?array
+    {
+        if (!preg_match('/\bclone\b/i', $code)) {
+            return null;
+        }
+
+        $tokens = token_get_all($code);
+        $callSpan = self::findCloneCallSpan($code, $tokens);
+        if (null !== $callSpan) {
+            return [
+                'line' => self::byteOffsetToLine($code, $callSpan['start']),
+                'message' => self::REFERENCE_PROFILE_UNEXPECTED_COMMA,
+            ];
+        }
+
+        $withSpan = self::findCloneWithSpan($code, $tokens);
+        if (null !== $withSpan) {
+            return [
+                'line' => self::byteOffsetToLine($code, $withSpan['start']),
+                'message' => self::REFERENCE_PROFILE_UNEXPECTED_WITH,
+            ];
+        }
+
+        return null;
+    }
+
     public static function desugar(string $code): string
     {
+        if (!CompilerVersion::supportsCloneWithSyntax()) {
+            return $code;
+        }
         if (!preg_match('/\bclone\b/i', $code)) {
             return $code;
         }
@@ -64,7 +104,7 @@ final class CloneWithDesugar
     }
 
     /**
-     * PHP 8.4+ `clone($obj, ['prop' => $val])` / `clone($obj, ['prop'])` (#9743).
+     * PHP 8.4+ `clone($obj, ['prop' => $val])` / `clone ($obj, with: [...])` (#9743, #12939).
      *
      * @param array<int, array{0: int, 1: string, 2: int}|string> $tokens
      *
@@ -112,6 +152,19 @@ final class CloneWithDesugar
             self::skipForwardIgnorable($tokens, $arrayStart);
             if ($arrayStart >= $c) {
                 continue;
+            }
+
+            if (self::isWithKeyword($tokens, $arrayStart)) {
+                $colonIdx = $arrayStart + 1;
+                self::skipForwardIgnorable($tokens, $colonIdx);
+                if ($colonIdx >= $c || ':' !== $tokens[$colonIdx]) {
+                    continue;
+                }
+                $arrayStart = $colonIdx + 1;
+                self::skipForwardIgnorable($tokens, $arrayStart);
+                if ($arrayStart >= $c) {
+                    continue;
+                }
             }
 
             $arrayEnd = self::scanCloneCallSecondArgEnd($tokens, $arrayStart);
@@ -1082,5 +1135,10 @@ final class CloneWithDesugar
         while ($pos < \count($tokens) && self::isIgnorable($tokens[$pos])) {
             ++$pos;
         }
+    }
+
+    private static function byteOffsetToLine(string $code, int $offset): int
+    {
+        return substr_count(substr($code, 0, max(0, $offset)), "\n") + 1;
     }
 }

@@ -8,10 +8,47 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\Frame;
 use PHPCompiler\RuntimeStrictness;
 use PHPCompiler\VM;
 use PHPCompiler\VM\EnumCaseSupport;
+use PHPCompiler\VM\HashTable;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
+
+/** @internal */
+final class VmNullStringParamDeprecation
+{
+    public static function message(string $function, int $argIndex, string $paramName): string
+    {
+        return sprintf(
+            '%s(): Passing null to parameter #%d ($%s) of type string is deprecated',
+            $function,
+            $argIndex + 1,
+            $paramName
+        );
+    }
+
+    public static function emit(?Frame $frame, string $function, int $argIndex, string $paramName): void
+    {
+        $vm = VM::running();
+        if (null === $vm) {
+            return;
+        }
+        if (null === $frame) {
+            $frame = $vm->builtinHandlerFrame();
+            if (null === $frame) {
+                $frames = $vm->context->runStackFrames();
+                $frame = [] !== $frames ? $frames[0] : null;
+            }
+        }
+        $vm->context->errors->internalDeprecated(
+            self::message($function, $argIndex, $paramName),
+            $vm->context,
+            $frame
+        );
+    }
+}
 
 final class VmString
 {
@@ -42,6 +79,25 @@ final class VmString
     }
 
     /**
+     * Coerce a typed string builtin operand (php-src IS_STRING; rejects null, #12640).
+     *
+     * @throws \TypeError when the operand is null or cannot be converted like Zend PHP 8.x
+     */
+    public static function coerceTypedStringBuiltinArg(
+        Variable $var,
+        string $function,
+        int $argIndex = 0,
+        string $paramName = 'string'
+    ): string {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_NULL === $var->type) {
+            throw new \TypeError(self::stringBuiltinTypeError($function, $argIndex, $paramName, 'null'));
+        }
+
+        return self::coerceStringBuiltinArg($var, $function, $argIndex, $paramName);
+    }
+
+    /**
      * Coerce a string builtin operand (php-src Z_PARAM_STR; rejects array / plain object, #4553).
      *
      * @throws \TypeError when the operand cannot be converted like Zend PHP 8.x
@@ -50,11 +106,17 @@ final class VmString
         Variable $var,
         string $function,
         int $argIndex = 0,
-        string $paramName = 'string'
+        string $paramName = 'string',
+        string $expectedType = 'string'
     ): string {
         $var = $var->resolveIndirect();
+        if (Variable::TYPE_NULL === $var->type) {
+            VmNullStringParamDeprecation::emit(null, $function, $argIndex, $paramName);
+
+            return '';
+        }
         if (Variable::TYPE_ARRAY === $var->type) {
-            throw new \TypeError(self::stringBuiltinTypeError($function, $argIndex, $paramName, 'array'));
+            throw new \TypeError(self::stringBuiltinTypeError($function, $argIndex, $paramName, 'array', $expectedType));
         }
         if (RuntimeStrictness::enforceStringBuiltinParityGuards() && EnumCaseSupport::isEnumCaseVariable($var)) {
             throw new \TypeError(
@@ -62,7 +124,8 @@ final class VmString
                     $function,
                     $argIndex,
                     $paramName,
-                    EnumCaseSupport::typeNameForVariable($var)
+                    EnumCaseSupport::typeNameForVariable($var),
+                    $expectedType
                 )
             );
         }
@@ -71,7 +134,7 @@ final class VmString
             $object = $var->toObject();
             if (null === $vm || !$vm->hasInstanceMethod($object->class, '__tostring')) {
                 throw new \TypeError(
-                    self::stringBuiltinTypeError($function, $argIndex, $paramName, $object->class->name)
+                    self::stringBuiltinTypeError($function, $argIndex, $paramName, $object->class->name, $expectedType)
                 );
             }
         }
@@ -91,6 +154,11 @@ final class VmString
         string $paramName = 'string'
     ): string {
         $var = $var->resolveIndirect();
+        if (Variable::TYPE_NULL === $var->type) {
+            VmNullStringParamDeprecation::emit(null, $function, $argIndex, $paramName);
+
+            return '';
+        }
         if (Variable::TYPE_ARRAY === $var->type) {
             throw new \TypeError(self::stringBuiltinTypeError($function, $argIndex, $paramName, 'array'));
         }
@@ -145,6 +213,78 @@ final class VmString
     }
 
     /**
+     * Z_PARAM_STR with caller strict_types parity (#12276 bindec/hexdec/octdec, #12274 base_convert).
+     *
+     * @throws \TypeError when caller strict_types rejects non-string operands
+     */
+    public static function stringBuiltinArgForFrame(
+        Frame $frame,
+        int $argIndex,
+        string $function,
+        int $userArgIndex,
+        string $paramName
+    ): string {
+        if (InternalStrictArg::isCallerStrict($frame)) {
+            InternalStrictArg::requireString($frame, $argIndex, $function, $paramName);
+
+            return $frame->calledArgs[$argIndex]->resolveIndirect()->toString();
+        }
+
+        return self::coerceStringBuiltinArg(
+            $frame->calledArgs[$argIndex],
+            $function,
+            $userArgIndex,
+            $paramName
+        );
+    }
+
+    /**
+     * Z_PARAM_STR with Stringable coercion under caller strict_types (#16925, ext/standard/string.c).
+     *
+     * php-src still invokes __toString for object operands even when the caller file uses strict_types;
+     * only scalar widening is blocked.
+     *
+     * @throws \TypeError when the operand is not a string or Stringable object
+     */
+    public static function zParamStrWithStringableForFrame(
+        Frame $frame,
+        int $argIndex,
+        string $function,
+        string $paramName
+    ): string {
+        $arg = $frame->calledArgs[$argIndex]->resolveIndirect();
+        if (InternalStrictArg::isCallerStrict($frame)) {
+            if (Variable::TYPE_STRING === $arg->type) {
+                return $arg->toString();
+            }
+            if (Variable::TYPE_OBJECT === $arg->type) {
+                return self::coerceStringBuiltinArg(
+                    $frame->calledArgs[$argIndex],
+                    $function,
+                    $argIndex,
+                    $paramName
+                );
+            }
+
+            throw new \TypeError(
+                self::stringBuiltinTypeError(
+                    $function,
+                    $argIndex,
+                    $paramName,
+                    VmStreamArg::debugTypeName($arg)
+                )
+            );
+        }
+
+        return self::coerceStringBuiltinArg(
+            $frame->calledArgs[$argIndex],
+            $function,
+            $argIndex,
+            $paramName
+        );
+    }
+
+    /**
      * Coerce a path builtin operand (php-src Z_PARAM_PATH; rejects embedded NUL, #4401).
      *
      * @throws \ValueError when the path contains a null byte
@@ -156,6 +296,10 @@ final class VmString
         int $argIndex = 0,
         string $paramName = 'path'
     ): string {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_NULL === $var->type) {
+            return '';
+        }
         $str = self::coerceStringBuiltinArg($var, $function, $argIndex, $paramName);
         if (str_contains($str, "\0")) {
             throw new \ValueError(
@@ -169,6 +313,27 @@ final class VmString
         }
 
         return $str;
+    }
+
+    /**
+     * Reject embedded NUL in string builtin operands (php-src Z_PARAM_STR no null bytes; #12497).
+     *
+     * @throws \ValueError when the string contains a null byte
+     */
+    public static function rejectNullByteBuiltinStringArg(
+        string $str,
+        string $function,
+        int $argIndex,
+        string $paramName
+    ): void {
+        if (str_contains($str, "\0")) {
+            throw new \ValueError(\sprintf(
+                '%s(): Argument #%d ($%s) must not contain any null bytes',
+                $function,
+                $argIndex + 1,
+                $paramName
+            ));
+        }
     }
 
     /**
@@ -193,13 +358,14 @@ final class VmString
     }
 
     /**
-     * Coerce disk_*_space() directory operand; null means default path (php-src filestat.c, #4915).
+     * Coerce disk_*_space() directory operand (php-src filestat.c).
      *
      * @throws \TypeError when the operand cannot be converted like Zend PHP 8.x
      */
     public static function coerceOptionalDirectoryArg(Variable $var, string $function): ?string
     {
-        if (Variable::TYPE_NULL === $var->resolveIndirect()->type) {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_NULL === $var->type) {
             return null;
         }
 
@@ -247,17 +413,158 @@ final class VmString
         return self::coerceOperand($var);
     }
 
+    /**
+     * Coerce a typed ?string builtin operand (php-src Z_PARAM_STR_OR_NULL; string|null only, #17765).
+     *
+     * @throws \TypeError when the operand is not string or null
+     */
+    public static function coerceTypedNullableStringBuiltinArg(
+        Variable $var,
+        string $function,
+        int $argIndex = 0,
+        string $paramName = 'string'
+    ): ?string {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_NULL === $var->type) {
+            return null;
+        }
+        if (Variable::TYPE_STRING === $var->type) {
+            return $var->toString();
+        }
+        if (Variable::TYPE_ARRAY === $var->type) {
+            throw new \TypeError(self::nullableStringBuiltinTypeError($function, $argIndex, $paramName, 'array'));
+        }
+        if (RuntimeStrictness::enforceStringBuiltinParityGuards() && EnumCaseSupport::isEnumCaseVariable($var)) {
+            throw new \TypeError(
+                self::nullableStringBuiltinTypeError(
+                    $function,
+                    $argIndex,
+                    $paramName,
+                    EnumCaseSupport::typeNameForVariable($var)
+                )
+            );
+        }
+        if (Variable::TYPE_OBJECT === $var->type) {
+            throw new \TypeError(
+                self::nullableStringBuiltinTypeError(
+                    $function,
+                    $argIndex,
+                    $paramName,
+                    $var->toObject()->class->name
+                )
+            );
+        }
+
+        throw new \TypeError(
+            self::nullableStringBuiltinTypeError(
+                $function,
+                $argIndex,
+                $paramName,
+                self::builtinScalarTypeName($var)
+            )
+        );
+    }
+
+    private static function builtinScalarTypeName(Variable $var): string
+    {
+        return match ($var->type) {
+            Variable::TYPE_BOOLEAN => 'bool',
+            Variable::TYPE_INTEGER => 'int',
+            Variable::TYPE_FLOAT => 'float',
+            Variable::TYPE_RESOURCE => 'resource',
+            default => 'mixed',
+        };
+    }
+
+    /**
+     * strtok() arg #1 ($string) — accepts null; invalid types report "string" not "?string" (#9207, php-src string.c).
+     *
+     * @throws \TypeError when the operand cannot be converted like Zend PHP 8.x
+     */
+    public static function coerceStrtokStringArg(Variable $var): ?string
+    {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_NULL === $var->type) {
+            return null;
+        }
+        if (Variable::TYPE_ARRAY === $var->type) {
+            throw new \TypeError(self::stringBuiltinTypeError('strtok', 0, 'string', 'array'));
+        }
+        if (EnumCaseSupport::isEnumCaseVariable($var)) {
+            throw new \TypeError(
+                self::stringBuiltinTypeError(
+                    'strtok',
+                    0,
+                    'string',
+                    EnumCaseSupport::typeNameForVariable($var)
+                )
+            );
+        }
+        if (Variable::TYPE_OBJECT === $var->type) {
+            $vm = VM::running();
+            $object = $var->toObject();
+            if (null === $vm || !$vm->hasInstanceMethod($object->class, '__tostring')) {
+                throw new \TypeError(
+                    self::stringBuiltinTypeError('strtok', 0, 'string', $object->class->name)
+                );
+            }
+        }
+
+        return self::coerceOperand($var);
+    }
+
+    /**
+     * strtok() arg #2 ($token) — TypeError labels "?string" like php-src (#9207, ext/standard/string.c).
+     *
+     * @throws \TypeError when the operand cannot be converted like Zend PHP 8.x
+     */
+    public static function coerceStrtokTokenArg(Variable $var): string
+    {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_NULL === $var->type) {
+            VmNullStringParamDeprecation::emit(null, 'strtok', 1, 'token');
+
+            return '';
+        }
+        if (Variable::TYPE_ARRAY === $var->type) {
+            throw new \TypeError(self::nullableStringBuiltinTypeError('strtok', 1, 'token', 'array'));
+        }
+        if (RuntimeStrictness::enforceStringBuiltinParityGuards() && EnumCaseSupport::isEnumCaseVariable($var)) {
+            throw new \TypeError(
+                self::nullableStringBuiltinTypeError(
+                    'strtok',
+                    1,
+                    'token',
+                    EnumCaseSupport::typeNameForVariable($var)
+                )
+            );
+        }
+        if (Variable::TYPE_OBJECT === $var->type) {
+            $vm = VM::running();
+            $object = $var->toObject();
+            if (null === $vm || !$vm->hasInstanceMethod($object->class, '__tostring')) {
+                throw new \TypeError(
+                    self::nullableStringBuiltinTypeError('strtok', 1, 'token', $object->class->name)
+                );
+            }
+        }
+
+        return self::coerceOperand($var);
+    }
+
     private static function stringBuiltinTypeError(
         string $function,
         int $argIndex,
         string $paramName,
-        string $given
+        string $given,
+        string $expectedType = 'string'
     ): string {
         return sprintf(
-            '%s(): Argument #%d ($%s) must be of type string, %s given',
+            '%s(): Argument #%d ($%s) must be of type %s, %s given',
             $function,
             $argIndex + 1,
             $paramName,
+            $expectedType,
             $given
         );
     }
@@ -356,6 +663,24 @@ final class VmString
         return true;
     }
 
+    /** Replace invalid UTF-8 byte sequences with U+FFFD (php-src ext/standard/html.c ENT_SUBSTITUTE). */
+    private static function utf8SubstituteInvalidSequences(string $string): string
+    {
+        $out = '';
+        $len = self::byteLength($string);
+        for ($i = 0; $i < $len; ) {
+            if (self::utf8SequenceValidAt($string, $len, $i, $need)) {
+                $out .= \substr($string, $i, $need + 1);
+                $i += $need + 1;
+            } else {
+                $out .= "\xEF\xBF\xBD";
+                ++$i;
+            }
+        }
+
+        return $out;
+    }
+
     /**
      * @param-out int $need continuation byte count when lead byte is multi-byte
      */
@@ -420,8 +745,14 @@ final class VmString
         return self::byteSlice($string, $start, $bytePos - $start);
     }
 
-    public static function byteSlice(string $string, int $offset, ?int $length = null): string
-    {
+    public static function byteSlice(
+        string $string,
+        int $offset,
+        ?int $length = null,
+        bool $warnOnClip = false,
+        ?\PHPCompiler\Frame $frame = null,
+        string $function = 'substr',
+    ): string {
         $len = self::byteLength($string);
         if ($offset < 0) {
             $offset = $len + $offset;
@@ -439,6 +770,9 @@ final class VmString
             if ($length < 0) {
                 return '';
             }
+        }
+        if ($warnOnClip && $length > 0 && $offset + $length > $len) {
+            self::emitSubstrTruncatedWarning($frame, $function);
         }
         if ($offset + $length > $len) {
             $length = $len - $offset;
@@ -528,30 +862,17 @@ final class VmString
         }
 
         if ($cut) {
-            return self::wordwrapCutFixedWidth($text, $len, $width, $break);
+            if ($width < 1) {
+                return $text;
+            }
+
+            return self::wordwrapGeneral($text, $len, $width, $break, $breakLen, true);
         }
         if (1 === $breakLen) {
             return self::wordwrapFastSingleByteBreak($text, $len, $width, $break[0]);
         }
 
         return self::wordwrapGeneral($text, $len, $width, $break, $breakLen);
-    }
-
-    /** cut=true — fixed-width chunks with full $break between segments (php-src php_wordwrap). */
-    private static function wordwrapCutFixedWidth(string $text, int $len, int $width, string $break): string
-    {
-        if ($width < 1) {
-            return $text;
-        }
-        $out = '';
-        for ($i = 0; $i < $len; $i += $width) {
-            if ($i > 0) {
-                $out .= $break;
-            }
-            $out .= self::byteSlice($text, $i, $width);
-        }
-
-        return $out;
     }
 
     /** Fast path: single-byte break, cut=false (while/continue CFG for AOT self-host). */
@@ -585,13 +906,14 @@ final class VmString
         return \implode('', $chars);
     }
 
-    /** General path: multi-byte break, cut=false (space wrapping with explicit break match). */
+    /** General path: multi-byte break and cut=true (php-src php_wordwrap else branch). */
     private static function wordwrapGeneral(
         string $text,
         int $len,
         int $width,
         string $break,
-        int $breakLen
+        int $breakLen,
+        bool $cut = false
     ): string {
         $pieces = [];
         $laststart = 0;
@@ -612,6 +934,11 @@ final class VmString
                     $laststart = $current + 1;
                 }
                 $lastspace = $current;
+                ++$current;
+            } elseif ($cut && $current - $laststart >= $width && $laststart >= $lastspace) {
+                $pieces[] = self::byteSlice($text, $laststart, $current - $laststart);
+                $pieces[] = $break;
+                $laststart = $lastspace = $current;
                 ++$current;
             } elseif ($current - $laststart >= $width && $laststart < $lastspace) {
                 $pieces[] = self::byteSlice($text, $laststart, $lastspace - $laststart);
@@ -940,9 +1267,10 @@ final class VmString
             $length = $needleLen > $hayRemain ? $hayRemain : $needleLen;
         }
         $s1 = self::byteSlice($haystack, $offset, $length);
+        $strncmpLen = $lengthOmitted ? $length : min($length, $needleLen);
         $cmp = $caseInsensitive
-            ? self::strncmpCase($s1, $needle, $length)
-            : self::strncmp($s1, $needle, $length);
+            ? self::strncmpCase($s1, $needle, $strncmpLen)
+            : self::strncmp($s1, $needle, $strncmpLen);
         if (0 !== $cmp) {
             return $cmp;
         }
@@ -1239,7 +1567,7 @@ final class VmString
 
     public static function strpbrk(string $str, string $mask) {
         if ('' === $mask) {
-            throw new \ValueError('strpbrk(): Argument #2 ($characters) must not be empty');
+            throw new \ValueError('strpbrk(): Argument #2 ($characters) must be a non-empty string');
         }
         $slen = self::byteLength($str);
         $mlen = self::byteLength($mask);
@@ -1876,6 +2204,13 @@ final class VmString
             $path = $rest;
         }
 
+        $host = self::replaceUrlControlChars($host);
+        $user = self::replaceUrlControlChars($user);
+        $pass = self::replaceUrlControlChars($pass);
+        $path = self::replaceUrlControlChars($path);
+        $query = self::replaceUrlControlChars($query);
+        $fragment = self::replaceUrlControlChars($fragment);
+
         if (-1 === $component) {
             $filtered = [];
             if (null !== $scheme && '' !== $scheme) {
@@ -1932,6 +2267,30 @@ final class VmString
     }
 
     /**
+     * php-src url.c php_replace_controlchars — control bytes become underscore (#13553).
+     */
+    private static function replaceUrlControlChars(?string $value): ?string
+    {
+        if (null === $value || '' === $value) {
+            return $value;
+        }
+        $len = self::byteLength($value);
+        $out = '';
+        $changed = false;
+        for ($i = 0; $i < $len; ++$i) {
+            $ord = self::byteOrd($value[$i]);
+            if ($ord < 0x20 || 0x7f === $ord) {
+                $out .= '_';
+                $changed = true;
+            } else {
+                $out .= $value[$i];
+            }
+        }
+
+        return $changed ? $out : $value;
+    }
+
+    /**
      * Parse //authority from $rest when present (scheme-relative or post-scheme URLs).
      */
     private static function parseUrlAuthority(
@@ -1966,7 +2325,22 @@ final class VmString
                 }
             }
         }
-        if (str_contains($authority, ':')) {
+        if (str_starts_with($authority, '[')) {
+            $closeBracket = strpos($authority, ']');
+            if (false !== $closeBracket) {
+                $host = substr($authority, 0, $closeBracket + 1);
+                $remainder = substr($authority, $closeBracket + 1);
+                if ('' !== $remainder && ':' === $remainder[0]) {
+                    $portVal = (int) substr($remainder, 1);
+                    if ($portVal > 0 && $portVal <= 65535) {
+                        $port = $portVal;
+                        $hasPort = true;
+                    }
+                }
+            } else {
+                $host = $authority;
+            }
+        } elseif (str_contains($authority, ':')) {
             [$host, $portStr] = explode(':', $authority, 2);
             $portVal = (int) $portStr;
             if ($portVal > 0 && $portVal <= 65535) {
@@ -1991,7 +2365,8 @@ final class VmString
                 ($ord >= 48 && $ord <= 57)
                 || ($ord >= 65 && $ord <= 90)
                 || ($ord >= 97 && $ord <= 122)
-                || $ch === '-' || $ch === '_' || $ch === '.' || $ch === '~'
+                || $ch === '-' || $ch === '_' || $ch === '.'
+                || (!$formEncoding && $ch === '~')
             ) {
                 $out .= $ch;
             } elseif ($formEncoding && $ch === ' ') {
@@ -2206,7 +2581,7 @@ final class VmString
     }
 
     /**
-     * str_padded() — UTF-8 codepoint padding (php-src ext/mbstring/mbstring.c mb_str_pad; issue #7044).
+     * Internal UTF-8 codepoint padding helper (mb_str_pad semantics; not a php-src userland builtin — #13581).
      */
     public static function strPadded(string $input, int $padLength, string $padString = ' ', int $padType = 1): string
     {
@@ -2268,7 +2643,13 @@ final class VmString
         if (!self::isUtf8Encoding($encoding)) {
             return \htmlspecialchars($string, $flags, $encoding, $doubleEncode);
         }
-        $quoteBoth = 0 !== ($flags & ENT_QUOTES);
+        if (!self::isValidUtf8($string)) {
+            if (0 === ($flags & ENT_SUBSTITUTE)) {
+                return '';
+            }
+            $string = self::utf8SubstituteInvalidSequences($string);
+        }
+        $quoteBoth = ENT_QUOTES === ($flags & ENT_QUOTES);
         $quoteDouble = !$quoteBoth && (0 !== ($flags & ENT_COMPAT));
         $entHtml5 = 0 !== ($flags & ENT_HTML5);
         $out = '';
@@ -2317,10 +2698,8 @@ final class VmString
         int $flags = ENT_QUOTES | ENT_SUBSTITUTE,
         string $encoding = 'UTF-8'
     ): \PHPCompiler\VM\HashTable {
-        if ('UTF-8' !== $encoding) {
-            throw new \LogicException(
-                'get_html_translation_table() only supports UTF-8 in this compiler build'
-            );
+        if (!self::isUtf8Encoding($encoding)) {
+            return self::getHtmlTranslationTableViaZend($table, $flags, $encoding);
         }
         $quoteBoth = ENT_QUOTES === ($flags & ENT_QUOTES);
         $quoteDouble = !$quoteBoth && (0 !== ($flags & ENT_COMPAT));
@@ -2339,7 +2718,15 @@ final class VmString
                 $entries["'"] = $entHtml5 ? '&apos;' : '&#039;';
             }
         } else {
-            $entries = HtmlEntityTable::entitiesEntQuotes();
+            $entries = $entHtml5
+                ? Html5TranslationTable::entities()
+                : HtmlEntityTable::entitiesEntQuotes();
+            if ($quoteBoth || $quoteDouble) {
+                $entries['"'] = '&quot;';
+            }
+            if ($quoteBoth) {
+                $entries["'"] = $entHtml5 ? '&apos;' : '&#039;';
+            }
             if (!$quoteBoth && !$quoteDouble) {
                 unset($entries['"']);
             }
@@ -2358,15 +2745,48 @@ final class VmString
         return $ht;
     }
 
+    /**
+     * Non-UTF-8 encodings delegate to Zend (ext/standard/html.c, #4459).
+     *
+     * @return \PHPCompiler\VM\HashTable
+     */
+    private static function getHtmlTranslationTableViaZend(
+        int $table,
+        int $flags,
+        string $encoding
+    ): \PHPCompiler\VM\HashTable {
+        $native = \get_html_translation_table($table, $flags, $encoding);
+        if (!\is_array($native)) {
+            $ht = new \PHPCompiler\VM\HashTable();
+
+            return $ht;
+        }
+
+        $ht = new \PHPCompiler\VM\HashTable();
+        foreach ($native as $key => $value) {
+            $var = new \PHPCompiler\VM\Variable();
+            $var->string((string) $value);
+            $ht->add((string) $key, $var);
+        }
+
+        return $ht;
+    }
+
     /** htmlentities() — full HTML_ENTITIES table for UTF-8 (#10734, ext/standard/html.c). */
     public static function htmlentities(
         string $string,
-        int $flags = ENT_COMPAT,
+        int $flags = ENT_QUOTES | ENT_SUBSTITUTE,
         string $encoding = 'UTF-8',
         bool $doubleEncode = true
     ): string {
         if (!self::isUtf8Encoding($encoding)) {
             return \htmlentities($string, $flags, $encoding, $doubleEncode);
+        }
+        if (!self::isValidUtf8($string)) {
+            if (0 === ($flags & ENT_SUBSTITUTE)) {
+                return '';
+            }
+            $string = self::utf8SubstituteInvalidSequences($string);
         }
         $entries = self::htmlEntitiesMapForFlags($flags);
         $out = '';
@@ -2394,13 +2814,16 @@ final class VmString
      */
     private static function htmlEntitiesMapForFlags(int $flags): array
     {
-        $quoteBoth = 0 !== ($flags & ENT_QUOTES);
+        $quoteBoth = ENT_QUOTES === ($flags & ENT_QUOTES);
         $quoteDouble = !$quoteBoth && (0 !== ($flags & ENT_COMPAT));
+        $entHtml5 = 0 !== ($flags & ENT_HTML5);
         $entries = HtmlEntityTable::entitiesEntQuotes();
         if (!$quoteBoth && !$quoteDouble) {
             unset($entries['"']);
         }
-        if (!$quoteBoth) {
+        if ($quoteBoth) {
+            $entries["'"] = $entHtml5 ? '&apos;' : '&#039;';
+        } else {
             unset($entries["'"]);
         }
 
@@ -2414,7 +2837,8 @@ final class VmString
         string $string,
         int $flags = ENT_QUOTES | ENT_SUBSTITUTE
     ): string {
-        $quoteBoth = 0 !== ($flags & ENT_QUOTES);
+        $quoteBoth = ENT_QUOTES === ($flags & ENT_QUOTES);
+        $quoteDouble = !$quoteBoth && (0 !== ($flags & ENT_COMPAT));
         $out = '';
         $len = self::byteLength($string);
         $i = 0;
@@ -2433,7 +2857,7 @@ final class VmString
             } elseif (self::entityAt($string, $i, $len, '&gt;', 4)) {
                 $out .= '>';
                 $i += 4;
-            } elseif ($quoteBoth && self::entityAt($string, $i, $len, '&quot;', 6)) {
+            } elseif (($quoteBoth || $quoteDouble) && self::entityAt($string, $i, $len, '&quot;', 6)) {
                 $out .= '"';
                 $i += 6;
             } elseif ($quoteBoth && self::entityAt($string, $i, $len, '&#039;', 6)) {
@@ -2458,8 +2882,12 @@ final class VmString
     /** html_entity_decode() — ENT_HTML5 named entities (php-src html.c); default ENT_COMPAT (#2472). */
     public static function html_entity_decode(
         string $string,
-        int $flags = ENT_COMPAT
+        int $flags = ENT_QUOTES | ENT_SUBSTITUTE,
+        string $encoding = 'UTF-8'
     ): string {
+        if (!self::isUtf8Encoding($encoding)) {
+            return \html_entity_decode($string, $flags, $encoding);
+        }
         if (0 !== ($flags & ENT_HTML5)) {
             return self::htmlEntityDecodeHtml5($string, $flags);
         }
@@ -2561,7 +2989,7 @@ final class VmString
             foreach (HtmlEntityTable::entitiesEntQuotes() as $char => $entity) {
                 $map[$entity] = $char;
             }
-            $map['&apos;'] = "'";
+            // &apos; is HTML5/XHTML only — ENT_HTML401 leaves it unchanged (ext/standard/html.c, #13948).
         }
 
         return $map;
@@ -3090,9 +3518,103 @@ final class VmString
         return $result;
     }
 
-    public static function substr(string $string, int $offset, ?int $length = null): string
+    public static function substr(
+        string $string,
+        int $offset,
+        ?int $length = null,
+        bool $warnOnClip = false,
+        ?\PHPCompiler\Frame $frame = null,
+        string $function = 'substr',
+    ): string {
+        return self::byteSlice($string, $offset, $length, $warnOnClip, $frame, $function);
+    }
+
+    private const SUBSTR_TRUNCATED_WARNING = '%s(): String is truncated';
+
+    private static function emitSubstrTruncatedWarning(?\PHPCompiler\Frame $frame, string $function): void
     {
-        return self::byteSlice($string, $offset, $length);
+        if (null === $frame?->vmContext) {
+            return;
+        }
+        $frame->vmContext->errors->triggerError(
+            \sprintf(self::SUBSTR_TRUNCATED_WARNING, $function),
+            \PHPCompiler\VM\ErrorReporter::E_WARNING,
+            '' !== $frame->scriptPath ? $frame->scriptPath : null,
+            $frame->vmContext,
+            $frame
+        );
+    }
+
+    /**
+     * Whether a positive length would extend past the end of $string after $offset normalization.
+     */
+    public static function substrLengthWouldClip(string $string, int $offset, int $length): bool
+    {
+        if ($length <= 0) {
+            return false;
+        }
+        $len = self::byteLength($string);
+        if ($offset < 0) {
+            $offset = $len + $offset;
+            if ($offset < 0) {
+                $offset = 0;
+            }
+        }
+        if ($offset >= $len) {
+            return false;
+        }
+
+        return $offset + $length > $len;
+    }
+
+    /**
+     * @param list<Variable> $optionalArgs trim/ltrim/rtrim args after $string (0..2 entries)
+     *
+     * @return array{0: string, 1: int} character mask and php_trim_int() mode bitmask
+     */
+    public static function resolveTrimMaskAndMode(
+        array $optionalArgs,
+        string $function,
+        int $defaultMode
+    ): array {
+        $argc = \count($optionalArgs);
+        if (0 === $argc) {
+            return [self::TRIM_DEFAULT, $defaultMode];
+        }
+        if (1 === $argc) {
+            return self::resolveTrimOptionalArg(
+                $optionalArgs[0],
+                $function,
+                1,
+                'characters',
+                $defaultMode
+            );
+        }
+
+        $mask = self::coerceStringBuiltinArg($optionalArgs[0], $function, 1, 'characters');
+        $modeFromEnum = self::tryStringTrimModeBitmask($optionalArgs[1]);
+        if (null === $modeFromEnum) {
+            $var = $optionalArgs[1]->resolveIndirect();
+            $given = EnumCaseSupport::isEnumCaseVariable($var)
+                ? EnumCaseSupport::typeNameForVariable($var)
+                : match ($var->type) {
+                    Variable::TYPE_NULL => 'null',
+                    Variable::TYPE_BOOLEAN => 'bool',
+                    Variable::TYPE_INTEGER => 'int',
+                    Variable::TYPE_FLOAT => 'float',
+                    Variable::TYPE_STRING => 'string',
+                    Variable::TYPE_ARRAY => 'array',
+                    Variable::TYPE_OBJECT => $var->toObject()->class->name,
+                    default => 'mixed',
+                };
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #3 ($mode) must be of type StringTrimMode, %s given',
+                $function,
+                $given
+            ));
+        }
+
+        return [$mask, $modeFromEnum];
     }
 
     /**
@@ -3160,6 +3682,12 @@ final class VmString
     public static function rtrim(string $string, string $characterMask = self::TRIM_DEFAULT): string
     {
         return self::trimInt($string, $characterMask, self::TRIM_SIDE_RIGHT);
+    }
+
+    /** php-src php_charmask() membership test — public for JIT helper (#14908). */
+    public static function charInTrimMask(string $ch, string $mask): bool
+    {
+        return self::charInMask($ch, $mask);
     }
 
     public static function tryStringTrimModeBitmask(Variable $var): ?int
@@ -3234,7 +3762,7 @@ final class VmString
     public static function strIncrement(string $string): string
     {
         if ('' === $string) {
-            throw new \ValueError('str_increment(): Argument #1 ($string) must not be empty');
+            throw new \Error('str_increment(): Argument #1 ($string) must not be empty');
         }
         if (!self::onlyAsciiAlphanumeric($string)) {
             throw new \ValueError('str_increment(): Argument #1 ($string) must be composed only of alphanumeric ASCII characters');
@@ -3343,7 +3871,7 @@ final class VmString
     public static function strDecrement(string $string): string
     {
         if ('' === $string) {
-            throw new \ValueError('str_decrement(): Argument #1 ($string) must not be empty');
+            throw new \Error('str_decrement(): Argument #1 ($string) must not be empty');
         }
         if (!self::onlyAsciiAlphanumeric($string)) {
             throw new \ValueError('str_decrement(): Argument #1 ($string) must be composed only of alphanumeric ASCII characters');
@@ -3393,6 +3921,11 @@ final class VmString
         $len = self::byteLength($string);
         for ($i = 0; $i < $len; ++$i) {
             $ch = $string[$i];
+            if ("\0" === $ch) {
+                // php-src string.c php_preg_quote: NUL -> \000 (backslash + three ASCII zeros)
+                $out .= '\\000';
+                continue;
+            }
             if (str_contains(self::PREG_QUOTE_ESCAPE, $ch) || (null !== $delim && $ch === $delim)) {
                 $out .= '\\'.$ch;
             } else {
@@ -3953,6 +4486,24 @@ final class VmString
     }
 
     /**
+     * strtr() replace_pairs HashTable form — nested JIT safe (numeric pair list, no string-key stores).
+     *
+     * @see php/php-src ext/standard/string.c php_strtr_array()
+     */
+    public static function strtrArrayFromHashTable(string $string, HashTable $replacePairs): string
+    {
+        $tupleList = [];
+        foreach ($replacePairs->exportKeyValuePairs(true) as [$keyVar, $valueVar]) {
+            $tupleList[] = [
+                self::coerceStringBuiltinArg($keyVar, 'strtr', 1, 'replace_pairs'),
+                self::coerceStringBuiltinArg($valueVar, 'strtr', 1, 'replace_pairs'),
+            ];
+        }
+
+        return self::strtrArrayFromPairTuples($string, $tupleList);
+    }
+
+    /**
      * strtr() replace_pairs array form — longest-match substitution.
      *
      * @see php/php-src ext/standard/string.c php_strtr_array()
@@ -4007,6 +4558,19 @@ final class VmString
         }
 
         return self::strtrArrayLongestMatch($string, $pairs);
+    }
+
+    /**
+     * @param list<array{0: string, 1: string}> $tupleList
+     */
+    private static function strtrArrayFromPairTuples(string $string, array $tupleList): string
+    {
+        $pairs = [];
+        foreach ($tupleList as [$from, $to]) {
+            $pairs[$from] = $to;
+        }
+
+        return self::strtrArray($string, $pairs);
     }
 
     /**
@@ -4348,7 +4912,7 @@ final class VmString
     public static function count_chars(string $string, int $mode = 0): array|string
     {
         if ($mode < 0 || $mode > 4) {
-            throw new \LogicException('count_chars(): Argument #2 ($mode) must be between 0 and 4 (inclusive)');
+            throw new \ValueError('count_chars(): Argument #2 ($mode) must be between 0 and 4 (inclusive)');
         }
         $counts = array_fill(0, 256, 0);
         $len = self::byteLength($string);

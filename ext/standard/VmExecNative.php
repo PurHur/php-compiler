@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\VM\OutputBuffer;
+
 /**
  * VM exec()/passthru()/system() via libc popen(3) — no host PHP wrappers (#3278, #8533).
  *
@@ -29,14 +31,14 @@ final class VmExecNative
 
         $handle = $opened['handle'];
         $lines = [];
-        while (!VmPhpFdStream::eof($handle)) {
-            $line = VmPhpFdStream::fgets($handle);
+        while (!VmFs::feof($handle)) {
+            $line = VmFs::fgets($handle);
             if (false === $line) {
                 break;
             }
             $lines[] = \rtrim($line, "\r\n");
         }
-        VmPhpFdStream::close($handle);
+        VmFs::fclose($handle);
 
         $status = VmPopenNative::pclose($opened['file']);
         if (-1 === $status) {
@@ -46,15 +48,15 @@ final class VmExecNative
         return ['lines' => $lines, 'status' => $status];
     }
 
-    /** Echo $data to STDOUT; returns false on write failure. */
+    /** Echo $data through the active output buffer or SAPI (php-src exec.c, #13251). */
     public static function echoToStdout(string $data): bool
     {
         if ('' === $data) {
             return true;
         }
-        $written = @\fwrite(\STDOUT, $data);
+        OutputBuffer::append($data);
 
-        return false !== $written && $written === \strlen($data);
+        return true;
     }
 
     /**

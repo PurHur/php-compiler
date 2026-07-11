@@ -51,7 +51,7 @@ final class BuiltinRegistry
      */
     public static function resolve(string $name): ?Internal
     {
-        $lc = strtolower($name);
+        $lc = strtolower(VmReflection::normalizeGlobalIntrospectionName($name));
         if (null === self::$byName) {
             self::$byName = [];
             foreach ([new Module(), new \PHPCompiler\ext\types\Module()] as $module) {
@@ -65,5 +65,18 @@ final class BuiltinRegistry
         }
 
         return self::$byName[$lc] ?? null;
+    }
+
+    public static function isAdvertised(string $name): bool
+    {
+        return null !== self::resolve($name)
+            && BuiltinIntrospectionPolicy::functionIsAdvertised($name);
+    }
+
+    /** @internal PHPUnit isolation when SAPI/env gating changes (#11780). */
+    public static function resetForTest(): void
+    {
+        self::$sortedNames = null;
+        self::$byName = null;
     }
 }

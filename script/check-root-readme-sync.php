@@ -34,10 +34,10 @@ $lines = preg_split("/\r\n|\n|\r/", $body) ?: [];
 /** Phrases that imply #764 native execute is still open (issue #1832). */
 $stale = [
     'empty stdout until [#764]',
-    'empty stdout until #764',
+    'empty stdout until #764', // stale-issue-ok: closed #764 pattern catalog
     'native execute blocked',
-    'execute blocked #764',
-    'blocked #764',
+    'execute blocked #764', // stale-issue-ok: closed #764 pattern catalog
+    'blocked #764', // stale-issue-ok: closed #764 pattern catalog
     'native execute partial',
     'execute 🚧',
 ];

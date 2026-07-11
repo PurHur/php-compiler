@@ -1,5 +1,5 @@
 --TEST--
-stdlib extension_loaded('curl') false until curl_init implemented (#11627, ext/standard/info.c)
+stdlib extension_loaded('curl') false until curl_init implemented (#11627, #11654, ext/standard/info.c)
 --FILE--
 <?php
 declare(strict_types=1);
@@ -10,4 +10,4 @@ echo 'funcs=', (int) function_exists('curl_init'), "\n";
 --EXPECT--
 loaded=0
 in_list=0
-funcs=1
+funcs=0

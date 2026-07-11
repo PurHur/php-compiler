@@ -1,5 +1,5 @@
 --TEST--
-Language: readonly class property default values rejected (#9653, Zend/zend_compile.c)
+Language: readonly class property cannot have default value (#17379, Zend/zend_compile.c)
 --FILE--
 <?php
 readonly class R {

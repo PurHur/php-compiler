@@ -13,9 +13,13 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\StringStrpos;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
+use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -30,18 +34,16 @@ final class strpos extends Internal
         if ($argc < 2 || $argc > 3) {
             throw new \LogicException('strpos() requires two or three arguments');
         }
-        $haystackStr = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'strpos', 0, 'haystack');
-        $needleStr = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'strpos', 1, 'needle');
+        InternalStrictArg::rejectNullString($frame->calledArgs[0], 'strpos', 'haystack', 0, $frame);
+        InternalStrictArg::rejectNullString($frame->calledArgs[1], 'strpos', 'needle', 1, $frame);
+        $haystackStr = self::vmStringArg($frame, 0, 'haystack');
+        $needleStr = self::vmStringArg($frame, 1, 'needle');
         if (null === $frame->returnVar) {
             return;
         }
         $offset = 0;
         if (3 === $argc) {
-            $offVar = $frame->calledArgs[2]->resolveIndirect();
-            if (Variable::TYPE_INTEGER !== $offVar->type) {
-                throw new \LogicException('strpos() offset must be an integer in this compiler build');
-            }
-            $offset = $offVar->toInt();
+            $offset = VmMath::parseIntBuiltinArgForFrame($frame, 2, 'strpos', 3, 'offset');
         }
         $result = VmString::strpos($haystackStr, $needleStr, $offset);
         if (false === $result) {
@@ -60,17 +62,59 @@ final class strpos extends Internal
         if ($argc < 2 || $argc > 3) {
             throw new \LogicException('strpos() requires two or three arguments');
         }
-        if (3 === $argc && JITVariable::TYPE_NATIVE_LONG !== $args[2]->type) {
-            throw new \LogicException('strpos() offset must be an integer in this compiler build');
+        JitInternalStrictArg::rejectNullString($context, $args[0], 'strpos', 'haystack', 1);
+        JitInternalStrictArg::rejectNullString($context, $args[1], 'strpos', 'needle', 2);
+        $hayLit = JitStringArg::compileTimeLiteral($args[0]);
+        $needleLit = JitStringArg::compileTimeLiteral($args[1]);
+        $offsetLit = 3 === $argc ? self::tryCompileTimeInt($context, $args[2]) : 0;
+        if (null !== $hayLit && null !== $needleLit && null !== $offsetLit) {
+            $pos = VmString::strpos($hayLit, $needleLit, $offsetLit);
+
+            return $context->constantFromInteger(
+                false === $pos ? StringStrpos::NOT_FOUND : $pos,
+                'int64'
+            );
         }
 
+        StringStrpos::ensureLinked($context);
         $hay = JitStringBuiltinArg::lower($context, $args[0], 'strpos', 0, 'haystack');
         $needle = JitStringBuiltinArg::lower($context, $args[1], 'strpos', 1, 'needle');
         $offset = 3 === $argc
-            ? $context->builder->truncOrBitCast($context->helper->loadValue($args[2]), $context->getTypeFromString('int64'))
+            ? JitIntdiv::lowerIntBuiltinArg($context, $args[2], 'strpos', 3, 'offset')
             : null;
 
-        return JitStrpos::find($context, $hay, $needle, $offset);
+        return StringStrpos::invoke($context, $hay, $needle, $offset);
     }
 
+    private static function tryCompileTimeInt(Context $context, JITVariable $arg): ?int
+    {
+        if (JITVariable::TYPE_NATIVE_LONG === $arg->type && JITVariable::KIND_VALUE === $arg->kind) {
+            $lib = $context->llvm->lib;
+            if (null !== $lib->LLVMIsAConstantInt($arg->value->value)) {
+                return (int) $lib->LLVMConstIntGetSExtValue($arg->value->value);
+            }
+        }
+        if (JITVariable::TYPE_NATIVE_DOUBLE === $arg->type && JITVariable::KIND_VALUE === $arg->kind) {
+            $const = $arg->value;
+            if ($const instanceof Value && $const->isConstant()) {
+                return VmMath::floatToZendLong((float) $const->constDouble());
+            }
+        }
+
+        return null;
+    }
+
+    private static function vmStringArg(Frame $frame, int $argIndex, string $paramName): string
+    {
+        if (InternalStrictArg::isCallerStrict($frame)) {
+            return InternalStrictArg::requireString($frame, $argIndex, 'strpos', $paramName)->toString();
+        }
+
+        return VmString::coerceStringBuiltinArg(
+            $frame->calledArgs[$argIndex],
+            'strpos',
+            $argIndex,
+            $paramName
+        );
+    }
 }

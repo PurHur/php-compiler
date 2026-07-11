@@ -43,7 +43,7 @@ final class openssl_digest extends Internal
                 'raw_output'
             );
         }
-        $digest = VmOpenssl::digest($data, $method, $rawOutput);
+        $digest = VmOpenssl::digest($data, $method, $rawOutput, $frame);
         if (false === $digest) {
             $frame->returnVar->bool(false);
 

@@ -47,6 +47,18 @@ final class VmStreamFilters
         return true;
     }
 
+    public static function classForFilter(string $filterName): ?string
+    {
+        return self::$registeredClasses[strtolower($filterName)] ?? null;
+    }
+
+    public static function isUserFilterName(string $filterName): bool
+    {
+        $filterName = strtolower($filterName);
+
+        return isset(self::$registeredClasses[$filterName]);
+    }
+
     /**
      * @return list<string>
      */

@@ -5,5 +5,5 @@ language: Closure::call() on internal class warns and returns null (#7127, zend_
 $fn = function () { return 42; };
 var_dump($fn->call(new stdClass()));
 --EXPECTF--
-PHP Warning:  Cannot bind closure to scope of internal class stdClass
+PHP Warning:  Cannot bind closure to scope of internal class stdClass in %s on line %d
 NULL

@@ -7,13 +7,14 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
+use PHPCompiler\JIT\NamedOptionalCallArgs;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/** mkdir() — VM via VmFs; JIT/AOT via __compiler_mkdir (libc mkdir(2), recursive in C). */
+/** mkdir() — VM via VmFs; JIT/AOT via MkdirJitHelper PHP (#15586). */
 final class mkdir_ extends Internal
 {
     public function __construct()
@@ -27,17 +28,17 @@ final class mkdir_ extends Internal
         if ($argc < 1 || $argc > 3) {
             throw new \LogicException('mkdir() requires one to three arguments in this compiler build');
         }
+        if (!isset($frame->calledArgs[0])) {
+            throw new \ArgumentCountError('mkdir(): Argument #1 ($directory) not passed');
+        }
+        InternalStrictArg::rejectNullString($frame->calledArgs[0], 'mkdir', 'directory', 0, $frame);
         $path = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'mkdir', 0, 'directory');
         $mode = 0777;
-        if ($argc >= 2) {
-            $modeVar = $frame->calledArgs[1]->resolveIndirect();
-            if (Variable::TYPE_INTEGER !== $modeVar->type) {
-                throw new \LogicException('mkdir() mode must be an integer in this compiler build');
-            }
-            $mode = $modeVar->toInt();
+        if (isset($frame->calledArgs[1])) {
+            $mode = VmFilestatArg::parseFileModeArgForFrame($frame, 1, 'mkdir', 'permissions');
         }
         $recursive = false;
-        if (3 === $argc) {
+        if (isset($frame->calledArgs[2])) {
             $recVar = $frame->calledArgs[2]->resolveIndirect();
             if (Variable::TYPE_BOOLEAN !== $recVar->type) {
                 throw new \LogicException('mkdir() recursive flag must be a boolean in this compiler build');
@@ -67,11 +68,11 @@ final class mkdir_ extends Internal
         $path = JitStringBuiltinArg::lower($context, $args[0], 'mkdir', 0, 'directory');
         $i64 = $context->getTypeFromString('int64');
         $mode = $i64->constInt(0777, false);
-        if ($argc >= 2) {
-            $mode = JitLongArg::lower($context, $args[1], 'mkdir() argument #2');
+        if (isset($args[1]) && !NamedOptionalCallArgs::isOmittedOptional($args[1])) {
+            $mode = JitFilestatArg::lowerFileMode($context, $args[1], 'mkdir', 1, 'permissions');
         }
         $recursive = $context->constantFromBool(false);
-        if (3 === $argc) {
+        if (isset($args[2]) && !NamedOptionalCallArgs::isOmittedOptional($args[2])) {
             $recursive = $this->jitBool($context, $args[2], 'mkdir() argument #3');
         }
 

@@ -10,10 +10,10 @@ use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_date_interval_format via DateIntervalFormatJitHelper PHP (#9499).
+ * JIT/AOT link for __compiler_date_interval_format via DateIntervalFormatJitHelper PHP (#9499, #12800).
  *
- * Standalone LLVM quarantine: {@see DateIntervalFormatStandaloneLlvm}
- * php-src: ext/date/php_date.c — PHP_FUNCTION(date_interval_format)
+ * JIT embed and AOT standalone compile {@see \PHPCompiler\ext\standard\DateIntervalFormatJitHelper}; thin LLVM bridge
+ * forwards the ABI. php-src: ext/date/php_date.c — PHP_FUNCTION(date_interval_format)
  */
 final class DateIntervalFormatRuntime
 {
@@ -33,17 +33,16 @@ final class DateIntervalFormatRuntime
         self::implement($context);
     }
 
+    public static function ensureStandaloneBodies(Context $context): void
+    {
+        self::implement($context);
+    }
+
     public static function implement(Context $context): void
     {
         $probe = $context->module->getNamedFunction(self::ABI_NAME);
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);
-
-            return;
-        }
-
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            DateIntervalFormatStandaloneLlvm::implement($context);
 
             return;
         }

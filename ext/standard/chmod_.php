@@ -11,7 +11,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/** chmod() — VM via VmFs; JIT/AOT via libc chmod(2). */
+/** chmod() — VM via VmFs; JIT/AOT via ChmodJitHelper PHP (#15458). */
 final class chmod_ extends Internal
 {
     public function __construct()
@@ -24,13 +24,13 @@ final class chmod_ extends Internal
         if (2 !== \count($frame->calledArgs)) {
             throw new \LogicException('chmod() requires exactly two arguments in this compiler build');
         }
-        $path = VmFilestatArg::coerceFilenameArg($frame->calledArgs[0], 'chmod');
-        $mode = VmFilestatArg::requireIntArg($frame->calledArgs[1], 'chmod', 1, 'permissions');
+        $path = VmFilestatArg::filenameArgForFrame($frame, 0, 'chmod');
+        $mode = VmFilestatArg::parseFileModeArgForFrame($frame, 1, 'chmod', 'permissions');
         if (null === $frame->returnVar) {
             return;
         }
         $ok = VmFs::chmod($path, $mode);
-        if (!$ok) {
+        if (!$ok && !VmStreamWrapperRegistry::isCustomProtocol($path)) {
             VmFilestatFailure::warnChmodFailed($frame, $path);
         }
         $frame->returnVar->bool($ok);
@@ -41,15 +41,9 @@ final class chmod_ extends Internal
         if (2 !== \count($args)) {
             throw new \LogicException('chmod() requires exactly two arguments in this compiler build');
         }
-        JitFilestatArg::guardInt($context, $args[1], 'chmod', 1, 'permissions');
-        if (JITVariable::TYPE_NATIVE_LONG !== $args[1]->type) {
-            throw new \LogicException('chmod() permissions must be an integer in this compiler build');
-        }
+        $modeI64 = JitFilestatArg::lowerFileMode($context, $args[1], 'chmod', 1, 'permissions');
         $i32 = $context->getTypeFromString('int32');
-        $mode = $context->builder->truncOrBitCast(
-            $context->helper->loadValue($args[1]),
-            $i32
-        );
+        $mode = $context->builder->truncOrBitCast($modeI64, $i32);
 
         $path = JitFilestatArg::lowerFilename($context, $args[0], 'chmod');
 

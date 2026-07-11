@@ -30,32 +30,27 @@ final class sprintf_ extends Internal
 
     public function execute(Frame $frame): void
     {
-        $argc = \count($frame->calledArgs);
-        if ($argc < 1) {
-            throw new \LogicException('sprintf() requires at least one argument');
-        }
+        $this->requireAtLeastArgCount($frame, 'sprintf', 1);
         if (null === $frame->returnVar) {
             return;
         }
-        $fmtVar = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_STRING !== $fmtVar->type) {
-            throw new \LogicException('sprintf() format must be a string in this compiler build');
-        }
+        $format = VmString::stringBuiltinArgForFrame($frame, 0, 'sprintf', 0, 'format');
+        $argc = \count($frame->calledArgs);
         $values = [];
         for ($i = 1; $i < $argc; ++$i) {
             $values[] = $frame->calledArgs[$i]->resolveIndirect();
         }
-        $frame->returnVar->string(VmSprintf::format($fmtVar->toString(), $values, $frame));
+        $frame->returnVar->string(VmSprintf::format($format, $values, $frame));
     }
 
     public Context $context;
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        return JitSprintf::formatWithFmt(
-            $context,
-            $this->jitString($context, $args[0], 'sprintf() format'),
-            ...\array_slice($args, 1)
-        );
+        if (!$this->requireAtLeastJitArgCount($context, $args, 'sprintf', 1)) {
+            return $context->constantFromString('');
+        }
+
+        return JitSprintf::format($context, ...$args);
     }
 }

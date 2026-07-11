@@ -9,6 +9,7 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitStringArg;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -33,32 +34,21 @@ final class hash_hkdf extends Internal
                 'hash_hkdf() requires string algorithm and key in this compiler build'
             );
         }
+        VmString::rejectEmptyBuiltinStringArg($key->toString(), 'hash_hkdf', 1, 'key');
         $length = 0;
         if ($argc >= 3) {
-            $lengthArg = $frame->calledArgs[2]->resolveIndirect();
-            if (Variable::TYPE_INTEGER !== $lengthArg->type) {
-                throw new \TypeError('hash_hkdf(): Argument #3 ($length) must be of type int');
-            }
-            $length = $lengthArg->toInt();
+            $length = VmMath::parseIntBuiltinArgForFrame($frame, 2, 'hash_hkdf', 3, 'length');
             if ($length < 0) {
                 throw new \ValueError('hash_hkdf(): Argument #3 ($length) must be greater than or equal to 0');
             }
         }
         $info = '';
         if ($argc >= 4) {
-            $infoArg = $frame->calledArgs[3]->resolveIndirect();
-            if (Variable::TYPE_STRING !== $infoArg->type) {
-                throw new \LogicException('hash_hkdf() info must be a string in this compiler build');
-            }
-            $info = $infoArg->toString();
+            $info = VmString::coerceStringBuiltinArg($frame->calledArgs[3], 'hash_hkdf', 4, 'info');
         }
         $salt = '';
         if (5 === $argc) {
-            $saltArg = $frame->calledArgs[4]->resolveIndirect();
-            if (Variable::TYPE_STRING !== $saltArg->type) {
-                throw new \LogicException('hash_hkdf() salt must be a string in this compiler build');
-            }
-            $salt = $saltArg->toString();
+            $salt = VmString::coerceStringBuiltinArg($frame->calledArgs[4], 'hash_hkdf', 5, 'salt');
         }
         $algoName = strtolower($algo->toString());
         if (!\in_array($algoName, ['sha256', 'sha1', 'md5'], true)) {
@@ -89,11 +79,18 @@ final class hash_hkdf extends Internal
         }
         $info = JitStringArg::lower($context, $args[3] ?? self::emptyStringJit($context), 'hash_hkdf() info');
         $salt = JitStringArg::lower($context, $args[4] ?? self::emptyStringJit($context), 'hash_hkdf() salt');
+        $key = JitStringArg::lower($context, $args[1], 'hash_hkdf() key');
+        JitStringBuiltinArg::rejectEmpty(
+            $context,
+            $args[1],
+            $key,
+            'hash_hkdf(): Argument #2 ($key) cannot be empty'
+        );
 
         return JitHash::hashHkdf(
             $context,
             JitStringArg::lower($context, $args[0], 'hash_hkdf() algorithm'),
-            JitStringArg::lower($context, $args[1], 'hash_hkdf() key'),
+            $key,
             $length,
             $info,
             $salt

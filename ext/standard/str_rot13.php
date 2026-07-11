@@ -13,6 +13,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\StringStrRot13;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -21,7 +22,9 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * str_rot13() for strings (subset of PHP; ASCII letters only in JIT).
+ * str_rot13() for strings (subset of PHP; ASCII letters only).
+ *
+ * VM: {@see VmString::strRot13()}; JIT/AOT: {@see StringStrRot13} + {@see StrRot13JitHelper}.
  */
 final class str_rot13 extends Internal
 {
@@ -52,9 +55,11 @@ final class str_rot13 extends Internal
         }
 
         $str = JitStringBuiltinArg::lower($context, $args[0], 'str_rot13', 0, 'string');
-        $copy = $context->builder->call($context->lookupFunction('__string__separate'), $str);
-        JitStrRot13::transformInPlace($context, $copy);
+        StringStrRot13::ensureLinked($context);
 
-        return $copy;
+        return $context->builder->call(
+            $context->lookupFunction('__compiler_str_rot13'),
+            $str
+        );
     }
 }

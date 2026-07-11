@@ -13,7 +13,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
-use PHPCompiler\JIT\ArrayBuiltinHelper;
+use PHPCompiler\JIT\Builtin\ArraySliceRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitBoolArg;
 use PHPCompiler\JIT\NamedOptionalCallArgs;
@@ -28,17 +28,23 @@ final class array_slice extends Internal
 {
     public function execute(Frame $frame): void
     {
-        if (!isset($frame->calledArgs[0], $frame->calledArgs[1])) {
-            throw new \LogicException('array_slice() requires at least two arguments in this compiler build');
+        $argc = \count($frame->calledArgs);
+        if ($argc < 2) {
+            throw new \ArgumentCountError(\sprintf(
+                'array_slice() expects at least 2 arguments, %d given',
+                $argc
+            ));
         }
-        $array = $frame->calledArgs[0]->resolveIndirect();
-        $offset = $frame->calledArgs[1]->resolveIndirect();
+        if ($argc > 4) {
+            throw new \ArgumentCountError(\sprintf(
+                'array_slice() expects at most 4 arguments, %d given',
+                $argc
+            ));
+        }
         if (null === $frame->returnVar) {
             return;
         }
-        if (Variable::TYPE_ARRAY !== $array->type) {
-            throw new \LogicException('array_slice() first argument must be an array in this compiler build');
-        }
+        $ht = VmArray::requireArray($frame->calledArgs[0]->resolveIndirect(), 'array_slice');
         $offsetInt = VmMath::parseIntBuiltinArgForFrame($frame, 1, 'array_slice', 2, 'offset');
         $length = null;
         if (isset($frame->calledArgs[2])) {
@@ -49,17 +55,32 @@ final class array_slice extends Internal
         }
         $preserveKeys = false;
         if (isset($frame->calledArgs[3])) {
-            $preserveKeys = $frame->calledArgs[3]->resolveIndirect()->toBool();
+            $preserveKeys = VmMath::requireBuiltinBoolArg(
+                $frame->calledArgs[3],
+                'array_slice',
+                4,
+                'preserve_keys'
+            );
         }
-        $frame->returnVar->array($array->toArray()->sliceCopy($offsetInt, $length, $preserveKeys));
+        $frame->returnVar->array($ht->sliceCopy($offsetInt, $length, $preserveKeys));
     }
 
     public function call(Context $context, JITVariable ...$args): Value
     {
         $argc = \count($args);
-        if ($argc < 2 || $argc > 4) {
-            throw new \LogicException('array_slice() requires two to four arguments in this compiler build');
+        if ($argc < 2) {
+            throw new \ArgumentCountError(\sprintf(
+                'array_slice() expects at least 2 arguments, %d given',
+                $argc
+            ));
         }
+        if ($argc > 4) {
+            throw new \ArgumentCountError(\sprintf(
+                'array_slice() expects at most 4 arguments, %d given',
+                $argc
+            ));
+        }
+        JitArrayElem::requireArrayArg($context, $args[0], 'array_slice');
         $hasExplicitLength = false;
         if ($argc >= 3 && !NamedOptionalCallArgs::isOmittedOptional($args[2])) {
             if (JITVariable::TYPE_NULL === $args[2]->type || $args[2]->isNullConstant) {
@@ -75,9 +96,9 @@ final class array_slice extends Internal
             ? JitIntdiv::lowerIntBuiltinArg($context, $args[2], 'array_slice', 3, 'length')
             : $context->getTypeFromString('int64')->constInt(0, false);
         $preserveKeys = ($argc >= 4 && !NamedOptionalCallArgs::isOmittedOptional($args[3]))
-            ? JitBoolArg::lower($context, $args[3], 'array_slice() preserve_keys')
+            ? JitBoolArg::lowerBuiltinTyped($context, $args[3], 'array_slice', 'preserve_keys', 4)
             : null;
 
-        return ArrayBuiltinHelper::buildSliceArray($context, $args[0], $offset, $hasLength, $length, $preserveKeys);
+        return ArraySliceRuntime::slice($context, $args[0], $offset, $hasLength, $length, $preserveKeys);
     }
 }

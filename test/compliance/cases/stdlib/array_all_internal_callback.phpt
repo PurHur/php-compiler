@@ -1,13 +1,11 @@
 --TEST--
-stdlib array_all/array_any/array_find — internal function string callbacks (#6543)
+stdlib array_all() — closure wrapping internal predicate (#6543, #13946)
 --FILE--
 <?php
-var_dump(array_all([1, 2, 3], 'is_int'));
-var_dump(array_any([1, 2, 3], 'is_string'));
-var_dump(array_find([1, 2, 3], 'is_int'));
-var_dump(array_all(['a', 'bb'], 'strlen'));
+var_dump(array_all(['a', 'bb'], fn ($v) => strlen($v) > 0));
+var_dump(array_any([1, 2, 3], fn ($v) => is_string($v)));
+var_dump(array_find([1, 2, 3], fn ($v) => is_int($v)));
 --EXPECT--
 bool(true)
 bool(false)
 int(1)
-bool(true)

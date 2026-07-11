@@ -6,7 +6,6 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT;
 use PHPCompiler\JIT\BasicBlockHelper;
-use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\NestedJitCompileScope;
@@ -15,9 +14,10 @@ use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_gettext* via GettextJitHelper PHP (#9859).
+ * JIT/AOT link for __compiler_gettext* via GettextJitHelper PHP (#9859, #12828).
  *
- * Replaces {@see StringGettextJit} LLVM (~775 LOC). SSOT: {@see \PHPCompiler\ext\gettext\VmGettextNative}.
+ * JIT embed and AOT standalone compile {@see \PHPCompiler\ext\gettext\GettextJitHelper}; thin LLVM bridges
+ * forward the ABI. SSOT: {@see \PHPCompiler\ext\gettext\VmGettextNative}.
  * php-src: ext/gettext/gettext.c
  */
 final class StringGettextRuntime
@@ -31,6 +31,8 @@ final class StringGettextRuntime
     private const DCGETTEXT_HELPER = 'PHPCompiler\\ext\\gettext\\GettextJitHelper::dcgettextArgv';
 
     private const DNGETTEXT_HELPER = 'PHPCompiler\\ext\\gettext\\GettextJitHelper::dngettextArgv';
+
+    private const NGETTEXT_HELPER = 'PHPCompiler\\ext\\gettext\\GettextJitHelper::ngettextArgv';
 
     private const DCNGETTEXT_HELPER = 'PHPCompiler\\ext\\gettext\\GettextJitHelper::dcngettextArgv';
 
@@ -52,6 +54,7 @@ final class StringGettextRuntime
         self::DGETTEXT_HELPER,
         self::DCGETTEXT_HELPER,
         self::DNGETTEXT_HELPER,
+        self::NGETTEXT_HELPER,
         self::DCNGETTEXT_HELPER,
         self::BIND_QUERY_HELPER,
         self::BIND_SET_HELPER,
@@ -67,6 +70,7 @@ final class StringGettextRuntime
         '__compiler_dgettext',
         '__compiler_dcgettext',
         '__compiler_dngettext',
+        '__compiler_ngettext',
         '__compiler_dcngettext',
         '__compiler_bindtextdomain',
         '__compiler_textdomain',
@@ -78,14 +82,13 @@ final class StringGettextRuntime
         self::implement($context);
     }
 
+    public static function ensureStandaloneBodies(Context $context): void
+    {
+        self::implement($context);
+    }
+
     public static function implement(Context $context): void
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            StringGettextStandaloneLlvm::implement($context);
-
-            return;
-        }
-
         $probe = $context->module->getNamedFunction('__compiler_gettext');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);
@@ -104,6 +107,7 @@ final class StringGettextRuntime
         self::implementStringReturnBridge($context, '__compiler_dgettext', self::DGETTEXT_HELPER, 2);
         self::implementDcgettextBridge($context);
         self::implementDngettextBridge($context);
+        self::implementNgettextBridge($context);
         self::implementDcngettextBridge($context);
         self::implementOptionalStringOutBridge(
             $context,
@@ -144,7 +148,7 @@ final class StringGettextRuntime
 
         $strPtr = $context->getTypeFromString('__string__*');
         $paramTypes = array_fill(0, $paramCount, $strPtr);
-        if ('__compiler_dcgettext' === $abiName || '__compiler_dcngettext' === $abiName) {
+        if ('__compiler_dcgettext' === $abiName || '__compiler_dcngettext' === $abiName || '__compiler_dngettext' === $abiName || '__compiler_ngettext' === $abiName) {
             // declared in dedicated bridge methods
             return;
         }
@@ -225,6 +229,37 @@ final class StringGettextRuntime
             $context,
             self::helperFunction($context, self::DNGETTEXT_HELPER),
             [$fn->getParam(0), $fn->getParam(1), $fn->getParam(2), $count]
+        );
+        $result = JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $resultRaw);
+        $context->builder->returnValue($result);
+        $context->registerFunction($abiName, $fn);
+    }
+
+    private static function implementNgettextBridge(Context $context): void
+    {
+        $abiName = '__compiler_ngettext';
+        $probe = $context->module->getNamedFunction($abiName);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
+
+        $strPtr = $context->getTypeFromString('__string__*');
+        $i64 = $context->getTypeFromString('int64');
+        $ft = $context->context->functionType($strPtr, false, $strPtr, $strPtr, $i64);
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction($abiName, $ft);
+
+        $entry = $fn->appendBasicBlock('ngettext_entry');
+        $context->builder->positionAtEnd($entry);
+        $i32 = $context->getTypeFromString('int32');
+        $count = $context->builder->trunc($fn->getParam(2), $i32);
+        $resultRaw = JitNestedHelperCoerce::callHelper(
+            $context,
+            self::helperFunction($context, self::NGETTEXT_HELPER),
+            [$fn->getParam(0), $fn->getParam(1), $count]
         );
         $result = JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $resultRaw);
         $context->builder->returnValue($result);

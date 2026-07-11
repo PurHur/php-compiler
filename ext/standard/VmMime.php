@@ -114,6 +114,35 @@ final class VmMime
             return 'application/pdf';
         }
 
+        $payload = \substr($data, $offset);
+        if ('' === $payload) {
+            return 'application/x-empty';
+        }
+        if (self::looksLikePlainText($payload)) {
+            return 'text/plain';
+        }
+
         return 'application/octet-stream';
+    }
+
+    /** libmagic ASCII/UTF-8 text heuristic (php-src ext/fileinfo; #12116). */
+    private static function looksLikePlainText(string $data): bool
+    {
+        $len = \strlen($data);
+        if (0 === $len) {
+            return false;
+        }
+        $checkLen = \min($len, 8192);
+        for ($i = 0; $i < $checkLen; ++$i) {
+            $byte = \ord($data[$i]);
+            if (0 === $byte || 127 === $byte) {
+                return false;
+            }
+            if ($byte < 32 && 9 !== $byte && 10 !== $byte && 13 !== $byte) {
+                return false;
+            }
+        }
+
+        return true;
     }
 }

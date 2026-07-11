@@ -1,0 +1,61 @@
+<?php
+
+declare(strict_types=1);
+
+namespace PHPCompiler\ext\mbstring;
+
+use PHPCompiler\ext\standard\VmString;
+use PHPCompiler\Frame;
+use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\BuiltinExecute;
+use PHPCompiler\VM\Variable;
+use PHPLLVM\Value;
+
+/**
+ * mb_str_split() — multibyte string to array (php-src ext/mbstring/mbstring.c; #3299).
+ */
+final class mb_str_split extends Internal
+{
+    public function __construct()
+    {
+        parent::__construct('mb_str_split');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if ($argc < 1 || $argc > 3) {
+            throw new \ArgumentCountError(sprintf(
+                'mb_str_split() expects at least 1 argument, %d given',
+                $argc
+            ));
+        }
+        $string = VmString::coerceStringBuiltinArg(
+            $frame->calledArgs[0],
+            'mb_str_split',
+            0,
+            'string'
+        );
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $length = 1;
+        if ($argc >= 2) {
+            $length = VmMbstring::coerceLengthArg($frame, 'mb_str_split', 1);
+        }
+        $encoding = $argc >= 3
+            ? VmMbstring::coerceEncodingArg($frame->calledArgs[2], 'mb_str_split', 2)
+            : 'UTF-8';
+        $result = VmMbstring::strSplit($string, $length, $encoding);
+        BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($result): void {
+            $ret->array(MbstringState::hashTableFromStringList($result));
+        });
+    }
+
+    public function call(Context $context, JITVariable ...$args): Value
+    {
+        throw new \LogicException('mb_str_split() is not lowered for JIT/AOT in this compiler build');
+    }
+}

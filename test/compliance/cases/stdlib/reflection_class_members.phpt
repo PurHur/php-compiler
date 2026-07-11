@@ -36,4 +36,4 @@ echo implode(',', $propsD), "\n";
 --EXPECT--
 x,y
 m
-x,y,z
+y,z

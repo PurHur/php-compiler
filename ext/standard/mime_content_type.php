@@ -9,6 +9,7 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
@@ -31,12 +32,25 @@ final class mime_content_type extends Internal
         if (null === $frame->returnVar) {
             return;
         }
+        $operand = $frame->calledArgs[0]->resolveIndirect();
+        $isPath = !$operand->isStreamResource()
+            && !(Variable::TYPE_INTEGER === $operand->type && VmFs::isValidHandle($operand->toInt()));
         $result = VmMime::mimeContentType($frame->calledArgs[0]);
         if (false === $result) {
+            if ($isPath) {
+                $path = VmString::coerceStringBuiltinArg(
+                    $frame->calledArgs[0],
+                    'mime_content_type',
+                    0,
+                    'filename_or_stream'
+                );
+                VmStreamOpenFailure::warnFailedToOpen($frame, 'mime_content_type', $path);
+            }
             $frame->returnVar->bool(false);
-        } else {
-            $frame->returnVar->string($result);
+
+            return;
         }
+        $frame->returnVar->string($result);
     }
 
     public function call(Context $context, JITVariable ...$args): Value

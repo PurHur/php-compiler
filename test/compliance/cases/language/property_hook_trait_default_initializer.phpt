@@ -1,5 +1,5 @@
 --TEST--
-Language: trait property hook with default initializer (#11594, Zend/zend_compile.c PHP 8.4)
+Language: trait backed property hook with default initializer compiles (#16861, Zend/zend_compile.c PHP 8.4)
 --FILE--
 <?php
 trait T {

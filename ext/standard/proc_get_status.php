@@ -33,7 +33,7 @@ final class proc_get_status extends Internal
             return;
         }
         $procVar = $frame->calledArgs[0]->resolveIndirect();
-        $handle = proc_close::requireProcessHandle($procVar, 'proc_get_status');
+        $handle = proc_close::requireProcessHandleForGetStatus($procVar, 'proc_get_status');
         $status = VmProcess::procGetStatus($handle);
         if (false === $status) {
             $frame->returnVar->bool(false);
@@ -72,6 +72,21 @@ final class proc_get_status extends Internal
         }
         if (\is_string($value)) {
             $slot->string($value);
+
+            return;
+        }
+        if (\is_array($value)) {
+            $ht = new HashTable();
+            foreach ($value as $index => $elem) {
+                $elemSlot = new Variable();
+                if (\is_int($elem)) {
+                    $elemSlot->int($elem);
+                } else {
+                    $elemSlot->null();
+                }
+                $ht->add((string) $index, $elemSlot);
+            }
+            $slot->array($ht);
 
             return;
         }

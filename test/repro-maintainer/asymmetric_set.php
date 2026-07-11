@@ -1,6 +1,6 @@
 <?php
 class User {
-    private(set) string $name = 'a';
+    public (private(set)) string $name = 'a';
 }
 $u = new User();
 try {

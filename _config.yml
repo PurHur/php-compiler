@@ -1,0 +1,84 @@
+# GitHub Pages (repo root) — scope Jekyll to docs/pages/ only.
+# jekyll-build-pages uses source=repo root; without this file the whole tree
+# (including tracked build/ AOT blobs) is published and deploys fail.
+# Public site map: docs/pages/PAGES.md
+title: php-compiler
+description: Compile PHP to native binaries — VM, LLVM JIT, AOT web deployment, and self-host bootstrap
+url: "https://purhur.github.io"
+baseurl: "/php-compiler"
+markdown: kramdown
+kramdown:
+  input: GFM
+layouts_dir: docs/pages/_layouts
+exclude:
+  - benchmarks
+  - bin
+  - build
+  - Docker
+  - examples
+  - ext
+  - lib
+  - patches
+  - prelinked
+  - script
+  - src
+  - templates
+  - test
+  - tests
+  - third_party
+  - vendor
+  - php
+  - .circleci
+  - .circleci-disabled
+  - .cursor
+  - .github
+  - .phan
+  - .tools
+  - .dockerignore
+  - .gitignore
+  - .php_cs
+  - CHANGELOG.md
+  - CODE_OF_CONDUCT.md
+  - CONTRIBUTING.md
+  - LICENSE
+  - Makefile
+  - README.md
+  - composer.json
+  - composer.lock
+  - phpc
+  - phpunit.xml.dist
+  - pre.lock
+  - repro_fiber_basic.php
+  - repro_globals_alias.php
+  - repro_match_guard_falsy.php
+  - docs/GETTING-STARTED.md
+  - docs/README.md
+  - docs/bootstrap-generations.md
+  - docs/bootstrap-inventory.md
+  - docs/bootstrap-inventory-lint-snapshot.json
+  - docs/bootstrap-inventory-triage-top50.json
+  - docs/bootstrap-m5-fast-path.md
+  - docs/bootstrap-profile.json
+  - docs/bootstrap-selfhost.md
+  - docs/bootstrap-vendor-inventory.md
+  - docs/capabilities.md
+  - docs/capabilities-syntax.md
+  - docs/deploy-production.md
+  - docs/deploy-web-aot.md
+  - docs/dev
+  - docs/doctor-gates-allowlist.txt
+  - docs/fixtures
+  - docs/generators-jit-aot.md
+  - docs/local-ci-matrix.md
+  - docs/miniwebapp-aot-unskip-matrix.md
+  - docs/miniwebapp-gates.md
+  - docs/phpc-json.md
+  - docs/phpc-json.schema.json
+  - docs/roadmap-wave3.md
+  - docs/runtime-semantics.md
+  - docs/self-host-target.md
+  - docs/selfhost-aot-stub-audit.md
+  - docs/stdlib-jit-audit.md
+  - docs/unsupported-syntax.md
+  - docs/pages/PAGES.md
+  - docs/pages/_config.yml

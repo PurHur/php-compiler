@@ -11,6 +11,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT;
 
+use PHPCfg\Op;
 use PHPCfg\Op\Expr\Array_;
 use PHPCfg\Op\Expr\StaticCall;
 use PHPCfg\Op\Expr\StaticPropertyFetch;
@@ -80,6 +81,32 @@ class AnalyzerTest extends TestCase
         $staticPropertyFetch = new StaticPropertyFetch($class, $name);
 
         $this->assertNull($analyzer->computeStaticArraySize($staticPropertyFetch->result));
+    }
+
+    public function testComputeStaticArraySizePhiMergeSameSize(): void
+    {
+        $analyzer = new Analyzer();
+        $left = $this->makeOperand([null, null]);
+        $right = $this->makeOperand([null, null]);
+        $result = new Operand\Temporary();
+        $phi = new Op\Phi($result);
+        $phi->addOperand($left);
+        $phi->addOperand($right);
+
+        $this->assertEquals(2, $analyzer->computeStaticArraySize($result));
+    }
+
+    public function testComputeStaticArraySizePhiMergeDifferentSizeReturnsNull(): void
+    {
+        $analyzer = new Analyzer();
+        $left = $this->makeOperand([null]);
+        $right = $this->makeOperand([null, null]);
+        $result = new Operand\Temporary();
+        $phi = new Op\Phi($result);
+        $phi->addOperand($left);
+        $phi->addOperand($right);
+
+        $this->assertNull($analyzer->computeStaticArraySize($result));
     }
 
     public function testCanEscapeFunctionStaticArrayInitOperand(): void

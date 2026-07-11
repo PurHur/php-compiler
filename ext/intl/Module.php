@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\intl;
 
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\ModuleAbstract;
 use PHPCompiler\Runtime;
 use PHPCompiler\VM;
@@ -13,6 +14,8 @@ use PHPCompiler\VM;
  *
  * Grapheme builtins are partial PHP implementations without ICU. Register under
  * {@see standard} so extension_loaded('intl') stays false until full ext/intl (#11472).
+ * {@see IntlExtensionPolicy} withholds locale/grapheme/intl_* from function_exists() and
+ * intl OOP classes from class_exists() until ext/intl is loaded (#11768, #12115, #16214).
  */
 class Module extends ModuleAbstract
 {
@@ -24,12 +27,13 @@ class Module extends ModuleAbstract
     public function init(Runtime $runtime): void
     {
         parent::init($runtime);
-        BuiltinClasses::register($runtime->vmContext);
-        foreach ([
-            'GRAPHEME_EXTR_COUNT' => VmGrapheme::EXTR_COUNT,
-            'GRAPHEME_EXTR_MAXBYTES' => VmGrapheme::EXTR_MAXBYTES,
-            'GRAPHEME_EXTR_MAXCHARS' => VmGrapheme::EXTR_MAXCHARS,
-        ] as $name => $value) {
+        if (IntlExtensionPolicy::advertisesLocale()) {
+            BuiltinClasses::registerLocale($runtime->vmContext);
+        }
+        if (IntlExtensionPolicy::advertisesBuiltins()) {
+            BuiltinClasses::register($runtime->vmContext);
+        }
+        foreach (IntlConstants::registeredConstants() as $name => $value) {
             $var = new VM\Variable();
             $var->int($value);
             $runtime->vmContext->defineConstant($name, $var);
@@ -38,7 +42,23 @@ class Module extends ModuleAbstract
 
     public function getFunctions(): array
     {
+        $functions = [];
+        if (IntlExtensionPolicy::advertisesLocale()) {
+            $functions[] = new locale_get_default();
+            $functions[] = new locale_set_default();
+            $functions[] = new locale_get_primary_language();
+            $functions[] = new locale_get_region();
+            $functions[] = new locale_get_script();
+        }
+        if (!IntlExtensionPolicy::advertisesBuiltins()) {
+            return [
+                ...$functions,
+                ...IntlExtensionPolicy::profileLocaleParserFunctions(),
+            ];
+        }
+
         return [
+            ...$functions,
             new grapheme_strlen(),
             new grapheme_substr(),
             new grapheme_strpos(),
@@ -50,7 +70,10 @@ class Module extends ModuleAbstract
             new grapheme_extract(),
             new grapheme_levenshtein(),
             new grapheme_str_split(),
+            ...(CompilerVersion::supportsGraphemeStrimwidth() ? [new grapheme_strimwidth()] : []),
             new intl_get_error_code(),
+            new intl_get_error_message(),
+            new intl_is_failure(),
         ];
     }
 }

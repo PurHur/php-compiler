@@ -6,12 +6,17 @@ namespace PHPCompiler\VM;
 
 use PHPCompiler\Frame;
 use PHPCompiler\ext\standard\VmDebugBacktrace;
+use PHPCompiler\Func\Internal;
+use PHPCompiler\VM\Builtin\VmClassMethod;
 
 /**
  * Populate user exception `trace` property on throw (issue #3351; Zend zend_exceptions.c).
  */
 final class ExceptionTrace
 {
+    /** Zend exception traces omit call arguments (zend_exception_get_trace); unlike debug_backtrace(). */
+    private const TRACE_OPTIONS = VmDebugBacktrace::IGNORE_ARGS;
+
     /**
      * Snapshot caller frame for manual `new Throwable()` (not thrown) — Zend object_init_ex (#9905).
      */
@@ -24,7 +29,9 @@ final class ExceptionTrace
         if (null === $caller) {
             return;
         }
-        $object->manualConstructTrace = self::sanitizeCapturedTrace(VmDebugBacktrace::build($caller));
+        $object->manualConstructTrace = self::sanitizeCapturedTrace(
+            VmDebugBacktrace::build($caller, self::TRACE_OPTIONS)
+        );
     }
 
     public static function captureOnThrow(Context $ctx, Frame $frame, Variable $thrown): void
@@ -43,7 +50,101 @@ final class ExceptionTrace
         if (Variable::TYPE_ARRAY === $existing->type && $existing->toArray()->getNumElements() > 0) {
             return;
         }
-        $traceProp->duplicateFrom(self::sanitizeCapturedTrace(VmDebugBacktrace::build($frame)));
+        $built = VmDebugBacktrace::build($frame, self::TRACE_OPTIONS);
+        if (0 === $built->toArray()->getNumElements()) {
+            // #14369 / #14132: bridge throws (return-type TypeError) run off runStack — anchor throw-site frame.
+            $built = VmDebugBacktrace::buildFromFrames([$frame], self::TRACE_OPTIONS);
+        }
+        $traceProp->duplicateFrom(self::sanitizeCapturedTrace($built));
+    }
+
+    /**
+     * Builtin throw trace — Zend includes internal function name at user call site (#11677).
+     */
+    public static function captureOnBuiltinThrow(
+        Context $ctx,
+        Frame $callerFrame,
+        Frame $handlerFrame,
+        Variable $thrown,
+    ): void {
+        $thrown = $thrown->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $thrown->type) {
+            return;
+        }
+        $object = $thrown->toObject();
+        $object->manualConstructTrace = null;
+        if (!self::classHasInstanceProperty($object->class, ExceptionSupport::PROP_TRACE, $ctx)) {
+            return;
+        }
+        $traceProp = $object->getProperty(ExceptionSupport::PROP_TRACE);
+        $existing = $traceProp->resolveIndirect();
+        if (Variable::TYPE_ARRAY === $existing->type && $existing->toArray()->getNumElements() > 0) {
+            return;
+        }
+        $builtinName = '';
+        if ($handlerFrame->hasHandler() && $handlerFrame->handler instanceof Internal) {
+            $builtinName = $handlerFrame->handler->getName();
+        }
+        $trace = new Variable();
+        $trace->newArray();
+        $ht = $trace->toArray();
+        if ('' !== $builtinName) {
+            $ht->append(VmDebugBacktrace::builtinInvokeFrameEntry($callerFrame, $builtinName));
+        }
+        $userTrace = self::sanitizeCapturedTrace(
+            VmDebugBacktrace::build($callerFrame, self::TRACE_OPTIONS)
+        );
+        foreach ($userTrace->toArray()->iterate(true) as $frameVar) {
+            $ht->append($frameVar);
+        }
+        $traceProp->duplicateFrom($trace);
+    }
+
+    /** Generator throw-site snapshot when debug_backtrace cannot see isolated stack (#13418). */
+    public static function captureGeneratorThrowSite(Context $ctx, Frame $frame, Variable $thrown): void
+    {
+        $thrown = $thrown->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $thrown->type) {
+            return;
+        }
+        $object = $thrown->toObject();
+        $object->manualConstructTrace = null;
+        if (!self::classHasInstanceProperty($object->class, ExceptionSupport::PROP_TRACE, $ctx)) {
+            return;
+        }
+        $traceProp = $object->getProperty(ExceptionSupport::PROP_TRACE);
+        $traceProp->duplicateFrom(self::sanitizeCapturedTrace(self::generatorThrowFrameTrace($frame)));
+    }
+
+    /** Append Generator::{next,send,...} after throw-site frames (Zend zend_generators.c, #13418). */
+    public static function captureOnGeneratorResumeUncaught(
+        Context $ctx,
+        Frame $callerFrame,
+        Frame $handlerFrame,
+        Variable $thrown,
+    ): void {
+        $thrown = $thrown->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $thrown->type) {
+            return;
+        }
+        $object = $thrown->toObject();
+        $object->manualConstructTrace = null;
+        if (!self::classHasInstanceProperty($object->class, ExceptionSupport::PROP_TRACE, $ctx)) {
+            return;
+        }
+        $resumeFrame = self::classMethodBuiltinFrameEntry($callerFrame, $handlerFrame);
+        $traceProp = $object->getProperty(ExceptionSupport::PROP_TRACE);
+        $existing = $traceProp->resolveIndirect();
+        $merged = new Variable();
+        $merged->newArray();
+        $mergedHt = $merged->toArray();
+        if (Variable::TYPE_ARRAY === $existing->type) {
+            foreach (self::sanitizeCapturedTrace($existing)->toArray()->iterate(true) as $frameVar) {
+                $mergedHt->append($frameVar);
+            }
+        }
+        $mergedHt->append($resumeFrame);
+        $traceProp->duplicateFrom($merged);
     }
 
     public static function resolveTraceVariable(ObjectEntry $object): Variable
@@ -99,6 +200,37 @@ final class ExceptionTrace
         }
 
         return $out;
+    }
+
+    private static function classMethodBuiltinFrameEntry(Frame $callerFrame, Frame $handlerFrame): Variable
+    {
+        $methodName = '';
+        if ($handlerFrame->hasHandler()) {
+            $methodName = $handlerFrame->handler->getName();
+        }
+        $className = '';
+        if ($handlerFrame->handler instanceof VmClassMethod && !empty($handlerFrame->calledArgs)) {
+            $receiver = $handlerFrame->calledArgs[0]->resolveIndirect();
+            if (Variable::TYPE_OBJECT === $receiver->type) {
+                $className = $receiver->toObject()->class->name ?? '';
+            }
+        }
+
+        return VmDebugBacktrace::builtinInvokeFrameEntry($callerFrame, $methodName, $className, '->');
+    }
+
+    private static function generatorThrowFrameTrace(Frame $frame): Variable
+    {
+        $trace = new Variable();
+        $trace->newArray();
+        if (null === $frame->block || null === $frame->block->func) {
+            return $trace;
+        }
+        $trace->toArray()->append(
+            VmDebugBacktrace::internalFunctionFrameEntry($frame->block->func->name)
+        );
+
+        return $trace;
     }
 
     private static function classHasInstanceProperty(ClassEntry $class, string $name, Context $ctx): bool

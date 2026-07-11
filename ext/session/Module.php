@@ -36,9 +36,11 @@ class Module extends ModuleAbstract
             new session_id(),
             new session_name(),
             new session_module_name(),
+            new session_save_path(),
             new session_status(),
             new session_destroy(),
             new session_write_close(),
+            new session_commit(),
             new session_regenerate_id(),
             new session_abort(),
             new session_reset(),
@@ -47,6 +49,10 @@ class Module extends ModuleAbstract
             new session_decode(),
             new session_unset(),
             new session_gc(),
+            new session_cache_expire(),
+            new session_cache_limiter(),
+            new session_set_cookie_params(),
+            new session_get_cookie_params(),
         ];
     }
 }

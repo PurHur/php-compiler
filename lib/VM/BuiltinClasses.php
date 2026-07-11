@@ -4,10 +4,23 @@ declare(strict_types=1);
 
 namespace PHPCompiler\VM;
 
+use PHPCompiler\CompilerVersion;
 use PHPCfg\Func as CfgFunc;
+use PHPCompiler\VM\Builtin\DatePeriodConstruct;
+use PHPCompiler\VM\Builtin\DatePeriodCreateFromISO8601String;
+use PHPCompiler\VM\Builtin\DatePeriodCurrent;
+use PHPCompiler\VM\Builtin\DatePeriodGetDateInterval;
+use PHPCompiler\VM\Builtin\DatePeriodGetEndDate;
+use PHPCompiler\VM\Builtin\DatePeriodGetRecurrences;
+use PHPCompiler\VM\Builtin\DatePeriodGetStartDate;
+use PHPCompiler\VM\Builtin\DatePeriodKey;
+use PHPCompiler\VM\Builtin\DatePeriodNext;
+use PHPCompiler\VM\Builtin\DatePeriodRewind;
+use PHPCompiler\VM\Builtin\DatePeriodValid;
 use PHPCompiler\VM\Builtin\DateIntervalConstruct;
 use PHPCompiler\VM\Builtin\DateIntervalCreateFromDateString;
 use PHPCompiler\VM\Builtin\DateIntervalFormat;
+use PHPCompiler\VM\Builtin\DateTimeAdd;
 use PHPCompiler\VM\Builtin\DateTimeConstruct;
 use PHPCompiler\VM\Builtin\DateTimeDiff;
 use PHPCompiler\VM\Builtin\DateTimeCreateFromFormat;
@@ -16,20 +29,29 @@ use PHPCompiler\VM\Builtin\DateTimeCreateFromInterface;
 use PHPCompiler\VM\Builtin\DateTimeCreateFromTimestamp;
 use PHPCompiler\VM\Builtin\DateTimeImmutableCreateFromTimestamp;
 use PHPCompiler\VM\Builtin\DateTimeFormat;
+use PHPCompiler\VM\Builtin\DateTimeGetTimezone;
 use PHPCompiler\VM\Builtin\DateTimeGetLastErrors;
 use PHPCompiler\VM\Builtin\DateTimeGetMicrosecond;
+use PHPCompiler\VM\Builtin\DateTimeGetOffset;
 use PHPCompiler\VM\Builtin\DateTimeGetTimestamp;
 use PHPCompiler\VM\Builtin\DateTimeImmutableConstruct;
 use PHPCompiler\VM\Builtin\DateTimeImmutableCreateFromFormat;
 use PHPCompiler\VM\Builtin\DateTimeImmutableCreateFromInterface;
 use PHPCompiler\VM\Builtin\DateTimeImmutableCreateFromMutable;
 use PHPCompiler\VM\Builtin\DateTimeModify;
+use PHPCompiler\VM\Builtin\DateTimeSetDate;
 use PHPCompiler\VM\Builtin\DateTimeSetMicrosecond;
+use PHPCompiler\VM\Builtin\DateTimeSetTime;
+use PHPCompiler\VM\Builtin\DateTimeSetTimestamp;
 use PHPCompiler\VM\Builtin\DateTimeSetTimezone;
+use PHPCompiler\VM\Builtin\DateTimeSub;
 use PHPCompiler\VM\Builtin\DateTimeZoneConstruct;
 use PHPCompiler\VM\Builtin\DateTimeZoneGetLocation;
 use PHPCompiler\VM\Builtin\DateTimeZoneGetName;
 use PHPCompiler\VM\Builtin\DateTimeZoneGetOffset;
+use PHPCompiler\VM\Builtin\DateTimeZoneGetTransitions;
+use PHPCompiler\VM\Builtin\DateTimeZoneListAbbreviations;
+use PHPCompiler\VM\Builtin\DateTimeZoneListIdentifiers;
 use PHPCompiler\VM\Builtin\ExceptionConstruct;
 use PHPCompiler\VM\Builtin\ErrorExceptionConstruct;
 use PHPCompiler\VM\Builtin\ErrorExceptionGetSeverity;
@@ -56,33 +78,48 @@ use PHPCompiler\VM\Builtin\FiberStart;
 use PHPCompiler\VM\Builtin\FiberSuspend;
 use PHPCompiler\VM\Builtin\FiberThrow;
 use PHPCompiler\VM\Builtin\ReflectionAttributeGetArguments;
+use PHPCompiler\VM\Builtin\ReflectionFunctionIsAccessible;
+use PHPCompiler\VM\Builtin\ReflectionFunctionSetAccessible;
+use PHPCompiler\VM\Builtin\ReflectionMethodIsAccessible;
+use PHPCompiler\VM\Builtin\ReflectionMethodSetAccessible;
+use PHPCompiler\VM\Builtin\ReflectionPropertyIsAccessible;
+use PHPCompiler\VM\Builtin\ReflectionPropertySetAccessible;
 use PHPCompiler\VM\Builtin\ReflectionAttributeGetName;
 use PHPCompiler\VM\Builtin\ReflectionAttributeIsRepeated;
 use PHPCompiler\VM\Builtin\ReflectionAttributeNewInstance;
 use PHPCompiler\VM\Builtin\ReflectionClassConstantGetDeprecatedMessage;
 use PHPCompiler\VM\Builtin\ReflectionClassConstantGetDeprecatedVersion;
+use PHPCompiler\VM\Builtin\ReflectionClassConstantGetModifiers;
 use PHPCompiler\VM\Builtin\ReflectionClassConstantGetType;
+use PHPCompiler\VM\Builtin\ReflectionClassConstantHasType;
 use PHPCompiler\VM\Builtin\ReflectionClassConstantIsDeprecated;
 use PHPCompiler\VM\Builtin\ReflectionClassConstantIsEnumCase;
 use PHPCompiler\VM\Builtin\ReflectionClassConstantIsFinal;
+use PHPCompiler\VM\Builtin\ReflectionClassConstantIsPrivate;
+use PHPCompiler\VM\Builtin\ReflectionClassConstantIsProtected;
+use PHPCompiler\VM\Builtin\ReflectionClassConstantIsPublic;
 use PHPCompiler\VM\Builtin\ReflectionClassConstruct;
 use PHPCompiler\VM\Builtin\ReflectionClassGetAttributes;
+use PHPCompiler\VM\Builtin\ReflectionClassGetConstructor;
 use PHPCompiler\VM\Builtin\ReflectionClassGetConstant;
 use PHPCompiler\VM\Builtin\ReflectionClassGetConstants;
 use PHPCompiler\VM\Builtin\ReflectionClassGetDefaultProperties;
 use PHPCompiler\VM\Builtin\ReflectionClassGetTraitAliases;
+use PHPCompiler\VM\Builtin\ReflectionClassGetInterfaceNames;
 use PHPCompiler\VM\Builtin\ReflectionClassGetTraitNames;
 use PHPCompiler\VM\Builtin\ReflectionClassGetLazyInitializer;
 use PHPCompiler\VM\Builtin\ReflectionClassGetLazyInitializationException;
 use PHPCompiler\VM\Builtin\ReflectionClassGetLazyPropertyNames;
 use PHPCompiler\VM\Builtin\ReflectionClassGetLazyProxyFactory;
 use PHPCompiler\VM\Builtin\ReflectionClassGetName;
+use PHPCompiler\VM\Builtin\ReflectionClassGetShortName;
 use PHPCompiler\VM\Builtin\ReflectionClassInitializeLazyObject;
 use PHPCompiler\VM\Builtin\ReflectionClassGetMethod;
 use PHPCompiler\VM\Builtin\ReflectionClassGetMethods;
 use PHPCompiler\VM\Builtin\ReflectionClassHasConstant;
 use PHPCompiler\VM\Builtin\ReflectionClassHasMethod;
 use PHPCompiler\VM\Builtin\ReflectionClassHasProperty;
+use PHPCompiler\VM\Builtin\ReflectionClassGetParentClass;
 use PHPCompiler\VM\Builtin\ReflectionClassGetProperty;
 use PHPCompiler\VM\Builtin\ReflectionClassGetProperties;
 use PHPCompiler\VM\Builtin\ReflectionClassGetReadOnlyProperties;
@@ -93,14 +130,21 @@ use PHPCompiler\VM\Builtin\ReflectionClassGetReflectionConstant;
 use PHPCompiler\VM\Builtin\ReflectionClassGetReflectionConstants;
 use PHPCompiler\VM\Builtin\ReflectionClassGetDocComment;
 use PHPCompiler\VM\Builtin\ReflectionClassGetEndLine;
+use PHPCompiler\VM\Builtin\ReflectionClassGetExtension;
 use PHPCompiler\VM\Builtin\ReflectionClassGetExtensionName;
 use PHPCompiler\VM\Builtin\ReflectionClassGetFileName;
 use PHPCompiler\VM\Builtin\ReflectionClassGetDeprecatedMessage;
 use PHPCompiler\VM\Builtin\ReflectionClassGetDeprecatedVersion;
 use PHPCompiler\VM\Builtin\ReflectionClassGetStartLine;
 use PHPCompiler\VM\Builtin\ReflectionClassIsDeprecated;
+use PHPCompiler\VM\Builtin\ReflectionClassImplementsInterface;
+use PHPCompiler\VM\Builtin\ReflectionClassIsAbstract;
 use PHPCompiler\VM\Builtin\ReflectionClassIsAnonymous;
 use PHPCompiler\VM\Builtin\ReflectionClassIsEnum;
+use PHPCompiler\VM\Builtin\ReflectionClassIsInstance;
+use PHPCompiler\VM\Builtin\ReflectionClassIsInstantiable;
+use PHPCompiler\VM\Builtin\ReflectionClassIsReadOnly;
+use PHPCompiler\VM\Builtin\ReflectionClassIsSubclassOf;
 use PHPCompiler\VM\Builtin\ReflectionClassIsInternal;
 use PHPCompiler\VM\Builtin\ReflectionClassIsStatic;
 use PHPCompiler\VM\Builtin\ReflectionClassIsUserDefined;
@@ -108,6 +152,7 @@ use PHPCompiler\VM\Builtin\ReflectionClassIsUninitializedLazyObject;
 use PHPCompiler\VM\Builtin\ReflectionClassMarkLazyObjectAsInitialized;
 use PHPCompiler\VM\Builtin\ReflectionClassCreateLazyGhost;
 use PHPCompiler\VM\Builtin\ReflectionClassCreateLazyProxy;
+use PHPCompiler\VM\Builtin\ReflectionClassNewInstanceWithoutConstructor;
 use PHPCompiler\VM\Builtin\ReflectionClassNewLazyGhost;
 use PHPCompiler\VM\Builtin\ReflectionClassResetAsLazyGhost;
 use PHPCompiler\VM\Builtin\ReflectionClassResetAsLazyObject;
@@ -115,12 +160,15 @@ use PHPCompiler\VM\Builtin\ReflectionClassResetAsLazyProxy;
 use PHPCompiler\VM\Builtin\ReflectionClassNewLazyProxy;
 use PHPCompiler\VM\Builtin\ReflectionConstantConstruct;
 use PHPCompiler\VM\Builtin\ReflectionConstantGetAttributes;
+use PHPCompiler\VM\Builtin\ReflectionConstantGetDeclaringClass;
 use PHPCompiler\VM\Builtin\ReflectionConstantGetName;
 use PHPCompiler\VM\Builtin\ReflectionConstantGetValue;
 use PHPCompiler\VM\Builtin\ReflectionEnumBackedCaseConstruct;
 use PHPCompiler\VM\Builtin\ReflectionEnumBackedCaseGetBackingValue;
 use PHPCompiler\VM\Builtin\ReflectionEnumBackedCaseIsBacked;
 use PHPCompiler\VM\Builtin\ReflectionEnumConstruct;
+use PHPCompiler\VM\Builtin\ReflectionEnumFromName;
+use PHPCompiler\VM\Builtin\ReflectionEnumGetBackingType;
 use PHPCompiler\VM\Builtin\ReflectionEnumGetCase;
 use PHPCompiler\VM\Builtin\ReflectionEnumGetCases;
 use PHPCompiler\VM\Builtin\ReflectionEnumGetName;
@@ -131,40 +179,66 @@ use PHPCompiler\VM\Builtin\ReflectionEnumUnitCaseGetAttributes;
 use PHPCompiler\VM\Builtin\ReflectionEnumUnitCaseGetName;
 use PHPCompiler\VM\Builtin\ReflectionEnumUnitCaseGetValue;
 use PHPCompiler\VM\Builtin\ReflectionEnumUnitCaseIsBacked;
+use PHPCompiler\VM\Builtin\ReflectionEnumUnitCaseIsDeprecated;
+use PHPCompiler\VM\Builtin\ReflectionExtensionConstruct;
+use PHPCompiler\VM\Builtin\ReflectionExtensionGetName;
+use PHPCompiler\VM\Builtin\ReflectionFiberConstruct;
 use PHPCompiler\VM\Builtin\ReflectionFiberGetExecutingFiber;
+use PHPCompiler\VM\Builtin\ReflectionFiberGetExecutingFile;
+use PHPCompiler\VM\Builtin\ReflectionFiberGetExecutingLine;
+use PHPCompiler\VM\Builtin\ReflectionFiberGetFiber;
+use PHPCompiler\VM\Builtin\ReflectionFiberGetTrace;
+use PHPCompiler\VM\Builtin\ReflectionFiberIsRunning;
+use PHPCompiler\VM\Builtin\ReflectionFiberIsStarted;
+use PHPCompiler\VM\Builtin\ReflectionFiberIsSuspended;
+use PHPCompiler\VM\Builtin\ReflectionFiberIsTerminated;
+use PHPCompiler\VM\Builtin\ReflectionGeneratorConstruct;
+use PHPCompiler\VM\Builtin\ReflectionGeneratorGetExecutingFile;
+use PHPCompiler\VM\Builtin\ReflectionGeneratorGetExecutingGenerator;
+use PHPCompiler\VM\Builtin\ReflectionGeneratorGetExecutingLine;
+use PHPCompiler\VM\Builtin\ReflectionGeneratorGetFunction;
 use PHPCompiler\VM\Builtin\ReflectionFunctionConstruct;
 use PHPCompiler\VM\Builtin\ReflectionFunctionCreateFromCallable;
 use PHPCompiler\VM\Builtin\ReflectionFunctionCreateFromFunction;
+use PHPCompiler\VM\Builtin\ReflectionFunctionGetClosure;
 use PHPCompiler\VM\Builtin\ReflectionFunctionGetClosureCalledClass;
 use PHPCompiler\VM\Builtin\ReflectionFunctionGetClosureScopeClass;
 use PHPCompiler\VM\Builtin\ReflectionFunctionGetClosureThis;
 use PHPCompiler\VM\Builtin\ReflectionFunctionGetClosureUsedVariables;
 use PHPCompiler\VM\Builtin\ReflectionFunctionGetExtensionName;
 use PHPCompiler\VM\Builtin\ReflectionFunctionGetName;
+use PHPCompiler\VM\Builtin\ReflectionFunctionGetNamedArguments;
 use PHPCompiler\VM\Builtin\ReflectionFunctionGetNumberOfParameters;
 use PHPCompiler\VM\Builtin\ReflectionFunctionGetParameters;
 use PHPCompiler\VM\Builtin\ReflectionFunctionGetReturnType;
+use PHPCompiler\VM\Builtin\ReflectionFunctionGetStaticVariables;
 use PHPCompiler\VM\Builtin\ReflectionFunctionHasReturnType;
 use PHPCompiler\VM\Builtin\ReflectionFunctionInvoke;
 use PHPCompiler\VM\Builtin\ReflectionFunctionIsAnonymous;
 use PHPCompiler\VM\Builtin\ReflectionFunctionIsClosure;
+use PHPCompiler\VM\Builtin\ReflectionFunctionIsGenerator;
 use PHPCompiler\VM\Builtin\ReflectionFunctionIsInternal;
+use PHPCompiler\VM\Builtin\ReflectionFunctionIsDeprecated;
 use PHPCompiler\VM\Builtin\ReflectionFunctionIsUserDefined;
 use PHPCompiler\VM\Builtin\ReflectionMethodConstruct;
 use PHPCompiler\VM\Builtin\ReflectionMethodCreateFromClosure;
 use PHPCompiler\VM\Builtin\ReflectionMethodCreateFromMethodName;
 use PHPCompiler\VM\Builtin\ReflectionMethodGetAttributes;
 use PHPCompiler\VM\Builtin\ReflectionMethodGetClosure;
+use PHPCompiler\VM\Builtin\ReflectionMethodGetClosureScopeClass;
+use PHPCompiler\VM\Builtin\ReflectionMethodGetClosureThis;
 use PHPCompiler\VM\Builtin\ReflectionMethodGetName;
 use PHPCompiler\VM\Builtin\ReflectionMethodGetNumberOfParameters;
 use PHPCompiler\VM\Builtin\ReflectionMethodGetParameters;
 use PHPCompiler\VM\Builtin\ReflectionMethodGetPrototype;
 use PHPCompiler\VM\Builtin\ReflectionMethodHasPrototype;
 use PHPCompiler\VM\Builtin\ReflectionMethodGetReturnType;
+use PHPCompiler\VM\Builtin\ReflectionMethodGetStaticVariables;
 use PHPCompiler\VM\Builtin\ReflectionMethodHasReturnType;
 use PHPCompiler\VM\Builtin\ReflectionMethodHasTentativeReturnType;
 use PHPCompiler\VM\Builtin\ReflectionMethodInvoke;
 use PHPCompiler\VM\Builtin\ReflectionMethodInvokeArgs;
+use PHPCompiler\VM\Builtin\ReflectionMethodGetDeclaringClass;
 use PHPCompiler\VM\Builtin\ReflectionMethodGetDocComment;
 use PHPCompiler\VM\Builtin\ReflectionMethodGetEndLine;
 use PHPCompiler\VM\Builtin\ReflectionMethodGetExtensionName;
@@ -175,30 +249,43 @@ use PHPCompiler\VM\Builtin\ReflectionMethodGetDeprecatedVersion;
 use PHPCompiler\VM\Builtin\ReflectionMethodGetStartLine;
 use PHPCompiler\VM\Builtin\ReflectionMethodIsDeprecated;
 use PHPCompiler\VM\Builtin\ReflectionMethodIsFinal;
+use PHPCompiler\VM\Builtin\ReflectionMethodIsGenerator;
 use PHPCompiler\VM\Builtin\ReflectionMethodIsPrivate;
 use PHPCompiler\VM\Builtin\ReflectionMethodIsProtected;
 use PHPCompiler\VM\Builtin\ReflectionMethodIsPublic;
 use PHPCompiler\VM\Builtin\ReflectionMethodIsStatic;
 use PHPCompiler\VM\Builtin\ReflectionMethodIsUserDefined;
+use PHPCompiler\VM\Builtin\ReflectionCompositeTypeGetTypes;
 use PHPCompiler\VM\Builtin\ReflectionNamedTypeGetName;
 use PHPCompiler\VM\Builtin\ReflectionNamedTypeIsBuiltin;
 use PHPCompiler\VM\Builtin\ReflectionParameterConstruct;
 use PHPCompiler\VM\Builtin\ReflectionParameterGetAttributes;
+use PHPCompiler\VM\Builtin\ReflectionParameterGetDefaultValue;
+use PHPCompiler\VM\Builtin\ReflectionParameterGetName;
 use PHPCompiler\VM\Builtin\ReflectionParameterGetType;
 use PHPCompiler\VM\Builtin\ReflectionParameterGetValue;
+use PHPCompiler\VM\Builtin\ReflectionParameterHasType;
+use PHPCompiler\VM\Builtin\ReflectionParameterIsDefaultValueAvailable;
+use PHPCompiler\VM\Builtin\ReflectionParameterIsDeprecated;
+use PHPCompiler\VM\Builtin\ReflectionParameterIsPromoted;
 use PHPCompiler\VM\Builtin\ReflectionParameterIsSensitive;
+use PHPCompiler\VM\Builtin\ReflectionParameterIsSensitiveParameter;
+use PHPCompiler\VM\Builtin\ReflectionParameterIsVariadic;
 use PHPCompiler\VM\Builtin\ReflectionPropertyConstruct;
 use PHPCompiler\VM\Builtin\ReflectionPropertyGetAsymmetricVisibility;
 use PHPCompiler\VM\Builtin\ReflectionPropertyGetAttributes;
 use PHPCompiler\VM\Builtin\ReflectionPropertyGetDeclaringClass;
 use PHPCompiler\VM\Builtin\ReflectionPropertyGetDefaultValue;
 use PHPCompiler\VM\Builtin\ReflectionPropertyGetDocComment;
+use PHPCompiler\VM\Builtin\ReflectionPropertyGetHook;
 use PHPCompiler\VM\Builtin\ReflectionPropertyGetHooks;
 use PHPCompiler\VM\Builtin\ReflectionPropertyHasDefaultValue;
 use PHPCompiler\VM\Builtin\ReflectionPropertyIsDefaultValueAvailable;
 use PHPCompiler\VM\Builtin\ReflectionPropertyGetMangledName;
 use PHPCompiler\VM\Builtin\ReflectionPropertyGetName;
 use PHPCompiler\VM\Builtin\ReflectionPropertyHasHook;
+use PHPCompiler\VM\Builtin\ReflectionPropertyHasHooks;
+use PHPCompiler\VM\Builtin\ReflectionPropertyIsDeprecated;
 use PHPCompiler\VM\Builtin\ReflectionPropertyIsDynamic;
 use PHPCompiler\VM\Builtin\ReflectionPropertyIsVirtual;
 use PHPCompiler\VM\Builtin\ReflectionPropertyGetRawValue;
@@ -208,6 +295,7 @@ use PHPCompiler\VM\Builtin\ReflectionPropertyGetType;
 use PHPCompiler\VM\Builtin\ReflectionPropertyGetValue;
 use PHPCompiler\VM\Builtin\ReflectionPropertySetValue;
 use PHPCompiler\VM\Builtin\ReflectionPropertyAsymmetricProbe;
+use PHPCompiler\VM\Builtin\ReflectionPropertyAccessProbe;
 use PHPCompiler\VM\Builtin\ReflectionPropertyIsAbstract;
 use PHPCompiler\VM\Builtin\ReflectionPropertyIsPrivate;
 use PHPCompiler\VM\Builtin\ReflectionPropertyIsProtected;
@@ -280,12 +368,31 @@ final class BuiltinClasses
         $iterator = new ClassEntry('Iterator');
         $iterator->isInterface = true;
         $iterator->interfaces = ['traversable'];
+        self::registerBuiltinInterfaceMethods($iterator, ['current', 'key', 'next', 'rewind', 'valid']);
         $ctx->classes['iterator'] = $iterator;
 
         $iteratorAggregate = new ClassEntry('IteratorAggregate');
         $iteratorAggregate->isInterface = true;
         $iteratorAggregate->interfaces = ['traversable'];
+        self::registerBuiltinInterfaceMethods($iteratorAggregate, ['getIterator']);
         $ctx->classes['iteratoraggregate'] = $iteratorAggregate;
+    }
+
+    /**
+     * Zend interface method tables for get_class_methods() / method_exists() (#11786, zend_API.c).
+     *
+     * @param list<string> $methods
+     */
+    public static function registerBuiltinInterfaceMethods(ClassEntry $iface, array $methods): void
+    {
+        $declLc = strtolower($iface->name);
+        foreach ($methods as $name) {
+            $lc = strtolower($name);
+            $iface->abstractMethods[$lc] = true;
+            $iface->methodNames[$lc] = $name;
+            $iface->methodVisibility[$lc] = CfgFunc::FLAG_PUBLIC;
+            $iface->methodDeclaringClassLc[$lc] = $declLc;
+        }
     }
 
     /** Zend zend_interfaces.c — Countable interface (#3364). */
@@ -293,6 +400,7 @@ final class BuiltinClasses
     {
         $entry = new ClassEntry('Countable');
         $entry->isInterface = true;
+        self::registerBuiltinInterfaceMethods($entry, ['count']);
         $ctx->classes['countable'] = $entry;
     }
 
@@ -301,6 +409,7 @@ final class BuiltinClasses
     {
         $entry = new ClassEntry('ArrayAccess');
         $entry->isInterface = true;
+        self::registerBuiltinInterfaceMethods($entry, ['offsetExists', 'offsetGet', 'offsetSet', 'offsetUnset']);
         $ctx->classes['arrayaccess'] = $entry;
     }
 
@@ -309,11 +418,13 @@ final class BuiltinClasses
     {
         $unitEnum = new ClassEntry('UnitEnum');
         $unitEnum->isInterface = true;
+        self::registerBuiltinInterfaceMethods($unitEnum, ['cases']);
         $ctx->classes['unitenum'] = $unitEnum;
 
         $backedEnum = new ClassEntry('BackedEnum');
         $backedEnum->isInterface = true;
         $backedEnum->interfaces = ['unitenum'];
+        self::registerBuiltinInterfaceMethods($backedEnum, ['tryFrom', 'from']);
         $ctx->classes['backedenum'] = $backedEnum;
     }
 
@@ -322,6 +433,7 @@ final class BuiltinClasses
     {
         $entry = new ClassEntry('Serializable');
         $entry->isInterface = true;
+        self::registerBuiltinInterfaceMethods($entry, ['serialize', 'unserialize']);
         $ctx->classes['serializable'] = $entry;
     }
 
@@ -411,6 +523,8 @@ final class BuiltinClasses
         $strProto = new Variable(Variable::TYPE_STRING);
         $intProto = new Variable(Variable::TYPE_INTEGER);
         $boolProto = new Variable(Variable::TYPE_BOOLEAN);
+        $boolFalseDefault = new Variable(Variable::TYPE_BOOLEAN);
+        $boolFalseDefault->bool(false);
         $arrayProto = new Variable(Variable::TYPE_ARRAY);
         $pub = CfgFunc::FLAG_PUBLIC;
         $pubStatic = $pub | CfgFunc::FLAG_STATIC;
@@ -430,6 +544,15 @@ final class BuiltinClasses
         $attr->methodVisibility['newinstance'] = $pub;
         $ctx->classes[ReflectionSupport::REFLECTION_ATTRIBUTE] = $attr;
 
+        $rext = new ClassEntry('ReflectionExtension');
+        $rext->properties[] = new ClassProperty(ReflectionSupport::PROP_EXTENSION_NAME, null, $strProto);
+        $rext->constructor = new ReflectionExtensionConstruct();
+        $rext->methods['__construct'] = $rext->constructor;
+        $rext->methodVisibility['__construct'] = $pub;
+        $rext->methods['getname'] = new ReflectionExtensionGetName();
+        $rext->methodVisibility['getname'] = $pub;
+        $ctx->classes[ReflectionSupport::REFLECTION_EXTENSION] = $rext;
+
         $rparam = new ClassEntry('ReflectionParameter');
         $rparam->properties[] = new ClassProperty(ReflectionSupport::PROP_CLASS_NAME, null, $strProto);
         $rparam->properties[] = new ClassProperty(ReflectionSupport::PROP_METHOD_NAME, null, $strProto);
@@ -442,17 +565,38 @@ final class BuiltinClasses
         $rparam->methodVisibility['__construct'] = $pub;
         $rparam->methods['getattributes'] = new ReflectionParameterGetAttributes();
         $rparam->methodVisibility['getattributes'] = $pub;
+        $rparam->methods['getname'] = new ReflectionParameterGetName();
+        $rparam->methodVisibility['getname'] = $pub;
         $rparam->methods['gettype'] = new ReflectionParameterGetType();
         $rparam->methodVisibility['gettype'] = $pub;
+        $rparam->methods['hastype'] = new ReflectionParameterHasType();
+        $rparam->methodVisibility['hastype'] = $pub;
         $rparam->methods['getvalue'] = new ReflectionParameterGetValue();
         $rparam->methodVisibility['getvalue'] = $pub;
+        $rparam->methods['getdefaultvalue'] = new ReflectionParameterGetDefaultValue();
+        $rparam->methodVisibility['getdefaultvalue'] = $pub;
+        $rparam->methods['isdefaultvalueavailable'] = new ReflectionParameterIsDefaultValueAvailable();
+        $rparam->methodVisibility['isdefaultvalueavailable'] = $pub;
+        $rparam->methods['isvariadic'] = new ReflectionParameterIsVariadic();
+        $rparam->methodVisibility['isvariadic'] = $pub;
         $rparam->methods['issensitive'] = new ReflectionParameterIsSensitive();
         $rparam->methodVisibility['issensitive'] = $pub;
+        if (CompilerVersion::supportsReflectionParameterIsSensitiveParameter()) {
+            $rparam->methods['issensitiveparameter'] = new ReflectionParameterIsSensitiveParameter();
+            $rparam->methodVisibility['issensitiveparameter'] = $pub;
+        }
+        if (CompilerVersion::supportsReflectionPropertyParameterIsDeprecated()) {
+            $rparam->methods['isdeprecated'] = new ReflectionParameterIsDeprecated();
+            $rparam->methodVisibility['isdeprecated'] = $pub;
+        }
+        $rparam->methods['ispromoted'] = new ReflectionParameterIsPromoted();
+        $rparam->methodVisibility['ispromoted'] = $pub;
         $ctx->classes[ReflectionSupport::REFLECTION_PARAMETER] = $rparam;
 
         $rm = new ClassEntry('ReflectionMethod');
         $rm->properties[] = new ClassProperty(ReflectionSupport::PROP_CLASS_NAME, null, $strProto);
         $rm->properties[] = new ClassProperty(ReflectionSupport::PROP_METHOD_NAME, null, $strProto);
+        $rm->properties[] = new ClassProperty(ReflectionSupport::PROP_ACCESSIBLE, $boolFalseDefault, $boolProto);
         $rm->constructor = new ReflectionMethodConstruct();
         $rm->methods['__construct'] = $rm->constructor;
         $rm->methodVisibility['__construct'] = $pub;
@@ -460,10 +604,14 @@ final class BuiltinClasses
         $rm->methodVisibility['getattributes'] = $pub;
         $rm->methods['getparameters'] = new ReflectionMethodGetParameters();
         $rm->methodVisibility['getparameters'] = $pub;
+        $rm->methods['getstaticvariables'] = new ReflectionMethodGetStaticVariables();
+        $rm->methodVisibility['getstaticvariables'] = $pub;
         $rm->methods['getnumberofparameters'] = new ReflectionMethodGetNumberOfParameters();
         $rm->methodVisibility['getnumberofparameters'] = $pub;
         $rm->methods['getname'] = new ReflectionMethodGetName();
         $rm->methodVisibility['getname'] = $pub;
+        $rm->methods['getdeclaringclass'] = new ReflectionMethodGetDeclaringClass();
+        $rm->methodVisibility['getdeclaringclass'] = $pub;
         $rm->methods['isdeprecated'] = new ReflectionMethodIsDeprecated();
         $rm->methodVisibility['isdeprecated'] = $pub;
         $rm->methods['getdeprecatedmessage'] = new ReflectionMethodGetDeprecatedMessage();
@@ -486,10 +634,16 @@ final class BuiltinClasses
         $rm->methodVisibility['invokeargs'] = $pub;
         $rm->methods['getclosure'] = new ReflectionMethodGetClosure();
         $rm->methodVisibility['getclosure'] = $pub;
-        $rm->methods['createfromclosure'] = new ReflectionMethodCreateFromClosure();
-        $rm->methodVisibility['createfromclosure'] = $pubStatic;
-        $rm->methods['createfrommethodname'] = new ReflectionMethodCreateFromMethodName();
-        $rm->methodVisibility['createfrommethodname'] = $pubStatic;
+        $rm->methods['getclosurescopeclass'] = new ReflectionMethodGetClosureScopeClass();
+        $rm->methodVisibility['getclosurescopeclass'] = $pub;
+        $rm->methods['getclosurethis'] = new ReflectionMethodGetClosureThis();
+        $rm->methodVisibility['getclosurethis'] = $pub;
+        if (CompilerVersion::supportsReflectionCreateFromFactories()) {
+            $rm->methods['createfromclosure'] = new ReflectionMethodCreateFromClosure();
+            $rm->methodVisibility['createfromclosure'] = $pubStatic;
+            $rm->methods['createfrommethodname'] = new ReflectionMethodCreateFromMethodName();
+            $rm->methodVisibility['createfrommethodname'] = $pubStatic;
+        }
         $rm->methods['isstatic'] = new ReflectionMethodIsStatic();
         $rm->methodVisibility['isstatic'] = $pub;
         $rm->methods['ispublic'] = new ReflectionMethodIsPublic();
@@ -498,8 +652,14 @@ final class BuiltinClasses
         $rm->methodVisibility['isprotected'] = $pub;
         $rm->methods['isprivate'] = new ReflectionMethodIsPrivate();
         $rm->methodVisibility['isprivate'] = $pub;
+        $rm->methods['setaccessible'] = new ReflectionMethodSetAccessible();
+        $rm->methodVisibility['setaccessible'] = $pub;
+        $rm->methods['isaccessible'] = new ReflectionMethodIsAccessible();
+        $rm->methodVisibility['isaccessible'] = $pub;
         $rm->methods['isfinal'] = new ReflectionMethodIsFinal();
         $rm->methodVisibility['isfinal'] = $pub;
+        $rm->methods['isgenerator'] = new ReflectionMethodIsGenerator();
+        $rm->methodVisibility['isgenerator'] = $pub;
         $rm->methods['getmodifiers'] = new ReflectionMethodGetModifiers();
         $rm->methodVisibility['getmodifiers'] = $pub;
         foreach (
@@ -515,6 +675,10 @@ final class BuiltinClasses
             $rm->methods[$name] = $method;
             $rm->methodVisibility[$name] = $pub;
         }
+        if (CompilerVersion::supportsReflectionFunctionGetNamedArguments()) {
+            $rm->methods['getnamedarguments'] = new ReflectionFunctionGetNamedArguments();
+            $rm->methodVisibility['getnamedarguments'] = $pub;
+        }
         $ctx->classes[ReflectionSupport::REFLECTION_METHOD] = $rm;
 
         $rc = new ClassEntry('ReflectionClass');
@@ -526,6 +690,8 @@ final class BuiltinClasses
         $rc->methodVisibility['getattributes'] = $pub;
         $rc->methods['getname'] = new ReflectionClassGetName();
         $rc->methodVisibility['getname'] = $pub;
+        $rc->methods['getshortname'] = new ReflectionClassGetShortName();
+        $rc->methodVisibility['getshortname'] = $pub;
         $rc->methods['getmethod'] = new ReflectionClassGetMethod();
         $rc->methodVisibility['getmethod'] = $pub;
         $rc->methods['hasmethod'] = new ReflectionClassHasMethod();
@@ -560,41 +726,63 @@ final class BuiltinClasses
         $rc->methodVisibility['gettraitaliases'] = $pub;
         $rc->methods['gettraitnames'] = new ReflectionClassGetTraitNames();
         $rc->methodVisibility['gettraitnames'] = $pub;
+        $rc->methods['getinterfacenames'] = new ReflectionClassGetInterfaceNames();
+        $rc->methodVisibility['getinterfacenames'] = $pub;
+        $rc->methods['getparentclass'] = new ReflectionClassGetParentClass();
+        $rc->methodVisibility['getparentclass'] = $pub;
+        $rc->methods['getconstructor'] = new ReflectionClassGetConstructor();
+        $rc->methodVisibility['getconstructor'] = $pub;
+        $rc->methods['issubclassof'] = new ReflectionClassIsSubclassOf();
+        $rc->methodVisibility['issubclassof'] = $pub;
+        $rc->methods['implementsinterface'] = new ReflectionClassImplementsInterface();
+        $rc->methodVisibility['implementsinterface'] = $pub;
+        $rc->methods['isinstance'] = new ReflectionClassIsInstance();
+        $rc->methodVisibility['isinstance'] = $pub;
+        $rc->methods['isinstantiable'] = new ReflectionClassIsInstantiable();
+        $rc->methodVisibility['isinstantiable'] = $pub;
+        $rc->methods['newinstancewithoutconstructor'] = new ReflectionClassNewInstanceWithoutConstructor();
+        $rc->methodVisibility['newinstancewithoutconstructor'] = $pub;
+        $rc->methods['isabstract'] = new ReflectionClassIsAbstract();
+        $rc->methodVisibility['isabstract'] = $pub;
         $rc->methods['getconstant'] = new ReflectionClassGetConstant();
         $rc->methodVisibility['getconstant'] = $pub;
         $rc->methods['hasconstant'] = new ReflectionClassHasConstant();
         $rc->methodVisibility['hasconstant'] = $pub;
         $pubStatic = $pub | CfgFunc::FLAG_STATIC;
-        $rc->methods['newlazyproxy'] = new ReflectionClassNewLazyProxy();
-        $rc->methodVisibility['newlazyproxy'] = $pubStatic;
-        $rc->methods['newlazyghost'] = new ReflectionClassNewLazyGhost();
-        $rc->methodVisibility['newlazyghost'] = $pubStatic;
-        $rc->methods['createlazyghost'] = new ReflectionClassCreateLazyGhost();
-        $rc->methodVisibility['createlazyghost'] = $pubStatic;
-        $rc->methods['createlazyproxy'] = new ReflectionClassCreateLazyProxy();
-        $rc->methodVisibility['createlazyproxy'] = $pubStatic;
-        $rc->methods['getlazyinitializer'] = new ReflectionClassGetLazyInitializer();
-        $rc->methodVisibility['getlazyinitializer'] = $pub;
-        $rc->methods['getlazyinitializationexception'] = new ReflectionClassGetLazyInitializationException();
-        $rc->methodVisibility['getlazyinitializationexception'] = $pub;
-        $rc->methods['getlazyproxyfactory'] = new ReflectionClassGetLazyProxyFactory();
-        $rc->methodVisibility['getlazyproxyfactory'] = $pub;
-        $rc->methods['isuninitializedlazyobject'] = new ReflectionClassIsUninitializedLazyObject();
-        $rc->methodVisibility['isuninitializedlazyobject'] = $pub;
-        $rc->methods['initializelazyobject'] = new ReflectionClassInitializeLazyObject();
-        $rc->methodVisibility['initializelazyobject'] = $pub;
-        $rc->methods['marklazyobjectasinitialized'] = new ReflectionClassMarkLazyObjectAsInitialized();
-        $rc->methodVisibility['marklazyobjectasinitialized'] = $pub;
-        $rc->methods['resetaslazyghost'] = new ReflectionClassResetAsLazyGhost();
-        $rc->methodVisibility['resetaslazyghost'] = $pubStatic;
-        $rc->methods['resetaslazyproxy'] = new ReflectionClassResetAsLazyProxy();
-        $rc->methodVisibility['resetaslazyproxy'] = $pubStatic;
-        $rc->methods['resetaslazyobject'] = new ReflectionClassResetAsLazyObject();
-        $rc->methodVisibility['resetaslazyobject'] = $pub;
+        if (CompilerVersion::supportsLazyObjectFactories()) {
+            $rc->methods['newlazyproxy'] = new ReflectionClassNewLazyProxy();
+            $rc->methodVisibility['newlazyproxy'] = $pubStatic;
+            $rc->methods['newlazyghost'] = new ReflectionClassNewLazyGhost();
+            $rc->methodVisibility['newlazyghost'] = $pubStatic;
+            $rc->methods['createlazyghost'] = new ReflectionClassCreateLazyGhost();
+            $rc->methodVisibility['createlazyghost'] = $pubStatic;
+            $rc->methods['createlazyproxy'] = new ReflectionClassCreateLazyProxy();
+            $rc->methodVisibility['createlazyproxy'] = $pubStatic;
+            $rc->methods['getlazyinitializer'] = new ReflectionClassGetLazyInitializer();
+            $rc->methodVisibility['getlazyinitializer'] = $pub;
+            $rc->methods['getlazyinitializationexception'] = new ReflectionClassGetLazyInitializationException();
+            $rc->methodVisibility['getlazyinitializationexception'] = $pub;
+            $rc->methods['getlazyproxyfactory'] = new ReflectionClassGetLazyProxyFactory();
+            $rc->methodVisibility['getlazyproxyfactory'] = $pub;
+            $rc->methods['isuninitializedlazyobject'] = new ReflectionClassIsUninitializedLazyObject();
+            $rc->methodVisibility['isuninitializedlazyobject'] = $pub;
+            $rc->methods['initializelazyobject'] = new ReflectionClassInitializeLazyObject();
+            $rc->methodVisibility['initializelazyobject'] = $pub;
+            $rc->methods['marklazyobjectasinitialized'] = new ReflectionClassMarkLazyObjectAsInitialized();
+            $rc->methodVisibility['marklazyobjectasinitialized'] = $pub;
+            $rc->methods['resetaslazyghost'] = new ReflectionClassResetAsLazyGhost();
+            $rc->methodVisibility['resetaslazyghost'] = $pubStatic;
+            $rc->methods['resetaslazyproxy'] = new ReflectionClassResetAsLazyProxy();
+            $rc->methodVisibility['resetaslazyproxy'] = $pubStatic;
+            $rc->methods['resetaslazyobject'] = new ReflectionClassResetAsLazyObject();
+            $rc->methodVisibility['resetaslazyobject'] = $pub;
+        }
         $rc->methods['isinternal'] = new ReflectionClassIsInternal();
         $rc->methodVisibility['isinternal'] = $pub;
         $rc->methods['isenum'] = new ReflectionClassIsEnum();
         $rc->methodVisibility['isenum'] = $pub;
+        $rc->methods['isreadonly'] = new ReflectionClassIsReadOnly();
+        $rc->methodVisibility['isreadonly'] = $pub;
         $rc->methods['isanonymous'] = new ReflectionClassIsAnonymous();
         $rc->methodVisibility['isanonymous'] = $pub;
         $rc->methods['isstatic'] = new ReflectionClassIsStatic();
@@ -613,6 +801,7 @@ final class BuiltinClasses
                 'getfilename' => new ReflectionClassGetFileName(),
                 'isuserdefined' => new ReflectionClassIsUserDefined(),
                 'getextensionname' => new ReflectionClassGetExtensionName(),
+                'getextension' => new ReflectionClassGetExtension(),
             ] as $name => $method
         ) {
             $rc->methods[$name] = $method;
@@ -623,6 +812,8 @@ final class BuiltinClasses
         $rp->properties[] = new ClassProperty(ReflectionSupport::PROP_CLASS_NAME, null, $strProto);
         $rp->properties[] = new ClassProperty(ReflectionSupport::PROP_PROPERTY_NAME, null, $strProto);
         $rp->properties[] = new ClassProperty(ReflectionSupport::PROP_DECLARING_CLASS_NAME, null, $strProto);
+        $rp->properties[] = new ClassProperty(ReflectionSupport::PROP_IS_DYNAMIC, null, $boolProto);
+        $rp->properties[] = new ClassProperty(ReflectionSupport::PROP_ACCESSIBLE, $boolFalseDefault, $boolProto);
         \PHPCompiler\ext\standard\VmReflection::registerReflectionPropertyClassConstants($rp);
         $rp->constructor = new ReflectionPropertyConstruct();
         $rp->methods['__construct'] = $rp->constructor;
@@ -639,6 +830,10 @@ final class BuiltinClasses
         $rp->methodVisibility['getvalue'] = $pub;
         $rp->methods['setvalue'] = new ReflectionPropertySetValue();
         $rp->methodVisibility['setvalue'] = $pub;
+        $rp->methods['setaccessible'] = new ReflectionPropertySetAccessible();
+        $rp->methodVisibility['setaccessible'] = $pub;
+        $rp->methods['isaccessible'] = new ReflectionPropertyIsAccessible();
+        $rp->methodVisibility['isaccessible'] = $pub;
         $rp->methods['setrawvalue'] = new ReflectionPropertySetRawValue();
         $rp->methodVisibility['setrawvalue'] = $pub;
         $rp->methods['getrawvalue'] = new ReflectionPropertyGetRawValue();
@@ -652,25 +847,10 @@ final class BuiltinClasses
                 'ispublic' => new ReflectionPropertyIsPublic(),
                 'isprivate' => new ReflectionPropertyIsPrivate(),
                 'isprotected' => new ReflectionPropertyIsProtected(),
-                'isabstract' => new ReflectionPropertyIsAbstract(),
-                'isvirtual' => new ReflectionPropertyIsVirtual(),
-                'isdynamic' => new ReflectionPropertyIsDynamic(),
                 'getmangledname' => new ReflectionPropertyGetMangledName(),
-                'hashook' => new ReflectionPropertyHasHook(),
-                'gethooks' => new ReflectionPropertyGetHooks(),
                 'isreadonly' => new ReflectionPropertyIsReadOnly(),
                 'ispromoted' => new ReflectionPropertyIsPromoted(),
-                'islazy' => new ReflectionPropertyIsLazy(),
                 'isinitialized' => new ReflectionPropertyIsInitialized(),
-                'setrawvaluewithoutlazyinitialization' => new ReflectionPropertySetRawValueWithoutLazyInitialization(),
-                'skiplazyinitialization' => new ReflectionPropertySkipLazyInitialization(),
-                'isprivateset' => ReflectionPropertyAsymmetricProbe::isPrivateSet(),
-                'isprotectedset' => ReflectionPropertyAsymmetricProbe::isProtectedSet(),
-                'ispublicset' => ReflectionPropertyAsymmetricProbe::isPublicSet(),
-                'isprivateget' => ReflectionPropertyAsymmetricProbe::isPrivateGet(),
-                'isprotectedget' => ReflectionPropertyAsymmetricProbe::isProtectedGet(),
-                'ispublicget' => ReflectionPropertyAsymmetricProbe::isPublicGet(),
-                'getasymmetricvisibility' => new ReflectionPropertyGetAsymmetricVisibility(),
                 'getreadabletype' => new ReflectionPropertyGetReadableType(),
                 'getsettabletype' => new ReflectionPropertyGetSettableType(),
                 'hasdefaultvalue' => new ReflectionPropertyHasDefaultValue(),
@@ -680,10 +860,59 @@ final class BuiltinClasses
             $rp->methods[$name] = $method;
             $rp->methodVisibility[$name] = $pub;
         }
+        if (CompilerVersion::supportsAsymmetricVisibility()) {
+            foreach (
+                [
+                    'isprivateset' => ReflectionPropertyAsymmetricProbe::isPrivateSet(),
+                    'isprotectedset' => ReflectionPropertyAsymmetricProbe::isProtectedSet(),
+                    'ispublicset' => ReflectionPropertyAsymmetricProbe::isPublicSet(),
+                    'isprivateget' => ReflectionPropertyAsymmetricProbe::isPrivateGet(),
+                    'isprotectedget' => ReflectionPropertyAsymmetricProbe::isProtectedGet(),
+                    'ispublicget' => ReflectionPropertyAsymmetricProbe::isPublicGet(),
+                    'getasymmetricvisibility' => new ReflectionPropertyGetAsymmetricVisibility(),
+                ] as $name => $method
+            ) {
+                $rp->methods[$name] = $method;
+                $rp->methodVisibility[$name] = $pub;
+            }
+        }
+        if (CompilerVersion::supportsReflectionPropertyHookProbes()) {
+            foreach (
+                [
+                    'isabstract' => new ReflectionPropertyIsAbstract(),
+                    'isvirtual' => new ReflectionPropertyIsVirtual(),
+                    'hashook' => new ReflectionPropertyHasHook(),
+                    'hashooks' => new ReflectionPropertyHasHooks(),
+                    'gethook' => new ReflectionPropertyGetHook(),
+                    'gethooks' => new ReflectionPropertyGetHooks(),
+                    'islazy' => new ReflectionPropertyIsLazy(),
+                    'setrawvaluewithoutlazyinitialization' => new ReflectionPropertySetRawValueWithoutLazyInitialization(),
+                    'skiplazyinitialization' => new ReflectionPropertySkipLazyInitialization(),
+                ] as $name => $method
+            ) {
+                $rp->methods[$name] = $method;
+                $rp->methodVisibility[$name] = $pub;
+            }
+        }
+        if (CompilerVersion::supportsReflectionPropertyAccessProbes()) {
+            $rp->methods['isreadable'] = ReflectionPropertyAccessProbe::isReadable();
+            $rp->methodVisibility['isreadable'] = $pub;
+            $rp->methods['iswritable'] = ReflectionPropertyAccessProbe::isWritable();
+            $rp->methodVisibility['iswritable'] = $pub;
+        }
+        if (CompilerVersion::supportsReflectionPropertyIsDynamic()) {
+            $rp->methods['isdynamic'] = new ReflectionPropertyIsDynamic();
+            $rp->methodVisibility['isdynamic'] = $pub;
+        }
+        if (CompilerVersion::supportsReflectionPropertyParameterIsDeprecated()) {
+            $rp->methods['isdeprecated'] = new ReflectionPropertyIsDeprecated();
+            $rp->methodVisibility['isdeprecated'] = $pub;
+        }
         $ctx->classes[ReflectionSupport::REFLECTION_PROPERTY] = $rp;
 
         $rf = new ClassEntry('ReflectionFunction');
         $rf->properties[] = new ClassProperty(ReflectionSupport::PROP_FUNC_NAME, null, $strProto);
+        $rf->properties[] = new ClassProperty(ReflectionSupport::PROP_ACCESSIBLE, $boolFalseDefault, $boolProto);
         $rf->constructor = new ReflectionFunctionConstruct();
         $rf->methods['__construct'] = $rf->constructor;
         $rf->methodVisibility['__construct'] = $pub;
@@ -696,50 +925,81 @@ final class BuiltinClasses
                 'hasreturntype' => new ReflectionFunctionHasReturnType(),
                 'isanonymous' => new ReflectionFunctionIsAnonymous(),
                 'isclosure' => new ReflectionFunctionIsClosure(),
+                'isgenerator' => new ReflectionFunctionIsGenerator(),
                 'isinternal' => new ReflectionFunctionIsInternal(),
                 'isuserdefined' => new ReflectionFunctionIsUserDefined(),
                 'getextensionname' => new ReflectionFunctionGetExtensionName(),
                 'getclosurethis' => new ReflectionFunctionGetClosureThis(),
+                'getclosure' => new ReflectionFunctionGetClosure(),
                 'getclosurescopeclass' => new ReflectionFunctionGetClosureScopeClass(),
                 'getclosurecalledclass' => new ReflectionFunctionGetClosureCalledClass(),
                 'getclosureusedvariables' => new ReflectionFunctionGetClosureUsedVariables(),
+                'getstaticvariables' => new ReflectionFunctionGetStaticVariables(),
                 'invoke' => new ReflectionFunctionInvoke(),
+                'setaccessible' => new ReflectionFunctionSetAccessible(),
+                'isaccessible' => new ReflectionFunctionIsAccessible(),
             ] as $name => $method
         ) {
             $rf->methods[$name] = $method;
             $rf->methodVisibility[$name] = $pub;
         }
-        $rf->methods['createfromcallable'] = new ReflectionFunctionCreateFromCallable();
-        $rf->methodVisibility['createfromcallable'] = $pubStatic;
-        $rf->methods['createfromfunction'] = new ReflectionFunctionCreateFromFunction();
-        $rf->methodVisibility['createfromfunction'] = $pubStatic;
+        if (CompilerVersion::supportsReflectionCreateFromFactories()) {
+            $rf->methods['createfromcallable'] = new ReflectionFunctionCreateFromCallable();
+            $rf->methodVisibility['createfromcallable'] = $pubStatic;
+            $rf->methods['createfromfunction'] = new ReflectionFunctionCreateFromFunction();
+            $rf->methodVisibility['createfromfunction'] = $pubStatic;
+        }
+        $rf->methods['isdeprecated'] = new ReflectionFunctionIsDeprecated();
+        $rf->methodVisibility['isdeprecated'] = $pub;
+        if (CompilerVersion::supportsReflectionFunctionGetNamedArguments()) {
+            $getNamedArguments = new ReflectionFunctionGetNamedArguments();
+            $rf->methods['getnamedarguments'] = $getNamedArguments;
+            $rf->methodVisibility['getnamedarguments'] = $pub;
+        }
         $ctx->classes[ReflectionSupport::REFLECTION_FUNCTION] = $rf;
 
-        $rconst = new ClassEntry('ReflectionConstant');
-        $rconst->properties[] = new ClassProperty(ReflectionSupport::PROP_CLASS_NAME, null, $strProto);
-        $rconst->properties[] = new ClassProperty(ReflectionSupport::PROP_CONSTANT_NAME, null, $strProto);
-        $rconst->constructor = new ReflectionConstantConstruct();
-        $rconst->methods['__construct'] = $rconst->constructor;
-        $rconst->methodVisibility['__construct'] = $pub;
-        $rconst->methods['getname'] = new ReflectionConstantGetName();
-        $rconst->methodVisibility['getname'] = $pub;
-        $rconst->methods['getvalue'] = new ReflectionConstantGetValue();
-        $rconst->methodVisibility['getvalue'] = $pub;
-        $rconst->methods['getattributes'] = new ReflectionConstantGetAttributes();
-        $rconst->methodVisibility['getattributes'] = $pub;
-        $rconst->methods['gettype'] = new ReflectionClassConstantGetType();
-        $rconst->methodVisibility['gettype'] = $pub;
-        $rconst->methods['isdeprecated'] = new ReflectionClassConstantIsDeprecated();
-        $rconst->methodVisibility['isdeprecated'] = $pub;
-        $rconst->methods['getdeprecatedmessage'] = new ReflectionClassConstantGetDeprecatedMessage();
-        $rconst->methodVisibility['getdeprecatedmessage'] = $pub;
-        $rconst->methods['getdeprecatedversion'] = new ReflectionClassConstantGetDeprecatedVersion();
-        $rconst->methodVisibility['getdeprecatedversion'] = $pub;
-        $rconst->methods['isfinal'] = new ReflectionClassConstantIsFinal();
-        $rconst->methodVisibility['isfinal'] = $pub;
-        $rconst->methods['isenumcase'] = new ReflectionClassConstantIsEnumCase();
-        $rconst->methodVisibility['isenumcase'] = $pub;
-        $ctx->classes[ReflectionSupport::REFLECTION_CONSTANT] = $rconst;
+        if (CompilerVersion::advertisesReflectionConstantClass()) {
+            $rconst = new ClassEntry('ReflectionConstant');
+            $rconst->properties[] = new ClassProperty(ReflectionSupport::PROP_CLASS_NAME, null, $strProto);
+            $rconst->properties[] = new ClassProperty(ReflectionSupport::PROP_CONSTANT_NAME, null, $strProto);
+            $rconst->constructor = new ReflectionConstantConstruct();
+            $rconst->methods['__construct'] = $rconst->constructor;
+            $rconst->methodVisibility['__construct'] = $pub;
+            $rconst->methods['getname'] = new ReflectionConstantGetName();
+            $rconst->methodVisibility['getname'] = $pub;
+            $rconst->methods['getvalue'] = new ReflectionConstantGetValue();
+            $rconst->methodVisibility['getvalue'] = $pub;
+            $rconst->methods['getattributes'] = new ReflectionConstantGetAttributes();
+            $rconst->methodVisibility['getattributes'] = $pub;
+            $rconst->methods['getdeclaringclass'] = new ReflectionConstantGetDeclaringClass();
+            $rconst->methodVisibility['getdeclaringclass'] = $pub;
+            $rconst->methods['gettype'] = new ReflectionClassConstantGetType();
+            $rconst->methodVisibility['gettype'] = $pub;
+            $rconst->methods['hastype'] = new ReflectionClassConstantHasType();
+            $rconst->methodVisibility['hastype'] = $pub;
+            $rconst->methods['getmodifiers'] = new ReflectionClassConstantGetModifiers();
+            $rconst->methodVisibility['getmodifiers'] = $pub;
+            if (CompilerVersion::supportsReflectionClassConstantIsDeprecated()) {
+                $rconst->methods['isdeprecated'] = new ReflectionClassConstantIsDeprecated();
+                $rconst->methodVisibility['isdeprecated'] = $pub;
+                $rconst->methods['getdeprecatedmessage'] = new ReflectionClassConstantGetDeprecatedMessage();
+                $rconst->methodVisibility['getdeprecatedmessage'] = $pub;
+                $rconst->methods['getdeprecatedversion'] = new ReflectionClassConstantGetDeprecatedVersion();
+                $rconst->methodVisibility['getdeprecatedversion'] = $pub;
+            }
+            $rconst->methods['isfinal'] = new ReflectionClassConstantIsFinal();
+            $rconst->methodVisibility['isfinal'] = $pub;
+            $rconst->methods['isenumcase'] = new ReflectionClassConstantIsEnumCase();
+            $rconst->methodVisibility['isenumcase'] = $pub;
+            $rconst->methods['ispublic'] = new ReflectionClassConstantIsPublic();
+            $rconst->methodVisibility['ispublic'] = $pub;
+            $rconst->methods['isprotected'] = new ReflectionClassConstantIsProtected();
+            $rconst->methodVisibility['isprotected'] = $pub;
+            $rconst->methods['isprivate'] = new ReflectionClassConstantIsPrivate();
+            $rconst->methodVisibility['isprivate'] = $pub;
+            \PHPCompiler\ext\standard\VmReflection::registerReflectionClassConstantClassConstants($rconst);
+            $ctx->classes[ReflectionSupport::REFLECTION_CONSTANT] = $rconst;
+        }
 
         $rcc = new ClassEntry('ReflectionClassConstant');
         $rcc->properties[] = new ClassProperty(ReflectionSupport::PROP_CLASS_NAME, null, $strProto);
@@ -753,18 +1013,33 @@ final class BuiltinClasses
         $rcc->methodVisibility['getvalue'] = $pub;
         $rcc->methods['getattributes'] = new ReflectionConstantGetAttributes();
         $rcc->methodVisibility['getattributes'] = $pub;
+        $rcc->methods['getdeclaringclass'] = new ReflectionConstantGetDeclaringClass();
+        $rcc->methodVisibility['getdeclaringclass'] = $pub;
         $rcc->methods['gettype'] = new ReflectionClassConstantGetType();
         $rcc->methodVisibility['gettype'] = $pub;
-        $rcc->methods['isdeprecated'] = new ReflectionClassConstantIsDeprecated();
-        $rcc->methodVisibility['isdeprecated'] = $pub;
-        $rcc->methods['getdeprecatedmessage'] = new ReflectionClassConstantGetDeprecatedMessage();
-        $rcc->methodVisibility['getdeprecatedmessage'] = $pub;
-        $rcc->methods['getdeprecatedversion'] = new ReflectionClassConstantGetDeprecatedVersion();
-        $rcc->methodVisibility['getdeprecatedversion'] = $pub;
+        $rcc->methods['hastype'] = new ReflectionClassConstantHasType();
+        $rcc->methodVisibility['hastype'] = $pub;
+        $rcc->methods['getmodifiers'] = new ReflectionClassConstantGetModifiers();
+        $rcc->methodVisibility['getmodifiers'] = $pub;
+        if (CompilerVersion::supportsReflectionClassConstantIsDeprecated()) {
+            $rcc->methods['isdeprecated'] = new ReflectionClassConstantIsDeprecated();
+            $rcc->methodVisibility['isdeprecated'] = $pub;
+            $rcc->methods['getdeprecatedmessage'] = new ReflectionClassConstantGetDeprecatedMessage();
+            $rcc->methodVisibility['getdeprecatedmessage'] = $pub;
+            $rcc->methods['getdeprecatedversion'] = new ReflectionClassConstantGetDeprecatedVersion();
+            $rcc->methodVisibility['getdeprecatedversion'] = $pub;
+        }
         $rcc->methods['isfinal'] = new ReflectionClassConstantIsFinal();
         $rcc->methodVisibility['isfinal'] = $pub;
         $rcc->methods['isenumcase'] = new ReflectionClassConstantIsEnumCase();
         $rcc->methodVisibility['isenumcase'] = $pub;
+        $rcc->methods['ispublic'] = new ReflectionClassConstantIsPublic();
+        $rcc->methodVisibility['ispublic'] = $pub;
+        $rcc->methods['isprotected'] = new ReflectionClassConstantIsProtected();
+        $rcc->methodVisibility['isprotected'] = $pub;
+        $rcc->methods['isprivate'] = new ReflectionClassConstantIsPrivate();
+        $rcc->methodVisibility['isprivate'] = $pub;
+        \PHPCompiler\ext\standard\VmReflection::registerReflectionClassConstantClassConstants($rcc);
         $ctx->classes[ReflectionSupport::REFLECTION_CLASS_CONSTANT] = $rcc;
 
         $ctx->classes[ReflectionSupport::REFLECTION_CLASS] = $rc;
@@ -778,19 +1053,27 @@ final class BuiltinClasses
         $renum->methodVisibility['getname'] = $pub;
         $renum->methods['isbacked'] = new ReflectionEnumIsBacked();
         $renum->methodVisibility['isbacked'] = $pub;
+        $renum->methods['getbackingtype'] = new ReflectionEnumGetBackingType();
+        $renum->methodVisibility['getbackingtype'] = $pub;
         $renum->methods['getcases'] = new ReflectionEnumGetCases();
         $renum->methodVisibility['getcases'] = $pub;
         $renum->methods['getcase'] = new ReflectionEnumGetCase();
         $renum->methodVisibility['getcase'] = $pub;
         $renum->methods['hascase'] = new ReflectionEnumHasCase();
         $renum->methodVisibility['hascase'] = $pub;
+        if (CompilerVersion::supportsReflectionEnumFromName()) {
+            $renum->methods['fromname'] = new ReflectionEnumFromName();
+            $renum->methodVisibility['fromname'] = $pubStatic;
+            $renum->methodNames['fromname'] = 'fromName';
+        }
         $renum->methods['gettraitnames'] = new ReflectionClassGetTraitNames();
+        $renum->methods['getinterfacenames'] = new ReflectionClassGetInterfaceNames();
         $renum->methodVisibility['gettraitnames'] = $pub;
         $ctx->classes[ReflectionSupport::REFLECTION_ENUM] = $renum;
 
         $reuc = new ClassEntry('ReflectionEnumUnitCase');
         $reuc->properties[] = new ClassProperty(ReflectionSupport::PROP_CLASS_NAME, null, $strProto);
-        $reuc->properties[] = new ClassProperty(ReflectionSupport::PROP_ENUM_CASE_NAME, null, $strProto);
+        $reuc->properties[] = new ClassProperty(ReflectionSupport::PROP_ENUM_CLASS_NAME, null, $strProto);
         $reuc->constructor = new ReflectionEnumUnitCaseConstruct();
         $reuc->methods['__construct'] = $reuc->constructor;
         $reuc->methodVisibility['__construct'] = $pub;
@@ -802,12 +1085,16 @@ final class BuiltinClasses
         $reuc->methodVisibility['getvalue'] = $pub;
         $reuc->methods['isbacked'] = new ReflectionEnumUnitCaseIsBacked();
         $reuc->methodVisibility['isbacked'] = $pub;
+        if (CompilerVersion::supportsReflectionEnumUnitCaseIsDeprecated()) {
+            $reuc->methods['isdeprecated'] = new ReflectionEnumUnitCaseIsDeprecated();
+            $reuc->methodVisibility['isdeprecated'] = $pub;
+        }
         $ctx->classes[ReflectionSupport::REFLECTION_ENUM_UNIT_CASE] = $reuc;
 
         $rebc = new ClassEntry('ReflectionEnumBackedCase');
         $rebc->parentLc = ReflectionSupport::REFLECTION_ENUM_UNIT_CASE;
         $rebc->properties[] = new ClassProperty(ReflectionSupport::PROP_CLASS_NAME, null, $strProto);
-        $rebc->properties[] = new ClassProperty(ReflectionSupport::PROP_ENUM_CASE_NAME, null, $strProto);
+        $rebc->properties[] = new ClassProperty(ReflectionSupport::PROP_ENUM_CLASS_NAME, null, $strProto);
         $rebc->constructor = new ReflectionEnumBackedCaseConstruct();
         $rebc->methods['__construct'] = $rebc->constructor;
         $rebc->methodVisibility['__construct'] = $pub;
@@ -846,7 +1133,9 @@ final class BuiltinClasses
             $boolProto,
             $arrayProto,
             $pub,
-            []
+            [
+                'gettypes' => new ReflectionCompositeTypeGetTypes(),
+            ]
         );
         self::registerReflectionTypeClass(
             $ctx,
@@ -856,15 +1145,52 @@ final class BuiltinClasses
             $boolProto,
             $arrayProto,
             $pub,
-            []
+            [
+                'gettypes' => new ReflectionCompositeTypeGetTypes(),
+            ]
         );
 
         $objProto = new Variable(Variable::TYPE_OBJECT);
         $rfiber = new ClassEntry('ReflectionFiber');
         $rfiber->properties[] = new ClassProperty(ReflectionSupport::PROP_FIBER_TARGET, null, $objProto);
-        $rfiber->methods['getexecutingfiber'] = new ReflectionFiberGetExecutingFiber();
-        $rfiber->methodVisibility['getexecutingfiber'] = $pub | CfgFunc::FLAG_STATIC;
+        $rfiber->constructor = new ReflectionFiberConstruct();
+        $rfiber->methods['__construct'] = $rfiber->constructor;
+        $rfiber->methodVisibility['__construct'] = $pub;
+        foreach (
+            [
+                'getfiber' => new ReflectionFiberGetFiber(),
+                'isstarted' => new ReflectionFiberIsStarted(),
+                'issuspended' => new ReflectionFiberIsSuspended(),
+                'isterminated' => new ReflectionFiberIsTerminated(),
+                'isrunning' => new ReflectionFiberIsRunning(),
+                'getexecutingline' => new ReflectionFiberGetExecutingLine(),
+                'getexecutingfile' => new ReflectionFiberGetExecutingFile(),
+                'gettrace' => new ReflectionFiberGetTrace(),
+                'getexecutingfiber' => new ReflectionFiberGetExecutingFiber(),
+            ] as $name => $method
+        ) {
+            $rfiber->methods[$name] = $method;
+            $rfiber->methodVisibility[$name] = 'getexecutingfiber' === $name ? ($pub | CfgFunc::FLAG_STATIC) : $pub;
+        }
         $ctx->classes[ReflectionSupport::REFLECTION_FIBER] = $rfiber;
+
+        $rgen = new ClassEntry('ReflectionGenerator');
+        $rgen->properties[] = new ClassProperty(ReflectionSupport::PROP_GENERATOR_TARGET, null, $objProto);
+        $rgen->constructor = new ReflectionGeneratorConstruct();
+        $rgen->methods['__construct'] = $rgen->constructor;
+        $rgen->methodVisibility['__construct'] = $pub;
+        foreach (
+            [
+                'getfunction' => new ReflectionGeneratorGetFunction(),
+                'getexecutingline' => new ReflectionGeneratorGetExecutingLine(),
+                'getexecutingfile' => new ReflectionGeneratorGetExecutingFile(),
+                'getexecutinggenerator' => new ReflectionGeneratorGetExecutingGenerator(),
+            ] as $name => $method
+        ) {
+            $rgen->methods[$name] = $method;
+            $rgen->methodVisibility[$name] = $pub;
+        }
+        $ctx->classes[ReflectionSupport::REFLECTION_GENERATOR] = $rgen;
     }
 
     /**
@@ -901,6 +1227,7 @@ final class BuiltinClasses
         $strProto = new Variable(Variable::TYPE_STRING);
         $intProto = new Variable(Variable::TYPE_INTEGER);
         $pub = CfgFunc::FLAG_PUBLIC;
+        $pubStatic = $pub | CfgFunc::FLAG_STATIC;
 
         $tz = new ClassEntry('DateTimeZone');
         DateTimeZoneSupport::registerClassConstants($tz);
@@ -914,16 +1241,32 @@ final class BuiltinClasses
         $tz->methodVisibility['getoffset'] = $pub;
         $tz->methods['getlocation'] = new DateTimeZoneGetLocation();
         $tz->methodVisibility['getlocation'] = $pub;
+        $tz->methods['gettransitions'] = new DateTimeZoneGetTransitions();
+        $tz->methodVisibility['gettransitions'] = $pub;
+        $tz->methods['listabbreviations'] = new DateTimeZoneListAbbreviations();
+        $tz->methodVisibility['listabbreviations'] = $pubStatic;
+        $tz->methods['listidentifiers'] = new DateTimeZoneListIdentifiers();
+        $tz->methodVisibility['listidentifiers'] = $pubStatic;
         $ctx->classes[DateTimeSupport::CLASS_DATETIMEZONE] = $tz;
 
-        $pubStatic = $pub | CfgFunc::FLAG_STATIC;
         $dateTimeMethods = [
             'format' => new DateTimeFormat(),
             'gettimestamp' => new DateTimeGetTimestamp(),
-            'getmicrosecond' => new DateTimeGetMicrosecond(),
+            'getoffset' => new DateTimeGetOffset(),
+            'gettimezone' => new DateTimeGetTimezone(),
+            ...(CompilerVersion::supportsDateTimeMicrosecond() ? [
+                'getmicrosecond' => new DateTimeGetMicrosecond(),
+            ] : []),
             'modify' => new DateTimeModify(),
+            'add' => new DateTimeAdd(),
+            'sub' => new DateTimeSub(),
             'diff' => new DateTimeDiff(),
-            'setmicrosecond' => new DateTimeSetMicrosecond(),
+            'setdate' => new DateTimeSetDate(),
+            'settime' => new DateTimeSetTime(),
+            ...(CompilerVersion::supportsDateTimeMicrosecond() ? [
+                'setmicrosecond' => new DateTimeSetMicrosecond(),
+            ] : []),
+            'settimestamp' => new DateTimeSetTimestamp(),
             'settimezone' => new DateTimeSetTimezone(),
         ];
 
@@ -985,6 +1328,7 @@ final class BuiltinClasses
         $di->properties[] = new ClassProperty('f', null, $floatProto);
         $di->properties[] = new ClassProperty('days', null, $boolProto);
         $di->properties[] = new ClassProperty('from_string', null, $boolProto);
+        $di->properties[] = new ClassProperty('date_string', null, $strProto);
         foreach ($di->properties as $prop) {
             $prop->visibility = $pub;
         }
@@ -996,6 +1340,49 @@ final class BuiltinClasses
         $di->methods['createfromdatestring'] = new DateIntervalCreateFromDateString();
         $di->methodVisibility['createfromdatestring'] = $pubStatic;
         $ctx->classes[DateIntervalSupport::CLASS_DATEINTERVAL] = $di;
+
+        $objProto = new Variable(Variable::TYPE_OBJECT);
+        $nullProto = new Variable(Variable::TYPE_NULL);
+        $dp = new ClassEntry('DatePeriod');
+        $dp->interfaces = ['iterator'];
+        $dp->properties[] = new ClassProperty('start', null, $objProto);
+        $dp->properties[] = new ClassProperty('current', null, $nullProto);
+        $dp->properties[] = new ClassProperty('end', null, $nullProto);
+        $dp->properties[] = new ClassProperty('interval', null, $objProto);
+        $dp->properties[] = new ClassProperty('recurrences', null, $intProto);
+        $dp->properties[] = new ClassProperty('include_start_date', null, $boolProto);
+        $dp->properties[] = new ClassProperty('include_end_date', null, $boolProto);
+        foreach ($dp->properties as $prop) {
+            $prop->visibility = $pub;
+        }
+        $dp->constructor = new DatePeriodConstruct();
+        $dp->methods['__construct'] = $dp->constructor;
+        $dp->methodVisibility['__construct'] = $pub;
+        $dp->methods['rewind'] = new DatePeriodRewind();
+        $dp->methodVisibility['rewind'] = $pub;
+        $dp->methods['valid'] = new DatePeriodValid();
+        $dp->methodVisibility['valid'] = $pub;
+        $dp->methods['current'] = new DatePeriodCurrent();
+        $dp->methodVisibility['current'] = $pub;
+        $dp->methods['key'] = new DatePeriodKey();
+        $dp->methodVisibility['key'] = $pub;
+        $dp->methods['next'] = new DatePeriodNext();
+        $dp->methodVisibility['next'] = $pub;
+        $dp->methods['getstartdate'] = new DatePeriodGetStartDate();
+        $dp->methodVisibility['getstartdate'] = $pub;
+        $dp->methods['getenddate'] = new DatePeriodGetEndDate();
+        $dp->methodVisibility['getenddate'] = $pub;
+        $dp->methods['getdateinterval'] = new DatePeriodGetDateInterval();
+        $dp->methodVisibility['getdateinterval'] = $pub;
+        $dp->methods['getrecurrences'] = new DatePeriodGetRecurrences();
+        $dp->methodVisibility['getrecurrences'] = $pub;
+        $dp->methods['getenddate'] = new DatePeriodGetEndDate();
+        $dp->methodVisibility['getenddate'] = $pub;
+        if (CompilerVersion::supportsDatePeriodCreateFromISO8601String()) {
+            $dp->methods['createfromiso8601string'] = new DatePeriodCreateFromISO8601String();
+            $dp->methodVisibility['createfromiso8601string'] = $pubStatic;
+        }
+        $ctx->classes[DatePeriodSupport::CLASS_DATEPERIOD] = $dp;
     }
 
     private static function registerExceptions(Context $ctx): void
@@ -1005,6 +1392,9 @@ final class BuiltinClasses
         $ctx->classes[ThrowableManifest::LC_THROWABLE] = $throwable;
 
         foreach (ThrowableManifest::registrationOrder() as $className) {
+            if (!ThrowableManifest::isAdvertised($className)) {
+                continue;
+            }
             self::registerThrowableClass(
                 $ctx,
                 $className,

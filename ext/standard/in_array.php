@@ -13,7 +13,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
-use PHPCompiler\JIT\ArrayBuiltinHelper;
+use PHPCompiler\JIT\Builtin\InArrayRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitBoolArg;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -21,14 +21,24 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * in_array() for arrays of scalar values (subset of PHP; JIT via ArrayBuiltinHelper).
+ * in_array() for arrays of scalar values (subset of PHP; JIT via InArrayRuntime).
  */
 final class in_array extends Internal
 {
     public function execute(Frame $frame): void
     {
-        if (2 !== \count($frame->calledArgs) && 3 !== \count($frame->calledArgs)) {
-            throw new \LogicException('in_array() requires two or three arguments');
+        $argc = \count($frame->calledArgs);
+        if ($argc < 2) {
+            throw new \ArgumentCountError(\sprintf(
+                'in_array() expects at least 2 arguments, %d given',
+                $argc
+            ));
+        }
+        if ($argc > 3) {
+            throw new \ArgumentCountError(\sprintf(
+                'in_array() expects at most 3 arguments, %d given',
+                $argc
+            ));
         }
         $needle = $frame->calledArgs[0]->resolveIndirect();
         $haystack = VmArray::requireArrayParam(
@@ -44,28 +54,30 @@ final class in_array extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        foreach ($haystack->iterate(true) as $value) {
-            $stored = $value->resolveIndirect();
-            if ($strict ? $needle->identicalTo($stored) : self::looseEquals($needle, $stored)) {
-                $frame->returnVar->bool(true);
-
-                return;
-            }
-        }
-        $frame->returnVar->bool(false);
+        $frame->returnVar->bool(VmArray::contains($needle, $haystack, $strict));
     }
 
-    public static function looseEquals(Variable $left, Variable $right): bool
+    public static function looseEquals(Variable $left, Variable $right, ?\PHPCompiler\VM $vm = null): bool
     {
-        return $left->resolveIndirect()->equals($right->resolveIndirect());
+        return $left->resolveIndirect()->equals($right->resolveIndirect(), $vm);
     }
 
     public Context $context;
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (2 !== \count($args) && 3 !== \count($args)) {
-            throw new \LogicException('in_array() requires two or three arguments');
+        $argc = \count($args);
+        if ($argc < 2) {
+            throw new \ArgumentCountError(\sprintf(
+                'in_array() expects at least 2 arguments, %d given',
+                $argc
+            ));
+        }
+        if ($argc > 3) {
+            throw new \ArgumentCountError(\sprintf(
+                'in_array() expects at most 3 arguments, %d given',
+                $argc
+            ));
         }
         $strict = $context->constantFromBool(false);
         if (3 === \count($args)) {
@@ -76,6 +88,6 @@ final class in_array extends Internal
         }
         JitArrayElem::requireArrayParam($context, $args[1], 'in_array', 2, 'haystack');
 
-        return ArrayBuiltinHelper::inArray($context, $args[0], $args[1], $strict);
+        return InArrayRuntime::inArray($context, $args[0], $args[1], $strict);
     }
 }

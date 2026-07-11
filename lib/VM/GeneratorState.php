@@ -21,6 +21,12 @@ use PHPCompiler\VM\Builtin\GeneratorValid;
  */
 final class GeneratorState
 {
+    /** Zend zend_generators.c — Generator::rewind() on started generator (#5195). */
+    public const REWIND_ALREADY_RUN_ERROR = 'Cannot rewind a generator that was already run';
+
+    /** Zend zend_generators.c — foreach / iterator_count on closed generator (#5132, #17368). */
+    public const CLOSED_TRAVERSE_ERROR = 'Cannot traverse an already closed generator';
+
     public bool $done = false;
 
     /** True after the generator body has been entered (Zend rewind guard, #5195). */
@@ -58,6 +64,9 @@ final class GeneratorState
     public bool $hasPendingThrow = false;
 
     public Variable $pendingThrow;
+
+    /** Foreach iteration must observe yielded values before a trailing throw (#13366). */
+    public bool $foreachAdvance = false;
 
     /** Closure binding when this generator was created from a closure (#6567). */
     public ?ClosureState $closureCall = null;
@@ -115,6 +124,14 @@ final class GeneratorState
         }
     }
 
+    /** Close after uncaught throw — done but not returned (Zend getReturn guard, #13027). */
+    public function markClosedWithoutReturn(): void
+    {
+        $this->done = true;
+        $this->frame = null;
+        $this->hasCurrent = false;
+    }
+
     public function wrapObject(): ObjectEntry
     {
         $entry = new ObjectEntry($this->vm->context->classes['generator']);
@@ -124,10 +141,19 @@ final class GeneratorState
         return $entry;
     }
 
+    /** Foreach ITER_RESET — closed generators use traverse error, not rewind (#17368). */
+    public function rewindForForeach(): void
+    {
+        if ($this->done) {
+            throw new \Exception(self::CLOSED_TRAVERSE_ERROR);
+        }
+        $this->rewind();
+    }
+
     public function rewind(): void
     {
         if ($this->started) {
-            throw new \Exception('Cannot rewind a generator that was already run');
+            throw new \Exception(self::REWIND_ALREADY_RUN_ERROR);
         }
         $this->done = false;
         $this->hasCurrent = false;

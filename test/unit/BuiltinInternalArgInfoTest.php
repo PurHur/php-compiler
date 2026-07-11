@@ -9,6 +9,14 @@ use PHPUnit\Framework\TestCase;
 /** Internal builtin arginfo arity via ircmaxell/php-types (#11453). */
 final class BuiltinInternalArgInfoTest extends TestCase
 {
+    public function testProcOpenCommandParamIsArrayOrStringUnion(): void
+    {
+        $info = new \PHPTypes\InternalArgInfo();
+        $params = $info->functions['proc_open']['params'];
+        self::assertSame('command', $params[0]['name']);
+        self::assertSame('array|string', $params[0]['type']);
+    }
+
     public function testArrayMapParamCount(): void
     {
         $this->assertSame(3, BuiltinInternalArgInfo::paramCountForFunction('array_map'));

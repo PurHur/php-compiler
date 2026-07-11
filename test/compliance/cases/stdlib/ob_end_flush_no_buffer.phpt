@@ -19,7 +19,6 @@ $active = ob_end_flush();
 var_export($active);
 echo "\n";
 --EXPECT--
-PHP Notice:  ob_end_flush(): Failed to delete and flush buffer. No buffer to delete or flush
 0
 false
 'ob_end_flush(): Failed to delete and flush buffer. No buffer to delete or flush'
