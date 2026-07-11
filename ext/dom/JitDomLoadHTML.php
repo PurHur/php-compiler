@@ -7,7 +7,6 @@ namespace PHPCompiler\ext\dom;
 use PHPCompiler\JIT\Builtin\DomLoadHTMLRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Intdiv as JitIntdiv;
-use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\NamedOptionalCallArgs;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -27,16 +26,7 @@ final class JitDomLoadHTML
         }
 
         $document = self::loadObjectArg($context, $args[0]);
-        $htmlLit = JitStringBuiltinArg::compileTimeLiteral($args[1]);
-        if (null !== $htmlLit) {
-            $html = $context->builder->load($context->constantStringFromString($htmlLit));
-        } else {
-            $html = self::loadStringArg($context, $args[1]);
-            $html = $context->builder->call(
-                $context->lookupFunction('__string__separate'),
-                $html
-            );
-        }
+        $html = JitValueBox::valuePtrFromVariable($context, $args[1]);
         $options = $context->getTypeFromString('int64')->constInt(0, false);
         if (isset($args[2]) && !NamedOptionalCallArgs::isOmittedOptional($args[2])) {
             $options = JitIntdiv::lowerIntBuiltinArg($context, $args[2], 'DOMDocument::loadHTML()', 2, 'options');
@@ -63,14 +53,5 @@ final class JitDomLoadHTML
         }
 
         throw new \LogicException('DOMDocument::loadHTML() receiver must be an object');
-    }
-
-    private static function loadStringArg(Context $context, JITVariable $arg): Value
-    {
-        if (JITVariable::TYPE_STRING === $arg->type) {
-            return $context->helper->loadValue($arg);
-        }
-
-        return JitStringBuiltinArg::lower($context, $arg, 'DOMDocument::loadHTML()', 0, 'source');
     }
 }

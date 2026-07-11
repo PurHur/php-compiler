@@ -5,7 +5,10 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitNestedHelperCoerce;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\JitVmHelperLink;
+use PHPLLVM\Builder;
 
 /** JIT/AOT link for DOMDocument::getElementById() via DomGetElementByIdJitHelper (#17954). */
 final class DomGetElementByIdRuntime
@@ -23,32 +26,73 @@ final class DomGetElementByIdRuntime
 
     public static function ensureLinked(Context $context): void
     {
+        $entryBlock = DomDocumentMethodUserScriptLlvm::shouldUse($context)
+            ? 'dom_get_element_by_id_user_script'
+            : 'dom_get_element_by_id_bridge';
         $probe = $context->module->getNamedFunction(self::ABI_NAME);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+        if (JitVmHelperLink::hasNamedBridgeEntry($probe, $entryBlock)) {
             $context->registerFunction(self::ABI_NAME, $probe);
 
             return;
         }
 
-        if (DomDocumentMethodUserScriptLlvm::shouldUse($context)) {
-            DomDocumentMethodUserScriptLlvm::ensureGetElementByIdBridge($context);
-
-            return;
+        $savedBlock = null;
+        try {
+            $savedBlock = $context->builder->getInsertBlock();
+        } catch (\Throwable) {
         }
 
+        JitVmHelperLink::ensureCompiled($context, self::HELPER_PATH, self::COMPILED_HELPERS, '#17954');
+
         $objPtr = $context->getTypeFromString('__object__*');
-        $strPtr = $context->getTypeFromString('__string__*');
         $valuePtr = $context->getTypeFromString('__value__*');
-        JitVmHelperLink::ensureBridge(
-            $context,
-            self::ABI_NAME,
-            'dom_get_element_by_id_bridge',
-            [$objPtr, $strPtr],
-            $valuePtr,
-            self::HELPER,
-            self::HELPER_PATH,
-            self::COMPILED_HELPERS,
-            '#17954'
+        $helperFn = JitVmHelperLink::lookupCompiled($context, self::HELPER, '#17954');
+        $ft = $context->context->functionType($valuePtr, false, $objPtr, $valuePtr);
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction(self::ABI_NAME, $ft);
+
+        $entry = JitVmHelperLink::bridgeEntryForEmit($fn, $entryBlock);
+        $context->builder->positionAtEnd($entry);
+        $args = [];
+        for ($i = 0, $n = $fn->countParams(); $i < $n; ++$i) {
+            $args[] = JitNestedHelperCoerce::coerceArgForHelper(
+                $context,
+                $fn->getParam($i),
+                $helperFn->getParam($i)->typeOf()
+            );
+        }
+        $foundObj = $context->builder->call($helperFn, ...$args);
+        $foundObj = JitNestedHelperCoerce::coerceBridgeResult($context, $foundObj, $objPtr);
+        $slot = JitValueBox::alloc($context);
+        $destPtr = JitValueBox::pointer($context, $slot);
+        $isNull = $context->builder->icmp(
+            Builder::INT_EQ,
+            $foundObj,
+            $objPtr->constNull()
         );
+        $nullBlock = $fn->appendBasicBlock('dom_gei_bridge_null');
+        $objBlock = $fn->appendBasicBlock('dom_gei_bridge_obj');
+        $doneBlock = $fn->appendBasicBlock('dom_gei_bridge_done');
+        $context->builder->branchIf($isNull, $nullBlock, $objBlock);
+        $context->builder->positionAtEnd($nullBlock);
+        $context->builder->call($context->lookupFunction('__value__writeNull'), $destPtr);
+        $context->builder->branch($doneBlock);
+        $context->builder->positionAtEnd($objBlock);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeObject'),
+            $destPtr,
+            $foundObj
+        );
+        $context->builder->branch($doneBlock);
+        $context->builder->positionAtEnd($doneBlock);
+        $context->builder->returnValue(JitValueBox::normalizeValuePtr($context, $destPtr));
+        $context->registerFunction(self::ABI_NAME, $fn);
+
+        if (null !== $savedBlock) {
+            $context->builder->positionAtEnd($savedBlock);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
     }
 }

@@ -70,12 +70,32 @@ final class DomActiveContextAotTest extends TestCase
         $this->assertStringContainsString('__phpc_dom_load_html', $source);
     }
 
-    public function testUserScriptStandaloneInitLinksDomLoadHTMLBridge(): void
+    public function testUserScriptStandaloneInitLinksDomExtensionOnly(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Context.php');
-        $this->assertStringContainsString('DomLoadHTMLRuntime::ensureLinked', $source);
-        $this->assertStringContainsString('DomGetElementByIdRuntime::ensureLinked', $source);
-        $this->assertStringContainsString('shouldDeferToVmClassMethodLowering', $source);
+        $this->assertStringContainsString('DomStandaloneAotInitRuntime::ensureLinked', $source);
+        $this->assertStringNotContainsString('DomLoadHTMLRuntime::ensureLinked', $source);
+    }
+
+    public function testDomLoadHTMLLoweringPassesValueBoxedHtml(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/dom/JitDomLoadHTML.php');
+        $this->assertStringContainsString('JitValueBox::valuePtrFromVariable', $source);
+        $this->assertStringContainsString('DomLoadHTMLRuntime::ABI_NAME', $source);
+    }
+
+    public function testDomGetElementByIdLoweringPassesValueBoxedId(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/dom/JitDomGetElementById.php');
+        $this->assertStringContainsString('JitValueBox::valuePtrFromVariable', $source);
+    }
+
+    public function testDomDocumentCallHandlersEnsureRuntimeLinked(): void
+    {
+        $load = (string) file_get_contents(__DIR__.'/../../lib/JIT/Call/DomDocumentLoadHTML.php');
+        $gei = (string) file_get_contents(__DIR__.'/../../lib/JIT/Call/DomDocumentGetElementById.php');
+        $this->assertStringContainsString('DomLoadHTMLRuntime::ensureLinked', $load);
+        $this->assertStringContainsString('DomGetElementByIdRuntime::ensureLinked', $gei);
     }
 
     public function testDomDocumentMethodUserScriptBridgeUsesHelperLinkEntryChecks(): void

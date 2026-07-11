@@ -33,21 +33,15 @@ final class DomLoadHTMLRuntime
             return;
         }
 
-        if (DomDocumentMethodUserScriptLlvm::shouldUse($context)) {
-            DomDocumentMethodUserScriptLlvm::ensureLoadHTMLBridge($context);
-
-            return;
-        }
-
         $objPtr = $context->getTypeFromString('__object__*');
-        $strPtr = $context->getTypeFromString('__string__*');
+        $valuePtr = $context->getTypeFromString('__value__*');
         $i64 = $context->getTypeFromString('int64');
         $i1 = $context->getTypeFromString('int1');
         JitVmHelperLink::ensureBridge(
             $context,
             self::ABI_NAME,
-            'dom_load_html_bridge',
-            [$objPtr, $strPtr, $i64],
+            DomDocumentMethodUserScriptLlvm::shouldUse($context) ? 'dom_load_html_user_script' : 'dom_load_html_bridge',
+            [$objPtr, $valuePtr, $i64],
             $i1,
             self::HELPER,
             self::HELPER_PATH,

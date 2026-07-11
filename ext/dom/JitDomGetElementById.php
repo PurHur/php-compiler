@@ -6,7 +6,6 @@ namespace PHPCompiler\ext\dom;
 
 use PHPCompiler\JIT\Builtin\DomGetElementByIdRuntime;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
@@ -25,7 +24,7 @@ final class JitDomGetElementById
         }
 
         $document = self::loadObjectArg($context, $args[0]);
-        $elementId = self::loadStringArg($context, $args[1]);
+        $elementId = JitValueBox::valuePtrFromVariable($context, $args[1]);
 
         return $context->builder->call(
             $context->lookupFunction(DomGetElementByIdRuntime::ABI_NAME),
@@ -47,14 +46,5 @@ final class JitDomGetElementById
         }
 
         throw new \LogicException('DOMDocument::getElementById() receiver must be an object');
-    }
-
-    private static function loadStringArg(Context $context, JITVariable $arg): Value
-    {
-        if (JITVariable::TYPE_STRING === $arg->type) {
-            return $context->helper->loadValue($arg);
-        }
-
-        return JitStringBuiltinArg::lower($context, $arg, 'DOMDocument::getElementById()', 0, 'elementId');
     }
 }

@@ -12,7 +12,9 @@ use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPCompiler\JIT\NestedVmActiveContextLlvm;
+use PHPCompiler\JIT\NestedVmVariableMethodLlvm;
 use PHPCompiler\JIT\UserScriptAotDeferNestedJit;
+use PHPCompiler\JIT\VmActiveContextLlvm;
 use PHPLLVM\Builder;
 
 /**
@@ -33,7 +35,7 @@ final class DomDocumentMethodUserScriptLlvm
             'dom_load_html_user_script',
             [
                 $context->getTypeFromString('__object__*'),
-                $context->getTypeFromString('__string__*'),
+                $context->getTypeFromString('__value__*'),
                 $context->getTypeFromString('int64'),
             ],
             $context->getTypeFromString('int1'),
@@ -50,7 +52,7 @@ final class DomDocumentMethodUserScriptLlvm
             'dom_get_element_by_id_user_script',
             [
                 $context->getTypeFromString('__object__*'),
-                $context->getTypeFromString('__string__*'),
+                $context->getTypeFromString('__value__*'),
             ],
             'PHPCompiler\\ext\\dom\\DomGetElementByIdJitHelper::getElementByIdArgv',
             '/ext/dom/DomGetElementByIdJitHelper.php'
@@ -91,6 +93,7 @@ final class DomDocumentMethodUserScriptLlvm
             return;
         }
 
+        self::ensureNestedHelperProxies($context);
         self::ensureMainModuleHelperCompiled($context, $helperPath, [$helperLogical]);
 
         $savedBlock = null;
@@ -109,7 +112,11 @@ final class DomDocumentMethodUserScriptLlvm
         $context->builder->positionAtEnd($entry);
         $args = [];
         for ($i = 0, $n = $fn->countParams(); $i < $n; ++$i) {
-            $args[] = $fn->getParam($i);
+            $args[] = JitNestedHelperCoerce::coerceArgForHelper(
+                $context,
+                $fn->getParam($i),
+                $helperFn->getParam($i)->typeOf()
+            );
         }
         $result = $context->builder->call($helperFn, ...$args);
         $ret = JitNestedHelperCoerce::coerceBridgeResult($context, $result, $returnType);
@@ -141,6 +148,7 @@ final class DomDocumentMethodUserScriptLlvm
             return;
         }
 
+        self::ensureNestedHelperProxies($context);
         self::ensureMainModuleHelperCompiled($context, $helperPath, [$helperLogical]);
 
         $savedBlock = null;
@@ -161,7 +169,11 @@ final class DomDocumentMethodUserScriptLlvm
         $context->builder->positionAtEnd($entry);
         $args = [];
         for ($i = 0, $n = $fn->countParams(); $i < $n; ++$i) {
-            $args[] = $fn->getParam($i);
+            $args[] = JitNestedHelperCoerce::coerceArgForHelper(
+                $context,
+                $fn->getParam($i),
+                $helperFn->getParam($i)->typeOf()
+            );
         }
         $foundObj = $context->builder->call($helperFn, ...$args);
         $foundObj = JitNestedHelperCoerce::coerceBridgeResult($context, $foundObj, $objPtr);
@@ -195,6 +207,14 @@ final class DomDocumentMethodUserScriptLlvm
         } else {
             $context->builder->clearInsertionPosition();
         }
+    }
+
+    private static function ensureNestedHelperProxies(Context $context): void
+    {
+        VmActiveContextLlvm::ensureAbi($context);
+        NestedVmActiveContextLlvm::ensureMethod($context);
+        NestedVmVariableMethodLlvm::ensureMethod($context, 'resolveindirect');
+        DomInstanceMethodRuntime::ensureActiveContextProxy($context);
     }
 
     /**

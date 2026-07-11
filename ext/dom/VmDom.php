@@ -3972,8 +3972,21 @@ final class VmDom
         if (0 !== ($options & \PHPCompiler\ext\libxml\LibxmlConstants::LIBXML_HTML_NOIMPLIED)) {
             return $trimmed;
         }
-        if (preg_match('/^\s*<(?:!DOCTYPE|html\b)/i', $trimmed)) {
-            return preg_replace('/^\s*<!DOCTYPE[^>]*>\s*/i', '', $trimmed) ?? $trimmed;
+        $pos = 0;
+        $len = \strlen($trimmed);
+        while ($pos < $len && ctype_space($trimmed[$pos])) {
+            ++$pos;
+        }
+        if ($pos < $len && '<' === $trimmed[$pos]) {
+            $rest = substr($trimmed, $pos + 1);
+            if (str_starts_with(strtolower($rest), '!doctype') || str_starts_with(strtolower($rest), 'html')) {
+                $close = strpos($trimmed, '>');
+                if (false !== $close && str_starts_with(strtolower(ltrim(substr($trimmed, $pos + 1))), '!doctype')) {
+                    return ltrim(substr($trimmed, $close + 1));
+                }
+
+                return $trimmed;
+            }
         }
 
         return '<html><body>'.$trimmed.'</body></html>';

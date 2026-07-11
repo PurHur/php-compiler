@@ -950,10 +950,7 @@ class Context {
         Builtin\StringFilePutContents::ensureStandaloneBodies($this);
         Builtin\SuperglobalNameRuntime::ensureLinked($this);
         if (DomInstanceMethodJit::shouldDeferToVmClassMethodLowering()) {
-            // Nested-JIT DOM bridges during invoke corrupt subsequent instance-method IR (#17954).
-            Builtin\DomLoadHTMLRuntime::ensureLinked($this);
-            Builtin\DomGetElementByIdRuntime::ensureLinked($this);
-            Builtin\DomElementTextContentRuntime::ensureLinked($this);
+            Builtin\DomStandaloneAotInitRuntime::ensureLinked($this);
         } elseif (CompilerVersion::supportsDomTokenList()) {
             Builtin\DomInstanceMethodRuntime::ensureLinked($this);
         }
