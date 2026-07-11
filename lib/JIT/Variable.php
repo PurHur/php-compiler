@@ -818,9 +818,10 @@ final class Variable {
     public function dimFetch(self $dim, ?Type $expectedType = null, bool $forWrite = false): Variable {
         switch ($this->type) {
             case self::TYPE_STRING:
+                $str = $this->context->helper->loadValue($this);
                 $charPtr = StringOffsetHelper::dimFetch(
                     $this->context,
-                    $this->value,
+                    $str,
                     $dim
                 );
                 if ($forWrite) {

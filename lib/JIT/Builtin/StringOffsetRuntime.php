@@ -90,10 +90,9 @@ final class StringOffsetRuntime
         ErrorRaise::emitRaise($context, StringOffsetJitHelper::emptyAssignErrorMessage());
     }
 
-    public static function dimFetch(Context $context, Value $strSlot, JitVariable $dim): Value
+    public static function dimFetch(Context $context, Value $str, JitVariable $dim): Value
     {
         self::ensureLinked($context);
-        $str = $context->builder->load($strSlot);
         $map = $context->structFieldMap['__string__'];
         $chars = $context->builder->structGep($str, $map['value']);
         $len = $context->builder->load(
