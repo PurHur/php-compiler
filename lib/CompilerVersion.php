@@ -2397,6 +2397,14 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.4+ Dom\ living-standard namespace (Dom\HTMLDocument, Dom\XMLDocument, …; ext/dom/html_document.c).
+     */
+    public static function supportsDomLivingStandardNamespace(): bool
+    {
+        return self::supportsDomApiSince('8.4.0');
+    }
+
+    /**
      * PHP 8.4+ parenthesized asymmetric set modifier `public (private(set))` on properties.
      *
      * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev reference profile
