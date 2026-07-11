@@ -179,7 +179,8 @@ final class JitStringBuiltinArg
         int $argIndex,
         string $paramName,
         string $expectedType = 'string',
-        ?string $arrayExpectedType = null
+        ?string $arrayExpectedType = null,
+        bool $allowStringableUnderStrict = false
     ): Value {
         JitNativeString::ensureInsertBlock($context);
         $arrayExpected = $arrayExpectedType ?? $expectedType;
@@ -203,7 +204,7 @@ final class JitStringBuiltinArg
             return self::unreachableStringPtr($context);
         }
         if (Variable::TYPE_OBJECT === $arg->type) {
-            if ($context->callerStrictTypes) {
+            if ($context->callerStrictTypes && !$allowStringableUnderStrict) {
                 self::emitRejectTypeError($context, $arg, $function, $argIndex, $paramName, $expectedType);
 
                 return self::unreachableStringPtr($context);
@@ -220,7 +221,8 @@ final class JitStringBuiltinArg
                 $argIndex,
                 $paramName,
                 $expectedType,
-                $arrayExpected
+                $arrayExpected,
+                $allowStringableUnderStrict
             );
         }
 
@@ -234,7 +236,8 @@ final class JitStringBuiltinArg
         int $argIndex,
         string $paramName,
         string $expectedType,
-        string $arrayExpectedType
+        string $arrayExpectedType,
+        bool $allowStringableUnderStrict = false
     ): Value {
         TypeErrorRaise::registerDeclarations($context);
         TypeErrorRaise::ensureLinked($context);
@@ -280,7 +283,7 @@ final class JitStringBuiltinArg
             $expectedType
         );
         $context->builder->positionAtEnd($objectRejectBlock);
-        if ($context->callerStrictTypes) {
+        if ($context->callerStrictTypes && !$allowStringableUnderStrict) {
             self::emitRuntimeBoxedObjectReject(
                 $context,
                 $valuePtr,

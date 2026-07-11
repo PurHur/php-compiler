@@ -602,9 +602,9 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsGetmygrgid());
     }
 
-    public function testDisktotalspaceNotAdvertisedOnReferenceProfile(): void
+    public function testDisktotalspaceAdvertisedOnReferenceProfile(): void
     {
-        $this->assertFalse(CompilerVersion::supportsDisktotalspace());
+        $this->assertTrue(CompilerVersion::supportsDisktotalspace());
     }
 
     public function testForwardGatedBuiltinsRegisteredOnProfile84(): void
@@ -615,9 +615,8 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
             $this->assertTrue(CompilerVersion::supportsStrxfrm());
             $this->assertTrue(CompilerVersion::supportsConvertCyrString());
             $this->assertTrue(CompilerVersion::supportsGetmygrgid());
-            $this->assertTrue(CompilerVersion::supportsDisktotalspace());
             $runtime = new Runtime();
-            foreach (['strxfrm', 'convert_cyr_string', 'getmygrgid', 'disktotalspace'] as $fn) {
+            foreach (['strxfrm', 'convert_cyr_string', 'getmygrgid'] as $fn) {
                 $this->assertTrue(isset($runtime->vmContext->functions[$fn]), $fn);
             }
         } finally {
@@ -874,10 +873,10 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         $this->assertFalse(isset($runtime->vmContext->functions['getmygrgid']));
     }
 
-    public function testVmDoesNotRegisterDisktotalspaceOnReferenceProfile(): void
+    public function testVmRegistersDisktotalspaceOnReferenceProfile(): void
     {
         $runtime = new Runtime();
-        $this->assertFalse(isset($runtime->vmContext->functions['disktotalspace']));
+        $this->assertTrue(isset($runtime->vmContext->functions['disktotalspace']));
     }
 
 

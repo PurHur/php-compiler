@@ -48,23 +48,14 @@ final class str_ends_with extends Internal
         }
         JitInternalStrictArg::rejectNullString($context, $args[0], 'str_ends_with', 'haystack', 1);
         JitInternalStrictArg::rejectNullString($context, $args[1], 'str_ends_with', 'needle', 2);
-        $hay = JitStringBuiltinArg::lowerCoercible($context, $args[0], 'str_ends_with', 0, 'haystack');
-        $needle = JitStringBuiltinArg::lowerCoercible($context, $args[1], 'str_ends_with', 1, 'needle');
+        $hay = JitStringBuiltinArg::lowerCoercible($context, $args[0], 'str_ends_with', 0, 'haystack', 'string', null, true);
+        $needle = JitStringBuiltinArg::lowerCoercible($context, $args[1], 'str_ends_with', 1, 'needle', 'string', null, true);
 
         return StringStrContains::invokeEndsWith($context, $hay, $needle);
     }
 
     private static function vmStringArg(Frame $frame, int $argIndex, string $paramName): string
     {
-        if (InternalStrictArg::isCallerStrict($frame)) {
-            return InternalStrictArg::requireString($frame, $argIndex, 'str_ends_with', $paramName)->toString();
-        }
-
-        return VmString::coerceStringBuiltinArg(
-            $frame->calledArgs[$argIndex],
-            'str_ends_with',
-            $argIndex,
-            $paramName
-        );
+        return VmString::zParamStrWithStringableForFrame($frame, $argIndex, 'str_ends_with', $paramName);
     }
 }

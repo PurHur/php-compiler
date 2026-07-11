@@ -58,23 +58,14 @@ final class str_contains extends Internal
         }
         JitInternalStrictArg::rejectNullString($context, $args[0], 'str_contains', 'haystack', 1);
         JitInternalStrictArg::rejectNullString($context, $args[1], 'str_contains', 'needle', 2);
-        $hay = JitStringBuiltinArg::lowerCoercible($context, $args[0], 'str_contains', 0, 'haystack');
-        $needle = JitStringBuiltinArg::lowerCoercible($context, $args[1], 'str_contains', 1, 'needle');
+        $hay = JitStringBuiltinArg::lowerCoercible($context, $args[0], 'str_contains', 0, 'haystack', 'string', null, true);
+        $needle = JitStringBuiltinArg::lowerCoercible($context, $args[1], 'str_contains', 1, 'needle', 'string', null, true);
 
         return StringStrContains::invokeContains($context, $hay, $needle);
     }
 
     private static function vmStringArg(Frame $frame, int $argIndex, string $paramName): string
     {
-        if (InternalStrictArg::isCallerStrict($frame)) {
-            return InternalStrictArg::requireString($frame, $argIndex, 'str_contains', $paramName)->toString();
-        }
-
-        return VmString::coerceStringBuiltinArg(
-            $frame->calledArgs[$argIndex],
-            'str_contains',
-            $argIndex,
-            $paramName
-        );
+        return VmString::zParamStrWithStringableForFrame($frame, $argIndex, 'str_contains', $paramName);
     }
 }
