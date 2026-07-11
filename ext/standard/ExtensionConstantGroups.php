@@ -90,6 +90,12 @@ final class ExtensionConstantGroups
         foreach (StdlibModuleConstants::CORE_BUCKET_NAMES as $name) {
             $set[$name] = true;
         }
+        foreach (LdapConstants::registeredConstants() as $name => $_) {
+            $set[$name] = true;
+        }
+        foreach (GetDefinedConstantsParity::standardBucketExcludeNames() as $name) {
+            $set[$name] = true;
+        }
         self::$registeredNameSet = $set;
 
         return self::$registeredNameSet;

@@ -115,6 +115,9 @@ final class VmJsonFlags
             'JSON_ERROR_RECURSION' => 6,
             'JSON_ERROR_INF_OR_NAN' => 7,
             'JSON_ERROR_UNSUPPORTED_TYPE' => VmJson::ERROR_UNSUPPORTED_TYPE,
+            'JSON_ERROR_INVALID_PROPERTY_NAME' => 9,
+            'JSON_ERROR_UTF16' => 10,
+            'JSON_ERROR_NON_BACKED_ENUM' => 11,
         ];
     }
 
