@@ -10,8 +10,9 @@ use PHPCompiler\Runtime;
 /**
  * sockets extension module entry (php-src ext/sockets/sockets.c; issue #6544).
  *
- * Register under {@see standard} so extension_loaded('sockets') stays false until
- * socket_create() and core socket API land (#3399, #11820).
+ * Constants register at init; {@see standard\Module} advertises the logical
+ * {@code sockets} extension for extension_loaded() / get_defined_constants(true)
+ * buckets (#17799, #18083). Socket builtins remain partial (#3399, #11820).
  */
 class Module extends ModuleAbstract
 {
