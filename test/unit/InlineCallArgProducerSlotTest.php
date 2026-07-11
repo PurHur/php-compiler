@@ -2510,6 +2510,58 @@ PHP;
         self::assertStringNotContainsString('NULL', $out);
     }
 
+    /** Issue #17872 — define(array); var_export(CONST) wires ConstFetch slot, not define() bool return. */
+    public function testVarExportAfterDefineArrayUsesConstFetchSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+define('ARR', [1, 2]);
+var_export(ARR);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'define_array_var_export.php');
+
+        $constFetchSlot = null;
+        $defineReturnSlot = null;
+        $varExportSendSlot = null;
+        $fcallOrdinal = 0;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                ++$fcallOrdinal;
+            }
+            if (OpCode::TYPE_CONST_FETCH === $op->type && null === $constFetchSlot) {
+                $constFetchSlot = $op->arg1;
+            }
+            if (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type && null === $defineReturnSlot) {
+                $defineReturnSlot = $op->arg1;
+            }
+            if (2 === $fcallOrdinal && OpCode::TYPE_ARG_SEND === $op->type && null === $varExportSendSlot) {
+                $varExportSendSlot = $op->arg1;
+            }
+        }
+
+        self::assertNotNull($constFetchSlot, 'expected CONST_FETCH slot for ARR');
+        self::assertNotNull($varExportSendSlot, 'expected var_export ARG_SEND');
+        self::assertSame($constFetchSlot, $varExportSendSlot);
+        if (null !== $defineReturnSlot) {
+            self::assertNotSame($defineReturnSlot, $varExportSendSlot);
+        }
+    }
+
+    /** Issue #17872 — define(array); var_export(CONST) runtime parity with Zend. */
+    public function testVarExportAfterDefineArrayRuntime(): void
+    {
+        $code = file_get_contents(dirname(__DIR__).'/repro/maintainer_gap_define_array_constant.php');
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'maintainer_gap_define_array_constant.php');
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertStringContainsString('0 => 1', $out);
+        self::assertStringContainsString('1 => 2', $out);
+        self::assertStringNotContainsString('true', $out);
+    }
+
     /** Bootstrap helloworld — New_ then static MethodCall (null var) must not TypeError in producer filter. */
     public function testNewStaticMethodCallCompilesWithoutOperandNullTypeError(): void
     {

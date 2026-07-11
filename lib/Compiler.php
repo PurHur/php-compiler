@@ -28894,6 +28894,22 @@ class Compiler {
 
             return null !== $arraySlot ? (int) $arraySlot : null;
         }
+        if (
+            ($stmtBefore instanceof Op\Expr\ConstFetch || $stmtBefore instanceof Op\Expr\ClassConstFetch)
+            && 0 === $argIndex
+            && $this->callArgIsDeadInlineTemporary($callArg)
+        ) {
+            // define('ARR', …); var_export(ARR) — ConstFetch prelude, not define() bool return (#17872).
+            $constSlot = $block->slotForOperand($stmtBefore->result);
+            if (null === $constSlot) {
+                foreach ($this->compileExpr($stmtBefore, $block) as $op) {
+                    $emitOps[] = $op;
+                }
+                $constSlot = $block->slotForOperand($stmtBefore->result);
+            }
+
+            return null !== $constSlot ? (int) $constSlot : null;
+        }
         $candidate = null;
         for ($i = $callIndex - 1; $i >= 0; --$i) {
             $child = $block->orig->children[$i];
@@ -46133,6 +46149,39 @@ class Compiler {
             || $this->inlineArrayProducerImmediatelyBeforeCfgCall($cfgCallOp, $block) instanceof Op\Expr\Array_
         ) {
             return;
+        }
+        if (null !== $block->orig) {
+            $callIndex = array_search($cfgCallOp, $block->orig->children, true);
+            if (\is_int($callIndex) && $callIndex > 0) {
+                $stmtBefore = $block->orig->children[$callIndex - 1] ?? null;
+                if (
+                    $stmtBefore instanceof Op\Expr\ConstFetch
+                    || $stmtBefore instanceof Op\Expr\ClassConstFetch
+                ) {
+                    $constSlot = $block->slotForOperand($stmtBefore->result);
+                    if (null === $constSlot) {
+                        foreach (array_reverse(array_merge($block->opCodes, $nestedProducerOps)) as $op) {
+                            if (OpCode::TYPE_CONST_FETCH !== $op->type || null === $op->arg1) {
+                                continue;
+                            }
+                            $constSlot = $op->arg1;
+                            break;
+                        }
+                    }
+                    if (null !== $constSlot) {
+                        foreach ($outerArgSends as &$send) {
+                            if (OpCode::TYPE_ARG_SEND !== $send->type) {
+                                continue;
+                            }
+                            $send->arg1 = (string) $constSlot;
+                            break;
+                        }
+                        unset($send);
+
+                        return;
+                    }
+                }
+            }
         }
         $execSlot = null;
         if (null !== $block->orig) {
