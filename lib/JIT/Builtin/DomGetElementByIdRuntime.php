@@ -26,9 +26,11 @@ final class DomGetElementByIdRuntime
 
     public static function ensureLinked(Context $context): void
     {
-        $entryBlock = DomDocumentMethodUserScriptLlvm::shouldUse($context)
-            ? 'dom_get_element_by_id_user_script'
-            : 'dom_get_element_by_id_bridge';
+        if (DomDocumentMethodUserScriptLlvm::shouldUse($context)) {
+            return;
+        }
+
+        $entryBlock = 'dom_get_element_by_id_bridge';
         $probe = $context->module->getNamedFunction(self::ABI_NAME);
         if (JitVmHelperLink::hasNamedBridgeEntry($probe, $entryBlock)) {
             $context->registerFunction(self::ABI_NAME, $probe);

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT;
 
+use PHPCompiler\ext\dom\VmDom;
 use PHPCompiler\JIT\Call;
 
 /** Lazy registration for ext/dom JIT instance-method proxies (#17130). */
@@ -19,7 +20,7 @@ final class DomInstanceMethodJit
         return (bool) preg_match('/^dom[a-z0-9_]*::[a-z0-9_]+$/', $lc);
     }
 
-    /** User-script AOT: direct LLVM for createElement; VmDomInstanceInvoke for loadHTML/getElementById (#17954). */
+    /** User-script AOT: direct LLVM for createElement/loadHTML/getElementById (#17954). */
     private static function isUserScriptDomMethod(string $proxyLc): bool
     {
         if ('domdocument::createelement' === $proxyLc
@@ -115,5 +116,9 @@ final class DomInstanceMethodJit
         $object->defineProperty($classId, 'tagName', Variable::TYPE_STRING);
         $object->defineProperty($classId, 'attributes', Variable::TYPE_VALUE);
         $object->defineProperty($classId, 'textContent', Variable::TYPE_STRING);
+        $docId = $object->lookup('DOMDocument');
+        if (!$object->hasProperty($docId, VmDom::PROP_ELEMENT_ID_MAP)) {
+            $object->defineProperty($docId, VmDom::PROP_ELEMENT_ID_MAP, Variable::TYPE_HASHTABLE);
+        }
     }
 }

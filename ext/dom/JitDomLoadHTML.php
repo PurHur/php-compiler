@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\dom;
 
+use PHPCompiler\JIT\Builtin\DomDocumentMethodUserScriptLlvm;
 use PHPCompiler\JIT\Builtin\DomLoadHTMLRuntime;
+use PHPCompiler\JIT\Builtin\DomSyncElementIdMapRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Intdiv as JitIntdiv;
 use PHPCompiler\JIT\JitValueBox;
@@ -32,12 +34,14 @@ final class JitDomLoadHTML
             $options = JitIntdiv::lowerIntBuiltinArg($context, $args[2], 'DOMDocument::loadHTML()', 2, 'options');
         }
 
-        return $context->builder->call(
+        $loaded = $context->builder->call(
             $context->lookupFunction(DomLoadHTMLRuntime::ABI_NAME),
             $document,
             $html,
             $options
         );
+
+        return $loaded;
     }
 
     private static function loadObjectArg(Context $context, JITVariable $arg): Value

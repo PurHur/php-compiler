@@ -1,0 +1,8 @@
+<?php
+
+declare(strict_types=1);
+
+$doc = new DOMDocument();
+$doc->loadHTML('<p id="target">hello</p>');
+$el = $doc->createElement('span');
+echo $el->nodeName, "\n";

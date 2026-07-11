@@ -13,6 +13,8 @@ use PHPCompiler\VM\Variable;
  *
  * SSOT: {@see VmDom::getElementById()}
  * php-src: ext/dom/php_dom.c — dom_document_get_element_by_id
+ *
+ * @deprecated User-script AOT routes through {@see VmDomInstanceInvoke} — kept for non-user-script JIT bridges.
  */
 final class DomGetElementByIdJitHelper
 {

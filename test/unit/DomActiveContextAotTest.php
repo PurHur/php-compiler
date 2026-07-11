@@ -49,11 +49,13 @@ final class DomActiveContextAotTest extends TestCase
         $this->assertStringContainsString('DomDocumentGetElementById', $source);
     }
 
-    public function testDomGetElementByIdUsesInitLinkedHelper(): void
+    public function testDomGetElementByIdUsesPureLlvmIdMap(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/dom/JitDomGetElementById.php');
-        $this->assertStringContainsString('DomGetElementByIdRuntime::ABI_NAME', $source);
-        $this->assertStringContainsString('DomGetElementByIdJitHelper::getElementByIdArgv', (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/DomGetElementByIdRuntime.php'));
+        $this->assertStringContainsString('HashTableHelper::readStringKeyToValueBox', $source);
+        $this->assertStringContainsString('VmDom::PROP_ELEMENT_ID_MAP', $source);
+        $call = (string) file_get_contents(__DIR__.'/../../lib/JIT/Call/DomDocumentGetElementById.php');
+        $this->assertStringNotContainsString('DomGetElementByIdRuntime::ensureLinked', $call);
     }
 
     public function testDomElementTextContentUsesInitLinkedHelper(): void
@@ -95,7 +97,7 @@ final class DomActiveContextAotTest extends TestCase
         $load = (string) file_get_contents(__DIR__.'/../../lib/JIT/Call/DomDocumentLoadHTML.php');
         $gei = (string) file_get_contents(__DIR__.'/../../lib/JIT/Call/DomDocumentGetElementById.php');
         $this->assertStringContainsString('DomLoadHTMLRuntime::ensureLinked', $load);
-        $this->assertStringContainsString('DomGetElementByIdRuntime::ensureLinked', $gei);
+        $this->assertStringContainsString('JitDomGetElementById::invoke', $gei);
     }
 
     public function testDomDocumentMethodUserScriptBridgeUsesHelperLinkEntryChecks(): void

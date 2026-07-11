@@ -160,6 +160,9 @@ final class VmDom
 
     public const PROP_TARGET = 'target';
 
+    /** JIT/AOT: string id → DOMElement map mirrored from DomRegistry::elementIds (#17954). */
+    public const PROP_ELEMENT_ID_MAP = '__phpcDomElementIdMap';
+
     public static function registerClasses(Context $ctx): void
     {
         if (isset($ctx->classes[self::CLASS_IMPLEMENTATION])) {
@@ -171,6 +174,7 @@ final class VmDom
         $nullProto = new Variable(Variable::TYPE_NULL);
         $objProto = new Variable(Variable::TYPE_OBJECT);
         $intProto = new Variable(Variable::TYPE_INTEGER);
+        $arrayProto = new Variable(Variable::TYPE_ARRAY);
         $pub = CfgFunc::FLAG_PUBLIC;
 
         $node = new ClassEntry('DOMNode');
@@ -496,6 +500,7 @@ final class VmDom
         $document->properties[] = new ClassProperty(self::PROP_XML_VERSION, null, $strProto);
         $document->properties[] = new ClassProperty(self::PROP_XML_STANDALONE, null, $boolProto);
         $document->properties[] = new ClassProperty(self::PROP_DOCUMENT_ELEMENT, $nullProto, $objProto);
+        $document->properties[] = new ClassProperty(self::PROP_ELEMENT_ID_MAP, $nullProto, $arrayProto);
         $document->methods['loadxml'] = new DocumentLoadXML();
         $document->methodVisibility['loadxml'] = $pub;
         $document->methods['load'] = new DocumentLoad();
@@ -818,6 +823,37 @@ final class VmDom
         if ($document->hasProperty(self::PROP_XML_STANDALONE)) {
             self::setDocumentBoolSlot($document, self::PROP_XML_STANDALONE, false);
         }
+    }
+
+    /** Empty id map for fresh documents; loadHTML replaces via {@see syncElementIdMapProperty()}. */
+    public static function initElementIdMapProperty(ObjectEntry $document): void
+    {
+        if (!$document->hasProperty(self::PROP_ELEMENT_ID_MAP)) {
+            return;
+        }
+        $ht = new HashTable();
+        $var = new Variable();
+        $var->array($ht);
+        $document->getProperty(self::PROP_ELEMENT_ID_MAP)->copyFrom($var);
+    }
+
+    /** Mirror DomRegistry elementIds onto the document for LLVM getElementById() (#17954). */
+    public static function syncElementIdMapProperty(ObjectEntry $document): void
+    {
+        if (!$document->hasProperty(self::PROP_ELEMENT_ID_MAP)) {
+            return;
+        }
+        $state = DomRegistry::state($document);
+        $ht = new HashTable();
+        foreach ($state->elementIds as $id => $objectId) {
+            $entry = DomRegistry::entry($objectId);
+            if (null !== $entry) {
+                $ht->add($id, self::elementVariable($entry));
+            }
+        }
+        $var = new Variable();
+        $var->array($ht);
+        $document->getProperty(self::PROP_ELEMENT_ID_MAP)->copyFrom($var);
     }
 
     private static function setDocumentBoolSlot(ObjectEntry $document, string $propName, bool $value): void

@@ -74,6 +74,21 @@ final class DomDocumentMethodUserScriptLlvm
         );
     }
 
+    public static function ensureSyncElementIdMapBridge(Context $context): void
+    {
+        self::ensureBridge(
+            $context,
+            DomSyncElementIdMapRuntime::ABI_NAME,
+            'dom_sync_element_id_map_user_script',
+            [
+                $context->getTypeFromString('__object__*'),
+            ],
+            $context->getTypeFromString('void'),
+            'PHPCompiler\\ext\\dom\\DomSyncElementIdMapJitHelper::syncArgv',
+            '/ext/dom/DomSyncElementIdMapJitHelper.php'
+        );
+    }
+
     /**
      * @param list<\PHPLLVM\Type> $paramTypes
      */
@@ -119,8 +134,12 @@ final class DomDocumentMethodUserScriptLlvm
             );
         }
         $result = $context->builder->call($helperFn, ...$args);
-        $ret = JitNestedHelperCoerce::coerceBridgeResult($context, $result, $returnType);
-        $context->builder->returnValue($ret);
+        if ('void' === $context->getStringFromType($returnType)) {
+            $context->builder->returnVoid();
+        } else {
+            $ret = JitNestedHelperCoerce::coerceBridgeResult($context, $result, $returnType);
+            $context->builder->returnValue($ret);
+        }
         $context->registerFunction($abi, $fn);
 
         if (null !== $savedBlock) {
