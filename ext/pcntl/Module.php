@@ -30,6 +30,11 @@ class Module extends ModuleAbstract
             new pcntl_wexitstatus(),
             new pcntl_signal(),
             new pcntl_signal_dispatch(),
+            new pcntl_async_signals(),
+            new pcntl_signal_get_handler(),
+            new pcntl_sigprocmask(),
+            new pcntl_sigtimedwait(),
+            new pcntl_waitid(),
         ];
     }
 }

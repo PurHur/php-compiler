@@ -35,6 +35,16 @@ final class PcntlHostBridge
         }, true);
     }
 
+    public static function installDisposition(int $signo, int $disposition): bool
+    {
+        if (!self::available()) {
+            return false;
+        }
+        $handler = PcntlConstants::SIG_IGN === $disposition ? \SIG_IGN : \SIG_DFL;
+
+        return \pcntl_signal($signo, $handler, true);
+    }
+
     public static function restoreDefault(int $signo): bool
     {
         if (!self::available()) {
@@ -50,6 +60,44 @@ final class PcntlHostBridge
             return;
         }
         \pcntl_signal_dispatch();
+    }
+
+    public static function asyncSignals(?bool $enable): bool
+    {
+        if (!\function_exists('pcntl_async_signals')) {
+            return false;
+        }
+        if (null === $enable) {
+            return \pcntl_async_signals();
+        }
+
+        return \pcntl_async_signals($enable);
+    }
+
+    /**
+     * @param list<int> $signals
+     * @param list<int>|null $old
+     */
+    public static function sigprocmask(int $mode, array $signals, ?array &$old = null): bool
+    {
+        if (!\function_exists('pcntl_sigprocmask')) {
+            return false;
+        }
+
+        return \pcntl_sigprocmask($mode, $signals, $old);
+    }
+
+    /**
+     * @param list<int> $signals
+     * @param array<string, int>|null $info
+     */
+    public static function sigtimedwait(array $signals, ?array &$info, int $seconds, int $nanoseconds): int|false
+    {
+        if (!\function_exists('pcntl_sigtimedwait')) {
+            return false;
+        }
+
+        return \pcntl_sigtimedwait($signals, $info, $seconds, $nanoseconds);
     }
 
     public static function forkAvailable(): bool

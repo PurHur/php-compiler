@@ -42,11 +42,48 @@ final class PcntlConstants
     /** waitpid(2) WNOHANG — return immediately if no child has exited (issue #3327). */
     public const WNOHANG = 1;
 
+    /** waitid(2) / waitpid(2) option flags (php-src ext/pcntl/pcntl.stub.php). */
+    public const WUNTRACED = 2;
+    public const WCONTINUED = 8;
+    public const WEXITED = 4;
+    public const WSTOPPED = 2;
+    public const WNOWAIT = 0x01000000;
+
+    /** waitid(2) idtype (Linux; php-src HAVE_POSIX_IDTYPES). */
+    public const P_ALL = 0;
+    public const P_PID = 1;
+    public const P_PGID = 2;
+
+    /** sigprocmask(2) mode + handler dispositions (php-src signal.h). */
+    public const SIG_BLOCK = 0;
+    public const SIG_UNBLOCK = 1;
+    public const SIG_SETMASK = 2;
+    public const SIG_DFL = 0;
+    public const SIG_IGN = 1;
+    public const SIG_ERR = -1;
+
+    /** Upper bound for valid POSIX signal numbers on Linux (php-src NSIG). */
+    public const NSIG = 64;
+
     /** @return array<string, int> */
     public static function registeredConstants(): array
     {
         return [
             'WNOHANG' => self::WNOHANG,
+            'WUNTRACED' => self::WUNTRACED,
+            'WCONTINUED' => self::WCONTINUED,
+            'WEXITED' => self::WEXITED,
+            'WSTOPPED' => self::WSTOPPED,
+            'WNOWAIT' => self::WNOWAIT,
+            'P_ALL' => self::P_ALL,
+            'P_PID' => self::P_PID,
+            'P_PGID' => self::P_PGID,
+            'SIG_BLOCK' => self::SIG_BLOCK,
+            'SIG_UNBLOCK' => self::SIG_UNBLOCK,
+            'SIG_SETMASK' => self::SIG_SETMASK,
+            'SIG_DFL' => self::SIG_DFL,
+            'SIG_IGN' => self::SIG_IGN,
+            'SIG_ERR' => self::SIG_ERR,
             'SIGHUP' => self::SIGHUP,
             'SIGINT' => self::SIGINT,
             'SIGQUIT' => self::SIGQUIT,
@@ -84,5 +121,10 @@ final class PcntlConstants
     public static function isUncatchable(int $signo): bool
     {
         return self::SIGKILL === $signo || self::SIGSTOP === $signo;
+    }
+
+    public static function isValidSignal(int $signo): bool
+    {
+        return $signo >= 1 && $signo < self::NSIG;
     }
 }

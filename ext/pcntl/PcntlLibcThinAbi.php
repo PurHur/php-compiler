@@ -58,6 +58,96 @@ final class PcntlLibcThinAbi
         return true;
     }
 
+    public static function installDisposition(int $signo, int $disposition): bool
+    {
+        if (!self::supportsNativeDispatch()) {
+            return false;
+        }
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return false;
+        }
+        $handlerVal = PcntlConstants::SIG_IGN === $disposition ? 1 : 0;
+        $ffi->signal($signo, $ffi->cast('sighandler_t', $handlerVal));
+
+        return true;
+    }
+
+    public static function sigprocmaskAvailable(): bool
+    {
+        return null !== self::ffi();
+    }
+
+    /**
+     * @param list<int> $signals
+     * @param list<int> $old
+     */
+    public static function sigprocmask(int $mode, array $signals, array &$old): bool
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return false;
+        }
+        $set = $ffi->new('uint64_t');
+        foreach ($signals as $signo) {
+            $set->cdata |= 1 << ((int) $signo - 1);
+        }
+        $oldSet = $ffi->new('uint64_t');
+        $rc = (int) $ffi->sigprocmask($mode, \FFI::addr($set), \FFI::addr($oldSet));
+        if (0 !== $rc) {
+            return false;
+        }
+        $old = self::decodeSignalSet((int) $oldSet->cdata);
+
+        return true;
+    }
+
+    public static function waitidAvailable(): bool
+    {
+        return null !== self::ffi();
+    }
+
+    /**
+     * @param array<string, int> $info
+     */
+    public static function waitid(int $idtype, int $id, array &$info, int $options): bool
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return false;
+        }
+        if (!\method_exists($ffi, 'waitid')) {
+            return false;
+        }
+        $siginfo = $ffi->new('int[128]');
+        $rc = (int) $ffi->waitid($idtype, $id, \FFI::addr($siginfo), $options);
+        if (0 !== $rc) {
+            return false;
+        }
+        $info = [
+            'signo' => (int) $siginfo[0],
+            'errno' => (int) $siginfo[1],
+            'code' => (int) $siginfo[2],
+        ];
+
+        return true;
+    }
+
+    /**
+     * @return list<int>
+     */
+    private static function decodeSignalSet(int $mask): array
+    {
+        $signals = [];
+        for ($signo = 1; $signo < PcntlConstants::NSIG; ++$signo) {
+            if (0 !== ($mask & (1 << ($signo - 1)))) {
+                $signals[] = $signo;
+            }
+        }
+
+        return $signals;
+    }
+
     public static function processAvailable(): bool
     {
         return null !== self::ffi();
@@ -116,9 +206,15 @@ final class PcntlLibcThinAbi
         $cdef = <<<'CDEF'
 typedef int pid_t;
 typedef void (*sighandler_t)(int);
+typedef unsigned long sigset_t;
 sighandler_t signal(int signum, sighandler_t handler);
+int sigprocmask(int how, const sigset_t *set, sigset_t *oldset);
 pid_t fork(void);
 pid_t waitpid(pid_t pid, int *status, int options);
+typedef int idtype_t;
+typedef unsigned int id_t;
+typedef struct { int si_signo; int si_errno; int si_code; } siginfo_t;
+int waitid(idtype_t idtype, id_t id, siginfo_t *infop, int options);
 CDEF;
 
         foreach (['libc.so.6', 'libc.so'] as $lib) {

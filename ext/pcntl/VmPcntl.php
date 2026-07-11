@@ -6,15 +6,24 @@ namespace PHPCompiler\ext\pcntl;
 
 use PHPCompiler\VM\ClosureState;
 use PHPCompiler\VM\Context;
+use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPCompiler\ext\standard\VmCallable;
 use PHPCompiler\ext\standard\VmClosureCall;
 
-/** VM pcntl_signal()/pcntl_signal_dispatch() (php-src ext/pcntl/pcntl.c; issue #6680). */
+/** VM pcntl_signal()/pcntl_signal_dispatch() (php-src ext/pcntl/pcntl.c; issue #6680, #6545). */
 final class VmPcntl
 {
-    /** @var array<int, array{kind: 'closure', closure: ClosureState}|array{kind: 'callable', callable: Variable}> */
+    /** @var array<int, array{kind: 'closure', closure: ClosureState, source: Variable}|array{kind: 'callable', callable: Variable}> */
     private static array $handlers = [];
+
+    /** @var array<int, int> SIG_DFL / SIG_IGN dispositions when no user handler is registered */
+    private static array $dispositions = [];
+
+    /** @var list<int> Blocked signal numbers (VM fallback when host sigprocmask unavailable). */
+    private static array $blockedSignals = [];
+
+    private static bool $asyncSignals = false;
 
     /** @var list<int> */
     private static array $pending = [];
@@ -89,19 +98,33 @@ final class VmPcntl
 
     public static function signal(int $signo, ?Variable $handler): bool
     {
+        VmPcntlArg::validateSignal($signo, 'pcntl_signal');
         if (PcntlConstants::isUncatchable($signo)) {
             throw new \ValueError('Cannot catch SIGKILL or SIGSTOP');
         }
         if (null === $handler) {
-            unset(self::$handlers[$signo]);
+            unset(self::$handlers[$signo], self::$dispositions[$signo]);
 
             return self::restoreOsHandler($signo);
         }
         $resolved = $handler->resolveIndirect();
+        if (Variable::TYPE_INTEGER === $resolved->type) {
+            $disposition = $resolved->toInt();
+            if (PcntlConstants::SIG_DFL === $disposition || PcntlConstants::SIG_IGN === $disposition) {
+                unset(self::$handlers[$signo]);
+                self::$dispositions[$signo] = $disposition;
+
+                return self::installOsDisposition($signo, $disposition);
+            }
+        }
+        unset(self::$dispositions[$signo]);
         if (VmClosureCall::isClosure($resolved)) {
+            $stored = new Variable();
+            $stored->copyFrom($resolved);
             self::$handlers[$signo] = [
                 'kind' => 'closure',
                 'closure' => VmClosureCall::resolve($resolved),
+                'source' => $stored,
             ];
         } else {
             $stored = new Variable();
@@ -113,6 +136,108 @@ final class VmPcntl
         }
 
         return self::installOsHandler($signo);
+    }
+
+    public static function getHandler(int $signo): Variable
+    {
+        VmPcntlArg::validateSignal($signo, 'pcntl_signal_get_handler');
+        $ret = new Variable();
+        if (isset(self::$handlers[$signo])) {
+            $handler = self::$handlers[$signo];
+            if ('closure' === $handler['kind']) {
+                $ret->copyFrom($handler['source']);
+
+                return $ret;
+            }
+            $ret->copyFrom($handler['callable']);
+
+            return $ret;
+        }
+        $ret->int(self::$dispositions[$signo] ?? PcntlConstants::SIG_DFL);
+
+        return $ret;
+    }
+
+    public static function asyncSignals(?bool $enable): bool
+    {
+        if (PcntlHostBridge::available() && \function_exists('pcntl_async_signals')) {
+            return PcntlHostBridge::asyncSignals($enable);
+        }
+        if (null === $enable) {
+            return self::$asyncSignals;
+        }
+        self::$asyncSignals = $enable;
+
+        return true;
+    }
+
+    public static function sigprocmask(int $mode, array $signals, ?Variable $oldOut): bool
+    {
+        foreach ($signals as $signo) {
+            VmPcntlArg::validateSignal($signo, 'pcntl_sigprocmask');
+        }
+        $old = [];
+        if (PcntlHostBridge::available() && \function_exists('pcntl_sigprocmask')) {
+            $ok = PcntlHostBridge::sigprocmask($mode, $signals, $old);
+            if (null !== $oldOut) {
+                VmPcntlArg::writeSignalList($old, $oldOut);
+            }
+            self::$blockedSignals = $old;
+
+            return $ok;
+        }
+        if (PcntlLibcThinAbi::sigprocmaskAvailable()) {
+            $ok = PcntlLibcThinAbi::sigprocmask($mode, $signals, $old);
+            if (null !== $oldOut) {
+                VmPcntlArg::writeSignalList($old, $oldOut);
+            }
+            self::$blockedSignals = $old;
+
+            return $ok;
+        }
+        $previous = self::$blockedSignals;
+        self::$blockedSignals = self::applyLocalMask($mode, $signals, self::$blockedSignals);
+        if (null !== $oldOut) {
+            VmPcntlArg::writeSignalList($previous, $oldOut);
+        }
+
+        return true;
+    }
+
+    /**
+     * @param array<string, int>|null $infoOut
+     */
+    public static function sigtimedwait(array $signals, ?Variable $infoOut, int $seconds, int $nanoseconds): int|false
+    {
+        foreach ($signals as $signo) {
+            VmPcntlArg::validateSignal($signo, 'pcntl_sigtimedwait');
+        }
+        $info = [];
+        if (PcntlHostBridge::available() && \function_exists('pcntl_sigtimedwait')) {
+            $rc = PcntlHostBridge::sigtimedwait($signals, $info, $seconds, $nanoseconds);
+            if (false !== $rc && null !== $infoOut) {
+                self::writeSiginfo($info, $infoOut);
+            }
+
+            return $rc;
+        }
+
+        throw new \Error('pcntl_sigtimedwait() is not available in this compiler build');
+    }
+
+    public static function waitid(int $idtype, int $id, ?Variable $infoOut, int $options): bool
+    {
+        if (PcntlLibcThinAbi::waitidAvailable()) {
+            $info = [];
+            $ok = PcntlLibcThinAbi::waitid($idtype, $id, $info, $options);
+            if ($ok && null !== $infoOut) {
+                self::writeSiginfo($info, $infoOut);
+            }
+
+            return $ok;
+        }
+
+        throw new \Error('pcntl_waitid() is not available in this compiler build');
     }
 
     public static function dispatch(Context $context): bool
@@ -136,7 +261,7 @@ final class VmPcntl
     }
 
     /**
-     * @param array{kind: 'closure', closure: ClosureState}|array{kind: 'callable', callable: Variable} $handler
+     * @param array{kind: 'closure', closure: ClosureState, source: Variable}|array{kind: 'callable', callable: Variable} $handler
      */
     private static function invokeHandler(Context $context, int $signo, array $handler): void
     {
@@ -162,6 +287,18 @@ final class VmPcntl
         return true;
     }
 
+    private static function installOsDisposition(int $signo, int $disposition): bool
+    {
+        if (PcntlHostBridge::preferred()) {
+            return PcntlHostBridge::installDisposition($signo, $disposition);
+        }
+        if (PcntlLibcThinAbi::supportsNativeDispatch()) {
+            return PcntlLibcThinAbi::installDisposition($signo, $disposition);
+        }
+
+        return true;
+    }
+
     private static function restoreOsHandler(int $signo): bool
     {
         if (PcntlHostBridge::preferred()) {
@@ -172,5 +309,50 @@ final class VmPcntl
         }
 
         return true;
+    }
+
+    /**
+     * @param list<int> $signals
+     * @param list<int> $current
+     *
+     * @return list<int>
+     */
+    private static function applyLocalMask(int $mode, array $signals, array $current): array
+    {
+        $set = [];
+        foreach ($current as $signo) {
+            $set[(int) $signo] = true;
+        }
+        foreach ($signals as $signo) {
+            $signo = (int) $signo;
+            if (PcntlConstants::SIG_BLOCK === $mode) {
+                $set[$signo] = true;
+            } elseif (PcntlConstants::SIG_UNBLOCK === $mode) {
+                unset($set[$signo]);
+            } elseif (PcntlConstants::SIG_SETMASK === $mode) {
+                $set = [];
+            }
+        }
+        if (PcntlConstants::SIG_SETMASK === $mode) {
+            foreach ($signals as $signo) {
+                $set[(int) $signo] = true;
+            }
+        }
+
+        return \array_keys($set);
+    }
+
+    /**
+     * @param array<string, int> $info
+     */
+    private static function writeSiginfo(array $info, Variable $out): void
+    {
+        $ht = new HashTable();
+        foreach ($info as $key => $value) {
+            $var = new Variable();
+            $var->int((int) $value);
+            $ht->add((string) $key, $var);
+        }
+        $out->byRefTarget()->array($ht);
     }
 }
