@@ -7,7 +7,7 @@ PHP_COMPILER_PROFILE=8.4
 echo mb_ucfirst('über'), "\n";
 echo mb_lcfirst('Über'), "\n";
 echo mb_ucfirst(''), "\n";
-echo mb_lcfirst('ßtraße'), "\n";
+echo mb_ucfirst('ßtraße'), "\n";
 --EXPECT--
 Über
 über
