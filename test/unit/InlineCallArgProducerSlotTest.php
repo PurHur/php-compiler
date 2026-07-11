@@ -246,6 +246,48 @@ PHP;
         self::assertSame("array (\n  1 => 2,\n  2 => 3,\n)\n", ob_get_clean());
     }
 
+    /** Issue #17948 — array_filter(explode(...), fn(...)) wires haystack + closure slots. */
+    public function testArrayFilterInlineHaystackClosureUsesCorrectSlots(): void
+    {
+        $code = file_get_contents(__DIR__.'/../repro/maintainer_gap_array_filter_inline_haystack_closure.php');
+        self::assertNotFalse($code);
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'maintainer_gap_array_filter_inline_haystack_closure.php');
+
+        $haystackReturnSlot = null;
+        $closureSlot = null;
+        $filterSends = [];
+        $fcallOrdinal = 0;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_CLOSURE === $op->type) {
+                $closureSlot = $op->arg1;
+            }
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                ++$fcallOrdinal;
+                if (2 === $fcallOrdinal) {
+                    $filterSends = [];
+                }
+            }
+            if (1 === $fcallOrdinal && OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
+                $haystackReturnSlot = $op->arg1;
+            }
+            if (2 === $fcallOrdinal && OpCode::TYPE_ARG_SEND === $op->type) {
+                $filterSends[] = $op->arg1;
+            }
+        }
+
+        self::assertNotNull($closureSlot);
+        self::assertNotNull($haystackReturnSlot);
+        self::assertCount(2, $filterSends, 'filter sends='.json_encode($filterSends));
+        self::assertSame($haystackReturnSlot, $filterSends[0], 'haystack slot');
+        self::assertSame($closureSlot, $filterSends[1], 'callback slot');
+
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertStringContainsString('ok', $out);
+    }
+
     /** Issue #11153 — vacuous array_all on inline [] matches Zend. */
     public function testArrayAllInlineEmptyArrayRuntime(): void
     {
