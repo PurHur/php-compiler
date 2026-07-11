@@ -29,6 +29,9 @@ final class BuiltinIntrospectionPolicy
         if ('crc32c' === $lc) {
             return CompilerVersion::advertisesCrc32c();
         }
+        if ('disktotalspace' === $lc) {
+            return CompilerVersion::advertisesDisktotalspace();
+        }
         if ('hebrevc' === $lc) {
             return CompilerVersion::advertisesHebrevc();
         }
