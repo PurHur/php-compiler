@@ -105,6 +105,23 @@ final class VmIni
         'sys_temp_dir',
     ];
 
+    /**
+     * get_cfg_var() compile-time keys that return '' when unset (php-src cfg_get_entry, #12543).
+     *
+     * Other {@see EMPTY_STRING_INI_KEYS} return false from get_cfg_var() — only ini_get() is ''.
+     *
+     * @var list<string>
+     */
+    private const CFG_EMPTY_STRING_KEYS = [
+        'auto_prepend_file',
+        'auto_append_file',
+        'doc_root',
+        'user_dir',
+        'disable_functions',
+        'disable_classes',
+        'mail.add_x_header',
+    ];
+
     /** @var list<string> */
     public const SUPPORTED_KEYS = [
         'error_reporting',
@@ -273,11 +290,11 @@ final class VmIni
         }
     }
 
-    /** get_cfg_var() — php.ini compile-time values (ext/standard/ini.c, #6119). */
+    /** get_cfg_var() — php.ini compile-time values (ext/standard/ini.c, #6119, #17881). */
     public static function getCfgVar(string $option): string|false
     {
         $key = strtolower($option);
-        if (in_array($key, self::EMPTY_STRING_INI_KEYS, true)) {
+        if (in_array($key, self::CFG_EMPTY_STRING_KEYS, true)) {
             return '';
         }
         if (isset(self::READONLY_BOOL_DEFAULTS[$key])) {
@@ -296,13 +313,6 @@ final class VmIni
             return VmAssertState::iniGet($option);
         }
         if (!in_array($key, self::SUPPORTED_KEYS, true)) {
-            $registry = VmIniIntrospection::registryEntry($key);
-            if (null !== $registry) {
-                $global = $registry['global_value'];
-
-                return null === $global ? '' : $global;
-            }
-
             return false;
         }
 
