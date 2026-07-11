@@ -7404,9 +7404,10 @@ class JIT {
                         break;
                     }
                     if ($value->type === Variable::TYPE_STRING) {
+                        $str = $this->context->helper->loadValue($value);
                         $charPtr = JIT\StringOffsetHelper::dimFetch(
                             $this->context,
-                            $value->value,
+                            $str,
                             $dim
                         );
                         if ($forWrite) {

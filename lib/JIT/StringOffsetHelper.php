@@ -32,9 +32,9 @@ final class StringOffsetHelper
         StringOffsetRuntime::emitIncDecError($context);
     }
 
-    public static function dimFetch(Context $context, PHPLLVM\Value $strSlot, Variable $dim): PHPLLVM\Value
+    public static function dimFetch(Context $context, PHPLLVM\Value $str, Variable $dim): PHPLLVM\Value
     {
-        return StringOffsetRuntime::dimFetch($context, $strSlot, $dim);
+        return StringOffsetRuntime::dimFetch($context, $str, $dim);
     }
 
     public static function normalizeOffset(Context $context, PHPLLVM\Value $index, PHPLLVM\Value $len): PHPLLVM\Value
