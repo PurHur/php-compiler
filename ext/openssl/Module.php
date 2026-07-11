@@ -39,6 +39,8 @@ class Module extends ModuleAbstract
             new openssl_verify(),
             new openssl_get_cipher_methods(),
             new openssl_get_md_methods(),
+            new openssl_get_cert_locations(),
+            new openssl_get_curve_names(),
             new openssl_pkey_new(),
             new openssl_pkey_get_private(),
             new openssl_pkey_export(),

@@ -60,6 +60,41 @@ final class VmOpenssl
     }
 
     /**
+     * openssl_get_cert_locations() — X509 default path metadata (php-src ext/openssl/openssl.c; #6560).
+     */
+    public static function certLocations(): HashTable
+    {
+        $locations = VmOpensslConfigNative::certLocations();
+        if (null === $locations) {
+            return self::assocStringArrayToHashTable([
+                'default_cert_file' => '',
+                'default_cert_file_env' => 'SSL_CERT_FILE',
+                'default_cert_dir' => '',
+                'default_cert_dir_env' => 'SSL_CERT_DIR',
+                'default_private_dir' => '',
+                'default_default_cert_area' => '',
+                'ini_cafile' => '',
+                'ini_capath' => '',
+            ]);
+        }
+
+        return self::assocStringArrayToHashTable($locations);
+    }
+
+    /**
+     * openssl_get_curve_names() — OBJ_nid2sn names from EC_get_builtin_curves (#6560).
+     */
+    public static function curveNames(): HashTable
+    {
+        $names = VmOpensslConfigNative::curveNames();
+        if (null === $names) {
+            return new HashTable();
+        }
+
+        return self::stringListToHashTable($names);
+    }
+
+    /**
      * openssl_digest() — one-shot digest (EVP_Digest parity via VmHashNative).
      *
      * @return string|false
@@ -500,6 +535,19 @@ final class VmOpenssl
             $var = new Variable();
             $var->string($item);
             $ht->append($var);
+        }
+
+        return $ht;
+    }
+
+    /** @param array<string, string> $items */
+    private static function assocStringArrayToHashTable(array $items): HashTable
+    {
+        $ht = new HashTable();
+        foreach ($items as $key => $value) {
+            $var = new Variable();
+            $var->string($value);
+            $ht->update($key, $var);
         }
 
         return $ht;
