@@ -25,6 +25,6 @@ final class DomLoadHTMLJitHelper
             'source'
         );
 
-        return VmDom::loadHTML(VmDomJitFrame::vmContext(), $document, $htmlStr, $options);
+        return VmDom::loadHTML(VmDomJitFrame::vmContext(), $document, $htmlStr, $options, null, true);
     }
 }

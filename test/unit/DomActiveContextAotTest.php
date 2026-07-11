@@ -80,6 +80,14 @@ final class DomActiveContextAotTest extends TestCase
         $body = substr($source, $pos, 8000);
         $this->assertStringContainsString('reindexDocumentIds', $body);
         $this->assertStringContainsString('syncElementIdMapProperty', $body);
+        $this->assertStringContainsString('deferDocumentSlotSync', $body);
+    }
+
+    public function testLoadHTMLJitHelperDefersDocumentSlotSync(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/dom/DomLoadHTMLJitHelper.php');
+        $this->assertStringContainsString('VmDom::loadHTML(', $source);
+        $this->assertStringContainsString(', null, true)', $source);
     }
 
     public function testDomElementTextContentUsesInitLinkedHelper(): void

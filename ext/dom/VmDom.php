@@ -790,15 +790,17 @@ final class VmDom
         return $defaultNs === $namespaceUri;
     }
 
-    public static function ensureDocument(ObjectEntry $document): DomNodeState
+    public static function ensureDocument(ObjectEntry $document, bool $deferPropertyInit = false): DomNodeState
     {
         if (!DomRegistry::has($document)) {
             $state = new DomNodeState();
             $state->nodeType = DomConstants::XML_DOCUMENT_NODE;
             $state->nodeName = '#document';
             DomRegistry::attach($document, $state);
-            self::initDocumentLibxmlDefaults($document);
-            self::initNodePropertySlots($document);
+            if (!$deferPropertyInit) {
+                self::initDocumentLibxmlDefaults($document);
+                self::initNodePropertySlots($document);
+            }
         }
 
         return DomRegistry::state($document);
@@ -3885,9 +3887,10 @@ final class VmDom
         ObjectEntry $document,
         string $html,
         int $options = 0,
-        ?\PHPCompiler\Frame $frame = null
+        ?\PHPCompiler\Frame $frame = null,
+        bool $deferDocumentSlotSync = false
     ): bool {
-        self::ensureDocument($document);
+        self::ensureDocument($document, $deferDocumentSlotSync);
         self::rejectEmptyLoadSource($html, 'DOMDocument::loadHTML()');
 
         $trimmed = trim($html);
@@ -3945,12 +3948,18 @@ final class VmDom
         $state->encoding = null;
         $state->xmlStandalone = false;
         $state->documentElementName = DomRegistry::state($root)->nodeName;
-        $document->getProperty(self::PROP_DOCUMENT_ELEMENT)->copyFrom(self::elementVariable($root));
+        if (!$deferDocumentSlotSync) {
+            $document->getProperty(self::PROP_DOCUMENT_ELEMENT)->copyFrom(self::elementVariable($root));
+        }
         self::linkChildToParent($root, $document);
         self::propagateDocumentId($root, $document->id);
-        self::syncSubtree($ctx, $document);
+        if (!$deferDocumentSlotSync) {
+            self::syncSubtree($ctx, $document);
+        }
         self::reindexDocumentIds($document, $root);
-        self::syncElementIdMapProperty($document);
+        if (!$deferDocumentSlotSync) {
+            self::syncElementIdMapProperty($document);
+        }
         $state->documentUri = self::defaultDocumentUri();
 
         return true;
