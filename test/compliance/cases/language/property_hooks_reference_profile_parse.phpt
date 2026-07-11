@@ -1,5 +1,5 @@
 --TEST--
-Language: property hooks on reference profile — Zend parse error not profile fatal (#18019, Zend/zend_language_parser.y)
+Language: property hooks on reference profile emit Parse error prefix (#18085, Zend/zend_language_parser.y)
 --SKIPIF--
 <?php
 if (!class_exists('PHPCompiler\\CompilerVersion')) {
@@ -12,11 +12,12 @@ if (PHPCompiler\CompilerVersion::supportsPropertyHooks()) {
 --FILE--
 <?php
 class C {
-    public int $x {
-        get => $this->x;
+    public string $x {
+        get => 'a';
     }
 }
+echo "compiled\n";
 --EXPECT_EXIT--
 255
 --EXPECTF--
-Fatal error: syntax error, unexpected token "{", expecting "," or ";" in %s on line %d
+Parse error: syntax error, unexpected token "{", expecting "," or ";" in %s on line %d
