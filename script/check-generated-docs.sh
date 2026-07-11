@@ -33,7 +33,10 @@ step "capability-syntax --check" "$PHP_BIN" script/capability-syntax.php --check
 # 3. Bootstrap inventory headers (docs/bootstrap-inventory.md)
 step "bootstrap-inventory --check" "$PHP_BIN" script/bootstrap-inventory.php --check
 
-# 4. composer.lock content-hash vs composer.json — #15620 class of drift
+# 4. Bootstrap SDK platform contract (docs/bootstrap-sdk-platform.{md,json}) — #15606
+step "bootstrap-sdk-platform --check" "$PHP_BIN" script/check-bootstrap-sdk-platform.php
+
+# 5. composer.lock content-hash vs composer.json — #15620 class of drift
 step "composer.lock content-hash" "$PHP_BIN" script/check-composer-lock-hash.php
 
 if [[ "$fail" -ne 0 ]]; then

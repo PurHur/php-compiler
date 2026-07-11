@@ -1,9 +1,11 @@
 # Bootstrap SDK platform contract
 
 **Audience:** Compiler / self-host contributors using the Bootstrap SDK (`prelinked/bootstrap-gen0/`, `build/bin-compile-aot-inventory`, spine probes).  
-**Living tracker:** [#15606](https://github.com/PurHur/php-compiler/issues/15606) · **Workflow:** [bootstrap-dev-workflow.md](bootstrap-dev-workflow.md) · **Onboarding:** [GETTING-STARTED.md](GETTING-STARTED.md) § Bootstrap contributors
+**Living tracker:** [#15606](https://github.com/PurHur/php-compiler/issues/15606) · **Machine-readable SSOT:** [bootstrap-sdk-platform.json](bootstrap-sdk-platform.json) · **Workflow:** [bootstrap-dev-workflow.md](bootstrap-dev-workflow.md) · **Onboarding:** [GETTING-STARTED.md](GETTING-STARTED.md) § Bootstrap contributors
 
 This document is the **supported platform contract** for Bootstrap SDK development and CI gates. The User SDK (`phpc run` / `phpc build` for shipped examples) has a wider host matrix for VM-only work; bootstrap prelinks and spine gates do not.
+
+Drift guard: `php script/check-bootstrap-sdk-platform.php` (also in `./script/check-generated-docs.sh`).
 
 ---
 
