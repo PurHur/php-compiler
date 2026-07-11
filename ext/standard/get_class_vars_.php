@@ -26,8 +26,12 @@ final class get_class_vars_ extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (1 !== \count($frame->calledArgs)) {
-            throw new \LogicException('get_class_vars() requires exactly one argument in this compiler build');
+        $argc = \count($frame->calledArgs);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'get_class_vars() expects exactly 1 argument, %d given',
+                $argc
+            ));
         }
         $className = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'get_class_vars', 0, 'class');
         if (null === $frame->returnVar) {
@@ -40,8 +44,12 @@ final class get_class_vars_ extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (1 !== \count($args)) {
-            throw new \LogicException('get_class_vars() requires exactly one argument in this compiler build');
+        $argc = \count($args);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'get_class_vars() expects exactly 1 argument, %d given',
+                $argc
+            ));
         }
         $literal = JitStringArg::compileTimeLiteral($args[0]);
         if (null !== $literal) {
