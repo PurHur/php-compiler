@@ -119,7 +119,7 @@ final class JitFilestatArg
         );
     }
 
-    /** chmod()/mkdir() mode — Z_PARAM_LONG decimal numeric strings; internal ignores caller strict_types (#17819, #17860). */
+    /** chmod()/mkdir() mode — Z_PARAM_LONG; honor caller strict_types for string operands (#17927). */
     public static function lowerFileMode(
         Context $context,
         JITVariable $arg,
@@ -127,13 +127,21 @@ final class JitFilestatArg
         int $argIndex,
         string $paramName
     ): Value {
-        if (JITVariable::TYPE_STRING === $arg->type && null !== $arg->compileTimeString) {
-            $raw = $arg->compileTimeString;
-            if ('' === $raw || !is_numeric($raw)) {
+        if (JITVariable::TYPE_STRING === $arg->type) {
+            if ($context->callerStrictTypes) {
                 self::emitTypeErrorAndAbort(
                     $context,
                     self::intTypeError($function, $argIndex, $paramName, 'string')
                 );
+            }
+            if (null !== $arg->compileTimeString) {
+                $raw = $arg->compileTimeString;
+                if ('' === $raw || !is_numeric($raw)) {
+                    self::emitTypeErrorAndAbort(
+                        $context,
+                        self::intTypeError($function, $argIndex, $paramName, 'string')
+                    );
+                }
             }
         }
 
