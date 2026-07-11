@@ -27,13 +27,20 @@ final class JitDomLoadHTML
         }
 
         $document = self::loadObjectArg($context, $args[0]);
-        $html = self::loadStringArg($context, $args[1]);
+        $htmlLit = JitStringBuiltinArg::compileTimeLiteral($args[1]);
+        if (null !== $htmlLit) {
+            $html = $context->builder->load($context->constantStringFromString($htmlLit));
+        } else {
+            $html = self::loadStringArg($context, $args[1]);
+            $html = $context->builder->call(
+                $context->lookupFunction('__string__separate'),
+                $html
+            );
+        }
         $options = $context->getTypeFromString('int64')->constInt(0, false);
         if (isset($args[2]) && !NamedOptionalCallArgs::isOmittedOptional($args[2])) {
             $options = JitIntdiv::lowerIntBuiltinArg($context, $args[2], 'DOMDocument::loadHTML()', 2, 'options');
         }
-
-        DomLoadHTMLRuntime::ensureLinked($context);
 
         return $context->builder->call(
             $context->lookupFunction(DomLoadHTMLRuntime::ABI_NAME),

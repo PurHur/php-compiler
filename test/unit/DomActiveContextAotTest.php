@@ -44,6 +44,23 @@ final class DomActiveContextAotTest extends TestCase
         $this->assertStringContainsString('DomDocumentCreateElement', $source);
         $this->assertStringContainsString('isUserScriptDomMethod', $source);
         $this->assertStringContainsString('loadhtml', $source);
+        $this->assertStringContainsString('getelementbyid', $source);
+        $this->assertStringContainsString('DomDocumentLoadHTML', $source);
+        $this->assertStringContainsString('DomDocumentGetElementById', $source);
+    }
+
+    public function testDomGetElementByIdUsesInitLinkedHelper(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/dom/JitDomGetElementById.php');
+        $this->assertStringContainsString('DomGetElementByIdRuntime::ABI_NAME', $source);
+        $this->assertStringContainsString('DomGetElementByIdJitHelper::getElementByIdArgv', (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/DomGetElementByIdRuntime.php'));
+    }
+
+    public function testDomElementTextContentUsesInitLinkedHelper(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/dom/JitDomElementTextContent.php');
+        $this->assertStringContainsString('DomElementTextContentRuntime::ABI_NAME', $source);
+        $this->assertStringContainsString('ObjectInstancePropertyLlvm', (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type/ObjectInstancePropertyLlvm.php'));
     }
 
     public function testDomLoadHTMLRuntimeDefinesAbi(): void
@@ -51,6 +68,21 @@ final class DomActiveContextAotTest extends TestCase
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/DomLoadHTMLRuntime.php');
         $this->assertStringContainsString('DomLoadHTMLJitHelper::loadHTMLArgv', $source);
         $this->assertStringContainsString('__phpc_dom_load_html', $source);
+    }
+
+    public function testUserScriptStandaloneInitLinksDomLoadHTMLBridge(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Context.php');
+        $this->assertStringContainsString('DomLoadHTMLRuntime::ensureLinked', $source);
+        $this->assertStringContainsString('DomGetElementByIdRuntime::ensureLinked', $source);
+        $this->assertStringContainsString('shouldDeferToVmClassMethodLowering', $source);
+    }
+
+    public function testDomDocumentMethodUserScriptBridgeUsesHelperLinkEntryChecks(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/DomDocumentMethodUserScriptLlvm.php');
+        $this->assertStringContainsString('hasNamedBridgeEntry', $source);
+        $this->assertStringContainsString('bridgeEntryForEmit', $source);
     }
 
     public function testDomInstanceMethodUserScriptRegistersProxiesBeforeHelperCompile(): void
@@ -72,5 +104,6 @@ final class DomActiveContextAotTest extends TestCase
         $this->assertStringContainsString('ensureDomElementPropertyLayout', $source);
         $this->assertStringContainsString('nodeName', $source);
         $this->assertStringContainsString('tagName', $source);
+        $this->assertStringContainsString('textContent', $source);
     }
 }

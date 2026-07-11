@@ -19,11 +19,12 @@ final class DomInstanceMethodJit
         return (bool) preg_match('/^dom[a-z0-9_]*::[a-z0-9_]+$/', $lc);
     }
 
-    /** User-script AOT: direct LLVM for createElement; __object__* leaf for loadHTML (#17954). */
+    /** User-script AOT: direct LLVM for createElement; VmDomInstanceInvoke for loadHTML/getElementById (#17954). */
     private static function isUserScriptDomMethod(string $proxyLc): bool
     {
         if ('domdocument::createelement' === $proxyLc
-            || 'domdocument::loadhtml' === $proxyLc) {
+            || 'domdocument::loadhtml' === $proxyLc
+            || 'domdocument::getelementbyid' === $proxyLc) {
             return true;
         }
 
@@ -59,6 +60,11 @@ final class DomInstanceMethodJit
 
                 return;
             }
+            if ('domdocument::getelementbyid' === $lc) {
+                $context->functionProxies[$lc] = new Call\DomDocumentGetElementById();
+
+                return;
+            }
             if (!self::isUserScriptDomMethod($lc)) {
                 return;
             }
@@ -69,7 +75,7 @@ final class DomInstanceMethodJit
         if (!preg_match('/^(dom[a-z0-9_]*)::([a-z0-9_]+)$/', $lc, $matches)) {
             return;
         }
-        $context->functionProxies[$lc] = new DomInstanceMethod($matches[1], $matches[2]);
+        $context->functionProxies[$lc] = new Call\DomInstanceMethod($matches[1], $matches[2]);
     }
 
     /** Register domdocument::createelement without generic nested helper (#17130). */
@@ -79,6 +85,7 @@ final class DomInstanceMethodJit
             self::ensureDomElementPropertyLayout($context);
             self::ensureProxy($context, 'domdocument::createelement');
             self::ensureProxy($context, 'domdocument::loadhtml');
+            self::ensureProxy($context, 'domdocument::getelementbyid');
 
             return;
         }
@@ -107,5 +114,6 @@ final class DomInstanceMethodJit
         $object->defineProperty($classId, 'nodeName', Variable::TYPE_STRING);
         $object->defineProperty($classId, 'tagName', Variable::TYPE_STRING);
         $object->defineProperty($classId, 'attributes', Variable::TYPE_VALUE);
+        $object->defineProperty($classId, 'textContent', Variable::TYPE_STRING);
     }
 }

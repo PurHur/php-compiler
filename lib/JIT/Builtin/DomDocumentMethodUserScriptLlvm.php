@@ -5,12 +5,15 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPCompiler\JIT\NestedVmActiveContextLlvm;
 use PHPCompiler\JIT\UserScriptAotDeferNestedJit;
+use PHPLLVM\Builder;
 
 /**
  * User-script standalone AOT: compile DOMDocument::loadHTML helper in the main module (#17954).
@@ -39,6 +42,36 @@ final class DomDocumentMethodUserScriptLlvm
         );
     }
 
+    public static function ensureGetElementByIdBridge(Context $context): void
+    {
+        self::ensureNullableObjectValueBridge(
+            $context,
+            DomGetElementByIdRuntime::ABI_NAME,
+            'dom_get_element_by_id_user_script',
+            [
+                $context->getTypeFromString('__object__*'),
+                $context->getTypeFromString('__string__*'),
+            ],
+            'PHPCompiler\\ext\\dom\\DomGetElementByIdJitHelper::getElementByIdArgv',
+            '/ext/dom/DomGetElementByIdJitHelper.php'
+        );
+    }
+
+    public static function ensureElementTextContentBridge(Context $context): void
+    {
+        self::ensureBridge(
+            $context,
+            DomElementTextContentRuntime::ABI_NAME,
+            'dom_element_text_content_user_script',
+            [
+                $context->getTypeFromString('__object__*'),
+            ],
+            $context->getTypeFromString('__string__*'),
+            'PHPCompiler\\ext\\dom\\DomElementTextContentJitHelper::textContentArgv',
+            '/ext/dom/DomElementTextContentJitHelper.php'
+        );
+    }
+
     /**
      * @param list<\PHPLLVM\Type> $paramTypes
      */
@@ -52,7 +85,7 @@ final class DomDocumentMethodUserScriptLlvm
         string $helperPath
     ): void {
         $probe = $context->module->getNamedFunction($abi);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+        if (JitVmHelperLink::hasNamedBridgeEntry($probe, $entryBlock)) {
             $context->registerFunction($abi, $probe);
 
             return;
@@ -72,7 +105,7 @@ final class DomDocumentMethodUserScriptLlvm
             ? $probe
             : $context->module->addFunction($abi, $ft);
 
-        $entry = $fn->appendBasicBlock($entryBlock);
+        $entry = JitVmHelperLink::bridgeEntryForEmit($fn, $entryBlock);
         $context->builder->positionAtEnd($entry);
         $args = [];
         for ($i = 0, $n = $fn->countParams(); $i < $n; ++$i) {
@@ -81,6 +114,80 @@ final class DomDocumentMethodUserScriptLlvm
         $result = $context->builder->call($helperFn, ...$args);
         $ret = JitNestedHelperCoerce::coerceBridgeResult($context, $result, $returnType);
         $context->builder->returnValue($ret);
+        $context->registerFunction($abi, $fn);
+
+        if (null !== $savedBlock) {
+            $context->builder->positionAtEnd($savedBlock);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
+    }
+
+    /**
+     * @param list<\PHPLLVM\Type> $paramTypes
+     */
+    private static function ensureNullableObjectValueBridge(
+        Context $context,
+        string $abi,
+        string $entryBlock,
+        array $paramTypes,
+        string $helperLogical,
+        string $helperPath
+    ): void {
+        $probe = $context->module->getNamedFunction($abi);
+        if (JitVmHelperLink::hasNamedBridgeEntry($probe, $entryBlock)) {
+            $context->registerFunction($abi, $probe);
+
+            return;
+        }
+
+        self::ensureMainModuleHelperCompiled($context, $helperPath, [$helperLogical]);
+
+        $savedBlock = null;
+        try {
+            $savedBlock = $context->builder->getInsertBlock();
+        } catch (\Throwable) {
+        }
+
+        $objPtr = $context->getTypeFromString('__object__*');
+        $valuePtr = $context->getTypeFromString('__value__*');
+        $helperFn = JitVmHelperLink::lookupCompiled($context, $helperLogical, '#17954');
+        $ft = $context->context->functionType($valuePtr, false, ...$paramTypes);
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction($abi, $ft);
+
+        $entry = JitVmHelperLink::bridgeEntryForEmit($fn, $entryBlock);
+        $context->builder->positionAtEnd($entry);
+        $args = [];
+        for ($i = 0, $n = $fn->countParams(); $i < $n; ++$i) {
+            $args[] = $fn->getParam($i);
+        }
+        $foundObj = $context->builder->call($helperFn, ...$args);
+        $foundObj = JitNestedHelperCoerce::coerceBridgeResult($context, $foundObj, $objPtr);
+        $slot = JitValueBox::alloc($context);
+        $destPtr = JitValueBox::pointer($context, $slot);
+        $isNull = $context->builder->icmp(
+            Builder::INT_EQ,
+            $foundObj,
+            $objPtr->constNull()
+        );
+        $nullBlock = $fn->appendBasicBlock('dom_gei_bridge_null');
+        $objBlock = $fn->appendBasicBlock('dom_gei_bridge_obj');
+        $doneBlock = $fn->appendBasicBlock('dom_gei_bridge_done');
+        $context->builder->branchIf($isNull, $nullBlock, $objBlock);
+        $context->builder->positionAtEnd($nullBlock);
+        $context->builder->call($context->lookupFunction('__value__writeNull'), $destPtr);
+        $context->builder->branch($doneBlock);
+        $context->builder->positionAtEnd($objBlock);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeObject'),
+            $destPtr,
+            $foundObj
+        );
+        $context->builder->branch($doneBlock);
+        $context->builder->positionAtEnd($doneBlock);
+        $context->builder->returnValue(JitValueBox::normalizeValuePtr($context, $destPtr));
         $context->registerFunction($abi, $fn);
 
         if (null !== $savedBlock) {

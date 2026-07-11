@@ -3986,14 +3986,32 @@ final class VmDom
         ?\PHPCompiler\Frame $frame = null
     ): ?ObjectEntry {
         $trimmed = trim($html);
-        if (preg_match('/^<([A-Za-z_][\w:.-]*)(\s[^>]*)?\/>$/s', $trimmed, $selfClose)) {
-            return self::createHtmlElementFromTag($ctx, $selfClose[1], $selfClose[2] ?? '', '', $ownerDocument, $frame);
-        }
-        if (!preg_match('/^<([A-Za-z_][\w:.-]*)(\s[^>]*)?>(.*)<\/\1>\s*$/is', $trimmed, $matches)) {
+        if ('' === $trimmed) {
             return null;
         }
+        $open = self::scanHtmlOpenTagAt($trimmed, 0);
+        if (null === $open) {
+            return null;
+        }
+        if ($open['selfClose']) {
+            return self::createHtmlElementFromTag($ctx, $open['tag'], $open['attrs'], '', $ownerDocument, $frame);
+        }
+        // Avoid PCRE backreferences and \G — VmPregPure lacks them (#17954, compiled loadHTML/AOT).
+        $end = self::findHtmlElementEnd($trimmed, 0);
+        if (null === $end || $end !== \strlen($trimmed)) {
+            return null;
+        }
+        $closePos = strrpos(substr($trimmed, 0, $end), '</');
+        if (false === $closePos) {
+            return null;
+        }
+        $close = self::scanHtmlCloseTagAt($trimmed, $closePos);
+        if (null === $close || strtolower($close['tag']) !== strtolower($open['tag'])) {
+            return null;
+        }
+        $inner = substr($trimmed, $open['end'], $closePos - $open['end']);
 
-        $entry = self::createHtmlElementFromTag($ctx, $matches[1], $matches[2] ?? '', $matches[3], $ownerDocument, $frame);
+        $entry = self::createHtmlElementFromTag($ctx, $open['tag'], $open['attrs'], $inner, $ownerDocument, $frame);
         self::syncSubtree($ctx, $entry);
 
         return $entry;
@@ -4029,10 +4047,8 @@ final class VmDom
         $pos = 0;
         $len = \strlen($inner);
         while ($pos < $len) {
-            if (preg_match('/\G\s+/s', $inner, $m, 0, $pos)) {
-                $pos += \strlen($m[0]);
-
-                continue;
+            while ($pos < $len && ctype_space($inner[$pos])) {
+                ++$pos;
             }
             if ($pos >= $len) {
                 break;
@@ -4082,43 +4098,45 @@ final class VmDom
     /** @return null|int byte offset after one HTML element starting at $pos */
     private static function findHtmlElementEnd(string $content, int $pos): ?int
     {
-        if (!isset($content[$pos]) || '<' !== $content[$pos]) {
+        $open = self::scanHtmlOpenTagAt($content, $pos);
+        if (null === $open) {
             return null;
         }
-        if (preg_match('/\G<([A-Za-z_][\w:.-]*)(\s[^>]*)?\/>/is', $content, $selfClose, 0, $pos)) {
-            return $pos + \strlen($selfClose[0]);
-        }
-        if (!preg_match('/\G<([A-Za-z_][\w:.-]*)(\s[^>]*)?>/is', $content, $open, 0, $pos)) {
-            return null;
+        if ($open['selfClose']) {
+            return $open['end'];
         }
 
-        $tag = strtolower($open[1]);
+        $tag = strtolower($open['tag']);
         /** @var list<string> $stack */
         $stack = [$tag];
-        $scan = $pos + \strlen($open[0]);
+        $scan = $open['end'];
         $len = \strlen($content);
         while ($scan < $len && [] !== $stack) {
-            if (preg_match('/\G<\/([A-Za-z_][\w:.-]*)>/is', $content, $close, 0, $scan)) {
-                $name = strtolower($close[1]);
+            if ('<' !== $content[$scan]) {
+                ++$scan;
+
+                continue;
+            }
+            $close = self::scanHtmlCloseTagAt($content, $scan);
+            if (null !== $close) {
+                $name = strtolower($close['tag']);
                 if ([] === $stack || end($stack) !== $name) {
                     return null;
                 }
                 array_pop($stack);
-                $scan += \strlen($close[0]);
+                $scan = $close['end'];
                 if ([] === $stack) {
                     return $scan;
                 }
 
                 continue;
             }
-            if (preg_match('/\G<([A-Za-z_][\w:.-]*)(\s[^>]*)?\/>/is', $content, $nestedSelf, 0, $scan)) {
-                $scan += \strlen($nestedSelf[0]);
-
-                continue;
-            }
-            if (preg_match('/\G<([A-Za-z_][\w:.-]*)(\s[^>]*)?>/is', $content, $nestedOpen, 0, $scan)) {
-                $stack[] = strtolower($nestedOpen[1]);
-                $scan += \strlen($nestedOpen[0]);
+            $nested = self::scanHtmlOpenTagAt($content, $scan);
+            if (null !== $nested) {
+                if (!$nested['selfClose']) {
+                    $stack[] = strtolower($nested['tag']);
+                }
+                $scan = $nested['end'];
 
                 continue;
             }
@@ -4126,6 +4144,104 @@ final class VmDom
         }
 
         return null;
+    }
+
+    /**
+     * @return null|array{tag:string, attrs:string, end:int, selfClose:bool}
+     */
+    private static function scanHtmlOpenTagAt(string $content, int $pos): ?array
+    {
+        if (!isset($content[$pos]) || '<' !== $content[$pos]) {
+            return null;
+        }
+        $len = \strlen($content);
+        $i = $pos + 1;
+        if ($i >= $len || !self::isHtmlTagNameStart($content[$i])) {
+            return null;
+        }
+        $nameStart = $i;
+        ++$i;
+        while ($i < $len && self::isHtmlTagNameChar($content[$i])) {
+            ++$i;
+        }
+        $tag = substr($content, $nameStart, $i - $nameStart);
+        $attrStart = $i;
+        $selfClose = false;
+        while ($i < $len) {
+            $ch = $content[$i];
+            if ('"' === $ch || "'" === $ch) {
+                $quote = $ch;
+                ++$i;
+                while ($i < $len && $content[$i] !== $quote) {
+                    ++$i;
+                }
+                if ($i < $len) {
+                    ++$i;
+                }
+
+                continue;
+            }
+            if ('>' === $ch) {
+                return [
+                    'tag' => $tag,
+                    'attrs' => substr($content, $attrStart, $i - $attrStart),
+                    'end' => $i + 1,
+                    'selfClose' => false,
+                ];
+            }
+            if ('/' === $ch && isset($content[$i + 1]) && '>' === $content[$i + 1]) {
+                return [
+                    'tag' => $tag,
+                    'attrs' => substr($content, $attrStart, $i - $attrStart),
+                    'end' => $i + 2,
+                    'selfClose' => true,
+                ];
+            }
+            ++$i;
+        }
+
+        return null;
+    }
+
+    /** @return null|array{tag:string, end:int} */
+    private static function scanHtmlCloseTagAt(string $content, int $pos): ?array
+    {
+        if (!isset($content[$pos]) || '<' !== $content[$pos]) {
+            return null;
+        }
+        $len = \strlen($content);
+        $i = $pos + 1;
+        if ($i >= $len || '/' !== $content[$i]) {
+            return null;
+        }
+        ++$i;
+        if ($i >= $len || !self::isHtmlTagNameStart($content[$i])) {
+            return null;
+        }
+        $nameStart = $i;
+        ++$i;
+        while ($i < $len && self::isHtmlTagNameChar($content[$i])) {
+            ++$i;
+        }
+        $tag = substr($content, $nameStart, $i - $nameStart);
+        while ($i < $len && ctype_space($content[$i])) {
+            ++$i;
+        }
+        if ($i >= $len || '>' !== $content[$i]) {
+            return null;
+        }
+
+        return ['tag' => $tag, 'end' => $i + 1];
+    }
+
+    private static function isHtmlTagNameStart(string $char): bool
+    {
+        return ctype_alpha($char) || '_' === $char;
+    }
+
+    private static function isHtmlTagNameChar(string $char): bool
+    {
+        return ctype_alnum($char) || '_' === $char || ':' === $char || '.' === $char || '-' === $char;
     }
 
     /** Innermost unclosed/malformed tag for loadHTML libxml warnings (#16190). */
