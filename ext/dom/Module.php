@@ -27,4 +27,11 @@ class Module extends ModuleAbstract
         parent::init($runtime);
         BuiltinClasses::register($runtime->vmContext);
     }
+
+    public function getFunctions(): array
+    {
+        return [
+            new dom_import_simplexml(),
+        ];
+    }
 }
