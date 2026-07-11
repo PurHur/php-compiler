@@ -24,6 +24,10 @@ class Module extends ModuleAbstract
     public function getFunctions(): array
     {
         return [
+            new pcntl_fork(),
+            new pcntl_waitpid(),
+            new pcntl_wifexited(),
+            new pcntl_wexitstatus(),
             new pcntl_signal(),
             new pcntl_signal_dispatch(),
         ];
