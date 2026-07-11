@@ -18,7 +18,7 @@ echo "\n";
 version_fn
 strerror_fn
 multi_strerror_fn
-ext_loaded
+ext_missing
 8.7.0
 'No error'
 'No error'

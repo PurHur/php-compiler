@@ -124,6 +124,9 @@ final class NewWithoutParensCompileCheck
 
                 return;
             }
+            if (!$prop->defaultVar instanceof Op) {
+                return;
+            }
             $this->walkSubBlocksPropertyDefaultNew($prop->defaultVar, $this->sourceCode, true);
 
             return;
