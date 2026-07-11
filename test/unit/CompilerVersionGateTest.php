@@ -1984,7 +1984,25 @@ final class CompilerVersionGateTest extends TestCase
 
     public function testSupportsDomNodeCompareDocumentPositionOnReferenceProfile(): void
     {
-        $this->assertTrue(CompilerVersion::supportsDomNodeCompareDocumentPosition());
+        $this->assertFalse(CompilerVersion::supportsDomNodeCompareDocumentPosition());
+    }
+
+    public function testVmRegistersDomNodeCompareDocumentPositionOnForwardProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $runtime = new Runtime();
+            $node = $runtime->vmContext->classes['domnode'] ?? null;
+            $this->assertNotNull($node);
+            $this->assertTrue(isset($node->methods['comparedocumentposition']));
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
     }
 
     public function testSupportsDomNodeGetRootNodeOnForwardProfile(): void
