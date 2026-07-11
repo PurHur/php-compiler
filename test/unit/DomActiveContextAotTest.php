@@ -42,6 +42,9 @@ final class DomActiveContextAotTest extends TestCase
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/DomInstanceMethodJit.php');
         $this->assertStringContainsString('shouldDeferToVmClassMethodLowering', $source);
         $this->assertStringContainsString('DomDocumentCreateElement', $source);
+        $this->assertStringContainsString('isUserScriptDomMethod', $source);
+        $this->assertStringContainsString('loadhtml', $source);
+        $this->assertStringContainsString('getelementbyid', $source);
     }
 
     public function testDomInstanceMethodUserScriptRegistersProxiesBeforeHelperCompile(): void

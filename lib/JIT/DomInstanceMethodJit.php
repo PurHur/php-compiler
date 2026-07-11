@@ -14,10 +14,22 @@ final class DomInstanceMethodJit
     {
         $lc = strtolower(ltrim($proxyName, '\\'));
         if (self::shouldDeferToVmClassMethodLowering()) {
-            return 'domdocument::createelement' === $lc;
+            return self::isUserScriptDomMethod($lc);
         }
 
         return (bool) preg_match('/^dom[a-z0-9_]*::[a-z0-9_]+$/', $lc);
+    }
+
+    /** User-script AOT: direct LLVM for createElement; dedicated leaf bridges for loadHTML/getElementById (#17954). */
+    private static function isUserScriptDomMethod(string $proxyLc): bool
+    {
+        if ('domdocument::createelement' === $proxyLc
+            || 'domdocument::loadhtml' === $proxyLc
+            || 'domdocument::getelementbyid' === $proxyLc) {
+            return true;
+        }
+
+        return false;
     }
 
     /** User-script AOT: nested VmDomInstanceInvoke JIT aborts — use VmClassMethod lowering (#15407, #17391). */
@@ -44,8 +56,11 @@ final class DomInstanceMethodJit
 
                 return;
             }
-
-            return;
+            if ('domdocument::loadhtml' === $lc || 'domdocument::getelementbyid' === $lc) {
+                // Use generic DomInstanceMethod + helper-runtime cache (not main-module nested JIT).
+            } elseif (!self::isUserScriptDomMethod($lc)) {
+                return;
+            }
         }
         if (!self::isDomInstanceMethodProxy($lc)) {
             return;
@@ -62,6 +77,8 @@ final class DomInstanceMethodJit
         if (self::shouldDeferToVmClassMethodLowering()) {
             self::ensureDomElementPropertyLayout($context);
             self::ensureProxy($context, 'domdocument::createelement');
+            self::ensureProxy($context, 'domdocument::loadhtml');
+            self::ensureProxy($context, 'domdocument::getelementbyid');
 
             return;
         }
