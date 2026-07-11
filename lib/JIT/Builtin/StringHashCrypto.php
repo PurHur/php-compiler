@@ -18,6 +18,11 @@ final class StringHashCrypto
         StringHashCryptoJit::implement($context);
     }
 
+    public static function ensureStandaloneBodies(Context $context): void
+    {
+        StringHashCryptoJit::ensureStandaloneBodies($context);
+    }
+
     public static function implement(Context $context): void
     {
         StringHashCryptoJit::implement($context);
