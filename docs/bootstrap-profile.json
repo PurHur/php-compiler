@@ -906,6 +906,7 @@
         "ext/standard/GetClassMethodsJitHelper.php",
         "ext/standard/GetClassVarsJitHelper.php",
         "ext/standard/GetDeclaredExcludeDeprecatedJit.php",
+        "ext/standard/GetDefinedConstantsParity.php",
         "ext/standard/GetDefinedExcludeDisabledJit.php",
         "ext/standard/GetHeadersJitHelper.php",
         "ext/standard/GetObjectVarsJitHelper.php",
@@ -4655,9 +4656,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 4421,
+        "inventory_files": 4422,
         "excluded": 0,
-        "eligible": 4421,
+        "eligible": 4422,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
