@@ -43,9 +43,9 @@ class Module extends ModuleAbstract
     {
         parent::init($runtime);
         \PHPCompiler\VM\OutputBufferHandlers::register(
-            static fn (string $content, string $handlerName, ?\PHPCompiler\VM\Context $ctx): string => VmObOutput::processHandler(
+            static fn (string $content, null|string|\PHPCompiler\VM\Variable|\PHPCompiler\VM\ClosureState $handler, ?\PHPCompiler\VM\Context $ctx): string => VmObOutput::processHandler(
                 $ctx ?? $runtime->vmContext,
-                $handlerName,
+                $handler,
                 $content
             )
         );

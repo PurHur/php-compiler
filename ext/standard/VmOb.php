@@ -20,9 +20,10 @@ final class VmOb
     /** ob_list_handlers() — handler name per buffer level (ext/standard/output.c, #3588). */
     public static function listHandlers(): HashTable
     {
+        $ctx = OutputBuffer::getActiveContext();
         $names = [];
-        foreach (OutputBuffer::getHandlerNames() as $handler) {
-            $names[] = null !== $handler ? $handler : self::HANDLER_NAME;
+        foreach (OutputBuffer::getHandlers() as $handler) {
+            $names[] = VmObOutput::handlerDisplayName($handler, $ctx);
         }
 
         return VmFs::stringListToArray($names);
@@ -34,14 +35,15 @@ final class VmOb
         if ([] === $buffers) {
             return new HashTable();
         }
-        $handlerNames = OutputBuffer::getHandlerNames();
+        $handlers = OutputBuffer::getHandlers();
+        $ctx = OutputBuffer::getActiveContext();
         if (!$full) {
             $idx = \count($buffers) - 1;
 
             return self::buildStatusEntry(
                 $idx,
                 \strlen($buffers[$idx]),
-                $handlerNames[$idx] ?? null
+                VmObOutput::handlerDisplayName($handlers[$idx] ?? null, $ctx)
             );
         }
         $list = new HashTable();
@@ -50,7 +52,7 @@ final class VmOb
             $entry->array(self::buildStatusEntry(
                 $idx,
                 \strlen($contents),
-                $handlerNames[$idx] ?? null
+                VmObOutput::handlerDisplayName($handlers[$idx] ?? null, $ctx)
             ));
             $list->append($entry);
         }
@@ -58,11 +60,11 @@ final class VmOb
         return $list;
     }
 
-    private static function buildStatusEntry(int $level, int $bufferUsed, ?string $handlerName = null): HashTable
+    private static function buildStatusEntry(int $level, int $bufferUsed, string $handlerName): HashTable
     {
         $ht = ObStatusJitHelper::buildStatusEntryPartial($level, $bufferUsed);
         $slot = new Variable();
-        $slot->string(null !== $handlerName ? $handlerName : self::HANDLER_NAME);
+        $slot->string($handlerName);
         $ht->add('name', $slot);
 
         return $ht;

@@ -24,8 +24,8 @@ final class VmUrlRewriterOb
         if (self::$registered) {
             return;
         }
-        foreach (OutputBuffer::getHandlerNames() as $name) {
-            if (self::HANDLER_NAME === $name) {
+        foreach (OutputBuffer::getHandlers() as $handler) {
+            if (\is_string($handler) && self::HANDLER_NAME === $handler) {
                 self::$registered = true;
 
                 return;
