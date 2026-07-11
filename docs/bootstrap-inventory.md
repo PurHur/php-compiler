@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 4471 |
-| Phase A inventory files (M2 ratio SSOT) | 4471 |
+| PHP files on vm.php path | 4473 |
+| Phase A inventory files (M2 ratio SSOT) | 4473 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 12141 |
+| Source constructs flagged (warnings) | 12145 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -484,13 +484,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/openssl/JitOpensslCipherIvLength.php` | 0 | 1 |
 | `ext/openssl/JitOpensslCipherKeyLength.php` | 0 | 1 |
 | `ext/openssl/JitOpensslSign.php` | 0 | 1 |
-| `ext/openssl/Module.php` | 0 | 20 |
+| `ext/openssl/Module.php` | 0 | 21 |
 | `ext/openssl/OpensslCipherRegistry.php` | 0 | 1 |
 | `ext/openssl/OpensslConstants.php` | 0 | 1 |
 | `ext/openssl/OpensslExtensionPolicy.php` | 0 | 1 |
 | `ext/openssl/OpensslFunction.php` | 0 | 1 |
 | `ext/openssl/OpensslSignJitHelper.php` | 0 | 1 |
 | `ext/openssl/VmOpenssl.php` | 0 | 3 |
+| `ext/openssl/VmOpensslErrorNative.php` | 0 | 1 |
 | `ext/openssl/VmOpensslObjects.php` | 0 | 12 |
 | `ext/openssl/VmOpensslPkeyDeriveNative.php` | 0 | 1 |
 | `ext/openssl/VmOpensslPkeyNative.php` | 0 | 1 |
@@ -500,6 +501,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/openssl/openssl_cipher_iv_length.php` | 0 | 2 |
 | `ext/openssl/openssl_cipher_key_length.php` | 0 | 2 |
 | `ext/openssl/openssl_digest.php` | 0 | 2 |
+| `ext/openssl/openssl_error_string.php` | 0 | 2 |
 | `ext/openssl/openssl_free_key.php` | 0 | 2 |
 | `ext/openssl/openssl_get_cipher_methods.php` | 0 | 2 |
 | `ext/openssl/openssl_get_md_methods.php` | 0 | 2 |
@@ -7605,6 +7607,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new openssl_free_key (line 51)
 - new openssl_spki_new (line 52)
 - new openssl_spki_verify (line 53)
+- new openssl_error_string (line 54)
 - 2 class method(s)
 
 ### `ext/openssl/OpensslCipherRegistry.php`
@@ -7638,6 +7641,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new HashTable (line 464)
 - new Variable (line 466)
 - 19 class method(s)
+
+### `ext/openssl/VmOpensslErrorNative.php`
+
+**Warnings** (review for bootstrap subset):
+- 4 class method(s)
 
 ### `ext/openssl/VmOpensslObjects.php`
 
@@ -7696,6 +7704,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 28)
+- 2 class method(s)
+
+### `ext/openssl/openssl_error_string.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 26)
 - 2 class method(s)
 
 ### `ext/openssl/openssl_free_key.php`
