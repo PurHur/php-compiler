@@ -2369,6 +2369,12 @@ class Compiler {
                         // resolveSiblingInlineCallArgProducerSlot (#9463, #10981, #12421, #13788).
                         break;
                     } elseif (
+                        $child instanceof Op\Expr\ConstFetch
+                        && $this->isDeferredLeadingConstFetchBeforeSiblingFuncCallConsumer($child, $ops, $i)
+                    ) {
+                        // explode(PATH_SEPARATOR, get_include_path()) — ConstFetch + sibling FuncCall (#15833).
+                        break;
+                    } elseif (
                         ($child instanceof Op\Expr\ConstFetch || $child instanceof Op\Expr\ClassConstFetch)
                         && $i + 1 < $opCount
                         && ($ops[$i + 1] instanceof Op\Expr\FuncCall || $ops[$i + 1] instanceof Op\Expr\NsFuncCall)
@@ -22050,6 +22056,85 @@ class Compiler {
     }
 
     /**
+     * explode(PATH_SEPARATOR, get_include_path()) — final ARG_SEND must bind ConstFetch + sibling FuncCall (#15833).
+     *
+     * @param list<OpCode> $emitOps
+     */
+    private function finalizeLeadingConstFetchFuncCallPreludeCallArgSlot(
+        Block $block,
+        Op $cfgCallOp,
+        int $argIndex,
+        array &$emitOps = []
+    ): ?string {
+        if (
+            null === $block->orig
+            || !\is_array($cfgCallOp->args ?? null)
+            || 2 !== \count($cfgCallOp->args)
+            || 'array_slice' === $this->resolveCfgFuncCallName($cfgCallOp)
+            || 'array_combine' === $this->resolveCfgFuncCallName($cfgCallOp)
+            || (
+                isset($cfgCallOp->args[0])
+                && $this->isEmbeddedCallLiteralArg($cfgCallOp->args[0])
+            )
+            || $this->consumerImmediateUnaryHoistedDeadTempArgZero($cfgCallOp, $block)
+        ) {
+            return null;
+        }
+        $constFuncPrelude = $this->leadingConstFetchFuncCallPreludeBeforeCfgCall($cfgCallOp, $block)
+            ?? $this->splitLeadingConstFetchWithFuncCallCallArg(
+                $this->precedingInlineCallArgProducersBeforeCfgOp($block->orig->children, $cfgCallOp)
+            );
+        if (null === $constFuncPrelude) {
+            return null;
+        }
+        [$constFetch, $funcProducer] = $constFuncPrelude;
+        $target = match ($argIndex) {
+            0 => $constFetch,
+            1 => $funcProducer,
+            default => null,
+        };
+        if (!$target instanceof Op\Expr) {
+            return null;
+        }
+        if (null === $block->slotForOperand($target->result)) {
+            foreach ($this->compileExpr($target, $block) as $op) {
+                $emitOps[] = $op;
+            }
+        }
+        $splitSlot = $block->slotForOperand($target->result);
+
+        return null !== $splitSlot ? (string) $splitSlot : null;
+    }
+
+    /**
+     * explode(PATH_SEPARATOR, get_include_path()) — defer leading ConstFetch until consumer (#15833).
+     *
+     * @param list<Op> $ops
+     */
+    private function isDeferredLeadingConstFetchBeforeSiblingFuncCallConsumer(
+        Op\Expr\ConstFetch $fetch,
+        array $ops,
+        int $fetchIndex
+    ): bool {
+        $func = $ops[$fetchIndex + 1] ?? null;
+        $consumer = $ops[$fetchIndex + 2] ?? null;
+        if (
+            !($func instanceof Op\Expr\FuncCall || $func instanceof Op\Expr\NsFuncCall)
+            || !($consumer instanceof Op\Expr\FuncCall || $consumer instanceof Op\Expr\NsFuncCall)
+            || !property_exists($consumer, 'args')
+            || !\is_array($consumer->args)
+            || 2 !== \count($consumer->args)
+        ) {
+            return false;
+        }
+        if (null === $this->splitLeadingConstFetchWithFuncCallCallArg([$fetch, $func])) {
+            return false;
+        }
+
+        return 'explode' === $this->resolveCfgFuncCallName($consumer);
+    }
+
+    /**
      * round(...); fmod(-1.5, …) — immediate UnaryMinus/Plus feeds arg #0 (#13508, #15736).
      */
     private function consumerImmediateUnaryHoistedDeadTempArgZero(?Op $cfgCallOp, Block $block): bool
@@ -30120,6 +30205,120 @@ class Compiler {
     }
 
     /**
+     * explode(PATH_SEPARATOR, get_include_path()) — hoisted ConstFetch separator + sibling FuncCall haystack (#15833).
+     *
+     * @return list<OpCode>|null
+     */
+    private function compileExplodeLeadingConstFetchFuncCallInlineCallArgSends(
+        array $args,
+        Block $block,
+        Op $cfgCallOp
+    ): ?array {
+        $blockOpsAtEntry = \count($block->opCodes);
+        if (null === $block->orig || !property_exists($cfgCallOp, 'args') || !is_array($cfgCallOp->args)) {
+            return null;
+        }
+        if ('explode' !== $this->resolveCfgFuncCallName($cfgCallOp)) {
+            return null;
+        }
+        if (2 !== \count($cfgCallOp->args)) {
+            return null;
+        }
+        if (
+            isset($cfgCallOp->args[0])
+            && $this->isEmbeddedCallLiteralArg($cfgCallOp->args[0])
+        ) {
+            return null;
+        }
+        if ($this->consumerImmediateUnaryHoistedDeadTempArgZero($cfgCallOp, $block)) {
+            return null;
+        }
+        $prelude = $this->leadingConstFetchFuncCallPreludeBeforeCfgCall($cfgCallOp, $block);
+        if (null === $prelude) {
+            return null;
+        }
+        [$constFetch, $funcProducer] = $prelude;
+        if (!$constFetch instanceof Op\Expr\ConstFetch) {
+            return null;
+        }
+        if (
+            !($funcProducer instanceof Op\Expr\FuncCall || $funcProducer instanceof Op\Expr\NsFuncCall)
+        ) {
+            return null;
+        }
+
+        $producerOps = [];
+        $prevForce = $this->forceDeferredSiblingCallReturnSlot;
+        $prevInlineNested = $this->inlineNestedProducerOpsInArgSends;
+        $this->forceDeferredSiblingCallReturnSlot = true;
+        $this->inlineNestedProducerOpsInArgSends = true;
+        try {
+            $blockOpsBeforeConst = \count($block->opCodes);
+            if (null === $block->slotForOperand($constFetch->result)) {
+                foreach ($this->compileExpr($constFetch, $block) as $op) {
+                    $producerOps[] = $op;
+                }
+            }
+            $producerOps = array_merge(
+                $producerOps,
+                $this->drainBlockOpcodesAppendedSince($block, $blockOpsBeforeConst)
+            );
+            $separatorSlot = $block->slotForOperand($constFetch->result);
+            if (null === $separatorSlot) {
+                return null;
+            }
+            $separatorSlot = (string) $separatorSlot;
+
+            $blockOpsBeforeFunc = \count($block->opCodes);
+            $funcOps = $this->compileExpr($funcProducer, $block);
+            $producerOps = array_merge(
+                $producerOps,
+                $this->drainBlockOpcodesAppendedSince($block, $blockOpsBeforeFunc),
+                $funcOps
+            );
+        } finally {
+            $this->forceDeferredSiblingCallReturnSlot = $prevForce;
+            $this->inlineNestedProducerOpsInArgSends = $prevInlineNested;
+        }
+
+        $haystackSlot = null;
+        foreach (array_reverse($producerOps) as $op) {
+            if (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type && null !== $op->arg1) {
+                $haystackSlot = (string) $op->arg1;
+                break;
+            }
+        }
+        if (null === $haystackSlot) {
+            return null;
+        }
+
+        $sends = [];
+        foreach ($args as $argIndex => $arg) {
+            $valueSlot = match ((int) $argIndex) {
+                0 => $separatorSlot,
+                1 => $haystackSlot,
+                default => null,
+            };
+            if (null === $valueSlot) {
+                $valueSlot = $this->compileOperand($arg, $block, true);
+            }
+            $sends[] = new OpCode(
+                OpCode::TYPE_ARG_SEND,
+                $valueSlot,
+                $this->callArgNameSlot($arg, $block),
+                null
+            );
+        }
+
+        $strayBlockOps = $this->drainBlockOpcodesAppendedSince($block, $blockOpsAtEntry);
+        if ([] !== $strayBlockOps) {
+            $producerOps = array_merge($strayBlockOps, $producerOps);
+        }
+
+        return array_merge($producerOps, $sends);
+    }
+
+    /**
      * array_chunk(range(1,5), 2, true) — hoisted FuncCall haystack + ConstFetch preserve_keys (#11767).
      *
      * @return list<OpCode>|null
@@ -36331,6 +36530,20 @@ class Compiler {
                 return true;
             }
         }
+        // array_chunk(range(...), 2, true) — php-cfg dead temps may not share cfg roots (#11767).
+        if (
+            $fetch instanceof Op\Expr\ConstFetch
+            && ($ops[$fetchIndex + 1] ?? null) === $consumer
+        ) {
+            $name = $this->staticNameFromOperand($fetch->name);
+            if (null !== $name && \in_array(strtolower($name), ['true', 'false', 'null'], true)) {
+                foreach ($consumer->args as $arg) {
+                    if ($this->callArgIsDeadInlineTemporary($arg)) {
+                        return true;
+                    }
+                }
+            }
+        }
 
         return false;
     }
@@ -37780,6 +37993,10 @@ class Compiler {
         $this->validateCallArgOrder($args);
 
         if (null !== $cfgCallOp) {
+            $explodeSends = $this->compileExplodeLeadingConstFetchFuncCallInlineCallArgSends($args, $block, $cfgCallOp);
+            if (null !== $explodeSends) {
+                return $explodeSends;
+            }
             $arrayChunkSends = $this->compileArrayChunkInlineNestedCallArgSends($args, $block, $cfgCallOp);
             if (null !== $arrayChunkSends) {
                 return $arrayChunkSends;
@@ -42940,6 +43157,21 @@ class Compiler {
                     $valueSlot = $mergeForcedSlot;
                 }
             }
+            if (null !== $cfgCallOp) {
+                $leadingConstFuncPreludeEmit = [];
+                $leadingConstFuncPreludeSlot = $this->finalizeLeadingConstFetchFuncCallPreludeCallArgSlot(
+                    $block,
+                    $cfgCallOp,
+                    (int) $argIndex,
+                    $leadingConstFuncPreludeEmit
+                );
+                if ([] !== $leadingConstFuncPreludeEmit) {
+                    $sends = array_merge($sends, $leadingConstFuncPreludeEmit);
+                }
+                if (null !== $leadingConstFuncPreludeSlot) {
+                    $valueSlot = $leadingConstFuncPreludeSlot;
+                }
+            }
             $sends[] = new OpCode(OpCode::TYPE_ARG_SEND, $valueSlot, $nameSlot, $unpackFlag);
         }
 
@@ -46685,7 +46917,14 @@ class Compiler {
             }
         }
         $initPrependedBeforeArgConstFetch = false;
-        if (!$skipPrependForSiblingFuncProducer && !$skipPrependForHaystackFamilyDimFetch) {
+        $skipPrependForExplodeLeadingConstFunc = null !== $cfgCallOp
+            && 'explode' === strtolower($this->resolveCfgFuncCallName($cfgCallOp) ?? '')
+            && null !== $this->leadingConstFetchFuncCallPreludeBeforeCfgCall($cfgCallOp, $block);
+        if (
+            !$skipPrependForSiblingFuncProducer
+            && !$skipPrependForHaystackFamilyDimFetch
+            && !$skipPrependForExplodeLeadingConstFunc
+        ) {
             $initPrependedBeforeArgConstFetch = $this->prependFuncCallInitBeforeTrailingArgConstFetches(
                 $block,
                 $init
