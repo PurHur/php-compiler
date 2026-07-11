@@ -33,4 +33,20 @@ final class TraitCompositionConflictMessage
     ): string {
         return self::incompatibleProperty($className, $traitName, $propertyName, $className);
     }
+
+    /**
+     * Runtime E_ERROR fatal for trait property composition (#17995, zend_inheritance.c).
+     *
+     * @return never
+     */
+    public static function throwRuntimeFatal(string $message, string $sourceFile, int $sourceLine): void
+    {
+        $file = '' !== $sourceFile ? $sourceFile : 'Standard input code';
+        throw new \LogicException(sprintf(
+            'Fatal error: %s in %s on line %d',
+            $message,
+            $file,
+            max(1, $sourceLine),
+        ));
+    }
 }
