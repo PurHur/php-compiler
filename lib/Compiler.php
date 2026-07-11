@@ -17347,7 +17347,10 @@ class Compiler {
         if ($this->isEmbeddedCallLiteralArg($callArg)) {
             return null;
         }
-        if (\count($callArgs) < 2) {
+        if (
+            \count($callArgs) < 2
+            && !$this->cfgCallAcceptsSingleInlineClosureCallback($cfgCallOp)
+        ) {
             return null;
         }
         $producers = $this->precedingInlineCallArgProducersBeforeCfgOp($block->orig->children, $cfgCallOp);
@@ -24413,6 +24416,17 @@ class Compiler {
             if ($this->siblingInlineCallProducerSkipsHoistedArgChain($child, $cfgChildren[$j + 1] ?? null)) {
                 continue;
             }
+            if (
+                ($child instanceof Op\Expr\FuncCall || $child instanceof Op\Expr\NsFuncCall)
+                && $this->isStatementLevelSideEffectFuncCall($child)
+            ) {
+                $consumer = $cfgChildren[$consumerIndex] ?? null;
+                if ($consumer instanceof Op\Expr\FuncCall || $consumer instanceof Op\Expr\NsFuncCall) {
+                    if ($this->cfgCallAcceptsSingleInlineClosureCallback($consumer)) {
+                        continue;
+                    }
+                }
+            }
             ++$count;
         }
 
@@ -26643,6 +26657,18 @@ class Compiler {
             if ($skip instanceof Op\Expr\Assign || $skip instanceof Op\Expr\AssignRef) {
                 ++$first;
                 continue;
+            }
+            if (
+                ($skip instanceof Op\Expr\FuncCall || $skip instanceof Op\Expr\NsFuncCall)
+                && $this->isStatementLevelSideEffectFuncCall($skip)
+            ) {
+                $consumer = $cfgChildren[$consumerIndex] ?? null;
+                if ($consumer instanceof Op\Expr\FuncCall || $consumer instanceof Op\Expr\NsFuncCall) {
+                    if ($this->cfgCallAcceptsSingleInlineClosureCallback($consumer)) {
+                        ++$first;
+                        continue;
+                    }
+                }
             }
             break;
         }
@@ -33342,6 +33368,44 @@ class Compiler {
         return strtolower($calleeName);
     }
 
+    /**
+     * Zend handler builtins whose sole argument may be an inline Closure/ArrowFunction (#17846, #17845).
+     *
+     * touch(); ob_start(fn(...)) must not treat touch as a hoisted sibling arg producer.
+     */
+    private function builtinAcceptsSingleInlineClosureCallback(?string $funcName, int $argCount = 1): bool
+    {
+        if (null === $funcName || '' === $funcName || 1 !== $argCount) {
+            return false;
+        }
+
+        return \in_array(strtolower($funcName), [
+            'ob_start',
+            'set_error_handler',
+            'set_exception_handler',
+            'register_shutdown_function',
+            'register_tick_function',
+            'unregister_tick_function',
+            'header_register_callback',
+            'spl_autoload_register',
+        ], true);
+    }
+
+    private function cfgCallAcceptsSingleInlineClosureCallback(Op $callOp): bool
+    {
+        if (!$callOp instanceof Op\Expr\FuncCall && !$callOp instanceof Op\Expr\NsFuncCall) {
+            return false;
+        }
+        if (!\is_array($callOp->args ?? null)) {
+            return false;
+        }
+
+        return $this->builtinAcceptsSingleInlineClosureCallback(
+            $this->resolveCfgFuncCallName($callOp),
+            \count($callOp->args)
+        );
+    }
+
     /** Callback arg index for closure + inline Array_ hoists (array_map vs array_reduce, #10775). */
     private function inlineClosureArrayPairCallbackArgIndex(?string $funcName): int
     {
@@ -33366,6 +33430,13 @@ class Compiler {
         if (in_array($funcName, [
             'array_map',
             'register_shutdown_function',
+            'ob_start',
+            'set_error_handler',
+            'set_exception_handler',
+            'register_tick_function',
+            'unregister_tick_function',
+            'header_register_callback',
+            'spl_autoload_register',
         ], true)) {
             return 0;
         }
@@ -35159,7 +35230,7 @@ class Compiler {
             [$callOp, $argIndex] = $callSite;
             if (
                 0 === $argIndex
-                && 'register_shutdown_function' === $this->resolveCfgFuncCallName($callOp)
+                && $this->cfgCallAcceptsSingleInlineClosureCallback($callOp)
             ) {
                 foreach ($this->precedingInlineCallArgProducersBeforeCfgOp($block->orig->children, $callOp) as $candidate) {
                     if ($candidate instanceof Op\Expr\Closure || $candidate instanceof Op\Expr\ArrowFunction) {
