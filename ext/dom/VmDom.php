@@ -819,7 +819,7 @@ final class VmDom
         $entry = new ObjectEntry($class);
         $entry->constructed = true;
         $entry->getProperty(self::PROP_NODE_NAME)->string($name);
-        self::initNodePropertySlots($entry);
+        self::initElementPropertySlots($entry);
 
         $state = new DomNodeState();
         $state->nodeType = DomConstants::XML_ELEMENT_NODE;
@@ -837,6 +837,7 @@ final class VmDom
             self::syncElementClassList($ctx, $entry);
         }
         self::ensureChildNodesList($ctx, $entry);
+        self::ensureElementAttributesMap($ctx, $entry);
 
         $var = new Variable(Variable::TYPE_OBJECT);
         $var->object($entry);
@@ -857,7 +858,7 @@ final class VmDom
         $entry = new ObjectEntry($class);
         $entry->constructed = true;
         $entry->getProperty(self::PROP_NODE_NAME)->string($qualifiedName);
-        self::initNodePropertySlots($entry);
+        self::initElementPropertySlots($entry);
 
         $state = new DomNodeState();
         $state->nodeType = DomConstants::XML_ELEMENT_NODE;
@@ -876,6 +877,7 @@ final class VmDom
             self::syncElementClassList($ctx, $entry);
         }
         self::ensureChildNodesList($ctx, $entry);
+        self::ensureElementAttributesMap($ctx, $entry);
 
         $var = new Variable(Variable::TYPE_OBJECT);
         $var->object($entry);
@@ -4653,6 +4655,28 @@ final class VmDom
         return $ids;
     }
 
+    /** Read DOMElement::$attributes without re-entering managed-property dispatch (#17619). */
+    public static function elementAttributesVariable(ObjectEntry $element): Variable
+    {
+        $props = $element->propertiesWithNames();
+        if (!isset($props[self::PROP_ATTRIBUTES])) {
+            throw new \LogicException('DOMElement attributes property slot is missing');
+        }
+        $var = new Variable();
+        $var->copyFrom($props[self::PROP_ATTRIBUTES]);
+
+        return $var;
+    }
+
+    /** Zend dom_element_attributes_read — empty DOMNamedNodeMap before first attribute (ext/dom/attr.c; #17619). */
+    public static function ensureElementAttributesMap(Context $ctx, ObjectEntry $element): void
+    {
+        if (!self::isElement($element) || !DomRegistry::has($element)) {
+            return;
+        }
+        self::syncElementAttributes($ctx, $element);
+    }
+
     private static function syncElementAttributes(Context $ctx, ObjectEntry $element): void
     {
         if (!self::isElement($element)) {
@@ -4662,7 +4686,12 @@ final class VmDom
         $state = DomRegistry::state($element);
         $attrIds = self::collectAttributeNodeIds($ctx, $element);
 
-        $attrsVar = $element->getProperty(self::PROP_ATTRIBUTES);
+        $props = $element->propertiesWithNames();
+        if (!isset($props[self::PROP_ATTRIBUTES])) {
+            $element->allocateProperty(self::PROP_ATTRIBUTES);
+            $props = $element->propertiesWithNames();
+        }
+        $attrsVar = $props[self::PROP_ATTRIBUTES];
         if (null !== $state->attributesListId) {
             $map = DomRegistry::entry($state->attributesListId);
             if (null !== $map) {

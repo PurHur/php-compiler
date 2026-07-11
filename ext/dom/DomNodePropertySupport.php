@@ -26,6 +26,7 @@ final class DomNodePropertySupport
             || strtolower(VmDom::PROP_NODE_NAME) === $lc
             || strtolower(VmDom::PROP_TAG_NAME) === $lc
             || strtolower(VmDom::PROP_OWNER_DOCUMENT) === $lc
+            || (VmDom::isElement($object) && strtolower(VmDom::PROP_ATTRIBUTES) === $lc)
             || strtolower(VmDom::PROP_NODE_VALUE) === $lc
             || strtolower(VmDom::PROP_TEXT_CONTENT) === $lc
             || strtolower(VmDom::PROP_BASE_URI) === $lc
@@ -68,6 +69,14 @@ final class DomNodePropertySupport
             }
 
             return $var;
+        }
+        if (VmDom::isElement($object) && strtolower(VmDom::PROP_ATTRIBUTES) === $lc) {
+            if (null === $ctx) {
+                $ctx = \PHPCompiler\VM\VmActiveContextJitHelper::resolve();
+            }
+            VmDom::ensureElementAttributesMap($ctx, $object);
+
+            return VmDom::elementAttributesVariable($object);
         }
         if (strtolower(VmDom::PROP_NODE_VALUE) === $lc) {
             $value = VmDom::readNodeValue($object);
