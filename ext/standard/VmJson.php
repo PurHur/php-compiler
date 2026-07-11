@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\Frame;
 use PHPCompiler\MethodVisibility;
 use PHPCompiler\VM;
@@ -514,6 +515,11 @@ final class VmJson
         }
 
         if (null === $case->enumClass->backedType) {
+            if (CompilerVersion::jsonEncodeUnitEnumValueError()) {
+                throw new \ValueError(
+                    'json_encode(): Argument #1 ($value) contains an invalid JSON type'
+                );
+            }
             throw new VmJsonExportException(self::ERROR_UNSUPPORTED_TYPE);
         }
         $backing = $case->backingValue->resolveIndirect();
