@@ -5448,6 +5448,7 @@ restart:
 
                         return self::EXCEPTION;
                     }
+                    $this->savePendingOutboundCallForInlineNew($frame);
                     $frame->call = $this->context->functions[$lcname];
                     $frame->callArgs = [];
                     $frame->callArgEntries = [];
@@ -12445,7 +12446,7 @@ restart:
     }
 
     /**
-     * Inline `new` in a call arg overwrites pending FUNCCALL_INIT state (#15217).
+     * Inline `new` or nested FUNCCALL_INIT in a call arg overwrites pending outbound call state (#15217, #17970).
      */
     private function savePendingOutboundCallForInlineNew(Frame $frame): void
     {
