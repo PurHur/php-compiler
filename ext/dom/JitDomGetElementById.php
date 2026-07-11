@@ -50,7 +50,7 @@ final class JitDomGetElementById
             VmDom::PROP_ELEMENT_ID_MAP,
             $classId
         );
-        $ht = HashTableHelper::loadHashtablePointer($context, $mapVar);
+        $ht = HashTableHelper::readHashtableFromValueBox($context, $mapVar);
         $foundVar = HashTableHelper::readStringKeyToValueBox($context, $ht, $idStr);
 
         return JitValueBox::valuePtrFromVariable($context, $foundVar);
@@ -63,7 +63,7 @@ final class JitDomGetElementById
         if ($object->hasProperty($classId, VmDom::PROP_ELEMENT_ID_MAP)) {
             return;
         }
-        $object->defineProperty($classId, VmDom::PROP_ELEMENT_ID_MAP, JITVariable::TYPE_HASHTABLE);
+        $object->defineProperty($classId, VmDom::PROP_ELEMENT_ID_MAP, JITVariable::TYPE_VALUE);
     }
 
     private static function loadObjectArg(Context $context, JITVariable $arg): Value

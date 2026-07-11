@@ -118,7 +118,7 @@ final class DomInstanceMethodJit
         $object->defineProperty($classId, 'textContent', Variable::TYPE_STRING);
         $docId = $object->lookup('DOMDocument');
         if (!$object->hasProperty($docId, VmDom::PROP_ELEMENT_ID_MAP)) {
-            $object->defineProperty($docId, VmDom::PROP_ELEMENT_ID_MAP, Variable::TYPE_HASHTABLE);
+            $object->defineProperty($docId, VmDom::PROP_ELEMENT_ID_MAP, Variable::TYPE_VALUE);
         }
     }
 }

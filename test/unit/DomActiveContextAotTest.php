@@ -52,8 +52,9 @@ final class DomActiveContextAotTest extends TestCase
     public function testDomGetElementByIdUsesPureLlvmIdMap(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/dom/JitDomGetElementById.php');
-        $this->assertStringContainsString('HashTableHelper::readStringKeyToValueBox', $source);
+        $this->assertStringContainsString('HashTableHelper::readHashtableFromValueBox', $source);
         $this->assertStringContainsString('VmDom::PROP_ELEMENT_ID_MAP', $source);
+        $this->assertStringContainsString('TYPE_VALUE', $source);
         $call = (string) file_get_contents(__DIR__.'/../../lib/JIT/Call/DomDocumentGetElementById.php');
         $this->assertStringNotContainsString('DomGetElementByIdRuntime::ensureLinked', $call);
     }
