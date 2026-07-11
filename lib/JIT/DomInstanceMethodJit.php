@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT;
 
 use PHPCompiler\JIT\Call;
-use PHPCompiler\JIT\Call\DomInstanceMethod;
 
 /** Lazy registration for ext/dom JIT instance-method proxies (#17130). */
 final class DomInstanceMethodJit
@@ -20,12 +19,11 @@ final class DomInstanceMethodJit
         return (bool) preg_match('/^dom[a-z0-9_]*::[a-z0-9_]+$/', $lc);
     }
 
-    /** User-script AOT: direct LLVM for createElement; dedicated leaf bridges for loadHTML/getElementById (#17954). */
+    /** User-script AOT: direct LLVM for createElement; __object__* leaf for loadHTML (#17954). */
     private static function isUserScriptDomMethod(string $proxyLc): bool
     {
         if ('domdocument::createelement' === $proxyLc
-            || 'domdocument::loadhtml' === $proxyLc
-            || 'domdocument::getelementbyid' === $proxyLc) {
+            || 'domdocument::loadhtml' === $proxyLc) {
             return true;
         }
 
@@ -56,9 +54,12 @@ final class DomInstanceMethodJit
 
                 return;
             }
-            if ('domdocument::loadhtml' === $lc || 'domdocument::getelementbyid' === $lc) {
-                // Use generic DomInstanceMethod + helper-runtime cache (not main-module nested JIT).
-            } elseif (!self::isUserScriptDomMethod($lc)) {
+            if ('domdocument::loadhtml' === $lc) {
+                $context->functionProxies[$lc] = new Call\DomDocumentLoadHTML();
+
+                return;
+            }
+            if (!self::isUserScriptDomMethod($lc)) {
                 return;
             }
         }
@@ -78,7 +79,6 @@ final class DomInstanceMethodJit
             self::ensureDomElementPropertyLayout($context);
             self::ensureProxy($context, 'domdocument::createelement');
             self::ensureProxy($context, 'domdocument::loadhtml');
-            self::ensureProxy($context, 'domdocument::getelementbyid');
 
             return;
         }
@@ -91,7 +91,7 @@ final class DomInstanceMethodJit
 
     /** @var array<string, list<string>> */
     private const KNOWN_METHODS = [
-        'domdocument' => ['createelement', 'appendchild'],
+        'domdocument' => ['createelement', 'appendchild', 'loadhtml', 'getelementbyid'],
         'domnode' => ['appendchild'],
         'domelement' => ['setattribute'],
         'domtokenlist' => ['add', 'contains', 'item', 'toggle', 'remove'],

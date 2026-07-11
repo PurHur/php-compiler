@@ -44,7 +44,13 @@ final class DomActiveContextAotTest extends TestCase
         $this->assertStringContainsString('DomDocumentCreateElement', $source);
         $this->assertStringContainsString('isUserScriptDomMethod', $source);
         $this->assertStringContainsString('loadhtml', $source);
-        $this->assertStringContainsString('getelementbyid', $source);
+    }
+
+    public function testDomLoadHTMLRuntimeDefinesAbi(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/DomLoadHTMLRuntime.php');
+        $this->assertStringContainsString('DomLoadHTMLJitHelper::loadHTMLArgv', $source);
+        $this->assertStringContainsString('__phpc_dom_load_html', $source);
     }
 
     public function testDomInstanceMethodUserScriptRegistersProxiesBeforeHelperCompile(): void
