@@ -239,6 +239,52 @@ final class VmString
     }
 
     /**
+     * Z_PARAM_STR with Stringable coercion under caller strict_types (#16925, ext/standard/string.c).
+     *
+     * php-src still invokes __toString for object operands even when the caller file uses strict_types;
+     * only scalar widening is blocked.
+     *
+     * @throws \TypeError when the operand is not a string or Stringable object
+     */
+    public static function zParamStrWithStringableForFrame(
+        Frame $frame,
+        int $argIndex,
+        string $function,
+        string $paramName
+    ): string {
+        $arg = $frame->calledArgs[$argIndex]->resolveIndirect();
+        if (InternalStrictArg::isCallerStrict($frame)) {
+            if (Variable::TYPE_STRING === $arg->type) {
+                return $arg->toString();
+            }
+            if (Variable::TYPE_OBJECT === $arg->type) {
+                return self::coerceStringBuiltinArg(
+                    $frame->calledArgs[$argIndex],
+                    $function,
+                    $argIndex,
+                    $paramName
+                );
+            }
+
+            throw new \TypeError(
+                self::stringBuiltinTypeError(
+                    $function,
+                    $argIndex,
+                    $paramName,
+                    VmStreamArg::debugTypeName($arg)
+                )
+            );
+        }
+
+        return self::coerceStringBuiltinArg(
+            $frame->calledArgs[$argIndex],
+            $function,
+            $argIndex,
+            $paramName
+        );
+    }
+
+    /**
      * Coerce a path builtin operand (php-src Z_PARAM_PATH; rejects embedded NUL, #4401).
      *
      * @throws \ValueError when the path contains a null byte

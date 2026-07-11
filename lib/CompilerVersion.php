@@ -2037,14 +2037,14 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.4+ disktotalspace() legacy alias (ext/standard/filestat.c, #11922, #17319).
+     * disktotalspace() legacy alias of disk_total_space() (ext/standard/filestat.c, #11922, #17821).
      *
-     * Withheld on 8.4.0-dev reference profile (matches Zend 8.2 function_exists gate). Enable via
-     * PHP_COMPILER_PROFILE=8.4 or stable 8.4.0+ runtime.
+     * Available whenever disk_total_space() is registered — Zend 8.2+ exposes the alias on the
+     * reference profile (not a forward-profile-only builtin).
      */
     public static function supportsDisktotalspace(): bool
     {
-        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+        return true;
     }
 
     /**

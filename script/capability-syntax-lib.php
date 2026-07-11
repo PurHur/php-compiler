@@ -1316,13 +1316,6 @@ function withheldBuiltinGateDefinitions(): array
             'relPath' => 'ext/standard/getmygrgid.php',
         ],
         [
-            'names' => ['disktotalspace'],
-            'gate' => [PHPCompiler\CompilerVersion::class, 'supportsDisktotalspace'],
-            'since' => '8.3.0',
-            'module' => 'standard',
-            'relPath' => 'ext/standard/disktotalspace.php',
-        ],
-        [
             'names' => ['crc32c'],
             'gate' => [PHPCompiler\CompilerVersion::class, 'supportsCrc32c'],
             'since' => '8.3.0',
