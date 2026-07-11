@@ -1708,13 +1708,13 @@ final class ArrayBuiltinHelper
         ?Value $preserveKeys = null
     ): Value {
         if (null === $preserveKeys) {
-            if (self::isNativeArray($array->type)) {
-                return self::buildSliceFromNativeArray($context, $array, $offset, $hasLength, $length);
-            }
+            $src = self::isNativeArray($array->type)
+                ? self::nativeListToHashTable($context, $array)
+                : self::loadHashTable($context, $array);
 
             return self::buildSliceFromHashTable(
                 $context,
-                self::loadHashTable($context, $array),
+                $src,
                 $offset,
                 $hasLength,
                 $length
@@ -1751,13 +1751,13 @@ final class ArrayBuiltinHelper
         Value $hasLength,
         Value $length
     ): Value {
-        if (self::isNativeArray($array->type)) {
-            return self::buildSlicePreserveKeysFromNativeArray($context, $array, $offset, $hasLength, $length);
-        }
+        $src = self::isNativeArray($array->type)
+            ? self::nativeListToHashTable($context, $array)
+            : self::loadHashTable($context, $array);
 
         return self::buildSlicePreserveKeysFromHashTable(
             $context,
-            self::loadHashTable($context, $array),
+            $src,
             $offset,
             $hasLength,
             $length
@@ -1963,110 +1963,6 @@ final class ArrayBuiltinHelper
         return $phi;
     }
 
-    private static function buildSliceFromNativeArray(
-        Context $context,
-        Variable $array,
-        Value $offset,
-        Value $hasLength,
-        Value $length
-    ): Value {
-        $elemType = $array->type & ~Variable::IS_NATIVE_ARRAY;
-        $sizeT = $context->getTypeFromString('size_t');
-        $i64 = $context->getTypeFromString('int64');
-        $zero = $sizeT->constInt(0, false);
-        $one = $sizeT->constInt(1, false);
-        $count = $context->constantFromInteger($array->nextFreeElement, 'size_t');
-        $countI64 = $context->builder->zExt($count, $i64);
-        $normOffsetI64 = self::normalizeSliceOffset($context, $offset, $countI64);
-        $normOffset = $context->builder->truncOrBitCast($normOffsetI64, $sizeT);
-
-        $emptyHt = HashTableHelper::alloc($context);
-        $beyondEnd = $context->builder->icmp(Builder::INT_SGE, $normOffset, $count);
-        $emptyBlock = BasicBlockHelper::append($context, 'array_slice_native_empty');
-        $workBlock = BasicBlockHelper::append($context, 'array_slice_native_work');
-        $doneBlock = BasicBlockHelper::append($context, 'array_slice_native_done');
-        $context->builder->branchIf($beyondEnd, $emptyBlock, $workBlock);
-
-        $context->builder->positionAtEnd($emptyBlock);
-        $context->builder->branch($doneBlock);
-
-        $context->builder->positionAtEnd($workBlock);
-        $dest = HashTableHelper::alloc($context);
-        $srcIdxSlot = $context->builder->alloca($sizeT, 1, 'array_slice_native_src');
-        $destIdxSlot = $context->builder->alloca($sizeT, 1, 'array_slice_native_dest');
-        $takenSlot = $context->builder->alloca($sizeT, 1, 'array_slice_native_taken');
-        $context->builder->store($normOffset, $srcIdxSlot);
-        $context->builder->store($zero, $destIdxSlot);
-        $context->builder->store($zero, $takenSlot);
-        $lengthSized = $context->builder->truncOrBitCast($length, $sizeT);
-
-        $head = BasicBlockHelper::append($context, 'array_slice_native_head');
-        $body = BasicBlockHelper::append($context, 'array_slice_native_body');
-        $advance = BasicBlockHelper::append($context, 'array_slice_native_advance');
-        $context->builder->branch($head);
-
-        $context->builder->positionAtEnd($head);
-        $srcIdx = $context->builder->load($srcIdxSlot);
-        $atEnd = $context->builder->icmp(Builder::INT_SGE, $srcIdx, $count);
-        $context->builder->branchIf($atEnd, $doneBlock, $body);
-
-        $limitExit = BasicBlockHelper::append($context, 'array_slice_native_limit_exit');
-        $copyBlock = BasicBlockHelper::append($context, 'array_slice_native_copy');
-
-        $context->builder->positionAtEnd($body);
-        $taken = $context->builder->load($takenSlot);
-        $limitReached = $context->builder->and(
-            $hasLength,
-            $context->builder->icmp(Builder::INT_SGE, $taken, $lengthSized)
-        );
-        $context->builder->branchIf($limitReached, $limitExit, $copyBlock);
-
-        $context->builder->positionAtEnd($limitExit);
-        $context->builder->branch($doneBlock);
-
-        $context->builder->positionAtEnd($copyBlock);
-        $srcIdx = $context->builder->load($srcIdxSlot);
-        $slot = $context->builder->inBoundsGep($array->value, $zero, $srcIdx);
-        if (Variable::TYPE_STRING === $elemType) {
-            $elem = new Variable($context, $elemType, Variable::KIND_VARIABLE, $slot);
-        } else {
-            $elem = new Variable(
-                $context,
-                $elemType,
-                Variable::KIND_VALUE,
-                $context->builder->load($slot)
-            );
-        }
-        $destIdx = $context->builder->load($destIdxSlot);
-        HashTableHelper::setAtIndex($context, $dest, $destIdx, $elem);
-        $context->builder->store(
-            $context->builder->addNoSignedWrap($destIdx, $one),
-            $destIdxSlot
-        );
-        $context->builder->store(
-            $context->builder->addNoSignedWrap(
-                $context->builder->load($takenSlot),
-                $one
-            ),
-            $takenSlot
-        );
-        $context->builder->branch($advance);
-
-        $context->builder->positionAtEnd($advance);
-        $context->builder->store(
-            $context->builder->addNoSignedWrap($srcIdx, $one),
-            $srcIdxSlot
-        );
-        $context->builder->branch($head);
-
-        $context->builder->positionAtEnd($doneBlock);
-        $phi = $context->builder->phi($emptyHt->typeOf());
-        $phi->addIncoming($emptyHt, $emptyBlock);
-        $phi->addIncoming($dest, $limitExit);
-        $phi->addIncoming($dest, $head);
-
-        return $phi;
-    }
 
     private static function buildSliceFromHashTable(
         Context $context,
@@ -2200,103 +2096,6 @@ final class ArrayBuiltinHelper
         return $phi;
     }
 
-    private static function buildSlicePreserveKeysFromNativeArray(
-        Context $context,
-        Variable $array,
-        Value $offset,
-        Value $hasLength,
-        Value $length
-    ): Value {
-        $elemType = $array->type & ~Variable::IS_NATIVE_ARRAY;
-        $sizeT = $context->getTypeFromString('size_t');
-        $i64 = $context->getTypeFromString('int64');
-        $zero = $sizeT->constInt(0, false);
-        $one = $sizeT->constInt(1, false);
-        $count = $context->constantFromInteger($array->nextFreeElement, 'size_t');
-        $countI64 = $context->builder->zExt($count, $i64);
-        $normOffsetI64 = self::normalizeSliceOffset($context, $offset, $countI64);
-        $normOffset = $context->builder->truncOrBitCast($normOffsetI64, $sizeT);
-
-        $emptyHt = HashTableHelper::alloc($context);
-        $beyondEnd = $context->builder->icmp(Builder::INT_SGE, $normOffset, $count);
-        $emptyBlock = BasicBlockHelper::append($context, 'array_slice_pk_native_empty');
-        $workBlock = BasicBlockHelper::append($context, 'array_slice_pk_native_work');
-        $doneBlock = BasicBlockHelper::append($context, 'array_slice_pk_native_done');
-        $context->builder->branchIf($beyondEnd, $emptyBlock, $workBlock);
-
-        $context->builder->positionAtEnd($emptyBlock);
-        $context->builder->branch($doneBlock);
-
-        $context->builder->positionAtEnd($workBlock);
-        $dest = HashTableHelper::alloc($context);
-        $srcIdxSlot = $context->builder->alloca($sizeT, 1, 'array_slice_pk_native_src');
-        $takenSlot = $context->builder->alloca($sizeT, 1, 'array_slice_pk_native_taken');
-        $context->builder->store($normOffset, $srcIdxSlot);
-        $context->builder->store($zero, $takenSlot);
-        $lengthSized = $context->builder->truncOrBitCast($length, $sizeT);
-
-        $head = BasicBlockHelper::append($context, 'array_slice_pk_native_head');
-        $body = BasicBlockHelper::append($context, 'array_slice_pk_native_body');
-        $advance = BasicBlockHelper::append($context, 'array_slice_pk_native_advance');
-        $context->builder->branch($head);
-
-        $context->builder->positionAtEnd($head);
-        $srcIdx = $context->builder->load($srcIdxSlot);
-        $atEnd = $context->builder->icmp(Builder::INT_SGE, $srcIdx, $count);
-        $context->builder->branchIf($atEnd, $doneBlock, $body);
-
-        $limitExit = BasicBlockHelper::append($context, 'array_slice_pk_native_limit_exit');
-        $copyBlock = BasicBlockHelper::append($context, 'array_slice_pk_native_copy');
-
-        $context->builder->positionAtEnd($body);
-        $taken = $context->builder->load($takenSlot);
-        $limitReached = $context->builder->and(
-            $hasLength,
-            $context->builder->icmp(Builder::INT_SGE, $taken, $lengthSized)
-        );
-        $context->builder->branchIf($limitReached, $limitExit, $copyBlock);
-
-        $context->builder->positionAtEnd($limitExit);
-        $context->builder->branch($doneBlock);
-
-        $context->builder->positionAtEnd($copyBlock);
-        $srcIdx = $context->builder->load($srcIdxSlot);
-        $slot = $context->builder->inBoundsGep($array->value, $zero, $srcIdx);
-        if (Variable::TYPE_STRING === $elemType) {
-            $elem = new Variable($context, $elemType, Variable::KIND_VARIABLE, $slot);
-        } else {
-            $elem = new Variable(
-                $context,
-                $elemType,
-                Variable::KIND_VALUE,
-                $context->builder->load($slot)
-            );
-        }
-        HashTableHelper::setAtIndex($context, $dest, $srcIdx, $elem);
-        $context->builder->store(
-            $context->builder->addNoSignedWrap(
-                $context->builder->load($takenSlot),
-                $one
-            ),
-            $takenSlot
-        );
-        $context->builder->branch($advance);
-
-        $context->builder->positionAtEnd($advance);
-        $context->builder->store(
-            $context->builder->addNoSignedWrap($srcIdx, $one),
-            $srcIdxSlot
-        );
-        $context->builder->branch($head);
-
-        $context->builder->positionAtEnd($doneBlock);
-        $phi = $context->builder->phi($emptyHt->typeOf());
-        $phi->addIncoming($emptyHt, $emptyBlock);
-        $phi->addIncoming($dest, $limitExit);
-        $phi->addIncoming($dest, $head);
-
-        return $phi;
-    }
 
     private static function buildSlicePreserveKeysFromHashTable(
         Context $context,
