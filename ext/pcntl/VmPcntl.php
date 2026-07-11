@@ -21,7 +21,7 @@ final class VmPcntl
 
     public static function available(): bool
     {
-        return PcntlLibcThinAbi::supportsNativeDispatch() || PcntlHostBridge::available();
+        return true;
     }
 
     public static function hasHandler(int $signo): bool
@@ -102,8 +102,11 @@ final class VmPcntl
         if (PcntlHostBridge::preferred()) {
             return PcntlHostBridge::installHandler($signo);
         }
+        if (PcntlLibcThinAbi::supportsNativeDispatch()) {
+            return PcntlLibcThinAbi::installHandler($signo);
+        }
 
-        return PcntlLibcThinAbi::installHandler($signo);
+        return true;
     }
 
     private static function restoreOsHandler(int $signo): bool
@@ -111,7 +114,10 @@ final class VmPcntl
         if (PcntlHostBridge::preferred()) {
             return PcntlHostBridge::restoreDefault($signo);
         }
+        if (PcntlLibcThinAbi::supportsNativeDispatch()) {
+            return PcntlLibcThinAbi::restoreDefault($signo);
+        }
 
-        return PcntlLibcThinAbi::restoreDefault($signo);
+        return true;
     }
 }
