@@ -366,6 +366,14 @@
         "ext/igbinary/igbinary_serialize.php",
         "ext/igbinary/igbinary_unpack.php",
         "ext/igbinary/igbinary_unserialize.php",
+        "ext/inotify/InotifyConstants.php",
+        "ext/inotify/InotifyLibcThinAbi.php",
+        "ext/inotify/Module.php",
+        "ext/inotify/VmInotify.php",
+        "ext/inotify/inotify_add_watch.php",
+        "ext/inotify/inotify_init.php",
+        "ext/inotify/inotify_read.php",
+        "ext/inotify/inotify_rm_watch.php",
         "ext/intl/BuiltinClasses.php",
         "ext/intl/CollatorCreate.php",
         "ext/intl/IntlClassMethod.php",
@@ -4708,9 +4716,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 4474,
+        "inventory_files": 4482,
         "excluded": 0,
-        "eligible": 4474,
+        "eligible": 4482,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
