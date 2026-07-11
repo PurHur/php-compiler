@@ -323,6 +323,7 @@
         "ext/hash/BuiltinClasses.php",
         "ext/hash/HashAlgosJitHelper.php",
         "ext/hash/HashContextDebugInfo.php",
+        "ext/hash/HashContextJitHelper.php",
         "ext/hash/HashContextJitSupport.php",
         "ext/hash/HashFunction.php",
         "ext/hash/JitHashAlgos.php",
@@ -3091,6 +3092,9 @@
         "lib/JIT/Builtin/GlobalIntrospectionNameRuntime.php",
         "lib/JIT/Builtin/GzStreamIo.php",
         "lib/JIT/Builtin/GzStreamRuntime.php",
+        "lib/JIT/Builtin/HashContextCopyLlvm.php",
+        "lib/JIT/Builtin/HashContextEmbedBridge.php",
+        "lib/JIT/Builtin/HashContextFinalLlvm.php",
         "lib/JIT/Builtin/HashContextRuntime.php",
         "lib/JIT/Builtin/HashtableValueOutJitBridge.php",
         "lib/JIT/Builtin/Hebrev.php",
@@ -4640,9 +4644,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 4406,
+        "inventory_files": 4410,
         "excluded": 0,
-        "eligible": 4406,
+        "eligible": 4410,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
