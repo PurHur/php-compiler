@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 4376 |
-| Phase A inventory files (M2 ratio SSOT) | 4376 |
+| PHP files on vm.php path | 4385 |
+| Phase A inventory files (M2 ratio SSOT) | 4385 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 11790 |
+| Source constructs flagged (warnings) | 11822 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -2709,6 +2709,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/types/Module.php` | 0 | 12 |
 | `ext/types/is_type.php` | 0 | 1 |
 | `ext/types/strlen.php` | 0 | 1 |
+| `ext/uri/BuiltinClasses.php` | 0 | 19 |
+| `ext/uri/Module.php` | 0 | 1 |
+| `ext/uri/UriClassMethods.php` | 0 | 4 |
+| `ext/uri/UriExtensionPolicy.php` | 0 | 1 |
+| `ext/uri/VmUri.php` | 0 | 6 |
 | `ext/xml/BuiltinClasses.php` | 0 | 1 |
 | `ext/xml/Module.php` | 0 | 5 |
 | `ext/xml/VmXml.php` | 0 | 1 |
@@ -3736,7 +3741,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/ReadonlyFunctionRejector.php` | 0 | 2 |
 | `lib/ReadonlyMethodModifierRejector.php` | 0 | 2 |
 | `lib/ReferenceProfileTokenScan.php` | 0 | 1 |
-| `lib/Runtime.php` | 0 | 74 |
+| `lib/Runtime.php` | 0 | 75 |
 | `lib/RuntimeStrictness.php` | 0 | 1 |
 | `lib/SourceBareThrowRewriter.php` | 0 | 1 |
 | `lib/SourcePreprocessor/PropertyHooks.php` | 0 | 4 |
@@ -20437,7 +20442,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new Variable (line 40)
-- new Variable (line 44)
+- new Variable (line 50)
 - 2 class method(s)
 
 ### `ext/standard/rename_.php`
@@ -21895,6 +21900,57 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
+
+### `ext/uri/BuiltinClasses.php`
+
+**Warnings** (review for bootstrap subset):
+- new ClassEntry (line 37)
+- new ClassEntry (line 43)
+- new ClassEntry (line 49)
+- new ClassEntry (line 53)
+- new ClassEntry (line 91)
+- new Variable (line 105)
+- new ClassEntry (line 124)
+- new Rfc3986UriParse (line 125)
+- new Rfc3986UriGetHost (line 128)
+- new Rfc3986UriGetPath (line 129)
+- new Rfc3986UriGetScheme (line 130)
+- new Rfc3986UriToString (line 131)
+- new ClassEntry (line 149)
+- new WhatWgUrlParse (line 150)
+- new WhatWgUrlGetScheme (line 153)
+- new WhatWgUrlGetAsciiHost (line 154)
+- new WhatWgUrlGetPath (line 155)
+- new WhatWgUrlToAsciiString (line 156)
+- 7 class method(s)
+
+### `ext/uri/Module.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s)
+
+### `ext/uri/UriClassMethods.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 26)
+- new ArgumentCountError (line 176)
+- 13 class method(s)
+- 10 closure(s)
+
+### `ext/uri/UriExtensionPolicy.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/uri/VmUri.php`
+
+**Warnings** (review for bootstrap subset):
+- new ObjectEntry (line 80)
+- new Variable (line 83)
+- new ObjectEntry (line 112)
+- new Variable (line 115)
+- new Uri\InvalidUriException (line 128)
+- 9 class method(s)
 
 ### `ext/xml/BuiltinClasses.php`
 
@@ -28876,17 +28932,18 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ext\brotli\Module (line 256)
 - new ext\sodium\Module (line 257)
 - new ext\sqlite3\Module (line 258)
-- new ext\standard\Module (line 259)
-- new JIT (line 335)
-- new JITContext (line 349)
-- new SealedClassPreprocessor (line 413)
-- new StaticClassPreprocessor (line 416)
-- new SourcePreprocessor\PropertyHooks (line 419)
-- new State (line 558)
-- new ReflectionProperty (line 585)
-- new ReflectionProperty (line 588)
-- new LintCompiler (line 994)
-- new Variable (line 1124)
+- new ext\uri\Module (line 259)
+- new ext\standard\Module (line 260)
+- new JIT (line 336)
+- new JITContext (line 350)
+- new SealedClassPreprocessor (line 414)
+- new StaticClassPreprocessor (line 417)
+- new SourcePreprocessor\PropertyHooks (line 420)
+- new State (line 559)
+- new ReflectionProperty (line 586)
+- new ReflectionProperty (line 589)
+- new LintCompiler (line 995)
+- new Variable (line 1125)
 - 53 class method(s)
 
 ### `lib/RuntimeStrictness.php`
@@ -32647,8 +32704,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/TickQueue.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 38)
-- 6 class method(s)
+- new Variable (line 33)
+- 8 class method(s)
 
 ### `lib/VM/TraitCompositionConflictMessage.php`
 

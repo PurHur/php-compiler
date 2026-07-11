@@ -1,0 +1,23 @@
+--- vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php
++++ vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php
+@@ -645,6 +645,10 @@ class TypeReconstructor
+ 
+     protected function resolveOp_Expr_ClassConstFetch(Operand $var, Op\Expr\ClassConstFetch $op, SplObjectStorage $resolved)
+     {
++        // PHP 8.3+ Class::{$name} — const name is runtime, not a Literal (#17801).
++        if (! ($op->name instanceof Operand\Literal)) {
++            return false;
++        }
+         $classes = [];
+         if ($op->class instanceof Operand\Literal) {
+             $class = strtolower($op->class->value);
+@@ -732,6 +736,9 @@ class TypeReconstructor
+ 
+     protected function resolveClassConstant($class, $op, SplObjectStorage $resolved)
+     {
++        if (! ($op->name instanceof Operand\Literal)) {
++            return false;
++        }
+         $try = $class.'::'.$op->name->value;
+         if (isset($this->state->constants[$try])) {
+             $types = [];
