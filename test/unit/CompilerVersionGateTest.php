@@ -374,6 +374,26 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
+    public function testJsonEncodeUnitEnumValueErrorFalseOnReferenceProfile(): void
+    {
+        $this->assertFalse(CompilerVersion::jsonEncodeUnitEnumValueError());
+    }
+
+    public function testJsonEncodeUnitEnumValueErrorTrueOnForwardProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertTrue(CompilerVersion::jsonEncodeUnitEnumValueError());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     public function testSupportsStreamSupportsFalseOnReferenceProfile(): void
     {
         $this->assertFalse(CompilerVersion::supportsStreamSupports());
