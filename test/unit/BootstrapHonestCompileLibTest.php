@@ -181,6 +181,20 @@ LOG;
         $this->assertStringContainsString('--sdk-url', $phpc);
     }
 
+    public function testBootstrapInitTier1DoesNotRequireComposer(): void
+    {
+        $body = (string) file_get_contents(self::$root.'/script/bootstrap-init.sh');
+        $this->assertStringContainsString('WITH_COMPOSER=0', $body);
+        $this->assertStringContainsString('skipping composer (Tier 1 only', $body);
+        $this->assertStringContainsString('--with-composer', $body);
+        $this->assertStringContainsString('#15600', $body);
+        $this->assertMatchesRegularExpression(
+            '/if \[\[ "\$\{WITH_COMPOSER\}" == "1" \]\]; then/',
+            $body,
+            'composer install only on --with-composer (#15600)'
+        );
+    }
+
     public function testBootstrapNativeLintScriptExists(): void
     {
         $script = self::$root.'/script/bootstrap-native-lint.sh';
