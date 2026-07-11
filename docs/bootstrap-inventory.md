@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 4385 |
-| Phase A inventory files (M2 ratio SSOT) | 4385 |
+| PHP files on vm.php path | 4397 |
+| Phase A inventory files (M2 ratio SSOT) | 4397 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 11822 |
+| Source constructs flagged (warnings) | 11853 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -254,7 +254,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/dom/TokenListReplace.php` | 0 | 1 |
 | `ext/dom/TokenListSupports.php` | 0 | 1 |
 | `ext/dom/TokenListToggle.php` | 0 | 1 |
-| `ext/dom/VmDom.php` | 0 | 294 |
+| `ext/dom/VmDom.php` | 0 | 295 |
 | `ext/dom/VmDomInstanceInvoke.php` | 0 | 2 |
 | `ext/dom/VmDomJitDispatch.php` | 0 | 9 |
 | `ext/dom/VmDomJitFrame.php` | 0 | 1 |
@@ -568,6 +568,18 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/session/Module.php` | 0 | 23 |
 | `ext/session/SessionConstants.php` | 0 | 1 |
 | `ext/session/SessionFileStorage.php` | 0 | 1 |
+| `ext/simplexml/BuiltinClasses.php` | 0 | 1 |
+| `ext/simplexml/Module.php` | 0 | 3 |
+| `ext/simplexml/SimpleXmlElementCount.php` | 0 | 1 |
+| `ext/simplexml/SimpleXmlElementGet.php` | 0 | 1 |
+| `ext/simplexml/SimpleXmlElementOffsetExists.php` | 0 | 1 |
+| `ext/simplexml/SimpleXmlElementOffsetGet.php` | 0 | 1 |
+| `ext/simplexml/SimpleXmlElementToString.php` | 0 | 1 |
+| `ext/simplexml/SimpleXmlNodeState.php` | 0 | 1 |
+| `ext/simplexml/SimpleXmlRegistry.php` | 0 | 1 |
+| `ext/simplexml/VmSimpleXml.php` | 0 | 15 |
+| `ext/simplexml/simplexml_load_file.php` | 0 | 2 |
+| `ext/simplexml/simplexml_load_string.php` | 0 | 2 |
 | `ext/sockets/BuiltinClasses.php` | 0 | 1 |
 | `ext/sockets/BuiltinEnums.php` | 0 | 3 |
 | `ext/sockets/JitSocketAtmark.php` | 0 | 1 |
@@ -2713,7 +2725,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/uri/Module.php` | 0 | 1 |
 | `ext/uri/UriClassMethods.php` | 0 | 4 |
 | `ext/uri/UriExtensionPolicy.php` | 0 | 1 |
-| `ext/uri/VmUri.php` | 0 | 6 |
+| `ext/uri/VmUri.php` | 0 | 5 |
 | `ext/xml/BuiltinClasses.php` | 0 | 1 |
 | `ext/xml/Module.php` | 0 | 5 |
 | `ext/xml/VmXml.php` | 0 | 1 |
@@ -3741,7 +3753,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/ReadonlyFunctionRejector.php` | 0 | 2 |
 | `lib/ReadonlyMethodModifierRejector.php` | 0 | 2 |
 | `lib/ReferenceProfileTokenScan.php` | 0 | 1 |
-| `lib/Runtime.php` | 0 | 75 |
+| `lib/Runtime.php` | 0 | 76 |
 | `lib/RuntimeStrictness.php` | 0 | 1 |
 | `lib/SourceBareThrowRewriter.php` | 0 | 1 |
 | `lib/SourcePreprocessor/PropertyHooks.php` | 0 | 4 |
@@ -5173,7 +5185,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/DomNodePropertySupport.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 46)
+- new Variable (line 47)
 - 3 class method(s)
 
 ### `ext/dom/DomRegistry.php`
@@ -5832,96 +5844,97 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new DomNodeState (line 802)
 - new ObjectEntry (line 819)
 - new DomNodeState (line 824)
-- new Variable (line 841)
-- new ObjectEntry (line 857)
-- new DomNodeState (line 862)
-- new Variable (line 880)
-- new ObjectEntry (line 895)
-- new DomNodeState (line 903)
-- new Variable (line 915)
-- new DOMException (line 932)
-- new Variable (line 936)
-- new Variable (line 942)
-- new DOMException (line 951)
-- new Variable (line 980)
-- new DOMException (line 993)
-- new DOMException (line 1006)
-- new Variable (line 1018)
-- new DOMException (line 1084)
-- new DOMException (line 1136)
-- new DOMException (line 1149)
-- new DOMException (line 1172)
-- new DOMException (line 1186)
-- new DOMException (line 1212)
-- new DOMException (line 1267)
-- new DOMException (line 1294)
-- new DOMException (line 1298)
-- new DOMException (line 1311)
-- new DOMException (line 1315)
-- new DOMException (line 1325)
-- new ObjectEntry (line 1696)
-- new DomNodeState (line 1701)
-- new ObjectEntry (line 1717)
-- new DomNodeState (line 1722)
-- new ObjectEntry (line 1738)
-- new DomNodeState (line 1743)
-- new DOMException (line 1782)
-- new DOMException (line 1792)
-- new DOMException (line 1805)
-- new DOMException (line 1824)
-- new ObjectEntry (line 1912)
-- new DomNodeState (line 1917)
-- new Variable (line 1926)
-- new ObjectEntry (line 1936)
-- new DomNodeState (line 1941)
-- new Variable (line 1947)
-- new ObjectEntry (line 2430)
-- new DomNodeState (line 2432)
-- new DOMException (line 2579)
-- new DOMException (line 2593)
-- new Variable (line 2609)
-- new DOMException (line 2623)
-- new DOMException (line 2626)
-- new DOMException (line 2634)
-- new DOMException (line 2660)
-- new DOMException (line 2673)
-- new DOMException (line 2859)
-- new DOMException (line 3056)
-- new DOMException (line 3060)
-- new DOMException (line 3149)
-- new DOMException (line 3153)
-- new DOMException (line 3211)
-- new DOMException (line 3228)
-- new DOMException (line 3257)
-- new DOMException (line 3298)
-- new DOMException (line 3323)
-- new DOMException (line 3810)
-- new Variable (line 3834)
-- new DOMException (line 4057)
-- new DOMException (line 4138)
-- new DOMException (line 4180)
-- new ObjectEntry (line 4265)
-- new DomNodeState (line 4269)
-- new Variable (line 4276)
-- new ObjectEntry (line 4476)
-- new DomNodeState (line 4480)
-- new Variable (line 4487)
-- new ObjectEntry (line 4507)
-- new DomNodeState (line 4510)
-- new Variable (line 4518)
-- new DOMException (line 4720)
-- new DOMException (line 4727)
-- new DOMException (line 4734)
-- new DOMException (line 4738)
-- new DOMException (line 4741)
-- new DOMException (line 4750)
-- new Variable (line 5520)
-- new Variable (line 5533)
-- new DOMException (line 5615)
-- new DOMException (line 5626)
-- new DOMException (line 5692)
-- new DOMException (line 5700)
-- 279 class method(s)
+- new Variable (line 842)
+- new ObjectEntry (line 858)
+- new DomNodeState (line 863)
+- new Variable (line 882)
+- new ObjectEntry (line 897)
+- new DomNodeState (line 905)
+- new Variable (line 917)
+- new DOMException (line 934)
+- new Variable (line 938)
+- new Variable (line 944)
+- new DOMException (line 953)
+- new Variable (line 982)
+- new DOMException (line 995)
+- new DOMException (line 1008)
+- new Variable (line 1020)
+- new DOMException (line 1086)
+- new DOMException (line 1138)
+- new DOMException (line 1151)
+- new DOMException (line 1174)
+- new DOMException (line 1188)
+- new DOMException (line 1214)
+- new DOMException (line 1269)
+- new DOMException (line 1296)
+- new DOMException (line 1300)
+- new DOMException (line 1313)
+- new DOMException (line 1317)
+- new DOMException (line 1327)
+- new ObjectEntry (line 1698)
+- new DomNodeState (line 1703)
+- new ObjectEntry (line 1719)
+- new DomNodeState (line 1724)
+- new ObjectEntry (line 1740)
+- new DomNodeState (line 1745)
+- new DOMException (line 1784)
+- new DOMException (line 1794)
+- new DOMException (line 1807)
+- new DOMException (line 1826)
+- new ObjectEntry (line 1914)
+- new DomNodeState (line 1919)
+- new Variable (line 1928)
+- new ObjectEntry (line 1938)
+- new DomNodeState (line 1943)
+- new Variable (line 1949)
+- new ObjectEntry (line 2432)
+- new DomNodeState (line 2434)
+- new DOMException (line 2581)
+- new DOMException (line 2595)
+- new Variable (line 2611)
+- new DOMException (line 2625)
+- new DOMException (line 2628)
+- new DOMException (line 2636)
+- new DOMException (line 2662)
+- new DOMException (line 2675)
+- new DOMException (line 2861)
+- new DOMException (line 3058)
+- new DOMException (line 3062)
+- new DOMException (line 3151)
+- new DOMException (line 3155)
+- new DOMException (line 3213)
+- new DOMException (line 3230)
+- new DOMException (line 3259)
+- new DOMException (line 3300)
+- new DOMException (line 3325)
+- new DOMException (line 3812)
+- new Variable (line 3836)
+- new DOMException (line 4059)
+- new DOMException (line 4140)
+- new DOMException (line 4182)
+- new ObjectEntry (line 4267)
+- new DomNodeState (line 4271)
+- new Variable (line 4278)
+- new ObjectEntry (line 4478)
+- new DomNodeState (line 4482)
+- new Variable (line 4489)
+- new ObjectEntry (line 4509)
+- new DomNodeState (line 4512)
+- new Variable (line 4520)
+- new Variable (line 4665)
+- new DOMException (line 4749)
+- new DOMException (line 4756)
+- new DOMException (line 4763)
+- new DOMException (line 4767)
+- new DOMException (line 4770)
+- new DOMException (line 4779)
+- new Variable (line 5549)
+- new Variable (line 5562)
+- new DOMException (line 5644)
+- new DOMException (line 5655)
+- new DOMException (line 5721)
+- new DOMException (line 5729)
+- 281 class method(s)
 - 2 closure(s)
 
 ### `ext/dom/VmDomInstanceInvoke.php`
@@ -8106,6 +8119,84 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 4 class method(s)
+
+### `ext/simplexml/BuiltinClasses.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/simplexml/Module.php`
+
+**Warnings** (review for bootstrap subset):
+- new simplexml_load_string (line 26)
+- new simplexml_load_file (line 27)
+- 2 class method(s)
+
+### `ext/simplexml/SimpleXmlElementCount.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/simplexml/SimpleXmlElementGet.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/simplexml/SimpleXmlElementOffsetExists.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/simplexml/SimpleXmlElementOffsetGet.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/simplexml/SimpleXmlElementToString.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/simplexml/SimpleXmlNodeState.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/simplexml/SimpleXmlRegistry.php`
+
+**Warnings** (review for bootstrap subset):
+- 7 class method(s)
+
+### `ext/simplexml/VmSimpleXml.php`
+
+**Warnings** (review for bootstrap subset):
+- new ClassEntry (line 30)
+- new SimpleXmlElementGet (line 38)
+- new SimpleXmlElementToString (line 40)
+- new SimpleXmlElementOffsetGet (line 43)
+- new SimpleXmlElementOffsetExists (line 46)
+- new SimpleXmlElementCount (line 49)
+- new Variable (line 128)
+- new Variable (line 134)
+- new Variable (line 143)
+- new ObjectEntry (line 212)
+- new ObjectEntry (line 222)
+- new SimpleXmlNodeState (line 225)
+- new SimpleXmlNodeState (line 247)
+- new SimpleXmlNodeState (line 256)
+- 17 class method(s)
+
+### `ext/simplexml/simplexml_load_file.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 25)
+- 2 class method(s)
+
+### `ext/simplexml/simplexml_load_string.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 25)
+- 2 class method(s)
 
 ### `ext/sockets/BuiltinClasses.php`
 
@@ -21945,11 +22036,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/uri/VmUri.php`
 
 **Warnings** (review for bootstrap subset):
-- new ObjectEntry (line 80)
-- new Variable (line 83)
-- new ObjectEntry (line 112)
-- new Variable (line 115)
-- new Uri\InvalidUriException (line 128)
+- new ObjectEntry (line 94)
+- new Variable (line 97)
+- new ObjectEntry (line 125)
+- new Variable (line 128)
 - 9 class method(s)
 
 ### `ext/xml/BuiltinClasses.php`
@@ -27987,18 +28077,18 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 656)
 - new Variable (line 674)
 - new Variable (line 717)
-- new Variable (line 999)
-- new Variable (line 1032)
-- new Variable (line 1402)
-- new Variable (line 1404)
-- new Variable (line 1433)
-- new Variable (line 1446)
-- new Variable (line 1456)
-- new Variable (line 1531)
-- new Variable (line 1545)
-- new Variable (line 1631)
-- new Variable (line 1638)
-- 56 class method(s)
+- new Variable (line 885)
+- new Variable (line 918)
+- new Variable (line 1018)
+- new Variable (line 1020)
+- new Variable (line 1049)
+- new Variable (line 1062)
+- new Variable (line 1072)
+- new Variable (line 1147)
+- new Variable (line 1161)
+- new Variable (line 1247)
+- new Variable (line 1254)
+- 46 class method(s)
 
 ### `lib/JIT/HashTableNestedExportLlvm.php`
 
@@ -28019,7 +28109,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new Variable (line 518)
-- 8 class method(s)
+- 21 class method(s)
 
 ### `lib/JIT/HeaderCallbackPolicy.php`
 
@@ -28903,47 +28993,48 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ext\zip\Module (line 227)
 - new ext\libxml\Module (line 228)
 - new ext\dom\Module (line 229)
-- new ext\xml\Module (line 230)
-- new ext\gd\Module (line 231)
-- new ext\iconv\Module (line 232)
-- new ext\gettext\Module (line 233)
-- new ext\mbstring\Module (line 234)
-- new ext\filter\Module (line 235)
-- new ext\calendar\Module (line 236)
-- new ext\ldap\Module (line 237)
-- new ext\session\Module (line 238)
-- new ext\bcmath\Module (line 239)
-- new ext\stats\Module (line 240)
-- new ext\openssl\Module (line 241)
-- new ext\curl\Module (line 242)
-- new ext\hash\Module (line 243)
-- new ext\posix\Module (line 244)
-- new ext\pcntl\Module (line 245)
-- new ext\sockets\Module (line 246)
-- new ext\ftp\Module (line 247)
-- new ext\ctype\Module (line 248)
-- new ext\tokenizer\Module (line 249)
-- new ext\random\Module (line 250)
-- new ext\igbinary\Module (line 251)
-- new ext\msgpack\Module (line 252)
-- new ext\zstd\Module (line 253)
-- new ext\lzf\Module (line 254)
-- new ext\bz2\Module (line 255)
-- new ext\brotli\Module (line 256)
-- new ext\sodium\Module (line 257)
-- new ext\sqlite3\Module (line 258)
-- new ext\uri\Module (line 259)
-- new ext\standard\Module (line 260)
-- new JIT (line 336)
-- new JITContext (line 350)
-- new SealedClassPreprocessor (line 414)
-- new StaticClassPreprocessor (line 417)
-- new SourcePreprocessor\PropertyHooks (line 420)
-- new State (line 559)
-- new ReflectionProperty (line 586)
-- new ReflectionProperty (line 589)
-- new LintCompiler (line 995)
-- new Variable (line 1125)
+- new ext\simplexml\Module (line 230)
+- new ext\xml\Module (line 231)
+- new ext\gd\Module (line 232)
+- new ext\iconv\Module (line 233)
+- new ext\gettext\Module (line 234)
+- new ext\mbstring\Module (line 235)
+- new ext\filter\Module (line 236)
+- new ext\calendar\Module (line 237)
+- new ext\ldap\Module (line 238)
+- new ext\session\Module (line 239)
+- new ext\bcmath\Module (line 240)
+- new ext\stats\Module (line 241)
+- new ext\openssl\Module (line 242)
+- new ext\curl\Module (line 243)
+- new ext\hash\Module (line 244)
+- new ext\posix\Module (line 245)
+- new ext\pcntl\Module (line 246)
+- new ext\sockets\Module (line 247)
+- new ext\ftp\Module (line 248)
+- new ext\ctype\Module (line 249)
+- new ext\tokenizer\Module (line 250)
+- new ext\random\Module (line 251)
+- new ext\igbinary\Module (line 252)
+- new ext\msgpack\Module (line 253)
+- new ext\zstd\Module (line 254)
+- new ext\lzf\Module (line 255)
+- new ext\bz2\Module (line 256)
+- new ext\brotli\Module (line 257)
+- new ext\sodium\Module (line 258)
+- new ext\sqlite3\Module (line 259)
+- new ext\uri\Module (line 260)
+- new ext\standard\Module (line 261)
+- new JIT (line 337)
+- new JITContext (line 351)
+- new SealedClassPreprocessor (line 415)
+- new StaticClassPreprocessor (line 418)
+- new SourcePreprocessor\PropertyHooks (line 421)
+- new State (line 560)
+- new ReflectionProperty (line 587)
+- new ReflectionProperty (line 590)
+- new LintCompiler (line 996)
+- new Variable (line 1126)
 - 53 class method(s)
 
 ### `lib/RuntimeStrictness.php`
