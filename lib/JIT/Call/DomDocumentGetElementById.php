@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Call;
 
 use PHPCompiler\ext\dom\JitDomGetElementById;
+use PHPCompiler\ext\dom\JitDomGetElementById;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\DomDocumentMethodUserScriptLlvm;
 use PHPCompiler\JIT\Call;
@@ -19,9 +20,6 @@ final class DomDocumentGetElementById implements Call
     {
         BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_gei_call_cont');
 
-        $result = JitDomGetElementById::invoke($context, ...$args);
-        BasicBlockHelper::branchToFreshContinue($context, 'after_dom_gei_call');
-
-        return $result;
+        return JitDomGetElementById::invoke($context, ...$args);
     }
 }

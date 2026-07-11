@@ -35,18 +35,8 @@ final class DomDocumentLoadHTML implements Call
             DomLoadHTMLRuntime::ensureLinked($context);
         }
 
-        if (DomDocumentMethodUserScriptLlvm::shouldUse($context)) {
-            BasicBlockHelper::branchToFreshContinue($context, 'dom_lh_invoke');
-        }
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_lh_call_cont');
 
-        $result = JitDomLoadHTML::invoke($context, ...$args);
-
-        if (DomDocumentMethodUserScriptLlvm::shouldUse($context)) {
-            $mainCont = BasicBlockHelper::append($context, 'main_cont_after_dom_lh');
-            $context->builder->branch($mainCont);
-            $context->builder->positionAtEnd($mainCont);
-        }
-
-        return $result;
+        return JitDomLoadHTML::invoke($context, ...$args);
     }
 }

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\dom;
 
-use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\ext\dom\DomParseSimpleHtmlJitHelper;
 use PHPCompiler\JIT\Builtin\DomDocumentMethodUserScriptLlvm;
 use PHPCompiler\JIT\Builtin\Type\ObjectInstancePropertyLlvm;
 use PHPCompiler\JIT\Context;
@@ -119,7 +119,6 @@ final class JitDomLoadHTMLUserScript
 
         $i1 = $context->getTypeFromString('int1');
         $result = $i1->constInt(1, false);
-        BasicBlockHelper::branchToFreshContinue($context, 'dom_lh_us_ok');
 
         return $result;
     }

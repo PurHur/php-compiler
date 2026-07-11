@@ -143,7 +143,8 @@ final class DomActiveContextAotTest extends TestCase
     public function testDomDocumentLoadHTMLUserScriptClearsBuilderAfterInvoke(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Call/DomDocumentLoadHTML.php');
-        $this->assertStringContainsString('main_cont_after_dom_lh', $source);
+        $this->assertStringContainsString('dom_lh_call_cont', $source);
+        $this->assertStringContainsString('ensureOpenInsertBlock', $source);
     }
 
     public function testDomLoadHTMLLoweringPassesObjectReceiver(): void

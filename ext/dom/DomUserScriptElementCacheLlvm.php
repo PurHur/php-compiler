@@ -69,15 +69,9 @@ final class DomUserScriptElementCacheLlvm
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($cmpBlock);
-        $ptrMatch = $context->builder->icmp(
-            Builder::INT_EQ,
-            $idStr,
-            $cachedId
-        );
         $cmp = JitStringCompare::strcmp($context, $idStr, $cachedId);
         $i64 = $context->getTypeFromString('int64');
-        $strMatch = $context->builder->icmp(Builder::INT_EQ, $cmp, $i64->constInt(0, false));
-        $idMatch = $context->builder->bitwiseOr($ptrMatch, $strMatch);
+        $idMatch = $context->builder->icmp(Builder::INT_EQ, $cmp, $i64->constInt(0, false));
         $cachedElem = $context->builder->load($context->module->getNamedGlobal(self::GLOBAL_ELEM));
         $found = $context->builder->select($idMatch, $cachedElem, $nullObj);
         $context->builder->store($found, $resultSlot);
@@ -85,7 +79,6 @@ final class DomUserScriptElementCacheLlvm
 
         $context->builder->positionAtEnd($doneBlock);
         $result = $context->builder->load($resultSlot);
-        BasicBlockHelper::branchToFreshContinue($context, 'after_dom_us_cache_lookup');
 
         return $result;
     }
