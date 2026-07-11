@@ -64,7 +64,7 @@
         </article>
         <article>
           <div>Stdlib builtins</div>
-          <strong>891</strong> / 942 full (VM+JIT+AOT)
+          <strong>892</strong> / 943 full (VM+JIT+AOT)
           <p style="margin:0.35rem 0 0;font-size:0.88rem;color:var(--text-muted)">27 partial · 24 gaps</p>
         </article>
         <article>
@@ -144,7 +144,7 @@
 <tr data-support="full"><td><code>Variable function calls (`$fn()`)</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td><a href="https://github.com/PurHur/php-compiler/issues/56">#56</a></td></tr>
 <tr data-support="full"><td><code>Invokable objects (`$obj()` / `__invoke`)</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td><a href="https://github.com/PurHur/php-compiler/issues/1232">#1232</a></td></tr>
 <tr data-support="full"><td><code>First-class callable syntax (`foo(...)`, `Class::m(...)`)</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td><a href="https://github.com/PurHur/php-compiler/issues/1363">#1363</a></td></tr>
-<tr data-support="gap"><td><code>PHP 8.5 pipe operator (`</code></td><td class="status-yes">yes</td><td class="">&gt;`)</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>no</td></tr>
+<tr data-support="gap"><td><code>PHP 8.5 pipe operator (`</code></td><td class="status-yes">yes</td><td class="">&gt;`)</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>yes</td></tr>
 <tr data-support="full"><td><code>`use function` / `use const` imports</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td><a href="https://github.com/PurHur/php-compiler/issues/2325">#2325</a></td></tr>
 <tr data-support="full"><td><code>Namespace group use (`use Foo\{Bar, Baz}`)</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td><a href="https://github.com/PurHur/php-compiler/issues/2443">#2443</a></td></tr>
 <tr data-support="full"><td><code>Flexible heredoc/nowdoc indentation stripping (PHP 7.3+)</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td><a href="https://github.com/PurHur/php-compiler/issues/3636">#3636</a></td></tr>
@@ -914,6 +914,7 @@
 <tr data-support="full"><td><code>`sizeof`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`sleep`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`socket_atmark`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
+<tr data-support="full"><td><code>`socket_export_stream`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`socket_import_stream`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`socket_set_block`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`socket_set_nonblock`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
