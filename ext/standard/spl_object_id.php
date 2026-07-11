@@ -31,7 +31,7 @@ final class spl_object_id extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $frame->returnVar->int(ObjectHandleSupport::requireObjectId($frame->calledArgs[0], 'spl_object_id'));
+        $frame->returnVar->int(ObjectHandleSupport::requireObjectId($frame->calledArgs[0], 'spl_object_id', $frame->vmContext));
     }
 
     public function call(Context $context, JITVariable ...$args): Value

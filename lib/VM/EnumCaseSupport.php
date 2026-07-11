@@ -33,6 +33,10 @@ final class EnumCaseSupport
         if (!self::tryMaterializeEnumCaseConstantFetch($enum, $memberLc, $dest)) {
             return false;
         }
+        $resolved = $dest->resolveIndirect();
+        if (Variable::TYPE_OBJECT === $resolved->type && self::isEnumCase($resolved->toObject())) {
+            return true;
+        }
         $dest->copyFrom(self::materializeConstantValue($context, $dest));
 
         return true;
@@ -54,19 +58,20 @@ final class EnumCaseSupport
             EnumSupport::ensureBackedEnumValuesUnique($enum);
         }
         $stored = $enum->constants[$memberLc]->resolveIndirect();
+        if (Variable::TYPE_OBJECT === $stored->type && self::isEnumCase($stored->toObject())) {
+            $dest->copyFrom($enum->constants[$memberLc]);
+
+            return true;
+        }
+        if (Variable::TYPE_ENUM_CASE === $stored->type) {
+            $dest->copyFrom($enum->constants[$memberLc]);
+
+            return true;
+        }
         $backing = new Variable(Variable::TYPE_NULL);
         $backing->null();
         if (null !== $enum->backedType) {
-            if (Variable::TYPE_OBJECT === $stored->type && self::isEnumCase($stored->toObject())) {
-                $caseValue = $stored->toObject()->enumCaseValue;
-                if (null !== $caseValue) {
-                    $backing->copyFrom($caseValue);
-                }
-            } elseif (Variable::TYPE_ENUM_CASE === $stored->type) {
-                $backing->copyFrom($stored->toEnumCase()->backingValue);
-            } else {
-                $backing->copyFrom($enum->constants[$memberLc]);
-            }
+            $backing->copyFrom($enum->constants[$memberLc]);
         }
         $dest->enumCase(new EnumCaseEntry($enum, $canonical, $backing));
 
@@ -334,12 +339,28 @@ final class EnumCaseSupport
     }
 
     /**
-     * Stable object handle for get_object_id() on enum case operands (#5837, ext/standard/basic_functions.c).
+     * Stable object handle for get_object_id() / spl_object_id() on enum case operands (#5837, #8941).
+     *
+     * Const fetches materialize TYPE_ENUM_CASE with a compile-time ClassEntry stub; resolve the live
+     * enum entry before reading the canonical singleton from {@see ClassEntry::$constants}.
      */
-    public static function objectIdForVariable(Variable $value): int
+    public static function objectIdForVariable(Variable $value, ?Context $context = null): int
     {
         if (!self::isEnumCaseVariable($value)) {
             throw new \LogicException('objectIdForVariable requires enum case variable');
+        }
+        $value = $value->resolveIndirect();
+        if (Variable::TYPE_OBJECT === $value->type && self::isEnumCase($value->toObject())) {
+            return $value->toObject()->id;
+        }
+        $entry = self::enumCaseEntryForVariable($value);
+        if (null === $entry) {
+            throw new \LogicException('objectIdForVariable requires enum case variable');
+        }
+        $runtime = EnumSupport::resolveRuntimeEnumClass($context, $entry->enumClass);
+        $caseVar = EnumSupport::materializeCaseForCasesList($runtime, $entry->caseName)->resolveIndirect();
+        if (Variable::TYPE_OBJECT === $caseVar->type && self::isEnumCase($caseVar->toObject())) {
+            return $caseVar->toObject()->id;
         }
 
         return self::receiverForInstanceMethod($value)->toObject()->id;

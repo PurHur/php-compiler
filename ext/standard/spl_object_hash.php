@@ -31,7 +31,7 @@ final class spl_object_hash extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $id = ObjectHandleSupport::requireObjectId($frame->calledArgs[0], 'spl_object_hash');
+        $id = ObjectHandleSupport::requireObjectId($frame->calledArgs[0], 'spl_object_hash', $frame->vmContext);
         $frame->returnVar->string(ObjectHandleSupport::hashForObjectId($id));
     }
 
