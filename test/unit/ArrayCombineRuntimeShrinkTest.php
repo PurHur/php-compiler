@@ -9,20 +9,40 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPUnit\Framework\TestCase;
 
-/** array_combine() JIT routes through ArrayCombineJitHelper PHP not ArrayBuiltinHelper LLVM (#12502, #14437). */
+/** array_combine() JIT routes all operands through ArrayCombineJitHelper PHP not ArrayBuiltinHelper native LLVM (#12502, #14437, #18013). */
 final class ArrayCombineRuntimeShrinkTest extends TestCase
 {
+    private const ARRAY_BUILTIN_HELPER_MAX_LINES = 8920;
+
     public function testArrayCombineRuntimeUsesJitHelperNotDirectLlvmMonolith(): void
     {
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ArrayCombineRuntime.php');
         $this->assertStringContainsString('ArrayCombineJitHelper', $runtime);
-        $this->assertStringContainsString('isNativeArray', $runtime);
-        $this->assertStringContainsString('ArrayBuiltinHelper::combine', $runtime);
+        $this->assertStringContainsString('nativeListToHashTable', $runtime);
+        $this->assertStringNotContainsString('ArrayBuiltinHelper::combine', $runtime);
         $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);
 
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/array_combine.php');
         $this->assertStringContainsString('ArrayCombineRuntime::combine', $builtin);
         $this->assertStringNotContainsString('ArrayBuiltinHelper::combine', $builtin);
+
+        $arrayBuiltin = (string) file_get_contents(__DIR__.'/../../lib/JIT/ArrayBuiltinHelper.php');
+        $this->assertStringNotContainsString('function combine(', $arrayBuiltin);
+        $this->assertStringNotContainsString('function combineHashTablesInto', $arrayBuiltin);
+        $this->assertStringNotContainsString('function combineNativeArrays', $arrayBuiltin);
+    }
+
+    public function testArrayBuiltinHelperLineBudgetAfterNativeCombineLlvmDeletion(): void
+    {
+        $lines = substr_count(
+            (string) file_get_contents(__DIR__.'/../../lib/JIT/ArrayBuiltinHelper.php'),
+            "\n"
+        ) + 1;
+        $this->assertLessThanOrEqual(
+            self::ARRAY_BUILTIN_HELPER_MAX_LINES,
+            $lines,
+            'ArrayBuiltinHelper.php LOC after dead array_combine native LLVM deletion (#18013)'
+        );
     }
 
     public function testArrayCombineJitHelperMatchesCombineSemantics(): void
