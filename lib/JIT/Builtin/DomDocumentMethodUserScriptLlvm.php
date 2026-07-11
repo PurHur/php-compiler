@@ -34,7 +34,7 @@ final class DomDocumentMethodUserScriptLlvm
             DomLoadHTMLRuntime::ABI_NAME,
             'dom_load_html_user_script',
             [
-                $context->getTypeFromString('int64'),
+                $context->getTypeFromString('__value__*'),
                 $context->getTypeFromString('__string__*'),
                 $context->getTypeFromString('int64'),
             ],

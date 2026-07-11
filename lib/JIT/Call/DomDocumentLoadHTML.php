@@ -7,7 +7,6 @@ namespace PHPCompiler\JIT\Call;
 use PHPCompiler\ext\dom\JitDomLoadHTML;
 use PHPCompiler\JIT\Builtin\DomDocumentMethodUserScriptLlvm;
 use PHPCompiler\JIT\Builtin\DomLoadHTMLRuntime;
-use PHPCompiler\JIT\Builtin\DomSyncElementIdMapRuntime;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\NestedJitCompileScope;
@@ -24,9 +23,6 @@ final class DomDocumentLoadHTML implements Call
             : null;
 
         DomLoadHTMLRuntime::ensureLinked($context);
-        if (DomDocumentMethodUserScriptLlvm::shouldUse($context)) {
-            DomSyncElementIdMapRuntime::ensureLinked($context);
-        }
 
         $result = JitDomLoadHTML::invoke($context, ...$args);
 

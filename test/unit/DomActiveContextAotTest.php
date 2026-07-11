@@ -49,11 +49,13 @@ final class DomActiveContextAotTest extends TestCase
         $this->assertStringContainsString('DomDocumentGetElementById', $source);
     }
 
-    public function testDomLoadHTMLRuntimeUsesMainModuleBridgeForUserScript(): void
+    public function testDomLoadHTMLRuntimeUsesValueBoxedReceiverBridge(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/DomLoadHTMLRuntime.php');
-        $this->assertStringContainsString('DomDocumentMethodUserScriptLlvm::ensureLoadHTMLBridge', $source);
-        $this->assertStringContainsString('DomDocumentMethodUserScriptLlvm::shouldUse', $source);
+        $this->assertStringContainsString('__value__*', $source);
+        $this->assertStringContainsString('DomLoadHTMLJitHelper::loadHTMLArgv', $source);
+        $helper = (string) file_get_contents(__DIR__.'/../../ext/dom/DomLoadHTMLJitHelper.php');
+        $this->assertStringContainsString('VariableObject::entry', $helper);
     }
 
     public function testDomGetElementByIdUsesPureLlvmIdMap(): void
@@ -91,11 +93,11 @@ final class DomActiveContextAotTest extends TestCase
         $this->assertStringContainsString('deferDocumentSlotSync', $body);
     }
 
-    public function testLoadHTMLJitHelperDefersDocumentSlotSync(): void
+    public function testLoadHTMLJitHelperSyncsDocumentSlots(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/dom/DomLoadHTMLJitHelper.php');
-        $this->assertStringContainsString('DomRegistry::entry', $source);
-        $this->assertStringContainsString('deferDocumentSlotSync', (string) file_get_contents(__DIR__.'/../../ext/dom/VmDom.php'));
+        $this->assertStringContainsString('VariableObject::entry', $source);
+        $this->assertStringNotContainsString('DomRegistry::entry', $source);
     }
 
     public function testDomElementTextContentUsesInitLinkedHelper(): void
