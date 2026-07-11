@@ -14,4 +14,4 @@ echo $ok ? 'ok' : 'fail', "\n";
 echo $mode, "\n";
 --EXPECT--
 ok
-420
+132
