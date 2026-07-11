@@ -21,5 +21,6 @@ final class BuiltinClasses
         if (CompilerVersion::supportsRange()) {
             RangeBuiltin::registerClass($ctx);
         }
+        VmZlibContext::registerClasses($ctx);
     }
 }
