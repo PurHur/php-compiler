@@ -11,7 +11,7 @@ namespace PHPCompiler\VM;
  */
 final class OutputBuffer
 {
-    /** @var list<array{content: string, handler: ?string}> */
+    /** @var list<array{content: string, handler: null|string|Variable|ClosureState}> */
     private static array $stack = [];
 
     private static bool $implicitFlush = false;
@@ -30,6 +30,11 @@ final class OutputBuffer
     public static function setActiveContext(?Context $ctx): void
     {
         self::$activeContext = $ctx;
+    }
+
+    public static function getActiveContext(): ?Context
+    {
+        return self::$activeContext;
     }
 
     public static function setImplicitFlush(bool $on): void
@@ -61,24 +66,24 @@ final class OutputBuffer
     }
 
     /**
-     * @return list<?string> handler name per buffer level (null = default handler)
+     * @return list<null|string|Variable|ClosureState> handler per buffer level (null = default handler)
      */
-    public static function getHandlerNames(): array
+    public static function getHandlers(): array
     {
-        $names = [];
+        $handlers = [];
         foreach (self::$stack as $level) {
-            $names[] = $level['handler'];
+            $handlers[] = $level['handler'];
         }
 
-        return $names;
+        return $handlers;
     }
 
-    public static function start(?string $handlerName = null): void
+    public static function start(null|string|Variable|ClosureState $handler = null): void
     {
         if (self::getLevel() >= ObStackLimits::MAX_DEPTH) {
             return;
         }
-        self::$stack[] = ['content' => '', 'handler' => $handlerName];
+        self::$stack[] = ['content' => '', 'handler' => $handler];
     }
 
     public static function append(string $chunk, ?string $file = null, int $line = 0): void
@@ -105,8 +110,13 @@ final class OutputBuffer
             return '';
         }
         $level = array_pop(self::$stack);
+        $content = $level['content'];
+        $handler = $level['handler'];
+        if (null === $handler) {
+            return $content;
+        }
 
-        return $level['content'];
+        return self::applyHandler($content, $handler);
     }
 
     /** ob_get_contents() — read active buffer without ending (ext/standard/output.c, issue #3236). */
@@ -245,8 +255,8 @@ final class OutputBuffer
         return self::applyHandler($content, $handler);
     }
 
-    private static function applyHandler(string $content, string $handlerName): string
+    private static function applyHandler(string $content, null|string|Variable|ClosureState $handler): string
     {
-        return OutputBufferHandlers::apply($content, $handlerName, self::$activeContext);
+        return OutputBufferHandlers::apply($content, $handler, self::$activeContext);
     }
 }
