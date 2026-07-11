@@ -404,6 +404,7 @@ class Runtime {
         AsymmetricVisibilityRejector::reject($code, $filename);
         LazyPropertyRejector::reject($code, $filename);
         CloneWithSyntaxRejector::reject($code, $filename);
+        PipeOperatorSyntaxRejector::reject($code, $filename);
         ListSpreadAssignSyntaxRejector::reject($code, $filename);
         ReadonlyAnonymousClassSyntaxRejector::reject($code, $filename);
         DnfParenIntersectionSyntaxRejector::reject($code, $filename);
