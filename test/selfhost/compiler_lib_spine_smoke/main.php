@@ -4425,6 +4425,7 @@ unset($__spineMimeSample, $__spineMimeEnc, $__spineMimeDec);
 \PHPCompiler\ext\standard\SetcookieOptions::spineSmokeParse();
 
 require_once __DIR__.'/../../../ext/dom/DocumentCreateCDATASection.php';
+require_once __DIR__.'/../../../ext/dom/DocumentCreateProcessingInstruction.php';
 require_once __DIR__.'/../../../ext/dom/TextIsElementContentWhitespace.php';
 require_once __DIR__.'/../../../ext/dom/TextIsWhitespaceInElementContent.php';
 require_once __DIR__.'/../../../lib/VM/NativeDateInvalidOperationException.php';

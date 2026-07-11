@@ -496,6 +496,9 @@ final class VmDom
         $document->methods['createcdatasection'] = new DocumentCreateCDATASection();
         $document->methodVisibility['createcdatasection'] = $pub;
         $document->methodNames['createcdatasection'] = 'createCDATASection';
+        $document->methods['createprocessinginstruction'] = new DocumentCreateProcessingInstruction();
+        $document->methodVisibility['createprocessinginstruction'] = $pub;
+        $document->methodNames['createprocessinginstruction'] = 'createProcessingInstruction';
         $document->methods['appendchild'] = new DocumentAppendChild();
         $document->methodVisibility['appendchild'] = $pub;
         $document->methods['savexml'] = new DocumentSaveXML();
@@ -2428,6 +2431,7 @@ final class VmDom
         string $data,
         ObjectEntry $ownerDocument
     ): ObjectEntry {
+        self::assertValidProcessingInstructionTarget($target);
         $class = self::resolveNodeClass($ctx, $ownerDocument, self::CLASS_PROCESSING_INSTRUCTION);
         $entry = new ObjectEntry($class);
         $entry->constructed = true;
@@ -4052,6 +4056,11 @@ final class VmDom
         if (self::isCommentNode($entry)) {
             return '<!--'.(DomRegistry::state($entry)->textContent ?? '').'-->';
         }
+        if (self::isProcessingInstruction($entry)) {
+            $pi = DomRegistry::state($entry);
+
+            return '<?'.$pi->nodeName.' '.($pi->textContent ?? '').'?>';
+        }
         if (self::isEntityReference($entry)) {
             return '&'.self::escapeName(DomRegistry::state($entry)->nodeName).';';
         }
@@ -5505,7 +5514,8 @@ final class VmDom
         return self::isElement($entry)
             || self::isTextOrCdataNode($entry)
             || self::isCommentNode($entry)
-            || self::isEntityReference($entry);
+            || self::isEntityReference($entry)
+            || self::isProcessingInstruction($entry);
     }
 
     private static function appendDocumentChild(Context $ctx, ObjectEntry $document, ObjectEntry $child): void
@@ -5726,6 +5736,15 @@ final class VmDom
     private static function assertValidXmlName(string $name): void
     {
         if ('' === $name || !preg_match('/^[A-Za-z_:][\w.:-]*$/', $name)) {
+            throw new \DOMException('Invalid Character Error', DomExceptionConstants::INVALID_CHARACTER_ERR);
+        }
+    }
+
+    /** @throws \DOMException when $target is not a valid PI target (php-src dom_document_create_processing_instruction). */
+    private static function assertValidProcessingInstructionTarget(string $target): void
+    {
+        self::assertValidXmlName($target);
+        if (0 === strcasecmp($target, 'xml')) {
             throw new \DOMException('Invalid Character Error', DomExceptionConstants::INVALID_CHARACTER_ERR);
         }
     }
