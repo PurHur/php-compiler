@@ -36668,6 +36668,32 @@ class Compiler {
     }
 
     /**
+     * Last ARRAY_DIM_FETCH before pending FUNCCALL_INIT — var_export($meta['k'], …) after earlier dim assigns (#18005).
+     *
+     * @param list<OpCode> $pendingOps
+     */
+    private function lastPendingCallArgArrayDimFetchSlot(Block $block, array $pendingOps): ?int
+    {
+        $dimFetchOpcodes = [];
+        $merged = array_merge($block->opCodes, $pendingOps);
+        for ($i = \count($merged) - 1; $i >= 0; --$i) {
+            $op = $merged[$i];
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type || OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
+                break;
+            }
+            if (\in_array($op->type, [OpCode::TYPE_ARRAY_DIM_FETCH, OpCode::TYPE_ARRAY_DIM_FETCH_WRITE], true)) {
+                array_unshift($dimFetchOpcodes, $op);
+            }
+        }
+        if ([] === $dimFetchOpcodes) {
+            return null;
+        }
+        $last = $dimFetchOpcodes[\count($dimFetchOpcodes) - 1];
+
+        return null !== $last->arg1 ? (int) $last->arg1 : null;
+    }
+
+    /**
      * Nested inline consumer — last FUNCCALL_EXEC_RETURN before trailing FUNCCALL_INIT (#14555).
      */
     private function slotForLastEmittedInlineCallResultBeforePendingFuncCall(Block $block): ?int
@@ -39582,6 +39608,7 @@ class Compiler {
                 null === $dimFetchSlot
                 && null !== $cfgCallOp
                 && null !== $block->orig
+                && !$this->isCallArgDirectArrayDimFetch($arg)
                 && $this->callArgIsDeadInlineTemporary($arg)
                 && !$this->shouldSkipFinalAdjacentNestedFuncCallArgProbe($cfgCallOp, (int) $argIndex, $block)
                 && !(
@@ -43747,18 +43774,21 @@ class Compiler {
                     }
                 }
             }
-            if (
-                null !== $cfgCallOp
-                && $this->callArgIsDeadInlineHaystackFamilySlot(
-                    $cfgCallOp,
-                    (int) $argIndex,
-                    $calleeName,
-                    $arg
-                )
-            ) {
-                $dimFetchSlot = $this->pendingCallArgArrayDimFetchSlot($block, $sends, 0);
-                if (null !== $dimFetchSlot) {
-                    $valueSlot = (string) $dimFetchSlot;
+            if (null !== $cfgCallOp) {
+                $pendingDimFetchSlot = $this->lastPendingCallArgArrayDimFetchSlot($block, $sends);
+                if (null === $pendingDimFetchSlot && (
+                    null !== $dimFetchSlot
+                    || $this->callArgIsDeadInlineHaystackFamilySlot(
+                        $cfgCallOp,
+                        (int) $argIndex,
+                        $calleeName,
+                        $arg
+                    )
+                )) {
+                    $pendingDimFetchSlot = $this->pendingCallArgArrayDimFetchSlot($block, $sends, 0);
+                }
+                if (null !== $pendingDimFetchSlot) {
+                    $valueSlot = (string) $pendingDimFetchSlot;
                 }
             }
             if (
@@ -46594,7 +46624,16 @@ class Compiler {
                 ++$argIndex;
                 continue;
             }
-            if (!$this->callArgIsDeadInlineTemporary($cfgCallOp->args[$argIndex] ?? null)) {
+            $multiArgCallArg = $cfgCallOp->args[$argIndex] ?? null;
+            if (!$this->callArgIsDeadInlineTemporary($multiArgCallArg)) {
+                ++$argIndex;
+                continue;
+            }
+            if (
+                'var_export' === strtolower($this->resolveCfgFuncCallName($cfgCallOp) ?? '')
+                && $multiArgCallArg instanceof Operand
+                && $this->isCallArgDirectArrayDimFetch($multiArgCallArg)
+            ) {
                 ++$argIndex;
                 continue;
             }
@@ -47111,6 +47150,59 @@ class Compiler {
         ) {
             return;
         }
+        $pendingDimFetchSlot = $this->lastPendingCallArgArrayDimFetchSlot(
+            $block,
+            array_merge($nestedProducerOps, $outerArgSends)
+        );
+        if (null !== $pendingDimFetchSlot) {
+            $trueSlot = null;
+            foreach (array_reverse(array_merge($block->opCodes, $nestedProducerOps, $outerArgSends)) as $op) {
+                if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                    break;
+                }
+                if (OpCode::TYPE_CONST_FETCH !== $op->type || null === $op->arg2) {
+                    continue;
+                }
+                $name = $this->resolveCompileTimeStringSlot((int) $op->arg2, $block);
+                if ('true' === strtolower($name ?? '')) {
+                    $trueSlot = $op->arg1;
+                    break;
+                }
+            }
+            $sendOrdinal = 0;
+            foreach ($outerArgSends as &$send) {
+                if (OpCode::TYPE_ARG_SEND !== $send->type) {
+                    continue;
+                }
+                if (0 === $sendOrdinal) {
+                    $send->arg1 = (string) $pendingDimFetchSlot;
+                } elseif (1 === $sendOrdinal && null !== $trueSlot) {
+                    $send->arg1 = (string) $trueSlot;
+                }
+                ++$sendOrdinal;
+            }
+            unset($send);
+
+            return;
+        }
+        if ($this->isCallArgDirectArrayDimFetch($callArg)) {
+            $dimSlot = $this->lastPendingCallArgArrayDimFetchSlot($block, $nestedProducerOps);
+            if (null !== $dimSlot) {
+                $sendOrdinal = 0;
+                foreach ($outerArgSends as &$send) {
+                    if (OpCode::TYPE_ARG_SEND !== $send->type) {
+                        continue;
+                    }
+                    if (0 === $sendOrdinal) {
+                        $send->arg1 = (string) $dimSlot;
+                    }
+                    ++$sendOrdinal;
+                }
+                unset($send);
+            }
+
+            return;
+        }
         if (null !== $block->orig) {
             $callIndex = array_search($cfgCallOp, $block->orig->children, true);
             if (\is_int($callIndex) && $callIndex > 0) {
@@ -47184,7 +47276,8 @@ class Compiler {
                     return;
                 }
                 // var_export($text->data) / var_export(JSON_HEX_TAG | JSON_HEX_AMP) — expression prelude feeds arg #0, not stale FuncCall EXEC_RETURN (#17540, #17562).
-                if ($this->isImmediateVarExportExpressionPrelude($producer)) {
+                $producerExpr = $producer instanceof Op\Expr\Assign ? $producer->expr : $producer;
+                if ($this->isImmediateVarExportExpressionPrelude($producerExpr)) {
                     return;
                 }
                 if ($producer instanceof Op\Expr\MethodCall || $producer instanceof Op\Expr\StaticCall) {
