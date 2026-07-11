@@ -5651,6 +5651,40 @@ PHP;
         self::assertSame('ok', $out);
     }
 
+    /** Issue #18015 — call_user_func_array('fn', [&$x]) must not wire ref dim-fetch to arg #0. */
+    public function testCallUserFuncArrayInlineByRefArrayLiteralCallbackSlot(): void
+    {
+        $code = file_get_contents(__DIR__.'/../repro/maintainer_gap_call_user_func_array_variadic_byref.php');
+        self::assertNotFalse($code);
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'maintainer_gap_call_user_func_array_variadic_byref.php');
+
+        $arraySlot = null;
+        $dimWriteSlot = null;
+        $sendSlots = [];
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_INIT_ARRAY === $op->type && null === $arraySlot) {
+                $arraySlot = $op->arg1;
+            }
+            if (OpCode::TYPE_ARRAY_DIM_FETCH_WRITE === $op->type) {
+                $dimWriteSlot = $op->arg1;
+            }
+            if (OpCode::TYPE_ARG_SEND === $op->type) {
+                $sendSlots[] = $op->arg1;
+            }
+        }
+
+        self::assertNotNull($arraySlot, 'array slot missing');
+        self::assertNotNull($dimWriteSlot, 'dim write slot missing');
+        self::assertCount(2, $sendSlots, 'arg sends='.json_encode($sendSlots));
+        self::assertNotSame($dimWriteSlot, $sendSlots[0], 'arg sends='.json_encode($sendSlots));
+        self::assertSame($arraySlot, $sendSlots[1], 'arg sends='.json_encode($sendSlots));
+
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("ok\n", ob_get_clean());
+    }
+
     /** Issue #12730 — sibling flat inline array literals must map to distinct arg slots. */
     public function testArrayDiffInlineFlatLiteralsUseDistinctArraySlots(): void
     {
