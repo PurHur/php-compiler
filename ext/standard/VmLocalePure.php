@@ -146,6 +146,7 @@ final class VmLocalePure
             $result = @\setlocale($category, $locale);
             if (false !== $result && '' !== $result) {
                 if (self::isLcAll($category)) {
+                    self::$preservedLcCtype = $result;
                     self::restorePreservedLcCtype();
                 } elseif (self::lcCtypeCategory() === $category) {
                     self::$preservedLcCtype = $result;
