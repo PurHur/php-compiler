@@ -101,6 +101,17 @@ final class IniJitHelper
         'sys_temp_dir',
     ];
 
+    /** get_cfg_var() compile-time keys that return '' when unset (#12543, #17881). */
+    private const CFG_EMPTY_STRING_KEYS = [
+        'auto_prepend_file',
+        'auto_append_file',
+        'doc_root',
+        'user_dir',
+        'disable_functions',
+        'disable_classes',
+        'mail.add_x_header',
+    ];
+
     private const CFG_DISPLAY_ERRORS = '';
 
     private const CFG_MEMORY_LIMIT = '-1';
@@ -357,7 +368,7 @@ final class IniJitHelper
     public static function iniCfgGet(string $option): ?string
     {
         $key = strtolower($option);
-        if (in_array($key, self::EMPTY_STRING_INI_KEYS, true)) {
+        if (in_array($key, self::CFG_EMPTY_STRING_KEYS, true)) {
             return '';
         }
         if (isset(self::READONLY_BOOL_DEFAULTS[$key])) {
