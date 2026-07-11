@@ -9647,6 +9647,7 @@ class Compiler {
                     if (
                         $this->errorSuppressEndBlockCallArgHasTrailingHoistedScalarProducer($endCompiled, $endChild, (int) $argIndex)
                         || $this->errorSuppressEndBlockCallArgHasTrailingHoistedArrayProducer($endCompiled, $endChild, (int) $argIndex)
+                        || $this->errorSuppressEndBlockCallArgHasTrailingArrayDimFetchProducer($endCompiled, $endChild, (int) $argIndex)
                         || $this->errorSuppressEndBlockCallArgHasAdjacentNestedFuncCallProducer($endCompiled, $endChild, (int) $argIndex)
                     ) {
                         continue;
@@ -37222,6 +37223,9 @@ class Compiler {
         if ($this->errorSuppressEndBlockCallArgHasTrailingHoistedArrayProducer($block, $cfgCallOp, $argIndex)) {
             return null;
         }
+        if ($this->errorSuppressEndBlockCallArgHasTrailingArrayDimFetchProducer($block, $cfgCallOp, $argIndex)) {
+            return null;
+        }
         if ($this->errorSuppressEndBlockCallArgHasAdjacentNestedFuncCallProducer($block, $cfgCallOp, $argIndex)) {
             return null;
         }
@@ -37358,6 +37362,43 @@ class Compiler {
         }
 
         return 0 === $producerOrdinal;
+    }
+
+    /**
+     * Trailing ArrayDimFetch before a post-@ call feeds this dead-temp arg (#18005).
+     */
+    private function errorSuppressEndBlockCallArgHasTrailingArrayDimFetchProducer(
+        Block $block,
+        Op $cfgCallOp,
+        int $argIndex
+    ): bool {
+        if (null === $block->orig || !property_exists($cfgCallOp, 'args') || !\is_array($cfgCallOp->args)) {
+            return false;
+        }
+        $callArg = $cfgCallOp->args[$argIndex] ?? null;
+        if (!$callArg instanceof Operand || $this->isEmbeddedCallLiteralArg($callArg)) {
+            return false;
+        }
+        if (!$this->callArgIsDeadInlineTemporary($callArg)) {
+            return false;
+        }
+        $children = $block->orig->children;
+        $callIndex = array_search($cfgCallOp, $children, true);
+        if (!\is_int($callIndex) || $callIndex < 1) {
+            return false;
+        }
+        $producer = $children[$callIndex - 1] ?? null;
+        if (!$producer instanceof Op\Expr\ArrayDimFetch) {
+            return false;
+        }
+        if (
+            null !== $producer->result
+            && $this->operandsReferToSameVariable($producer->result, $callArg)
+        ) {
+            return true;
+        }
+
+        return $this->isFirstNonEmbeddedDeadInlineCallArg($cfgCallOp, $argIndex);
     }
 
     /**
