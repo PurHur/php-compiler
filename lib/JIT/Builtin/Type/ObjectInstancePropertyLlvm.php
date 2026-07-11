@@ -23,6 +23,23 @@ final class ObjectInstancePropertyLlvm
         string $name,
         int $classId
     ): Variable {
+        if (self::shouldPreferRuntimeDomPropertySlot($class, $name)) {
+            $runtimeFetch = self::tryPropertyFetchByRuntimeClass($object, $obj, $name);
+            if (null !== $runtimeFetch) {
+                return $runtimeFetch;
+            }
+        }
+
+        return self::propertyFetchOrdinaryStatic($object, $obj, $class, $name, $classId);
+    }
+
+    private static function propertyFetchOrdinaryStatic(
+        Object_ $object,
+        Value $obj,
+        string $class,
+        string $name,
+        int $classId
+    ): Variable {
         $context = $object->jitContext();
         $className = $object->classNameForId($classId);
         $nameId = $object->propNameIdFor($name);
@@ -123,6 +140,18 @@ final class ObjectInstancePropertyLlvm
     }
 
     /**
+     * ext/dom: inherited DOMNode properties on DOMElement use runtime class slots (#17391).
+     */
+    private static function shouldPreferRuntimeDomPropertySlot(string $class, string $name): bool
+    {
+        if (!str_starts_with(strtolower(ltrim($class, '\\')), 'dom')) {
+            return false;
+        }
+
+        return \in_array(strtolower($name), ['nodename', 'tagname'], true);
+    }
+
+    /**
      * When the static declaring class lacks a JIT slot, resolve via runtime class_id (#17391).
      */
     private static function tryPropertyFetchByRuntimeClass(
@@ -143,7 +172,7 @@ final class ObjectInstancePropertyLlvm
             $classId = array_key_first($candidates);
             $className = $candidates[$classId];
 
-            return self::propertyFetchOrdinary($object, $obj, $className, $name, $classId);
+            return self::propertyFetchOrdinaryStatic($object, $obj, $className, $name, $classId);
         }
 
         return self::propertyFetchByRuntimeClassDispatch($object, $obj, $name, $candidates);
@@ -190,7 +219,7 @@ final class ObjectInstancePropertyLlvm
                 : $fn->appendBasicBlock('prop_fetch_rt_try_'.$classId);
             $context->builder->branchIf($match, $caseBlock, $nextBlock);
             $context->builder->positionAtEnd($caseBlock);
-            $fetched = self::propertyFetchOrdinary($object, $obj, $className, $name, $classId);
+            $fetched = self::propertyFetchOrdinaryStatic($object, $obj, $className, $name, $classId);
             self::boxFetchedPropertyIntoValue($object, $resultSlot, $fetched, $fetched->objectPropertyType ?? $fetched->type);
             $context->builder->branch($done);
             $checkBlock = $nextBlock;
