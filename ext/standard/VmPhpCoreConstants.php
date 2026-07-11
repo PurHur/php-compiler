@@ -13,6 +13,9 @@ use PHPCompiler\VM\Variable;
  */
 final class VmPhpCoreConstants
 {
+    /** php-src ZEND_ACC_TENTATIVE_RETURN exposed as TENTATIVE_RETURN (PHP 8.4+, zend_attributes.h). */
+    public const TENTATIVE_RETURN = 1;
+
     /**
      * Names registered in Zend get_defined_constants(true)['Core'] with PHP_ prefix.
      *
@@ -96,6 +99,10 @@ final class VmPhpCoreConstants
         if (null !== $compiler) {
             return self::fromPhpValue($compiler);
         }
+        $forward = self::forwardProfileCoreConstantLoose($name);
+        if (null !== $forward) {
+            return self::fromPhpValue($forward);
+        }
         $canonical = self::canonicalName($name);
         if (null === $canonical || !\defined($canonical)) {
             return null;
@@ -114,6 +121,10 @@ final class VmPhpCoreConstants
         $compiler = self::compilerVersionConstantExact($name);
         if (null !== $compiler) {
             return self::fromPhpValue($compiler);
+        }
+        $forward = self::forwardProfileCoreConstantExact($name);
+        if (null !== $forward) {
+            return self::fromPhpValue($forward);
         }
         if (!\in_array($name, self::CORE_NAMES, true) || !\defined($name)) {
             return null;
@@ -189,8 +200,45 @@ final class VmPhpCoreConstants
                 $entries[$canonical] = $var;
             }
         }
+        foreach (self::forwardProfileCoreIntConstants() as $canonical => $value) {
+            $var = self::fromPhpValue($value);
+            if (null !== $var) {
+                $entries[$canonical] = $var;
+            }
+        }
 
         return $entries;
+    }
+
+    /**
+     * @return array<string, int>
+     */
+    private static function forwardProfileCoreIntConstants(): array
+    {
+        if (!CompilerVersion::supportsTentativeReturnConstant()) {
+            return [];
+        }
+
+        return [
+            'TENTATIVE_RETURN' => self::TENTATIVE_RETURN,
+        ];
+    }
+
+    private static function forwardProfileCoreConstantLoose(string $name): ?int
+    {
+        $upper = strtoupper($name);
+        foreach (self::forwardProfileCoreIntConstants() as $canonical => $value) {
+            if (strtoupper($canonical) === $upper) {
+                return $value;
+            }
+        }
+
+        return null;
+    }
+
+    private static function forwardProfileCoreConstantExact(string $name): ?int
+    {
+        return self::forwardProfileCoreIntConstants()[$name] ?? null;
     }
 
     public static function pathSeparatorValue(): string
