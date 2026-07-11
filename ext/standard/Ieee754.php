@@ -211,8 +211,8 @@ final class Ieee754
         if (0.0 === $abs) {
             return [0.0, 0];
         }
-        $exp = (int) floor(log($abs, 2.0));
-        $mantissa = $abs / self::pow2($exp);
+        $exp = 0;
+        $mantissa = $abs;
         while ($mantissa >= 1.0) {
             $mantissa /= 2.0;
             ++$exp;
