@@ -4463,4 +4463,6 @@ require_once __DIR__.'/../../../ext/uri/UriClassMethods.php';
 require_once __DIR__.'/../../../ext/uri/UriExtensionPolicy.php';
 require_once __DIR__.'/../../../ext/uri/VmUri.php';
 require_once __DIR__.'/../../../lib/VM/TickQueue.php';
+require_once __DIR__.'/../../../ext/xml/VmXmlStructBuilder.php';
+require_once __DIR__.'/../../../ext/xml/xml_parse_into_struct.php';
 echo "compiler_lib_spine_smoke bundle OK\n";

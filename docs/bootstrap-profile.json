@@ -2791,9 +2791,11 @@
         "ext/xml/BuiltinClasses.php",
         "ext/xml/Module.php",
         "ext/xml/VmXml.php",
+        "ext/xml/VmXmlStructBuilder.php",
         "ext/xml/XmlConstants.php",
         "ext/xml/xml_get_error_code.php",
         "ext/xml/xml_parse.php",
+        "ext/xml/xml_parse_into_struct.php",
         "ext/xml/xml_parser_create.php",
         "ext/xml/xml_parser_free.php",
         "ext/zip/BuiltinClasses.php",
@@ -4638,9 +4640,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 4404,
+        "inventory_files": 4406,
         "excluded": 0,
-        "eligible": 4404,
+        "eligible": 4406,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
