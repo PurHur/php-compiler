@@ -44,6 +44,18 @@ PHP);
 
     public function testInstanceTypedPropertyDefaultNewCompileErrors(): void
     {
+        if (CompilerVersion::supportsPropertyDefaultObjectExpressions()) {
+            $runtime = new Runtime();
+            $block = $runtime->parseAndCompile(<<<'PHP'
+<?php
+class C {
+    public DateTime $d = new DateTime('2020-01-01');
+}
+PHP, 'property_default_new_instance_typed.php');
+            $this->assertNotNull($block);
+
+            return;
+        }
         $this->expectCompileError(<<<'PHP'
 <?php
 class C {
@@ -54,6 +66,18 @@ PHP);
 
     public function testInstancePropertyDefaultNewWithoutParensCompileErrors(): void
     {
+        if (CompilerVersion::supportsPropertyDefaultObjectExpressions()) {
+            $runtime = new Runtime();
+            $block = $runtime->parseAndCompile(<<<'PHP'
+<?php
+class C {
+    public $p = new stdClass();
+}
+PHP, 'property_default_new_instance_untyped.php');
+            $this->assertNotNull($block);
+
+            return;
+        }
         $this->expectCompileError(<<<'PHP'
 <?php
 class C {
@@ -64,6 +88,18 @@ PHP);
 
     public function testInstancePropertyDefaultNewWithParensCompileErrors(): void
     {
+        if (CompilerVersion::supportsPropertyDefaultObjectExpressions()) {
+            $runtime = new Runtime();
+            $block = $runtime->parseAndCompile(<<<'PHP'
+<?php
+class C {
+    public $p = new stdClass();
+}
+PHP, 'property_default_new_with_parens.php');
+            $this->assertNotNull($block);
+
+            return;
+        }
         $this->expectCompileError(<<<'PHP'
 <?php
 class C {

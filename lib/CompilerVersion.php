@@ -628,7 +628,8 @@ final class CompilerVersion
      *
      * PHP 8.3+ forward profile: `public const X = new DateTime(...)` materializes once per class
      * (#12940, #16878, Zend/zend_compile.c zend_const_expr_to_zval allow_dynamic). Withheld on the
-     * 8.4.0-dev reference profile (matches Zend 8.2 rejection). Property defaults still reject `new`.
+     * 8.4.0-dev reference profile (matches Zend 8.2 rejection). Instance property defaults allow `new`
+     * only on PHP 8.4+ forward profile via {@see supportsPropertyDefaultObjectExpressions()}.
      */
     public static function supportsClassConstObjectExpressions(): bool
     {
@@ -963,6 +964,17 @@ final class CompilerVersion
      * php-src: Zend/zend_compile.c ZEND_ACC_READONLY_FUNCTION; zend_ast.c ZEND_AST_FUNC_DECL.
      */
     public static function supportsReadonlyFunction(): bool
+    {
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+    }
+
+    /**
+     * PHP 8.4+ instance property default `new Class(...)` initializers (#18040, Zend/zend_compile.c).
+     *
+     * Static property defaults and class constants keep php-src rejection rules on every profile.
+     * Gated on {@see languageProfileVersion()} so 8.4.0-dev reference profile rejects like Zend 8.2.
+     */
+    public static function supportsPropertyDefaultObjectExpressions(): bool
     {
         return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
     }
