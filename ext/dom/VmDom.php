@@ -4072,7 +4072,21 @@ final class VmDom
         }
         // Avoid PCRE backreferences and \G — VmPregPure lacks them (#17954, compiled loadHTML/AOT).
         $end = self::findHtmlElementEnd($trimmed, 0);
-        if (null === $end || $end !== \strlen($trimmed)) {
+        if (null === $end) {
+            if (null === $frame) {
+                return null;
+            }
+
+            return self::createHtmlElementFromTag(
+                $ctx,
+                $open['tag'],
+                $open['attrs'],
+                substr($trimmed, $open['end']),
+                $ownerDocument,
+                $frame
+            );
+        }
+        if ($end !== \strlen($trimmed)) {
             return null;
         }
         $closePos = strrpos(substr($trimmed, 0, $end), '</');

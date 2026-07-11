@@ -1984,7 +1984,7 @@ final class CompilerVersionGateTest extends TestCase
 
     public function testSupportsDomNodeCompareDocumentPositionOnReferenceProfile(): void
     {
-        $this->assertTrue(CompilerVersion::supportsDomNodeCompareDocumentPosition());
+        $this->assertFalse(CompilerVersion::supportsDomNodeCompareDocumentPosition());
     }
 
     public function testSupportsDomNodeGetRootNodeOnForwardProfile(): void
