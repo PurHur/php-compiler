@@ -7,7 +7,6 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitOperandTypeLabel;
 use PHPCompiler\JIT\JitStringBuiltinArg;
@@ -120,7 +119,7 @@ final class JitFilestatArg
         );
     }
 
-    /** chmod()/mkdir() mode — strict int or weak numeric-string Z_PARAM_LONG decimal cast (#15902, ext/standard/filestat.c). */
+    /** chmod()/mkdir() mode — Z_PARAM_LONG zend_strtol base 0; internal ignores caller strict_types (#17819, #17822). */
     public static function lowerFileMode(
         Context $context,
         JITVariable $arg,
@@ -128,10 +127,6 @@ final class JitFilestatArg
         int $argIndex,
         string $paramName
     ): Value {
-        JitInternalStrictArg::requireInt($context, $arg, $function, $paramName, $argIndex + 1);
-        if ($context->callerStrictTypes) {
-            return $context->helper->loadValue($arg);
-        }
         if (JITVariable::TYPE_STRING === $arg->type && null !== $arg->compileTimeString) {
             $raw = $arg->compileTimeString;
             if ('' === $raw || !is_numeric($raw)) {
@@ -142,7 +137,7 @@ final class JitFilestatArg
             }
         }
 
-        return JitLongArg::lower($context, $arg, $function.'() '.$paramName);
+        return JitLongArg::lowerZendLong($context, $arg, $function.'() '.$paramName);
     }
 
     public static function coerceIntOrStringJitArg(
