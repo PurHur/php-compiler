@@ -31,12 +31,7 @@ final class localtime extends Internal
         }
         $timestamp = null;
         if ($argc >= 1) {
-            $tsVar = $frame->calledArgs[0]->resolveIndirect();
-            if (Variable::TYPE_INTEGER === $tsVar->type) {
-                $timestamp = $tsVar->toInt();
-            } elseif (Variable::TYPE_NULL !== $tsVar->type) {
-                throw new \TypeError(self::timestampTypeError($tsVar->type));
-            }
+            $timestamp = VmDate::coerceNullableTimestampArgForFrame($frame, 0, 'localtime', 1, 'timestamp');
         }
         $associative = false;
         if (2 === $argc) {
@@ -103,14 +98,6 @@ final class localtime extends Internal
                     .self::vmTypeName($var->type).' given'
                 );
         }
-    }
-
-    private static function timestampTypeError(int $type): string
-    {
-        return \sprintf(
-            'localtime(): Argument #1 ($timestamp) must be of type ?int, %s given',
-            self::vmTypeName($type)
-        );
     }
 
     private static function vmTypeName(int $type): string

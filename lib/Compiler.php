@@ -30979,13 +30979,42 @@ class Compiler {
         if (!\in_array($callee, ['date_sunrise', 'date_sunset', 'date_sun_info'], true)) {
             return null;
         }
+        $blockOpsAtEntry = \count($block->opCodes);
         $producerOps = [];
         $timeArgSlot = null;
+        $sunfuncsArgSlot = null;
+        $longitudeSlot = null;
         $callIndex = null;
         foreach ($block->orig->children as $i => $child) {
             if ($child === $cfgCallOp) {
                 $callIndex = $i;
                 break;
+            }
+        }
+        foreach ($this->hoistedPreludeProducersImmediatelyBeforeCall($cfgCallOp, $block) as $prelude) {
+            if ($prelude instanceof Op\Expr\ConstFetch) {
+                $name = strtolower($this->staticNameFromOperand($prelude->name) ?? '');
+                if (!str_starts_with($name, 'sunfuncs_ret_')) {
+                    continue;
+                }
+                $folded = $this->tryFoldGlobalConstFetch($prelude);
+                if (null === $folded) {
+                    $stdlibInt = \PHPCompiler\ext\standard\StdlibConstants::CORE_INT_BY_NAME[$name] ?? null;
+                    if (null !== $stdlibInt) {
+                        $folded = new Variable(Variable::TYPE_INTEGER);
+                        $folded->int($stdlibInt);
+                    }
+                }
+                if (null === $folded) {
+                    continue;
+                }
+                $sunfuncsArgSlot = (string) $block->registerConstant(new Operand\Temporary(), $folded);
+            }
+            if ($prelude instanceof Op\Expr\UnaryMinus || $prelude instanceof Op\Expr\UnaryPlus) {
+                $foldedUnary = $this->tryFoldUnaryLiteralDefault($prelude);
+                if (null !== $foldedUnary) {
+                    $longitudeSlot = (string) $block->registerConstant(new Operand\Temporary(), $foldedUnary);
+                }
             }
         }
         if (null !== $callIndex) {
@@ -31002,11 +31031,20 @@ class Compiler {
                     break;
                 }
                 $prevForce = $this->forceDeferredSiblingCallReturnSlot;
+                $prevInlineNested = $this->inlineNestedProducerOpsInArgSends;
                 $this->forceDeferredSiblingCallReturnSlot = true;
+                $this->inlineNestedProducerOpsInArgSends = true;
                 try {
-                    $producerOps = $this->compileExpr($child, $block);
+                    $blockOpsBeforeProducer = \count($block->opCodes);
+                    $compiledProducer = $this->compileExpr($child, $block);
+                    $producerOps = array_merge(
+                        $producerOps,
+                        $this->drainBlockOpcodesAppendedSince($block, $blockOpsBeforeProducer),
+                        $compiledProducer
+                    );
                 } finally {
                     $this->forceDeferredSiblingCallReturnSlot = $prevForce;
+                    $this->inlineNestedProducerOpsInArgSends = $prevInlineNested;
                 }
                 foreach ($producerOps as $op) {
                     if (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type && null !== $op->arg1) {
@@ -31015,27 +31053,6 @@ class Compiler {
                     }
                 }
                 break;
-            }
-        }
-        $sunfuncsArgSlot = null;
-        $longitudeSlot = null;
-        foreach ($this->hoistedPreludeProducersImmediatelyBeforeCall($cfgCallOp, $block) as $prelude) {
-            if ($prelude instanceof Op\Expr\ConstFetch) {
-                $name = strtolower($this->staticNameFromOperand($prelude->name) ?? '');
-                if (!str_starts_with($name, 'sunfuncs_ret_')) {
-                    continue;
-                }
-                $folded = $this->tryFoldGlobalConstFetch($prelude);
-                if (null === $folded) {
-                    continue;
-                }
-                $sunfuncsArgSlot = (string) $block->registerConstant($prelude->result, $folded);
-            }
-            if ($prelude instanceof Op\Expr\UnaryMinus || $prelude instanceof Op\Expr\UnaryPlus) {
-                $foldedUnary = $this->tryFoldUnaryLiteralDefault($prelude);
-                if (null !== $foldedUnary) {
-                    $longitudeSlot = (string) $block->registerConstant($prelude->result, $foldedUnary);
-                }
             }
         }
         $longitudeArgIndex = $isDateSunInfo ? 2 : 3;
@@ -31057,6 +31074,10 @@ class Compiler {
                 $valueSlot = $this->compileOperand($arg, $block, true);
             }
             $sends[] = new OpCode(OpCode::TYPE_ARG_SEND, $valueSlot, null, null);
+        }
+        $strayBlockOps = $this->drainBlockOpcodesAppendedSince($block, $blockOpsAtEntry);
+        if ([] !== $strayBlockOps) {
+            $producerOps = array_merge($strayBlockOps, $producerOps);
         }
 
         return array_merge($producerOps, $sends);
@@ -46920,10 +46941,18 @@ class Compiler {
         $skipPrependForExplodeLeadingConstFunc = null !== $cfgCallOp
             && 'explode' === strtolower($this->resolveCfgFuncCallName($cfgCallOp) ?? '')
             && null !== $this->leadingConstFetchFuncCallPreludeBeforeCfgCall($cfgCallOp, $block);
+        // date_sunrise()/date_sunset() hoisted strtotime + SUNFUNCS_RET_* ConstFetch — producer INIT must run first (#17937).
+        $skipPrependForDateSunFunc = null !== $cfgCallOp
+            && \in_array(
+                strtolower($this->resolveCfgFuncCallName($cfgCallOp) ?? ''),
+                ['date_sunrise', 'date_sunset', 'date_sun_info'],
+                true
+            );
         if (
             !$skipPrependForSiblingFuncProducer
             && !$skipPrependForHaystackFamilyDimFetch
             && !$skipPrependForExplodeLeadingConstFunc
+            && !$skipPrependForDateSunFunc
         ) {
             $initPrependedBeforeArgConstFetch = $this->prependFuncCallInitBeforeTrailingArgConstFetches(
                 $block,
