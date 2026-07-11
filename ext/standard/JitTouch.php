@@ -43,6 +43,11 @@ final class JitTouch
         if (JITVariable::TYPE_NULL === $arg->type) {
             return $nullSentinel;
         }
+        if (JITVariable::TYPE_STRING === $arg->type && $context->callerStrictTypes) {
+            self::emitNullableLongTypeErrorAndAbort($context, $argIndex, $paramName, 'string');
+
+            return $nullSentinel;
+        }
         if (($arg->type & JITVariable::IS_NATIVE_ARRAY) || JITVariable::TYPE_HASHTABLE === $arg->type) {
             self::emitNullableLongTypeErrorAndAbort($context, $argIndex, $paramName, 'array');
 

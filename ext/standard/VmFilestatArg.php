@@ -204,7 +204,7 @@ final class VmFilestatArg
     }
 
     /**
-     * chmod()/mkdir() mode — Z_PARAM_LONG; internal calls ignore caller strict_types (#17822, #4207).
+     * chmod()/mkdir() mode — Z_PARAM_LONG; honor caller strict_types for string operands (#17927, #17822).
      *
      * @throws \TypeError
      */
@@ -214,7 +214,13 @@ final class VmFilestatArg
         string $function,
         string $paramName
     ): int {
-        return self::parseFileModeArg($frame->calledArgs[$argIndex], $function, $argIndex, $paramName);
+        return self::parseFileModeArg(
+            $frame->calledArgs[$argIndex],
+            $function,
+            $argIndex,
+            $paramName,
+            $frame
+        );
     }
 
     /**
@@ -226,7 +232,8 @@ final class VmFilestatArg
         Variable $var,
         string $function,
         int $argIndex,
-        string $paramName
+        string $paramName,
+        ?Frame $frame = null
     ): int {
         $var = $var->resolveIndirect();
         self::rejectEnumCaseIntArg($var, $function, $argIndex, $paramName);
@@ -258,20 +265,23 @@ final class VmFilestatArg
         if (Variable::TYPE_NULL === $var->type) {
             return 0;
         }
-        if (Variable::TYPE_STRING !== $var->type) {
-            throw new \TypeError(self::intTypeError(
-                $function,
-                $argIndex,
-                $paramName,
-                self::vmTypeName($var->type)
-            ));
-        }
-        $s = $var->toString();
-        if ('' === $s || !is_numeric($s)) {
-            throw new \TypeError(self::intTypeError($function, $argIndex, $paramName, 'string'));
-        }
+        if (Variable::TYPE_STRING === $var->type) {
+            if (null !== $frame && InternalStrictArg::isCallerStrict($frame)) {
+                throw new \TypeError(self::intTypeError($function, $argIndex, $paramName, 'string'));
+            }
+            $s = $var->toString();
+            if ('' === $s || !is_numeric($s)) {
+                throw new \TypeError(self::intTypeError($function, $argIndex, $paramName, 'string'));
+            }
 
-        return (int) VmMath::baseToZval($s, 10);
+            return (int) VmMath::baseToZval($s, 10);
+        }
+        throw new \TypeError(self::intTypeError(
+            $function,
+            $argIndex,
+            $paramName,
+            self::vmTypeName($var->type)
+        ));
     }
 
     private static function vmTypeName(int $type): string
