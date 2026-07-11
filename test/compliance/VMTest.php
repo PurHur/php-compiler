@@ -375,6 +375,14 @@ class VMTest extends BaseTest {
                 && str_contains($name, 'reflection_property_hook_methods_reference_profile')) {
                 continue;
             }
+            if (!CompilerVersion::supportsAsymmetricVisibility()
+                && str_contains($name, 'reflection_property_asymmetric_probes_forward_profile')) {
+                continue;
+            }
+            if (CompilerVersion::supportsAsymmetricVisibility()
+                && str_contains($name, 'reflection_property_asymmetric_probes_profile')) {
+                continue;
+            }
             if (!CompilerVersion::supportsReflectionPropertyIsDynamic()
                 && str_contains($name, 'reflection_property_isdynamic_forward_profile')) {
                 continue;
@@ -846,7 +854,8 @@ class VMTest extends BaseTest {
                 && !str_contains($name, 'asymmetric_double_modifier_reference_profile')
                 && !str_contains($name, 'asymmetric_visibility_reference_profile')
                 && !str_contains($name, 'asymmetric_visibility_profile_gate')
-                && !str_contains($name, 'asymmetric_visibility_forward_84')) {
+                && !str_contains($name, 'asymmetric_visibility_forward_84')
+                && !str_contains($name, 'asymmetric_probes_profile')) {
                 continue;
             }
             // 8.4-target reject gate; skipped when property hooks enabled (#12574, #14432).

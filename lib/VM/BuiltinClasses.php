@@ -851,13 +851,6 @@ final class BuiltinClasses
                 'isreadonly' => new ReflectionPropertyIsReadOnly(),
                 'ispromoted' => new ReflectionPropertyIsPromoted(),
                 'isinitialized' => new ReflectionPropertyIsInitialized(),
-                'isprivateset' => ReflectionPropertyAsymmetricProbe::isPrivateSet(),
-                'isprotectedset' => ReflectionPropertyAsymmetricProbe::isProtectedSet(),
-                'ispublicset' => ReflectionPropertyAsymmetricProbe::isPublicSet(),
-                'isprivateget' => ReflectionPropertyAsymmetricProbe::isPrivateGet(),
-                'isprotectedget' => ReflectionPropertyAsymmetricProbe::isProtectedGet(),
-                'ispublicget' => ReflectionPropertyAsymmetricProbe::isPublicGet(),
-                'getasymmetricvisibility' => new ReflectionPropertyGetAsymmetricVisibility(),
                 'getreadabletype' => new ReflectionPropertyGetReadableType(),
                 'getsettabletype' => new ReflectionPropertyGetSettableType(),
                 'hasdefaultvalue' => new ReflectionPropertyHasDefaultValue(),
@@ -866,6 +859,22 @@ final class BuiltinClasses
         ) {
             $rp->methods[$name] = $method;
             $rp->methodVisibility[$name] = $pub;
+        }
+        if (CompilerVersion::supportsAsymmetricVisibility()) {
+            foreach (
+                [
+                    'isprivateset' => ReflectionPropertyAsymmetricProbe::isPrivateSet(),
+                    'isprotectedset' => ReflectionPropertyAsymmetricProbe::isProtectedSet(),
+                    'ispublicset' => ReflectionPropertyAsymmetricProbe::isPublicSet(),
+                    'isprivateget' => ReflectionPropertyAsymmetricProbe::isPrivateGet(),
+                    'isprotectedget' => ReflectionPropertyAsymmetricProbe::isProtectedGet(),
+                    'ispublicget' => ReflectionPropertyAsymmetricProbe::isPublicGet(),
+                    'getasymmetricvisibility' => new ReflectionPropertyGetAsymmetricVisibility(),
+                ] as $name => $method
+            ) {
+                $rp->methods[$name] = $method;
+                $rp->methodVisibility[$name] = $pub;
+            }
         }
         if (CompilerVersion::supportsReflectionPropertyHookProbes()) {
             foreach (
