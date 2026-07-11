@@ -22,8 +22,6 @@ final class JitSscanf
 {
     public static function parse(Context $context, JITVariable ...$args): Value
     {
-        Sscanf::ensureLinked($context);
-
         $argc = \count($args);
         if ($argc < 2) {
             TypeErrorRaise::emitArgumentCountError(
@@ -42,6 +40,8 @@ final class JitSscanf
         if (null !== $strLit && null !== $fmtLit && self::canFoldCompileTime($fmtLit, $argc - 2)) {
             return self::parseCompileTime($context, $strLit, $fmtLit, \array_slice($args, 2));
         }
+
+        Sscanf::ensureLinked($context);
 
         JitInternalStrictArg::rejectNullString($context, $args[0], 'sscanf', 'string', 1);
         $str = JitStringBuiltinArg::lower($context, $args[0], 'sscanf', 0, 'string');
