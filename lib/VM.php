@@ -10973,14 +10973,11 @@ restart:
         return null;
     }
 
-    /** Reject reads/isset/empty on write-only hooked instance properties (#6484, zend_property_hooks.c). */
+    /** Reject reads/isset/empty on set-only hooked instance properties (#6484, #18072, zend_property_hooks.c). */
     private function enforceWriteOnlyVirtualPropertyRead(ObjectEntry $object, string $propName, Frame $frame): ?Frame
     {
         $meta = $this->classPropertyMeta($object, $propName);
         if (null === $meta || null === $meta->setHookMethodLc || null !== $meta->getHookMethodLc) {
-            return null;
-        }
-        if (!$this->instancePropertyIsWriteOnlyVirtualHook($object, $propName)) {
             return null;
         }
         $className = $object->class->name;
@@ -11170,7 +11167,7 @@ restart:
     }
 
     /**
-     * Reject writes to get-only virtual hooked properties (#4687, Zend zend_object_handlers.c).
+     * Reject writes to get-only hooked properties (#4687, #18072, Zend zend_object_handlers.c).
      */
     private function enforceVirtualPropertyHookWrite(Variable $lvalue, Frame $frame): ?Frame
     {
@@ -11189,12 +11186,14 @@ restart:
         }
         $className = null;
         $virtual = false;
+        $hasGetHook = false;
         $hasSetHook = false;
         $classLc = $target->staticPropertyClassLc;
         if (is_string($classLc) && isset($this->context->classes[$classLc])) {
             $entry = $this->context->classes[$classLc];
             $hooks = $this->resolveStaticPropertyHooks($classLc, strtolower($propName)) ?? [];
             $virtual = !empty($hooks['virtual']);
+            $hasGetHook = !empty($hooks['get']);
             $hasSetHook = !empty($hooks['set']);
             $className = $entry->name;
         } else {
@@ -11207,19 +11206,23 @@ restart:
                 return null;
             }
             $virtual = $meta->propertyHookVirtual;
+            $hasGetHook = null !== $meta->getHookMethodLc;
             $hasSetHook = null !== $meta->setHookMethodLc;
             $className = $owner->class->name;
         }
-        if (!$virtual || $hasSetHook) {
+        if (!$hasGetHook || $hasSetHook) {
             return null;
         }
         if ($this->propertyHasDistinctAsymmetricSetVisibility($classLc, $propName, $lvalue)) {
             return $this->enforceAsymmetricPropertyWrite($lvalue, $frame);
         }
 
+        $message = $virtual
+            ? sprintf('Property %s::$%s is read-only', $className, $propName)
+            : sprintf('Cannot write property %s::$%s without set hook', $className, $propName);
         $thrown = VM\BuiltinExceptionSupport::materializeError(
             $this->context,
-            sprintf('Property %s::$%s is read-only', $className, $propName)
+            $message
         );
         $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
         if (null !== $catchFrame) {
