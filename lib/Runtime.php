@@ -230,6 +230,7 @@ class Runtime {
         $this->load(new ext\simplexml\Module);
         $this->load(new ext\xml\Module);
         $this->load(new ext\xmlreader\Module);
+        $this->load(new ext\xmlwriter\Module);
         $this->load(new ext\gd\Module);
         $this->load(new ext\iconv\Module);
         $this->load(new ext\gettext\Module);
