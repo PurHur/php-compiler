@@ -206,6 +206,13 @@ class Context {
     /** Scope slot for {@see $ternarySharedReturnOperand} on the merge RETURN (#8555). */
     public ?int $ternarySharedReturnSlot = null;
 
+    /**
+     * ?: arm temp slot => phi dest operand when merge-block ECHO still references the arm temp (#18052).
+     *
+     * @var array<int, Operand>
+     */
+    public array $ternaryEchoPhiByAliasSlot = [];
+
     /** Guarded list destruct: assign-path dim fetches compile as unreachable stubs (#4308). */
     public bool $listUnpackSkipAssignPath = false;
 

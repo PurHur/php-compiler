@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\dom;
 
-use PHPCompiler\ext\standard\VmString;
+use PHPCompiler\VM\Context;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\Variable;
 
@@ -13,20 +13,15 @@ use PHPCompiler\VM\Variable;
  *
  * SSOT: {@see VmDom::getElementById()}
  * php-src: ext/dom/php_dom.c — dom_document_get_element_by_id
- *
- * @deprecated User-script AOT routes through {@see VmDomInstanceInvoke} — kept for non-user-script JIT bridges.
  */
 final class DomGetElementByIdJitHelper
 {
-    public static function getElementByIdArgv(ObjectEntry $document, Variable $elementId): ?ObjectEntry
+    public static function getElementByIdArgv(Context $ctx, ObjectEntry $document, Variable $elementId): ?ObjectEntry
     {
-        $id = VmString::coerceStringBuiltinArg(
-            $elementId->resolveIndirect(),
-            'DOMDocument::getElementById()',
-            0,
-            'elementId'
-        );
+        if (Variable::TYPE_STRING !== $elementId->type) {
+            return null;
+        }
 
-        return VmDom::getElementById($document, $id);
+        return VmDom::getElementById($document, $elementId->toString($ctx));
     }
 }

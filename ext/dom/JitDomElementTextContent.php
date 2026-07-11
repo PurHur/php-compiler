@@ -23,8 +23,9 @@ final class JitDomElementTextContent
     {
         $context = $objectType->jitContext();
         if (DomDocumentMethodUserScriptLlvm::shouldUse($context)) {
-            return self::fetchDirectSlot($objectType, $obj);
+            return self::fetchFromLlvmLayout($objectType, $obj);
         }
+
         $str = $context->builder->call(
             $context->lookupFunction(DomElementTextContentRuntime::ABI_NAME),
             $obj
@@ -38,7 +39,7 @@ final class JitDomElementTextContent
         );
     }
 
-    private static function fetchDirectSlot(Object_ $objectType, Value $obj): JITVariable
+    private static function fetchFromLlvmLayout(Object_ $objectType, Value $obj): JITVariable
     {
         $context = $objectType->jitContext();
         $classId = $objectType->lookup(self::CLASS_ELEMENT);
@@ -47,12 +48,16 @@ final class JitDomElementTextContent
         }
         $slot = $objectType->propertySlotFor($obj, self::CLASS_ELEMENT, self::PROP_TEXT_CONTENT);
         $loaded = $context->builder->load($slot);
+        $typed = $context->builder->pointerCast(
+            $loaded,
+            $context->getTypeFromString('__string__*')
+        );
 
         return new JITVariable(
             $context,
             JITVariable::TYPE_STRING,
             JITVariable::KIND_VALUE,
-            $loaded
+            $typed
         );
     }
 

@@ -319,6 +319,7 @@ class JIT {
             $this->context->inlineIncludeReturnOperands = [];
             $this->context->coalesceAssignTargets = new \SplObjectStorage();
             $this->context->coalesceMergeSlotOperands = [];
+            $this->context->ternaryEchoPhiByAliasSlot = [];
             $this->context->listUnpackSkipAssignPath = false;
             $this->context->listUnpackMergeLlvmBlocks = new \SplObjectStorage();
             $this->context->listUnpackMergeNullInitTargets = [];
@@ -406,6 +407,89 @@ class JIT {
         // the ?: phi before breaking; require an arm assign (#878).
         return null !== $this->ternaryPhiAssignSourceOperand($ifBlock, $ifMerge)
             || null !== $this->ternaryPhiAssignSourceOperand($elseBlock, $ifMerge);
+    }
+
+    /** Both ?: arms jump to a merge block whose first ECHO uses the phi alias temp (#3790, #18052). */
+    private function jumpIfTargetsEchoMerge(?Block $ifBlock, ?Block $elseBlock): bool
+    {
+        $ifMerge = $this->branchJumpMergeBlock($ifBlock);
+        $elseMerge = $this->branchJumpMergeBlock($elseBlock);
+        if (null === $ifMerge || $ifMerge !== $elseMerge) {
+            return false;
+        }
+        if (null === $this->mergeEchoSlot($ifMerge)) {
+            return false;
+        }
+        if (null !== $this->ternaryReturnPhiOperand($ifMerge)) {
+            return false;
+        }
+        if (!$this->ternaryEchoMergeNeedsStackPhi($ifMerge, $ifBlock, $elseBlock)) {
+            return false;
+        }
+
+        return null !== $this->ternaryEchoPhiOperand($ifMerge, $ifBlock, $elseBlock);
+    }
+
+    /** Literal ?: echo arms keep operand redirect; non-literal arms need stack-slot phi (#18052). */
+    private function ternaryEchoMergeNeedsStackPhi(Block $mergeBlock, ?Block $ifBlock, ?Block $elseBlock): bool
+    {
+        $echoSlot = $this->mergeEchoSlot($mergeBlock);
+        if (null === $echoSlot) {
+            return false;
+        }
+        foreach ([$ifBlock, $elseBlock] as $branch) {
+            if (null === $branch) {
+                continue;
+            }
+            foreach ($branch->opCodes as $branchOp) {
+                if (OpCode::TYPE_ASSIGN !== $branchOp->type || (int) $branchOp->arg2 !== $echoSlot) {
+                    continue;
+                }
+                $rhsSlot = null !== $branchOp->arg3 ? (int) $branchOp->arg3 : (int) $branchOp->arg2;
+                $rhs = $branch->getOperand($rhsSlot);
+                if (!$rhs instanceof Operand\Literal) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private function mergeEchoSlot(Block $mergeBlock): ?int
+    {
+        foreach ($mergeBlock->opCodes as $mergeOp) {
+            if (OpCode::TYPE_ECHO === $mergeOp->type) {
+                return (int) $mergeOp->arg1;
+            }
+        }
+
+        return null;
+    }
+
+    private function ternaryEchoPhiOperand(Block $mergeBlock, ?Block $ifBlock, ?Block $elseBlock): ?Operand
+    {
+        $echoSlot = $this->mergeEchoSlot($mergeBlock);
+        if (null === $echoSlot) {
+            return null;
+        }
+        foreach ([$ifBlock, $elseBlock] as $branch) {
+            if (null === $branch) {
+                continue;
+            }
+            foreach ($branch->opCodes as $branchOp) {
+                if (OpCode::TYPE_ASSIGN !== $branchOp->type) {
+                    continue;
+                }
+                if ((int) $branchOp->arg2 !== $echoSlot) {
+                    continue;
+                }
+
+                return $branch->getOperand($branchOp->arg1);
+            }
+        }
+
+        return null;
     }
 
     /**
@@ -7118,9 +7202,19 @@ class JIT {
                         $aliasVar = $this->context->getVariableFromOp($aliasOp);
                         $srcVar = $this->context->getVariableFromOp($block->getOperand($rhsSlot));
                         if ($aliasVar === $srcVar) {
+                            $prior = $i > 0 ? $block->opCodes[$i - 1] : null;
+                            if (
+                                null !== $prior
+                                && $this->context->coalesceAssignTargets->contains($destOp)
+                                && null !== $this->ternaryEchoPhiPropertyFetchDest($block, $i - 1)
+                            ) {
+                                $this->recordTernaryEchoPhiByAliasSlot($block, $op, $destOp, $aliasOp, $rhsSlot);
+                                break;
+                            }
                             if ([] !== $destOp->usages || $forceAssign) {
                                 $this->assignOperand($destOp, $value, $forceAssign);
                             }
+                            $this->recordTernaryEchoPhiByAliasSlot($block, $op, $destOp, $aliasOp, $rhsSlot);
                             break;
                         }
                     }
@@ -7153,6 +7247,7 @@ class JIT {
                     }
                     if (null !== $aliasOp) {
                         $this->maybeBindNamedVariable($aliasOp);
+                        $this->recordTernaryEchoPhiByAliasSlot($block, $op, $destOp, $aliasOp, $rhsSlot);
                     }
                     if ($op->arg1 === $op->arg2) {
                         $this->maybeBindNamedVariable($destOp);
@@ -8284,7 +8379,25 @@ class JIT {
                     }
                     JIT\Builtin\PendingHeaders::emitFlushForStandalone($this->context);
                     $argOffset = $op->type === OpCode::TYPE_ECHO ? $op->arg1 : $op->arg2;
-                    $arg = $this->context->getVariableFromOp($block->getOperand($argOffset));
+                    $echoOp = $block->getOperand($argOffset);
+                    $echoSlot = $block->slotForOperand($echoOp);
+                    if (null !== $echoSlot && isset($this->context->coalesceMergeSlotOperands[$echoSlot])) {
+                        $arg = $this->materializeCoalesceMergeSlotArgSend(
+                            $block,
+                            $this->context->coalesceMergeSlotOperands[$echoSlot]
+                        );
+                        if (Variable::TYPE_VALUE === $arg->type) {
+                            JIT\ValueEchoHelper::echo(
+                                $this->context,
+                                JIT\JitValueBox::pointer($this->context, $arg->value)
+                            );
+                            break;
+                        }
+                    }
+                    if (null !== $echoSlot && isset($this->context->ternaryEchoPhiByAliasSlot[$echoSlot])) {
+                        $echoOp = $this->context->ternaryEchoPhiByAliasSlot[$echoSlot];
+                    }
+                    $arg = $this->context->getVariableFromOpInScopes($echoOp);
                     if (Variable::KIND_VARIABLE === $arg->kind) {
                         $slotType = $this->context->getStringFromType($arg->value->typeOf());
                         if ('__value__' === $slotType) {
@@ -8746,10 +8859,14 @@ class JIT {
                     $builder->positionAtEnd($branchBlock);
                     $this->maybeRefreshIncludeBindingsBeforeUse();
                     $ternaryMergeReturn = null;
+                    $ternaryMergeEcho = null;
                     $savedTernarySharedReturn = $this->context->ternarySharedReturnOperand;
                     $savedTernarySharedReturnSlot = $this->context->ternarySharedReturnSlot;
                     $isTernaryReturnMerge = 0 === $this->context->inlineIncludeDepth
                         && $this->jumpIfTargetsReturnMerge($op->block1, $op->block2);
+                    $isTernaryEchoMerge = 0 === $this->context->inlineIncludeDepth
+                        && !$isTernaryReturnMerge
+                        && $this->jumpIfTargetsEchoMerge($op->block1, $op->block2);
                     if ($isTernaryReturnMerge) {
                         $mergeBlock = $this->branchJumpMergeBlock($op->block1);
                         assert(null !== $mergeBlock);
@@ -8762,6 +8879,18 @@ class JIT {
                                     $this->context->ternarySharedReturnSlot = (int) $mergeOp->arg1;
                                     break;
                                 }
+                            }
+                        }
+                    } elseif ($isTernaryEchoMerge) {
+                        $mergeBlock = $this->branchJumpMergeBlock($op->block1);
+                        assert(null !== $mergeBlock);
+                        $ternaryMergeEcho = $this->ternaryEchoPhiOperand($mergeBlock, $op->block1, $op->block2);
+                        if (null !== $ternaryMergeEcho) {
+                            $this->context->coalesceAssignTargets[$ternaryMergeEcho] = true;
+                            $this->ensureCoalesceMergeStackSlot($ternaryMergeEcho);
+                            $echoSlot = $this->mergeEchoSlot($mergeBlock);
+                            if (null !== $echoSlot) {
+                                $this->context->coalesceMergeSlotOperands[$echoSlot] = $ternaryMergeEcho;
                             }
                         }
                     }
@@ -8869,6 +8998,9 @@ class JIT {
                     $builder->branchIf($condition, $ifEntry, $elseEntry);
                     if (null !== $ternaryMergeReturn) {
                         unset($this->context->coalesceAssignTargets[$ternaryMergeReturn]);
+                    }
+                    if (null !== $ternaryMergeEcho) {
+                        unset($this->context->coalesceAssignTargets[$ternaryMergeEcho]);
                     }
                     $this->context->ternarySharedReturnOperand = $savedTernarySharedReturn;
                     $this->context->ternarySharedReturnSlot = $savedTernarySharedReturnSlot;
@@ -9868,6 +10000,7 @@ class JIT {
                     break;
                 case OpCode::TYPE_PROPERTY_FETCH:
                 case OpCode::TYPE_PROPERTY_FETCH_WRITE:
+                    JIT\BasicBlockHelper::ensureOpenInsertBlock($this->context, 'prop_fetch_cont');
                     $result = $block->getOperand($op->arg1);
                     $obj = $block->getOperand($op->arg2);
                     $name = $block->getOperand($op->arg3);
@@ -9930,6 +10063,10 @@ class JIT {
                     assert($obj->type->type === Type::TYPE_OBJECT);
                     $declaringClass = $this->resolvePropertyDeclaringClass($obj, $block, $propName);
                     $receiver = $this->loadPropertyFetchReceiver($obj);
+                    $phiDest = $this->ternaryEchoPhiPropertyFetchDest($block, $i);
+                    if (null !== $phiDest) {
+                        $result = $phiDest;
+                    }
                     $forceBranchMerge = $this->context->coalesceAssignTargets->contains($result);
                     if ($forceBranchMerge) {
                         if (!$this->context->hasVariableOp($result)) {
@@ -10964,6 +11101,36 @@ class JIT {
         return false;
     }
 
+    /**
+     * Pin call SSA results in the open insert block after callee CFG splits (#18052).
+     *
+     * Bool-return instance methods (e.g. DOMDocument::loadHTML) branch to fresh
+     * continuations; boxed __value__* results from the next call can be unreachable
+     * for assignOperandValue unless copied on-stack in the current block.
+     */
+    private function materializeCallResultReachable(PHPLLVM\Value $llvmResult): PHPLLVM\Value
+    {
+        $ty = $this->context->getStringFromType($llvmResult->typeOf());
+        if ('__object__*' === $ty) {
+            JIT\BasicBlockHelper::ensureOpenInsertBlock($this->context, 'call_result_obj_reach_cont');
+            $objSlot = JIT\BasicBlockHelper::entryAlloca($this->context, $this->context->getTypeFromString('__object__*'));
+            $this->context->builder->store($llvmResult, $objSlot);
+
+            return $this->context->builder->load($objSlot);
+        }
+        if ('__value__*' !== $ty) {
+            return $llvmResult;
+        }
+        JIT\BasicBlockHelper::ensureOpenInsertBlock($this->context, 'call_result_reach_cont');
+        $slot = JIT\BasicBlockHelper::entryAlloca($this->context, $this->context->getTypeFromString('__value__*'));
+        $this->context->builder->store(
+            JIT\JitValueBox::normalizeValuePtr($this->context, $llvmResult),
+            $slot
+        );
+
+        return $this->context->builder->load($slot);
+    }
+
     private function assignCallResultOperand(Operand $result, PHPLLVM\Value $llvmResult, bool $returnsByRef): void
     {
         if ('void' === $this->context->getStringFromType($llvmResult->typeOf())) {
@@ -10972,7 +11139,24 @@ class JIT {
         if (!$returnsByRef) {
             // FUNCCALL_EXEC_RETURN must materialize even when php-cfg dropped result usages
             // (nested f(g()) arg temps — strlen(trim($s)), #8561).
+            $llvmTy = $this->context->getStringFromType($llvmResult->typeOf());
+            if (
+                $this->context->hasVariableOp($result)
+                && ('__value__*' === $llvmTy || '__value__' === $llvmTy)
+            ) {
+                $prior = $this->context->getVariableFromOp($result);
+                if (Variable::TYPE_OBJECT === $prior->type) {
+                    // Inline f(); g() must not inherit object-typed operand slots (#18052).
+                    $prior->free();
+                    unset($this->context->scope->variables[$result]);
+                }
+            }
+            $llvmResult = $this->materializeCallResultReachable($llvmResult);
+            JIT\BasicBlockHelper::ensureOpenInsertBlock($this->context, 'call_assign_cont');
             $this->assignOperandValue($result, $llvmResult, true);
+            if ($this->context->scope->toCall instanceof JIT\Call\DomDocumentGetElementById) {
+                JIT\BasicBlockHelper::ensureOpenInsertBlock($this->context, 'dom_gei_post_assign');
+            }
 
             return;
         }
@@ -13333,6 +13517,16 @@ class JIT {
             $result->addref();
 
             return;
+        } elseif (Variable::TYPE_VALUE === $result->type && Variable::TYPE_OBJECT === $value->type) {
+            JIT\JitValueBox::assignToPointer(
+                $this->context,
+                JIT\JitValueBox::pointer($this->context, $result->value),
+                $value
+            );
+            $this->recordListUnpackAssignSlot($resultOp, $result);
+            $result->addref();
+
+            return;
         } elseif (Variable::TYPE_OBJECT === $result->type && Variable::TYPE_NATIVE_BOOL === $value->type) {
             // Self-host inventory spine: bool assigned into object-typed operand (#2967, #8708).
             $slot = JIT\JitValueBox::alloc($this->context);
@@ -13546,6 +13740,27 @@ class JIT {
             $this->context->builder->branch($doneBlock);
             $this->context->builder->positionAtEnd($doneBlock);
             $dest->addref();
+
+            return;
+        }
+        if ('__object__*' === $valueTy && Variable::TYPE_VALUE === $dest->type) {
+            $slot = JIT\BasicBlockHelper::entryAlloca($this->context, $this->context->getTypeFromString('__object__*'));
+            $this->context->builder->store($value, $slot);
+            $var = new Variable(
+                $this->context,
+                Variable::TYPE_OBJECT,
+                Variable::KIND_VARIABLE,
+                $slot
+            );
+            $var->addref();
+            $this->context->setVariableOp($result, $var);
+            $resolved = JIT\OperandName::resolve($result);
+            if (null !== $resolved && '' !== $resolved) {
+                $this->context->bindVariableByName(
+                    $this->context->resolveRefAliasName($resolved),
+                    $var
+                );
+            }
 
             return;
         }
@@ -16356,9 +16571,84 @@ class JIT {
         return JIT\VmConstantJit::toVariable($this->context, $vm);
     }
 
+    private function ternaryEchoPhiPropertyFetchDest(Block $block, int $fetchIndex): ?Operand
+    {
+        $fetch = $block->opCodes[$fetchIndex];
+        if (OpCode::TYPE_PROPERTY_FETCH !== $fetch->type && OpCode::TYPE_PROPERTY_FETCH_WRITE !== $fetch->type) {
+            return null;
+        }
+        $fetchResultSlot = (int) $fetch->arg1;
+        $next = $block->opCodes[$fetchIndex + 1] ?? null;
+        if (null === $next || OpCode::TYPE_ASSIGN !== $next->type) {
+            return null;
+        }
+        if ((int) $next->arg2 !== $fetchResultSlot || (int) $next->arg3 !== $fetchResultSlot) {
+            return null;
+        }
+        $dest = $block->getOperand($next->arg1);
+        if (!$this->context->coalesceAssignTargets->contains($dest)) {
+            return null;
+        }
+
+        return $dest;
+    }
+
+    private function ensureCoalesceMergeStackSlot(Operand $mergeOp): void
+    {
+        if ($this->context->hasVariableOp($mergeOp)) {
+            $var = $this->context->getVariableFromOp($mergeOp);
+            if (Variable::TYPE_VALUE === $var->type && Variable::KIND_VARIABLE === $var->kind) {
+                return;
+            }
+        }
+        $slot = JIT\JitValueBox::alloc($this->context);
+        $this->context->setVariableOp(
+            $mergeOp,
+            new Variable(
+                $this->context,
+                Variable::TYPE_VALUE,
+                Variable::KIND_VARIABLE,
+                $slot
+            )
+        );
+    }
+
+    /**
+     * Merge-block ECHO may reference the ternary alias temp; redirect to the phi dest (#18052).
+     */
+    private function recordTernaryEchoPhiByAliasSlot(
+        Block $block,
+        OpCode $op,
+        Operand $destOp,
+        ?Operand $aliasOp,
+        int $rhsSlot
+    ): void {
+        if (null === $aliasOp || $op->arg1 === $op->arg2) {
+            return;
+        }
+        $aliasSlot = $block->slotForOperand($aliasOp);
+        if (null === $aliasSlot) {
+            return;
+        }
+        $phiOp = $this->context->coalesceAssignTargets->contains($destOp) || $op->arg2 === $rhsSlot
+            ? $destOp
+            : $block->getOperand($rhsSlot);
+        $this->context->ternaryEchoPhiByAliasSlot[$aliasSlot] = $phiOp;
+    }
+
     private function loadPropertyFetchReceiver(Operand $objOp): PHPLLVM\Value
     {
-        $var = $this->context->getVariableFromOp($objOp);
+        $name = JIT\OperandName::resolve($objOp);
+        if (null !== $name && '' !== $name) {
+            $resolved = $this->context->resolveRefAliasName($name);
+            if (isset($this->context->namedVariableBindings[$resolved])) {
+                $bound = $this->context->namedVariableBindings[$resolved];
+                if (Variable::TYPE_OBJECT === $bound->type) {
+                    return $this->context->helper->loadValue($bound);
+                }
+            }
+        }
+        $var = $this->context->getVariableFromOpInScopes($objOp);
         if (Variable::TYPE_OBJECT === $var->type) {
             return $this->context->helper->loadValue($var);
         }
