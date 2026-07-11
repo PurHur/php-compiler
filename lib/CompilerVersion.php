@@ -2233,7 +2233,7 @@ final class CompilerVersion
      */
     public static function supportsDomNodeContains(): bool
     {
-        return self::supportsDomApiSince('8.4.0');
+        return true;
     }
 
     /**

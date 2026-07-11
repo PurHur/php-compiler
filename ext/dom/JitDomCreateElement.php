@@ -63,7 +63,7 @@ final class JitDomCreateElement
         self::storeStringProperty($context, $obj, self::CLASS_ELEMENT, self::PROP_TAG_NAME, $nameStr);
         self::storeNullProperty($context, $obj, self::CLASS_ELEMENT, self::PROP_ATTRIBUTES);
 
-        return self::boxObject($context, $obj);
+        return $obj;
     }
 
     private static function materializeElementFromRuntimeName(Context $context, JITVariable $nameArg): Value
@@ -79,7 +79,7 @@ final class JitDomCreateElement
         self::storeStringProperty($context, $obj, self::CLASS_ELEMENT, self::PROP_TAG_NAME, $nameStr);
         self::storeNullProperty($context, $obj, self::CLASS_ELEMENT, self::PROP_ATTRIBUTES);
 
-        return self::boxObject($context, $obj);
+        return $obj;
     }
 
     private static function ensureElementPropertyLayout(
@@ -92,19 +92,6 @@ final class JitDomCreateElement
                 $objectType->defineProperty($classId, $prop, $type);
             }
         }
-    }
-
-    private static function boxObject(Context $context, Value $obj): Value
-    {
-        $slot = JitValueBox::alloc($context);
-        $ptr = JitValueBox::pointer($context, $slot);
-        $context->builder->call(
-            $context->lookupFunction('__value__writeObject'),
-            $ptr,
-            $obj
-        );
-
-        return $ptr;
     }
 
     private static function loadStringArg(Context $context, JITVariable $arg): Value
