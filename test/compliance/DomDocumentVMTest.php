@@ -124,9 +124,9 @@ final class DomDocumentVMTest extends BaseTest
                 'dom_node_compare_document_position.phpt'
             );
         } else {
-            yield 'php84_dom_node_compare_document_position_phantom.phpt' => self::parsePHPT(
-                __DIR__.'/cases/stdlib/php84_dom_node_compare_document_position_phantom.phpt',
-                'php84_dom_node_compare_document_position_phantom.phpt'
+            yield 'dom_node_compare_document_position_phantom.phpt' => self::parsePHPT(
+                __DIR__.'/cases/dom/dom_node_compare_document_position_phantom.phpt',
+                'dom_node_compare_document_position_phantom.phpt'
             );
         }
         if (CompilerVersion::supportsDomElementInsertAdjacentHtml()) {
