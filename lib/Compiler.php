@@ -30708,6 +30708,13 @@ class Compiler {
         if (1 !== $this->inlineClosureArrayPairCallbackArgIndex($funcName)) {
             return null;
         }
+        $haystackArg = $cfgCallOp->args[0] ?? null;
+        if (
+            $haystackArg instanceof Operand
+            && null !== $this->resolveNamedLocalCallArgSendSlot($haystackArg, $block, $cfgCallOp, 0)
+        ) {
+            return null;
+        }
         $leadingCallback = $this->leadingCallbackFirstInlineProducerBeforeCfgCall($cfgCallOp, $block);
         if (
             !$leadingCallback instanceof Op\Expr\Closure
@@ -40223,7 +40230,12 @@ class Compiler {
                         }
                     }
                 }
-                if (null === $valueSlot && null !== $cfgCallOp && null !== $block->orig) {
+                if (
+                    null === $valueSlot
+                    && null !== $cfgCallOp
+                    && null !== $block->orig
+                    && null === $this->resolveNamedLocalCallArgSendSlot($arg, $block, $cfgCallOp, (int) $argIndex)
+                ) {
                     if (
                         !(
                             $this->hasSiblingMultiArgInlineCallProducers($block, $cfgCallOp)
@@ -41363,7 +41375,15 @@ class Compiler {
                     if ([] !== $siblingOps) {
                         $sends = array_merge($sends, $siblingOps);
                     }
-                    $valueSlot = $siblingSlot;
+                    $namedSendSlot = $this->resolveNamedLocalCallArgSendSlot(
+                        $arg,
+                        $block,
+                        $cfgCallOp,
+                        (int) $argIndex
+                    );
+                    $valueSlot = null !== $namedSendSlot
+                        ? (string) $this->finalizeOperandSlotForAccess($block, $namedSendSlot, true)
+                        : $siblingSlot;
                 } elseif (
                     null !== $cfgCallOp
                     && $this->siblingConsumerHasTrailingByRefNamedLocal($cfgCallOp)
@@ -43391,7 +43411,15 @@ class Compiler {
                         && null === $constPreludeSlot
                         && !$this->callArgHasHoistedConstPrelude($cfgCallOp, (int) $argIndex, $block)
                     ) {
-                        $valueSlot = (string) $forcedSiblingSlot;
+                        $namedSendSlot = $this->resolveNamedLocalCallArgSendSlot(
+                            $arg,
+                            $block,
+                            $cfgCallOp,
+                            (int) $argIndex
+                        );
+                        $valueSlot = null !== $namedSendSlot
+                            ? (string) $this->finalizeOperandSlotForAccess($block, $namedSendSlot, true)
+                            : (string) $forcedSiblingSlot;
                     }
                 }
             }
@@ -43745,6 +43773,17 @@ class Compiler {
                 }
                 if (null !== $leadingConstFuncPreludeSlot) {
                     $valueSlot = $leadingConstFuncPreludeSlot;
+                }
+            }
+            if (null !== $cfgCallOp) {
+                $namedSendSlot = $this->resolveNamedLocalCallArgSendSlot(
+                    $arg,
+                    $block,
+                    $cfgCallOp,
+                    (int) $argIndex
+                );
+                if (null !== $namedSendSlot) {
+                    $valueSlot = (string) $this->finalizeOperandSlotForAccess($block, $namedSendSlot, true);
                 }
             }
             $sends[] = new OpCode(OpCode::TYPE_ARG_SEND, $valueSlot, $nameSlot, $unpackFlag);
@@ -44738,6 +44777,26 @@ class Compiler {
         }
 
         return $namedSlot;
+    }
+
+    /**
+     * Named CV for call-arg send — assign-bound locals must win over sibling EXEC_RETURN (#17989).
+     */
+    private function resolveNamedLocalCallArgSendSlot(
+        Operand $arg,
+        Block $block,
+        ?Op $cfgCallOp,
+        int $argIndex
+    ): ?int {
+        $probe = ($cfgCallOp->args[$argIndex] ?? null) ?? $arg;
+        $named = $this->namedLocalCallArgSlotIfBound($probe, $block, $cfgCallOp, $argIndex)
+            ?? $this->slotForNamedLocalFromAssignVarOperand($probe, $block);
+        if (null === $named) {
+            return null;
+        }
+        $assignDest = $block->slotForNamedAssignDest($probe);
+
+        return null !== $assignDest ? (int) $assignDest : (int) $named;
     }
 
     /**

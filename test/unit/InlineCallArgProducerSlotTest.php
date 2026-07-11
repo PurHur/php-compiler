@@ -3866,6 +3866,47 @@ PHP;
         self::assertNotSame($walkSends[0], $walkSends[1], 'walk sends='.json_encode($walkSends));
     }
 
+    /** Issue #17989 — ob_start(); array_walk($a, fn) must send named (object) cast local, not ob_start return. */
+    public function testArrayWalkNamedObjectCastAfterObStartCallArgZeroSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+$a = (object) ['x' => 1];
+ob_start();
+array_walk($a, static fn ($v) => print($v));
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'array_walk_object_cast_variable.php');
+
+        $namedSlot = null;
+        $obStartReturnSlot = null;
+        $walkSends = [];
+        $fcallOrdinal = 0;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_ASSIGN === $op->type && null === $namedSlot) {
+                $namedSlot = $op->arg2;
+            }
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                ++$fcallOrdinal;
+                if (2 === $fcallOrdinal) {
+                    $walkSends = [];
+                }
+            }
+            if (1 === $fcallOrdinal && OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
+                $obStartReturnSlot = $op->arg1;
+            }
+            if (2 === $fcallOrdinal && OpCode::TYPE_ARG_SEND === $op->type) {
+                $walkSends[] = $op->arg1;
+            }
+        }
+
+        self::assertNotNull($namedSlot, 'named $a assign slot');
+        self::assertNotNull($obStartReturnSlot, 'ob_start EXEC_RETURN slot');
+        self::assertCount(2, $walkSends, 'walk sends='.json_encode($walkSends));
+        self::assertSame($namedSlot, $walkSends[0], 'walk must send $a slot, not ob_start return');
+        self::assertNotSame($obStartReturnSlot, $walkSends[0]);
+    }
+
     /** Issue #15858 — array_merge((object)[...], [...]) wires hoisted Cast to arg #0, not trailing Array_. */
     public function testArrayMergeObjectCastInlineCallArgZeroSlot(): void
     {
