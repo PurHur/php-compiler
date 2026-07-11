@@ -2133,6 +2133,9 @@ class Context {
 
                         return $this->scope->variables[$op];
                     }
+                    if ($this->aliasVariableOpFromSlot($block, $op)) {
+                        return $this->scope->variables[$op];
+                    }
                 }
                 // Temporaries can be introduced by CFG transforms after scope variable allocation.
                 // Treat unknown temporaries as boxed __value__ slots to keep self-host emit paths alive.

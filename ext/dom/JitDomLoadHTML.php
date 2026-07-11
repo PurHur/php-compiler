@@ -39,6 +39,13 @@ final class JitDomLoadHTML
             $options
         );
 
+        if (DomDocumentMethodUserScriptLlvm::shouldUse($context)) {
+            $context->builder->call(
+                $context->lookupFunction(DomSyncElementIdMapRuntime::ABI_NAME),
+                $document
+            );
+        }
+
         return $loaded;
     }
 

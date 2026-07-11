@@ -119,6 +119,20 @@ final class DomActiveContextAotTest extends TestCase
         $this->assertStringNotContainsString('DomLoadHTMLRuntime::ensureLinked', $source);
     }
 
+    public function testDomGetElementByIdResolvesScriptGlobalReceiverAfterLoadHTML(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT.php');
+        $this->assertStringContainsString('resolveUserScriptDomDocumentReceiver', $source);
+        $this->assertStringContainsString('getelementbyid', $source);
+    }
+
+    public function testDomDocumentLoadHTMLRestoresScopeAfterNestedEnsureLinked(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Call/DomDocumentLoadHTML.php');
+        $this->assertStringContainsString('cloneVariableStorage', $source);
+        $this->assertStringContainsString('resyncNamedBindings', $source);
+    }
+
     public function testDomLoadHTMLLoweringPassesValueBoxedHtml(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/dom/JitDomLoadHTML.php');

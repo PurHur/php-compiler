@@ -19,6 +19,16 @@ final class NestedJitCompileScope
     }
 
     /**
+     * Re-attach named scope slots after nested helper compiles (#17954).
+     */
+    public static function resyncNamedBindings(Context $context): void
+    {
+        foreach ($context->namedVariableBindings as $name => $var) {
+            $context->bindVariableByName($name, $var);
+        }
+    }
+
+    /**
      * @template T
      *
      * @param callable(): T $compile
@@ -32,8 +42,10 @@ final class NestedJitCompileScope
         $restoreBlock = self::captureInsertBlock($context);
         $savedBlockStorage = $context->scope->blockStorage;
         $savedBlockEntryStorage = $context->scope->blockEntryStorage;
+        $savedNamedBindings = $context->namedVariableBindings;
         $context->scope->blockStorage = new \SplObjectStorage();
         $context->scope->blockEntryStorage = new \SplObjectStorage();
+        $context->namedVariableBindings = [];
         $prevSelfHostAot = \getenv('PHP_COMPILER_SELFHOST_AOT');
         if (\function_exists('putenv')) {
             \putenv('PHP_COMPILER_SELFHOST_AOT=0');
@@ -47,6 +59,8 @@ final class NestedJitCompileScope
             --self::$depth;
             $context->scope->blockStorage = $savedBlockStorage;
             $context->scope->blockEntryStorage = $savedBlockEntryStorage;
+            $context->namedVariableBindings = $savedNamedBindings;
+            self::resyncNamedBindings($context);
             $context->builder = $savedBuilder;
             self::restoreInsertBlock($context, $restoreBlock);
             $context->activeFunction = $savedActive;
