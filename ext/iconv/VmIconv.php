@@ -99,6 +99,98 @@ final class VmIconv
         );
     }
 
+    public static function coerceOptionalEncodingArg(
+        Variable $var,
+        string $function,
+        int $argIndex,
+        string $param = 'encoding'
+    ): string {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_NULL === $var->type) {
+            return 'UTF-8';
+        }
+
+        return self::coerceEncodingArg($var, $function, $argIndex, $param);
+    }
+
+    public static function iconvStrlen(string $input, string $encoding, ?Frame $frame = null): int|false
+    {
+        if (null === CharsetEngine::parseEncodingSpec($encoding)) {
+            self::triggerUnsupportedEncodingWarning($frame, $encoding, $encoding);
+
+            return false;
+        }
+        if (null === CharsetString::splitCharacters($encoding, $input)) {
+            self::triggerConvertNotice($frame, CharsetEngine::ERROR_ILLEGAL);
+
+            return false;
+        }
+
+        return CharsetString::strlen($encoding, $input);
+    }
+
+    public static function iconvSubstr(
+        string $input,
+        int $offset,
+        ?int $length,
+        string $encoding,
+        ?Frame $frame = null
+    ): string|false {
+        if (null === CharsetEngine::parseEncodingSpec($encoding)) {
+            self::triggerUnsupportedEncodingWarning($frame, $encoding, $encoding);
+
+            return false;
+        }
+        if (null === CharsetString::splitCharacters($encoding, $input)) {
+            self::triggerConvertNotice($frame, CharsetEngine::ERROR_ILLEGAL);
+
+            return false;
+        }
+
+        return CharsetString::substr($encoding, $input, $offset, $length);
+    }
+
+    public static function iconvStrpos(
+        string $haystack,
+        string $needle,
+        int $offset,
+        string $encoding,
+        ?Frame $frame = null
+    ): int|false {
+        if (null === CharsetEngine::parseEncodingSpec($encoding)) {
+            self::triggerUnsupportedEncodingWarning($frame, $encoding, $encoding);
+
+            return false;
+        }
+        if (null === CharsetString::splitCharacters($encoding, $haystack)) {
+            self::triggerConvertNotice($frame, CharsetEngine::ERROR_ILLEGAL);
+
+            return false;
+        }
+
+        return CharsetString::strpos($encoding, $haystack, $needle, $offset);
+    }
+
+    public static function iconvStrrpos(
+        string $haystack,
+        string $needle,
+        string $encoding,
+        ?Frame $frame = null
+    ): int|false {
+        if (null === CharsetEngine::parseEncodingSpec($encoding)) {
+            self::triggerUnsupportedEncodingWarning($frame, $encoding, $encoding);
+
+            return false;
+        }
+        if (null === CharsetString::splitCharacters($encoding, $haystack)) {
+            self::triggerConvertNotice($frame, CharsetEngine::ERROR_ILLEGAL);
+
+            return false;
+        }
+
+        return CharsetString::strrpos($encoding, $haystack, $needle);
+    }
+
     private static function typeLabel(Variable $var): string
     {
         return match ($var->type) {

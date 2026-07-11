@@ -28,6 +28,7 @@ function collectCapabilities(string $root): array
         'ctype' => new PHPCompiler\ext\ctype\Module(),
         'tokenizer' => new PHPCompiler\ext\tokenizer\Module(),
         'filter' => new PHPCompiler\ext\filter\Module(),
+        'iconv' => new PHPCompiler\ext\iconv\Module(),
         'session' => new PHPCompiler\ext\session\Module(),
         'mbstring' => new PHPCompiler\ext\mbstring\Module(),
         'intl' => new PHPCompiler\ext\intl\Module(),
