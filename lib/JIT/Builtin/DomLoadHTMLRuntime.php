@@ -25,9 +25,14 @@ final class DomLoadHTMLRuntime
 
     public static function ensureLinked(Context $context): void
     {
+        if (DomDocumentMethodUserScriptLlvm::shouldUse($context)) {
+            DomDocumentMethodUserScriptLlvm::ensureLoadHTMLBridge($context);
+
+            return;
+        }
+
         $probe = $context->module->getNamedFunction(self::ABI_NAME);
-        if (JitVmHelperLink::hasNamedBridgeEntry($probe, 'dom_load_html_bridge')
-            || JitVmHelperLink::hasNamedBridgeEntry($probe, 'dom_load_html_user_script')) {
+        if (JitVmHelperLink::hasNamedBridgeEntry($probe, 'dom_load_html_bridge')) {
             $context->registerFunction(self::ABI_NAME, $probe);
 
             return;
@@ -40,7 +45,7 @@ final class DomLoadHTMLRuntime
         JitVmHelperLink::ensureBridge(
             $context,
             self::ABI_NAME,
-            DomDocumentMethodUserScriptLlvm::shouldUse($context) ? 'dom_load_html_user_script' : 'dom_load_html_bridge',
+            'dom_load_html_bridge',
             [$objPtr, $valuePtr, $i64],
             $i1,
             self::HELPER,

@@ -4,9 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\dom;
 
-use PHPCompiler\JIT\Builtin\DomDocumentMethodUserScriptLlvm;
 use PHPCompiler\JIT\Builtin\DomLoadHTMLRuntime;
-use PHPCompiler\JIT\Builtin\DomSyncElementIdMapRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Intdiv as JitIntdiv;
 use PHPCompiler\JIT\JitValueBox;

@@ -49,6 +49,13 @@ final class DomActiveContextAotTest extends TestCase
         $this->assertStringContainsString('DomDocumentGetElementById', $source);
     }
 
+    public function testDomLoadHTMLRuntimeUsesMainModuleBridgeForUserScript(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/DomLoadHTMLRuntime.php');
+        $this->assertStringContainsString('DomDocumentMethodUserScriptLlvm::ensureLoadHTMLBridge', $source);
+        $this->assertStringContainsString('DomDocumentMethodUserScriptLlvm::shouldUse', $source);
+    }
+
     public function testDomGetElementByIdUsesPureLlvmIdMap(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/dom/JitDomGetElementById.php');
