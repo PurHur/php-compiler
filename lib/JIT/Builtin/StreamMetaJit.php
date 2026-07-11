@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\NestedJitCompileScope;
@@ -50,11 +51,7 @@ final class StreamMetaJit
             return;
         }
 
-        $savedBlock = null;
-        try {
-            $savedBlock = $context->builder->getInsertBlock();
-        } catch (\Throwable) {
-        }
+        $savedBlock = BasicBlockHelper::tryGetInsertBlock($context);
 
         StreamModeRuntime::ensureLinked($context);
         self::ensureJitHelperCompiled($context);
@@ -64,7 +61,7 @@ final class StreamMetaJit
         self::registerLinkedRuntime($context);
 
         if (null !== $savedBlock) {
-            $context->builder->positionAtEnd($savedBlock);
+            BasicBlockHelper::restoreInsertBlock($context, $savedBlock);
         } else {
             $context->builder->clearInsertionPosition();
         }

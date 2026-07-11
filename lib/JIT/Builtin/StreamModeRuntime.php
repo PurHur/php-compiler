@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
@@ -52,10 +54,17 @@ final class StreamModeRuntime
             return;
         }
 
+        $savedBlock = BasicBlockHelper::tryGetInsertBlock($context);
+
         self::ensureJitHelperCompiled($context);
         self::implementModeBridge($context);
         self::registerLinkedRuntime($context);
-        $context->builder->clearInsertionPosition();
+
+        if (null !== $savedBlock) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedBlock);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
     }
 
     public static function emitRegisterMode(Context $context, Value $handle, Value $modeStr): void
@@ -100,7 +109,9 @@ final class StreamModeRuntime
             self::helperFunction($context, self::MODE_HELPER),
             $fn->getParam(0)
         );
-        $context->builder->returnValue($result);
+        $context->builder->returnValue(
+            JitNestedHelperCoerce::coerceBridgeResult($context, $result, $strPtr)
+        );
         $context->registerFunction($abiName, $fn);
     }
 
