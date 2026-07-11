@@ -16,6 +16,9 @@ class Module extends ModuleAbstract
     public function init(Runtime $runtime): void
     {
         parent::init($runtime);
+        if (!InotifyExtensionPolicy::advertisesExtension()) {
+            return;
+        }
         foreach (InotifyConstants::registeredConstants() as $name => $value) {
             $var = new VM\Variable();
             $var->int($value);
@@ -25,7 +28,7 @@ class Module extends ModuleAbstract
 
     public function getFunctions(): array
     {
-        if (!VmInotify::available()) {
+        if (!VmInotify::available() || !InotifyExtensionPolicy::advertisesExtension()) {
             return [];
         }
 

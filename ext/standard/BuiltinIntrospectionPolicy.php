@@ -152,6 +152,9 @@ final class BuiltinIntrospectionPolicy
         if ('fastcgi_finish_request' === $lc) {
             return VmFastCgi::registersFinishRequestFunction();
         }
+        if (str_starts_with($lc, 'inotify_')) {
+            return \PHPCompiler\ext\inotify\InotifyExtensionPolicy::advertisesExtension();
+        }
         if (\in_array($lc, ['class_has_method', 'class_has_property', 'class_has_constant'], true)) {
             return CompilerVersion::supportsClassHasFunctions();
         }
@@ -185,6 +188,9 @@ final class BuiltinIntrospectionPolicy
         }
         if ('ldap' === $ext) {
             return \PHPCompiler\ext\ldap\LdapExtensionPolicy::advertisesExtension();
+        }
+        if ('inotify' === $ext) {
+            return \PHPCompiler\ext\inotify\InotifyExtensionPolicy::advertisesExtension();
         }
 
         return true;
