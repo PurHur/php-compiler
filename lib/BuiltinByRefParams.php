@@ -47,6 +47,8 @@ final class BuiltinByRefParams
                 return [1];
             case 'parse_str':
                 return [1];
+            case 'xml_parse_into_struct':
+                return [2, 3];
             case 'dns_get_mx':
             case 'getmxrr':
                 return [1, 2];

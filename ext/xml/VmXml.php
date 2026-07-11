@@ -87,6 +87,50 @@ final class VmXml
     }
 
     /**
+     * xml_parse_into_struct() — build values/index arrays (#3494).
+     *
+     * @return array{status: int, values: HashTable, index: HashTable}
+     */
+    public static function parseIntoStruct(
+        Context $ctx,
+        int $parser,
+        string $data,
+        ?Frame $frame = null
+    ): array {
+        if (!isset(self::$parsers[$parser])) {
+            throw new \ValueError('xml_parse_into_struct(): Argument #1 ($parser) must be a valid XML parser');
+        }
+
+        $error = self::validateWellFormed($data);
+        if (null !== $error) {
+            self::$parsers[$parser]['errorCode'] = $error['code'];
+            \PHPCompiler\ext\libxml\VmLibxml::handleError($ctx, $error, $frame);
+
+            return [
+                'status' => 0,
+                'values' => new \PHPCompiler\VM\HashTable(),
+                'index' => new \PHPCompiler\VM\HashTable(),
+            ];
+        }
+
+        self::$parsers[$parser]['errorCode'] = 0;
+        $built = VmXmlStructBuilder::build($data);
+        $result = $built->result();
+
+        return [
+            'status' => 1,
+            'values' => $result['values'],
+            'index' => $result['index'],
+        ];
+    }
+
+    /** @return null|int byte offset after one element starting at $pos */
+    public static function findElementEndForStruct(string $content, int $pos): ?int
+    {
+        return self::findElementEnd($content, $pos);
+    }
+
+    /**
      * Validate XML well-formedness and record libxml errors when invalid (#14185).
      */
     public static function validateAndReport(Context $ctx, string $data, ?Frame $frame = null): bool

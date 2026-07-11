@@ -36,6 +36,7 @@ class Module extends ModuleAbstract
             new xml_parse(),
             new xml_parser_free(),
             new xml_get_error_code(),
+            new xml_parse_into_struct(),
         ];
     }
 }
