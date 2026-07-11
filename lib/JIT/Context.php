@@ -78,6 +78,9 @@ class Context {
     /** Operand for call_user_func_array() $args during FUNCCALL lowering (#10359). */
     public ?Operand $jitCallUserFuncArrayParamsOperand = null;
 
+    /** Operand for mb_encode/decode_numericentity() $convmap during FUNCCALL lowering (#18035). */
+    public ?Operand $jitMbNumericEntityConvmapOperand = null;
+
     /**
      * Backing property name for raw writes inside a lowering set-hook method (#4025).
      *

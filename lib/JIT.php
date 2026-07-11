@@ -9483,6 +9483,18 @@ class JIT {
                     ) {
                         $this->context->jitCallUserFuncArrayParamsOperand = $callOperands[1];
                     }
+                    $savedMbNumericEntityConvmapOperand = $this->context->jitMbNumericEntityConvmapOperand;
+                    if (
+                        $this->context->scope->toCall instanceof CoreFunc\Internal
+                        && \in_array(
+                            strtolower($this->context->scope->toCall->getName()),
+                            ['mb_encode_numericentity', 'mb_decode_numericentity'],
+                            true
+                        )
+                        && isset($callOperands[1])
+                    ) {
+                        $this->context->jitMbNumericEntityConvmapOperand = $callOperands[1];
+                    }
                     $this->promoteCompileTimeStringOnCallArgs($block, $callOperands, $callArgs);
                     if ($this->context->scope->toCall instanceof CoreFunc\Internal) {
                         $callArgs = $this->densifyInternalCallArgs($this->context->scope->toCall, $callArgs);
@@ -9491,6 +9503,7 @@ class JIT {
                     $this->context->jitUnserializeOptionsOperand = $savedUnserializeOptionsOperand;
                     $this->context->jitJsonEncodeValueOperand = $savedJsonEncodeValueOperand;
                     $this->context->jitCallUserFuncArrayParamsOperand = $savedCallUserFuncArrayOperand;
+                    $this->context->jitMbNumericEntityConvmapOperand = $savedMbNumericEntityConvmapOperand;
                     $this->markNewObjectConstructedAfterCall($this->context->scope->toCall, $callArgs);
                     $this->context->callerStrictTypes = $prevStrict;
                     $this->assignCallResultOperand(

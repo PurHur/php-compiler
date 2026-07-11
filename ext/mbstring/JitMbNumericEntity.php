@@ -4,12 +4,16 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\mbstring;
 
+use PHPCompiler\Block;
 use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\Builtin\MbNumericEntity;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\OpCode;
+use PHPCompiler\VM\Variable as VMVariable;
+use PHPCfg\Operand;
 use PHPLLVM\Value;
 
 /**
@@ -155,9 +159,9 @@ final class JitMbNumericEntity
             $isHex = $boolFold;
         }
 
-        return $context->constantFromString(
+        return $context->builder->load($context->constantStringFromString(
             VmMbstring::encodeNumericEntity($str, $convmap, $encoding ?? 'UTF-8', $isHex)
-        );
+        ));
     }
 
     /**
@@ -178,9 +182,9 @@ final class JitMbNumericEntity
             return null;
         }
 
-        return $context->constantFromString(
+        return $context->builder->load($context->constantStringFromString(
             VmMbstring::decodeNumericEntity($str, $convmap, $encoding ?? 'UTF-8')
-        );
+        ));
     }
 
     /**
@@ -212,26 +216,50 @@ final class JitMbNumericEntity
 
             return $out;
         }
-        if (\is_array($var->compileTimeArray ?? null)) {
-            $out = [];
-            foreach ($var->compileTimeArray as $elem) {
-                if (JITVariable::TYPE_NATIVE_LONG !== $elem->type || JITVariable::KIND_VALUE !== $elem->kind) {
-                    return null;
-                }
-                $const = $elem->value;
-                if (!($const instanceof Value && $const->isConstant())) {
-                    return null;
-                }
-                $out[] = (int) $const->constInt();
-            }
-            if (0 === \count($out) || 0 !== (\count($out) % 4)) {
-                return null;
-            }
 
-            return $out;
+        $convmapOperand = $context->jitMbNumericEntityConvmapOperand;
+        $block = $context->jitEnclosingBlock;
+        if (null !== $block && $convmapOperand instanceof Operand) {
+            $fromBlock = self::compileTimeConvMapFromBlock($block, $convmapOperand);
+            if (null !== $fromBlock) {
+                return $fromBlock;
+            }
         }
 
         return null;
+    }
+
+    /**
+     * @return list<int>|null
+     */
+    private static function compileTimeConvMapFromBlock(Block $block, Operand $operand): ?array
+    {
+        $slot = $block->getVarSlot($operand, true);
+        $elements = [];
+        $foundInit = false;
+        foreach ($block->opCodes as $op) {
+            if ($op->arg1 !== $slot) {
+                continue;
+            }
+            if (OpCode::TYPE_INIT_ARRAY !== $op->type && OpCode::TYPE_ADD_ARRAY_ELEMENT !== $op->type) {
+                continue;
+            }
+            $foundInit = true;
+            $valueSlot = $op->arg2;
+            if (null === $valueSlot || !isset($block->constants[$valueSlot])) {
+                return null;
+            }
+            $const = $block->constants[$valueSlot];
+            if (VMVariable::TYPE_INTEGER !== $const->type) {
+                return null;
+            }
+            $elements[] = $const->toInt();
+        }
+        if (!$foundInit || 0 === \count($elements) || 0 !== (\count($elements) % 4)) {
+            return null;
+        }
+
+        return $elements;
     }
 
     /**
