@@ -186,6 +186,9 @@ final class BuiltinIntrospectionPolicy
         if ('ldap' === $ext) {
             return \PHPCompiler\ext\ldap\LdapExtensionPolicy::advertisesExtension();
         }
+        if ('inotify' === $ext) {
+            return \PHPCompiler\ext\inotify\InotifyExtensionPolicy::advertisesExtension();
+        }
 
         return true;
     }

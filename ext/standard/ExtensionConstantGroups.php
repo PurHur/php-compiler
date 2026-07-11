@@ -59,7 +59,9 @@ final class ExtensionConstantGroups
         $groups['session'] = SessionConstants::registeredConstants();
         $groups['mbstring'] = MbstringConstants::registeredConstants();
         $groups['hash'] = MhashRegistry::constants();
-        $groups['inotify'] = InotifyConstants::registeredConstants();
+        if (\PHPCompiler\ext\inotify\InotifyExtensionPolicy::advertisesExtension()) {
+            $groups['inotify'] = InotifyConstants::registeredConstants();
+        }
         $groups['curl'] = CurlConstants::registeredConstants();
         $groups['intl'] = IntlConstants::registeredConstants();
         if (LdapExtensionPolicy::advertisesExtension()) {
