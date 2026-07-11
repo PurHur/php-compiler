@@ -1586,6 +1586,49 @@ PHP;
         self::assertStringContainsString('true', $out);
     }
 
+    /** Issue #17895 — var_export($g->valid(), true) after stmt next() — MethodCall EXEC_RETURN + true ConstFetch (#17251). */
+    public function testVarExportGeneratorValidAfterReturnUsesMethodExecReturnAndTrueLiteral(): void
+    {
+        $code = <<<'PHP'
+<?php
+function gen(): Generator {
+    yield 1;
+    return 99;
+}
+$g = gen();
+$g->next();
+$g->next();
+echo var_export($g->valid(), true);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'generator_valid_var_export.php');
+
+        $execReturnSlots = [];
+        $trueConstSlot = null;
+        $sendSlots = [];
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
+                $execReturnSlots[] = $op->arg1;
+            }
+            if (OpCode::TYPE_CONST_FETCH === $op->type && null === $trueConstSlot) {
+                $trueConstSlot = $op->arg1;
+            }
+            if (OpCode::TYPE_ARG_SEND === $op->type) {
+                $sendSlots[] = $op->arg1;
+            }
+        }
+
+        self::assertCount(2, $sendSlots, 'arg sends='.json_encode($sendSlots));
+        self::assertNotSame($sendSlots[0], $sendSlots[1], 'arg sends='.json_encode($sendSlots));
+        self::assertContains($sendSlots[0], $execReturnSlots, 'exec returns='.json_encode($execReturnSlots));
+        self::assertSame($trueConstSlot, $sendSlots[1], 'arg sends='.json_encode($sendSlots));
+
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertSame('false', $out);
+    }
+
     /** Issue #17277 — var_export([1] !== false, true) after prior compare must not reuse stale comparison slots. */
     public function testVarExportArrayLiteralNotIdenticalFalseReturnTrueUsesComparisonProducerSlot(): void
     {
