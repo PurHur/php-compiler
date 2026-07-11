@@ -9301,6 +9301,7 @@ class JIT {
                     if ($this->context->scope->toCall instanceof CoreFunc\Internal) {
                         $callArgs = $this->densifyInternalCallArgs($this->context->scope->toCall, $callArgs);
                     }
+                    $this->promoteCompileTimeStringOnCallArgs($block, $callOperands, $callArgs);
                     $this->context->scope->toCall->call($this->context, ...$callArgs);
                     JIT\NoDiscardCallGuard::emitAfterDiscardedReturn($this->context, $this->context->scope->toCall);
                     $this->markNewObjectConstructedAfterCall($this->context->scope->toCall, $callArgs);
@@ -13151,7 +13152,43 @@ class JIT {
             $result->free();
             $this->context->builder->store($obj, $result->value);
             $result->addref();
-            $this->context->builder->branch($doneBlock);
+            $globalTarget = $this->resolveScriptGlobalAssignTarget($resultOp, $result)
+                ?? $this->recoverScriptGlobalAssignLvalueBySlot($resultOp, $result);
+            if (null !== $globalTarget) {
+                JIT\JitValueBox::assignToPointer(
+                    $this->context,
+                    JIT\JitValueBox::valuePtrFromVariable($this->context, $globalTarget),
+                    $value
+                );
+                $this->context->setVariableOp($resultOp, $globalTarget);
+                $globalName = JIT\OperandName::resolve($resultOp);
+                if (null === $globalName || '' === $globalName) {
+                    $block = $this->context->jitEnclosingBlock;
+                    if (null !== $block) {
+                        $slot = $block->slotForOperand($resultOp);
+                        if (null !== $slot) {
+                            foreach ($block->scopedOperands() as $scopeOp) {
+                                if ($block->slotForOperand($scopeOp) !== $slot) {
+                                    continue;
+                                }
+                                $scopeName = JIT\OperandName::resolve($scopeOp);
+                                if (null !== $scopeName && '' !== $scopeName) {
+                                    $globalName = $scopeName;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+                if (null !== $globalName && '' !== $globalName) {
+                    $this->context->bindVariableByName(
+                        $this->context->resolveRefAliasName($globalName),
+                        $globalTarget
+                    );
+                }
+            }
+            JIT\BasicBlockHelper::branchToFreshContinue($this->context, 'after_assign_object_from_value_obj');
+
             $this->context->builder->positionAtEnd($handleBlock);
             $result->free();
             $slot = JIT\JitValueBox::alloc($this->context);
@@ -13186,6 +13223,7 @@ class JIT {
             $result->value = $slot;
             $result->addref();
             $this->context->builder->positionAtEnd($doneBlock);
+            JIT\BasicBlockHelper::branchToFreshContinue($this->context, 'after_assign_object_from_value_handle');
 
             return;
         } elseif (Variable::TYPE_OBJECT === $result->type && Variable::TYPE_HASHTABLE === $value->type) {
@@ -14689,6 +14727,57 @@ class JIT {
         return $objVar;
     }
 
+    /**
+     * Nested loadHTML helper compile can leave method-call receiver temps without script-global alias (#17954).
+     */
+    private function resolveUserScriptDomDocumentReceiver(
+        Block $block,
+        Operand $receiverOp,
+        string $declaringClassLc,
+        string $methodLc,
+        Variable $receiverVar
+    ): Variable {
+        if (!JIT\DomInstanceMethodJit::shouldDeferToVmClassMethodLowering()) {
+            return $receiverVar;
+        }
+        if ('domdocument' !== $declaringClassLc) {
+            return $receiverVar;
+        }
+        if (!\in_array($methodLc, ['loadhtml', 'getelementbyid', 'createelement'], true)) {
+            return $receiverVar;
+        }
+        if (null !== $receiverVar->valueBoxAliasPtr || $receiverVar->functionStaticGlobal) {
+            return $receiverVar;
+        }
+
+        $name = JIT\OperandName::resolve($receiverOp);
+        if (null !== $name && '' !== $name) {
+            $resolved = $this->context->resolveRefAliasName($name);
+            if (isset($this->context->namedVariableBindings[$resolved])) {
+                return $this->context->namedVariableBindings[$resolved];
+            }
+        }
+
+        $slot = $block->slotForOperand($receiverOp);
+        if (null !== $slot) {
+            foreach ($block->scopedOperands() as $scopeOp) {
+                if ($block->slotForOperand($scopeOp) !== $slot) {
+                    continue;
+                }
+                $scopeName = JIT\OperandName::resolve($scopeOp);
+                if (null === $scopeName || '' === $scopeName) {
+                    continue;
+                }
+                $resolved = $this->context->resolveRefAliasName($scopeName);
+                if (isset($this->context->namedVariableBindings[$resolved])) {
+                    return $this->context->namedVariableBindings[$resolved];
+                }
+            }
+        }
+
+        return $receiverVar;
+    }
+
     private function initJitMethodCall(Block $block, Operand $receiverOp, string $methodName): void
     {
         if ('__invoke' === strtolower($methodName)) {
@@ -14788,6 +14877,13 @@ class JIT {
 
         $proxyName = $this->resolveJitInstanceMethodProxyName($declaringClassLc, $methodLc);
         $receiverVar = $this->context->getVariableFromOp($receiverOp);
+        $receiverVar = $this->resolveUserScriptDomDocumentReceiver(
+            $block,
+            $receiverOp,
+            $declaringClassLc,
+            $methodLc,
+            $receiverVar
+        );
         $dispatchReceiver = $this->jitInstanceMethodReceiverVariable($receiverVar);
         $splObjectStorageMethod = str_starts_with(strtolower($proxyName), 'splobjectstorage::');
         if (Type::TYPE_OBJECT === $receiverOp->type?->type && !$splObjectStorageMethod) {

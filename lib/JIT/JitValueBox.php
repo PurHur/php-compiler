@@ -180,6 +180,14 @@ final class JitValueBox
     }
 
     /**
+     * Box a nullable {@see __object__*} into a fresh {@see __value__*} (#17954).
+     */
+    public static function nullableObjectToValuePtr(Context $context, Value $objPtr): Value
+    {
+        return self::valuePtrFromObjectParam($context, $objPtr);
+    }
+
+    /**
      * Box a nullable object param ({@see __object__*} at the LLVM edge, {@see Variable::TYPE_VALUE} in JIT).
      */
     private static function valuePtrFromObjectParam(Context $context, Value $objPtr): Value
@@ -560,6 +568,7 @@ final class JitValueBox
         $context->builder->branch($done);
 
         $context->builder->positionAtEnd($done);
+        BasicBlockHelper::branchToFreshContinue($context, 'after_value_copy_'.$tag);
     }
 
     public static function writeBool(Context $context, Value $slot, Value $bool): void

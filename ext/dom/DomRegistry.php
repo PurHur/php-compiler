@@ -9,32 +9,48 @@ use PHPCompiler\VM\ObjectEntry;
 /** Object-id keyed DOM node state (issue #6140). */
 final class DomRegistry
 {
-    /** @var array<int, DomNodeState> */
-    private static array $states = [];
+    private const GLOBAL_KEY = '__phpc_dom_registry';
 
-    /** @var array<int, ObjectEntry> */
-    private static array $entries = [];
+    /** @return array{states: array<int, DomNodeState>, entries: array<int, ObjectEntry>} */
+    private static function &bucket(): array
+    {
+        if (!isset($GLOBALS[self::GLOBAL_KEY]) || !\is_array($GLOBALS[self::GLOBAL_KEY])) {
+            $GLOBALS[self::GLOBAL_KEY] = [
+                'states' => [],
+                'entries' => [],
+            ];
+        }
+
+        return $GLOBALS[self::GLOBAL_KEY];
+    }
 
     public static function reset(): void
     {
-        self::$states = [];
-        self::$entries = [];
+        $GLOBALS[self::GLOBAL_KEY] = [
+            'states' => [],
+            'entries' => [],
+        ];
     }
 
     public static function attach(ObjectEntry $entry, DomNodeState $state): void
     {
-        self::$states[$entry->id] = $state;
-        self::$entries[$entry->id] = $entry;
+        $bucket = &self::bucket();
+        $bucket['states'][$entry->id] = $state;
+        $bucket['entries'][$entry->id] = $entry;
+        VmDom::initRegistryIdProperty($entry);
     }
 
     public static function entry(int $id): ?ObjectEntry
     {
-        return self::$entries[$id] ?? null;
+        $bucket = self::bucket();
+
+        return $bucket['entries'][$id] ?? null;
     }
 
     public static function state(ObjectEntry $entry): DomNodeState
     {
-        $state = self::$states[$entry->id] ?? null;
+        $bucket = self::bucket();
+        $state = $bucket['states'][$entry->id] ?? null;
         if (null === $state) {
             throw new \LogicException('DOM object has no registered node state in this compiler build');
         }
@@ -44,6 +60,8 @@ final class DomRegistry
 
     public static function has(ObjectEntry $entry): bool
     {
-        return isset(self::$states[$entry->id]);
+        $bucket = self::bucket();
+
+        return isset($bucket['states'][$entry->id]);
     }
 }

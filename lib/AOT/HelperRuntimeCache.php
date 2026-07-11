@@ -52,6 +52,15 @@ final class HelperRuntimeCache
     /** @var array<string, true> unit dir → merged at link time */
     private static array $usedUnits = [];
 
+    /**
+     * User-script AOT previously forced inline compile for stale prelink units (#17954).
+     * ObjectEntry ABI + ext/dom fingerprint deps invalidate stale helper TUs.
+     *
+     * @var array<string, true>
+     */
+    private const USER_SCRIPT_INLINE_ONLY_LOGICALS = [
+    ];
+
     private static bool $loggedHit = false;
 
     public static function enabled(): bool
@@ -194,12 +203,39 @@ final class HelperRuntimeCache
         return \dirname(__DIR__, 2).'/prelinked/helper-runtime/'.self::archKey().'/units';
     }
 
-    /** Per-unit fingerprint: core + the helper source content. */
+    /** Per-unit fingerprint: core + helper source + ext/dom SSOT deps when applicable (#17954). */
     public static function unitFingerprint(string $unitSourceAbsPath): string
     {
         $source = @file_get_contents($unitSourceAbsPath);
+        $material = self::coreFingerprint()."\n".(string) $source;
+        $extra = self::unitDependencyFingerprintMaterial($unitSourceAbsPath);
+        if ('' !== $extra) {
+            $material .= "\n".$extra;
+        }
 
-        return substr(hash('sha256', self::coreFingerprint()."\n".(string) $source), 0, 20);
+        return substr(hash('sha256', $material), 0, 20);
+    }
+
+    /**
+     * Nested helper units embed ext/dom semantics pulled in at emit time; hash SSOT
+     * alongside the helper stub so VmDom edits invalidate stale units (#17954).
+     */
+    private static function unitDependencyFingerprintMaterial(string $unitSourceAbsPath): string
+    {
+        $root = \dirname(__DIR__, 2);
+        if (!str_starts_with($unitSourceAbsPath, $root.'/ext/dom/')) {
+            return '';
+        }
+        $parts = [];
+        foreach ([
+            '/ext/dom/VmDom.php',
+            '/ext/dom/VmDomJitFrame.php',
+            '/ext/dom/DomRegistry.php',
+        ] as $rel) {
+            $parts[] = $rel.':'.@hash_file('sha256', $root.$rel);
+        }
+
+        return implode("\n", $parts);
     }
 
     /** @return array{fingerprint: string, unit: string, helpers: array<string,string>}|null */
@@ -313,6 +349,9 @@ final class HelperRuntimeCache
         $bound = 0;
         foreach ($logicalNames as $logical) {
             $lc = strtolower($logical);
+            if (self::shouldInlineOnlyForUserScript($lc)) {
+                continue;
+            }
             if (isset($context->functions[$lc]) || !isset($index[$lc])) {
                 continue;
             }
@@ -529,5 +568,15 @@ final class HelperRuntimeCache
     public static function markEmitting(): void
     {
         putenv(self::ENV_EMITTING.'=1');
+    }
+
+    private static function shouldInlineOnlyForUserScript(string $logicalLc): bool
+    {
+        if (!isset(self::USER_SCRIPT_INLINE_ONLY_LOGICALS[$logicalLc])) {
+            return false;
+        }
+        $user = getenv('PHP_COMPILER_AOT_USER_SCRIPT');
+
+        return '1' === $user || 'true' === strtolower((string) $user);
     }
 }

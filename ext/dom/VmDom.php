@@ -160,6 +160,12 @@ final class VmDom
 
     public const PROP_TARGET = 'target';
 
+    /** JIT/AOT: string id → DOMElement map mirrored from DomRegistry::elementIds (#17954). */
+    public const PROP_ELEMENT_ID_MAP = '__phpcDomElementIdMap';
+
+    /** JIT/AOT: DomRegistry object id for scalar helper bridges (#17954, #16075). */
+    public const PROP_REGISTRY_ID = '__phpcDomRegistryId';
+
     public static function registerClasses(Context $ctx): void
     {
         if (isset($ctx->classes[self::CLASS_IMPLEMENTATION])) {
@@ -171,6 +177,7 @@ final class VmDom
         $nullProto = new Variable(Variable::TYPE_NULL);
         $objProto = new Variable(Variable::TYPE_OBJECT);
         $intProto = new Variable(Variable::TYPE_INTEGER);
+        $arrayProto = new Variable(Variable::TYPE_ARRAY);
         $pub = CfgFunc::FLAG_PUBLIC;
 
         $node = new ClassEntry('DOMNode');
@@ -496,6 +503,8 @@ final class VmDom
         $document->properties[] = new ClassProperty(self::PROP_XML_VERSION, null, $strProto);
         $document->properties[] = new ClassProperty(self::PROP_XML_STANDALONE, null, $boolProto);
         $document->properties[] = new ClassProperty(self::PROP_DOCUMENT_ELEMENT, $nullProto, $objProto);
+        $document->properties[] = new ClassProperty(self::PROP_ELEMENT_ID_MAP, $nullProto, $arrayProto);
+        $document->properties[] = new ClassProperty(self::PROP_REGISTRY_ID, null, $intProto);
         $document->methods['loadxml'] = new DocumentLoadXML();
         $document->methodVisibility['loadxml'] = $pub;
         $document->methods['load'] = new DocumentLoad();
@@ -785,15 +794,17 @@ final class VmDom
         return $defaultNs === $namespaceUri;
     }
 
-    public static function ensureDocument(ObjectEntry $document): DomNodeState
+    public static function ensureDocument(ObjectEntry $document, bool $deferPropertyInit = false): DomNodeState
     {
         if (!DomRegistry::has($document)) {
             $state = new DomNodeState();
             $state->nodeType = DomConstants::XML_DOCUMENT_NODE;
             $state->nodeName = '#document';
             DomRegistry::attach($document, $state);
-            self::initDocumentLibxmlDefaults($document);
-            self::initNodePropertySlots($document);
+            if (!$deferPropertyInit) {
+                self::initDocumentLibxmlDefaults($document);
+                self::initNodePropertySlots($document);
+            }
         }
 
         return DomRegistry::state($document);
@@ -818,6 +829,48 @@ final class VmDom
         if ($document->hasProperty(self::PROP_XML_STANDALONE)) {
             self::setDocumentBoolSlot($document, self::PROP_XML_STANDALONE, false);
         }
+    }
+
+    /** Mirror DomRegistry object id onto the document for LLVM helper bridges (#17954). */
+    public static function initRegistryIdProperty(ObjectEntry $document): void
+    {
+        if (!$document->hasProperty(self::PROP_REGISTRY_ID)) {
+            return;
+        }
+        $idVar = new Variable();
+        $idVar->int($document->id);
+        $document->getProperty(self::PROP_REGISTRY_ID)->copyFrom($idVar);
+    }
+
+    /** Empty id map for fresh documents; loadHTML replaces via {@see syncElementIdMapProperty()}. */
+    public static function initElementIdMapProperty(ObjectEntry $document): void
+    {
+        if (!$document->hasProperty(self::PROP_ELEMENT_ID_MAP)) {
+            return;
+        }
+        $ht = new HashTable();
+        $var = new Variable();
+        $var->array($ht);
+        $document->getProperty(self::PROP_ELEMENT_ID_MAP)->copyFrom($var);
+    }
+
+    /** Mirror DomRegistry elementIds onto the document for LLVM getElementById() (#17954). */
+    public static function syncElementIdMapProperty(ObjectEntry $document): void
+    {
+        if (!$document->hasProperty(self::PROP_ELEMENT_ID_MAP)) {
+            return;
+        }
+        $state = DomRegistry::state($document);
+        $ht = new HashTable();
+        foreach ($state->elementIds as $id => $objectId) {
+            $entry = DomRegistry::entry($objectId);
+            if (null !== $entry) {
+                $ht->add($id, self::elementVariable($entry));
+            }
+        }
+        $var = new Variable();
+        $var->array($ht);
+        $document->getProperty(self::PROP_ELEMENT_ID_MAP)->copyFrom($var);
     }
 
     private static function setDocumentBoolSlot(ObjectEntry $document, string $propName, bool $value): void
@@ -3849,9 +3902,10 @@ final class VmDom
         ObjectEntry $document,
         string $html,
         int $options = 0,
-        ?\PHPCompiler\Frame $frame = null
+        ?\PHPCompiler\Frame $frame = null,
+        bool $deferDocumentSlotSync = false
     ): bool {
-        self::ensureDocument($document);
+        self::ensureDocument($document, $deferDocumentSlotSync);
         self::rejectEmptyLoadSource($html, 'DOMDocument::loadHTML()');
 
         $trimmed = trim($html);
@@ -3909,11 +3963,18 @@ final class VmDom
         $state->encoding = null;
         $state->xmlStandalone = false;
         $state->documentElementName = DomRegistry::state($root)->nodeName;
-        $document->getProperty(self::PROP_DOCUMENT_ELEMENT)->copyFrom(self::elementVariable($root));
+        if (!$deferDocumentSlotSync) {
+            $document->getProperty(self::PROP_DOCUMENT_ELEMENT)->copyFrom(self::elementVariable($root));
+        }
         self::linkChildToParent($root, $document);
         self::propagateDocumentId($root, $document->id);
-        self::syncSubtree($ctx, $document);
+        if (!$deferDocumentSlotSync) {
+            self::syncSubtree($ctx, $document);
+        }
         self::reindexDocumentIds($document, $root);
+        if (!$deferDocumentSlotSync) {
+            self::syncElementIdMapProperty($document);
+        }
         $state->documentUri = self::defaultDocumentUri();
 
         return true;
@@ -3972,8 +4033,21 @@ final class VmDom
         if (0 !== ($options & \PHPCompiler\ext\libxml\LibxmlConstants::LIBXML_HTML_NOIMPLIED)) {
             return $trimmed;
         }
-        if (preg_match('/^\s*<(?:!DOCTYPE|html\b)/i', $trimmed)) {
-            return preg_replace('/^\s*<!DOCTYPE[^>]*>\s*/i', '', $trimmed) ?? $trimmed;
+        $pos = 0;
+        $len = \strlen($trimmed);
+        while ($pos < $len && ctype_space($trimmed[$pos])) {
+            ++$pos;
+        }
+        if ($pos < $len && '<' === $trimmed[$pos]) {
+            $rest = substr($trimmed, $pos + 1);
+            if (str_starts_with(strtolower($rest), '!doctype') || str_starts_with(strtolower($rest), 'html')) {
+                $close = strpos($trimmed, '>');
+                if (false !== $close && str_starts_with(strtolower(ltrim(substr($trimmed, $pos + 1))), '!doctype')) {
+                    return ltrim(substr($trimmed, $close + 1));
+                }
+
+                return $trimmed;
+            }
         }
 
         return '<html><body>'.$trimmed.'</body></html>';
@@ -3986,14 +4060,32 @@ final class VmDom
         ?\PHPCompiler\Frame $frame = null
     ): ?ObjectEntry {
         $trimmed = trim($html);
-        if (preg_match('/^<([A-Za-z_][\w:.-]*)(\s[^>]*)?\/>$/s', $trimmed, $selfClose)) {
-            return self::createHtmlElementFromTag($ctx, $selfClose[1], $selfClose[2] ?? '', '', $ownerDocument, $frame);
-        }
-        if (!preg_match('/^<([A-Za-z_][\w:.-]*)(\s[^>]*)?>(.*)<\/\1>\s*$/is', $trimmed, $matches)) {
+        if ('' === $trimmed) {
             return null;
         }
+        $open = self::scanHtmlOpenTagAt($trimmed, 0);
+        if (null === $open) {
+            return null;
+        }
+        if ($open['selfClose']) {
+            return self::createHtmlElementFromTag($ctx, $open['tag'], $open['attrs'], '', $ownerDocument, $frame);
+        }
+        // Avoid PCRE backreferences and \G — VmPregPure lacks them (#17954, compiled loadHTML/AOT).
+        $end = self::findHtmlElementEnd($trimmed, 0);
+        if (null === $end || $end !== \strlen($trimmed)) {
+            return null;
+        }
+        $closePos = strrpos(substr($trimmed, 0, $end), '</');
+        if (false === $closePos) {
+            return null;
+        }
+        $close = self::scanHtmlCloseTagAt($trimmed, $closePos);
+        if (null === $close || strtolower($close['tag']) !== strtolower($open['tag'])) {
+            return null;
+        }
+        $inner = substr($trimmed, $open['end'], $closePos - $open['end']);
 
-        $entry = self::createHtmlElementFromTag($ctx, $matches[1], $matches[2] ?? '', $matches[3], $ownerDocument, $frame);
+        $entry = self::createHtmlElementFromTag($ctx, $open['tag'], $open['attrs'], $inner, $ownerDocument, $frame);
         self::syncSubtree($ctx, $entry);
 
         return $entry;
@@ -4029,10 +4121,8 @@ final class VmDom
         $pos = 0;
         $len = \strlen($inner);
         while ($pos < $len) {
-            if (preg_match('/\G\s+/s', $inner, $m, 0, $pos)) {
-                $pos += \strlen($m[0]);
-
-                continue;
+            while ($pos < $len && ctype_space($inner[$pos])) {
+                ++$pos;
             }
             if ($pos >= $len) {
                 break;
@@ -4082,43 +4172,45 @@ final class VmDom
     /** @return null|int byte offset after one HTML element starting at $pos */
     private static function findHtmlElementEnd(string $content, int $pos): ?int
     {
-        if (!isset($content[$pos]) || '<' !== $content[$pos]) {
+        $open = self::scanHtmlOpenTagAt($content, $pos);
+        if (null === $open) {
             return null;
         }
-        if (preg_match('/\G<([A-Za-z_][\w:.-]*)(\s[^>]*)?\/>/is', $content, $selfClose, 0, $pos)) {
-            return $pos + \strlen($selfClose[0]);
-        }
-        if (!preg_match('/\G<([A-Za-z_][\w:.-]*)(\s[^>]*)?>/is', $content, $open, 0, $pos)) {
-            return null;
+        if ($open['selfClose']) {
+            return $open['end'];
         }
 
-        $tag = strtolower($open[1]);
+        $tag = strtolower($open['tag']);
         /** @var list<string> $stack */
         $stack = [$tag];
-        $scan = $pos + \strlen($open[0]);
+        $scan = $open['end'];
         $len = \strlen($content);
         while ($scan < $len && [] !== $stack) {
-            if (preg_match('/\G<\/([A-Za-z_][\w:.-]*)>/is', $content, $close, 0, $scan)) {
-                $name = strtolower($close[1]);
+            if ('<' !== $content[$scan]) {
+                ++$scan;
+
+                continue;
+            }
+            $close = self::scanHtmlCloseTagAt($content, $scan);
+            if (null !== $close) {
+                $name = strtolower($close['tag']);
                 if ([] === $stack || end($stack) !== $name) {
                     return null;
                 }
                 array_pop($stack);
-                $scan += \strlen($close[0]);
+                $scan = $close['end'];
                 if ([] === $stack) {
                     return $scan;
                 }
 
                 continue;
             }
-            if (preg_match('/\G<([A-Za-z_][\w:.-]*)(\s[^>]*)?\/>/is', $content, $nestedSelf, 0, $scan)) {
-                $scan += \strlen($nestedSelf[0]);
-
-                continue;
-            }
-            if (preg_match('/\G<([A-Za-z_][\w:.-]*)(\s[^>]*)?>/is', $content, $nestedOpen, 0, $scan)) {
-                $stack[] = strtolower($nestedOpen[1]);
-                $scan += \strlen($nestedOpen[0]);
+            $nested = self::scanHtmlOpenTagAt($content, $scan);
+            if (null !== $nested) {
+                if (!$nested['selfClose']) {
+                    $stack[] = strtolower($nested['tag']);
+                }
+                $scan = $nested['end'];
 
                 continue;
             }
@@ -4126,6 +4218,104 @@ final class VmDom
         }
 
         return null;
+    }
+
+    /**
+     * @return null|array{tag:string, attrs:string, end:int, selfClose:bool}
+     */
+    private static function scanHtmlOpenTagAt(string $content, int $pos): ?array
+    {
+        if (!isset($content[$pos]) || '<' !== $content[$pos]) {
+            return null;
+        }
+        $len = \strlen($content);
+        $i = $pos + 1;
+        if ($i >= $len || !self::isHtmlTagNameStart($content[$i])) {
+            return null;
+        }
+        $nameStart = $i;
+        ++$i;
+        while ($i < $len && self::isHtmlTagNameChar($content[$i])) {
+            ++$i;
+        }
+        $tag = substr($content, $nameStart, $i - $nameStart);
+        $attrStart = $i;
+        $selfClose = false;
+        while ($i < $len) {
+            $ch = $content[$i];
+            if ('"' === $ch || "'" === $ch) {
+                $quote = $ch;
+                ++$i;
+                while ($i < $len && $content[$i] !== $quote) {
+                    ++$i;
+                }
+                if ($i < $len) {
+                    ++$i;
+                }
+
+                continue;
+            }
+            if ('>' === $ch) {
+                return [
+                    'tag' => $tag,
+                    'attrs' => substr($content, $attrStart, $i - $attrStart),
+                    'end' => $i + 1,
+                    'selfClose' => false,
+                ];
+            }
+            if ('/' === $ch && isset($content[$i + 1]) && '>' === $content[$i + 1]) {
+                return [
+                    'tag' => $tag,
+                    'attrs' => substr($content, $attrStart, $i - $attrStart),
+                    'end' => $i + 2,
+                    'selfClose' => true,
+                ];
+            }
+            ++$i;
+        }
+
+        return null;
+    }
+
+    /** @return null|array{tag:string, end:int} */
+    private static function scanHtmlCloseTagAt(string $content, int $pos): ?array
+    {
+        if (!isset($content[$pos]) || '<' !== $content[$pos]) {
+            return null;
+        }
+        $len = \strlen($content);
+        $i = $pos + 1;
+        if ($i >= $len || '/' !== $content[$i]) {
+            return null;
+        }
+        ++$i;
+        if ($i >= $len || !self::isHtmlTagNameStart($content[$i])) {
+            return null;
+        }
+        $nameStart = $i;
+        ++$i;
+        while ($i < $len && self::isHtmlTagNameChar($content[$i])) {
+            ++$i;
+        }
+        $tag = substr($content, $nameStart, $i - $nameStart);
+        while ($i < $len && ctype_space($content[$i])) {
+            ++$i;
+        }
+        if ($i >= $len || '>' !== $content[$i]) {
+            return null;
+        }
+
+        return ['tag' => $tag, 'end' => $i + 1];
+    }
+
+    private static function isHtmlTagNameStart(string $char): bool
+    {
+        return ctype_alpha($char) || '_' === $char;
+    }
+
+    private static function isHtmlTagNameChar(string $char): bool
+    {
+        return ctype_alnum($char) || '_' === $char || ':' === $char || '.' === $char || '-' === $char;
     }
 
     /** Innermost unclosed/malformed tag for loadHTML libxml warnings (#16190). */

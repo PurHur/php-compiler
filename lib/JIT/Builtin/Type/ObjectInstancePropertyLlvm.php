@@ -23,6 +23,11 @@ final class ObjectInstancePropertyLlvm
         string $name,
         int $classId
     ): Variable {
+        $classLc = strtolower(str_replace('/', '\\', ltrim($class, '\\')));
+        if (\PHPCompiler\ext\dom\JitDomElementTextContent::isDomElementTextContent($classLc, strtolower($name))) {
+            return \PHPCompiler\ext\dom\JitDomElementTextContent::fetch($object, $obj);
+        }
+
         $context = $object->jitContext();
         $className = $object->classNameForId($classId);
         $nameId = $object->propNameIdFor($name);

@@ -959,8 +959,9 @@ class Context {
         Builtin\StringStripslashes::ensureStandaloneBodies($this);
         Builtin\StringFilePutContents::ensureStandaloneBodies($this);
         Builtin\SuperglobalNameRuntime::ensureLinked($this);
-        if (CompilerVersion::supportsDomTokenList()
-            && !DomInstanceMethodJit::shouldDeferToVmClassMethodLowering()) {
+        if (DomInstanceMethodJit::shouldDeferToVmClassMethodLowering()) {
+            Builtin\DomStandaloneAotInitRuntime::ensureLinked($this);
+        } elseif (CompilerVersion::supportsDomTokenList()) {
             Builtin\DomInstanceMethodRuntime::ensureLinked($this);
         }
     }
@@ -2145,6 +2146,9 @@ class Context {
                             $block->constants[$slot]
                         );
 
+                        return $this->scope->variables[$op];
+                    }
+                    if ($this->aliasVariableOpFromSlot($block, $op)) {
                         return $this->scope->variables[$op];
                     }
                 }
