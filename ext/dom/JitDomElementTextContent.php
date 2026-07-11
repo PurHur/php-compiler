@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\dom;
 
+use PHPCompiler\JIT\Builtin\DomDocumentMethodUserScriptLlvm;
 use PHPCompiler\JIT\Builtin\DomElementTextContentRuntime;
 use PHPCompiler\JIT\Builtin\Type\Object_;
 use PHPCompiler\JIT\Context;
@@ -16,9 +17,14 @@ final class JitDomElementTextContent
 {
     private const CLASS_ELEMENT = 'DOMElement';
 
+    private const PROP_TEXT_CONTENT = 'textContent';
+
     public static function fetch(Object_ $objectType, Value $obj): JITVariable
     {
         $context = $objectType->jitContext();
+        if (DomDocumentMethodUserScriptLlvm::shouldUse($context)) {
+            return self::fetchDirectSlot($objectType, $obj);
+        }
         $str = $context->builder->call(
             $context->lookupFunction(DomElementTextContentRuntime::ABI_NAME),
             $obj
@@ -29,6 +35,24 @@ final class JitDomElementTextContent
             JITVariable::TYPE_STRING,
             JITVariable::KIND_VALUE,
             $str
+        );
+    }
+
+    private static function fetchDirectSlot(Object_ $objectType, Value $obj): JITVariable
+    {
+        $context = $objectType->jitContext();
+        $classId = $objectType->lookup(self::CLASS_ELEMENT);
+        if (!$objectType->hasProperty($classId, self::PROP_TEXT_CONTENT)) {
+            $objectType->defineProperty($classId, self::PROP_TEXT_CONTENT, JITVariable::TYPE_STRING);
+        }
+        $slot = $objectType->propertySlotFor($obj, self::CLASS_ELEMENT, self::PROP_TEXT_CONTENT);
+        $loaded = $context->builder->load($slot);
+
+        return new JITVariable(
+            $context,
+            JITVariable::TYPE_STRING,
+            JITVariable::KIND_VALUE,
+            $loaded
         );
     }
 

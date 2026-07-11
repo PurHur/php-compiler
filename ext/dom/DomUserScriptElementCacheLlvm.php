@@ -34,12 +34,7 @@ final class DomUserScriptElementCacheLlvm
         $i1 = $context->getTypeFromString('int1');
 
         $context->builder->store($i1->constInt(1, false), $context->module->getNamedGlobal(self::GLOBAL_OK));
-
-        $ownedId = $context->builder->call(
-            $context->lookupFunction('__string__separate'),
-            $idStr
-        );
-        $context->builder->store($ownedId, $context->module->getNamedGlobal(self::GLOBAL_ID));
+        $context->builder->store($idStr, $context->module->getNamedGlobal(self::GLOBAL_ID));
         $context->builder->store($element, $context->module->getNamedGlobal(self::GLOBAL_ELEM));
     }
 
@@ -74,17 +69,25 @@ final class DomUserScriptElementCacheLlvm
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($cmpBlock);
+        $ptrMatch = $context->builder->icmp(
+            Builder::INT_EQ,
+            $idStr,
+            $cachedId
+        );
         $cmp = JitStringCompare::strcmp($context, $idStr, $cachedId);
         $i64 = $context->getTypeFromString('int64');
-        $idMatch = $context->builder->icmp(Builder::INT_EQ, $cmp, $i64->constInt(0, false));
+        $strMatch = $context->builder->icmp(Builder::INT_EQ, $cmp, $i64->constInt(0, false));
+        $idMatch = $context->builder->bitwiseOr($ptrMatch, $strMatch);
         $cachedElem = $context->builder->load($context->module->getNamedGlobal(self::GLOBAL_ELEM));
         $found = $context->builder->select($idMatch, $cachedElem, $nullObj);
         $context->builder->store($found, $resultSlot);
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($doneBlock);
+        $result = $context->builder->load($resultSlot);
+        BasicBlockHelper::branchToFreshContinue($context, 'after_dom_us_cache_lookup');
 
-        return $context->builder->load($resultSlot);
+        return $result;
     }
 
     private static function ensureGlobals(Context $context): void

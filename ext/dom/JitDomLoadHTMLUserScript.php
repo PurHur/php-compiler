@@ -66,11 +66,9 @@ final class JitDomLoadHTMLUserScript
             throw new \LogicException('DOMDocument::loadHTML() expects receiver and HTML string');
         }
 
-        $parsed = self::tryParseCompileTimeHtml($args[1]);
+        $parsed = self::tryParseCompileTimeHtml($args[1]) ?? self::$lastCompileTimeParsed;
         $i1 = $context->getTypeFromString('int1');
         if (null === $parsed) {
-            self::$lastCompileTimeParsed = null;
-
             return $i1->constInt(0, false);
         }
         self::$lastCompileTimeParsed = $parsed;
@@ -176,7 +174,6 @@ final class JitDomLoadHTMLUserScript
         );
         $propVar = new JITVariable($context, JITVariable::TYPE_VALUE, JITVariable::KIND_VARIABLE, $slot);
         $objectType->propertyStore($propSlot, $propVar, JITVariable::TYPE_VALUE);
-        DomUserScriptElementCacheLlvm::store($context, $document, $idStr, $element);
     }
 
     private static function storeElementTextContent(Context $context, Value $element, string $textLit): void

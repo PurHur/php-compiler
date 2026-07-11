@@ -30,7 +30,7 @@ final class JitDomLoadHTML
             return JitDomLoadHTMLUserScript::invoke($context, ...$args);
         }
 
-        $receiverPtr = self::receiverValuePtr($context, $args[0]);
+        $receiverPtr = self::loadObjectArg($context, $args[0]);
         $htmlStr = self::loadStringArg($context, $args[1]);
         $options = $context->getTypeFromString('int64')->constInt(0, false);
         if (isset($args[2]) && !NamedOptionalCallArgs::isOmittedOptional($args[2])) {
@@ -57,7 +57,7 @@ final class JitDomLoadHTML
         );
     }
 
-    private static function receiverValuePtr(Context $context, JITVariable $receiver): Value
+    private static function loadObjectArg(Context $context, JITVariable $receiver): Value
     {
         if (JITVariable::TYPE_VALUE === $receiver->type) {
             return JitValueBox::valuePtrFromVariable($context, $receiver);

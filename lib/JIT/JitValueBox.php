@@ -568,6 +568,7 @@ final class JitValueBox
         $context->builder->branch($done);
 
         $context->builder->positionAtEnd($done);
+        BasicBlockHelper::branchToFreshContinue($context, 'after_value_copy_'.$tag);
     }
 
     public static function writeBool(Context $context, Value $slot, Value $bool): void

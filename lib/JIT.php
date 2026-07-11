@@ -13094,7 +13094,43 @@ class JIT {
             $result->free();
             $this->context->builder->store($obj, $result->value);
             $result->addref();
-            $this->context->builder->branch($doneBlock);
+            $globalTarget = $this->resolveScriptGlobalAssignTarget($resultOp, $result)
+                ?? $this->recoverScriptGlobalAssignLvalueBySlot($resultOp, $result);
+            if (null !== $globalTarget) {
+                JIT\JitValueBox::assignToPointer(
+                    $this->context,
+                    JIT\JitValueBox::valuePtrFromVariable($this->context, $globalTarget),
+                    $value
+                );
+                $this->context->setVariableOp($resultOp, $globalTarget);
+                $globalName = JIT\OperandName::resolve($resultOp);
+                if (null === $globalName || '' === $globalName) {
+                    $block = $this->context->jitEnclosingBlock;
+                    if (null !== $block) {
+                        $slot = $block->slotForOperand($resultOp);
+                        if (null !== $slot) {
+                            foreach ($block->scopedOperands() as $scopeOp) {
+                                if ($block->slotForOperand($scopeOp) !== $slot) {
+                                    continue;
+                                }
+                                $scopeName = JIT\OperandName::resolve($scopeOp);
+                                if (null !== $scopeName && '' !== $scopeName) {
+                                    $globalName = $scopeName;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+                if (null !== $globalName && '' !== $globalName) {
+                    $this->context->bindVariableByName(
+                        $this->context->resolveRefAliasName($globalName),
+                        $globalTarget
+                    );
+                }
+            }
+            JIT\BasicBlockHelper::branchToFreshContinue($this->context, 'after_assign_object_from_value_obj');
+
             $this->context->builder->positionAtEnd($handleBlock);
             $result->free();
             $slot = JIT\JitValueBox::alloc($this->context);
@@ -13129,6 +13165,7 @@ class JIT {
             $result->value = $slot;
             $result->addref();
             $this->context->builder->positionAtEnd($doneBlock);
+            JIT\BasicBlockHelper::branchToFreshContinue($this->context, 'after_assign_object_from_value_handle');
 
             return;
         } elseif (Variable::TYPE_OBJECT === $result->type && Variable::TYPE_HASHTABLE === $value->type) {

@@ -19,6 +19,9 @@ final class DomDocumentGetElementById implements Call
     {
         BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_gei_call_cont');
 
-        return JitDomGetElementById::invoke($context, ...$args);
+        $result = JitDomGetElementById::invoke($context, ...$args);
+        BasicBlockHelper::branchToFreshContinue($context, 'after_dom_gei_call');
+
+        return $result;
     }
 }
