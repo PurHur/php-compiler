@@ -12,9 +12,9 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * JIT/AOT link for array_column() via ArrayColumnJitHelper PHP (#14256, #14264).
+ * JIT/AOT link for array_column() via ArrayColumnJitHelper PHP (#14256, #14264, #17973).
  *
- * Standalone AOT compiles {@see ArrayColumnJitHelper} via JitVmHelperLink (#14275); native literal arrays keep LLVM in {@see ArrayBuiltinHelper::buildColumnArray*} cluster.
+ * Standalone AOT compiles {@see ArrayColumnJitHelper} via JitVmHelperLink (#14275); native literal arrays materialize to hashtable then route through PHP (#17973).
  * SSOT: {@see \PHPCompiler\ext\standard\array_column}
  * php-src: ext/standard/array.c — php_array_column()
  */
@@ -73,16 +73,11 @@ final class ArrayColumnRuntime
 
     public static function column(Context $context, JITVariable $array, Value $columnKeyStr): Value
     {
-        if (self::useLlvm($context, $array)) {
-            return ArrayBuiltinHelper::buildColumnArray($context, $array, $columnKeyStr);
-        }
-
         self::ensureLinked($context);
-        $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
 
         return $context->builder->call(
             $context->lookupFunction(self::ABI_COLUMN),
-            $ht,
+            self::argToHashtable($context, $array),
             $columnKeyStr
         );
     }
@@ -93,16 +88,11 @@ final class ArrayColumnRuntime
         Value $columnKeyStr,
         Value $indexKeyStr
     ): Value {
-        if (self::useLlvm($context, $array)) {
-            return ArrayBuiltinHelper::buildColumnArrayWithIndex($context, $array, $columnKeyStr, $indexKeyStr);
-        }
-
         self::ensureLinked($context);
-        $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
 
         return $context->builder->call(
             $context->lookupFunction(self::ABI_COLUMN_INDEX),
-            $ht,
+            self::argToHashtable($context, $array),
             $columnKeyStr,
             $indexKeyStr
         );
@@ -110,16 +100,11 @@ final class ArrayColumnRuntime
 
     public static function columnNull(Context $context, JITVariable $array): Value
     {
-        if (self::useLlvm($context, $array)) {
-            return ArrayBuiltinHelper::buildColumnArrayNullColumn($context, $array);
-        }
-
         self::ensureLinked($context);
-        $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
 
         return $context->builder->call(
             $context->lookupFunction(self::ABI_NULL),
-            $ht
+            self::argToHashtable($context, $array)
         );
     }
 
@@ -128,16 +113,11 @@ final class ArrayColumnRuntime
         JITVariable $array,
         Value $indexKeyStr
     ): Value {
-        if (self::useLlvm($context, $array)) {
-            return ArrayBuiltinHelper::buildColumnArrayNullColumnWithIndex($context, $array, $indexKeyStr);
-        }
-
         self::ensureLinked($context);
-        $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
 
         return $context->builder->call(
             $context->lookupFunction(self::ABI_NULL_INDEX),
-            $ht,
+            self::argToHashtable($context, $array),
             $indexKeyStr
         );
     }
@@ -147,17 +127,12 @@ final class ArrayColumnRuntime
         JITVariable $array,
         JITVariable $columnKey
     ): Value {
-        if (self::useLlvm($context, $array)) {
-            return ArrayBuiltinHelper::buildColumnArrayWithRuntimeColumnKey($context, $array, $columnKey);
-        }
-
         self::ensureLinked($context);
-        $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
         $keyPtr = JitValueBox::valuePtrFromVariable($context, $columnKey);
 
         return $context->builder->call(
             $context->lookupFunction(self::ABI_COLUMN_RUNTIME),
-            $ht,
+            self::argToHashtable($context, $array),
             $keyPtr
         );
     }
@@ -168,22 +143,12 @@ final class ArrayColumnRuntime
         JITVariable $columnKey,
         Value $indexKeyStr
     ): Value {
-        if (self::useLlvm($context, $array)) {
-            return ArrayBuiltinHelper::buildColumnArrayWithRuntimeColumnKeyAndIndex(
-                $context,
-                $array,
-                $columnKey,
-                $indexKeyStr
-            );
-        }
-
         self::ensureLinked($context);
-        $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
         $keyPtr = JitValueBox::valuePtrFromVariable($context, $columnKey);
 
         return $context->builder->call(
             $context->lookupFunction(self::ABI_COLUMN_RUNTIME_INDEX),
-            $ht,
+            self::argToHashtable($context, $array),
             $keyPtr,
             $indexKeyStr
         );
@@ -195,23 +160,13 @@ final class ArrayColumnRuntime
         JITVariable $columnKey,
         JITVariable $indexKey
     ): Value {
-        if (self::useLlvm($context, $array)) {
-            return ArrayBuiltinHelper::buildColumnArrayWithRuntimeColumnKeyAndRuntimeIndex(
-                $context,
-                $array,
-                $columnKey,
-                $indexKey
-            );
-        }
-
         self::ensureLinked($context);
-        $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
         $columnPtr = JitValueBox::valuePtrFromVariable($context, $columnKey);
         $indexPtr = JitValueBox::valuePtrFromVariable($context, $indexKey);
 
         return $context->builder->call(
             $context->lookupFunction(self::ABI_COLUMN_RUNTIME_RUNTIME_INDEX),
-            $ht,
+            self::argToHashtable($context, $array),
             $columnPtr,
             $indexPtr
         );
@@ -223,22 +178,12 @@ final class ArrayColumnRuntime
         Value $columnKeyStr,
         JITVariable $indexKey
     ): Value {
-        if (self::useLlvm($context, $array)) {
-            return ArrayBuiltinHelper::buildColumnArrayWithRuntimeIndexKey(
-                $context,
-                $array,
-                $columnKeyStr,
-                $indexKey
-            );
-        }
-
         self::ensureLinked($context);
-        $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
         $indexPtr = JitValueBox::valuePtrFromVariable($context, $indexKey);
 
         return $context->builder->call(
             $context->lookupFunction(self::ABI_COLUMN_INDEX_RUNTIME),
-            $ht,
+            self::argToHashtable($context, $array),
             $columnKeyStr,
             $indexPtr
         );
@@ -249,19 +194,23 @@ final class ArrayColumnRuntime
         JITVariable $array,
         JITVariable $indexKey
     ): Value {
-        if (self::useLlvm($context, $array)) {
-            return ArrayBuiltinHelper::buildColumnArrayNullColumnWithRuntimeIndex($context, $array, $indexKey);
-        }
-
         self::ensureLinked($context);
-        $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
         $indexPtr = JitValueBox::valuePtrFromVariable($context, $indexKey);
 
         return $context->builder->call(
             $context->lookupFunction(self::ABI_NULL_RUNTIME_INDEX),
-            $ht,
+            self::argToHashtable($context, $array),
             $indexPtr
         );
+    }
+
+    private static function argToHashtable(Context $context, JITVariable $arg): Value
+    {
+        if (ArrayBuiltinHelper::isNativeArray($arg->type)) {
+            return ArrayBuiltinHelper::nativeListToHashTable($context, $arg);
+        }
+
+        return ArrayBuiltinHelper::loadHashTable($context, $arg);
     }
 
     public static function ensureLinked(Context $context): void
@@ -398,11 +347,6 @@ final class ArrayColumnRuntime
         } else {
             $context->builder->clearInsertionPosition();
         }
-    }
-
-    private static function useLlvm(Context $context, JITVariable $array): bool
-    {
-        return ArrayBuiltinHelper::isNativeArray($array->type);
     }
 
     private static function bridgeReady(Context $context, string $abi): bool

@@ -9,15 +9,17 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPUnit\Framework\TestCase;
 
-/** array_column() JIT routes key paths through ArrayColumnJitHelper PHP (#14256, #14264, #14275). */
+/** array_column() JIT routes all operands through ArrayColumnJitHelper PHP not ArrayBuiltinHelper native LLVM (#14256, #14264, #17973). */
 final class ArrayColumnRuntimeShrinkTest extends TestCase
 {
+    private const ARRAY_BUILTIN_HELPER_MAX_LINES = 9150;
+
     public function testArrayColumnRuntimeUsesJitHelperNotDirectLlvmMonolith(): void
     {
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ArrayColumnRuntime.php');
         $this->assertStringContainsString('ArrayColumnJitHelper', $runtime);
-        $this->assertStringContainsString('isNativeArray', $runtime);
-        $this->assertStringContainsString('ArrayBuiltinHelper::buildColumnArray', $runtime);
+        $this->assertStringContainsString('nativeListToHashTable', $runtime);
+        $this->assertStringNotContainsString('ArrayBuiltinHelper::buildColumnArray', $runtime);
         $this->assertStringContainsString('columnWithRuntimeKey', $runtime);
         $this->assertStringContainsString('ABI_COLUMN_RUNTIME', $runtime);
         $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);
@@ -26,6 +28,24 @@ final class ArrayColumnRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('ArrayColumnRuntime::column', $builtin);
         $this->assertStringContainsString('ArrayColumnRuntime::columnWithRuntimeKey', $builtin);
         $this->assertStringNotContainsString('ArrayBuiltinHelper::buildColumnArray(', $builtin);
+
+        $arrayBuiltin = (string) file_get_contents(__DIR__.'/../../lib/JIT/ArrayBuiltinHelper.php');
+        $this->assertStringNotContainsString('function buildColumnArray', $arrayBuiltin);
+        $this->assertStringNotContainsString('function buildColumnFromHashTable', $arrayBuiltin);
+        $this->assertStringNotContainsString('function buildColumnWithIndexFromHashTable', $arrayBuiltin);
+    }
+
+    public function testArrayBuiltinHelperLineBudgetAfterNativeColumnLlvmDeletion(): void
+    {
+        $lines = substr_count(
+            (string) file_get_contents(__DIR__.'/../../lib/JIT/ArrayBuiltinHelper.php'),
+            "\n"
+        ) + 1;
+        $this->assertLessThanOrEqual(
+            self::ARRAY_BUILTIN_HELPER_MAX_LINES,
+            $lines,
+            'ArrayBuiltinHelper.php LOC after dead array_column native LLVM deletion (#17973)'
+        );
     }
 
     public function testArrayColumnJitHelperMatchesInlineHaystackRepro(): void
