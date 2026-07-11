@@ -1,5 +1,10 @@
 --TEST--
 stdlib msgpack_pack/msgpack_unpack round-trip (#6551, ext/msgpack/msgpack.c)
+--SKIPIF--
+<?php
+if (!\PHPCompiler\CompilerVersion::supportsMsgpack()) {
+    die('skip msgpack withheld on reference profile (#17994)');
+}
 --FILE--
 <?php
 declare(strict_types=1);
