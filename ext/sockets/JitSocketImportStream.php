@@ -46,7 +46,10 @@ final class JitSocketImportStream
         $context->builder->branchIf($ok, $okBb, $failBb);
 
         $context->builder->positionAtEnd($failBb);
-        $context->builder->call($context->lookupFunction('__compiler_socket_import_warn'));
+        $context->builder->call(
+            $context->lookupFunction('__compiler_socket_import_warn'),
+            $handle
+        );
         $falseSlot = JitValueBox::alloc($context);
         $falsePtr = JitValueBox::pointer($context, $falseSlot);
         JitValueBox::writeBool($context, $falseSlot, $context->getTypeFromString('int1')->constInt(0, false));

@@ -1,5 +1,5 @@
 --TEST--
-stdlib chmod()/mkdir() octal numeric-string permissions (#17819, ext/standard/filestat.c)
+stdlib chmod()/mkdir() decimal numeric-string permissions (#17819, #17860, ext/standard/filestat.c)
 --FILE--
 <?php
 
@@ -11,11 +11,11 @@ $chmodMode = fileperms($f) & 0777;
 
 $d = sys_get_temp_dir() . '/phpc_mkdir_octal_' . uniqid('', true);
 mkdir($d, '0755', true);
-$mkdirMode = is_dir($d) ? (fileperms($d) & 0777) : 0;
+$mkdirMode = is_dir($d) ? decoct(fileperms($d) & 0777) : '0';
 @rmdir($d);
 
 echo 'chmod=', $chmodMode, ' mkdir=', $mkdirMode, "\n";
-echo 420 === $chmodMode && 493 === $mkdirMode ? 'ok' : 'fail', "\n";
+echo 132 === $chmodMode && '341' === $mkdirMode ? 'ok' : 'fail', "\n";
 --EXPECT--
-chmod=420 mkdir=493
+chmod=132 mkdir=341
 ok

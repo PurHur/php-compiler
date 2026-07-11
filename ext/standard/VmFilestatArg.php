@@ -218,7 +218,7 @@ final class VmFilestatArg
     }
 
     /**
-     * File mode coercion — zend_strtol(..., 0) for numeric strings (#17819, ext/standard/filestat.c).
+     * File mode coercion — Z_PARAM_LONG decimal numeric strings (#17819, #17860, ext/standard/filestat.c).
      *
      * @throws \TypeError
      */
@@ -270,9 +270,8 @@ final class VmFilestatArg
         if ('' === $s || !is_numeric($s)) {
             throw new \TypeError(self::intTypeError($function, $argIndex, $paramName, 'string'));
         }
-        $base = VmMath::autodetectBase($s);
 
-        return (int) VmMath::baseToZval($s, $base);
+        return (int) VmMath::baseToZval($s, 10);
     }
 
     private static function vmTypeName(int $type): string
