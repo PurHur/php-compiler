@@ -7,16 +7,15 @@ namespace PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
-use PHPCompiler\JIT\NestedJitCompileScope;
-use PHPCompiler\JIT\UserScriptAotDeferNestedJit;
 
 /**
- * JIT/AOT link for mb_encode/decode_numericentity() via MbNumericEntityJitHelper PHP (#7237).
+ * User-script standalone AOT bridges for mb_encode/decode_numericentity() (#18035).
  *
- * SSOT: {@see \PHPCompiler\ext\mbstring\VmMbstring}
+ * Nested {@see MbNumericEntityJitHelper} compile segfaults after minimal standalone init
+ * (#15407). Emit thin ABI bridges that call prelinked helper-runtime units (#15889).
  * php-src: ext/mbstring/mbstring.c — PHP_FUNCTION(mb_encode_numericentity)
  */
-final class MbNumericEntity
+final class MbNumericEntityLlvm
 {
     private const ABI_ENCODE4 = '__compiler_mb_encode_numericentity4';
     private const ABI_DECODE4 = '__compiler_mb_decode_numericentity4';
@@ -35,28 +34,8 @@ final class MbNumericEntity
         self::DECODE4_HELPER,
     ];
 
-    public static function ensureLinked(Context $context): void
+    public static function implement(Context $context): void
     {
-        self::implement($context);
-    }
-
-    public static function ensureStandaloneBodies(Context $context): void
-    {
-        self::implement($context);
-    }
-
-    private static function implement(Context $context): void
-    {
-        if (NestedJitCompileScope::isActive()) {
-            return;
-        }
-
-        if (UserScriptAotDeferNestedJit::shouldDefer($context)) {
-            MbNumericEntityLlvm::implement($context);
-
-            return;
-        }
-
         $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
         self::implementEncode4Bridge($context);
         self::implementDecode4Bridge($context);
@@ -69,13 +48,6 @@ final class MbNumericEntity
 
     private static function implementEncode4Bridge(Context $context): void
     {
-        $probe = $context->module->getNamedFunction(self::ABI_ENCODE4);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            $context->registerFunction(self::ABI_ENCODE4, $probe);
-
-            return;
-        }
-
         $strPtr = $context->getTypeFromString('__string__*');
         $i64 = $context->getTypeFromString('int64');
         $i8 = $context->getTypeFromString('int8');
@@ -88,19 +60,12 @@ final class MbNumericEntity
             self::ENCODE4_HELPER,
             self::HELPER_PATH,
             self::COMPILED_HELPERS,
-            '#7237'
+            '#18035'
         );
     }
 
     private static function implementDecode4Bridge(Context $context): void
     {
-        $probe = $context->module->getNamedFunction(self::ABI_DECODE4);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            $context->registerFunction(self::ABI_DECODE4, $probe);
-
-            return;
-        }
-
         $strPtr = $context->getTypeFromString('__string__*');
         $i64 = $context->getTypeFromString('int64');
         JitVmHelperLink::ensureBridge(
@@ -112,7 +77,7 @@ final class MbNumericEntity
             self::DECODE4_HELPER,
             self::HELPER_PATH,
             self::COMPILED_HELPERS,
-            '#7237'
+            '#18035'
         );
     }
 }
