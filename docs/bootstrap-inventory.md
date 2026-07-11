@@ -7626,9 +7626,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/msgpack/Module.php`
 
 **Warnings** (review for bootstrap subset):
-- new msgpack_pack (line 24)
-- new msgpack_unpack (line 25)
-- 1 class method(s)
+- new msgpack_pack (line 42)
+- new msgpack_unpack (line 43)
+- 3 class method(s)
 
 ### `ext/msgpack/MsgpackExtensionPolicy.php`
 

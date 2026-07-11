@@ -37,7 +37,7 @@ PHP;
         self::assertSame('000', ob_get_clean());
     }
 
-    public function test_msgpack_registered_on_forward_profile(): void
+    public function test_msgpack_registered_and_extension_loaded_on_forward_profile(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE=8.4');

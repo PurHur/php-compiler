@@ -364,26 +364,6 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
-    public function testSupportsBrotliFalseOnReferenceProfile(): void
-    {
-        $this->assertFalse(CompilerVersion::supportsBrotli());
-    }
-
-    public function testSupportsBrotliTrueOnForwardProfile(): void
-    {
-        $prev = getenv('PHP_COMPILER_PROFILE');
-        putenv('PHP_COMPILER_PROFILE=8.4');
-        try {
-            $this->assertTrue(CompilerVersion::supportsBrotli());
-        } finally {
-            if (false === $prev) {
-                putenv('PHP_COMPILER_PROFILE');
-            } else {
-                putenv('PHP_COMPILER_PROFILE='.$prev);
-            }
-        }
-    }
-
     public function testSupportsMsgpackFalseOnReferenceProfile(): void
     {
         $this->assertFalse(CompilerVersion::supportsMsgpack());
@@ -395,6 +375,26 @@ final class CompilerVersionGateTest extends TestCase
         putenv('PHP_COMPILER_PROFILE=8.4');
         try {
             $this->assertTrue(CompilerVersion::supportsMsgpack());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testSupportsBrotliFalseOnReferenceProfile(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsBrotli());
+    }
+
+    public function testSupportsBrotliTrueOnForwardProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertTrue(CompilerVersion::supportsBrotli());
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');
