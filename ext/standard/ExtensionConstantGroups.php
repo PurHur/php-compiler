@@ -11,6 +11,7 @@ use PHPCompiler\ext\filter\FilterConstants;
 use PHPCompiler\ext\hash\MhashRegistry;
 use PHPCompiler\ext\intl\IntlConstants;
 use PHPCompiler\ext\ldap\LdapConstants;
+use PHPCompiler\ext\ldap\LdapExtensionPolicy;
 use PHPCompiler\ext\libxml\LibxmlConstants;
 use PHPCompiler\ext\mbstring\MbstringConstants;
 use PHPCompiler\ext\openssl\OpensslConstants;
@@ -56,7 +57,9 @@ final class ExtensionConstantGroups
         $groups['hash'] = MhashRegistry::constants();
         $groups['curl'] = CurlConstants::registeredConstants();
         $groups['intl'] = IntlConstants::registeredConstants();
-        $groups['ldap'] = LdapConstants::registeredConstants();
+        if (LdapExtensionPolicy::advertisesExtension()) {
+            $groups['ldap'] = LdapConstants::registeredConstants();
+        }
         if (\PHPCompiler\ext\sodium\SodiumExtensionPolicy::advertisesExtension()) {
             $groups['sodium'] = SodiumConstants::registeredConstants();
         }
