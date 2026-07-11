@@ -9,6 +9,7 @@ use PHPCompiler\ext\curl\CurlConstants;
 use PHPCompiler\ext\dom\DomExceptionConstants;
 use PHPCompiler\ext\filter\FilterConstants;
 use PHPCompiler\ext\hash\MhashRegistry;
+use PHPCompiler\ext\inotify\InotifyConstants;
 use PHPCompiler\ext\intl\IntlConstants;
 use PHPCompiler\ext\ldap\LdapConstants;
 use PHPCompiler\ext\ldap\LdapExtensionPolicy;
@@ -58,6 +59,7 @@ final class ExtensionConstantGroups
         $groups['session'] = SessionConstants::registeredConstants();
         $groups['mbstring'] = MbstringConstants::registeredConstants();
         $groups['hash'] = MhashRegistry::constants();
+        $groups['inotify'] = InotifyConstants::registeredConstants();
         $groups['curl'] = CurlConstants::registeredConstants();
         $groups['intl'] = IntlConstants::registeredConstants();
         if (LdapExtensionPolicy::advertisesExtension()) {
