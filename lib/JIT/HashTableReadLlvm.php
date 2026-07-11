@@ -647,4 +647,109 @@ final class HashTableReadLlvm
         );
     }
 
+    /** Materialize empty hashtables for null boxed arrays and object properties (#1086, #17865). */
+    public static function ensureHashtablePointer(Context $context, Variable $array): Value
+    {
+        if (null !== $array->objectPropertySlot && Variable::TYPE_VALUE === ($array->objectPropertyType ?? null)) {
+            $voidPtr = $context->getTypeFromString('void*');
+            $slot = $array->objectPropertySlot;
+            $loaded = $context->builder->pointerCast(
+                $context->builder->load($slot),
+                $voidPtr
+            );
+            $slotEmpty = $context->builder->icmp(
+                Builder::INT_EQ,
+                $loaded,
+                $voidPtr->constNull()
+            );
+            $initSlot = BasicBlockHelper::append($context, 'ht_ensure_prop_slot_init');
+            $useSlot = BasicBlockHelper::append($context, 'ht_ensure_prop_slot_use');
+            $done = BasicBlockHelper::append($context, 'ht_ensure_prop_slot_done');
+            $context->builder->branchIf($slotEmpty, $initSlot, $useSlot);
+
+            $context->builder->positionAtEnd($initSlot);
+            $newHt = HashTableHelper::alloc($context);
+            $emptyHt = new Variable(
+                $context,
+                Variable::TYPE_HASHTABLE,
+                Variable::KIND_VALUE,
+                $newHt
+            );
+            $context->type->object->propertyStore($slot, $emptyHt, Variable::TYPE_VALUE);
+            $context->builder->branch($done);
+
+            $context->builder->positionAtEnd($useSlot);
+            $valPtr = $context->builder->pointerCast(
+                $loaded,
+                $context->getTypeFromString('__value__*')
+            );
+            $existing = $context->builder->call(
+                $context->lookupFunction('__value__readHashtable'),
+                $valPtr
+            );
+            $needsInit = $context->builder->icmp(
+                Builder::INT_EQ,
+                $existing,
+                $existing->typeOf()->constNull()
+            );
+            $initBox = BasicBlockHelper::append($context, 'ht_ensure_prop_box_init');
+            $ready = BasicBlockHelper::append($context, 'ht_ensure_prop_box_ready');
+            $context->builder->branchIf($needsInit, $initBox, $ready);
+
+            $context->builder->positionAtEnd($initBox);
+            $boxHt = HashTableHelper::alloc($context);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeHashtable'),
+                $valPtr,
+                $boxHt
+            );
+            $context->builder->branch($done);
+
+            $context->builder->positionAtEnd($ready);
+            $context->builder->branch($done);
+
+            $context->builder->positionAtEnd($done);
+            $htPhi = $context->builder->phi($newHt->typeOf());
+            $htPhi->addIncoming($newHt, $initSlot);
+            $htPhi->addIncoming($boxHt, $initBox);
+            $htPhi->addIncoming($existing, $ready);
+
+            return $htPhi;
+        }
+
+        $valPtr = JitValueBox::valuePtrFromVariable($context, $array);
+        $ht = $context->builder->call(
+            $context->lookupFunction('__value__readHashtable'),
+            $valPtr
+        );
+        $isNull = $context->builder->icmp(
+            Builder::INT_EQ,
+            $ht,
+            $ht->typeOf()->constNull()
+        );
+        $init = BasicBlockHelper::append($context, 'ht_ensure_box_init');
+        $ready = BasicBlockHelper::append($context, 'ht_ensure_box_ready');
+        $done = BasicBlockHelper::append($context, 'ht_ensure_box_done');
+        $context->builder->branchIf($isNull, $init, $ready);
+
+        $context->builder->positionAtEnd($init);
+        $newHt = HashTableHelper::alloc($context);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeHashtable'),
+            $valPtr,
+            $newHt
+        );
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($ready);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($done);
+        $result = $context->builder->phi($ht->typeOf());
+        $result->addIncoming($newHt, $init);
+        $result->addIncoming($ht, $ready);
+
+        return $result;
+    }
+
 }
