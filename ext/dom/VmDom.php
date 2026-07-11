@@ -54,6 +54,10 @@ final class VmDom
 
     public const CLASS_ENTITY_REFERENCE = 'domentityreference';
 
+    public const CLASS_ENTITY = 'domentity';
+
+    public const CLASS_NOTATION = 'domnotation';
+
     public const CLASS_DOCUMENT_FRAGMENT = 'domdocumentfragment';
 
     public const CLASS_NODE = 'domnode';
@@ -147,6 +151,12 @@ final class VmDom
     public const PROP_PUBLIC_ID = 'publicId';
 
     public const PROP_SYSTEM_ID = 'systemId';
+
+    public const PROP_ENTITIES = 'entities';
+
+    public const PROP_NOTATIONS = 'notations';
+
+    public const PROP_NOTATION_NAME = 'notationName';
 
     public const PROP_TARGET = 'target';
 
@@ -311,6 +321,23 @@ final class VmDom
         $entityRef->properties[] = new ClassProperty(self::PROP_NODE_NAME, null, $strProto);
         $ctx->classes[self::CLASS_ENTITY_REFERENCE] = $entityRef;
 
+        $entity = new ClassEntry('DOMEntity');
+        $entity->isInternal = true;
+        $entity->parentLc = self::CLASS_NODE;
+        $entity->properties[] = new ClassProperty(self::PROP_NODE_NAME, null, $strProto);
+        $entity->properties[] = new ClassProperty(self::PROP_PUBLIC_ID, $nullProto, $strProto);
+        $entity->properties[] = new ClassProperty(self::PROP_SYSTEM_ID, $nullProto, $strProto);
+        $entity->properties[] = new ClassProperty(self::PROP_NOTATION_NAME, $nullProto, $strProto);
+        $ctx->classes[self::CLASS_ENTITY] = $entity;
+
+        $notation = new ClassEntry('DOMNotation');
+        $notation->isInternal = true;
+        $notation->parentLc = self::CLASS_NODE;
+        $notation->properties[] = new ClassProperty(self::PROP_NODE_NAME, null, $strProto);
+        $notation->properties[] = new ClassProperty(self::PROP_PUBLIC_ID, $nullProto, $strProto);
+        $notation->properties[] = new ClassProperty(self::PROP_SYSTEM_ID, $nullProto, $strProto);
+        $ctx->classes[self::CLASS_NOTATION] = $notation;
+
         $attr = new ClassEntry('DOMAttr');
         $attr->isInternal = true;
         $attr->parentLc = self::CLASS_NODE;
@@ -438,6 +465,8 @@ final class VmDom
         $doctype->properties[] = new ClassProperty(self::PROP_NAME, null, $strProto);
         $doctype->properties[] = new ClassProperty(self::PROP_PUBLIC_ID, null, $strProto);
         $doctype->properties[] = new ClassProperty(self::PROP_SYSTEM_ID, null, $strProto);
+        $doctype->properties[] = new ClassProperty(self::PROP_ENTITIES, $nullProto, $objProto);
+        $doctype->properties[] = new ClassProperty(self::PROP_NOTATIONS, $nullProto, $objProto);
         $ctx->classes[self::CLASS_DOCUMENT_TYPE] = $doctype;
 
         $processingInstruction = new ClassEntry('DOMProcessingInstruction');
@@ -648,6 +677,12 @@ final class VmDom
         $state->systemId = $systemId;
         DomRegistry::attach($entry, $state);
         self::initDocumentTypePropertySlots($entry, $qualifiedName, $publicId, $systemId);
+        $entitiesMap = self::createNamedNodeMap($ctx, []);
+        $notationsMap = self::createNamedNodeMap($ctx, []);
+        $state->entitiesMapId = $entitiesMap->toObject()->id;
+        $state->notationsMapId = $notationsMap->toObject()->id;
+        $entry->getProperty(self::PROP_ENTITIES)->copyFrom($entitiesMap);
+        $entry->getProperty(self::PROP_NOTATIONS)->copyFrom($notationsMap);
 
         $var = new Variable(Variable::TYPE_OBJECT);
         $var->object($entry);
@@ -1990,6 +2025,7 @@ final class VmDom
         $trimmed = trim($xml);
         $decl = self::parseXmlDeclaration($trimmed);
         $idAttrByElement = self::parseDoctypeIdAttributes($trimmed);
+        $generalEntities = self::parseDoctypeGeneralEntities($trimmed);
         [$elementXml, $elementOffset] = self::stripDoctypeWithOffset($trimmed);
         $validationError = VmXml::validationErrorRecord($elementXml);
         if (null !== $validationError) {
@@ -2003,7 +2039,7 @@ final class VmDom
 
             return false;
         }
-        $root = self::parseElementTree($ctx, $elementXml, $trimmed, $elementOffset);
+        $root = self::parseElementTree($ctx, $elementXml, $trimmed, $elementOffset, $generalEntities);
         if (null === $root) {
             return false;
         }
@@ -2016,17 +2052,20 @@ final class VmDom
         $childIds = [];
         $doctypeDecl = self::parseDoctypeDeclaration($trimmed);
         if (null !== $doctypeDecl) {
-            $childIds[] = self::attachDoctypeChild(
+            $doctype = self::attachDoctypeChild(
                 $ctx,
                 $document,
                 $doctypeDecl['name'],
                 $doctypeDecl['publicId'],
                 $doctypeDecl['systemId']
-            )->id;
+            );
+            $childIds[] = $doctype->id;
+            self::populateDoctypeInternalSubset($ctx, $doctype, $document, $trimmed);
         }
         $childIds[] = $root->id;
         $state->childIds = $childIds;
         $state->idAttrByElement = $idAttrByElement;
+        $state->generalEntities = $generalEntities;
         $state->elementIds = [];
         $state->xmlVersion = $decl['version'];
         $state->encoding = $decl['encoding'];
@@ -2393,6 +2432,13 @@ final class VmDom
                 'systemId' => '',
             ];
         }
+        if (preg_match('/^<!DOCTYPE\s+([A-Za-z_][\w:.-]*)\s*\[[^\]]*\]\s*>/is', $trimmed, $match)) {
+            return [
+                'name' => $match[1],
+                'publicId' => '',
+                'systemId' => '',
+            ];
+        }
 
         return null;
     }
@@ -2516,6 +2562,341 @@ final class VmDom
         }
 
         return $idAttrs;
+    }
+
+    /**
+     * @return array<string, string> general entity name => replacement text
+     */
+    private static function parseDoctypeGeneralEntities(string $xml): array
+    {
+        $entities = [];
+        $subset = self::extractDoctypeInternalSubset($xml);
+        if (null === $subset) {
+            return $entities;
+        }
+        if (preg_match_all('/<!ENTITY\s+([A-Za-z_][\w:.-]*)\s+"([^"]*)"\s*>/', $subset, $matches, PREG_SET_ORDER)) {
+            foreach ($matches as $match) {
+                $entities[$match[1]] = $match[2];
+            }
+        }
+
+        return $entities;
+    }
+
+    private static function extractDoctypeInternalSubset(string $xml): ?string
+    {
+        if (!preg_match('/<!DOCTYPE\s+\S+\s*\[(.*)\]\s*>/s', $xml, $match)) {
+            return null;
+        }
+
+        return $match[1];
+    }
+
+    private static function populateDoctypeInternalSubset(
+        Context $ctx,
+        ObjectEntry $doctype,
+        ObjectEntry $document,
+        string $xml
+    ): void {
+        $subset = self::extractDoctypeInternalSubset($xml);
+        if (null === $subset) {
+            return;
+        }
+
+        /** @var list<int> $entityIds */
+        $entityIds = [];
+        if (preg_match_all('/<!ENTITY\s+([A-Za-z_][\w:.-]*)\s+"([^"]*)"\s*>/', $subset, $entityMatches, PREG_SET_ORDER)) {
+            foreach ($entityMatches as $match) {
+                $entity = self::createEntityDeclaration(
+                    $ctx,
+                    $match[1],
+                    $match[2],
+                    null,
+                    null,
+                    null,
+                    $document
+                );
+                $entityIds[] = $entity->id;
+            }
+        }
+
+        /** @var list<int> $notationIds */
+        $notationIds = [];
+        if (preg_match_all(
+            '/<!NOTATION\s+([A-Za-z_][\w:.-]*)\s+PUBLIC\s+"([^"]*)"\s+"([^"]*)"\s*>/',
+            $subset,
+            $notationMatches,
+            PREG_SET_ORDER
+        )) {
+            foreach ($notationMatches as $match) {
+                $notation = self::createNotationDeclaration(
+                    $ctx,
+                    $match[1],
+                    $match[2],
+                    $match[3],
+                    $document
+                );
+                $notationIds[] = $notation->id;
+            }
+        }
+        if (preg_match_all(
+            '/<!NOTATION\s+([A-Za-z_][\w:.-]*)\s+SYSTEM\s+"([^"]*)"\s*>/',
+            $subset,
+            $notationMatches,
+            PREG_SET_ORDER
+        )) {
+            foreach ($notationMatches as $match) {
+                $notation = self::createNotationDeclaration(
+                    $ctx,
+                    $match[1],
+                    '',
+                    $match[2],
+                    $document
+                );
+                $notationIds[] = $notation->id;
+            }
+        }
+
+        $doctypeState = DomRegistry::state($doctype);
+        $entitiesMap = self::createNamedNodeMap($ctx, $entityIds);
+        $doctypeState->entitiesMapId = $entitiesMap->toObject()->id;
+        $doctype->getProperty(self::PROP_ENTITIES)->copyFrom($entitiesMap);
+
+        $notationsMap = self::createNamedNodeMap($ctx, $notationIds);
+        $doctypeState->notationsMapId = $notationsMap->toObject()->id;
+        $doctype->getProperty(self::PROP_NOTATIONS)->copyFrom($notationsMap);
+    }
+
+    public static function createEntityDeclaration(
+        Context $ctx,
+        string $name,
+        ?string $replacementText,
+        ?string $publicId,
+        ?string $systemId,
+        ?string $notationName,
+        ObjectEntry $ownerDocument
+    ): ObjectEntry {
+        $class = self::resolveNodeClass($ctx, $ownerDocument, self::CLASS_ENTITY);
+        $entry = new ObjectEntry($class);
+        $entry->constructed = true;
+        $state = new DomNodeState();
+        $state->nodeType = DomConstants::XML_ENTITY_DECL_NODE;
+        $state->nodeName = $name;
+        $state->entityReplacementText = $replacementText;
+        $state->publicId = $publicId;
+        $state->systemId = $systemId;
+        $state->notationName = $notationName;
+        $state->documentId = $ownerDocument->id;
+        DomRegistry::attach($entry, $state);
+        self::initEntityPropertySlots(
+            $entry,
+            $name,
+            $publicId ?? '',
+            $systemId ?? '',
+            $notationName
+        );
+
+        return $entry;
+    }
+
+    public static function createNotationDeclaration(
+        Context $ctx,
+        string $name,
+        string $publicId,
+        string $systemId,
+        ObjectEntry $ownerDocument
+    ): ObjectEntry {
+        $class = self::resolveNodeClass($ctx, $ownerDocument, self::CLASS_NOTATION);
+        $entry = new ObjectEntry($class);
+        $entry->constructed = true;
+        $state = new DomNodeState();
+        $state->nodeType = DomConstants::XML_NOTATION_NODE;
+        $state->nodeName = $name;
+        $state->publicId = $publicId;
+        $state->systemId = $systemId;
+        $state->documentId = $ownerDocument->id;
+        DomRegistry::attach($entry, $state);
+        self::initNotationPropertySlots($entry, $name, $publicId, $systemId);
+
+        return $entry;
+    }
+
+    private static function initEntityPropertySlots(
+        ObjectEntry $entry,
+        string $name,
+        string $publicId,
+        string $systemId,
+        ?string $notationName
+    ): void {
+        $entry->getProperty(self::PROP_NODE_NAME)->string($name);
+        if ('' === $publicId) {
+            $entry->getProperty(self::PROP_PUBLIC_ID)->null();
+        } else {
+            $entry->getProperty(self::PROP_PUBLIC_ID)->string($publicId);
+        }
+        if ('' === $systemId) {
+            $entry->getProperty(self::PROP_SYSTEM_ID)->null();
+        } else {
+            $entry->getProperty(self::PROP_SYSTEM_ID)->string($systemId);
+        }
+        if (null === $notationName || '' === $notationName) {
+            $entry->getProperty(self::PROP_NOTATION_NAME)->null();
+        } else {
+            $entry->getProperty(self::PROP_NOTATION_NAME)->string($notationName);
+        }
+        self::initNodePropertySlots($entry);
+    }
+
+    private static function initNotationPropertySlots(
+        ObjectEntry $entry,
+        string $name,
+        string $publicId,
+        string $systemId
+    ): void {
+        $entry->getProperty(self::PROP_NODE_NAME)->string($name);
+        if ('' === $publicId) {
+            $entry->getProperty(self::PROP_PUBLIC_ID)->null();
+        } else {
+            $entry->getProperty(self::PROP_PUBLIC_ID)->string($publicId);
+        }
+        if ('' === $systemId) {
+            $entry->getProperty(self::PROP_SYSTEM_ID)->null();
+        } else {
+            $entry->getProperty(self::PROP_SYSTEM_ID)->string($systemId);
+        }
+        self::initNodePropertySlots($entry);
+    }
+
+    /**
+     * @param array<string, string> $generalEntities
+     */
+    private static function appendParsedTextOrEntityRefs(
+        Context $ctx,
+        ObjectEntry $parent,
+        string $text,
+        ?ObjectEntry $ownerDocument,
+        array $generalEntities
+    ): void {
+        if ('' === $text) {
+            return;
+        }
+        $state = DomRegistry::state($parent);
+        $pos = 0;
+        $len = \strlen($text);
+        $buffer = '';
+        while ($pos < $len) {
+            $amp = strpos($text, '&', $pos);
+            if (false === $amp) {
+                $buffer .= substr($text, $pos);
+                break;
+            }
+            if ($amp > $pos) {
+                $buffer .= substr($text, $pos, $amp - $pos);
+            }
+            $semi = strpos($text, ';', $amp + 1);
+            if (false === $semi) {
+                $buffer .= substr($text, $amp);
+                break;
+            }
+            $refName = substr($text, $amp + 1, $semi - $amp - 1);
+            if (isset($generalEntities[$refName])) {
+                if ('' !== $buffer) {
+                    $textNode = self::createTextNode($ctx, self::decodePredefinedXmlEntities($buffer), $ownerDocument);
+                    $state->childIds[] = $textNode->id;
+                    self::linkChildToParent($textNode, $parent);
+                    $buffer = '';
+                }
+                $entityRef = self::createEntityReferenceFromLoad(
+                    $ctx,
+                    $refName,
+                    $generalEntities[$refName],
+                    $ownerDocument
+                );
+                $state->childIds[] = $entityRef->id;
+                self::linkChildToParent($entityRef, $parent);
+            } else {
+                $decoded = self::decodePredefinedXmlEntity($refName);
+                if (null !== $decoded) {
+                    $buffer .= $decoded;
+                } else {
+                    $buffer .= substr($text, $amp, $semi - $amp + 1);
+                }
+            }
+            $pos = $semi + 1;
+        }
+        if ('' !== $buffer) {
+            $textNode = self::createTextNode($ctx, self::decodePredefinedXmlEntities($buffer), $ownerDocument);
+            $state->childIds[] = $textNode->id;
+            self::linkChildToParent($textNode, $parent);
+        }
+    }
+
+    private static function createEntityReferenceFromLoad(
+        Context $ctx,
+        string $name,
+        string $replacementText,
+        ?ObjectEntry $ownerDocument
+    ): ObjectEntry {
+        $class = self::resolveNodeClass($ctx, $ownerDocument, self::CLASS_ENTITY_REFERENCE);
+        $entry = new ObjectEntry($class);
+        $entry->constructed = true;
+        $entry->getProperty(self::PROP_NODE_NAME)->string($name);
+        self::initNodePropertySlots($entry);
+
+        $state = new DomNodeState();
+        $state->nodeType = DomConstants::XML_ENTITY_REF_NODE;
+        $state->nodeName = $name;
+        $state->entityReplacementText = $replacementText;
+        if (null !== $ownerDocument) {
+            $state->documentId = $ownerDocument->id;
+        }
+        DomRegistry::attach($entry, $state);
+
+        return $entry;
+    }
+
+    private static function decodePredefinedXmlEntities(string $text): string
+    {
+        $pos = 0;
+        $len = \strlen($text);
+        $out = '';
+        while ($pos < $len) {
+            $amp = strpos($text, '&', $pos);
+            if (false === $amp) {
+                $out .= substr($text, $pos);
+                break;
+            }
+            if ($amp > $pos) {
+                $out .= substr($text, $pos, $amp - $pos);
+            }
+            $semi = strpos($text, ';', $amp + 1);
+            if (false === $semi) {
+                $out .= substr($text, $amp);
+                break;
+            }
+            $refName = substr($text, $amp + 1, $semi - $amp - 1);
+            $decoded = self::decodePredefinedXmlEntity($refName);
+            if (null !== $decoded) {
+                $out .= $decoded;
+            } else {
+                $out .= substr($text, $amp, $semi - $amp + 1);
+            }
+            $pos = $semi + 1;
+        }
+
+        return $out;
+    }
+
+    private static function decodePredefinedXmlEntity(string $name): ?string
+    {
+        return match ($name) {
+            'amp' => '&',
+            'lt' => '<',
+            'gt' => '>',
+            'quot' => '"',
+            'apos' => "'",
+            default => null,
+        };
     }
 
     private static function stripDoctype(string $xml): string
@@ -3875,7 +4256,7 @@ final class VmDom
                 return null;
             }
             $childXml = substr($xml, $pos, $end - $pos);
-            $child = self::parseElementTree($ctx, $childXml, $xml, $pos);
+            $child = self::parseElementTree($ctx, $childXml, $xml, $pos, []);
             if (null === $child) {
                 return null;
             }
@@ -3886,11 +4267,15 @@ final class VmDom
         return $children;
     }
 
+    /**
+     * @param array<string, string> $generalEntities
+     */
     private static function parseElementTree(
         Context $ctx,
         string $elementXml,
         string $sourceXml,
-        int $baseOffset
+        int $baseOffset,
+        array $generalEntities = []
     ): ?ObjectEntry {
         $trimmed = trim($elementXml);
         if (preg_match('/^<([A-Za-z_][\w:.-]*)(\s[^>]*)?\/>$/s', $trimmed, $selfClose)) {
@@ -3925,9 +4310,7 @@ final class VmDom
             if ('<' !== $inner[$pos]) {
                 $next = strpos($inner, '<', $pos);
                 $text = false === $next ? substr($inner, $pos) : substr($inner, $pos, $next - $pos);
-                $textNode = self::createTextNode($ctx, $text, null);
-                $state->childIds[] = $textNode->id;
-                self::linkChildToParent($textNode, $entry);
+                self::appendParsedTextOrEntityRefs($ctx, $entry, $text, null, $generalEntities);
                 $pos = false === $next ? $len : $next;
 
                 continue;
@@ -3955,7 +4338,7 @@ final class VmDom
                 return null;
             }
             $childXml = substr($inner, $pos, $end - $pos);
-            $child = self::parseElementTree($ctx, $childXml, $sourceXml, $innerBase + $pos);
+            $child = self::parseElementTree($ctx, $childXml, $sourceXml, $innerBase + $pos, $generalEntities);
             if (null === $child) {
                 return null;
             }
@@ -5422,6 +5805,9 @@ final class VmDom
             || DomConstants::XML_CDATA_SECTION_NODE === $state->nodeType) {
             return $state->textContent ?? '';
         }
+        if (self::isEntityReference($node)) {
+            return $state->entityReplacementText ?? '';
+        }
         if (DomConstants::XML_ATTRIBUTE_NODE === $state->nodeType) {
             return $state->textContent ?? '';
         }
@@ -5479,6 +5865,18 @@ final class VmDom
     {
         return DomRegistry::has($entry)
             && DomConstants::XML_ENTITY_REF_NODE === DomRegistry::state($entry)->nodeType;
+    }
+
+    public static function isEntity(ObjectEntry $entry): bool
+    {
+        return DomRegistry::has($entry)
+            && DomConstants::XML_ENTITY_DECL_NODE === DomRegistry::state($entry)->nodeType;
+    }
+
+    public static function isNotation(ObjectEntry $entry): bool
+    {
+        return DomRegistry::has($entry)
+            && DomConstants::XML_NOTATION_NODE === DomRegistry::state($entry)->nodeType;
     }
 
     public static function isAttr(ObjectEntry $entry): bool
@@ -5942,6 +6340,8 @@ final class VmDom
             self::CLASS_PROCESSING_INSTRUCTION => 'DOMProcessingInstruction',
             self::CLASS_ELEMENT => 'DOMElement',
             self::CLASS_DOCUMENT_FRAGMENT => 'DOMDocumentFragment',
+            self::CLASS_ENTITY => 'DOMEntity',
+            self::CLASS_NOTATION => 'DOMNotation',
             default => $lc,
         };
     }

@@ -19,6 +19,9 @@ final class DomConstants
 
     public const XML_ENTITY_REF_NODE = 5;
 
+    /** General entity declaration in doctype (php-src XML_ENTITY_DECL_NODE; #6320). */
+    public const XML_ENTITY_DECL_NODE = 17;
+
     public const XML_DOCUMENT_NODE = 9;
 
     public const XML_DOCUMENT_TYPE_NODE = 10;
@@ -26,6 +29,8 @@ final class DomConstants
     public const XML_PROCESSING_INSTRUCTION_NODE = 7;
 
     public const XML_DOCUMENT_FRAG_NODE = 11;
+
+    public const XML_NOTATION_NODE = 12;
 
     /** Internal marker for {@see VmDom::createNodeList()} handles. */
     public const XML_NODELIST = -1;
