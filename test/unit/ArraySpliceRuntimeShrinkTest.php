@@ -9,20 +9,40 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPUnit\Framework\TestCase;
 
-/** array_splice() JIT routes through ArraySpliceJitHelper PHP not ArrayBuiltinHelper LLVM (#13643, #14304). */
+/** array_splice() JIT routes all operands through ArraySpliceJitHelper PHP not ArrayBuiltinHelper native LLVM (#13643, #14304, #17967). */
 final class ArraySpliceRuntimeShrinkTest extends TestCase
 {
+    private const ARRAY_BUILTIN_HELPER_MAX_LINES = 9690;
+
     public function testArraySpliceRuntimeUsesJitHelperNotDirectLlvmMonolith(): void
     {
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ArraySpliceRuntime.php');
         $this->assertStringContainsString('ArraySpliceJitHelper', $runtime);
-        $this->assertStringContainsString('isNativeArray', $runtime);
-        $this->assertStringContainsString('ArrayBuiltinHelper::buildSpliceArray', $runtime);
+        $this->assertStringContainsString('nativeListToHashTable', $runtime);
+        $this->assertStringNotContainsString('ArrayBuiltinHelper::buildSpliceArray', $runtime);
         $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);
 
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/array_splice.php');
         $this->assertStringContainsString('ArraySpliceRuntime::splice', $builtin);
         $this->assertStringNotContainsString('ArrayBuiltinHelper::buildSpliceArray', $builtin);
+
+        $arrayBuiltin = (string) file_get_contents(__DIR__.'/../../lib/JIT/ArrayBuiltinHelper.php');
+        $this->assertStringNotContainsString('function buildSpliceArray', $arrayBuiltin);
+        $this->assertStringNotContainsString('function buildSpliceFromHashTable', $arrayBuiltin);
+        $this->assertStringNotContainsString('function clonePackedHashTable', $arrayBuiltin);
+    }
+
+    public function testArrayBuiltinHelperLineBudgetAfterNativeSpliceLlvmDeletion(): void
+    {
+        $lines = substr_count(
+            (string) file_get_contents(__DIR__.'/../../lib/JIT/ArrayBuiltinHelper.php'),
+            "\n"
+        ) + 1;
+        $this->assertLessThanOrEqual(
+            self::ARRAY_BUILTIN_HELPER_MAX_LINES,
+            $lines,
+            'ArrayBuiltinHelper.php LOC after dead array_splice native LLVM deletion (#17967)'
+        );
     }
 
     public function testArraySpliceJitHelperMatchesVmSpliceInPlaceSemantics(): void
