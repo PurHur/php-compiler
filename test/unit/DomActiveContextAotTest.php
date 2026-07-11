@@ -94,8 +94,8 @@ final class DomActiveContextAotTest extends TestCase
     public function testLoadHTMLJitHelperDefersDocumentSlotSync(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/dom/DomLoadHTMLJitHelper.php');
-        $this->assertStringContainsString('VmDom::loadHTML(', $source);
-        $this->assertStringContainsString(', null, true)', $source);
+        $this->assertStringContainsString('DomRegistry::entry', $source);
+        $this->assertStringContainsString('deferDocumentSlotSync', (string) file_get_contents(__DIR__.'/../../ext/dom/VmDom.php'));
     }
 
     public function testDomElementTextContentUsesInitLinkedHelper(): void

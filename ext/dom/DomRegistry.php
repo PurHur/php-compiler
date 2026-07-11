@@ -37,6 +37,7 @@ final class DomRegistry
         $bucket = &self::bucket();
         $bucket['states'][$entry->id] = $state;
         $bucket['entries'][$entry->id] = $entry;
+        VmDom::initRegistryIdProperty($entry);
     }
 
     public static function entry(int $id): ?ObjectEntry

@@ -34,8 +34,8 @@ final class DomDocumentMethodUserScriptLlvm
             DomLoadHTMLRuntime::ABI_NAME,
             'dom_load_html_user_script',
             [
-                $context->getTypeFromString('__object__*'),
-                $context->getTypeFromString('__value__*'),
+                $context->getTypeFromString('int64'),
+                $context->getTypeFromString('__string__*'),
                 $context->getTypeFromString('int64'),
             ],
             $context->getTypeFromString('int1'),
@@ -81,7 +81,7 @@ final class DomDocumentMethodUserScriptLlvm
             DomSyncElementIdMapRuntime::ABI_NAME,
             'dom_sync_element_id_map_user_script',
             [
-                $context->getTypeFromString('__object__*'),
+                $context->getTypeFromString('int64'),
             ],
             $context->getTypeFromString('void'),
             'PHPCompiler\\ext\\dom\\DomSyncElementIdMapJitHelper::syncArgv',

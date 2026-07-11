@@ -4,10 +4,6 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\dom;
 
-use PHPCompiler\ext\standard\VmString;
-use PHPCompiler\VM\ObjectEntry;
-use PHPCompiler\VM\Variable;
-
 /**
  * DOMDocument::loadHTML() for compiled JIT/AOT modules (#17954).
  *
@@ -16,15 +12,20 @@ use PHPCompiler\VM\Variable;
  */
 final class DomLoadHTMLJitHelper
 {
-    public static function loadHTMLArgv(ObjectEntry $document, Variable $html, int $options): bool
+    public static function loadHTMLArgv(int $documentId, string $html, int $options): bool
     {
-        $htmlStr = VmString::coerceStringBuiltinArg(
-            $html->resolveIndirect(),
-            'DOMDocument::loadHTML()',
-            0,
-            'source'
-        );
+        $document = DomRegistry::entry($documentId);
+        if (null === $document) {
+            return false;
+        }
 
-        return VmDom::loadHTML(VmDomJitFrame::vmContext(), $document, $htmlStr, $options, null, true);
+        return VmDom::loadHTML(
+            VmDomJitFrame::vmContext(),
+            $document,
+            $html,
+            $options,
+            null,
+            true
+        );
     }
 }

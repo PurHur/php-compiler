@@ -38,15 +38,14 @@ final class DomLoadHTMLRuntime
             return;
         }
 
-        $objPtr = $context->getTypeFromString('__object__*');
-        $valuePtr = $context->getTypeFromString('__value__*');
+        $strPtr = $context->getTypeFromString('__string__*');
         $i64 = $context->getTypeFromString('int64');
         $i1 = $context->getTypeFromString('int1');
         JitVmHelperLink::ensureBridge(
             $context,
             self::ABI_NAME,
             'dom_load_html_bridge',
-            [$objPtr, $valuePtr, $i64],
+            [$i64, $strPtr, $i64],
             $i1,
             self::HELPER,
             self::HELPER_PATH,

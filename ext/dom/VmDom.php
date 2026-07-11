@@ -163,6 +163,9 @@ final class VmDom
     /** JIT/AOT: string id → DOMElement map mirrored from DomRegistry::elementIds (#17954). */
     public const PROP_ELEMENT_ID_MAP = '__phpcDomElementIdMap';
 
+    /** JIT/AOT: DomRegistry object id for scalar helper bridges (#17954, #16075). */
+    public const PROP_REGISTRY_ID = '__phpcDomRegistryId';
+
     public static function registerClasses(Context $ctx): void
     {
         if (isset($ctx->classes[self::CLASS_IMPLEMENTATION])) {
@@ -501,6 +504,7 @@ final class VmDom
         $document->properties[] = new ClassProperty(self::PROP_XML_STANDALONE, null, $boolProto);
         $document->properties[] = new ClassProperty(self::PROP_DOCUMENT_ELEMENT, $nullProto, $objProto);
         $document->properties[] = new ClassProperty(self::PROP_ELEMENT_ID_MAP, $nullProto, $arrayProto);
+        $document->properties[] = new ClassProperty(self::PROP_REGISTRY_ID, null, $intProto);
         $document->methods['loadxml'] = new DocumentLoadXML();
         $document->methodVisibility['loadxml'] = $pub;
         $document->methods['load'] = new DocumentLoad();
@@ -825,6 +829,17 @@ final class VmDom
         if ($document->hasProperty(self::PROP_XML_STANDALONE)) {
             self::setDocumentBoolSlot($document, self::PROP_XML_STANDALONE, false);
         }
+    }
+
+    /** Mirror DomRegistry object id onto the document for LLVM helper bridges (#17954). */
+    public static function initRegistryIdProperty(ObjectEntry $document): void
+    {
+        if (!$document->hasProperty(self::PROP_REGISTRY_ID)) {
+            return;
+        }
+        $idVar = new Variable();
+        $idVar->int($document->id);
+        $document->getProperty(self::PROP_REGISTRY_ID)->copyFrom($idVar);
     }
 
     /** Empty id map for fresh documents; loadHTML replaces via {@see syncElementIdMapProperty()}. */

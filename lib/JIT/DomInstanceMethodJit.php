@@ -120,5 +120,8 @@ final class DomInstanceMethodJit
         if (!$object->hasProperty($docId, VmDom::PROP_ELEMENT_ID_MAP)) {
             $object->defineProperty($docId, VmDom::PROP_ELEMENT_ID_MAP, Variable::TYPE_VALUE);
         }
+        if (!$object->hasProperty($docId, VmDom::PROP_REGISTRY_ID)) {
+            $object->defineProperty($docId, VmDom::PROP_REGISTRY_ID, Variable::TYPE_VALUE);
+        }
     }
 }
