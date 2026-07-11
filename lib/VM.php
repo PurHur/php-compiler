@@ -5319,6 +5319,11 @@ restart:
                     }
                     goto return_value_complete;
                 case OpCode::TYPE_FUNCDEF:
+                    VM\RedundantTrueFalseUnionCheck::assertFunctionBlock(
+                        $op->block1,
+                        $frame,
+                        $op->sourceLocation
+                    );
                     $name = $frame->scope[$op->arg1]->toString();
                     $lcname = strtolower($name);
                     if (isset($this->context->functions[$lcname])) {
@@ -14807,6 +14812,7 @@ restart:
                     $pendingTraits = [];
                     break;
                 case OpCode::TYPE_DECLARE_PROPERTY:
+                    VM\RedundantTrueFalseUnionCheck::assertPropertyOp($frame, $op);
                     $this->flushPendingTraitUses($entry, $pendingTraits, $ownMethods);
                     $pendingTraits = [];
                     $name = $frame->scope[$op->arg1];
@@ -14883,6 +14889,7 @@ restart:
                     }
                     break;
                 case OpCode::TYPE_DECLARE_STATIC_PROPERTY:
+                    VM\RedundantTrueFalseUnionCheck::assertPropertyOp($frame, $op);
                     $this->flushPendingTraitUses($entry, $pendingTraits, $ownMethods);
                     $pendingTraits = [];
                     $name = strtolower($frame->scope[$op->arg1]->toString());
@@ -14979,6 +14986,11 @@ restart:
                         $entry->methodSourceLocations[$name] = $op->sourceLocation;
                     }
                     if (null !== $op->block1) {
+                        VM\RedundantTrueFalseUnionCheck::assertFunctionBlock(
+                            $op->block1,
+                            $frame,
+                            $op->sourceLocation
+                        );
                         $method = new Func\PHP($entry->name.'::'.$name, $op->block1);
                         $method->deprecated = $op->deprecatedMetadata;
                         $entry->methods[$name] = $method;
