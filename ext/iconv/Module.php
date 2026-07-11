@@ -15,6 +15,10 @@ class Module extends ModuleAbstract
     {
         return [
             new iconv(),
+            new iconv_strlen(),
+            new iconv_strpos(),
+            new iconv_substr(),
+            new iconv_strrpos(),
         ];
     }
 }

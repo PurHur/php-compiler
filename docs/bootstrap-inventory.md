@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 4510 |
-| Phase A inventory files (M2 ratio SSOT) | 4510 |
+| PHP files on vm.php path | 4517 |
+| Phase A inventory files (M2 ratio SSOT) | 4517 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 12247 |
+| Source constructs flagged (warnings) | 12261 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -345,11 +345,18 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/hash/mhash_get_hash_name.php` | 0 | 3 |
 | `ext/hash/mhash_keygen_s2k.php` | 0 | 3 |
 | `ext/iconv/CharsetEngine.php` | 0 | 1 |
+| `ext/iconv/CharsetString.php` | 0 | 1 |
 | `ext/iconv/IconvJitHelper.php` | 0 | 1 |
+| `ext/iconv/IconvStringFunction.php` | 0 | 2 |
 | `ext/iconv/JitIconv.php` | 0 | 1 |
-| `ext/iconv/Module.php` | 0 | 2 |
+| `ext/iconv/JitIconvString.php` | 0 | 1 |
+| `ext/iconv/Module.php` | 0 | 6 |
 | `ext/iconv/VmIconv.php` | 0 | 1 |
 | `ext/iconv/iconv.php` | 0 | 3 |
+| `ext/iconv/iconv_strlen.php` | 0 | 2 |
+| `ext/iconv/iconv_strpos.php` | 0 | 2 |
+| `ext/iconv/iconv_strrpos.php` | 0 | 2 |
+| `ext/iconv/iconv_substr.php` | 0 | 2 |
 | `ext/igbinary/IgbinaryFunction.php` | 0 | 3 |
 | `ext/igbinary/Module.php` | 0 | 1 |
 | `ext/inotify/InotifyConstants.php` | 0 | 1 |
@@ -1906,7 +1913,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VmStreamTransports.php` | 0 | 1 |
 | `ext/standard/VmStreamWrapperMetadata.php` | 0 | 7 |
 | `ext/standard/VmStreamWrapperRegistry.php` | 0 | 1 |
-| `ext/standard/VmString.php` | 0 | 5 |
+| `ext/standard/VmString.php` | 0 | 3 |
 | `ext/standard/VmStripWhitespace.php` | 0 | 1 |
 | `ext/standard/VmSys.php` | 0 | 3 |
 | `ext/standard/VmSysGetTempDirNative.php` | 0 | 1 |
@@ -6704,26 +6711,46 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 22 class method(s)
 
+### `ext/iconv/CharsetString.php`
+
+**Warnings** (review for bootstrap subset):
+- 8 class method(s)
+
 ### `ext/iconv/IconvJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
+
+### `ext/iconv/IconvStringFunction.php`
+
+**Warnings** (review for bootstrap subset):
+- 7 class method(s)
+- 2 closure(s)
 
 ### `ext/iconv/JitIconv.php`
 
 **Warnings** (review for bootstrap subset):
 - 3 class method(s)
 
+### `ext/iconv/JitIconvString.php`
+
+**Warnings** (review for bootstrap subset):
+- 8 class method(s)
+
 ### `ext/iconv/Module.php`
 
 **Warnings** (review for bootstrap subset):
 - new iconv (line 17)
+- new iconv_strlen (line 18)
+- new iconv_strpos (line 19)
+- new iconv_substr (line 20)
+- new iconv_strrpos (line 21)
 - 1 class method(s)
 
 ### `ext/iconv/VmIconv.php`
 
 **Warnings** (review for bootstrap subset):
-- 5 class method(s)
+- 10 class method(s)
 
 ### `ext/iconv/iconv.php`
 
@@ -6731,6 +6758,30 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 31)
 - 2 class method(s)
 - 1 closure(s)
+
+### `ext/iconv/iconv_strlen.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 23)
+- 1 class method(s)
+
+### `ext/iconv/iconv_strpos.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 23)
+- 1 class method(s)
+
+### `ext/iconv/iconv_strrpos.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 23)
+- 1 class method(s)
+
+### `ext/iconv/iconv_substr.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 23)
+- 1 class method(s)
 
 ### `ext/igbinary/IgbinaryFunction.php`
 
@@ -16679,11 +16730,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmPhpCoreConstants.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 324)
-- new Variable (line 330)
-- new Variable (line 336)
-- new Variable (line 342)
-- 16 class method(s)
+- new Variable (line 372)
+- new Variable (line 378)
+- new Variable (line 384)
+- new Variable (line 390)
+- 19 class method(s)
 
 ### `ext/standard/VmPhpFdStream.php`
 
@@ -17509,8 +17560,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new Error (line 1577)
 - new Error (line 1588)
-- new Error (line 3719)
-- new Error (line 3828)
 - 211 class method(s)
 
 ### `ext/standard/VmStripWhitespace.php`
@@ -23352,11 +23401,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/AsymmetricVisibilityRejector.php`
 
 **Warnings** (review for bootstrap subset):
-- new CompileFatal (line 36)
-- new CompileFatal (line 45)
-- new CompileFatal (line 58)
-- new CompileFatal (line 66)
-- new CompileFatal (line 74)
+- new CompileFatal (line 41)
+- new CompileFatal (line 50)
+- new CompileFatal (line 59)
+- new CompileFatal (line 67)
+- new CompileFatal (line 75)
 - 3 class method(s)
 
 ### `lib/BareThrowSyntaxRejector.php`
@@ -24272,7 +24321,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/CompilerVersion.php`
 
 **Warnings** (review for bootstrap subset):
-- 183 class method(s)
+- 184 class method(s)
 
 ### `lib/CurlyBraceOffsetRejector.php`
 
