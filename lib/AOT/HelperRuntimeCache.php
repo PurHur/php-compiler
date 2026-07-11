@@ -277,6 +277,7 @@ final class HelperRuntimeCache
                         'dir' => $unitDir,
                         'init' => (string) $manifest['init_symbol'],
                         'shutdown' => isset($manifest['shutdown_symbol']) ? (string) $manifest['shutdown_symbol'] : null,
+                        'init_via_global_ctor' => !empty($manifest['init_via_global_ctor']),
                     ];
                 }
             }
@@ -440,7 +441,7 @@ final class HelperRuntimeCache
      * Units emitted before init symbols existed have no manifest entry and
      * keep the old (uninitialized) behavior.
      *
-     * @param array{symbol: string, dir: string, init: ?string, shutdown: ?string} $entry
+     * @param array{symbol: string, dir: string, init: ?string, shutdown: ?string, init_via_global_ctor?: bool} $entry
      */
     private static function wireUnitLifecycle(Context $context, array $entry): void
     {
@@ -449,6 +450,10 @@ final class HelperRuntimeCache
             return;
         }
         self::$wiredLifecycles[$unitDir] = true;
+        if (!empty($entry['init_via_global_ctor'])) {
+            // Unit init runs via llvm.global_ctors at load time (#16075 step 4).
+            return;
+        }
         $voidFn = static function (string $name) use ($context): object {
             $fn = $context->module->getNamedFunction($name);
             if (null !== $fn) {
@@ -460,9 +465,9 @@ final class HelperRuntimeCache
                 $context->context->functionType($context->context->voidType(), false)
             );
         };
-        // User-script AOT: skip cached-unit __init__ until per-unit global_ctors
-        // isolation lands (#16075 step 4). Running unit inits here aliases module
-        // globals and breaks echo of short literals ("0"/"1") and count ternaries.
+        // Legacy units without global ctors: user-script AOT must skip emitInInit
+        // wiring — calling unit inits from script __init__ aliases muldefs-merged
+        // globals (#17069).
         $userAot = getenv('PHP_COMPILER_AOT_USER_SCRIPT');
         $skipInit = '1' === $userAot || 'true' === strtolower((string) $userAot);
         if (!$skipInit && null !== $entry['init'] && '' !== $entry['init']) {

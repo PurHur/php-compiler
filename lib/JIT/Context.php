@@ -1348,6 +1348,10 @@ class Context {
         Builtin\ReflectionNamedArgumentsLowering::implementLookupFunctions($this);
         VmActiveContextInitLlvm::emitPendingBeforeSeal($this);
         $this->sealInitFunction();
+        $initSuffix = (string) getenv('PHP_COMPILER_INIT_SYMBOL_SUFFIX');
+        if ('' !== $initSuffix) {
+            \PHPCompiler\AOT\HelperUnitGlobalCtor::register($this, '__init__'.$initSuffix);
+        }
         $this->sealInitShutdownReturn($this->shutdownBlock);
         $this->sealInitShutdownReturn($this->headerPreFlushBlock);
 
