@@ -67,10 +67,11 @@ final class JitDomLoadHTMLUserScript
         }
 
         $parsed = self::tryParseCompileTimeHtml($args[1]);
+        if (null === $parsed) {
+            $parsed = self::$lastCompileTimeParsed;
+        }
         $i1 = $context->getTypeFromString('int1');
         if (null === $parsed) {
-            self::$lastCompileTimeParsed = null;
-
             return $i1->constInt(0, false);
         }
         self::$lastCompileTimeParsed = $parsed;
@@ -120,10 +121,8 @@ final class JitDomLoadHTMLUserScript
         self::pinUserScriptLoadSideEffects($context);
 
         $i1 = $context->getTypeFromString('int1');
-        $result = $i1->constInt(1, false);
-        BasicBlockHelper::branchToFreshContinue($context, 'dom_lh_us_ok');
 
-        return $result;
+        return $i1->constInt(1, false);
     }
 
     /** Keep id-map/cache writes when loadHTML() return is discarded (#17954). */

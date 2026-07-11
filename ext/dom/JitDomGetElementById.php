@@ -266,7 +266,7 @@ final class JitDomGetElementById
             JITVariable::TYPE_STRING
         );
 
-        return self::boxObjectResult($context, $element);
+        return $element;
     }
 
     private static function boxObjectResult(Context $context, Value $element): Value
