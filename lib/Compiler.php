@@ -27771,6 +27771,12 @@ class Compiler {
             return null;
         }
         $callArg = $cfgCallOp->args[$argIndex] ?? null;
+        if (
+            $callArg instanceof Operand
+            && $this->isByRefNamedCallArgExcludedFromSiblingProducerWiring($cfgCallOp, $argIndex, $callArg)
+        ) {
+            return null;
+        }
         if ($this->callArgHasHoistedConstPrelude($cfgCallOp, $argIndex, $block)) {
             return null;
         }
@@ -28065,12 +28071,24 @@ class Compiler {
             return (string) $execReturnSlot;
         }
         if ([] === $emitOps && $this->siblingConsumerHasTrailingByRefNamedLocal($cfgCallOp)) {
-            $execReturnSlot = $this->slotForSiblingInlineFuncCallProducerExecReturnOrdinal(
-                $block,
-                (int) $argIndex
-            );
-            if (null !== $execReturnSlot) {
-                return (string) $execReturnSlot;
+            $byRefNamedArg = $cfgCallOp->args[$argIndex] ?? null;
+            if (
+                !(
+                    $byRefNamedArg instanceof Operand
+                    && $this->isByRefNamedCallArgExcludedFromSiblingProducerWiring(
+                        $cfgCallOp,
+                        $argIndex,
+                        $byRefNamedArg
+                    )
+                )
+            ) {
+                $execReturnSlot = $this->slotForSiblingInlineFuncCallProducerExecReturnOrdinal(
+                    $block,
+                    (int) $argIndex
+                );
+                if (null !== $execReturnSlot) {
+                    return (string) $execReturnSlot;
+                }
             }
         }
 
@@ -30706,6 +30724,17 @@ class Compiler {
         }
         $funcName = $this->resolveCfgFuncCallName($cfgCallOp);
         if (1 !== $this->inlineClosureArrayPairCallbackArgIndex($funcName)) {
+            return null;
+        }
+        $haystackArg = $cfgCallOp->args[0] ?? $args[0] ?? null;
+        if (
+            $haystackArg instanceof Operand
+            && (
+                $this->isNamedVariableOperand($haystackArg)
+                || $this->isByRefNamedCallArgExcludedFromSiblingProducerWiring($cfgCallOp, 0, $haystackArg)
+            )
+        ) {
+            // array_walk($a, fn) — real CV haystack, not a hoisted sibling FuncCall (#17989).
             return null;
         }
         $leadingCallback = $this->leadingCallbackFirstInlineProducerBeforeCfgCall($cfgCallOp, $block);
