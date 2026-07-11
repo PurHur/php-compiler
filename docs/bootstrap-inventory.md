@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 4474 |
-| Phase A inventory files (M2 ratio SSOT) | 4474 |
+| PHP files on vm.php path | 4482 |
+| Phase A inventory files (M2 ratio SSOT) | 4482 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 12148 |
+| Source constructs flagged (warnings) | 12170 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -352,6 +352,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/iconv/iconv.php` | 0 | 3 |
 | `ext/igbinary/IgbinaryFunction.php` | 0 | 3 |
 | `ext/igbinary/Module.php` | 0 | 1 |
+| `ext/inotify/InotifyConstants.php` | 0 | 1 |
+| `ext/inotify/InotifyLibcThinAbi.php` | 0 | 1 |
+| `ext/inotify/Module.php` | 0 | 6 |
+| `ext/inotify/VmInotify.php` | 0 | 5 |
+| `ext/inotify/inotify_add_watch.php` | 0 | 2 |
+| `ext/inotify/inotify_init.php` | 0 | 2 |
+| `ext/inotify/inotify_read.php` | 0 | 2 |
+| `ext/inotify/inotify_rm_watch.php` | 0 | 2 |
 | `ext/intl/BuiltinClasses.php` | 0 | 9 |
 | `ext/intl/CollatorCreate.php` | 0 | 1 |
 | `ext/intl/IntlClassMethod.php` | 0 | 3 |
@@ -3827,7 +3835,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/ReadonlyFunctionRejector.php` | 0 | 2 |
 | `lib/ReadonlyMethodModifierRejector.php` | 0 | 2 |
 | `lib/ReferenceProfileTokenScan.php` | 0 | 1 |
-| `lib/Runtime.php` | 0 | 78 |
+| `lib/Runtime.php` | 0 | 79 |
 | `lib/RuntimeStrictness.php` | 0 | 1 |
 | `lib/SourceBareThrowRewriter.php` | 0 | 1 |
 | `lib/SourcePreprocessor/PropertyHooks.php` | 0 | 4 |
@@ -6705,6 +6713,59 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
+
+### `ext/inotify/InotifyConstants.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/inotify/InotifyLibcThinAbi.php`
+
+**Warnings** (review for bootstrap subset):
+- 8 class method(s)
+
+### `ext/inotify/Module.php`
+
+**Warnings** (review for bootstrap subset):
+- new VM\Variable (line 20)
+- new inotify_init (line 33)
+- new inotify_add_watch (line 34)
+- new inotify_rm_watch (line 35)
+- new inotify_read (line 36)
+- 2 class method(s)
+
+### `ext/inotify/VmInotify.php`
+
+**Warnings** (review for bootstrap subset):
+- new HashTable (line 147)
+- new HashTable (line 149)
+- new Variable (line 151)
+- new Variable (line 159)
+- 10 class method(s)
+
+### `ext/inotify/inotify_add_watch.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 28)
+- 3 class method(s)
+
+### `ext/inotify/inotify_init.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 26)
+- 3 class method(s)
+
+### `ext/inotify/inotify_read.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 26)
+- 3 class method(s)
+
+### `ext/inotify/inotify_rm_watch.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 27)
+- 3 class method(s)
 
 ### `ext/intl/BuiltinClasses.php`
 
@@ -11654,8 +11715,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitGetimagesize.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 27)
-- new ArgumentCountError (line 33)
+- new ArgumentCountError (line 28)
+- new ArgumentCountError (line 34)
 - 4 class method(s)
 
 ### `ext/standard/JitGetopt.php`
@@ -29673,32 +29734,33 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ext\curl\Module (line 245)
 - new ext\hash\Module (line 246)
 - new ext\posix\Module (line 247)
-- new ext\pcntl\Module (line 248)
-- new ext\sockets\Module (line 249)
-- new ext\ftp\Module (line 250)
-- new ext\ctype\Module (line 251)
-- new ext\tokenizer\Module (line 252)
-- new ext\random\Module (line 253)
-- new ext\igbinary\Module (line 254)
-- new ext\msgpack\Module (line 255)
-- new ext\zstd\Module (line 256)
-- new ext\lzf\Module (line 257)
-- new ext\bz2\Module (line 258)
-- new ext\brotli\Module (line 259)
-- new ext\sodium\Module (line 260)
-- new ext\sqlite3\Module (line 261)
-- new ext\uri\Module (line 262)
-- new ext\standard\Module (line 263)
-- new JIT (line 339)
-- new JITContext (line 353)
-- new SealedClassPreprocessor (line 417)
-- new StaticClassPreprocessor (line 420)
-- new SourcePreprocessor\PropertyHooks (line 423)
-- new State (line 563)
-- new ReflectionProperty (line 590)
-- new ReflectionProperty (line 593)
-- new LintCompiler (line 999)
-- new Variable (line 1129)
+- new ext\inotify\Module (line 248)
+- new ext\pcntl\Module (line 249)
+- new ext\sockets\Module (line 250)
+- new ext\ftp\Module (line 251)
+- new ext\ctype\Module (line 252)
+- new ext\tokenizer\Module (line 253)
+- new ext\random\Module (line 254)
+- new ext\igbinary\Module (line 255)
+- new ext\msgpack\Module (line 256)
+- new ext\zstd\Module (line 257)
+- new ext\lzf\Module (line 258)
+- new ext\bz2\Module (line 259)
+- new ext\brotli\Module (line 260)
+- new ext\sodium\Module (line 261)
+- new ext\sqlite3\Module (line 262)
+- new ext\uri\Module (line 263)
+- new ext\standard\Module (line 264)
+- new JIT (line 340)
+- new JITContext (line 354)
+- new SealedClassPreprocessor (line 418)
+- new StaticClassPreprocessor (line 421)
+- new SourcePreprocessor\PropertyHooks (line 424)
+- new State (line 564)
+- new ReflectionProperty (line 591)
+- new ReflectionProperty (line 594)
+- new LintCompiler (line 1000)
+- new Variable (line 1130)
 - 53 class method(s)
 
 ### `lib/RuntimeStrictness.php`
