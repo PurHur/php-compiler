@@ -26,8 +26,17 @@ final class class_implements_ extends Internal
     public function execute(Frame $frame): void
     {
         $argc = \count($frame->calledArgs);
-        if ($argc < 1 || $argc > 2) {
-            throw new \LogicException('class_implements() requires one or two arguments in this compiler build');
+        if ($argc < 1) {
+            throw new \ArgumentCountError(\sprintf(
+                'class_implements() expects at least 1 argument, %d given',
+                $argc
+            ));
+        }
+        if ($argc > 2) {
+            throw new \ArgumentCountError(\sprintf(
+                'class_implements() expects at most 2 arguments, %d given',
+                $argc
+            ));
         }
         if (null === $frame->returnVar) {
             return;
@@ -58,8 +67,18 @@ final class class_implements_ extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (\count($args) < 1 || \count($args) > 2) {
-            throw new \LogicException('class_implements() requires one or two arguments in this compiler build');
+        $argc = \count($args);
+        if ($argc < 1) {
+            throw new \ArgumentCountError(\sprintf(
+                'class_implements() expects at least 1 argument, %d given',
+                $argc
+            ));
+        }
+        if ($argc > 2) {
+            throw new \ArgumentCountError(\sprintf(
+                'class_implements() expects at most 2 arguments, %d given',
+                $argc
+            ));
         }
         $autoload = true;
         if (\count($args) >= 2) {
