@@ -4,17 +4,55 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\PregReplaceCallbackArrayRuntime;
+use PHPCompiler\JIT\Builtin\StringPregMatch;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringArg;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** LLVM lowering for preg_replace_callback_array() — chain JitPregReplaceCallback (#3568). */
+/** LLVM lowering for preg_replace_callback_array() via PregReplaceCallbackArrayRuntime (#3568). */
 final class JitPregReplaceCallbackArray
 {
+    private static int $blockSerial = 0;
+
     public static function invoke(Context $context, JITVariable $patterns, JITVariable $subject): Value
     {
-        throw new \LogicException(
-            'preg_replace_callback_array() is not implemented for JIT/AOT in this compiler build; use bin/vm.php (#3568)'
+        StringPregMatch::ensureLinked($context);
+        PregReplaceCallbackArrayRuntime::ensureLinked($context);
+
+        $raw = $context->builder->call(
+            $context->lookupFunction(PregReplaceCallbackArrayRuntime::ABI_REPLACE_CALLBACK_ARRAY),
+            PregReplaceCallbackArrayRuntime::patternsToHashtable($context, $patterns),
+            JitStringArg::lower($context, $subject, 'preg_replace_callback_array() subject')
         );
+
+        $strPtrTy = $context->getTypeFromString('__string__*');
+        $isError = $context->builder->icmp(Builder::INT_EQ, $raw, $strPtrTy->constNull());
+
+        $id = (string) (++self::$blockSerial);
+        $failBlock = BasicBlockHelper::append($context, 'preg_replace_callback_array_fail_'.$id);
+        $okBlock = BasicBlockHelper::append($context, 'preg_replace_callback_array_ok_'.$id);
+        $doneBlock = BasicBlockHelper::append($context, 'preg_replace_callback_array_done_'.$id);
+
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $context->builder->branchIf($isError, $failBlock, $okBlock);
+
+        $context->builder->positionAtEnd($failBlock);
+        $i1 = $context->getTypeFromString('int1');
+        JitValueBox::writeBool($context, $slot, $i1->constInt(0, false));
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($okBlock);
+        $context->builder->call($context->lookupFunction('__value__writeString'), $ptr, $raw);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+
+        return $ptr;
     }
 }

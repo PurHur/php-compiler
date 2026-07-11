@@ -46,6 +46,9 @@ final class PregMatchRuntime
 
     private const REPLACE_CALLBACK_HELPER = 'PHPCompiler\\ext\\standard\\PregJitHelper::replaceCallbackArgv';
 
+    private const REPLACE_CALLBACK_ARRAY_HELPER =
+        'PHPCompiler\\ext\\standard\\PregJitHelper::replaceCallbackArrayArgv';
+
     private const INVOKE_CALLBACK_HELPER = 'PHPCompiler\\ext\\standard\\PregCallbackInvokeJitHelper::invoke';
 
     private const SPLIT_HELPER = 'PHPCompiler\\ext\\standard\\PregJitHelper::splitArgv';
@@ -62,6 +65,7 @@ final class PregMatchRuntime
         self::TAKE_MATCH_ALL_EX_HT,
         self::REPLACE_HELPER,
         self::REPLACE_CALLBACK_HELPER,
+        self::REPLACE_CALLBACK_ARRAY_HELPER,
         self::SPLIT_HELPER,
     ];
 

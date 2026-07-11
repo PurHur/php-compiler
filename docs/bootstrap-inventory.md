@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 4545 |
-| Phase A inventory files (M2 ratio SSOT) | 4545 |
+| PHP files on vm.php path | 4546 |
+| Phase A inventory files (M2 ratio SSOT) | 4546 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 12331 |
+| Source constructs flagged (warnings) | 12333 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -339,7 +339,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/hash/HashContextJitHelper.php` | 0 | 1 |
 | `ext/hash/HashFunction.php` | 0 | 1 |
 | `ext/hash/JitHashAlgos.php` | 0 | 1 |
-| `ext/hash/JitHashContext.php` | 0 | 2 |
+| `ext/hash/JitHashContext.php` | 0 | 3 |
 | `ext/hash/MhashRegistry.php` | 0 | 1 |
 | `ext/hash/Module.php` | 0 | 16 |
 | `ext/hash/VmHashContext.php` | 0 | 6 |
@@ -3279,6 +3279,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/PregEmptyPatternReplaceRuntime.php` | 0 | 2 |
 | `lib/JIT/Builtin/PregExpandRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/PregMatchRuntime.php` | 0 | 3 |
+| `lib/JIT/Builtin/PregReplaceCallbackArrayRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/ProcessExecCaptureLlvm.php` | 0 | 1 |
 | `lib/JIT/Builtin/ProcessIdentityJit.php` | 0 | 3 |
 | `lib/JIT/Builtin/ProcessOpen.php` | 0 | 1 |
@@ -6187,34 +6188,34 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new DOMException (line 3704)
 - new DOMException (line 3745)
 - new DOMException (line 3770)
-- new DOMException (line 4394)
-- new Variable (line 4418)
-- new DOMException (line 4648)
-- new DOMException (line 4729)
-- new DOMException (line 4771)
-- new ObjectEntry (line 4856)
-- new DomNodeState (line 4860)
-- new Variable (line 4867)
-- new ObjectEntry (line 5067)
-- new DomNodeState (line 5071)
-- new Variable (line 5078)
-- new ObjectEntry (line 5098)
-- new DomNodeState (line 5101)
-- new Variable (line 5109)
-- new Variable (line 5254)
-- new DOMException (line 5338)
-- new DOMException (line 5345)
+- new DOMException (line 4408)
+- new Variable (line 4432)
+- new DOMException (line 4662)
+- new DOMException (line 4743)
+- new DOMException (line 4785)
+- new ObjectEntry (line 4870)
+- new DomNodeState (line 4874)
+- new Variable (line 4881)
+- new ObjectEntry (line 5081)
+- new DomNodeState (line 5085)
+- new Variable (line 5092)
+- new ObjectEntry (line 5112)
+- new DomNodeState (line 5115)
+- new Variable (line 5123)
+- new Variable (line 5268)
 - new DOMException (line 5352)
-- new DOMException (line 5356)
 - new DOMException (line 5359)
-- new DOMException (line 5368)
-- new Variable (line 6154)
-- new Variable (line 6167)
-- new DOMException (line 6249)
-- new DOMException (line 6260)
-- new DOMException (line 6326)
-- new DOMException (line 6334)
-- new DOMException (line 6343)
+- new DOMException (line 5366)
+- new DOMException (line 5370)
+- new DOMException (line 5373)
+- new DOMException (line 5382)
+- new Variable (line 6168)
+- new Variable (line 6181)
+- new DOMException (line 6263)
+- new DOMException (line 6274)
+- new DOMException (line 6340)
+- new DOMException (line 6348)
+- new DOMException (line 6357)
 - 302 class method(s)
 - 2 closure(s)
 
@@ -6685,7 +6686,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/hash/HashContextJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 8 class method(s)
+- 9 class method(s)
 
 ### `ext/hash/HashFunction.php`
 
@@ -6700,8 +6701,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/hash/JitHashContext.php`
 
 **Warnings** (review for bootstrap subset):
-- new JITVariable (line 151)
-- 13 class method(s)
+- new JITVariable (line 276)
+- new JITVariable (line 303)
+- 18 class method(s)
 
 ### `ext/hash/MhashRegistry.php`
 
@@ -14759,7 +14761,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/PregJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 11 class method(s)
+- 12 class method(s)
 - 1 closure(s)
 
 ### `ext/standard/PregQuoteJitHelper.php`
@@ -24408,11 +24410,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new CompileError (line 135)
 - new CompileError (line 164)
 - new CompileError (line 182)
-- new CompileError (line 229)
+- new CompileError (line 224)
+- new CompileError (line 242)
 - new CompileError (line 247)
-- new CompileError (line 252)
-- new CompileError (line 272)
-- new CompileError (line 281)
+- new CompileError (line 267)
+- new CompileError (line 276)
 - 23 class method(s)
 
 ### `lib/Compiler/SourceLocation.php`
@@ -25616,7 +25618,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/HashContextEmbedBridge.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 84)
+- new JIT (line 81)
 - 3 class method(s)
 - 1 closure(s)
 
@@ -26338,9 +26340,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/PregMatchRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 496)
+- new JIT (line 500)
 - 15 class method(s)
 - 2 closure(s)
+
+### `lib/JIT/Builtin/PregReplaceCallbackArrayRuntime.php`
+
+**Warnings** (review for bootstrap subset):
+- 4 class method(s)
 
 ### `lib/JIT/Builtin/ProcessExecCaptureLlvm.php`
 
@@ -28298,28 +28305,28 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 2309)
 - new Variable (line 2322)
 - new Variable (line 2481)
-- new VMVariable (line 3167)
-- new VMVariable (line 3185)
-- new VMVariable (line 3193)
-- new VMVariable (line 3211)
-- new ReflectionClassConstant (line 4350)
-- new Variable (line 4714)
-- new Variable (line 4727)
-- new Variable (line 4861)
-- new Variable (line 5128)
-- new Variable (line 5154)
-- new Variable (line 5162)
-- new Variable (line 5185)
-- new Variable (line 5211)
-- new Variable (line 5219)
-- new Variable (line 5293)
-- new Literal (line 5310)
+- new VMVariable (line 3169)
+- new VMVariable (line 3187)
+- new VMVariable (line 3195)
+- new VMVariable (line 3213)
+- new ReflectionClassConstant (line 4355)
+- new Variable (line 4719)
+- new Variable (line 4732)
+- new Variable (line 4866)
+- new Variable (line 5133)
+- new Variable (line 5159)
+- new Variable (line 5167)
+- new Variable (line 5190)
+- new Variable (line 5216)
+- new Variable (line 5224)
+- new Variable (line 5298)
 - new Literal (line 5315)
 - new Literal (line 5320)
-- new Variable (line 5331)
-- new Variable (line 5364)
-- new Variable (line 5387)
-- new Variable (line 5751)
+- new Literal (line 5325)
+- new Variable (line 5336)
+- new Variable (line 5369)
+- new Variable (line 5392)
+- new Variable (line 5756)
 - 259 class method(s)
 - 9 closure(s)
 
