@@ -1,5 +1,5 @@
 --TEST--
-Language: trait/class incompatible instance property — Zend fatal (#11834, zend_inheritance.c)
+Language: incompatible trait/class property — runtime fatal not compile (#17995, zend_inheritance.c)
 --FILE--
 <?php
 trait T { public $x = 1; }

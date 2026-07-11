@@ -14,6 +14,7 @@ require_once __DIR__.'/OpCodeNames.php';
 use PHPCompiler\BuiltinByRefParams;
 use PHPCompiler\Compiler\AttributeNames;
 use PHPCompiler\Compiler\NoDiscardMetadata;
+use PHPCompiler\Compiler\SourceLocation;
 use PHPCompiler\Func;
 use PHPCompiler\ext\standard\VmEval;
 use PHPCompiler\ext\standard\VmForwardStaticCall;
@@ -13829,12 +13830,15 @@ restart:
                     $prevTrait = $usedTraitNameByLc[$declaringLc]
                         ?? $this->context->classes[$declaringLc]->name
                         ?? $declaringLc;
-                    throw new \LogicException(TraitCompositionConflictMessage::incompatibleProperty(
-                        $prevTrait,
-                        $trait->name,
-                        $name,
-                        $entry->name
-                    ));
+                    $this->throwTraitPropertyCompositionFatal(
+                        TraitCompositionConflictMessage::incompatibleProperty(
+                            $prevTrait,
+                            $trait->name,
+                            $name,
+                            $entry->name
+                        ),
+                        $entry
+                    );
                 }
                 $entry->staticProperties[$name] = $this->cloneStaticPropertyStorage($storage);
                 $this->linkStaticTypedPropertySlot(
@@ -14135,6 +14139,26 @@ restart:
         }
     }
 
+    /**
+     * Zend linkage-time fatal for incompatible trait properties (#17995, zend_inheritance.c).
+     *
+     * @return never
+     */
+    protected function throwTraitPropertyCompositionFatal(
+        string $message,
+        ClassEntry $entry,
+        ?SourceLocation $opLocation = null,
+        ?Frame $frame = null,
+    ): void {
+        $location = $opLocation ?? $entry->sourceLocation;
+        $file = $location?->filename ?? '';
+        if ('' === $file && null !== $frame && '' !== $frame->scriptPath) {
+            $file = $frame->scriptPath;
+        }
+        $line = $location?->startLine ?? 1;
+        TraitCompositionConflictMessage::throwRuntimeFatal($message, $file, $line);
+    }
+
     protected function inheritTraitInstanceProperties(ClassEntry $entry, ClassEntry $trait, string $traitName): void
     {
         $traitLc = strtolower(ltrim($traitName, '\\'));
@@ -14152,22 +14176,28 @@ restart:
                             $this->mergeTraitAbstractPropertyHookOverride($entry, $trait, $property, $existing);
                             continue 2;
                         }
-                        throw new \LogicException(TraitCompositionConflictMessage::incompatibleClassTraitProperty(
-                            $entry->name,
-                            $traitName,
-                            $property->name
-                        ));
+                        $this->throwTraitPropertyCompositionFatal(
+                            TraitCompositionConflictMessage::incompatibleClassTraitProperty(
+                                $entry->name,
+                                $traitName,
+                                $property->name
+                            ),
+                            $entry
+                        );
                     }
                     $prevTraitLc = $existing->declaringClassLc;
                     $prevTrait = isset($this->context->classes[$prevTraitLc])
                         ? $this->context->classes[$prevTraitLc]->name
                         : $prevTraitLc;
-                    throw new \LogicException(TraitCompositionConflictMessage::incompatibleProperty(
-                        $prevTrait,
-                        $traitName,
-                        $property->name,
-                        $entry->name
-                    ));
+                    $this->throwTraitPropertyCompositionFatal(
+                        TraitCompositionConflictMessage::incompatibleProperty(
+                            $prevTrait,
+                            $traitName,
+                            $property->name,
+                            $entry->name
+                        ),
+                        $entry
+                    );
                 }
             }
             $entry->properties[] = $this->cloneClassPropertyForEntry($property, $entry);
@@ -14842,11 +14872,16 @@ restart:
                             $traitName = isset($this->context->classes[$declaringLc])
                                 ? $this->context->classes[$declaringLc]->name
                                 : $declaringLc;
-                            throw new \LogicException(TraitCompositionConflictMessage::incompatibleClassTraitProperty(
-                                $entry->name,
-                                $traitName,
-                                $name->toString()
-                            ));
+                            $this->throwTraitPropertyCompositionFatal(
+                                TraitCompositionConflictMessage::incompatibleClassTraitProperty(
+                                    $entry->name,
+                                    $traitName,
+                                    $name->toString()
+                                ),
+                                $entry,
+                                null,
+                                $frame
+                            );
                         }
                     }
                     $prop = new VM\ClassProperty(
@@ -14900,11 +14935,16 @@ restart:
                             $traitName = isset($this->context->classes[$declaringLc])
                                 ? $this->context->classes[$declaringLc]->name
                                 : $declaringLc;
-                            throw new \LogicException(TraitCompositionConflictMessage::incompatibleClassTraitProperty(
-                                $entry->name,
-                                $traitName,
-                                $name
-                            ));
+                            $this->throwTraitPropertyCompositionFatal(
+                                TraitCompositionConflictMessage::incompatibleClassTraitProperty(
+                                    $entry->name,
+                                    $traitName,
+                                    $name
+                                ),
+                                $entry,
+                                null,
+                                $frame
+                            );
                         }
                     }
                     $storage = $this->cloneStaticPropertyStorage($frame->scope[$op->arg3]);
