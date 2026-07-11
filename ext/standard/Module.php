@@ -63,6 +63,29 @@ class Module extends ModuleAbstract
             $var->string($value);
             $runtime->vmContext->defineConstant($name, $var);
         }
+        foreach (PcreConstants::registeredConstants() as $name => $value) {
+            self::defineModuleConstant($runtime, $name, $value);
+        }
+        foreach (ReadlineConstants::registeredConstants() as $name => $value) {
+            self::defineModuleConstant($runtime, $name, $value);
+        }
+        foreach (XslConstants::registeredConstants() as $name => $value) {
+            self::defineModuleConstant($runtime, $name, $value);
+        }
+    }
+
+    /**
+     * @param int|string $value
+     */
+    private static function defineModuleConstant(Runtime $runtime, string $name, int|string $value): void
+    {
+        $var = new VM\Variable();
+        if (\is_int($value)) {
+            $var->int($value);
+        } else {
+            $var->string($value);
+        }
+        $runtime->vmContext->defineConstant($name, $var);
     }
 
     public function getFunctions(): array

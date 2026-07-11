@@ -17,12 +17,15 @@ use PHPCompiler\ext\mbstring\MbstringConstants;
 use PHPCompiler\ext\openssl\OpensslConstants;
 use PHPCompiler\ext\pcntl\PcntlConstants;
 use PHPCompiler\ext\posix\PosixConstants;
+use PHPCompiler\ext\random\RandomConstants;
 use PHPCompiler\ext\session\SessionConstants;
+use PHPCompiler\ext\sockets\SocketConstants;
 use PHPCompiler\ext\sodium\SodiumConstants;
 use PHPCompiler\ext\tokenizer\TokenConstants;
+use PHPCompiler\ext\xml\XmlConstants;
 
 /**
- * Extension constant groups for get_defined_constants(true) (Zend/zend_builtin_functions.c; #17416).
+ * Extension constant groups for get_defined_constants(true) (Zend/zend_builtin_functions.c; #17416, #17799).
  */
 final class ExtensionConstantGroups
 {
@@ -60,6 +63,11 @@ final class ExtensionConstantGroups
         if (LdapExtensionPolicy::advertisesExtension()) {
             $groups['ldap'] = LdapConstants::registeredConstants();
         }
+        $groups['random'] = RandomConstants::registeredConstants();
+        $groups['xml'] = XmlConstants::registeredConstants();
+        $groups['sockets'] = SocketConstants::registeredConstants();
+        $groups['readline'] = ReadlineConstants::registeredConstants();
+        $groups['xsl'] = XslConstants::registeredConstants();
         if (\PHPCompiler\ext\sodium\SodiumExtensionPolicy::advertisesExtension()) {
             $groups['sodium'] = SodiumConstants::registeredConstants();
         }
