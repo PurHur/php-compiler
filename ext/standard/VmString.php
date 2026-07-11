@@ -3716,7 +3716,7 @@ final class VmString
     public static function strIncrement(string $string): string
     {
         if ('' === $string) {
-            throw new \Error('str_increment(): Argument #1 ($string) must not be empty');
+            throw new \ValueError('str_increment(): Argument #1 ($string) must not be empty');
         }
         if (!self::onlyAsciiAlphanumeric($string)) {
             throw new \ValueError('str_increment(): Argument #1 ($string) must be composed only of alphanumeric ASCII characters');
@@ -3825,7 +3825,7 @@ final class VmString
     public static function strDecrement(string $string): string
     {
         if ('' === $string) {
-            throw new \Error('str_decrement(): Argument #1 ($string) must not be empty');
+            throw new \ValueError('str_decrement(): Argument #1 ($string) must not be empty');
         }
         if (!self::onlyAsciiAlphanumeric($string)) {
             throw new \ValueError('str_decrement(): Argument #1 ($string) must be composed only of alphanumeric ASCII characters');
