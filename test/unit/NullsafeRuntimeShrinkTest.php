@@ -48,4 +48,22 @@ final class NullsafeRuntimeShrinkTest extends TestCase
             false
         ));
     }
+
+    public function testNullsafeShortCircuitReceiverSkipsScalar(): void
+    {
+        $int = new \PHPCompiler\VM\Variable();
+        $int->int(1);
+        $this->assertTrue(
+            \PHPCompiler\VM\TypedPropertyCheck::nullsafeShortCircuitReceiver($int)
+        );
+    }
+
+    public function testNullsafeShortCircuitReceiverKeepsObject(): void
+    {
+        $obj = new \PHPCompiler\VM\Variable();
+        $obj->object(new \PHPCompiler\VM\ObjectEntry(new \PHPCompiler\VM\ClassEntry('C')));
+        $this->assertFalse(
+            \PHPCompiler\VM\TypedPropertyCheck::nullsafeShortCircuitReceiver($obj)
+        );
+    }
 }

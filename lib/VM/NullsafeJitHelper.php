@@ -14,7 +14,7 @@ final class NullsafeJitHelper
 {
     /**
      * Value-box slice of nullsafe short-circuit: PHP null, scalar/non-object, or uninitialized
-     * nullable typed slot (#5220, #18026).
+     * nullable typed slot (#5220, #18026, #18028).
      */
     public static function valueBoxShortCircuits(int $typeByte, bool $nullablePropertySlot): bool
     {
