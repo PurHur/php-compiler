@@ -134,6 +134,9 @@ if (!function_exists('php_compiler_cli_apply_ini_overrides')) {
             if (!is_string($key) || !is_string($value)) {
                 continue;
             }
+            if (\PHPCompiler\ext\standard\VmIni::applyStartupIniOverride($key, $value)) {
+                continue;
+            }
             \PHPCompiler\ext\standard\VmIni::set($ctx, $key, $value);
         }
     }
