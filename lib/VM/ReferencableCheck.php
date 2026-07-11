@@ -390,6 +390,10 @@ final class ReferencableCheck
         if (null === $slot || null === $caller->block) {
             return false;
         }
+        // Named CV assigned from (object)[...] is a real lvalue — not an inline cast (#17989).
+        if ($caller->block->isNamedVariableSlot($slot)) {
+            return false;
+        }
 
         return self::scopeSlotIsObjectCastResult($caller->block, $slot);
     }
@@ -422,6 +426,10 @@ final class ReferencableCheck
         if (null !== $block) {
             $slot = $block->slotForOperand($operand);
             if (null !== $slot) {
+                if ($block->isNamedVariableSlot($slot)) {
+                    return false;
+                }
+
                 return self::scopeSlotIsObjectCastResult($block, $slot);
             }
         }
