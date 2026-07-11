@@ -162,6 +162,11 @@ final class Superglobals
      */
     public static function populateCliArgv(Context $context, array $argv): void
     {
+        if (!\PHPCompiler\ext\standard\VmIni::registerArgcArgvEnabled()) {
+            $context->cliRequestArgv = [];
+
+            return;
+        }
         // Always define both globals (Zend: they exist even when empty).
         $argv = array_values(array_map('strval', $argv));
         $context->cliRequestArgv = $argv;

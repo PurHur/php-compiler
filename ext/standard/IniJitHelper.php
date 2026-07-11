@@ -56,7 +56,6 @@ final class IniJitHelper
     private const READONLY_BOOL_DEFAULTS = [
         'enable_dl' => false,
         'short_open_tag' => false,
-        'register_argc_argv' => true,
         'zend.enable_gc' => true,
         'session.use_cookies' => true,
         'session.use_only_cookies' => true,
@@ -160,6 +159,18 @@ final class IniJitHelper
     private static int $pcreRecursionLimit = 100_000;
 
     private static string $maxExecutionTime = self::CFG_MAX_EXECUTION_TIME;
+
+    private static bool $registerArgcArgv = true;
+
+    public static function syncRegisterArgcArgv(bool $enabled): void
+    {
+        self::$registerArgcArgv = $enabled;
+    }
+
+    public static function registerArgcArgvEnabled(): bool
+    {
+        return self::$registerArgcArgv;
+    }
 
     public static function getUserAgent(): string
     {
@@ -291,6 +302,9 @@ final class IniJitHelper
         if ('max_execution_time' === $key) {
             return self::$maxExecutionTime;
         }
+        if ('register_argc_argv' === $key) {
+            return VmIni::formatRegisterArgcArgvIniGet(self::$registerArgcArgv);
+        }
 
         return null;
     }
@@ -359,6 +373,9 @@ final class IniJitHelper
         }
         if ('max_execution_time' === $key) {
             return self::setMaxExecutionTime($newValue);
+        }
+        if ('register_argc_argv' === $key) {
+            return null;
         }
 
         return null;
@@ -442,6 +459,9 @@ final class IniJitHelper
         if ('pcre.recursion_limit' === $key) {
             return self::CFG_PCRE_RECURSION_LIMIT;
         }
+        if ('register_argc_argv' === $key) {
+            return VmIni::formatRegisterArgcArgvIniGet(self::$registerArgcArgv);
+        }
 
         return null;
     }
@@ -501,6 +521,9 @@ final class IniJitHelper
             case 'max_execution_time':
                 self::$maxExecutionTime = self::CFG_MAX_EXECUTION_TIME;
                 ExecutionLimitsJitHelper::applyMaxExecutionTime((int) self::CFG_MAX_EXECUTION_TIME);
+                break;
+            case 'register_argc_argv':
+                self::$registerArgcArgv = true;
                 break;
         }
     }

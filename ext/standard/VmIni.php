@@ -20,7 +20,6 @@ final class VmIni
     private const READONLY_BOOL_DEFAULTS = [
         'enable_dl' => false,
         'short_open_tag' => false,
-        'register_argc_argv' => true,
         'zend.enable_gc' => true,
         'session.use_cookies' => true,
         'session.use_only_cookies' => true,
@@ -215,6 +214,9 @@ final class VmIni
                 return self::setPcreRecursionLimit($newValue);
             case 'max_execution_time':
                 return self::setMaxExecutionTime($ctx, $newValue);
+            case 'register_argc_argv':
+                // php-src: PHP_INI_PERDIR — not modifiable after startup (#4515).
+                return false;
             default:
                 return false;
         }
@@ -285,6 +287,8 @@ final class VmIni
                 return (string) self::$pcreRecursionLimit;
             case 'max_execution_time':
                 return self::$maxExecutionTime;
+            case 'register_argc_argv':
+                return self::formatRegisterArgcArgvIniGet(self::$registerArgcArgv);
             default:
                 return false;
         }
@@ -333,6 +337,7 @@ final class VmIni
             'pcre.backtrack_limit' => self::CFG_PCRE_BACKTRACK_LIMIT,
             'pcre.jit' => '1',
             'pcre.recursion_limit' => self::CFG_PCRE_RECURSION_LIMIT,
+            'register_argc_argv' => self::formatRegisterArgcArgvIniGet(self::$registerArgcArgv),
             default => false,
         };
     }
@@ -389,6 +394,31 @@ final class VmIni
     private static int $pcreRecursionLimit = 100_000;
 
     private static string $maxExecutionTime = self::CFG_MAX_EXECUTION_TIME;
+
+    /** php-src PG(register_argc_argv) — startup/-d only; runtime ini_set() returns false (#4515). */
+    private static bool $registerArgcArgv = true;
+
+    /** True when CLI SAPI should define $argc/$argv (php-src main.c, issue #4374). */
+    public static function registerArgcArgvEnabled(): bool
+    {
+        return self::$registerArgcArgv;
+    }
+
+    /**
+     * Apply php.ini / -d overrides before SAPI argv population (ext/standard/ini.c, #4515).
+     *
+     * @return bool true when the key was applied as a startup-only directive
+     */
+    public static function applyStartupIniOverride(string $option, string $value): bool
+    {
+        if ('register_argc_argv' !== strtolower($option)) {
+            return false;
+        }
+        self::$registerArgcArgv = self::parseBoolIni($value);
+        IniJitHelper::syncRegisterArgcArgv(self::$registerArgcArgv);
+
+        return true;
+    }
 
     /** Observable ini_get('max_execution_time') after set_time_limit / ini_set (#12481). */
     public static function syncMaxExecutionTime(int $seconds): void
@@ -609,6 +639,12 @@ final class VmIni
         return $on ? '1' : '';
     }
 
+    /** register_argc_argv ini_get() always returns "0" or "1" (ext/standard/ini.c, #4515). */
+    public static function formatRegisterArgcArgvIniGet(bool $on): string
+    {
+        return $on ? '1' : '0';
+    }
+
     /**
      * ini_restore() — reset local value to php.ini global default (ext/standard/ini.c, #3205).
      */
@@ -666,6 +702,10 @@ final class VmIni
             case 'max_execution_time':
                 self::$maxExecutionTime = self::CFG_MAX_EXECUTION_TIME;
                 $ctx->executionLimits->applyMaxExecutionTime((int) self::CFG_MAX_EXECUTION_TIME);
+                break;
+            case 'register_argc_argv':
+                self::$registerArgcArgv = true;
+                IniJitHelper::syncRegisterArgcArgv(true);
                 break;
         }
     }
