@@ -79,6 +79,21 @@ final class ExtensionConstantGroups
         return $groups;
     }
 
+    /**
+     * Whether get_defined_constants(true) should emit a module bucket (#18083).
+     *
+     * Socket constants register on the reference profile while extension_loaded('sockets')
+     * stays false until socket_create() lands (#11820).
+     */
+    public static function shouldMaterializeExtensionBucket(string $extension): bool
+    {
+        if (VmInfo::extension_loaded($extension)) {
+            return true;
+        }
+
+        return 'sockets' === strtolower($extension);
+    }
+
     /** @return array<string, true> */
     public static function registeredNameSet(): array
     {
