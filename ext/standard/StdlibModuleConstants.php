@@ -123,7 +123,8 @@ final class StdlibModuleConstants
             'PSFS_FLAG_NORMAL' => StdlibConstants::PSFS_FLAG_NORMAL,
             'PSFS_FLAG_FLUSH_INC' => StdlibConstants::PSFS_FLAG_FLUSH_INC,
             'PSFS_FLAG_FLUSH_CLOSE' => StdlibConstants::PSFS_FLAG_FLUSH_CLOSE,
-        ] + VmStreamSupports::constants() + VmStreamNotification::constants() + VmImage::constants() + VmJsonFlags::constants();
+        ] + VmStreamSupports::constants() + VmStreamNotification::constants() + VmImage::constants() + VmJsonFlags::constants()
+            + GetDefinedConstantsParity::standardIntConstants();
     }
 
     /**
@@ -138,7 +139,20 @@ final class StdlibModuleConstants
             $out[strtoupper($lc)] = $value;
         }
 
-        return $out;
+        return $out + GetDefinedConstantsParity::standardStringConstants();
+    }
+
+    /**
+     * @return array<string, float>
+     */
+    public static function bootstrapFloatConstants(): array
+    {
+        $out = [];
+        foreach (StdlibConstants::CORE_FLOAT_BY_NAME as $lc => $value) {
+            $out[strtoupper($lc)] = $value;
+        }
+
+        return $out + GetDefinedConstantsParity::standardFloatConstants();
     }
 
     /**
@@ -150,6 +164,10 @@ final class StdlibModuleConstants
         $zlib = [];
         $json = [];
         foreach ($standard as $name => $value) {
+            if (GetDefinedConstantsParity::isStandardBucketExcluded($name)) {
+                unset($standard[$name]);
+                continue;
+            }
             if (str_starts_with($name, 'ZLIB_')) {
                 $zlib[$name] = $value;
                 unset($standard[$name]);
@@ -161,12 +179,19 @@ final class StdlibModuleConstants
             }
         }
 
+        $date = DateConstants::registeredConstants() + DateConstants::sunfuncsConstants();
+        foreach (GetDefinedConstantsParity::sunfuncsConstantNames() as $name) {
+            if (isset($standard[$name])) {
+                unset($standard[$name]);
+            }
+        }
+
         return [
             'standard' => $standard,
             'zlib' => $zlib,
-            'json' => $json,
+            'json' => $json + GetDefinedConstantsParity::jsonIntConstants(),
             'pcre' => PcreConstants::registeredConstants(),
-            'date' => DateConstants::registeredConstants(),
+            'date' => $date,
         ];
     }
 
@@ -193,6 +218,9 @@ final class StdlibModuleConstants
         }
         foreach (StdlibConstants::CORE_FLOAT_BY_NAME as $lc => $value) {
             $standard[strtoupper($lc)] = $value;
+        }
+        foreach (GetDefinedConstantsParity::standardFloatConstants() as $name => $value) {
+            $standard[$name] = $value;
         }
         foreach (StdlibConstants::CORE_STRING_BY_NAME as $lc => $value) {
             $standard[strtoupper($lc)] = $value;
