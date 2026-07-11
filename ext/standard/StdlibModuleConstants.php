@@ -123,7 +123,7 @@ final class StdlibModuleConstants
             'PSFS_FLAG_NORMAL' => StdlibConstants::PSFS_FLAG_NORMAL,
             'PSFS_FLAG_FLUSH_INC' => StdlibConstants::PSFS_FLAG_FLUSH_INC,
             'PSFS_FLAG_FLUSH_CLOSE' => StdlibConstants::PSFS_FLAG_FLUSH_CLOSE,
-        ] + VmStreamSupports::constants() + VmStreamNotification::constants() + VmImage::constants() + VmJsonFlags::constants();
+        ] + VmStreamSupports::constants() + VmStreamNotification::constants() + VmImage::constants() + VmJsonFlags::constants() + GetDefinedConstantsStdlibGap::intConstants();
     }
 
     /**
@@ -137,8 +137,19 @@ final class StdlibModuleConstants
         foreach (StdlibConstants::CORE_STRING_BY_NAME as $lc => $value) {
             $out[strtoupper($lc)] = $value;
         }
+        foreach (GetDefinedConstantsStdlibGap::stringConstants() as $name => $value) {
+            $out[$name] = $value;
+        }
 
         return $out;
+    }
+
+    /**
+     * @return array<string, float>
+     */
+    public static function bootstrapFloatConstants(): array
+    {
+        return GetDefinedConstantsStdlibGap::floatConstants();
     }
 
     /**
@@ -158,6 +169,10 @@ final class StdlibModuleConstants
                 unset($standard[$name]);
             } elseif (str_starts_with($name, 'PREG_') || str_starts_with($name, 'PCRE_')) {
                 unset($standard[$name]);
+            } elseif (str_starts_with($name, 'SUNFUNCS_RET_')) {
+                unset($standard[$name]);
+            } elseif (isset(GetDefinedConstantsBucketPolicy::standardBucketExcludeNames()[$name])) {
+                unset($standard[$name]);
             }
         }
 
@@ -166,7 +181,7 @@ final class StdlibModuleConstants
             'zlib' => $zlib,
             'json' => $json,
             'pcre' => PcreConstants::registeredConstants(),
-            'date' => DateConstants::registeredConstants(),
+            'date' => DateConstants::registeredConstants() + DateConstants::registeredIntConstants(),
         ];
     }
 
@@ -193,6 +208,9 @@ final class StdlibModuleConstants
         }
         foreach (StdlibConstants::CORE_FLOAT_BY_NAME as $lc => $value) {
             $standard[strtoupper($lc)] = $value;
+        }
+        foreach (GetDefinedConstantsStdlibGap::floatConstants() as $name => $value) {
+            $standard[$name] = $value;
         }
         foreach (StdlibConstants::CORE_STRING_BY_NAME as $lc => $value) {
             $standard[strtoupper($lc)] = $value;

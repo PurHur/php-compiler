@@ -871,6 +871,8 @@ require_once __DIR__.'/../../../ext/standard/GetClassJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/GetClassMethodsJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/GetClassVarsJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/GetDeclaredExcludeDeprecatedJit.php';
+require_once __DIR__.'/../../../ext/standard/GetDefinedConstantsBucketPolicy.php';
+require_once __DIR__.'/../../../ext/standard/GetDefinedConstantsStdlibGap.php';
 require_once __DIR__.'/../../../ext/standard/GetDefinedExcludeDisabledJit.php';
 require_once __DIR__.'/../../../ext/standard/GetHeadersJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/GetObjectVarsJitHelper.php';

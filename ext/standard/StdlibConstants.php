@@ -368,7 +368,7 @@ final class StdlibConstants
         'stream_pf_inet' => self::STREAM_PF_INET,
         'stream_sock_stream' => self::STREAM_SOCK_STREAM,
         'stream_sock_dgram' => self::STREAM_SOCK_DGRAM,
-        'stream_iproto_ip' => self::STREAM_IPPROTO_IP,
+        'stream_ipproto_ip' => self::STREAM_IPPROTO_IP,
         'stream_cast_as_stream' => self::STREAM_CAST_AS_STREAM,
         'stream_cast_for_select' => self::STREAM_CAST_FOR_SELECT,
         'sunfuncs_ret_string' => VmDate::SUNFUNCS_RET_STRING,

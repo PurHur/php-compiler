@@ -63,6 +63,11 @@ class Module extends ModuleAbstract
             $var->string($value);
             $runtime->vmContext->defineConstant($name, $var);
         }
+        foreach (StdlibModuleConstants::bootstrapFloatConstants() as $name => $value) {
+            $var = new VM\Variable();
+            $var->float($value);
+            $runtime->vmContext->defineConstant($name, $var);
+        }
         foreach (PcreConstants::registeredConstants() as $name => $value) {
             self::defineModuleConstant($runtime, $name, $value);
         }
