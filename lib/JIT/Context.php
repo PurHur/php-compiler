@@ -944,6 +944,7 @@ class Context {
         Builtin\StringStrContains::ensureStandaloneBodies($this);
         Builtin\StatPathRuntime::ensureStandaloneBodies($this);
         Builtin\StringFileGetContents::ensureStandaloneBodies($this);
+        Builtin\StringHashCrypto::ensureStandaloneBodies($this);
         Builtin\StringReadfile::ensureStandaloneBodies($this);
         Builtin\StringAddslashes::ensureStandaloneBodies($this);
         Builtin\StringStripslashes::ensureStandaloneBodies($this);
