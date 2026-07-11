@@ -30704,6 +30704,13 @@ class Compiler {
         if (null === $cfgCallOp || null === $block->orig || 2 !== \count($args)) {
             return null;
         }
+        $haystackArg = $args[0] ?? null;
+        if (
+            $haystackArg instanceof Operand
+            && $this->isByRefNamedCallArgExcludedFromSiblingProducerWiring($cfgCallOp, 0, $haystackArg)
+        ) {
+            return null;
+        }
         $funcName = $this->resolveCfgFuncCallName($cfgCallOp);
         if (1 !== $this->inlineClosureArrayPairCallbackArgIndex($funcName)) {
             return null;
