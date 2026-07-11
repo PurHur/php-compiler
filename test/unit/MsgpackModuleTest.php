@@ -4,23 +4,27 @@ declare(strict_types=1);
 
 namespace PHPCompiler;
 
+use PHPCompiler\CompilerVersion;
+use PHPCompiler\ext\msgpack\MsgpackExtensionPolicy;
 use PHPCompiler\ext\standard\VmReflection;
 use PHPUnit\Framework\TestCase;
 
 /**
- * msgpack extension module — pack/unpack round-trip (#6551, ext/msgpack/msgpack.c).
+ * msgpack extension module — pack/unpack round-trip (#6551, ext/msgpack/msgpack.c; #17994 phantom gate).
  *
  * @group msgpack
  */
 final class MsgpackModuleTest extends TestCase
 {
-    public function test_msgpack_registered_and_extension_loaded(): void
+    public function testMsgpackWithheldOnReferenceProfile(): void
     {
+        self::assertFalse(MsgpackExtensionPolicy::advertisesExtension());
+
         $runtime = new Runtime();
         $ctx = $runtime->vmContext;
 
         foreach (['msgpack_pack', 'msgpack_unpack'] as $fn) {
-            self::assertTrue(VmReflection::functionExists($ctx, $fn), $fn);
+            self::assertFalse(VmReflection::functionExists($ctx, $fn), $fn);
         }
 
         $code = <<<'PHP'
@@ -32,13 +36,51 @@ PHP;
         $block = $runtime->parseAndCompile($code, 'msgpack_module.php');
         ob_start();
         $runtime->run($block);
-        self::assertSame('111', ob_get_clean());
+        self::assertSame('000', ob_get_clean());
     }
 
-    public function test_msgpack_scalar_and_array_roundtrip(): void
+    public function testMsgpackRegisteredOnForwardProfile(): void
     {
-        $runtime = new Runtime();
-        $code = <<<'PHP'
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            self::assertTrue(MsgpackExtensionPolicy::advertisesExtension());
+
+            $runtime = new Runtime();
+            $ctx = $runtime->vmContext;
+
+            foreach (['msgpack_pack', 'msgpack_unpack'] as $fn) {
+                self::assertTrue(VmReflection::functionExists($ctx, $fn), $fn);
+            }
+
+            $code = <<<'PHP'
+<?php
+echo (int) function_exists('msgpack_pack');
+echo (int) function_exists('msgpack_unpack');
+echo (int) extension_loaded('msgpack');
+PHP;
+            $block = $runtime->parseAndCompile($code, 'msgpack_module.php');
+            ob_start();
+            $runtime->run($block);
+            self::assertSame('111', ob_get_clean());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testMsgpackScalarAndArrayRoundtripOnForwardProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            self::assertTrue(CompilerVersion::supportsMsgpack());
+
+            $runtime = new Runtime();
+            $code = <<<'PHP'
 <?php
 $data = ['a' => 1, 'b' => [2, 3], 'c' => 'hello', 'd' => true, 'e' => null, 'f' => 1.5];
 $packed = msgpack_pack($data);
@@ -47,9 +89,16 @@ echo (int) is_string($packed);
 echo (int) ($unpacked === $data);
 echo msgpack_unpack("\xff") === false ? '1' : '0';
 PHP;
-        $block = $runtime->parseAndCompile($code, 'msgpack_roundtrip.php');
-        ob_start();
-        $runtime->run($block);
-        self::assertSame('110', ob_get_clean());
+            $block = $runtime->parseAndCompile($code, 'msgpack_roundtrip.php');
+            ob_start();
+            $runtime->run($block);
+            self::assertSame('110', ob_get_clean());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
     }
 }

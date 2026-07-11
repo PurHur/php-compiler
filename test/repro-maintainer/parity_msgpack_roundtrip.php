@@ -2,6 +2,12 @@
 
 declare(strict_types=1);
 
+$profile = getenv('PHP_COMPILER_PROFILE');
+if (!is_string($profile) || '8.4' !== $profile) {
+    echo "skip: msgpack forward profile requires PHP_COMPILER_PROFILE=8.4\n";
+    exit(0);
+}
+
 if (!extension_loaded('msgpack')) {
     echo "fail: extension_loaded('msgpack') false\n";
     exit(1);

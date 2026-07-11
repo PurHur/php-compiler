@@ -384,6 +384,26 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
+    public function testSupportsMsgpackFalseOnReferenceProfile(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsMsgpack());
+    }
+
+    public function testSupportsMsgpackTrueOnForwardProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertTrue(CompilerVersion::supportsMsgpack());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     public function testSupportsNextafterFalseOnReferenceProfile(): void
     {
         $this->assertFalse(CompilerVersion::supportsNextafter());

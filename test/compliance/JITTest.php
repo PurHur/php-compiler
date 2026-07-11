@@ -621,6 +621,15 @@ class JITTest extends BaseTest {
                 && str_contains($name, 'brotli_phantom')) {
                 continue;
             }
+            if (!CompilerVersion::supportsMsgpack()
+                && str_contains($name, 'msgpack')
+                && !str_contains($name, 'msgpack_phantom')) {
+                continue;
+            }
+            if (CompilerVersion::supportsMsgpack()
+                && str_contains($name, 'msgpack_phantom')) {
+                continue;
+            }
             if (!CompilerVersion::supportsUri()
                 && str_contains($name, 'uri_rfc3986')
                 && !str_contains($name, 'uri_phantom')) {

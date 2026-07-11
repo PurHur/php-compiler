@@ -149,6 +149,9 @@ final class BuiltinIntrospectionPolicy
         if ('fastcgi_finish_request' === $lc) {
             return VmFastCgi::registersFinishRequestFunction();
         }
+        if (\in_array($lc, ['msgpack_pack', 'msgpack_unpack'], true)) {
+            return \PHPCompiler\ext\msgpack\MsgpackExtensionPolicy::advertisesExtension();
+        }
         if (\in_array($lc, ['class_has_method', 'class_has_property', 'class_has_constant'], true)) {
             return CompilerVersion::supportsClassHasFunctions();
         }
@@ -173,6 +176,9 @@ final class BuiltinIntrospectionPolicy
         }
         if ('brotli' === $ext) {
             return \PHPCompiler\ext\brotli\BrotliExtensionPolicy::advertisesExtension();
+        }
+        if ('msgpack' === $ext) {
+            return \PHPCompiler\ext\msgpack\MsgpackExtensionPolicy::advertisesExtension();
         }
         if ('uri' === $ext) {
             return \PHPCompiler\ext\uri\UriExtensionPolicy::advertisesExtension();

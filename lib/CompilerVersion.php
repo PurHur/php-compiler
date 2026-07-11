@@ -2205,6 +2205,17 @@ final class CompilerVersion
     }
 
     /**
+     * ext/msgpack via pure PHP {@see \PHPCompiler\ext\msgpack\VmMsgpack} — withheld on reference profile (#17994).
+     *
+     * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev reference profile matches Zend 8.2
+     * phantom gate (host ext-msgpack absent). Enable forward profile via `PHP_COMPILER_PROFILE=8.4`.
+     */
+    public static function supportsMsgpack(): bool
+    {
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+    }
+
+    /**
      * ext/uri (php-src ext/uri/php_uri.stub.php) — withheld on reference profile (#9051, #17830).
      *
      * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev reference profile matches Zend 8.2
