@@ -46403,10 +46403,24 @@ class Compiler {
             $this->assignSourceMetadata($init, $cfgCallOp);
         }
 
-        $initPrependedBeforeArgConstFetch = $this->prependFuncCallInitBeforeTrailingArgConstFetches(
-            $block,
-            $init
-        );
+        // var_export(fdiv(...), true) — sibling FuncCall producer must INIT/EXEC before consumer (#5471, #4633).
+        $skipPrependForSiblingFuncProducer = false;
+        if (null !== $cfgCallOp && null !== $block->orig) {
+            $consumerCfgIndex = array_search($cfgCallOp, $block->orig->children, true);
+            if (\is_int($consumerCfgIndex)) {
+                $skipPrependForSiblingFuncProducer = null !== $this->firstSiblingInlineFuncCallProducerIndex(
+                    $consumerCfgIndex,
+                    $block->orig->children
+                );
+            }
+        }
+        $initPrependedBeforeArgConstFetch = false;
+        if (!$skipPrependForSiblingFuncProducer) {
+            $initPrependedBeforeArgConstFetch = $this->prependFuncCallInitBeforeTrailingArgConstFetches(
+                $block,
+                $init
+            );
+        }
 
         $argSends = $this->compileCallArgSends($args, $block, $calleeName, $cfgCallOp);
         [$nestedProducerOps, $outerArgSends] = $this->partitionNestedInlineCallArgProducerOps($argSends);

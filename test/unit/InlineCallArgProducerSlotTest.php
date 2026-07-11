@@ -1846,6 +1846,51 @@ PHP;
         self::assertSame('0.7853981633974483', $out);
     }
 
+    /** Issue #5471 / #4633 — var_export(fdiv(...), true) must run nested fdiv before consumer INIT. */
+    public function testVarExportInlineFdivNonFiniteUsesFuncCallProducerSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+echo var_export(fdiv(1.0, 0.0), true);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'var_export_inline_fdiv_inf.php');
+
+        $fdivReturnSlot = null;
+        $varExportInitIndex = null;
+        $fdivInitIndex = null;
+        $varExportSends = [];
+        $fcallOrdinal = 0;
+        foreach ($block->opCodes as $i => $op) {
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                ++$fcallOrdinal;
+                if (1 === $fcallOrdinal) {
+                    $fdivInitIndex = $i;
+                } elseif (2 === $fcallOrdinal) {
+                    $varExportInitIndex = $i;
+                }
+            }
+            if (1 === $fcallOrdinal && OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
+                $fdivReturnSlot = $op->arg1;
+            }
+            if (2 === $fcallOrdinal && OpCode::TYPE_ARG_SEND === $op->type) {
+                $varExportSends[] = $op->arg1;
+            }
+        }
+
+        self::assertNotNull($fdivReturnSlot);
+        self::assertNotNull($fdivInitIndex);
+        self::assertNotNull($varExportInitIndex);
+        self::assertLessThan($varExportInitIndex, $fdivInitIndex, 'fdiv FUNCCALL_INIT must precede var_export FUNCCALL_INIT');
+        self::assertCount(2, $varExportSends);
+        self::assertSame($fdivReturnSlot, $varExportSends[0], 'arg sends='.json_encode($varExportSends));
+
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertSame('INF', $out);
+    }
+
     /** Issue #10808 — preg_replace() sibling inline Array_ pattern/replacement + embedded subject. */
     public function testPregReplaceDualInlineArrayLiteralsUseBothArraySlots(): void
     {
