@@ -59,7 +59,7 @@ Enable with `./phpc bootstrap init --with-composer`.
 | **Linux aarch64 / ARM64** | **Not supported** — no committed prelinked gen-0 for ARM |
 | **Windows** (native or WSL without Docker) | **Not supported** for bootstrap gates |
 | **LLVM 14+** as default bootstrap toolchain | **Not supported** until [#174](https://github.com/PurHur/php-compiler/issues/174) FFI lands; CI still pins LLVM 9 |
-| **Zend-free full dev** (no Composer / no PHPUnit) | **Not a goal yet** — track [#15600](https://github.com/PurHur/php-compiler/issues/15600), [#15599](https://github.com/PurHur/php-compiler/issues/15599) |
+| **Zend-free full dev** (no Composer / no PHPUnit) | **Tier 1 compile** via `./phpc bootstrap init` ([#15600](https://github.com/PurHur/php-compiler/issues/15600)); full PHPUnit harness still Tier 0 — [#15599](https://github.com/PurHur/php-compiler/issues/15599) |
 | **Honest full-spine compile without gen-0 sidecar** | **Not required for daily dev** — release criterion [#15597](https://github.com/PurHur/php-compiler/issues/15597) |
 
 Contributors on unsupported hosts should use **Docker** (`php-compiler:22.04-dev`) for all Tier 1–2 bootstrap work. VM-only User SDK iteration may work on other OSes; do not expect bootstrap spine or prelink gates to pass there.
