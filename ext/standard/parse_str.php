@@ -32,7 +32,7 @@ final class parse_str extends Internal
         $supportsSeparator = CompilerVersion::supportsParseStrSeparator();
         if ($argc < 2) {
             throw new ArgumentCountError(\sprintf(
-                'parse_str() expects at least 2 arguments, %d given',
+                'parse_str() expects exactly 2 arguments, %d given',
                 $argc
             ));
         }
@@ -90,7 +90,7 @@ final class parse_str extends Internal
             TypeErrorRaise::ensureLinked($context);
             TypeErrorRaise::emitArgumentCountError(
                 $context,
-                \sprintf('parse_str() expects at least 2 arguments, %d given', $argc)
+                \sprintf('parse_str() expects exactly 2 arguments, %d given', $argc)
             );
 
             return $context->getTypeFromString('int32')->constInt(0, false);

@@ -118,6 +118,34 @@ final class VmPreg
     }
 
     /**
+     * Z_PARAM_STR_OR_ARR on preg_replace() $replacement — null coerces to '' (delete match) outside strict_types (#17871).
+     *
+     * @throws \TypeError
+     */
+    public static function resolveStringOrArrayReplacement(
+        Frame $frame,
+        Variable $var,
+        string $function,
+        int $argIndex = 1,
+        string $paramName = 'replacement'
+    ): Variable {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_NULL === $var->type) {
+            if (InternalStrictArg::isCallerStrict($frame)) {
+                throw new \TypeError(
+                    self::stringOrArraySubjectTypeError($function, $argIndex, $paramName, 'null')
+                );
+            }
+            $empty = new Variable();
+            $empty->string('');
+
+            return $empty;
+        }
+
+        return self::requireStringOrArrayArg($var, $function, $argIndex, $paramName);
+    }
+
+    /**
      * Z_PARAM_STR_OR_ARR on preg_* $pattern / $replacement (ext/pcre/php_pcre.c).
      *
      * @throws \TypeError

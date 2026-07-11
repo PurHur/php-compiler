@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 4414 |
-| Phase A inventory files (M2 ratio SSOT) | 4414 |
+| PHP files on vm.php path | 4417 |
+| Phase A inventory files (M2 ratio SSOT) | 4417 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 11921 |
+| Source constructs flagged (warnings) | 11929 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -425,8 +425,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/mbstring/MbStrwidthJitHelper.php` | 0 | 1 |
 | `ext/mbstring/MbstringConstants.php` | 0 | 1 |
 | `ext/mbstring/MbstringEncodingRegistry.php` | 0 | 1 |
+| `ext/mbstring/MbstringLanguageRegistry.php` | 0 | 1 |
 | `ext/mbstring/MbstringState.php` | 0 | 3 |
-| `ext/mbstring/Module.php` | 0 | 42 |
+| `ext/mbstring/Module.php` | 0 | 44 |
 | `ext/mbstring/Utf8CaseMap.php` | 0 | 1 |
 | `ext/mbstring/VmMbConvertVariables.php` | 0 | 3 |
 | `ext/mbstring/VmMbstring.php` | 0 | 3 |
@@ -443,8 +444,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/mbstring/mb_encode_mimeheader.php` | 0 | 2 |
 | `ext/mbstring/mb_encode_numericentity.php` | 0 | 2 |
 | `ext/mbstring/mb_encoding_aliases.php` | 0 | 2 |
+| `ext/mbstring/mb_http_input.php` | 0 | 2 |
 | `ext/mbstring/mb_http_output.php` | 0 | 2 |
 | `ext/mbstring/mb_internal_encoding.php` | 0 | 2 |
+| `ext/mbstring/mb_language.php` | 0 | 2 |
 | `ext/mbstring/mb_lcfirst.php` | 0 | 3 |
 | `ext/mbstring/mb_list_encodings.php` | 0 | 1 |
 | `ext/mbstring/mb_ltrim.php` | 0 | 1 |
@@ -1769,7 +1772,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VmPointerTarget.php` | 0 | 3 |
 | `ext/standard/VmPopenNative.php` | 0 | 1 |
 | `ext/standard/VmPopenPure.php` | 0 | 1 |
-| `ext/standard/VmPreg.php` | 0 | 8 |
+| `ext/standard/VmPreg.php` | 0 | 9 |
 | `ext/standard/VmPregEngine.php` | 0 | 60 |
 | `ext/standard/VmPregFailure.php` | 0 | 1 |
 | `ext/standard/VmPregLimits.php` | 0 | 1 |
@@ -7096,12 +7099,17 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 8 class method(s)
 
+### `ext/mbstring/MbstringLanguageRegistry.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
 ### `ext/mbstring/MbstringState.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 104)
-- new Variable (line 106)
-- 12 class method(s)
+- new HashTable (line 160)
+- new Variable (line 162)
+- 16 class method(s)
 
 ### `ext/mbstring/Module.php`
 
@@ -7141,12 +7149,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new mb_decode_mimeheader (line 69)
 - new mb_http_output (line 70)
 - new mb_internal_encoding (line 71)
-- new mb_detect_order (line 72)
-- new mb_substitute_character (line 73)
-- new mb_preferred_mime_name (line 74)
-- new mb_encoding_aliases (line 75)
-- new mb_convert_kana (line 76)
-- new mb_split (line 77)
+- new mb_language (line 72)
+- new mb_http_input (line 73)
+- new mb_detect_order (line 74)
+- new mb_substitute_character (line 75)
+- new mb_preferred_mime_name (line 76)
+- new mb_encoding_aliases (line 77)
+- new mb_convert_kana (line 78)
+- new mb_split (line 79)
 - 2 class method(s)
 
 ### `ext/mbstring/Utf8CaseMap.php`
@@ -7164,9 +7174,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/mbstring/VmMbstring.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 1249)
-- new ArgumentCountError (line 1257)
-- 111 class method(s)
+- new ArgumentCountError (line 1301)
+- new ArgumentCountError (line 1309)
+- 113 class method(s)
 
 ### `ext/mbstring/mb_check_encoding.php`
 
@@ -7251,6 +7261,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 25)
 - 2 class method(s)
 
+### `ext/mbstring/mb_http_input.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 25)
+- 2 class method(s)
+
 ### `ext/mbstring/mb_http_output.php`
 
 **Warnings** (review for bootstrap subset):
@@ -7258,6 +7274,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 2 class method(s)
 
 ### `ext/mbstring/mb_internal_encoding.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 25)
+- 2 class method(s)
+
+### `ext/mbstring/mb_language.php`
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 25)
@@ -8322,7 +8344,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/sockets/SocketImportStreamJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 3 class method(s)
+- 4 class method(s)
 
 ### `ext/sockets/VmSocket.php`
 
@@ -8353,7 +8375,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 32)
-- 2 class method(s)
+- 3 class method(s)
 - 2 closure(s)
 
 ### `ext/sockets/socket_set_block.php`
@@ -16229,13 +16251,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new Variable (line 111)
-- new Variable (line 149)
-- new HashTable (line 453)
-- new Variable (line 466)
-- new HashTable (line 473)
-- new Variable (line 474)
-- new Variable (line 477)
-- 21 class method(s)
+- new Variable (line 139)
+- new Variable (line 177)
+- new HashTable (line 481)
+- new Variable (line 494)
+- new HashTable (line 501)
+- new Variable (line 502)
+- new Variable (line 505)
+- 22 class method(s)
 
 ### `ext/standard/VmPregEngine.php`
 
@@ -20369,9 +20392,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/preg_replace.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 124)
-- new Variable (line 126)
-- new Variable (line 132)
+- new HashTable (line 129)
+- new Variable (line 131)
+- new Variable (line 137)
 - 6 class method(s)
 
 ### `ext/standard/preg_replace_callback.php`
@@ -25652,7 +25675,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/SocketImportStreamRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 193)
+- new JIT (line 197)
 - 7 class method(s)
 - 1 closure(s)
 
