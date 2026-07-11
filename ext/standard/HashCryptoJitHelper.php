@@ -14,12 +14,22 @@ final class HashCryptoJitHelper
 {
     public static function hash(string $algo, string $data, bool $raw): string
     {
-        return VmHash::hash($algo, $data, $raw);
+        $digest = VmHashNative::hash($algo, $data, $raw);
+        if (false === $digest) {
+            throw new \ValueError(VmHash::HASH_UNKNOWN_ALGO_MSG);
+        }
+
+        return $digest;
     }
 
     public static function hashHmac(string $algo, string $data, string $key, bool $raw): string
     {
-        return VmHash::hashHmac($algo, $data, $key, $raw);
+        $digest = VmHashNative::hashHmac($algo, $data, $key, $raw);
+        if (false === $digest) {
+            throw new \ValueError(VmHash::HASH_HMAC_UNKNOWN_ALGO_MSG);
+        }
+
+        return $digest;
     }
 
     public static function hashPbkdf2(
@@ -30,7 +40,7 @@ final class HashCryptoJitHelper
         int $length,
         bool $raw
     ): string {
-        return VmHash::hashPbkdf2($algo, $password, $salt, $iterations, $length, $raw);
+        return VmHashNative::hashPbkdf2($algo, $password, $salt, $iterations, $length, $raw);
     }
 
     public static function hashHkdf(
@@ -40,6 +50,6 @@ final class HashCryptoJitHelper
         string $info,
         string $salt
     ): string {
-        return VmHash::hashHkdf($algo, $key, $length, $info, $salt);
+        return VmHashNative::hashHkdf($algo, $key, $length, $info, $salt);
     }
 }

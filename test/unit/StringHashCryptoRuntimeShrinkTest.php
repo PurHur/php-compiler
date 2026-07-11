@@ -28,13 +28,13 @@ final class StringHashCryptoRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('StringHashCryptoNativeJit', $source);
     }
 
-    public function testHashCryptoJitHelperDelegatesToVmHash(): void
+    public function testHashCryptoJitHelperDelegatesToVmHashNative(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/HashCryptoJitHelper.php');
-        $this->assertStringContainsString('VmHash::hash', $source);
-        $this->assertStringContainsString('VmHash::hashHmac', $source);
-        $this->assertStringContainsString('VmHash::hashPbkdf2', $source);
-        $this->assertStringContainsString('VmHash::hashHkdf', $source);
+        $this->assertStringContainsString('VmHashNative::hash', $source);
+        $this->assertStringContainsString('VmHashNative::hashHmac', $source);
+        $this->assertStringContainsString('VmHashNative::hashPbkdf2', $source);
+        $this->assertStringContainsString('VmHashNative::hashHkdf', $source);
     }
 
     public function testHashCryptoJitHelperSemanticsMatchVmHash(): void
