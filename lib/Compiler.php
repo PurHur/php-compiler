@@ -36855,6 +36855,13 @@ class Compiler {
         ) {
             return null;
         }
+        if (
+            0 === $argIndex
+            && null !== $this->nonConstInlineProducerBeforeTrailingScalarConstFetchPreludes($callIndex, $children)
+        ) {
+            // var_export($a[1][0], true) — arg #0 is chained dim-fetch, not trailing ConstFetch (#17894, re-#15945).
+            return null;
+        }
         foreach ($trailingConstFetches as $fetch) {
             if (
                 null !== $fetch->result
@@ -42031,6 +42038,26 @@ class Compiler {
                         }
                     }
                     $chainSlot = $block->slotForOperand($chainedDimFetch->result);
+                    if (null === $chainSlot) {
+                        $producers = $this->precedingInlineCallArgProducersBeforeCfgOp(
+                            $block->orig->children,
+                            $cfgCallOp
+                        );
+                        $dimFetches = array_values(array_filter(
+                            $producers,
+                            static fn (Op\Expr $producer): bool => $producer instanceof Op\Expr\ArrayDimFetch
+                        ));
+                        if (
+                            \count($dimFetches) >= 2
+                            && $this->arrayDimFetchesFormProducerChain($dimFetches)
+                        ) {
+                            $chainSlot = $this->pendingCallArgArrayDimFetchSlot(
+                                $block,
+                                $sends,
+                                \count($dimFetches) - 1
+                            );
+                        }
+                    }
                     if (null !== $chainSlot) {
                         $valueSlot = (string) $chainSlot;
                     }
@@ -46162,8 +46189,11 @@ class Compiler {
             if (\is_int($callIndex) && $callIndex > 0) {
                 $stmtBefore = $block->orig->children[$callIndex - 1] ?? null;
                 if (
-                    $stmtBefore instanceof Op\Expr\ConstFetch
-                    || $stmtBefore instanceof Op\Expr\ClassConstFetch
+                    ($stmtBefore instanceof Op\Expr\ConstFetch || $stmtBefore instanceof Op\Expr\ClassConstFetch)
+                    && null === $this->nonConstInlineProducerBeforeTrailingScalarConstFetchPreludes(
+                        $callIndex,
+                        $block->orig->children
+                    )
                 ) {
                     $constSlot = $block->slotForOperand($stmtBefore->result);
                     if (null === $constSlot) {
@@ -46227,6 +46257,34 @@ class Compiler {
                             $cfgCallOp,
                             $block->orig->children
                         );
+                    }
+                } elseif ($producer instanceof Op\Expr\ArrayDimFetch) {
+                    $producers = $this->precedingInlineCallArgProducersBeforeCfgOp(
+                        $block->orig->children,
+                        $cfgCallOp
+                    );
+                    $chainedDimFetch = $this->matchChainedArrayDimFetchInlineCallArgProducer($producers, 0);
+                    if ($chainedDimFetch instanceof Op\Expr\ArrayDimFetch && null !== $chainedDimFetch->result) {
+                        $dimSlot = $block->slotForOperand($chainedDimFetch->result);
+                        if (null === $dimSlot) {
+                            $dimFetches = array_values(array_filter(
+                                $producers,
+                                static fn (Op\Expr $p): bool => $p instanceof Op\Expr\ArrayDimFetch
+                            ));
+                            if (
+                                \count($dimFetches) >= 2
+                                && $this->arrayDimFetchesFormProducerChain($dimFetches)
+                            ) {
+                                $dimSlot = $this->pendingCallArgArrayDimFetchSlot(
+                                    $block,
+                                    array_merge($block->opCodes, $nestedProducerOps),
+                                    \count($dimFetches) - 1
+                                );
+                            }
+                        }
+                        if (null !== $dimSlot) {
+                            $execSlot = (string) $dimSlot;
+                        }
                     }
                 } elseif ($producer instanceof Op\Expr\FuncCall || $producer instanceof Op\Expr\NsFuncCall) {
                     $operandSlot = $block->slotForOperand($producer->result);
