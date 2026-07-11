@@ -30,6 +30,7 @@ final class ArrayReduceRuntimeShrinkTest extends TestCase
 
         $arrayBuiltin = (string) file_get_contents(__DIR__.'/../../lib/JIT/ArrayBuiltinHelper.php');
         $this->assertStringContainsString('ArrayReduceRuntime::reduce', $arrayBuiltin);
+        $this->assertStringNotContainsString('buildReduceFromHashTableWithClosure', $arrayBuiltin);
     }
 
     public function testArrayReduceJitHelperHonorsInitialOnEmpty(): void
