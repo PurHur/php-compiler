@@ -37,8 +37,8 @@ PHP;
         $runtime->parseAndCompile($code, 'readonly_child.php');
     }
 
-    /** @covers issue #17379 */
-    public function testReadonlyClassPropertyDefaultFailsAtCompileTime(): void
+    /** @covers issue #18074 */
+    public function testReadonlyClassPropertyDefaultCompilesAndRuns(): void
     {
         $runtime = new Runtime();
         $code = <<<'PHP'
@@ -47,10 +47,13 @@ readonly class R2 {
     public int $x = 1;
     public string $name = 'x';
 }
+echo (new R2())->x, (new R2())->name, PHP_EOL;
 PHP;
-        $this->expectException(\CompileError::class);
-        $this->expectExceptionMessage('Readonly property R2::$x cannot have default value');
-        $runtime->parseAndCompile($code, 'readonly_default.php');
+        $block = $runtime->parseAndCompile($code, 'readonly_default.php');
+        $this->assertNotNull($block);
+        ob_start();
+        $runtime->run($block);
+        $this->assertSame("1x\n", ob_get_clean());
     }
 
     /** @covers issue #9653 */
