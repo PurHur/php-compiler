@@ -5,11 +5,13 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\UserScriptAotDeferNestedJit;
 
 /**
  * LLVM lowering for hash() / hash_hmac() / hash_pbkdf2() / hash_equals() / hash_hmac_algos().
  *
- * Digest helpers via {@see StringHashCryptoPhp} → HashCryptoJitHelper → VmHash (#9164).
+ * Digest helpers via {@see StringHashCryptoPhp} → HashCryptoJitHelper → VmHash (#9164),
+ * or {@see StringHashCryptoLlvm} for user-script standalone AOT (#3357, #16734).
  * hash_equals / hash_hmac_algos / hash_algos via {@see StringHashEquals} / {@see StringHashHmacAlgos} / {@see StringHashAlgos} (#7189, #11463).
  */
 final class StringHashCryptoJit
@@ -25,12 +27,22 @@ final class StringHashCryptoJit
         '__compiler_hash_algos',
     ];
 
+    public static function ensureStandaloneBodies(Context $context): void
+    {
+        self::implement($context);
+    }
+
     public static function implement(Context $context): void
     {
         StringHashEquals::ensureLinked($context);
         StringHashHmacAlgos::ensureLinked($context);
         StringHashAlgos::ensureLinked($context);
-        StringHashCryptoPhp::implement($context);
+
+        if (UserScriptAotDeferNestedJit::shouldDefer($context)) {
+            StringHashCryptoLlvm::implement($context);
+        } else {
+            StringHashCryptoPhp::implement($context);
+        }
 
         self::registerLinkedRuntime($context);
     }

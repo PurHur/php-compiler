@@ -945,6 +945,7 @@ class Context {
         Builtin\StatPathRuntime::ensureStandaloneBodies($this);
         Builtin\StringFileGetContents::ensureStandaloneBodies($this);
         Builtin\StringReadfile::ensureStandaloneBodies($this);
+        Builtin\StringHashCrypto::ensureStandaloneBodies($this);
         Builtin\StringAddslashes::ensureStandaloneBodies($this);
         Builtin\StringStripslashes::ensureStandaloneBodies($this);
         Builtin\StringFilePutContents::ensureStandaloneBodies($this);
@@ -988,6 +989,7 @@ class Context {
                 Builtin\StringMetaphone::ensureStandaloneBodies($this);
                 Builtin\StringWordwrap::ensureStandaloneBodies($this);
                 Builtin\StringBin2hex::ensureStandaloneBodies($this);
+                Builtin\StringHashCrypto::ensureStandaloneBodies($this);
                 Builtin\StringBase64Encode::ensureStandaloneBodies($this);
                 Builtin\StringBase64Decode::ensureStandaloneBodies($this);
                 Builtin\StringStrrev::ensureStandaloneBodies($this);

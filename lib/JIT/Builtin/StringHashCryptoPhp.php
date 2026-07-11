@@ -8,6 +8,7 @@ use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPCompiler\JIT\UserScriptAotDeferNestedJit;
 use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
@@ -47,6 +48,12 @@ final class StringHashCryptoPhp
 
     public static function implement(Context $context): void
     {
+        if (UserScriptAotDeferNestedJit::shouldDefer($context)) {
+            StringHashCryptoLlvm::implement($context);
+
+            return;
+        }
+
         $probe = $context->module->getNamedFunction('__compiler_hash');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);
@@ -184,7 +191,9 @@ final class StringHashCryptoPhp
             );
         }
 
-        return $context->builder->call($helperFn, ...$args);
+        $raw = $context->builder->call($helperFn, ...$args);
+
+        return JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $raw);
     }
 
     private static function helperFunction(Context $context, string $logical): LlvmFunction
