@@ -156,6 +156,8 @@ final class StdlibModuleConstants
             } elseif (str_starts_with($name, 'JSON_')) {
                 $json[$name] = $value;
                 unset($standard[$name]);
+            } elseif (str_starts_with($name, 'PREG_') || str_starts_with($name, 'PCRE_')) {
+                unset($standard[$name]);
             }
         }
 
@@ -163,6 +165,7 @@ final class StdlibModuleConstants
             'standard' => $standard,
             'zlib' => $zlib,
             'json' => $json,
+            'pcre' => PcreConstants::registeredConstants(),
             'date' => DateConstants::registeredConstants(),
         ];
     }

@@ -18,5 +18,10 @@ class Module extends ModuleAbstract
     {
         parent::init($runtime);
         BuiltinClasses::register($runtime->vmContext);
+        foreach (RandomConstants::registeredConstants() as $name => $value) {
+            $var = new \PHPCompiler\VM\Variable();
+            $var->int($value);
+            $runtime->vmContext->defineConstant($name, $var);
+        }
     }
 }

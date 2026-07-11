@@ -25,6 +25,11 @@ class Module extends ModuleAbstract
         parent::init($runtime);
         BuiltinEnums::register($runtime->vmContext);
         BuiltinClasses::register($runtime->vmContext);
+        foreach (SocketConstants::registeredConstants() as $name => $value) {
+            $var = new \PHPCompiler\VM\Variable();
+            $var->int($value);
+            $runtime->vmContext->defineConstant($name, $var);
+        }
     }
 
     public function getFunctions(): array

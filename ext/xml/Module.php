@@ -18,6 +18,15 @@ class Module extends ModuleAbstract
     {
         parent::init($runtime);
         BuiltinClasses::register($runtime->vmContext);
+        foreach (XmlConstants::registeredConstants() as $name => $value) {
+            $var = new \PHPCompiler\VM\Variable();
+            if (\is_int($value)) {
+                $var->int($value);
+            } else {
+                $var->string((string) $value);
+            }
+            $runtime->vmContext->defineConstant($name, $var);
+        }
     }
 
     public function getFunctions(): array
