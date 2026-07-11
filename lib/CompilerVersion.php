@@ -2404,7 +2404,7 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.4+ DOMNode::compareDocumentPosition() (ext/dom/node.c, #14448, #15613, #18092).
+     * PHP 8.4+ DOMNode::compareDocumentPosition() (ext/dom/node.c, #14448, #17696, #18092).
      *
      * Withheld on 8.4.0-dev reference profile (matches Zend 8.2 method_exists gate).
      * Enable via stable 8.4.0+ or explicit `PHP_COMPILER_PROFILE=8.4` forward profile.
