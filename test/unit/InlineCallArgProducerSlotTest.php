@@ -7465,4 +7465,23 @@ PHP;
         $out = ob_get_clean();
         self::assertSame("x=false\nvalid=false\n", $out);
     }
+
+    /** Issue #17846 — touch(); ob_start(fn(...)) must wire closure slot, not stmt-level touch producer. */
+    public function testObStartClosureAfterTouchRuntime(): void
+    {
+        $code = <<<'PHP'
+<?php
+$p = sys_get_temp_dir() . '/phpc_ob_touch_' . getmypid() . '.tmp';
+touch($p, 1);
+ob_start(fn($b) => strtoupper($b));
+echo 'hi';
+ob_end_flush();
+@unlink($p);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'ob_start_closure_after_touch.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame('HI', ob_get_clean());
+    }
 }
