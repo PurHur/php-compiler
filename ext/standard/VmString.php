@@ -5314,7 +5314,7 @@ final class VmString
      */
     public static function realpath(string $path) {
         if ('' === $path) {
-            $path = '.';
+            return false;
         }
         if (str_contains($path, "\0")) {
             return false;

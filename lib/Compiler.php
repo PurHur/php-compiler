@@ -36902,6 +36902,25 @@ class Compiler {
     }
 
     /**
+     * Hoisted call-arg ConstFetch may compile before FUNCCALL_INIT; php-src resolves callee first (#17697).
+     */
+    private function prependFuncCallInitBeforeTrailingArgConstFetches(Block $block, OpCode $init): bool
+    {
+        $n = \count($block->opCodes);
+        if (0 === $n || OpCode::TYPE_CONST_FETCH !== $block->opCodes[$n - 1]->type) {
+            return false;
+        }
+        $insertAt = $n;
+        while ($insertAt > 0 && OpCode::TYPE_CONST_FETCH === $block->opCodes[$insertAt - 1]->type) {
+            --$insertAt;
+        }
+        array_splice($block->opCodes, $insertAt, 0, [$init]);
+        $block->nOpCodes = \count($block->opCodes);
+
+        return true;
+    }
+
+    /**
      * var_export([...] + [...], true) — true is emitted as TYPE_CONST_FETCH before FUNCCALL_INIT (#11511).
      */
     private function slotForBoolNullConstFetchBeforeLastFuncCallInit(Block $block): ?int
@@ -46384,6 +46403,11 @@ class Compiler {
             $this->assignSourceMetadata($init, $cfgCallOp);
         }
 
+        $initPrependedBeforeArgConstFetch = $this->prependFuncCallInitBeforeTrailingArgConstFetches(
+            $block,
+            $init
+        );
+
         $argSends = $this->compileCallArgSends($args, $block, $calleeName, $cfgCallOp);
         [$nestedProducerOps, $outerArgSends] = $this->partitionNestedInlineCallArgProducerOps($argSends);
         $this->rewireArrayBuiltinAdjacentFuncCallArgSendSlots(
@@ -46432,7 +46456,9 @@ class Compiler {
         }
         // php-src resolves callee before evaluating call args (#17697); hoisted nested FuncCall
         // producers (ensureDeferredSiblingInlineCallArgProducersCompiled) must run first (#17708).
-        $return[] = $init;
+        if (!$initPrependedBeforeArgConstFetch) {
+            $return[] = $init;
+        }
         foreach ($outerArgSends as $send) {
             if (OpCode::TYPE_ASSIGN !== $send->type) {
                 $return[] = $send;

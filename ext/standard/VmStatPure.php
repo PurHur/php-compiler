@@ -67,7 +67,7 @@ final class VmStatPure
     public static function realpath(string $path): string|false
     {
         if ('' === $path) {
-            $path = '.';
+            return false;
         }
         if (str_contains($path, "\0")) {
             return false;
