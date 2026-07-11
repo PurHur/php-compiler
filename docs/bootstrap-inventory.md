@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 4488 |
-| Phase A inventory files (M2 ratio SSOT) | 4488 |
+| PHP files on vm.php path | 4493 |
+| Phase A inventory files (M2 ratio SSOT) | 4493 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 12193 |
+| Source constructs flagged (warnings) | 12201 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -624,15 +624,18 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/sockets/BuiltinClasses.php` | 0 | 1 |
 | `ext/sockets/BuiltinEnums.php` | 0 | 3 |
 | `ext/sockets/JitSocketAtmark.php` | 0 | 1 |
+| `ext/sockets/JitSocketExportStream.php` | 0 | 1 |
 | `ext/sockets/JitSocketImportStream.php` | 0 | 1 |
-| `ext/sockets/Module.php` | 0 | 5 |
+| `ext/sockets/Module.php` | 0 | 6 |
 | `ext/sockets/SocketAtmarkJitHelper.php` | 0 | 1 |
 | `ext/sockets/SocketConstants.php` | 0 | 1 |
+| `ext/sockets/SocketExportStreamJitHelper.php` | 0 | 1 |
 | `ext/sockets/SocketImportStreamJitHelper.php` | 0 | 1 |
-| `ext/sockets/VmSocket.php` | 0 | 4 |
+| `ext/sockets/VmSocket.php` | 0 | 5 |
 | `ext/sockets/VmSocketArg.php` | 0 | 1 |
 | `ext/sockets/VmSockets.php` | 0 | 1 |
 | `ext/sockets/socket_atmark.php` | 0 | 3 |
+| `ext/sockets/socket_export_stream.php` | 0 | 3 |
 | `ext/sockets/socket_import_stream.php` | 0 | 3 |
 | `ext/sockets/socket_set_block.php` | 0 | 3 |
 | `ext/sockets/socket_set_nonblock.php` | 0 | 3 |
@@ -2962,7 +2965,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Analyzer.php` | 0 | 1 |
 | `lib/JIT/AotDebugSymbols.php` | 0 | 1 |
 | `lib/JIT/ArrayAccessHelper.php` | 0 | 1 |
-| `lib/JIT/ArrayBuiltinHelper.php` | 0 | 44 |
+| `lib/JIT/ArrayBuiltinHelper.php` | 0 | 41 |
 | `lib/JIT/ArrayFilterCallbackPolicy.php` | 0 | 1 |
 | `lib/JIT/ArrayFindCallbackPolicy.php` | 0 | 1 |
 | `lib/JIT/ArrayFindHelper.php` | 0 | 1 |
@@ -3280,6 +3283,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/ShuffleRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/SilenceRuntime.php` | 0 | 2 |
 | `lib/JIT/Builtin/SocketAtmarkRuntime.php` | 0 | 3 |
+| `lib/JIT/Builtin/SocketExportStreamRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/SocketImportStreamRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/SortRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/SpaceshipCompareJit.php` | 0 | 2 |
@@ -3469,6 +3473,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringSimilarText.php` | 0 | 2 |
 | `lib/JIT/Builtin/StringSimilarTextJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringSocketAtmark.php` | 0 | 1 |
+| `lib/JIT/Builtin/StringSocketExportStream.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringSocketImportStream.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringSodium.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringSoundex.php` | 0 | 3 |
@@ -8651,6 +8656,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 5 class method(s)
 
+### `ext/sockets/JitSocketExportStream.php`
+
+**Warnings** (review for bootstrap subset):
+- 6 class method(s)
+
 ### `ext/sockets/JitSocketImportStream.php`
 
 **Warnings** (review for bootstrap subset):
@@ -8661,8 +8671,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new socket_atmark (line 42)
 - new socket_import_stream (line 43)
-- new socket_set_nonblock (line 44)
-- new socket_set_block (line 45)
+- new socket_export_stream (line 44)
+- new socket_set_nonblock (line 45)
+- new socket_set_block (line 46)
 - 3 class method(s)
 
 ### `ext/sockets/SocketAtmarkJitHelper.php`
@@ -8675,6 +8686,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `ext/sockets/SocketExportStreamJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
 ### `ext/sockets/SocketImportStreamJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
@@ -8686,7 +8702,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ClassEntry (line 49)
 - new Variable (line 126)
 - new ObjectEntry (line 127)
-- 12 class method(s)
+- new Variable (line 215)
+- 15 class method(s)
 
 ### `ext/sockets/VmSocketArg.php`
 
@@ -8704,6 +8721,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 35)
 - 2 class method(s)
 - 1 closure(s)
+
+### `ext/sockets/socket_export_stream.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 32)
+- 2 class method(s)
+- 2 closure(s)
 
 ### `ext/sockets/socket_import_stream.php`
 
@@ -23706,83 +23730,83 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Operand\Temporary (line 35763)
 - new Operand\Temporary (line 35769)
 - new Operand\Temporary (line 35778)
-- new Operand\Temporary (line 37881)
-- new Variable (line 38312)
-- new Variable (line 38316)
-- new Variable (line 38324)
-- new Variable (line 38328)
-- new Variable (line 38612)
-- new OpCode (line 38707)
-- new OpCode (line 38738)
-- new OpCode (line 38786)
-- new OpCode (line 38803)
-- new OpCode (line 38822)
-- new OpCode (line 38842)
-- new OpCode (line 38888)
-- new OpCode (line 38923)
-- new OpCode (line 38941)
-- new OpCode (line 38974)
-- new OpCode (line 39015)
-- new OpCode (line 39031)
-- new OpCode (line 39049)
-- new OpCode (line 39066)
-- new OpCode (line 39080)
-- new OpCode (line 39102)
-- new OpCode (line 39124)
-- new OpCode (line 39133)
-- new OpCode (line 39153)
-- new OpCode (line 39230)
-- new OpCode (line 39243)
-- new OpCode (line 39256)
-- new OpCode (line 39261)
-- new OpCode (line 39278)
-- new OpCode (line 39324)
-- new OpCode (line 39364)
-- new OpCode (line 39456)
-- new OpCode (line 39495)
-- new OpCode (line 39573)
-- new OpCode (line 39598)
-- new OpCode (line 39631)
-- new OpCode (line 39703)
-- new Operand\Temporary (line 41428)
-- new Operand\Temporary (line 41949)
-- new Operand\Temporary (line 42135)
-- new Operand\Temporary (line 42167)
-- new Operand\Temporary (line 42263)
-- new Operand\Temporary (line 42385)
-- new OpCode (line 42387)
-- new OpCode (line 43842)
-- new Operand\Temporary (line 44313)
-- new OpCode (line 44918)
-- new Operand\Literal (line 45217)
-- new Variable (line 45219)
-- new OpCode (line 45265)
-- new OpCode (line 45480)
-- new OpCode (line 45490)
-- new OpCode (line 45493)
-- new Operand\Temporary (line 45520)
-- new Operand\Temporary (line 45557)
-- new OpCode (line 45559)
+- new Operand\Temporary (line 37892)
+- new Variable (line 38323)
+- new Variable (line 38327)
+- new Variable (line 38335)
+- new Variable (line 38339)
+- new Variable (line 38623)
+- new OpCode (line 38718)
+- new OpCode (line 38749)
+- new OpCode (line 38797)
+- new OpCode (line 38814)
+- new OpCode (line 38833)
+- new OpCode (line 38853)
+- new OpCode (line 38899)
+- new OpCode (line 38934)
+- new OpCode (line 38952)
+- new OpCode (line 38985)
+- new OpCode (line 39026)
+- new OpCode (line 39042)
+- new OpCode (line 39060)
+- new OpCode (line 39077)
+- new OpCode (line 39091)
+- new OpCode (line 39113)
+- new OpCode (line 39135)
+- new OpCode (line 39144)
+- new OpCode (line 39164)
+- new OpCode (line 39241)
+- new OpCode (line 39254)
+- new OpCode (line 39267)
+- new OpCode (line 39272)
+- new OpCode (line 39289)
+- new OpCode (line 39335)
+- new OpCode (line 39375)
+- new OpCode (line 39467)
+- new OpCode (line 39506)
+- new OpCode (line 39584)
+- new OpCode (line 39609)
+- new OpCode (line 39642)
+- new OpCode (line 39714)
+- new Operand\Temporary (line 41439)
+- new Operand\Temporary (line 41960)
+- new Operand\Temporary (line 42146)
+- new Operand\Temporary (line 42178)
+- new Operand\Temporary (line 42274)
+- new Operand\Temporary (line 42396)
+- new OpCode (line 42398)
+- new OpCode (line 43853)
+- new Operand\Temporary (line 44324)
+- new OpCode (line 44929)
+- new Operand\Literal (line 45228)
+- new Variable (line 45230)
+- new OpCode (line 45276)
+- new OpCode (line 45491)
+- new OpCode (line 45501)
+- new OpCode (line 45504)
+- new Operand\Temporary (line 45531)
+- new Operand\Temporary (line 45568)
 - new OpCode (line 45570)
-- new Operand\Temporary (line 45573)
-- new OpCode (line 45575)
-- new OpCode (line 45583)
-- new OpCode (line 45591)
-- new OpCode (line 45599)
+- new OpCode (line 45581)
+- new Operand\Temporary (line 45584)
+- new OpCode (line 45586)
+- new OpCode (line 45594)
 - new OpCode (line 45602)
-- new OpCode (line 45627)
-- new OpCode (line 45653)
-- new OpCode (line 45671)
-- new OpCode (line 45678)
-- new Operand\Literal (line 46440)
-- new OpCode (line 47664)
-- new Literal (line 47804)
-- new OpCode (line 47903)
-- new Variable (line 47910)
-- new Temporary (line 47912)
-- new OpCode (line 47915)
-- new CompileFatal (line 48250)
-- new CompileFatal (line 48505)
+- new OpCode (line 45610)
+- new OpCode (line 45613)
+- new OpCode (line 45638)
+- new OpCode (line 45664)
+- new OpCode (line 45682)
+- new OpCode (line 45689)
+- new Operand\Literal (line 46451)
+- new OpCode (line 47675)
+- new Literal (line 47815)
+- new OpCode (line 47914)
+- new Variable (line 47921)
+- new Temporary (line 47923)
+- new OpCode (line 47926)
+- new CompileFatal (line 48261)
+- new CompileFatal (line 48516)
 - 1013 class method(s)
 - 49 closure(s)
 
@@ -24132,7 +24156,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/CompilerVersion.php`
 
 **Warnings** (review for bootstrap subset):
-- 180 class method(s)
+- 181 class method(s)
 
 ### `lib/CurlyBraceOffsetRejector.php`
 
@@ -24395,41 +24419,38 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 1110)
 - new Variable (line 1112)
 - new Variable (line 2263)
-- new Variable (line 3062)
-- new Variable (line 3111)
-- new Variable (line 3114)
-- new Variable (line 4048)
-- new Variable (line 4084)
-- new Variable (line 4092)
-- new Variable (line 4102)
-- new Variable (line 4113)
-- new Variable (line 4121)
-- new Variable (line 4171)
-- new Variable (line 4192)
-- new Variable (line 4213)
-- new Variable (line 4237)
-- new Variable (line 4266)
-- new Variable (line 4286)
-- new Variable (line 4337)
-- new Variable (line 4345)
-- new Variable (line 6675)
-- new Variable (line 6706)
-- new Variable (line 6723)
-- new Variable (line 6739)
-- new strval (line 6764)
-- new Variable (line 7013)
-- new Variable (line 7029)
-- new Variable (line 7202)
-- new Variable (line 7218)
-- new Variable (line 7266)
-- new Variable (line 7571)
-- new Variable (line 7580)
-- new Variable (line 8066)
-- new Variable (line 8082)
-- new Variable (line 8132)
-- new Variable (line 8638)
-- new Variable (line 8644)
-- 179 class method(s)
+- new Variable (line 3815)
+- new Variable (line 3851)
+- new Variable (line 3859)
+- new Variable (line 3869)
+- new Variable (line 3880)
+- new Variable (line 3888)
+- new Variable (line 3938)
+- new Variable (line 3959)
+- new Variable (line 3980)
+- new Variable (line 4004)
+- new Variable (line 4033)
+- new Variable (line 4053)
+- new Variable (line 4104)
+- new Variable (line 4112)
+- new Variable (line 6442)
+- new Variable (line 6473)
+- new Variable (line 6490)
+- new Variable (line 6506)
+- new strval (line 6531)
+- new Variable (line 6780)
+- new Variable (line 6796)
+- new Variable (line 6969)
+- new Variable (line 6985)
+- new Variable (line 7033)
+- new Variable (line 7338)
+- new Variable (line 7347)
+- new Variable (line 7833)
+- new Variable (line 7849)
+- new Variable (line 7899)
+- new Variable (line 8405)
+- new Variable (line 8411)
+- 175 class method(s)
 
 ### `lib/JIT/ArrayFilterCallbackPolicy.php`
 
@@ -24513,7 +24534,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/ArrayCombineRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- 5 class method(s)
+- 6 class method(s)
 
 ### `lib/JIT/Builtin/ArrayCountRecursiveRuntime.php`
 
@@ -26261,6 +26282,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 4 class method(s)
 - 1 closure(s)
 
+### `lib/JIT/Builtin/SocketExportStreamRuntime.php`
+
+**Warnings** (review for bootstrap subset):
+- new JIT (line 137)
+- 6 class method(s)
+- 1 closure(s)
+
 ### `lib/JIT/Builtin/SocketImportStreamRuntime.php`
 
 **Warnings** (review for bootstrap subset):
@@ -27357,6 +27385,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 1 class method(s)
 
 ### `lib/JIT/Builtin/StringSocketAtmark.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
+### `lib/JIT/Builtin/StringSocketExportStream.php`
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)

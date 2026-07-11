@@ -41,6 +41,7 @@ class Module extends ModuleAbstract
         $fns = [
             new socket_atmark(),
             new socket_import_stream(),
+            new socket_export_stream(),
             new socket_set_nonblock(),
             new socket_set_block(),
         ];
