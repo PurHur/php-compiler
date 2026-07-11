@@ -7773,4 +7773,44 @@ PHP;
         $runtime->run($block);
         self::assertSame('HI', ob_get_clean());
     }
+
+    /** Issue #17989 — array_walk($a, fn) after ob_start() must ARG_SEND named CV, not ob_start return. */
+    public function testArrayWalkNamedObjectCastAfterObStartUsesCvSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+$a = (object) ['x' => 1];
+ob_start();
+array_walk($a, static fn ($v) => print($v));
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'array_walk_object_cast_after_ob_start.php');
+
+        $obStartReturnSlot = null;
+        $arrayWalkHaystackSend = null;
+        $pendingFunc = null;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                $pendingFunc = $block->constants[$op->arg1]->toString();
+                continue;
+            }
+            if ('ob_start' === $pendingFunc && OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
+                $obStartReturnSlot = $op->arg1;
+                $pendingFunc = null;
+                continue;
+            }
+            if ('array_walk' === $pendingFunc && OpCode::TYPE_ARG_SEND === $op->type && null === $arrayWalkHaystackSend) {
+                $arrayWalkHaystackSend = $op->arg1;
+                $pendingFunc = null;
+            }
+        }
+
+        self::assertNotNull($obStartReturnSlot, 'ob_start return slot');
+        self::assertNotNull($arrayWalkHaystackSend, 'array_walk haystack ARG_SEND');
+        self::assertNotSame($obStartReturnSlot, $arrayWalkHaystackSend, 'array_walk arg0 must not be ob_start() return');
+
+        ob_start();
+        $runtime->run($block);
+        self::assertSame('1', ob_get_clean());
+    }
 }
