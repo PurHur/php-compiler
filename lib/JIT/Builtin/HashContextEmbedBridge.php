@@ -20,11 +20,9 @@ final class HashContextEmbedBridge
 
     private const UPDATE_HELPER = 'PHPCompiler\\ext\\hash\\HashContextJitHelper::update';
 
-    private const ALGO_HELPER = 'PHPCompiler\\ext\\hash\\HashContextJitHelper::algoName';
-
-    private const DATA_HELPER = 'PHPCompiler\\ext\\hash\\HashContextJitHelper::dataString';
-
     private const MARK_FINAL_HELPER = 'PHPCompiler\\ext\\hash\\HashContextJitHelper::markFinalized';
+
+    private const FINALIZE_HELPER = 'PHPCompiler\\ext\\hash\\HashContextJitHelper::finalize';
 
     private const COPY_HELPER = 'PHPCompiler\\ext\\hash\\HashContextJitHelper::copy';
 
@@ -32,8 +30,7 @@ final class HashContextEmbedBridge
     private const COMPILED_HELPERS = [
         self::INIT_HELPER,
         self::UPDATE_HELPER,
-        self::ALGO_HELPER,
-        self::DATA_HELPER,
+        self::FINALIZE_HELPER,
         self::MARK_FINAL_HELPER,
         self::COPY_HELPER,
     ];

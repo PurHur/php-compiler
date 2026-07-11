@@ -5,16 +5,18 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\hash;
 
 use PHPCompiler\ext\standard\JitHash;
-use PHPCompiler\JIT\Builtin\HashContextCopyLlvm;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\HashContextEmbedBridge;
-use PHPCompiler\JIT\Builtin\HashContextFinalLlvm;
 use PHPCompiler\JIT\Builtin\HashContextRuntime;
+use PHPCompiler\JIT\Builtin\StringHashCrypto;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitBoolArg;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\JIT\UserScriptAotDeferNestedJit;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /** LLVM lowering for hash_init/update/final/copy (#7174, #3357). */
@@ -24,9 +26,7 @@ final class JitHashContext
 
     private const UPDATE_HELPER = 'PHPCompiler\\ext\\hash\\HashContextJitHelper::update';
 
-    private const ALGO_HELPER = 'PHPCompiler\\ext\\hash\\HashContextJitHelper::algoName';
-
-    private const DATA_HELPER = 'PHPCompiler\\ext\\hash\\HashContextJitHelper::dataString';
+    private const FINALIZE_HELPER = 'PHPCompiler\\ext\\hash\\HashContextJitHelper::finalize';
 
     private const MARK_FINAL_HELPER = 'PHPCompiler\\ext\\hash\\HashContextJitHelper::markFinalized';
 
@@ -60,6 +60,13 @@ final class JitHashContext
         $obj = $objectType->allocate($classId);
         $objectType->markObjectConstructed($obj);
         self::storeHandle($context, $obj, $handle);
+        self::storeStringProperty($context, $obj, HashContextJitSupport::PROP_ALGO, $algoStr);
+        self::storeStringProperty(
+            $context,
+            $obj,
+            HashContextJitSupport::PROP_BUF,
+            self::emptyString($context)
+        );
 
         return self::boxObject($context, $obj);
     }
@@ -74,6 +81,34 @@ final class JitHashContext
         $handle = self::loadHandle($context, $obj);
         $chunkStr = JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[1], 'hash_update', 1, 'data');
         self::callHelper($context, self::UPDATE_HELPER, $handle, $chunkStr);
+        $bufPtr = self::loadStringProperty($context, $obj, HashContextJitSupport::PROP_BUF);
+        $map = $context->structFieldMap['__string__'];
+        $leftLen = $context->builder->load($context->builder->structGep($bufPtr, $map['length']));
+        $i64 = $context->getTypeFromString('int64');
+        $isEmpty = $context->builder->icmp(
+            Builder::INT_SLE,
+            $leftLen,
+            $i64->constInt(0, false)
+        );
+        $emptyBlock = BasicBlockHelper::append($context, 'hc_update_buf_empty');
+        $appendBlock = BasicBlockHelper::append($context, 'hc_update_buf_append');
+        $doneBlock = BasicBlockHelper::append($context, 'hc_update_buf_done');
+        $context->builder->branchIf($isEmpty, $emptyBlock, $appendBlock);
+
+        $context->builder->positionAtEnd($emptyBlock);
+        self::storeStringProperty($context, $obj, HashContextJitSupport::PROP_BUF, $chunkStr);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($appendBlock);
+        self::storeStringProperty(
+            $context,
+            $obj,
+            HashContextJitSupport::PROP_BUF,
+            self::appendStringPtr($context, $bufPtr, $chunkStr)
+        );
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
 
         return self::returnTrue($context);
     }
@@ -91,28 +126,31 @@ final class JitHashContext
             $rawBool = JitBoolArg::lower($context, $args[1], 'hash_final(): Argument #2 ($binary)');
         }
 
-        return $context->builder->call(
-            $context->lookupFunction('__compiler_hash_context_final'),
-            JitValueBox::valuePtrFromVariable($context, $args[0]),
-            $rawBool
-        );
+        return self::finalLowering($context, $args[0], $rawBool);
     }
 
-    /** Shared hash_final() body for call sites and {@see HashContextFinalLlvm} (#3357). */
+    /** Shared hash_final() body (#3357). */
     public static function finalLowering(Context $context, JITVariable $ctxArg, Value $rawBool): Value
     {
+        if (UserScriptAotDeferNestedJit::shouldDefer($context)) {
+            return self::finalLoweringStandaloneAot($context, $ctxArg, $rawBool);
+        }
+
         HashContextEmbedBridge::ensureLinked($context);
         $obj = self::readContextObject($context, $ctxArg);
         $handle = self::loadHandle($context, $obj);
 
-        $algoRaw = self::callHelper($context, self::ALGO_HELPER, $handle);
-        $dataRaw = self::callHelper($context, self::DATA_HELPER, $handle);
-        $algoPtr = JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $algoRaw);
-        $dataPtr = JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $dataRaw);
-        $digestPtr = JitHash::hash($context, $algoPtr, $dataPtr, $rawBool);
-        self::callHelper($context, self::MARK_FINAL_HELPER, $handle);
+        $digestRaw = self::callHelper($context, self::FINALIZE_HELPER, $handle, $rawBool);
+        $digestStr = JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $digestRaw);
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeString'),
+            $ptr,
+            $digestStr
+        );
 
-        return $digestPtr;
+        return $ptr;
     }
 
     public static function copy(Context $context, JITVariable ...$args): Value
@@ -122,13 +160,10 @@ final class JitHashContext
         }
         HashContextEmbedBridge::ensureLinked($context);
 
-        return $context->builder->call(
-            $context->lookupFunction('__compiler_hash_context_copy'),
-            JitValueBox::valuePtrFromVariable($context, $args[0])
-        );
+        return self::copyLowering($context, $args[0]);
     }
 
-    /** Shared hash_copy() body for call sites and {@see HashContextCopyLlvm} (#3357). */
+    /** Shared hash_copy() body (#3357). */
     public static function copyLowering(Context $context, JITVariable $ctxArg): Value
     {
         HashContextEmbedBridge::ensureLinked($context);
@@ -142,8 +177,125 @@ final class JitHashContext
         $dst = $objectType->allocate($classId);
         $objectType->markObjectConstructed($dst);
         self::storeHandle($context, $dst, $newHandle);
+        self::storeStringProperty(
+            $context,
+            $dst,
+            HashContextJitSupport::PROP_ALGO,
+            self::loadStringProperty($context, $src, HashContextJitSupport::PROP_ALGO)
+        );
+        self::storeStringProperty(
+            $context,
+            $dst,
+            HashContextJitSupport::PROP_BUF,
+            self::loadStringProperty($context, $src, HashContextJitSupport::PROP_BUF)
+        );
 
         return self::boxObject($context, $dst);
+    }
+
+    private static function finalLoweringStandaloneAot(
+        Context $context,
+        JITVariable $ctxArg,
+        Value $rawBool
+    ): Value {
+        HashContextEmbedBridge::ensureLinked($context);
+        StringHashCrypto::ensureLinked($context);
+        $obj = self::readContextObject($context, $ctxArg);
+        $handle = self::loadHandle($context, $obj);
+        $algoPtr = self::loadStringProperty($context, $obj, HashContextJitSupport::PROP_ALGO);
+        $dataPtr = self::loadStringProperty($context, $obj, HashContextJitSupport::PROP_BUF);
+        $map = $context->structFieldMap['__string__'];
+        $charPtr = $context->getTypeFromString('char*');
+        $dataLen = $context->builder->load($context->builder->structGep($dataPtr, $map['length']));
+        $dataBytes = $context->builder->structGep($dataPtr, $map['value']);
+        $dataForHash = $context->builder->call(
+            $context->lookupFunction('__string__init'),
+            $dataLen,
+            $context->builder->pointerCast($dataBytes, $charPtr)
+        );
+        $rawI32 = $context->builder->zExt($rawBool, $context->getTypeFromString('int32'));
+        $digestStr = $context->builder->call(
+            $context->lookupFunction('__compiler_hash'),
+            $algoPtr,
+            $dataForHash,
+            $rawI32
+        );
+        self::callHelper($context, self::MARK_FINAL_HELPER, $handle);
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeString'),
+            $ptr,
+            $digestStr
+        );
+
+        return $ptr;
+    }
+
+    private static function appendStringPtr(Context $context, Value $left, Value $right): Value
+    {
+        $map = $context->structFieldMap['__string__'];
+        $leftLen = $context->builder->load($context->builder->structGep($left, $map['length']));
+        $rightLen = $context->builder->load($context->builder->structGep($right, $map['length']));
+        $totalLen = $context->builder->add($leftLen, $rightLen);
+        $dest = $context->builder->call($context->lookupFunction('__string__alloc'), $totalLen);
+        $destPtr = $context->builder->structGep($dest, $map['value']);
+        $context->builder->store(
+            $totalLen,
+            $context->builder->structGep($dest, $map['length'])
+        );
+        $leftPtr = $context->builder->structGep($left, $map['value']);
+        $rightPtr = $context->builder->structGep($right, $map['value']);
+        $context->intrinsic->memcpy($destPtr, $leftPtr, $leftLen, false);
+        $context->intrinsic->memcpy(
+            $context->builder->gep($destPtr, $leftLen),
+            $rightPtr,
+            $rightLen,
+            false
+        );
+
+        return $dest;
+    }
+
+    private static function emptyString(Context $context): Value
+    {
+        $i64 = $context->getTypeFromString('int64');
+
+        return $context->builder->call(
+            $context->lookupFunction('__string__alloc'),
+            $i64->constInt(0, false)
+        );
+    }
+
+    private static function storeStringProperty(
+        Context $context,
+        Value $obj,
+        string $prop,
+        Value $strPtr
+    ): void {
+        $strVar = new JITVariable(
+            $context,
+            JITVariable::TYPE_STRING,
+            JITVariable::KIND_VALUE,
+            $strPtr
+        );
+        $context->type->object->storeInstanceProperty(
+            $obj,
+            HashContextJitSupport::CLASS_NAME,
+            $prop,
+            $strVar
+        );
+    }
+
+    private static function loadStringProperty(Context $context, Value $obj, string $prop): Value
+    {
+        $strVar = $context->type->object->propertyFetch(
+            $obj,
+            HashContextJitSupport::CLASS_NAME,
+            $prop
+        );
+
+        return $context->helper->loadValue($strVar);
     }
 
     private static function storeHandle(Context $context, Value $obj, Value $handleI64): void
