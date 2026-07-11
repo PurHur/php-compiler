@@ -1,5 +1,5 @@
 --TEST--
-Language: true|false union type — compile fatal, use bool instead (#12045, zend_compile.c)
+Language: true|false union type — runtime fatal, use bool instead (#12045, #17996, zend_compile.c)
 --FILE--
 <?php
 function f(true|false $x): string {
@@ -9,4 +9,4 @@ echo "ok\n";
 --EXPECT_EXIT--
 255
 --EXPECTF--
-parseAndCompile failure: target=%s: Type contains both true and false, bool should be used instead
+Fatal error: Type contains both true and false, bool should be used instead in %s on line %d

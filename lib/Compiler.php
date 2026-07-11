@@ -632,7 +632,6 @@ class Compiler {
         }
         $this->rejectPseudoClassTypeHintOutsideClassScope($returnType, $block, $func);
         $this->assertFunctionSignatureNeverType($returnType);
-        $this->assertNoRedundantTrueFalseUnion($returnType);
         $block->returnDeclaredType = $returnType;
         if ($returnType instanceof Op\Type\Void_) {
             $block->returnTypeVoid = true;
@@ -6284,19 +6283,6 @@ class Compiler {
         return false;
     }
 
-    /**
-     * Zend zend_compile_type — redundant true|false union must use bool (#12045).
-     */
-    protected function assertNoRedundantTrueFalseUnion(?Op\Type $type): void
-    {
-        if (
-            $this->cfgTypeContainsLiteralBool($type, 'true')
-            && $this->cfgTypeContainsLiteralBool($type, 'false')
-        ) {
-            $this->throwCompileError('Type contains both true and false, bool should be used instead');
-        }
-    }
-
     protected function cfgTypeContainsNull(?Op\Type $type): bool
     {
         if (null === $type) {
@@ -6345,7 +6331,6 @@ class Compiler {
      */
     protected function assertPropertyDeclaredType(?Op\Type $type, string $propName): void
     {
-        $this->assertNoRedundantTrueFalseUnion($type);
         if (!$this->cfgTypeContainsNever($type)) {
             return;
         }
@@ -6457,7 +6442,6 @@ class Compiler {
     {
         $this->rejectPseudoClassTypeHintOutsideClassScope($declared, $block, $func);
         $this->assertFunctionSignatureNeverType($declared);
-        $this->assertNoRedundantTrueFalseUnion($declared);
         if ($this->cfgTypeIsStandaloneNever($declared)) {
             $this->throwCompileError('never cannot be used as a parameter type');
         }
@@ -6714,6 +6698,7 @@ class Compiler {
                         $defaultSlot,
                         $typeSlot
                     );
+                    $declare->cfgDeclaredType = $child->declaredType;
                     $declare->propertyVisibility = MethodVisibility::mask($child->visibility);
                     $declare->propertySetVisibility = $this->asymmetricSetVisibilityFromCfgOp($child);
                     $declare->propertyGetVisibility = $this->asymmetricGetVisibilityFromCfgOp($child);

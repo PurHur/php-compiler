@@ -271,6 +271,8 @@ class OpCode {
     public bool $propertyFromConstructorPromotion = false;
     /** TYPE_DECLARE_PROPERTY: PHPCfg visibility flags (#145). */
     public int $propertyVisibility = 0;
+    /** TYPE_DECLARE_PROPERTY / TYPE_DECLARE_STATIC_PROPERTY: cfg declared type for runtime validation (#17996). */
+    public ?\PHPCfg\Op\Type $cfgDeclaredType = null;
     /** TYPE_DECLARE_FUNCTION_STATIC: declared type prototype constant slot (#9998). */
     public ?int $functionStaticTypeSlot = null;
     /** TYPE_DECLARE_FUNCTION_STATIC / TYPE_FUNCTION_STATIC_INIT_STORE: variable name for TypeError (#9998). */
