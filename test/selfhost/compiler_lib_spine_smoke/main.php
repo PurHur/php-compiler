@@ -483,6 +483,7 @@ require_once __DIR__.'/../../../ext/mbstring/mb_substr.php';
 require_once __DIR__.'/../../../ext/mbstring/mb_substr_count.php';
 require_once __DIR__.'/../../../ext/mbstring/mb_trim.php';
 require_once __DIR__.'/../../../ext/mbstring/mb_ucfirst.php';
+require_once __DIR__.'/../../../ext/msgpack/MsgpackExtensionPolicy.php';
 require_once __DIR__.'/../../../ext/msgpack/Module.php';
 require_once __DIR__.'/../../../ext/msgpack/VmMsgpack.php';
 require_once __DIR__.'/../../../ext/msgpack/msgpack_pack.php';
