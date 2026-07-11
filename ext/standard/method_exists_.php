@@ -25,8 +25,12 @@ final class method_exists_ extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (2 !== \count($frame->calledArgs)) {
-            throw new \LogicException('method_exists() requires exactly two arguments');
+        $argc = \count($frame->calledArgs);
+        if (2 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'method_exists() expects exactly 2 arguments, %d given',
+                $argc
+            ));
         }
         $ctx = VmReflection::requireContext($frame);
         $method = VmReflection::stringArg($frame->calledArgs[1], 'method_exists() method name', 1);
@@ -38,8 +42,12 @@ final class method_exists_ extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (2 !== \count($args)) {
-            throw new \LogicException('method_exists() requires exactly two arguments');
+        $argc = \count($args);
+        if (2 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'method_exists() expects exactly 2 arguments, %d given',
+                $argc
+            ));
         }
         if (JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false)) {
             self::emitJitTypeErrorAndAbort($context, \sprintf(self::OBJECT_OR_CLASS_TYPE_ERROR, 'null'));
