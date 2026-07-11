@@ -117,6 +117,144 @@ final class VmMbstring
     }
 
     /**
+     * mb_detect_encoding() — guess byte-string encoding (php-src ext/mbstring/mbstring.c; #3075).
+     *
+     * @param list<string>|null $encodingList
+     */
+    public static function detectEncoding(
+        string $string,
+        ?array $encodingList = null,
+        bool $strict = false
+    ): string|false {
+        $order = $encodingList ?? MbstringState::detectOrder();
+        if (
+            \in_array('UTF-8', $order, true)
+            && VmString::isValidUtf8($string)
+            && !self::isAsciiByteString($string)
+        ) {
+            return 'UTF-8';
+        }
+        foreach ($order as $encoding) {
+            if ('UTF-8' === $encoding) {
+                continue;
+            }
+            if (self::stringMatchesEncoding($string, $encoding, $strict)) {
+                return $encoding;
+            }
+        }
+        if (\in_array('UTF-8', $order, true) && VmString::isValidUtf8($string)) {
+            return 'UTF-8';
+        }
+
+        return false;
+    }
+
+    /**
+     * @return list<string>
+     */
+    public static function coerceDetectEncodingListArg(
+        Variable $var,
+        string $function,
+        int $argIndex = 1
+    ): array {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_NULL === $var->type) {
+            return MbstringState::detectOrder();
+        }
+        if (Variable::TYPE_STRING === $var->type) {
+            return MbstringEncodingRegistry::parseOrderList($function, $argIndex, $var->toString());
+        }
+        if (Variable::TYPE_ARRAY !== $var->type) {
+            throw new \TypeError(sprintf(
+                '%s(): Argument #%d ($encodings) must be of type array|string|null, %s given',
+                $function,
+                $argIndex + 1,
+                self::typeLabel($var)
+            ));
+        }
+
+        $order = [];
+        foreach ($var->toArray()->iterateKeyed(true) as [, $elem]) {
+            $elem = $elem->resolveIndirect();
+            if (EnumCaseSupport::isEnumCaseVariable($elem)) {
+                throw new \TypeError(sprintf(
+                    '%s(): Argument #%d ($encodings) must be of type array|string|null, %s given',
+                    $function,
+                    $argIndex + 1,
+                    EnumCaseSupport::typeNameForVariable($elem)
+                ));
+            }
+            if (Variable::TYPE_STRING !== $elem->type) {
+                throw new \TypeError(sprintf(
+                    '%s(): Argument #%d ($encodings) must be of type array|string|null, %s given',
+                    $function,
+                    $argIndex + 1,
+                    self::typeLabel($elem)
+                ));
+            }
+            $canonical = MbstringEncodingRegistry::resolve($elem->toString());
+            if (null === $canonical) {
+                throw new \ValueError(sprintf(
+                    '%s(): Argument #%d ($encodings) contains invalid encoding "%s"',
+                    $function,
+                    $argIndex + 1,
+                    $elem->toString()
+                ));
+            }
+            $order[] = $canonical;
+        }
+        MbstringEncodingRegistry::assertNonEmptyOrder($function, $argIndex, $order);
+
+        return $order;
+    }
+
+    private static function stringMatchesEncoding(string $string, string $encoding, bool $strict): bool
+    {
+        $canonical = MbstringEncodingRegistry::resolve($encoding) ?? $encoding;
+        if ('UTF-8' === $canonical) {
+            return VmString::isValidUtf8($string);
+        }
+        if ('ASCII' === $canonical) {
+            return self::isAsciiByteString($string);
+        }
+        if ('ISO-8859-1' === $canonical || '8BIT' === $canonical) {
+            if (!$strict) {
+                return true;
+            }
+
+            return self::strictLatin1RoundTrip($string);
+        }
+        if (null !== CharsetEngine::parseEncodingSpec($canonical)) {
+            return self::checkEncoding($string, $canonical);
+        }
+
+        return false;
+    }
+
+    private static function isAsciiByteString(string $string): bool
+    {
+        $len = \strlen($string);
+        for ($i = 0; $i < $len; ++$i) {
+            if (\ord($string[$i]) >= 0x80) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static function strictLatin1RoundTrip(string $string): bool
+    {
+        $utf8 = CharsetEngine::convert('ISO-8859-1', 'UTF-8', $string);
+        if (false === $utf8) {
+            return false;
+        }
+        $back = CharsetEngine::convert('UTF-8', 'ISO-8859-1', $utf8);
+
+        return false !== $back && $back === $string;
+    }
+
+    /**
      * mb_convert_encoding() core — charset + HTML-ENTITIES pseudo-encoding (#11212).
      */
     public static function convertEncoding(string $source, string $to, string $from): string|false
