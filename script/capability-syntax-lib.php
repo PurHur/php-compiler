@@ -599,9 +599,10 @@ function syntaxRowDefinitions(): array
             'construct' => 'PHP 8.5 pipe operator (`|>`)',
             'opcodes' => ['TYPE_FUNCCALL_INIT', 'TYPE_FUNCCALL_EXEC_RETURN'],
             'issue' => 7219,
-            'aot' => false,
+            'aot' => true,
             'notes' => [
                 'Ast\\PipeOperatorDesugar before php-parser (#3243); lowers $lhs |> f(...) to f($lhs, ...)',
+                'PipeOperatorSyntaxRejector on reference profile (#12424, #18007)',
                 'Bare callable names: $lhs |> strlen → strlen($lhs) (#7219)',
                 'Arrow-fn RHS: $lhs |> fn($p) => expr and parenthesized form (#7219, #11858)',
                 'Chained pipes and parenthesized-callable LHS (#6705, #7219)',

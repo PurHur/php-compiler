@@ -947,6 +947,21 @@ class JITTest extends BaseTest {
                 && !str_contains($name, 'clone_with_forward_profile')) {
                 continue;
             }
+            // 8.4-target reject gate; skipped when pipe operator enabled (#12424, #18007).
+            if (CompilerVersion::supportsPipeOperator()
+                && str_contains($name, 'pipe_operator_reference_profile')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsPipeOperator()
+                && str_contains($name, 'pipe_operator')
+                && !str_contains($name, 'pipe_operator_reference_profile')
+                && !str_contains($name, 'pipe_operator_forward_profile')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsPipeOperator()
+                && (str_contains($name, 'pipe_first_class') || str_contains($name, 'pipe_enum_case'))) {
+                continue;
+            }
             // 8.3-target reject gate; skipped when new readonly class enabled (#16255).
             if (CompilerVersion::supportsReadonlyAnonymousClass()
                 && str_contains($name, 'readonly_anonymous_class_reference_profile')) {
