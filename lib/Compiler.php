@@ -46650,9 +46650,32 @@ class Compiler {
             $this->assignSourceMetadata($init, $cfgCallOp);
         }
 
+        $skipPrependForHaystackFamilyDimFetch = false;
+        if (null !== $cfgCallOp && \is_array($cfgCallOp->args ?? null)) {
+            foreach ($cfgCallOp->args as $argIndex => $callArg) {
+                if (!$callArg instanceof Operand) {
+                    continue;
+                }
+                if ($this->callArgIsDeadInlineHaystackFamilySlot(
+                    $cfgCallOp,
+                    (int) $argIndex,
+                    $calleeName,
+                    $callArg
+                )) {
+                    $skipPrependForHaystackFamilyDimFetch = true;
+                    break;
+                }
+            }
+        }
+
         // var_export(fdiv(...), true) — sibling FuncCall producer must INIT/EXEC before consumer (#5471, #4633).
+        // Scope to var_export only — broad skip breaks in_array dim-fetch haystack in echo ternary chains (re-#17000, #17851).
         $skipPrependForSiblingFuncProducer = false;
-        if (null !== $cfgCallOp && null !== $block->orig) {
+        if (
+            null !== $cfgCallOp
+            && null !== $block->orig
+            && 'var_export' === strtolower($this->resolveCfgFuncCallName($cfgCallOp) ?? '')
+        ) {
             $consumerCfgIndex = array_search($cfgCallOp, $block->orig->children, true);
             if (\is_int($consumerCfgIndex)) {
                 $skipPrependForSiblingFuncProducer = null !== $this->firstSiblingInlineFuncCallProducerIndex(
@@ -46662,7 +46685,7 @@ class Compiler {
             }
         }
         $initPrependedBeforeArgConstFetch = false;
-        if (!$skipPrependForSiblingFuncProducer) {
+        if (!$skipPrependForSiblingFuncProducer && !$skipPrependForHaystackFamilyDimFetch) {
             $initPrependedBeforeArgConstFetch = $this->prependFuncCallInitBeforeTrailingArgConstFetches(
                 $block,
                 $init
