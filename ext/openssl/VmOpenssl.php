@@ -553,6 +553,11 @@ final class VmOpenssl
         return $ht;
     }
 
+    public static function userWarningForFrame(string $message, ?Frame $frame): void
+    {
+        self::userWarning($message, $frame);
+    }
+
     private static function userWarning(string $message, ?Frame $frame): void
     {
         if (null === $frame?->vmContext) {

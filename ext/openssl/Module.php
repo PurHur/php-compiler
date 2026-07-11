@@ -51,6 +51,7 @@ class Module extends ModuleAbstract
             new openssl_pbkdf2(),
             new openssl_x509_read(),
             new openssl_x509_parse(),
+            new openssl_x509_fingerprint(),
             new openssl_free_key(),
             new openssl_spki_new(),
             new openssl_spki_verify(),
