@@ -1136,6 +1136,15 @@ class VMTest extends BaseTest {
                 && str_contains($name, 'class_has_functions_phantom')) {
                 continue;
             }
+            if (!CompilerVersion::supportsDomLivingStandardNamespace()
+                && str_contains($name, 'dom_html_document')
+                && !str_contains($name, 'dom_html_document_phantom')) {
+                continue;
+            }
+            if (CompilerVersion::supportsDomLivingStandardNamespace()
+                && str_contains($name, 'dom_html_document_phantom')) {
+                continue;
+            }
             if (str_contains(strtolower($case[0]), 'splobjectstorage')) {
                 continue;
             }

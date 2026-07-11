@@ -582,6 +582,34 @@ PHP;
         self::assertSame("1\n1\nb\n", ob_get_clean());
     }
 
+    public function test_dom_html_document_create_from_string_living_namespace(): void
+    {
+        $previous = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            if (!CompilerVersion::supportsDomLivingStandardNamespace()) {
+                self::markTestSkipped('Dom\\ living-standard namespace withheld without PHP_COMPILER_PROFILE=8.4 (#6506)');
+            }
+            $runtime = new Runtime();
+            $code = <<<'PHP'
+<?php
+echo (int) class_exists('Dom\\HTMLDocument'), "\n";
+$doc = Dom\HTMLDocument::createFromString('<p>hi</p>');
+echo $doc->body->textContent, "\n";
+PHP;
+            $block = $runtime->parseAndCompile($code, 'dom_html_document.php');
+            ob_start();
+            $runtime->run($block);
+            self::assertSame("1\nhi\n", ob_get_clean());
+        } finally {
+            if (false === $previous) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$previous);
+            }
+        }
+    }
+
     public function test_runtime_shrink_has_no_dom_c_runtime(): void
     {
         $linker = (string) file_get_contents(__DIR__.'/../../lib/AOT/Linker.php');
