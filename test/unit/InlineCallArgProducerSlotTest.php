@@ -3812,6 +3812,26 @@ PHP;
         self::assertNotSame($combineSends[0], $combineSends[1], 'combine sends='.json_encode($combineSends));
     }
 
+    /** Issue #17981 — array_combine($keys ?? [], $values ?? []) maps each stmt-level ?? to its arg slot. */
+    public function testArrayCombineCoalesceWrappedInlineCallArgsUseDistinctSlots(): void
+    {
+        $code = <<<'PHP'
+<?php
+function combine_keys_values(array $keys, array $values): void {
+    $c = array_combine($keys ?? [], $values ?? []);
+    echo $c['a'], '|', $c['b'], "\n";
+}
+combine_keys_values(['a', 'b'], [1, 2]);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'array_combine_coalesce_call_arg.php');
+
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertSame("1|2\n", $out);
+    }
+
     /** Issue #15874 — array_walk((object)[...], fn) wires hoisted Cast to by-ref arg #0. */
     public function testArrayWalkObjectCastInlineCallArgZeroSlot(): void
     {
