@@ -484,7 +484,7 @@ require_once __DIR__.'/../../../ext/mbstring/mb_substr_count.php';
 require_once __DIR__.'/../../../ext/mbstring/mb_trim.php';
 require_once __DIR__.'/../../../ext/mbstring/mb_ucfirst.php';
 require_once __DIR__.'/../../../ext/msgpack/Module.php';
-require_once __DIR__.'/../../../ext/msgpack/MsgpackFunction.php';
+require_once __DIR__.'/../../../ext/msgpack/VmMsgpack.php';
 require_once __DIR__.'/../../../ext/msgpack/msgpack_pack.php';
 require_once __DIR__.'/../../../ext/msgpack/msgpack_unpack.php';
 require_once __DIR__.'/../../../ext/openssl/BuiltinClasses.php';

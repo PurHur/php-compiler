@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 4482 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 12170 |
+| Source constructs flagged (warnings) | 12184 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -486,8 +486,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/mbstring/mb_substr_count.php` | 0 | 2 |
 | `ext/mbstring/mb_trim.php` | 0 | 1 |
 | `ext/mbstring/mb_ucfirst.php` | 0 | 3 |
-| `ext/msgpack/Module.php` | 0 | 1 |
-| `ext/msgpack/MsgpackFunction.php` | 0 | 3 |
+| `ext/msgpack/Module.php` | 0 | 3 |
+| `ext/msgpack/VmMsgpack.php` | 0 | 11 |
+| `ext/msgpack/msgpack_pack.php` | 0 | 3 |
+| `ext/msgpack/msgpack_unpack.php` | 0 | 2 |
 | `ext/openssl/BuiltinClasses.php` | 0 | 1 |
 | `ext/openssl/JitOpensslCipherIvLength.php` | 0 | 1 |
 | `ext/openssl/JitOpensslCipherKeyLength.php` | 0 | 1 |
@@ -2956,7 +2958,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Analyzer.php` | 0 | 1 |
 | `lib/JIT/AotDebugSymbols.php` | 0 | 1 |
 | `lib/JIT/ArrayAccessHelper.php` | 0 | 1 |
-| `lib/JIT/ArrayBuiltinHelper.php` | 0 | 45 |
+| `lib/JIT/ArrayBuiltinHelper.php` | 0 | 44 |
 | `lib/JIT/ArrayFilterCallbackPolicy.php` | 0 | 1 |
 | `lib/JIT/ArrayFindCallbackPolicy.php` | 0 | 1 |
 | `lib/JIT/ArrayFindHelper.php` | 0 | 1 |
@@ -7618,13 +7620,36 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/msgpack/Module.php`
 
 **Warnings** (review for bootstrap subset):
-- 2 class method(s)
+- new msgpack_pack (line 17)
+- new msgpack_unpack (line 18)
+- 1 class method(s)
 
-### `ext/msgpack/MsgpackFunction.php`
+### `ext/msgpack/VmMsgpack.php`
 
 **Warnings** (review for bootstrap subset):
-- new Error (line 22)
-- new Error (line 27)
+- new MsgpackUnpackException (line 32)
+- new MsgpackUnpackException (line 35)
+- new Exception (line 63)
+- new Exception (line 74)
+- new Exception (line 170)
+- new MsgpackUnpackException (line 180)
+- new MsgpackUnpackException (line 246)
+- new MsgpackUnpackException (line 327)
+- new MsgpackUnpackException (line 404)
+- new MsgpackUnpackException (line 428)
+- 28 class method(s)
+
+### `ext/msgpack/msgpack_pack.php`
+
+**Warnings** (review for bootstrap subset):
+- new Exception (line 30)
+- new Error (line 37)
+- 2 class method(s)
+
+### `ext/msgpack/msgpack_unpack.php`
+
+**Warnings** (review for bootstrap subset):
+- new Error (line 58)
 - 2 class method(s)
 
 ### `ext/openssl/BuiltinClasses.php`
@@ -24334,50 +24359,49 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new Variable (line 120)
-- new Variable (line 859)
-- new Variable (line 1160)
-- new Variable (line 1218)
-- new Variable (line 1220)
-- new Variable (line 1232)
-- new Variable (line 1337)
-- new Variable (line 1339)
-- new Variable (line 2490)
-- new Variable (line 3289)
-- new Variable (line 3338)
-- new Variable (line 3341)
-- new Variable (line 4275)
-- new Variable (line 4311)
-- new Variable (line 4319)
-- new Variable (line 4329)
-- new Variable (line 4340)
-- new Variable (line 4348)
-- new Variable (line 4398)
-- new Variable (line 4419)
-- new Variable (line 4440)
-- new Variable (line 4464)
-- new Variable (line 4493)
-- new Variable (line 4513)
-- new Variable (line 4564)
-- new Variable (line 4572)
-- new Variable (line 6902)
-- new Variable (line 6933)
-- new Variable (line 6950)
-- new Variable (line 6966)
-- new strval (line 6991)
-- new Variable (line 7240)
-- new Variable (line 7256)
-- new Variable (line 7429)
-- new Variable (line 7445)
-- new Variable (line 7493)
-- new Variable (line 7798)
-- new Variable (line 7807)
-- new Variable (line 8293)
-- new Variable (line 8309)
-- new Variable (line 8359)
-- new Variable (line 8865)
-- new Variable (line 8871)
-- 188 class method(s)
-- 8 closure(s)
+- new Variable (line 632)
+- new Variable (line 933)
+- new Variable (line 991)
+- new Variable (line 993)
+- new Variable (line 1005)
+- new Variable (line 1110)
+- new Variable (line 1112)
+- new Variable (line 2263)
+- new Variable (line 3062)
+- new Variable (line 3111)
+- new Variable (line 3114)
+- new Variable (line 4048)
+- new Variable (line 4084)
+- new Variable (line 4092)
+- new Variable (line 4102)
+- new Variable (line 4113)
+- new Variable (line 4121)
+- new Variable (line 4171)
+- new Variable (line 4192)
+- new Variable (line 4213)
+- new Variable (line 4237)
+- new Variable (line 4266)
+- new Variable (line 4286)
+- new Variable (line 4337)
+- new Variable (line 4345)
+- new Variable (line 6675)
+- new Variable (line 6706)
+- new Variable (line 6723)
+- new Variable (line 6739)
+- new strval (line 6764)
+- new Variable (line 7013)
+- new Variable (line 7029)
+- new Variable (line 7202)
+- new Variable (line 7218)
+- new Variable (line 7266)
+- new Variable (line 7571)
+- new Variable (line 7580)
+- new Variable (line 8066)
+- new Variable (line 8082)
+- new Variable (line 8132)
+- new Variable (line 8638)
+- new Variable (line 8644)
+- 179 class method(s)
 
 ### `lib/JIT/ArrayFilterCallbackPolicy.php`
 
