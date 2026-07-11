@@ -278,7 +278,7 @@ final class VmConstants
         $result->add('Core', self::wrapArray($core));
 
         foreach (ExtensionConstantGroups::groups() as $extension => $registered) {
-            if (!VmInfo::extension_loaded($extension)) {
+            if (!ExtensionConstantGroups::shouldMaterializeExtensionBucket($extension)) {
                 continue;
             }
             $bucket = self::extensionConstantBucket($registered, $ctx);
