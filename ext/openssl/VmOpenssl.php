@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\openssl;
 
 use PHPCompiler\ext\standard\VmHash;
+use PHPCompiler\ext\standard\VmHashNative;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\ErrorReporter;
@@ -77,6 +78,39 @@ final class VmOpenssl
 
             return false;
         }
+    }
+
+    /**
+     * openssl_pbkdf2() — PKCS#5 PBKDF2 via VmHashNative (php-src ext/openssl/kdf.c; #6488).
+     *
+     * @return string|false raw key bytes
+     */
+    public static function pbkdf2(
+        string $password,
+        string $salt,
+        int $keyLength,
+        int $iterations,
+        string $digestAlgo = 'sha1',
+        ?Frame $frame = null
+    ): string|false {
+        if ($keyLength <= 0) {
+            throw new \ValueError('openssl_pbkdf2(): Argument #3 ($key_length) must be greater than 0');
+        }
+        if ($iterations <= 0) {
+            return false;
+        }
+        $method = strtolower($digestAlgo);
+        if (!OpensslCipherRegistry::digestImplemented($method)) {
+            self::userWarning('openssl_pbkdf2(): Unknown digest algorithm', $frame);
+
+            return false;
+        }
+        $derived = VmHashNative::hashPbkdf2($method, $password, $salt, $iterations, $keyLength, true);
+        if ('' === $derived) {
+            return false;
+        }
+
+        return $derived;
     }
 
     /**
