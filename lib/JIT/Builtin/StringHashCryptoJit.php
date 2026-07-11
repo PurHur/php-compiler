@@ -11,7 +11,7 @@ use PHPCompiler\JIT\UserScriptAotDeferNestedJit;
  * LLVM lowering for hash() / hash_hmac() / hash_pbkdf2() / hash_equals() / hash_hmac_algos().
  *
  * Digest helpers via {@see StringHashCryptoPhp} → HashCryptoJitHelper → VmHash (#9164).
- * User-script standalone AOT in-module nested compile (#3357) when defer nested JIT.
+ * User-script standalone AOT: {@see StringHashCryptoLlvm} libcrypto EVP bridge (#3357).
  * hash_equals / hash_hmac_algos / hash_algos via {@see StringHashEquals} / {@see StringHashHmacAlgos} / {@see StringHashAlgos}.
  */
 final class StringHashCryptoJit
@@ -34,7 +34,7 @@ final class StringHashCryptoJit
         StringHashAlgos::ensureLinked($context);
 
         if (UserScriptAotDeferNestedJit::shouldDefer($context)) {
-            StringHashCryptoPhp::implement($context, true);
+            StringHashCryptoLlvm::implement($context);
         } else {
             StringHashCryptoPhp::implement($context);
         }
@@ -49,7 +49,7 @@ final class StringHashCryptoJit
         StringHashAlgos::ensureLinked($context);
 
         if (UserScriptAotDeferNestedJit::shouldDefer($context)) {
-            StringHashCryptoPhp::implement($context, true);
+            StringHashCryptoLlvm::implement($context);
         } else {
             StringHashCryptoPhp::implement($context);
         }
