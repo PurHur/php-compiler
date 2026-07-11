@@ -6,10 +6,10 @@ namespace PHPCompiler\Test\Unit;
 
 use PHPUnit\Framework\TestCase;
 
-/** HashTableHelper v1/v2/v3/v4 slices route DefineRuntime + splits read/write LLVM (#10031, #16390, #17710). */
+/** HashTableHelper v1/v2/v3/v4/v5 slices route DefineRuntime + splits read/write LLVM (#10031, #17809). */
 final class HashTableHelperShrinkTest extends TestCase
 {
-    private const HELPER_MAX_LINES = 1700;
+    private const HELPER_MAX_LINES = 1350;
 
     public function testHashTableHelperDelegatesWriteLlvm(): void
     {
@@ -107,7 +107,24 @@ final class HashTableHelperShrinkTest extends TestCase
         $this->assertLessThanOrEqual(
             self::HELPER_MAX_LINES,
             $lines,
-            'HashTableHelper.php should shrink as LLVM moves to Read/WriteLlvm (#10031 v4)'
+            'HashTableHelper.php should shrink as LLVM moves to Read/WriteLlvm (#10031 v4, #17809 v5)'
         );
+    }
+
+    public function testHashTableHelperDelegatesWritePathLlvmV5(): void
+    {
+        $helper = (string) file_get_contents(__DIR__.'/../../lib/JIT/HashTableHelper.php');
+        $this->assertStringContainsString('HashTableWriteLlvm::addElement', $helper);
+        $this->assertStringContainsString('HashTableWriteLlvm::setValueBoxKey', $helper);
+        $this->assertStringContainsString('HashTableWriteLlvm::setAtObjectKey', $helper);
+        $this->assertStringContainsString('HashTableWriteLlvm::setAtKeyCoercingNumericString', $helper);
+        $this->assertStringNotContainsString('function setAtKeyCoercingNumericStringBody', $helper);
+        $this->assertStringNotContainsString('function setValueBoxAtObjectKey', $helper);
+
+        $write = (string) file_get_contents(__DIR__.'/../../lib/JIT/HashTableWriteLlvm.php');
+        $this->assertStringContainsString('public static function addElement', $write);
+        $this->assertStringContainsString('public static function setValueBoxKey', $write);
+        $this->assertStringContainsString('public static function setAtObjectKey', $write);
+        $this->assertStringContainsString('public static function setAtKeyCoercingNumericString', $write);
     }
 }
