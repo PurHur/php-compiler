@@ -26,6 +26,7 @@ if (!defined('PHP_COMPILER_LIB_SPINE_SMOKE')) {
 
 
 
+
 require_once __DIR__.'/../../../lib/OpCode.php';
 require_once __DIR__.'/../../../lib/Block.php';
 require_once __DIR__.'/../../../lib/Frame.php';
@@ -4450,38 +4451,24 @@ require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassIsInstance.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassIsInstantiable.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassIsSubclassOf.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ArrayPadTypeJit.php';
-// VM -r smoke: bootstrap-selfhost-lib-spine-vm-smoke.sh (#1846).
-// VM driver execute: bootstrap-selfhost-vm-driver-execute-probe.sh (#2201).
-
-$vmDriverExecute = getenv('PHP_COMPILER_VM_DRIVER_EXECUTE');
-if (is_string($vmDriverExecute) && ('1' === $vmDriverExecute || 'true' === strtolower($vmDriverExecute))) {
-    // Honest bin/vm.php run() dispatch: main() → run() on -r fixture (#8693, #2201).
-    run('Standard input code', '<?php echo "vm driver ok\n";', []);
-    exit(0);
-}
-
-$vmSpineSmoke = getenv('PHP_COMPILER_VM_SPINE_SMOKE');
-if (is_string($vmSpineSmoke) && ('1' === $vmSpineSmoke || 'true' === strtolower($vmSpineSmoke))) {
-    // Honest bin/vm.php run() dispatch: main() → run() on -r fixture (#8719, #1846).
-    run('Standard input code', '<?php echo "1\n";', []);
-    exit(0);
-}
-
-// M2 spine unit: mb_encode/decode_mimeheader Vm + JIT inventory (#8697).
-$__spineMimeSample = 'Hello 世界';
-$__spineMimeEnc = \PHPCompiler\ext\mbstring\VmMbstring::encodeMimeheader(
-    $__spineMimeSample,
-    'UTF-8',
-    true,
-    "\r\n",
-    0
-);
-$__spineMimeDec = \PHPCompiler\ext\mbstring\VmMbstring::decodeMimeheader($__spineMimeEnc);
-unset($__spineMimeSample, $__spineMimeEnc, $__spineMimeDec);
-
-// M2 spine unit: setcookie options array parser Vm inventory (#8698).
-\PHPCompiler\ext\standard\SetcookieOptions::spineSmokeParse();
-
+require_once __DIR__.'/../../../ext/dom/DomElementTextContentJitHelper.php';
+require_once __DIR__.'/../../../ext/dom/DomGetElementByIdJitHelper.php';
+require_once __DIR__.'/../../../ext/dom/DomLoadHTMLJitHelper.php';
+require_once __DIR__.'/../../../ext/dom/DomParseSimpleHtmlJitHelper.php';
+require_once __DIR__.'/../../../ext/dom/DomSyncElementIdMapJitHelper.php';
+require_once __DIR__.'/../../../ext/dom/DomUserScriptElementCacheLlvm.php';
+require_once __DIR__.'/../../../ext/dom/JitDomElementTextContent.php';
+require_once __DIR__.'/../../../ext/dom/JitDomGetElementById.php';
+require_once __DIR__.'/../../../ext/dom/JitDomLoadHTML.php';
+require_once __DIR__.'/../../../ext/dom/JitDomLoadHTMLUserScript.php';
+require_once __DIR__.'/../../../ext/standard/VmHttpConstants.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/DomDocumentMethodUserScriptLlvm.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/DomElementTextContentRuntime.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/DomGetElementByIdRuntime.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/DomLoadHTMLRuntime.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/DomSyncElementIdMapRuntime.php';
+require_once __DIR__.'/../../../lib/JIT/Call/DomDocumentGetElementById.php';
+require_once __DIR__.'/../../../lib/JIT/Call/DomDocumentLoadHTML.php';
 require_once __DIR__.'/../../../ext/dom/DocumentCreateCDATASection.php';
 require_once __DIR__.'/../../../ext/dom/DocumentCreateProcessingInstruction.php';
 require_once __DIR__.'/../../../ext/dom/TextIsElementContentWhitespace.php';
@@ -4582,4 +4569,36 @@ require_once __DIR__.'/../../../ext/xmlreader/XmlReaderState.php';
 require_once __DIR__.'/../../../ext/xmlwriter/XmlWriterState.php';
 require_once __DIR__.'/../../../ext/inotify/InotifyExtensionPolicy.php';
 require_once __DIR__.'/../../../lib/AOT/HelperUnitGlobalCtor.php';
+// VM -r smoke: bootstrap-selfhost-lib-spine-vm-smoke.sh (#1846).
+// VM driver execute: bootstrap-selfhost-vm-driver-execute-probe.sh (#2201).
+
+$vmDriverExecute = getenv('PHP_COMPILER_VM_DRIVER_EXECUTE');
+if (is_string($vmDriverExecute) && ('1' === $vmDriverExecute || 'true' === strtolower($vmDriverExecute))) {
+    // Honest bin/vm.php run() dispatch: main() → run() on -r fixture (#8693, #2201).
+    run('Standard input code', '<?php echo "vm driver ok\n";', []);
+    exit(0);
+}
+
+$vmSpineSmoke = getenv('PHP_COMPILER_VM_SPINE_SMOKE');
+if (is_string($vmSpineSmoke) && ('1' === $vmSpineSmoke || 'true' === strtolower($vmSpineSmoke))) {
+    // Honest bin/vm.php run() dispatch: main() → run() on -r fixture (#8719, #1846).
+    run('Standard input code', '<?php echo "1\n";', []);
+    exit(0);
+}
+
+// M2 spine unit: mb_encode/decode_mimeheader Vm + JIT inventory (#8697).
+$__spineMimeSample = 'Hello 世界';
+$__spineMimeEnc = \PHPCompiler\ext\mbstring\VmMbstring::encodeMimeheader(
+    $__spineMimeSample,
+    'UTF-8',
+    true,
+    "\r\n",
+    0
+);
+$__spineMimeDec = \PHPCompiler\ext\mbstring\VmMbstring::decodeMimeheader($__spineMimeEnc);
+unset($__spineMimeSample, $__spineMimeEnc, $__spineMimeDec);
+
+// M2 spine unit: setcookie options array parser Vm inventory (#8698).
+\PHPCompiler\ext\standard\SetcookieOptions::spineSmokeParse();
+
 echo "compiler_lib_spine_smoke bundle OK\n";
