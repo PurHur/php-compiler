@@ -1,5 +1,7 @@
 --TEST--
 AOT mb_trim() / mb_ltrim() / mb_rtrim() — UTF-8 ideographic space (#9208)
+--ENV--
+PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
 $s = "\u{3000}hello\u{3000}";
