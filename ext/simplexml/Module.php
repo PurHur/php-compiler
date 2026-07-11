@@ -25,6 +25,7 @@ class Module extends ModuleAbstract
         return [
             new simplexml_load_string(),
             new simplexml_load_file(),
+            new simplexml_import_dom(),
         ];
     }
 }
