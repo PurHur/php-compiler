@@ -429,6 +429,7 @@ class Runtime {
         }
         CurlyBraceOffsetRejector::reject($code, $filename);
         ClassConstBraceDerefRejector::reject($code, $filename);
+        ClassConstDynamicFetchRejector::reject($code, $filename);
         EncapsedCoalesceRejector::reject($code, $filename);
         ReadonlyMethodModifierRejector::reject($code, $filename);
         ReadonlyFunctionRejector::reject($code, $filename);

@@ -1,5 +1,14 @@
 --TEST--
 Language: PHP 8.3 dynamic class constant fetch Class::{$name} (#5923, zend_compile.c)
+--SKIPIF--
+<?php
+if (!class_exists('PHPCompiler\\CompilerVersion')) {
+    require __DIR__ . '/../../../../vendor/autoload.php';
+}
+if (!PHPCompiler\CompilerVersion::supportsDynamicClassConstFetch()) {
+    die('skip dynamic class const fetch disabled on reference profile');
+}
+?>
 --FILE--
 <?php
 class C {

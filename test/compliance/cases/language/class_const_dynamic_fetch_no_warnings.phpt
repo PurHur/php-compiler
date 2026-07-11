@@ -5,7 +5,7 @@ Language: dynamic class constant fetch Class::{$name} — no TypeReconstructor w
 if (!class_exists('PHPCompiler\\CompilerVersion')) {
     require __DIR__ . '/../../../../vendor/autoload.php';
 }
-if (!PHPCompiler\CompilerVersion::supportsClassConstBraceDeref()) {
+if (!PHPCompiler\CompilerVersion::supportsDynamicClassConstFetch()) {
     die('skip dynamic class const fetch disabled on reference profile');
 }
 ?>

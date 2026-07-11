@@ -1,5 +1,5 @@
 --TEST--
-Language: dynamic class constant fetch Class::{$name} JIT (#3150)
+Language: dynamic class constant fetch C::{$name} on forward profile (#17863, Zend/zend_compile.c)
 --SKIPIF--
 <?php
 if (!class_exists('PHPCompiler\\CompilerVersion')) {
@@ -12,15 +12,11 @@ if (!PHPCompiler\CompilerVersion::supportsDynamicClassConstFetch()) {
 --FILE--
 <?php
 class C {
-    public const X = 42;
-    public const LABEL = 'ok';
+    public const FOO = 'bar';
 }
-$n = 'X';
-echo C::{$n};
-echo "\n";
-$m = 'label';
-echo C::{$m};
-echo "\n";
+$name = 'FOO';
+echo constant(C::class.'::'.$name), "\n";
+echo C::{$name}, "\n";
 --EXPECT--
-42
-ok
+bar
+bar
