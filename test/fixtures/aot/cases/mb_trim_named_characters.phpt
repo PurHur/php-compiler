@@ -1,5 +1,7 @@
 --TEST--
 AOT mb_trim() named characters: parameter (#9839, ext/mbstring/mbstring.c)
+--ENV--
+PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
 echo mb_trim('--héllo--', characters: '-'), "\n";
