@@ -13,7 +13,7 @@ use PHPLLVM\Value;
 /**
  * JIT/AOT link for array_values() via ArrayValuesJitHelper PHP (#12329).
  *
- * Standalone AOT compiles {@see ArrayValuesJitHelper} via JitVmHelperLink (#14244); native literal arrays keep LLVM in {@see ArrayBuiltinHelper::buildValuesArray()}.
+ * Standalone AOT compiles {@see ArrayValuesJitHelper} via JitVmHelperLink (#14244); native literal arrays materialize to hashtable then route through PHP (#17922).
  * SSOT: {@see \PHPCompiler\VM\HashTable::valuesCopy()}
  * php-src: ext/standard/array.c — php_array_values()
  */
@@ -32,16 +32,11 @@ final class ArrayValuesRuntime
 
     public static function values(Context $context, JITVariable $array): Value
     {
-        if (ArrayBuiltinHelper::isNativeArray($array->type)) {
-            return ArrayBuiltinHelper::buildValuesArray($context, $array);
-        }
-
         self::ensureLinked($context);
-        $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
 
         return $context->builder->call(
             $context->lookupFunction(self::ABI_VALUES),
-            $ht
+            ArrayBuiltinHelper::loadHashTable($context, $array)
         );
     }
 

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Call;
 
-use PHPCompiler\JIT\ArrayBuiltinHelper;
+use PHPCompiler\JIT\Builtin\ArrayValuesRuntime;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable;
@@ -19,7 +19,7 @@ final class HashTableValuesCopy implements Call
             throw new \LogicException('valuesCopy() requires a HashTable receiver');
         }
 
-        return ArrayBuiltinHelper::buildValuesArray($context, self::receiverVariable($context, $args[0]));
+        return ArrayValuesRuntime::values($context, self::receiverVariable($context, $args[0]));
     }
 
     private static function receiverVariable(Context $context, Variable $receiver): Variable
