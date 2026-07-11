@@ -4567,4 +4567,6 @@ require_once __DIR__.'/../../../ext/inotify/inotify_rm_watch.php';
 require_once __DIR__.'/../../../ext/xmlreader/XmlReaderEvent.php';
 require_once __DIR__.'/../../../ext/xmlreader/XmlReaderState.php';
 require_once __DIR__.'/../../../ext/xmlwriter/XmlWriterState.php';
+require_once __DIR__.'/../../../ext/inotify/InotifyExtensionPolicy.php';
+require_once __DIR__.'/../../../lib/AOT/HelperUnitGlobalCtor.php';
 echo "compiler_lib_spine_smoke bundle OK\n";

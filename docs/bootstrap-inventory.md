@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 4509 |
-| Phase A inventory files (M2 ratio SSOT) | 4509 |
+| PHP files on vm.php path | 4510 |
+| Phase A inventory files (M2 ratio SSOT) | 4510 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 12246 |
+| Source constructs flagged (warnings) | 12247 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -353,6 +353,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/igbinary/IgbinaryFunction.php` | 0 | 3 |
 | `ext/igbinary/Module.php` | 0 | 1 |
 | `ext/inotify/InotifyConstants.php` | 0 | 1 |
+| `ext/inotify/InotifyExtensionPolicy.php` | 0 | 1 |
 | `ext/inotify/InotifyLibcThinAbi.php` | 0 | 1 |
 | `ext/inotify/Module.php` | 0 | 6 |
 | `ext/inotify/VmInotify.php` | 0 | 5 |
@@ -6748,6 +6749,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `ext/inotify/InotifyExtensionPolicy.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `ext/inotify/InotifyLibcThinAbi.php`
 
 **Warnings** (review for bootstrap subset):
@@ -6756,11 +6762,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/inotify/Module.php`
 
 **Warnings** (review for bootstrap subset):
-- new VM\Variable (line 20)
-- new inotify_init (line 33)
-- new inotify_add_watch (line 34)
-- new inotify_rm_watch (line 35)
-- new inotify_read (line 36)
+- new VM\Variable (line 23)
+- new inotify_init (line 36)
+- new inotify_add_watch (line 37)
+- new inotify_rm_watch (line 38)
+- new inotify_read (line 39)
 - 2 class method(s)
 
 ### `ext/inotify/VmInotify.php`
@@ -15625,14 +15631,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new HashTable (line 271)
 - new HashTable (line 272)
 - new Variable (line 274)
-- new HashTable (line 288)
-- new Variable (line 293)
-- new HashTable (line 352)
-- new Variable (line 356)
-- new Variable (line 360)
-- new Variable (line 364)
-- new Variable (line 371)
-- new Variable (line 414)
+- new HashTable (line 291)
+- new Variable (line 296)
+- new HashTable (line 355)
+- new Variable (line 359)
+- new Variable (line 363)
+- new Variable (line 367)
+- new Variable (line 374)
+- new Variable (line 417)
 - 15 class method(s)
 - 2 closure(s)
 
@@ -24165,17 +24171,17 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new self (line 31)
-- new CompileError (line 82)
 - new CompileError (line 85)
-- new CompileError (line 91)
-- new CompileError (line 96)
-- new CompileError (line 122)
-- new CompileError (line 137)
-- new CompileError (line 152)
-- new CompileError (line 155)
+- new CompileError (line 88)
+- new CompileError (line 94)
+- new CompileError (line 99)
+- new CompileError (line 125)
+- new CompileError (line 143)
 - new CompileError (line 161)
-- new CompileError (line 166)
-- new CompileError (line 188)
+- new CompileError (line 164)
+- new CompileError (line 170)
+- new CompileError (line 175)
+- new CompileError (line 200)
 - 10 class method(s)
 
 ### `lib/Compiler/NoDiscardMetadata.php`
