@@ -2923,6 +2923,8 @@ class Object_ extends Type {
         // HashContext JIT handle slot must exist before allocate() (ext/hash/JitHashContext.php, #3357).
         if ('hashcontext' === $lcname) {
             $this->defineProperty($id, '__hcId', Variable::TYPE_NATIVE_LONG);
+            $this->defineProperty($id, '__hcAlgo', Variable::TYPE_STRING);
+            $this->defineProperty($id, '__hcBuf', Variable::TYPE_STRING);
         }
         if ('phpcompiler\vm\context' === $lcname) {
             $this->defineProperty($id, 'runtime', Variable::TYPE_OBJECT);
@@ -3366,6 +3368,9 @@ class Object_ extends Type {
         // HashContext JIT handle (ext/hash/JitHashContext.php, #3357).
         if ('hashcontext' === $lcClass && '__hcid' === $lcName) {
             return Variable::TYPE_NATIVE_LONG;
+        }
+        if ('hashcontext' === $lcClass && ('__hcalgo' === $lcName || '__hcbuf' === $lcName)) {
+            return Variable::TYPE_STRING;
         }
 
         return Variable::TYPE_VALUE;

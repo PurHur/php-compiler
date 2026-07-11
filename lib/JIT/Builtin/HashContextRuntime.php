@@ -18,9 +18,6 @@ final class HashContextRuntime
         }
 
         HashContextEmbedBridge::ensureLinked($context);
-        HashContextFinalLlvm::implement($context);
-        HashContextCopyLlvm::implement($context);
-        StringHashCrypto::ensureLinked($context);
 
         if (null !== $savedBlock) {
             $context->builder->positionAtEnd($savedBlock);
