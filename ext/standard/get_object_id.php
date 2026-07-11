@@ -32,7 +32,7 @@ final class get_object_id extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $frame->returnVar->int(ObjectHandleSupport::requireObjectId($frame->calledArgs[0], 'get_object_id'));
+        $frame->returnVar->int(ObjectHandleSupport::requireObjectId($frame->calledArgs[0], 'get_object_id', $frame->vmContext));
     }
 
     public function call(Context $context, JITVariable ...$args): Value
