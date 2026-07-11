@@ -48,6 +48,10 @@ final class NullsafeHelper
     {
         $context = $jit->context;
         $builder = $context->builder;
+        $i1 = $context->getTypeFromString('int1');
+        if (null !== Variable::propertyFetchNonObjectTypeLabel($receiver->type)) {
+            return $i1->constInt(1, false);
+        }
         if (Variable::TYPE_OBJECT === $receiver->type) {
             $obj = $context->helper->loadValue($receiver);
 
@@ -68,7 +72,6 @@ final class NullsafeHelper
                 $context->structFieldMap['__value__']['type']
             )
         );
-        $i1 = $context->getTypeFromString('int1');
         $nullableSlot = $i1->constInt(self::nullablePropertySlot($context, $receiver) ? 1 : 0, false);
 
         return self::callValueBoxShortCircuits($context, $typeByte, $nullableSlot);

@@ -6380,6 +6380,10 @@ restart:
                             }
                             break;
                         }
+                        if ($op->nullsafeFetchPropertyRead) {
+                            $result->null();
+                            break;
+                        }
                         if (Variable::TYPE_NULL === $resolved->type) {
                             $this->context->errors->propertyReadOnNonObject(
                                 $name,

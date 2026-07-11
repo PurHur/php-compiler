@@ -13,14 +13,24 @@ namespace PHPCompiler\VM;
 final class NullsafeJitHelper
 {
     /**
-     * Value-box slice of nullsafe short-circuit: PHP null, or uninitialized nullable typed slot (#5220).
+     * Value-box slice of nullsafe short-circuit: PHP null, scalar/non-object, or uninitialized
+     * nullable typed slot (#5220, #18026, #18028).
      */
     public static function valueBoxShortCircuits(int $typeByte, bool $nullablePropertySlot): bool
     {
         if (Variable::TYPE_NULL === $typeByte) {
             return true;
         }
-        if (Variable::TYPE_UNDEFINED === $typeByte && $nullablePropertySlot) {
+        if (Variable::TYPE_UNDEFINED === $typeByte) {
+            return $nullablePropertySlot;
+        }
+        if (\in_array($typeByte, [
+            Variable::TYPE_BOOLEAN,
+            Variable::TYPE_INTEGER,
+            Variable::TYPE_FLOAT,
+            Variable::TYPE_STRING,
+            Variable::TYPE_ARRAY,
+        ], true)) {
             return true;
         }
 
