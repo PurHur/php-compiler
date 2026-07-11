@@ -180,6 +180,14 @@ final class JitValueBox
     }
 
     /**
+     * Box a nullable {@see __object__*} into a fresh {@see __value__*} (#17954).
+     */
+    public static function nullableObjectToValuePtr(Context $context, Value $objPtr): Value
+    {
+        return self::valuePtrFromObjectParam($context, $objPtr);
+    }
+
+    /**
      * Box a nullable object param ({@see __object__*} at the LLVM edge, {@see Variable::TYPE_VALUE} in JIT).
      */
     private static function valuePtrFromObjectParam(Context $context, Value $objPtr): Value

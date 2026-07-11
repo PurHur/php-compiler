@@ -8,7 +8,6 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\JitVmHelperLink;
-use PHPLLVM\Builder;
 
 /** JIT/AOT link for DOMDocument::getElementById() via DomGetElementByIdJitHelper (#17954). */
 final class DomGetElementByIdRuntime
@@ -66,29 +65,7 @@ final class DomGetElementByIdRuntime
         }
         $foundObj = $context->builder->call($helperFn, ...$args);
         $foundObj = JitNestedHelperCoerce::coerceBridgeResult($context, $foundObj, $objPtr);
-        $slot = JitValueBox::alloc($context);
-        $destPtr = JitValueBox::pointer($context, $slot);
-        $isNull = $context->builder->icmp(
-            Builder::INT_EQ,
-            $foundObj,
-            $objPtr->constNull()
-        );
-        $nullBlock = $fn->appendBasicBlock('dom_gei_bridge_null');
-        $objBlock = $fn->appendBasicBlock('dom_gei_bridge_obj');
-        $doneBlock = $fn->appendBasicBlock('dom_gei_bridge_done');
-        $context->builder->branchIf($isNull, $nullBlock, $objBlock);
-        $context->builder->positionAtEnd($nullBlock);
-        $context->builder->call($context->lookupFunction('__value__writeNull'), $destPtr);
-        $context->builder->branch($doneBlock);
-        $context->builder->positionAtEnd($objBlock);
-        $context->builder->call(
-            $context->lookupFunction('__value__writeObject'),
-            $destPtr,
-            $foundObj
-        );
-        $context->builder->branch($doneBlock);
-        $context->builder->positionAtEnd($doneBlock);
-        $context->builder->returnValue(JitValueBox::normalizeValuePtr($context, $destPtr));
+        $context->builder->returnValue(JitValueBox::nullableObjectToValuePtr($context, $foundObj));
         $context->registerFunction(self::ABI_NAME, $fn);
 
         if (null !== $savedBlock) {

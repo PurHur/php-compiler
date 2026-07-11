@@ -58,6 +58,30 @@ final class DomActiveContextAotTest extends TestCase
         $this->assertStringNotContainsString('DomGetElementByIdRuntime::ensureLinked', $call);
     }
 
+    public function testDomRegistryUsesProcessGlobalBucket(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/dom/DomRegistry.php');
+        $this->assertStringContainsString('__phpc_dom_registry', $source);
+        $this->assertStringContainsString('$GLOBALS', $source);
+    }
+
+    public function testHelperRuntimeFingerprintHashesExtDomDeps(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../lib/AOT/HelperRuntimeCache.php');
+        $this->assertStringContainsString('unitDependencyFingerprintMaterial', $source);
+        $this->assertStringContainsString('/ext/dom/VmDom.php', $source);
+    }
+
+    public function testLoadHTMLSyncsElementIdMapAfterParse(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/dom/VmDom.php');
+        $pos = strpos($source, 'public static function loadHTML(');
+        $this->assertNotFalse($pos);
+        $body = substr($source, $pos, 8000);
+        $this->assertStringContainsString('reindexDocumentIds', $body);
+        $this->assertStringContainsString('syncElementIdMapProperty', $body);
+    }
+
     public function testDomElementTextContentUsesInitLinkedHelper(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/dom/JitDomElementTextContent.php');

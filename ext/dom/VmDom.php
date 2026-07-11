@@ -3950,6 +3950,7 @@ final class VmDom
         self::propagateDocumentId($root, $document->id);
         self::syncSubtree($ctx, $document);
         self::reindexDocumentIds($document, $root);
+        self::syncElementIdMapProperty($document);
         $state->documentUri = self::defaultDocumentUri();
 
         return true;
