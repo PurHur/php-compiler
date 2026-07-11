@@ -36487,6 +36487,13 @@ class Compiler {
         if (null === $block->orig || $argIndex < 0) {
             return null;
         }
+        $callArg = property_exists($cfgCallOp, 'args') && is_array($cfgCallOp->args)
+            ? ($cfgCallOp->args[$argIndex] ?? null)
+            : null;
+        // Embedded literals (e.g. call_user_func_array('fn', [&$x])) are not dim-fetch producers (#18015).
+        if ($this->isEmbeddedCallLiteralArg($callArg)) {
+            return null;
+        }
         $callIndex = null;
         foreach ($block->orig->children as $i => $child) {
             if ($child === $cfgCallOp) {
@@ -36499,6 +36506,10 @@ class Compiler {
         }
         $fetch = $block->orig->children[$callIndex - 1] ?? null;
         if (!$fetch instanceof Op\Expr\ArrayDimFetch) {
+            return null;
+        }
+        // Array-literal by-ref element setup (FETCH_DIM_W + ASSIGN_REF) is not a dim-read call arg (#18015).
+        if ($this->isArrayDimFetchForWrite($fetch, $block)) {
             return null;
         }
         $array = $callIndex >= 2 ? ($block->orig->children[$callIndex - 2] ?? null) : null;
@@ -43774,7 +43785,7 @@ class Compiler {
                     }
                 }
             }
-            if (null !== $cfgCallOp) {
+            if (null !== $cfgCallOp && !$this->isEmbeddedCallLiteralArg($arg)) {
                 $pendingDimFetchSlot = $this->lastPendingCallArgArrayDimFetchSlot($block, $sends);
                 if (null === $pendingDimFetchSlot && (
                     null !== $dimFetchSlot
