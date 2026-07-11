@@ -61,6 +61,15 @@ class Context {
 
     public Runtime $runtime;
 
+    /** Active declare(ticks=N) interval; 0 disables tick dispatch (#3343). */
+    public int $tickInterval = 0;
+
+    /** Countdown to next tick callback invocation (#3343). */
+    public int $tickCounter = 0;
+
+    /** @var list<int> Saved tick intervals for nested declare blocks (#3343). */
+    public array $tickIntervalStack = [];
+
     /**
      * Property-hook virtual/backing metadata from {@see \PHPCompiler\SourcePreprocessor\PropertyHooks} (#4687).
      *

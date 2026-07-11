@@ -63,6 +63,9 @@ class Block {
     /** File-level declare(strict_types=1) for this function body (issue #156). */
     public bool $strictTypes = false;
 
+    /** True when this CFG block emitted declare(ticks=N) enter (#3343). */
+    public bool $tickScopeOpened = false;
+
     /** __COMPILER_HALT_OFFSET__ when the script contains __halt_compiler() (#5455). */
     public ?int $haltCompilerOffset = null;
 

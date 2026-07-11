@@ -396,6 +396,8 @@ class Module extends ModuleAbstract
             ...(VmFastCgi::registersFinishRequestFunction() ? [new fastcgi_finish_request()] : []),
             new header_register_callback(),
             new register_shutdown_function(),
+            new register_tick_function(),
+            new unregister_tick_function(),
             ...(CompilerVersion::supportsReadonlyBuiltin() ? [new readonly_()] : []),
             new setcookie(),
             new setrawcookie(),

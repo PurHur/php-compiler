@@ -3070,6 +3070,19 @@ class VM {
         }
     }
 
+    private function maybeRunTick(): void
+    {
+        if (VM\TickQueue::isRunning() || $this->context->tickInterval <= 0) {
+            return;
+        }
+        --$this->context->tickCounter;
+        if ($this->context->tickCounter > 0) {
+            return;
+        }
+        $this->context->tickCounter = $this->context->tickInterval;
+        VM\TickQueue::run($this->context);
+    }
+
     private function runFrames(): int
     {
         $previous = self::$running;
@@ -7515,6 +7528,29 @@ restart:
                         goto restart;
                     }
                     break;
+                case OpCode::TYPE_TICK_SCOPE_ENTER:
+                    $this->context->tickIntervalStack[] = $this->context->tickInterval;
+                    $this->context->tickInterval = max(0, (int) $op->arg1);
+                    $this->context->tickCounter = $this->context->tickInterval > 0
+                        ? $this->context->tickInterval
+                        : 0;
+                    break;
+                case OpCode::TYPE_TICK_SCOPE_SET:
+                    $this->context->tickInterval = max(0, (int) $op->arg1);
+                    $this->context->tickCounter = $this->context->tickInterval > 0
+                        ? $this->context->tickInterval
+                        : 0;
+                    break;
+                case OpCode::TYPE_TICK_SCOPE_LEAVE:
+                    if ([] !== $this->context->tickIntervalStack) {
+                        $this->context->tickInterval = array_pop($this->context->tickIntervalStack);
+                    } else {
+                        $this->context->tickInterval = 0;
+                    }
+                    $this->context->tickCounter = $this->context->tickInterval > 0
+                        ? $this->context->tickInterval
+                        : 0;
+                    break;
                 default:
                     throw new \LogicException("VM OpCode Not Implemented: " . opcode_type_name($op->type));
                 }
@@ -7557,6 +7593,7 @@ restart:
                 $frame = $redirect->catchFrame;
                 goto restart;
             }
+            $this->maybeRunTick();
             if ($this->shouldAbortPropertyHookInvocation($frame)) {
                 return self::FAILURE;
             }
