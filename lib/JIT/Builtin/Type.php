@@ -480,6 +480,9 @@ class Type extends Builtin {
         $fntypeStreamSetBlocking = $this->context->context->functionType($i32, false, $i64, $i64);
         $fnStreamSetBlocking = $this->context->module->addFunction('__compiler_stream_set_blocking', $fntypeStreamSetBlocking);
         $this->context->registerFunction('__compiler_stream_set_blocking', $fnStreamSetBlocking);
+        $fntypeStreamEnableCrypto = $this->context->context->functionType($i32, false, $i64, $i64, $i64, $i64);
+        $fnStreamEnableCrypto = $this->context->module->addFunction('__compiler_stream_enable_crypto', $fntypeStreamEnableCrypto);
+        $this->context->registerFunction('__compiler_stream_enable_crypto', $fnStreamEnableCrypto);
         $fntypeStreamSocketGetName = $this->context->context->functionType($strPtr, false, $i64, $i64);
         $fnStreamSocketGetName = $this->context->module->addFunction('__compiler_stream_socket_get_name', $fntypeStreamSocketGetName);
         $this->context->registerFunction('__compiler_stream_socket_get_name', $fnStreamSocketGetName);

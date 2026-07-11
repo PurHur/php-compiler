@@ -155,6 +155,7 @@ final class SelfHostBuiltinPolicy
         'stream_copy_to_string' => 'filesystem',
         'stream_get_meta_data' => 'filesystem',
         'stream_set_blocking' => 'filesystem',
+        'stream_socket_enable_crypto' => 'filesystem',
         'stream_socket_get_name' => 'filesystem',
         'stream_socket_accept' => 'filesystem',
         'feof' => 'filesystem', 'fflush' => 'filesystem', 'fsync' => 'filesystem', 'fdatasync' => 'filesystem', 'ftruncate' => 'filesystem', 'rewind' => 'filesystem', 'fpassthru' => 'filesystem',

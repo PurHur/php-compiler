@@ -1675,6 +1675,33 @@ final class VmFs
         return VmStreamMeta::supportsMetadata(self::handleUri($handle));
     }
 
+    /** Host PHP stream resource for adopted handles, or null for VM-native streams. */
+    public static function hostStreamResource(int $handle): mixed
+    {
+        return self::lookup($handle);
+    }
+
+    /**
+     * stream_socket_enable_crypto() — php-src ext/standard/streamsfuncs.c (#4610).
+     */
+    public static function streamSocketEnableCrypto(
+        int $handle,
+        bool $enable,
+        ?int $cryptoMethod = null,
+        ?int $sessionHandle = null,
+        ?string $capturePeerCert = null,
+        ?string $passphrase = null
+    ): bool {
+        return VmStreamEnableCrypto::invoke(
+            $handle,
+            $enable,
+            $cryptoMethod,
+            $sessionHandle,
+            $capturePeerCert,
+            $passphrase
+        );
+    }
+
     /**
      * stream_set_timeout() — php-src ext/standard/streams.c (issue #3754).
      */
