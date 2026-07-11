@@ -28,6 +28,8 @@ final class GeneratorVMTest extends BaseTest
                 'generator_get_return_early.phpt',
                 'generator_get_return_before_yield.phpt',
                 'generator_get_return_after_throw.phpt',
+                'generator_valid_after_return.phpt',
+                'generator_next_closed.phpt',
                 'generator_throw_after_yield.phpt',
                 'generator_current_throw_after_yield.phpt',
                 'generator_next_throw_before_fwrite.phpt',
