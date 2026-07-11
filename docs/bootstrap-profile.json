@@ -148,6 +148,7 @@
         "ext/dom/DocumentCreateElement.php",
         "ext/dom/DocumentCreateElementNS.php",
         "ext/dom/DocumentCreateEntityReference.php",
+        "ext/dom/DocumentCreateProcessingInstruction.php",
         "ext/dom/DocumentCreateTextNode.php",
         "ext/dom/DocumentGetElementById.php",
         "ext/dom/DocumentGetElementsByTagName.php",
@@ -447,6 +448,7 @@
         "ext/mbstring/mb_convert_variables.php",
         "ext/mbstring/mb_decode_mimeheader.php",
         "ext/mbstring/mb_decode_numericentity.php",
+        "ext/mbstring/mb_detect_encoding.php",
         "ext/mbstring/mb_detect_order.php",
         "ext/mbstring/mb_encode_mimeheader.php",
         "ext/mbstring/mb_encode_numericentity.php",
@@ -4636,9 +4638,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 4402,
+        "inventory_files": 4404,
         "excluded": 0,
-        "eligible": 4402,
+        "eligible": 4404,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1

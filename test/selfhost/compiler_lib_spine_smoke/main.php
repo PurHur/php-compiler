@@ -436,6 +436,7 @@ require_once __DIR__.'/../../../ext/mbstring/mb_check_encoding.php';
 require_once __DIR__.'/../../../ext/mbstring/mb_chr.php';
 require_once __DIR__.'/../../../ext/mbstring/mb_convert_case.php';
 require_once __DIR__.'/../../../ext/mbstring/mb_convert_encoding.php';
+require_once __DIR__.'/../../../ext/mbstring/mb_detect_encoding.php';
 require_once __DIR__.'/../../../ext/mbstring/mb_convert_kana.php';
 require_once __DIR__.'/../../../ext/mbstring/mb_convert_variables.php';
 require_once __DIR__.'/../../../ext/mbstring/mb_decode_mimeheader.php';
