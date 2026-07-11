@@ -58,6 +58,44 @@ final class PcntlLibcThinAbi
         return true;
     }
 
+    public static function processAvailable(): bool
+    {
+        return null !== self::ffi();
+    }
+
+    public static function fork(): int
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return -1;
+        }
+
+        return (int) $ffi->fork();
+    }
+
+    public static function waitpid(int $pid, int &$status, int $options): int
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return -1;
+        }
+        $statusVar = $ffi->new('int');
+        $rc = (int) $ffi->waitpid($pid, \FFI::addr($statusVar), $options);
+        $status = (int) $statusVar->cdata;
+
+        return $rc;
+    }
+
+    public static function wifexited(int $status): bool
+    {
+        return 0 === ($status & 0x7f);
+    }
+
+    public static function wexitstatus(int $status): int
+    {
+        return ($status >> 8) & 0xff;
+    }
+
     private static function ffi(): ?\FFI
     {
         if (!self::ffiEnabled()) {
@@ -76,8 +114,11 @@ final class PcntlLibcThinAbi
         }
 
         $cdef = <<<'CDEF'
+typedef int pid_t;
 typedef void (*sighandler_t)(int);
 sighandler_t signal(int signum, sighandler_t handler);
+pid_t fork(void);
+pid_t waitpid(pid_t pid, int *status, int options);
 CDEF;
 
         foreach (['libc.so.6', 'libc.so'] as $lib) {

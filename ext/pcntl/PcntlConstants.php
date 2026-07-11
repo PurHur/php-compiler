@@ -39,10 +39,14 @@ final class PcntlConstants
     public const SIGPWR = 30;
     public const SIGSYS = 31;
 
+    /** waitpid(2) WNOHANG — return immediately if no child has exited (issue #3327). */
+    public const WNOHANG = 1;
+
     /** @return array<string, int> */
     public static function registeredConstants(): array
     {
         return [
+            'WNOHANG' => self::WNOHANG,
             'SIGHUP' => self::SIGHUP,
             'SIGINT' => self::SIGINT,
             'SIGQUIT' => self::SIGQUIT,

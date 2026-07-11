@@ -52,6 +52,31 @@ final class PcntlHostBridge
         \pcntl_signal_dispatch();
     }
 
+    public static function forkAvailable(): bool
+    {
+        return \function_exists('pcntl_fork');
+    }
+
+    public static function fork(): int
+    {
+        return (int) \pcntl_fork();
+    }
+
+    public static function waitpid(int $pid, int &$status, int $options): int
+    {
+        return (int) \pcntl_waitpid($pid, $status, $options);
+    }
+
+    public static function wifexited(int $status): bool
+    {
+        return \pcntl_wifexited($status);
+    }
+
+    public static function wexitstatus(int $status): int
+    {
+        return (int) \pcntl_wexitstatus($status);
+    }
+
     private static function ffiCallbackAvailable(): bool
     {
         return \class_exists(\FFI::class, false) && \method_exists(\FFI::class, 'callback');

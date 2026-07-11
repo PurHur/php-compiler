@@ -24,6 +24,59 @@ final class VmPcntl
         return true;
     }
 
+    public static function processAvailable(): bool
+    {
+        return PcntlHostBridge::forkAvailable() || PcntlLibcThinAbi::processAvailable();
+    }
+
+    public static function fork(): int
+    {
+        if (PcntlHostBridge::forkAvailable()) {
+            return PcntlHostBridge::fork();
+        }
+        if (PcntlLibcThinAbi::processAvailable()) {
+            return PcntlLibcThinAbi::fork();
+        }
+
+        throw new \Error('pcntl_fork() is not available in this compiler build');
+    }
+
+    public static function waitpid(int $pid, int &$status, int $options): int
+    {
+        if (PcntlHostBridge::forkAvailable()) {
+            return PcntlHostBridge::waitpid($pid, $status, $options);
+        }
+        if (PcntlLibcThinAbi::processAvailable()) {
+            return PcntlLibcThinAbi::waitpid($pid, $status, $options);
+        }
+
+        throw new \Error('pcntl_waitpid() is not available in this compiler build');
+    }
+
+    public static function wifexited(int $status): bool
+    {
+        if (PcntlHostBridge::forkAvailable()) {
+            return PcntlHostBridge::wifexited($status);
+        }
+        if (PcntlLibcThinAbi::processAvailable()) {
+            return PcntlLibcThinAbi::wifexited($status);
+        }
+
+        throw new \Error('pcntl_wifexited() is not available in this compiler build');
+    }
+
+    public static function wexitstatus(int $status): int
+    {
+        if (PcntlHostBridge::forkAvailable()) {
+            return PcntlHostBridge::wexitstatus($status);
+        }
+        if (PcntlLibcThinAbi::processAvailable()) {
+            return PcntlLibcThinAbi::wexitstatus($status);
+        }
+
+        throw new \Error('pcntl_wexitstatus() is not available in this compiler build');
+    }
+
     public static function hasHandler(int $signo): bool
     {
         return isset(self::$handlers[$signo]);
