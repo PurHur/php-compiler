@@ -5887,6 +5887,63 @@ PHP;
         self::assertSame("match\n", ob_get_clean());
     }
 
+    /** Issue #17937 — date_sunrise(strtotime(...), SUNFUNCS_RET_STRING, …) wires hoisted FuncCall + ConstFetch slots. */
+    public function testDateSunriseInlineStrtotimeAndSunfuncsConstUsesProducerSlots(): void
+    {
+        $code = <<<'PHP'
+<?php
+date_sunrise(strtotime('2026-07-11'), SUNFUNCS_RET_STRING, 40.7, -74.0, 90, 1);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'date_sunrise_inline_strtotime.php');
+
+        $strtotimeReturnSlot = null;
+        $sunriseSends = [];
+        $fcallOrdinal = 0;
+        $lastInitOrdinal = 0;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                ++$fcallOrdinal;
+                $lastInitOrdinal = $fcallOrdinal;
+                if ($lastInitOrdinal > 1) {
+                    $sunriseSends = [];
+                }
+            }
+            if (1 === $fcallOrdinal && OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
+                $strtotimeReturnSlot = $op->arg1;
+            }
+            if ($fcallOrdinal === $lastInitOrdinal && $lastInitOrdinal > 1 && OpCode::TYPE_ARG_SEND === $op->type) {
+                $sunriseSends[] = $op->arg1;
+            }
+        }
+
+        self::assertNotNull($strtotimeReturnSlot, 'strtotime must FUNCCALL_EXEC_RETURN');
+        self::assertCount(6, $sunriseSends, 'arg sends='.json_encode($sunriseSends));
+        self::assertSame($strtotimeReturnSlot, $sunriseSends[0], 'arg sends='.json_encode($sunriseSends));
+        self::assertSame(
+            '1',
+            $block->constants[$sunriseSends[1] ?? -1]->toString() ?? null,
+            'SUNFUNCS_RET_STRING arg sends='.json_encode($sunriseSends)
+        );
+    }
+
+    /** Issue #17937 — date_sunrise inline strtotime timestamp must match variable form at runtime. */
+    public function testDateSunriseInlineStrtotimeRuntimeMatchesVariableForm(): void
+    {
+        $code = <<<'PHP'
+<?php
+$inline = date_sunrise(strtotime('2026-07-11'), SUNFUNCS_RET_STRING, 40.7, -74.0, 90, 1);
+$t = strtotime('2026-07-11');
+$var = date_sunrise($t, SUNFUNCS_RET_STRING, 40.7, -74.0, 90, 1);
+echo (\is_string($inline) && $inline === $var && preg_match('/^\d{2}:\d{2}$/', $inline)) ? "match\n" : "mismatch\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'date_sunrise_inline_strtotime_runtime.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("match\n", ob_get_clean());
+    }
+
     /** Issue #12009 — hoisted FuncCall + ConstFetch siblings with embedded middle literal (try body). */
     public function testJsonDecodeInlineStrRepeatJsonThrowOnErrorDepthRuntime(): void
     {
