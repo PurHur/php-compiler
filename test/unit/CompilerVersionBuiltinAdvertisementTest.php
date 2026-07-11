@@ -817,13 +817,13 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         }
     }
 
-    public function testVmRegistersGeneratorToArrayOnDefaultDevProfile(): void
+    public function testVmDoesNotRegisterGeneratorToArrayOnReferenceProfile(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE');
         try {
             $runtime = new Runtime();
-            $this->assertTrue(isset($runtime->vmContext->functions['generator_to_array']));
+            $this->assertFalse(isset($runtime->vmContext->functions['generator_to_array']));
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');

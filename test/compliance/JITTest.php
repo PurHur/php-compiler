@@ -280,7 +280,8 @@ class JITTest extends BaseTest {
             }
             if (!CompilerVersion::supportsGeneratorToArray()
                 && str_contains($name, 'generator_to_array')
-                && !str_contains($name, 'php84_generator_to_array_phantom')) {
+                && !str_contains($name, 'php84_generator_to_array_phantom')
+                && !str_contains($name, 'generator_to_array_forward_84')) {
                 continue;
             }
             if (!CompilerVersion::supportsDateTimeMicrosecond()
