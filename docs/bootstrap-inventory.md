@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 4364 |
-| Phase A inventory files (M2 ratio SSOT) | 4364 |
+| PHP files on vm.php path | 4373 |
+| Phase A inventory files (M2 ratio SSOT) | 4373 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 11753 |
+| Source constructs flagged (warnings) | 11778 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -500,9 +500,17 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/openssl/openssl_verify.php` | 0 | 3 |
 | `ext/openssl/openssl_x509_parse.php` | 0 | 2 |
 | `ext/openssl/openssl_x509_read.php` | 0 | 2 |
+| `ext/pcntl/Module.php` | 0 | 4 |
+| `ext/pcntl/PcntlConstants.php` | 0 | 1 |
+| `ext/pcntl/PcntlHostBridge.php` | 0 | 2 |
+| `ext/pcntl/PcntlLibcThinAbi.php` | 0 | 2 |
+| `ext/pcntl/VmPcntl.php` | 0 | 3 |
+| `ext/pcntl/VmPcntlArg.php` | 0 | 1 |
+| `ext/pcntl/pcntl_signal.php` | 0 | 3 |
+| `ext/pcntl/pcntl_signal_dispatch.php` | 0 | 3 |
 | `ext/posix/JitPosix.php` | 0 | 1 |
 | `ext/posix/JitPosixTimes.php` | 0 | 1 |
-| `ext/posix/Module.php` | 0 | 28 |
+| `ext/posix/Module.php` | 0 | 29 |
 | `ext/posix/PosixConstants.php` | 0 | 1 |
 | `ext/posix/PosixCtermidJitHelper.php` | 0 | 1 |
 | `ext/posix/PosixFunction.php` | 0 | 3 |
@@ -532,6 +540,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/posix/posix_getppid.php` | 0 | 2 |
 | `ext/posix/posix_getrlimit.php` | 0 | 5 |
 | `ext/posix/posix_getsid.php` | 0 | 2 |
+| `ext/posix/posix_kill.php` | 0 | 3 |
 | `ext/posix/posix_mkfifo.php` | 0 | 3 |
 | `ext/posix/posix_mknod.php` | 0 | 3 |
 | `ext/posix/posix_setegid.php` | 0 | 2 |
@@ -3441,7 +3450,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/Type/ObjectEnumCasePropertyLlvm.php` | 0 | 5 |
 | `lib/JIT/Builtin/Type/ObjectEnumStringCastLlvm.php` | 0 | 1 |
 | `lib/JIT/Builtin/Type/ObjectExitStatusLlvm.php` | 0 | 1 |
-| `lib/JIT/Builtin/Type/ObjectInstancePropertyLlvm.php` | 0 | 4 |
+| `lib/JIT/Builtin/Type/ObjectInstancePropertyLlvm.php` | 0 | 5 |
 | `lib/JIT/Builtin/Type/ObjectStaticPropertyInitLlvm.php` | 0 | 2 |
 | `lib/JIT/Builtin/Type/Object_.php` | 0 | 34 |
 | `lib/JIT/Builtin/Type/String_.php` | 0 | 1 |
@@ -3725,7 +3734,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/ReadonlyFunctionRejector.php` | 0 | 2 |
 | `lib/ReadonlyMethodModifierRejector.php` | 0 | 2 |
 | `lib/ReferenceProfileTokenScan.php` | 0 | 1 |
-| `lib/Runtime.php` | 0 | 73 |
+| `lib/Runtime.php` | 0 | 74 |
 | `lib/RuntimeStrictness.php` | 0 | 1 |
 | `lib/SourceBareThrowRewriter.php` | 0 | 1 |
 | `lib/SourcePreprocessor/PropertyHooks.php` | 0 | 4 |
@@ -5329,9 +5338,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/JitDomCreateElement.php`
 
 **Warnings** (review for bootstrap subset):
-- new JITVariable (line 134)
-- new JITVariable (line 154)
-- 9 class method(s)
+- new JITVariable (line 121)
+- new JITVariable (line 141)
+- 8 class method(s)
 
 ### `ext/dom/Module.php`
 
@@ -7558,6 +7567,57 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 26)
 - 2 class method(s)
 
+### `ext/pcntl/Module.php`
+
+**Warnings** (review for bootstrap subset):
+- new VM\Variable (line 18)
+- new pcntl_signal (line 27)
+- new pcntl_signal_dispatch (line 28)
+- 2 class method(s)
+
+### `ext/pcntl/PcntlConstants.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
+### `ext/pcntl/PcntlHostBridge.php`
+
+**Warnings** (review for bootstrap subset):
+- 6 class method(s)
+- 1 closure(s)
+
+### `ext/pcntl/PcntlLibcThinAbi.php`
+
+**Warnings** (review for bootstrap subset):
+- 6 class method(s)
+- 1 closure(s)
+
+### `ext/pcntl/VmPcntl.php`
+
+**Warnings** (review for bootstrap subset):
+- new Variable (line 54)
+- new Variable (line 90)
+- 8 class method(s)
+
+### `ext/pcntl/VmPcntlArg.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
+### `ext/pcntl/pcntl_signal.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 25)
+- new Error (line 49)
+- 2 class method(s)
+
+### `ext/pcntl/pcntl_signal_dispatch.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 24)
+- new Error (line 34)
+- 2 class method(s)
+
 ### `ext/posix/JitPosix.php`
 
 **Warnings** (review for bootstrap subset):
@@ -7598,6 +7658,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new posix_getsid (line 77)
 - new posix_getpgid (line 78)
 - new posix_setpgid (line 79)
+- new posix_kill (line 80)
 - 2 class method(s)
 
 ### `ext/posix/PosixConstants.php`
@@ -7620,7 +7681,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/posix/PosixLibcThinAbi.php`
 
 **Warnings** (review for bootstrap subset):
-- 15 class method(s)
+- 16 class method(s)
 
 ### `ext/posix/PosixSessionJitHelper.php`
 
@@ -7655,8 +7716,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Error (line 338)
 - new Error (line 352)
 - new Error (line 392)
-- new Error (line 412)
-- 33 class method(s)
+- new Error (line 433)
+- 34 class method(s)
 
 ### `ext/posix/VmPosixCtermidPure.php`
 
@@ -7782,6 +7843,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 27)
+- 2 class method(s)
+
+### `ext/posix/posix_kill.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 25)
+- new Error (line 37)
 - 2 class method(s)
 
 ### `ext/posix/posix_mkfifo.php`
@@ -26883,10 +26951,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/Type/ObjectInstancePropertyLlvm.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 58)
-- new Variable (line 79)
-- new Variable (line 100)
-- 2 class method(s)
+- new Variable (line 63)
+- new Variable (line 84)
+- new Variable (line 105)
+- new Variable (line 210)
+- 4 class method(s)
 
 ### `lib/JIT/Builtin/Type/ObjectStaticPropertyInitLlvm.php`
 
@@ -28772,30 +28841,31 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ext\curl\Module (line 242)
 - new ext\hash\Module (line 243)
 - new ext\posix\Module (line 244)
-- new ext\sockets\Module (line 245)
-- new ext\ftp\Module (line 246)
-- new ext\ctype\Module (line 247)
-- new ext\tokenizer\Module (line 248)
-- new ext\random\Module (line 249)
-- new ext\igbinary\Module (line 250)
-- new ext\msgpack\Module (line 251)
-- new ext\zstd\Module (line 252)
-- new ext\lzf\Module (line 253)
-- new ext\bz2\Module (line 254)
-- new ext\brotli\Module (line 255)
-- new ext\sodium\Module (line 256)
-- new ext\sqlite3\Module (line 257)
-- new ext\standard\Module (line 258)
-- new JIT (line 334)
-- new JITContext (line 348)
-- new SealedClassPreprocessor (line 412)
-- new StaticClassPreprocessor (line 415)
-- new SourcePreprocessor\PropertyHooks (line 418)
-- new State (line 557)
-- new ReflectionProperty (line 584)
-- new ReflectionProperty (line 587)
-- new LintCompiler (line 993)
-- new Variable (line 1123)
+- new ext\pcntl\Module (line 245)
+- new ext\sockets\Module (line 246)
+- new ext\ftp\Module (line 247)
+- new ext\ctype\Module (line 248)
+- new ext\tokenizer\Module (line 249)
+- new ext\random\Module (line 250)
+- new ext\igbinary\Module (line 251)
+- new ext\msgpack\Module (line 252)
+- new ext\zstd\Module (line 253)
+- new ext\lzf\Module (line 254)
+- new ext\bz2\Module (line 255)
+- new ext\brotli\Module (line 256)
+- new ext\sodium\Module (line 257)
+- new ext\sqlite3\Module (line 258)
+- new ext\standard\Module (line 259)
+- new JIT (line 335)
+- new JITContext (line 349)
+- new SealedClassPreprocessor (line 413)
+- new StaticClassPreprocessor (line 416)
+- new SourcePreprocessor\PropertyHooks (line 419)
+- new State (line 558)
+- new ReflectionProperty (line 585)
+- new ReflectionProperty (line 588)
+- new LintCompiler (line 994)
+- new Variable (line 1124)
 - 53 class method(s)
 
 ### `lib/RuntimeStrictness.php`

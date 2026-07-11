@@ -14,6 +14,7 @@ use PHPCompiler\ext\ldap\LdapConstants;
 use PHPCompiler\ext\libxml\LibxmlConstants;
 use PHPCompiler\ext\mbstring\MbstringConstants;
 use PHPCompiler\ext\openssl\OpensslConstants;
+use PHPCompiler\ext\pcntl\PcntlConstants;
 use PHPCompiler\ext\posix\PosixConstants;
 use PHPCompiler\ext\session\SessionConstants;
 use PHPCompiler\ext\sodium\SodiumConstants;
@@ -48,6 +49,7 @@ final class ExtensionConstantGroups
         $groups['dom'] = DomExceptionConstants::globalConstants();
         $groups['libxml'] = LibxmlConstants::registeredConstants();
         $groups['openssl'] = OpensslConstants::registeredConstants();
+        $groups['pcntl'] = PcntlConstants::registeredConstants();
         $groups['posix'] = PosixConstants::registeredConstants();
         $groups['session'] = SessionConstants::registeredConstants();
         $groups['mbstring'] = MbstringConstants::registeredConstants();
