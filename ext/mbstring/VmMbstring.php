@@ -179,12 +179,15 @@ final class VmMbstring
         bool $strict = false
     ): string|false {
         $order = $encodingList ?? MbstringState::detectOrder();
-        if (
-            \in_array('UTF-8', $order, true)
-            && VmString::isValidUtf8($string)
-            && !self::isAsciiByteString($string)
-        ) {
-            return 'UTF-8';
+        if (\in_array('UTF-8', $order, true) && VmString::isValidUtf8($string)) {
+            if (!self::isAsciiByteString($string)) {
+                return 'UTF-8';
+            }
+            $utf8Pos = \array_search('UTF-8', $order, true);
+            $asciiPos = \array_search('ASCII', $order, true);
+            if (false === $asciiPos || (false !== $utf8Pos && $utf8Pos < $asciiPos)) {
+                return 'UTF-8';
+            }
         }
         foreach ($order as $encoding) {
             if ('UTF-8' === $encoding) {
