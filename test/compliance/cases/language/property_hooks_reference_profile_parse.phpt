@@ -1,5 +1,5 @@
 --TEST--
-Language: property hooks on reference profile hint PHP_COMPILER_PROFILE=8.4 (#17610, Zend/zend_language_parser.y)
+Language: property hooks on reference profile parse error (#18019, Zend/zend_language_parser.y)
 --SKIPIF--
 <?php
 if (!class_exists('PHPCompiler\\CompilerVersion')) {
@@ -19,4 +19,4 @@ class C {
 --EXPECT_EXIT--
 255
 --EXPECTF--
-Fatal error: Property hooks require PHP_COMPILER_PROFILE=8.4 (PHP 8.4 forward profile) in %s on line %d
+Fatal error: syntax error, unexpected token "{", expecting "," or ";" in %s on line %d

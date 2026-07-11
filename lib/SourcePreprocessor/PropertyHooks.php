@@ -109,12 +109,10 @@ final class PropertyHooks
         return sprintf(self::VIRTUAL_HOOKED_DEFAULT_COMPILE_ERROR, $className, $propName);
     }
 
-    /** Reference-profile reject with forward-profile env hint (#17610). */
+    /** Reference-profile reject mirrors Zend parse diagnostics (#18019, zend_language_parser.y). */
     public static function referenceProfileHookRejectMessage(string $zendSyntaxDetail): string
     {
-        return CompilerVersion::supportsPropertyHooks()
-            ? $zendSyntaxDetail
-            : self::REFERENCE_PROFILE_PROPERTY_HOOKS_HINT;
+        return $zendSyntaxDetail;
     }
 
     private function locateReferenceProfileHookSyntaxError(string $code): ?array
