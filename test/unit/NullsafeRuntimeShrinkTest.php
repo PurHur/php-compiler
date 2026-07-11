@@ -35,9 +35,17 @@ final class NullsafeRuntimeShrinkTest extends TestCase
             \PHPCompiler\VM\Variable::TYPE_UNDEFINED,
             false
         ));
-        $this->assertFalse($helper::valueBoxShortCircuits(
+        $this->assertTrue($helper::valueBoxShortCircuits(
+            \PHPCompiler\VM\Variable::TYPE_INTEGER,
+            false
+        ));
+        $this->assertTrue($helper::valueBoxShortCircuits(
             \PHPCompiler\VM\Variable::TYPE_STRING,
-            true
+            false
+        ));
+        $this->assertFalse($helper::valueBoxShortCircuits(
+            \PHPCompiler\VM\Variable::TYPE_OBJECT,
+            false
         ));
     }
 }
