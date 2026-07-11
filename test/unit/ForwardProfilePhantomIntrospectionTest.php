@@ -148,6 +148,54 @@ final class ForwardProfilePhantomIntrospectionTest extends TestCase
         }
     }
 
+    public function testGetObjectIdCallableAndAdvertisedOnForwardProfile83(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.3');
+        try {
+            $this->assertTrue(CompilerVersion::supportsGetObjectId());
+            $this->assertTrue(CompilerVersion::advertisesGetObjectId());
+            $this->assertTrue(BuiltinIntrospectionPolicy::functionIsAdvertised('get_object_id'));
+
+            $runtime = new Runtime();
+            $ctx = $runtime->vmContext;
+            $this->assertTrue(isset($ctx->functions['get_object_id']));
+            $this->assertTrue(
+                \PHPCompiler\ext\standard\VmReflection::functionExists($ctx, 'get_object_id')
+            );
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testGetObjectIdCallableAndAdvertisedOnForwardProfile84(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertTrue(CompilerVersion::supportsGetObjectId());
+            $this->assertTrue(CompilerVersion::advertisesGetObjectId());
+            $this->assertTrue(BuiltinIntrospectionPolicy::functionIsAdvertised('get_object_id'));
+
+            $runtime = new Runtime();
+            $ctx = $runtime->vmContext;
+            $this->assertTrue(isset($ctx->functions['get_object_id']));
+            $this->assertTrue(
+                \PHPCompiler\ext\standard\VmReflection::functionExists($ctx, 'get_object_id')
+            );
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     public function testHttpLastResponseHeadersAdvertisedOnForwardProfile84(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
@@ -222,19 +270,19 @@ final class ForwardProfilePhantomIntrospectionTest extends TestCase
         }
     }
 
-    public function testReadonlyCallableButNotAdvertisedOnForwardProfile(): void
+    public function testReadonlyAdvertisedOnForwardProfile84(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE=8.4');
         try {
             $this->assertTrue(CompilerVersion::supportsReadonlyBuiltin());
-            $this->assertFalse(CompilerVersion::advertisesReadonlyBuiltin());
-            $this->assertFalse(BuiltinIntrospectionPolicy::functionIsAdvertised('readonly'));
+            $this->assertTrue(CompilerVersion::advertisesReadonlyBuiltin());
+            $this->assertTrue(BuiltinIntrospectionPolicy::functionIsAdvertised('readonly'));
 
             $runtime = new Runtime();
             $ctx = $runtime->vmContext;
             $this->assertTrue(isset($ctx->functions['readonly']));
-            $this->assertFalse(
+            $this->assertTrue(
                 \PHPCompiler\ext\standard\VmReflection::functionExists($ctx, 'readonly')
             );
         } finally {
@@ -378,7 +426,7 @@ final class ForwardProfilePhantomIntrospectionTest extends TestCase
         }
     }
 
-    public function testGraphemeProfile84BuiltinsCallableButNotAdvertisedWithoutIntl(): void
+    public function testGraphemeProfile84BuiltinsNotAdvertisedWithoutIntl(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE=8.4');
@@ -386,6 +434,7 @@ final class ForwardProfilePhantomIntrospectionTest extends TestCase
             $this->assertTrue(CompilerVersion::supportsGraphemeStrContains());
             $this->assertTrue(CompilerVersion::supportsGraphemeStrimwidth());
             $this->assertTrue(CompilerVersion::supportsGraphemeForwardProfileCore());
+            $this->assertFalse(CompilerVersion::advertisesGraphemeForwardProfileCore());
             $this->assertFalse(
                 \PHPCompiler\ext\standard\ModuleRegistry::extensionLoaded('intl')
             );
@@ -398,7 +447,10 @@ final class ForwardProfilePhantomIntrospectionTest extends TestCase
                 'grapheme_str_contains',
                 'grapheme_strimwidth',
             ] as $fn) {
-                $this->assertFalse(BuiltinIntrospectionPolicy::functionIsAdvertised($fn));
+                $this->assertFalse(
+                    BuiltinIntrospectionPolicy::functionIsAdvertised($fn),
+                    $fn.' must not be advertised on forward 8.4 profile without intl'
+                );
             }
 
             $runtime = new Runtime();
@@ -412,9 +464,13 @@ final class ForwardProfilePhantomIntrospectionTest extends TestCase
                 'grapheme_str_contains',
                 'grapheme_strimwidth',
             ] as $fn) {
-                $this->assertTrue(isset($ctx->functions[$fn]));
                 $this->assertFalse(
-                    \PHPCompiler\ext\standard\VmReflection::functionExists($ctx, $fn)
+                    isset($ctx->functions[$fn]),
+                    $fn.' must not be registered without ext/intl'
+                );
+                $this->assertFalse(
+                    \PHPCompiler\ext\standard\VmReflection::functionExists($ctx, $fn),
+                    $fn.' must not be visible on forward 8.4 profile without intl'
                 );
             }
         } finally {

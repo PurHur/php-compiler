@@ -38,29 +38,22 @@ final class IntlExtensionPolicy
         return ModuleRegistry::extensionLoaded('intl');
     }
 
-    /**
-     * PHP 8.4 profile grapheme builtins registered without full ext/intl (#16667, #7128, #9793).
-     *
-     * @return list<\PHPCompiler\Internal>
-     */
-    public static function profileGraphemeFunctions(): array
+    /** grapheme_strlen/substr/strpos/extract/str_split — require loaded ext/intl (#17694, php-src ext/intl/php_intl.c). */
+    public static function advertisesGraphemeCore(): bool
     {
-        $functions = [];
-        if (CompilerVersion::supportsGraphemeForwardProfileCore()) {
-            $functions[] = new grapheme_strlen();
-            $functions[] = new grapheme_substr();
-            $functions[] = new grapheme_strpos();
-            $functions[] = new grapheme_extract();
-            $functions[] = new grapheme_str_split();
-        }
-        if (CompilerVersion::supportsGraphemeStrContains()) {
-            $functions[] = new grapheme_str_contains();
-        }
-        if (CompilerVersion::supportsGraphemeStrimwidth()) {
-            $functions[] = new grapheme_strimwidth();
-        }
+        return self::advertisesBuiltins();
+    }
 
-        return $functions;
+    /** grapheme_str_contains — require loaded ext/intl (#17694). */
+    public static function advertisesGraphemeStrContains(): bool
+    {
+        return self::advertisesBuiltins();
+    }
+
+    /** grapheme_strimwidth — require loaded ext/intl (#17694). */
+    public static function advertisesGraphemeStrimwidth(): bool
+    {
+        return self::advertisesBuiltins();
     }
 
     /**
@@ -98,7 +91,7 @@ final class IntlExtensionPolicy
         return false;
     }
 
-    /** Run grapheme compliance when ext/intl is loaded or a profile gate matches (#16667). */
+    /** Run grapheme compliance when ext/intl is loaded or a phantom-registration guard matches (#17694). */
     public static function runsGraphemeCompliance(string $testFileName): bool
     {
         if (self::advertisesBuiltins()) {
@@ -109,27 +102,6 @@ final class IntlExtensionPolicy
             || str_contains($testFileName, 'grapheme_forward_profile')
             || str_contains($testFileName, 'grapheme_profile_84')) {
             return true;
-        }
-        if (str_contains($testFileName, 'grapheme_str_contains')
-            && CompilerVersion::supportsGraphemeStrContains()) {
-            return true;
-        }
-        if (str_contains($testFileName, 'grapheme_strimwidth')
-            && CompilerVersion::supportsGraphemeStrimwidth()) {
-            return true;
-        }
-        if (CompilerVersion::supportsGraphemeForwardProfileCore()) {
-            foreach ([
-                'grapheme_strlen',
-                'grapheme_substr',
-                'grapheme_strpos',
-                'grapheme_extract',
-                'grapheme_str_split',
-            ] as $basename) {
-                if (str_contains($testFileName, $basename)) {
-                    return true;
-                }
-            }
         }
 
         return false;

@@ -6,14 +6,13 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedJitCompileScope;
-use PHPCompiler\JIT\UserScriptAotDeferNestedJit;
 
 /**
- * JIT/AOT link for wordwrap() — nested WordwrapJitHelper PHP, or LLVM for user-script AOT (#16734).
+ * JIT/AOT link for wordwrap() via WordwrapJitHelper PHP (#14565, #17724).
  *
+ * User-script AOT uses HelperRuntimeCache prelinked units (#15889) instead of LLVM defer.
  * SSOT: {@see \PHPCompiler\ext\standard\VmString}.
  * php-src: ext/standard/string.c — PHP_FUNCTION(wordwrap)
  */
@@ -31,11 +30,6 @@ final class StringWordwrap
     private const COMPILED_HELPERS = [
         self::WORDWRAP_HELPER,
     ];
-
-    public static function shouldDeferNestedHelper(Context $context): bool
-    {
-        return UserScriptAotDeferNestedJit::shouldDefer($context);
-    }
 
     public static function ensureLinked(Context $context): void
     {
@@ -61,11 +55,7 @@ final class StringWordwrap
         }
 
         $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
-        if (self::shouldDeferNestedHelper($context)) {
-            StringWordwrapLlvm::implement($context);
-        } else {
-            self::implementBridge($context);
-        }
+        self::implementBridge($context);
         if (null !== $savedInsert) {
             BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
         } else {
@@ -87,7 +77,7 @@ final class StringWordwrap
             self::WORDWRAP_HELPER,
             self::HELPER_PATH,
             self::COMPILED_HELPERS,
-            '#14565'
+            '#17724'
         );
     }
 }

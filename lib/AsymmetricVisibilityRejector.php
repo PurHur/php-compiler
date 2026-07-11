@@ -55,7 +55,11 @@ final class AsymmetricVisibilityRejector
 
         $multipleLine = AsymmetricVisibilityRewriter::findMultipleAccessModifierLine($code);
         if ($multipleLine > 0) {
-            throw new CompileFatal($filename, $multipleLine, AsymmetricVisibilityRewriter::MULTIPLE_MODIFIERS_MESSAGE);
+            throw new CompileFatal(
+                $filename,
+                $multipleLine,
+                AsymmetricVisibilityRewriter::referenceProfileMultipleModifierMessage($code, $multipleLine)
+            );
         }
 
         if (null !== $parenSet) {

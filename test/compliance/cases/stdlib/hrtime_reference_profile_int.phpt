@@ -1,9 +1,9 @@
 --TEST--
-stdlib hrtime(true) integer on Zend 8.2 reference profile (issue #12789)
+stdlib hrtime(true) integer nanoseconds on 8.2 reference profile (issue #12789, #17468)
 --FILE--
 <?php
-if ('integer' !== gettype(hrtime(true))) {
-    echo "skip — requires reference profile integer hrtime(true)\n";
+if ('double' === gettype(hrtime(true))) {
+    echo "skip — hrtime(true) float on forward profile\n";
     exit(0);
 }
 echo gettype(hrtime(true)) === 'integer' ? "int\n" : "bad\n";

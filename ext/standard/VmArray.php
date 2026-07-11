@@ -27,7 +27,16 @@ final class VmArray
      */
     public static function shouldSkipNumericArrayFoldElement(Variable $value): bool
     {
-        return EnumCaseSupport::isEnumCaseVariable($value);
+        if (EnumCaseSupport::isEnumCaseVariable($value)) {
+            return true;
+        }
+        $value = $value->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $value->type) {
+            return false;
+        }
+
+        // Case singletons may lack isEnumCase on legacy materialization paths (#8828, #5578).
+        return $value->toObject()->class->isEnum;
     }
 
     /**

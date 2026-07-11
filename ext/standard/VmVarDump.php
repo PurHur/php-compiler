@@ -117,7 +117,8 @@ final class VmVarDump
         }
         $props = $object->getProperties(ClassEntry::PROP_PURPOSE_DEBUG, $vm, $frame);
         $count = \count($props);
-        self::write('object('.$object->class->name.')#'.$object->id.' ('.$count.") {\n");
+        $className = VmObjectDebugType::fromClassName($object->class->name);
+        self::write('object('.$className.')#'.$object->id.' ('.$count.") {\n");
         foreach ($props as $name => $value) {
             self::write(str_repeat(' ', $level));
             self::write('["'.$name."\"]=>\n");

@@ -130,6 +130,13 @@ class Object_ extends Type {
     /** @var array<string, PHPLLVM\Value> immortal __hashtable__* globals for array class constants (#4900) */
     private array $classConstHashtableGlobals = [];
 
+    /**
+     * Per-class map: const key (lowercase) => value, used to shrink dynamic class const fetch lowering (#10200).
+     *
+     * @var array<int, \PHPLLVM\Value> class id => __hashtable__* LLVM global
+     */
+    private array $classConstMapGlobals = [];
+
     /** @var array<int, array<int, array{propertyType: int, type: int, value: int|float|bool|string|null}>> */
     private array $propertyDefaults = [];
 
@@ -3009,7 +3016,7 @@ class Object_ extends Type {
                 $this->defineMethodVisibility($id, 'createfromiso8601string', $pubStatic);
             }
             $pub = \PHPCfg\Func::FLAG_PUBLIC;
-            foreach (['rewind', 'valid', 'current', 'key', 'next', 'getstartdate', 'getdateinterval', 'getrecurrences'] as $method) {
+            foreach (['rewind', 'valid', 'current', 'key', 'next', 'getstartdate', 'getenddate', 'getdateinterval', 'getrecurrences'] as $method) {
                 $this->defineMethodVisibility($id, $method, $pub);
             }
         }
@@ -3173,6 +3180,14 @@ class Object_ extends Type {
             ] as $caseName) {
                 $backing = new VMVariable();
                 $backing->int(\PHPCompiler\ext\standard\VmRoundMode::roundModeIntFromCaseName($caseName));
+                $this->defineEnumCaseConst($id, $caseName, $backing);
+            }
+        }
+        if ('arraypadtype' === $lcname && \PHPCompiler\CompilerVersion::supportsArrayPadTypeEnum()) {
+            $this->enums[$lcname] = true;
+            foreach (['Positive', 'Negative'] as $caseName) {
+                $backing = new VMVariable();
+                $backing->null();
                 $this->defineEnumCaseConst($id, $caseName, $backing);
             }
         }
@@ -3702,6 +3717,7 @@ class Object_ extends Type {
     {
         $key = strtolower($name);
         $this->classConstDisplayNames[$classId][$key] = $name;
+        unset($this->classConstMapGlobals[$classId]);
         if (VMVariable::TYPE_ARRAY === $value->type) {
             $table = $value->toArray();
             if (!$table instanceof \PHPCompiler\VM\HashTable) {
@@ -3765,6 +3781,45 @@ class Object_ extends Type {
         $this->rejectIncompatibleTraitClassConstOverride($classId, $key, $name, $entry);
         unset($this->traitConstSources[$classId][$key]);
         $this->classConstants[$classId][$key] = $entry;
+    }
+
+    /**
+     * Per-class hashtable map used by dynamic class constant fetch (string key => value).
+     *
+     * Values are stored as actual runtime values (strings, scalars, hashtable pointers, objects),
+     * so dynamic fetch can read a single {@see __value__*} entry and copy it to a result box.
+     *
+     * @return \PHPLLVM\Value a loaded {@see __hashtable__*} pointer
+     */
+    public function classConstMapPointerForId(int $classId): \PHPLLVM\Value
+    {
+        if (!isset($this->classConstMapGlobals[$classId])) {
+            $this->defineClassConstMapGlobal($classId);
+        }
+
+        return $this->context->builder->load($this->classConstMapGlobals[$classId]);
+    }
+
+    private function defineClassConstMapGlobal(int $classId): void
+    {
+        $globalName = 'php_compiler_class_const_map_'.$classId;
+        $htPtrType = $this->context->getTypeFromString('__hashtable__*');
+        $global = $this->context->module->addGlobal($htPtrType, $globalName);
+        $global->setInitializer($htPtrType->constNull());
+        $this->classConstMapGlobals[$classId] = $global;
+        $this->context->emitInInit(function (Context $ctx) use ($classId, $global): void {
+            $ht = HashTableHelper::alloc($ctx);
+            foreach ($this->classConstants[$classId] ?? [] as $key => $entry) {
+                if (!\is_string($key) || '' === $key) {
+                    continue;
+                }
+                $keyPtr = $ctx->builder->load($ctx->constantStringFromString($key));
+                $valueVar = $this->jitConstantFromEntry($entry);
+                HashTableHelper::setAtStringKey($ctx, $ht, $keyPtr, $valueVar);
+            }
+            $ctx->refcount->addref($ht);
+            $ctx->builder->store($ht, $global);
+        });
     }
 
     public function defineClassConstEnumCaseRef(
@@ -5480,6 +5535,11 @@ class Object_ extends Type {
     public function roundingModeEnumClassId(): ?int
     {
         return $this->classes['roundingmode'] ?? null;
+    }
+
+    public function arrayPadTypeEnumClassId(): ?int
+    {
+        return $this->classes['arraypadtype'] ?? null;
     }
 
     public function infoViewEnumClassId(): ?int

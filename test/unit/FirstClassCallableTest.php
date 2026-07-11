@@ -91,6 +91,30 @@ PHP;
         $this->assertSame('5', ob_get_clean());
     }
 
+    /** Issue #17655: parent::instanceMethod(...) bound closure with parent scope. */
+    public function testVmParentInstanceMethodFirstClassCallable(): void
+    {
+        $code = <<<'PHP'
+<?php
+class ParentMethod {
+    public function label(): string { return 'parent'; }
+}
+class ChildMethod extends ParentMethod {
+    public function label(): string { return 'child'; }
+    public function viaFcc(): string {
+        $f = parent::label(...);
+        return $f();
+    }
+}
+echo (new ChildMethod())->viaFcc();
+PHP;
+        $rt = new Runtime();
+        $block = $rt->parseAndCompile($code, 'test.php');
+        ob_start();
+        $rt->run($block);
+        $this->assertSame('parent', ob_get_clean());
+    }
+
     /** Issue #6851: enum case value as first-class callable must compile then Error at runtime. */
     public function testVmEnumCaseValueFirstClassCallableThrowsError(): void
     {

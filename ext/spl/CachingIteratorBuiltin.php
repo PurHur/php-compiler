@@ -93,7 +93,8 @@ final class CachingIteratorBuiltin
 
     private static function classIsComplete(ClassEntry $entry): bool
     {
-        return isset($entry->methods['rewind'], $entry->methods['valid'], $entry->methods['hasnext']);
+        return isset($entry->methods['rewind'], $entry->methods['valid'], $entry->methods['hasnext'], $entry->methods['__construct'])
+            && $entry->constructor instanceof CachingIteratorConstruct;
     }
 }
 
@@ -315,14 +316,15 @@ final class CachingIteratorConstruct extends VmClassMethod
         if (null === $frame->vmContext) {
             throw new \LogicException('CachingIterator::__construct() requires VM context');
         }
+        [$iteratorArg, $flagsArg] = self::resolveConstructArgs($frame);
         $inner = SplDualIteratorStorage::resolveIterator(
             $frame->vmContext,
             $frame,
-            $frame->calledArgs[1]
+            $iteratorArg
         );
         $flags = 0;
-        if (isset($frame->calledArgs[2])) {
-            $flagsArg = $frame->calledArgs[2]->resolveIndirect();
+        if (null !== $flagsArg) {
+            $flagsArg = $flagsArg->resolveIndirect();
             if (Variable::TYPE_INTEGER !== $flagsArg->type) {
                 throw new \TypeError(
                     'CachingIterator::__construct(): Argument #2 ($flags) must be of type int, '
@@ -333,6 +335,25 @@ final class CachingIteratorConstruct extends VmClassMethod
         }
         SplDualIteratorStorage::callInner($frame, $inner, 'rewind');
         SplCachingIteratorStorage::init($object, $inner, $flags);
+    }
+
+    /**
+     * php-cfg hoists ClassConstFetch before inline Expr_New call args — compiler may
+     * ARG_SEND flags before the nested iterator (#17400).
+     *
+     * @return array{0: Variable, 1: ?Variable}
+     */
+    private static function resolveConstructArgs(Frame $frame): array
+    {
+        if (isset($frame->calledArgs[2])) {
+            $first = $frame->calledArgs[1]->resolveIndirect();
+            $second = $frame->calledArgs[2]->resolveIndirect();
+            if (Variable::TYPE_INTEGER === $first->type && Variable::TYPE_OBJECT === $second->type) {
+                return [$frame->calledArgs[2], $frame->calledArgs[1]];
+            }
+        }
+
+        return [$frame->calledArgs[1], $frame->calledArgs[2] ?? null];
     }
 
     private static function typeLabel(Variable $var): string

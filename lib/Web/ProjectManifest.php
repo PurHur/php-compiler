@@ -56,6 +56,41 @@ final class ProjectManifest
     }
 
     /**
+     * Language-syntax profile from manifest `languageProfile` (issue #17681).
+     *
+     * Values: `8.2`, `8.4`, `8.4.0`, … — applied before preprocess when
+     * {@see getenv()} `PHP_COMPILER_PROFILE` is unset.
+     */
+    public static function resolveLanguageProfile(string $startDir, ?array $manifest = null): ?string
+    {
+        $projectDir = self::resolveProjectDir($startDir);
+        if (null === $projectDir) {
+            return null;
+        }
+
+        $manifest ??= self::loadManifest($projectDir);
+        if (null === $manifest || !isset($manifest['languageProfile'])) {
+            return null;
+        }
+        $raw = $manifest['languageProfile'];
+        if (!\is_string($raw) && !\is_int($raw) && !\is_float($raw)) {
+            return null;
+        }
+        $token = trim((string) $raw);
+        if ('' === $token) {
+            return null;
+        }
+        if (preg_match('/^\d+\.\d+$/', $token)) {
+            return $token;
+        }
+        if (preg_match('/^\d+\.\d+\.\d+/', $token, $m)) {
+            return $m[0];
+        }
+
+        return null;
+    }
+
+    /**
      * Entry script path for phpc build --project (issue #106).
      */
     public static function resolveEntryPath(string $startDir, ?array $manifest = null): ?string

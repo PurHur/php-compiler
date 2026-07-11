@@ -26,6 +26,9 @@ final class PropertyHooks
     /** Zend 8.2 reference profile — hook block after property name (#12574). */
     public const REFERENCE_PROFILE_UNEXPECTED_BRACE = 'syntax error, unexpected token "{", expecting "," or ";"';
 
+    /** Actionable DX when property-hook syntax is rejected on the reference profile (#17610). */
+    public const REFERENCE_PROFILE_PROPERTY_HOOKS_HINT = 'Property hooks require PHP_COMPILER_PROFILE=8.4 (PHP 8.4 forward profile)';
+
     /** php-src: zend_verify_hooked_property — virtual hooked property + explicit default (#16861, #12995). */
     public const VIRTUAL_HOOKED_DEFAULT_COMPILE_ERROR = 'Cannot specify default value for virtual hooked property %s::$%s';
 
@@ -104,6 +107,14 @@ final class PropertyHooks
     public static function virtualHookedDefaultCompileError(string $className, string $propName): string
     {
         return sprintf(self::VIRTUAL_HOOKED_DEFAULT_COMPILE_ERROR, $className, $propName);
+    }
+
+    /** Reference-profile reject with forward-profile env hint (#17610). */
+    public static function referenceProfileHookRejectMessage(string $zendSyntaxDetail): string
+    {
+        return CompilerVersion::supportsPropertyHooks()
+            ? $zendSyntaxDetail
+            : self::REFERENCE_PROFILE_PROPERTY_HOOKS_HINT;
     }
 
     private function locateReferenceProfileHookSyntaxError(string $code): ?array
@@ -200,7 +211,7 @@ final class PropertyHooks
                 if (null === $hookSpan) {
                     return [
                         'line' => self::lineAtOffset($fullCode, $absHookOpen),
-                        'message' => self::REFERENCE_PROFILE_UNEXPECTED_BRACE,
+                        'message' => self::referenceProfileHookRejectMessage(self::REFERENCE_PROFILE_UNEXPECTED_BRACE),
                     ];
                 }
                 [$open, $close] = $hookSpan;
@@ -225,14 +236,14 @@ final class PropertyHooks
 
                     return [
                         'line' => self::lineAtOffset($fullCode, $absArrow),
-                        'message' => self::REFERENCE_PROFILE_UNEXPECTED_ARROW,
+                        'message' => self::referenceProfileHookRejectMessage(self::REFERENCE_PROFILE_UNEXPECTED_ARROW),
                     ];
                 }
             }
 
             return [
                 'line' => self::lineAtOffset($fullCode, $absHookOpen),
-                'message' => self::REFERENCE_PROFILE_UNEXPECTED_BRACE,
+                'message' => self::referenceProfileHookRejectMessage(self::REFERENCE_PROFILE_UNEXPECTED_BRACE),
             ];
         }
 

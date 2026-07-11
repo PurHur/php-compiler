@@ -92,4 +92,48 @@ final class IntlExtensionPolicyTest extends TestCase
             }
         }
     }
+
+    public function testGraphemeCoreWithheldOnForwardProfile84WithoutIntl(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            self::assertTrue(CompilerVersion::supportsGraphemeForwardProfileCore());
+            self::assertFalse(CompilerVersion::advertisesGraphemeForwardProfileCore());
+            self::assertFalse(IntlExtensionPolicy::advertisesGraphemeCore());
+            self::assertFalse(IntlExtensionPolicy::advertisesGraphemeStrContains());
+            self::assertFalse(IntlExtensionPolicy::advertisesGraphemeStrimwidth());
+            self::assertFalse(IntlExtensionPolicy::advertisesBuiltins());
+
+            $runtime = new Runtime();
+            $ctx = $runtime->vmContext;
+            foreach ([
+                'grapheme_strlen',
+                'grapheme_substr',
+                'grapheme_strpos',
+                'grapheme_extract',
+                'grapheme_str_split',
+                'grapheme_str_contains',
+                'grapheme_strimwidth',
+            ] as $fn) {
+                self::assertFalse(isset($ctx->functions[$fn]), $fn.' must not register without ext/intl');
+                self::assertFalse(
+                    ext\standard\VmReflection::functionExists($ctx, $fn),
+                    $fn.' must not be visible on forward 8.4 profile without intl'
+                );
+            }
+            foreach (['grapheme_stripos', 'grapheme_stristr', 'grapheme_strrpos'] as $fn) {
+                self::assertFalse(
+                    ext\standard\VmReflection::functionExists($ctx, $fn),
+                    $fn.' must stay gated without full ext/intl'
+                );
+            }
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
 }

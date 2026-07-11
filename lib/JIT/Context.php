@@ -191,6 +191,9 @@ class Context {
     /** ?? / ?-> result operands that must receive branch assigns even when php-cfg marks them dead (#99, #3219). */
     public \SplObjectStorage $coalesceAssignTargets;
 
+    /** Scope slot => ?? result operand for runtime reload at chained call-arg send (#17590). */
+    public array $coalesceMergeSlotOperands = [];
+
     /** `return $c ? $a : $b` shared merge operand — emit direct returns per arm (#8555 AOT). */
     public ?Operand $ternarySharedReturnOperand = null;
 
@@ -856,6 +859,10 @@ class Context {
         if (CompilerVersion::supportsReflectionParameterIsSensitiveParameter()) {
             $this->functionProxies['reflectionparameter::issensitiveparameter'] = new Call\ReflectionParameterIsSensitiveParameter();
         }
+        if (CompilerVersion::supportsReflectionFunctionGetNamedArguments()) {
+            $this->functionProxies['reflectionfunction::getnamedarguments'] = new Call\ReflectionFunctionGetNamedArguments();
+            $this->functionProxies['reflectionmethod::getnamedarguments'] = new Call\ReflectionMethodGetNamedArguments();
+        }
         $this->functionProxies['reflectionattribute::getname'] = new Call\ReflectionAttributeGetName();
         $this->functionProxies['reflectionattribute::newinstance'] = new Call\ReflectionAttributeNewInstance();
         $this->functionProxies['reflectionenum::__construct'] = new Call\ReflectionEnumConstruct();
@@ -876,6 +883,8 @@ class Context {
                 $this->functionProxies['dateperiod::'.$dpIterMethod] = new Call\DatePeriodIteratorMethod($dpIterMethod);
             }
         }
+        $this->functionProxies['datetime::format'] = new Call\DateTimeFormat();
+        $this->functionProxies['datetimeimmutable::format'] = new Call\DateTimeFormat();
         if (CompilerVersion::supportsDomTokenList()) {
             DomInstanceMethodJit::registerKnownProxies($this);
         }
@@ -914,9 +923,13 @@ class Context {
         Builtin\StringJsonDecode::ensureDeferredStubsForInventoryEmit($this);
         Builtin\StringJsonEncode::ensureDeferredStubsForInventoryEmit($this);
         Builtin\StringHtmlspecialchars::ensureStandaloneBodies($this);
+        Builtin\StringHtmlspecialcharsDecode::ensureStandaloneBodies($this);
         ExceptionBridge::ensureStandaloneBodies($this);
         ErrorBridge::ensureStandaloneBodies($this);
+        Builtin\ErrorHandlerJitRuntime::ensureStandaloneBodies($this);
+        Builtin\ExceptionHandlerJitRuntime::ensureStandaloneBodies($this);
         Builtin\StreamLifecycleRuntime::ensureDeferredStubsForInventoryEmit($this);
+        Builtin\StreamBucketRuntime::ensureDeferredStubsForInventoryEmit($this);
         Builtin\StreamReadRuntime::ensureDeferredStubsForInventoryEmit($this);
         Builtin\AssertFail::ensureStandaloneBodies($this);
         Builtin\JitReturnPending::ensureStandaloneBodies($this);
@@ -1321,6 +1334,7 @@ class Context {
         }
         Builtin\AttributeRegistryLowering::implementLookupFunctions($this);
         Builtin\ParamSensitiveLowering::implementLookupFunctions($this);
+        Builtin\ReflectionNamedArgumentsLowering::implementLookupFunctions($this);
         VmActiveContextInitLlvm::emitPendingBeforeSeal($this);
         $this->sealInitFunction();
         $this->sealInitShutdownReturn($this->shutdownBlock);

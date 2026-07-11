@@ -17,4 +17,4 @@ class C {
 --EXPECT_EXIT--
 255
 --EXPECTF--
-Fatal error: Multiple access type modifiers are not allowed in %s on line %d
+Fatal error: Asymmetric visibility requires PHP_COMPILER_PROFILE=8.4 (PHP 8.4 forward profile) in %s on line %d

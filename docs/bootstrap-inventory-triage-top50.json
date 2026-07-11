@@ -1,10 +1,10 @@
 {
-    "scanned": 4179,
+    "scanned": 4293,
     "top": 50,
     "rows": [
         {
             "message": "Stmt_TraitUse",
-            "file_count": 4,
+            "file_count": 5,
             "examples": [
                 "ext/standard/array_diff_assoc.php",
                 "ext/standard/array_diff_key.php",
@@ -25,24 +25,13 @@
             "rank": 2
         },
         {
-            "message": "syntax error, unexpected token \"private\"",
-            "file_count": 3,
-            "examples": [
-                "lib/Ast/AsymmetricVisibilityRewriter.php",
-                "lib/AsymmetricVisibilityRejector.php",
-                "lib/CompilerVersion.php"
-            ],
-            "issue": null,
-            "rank": 3
-        },
-        {
             "message": "Cannot redeclare class::$func",
             "file_count": 1,
             "examples": [
                 "ext/standard/VmSplAutoload.php"
             ],
             "issue": null,
-            "rank": 4
+            "rank": 3
         },
         {
             "message": "Cannot redeclare class::$multiline",
@@ -51,7 +40,7 @@
                 "ext/standard/VmPregEngine.php"
             ],
             "issue": null,
-            "rank": 5
+            "rank": 4
         },
         {
             "message": "Cannot redeclare class::$ownerLc",
@@ -60,16 +49,16 @@
                 "ext/spl/SplLegacySerializableMethods.php"
             ],
             "issue": null,
-            "rank": 6
+            "rank": 5
         },
         {
-            "message": "syntax error, unexpected token \"{\", expecting \",\" or \";\"",
+            "message": "Trait \"ClassConstFetchHelperTrait\" not found",
             "file_count": 1,
             "examples": [
-                "lib/JIT/Builtin/GetClassRuntime.php"
+                "lib/JIT/ClassConstFetchHelper.php"
             ],
             "issue": null,
-            "rank": 7
+            "rank": 6
         }
     ],
     "source": "live"

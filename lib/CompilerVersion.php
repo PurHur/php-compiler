@@ -365,6 +365,50 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.3+ get_object_id() (ext/standard/basic_functions.c, issue #3537, #17564).
+     *
+     * Withheld on 8.4.0-dev reference profile (matches Zend 8.2 function_exists gate). Enable via
+     * stable 8.4.0+ or explicit `PHP_COMPILER_PROFILE=8.3` / `8.4` forward profile.
+     */
+    public static function supportsGetObjectId(): bool
+    {
+        if (version_compare(self::VERSION, '8.3', '<')) {
+            return false;
+        }
+
+        if (version_compare(self::VERSION, '8.4.0', '>=')) {
+            return true;
+        }
+
+        $raw = getenv('PHP_COMPILER_PROFILE');
+        if (!\is_string($raw) || '' === trim($raw)) {
+            return false;
+        }
+
+        return version_compare(self::languageProfileVersion(), '8.3.0', '>=');
+    }
+
+    /**
+     * get_object_id() visible to function_exists() — stable runtime or forward 8.3+ (#17564, #17607).
+     *
+     * Callable under forward profile via {@see supportsGetObjectId()}; withheld from introspection on
+     * 8.4.0-dev reference harness like Zend 8.2.
+     */
+    public static function advertisesGetObjectId(): bool
+    {
+        if (version_compare(self::VERSION, '8.4.0', '>=')) {
+            return true;
+        }
+
+        $raw = getenv('PHP_COMPILER_PROFILE');
+        if (!\is_string($raw) || '' === trim($raw)) {
+            return false;
+        }
+
+        return version_compare(self::languageProfileVersion(), '8.3.0', '>=');
+    }
+
+    /**
      * PHP 8.3+ clamp() (ext/standard/math.c).
      *
      * Withheld on 8.4.0-dev reference profile (matches Zend 8.2 function_exists gate). Enable via
@@ -672,8 +716,10 @@ final class CompilerVersion
     /**
      * PHP 8.3+ number_format() negative $decimals (ext/standard/number_format.c, #15917).
      *
-     * Prior to 8.3, negative values are ignored like 0. Requires explicit
-     * `PHP_COMPILER_PROFILE=8.3` / `8.4` so the 8.4.0-dev reference profile matches Zend 8.2.
+     * Prior to 8.3, negative values are ignored like 0. On PHP 8.4+, negative decimals are rejected
+     * with ValueError (re-#17261, #17369).
+     *
+     * Requires explicit `PHP_COMPILER_PROFILE=8.3` so the 8.4.0-dev reference profile matches Zend 8.2.
      */
     public static function supportsNumberFormatNegativeDecimals(): bool
     {
@@ -685,7 +731,12 @@ final class CompilerVersion
             return false;
         }
 
-        return version_compare(self::languageProfileVersion(), '8.3.0', '>=');
+        $profile = self::languageProfileVersion();
+        if (version_compare($profile, '8.4.0', '>=')) {
+            return false;
+        }
+
+        return version_compare($profile, '8.3.0', '>=');
     }
 
     /**
@@ -712,6 +763,16 @@ final class CompilerVersion
      * Gated on stable 8.4.0 so 8.4.0-dev reference profile rejects any argument like Zend 8.2.
      */
     public static function supportsGetDeclaredExcludeDeprecated(): bool
+    {
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+    }
+
+    /**
+     * PHP 8.4+ get_class()/get_parent_class() optional $allow_string (ext/standard/basic_functions.c, #17395).
+     *
+     * Gated on stable 8.4.0 so 8.4.0-dev reference profile rejects a second argument like Zend 8.2.
+     */
+    public static function supportsGetClassAllowString(): bool
     {
         return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
     }
@@ -747,15 +808,6 @@ final class CompilerVersion
      */
     public static function supportsExitFunctionForm(): bool
     {
-        if (version_compare(self::VERSION, '8.4.0', '>=')) {
-            return true;
-        }
-
-        $raw = getenv('PHP_COMPILER_PROFILE');
-        if (!\is_string($raw) || '' === trim($raw)) {
-            return false;
-        }
-
         return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
     }
 
@@ -829,6 +881,22 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.5+ compile-time rejection of {@code #[\AllowDynamicProperties]} on enums (php-src GH-15731, #17402).
+     *
+     * Withheld on reference profile (matches Zend 8.2 acceptance). Enable via stable 8.5.0+ or explicit
+     * {@code PHP_COMPILER_PROFILE=8.5} forward profile.
+     * php-src: {@code Zend/zend_attributes.c} {@code validate_allow_dynamic_properties}.
+     */
+    public static function rejectsAllowDynamicPropertiesOnEnum(): bool
+    {
+        if (version_compare(self::VERSION, '8.5.0', '>=')) {
+            return true;
+        }
+
+        return version_compare(self::languageProfileVersion(), '8.5.0', '>=');
+    }
+
+    /**
      * PHP 8.4+ asymmetric property visibility (private(set), protected(set), …).
      *
      * Gated on {@see languageProfileVersion()} so 8.4.0-dev reference profile rejects like Zend 8.2 (#12508, #17197).
@@ -859,6 +927,17 @@ final class CompilerVersion
      * php-src: Zend/zend_compile.c ZEND_ACC_LAZY; zend_lazy_objects.c.
      */
     public static function supportsLazyPropertyModifier(): bool
+    {
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+    }
+
+    /**
+     * PHP 8.4+ `readonly function` / `readonly fn` declarations (#17657).
+     *
+     * Gated on {@see languageProfileVersion()} so 8.4.0-dev reference profile rejects like Zend 8.2.
+     * php-src: Zend/zend_compile.c ZEND_ACC_READONLY_FUNCTION; zend_ast.c ZEND_AST_FUNC_DECL.
+     */
+    public static function supportsReadonlyFunction(): bool
     {
         return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
     }
@@ -896,6 +975,18 @@ final class CompilerVersion
     public static function supportsReflectionPropertyAccessProbes(): bool
     {
         return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+    }
+
+    /**
+     * PHP 8.4+ ReflectionProperty hook/lazy introspection
+     * ({hasHook,hasHooks,getHook,getHooks,isLazy,skipLazyInitialization}, ext/reflection/php_reflection.c, #17493).
+     *
+     * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev reference profile matches Zend 8.2
+     * (methods absent). Enable forward profile on dev via `PHP_COMPILER_PROFILE=8.4`.
+     */
+    public static function supportsReflectionPropertyHookProbes(): bool
+    {
+        return self::supportsPropertyHooks();
     }
 
     /**
@@ -985,6 +1076,17 @@ final class CompilerVersion
      * (methods absent). Enable forward profile on dev via `PHP_COMPILER_PROFILE=8.4`.
      */
     public static function supportsReflectionCreateFromFactories(): bool
+    {
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+    }
+
+    /**
+     * PHP 8.4+ ReflectionFunctionAbstract::getNamedArguments() (ext/reflection/php_reflection.c, #17658).
+     *
+     * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev reference profile matches Zend 8.2
+     * (method absent). Enable forward profile on dev via `PHP_COMPILER_PROFILE=8.4`.
+     */
+    public static function supportsReflectionFunctionGetNamedArguments(): bool
     {
         return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
     }
@@ -1090,6 +1192,14 @@ final class CompilerVersion
      * Gated on stable 8.4.0 so 8.4.0-dev reference profile matches Zend 8.2 phantom gate.
      */
     public static function supportsSortingEnum(): bool
+    {
+        return self::supportsBuiltinStubEnums();
+    }
+
+    /**
+     * PHP 8.4+ Range value object — Range::from() inclusive intervals (ext/standard/range.c, #17427).
+     */
+    public static function supportsRange(): bool
     {
         return self::supportsBuiltinStubEnums();
     }
@@ -1209,6 +1319,30 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.3+ json_encode() on unit enum cases — ValueError not silent false (ext/json/php_json.c, #5683).
+     *
+     * Withheld on 8.4.0-dev reference profile (matches Zend 8.2 — returns false). Enable via stable
+     * 8.4.0+ or explicit `PHP_COMPILER_PROFILE=8.3` / `8.4` forward profile.
+     */
+    public static function jsonEncodeUnitEnumValueError(): bool
+    {
+        if (version_compare(self::VERSION, '8.3', '<')) {
+            return false;
+        }
+
+        if (version_compare(self::VERSION, '8.4.0', '>=')) {
+            return true;
+        }
+
+        $raw = getenv('PHP_COMPILER_PROFILE');
+        if (!\is_string($raw) || '' === trim($raw)) {
+            return false;
+        }
+
+        return version_compare(self::languageProfileVersion(), '8.3.0', '>=');
+    }
+
+    /**
      * PHP 8.4+ readonly(object) dynamic object marker (ext/standard/basic_functions.c, #12607, #15692).
      *
      * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev reference profile matches Zend 8.2 phantom gate.
@@ -1219,14 +1353,18 @@ final class CompilerVersion
     }
 
     /**
-     * readonly() visible to function_exists() — stable runtime only (#16357, re-#16292).
+     * readonly() visible to function_exists() — stable runtime or forward 8.4+ profile (#16357, #17693).
      *
-     * Callable under forward profile via {@see supportsReadonlyBuiltin()}; withheld from introspection on 8.4.0-dev
-     * reference harness like Zend 8.2.
+     * Withheld on 8.4.0-dev reference profile (matches Zend 8.2 phantom gate). Callable and advertised when
+     * {@see supportsReadonlyBuiltin()} is true (stable 8.4.0+ or explicit {@code PHP_COMPILER_PROFILE=8.4}).
      */
     public static function advertisesReadonlyBuiltin(): bool
     {
-        return version_compare(self::VERSION, '8.4.0', '>=');
+        if (version_compare(self::VERSION, '8.4.0', '>=')) {
+            return true;
+        }
+
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
     }
 
     /**
@@ -1261,43 +1399,44 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.4+ hrtime(true) returns double (ext/standard/hrtime.c, #12779).
+     * hrtime(true) scalar type follows platform width (ext/standard/hrtime.c, #12779, #17561).
      *
-     * Gated on stable 8.4.0 so 8.4.0-dev reference profile keeps integer nanoseconds (#12789, #13696).
+     * php-src: RETURN_LONG when ZEND_ENABLE_ZVAL_LONG64 (64-bit), else RETURN_DOUBLE via zend_strtod.
+     * Profile gates do not change this — PHP 8.4 on 64-bit still returns integer nanoseconds.
      */
     public static function supportsHrtimeAsNumberFloat(): bool
     {
-        return version_compare(self::VERSION, '8.4.0', '>=');
+        return \PHP_INT_SIZE < 8;
     }
 
     /**
      * PHP 8.3+ class_constants() (ext/standard/basic_functions.c, #7309, #12448).
      *
-     * Gated on stable 8.4.0 so 8.4.0-dev reference profile matches Zend 8.2 phantom gate.
+     * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev reference profile matches Zend 8.2 phantom gate.
      */
     public static function supportsClassConstants(): bool
     {
-        return version_compare(self::VERSION, '8.4.0', '>=');
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
     }
 
     /**
      * PHP 8.3+ header_list() (ext/standard/head.c, #12546).
      *
-     * Gated on stable 8.4.0 so 8.4.0-dev reference profile matches Zend 8.2 CLI phantom gate.
+     * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev reference profile matches Zend 8.2 CLI phantom gate.
      */
     public static function supportsHeaderList(): bool
     {
-        return version_compare(self::VERSION, '8.4.0', '>=');
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
     }
 
     /**
      * PHP 8.4+ get_defined_constants() optional $category named filter (ext/standard/basic_functions.c, #12947).
      *
-     * Gated on stable 8.4.0 so 8.4.0-dev reference profile rejects unknown named param like Zend 8.2.
+     * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev reference profile rejects unknown named param like Zend 8.2.
      */
     public static function supportsGetDefinedConstantsCategory(): bool
     {
-        return version_compare(self::VERSION, '8.4.0', '>=');
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
     }
 
     /**
@@ -1394,8 +1533,8 @@ final class CompilerVersion
     /**
      * PHP 8.4+ grapheme_str_contains() (ext/intl/grapheme/grapheme.c, issue #7128, #16667, #17010).
      *
-     * Registered on stable 8.4.0+ or explicit forward profile — callable without ext/intl;
-     * function_exists() stays false until {@see IntlExtensionPolicy::advertisesBuiltins()}.
+     * Registered on stable 8.4.0+ when ext/intl is loaded; withheld from function_exists() until
+     * {@see IntlExtensionPolicy::advertisesBuiltins()} (#17694).
      * Withheld on 8.4.0-dev reference profile (matches Zend 8.2 phantom gate, #17105).
      */
     public static function supportsGraphemeStrContains(): bool
@@ -1416,21 +1555,17 @@ final class CompilerVersion
         return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
     }
 
-    /** grapheme_str_contains() visible to function_exists() — stable runtime or forward 8.4+ profile (#16667). */
+    /** grapheme_str_contains() visible to function_exists() — only with loaded ext/intl (#17694). */
     public static function advertisesGraphemeStrContains(): bool
     {
-        if (version_compare(self::VERSION, '8.4.0', '>=')) {
-            return true;
-        }
-
-        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+        return false;
     }
 
     /**
      * PHP 8.4+ grapheme_strimwidth() (ext/intl/grapheme/grapheme_string.c, issue #9793, #17010).
      *
-     * Registered on stable 8.4.0+ or explicit forward profile — callable without ext/intl;
-     * function_exists() stays false until {@see IntlExtensionPolicy::advertisesBuiltins()}.
+     * Registered on stable 8.4.0+ when ext/intl is loaded; withheld from function_exists() until
+     * {@see IntlExtensionPolicy::advertisesBuiltins()} (#17694).
      * Withheld on 8.4.0-dev reference profile (matches Zend 8.2 phantom gate, #17105).
      */
     public static function supportsGraphemeStrimwidth(): bool
@@ -1451,31 +1586,27 @@ final class CompilerVersion
         return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
     }
 
-    /** grapheme_strimwidth() visible to function_exists() — stable runtime or forward 8.4+ profile (#16667). */
+    /** grapheme_strimwidth() visible to function_exists() — only with loaded ext/intl (#17694). */
     public static function advertisesGraphemeStrimwidth(): bool
     {
-        if (version_compare(self::VERSION, '8.4.0', '>=')) {
-            return true;
-        }
-
-        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+        return false;
     }
 
     /**
      * PHP 8.4 forward-profile core grapheme helpers (ext/intl/grapheme; #16915).
      *
-     * grapheme_strlen/substr/strpos/extract/str_split registered without full ext/intl when
-     * {@code PHP_COMPILER_PROFILE=8.4} — same gate as grapheme_str_contains (#16667).
+     * grapheme_strlen/substr/strpos/extract/str_split — implementation in-tree; registered only with
+     * loaded ext/intl ({@see IntlExtensionPolicy::advertisesBuiltins()}, #17694).
      */
     public static function supportsGraphemeForwardProfileCore(): bool
     {
         return self::supportsGraphemeStrContains();
     }
 
-    /** Core grapheme helpers visible to function_exists() — stable runtime or forward 8.4+ profile (#16915). */
+    /** Core grapheme helpers visible to function_exists() — only with loaded ext/intl (#17694). */
     public static function advertisesGraphemeForwardProfileCore(): bool
     {
-        return self::advertisesGraphemeStrContains();
+        return false;
     }
 
     /**
@@ -1659,11 +1790,11 @@ final class CompilerVersion
     /**
      * PHP 8.4+ array_replace_key() (ext/standard/array.c, issue #5650, #12826).
      *
-     * Gated on stable 8.4.0 so 8.4.0-dev reference profile matches Zend 8.2 phantom gate.
+     * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev reference profile matches Zend 8.2 phantom gate.
      */
     public static function supportsArrayReplaceKey(): bool
     {
-        return version_compare(self::VERSION, '8.4.0', '>=');
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
     }
 
     /**
@@ -1673,7 +1804,15 @@ final class CompilerVersion
      */
     public static function supportsArrayPadTypeEnum(): bool
     {
-        return self::supportsRoundingModeEnum();
+        if (version_compare(self::VERSION, '8.4.0', '>=')) {
+            return true;
+        }
+        $raw = getenv('PHP_COMPILER_PROFILE');
+        if (!\is_string($raw) || '' === trim($raw)) {
+            return false;
+        }
+
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
     }
 
     /**
@@ -1728,6 +1867,51 @@ final class CompilerVersion
         }
 
         return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+    }
+
+    /**
+     * PHP 8.3+ mb_ucfirst()/mb_lcfirst() (ext/mbstring/mbstring.c, issue #4007, #17609).
+     *
+     * Withheld on 8.4.0-dev reference profile (matches Zend 8.2 function_exists gate). Enable via
+     * stable 8.4.0+ or explicit `PHP_COMPILER_PROFILE=8.3` / `8.4` forward profile.
+     */
+    public static function supportsMbUcfirstLcfirst(): bool
+    {
+        if (version_compare(self::VERSION, '8.3', '<')) {
+            return false;
+        }
+
+        if (version_compare(self::VERSION, '8.4.0', '>=')) {
+            return true;
+        }
+
+        $raw = getenv('PHP_COMPILER_PROFILE');
+        if (!\is_string($raw) || '' === trim($raw)) {
+            return false;
+        }
+
+        return version_compare(self::languageProfileVersion(), '8.3.0', '>=');
+    }
+
+    /**
+     * mb_ucfirst()/mb_lcfirst() visible to function_exists() — stable runtime or forward profile (#17609).
+     */
+    public static function advertisesMbUcfirstLcfirst(): bool
+    {
+        if (version_compare(self::VERSION, '8.4.0', '>=')) {
+            return true;
+        }
+
+        if (!self::supportsMbUcfirstLcfirst()) {
+            return false;
+        }
+
+        $raw = getenv('PHP_COMPILER_PROFILE');
+        if (!\is_string($raw) || '' === trim($raw)) {
+            return false;
+        }
+
+        return true;
     }
 
     /**
@@ -1945,6 +2129,17 @@ final class CompilerVersion
     }
 
     /**
+     * ext/brotli via pure PHP {@see \PHPCompiler\ext\brotli\VmBrotliNative} — withheld on reference profile (#17563).
+     *
+     * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev reference profile matches Zend 8.2
+     * phantom gate (host ext-brotli absent). Enable forward profile via `PHP_COMPILER_PROFILE=8.4`.
+     */
+    public static function supportsBrotli(): bool
+    {
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+    }
+
+    /**
      * ext/sqlite3 exception surface — withheld on reference profile (#17106, #17194).
      *
      * Forward profile ({@code PHP_COMPILER_PROFILE=8.4}) advertises extension_loaded('sqlite3')
@@ -1990,6 +2185,26 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.4+ get_error_handler() / get_exception_handler() (ext/standard/basic_functions.c; #17644).
+     *
+     * Callable under forward profile via {@see languageProfileVersion()}; withheld on 8.4.0-dev reference profile.
+     */
+    public static function supportsGetHandlerIntrospection(): bool
+    {
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+    }
+
+    /** get_error_handler()/get_exception_handler() visible to function_exists() — stable runtime or forward 8.4+. */
+    public static function advertisesGetHandlerIntrospection(): bool
+    {
+        if (version_compare(self::VERSION, '8.4.0', '>=')) {
+            return true;
+        }
+
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+    }
+
+    /**
      * Forward DOM APIs gated like gc_status / str_increment (#15613, #14535).
      *
      * On `8.4.0-dev` reference profile (unset `PHP_COMPILER_PROFILE`), withhold PHP 8.3+/8.4+
@@ -2011,9 +2226,10 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.0+ DOMNode::contains() (ext/dom/node.c, #14447, #17163).
+     * PHP 8.4+ DOMNode::contains() (ext/dom/node.c, #14447, #17163, #17759).
      *
-     * Available on Zend 8.0+; not gated behind PHP_COMPILER_PROFILE (8.4 DOM batch).
+     * Withheld on 8.4.0-dev reference profile (matches Zend 8.2 method_exists gate).
+     * Enable via stable 8.4.0+ or explicit `PHP_COMPILER_PROFILE=8.4` forward profile.
      */
     public static function supportsDomNodeContains(): bool
     {
@@ -2021,11 +2237,13 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.4+ DOMNode::compareDocumentPosition() (ext/dom/node.c, #14448, #15613).
+     * DOM Level 3 DOMNode::compareDocumentPosition() (ext/dom/node.c, #14448, #17696).
+     *
+     * Available on Zend 8.0+ reference profile; not gated behind PHP_COMPILER_PROFILE.
      */
     public static function supportsDomNodeCompareDocumentPosition(): bool
     {
-        return self::supportsDomApiSince('8.4.0');
+        return true;
     }
 
     /**

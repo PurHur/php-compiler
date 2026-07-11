@@ -6,9 +6,11 @@ namespace PHPCompiler\ext\filter;
 
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\StringFilterBoolean;
+use PHPCompiler\JIT\Builtin\StringFilterDomain;
 use PHPCompiler\JIT\Builtin\StringFilterEmail;
 use PHPCompiler\JIT\Builtin\StringFilterInt;
 use PHPCompiler\JIT\Builtin\StringFilterIp;
+use PHPCompiler\JIT\Builtin\StringFilterMac;
 use PHPCompiler\JIT\Builtin\StringFilterSanitize;
 use PHPCompiler\JIT\Builtin\StringFilterUrl;
 use PHPCompiler\JIT\Context;
@@ -449,6 +451,56 @@ final class JitFilter
         return $ptr;
     }
 
+    public static function validateDomain(Context $context, JITVariable $value): Value
+    {
+        StringFilterDomain::ensureLinked($context);
+        if (JITVariable::TYPE_VALUE === $value->type) {
+            return self::boxValueValidateDomain($context, $value);
+        }
+
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $falseVal = $context->constantFromBool(false);
+
+        if (JITVariable::TYPE_NULL === $value->type
+            || JITVariable::TYPE_STRING !== $value->type) {
+            JitValueBox::writeBool($context, $slot, $falseVal);
+
+            return $ptr;
+        }
+
+        $str = $context->helper->loadValue($value);
+        $validated = $context->builder->call(
+            $context->lookupFunction('__compiler_filter_validate_domain'),
+            $str
+        );
+        $null = $context->getTypeFromString('__string__*')->constNull();
+        $isNull = $context->builder->icmp(Builder::INT_EQ, $validated, $null);
+
+        $id = (string) (++self::$blockSerial);
+        $failBlock = BasicBlockHelper::append($context, 'fvd_fail_'.$id);
+        $okBlock = BasicBlockHelper::append($context, 'fvd_ok_'.$id);
+        $mergeBlock = BasicBlockHelper::append($context, 'fvd_merge_'.$id);
+        $context->builder->branchIf($isNull, $failBlock, $okBlock);
+
+        $context->builder->positionAtEnd($failBlock);
+        JitValueBox::writeBool($context, $slot, $falseVal);
+        $context->builder->branch($mergeBlock);
+
+        $context->builder->positionAtEnd($okBlock);
+        $owned = $context->builder->call($context->lookupFunction('__string__separate'), $str);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeString'),
+            $ptr,
+            $owned
+        );
+        $context->builder->branch($mergeBlock);
+
+        $context->builder->positionAtEnd($mergeBlock);
+
+        return $ptr;
+    }
+
     public static function validateIp(Context $context, JITVariable $value): Value
     {
         StringFilterIp::ensureLinked($context);
@@ -499,6 +551,55 @@ final class JitFilter
         return $ptr;
     }
 
+    private static function boxValueValidateDomain(Context $context, JITVariable $arg): Value
+    {
+        $valuePtr = JitValueBox::valuePtrFromVariable($context, $arg);
+        $strVal = $context->builder->call($context->lookupFunction('__value__readString'), $valuePtr);
+        $null = $context->getTypeFromString('__string__*')->constNull();
+        $isNull = $context->builder->icmp(Builder::INT_EQ, $strVal, $null);
+
+        $id = (string) (++self::$blockSerial);
+        $failBlock = BasicBlockHelper::append($context, 'fvd_box_fail_'.$id);
+        $okBlock = BasicBlockHelper::append($context, 'fvd_box_ok_'.$id);
+        $mergeBlock = BasicBlockHelper::append($context, 'fvd_box_merge_'.$id);
+        $context->builder->branchIf($isNull, $failBlock, $okBlock);
+
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $falseVal = $context->constantFromBool(false);
+
+        $context->builder->positionAtEnd($failBlock);
+        JitValueBox::writeBool($context, $slot, $falseVal);
+        $context->builder->branch($mergeBlock);
+
+        $context->builder->positionAtEnd($okBlock);
+        $validated = $context->builder->call(
+            $context->lookupFunction('__compiler_filter_validate_domain'),
+            $strVal
+        );
+        $validatedNull = $context->builder->icmp(Builder::INT_EQ, $validated, $null);
+        $invalidBlock = BasicBlockHelper::append($context, 'fvd_box_invalid_'.$id);
+        $validBlock = BasicBlockHelper::append($context, 'fvd_box_valid_'.$id);
+        $context->builder->branchIf($validatedNull, $invalidBlock, $validBlock);
+
+        $context->builder->positionAtEnd($invalidBlock);
+        JitValueBox::writeBool($context, $slot, $falseVal);
+        $context->builder->branch($mergeBlock);
+
+        $context->builder->positionAtEnd($validBlock);
+        $owned = $context->builder->call($context->lookupFunction('__string__separate'), $strVal);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeString'),
+            $ptr,
+            $owned
+        );
+        $context->builder->branch($mergeBlock);
+
+        $context->builder->positionAtEnd($mergeBlock);
+
+        return $ptr;
+    }
+
     private static function boxValueValidateIp(Context $context, JITVariable $arg): Value
     {
         $valuePtr = JitValueBox::valuePtrFromVariable($context, $arg);
@@ -528,6 +629,105 @@ final class JitFilter
         $validatedNull = $context->builder->icmp(Builder::INT_EQ, $validated, $null);
         $invalidBlock = BasicBlockHelper::append($context, 'fvi_box_invalid_'.$id);
         $validBlock = BasicBlockHelper::append($context, 'fvi_box_valid_'.$id);
+        $context->builder->branchIf($validatedNull, $invalidBlock, $validBlock);
+
+        $context->builder->positionAtEnd($invalidBlock);
+        JitValueBox::writeBool($context, $slot, $falseVal);
+        $context->builder->branch($mergeBlock);
+
+        $context->builder->positionAtEnd($validBlock);
+        $owned = $context->builder->call($context->lookupFunction('__string__separate'), $strVal);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeString'),
+            $ptr,
+            $owned
+        );
+        $context->builder->branch($mergeBlock);
+
+        $context->builder->positionAtEnd($mergeBlock);
+
+        return $ptr;
+    }
+
+    public static function validateMac(Context $context, JITVariable $value): Value
+    {
+        StringFilterMac::ensureLinked($context);
+        if (JITVariable::TYPE_VALUE === $value->type) {
+            return self::boxValueValidateMac($context, $value);
+        }
+
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $falseVal = $context->constantFromBool(false);
+
+        if (JITVariable::TYPE_NULL === $value->type
+            || JITVariable::TYPE_STRING !== $value->type) {
+            JitValueBox::writeBool($context, $slot, $falseVal);
+
+            return $ptr;
+        }
+
+        $str = $context->helper->loadValue($value);
+        $validated = $context->builder->call(
+            $context->lookupFunction('__compiler_filter_validate_mac'),
+            $str
+        );
+        $null = $context->getTypeFromString('__string__*')->constNull();
+        $isNull = $context->builder->icmp(Builder::INT_EQ, $validated, $null);
+
+        $id = (string) (++self::$blockSerial);
+        $failBlock = BasicBlockHelper::append($context, 'fvm_fail_'.$id);
+        $okBlock = BasicBlockHelper::append($context, 'fvm_ok_'.$id);
+        $mergeBlock = BasicBlockHelper::append($context, 'fvm_merge_'.$id);
+        $context->builder->branchIf($isNull, $failBlock, $okBlock);
+
+        $context->builder->positionAtEnd($failBlock);
+        JitValueBox::writeBool($context, $slot, $falseVal);
+        $context->builder->branch($mergeBlock);
+
+        $context->builder->positionAtEnd($okBlock);
+        $owned = $context->builder->call($context->lookupFunction('__string__separate'), $str);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeString'),
+            $ptr,
+            $owned
+        );
+        $context->builder->branch($mergeBlock);
+
+        $context->builder->positionAtEnd($mergeBlock);
+
+        return $ptr;
+    }
+
+    private static function boxValueValidateMac(Context $context, JITVariable $arg): Value
+    {
+        $valuePtr = JitValueBox::valuePtrFromVariable($context, $arg);
+        $strVal = $context->builder->call($context->lookupFunction('__value__readString'), $valuePtr);
+        $null = $context->getTypeFromString('__string__*')->constNull();
+        $isNull = $context->builder->icmp(Builder::INT_EQ, $strVal, $null);
+
+        $id = (string) (++self::$blockSerial);
+        $failBlock = BasicBlockHelper::append($context, 'fvm_box_fail_'.$id);
+        $okBlock = BasicBlockHelper::append($context, 'fvm_box_ok_'.$id);
+        $mergeBlock = BasicBlockHelper::append($context, 'fvm_box_merge_'.$id);
+        $context->builder->branchIf($isNull, $failBlock, $okBlock);
+
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $falseVal = $context->constantFromBool(false);
+
+        $context->builder->positionAtEnd($failBlock);
+        JitValueBox::writeBool($context, $slot, $falseVal);
+        $context->builder->branch($mergeBlock);
+
+        $context->builder->positionAtEnd($okBlock);
+        $validated = $context->builder->call(
+            $context->lookupFunction('__compiler_filter_validate_mac'),
+            $strVal
+        );
+        $validatedNull = $context->builder->icmp(Builder::INT_EQ, $validated, $null);
+        $invalidBlock = BasicBlockHelper::append($context, 'fvm_box_invalid_'.$id);
+        $validBlock = BasicBlockHelper::append($context, 'fvm_box_valid_'.$id);
         $context->builder->branchIf($validatedNull, $invalidBlock, $validBlock);
 
         $context->builder->positionAtEnd($invalidBlock);

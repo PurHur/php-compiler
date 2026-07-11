@@ -211,7 +211,7 @@ final class VmPassword
         return match ($var->type) {
             Variable::TYPE_NULL => 'null',
             Variable::TYPE_BOOLEAN => 'bool',
-            Variable::TYPE_DOUBLE => 'float',
+            Variable::TYPE_FLOAT => 'float',
             Variable::TYPE_STRING => 'string',
             Variable::TYPE_ARRAY => 'array',
             Variable::TYPE_OBJECT => $var->toObject()->class->name,

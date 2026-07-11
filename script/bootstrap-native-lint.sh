@@ -2,7 +2,7 @@
 # Native lint via gen-2 inventory argv driver -l (#15601).
 #
 # Prefers build/bin-compile-aot-inventory -l (same parse/compile path as Tier 1 compile).
-# Falls back to Zend php bin/compile.php -l when the gen-2 driver is missing.
+# Falls back to Zend php bin/compile.php -l when the gen-2 driver is missing or parse spine gaps (#15597).
 #
 # Usage:
 #   ./script/bootstrap-native-lint.sh FILE.php
@@ -49,13 +49,33 @@ if [[ ! -f "${FILE}" ]]; then
   exit 1
 fi
 
+zend_lint_fallback() {
+  echo "bootstrap-native-lint: Zend php bin/compile.php -l ${FILE} (#15601)" >&2
+  "${PHP_BIN}" "${PHP_OPTS[@]}" "${ROOT}/bin/compile.php" -l "${FILE}"
+  echo "bootstrap-native-lint: OK (Zend fallback) ${FILE}"
+}
+
 DRIVER="${ROOT}/build/bin-compile-aot-inventory"
-if [[ -x "${DRIVER}" ]]; then
-  "${DRIVER}" -l "${FILE}"
-  echo "bootstrap-native-lint: OK (gen-2 driver) ${FILE}"
+if [[ "${PHP_COMPILER_NATIVE_LINT_ZEND_ONLY:-}" == "1" ]]; then
+  zend_lint_fallback
   exit 0
 fi
 
-echo "bootstrap-native-lint: ${DRIVER} missing — fallback to Zend php bin/compile.php -l (#15601)" >&2
-"${PHP_BIN}" "${PHP_OPTS[@]}" "${ROOT}/bin/compile.php" -l "${FILE}"
-echo "bootstrap-native-lint: OK (Zend fallback) ${FILE}"
+if [[ -x "${DRIVER}" ]]; then
+  driver_out=""
+  if driver_out="$("${DRIVER}" -l "${FILE}" 2>&1)"; then
+    printf '%s\n' "${driver_out}"
+    echo "bootstrap-native-lint: OK (gen-2 driver) ${FILE}"
+    exit 0
+  fi
+  printf '%s\n' "${driver_out}" >&2
+  if grep -qE 'parseAndCompile returned null|native emit failed at phase=parseAndCompile|lint failed' <<<"${driver_out}"; then
+    echo "bootstrap-native-lint: gen-2 parse spine gap — fallback to Zend (#15601, #15597)" >&2
+  else
+    echo "bootstrap-native-lint: gen-2 driver lint failed — fallback to Zend (#15601)" >&2
+  fi
+else
+  echo "bootstrap-native-lint: ${DRIVER} missing — fallback to Zend php bin/compile.php -l (#15601)" >&2
+fi
+
+zend_lint_fallback

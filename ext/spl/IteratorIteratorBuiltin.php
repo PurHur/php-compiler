@@ -163,6 +163,23 @@ final class SplDualIteratorStorage
     /** @var array<int, array{inner: ObjectEntry, recursive: bool, mode: int, stack: list<array{iterator: ObjectEntry, state: int}>, maxDepth: int, rewound: bool, noRewind: bool}> */
     private static array $store = [];
 
+    public static function hasStateFor(ObjectEntry $object): bool
+    {
+        return isset(self::$store[$object->id]);
+    }
+
+    /**
+     * Move wrapper sidecar when ClassConstMaterializer detaches object identity (#17721).
+     */
+    public static function transferState(int $fromId, int $toId): void
+    {
+        if (!isset(self::$store[$fromId])) {
+            return;
+        }
+        self::$store[$toId] = self::$store[$fromId];
+        unset(self::$store[$fromId]);
+    }
+
     public static function initSimple(ObjectEntry $object, ObjectEntry $inner): void
     {
         self::$store[$object->id] = [
@@ -480,6 +497,11 @@ final class SplDualIteratorStorage
                     $entry['state'] = self::RS_TEST;
                     // fall through
                 case self::RS_TEST:
+                    if (null !== $frame->vmContext
+                        && self::mustSkipForMaxDepth($frame->vmContext, $frame, $object, $iterator)) {
+                        $entry['state'] = self::RS_NEXT;
+                        continue 2;
+                    }
                     $mode = self::traversalMode($state['mode']);
                     if (self::iteratorHasChildren($frame, $object, $iterator, $level, $state)) {
                         if (self::canDescend($state, $level)) {
@@ -559,9 +581,6 @@ final class SplDualIteratorStorage
         int $level,
         array $state
     ): bool {
-        if (self::mustSkipForMaxDepth($frame->vmContext, $frame, $object, $iterator)) {
-            return false;
-        }
         if (null === $frame->vmContext) {
             return false;
         }

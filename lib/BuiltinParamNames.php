@@ -83,7 +83,11 @@ final class BuiltinParamNames
             case 'usort':
             case 'uasort':
             case 'uksort':
-                return ['array', 'callback'];
+            case 'array_uasort':
+            case 'array_uksort':
+                return \PHPCompiler\CompilerVersion::supportsSortingEnum()
+                    ? ['array', 'callback', 'direction']
+                    : ['array', 'callback'];
             case 'shuffle':
             case 'array_sum':
             case 'array_product':
@@ -325,6 +329,14 @@ final class BuiltinParamNames
                 return ['callback', 'args'];
             case 'is_callable':
                 return ['value', 'syntax_only', 'callable_name'];
+            case 'get_class':
+                return \PHPCompiler\CompilerVersion::supportsGetClassAllowString()
+                    ? ['object', 'allow_string']
+                    : ['object'];
+            case 'get_parent_class':
+                return \PHPCompiler\CompilerVersion::supportsGetClassAllowString()
+                    ? ['object_or_class', 'allow_string']
+                    : ['object_or_class'];
             case 'class_exists':
                 return ['class', 'autoload'];
             case 'interface_exists':

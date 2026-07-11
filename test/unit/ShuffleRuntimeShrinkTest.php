@@ -9,16 +9,16 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPUnit\Framework\TestCase;
 
-/** shuffle() JIT routes through ShuffleJitHelper PHP not __hashtable__shufflePacked LLVM (#12762, #14299). */
+/** shuffle() JIT routes through ShuffleJitHelper PHP not __hashtable__shufflePacked LLVM (#12762, #14299, #17775). */
 final class ShuffleRuntimeShrinkTest extends TestCase
 {
     public function testShuffleRuntimeUsesJitHelperNotDirectLlvmMonolith(): void
     {
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ShuffleRuntime.php');
         $this->assertStringContainsString('ShuffleJitHelper', $runtime);
-        $this->assertStringContainsString('isNativeArray', $runtime);
-        $this->assertStringContainsString('ArrayBuiltinHelper::shufflePacked', $runtime);
+        $this->assertStringContainsString('loadHashTable', $runtime);
         $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);
+        $this->assertStringNotContainsString('ArrayBuiltinHelper::shufflePacked', $runtime);
 
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/shuffle_.php');
         $this->assertStringContainsString('ShuffleRuntime::shufflePacked', $builtin);

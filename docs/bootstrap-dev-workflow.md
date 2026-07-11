@@ -31,7 +31,7 @@ Tier 2 — Bootstrap verify   north-star5-verify-fast, bootstrap-loop-probe
 |------|------|-------|
 | **0** | Once per clone; every PHPUnit / doc-sync PR | `composer install`, `script/apply-patches.sh`, `./script/check-generated-docs.sh` (< 30 s, mandatory pre-merge; [#15621](https://github.com/PurHur/php-compiler/issues/15621)), `./script/ci-fast.sh` |
 | **1** | Compiling fixtures, examples, local AOT during feature work | `./build/bin-compile-aot-inventory -o OUT SOURCE.php` |
-| **1.5** | Curated native smoke without host PHPUnit ([#15599](https://github.com/PurHur/php-compiler/issues/15599)) | `make bootstrap-native-test`, `./script/bootstrap-native-test.sh` |
+| **1.5** | Curated native smoke without host PHPUnit ([#15599](https://github.com/PurHur/php-compiler/issues/15599)) | `phpc test --native`, `make bootstrap-native-test-subset`, `./script/bootstrap-native-test-subset.sh` |
 | **2** | Before merge; after spine or gen-0 edits | `make north-star5-verify-fast`, `make bootstrap-loop-probe` |
 
 **Rule:** Do not aim for “Zend-free development” yet. Aim for **Zend-free compile** on the paths you are bootstrapping.
@@ -110,7 +110,6 @@ After Tier 0 setup, use the **inventory argv driver** for compile work (gen-2 in
 
 **Still use Zend for:**
 
-- `php bin/compile.php -l …` (fast lint during editing)
 - `vendor/bin/phpunit` (full test matrix)
 - `composer install` / `script/apply-patches.sh`
 
@@ -219,7 +218,7 @@ GitHub Actions runs the same spine gates on matching paths — see [`.github/wor
 | Task | Use |
 |------|-----|
 | Run PHPUnit / compliance | **Zend** — `make test-fast` / `ci-fast.sh` |
-| Lint single file quickly | **Zend** — `php bin/compile.php -l path.php` |
+| Lint single file quickly | **gen-2 + Zend fallback** — `phpc lint --native path.php` (tries `build/bin-compile-aot-inventory -l`, falls back to `php bin/compile.php -l` until #15597) |
 | Compile bootstrap fixture / spine | **gen-2** — `build/bin-compile-aot-inventory -o OUT SRC` |
 | Cold empty `build/` | **gen-0 prelinked** — `BOOTSTRAP_M5_NO_ZEND=1 make bootstrap-selfhost-link` |
 | LLVM / AOT / spine link | **Docker** — `./script/docker-exec.sh` |
@@ -275,11 +274,11 @@ Track progress toward **gen-1+ only** development ([#1492](https://github.com/Pu
 |---|-------|--------|
 | 1 | [#15597](https://github.com/PurHur/php-compiler/issues/15597) | Honest full-spine native compile (no sidecar fallback) |
 | 2 | [#15598](https://github.com/PurHur/php-compiler/issues/15598) | Gen-N compiles **changed** sources — **landed:** `make bootstrap-changed-sources-probe` (also `bootstrap-changed-tree-probe` fixture scaffold) |
-| 3 | [#15599](https://github.com/PurHur/php-compiler/issues/15599) | Native test harness (no Zend PHPUnit) — **starter landed:** `make bootstrap-native-test` (one fixture; full matrix later) |
+| 3 | [#15599](https://github.com/PurHur/php-compiler/issues/15599) | Native test harness (no Zend PHPUnit) — **landed:** `phpc test --native` (AOT smoke + VM driver probe + bin/vm.php compliance manifest) |
 | 4 | [#15600](https://github.com/PurHur/php-compiler/issues/15600) | Bootstrap cold path without `composer install` |
 | 5 | [#15601](https://github.com/PurHur/php-compiler/issues/15601) | Native lint via gen-2 driver |
 | 6 | [#15602](https://github.com/PurHur/php-compiler/issues/15602) | Bootstrap SDK release tarball |
-| 7 | [#15603](https://github.com/PurHur/php-compiler/issues/15603) | Honest compile CI gate — **landed:** `BOOTSTRAP_HONEST_COMPILE_GATE=1`, `bootstrap-loop-probe --honest-compile` |
+| 7 | [#15603](https://github.com/PurHur/php-compiler/issues/15603) | Honest compile CI gate — **landed:** `BOOTSTRAP_HONEST_COMPILE_GATE=1`, `bootstrap-loop-probe --honest-compile`, `release-readiness.sh --json` `honest_compile` metric |
 | 8 | [#15604](https://github.com/PurHur/php-compiler/issues/15604) | Inventory argv driver without emit-helper sidecar — **starter:** `make bootstrap-inventory-argv-probe` |
 | 9 | [#15605](https://github.com/PurHur/php-compiler/issues/15605) | Flip default onboarding to gen-1+ tiers |
 | 10 | [#15606](https://github.com/PurHur/php-compiler/issues/15606) | Bootstrap SDK platform contract |
@@ -294,18 +293,28 @@ make bootstrap-init
 # Native lint via gen-2 driver -l (#15601)
 phpc lint --native test/bootstrap-aot/compiler_smoke.php
 ./script/bootstrap-native-lint.sh path/to/file.php
-# Fallback when build/bin-compile-aot-inventory is missing: php bin/compile.php -l
+# Tries gen-2 driver -l first; Zend php bin/compile.php -l when parse spine gaps (#15597)
+# Force Zend only: PHP_COMPILER_NATIVE_LINT_ZEND_ONLY=1 phpc lint --native FILE.php
 
 # Bootstrap SDK release tarball (#15602)
 make bootstrap-sdk-pack
 # → build/php-compiler-bootstrap-{spine-sha-prefix}.tar.gz
+make bootstrap-sdk-pack TAG=v1.0.0
+# → build/php-compiler-bootstrap-v1.0.0-linux-x86_64.tar.gz (GitHub Release asset)
+# Cold start from tarball:
+phpc bootstrap init --sdk-url file:///path/to/php-compiler-bootstrap-*.tar.gz
+# or: PHP_COMPILER_BOOTSTRAP_SDK=https://…/php-compiler-bootstrap-v1.0.0-linux-x86_64.tar.gz phpc bootstrap init
 # Extract at repo root to seed prelinked/bootstrap-gen0/ + vendor *.o
 
 # Honest compile gate — opt-in; fails until #15597 closes (#15603)
 BOOTSTRAP_HONEST_COMPILE_GATE=1 ./script/bootstrap-loop-probe.sh
 ./script/bootstrap-loop-probe.sh --honest-compile
 
-# Native test harness — one bootstrap-aot smoke without Zend PHPUnit (#15599)
+# Native test harness — AOT smoke + VM compliance subset without Zend PHPUnit (#15599)
+phpc test --native
+make bootstrap-native-test-subset
+./script/bootstrap-native-test-subset.sh
+# Single AOT fixture only:
 make bootstrap-native-test
 ./script/bootstrap-native-test.sh
 

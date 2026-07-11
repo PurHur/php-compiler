@@ -42,11 +42,36 @@ final class VmPregPatternTest extends TestCase
         );
     }
 
+    /** Issue #17584 — duplicate named subpatterns without PCRE2_DUPNAMES. */
+    public function testCompileWarningMessageForDuplicateNamedSubpatterns(): void
+    {
+        $this->assertSame(
+            'Compilation failed: two named subpatterns have the same name (PCRE2_DUPNAMES not set) at offset 12',
+            VmPregPattern::compileWarningMessage('/(?<x>a)(?<x>b)/')
+        );
+    }
+
+    public function testPregMatchRejectsDuplicateNamedSubpatterns(): void
+    {
+        $matches = [];
+        $this->assertFalse(VmPregNative::pregMatch('/(?<x>a)(?<x>b)/', 'ab', $matches));
+        $this->assertSame(1, VmPregNative::lastError());
+        $this->assertSame([], $matches);
+    }
+
+    public function testPregMatchAllowsDuplicateNamedSubpatternsWithJModifier(): void
+    {
+        $matches = [];
+        $this->assertSame(1, VmPregNative::pregMatch('/(?<x>a)(?<x>b)/J', 'ab', $matches));
+        $this->assertSame(0, VmPregNative::lastError());
+        $this->assertSame('b', $matches['x']);
+    }
+
     public function testVmPregPureDelegatesPatternParseToVmPregPattern(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/VmPregPure.php');
         $this->assertStringContainsString('VmPregPattern::parsePhpPattern', $source);
-        $this->assertStringContainsString('VmPregPattern::patternWarningMessage', $source);
+        $this->assertStringContainsString('VmPregPattern::compileWarningMessage', $source);
         $native = (string) file_get_contents(__DIR__.'/../../ext/standard/VmPregNative.php');
         $this->assertStringContainsString('VmPregPure::pregMatch', $native);
     }

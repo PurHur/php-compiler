@@ -27,6 +27,16 @@ class JITTest extends BaseTest {
                 && str_contains($name, 'str_increment_phantom')) {
                 continue;
             }
+            if (!CompilerVersion::supportsGetObjectId()
+                && str_contains($name, 'get_object_id')
+                && !str_contains($name, 'get_object_id_phantom')
+                && !str_contains($name, 'get_object_id_function_exists_forward')) {
+                continue;
+            }
+            if (CompilerVersion::supportsGetObjectId()
+                && str_contains($name, 'get_object_id_phantom')) {
+                continue;
+            }
             if (!CompilerVersion::supportsClamp()
                 && str_contains($name, 'clamp')) {
                 continue;
@@ -85,7 +95,8 @@ class JITTest extends BaseTest {
                 continue;
             }
             if (!CompilerVersion::supportsNumberFormatNegativeDecimals()
-                && str_contains($name, 'number_format_negative_decimals_84')) {
+                && str_contains($name, 'number_format_negative_decimals')
+                && !str_contains($name, 'number_format_negative_decimals_84')) {
                 continue;
             }
             if (CompilerVersion::supportsNumberFormatNegativeDecimals()
@@ -109,6 +120,15 @@ class JITTest extends BaseTest {
             }
             if (CompilerVersion::supportsGetDeclaredExcludeDeprecated()
                 && str_contains($name, 'get_declared_exclude_deprecated_reference_profile')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsGetClassAllowString()
+                && str_contains($name, 'get_class_allow_string')
+                && !str_contains($name, 'get_class_allow_string_reference_profile')) {
+                continue;
+            }
+            if (CompilerVersion::supportsGetClassAllowString()
+                && str_contains($name, 'get_class_allow_string_reference_profile')) {
                 continue;
             }
             if (!CompilerVersion::supportsGetDeclaredExcludeDeprecated()
@@ -183,6 +203,15 @@ class JITTest extends BaseTest {
                 && str_contains($name, 'mb_str_pad_phantom')) {
                 continue;
             }
+            if (!CompilerVersion::supportsMbUcfirstLcfirst()
+                && (str_contains($name, 'mb_ucfirst') || str_contains($name, 'mb_lcfirst'))
+                && !str_contains($name, 'mb_ucfirst_lcfirst_phantom')) {
+                continue;
+            }
+            if (CompilerVersion::supportsMbUcfirstLcfirst()
+                && str_contains($name, 'mb_ucfirst_lcfirst_phantom')) {
+                continue;
+            }
             if (!CompilerVersion::supportsSortingEnum()
                 && str_contains($name, 'sort_sorting_enum')
                 && !str_contains($name, 'sorting_enum_phantom')) {
@@ -190,6 +219,15 @@ class JITTest extends BaseTest {
             }
             if (CompilerVersion::supportsSortingEnum()
                 && str_contains($name, 'sorting_enum_phantom')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsRange()
+                && str_contains($name, 'range_from_84')
+                && !str_contains($name, 'range_phantom')) {
+                continue;
+            }
+            if (CompilerVersion::supportsRange()
+                && str_contains($name, 'range_phantom')) {
                 continue;
             }
             if (!CompilerVersion::supportsBuiltinStubEnums()
@@ -348,12 +386,24 @@ class JITTest extends BaseTest {
                 continue;
             }
             if (!CompilerVersion::supportsReadonlyBuiltin()
-                && str_contains($name, 'readonly_function')
+                && (preg_match('#(?:^|/)readonly_function$#', $name)
+                    || str_contains($name, 'readonly_function_jit'))
                 && !str_contains($name, 'readonly_phantom')) {
                 continue;
             }
             if (CompilerVersion::supportsReadonlyBuiltin()
                 && str_contains($name, 'readonly_phantom')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsReadonlyFunction()
+                && (str_contains($name, 'readonly_function/')
+                    || str_contains($name, 'readonly_function_84'))) {
+                continue;
+            }
+            if (CompilerVersion::supportsReadonlyFunction()
+                && (str_contains($name, 'readonly_function_decl')
+                    || str_contains($name, 'readonly_function_reject')
+                    || str_contains($name, 'readonly_function_mutable_capture'))) {
                 continue;
             }
             if (!CompilerVersion::supportsStreamContextSetOptions()
@@ -421,6 +471,7 @@ class JITTest extends BaseTest {
                     || str_contains($name, 'lazy_ghost_trait')
                     || str_contains($name, 'class_has_lazy_object_initializer')
                     || str_contains($name, 'class_has_lazy_object_uninitializer')
+                    || str_contains($name, 'is_uninitialized_lazy_object')
                     || str_contains($name, 'reflection_lazy_property')
                     || str_contains($name, 'reflection_property_set_raw_without_lazy')
                     || str_contains($name, 'reflection_property_skip_lazy'))
@@ -543,6 +594,15 @@ class JITTest extends BaseTest {
                 && str_contains($name, 'curl_escape_phantom')) {
                 continue;
             }
+            if (!\PHPCompiler\ext\ldap\LdapExtensionPolicy::advertisesBuiltins()
+                && str_contains($name, 'ldap_escape')
+                && !str_contains($name, 'ldap_escape_phantom')) {
+                continue;
+            }
+            if (\PHPCompiler\ext\ldap\LdapExtensionPolicy::advertisesBuiltins()
+                && str_contains($name, 'ldap_escape_phantom')) {
+                continue;
+            }
             if (!CompilerVersion::supportsBz2()
                 && (str_contains($name, 'bz2') || str_contains($name, 'bzcompress'))
                 && !str_contains($name, 'bz2_phantom')) {
@@ -550,6 +610,15 @@ class JITTest extends BaseTest {
             }
             if (CompilerVersion::supportsBz2()
                 && str_contains($name, 'bz2_phantom')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsBrotli()
+                && (str_contains($name, 'brotli') || str_contains($name, 'brotli_'))
+                && !str_contains($name, 'brotli_phantom')) {
+                continue;
+            }
+            if (CompilerVersion::supportsBrotli()
+                && str_contains($name, 'brotli_phantom')) {
                 continue;
             }
             if (!CompilerVersion::supportsBcmath()
@@ -635,6 +704,8 @@ class JITTest extends BaseTest {
                     || str_contains($name, 'exit_die_two_args')
                     || str_contains($name, 'exit_type_error')
                     || str_contains($name, 'exit_status_named')
+                    || (str_contains($name, 'exit_named_status')
+                        && !str_contains($name, 'exit_named_status_reference_profile'))
                     || str_contains($name, 'die_status_named')
                     || (str_contains($name, 'die_named_message')
                         && !str_contains($name, 'die_named_message_reference_profile')))) {
@@ -645,6 +716,7 @@ class JITTest extends BaseTest {
                 && (str_contains($name, 'private_set_reference_profile')
                     || str_contains($name, 'asymmetric_double_modifier_reference_profile')
                     || str_contains($name, 'asymmetric_visibility_reference_profile')
+                    || str_contains($name, 'asymmetric_visibility_profile_gate')
                     || str_contains($name, 'asymmetric_visibility_public_protected_set_compile_error')
                     || str_contains($name, 'asymmetric_visibility_promoted_public_protected_set_compile_error')
                     || str_contains($name, 'asymmetric_visibility_promoted_public_private_set_compile_error'))) {
@@ -674,6 +746,7 @@ class JITTest extends BaseTest {
                 && !str_contains($name, 'private_set_reference_profile')
                 && !str_contains($name, 'asymmetric_double_modifier_reference_profile')
                 && !str_contains($name, 'asymmetric_visibility_reference_profile')
+                && !str_contains($name, 'asymmetric_visibility_profile_gate')
                 && !str_contains($name, 'asymmetric_visibility_forward_84')) {
                 continue;
             }

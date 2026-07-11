@@ -765,17 +765,41 @@ final class VmInternalCompare
      */
     public static function sortKeyedPairsByKeyWithCompare(array &$pairs, Internal $compare): void
     {
+        self::sortKeyedPairsByKeyWithCompareOrdered($pairs, $compare, false);
+    }
+
+    /**
+     * @param list<array{0: Variable, 1: Variable}> $pairs
+     */
+    public static function sortKeyedPairsByKeyWithCompareDesc(array &$pairs, Internal $compare): void
+    {
+        self::sortKeyedPairsByKeyWithCompareOrdered($pairs, $compare, true);
+    }
+
+    /**
+     * @param list<array{0: Variable, 1: Variable}> $pairs
+     */
+    private static function sortKeyedPairsByKeyWithCompareOrdered(
+        array &$pairs,
+        Internal $compare,
+        bool $descending
+    ): void {
         $n = \count($pairs);
         for ($i = 1; $i < $n; ++$i) {
             $j = $i;
-            while (
-                $j > 0
-                && self::invoke(
+            while ($j > 0) {
+                $cmp = self::invoke(
                     $compare,
                     self::coerceForStringSort($pairs[$j - 1][0]),
                     self::coerceForStringSort($pairs[$j][0])
-                ) > 0
-            ) {
+                );
+                if ($descending) {
+                    if ($cmp >= 0) {
+                        break;
+                    }
+                } elseif ($cmp <= 0) {
+                    break;
+                }
                 $tmp = $pairs[$j - 1];
                 $pairs[$j - 1] = $pairs[$j];
                 $pairs[$j] = $tmp;

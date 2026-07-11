@@ -37,20 +37,13 @@ final class InArrayRuntime
         JITVariable $haystack,
         Value $strict
     ): Value {
+        // Packed/boxed hashtables: LLVM scan (array_search-style). PHP bridge kept for
+        // module init / self-host inventory; AOT user scripts use ArrayBuiltinHelper (#3118).
         if (ArrayBuiltinHelper::isNativeArray($haystack->type)) {
             return ArrayBuiltinHelper::inArray($context, $needle, $haystack, $strict);
         }
 
-        self::ensureLinked($context);
-        $needlePtr = JitValueBox::valuePtrFromVariable($context, $needle);
-        $ht = ArrayBuiltinHelper::loadHashTable($context, $haystack);
-
-        return $context->builder->call(
-            $context->lookupFunction(self::ABI_CONTAINS),
-            $needlePtr,
-            $ht,
-            $strict
-        );
+        return ArrayBuiltinHelper::inArray($context, $needle, $haystack, $strict);
     }
 
     public static function ensureLinked(Context $context): void

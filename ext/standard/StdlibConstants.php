@@ -282,6 +282,11 @@ final class StdlibConstants
     public const DNS_A6 = 2048;
     public const DNS_ALL = 4095;
     public const DNS_ANY = 4096;
+    public const DNS_CAA = 8192;
+
+    /** stream_socket_enable_crypto() client/server method flags (ext/standard/streams.c). */
+    public const STREAM_CRYPTO_METHOD_TLS_SERVER = 120;
+    public const STREAM_CRYPTO_METHOD_TLS_CLIENT = 121;
 
     /** glob() flags (ext/standard/dir.c / glob.h; values match php-src on Linux). */
     public const GLOB_ERR = 1;
@@ -462,6 +467,9 @@ final class StdlibConstants
         'dns_a6' => self::DNS_A6,
         'dns_all' => self::DNS_ALL,
         'dns_any' => self::DNS_ANY,
+        'dns_caa' => self::DNS_CAA,
+        'stream_crypto_method_tls_server' => self::STREAM_CRYPTO_METHOD_TLS_SERVER,
+        'stream_crypto_method_tls_client' => self::STREAM_CRYPTO_METHOD_TLS_CLIENT,
         'assert_active' => self::ASSERT_ACTIVE,
         'assert_callback' => self::ASSERT_CALLBACK,
         'assert_bail' => self::ASSERT_BAIL,

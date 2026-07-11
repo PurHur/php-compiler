@@ -8,6 +8,7 @@ use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPCompiler\JIT\UserScriptAotDeferNestedJit;
 use PHPLLVM\Builder;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
@@ -69,10 +70,17 @@ final class ProcessRuntime
         } catch (\Throwable) {
         }
 
-        self::ensureShellHelperCompiled($context);
-        self::implementNullableStringBridge($context, '__compiler_shell_exec', self::SHELL_EXEC);
-        self::implementStringBridge($context, '__compiler_escapeshellarg', self::ESCAPESHELLARG);
-        self::implementStringBridge($context, '__compiler_escapeshellcmd', self::ESCAPESHELLCMD);
+        if (UserScriptAotDeferNestedJit::shouldDefer($context)) {
+            ProcessShellExecLibc::implement($context);
+            self::ensureShellHelperCompiled($context);
+            self::implementStringBridge($context, '__compiler_escapeshellarg', self::ESCAPESHELLARG);
+            self::implementStringBridge($context, '__compiler_escapeshellcmd', self::ESCAPESHELLCMD);
+        } else {
+            self::ensureShellHelperCompiled($context);
+            self::implementNullableStringBridge($context, '__compiler_shell_exec', self::SHELL_EXEC);
+            self::implementStringBridge($context, '__compiler_escapeshellarg', self::ESCAPESHELLARG);
+            self::implementStringBridge($context, '__compiler_escapeshellcmd', self::ESCAPESHELLCMD);
+        }
         self::registerShellRuntime($context);
 
         if (null !== $savedBlock) {
@@ -196,8 +204,12 @@ final class ProcessRuntime
         }
 
         self::ensureNativeHtInternalProxies($context);
-        self::ensureExecCaptureHelperCompiled($context);
-        self::implementExecCaptureNativeBridge($context);
+        if (UserScriptAotDeferNestedJit::shouldDefer($context)) {
+            ProcessExecCaptureLlvm::implementBridge($context);
+        } else {
+            self::ensureExecCaptureHelperCompiled($context);
+            self::implementExecCaptureNativeBridge($context);
+        }
         $fn = $context->module->getNamedFunction('__compiler_process_exec_capture');
         if (null === $fn || 0 === $fn->countBasicBlocks()) {
             throw new \LogicException('__compiler_process_exec_capture missing after ProcessRuntime bridge (#9337)');

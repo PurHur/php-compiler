@@ -334,7 +334,8 @@ final class VmImage
             if (0xD9 === $marker) {
                 break;
             }
-            if ($marker <= 0xD0 || ($marker >= 0xD1 && $marker <= 0xD7)) {
+            // RSTn markers (0xD0–0xD7) have no length field — php-src ext/standard/image.c php_parsejpeg.
+            if ($marker >= 0xD0 && $marker <= 0xD7) {
                 $pos += 2;
 
                 continue;

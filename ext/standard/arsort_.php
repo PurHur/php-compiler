@@ -16,7 +16,7 @@ use PHPLLVM\Value;
  * arsort() — sort by value descending, preserve keys (subset of PHP; issue #2296, #4118, #11991).
  *
  * VM: key-preserving value sort via {@see VmArray::arsortCopy()}.
- * JIT/AOT: packed list via __hashtable__sortPackedReverse; string-key via __hashtable__sortStringKeyValuesReverse.
+ * JIT/AOT: packed list via SortJitHelper reverse; string-key via __hashtable__sortStringKeyValuesReverse.
  */
 final class arsort_ extends Internal
 {

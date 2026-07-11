@@ -204,13 +204,33 @@ final class DomDocumentVMTest extends BaseTest
             __DIR__.'/cases/stdlib/dom_loadxml_invalid_warning.phpt',
             'dom_loadxml_invalid_warning.phpt'
         );
+        yield 'dom_loadxml_comment.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/dom_loadxml_comment.phpt',
+            'dom_loadxml_comment.phpt'
+        );
+        yield 'dom_load_empty_source.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/dom_load_empty_source.phpt',
+            'dom_load_empty_source.phpt'
+        );
         yield 'dom_namednodemap.phpt' => self::parsePHPT(
             __DIR__.'/cases/stdlib/dom_namednodemap.phpt',
             'dom_namednodemap.phpt'
         );
+        yield 'dom_namednodemap_get_named_item_ns.phpt' => self::parsePHPT(
+            __DIR__.'/cases/dom/dom_namednodemap_get_named_item_ns.phpt',
+            'dom_namednodemap_get_named_item_ns.phpt'
+        );
         yield 'dom_text_nodes.phpt' => self::parsePHPT(
             __DIR__.'/cases/stdlib/dom_text_nodes.phpt',
             'dom_text_nodes.phpt'
+        );
+        yield 'dom_character_data_length.phpt' => self::parsePHPT(
+            __DIR__.'/cases/dom/dom_character_data_length.phpt',
+            'dom_character_data_length.phpt'
+        );
+        yield 'dom_childnodes_empty.phpt' => self::parsePHPT(
+            __DIR__.'/cases/dom/dom_childnodes_empty.phpt',
+            'dom_childnodes_empty.phpt'
         );
     }
 

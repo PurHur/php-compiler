@@ -32,6 +32,7 @@ final class PhpcCliTest extends TestCase
         $this->assertStringContainsString('--from-build', $result['stdout']);
         $this->assertStringContainsString('phpc test', $result['stdout']);
         $this->assertStringContainsString('phpc test --bootstrap', $result['stdout']);
+        $this->assertStringContainsString('phpc test --native', $result['stdout']);
         $this->assertStringContainsString('phpc lint', $result['stdout']);
         $this->assertStringContainsString('phpc init', $result['stdout']);
         $this->assertStringContainsString('phpc doctor', $result['stdout']);

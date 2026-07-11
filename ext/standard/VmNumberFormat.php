@@ -109,6 +109,9 @@ final class VmNumberFormat
         // Pre-8.3 ignores negative $decimals like 0.
         $roundPlaces = $decimals;
         if ($decimals < 0) {
+            if (version_compare(CompilerVersion::languageProfileVersion(), '8.4.0', '>=')) {
+                throw new \ValueError('number_format(): Argument #2 ($decimals) must be greater than or equal to 0');
+            }
             if (!CompilerVersion::supportsNumberFormatNegativeDecimals()) {
                 $roundPlaces = 0;
                 $decimals = 0;

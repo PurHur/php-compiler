@@ -134,7 +134,21 @@ final class JitVmHelperLink
         if (null !== $savedBlock) {
             $context->builder->positionAtEnd($savedBlock);
         } else {
-            $context->builder->clearInsertionPosition();
+            $fallback = null;
+            if ('' !== $context->activeFunction && isset($context->functions[$context->activeFunction])) {
+                $active = $context->functions[$context->activeFunction];
+                if ($active instanceof LlvmFunction) {
+                    $fallback = $active;
+                }
+            }
+            if (null === $fallback && $context->main instanceof LlvmFunction) {
+                $fallback = $context->main;
+            }
+            if (null !== $fallback && $fallback->countBasicBlocks() > 0) {
+                $context->builder->positionAtEnd($fallback->getEntryBasicBlock());
+            } else {
+                $context->builder->clearInsertionPosition();
+            }
         }
     }
 

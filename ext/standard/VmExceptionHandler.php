@@ -36,6 +36,11 @@ final class VmExceptionHandler
         return $context->exceptionHandlers->pop();
     }
 
+    public static function get(Context $context): Variable
+    {
+        return self::handlerReturnValue($context->exceptionHandlers->getActiveHandler());
+    }
+
     public static function invoke(
         Context $context,
         Variable $handler,

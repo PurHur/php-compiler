@@ -32,7 +32,13 @@ final class NullsafeHelper
         Function_ $func,
         Block $branchBlock
     ): BasicBlock {
-        return $jit->compileSubBlock($func, $branchBlock);
+        $saved = $branchBlock->syntheticCfgBranch ?? false;
+        $branchBlock->syntheticCfgBranch = true;
+        try {
+            return $jit->compileSubBlock($func, $branchBlock);
+        } finally {
+            $branchBlock->syntheticCfgBranch = $saved;
+        }
     }
 
     /**
@@ -109,7 +115,6 @@ final class NullsafeHelper
             self::COMPILED_HELPERS,
             '#10311'
         );
-        $context->builder->clearInsertionPosition();
     }
 
     private static function callValueBoxShortCircuits(Context $context, Value $typeByte, Value $nullableSlot): Value

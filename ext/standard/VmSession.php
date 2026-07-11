@@ -57,6 +57,16 @@ final class VmSession
 
     public const HEADERS_SENT_COOKIE_PARAMS_WARNING = 'Session cookie parameters cannot be changed after headers have already been sent';
 
+    public const ACTIVE_SAVE_PATH_WARNING = 'Session save path cannot be changed when a session is active';
+
+    public const HEADERS_SENT_SAVE_PATH_WARNING = 'Session save path cannot be changed after headers have already been sent';
+
+    /** php-src ext/session/session.c — php_session_start() when SG(headers_sent). */
+    public const HEADERS_SENT_START_WARNING = 'session_start(): Session cannot be started after headers have already been sent';
+
+    /** php-src ext/session/session.c — PG(session_save_path) default on Linux CLI. */
+    public const DEFAULT_SAVE_PATH = '/var/lib/php/sessions';
+
     private static bool $active = false;
 
     private static string $name = self::DEFAULT_NAME;
@@ -287,6 +297,39 @@ final class VmSession
     public static function getModuleName(): string
     {
         return self::$moduleName;
+    }
+
+    public static function getSavePath(): string
+    {
+        return VmIni::getSessionSavePath();
+    }
+
+    public static function canChangeSavePath(?Frame $frame): bool
+    {
+        if (self::$active) {
+            self::triggerSessionWarning($frame, self::ACTIVE_SAVE_PATH_WARNING);
+
+            return false;
+        }
+        if (SapiOutput::headersSent()) {
+            self::triggerSessionWarning($frame, self::HEADERS_SENT_SAVE_PATH_WARNING);
+
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * @return string|false previous save path on success, or false when change is rejected
+     */
+    public static function setSavePath(?Frame $frame, string $newPath): string|false
+    {
+        if (!self::canChangeSavePath($frame)) {
+            return false;
+        }
+
+        return VmIni::setSessionSavePathValue($newPath);
     }
 
     public static function isSupportedModule(string $module): bool

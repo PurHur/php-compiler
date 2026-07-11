@@ -97,11 +97,9 @@ final class VmFsGlobPure
         $matches = [];
         $skipDotEntries = '' !== $filePattern && '.' !== $filePattern[0];
         foreach ($entries as $entry) {
-            if ('.' === $entry || '..' === $entry) {
-                continue;
-            }
-            // php-src ext/standard/dir.c — omit dotfiles unless pattern explicitly requests them.
-            if ($skipDotEntries && isset($entry[0]) && '.' === $entry[0]) {
+            // php-src ext/standard/dir.c — omit dot entries unless pattern explicitly requests them.
+            if ($skipDotEntries && ('.' === $entry || '..' === $entry
+                || (isset($entry[0]) && '.' === $entry[0]))) {
                 continue;
             }
             if (!VmFnmatch::match($filePattern, $entry, self::fnmatchFlagsFromGlob($libcFlags))) {

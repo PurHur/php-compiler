@@ -11,6 +11,9 @@ namespace PHPCompiler\ext\standard;
  */
 final class VmPregPattern
 {
+    /** PCRE2_UTF — PHP /u pattern modifier (ext/pcre/php_pcre.c). */
+    public const PCRE2_UTF = 0x00080000;
+
     /**
      * Zend ext/pcre/php_pcre.c delimiter/compile failure text (issue #12083).
      */
@@ -52,7 +55,7 @@ final class VmPregPattern
                 return 'The /e modifier is no longer supported, use preg_replace_callback instead';
             }
             $mod = match ($pattern[$j]) {
-                'i', 'm', 's', 'x', 'A', 'D', 'U', 'u' => true,
+                'i', 'm', 's', 'x', 'A', 'D', 'U', 'u', 'J' => true,
                 default => null,
             };
             if (null === $mod) {
@@ -124,7 +127,8 @@ final class VmPregPattern
                 'A' => 0x80000000,
                 'D' => 0x00000010,
                 'U' => 0x00040000,
-                'u' => 0x00080000,
+                'u' => self::PCRE2_UTF,
+                'J' => 0x00100000,
                 default => 0,
             };
         }

@@ -217,6 +217,7 @@ final class JitNestedHelperCoerce
      */
     public static function callHelper(Context $context, LlvmFunction $helper, array $args): Value
     {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'nested_helper_call');
         $coerced = [];
         for ($i = 0, $n = \count($args); $i < $n; ++$i) {
             $coerced[] = self::coerceArgForHelper($context, $args[$i], $helper->getParam($i)->typeOf());

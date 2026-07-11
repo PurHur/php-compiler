@@ -1099,6 +1099,58 @@ final class ReflectionSupport
         return self::resolveUserFunction($ctx, self::functionNameFromReflection($reflection));
     }
 
+    /**
+     * php-src: ext/reflection/php_reflection.c — reflection_function_is_generator().
+     */
+    public static function isReflectionFunctionGenerator(Context $ctx, ObjectEntry $reflection): bool
+    {
+        if ($reflection->reflectionIsInternalFunction ?? false) {
+            return false;
+        }
+        $func = self::resolveFunctionFromReflection($ctx, $reflection);
+
+        return $func->block->isGenerator;
+    }
+
+    /**
+     * php-src: ext/reflection/php_reflection.c — reflection_method_is_generator().
+     */
+    public static function isReflectionMethodGenerator(Context $ctx, ObjectEntry $reflection): bool
+    {
+        $className = self::classNameFromReflection($reflection);
+        $methodName = self::methodNameFromReflection($reflection);
+        $entry = VmReflection::resolveClassEntry($ctx, $className);
+        if (null === $entry) {
+            return false;
+        }
+        $func = self::resolveDeclaredMethodFunc($ctx, $entry, strtolower($methodName));
+        if (!($func instanceof PhpFunc)) {
+            return false;
+        }
+
+        return $func->block->isGenerator;
+    }
+
+    private static function resolveDeclaredMethodFunc(Context $ctx, ClassEntry $entry, string $methodLc): ?Func
+    {
+        $current = $entry;
+        while (null !== $current) {
+            if (isset($current->methods[$methodLc])) {
+                $method = $current->methods[$methodLc];
+                if ($method instanceof Func) {
+                    return $method;
+                }
+            }
+            $parentLc = $current->parentLc ?? '';
+            if ('' === $parentLc) {
+                break;
+            }
+            $current = $ctx->classes[$parentLc] ?? null;
+        }
+
+        return null;
+    }
+
     public static function constantNameFromReflection(ObjectEntry $reflection): string
     {
         $nameVar = $reflection->getProperty(self::PROP_CONSTANT_NAME)->resolveIndirect();
@@ -1306,6 +1358,85 @@ final class ReflectionSupport
         }
 
         return false;
+    }
+
+    public static function parameterIsPromoted(Context $ctx, ObjectEntry $reflection): bool
+    {
+        $classNameVar = $reflection->getProperty(self::PROP_CLASS_NAME)->resolveIndirect();
+        if (Variable::TYPE_STRING !== $classNameVar->type) {
+            return false;
+        }
+        $className = $classNameVar->toString();
+        $method = self::methodNameFromReflection($reflection);
+        $entry = VmReflection::resolveClassEntry($ctx, $className);
+        if (null === $entry) {
+            return false;
+        }
+        $methodLc = strtolower($method);
+        $position = self::paramPositionFromReflection($reflection);
+        $params = $entry->methodParameterMetadata[$methodLc] ?? [];
+        $paramMeta = $params[$position] ?? null;
+
+        return null !== $paramMeta && $paramMeta->isPromoted;
+    }
+
+    public static function resolveParameterBlock(Context $ctx, ObjectEntry $reflection): \PHPCompiler\Block
+    {
+        $classNameVar = $reflection->getProperty(self::PROP_CLASS_NAME)->resolveIndirect();
+        if (Variable::TYPE_STRING === $classNameVar->type) {
+            $className = $classNameVar->toString();
+            $method = self::methodNameFromReflection($reflection);
+            $entry = VmReflection::resolveClassEntry($ctx, $className);
+            if (null === $entry) {
+                throw new \LogicException('ReflectionParameter refers to unknown class in this compiler build');
+            }
+            $methodLc = strtolower($method);
+            $func = $entry->methods[$methodLc] ?? null;
+            if (!$func instanceof \PHPCompiler\Func\PHP) {
+                throw new \LogicException('ReflectionParameter refers to unknown method in this compiler build');
+            }
+
+            return $func->block;
+        }
+
+        return self::resolveFunctionForReflectionParameter($ctx, $reflection)->block;
+    }
+
+    public static function parameterIndexForReflection(ObjectEntry $reflection): int
+    {
+        $classNameVar = $reflection->getProperty(self::PROP_CLASS_NAME)->resolveIndirect();
+        if (Variable::TYPE_STRING === $classNameVar->type) {
+            return self::paramPositionFromReflection($reflection);
+        }
+
+        return self::paramIndexFromReflection($reflection);
+    }
+
+    public static function parameterIsVariadic(\PHPCompiler\Block $block, int $paramIndex): bool
+    {
+        return null !== $block->variadicParamIndex && $block->variadicParamIndex === $paramIndex;
+    }
+
+    public static function parameterDefaultValueIsAvailable(\PHPCompiler\Block $block, int $paramIndex): bool
+    {
+        if (self::parameterIsVariadic($block, $paramIndex)) {
+            return false;
+        }
+
+        return ParamArgumentCountError::parameterHasDefault($block, $paramIndex);
+    }
+
+    public static function parameterScopeSlot(\PHPCompiler\Block $block, int $paramIndex): ?int
+    {
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_ARG_RECV !== $op->type || (int) $op->arg2 !== $paramIndex) {
+                continue;
+            }
+
+            return (int) $op->arg1;
+        }
+
+        return null;
     }
 
     /**

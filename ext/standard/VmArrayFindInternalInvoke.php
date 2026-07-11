@@ -21,10 +21,14 @@ final class VmArrayFindInternalInvoke
         Variable $value,
         Variable $key,
         bool $unaryUsesKey = false,
+        bool $keyFirst = false,
     ): Variable {
         $maxArgs = InternalArityPolicy::maxArgsForArrayCallback($fn);
         if ($maxArgs <= 1) {
             return VmInternalCall::invoke($fn, $unaryUsesKey ? $key : $value);
+        }
+        if ($keyFirst) {
+            return VmInternalCall::invoke($fn, $key, $value);
         }
 
         return VmInternalCall::invoke($fn, $value, $key);

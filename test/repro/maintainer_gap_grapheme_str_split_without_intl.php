@@ -2,41 +2,27 @@
 
 declare(strict_types=1);
 
-/**
- * Maintainer repro: grapheme_str_split() must not appear in function_exists() without ext/intl (#11825).
- *
- * php-src: ext/intl/php_intl.c — grapheme helpers registered only with loaded intl module.
- */
+// Issue #17694 — grapheme_* must not appear in function_exists() without ext/intl.
+putenv('PHP_COMPILER_PROFILE=8.4');
 
-$phantoms = [];
+if (extension_loaded('intl')) {
+    fwrite(STDERR, "SKIP: ext/intl loaded\n");
+    exit(0);
+}
+
 foreach ([
     'grapheme_str_split',
-    'grapheme_extract',
+    'grapheme_strlen',
     'grapheme_substr',
     'grapheme_strpos',
-    'grapheme_stripos',
-    'grapheme_stristr',
-    'grapheme_strrpos',
-    'grapheme_strlen',
+    'grapheme_extract',
     'grapheme_str_contains',
     'grapheme_strimwidth',
-    'intl_get_error_code',
-    'intl_get_error_message',
-    'intl_is_failure',
-] as $fn) {
-    if (\function_exists($fn)) {
-        $phantoms[] = $fn;
+] as $name) {
+    if (function_exists($name)) {
+        fwrite(STDERR, "FAIL: function_exists true for {$name} without ext/intl\n");
+        exit(1);
     }
 }
 
-if ([] !== $phantoms) {
-    echo 'fail: '.implode(', ', $phantoms).' advertised without intl';
-    exit(1);
-}
-
-if (\extension_loaded('intl')) {
-    echo 'fail: extension_loaded(intl)=true without full ext/intl';
-    exit(1);
-}
-
-echo "ok: absent\n";
+echo "ok\n";

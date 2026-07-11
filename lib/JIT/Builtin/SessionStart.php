@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\ext\standard\VmSession;
 use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable;
+use PHPCompiler\VM\ErrorReporter;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -31,9 +33,12 @@ final class SessionStart
         $i8 = $context->getTypeFromString('int8');
         $zeroI8 = $i8->constInt(0, false);
         $oneI8 = $i8->constInt(1, false);
+        $i32 = $context->getTypeFromString('int32');
 
         $entry = $fn->appendBasicBlock('ss_entry');
         $bbActive = $fn->appendBasicBlock('ss_active');
+        $bbCheckHeaders = $fn->appendBasicBlock('ss_check_headers');
+        $bbHeadersFail = $fn->appendBasicBlock('ss_headers_fail');
         $bbStart = $fn->appendBasicBlock('ss_start');
         $bbDone = $fn->appendBasicBlock('ss_done');
 
@@ -41,10 +46,20 @@ final class SessionStart
         $outPtr = $fn->getParam(0);
         $active = $context->builder->load(SessionStorageGlobals::$activeGlobal);
         $isActive = $context->builder->icmp(Builder::INT_NE, $active, $zeroI8);
-        $context->builder->branchIf($isActive, $bbActive, $bbStart);
+        $context->builder->branchIf($isActive, $bbActive, $bbCheckHeaders);
 
         $context->builder->positionAtEnd($bbActive);
         self::emitWriteBool($context, $outPtr, true);
+        $context->builder->branch($bbDone);
+
+        $context->builder->positionAtEnd($bbCheckHeaders);
+        $headersSent = $context->builder->call($context->lookupFunction('__phpc_headers_sent'));
+        $headersSentNonZero = $context->builder->icmp(Builder::INT_NE, $headersSent, $i32->constInt(0, false));
+        $context->builder->branchIf($headersSentNonZero, $bbHeadersFail, $bbStart);
+
+        $context->builder->positionAtEnd($bbHeadersFail);
+        self::emitHeadersSentWarning($context);
+        self::emitWriteBool($context, $outPtr, false);
         $context->builder->branch($bbDone);
 
         $context->builder->positionAtEnd($bbStart);
@@ -95,5 +110,28 @@ final class SessionStart
             $i64->constInt(0, false)
         );
         $context->builder->store($i8->constInt($value ? 1 : 0, false), $firstByte);
+    }
+
+    public static function emitHeadersSentWarning(Context $context): void
+    {
+        StringTriggerError::ensureLinked($context);
+        $msg = $context->constantFromString(VmSession::HEADERS_SENT_START_WARNING);
+        $strMap = $context->structFieldMap['__string__'];
+        $i8p = $context->getTypeFromString('int8*');
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $msgLen = $context->builder->load(
+            $context->builder->structGep($msg, $strMap['length'])
+        );
+        $msgBytes = $context->builder->structGep($msg, $strMap['value']);
+        $msgPtr = $context->builder->pointerCast($msgBytes, $i8p);
+        $context->builder->call(
+            $context->lookupFunction('__compiler_trigger_error'),
+            $msgPtr,
+            $context->builder->trunc($msgLen, $context->getTypeFromString('size_t')),
+            $i32->constInt(ErrorReporter::E_WARNING, false),
+            $context->builder->pointerCast($context->constantFromString(''), $i8p),
+            $i32->constInt(0, false)
+        );
     }
 }

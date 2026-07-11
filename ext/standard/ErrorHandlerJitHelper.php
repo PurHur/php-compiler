@@ -21,17 +21,19 @@ final class ErrorHandlerJitHelper
 
     private static int $topMask = 0;
 
-    private static ?string $topName = null;
+    /** Empty string = no active handler name (nullable static stores break nested JIT #17671). */
+    private static string $topName = '';
 
     private static int $savedFnAddr = 0;
 
     private static int $savedMask = 0;
 
-    private static ?string $savedName = null;
+    private static string $savedName = '';
 
-    public static function setApply(int $fnAddr, int $mask, ?string $handlerName): ?string
+    /** @return string previous handler name, or empty when none */
+    public static function setApply(int $fnAddr, int $mask, ?string $handlerName): string
     {
-        $previous = null;
+        $previous = '';
         if (self::$depth > 0) {
             $previous = self::$topName;
         }
@@ -45,7 +47,7 @@ final class ErrorHandlerJitHelper
         }
         self::$topFnAddr = $fnAddr;
         self::$topMask = $mask;
-        self::$topName = $handlerName;
+        self::$topName = null === $handlerName ? '' : $handlerName;
         ++self::$depth;
 
         return $previous;
@@ -62,11 +64,11 @@ final class ErrorHandlerJitHelper
             self::$topName = self::$savedName;
             self::$savedFnAddr = 0;
             self::$savedMask = 0;
-            self::$savedName = null;
+            self::$savedName = '';
         } else {
             self::$topFnAddr = 0;
             self::$topMask = 0;
-            self::$topName = null;
+            self::$topName = '';
         }
         --self::$depth;
 
@@ -86,5 +88,15 @@ final class ErrorHandlerJitHelper
         }
 
         return self::$topFnAddr;
+    }
+
+    /** Active handler name for get_error_handler() JIT/AOT (#17668); empty when inactive. */
+    public static function getTopName(): string
+    {
+        if (self::$depth <= 0) {
+            return '';
+        }
+
+        return self::$topName;
     }
 }

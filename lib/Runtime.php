@@ -27,6 +27,8 @@ use PHPCompiler\VM\HashTableRegistry;
 use PHPCompiler\JIT\Context as JITContext;
 use PHPCompiler\Ast\AsymmetricVisibilityRewriter;
 use PHPCompiler\Ast\LazyPropertyRewriter;
+use PHPCompiler\Ast\ReadonlyFunctionRewriter;
+use PHPCompiler\Ast\ReadonlyFunctionAnnotator;
 use PHPCompiler\Ast\DnfParenTypeRewriter;
 use PHPCompiler\Ast\GlobalDeprecatedConstRewriter;
 use PHPCompiler\Ast\GlobalTypedConstRewriter;
@@ -144,6 +146,7 @@ class Runtime {
         $astTraverser->addVisitor($this->staticClassAnnotator);
         $astTraverser->addVisitor(new Ast\EnumPropertyCompileCheck());
         $astTraverser->addVisitor(new Ast\GeneratorYieldSourceMarker());
+        $astTraverser->addVisitor(new ReadonlyFunctionAnnotator());
         $astTraverser->addVisitor(new TryCatchElseAttacher());
         $this->parser = new Parser(
             (new ParserFactory)->create(ParserFactory::ONLY_PHP7),
@@ -231,6 +234,7 @@ class Runtime {
         $this->load(new ext\mbstring\Module);
         $this->load(new ext\filter\Module);
         $this->load(new ext\calendar\Module);
+        $this->load(new ext\ldap\Module);
         $this->load(new ext\session\Module);
         $this->load(new ext\bcmath\Module);
         $this->load(new ext\stats\Module);
@@ -471,10 +475,15 @@ class Runtime {
      */
     public function prepareSourceForParser(string $code, string $filename = 'unknown'): array
     {
-        [$code, $bareRethrowLines] = $this->preprocessSourceForParse($code, $filename);
-        $code = $this->rewriteSourceBeforeParser($code, $filename);
+        $profileScope = LanguageProfileScope::beginForCompilationUnit($code, $filename);
+        try {
+            [$code, $bareRethrowLines] = $this->preprocessSourceForParse($code, $filename);
+            $code = $this->rewriteSourceBeforeParser($code, $filename);
 
-        return [$code, $bareRethrowLines];
+            return [$code, $bareRethrowLines];
+        } finally {
+            $profileScope->end();
+        }
     }
 
     /**
@@ -517,6 +526,7 @@ class Runtime {
         $code = DnfParenTypeRewriter::rewrite($code);
         $code = AsymmetricVisibilityRewriter::rewrite($code);
         $code = LazyPropertyRewriter::rewrite($code);
+        $code = ReadonlyFunctionRewriter::rewrite($code);
         $code = TypedFunctionStaticRewriter::rewrite($code);
         $code = HexFloatLiteralDesugar::desugar($code);
         $code = NewDereferenceableDesugar::desugar($code);

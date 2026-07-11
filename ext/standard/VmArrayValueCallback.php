@@ -48,8 +48,9 @@ final class VmArrayValueCallback
     }
 
     /**
-     * Invoke array_find-family predicate — closures/user fns get (value, key); internal builtins
-     * get arity-trimmed operands per php-src (ext/standard/array.c; #17300).
+     * Invoke array_find-family predicate — php-src php_array_find passes (value, key) for
+     * array_find/array_find_key/array_any/array_all; forward-profile array_any_key/array_all_key
+     * closures get (key, value); internal builtins get arity-trimmed operands (#17300, #17599).
      */
     public static function invokePredicate(
         Frame $frame,
@@ -61,6 +62,7 @@ final class VmArrayValueCallback
     ): Variable {
         self::requireCallback($frame, $callback, $function, $argNum);
         $callback = $callback->resolveIndirect();
+        $keyFirst = self::callbackKeyFirst($function);
         if (VmClosureCall::isClosure($callback)) {
             if (null === $frame->vmContext) {
                 throw new \LogicException(
@@ -71,8 +73,8 @@ final class VmArrayValueCallback
             return VmClosureCall::invoke(
                 $frame->vmContext,
                 VmClosureCall::resolve($callback),
-                $value,
-                $key,
+                $keyFirst ? $key : $value,
+                $keyFirst ? $value : $key,
             );
         }
         $name = $callback->toString();
@@ -84,6 +86,7 @@ final class VmArrayValueCallback
                 $value,
                 $key,
                 self::unaryInternalUsesKey($function),
+                $keyFirst,
             );
         } catch (\LogicException) {
             // Not a registered string builtin — try a user-defined function.
@@ -95,7 +98,21 @@ final class VmArrayValueCallback
         }
         $fn = VmUserCall::resolveStringCallback($frame->vmContext, $name);
 
-        return VmUserCall::invokeTwo($frame->vmContext, $fn, $value, $key);
+        return VmUserCall::invokeTwo(
+            $frame->vmContext,
+            $fn,
+            $keyFirst ? $key : $value,
+            $keyFirst ? $value : $key,
+        );
+    }
+
+    /**
+     * Forward-profile array_any_key/array_all_key pass key before value; php-src array_find_key uses (value, key) (#17599).
+     */
+    public static function callbackKeyFirst(string $function): bool
+    {
+        return 'array_any_key' === $function
+            || 'array_all_key' === $function;
     }
 
     /**

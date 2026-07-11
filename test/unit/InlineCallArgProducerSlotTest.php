@@ -396,6 +396,41 @@ PHP;
         self::assertSame("bool(true)\nbool(false)\n", ob_get_clean());
     }
 
+    /** Issue #17555 — var_export(isset($obj->typed), true) must export bool, not __set_state. */
+    public function testVarExportIssetUninitTypedPropertyUsesBoolSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+class T {
+    public int $i;
+}
+$t = new T();
+echo var_export(isset($t->i), true);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'var_export_isset_typed.php');
+
+        $issetSlots = [];
+        $sendSlots = [];
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_ISSET === $op->type) {
+                $issetSlots[] = $op->arg1;
+            }
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                $sendSlots = [];
+            }
+            if (OpCode::TYPE_ARG_SEND === $op->type) {
+                $sendSlots[] = $op->arg1;
+            }
+        }
+        self::assertNotEmpty($issetSlots);
+        self::assertContains($sendSlots[0] ?? null, $issetSlots, 'isset bool feeds var_export arg 0');
+
+        ob_start();
+        $runtime->run($block);
+        self::assertSame('false', ob_get_clean());
+    }
+
     /** Issue #10917 — sibling str_repeat() producers map to distinct levenshtein() arg slots. */
     public function testLevenshteinDualStrRepeatUsesDistinctProducerSlots(): void
     {
@@ -1077,6 +1112,31 @@ PHP;
         self::assertSame([$castSlot], $sendSlots, 'arg sends='.json_encode($sendSlots));
     }
 
+    /** Issue #17551 — (object) array literal as call arg must compile (TYPE_CAST_OBJECT prelude slot). */
+    public function testArraySpliceObjectCastPreludeCompilesAndSendsCastSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+array_splice((object) [1, 2, 3], 1, 1);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'array_splice_object_cast.php');
+
+        $castSlot = null;
+        $sendSlots = [];
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_CAST_OBJECT === $op->type) {
+                $castSlot = $op->arg1;
+            }
+            if (OpCode::TYPE_ARG_SEND === $op->type) {
+                $sendSlots[] = $op->arg1;
+            }
+        }
+
+        self::assertNotNull($castSlot);
+        self::assertSame($castSlot, $sendSlots[0] ?? null, 'arg sends='.json_encode($sendSlots));
+    }
+
     /** Issue #9684 — enum case ->name/->value in direct call args use property-fetch slot. */
     public function testVarDumpEnumCaseMagicPropertyUsesPropertyFetchSlot(): void
     {
@@ -1342,6 +1402,38 @@ PHP;
         self::assertSame("ok\n", ob_get_clean());
     }
 
+    /** Issue #17524 — DatePeriod inline sibling New_ ctor args wire positional slots, not last New_. */
+    public function testDatePeriodInlineSiblingNewUsesPositionalProducerSlots(): void
+    {
+        $code = <<<'PHP'
+<?php
+new DatePeriod(new DateTime('2020-01-01'), new DateInterval('P1D'), new DateTime('2020-01-03'));
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'dateperiod_inline_sibling_new.php');
+
+        $newSlots = [];
+        $periodSends = [];
+        $inPeriodCtor = false;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_NEW === $op->type) {
+                $newSlots[] = $op->arg1;
+            }
+            if (OpCode::TYPE_NEW === $op->type && 4 === \count($newSlots)) {
+                $inPeriodCtor = true;
+            }
+            if ($inPeriodCtor && OpCode::TYPE_ARG_SEND === $op->type) {
+                $periodSends[] = $op->arg1;
+            }
+            if ($inPeriodCtor && OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
+                break;
+            }
+        }
+
+        self::assertSame([0, 4, 8, 12], $newSlots, 'new slots='.json_encode($newSlots));
+        self::assertSame([0, 4, 8], $periodSends, 'DatePeriod arg sends='.json_encode($periodSends));
+    }
+
     /** Issue #10143 — var_export((string) NAN) wires Cast producer, not dead arg temp. */
     public function testStringCastNanConstantUsesCastProducerSlot(): void
     {
@@ -1403,6 +1495,51 @@ PHP;
         $runtime->run($block);
         $out = ob_get_clean();
         self::assertStringContainsString('1.0', $out);
+    }
+
+    /** Issue #17562 — var_export(JSON_HEX_* | …) after echoed json_encode uses BitwiseOr slot, not stale EXEC_RETURN. */
+    public function testVarExportBitwiseOrAfterEchoedJsonEncodeUsesArithmeticProducerSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+echo json_encode('<', JSON_HEX_TAG | JSON_HEX_AMP);
+var_export(JSON_HEX_TAG | JSON_HEX_AMP);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'var_export_json_hex_after_encode.php');
+
+        $bitwiseOrSlots = [];
+        $jsonEncodeExecSlot = null;
+        $varExportSends = [];
+        $fcallOrdinal = 0;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                ++$fcallOrdinal;
+                if (2 === $fcallOrdinal) {
+                    $varExportSends = [];
+                }
+            }
+            if (OpCode::TYPE_BITWISE_OR === $op->type) {
+                $bitwiseOrSlots[] = $op->arg1;
+            }
+            if (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type && 1 === $fcallOrdinal) {
+                $jsonEncodeExecSlot = $op->arg1;
+            }
+            if (2 === $fcallOrdinal && OpCode::TYPE_ARG_SEND === $op->type) {
+                $varExportSends[] = $op->arg1;
+            }
+        }
+
+        self::assertCount(2, $bitwiseOrSlots, 'expected two BitwiseOr preludes');
+        self::assertNotNull($jsonEncodeExecSlot);
+        self::assertCount(1, $varExportSends);
+        self::assertSame($bitwiseOrSlots[1], $varExportSends[0], 'arg sends='.json_encode($varExportSends));
+        self::assertNotSame($jsonEncodeExecSlot, $varExportSends[0]);
+
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertStringEndsWith('3', trim($out));
     }
 
     /** Issue #17250 — var_export($x !== false, true) wires NotIdentical producer, not hoisted false ConstFetch. */
@@ -1488,6 +1625,39 @@ PHP;
         $runtime->run($block);
         $out = ob_get_clean();
         self::assertStringContainsString('truetrue', str_replace("\n", '', $out));
+    }
+
+    /** Issue #17757 — false !== ini_get('bogus') must wire false into NOT_IDENTICAL LHS (#17697). */
+    public function testJumpIfNotIdenticalFalseBuiltinCallEmitsConstFetchForFalse(): void
+    {
+        $code = <<<'PHP'
+<?php
+if (false !== ini_get('bogus_xyz')) {
+    echo "bad\n";
+} else {
+    echo "ok\n";
+}
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'ini_get_not_identical_false.php');
+
+        $notIdenticalLeft = null;
+        $notIdenticalRight = null;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_NOT_IDENTICAL === $op->type) {
+                $notIdenticalLeft = $op->arg2;
+                $notIdenticalRight = $op->arg3;
+            }
+        }
+
+        self::assertNotNull($notIdenticalLeft, 'NOT_IDENTICAL must be lowered');
+        self::assertNotNull($notIdenticalRight, 'NOT_IDENTICAL must compare builtin return');
+        self::assertNotSame($notIdenticalLeft, $notIdenticalRight, 'false and ini_get() must use distinct slots');
+
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertSame("ok\n", $out);
     }
 
     /** Issue #17259 — static call with two hoisted !== preludes wires distinct comparison slots. */
@@ -3915,6 +4085,28 @@ PHP;
         self::assertSame("key=1\n", $out);
     }
 
+    /** var_export($g->valid(), true) after Generator::send assign + prior var_export (Zend/zend_generators.c). */
+    public function testVarExportNestedGeneratorValidAfterSendAssignUsesMethodCallProducerSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+$g = (function (): Generator { yield 1; })();
+$g->next();
+$r = $g->send(99);
+echo 'send=', var_export($r, true), "\n";
+echo 'valid_inline=', var_export($g->valid(), true), "\n";
+$v = $g->valid();
+echo 'valid_stored=', var_export($v, true), "\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'var_export_nested_generator_valid_after_send.php');
+
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertSame("send=NULL\nvalid_inline=false\nvalid_stored=false\n", $out);
+    }
+
     /** Issue #13830 — var_export(next($a), true) in concat after prior next($a). */
     public function testVarExportNestedNextUsesFuncCallProducerSlot(): void
     {
@@ -4047,6 +4239,45 @@ PHP;
         $runtime->run($block);
         $out = ob_get_clean();
         self::assertSame('0644', $out);
+    }
+
+    /** Issue #17572 — substr(dechex(...), -N) wires nested FuncCall + UnaryMinus producer slots. */
+    public function testSubstrNestedDechexUsesFuncCallProducerSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+echo substr(dechex(255), -2);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'nested_substr_dechex.php');
+
+        $dechexReturnSlot = null;
+        $substrSends = [];
+        $fcallOrdinal = 0;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                ++$fcallOrdinal;
+                if (2 === $fcallOrdinal) {
+                    $substrSends = [];
+                }
+            }
+            if (1 === $fcallOrdinal && OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
+                $dechexReturnSlot = $op->arg1;
+            }
+            if (2 === $fcallOrdinal && OpCode::TYPE_ARG_SEND === $op->type) {
+                $substrSends[] = $op->arg1;
+            }
+        }
+
+        self::assertNotNull($dechexReturnSlot);
+        self::assertCount(2, $substrSends);
+        self::assertSame($dechexReturnSlot, $substrSends[0], 'arg sends='.json_encode($substrSends));
+        self::assertNotSame($substrSends[0], $substrSends[1], 'arg sends='.json_encode($substrSends));
+
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertSame('ff', $out);
     }
 
     /** Issue #13636 — substr(sprintf('%o', fileperms($path)), -N) nested int builtin arg slot + runtime. */
@@ -4209,6 +4440,32 @@ PHP, 'fopen_chained_concat_path_warn.php');
         $err = error_get_last();
         self::assertNotNull($err);
         self::assertStringContainsString('/tmp/maint_99/sub/file.txt', $err['message'] ?? '');
+    }
+
+    /** Issue #17478 — file_get_contents($path) after concat assign must wire path variable, not literal prefix. */
+    public function testFileGetContentsAfterConcatAssignUsesPathVariableSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+declare(strict_types=1);
+$path = '/nope/'.getmypid();
+file_get_contents($path);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'file_get_contents_concat_assign.php');
+
+        $concatSlots = [];
+        $sendSlots = [];
+        $this->collectOpCodesFromBlock($block, $concatSlots, $sendSlots);
+
+        self::assertNotEmpty($concatSlots, 'concat slots='.json_encode($concatSlots));
+        self::assertContains($concatSlots[\count($concatSlots) - 1], $sendSlots, 'arg sends='.json_encode($sendSlots));
+
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type || OpCode::TYPE_FUNCCALL_EXEC_NORETURN === $op->type) {
+                self::assertNotSame('/nope/', $op->arg1, 'must not misbind concat literal into funccall slot');
+            }
+        }
     }
 
     /** Issue #15929 — chained Mul/Div in call operands wires final Div slot, not inner Mul. */
@@ -4393,6 +4650,66 @@ echo null === $r ? "ok\n" : "bad\n";
 PHP;
         $runtime = new Runtime();
         $block = $runtime->parseAndCompile($code, 'filter_var_flags_options_runtime.php');
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertSame("ok\n", $out);
+    }
+
+    /** Issue #17410 — filter_var() BitwiseOr int flags maps filter const + flags expr to arg slots. */
+    public function testFilterVarSanitizeNumberFloatBitmaskFlagsSlots(): void
+    {
+        $code = <<<'PHP'
+<?php
+$s = '1,234.5e2';
+filter_var(
+    $s,
+    FILTER_SANITIZE_NUMBER_FLOAT,
+    FILTER_FLAG_ALLOW_FRACTION | FILTER_FLAG_ALLOW_THOUSAND | FILTER_FLAG_ALLOW_SCIENTIFIC
+);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'filter_var_sanitize_float_flags.php');
+
+        $filterSlot = null;
+        $flagsSlot = null;
+        $sendSlots = [];
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_CONST_FETCH === $op->type && null === $filterSlot) {
+                $filterSlot = $op->arg1;
+            }
+            if (OpCode::TYPE_BITWISE_OR === $op->type) {
+                $flagsSlot = $op->arg1;
+            }
+            if (OpCode::TYPE_ARG_SEND === $op->type) {
+                $sendSlots[] = $op->arg1;
+            }
+        }
+
+        self::assertNotNull($filterSlot);
+        self::assertNotNull($flagsSlot);
+        self::assertCount(3, $sendSlots, 'filter_var arg sends='.json_encode($sendSlots));
+        self::assertSame($filterSlot, $sendSlots[1] ?? null, 'arg sends='.json_encode($sendSlots));
+        self::assertSame($flagsSlot, $sendSlots[2] ?? null, 'arg sends='.json_encode($sendSlots));
+    }
+
+    /** Issue #17410 — filter_var() sanitize-number-float + BitwiseOr flags runtime parity. */
+    public function testFilterVarSanitizeNumberFloatBitmaskFlagsRuntime(): void
+    {
+        $code = <<<'PHP'
+<?php
+declare(strict_types=1);
+
+$s = '1,234.5e2';
+$r = filter_var(
+    $s,
+    FILTER_SANITIZE_NUMBER_FLOAT,
+    FILTER_FLAG_ALLOW_FRACTION | FILTER_FLAG_ALLOW_THOUSAND | FILTER_FLAG_ALLOW_SCIENTIFIC
+);
+echo $r === '1,234.5e2' ? "ok\n" : "bad\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'filter_var_sanitize_float_flags_runtime.php');
         ob_start();
         $runtime->run($block);
         $out = ob_get_clean();
@@ -5956,6 +6273,66 @@ PHP;
         self::assertNotSame($constSlots[0], $argSendSlots[0], 'hoisted false must not feed file_exists arg');
     }
 
+    /** Issue #17757 — false !== ini_get('bogus') must compare against false, not an uninitialized temp. */
+    public function testIniGetUnknownKeyInlineFalseComparisonEmitsConstFetch(): void
+    {
+        $code = <<<'PHP'
+<?php
+declare(strict_types=1);
+var_export(false !== ini_get('bogus_xyz'));
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'ini_get_unknown_inline_false.php');
+
+        $falseConstSlot = null;
+        $notIdenticalLeft = null;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_CONST_FETCH === $op->type && null === $falseConstSlot) {
+                $falseConstSlot = $op->arg1;
+            }
+            if (OpCode::TYPE_NOT_IDENTICAL === $op->type) {
+                $notIdenticalLeft = $op->arg2;
+            }
+        }
+
+        self::assertNotNull($falseConstSlot, 'missing false ConstFetch');
+        self::assertSame($falseConstSlot, $notIdenticalLeft, 'NOT_IDENTICAL left must be false literal slot');
+    }
+
+    /** Issue #17756 — false !== class_alias(...) must compare against false after EXEC_RETURN. */
+    public function testClassAliasInlineFalseComparisonEmitsConstFetch(): void
+    {
+        $code = <<<'PHP'
+<?php
+declare(strict_types=1);
+var_export(false !== class_alias('NoSuch17756', 'Alias17756'));
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'class_alias_unknown_inline_false.php');
+
+        $falseConstSlot = null;
+        $aliasReturnSlot = null;
+        $notIdenticalLeft = null;
+        $notIdenticalRight = null;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_CONST_FETCH === $op->type && null === $falseConstSlot) {
+                $falseConstSlot = $op->arg1;
+            }
+            if (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type && null === $aliasReturnSlot) {
+                $aliasReturnSlot = $op->arg1;
+            }
+            if (OpCode::TYPE_NOT_IDENTICAL === $op->type) {
+                $notIdenticalLeft = $op->arg2;
+                $notIdenticalRight = $op->arg3;
+            }
+        }
+
+        self::assertNotNull($falseConstSlot, 'missing false ConstFetch');
+        self::assertNotNull($aliasReturnSlot, 'missing class_alias return slot');
+        self::assertSame($falseConstSlot, $notIdenticalLeft);
+        self::assertSame($aliasReturnSlot, $notIdenticalRight);
+    }
+
     /** Issue #14042 — nested array_reverse() feeds trailing mixed param, not hoisted Array_ prelude. */
     public function testNestedArrayReverseTrailingMixedCallArgUsesFuncCallSlot(): void
     {
@@ -6447,6 +6824,23 @@ PHP;
             ."uksort: TypeError\n",
             ob_get_clean()
         );
+    }
+
+    /** Issue #17598 — stmt-level substr(..., -N) must not wire prior discard as nested haystack for 3-arg substr. */
+    public function testSubstrNegativeLengthAfterDiscardedNegativeOffsetRuntime(): void
+    {
+        $code = <<<'PHP'
+<?php
+declare(strict_types=1);
+substr('hello', -3);
+echo substr('hello', 0, -2), "\n";
+echo substr('abcdef', -4, 2), "\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'substr_neg_len_after_offset.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("hel\ncd\n", ob_get_clean());
     }
 
     /** Issue #16481 — mb_substr/mb_strcut($s, -N, null[, $enc]) wires UnaryMinus offset + null length. */
@@ -6973,5 +7367,57 @@ PHP;
         $out = ob_get_clean();
         self::assertStringContainsString("29\n", $out);
         self::assertStringContainsString('proc_sync', $out);
+    }
+
+    /** Issue #17767 — var_export($obj->m(), true) in concat must wire method EXEC_RETURN, not spurious echo. */
+    public function testMethodCallFalseReturnVarExportConcatOperandSlotWiring(): void
+    {
+        $code = <<<'PHP'
+<?php
+declare(strict_types=1);
+class C { public function f(): bool { return false; } }
+$c = new C();
+echo 'x='.var_export($c->f(), true)."\n";
+function gen(): Generator { yield 1; return 99; }
+$g = gen(); $g->next(); $g->next();
+echo 'valid='.var_export($g->valid(), true)."\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'method_call_concat_operand.php');
+
+        $methodReturnSlot = null;
+        $varExportArgSend = null;
+        $pendingMethod = null;
+        $fcallOrdinal = 0;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_METHODCALL_INIT === $op->type) {
+                $pendingMethod = $block->constants[$op->arg2]->toString();
+                continue;
+            }
+            if ('f' === $pendingMethod && OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
+                $methodReturnSlot = $op->arg1;
+                $pendingMethod = null;
+                continue;
+            }
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                ++$fcallOrdinal;
+                $name = $block->constants[$op->arg1]->toString();
+                if (1 === $fcallOrdinal && 'var_export' === $name) {
+                    continue;
+                }
+            }
+            if (1 === $fcallOrdinal && OpCode::TYPE_ARG_SEND === $op->type && null === $varExportArgSend) {
+                $varExportArgSend = $op->arg1;
+            }
+        }
+
+        self::assertNotNull($methodReturnSlot, 'method f() must EXEC_RETURN before var_export');
+        self::assertNotNull($varExportArgSend, 'var_export must ARG_SEND method return');
+        self::assertSame($methodReturnSlot, $varExportArgSend, 'var_export arg0 must reuse method return slot');
+
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertSame("x=false\nvalid=false\n", $out);
     }
 }

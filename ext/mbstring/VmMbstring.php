@@ -600,6 +600,51 @@ final class VmMbstring
         );
     }
 
+    /** php-src ext/mbstring/mbstring.c php_mb_ulcfirst — first multibyte char only (#17609). */
+    public static function ucfirst(string $string, string $encoding = 'UTF-8'): string
+    {
+        return self::ulcfirst(
+            $string,
+            MbstringConstants::MB_CASE_TITLE,
+            $encoding,
+            'mb_ucfirst',
+            1
+        );
+    }
+
+    /** php-src ext/mbstring/mbstring.c php_mb_ulcfirst — first multibyte char only (#17609). */
+    public static function lcfirst(string $string, string $encoding = 'UTF-8'): string
+    {
+        return self::ulcfirst(
+            $string,
+            MbstringConstants::MB_CASE_LOWER,
+            $encoding,
+            'mb_lcfirst',
+            1
+        );
+    }
+
+    private static function ulcfirst(
+        string $string,
+        int $mode,
+        string $encoding,
+        string $function,
+        int $encodingArgIndex
+    ): string {
+        $encoding = MbstringEncodingRegistry::assertValid($encoding, $function, $encodingArgIndex);
+        if ('' === $string) {
+            return $string;
+        }
+        $first = self::substr($string, 0, 1, $encoding);
+        $head = self::convertCase($first, $mode, $encoding, $function, $encodingArgIndex);
+        if ($first === $head) {
+            return $string;
+        }
+        $rest = self::substr($string, 1, null, $encoding);
+
+        return $head.$rest;
+    }
+
     public static function coerceStartArg(Frame $frame, string $function, int $argIndex): int
     {
         return VmMath::parseIntBuiltinArgForFrame($frame, $argIndex, $function, $argIndex + 1, 'start');
