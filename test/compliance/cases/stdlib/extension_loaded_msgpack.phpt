@@ -1,5 +1,5 @@
 --TEST--
-stdlib extension_loaded('msgpack') true when pack/unpack implemented (#6551, ext/msgpack/msgpack.c)
+stdlib extension_loaded('msgpack') withheld on reference profile (#17994, ext/msgpack/msgpack.c)
 --FILE--
 <?php
 declare(strict_types=1);
@@ -9,7 +9,7 @@ echo 'in_list=', (int) in_array('msgpack', get_loaded_extensions(), true), "\n";
 echo 'pack=', (int) function_exists('msgpack_pack'), "\n";
 echo 'unpack=', (int) function_exists('msgpack_unpack'), "\n";
 --EXPECT--
-loaded=1
-in_list=1
-pack=1
-unpack=1
+loaded=0
+in_list=0
+pack=0
+unpack=0

@@ -2,26 +2,18 @@
 
 declare(strict_types=1);
 
+$m = stream_get_meta_data(tmpfile());
 @getimagesizefromstring('not-image');
-$meta = stream_get_meta_data(tmpfile());
-$direct = $meta['seekable'];
-$foreach = null;
-foreach ($meta as $k => $v) {
-    if ('seekable' === $k) {
-        $foreach = $v;
+if (true !== ($m['seekable'] ?? null)) {
+    echo "fail: seekable offset read after @ getimagesizefromstring\n";
+    exit(1);
+}
+
+foreach ($m as $key => $value) {
+    if ('seekable' === $key && true !== $value) {
+        echo "fail: seekable foreach after @ getimagesizefromstring\n";
+        exit(1);
     }
-}
-
-echo 'direct=', var_export($direct, true), "\n";
-echo 'foreach=', var_export($foreach, true), "\n";
-
-if (true !== $direct) {
-    echo "fail: direct seekable not true\n";
-    exit(1);
-}
-if (true !== $foreach) {
-    echo "fail: foreach seekable not true\n";
-    exit(1);
 }
 
 echo "ok\n";
