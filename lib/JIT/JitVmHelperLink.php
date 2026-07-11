@@ -197,7 +197,7 @@ final class JitVmHelperLink
         }
     }
 
-    private static function bridgeEntryForEmit(LlvmFunction $fn, string $entryBlockName): \PHPLLVM\BasicBlock
+    public static function bridgeEntryForEmit(LlvmFunction $fn, string $entryBlockName): \PHPLLVM\BasicBlock
     {
         try {
             foreach ($fn->getBasicBlocks() as $block) {
