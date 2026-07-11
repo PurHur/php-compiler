@@ -7332,6 +7332,24 @@ PHP;
         self::assertSame("11110\n", ob_get_clean());
     }
 
+    /** Issue #17980 — in_array()/array_search() haystack $arr['k'] ?? [] inline uses coalesce merge slot. */
+    public function testInArrayCoalesceHaystackInlineCallArgUsesCoalesceMergeSlot(): void
+    {
+        $code = file_get_contents(
+            __DIR__.'/../repro/maintainer_gap_in_array_coalesce_haystack_call_arg.php'
+        );
+        self::assertNotFalse($code);
+
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'in_array_coalesce_haystack_call_arg.php');
+
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertStringContainsString('bool(true)', $out);
+        self::assertStringContainsString('int(1)', $out);
+    }
+
     /** Issue #10303 — tempnam(sys_get_temp_dir(), E::A) wires enum case fetch to arg #1. */
     public function testTempnamNestedFuncCallEnumPrefixUsesClassConstFetchSlot(): void
     {

@@ -15083,8 +15083,7 @@ class Compiler {
                     if ($this->onlyInlineCallArgProducersBetweenIndices($block->orig->children, $j, $i)) {
                         // Stmt-level ?? feeds arg #0 only; trailing hoisted true/false/null are unrelated (#13789).
                         $firstArg = $child->args[0] ?? null;
-                        if (
-                            null === $matchedCallArg
+                        $feedsFirstArg = null === $matchedCallArg
                             || (
                                 null !== $firstArg
                                 && (
@@ -15092,8 +15091,21 @@ class Compiler {
                                     || $this->operandsReferToSameVariable($firstArg, $matchedCallArg)
                                     || $this->operandsReferToSameVariable($prev->result, $matchedCallArg)
                                 )
-                            )
-                        ) {
+                            );
+                        $feedsHaystackArg = false;
+                        if (!$feedsFirstArg && null !== $matchedCallArg) {
+                            $calleeLc = strtolower($this->resolveCfgFuncCallName($child) ?? '');
+                            if (\in_array($calleeLc, ['in_array', 'array_search', 'array_key_exists'], true)) {
+                                $haystackArg = $child->args[1] ?? null;
+                                $feedsHaystackArg = null !== $haystackArg
+                                    && $this->callArgOperandExpectsArrayProducer($haystackArg)
+                                    && (
+                                        $haystackArg === $matchedCallArg
+                                        || $this->operandsReferToSameVariable($haystackArg, $matchedCallArg)
+                                    );
+                            }
+                        }
+                        if ($feedsFirstArg || $feedsHaystackArg) {
                             return $prev;
                         }
                     }
@@ -40914,6 +40926,21 @@ class Compiler {
                         $haystackArg = $cfgCallOp->args[1] ?? $arg;
                         if (
                             null !== $haystackArg
+                            && $this->callArgIsCoalesceMergeProducer($haystackArg, $block, $cfgCallOp, 1)
+                        ) {
+                            $coalesceHaystackSlot = $this->compileCallArgCoalesceSlot(
+                                $haystackArg,
+                                $block,
+                                $cfgCallOp,
+                                1
+                            );
+                            if (null !== $coalesceHaystackSlot) {
+                                $valueSlot = (string) $coalesceHaystackSlot;
+                            }
+                        }
+                        if (
+                            null === $valueSlot
+                            && null !== $haystackArg
                             && $this->callArgOperandExpectsArrayProducer($haystackArg)
                         ) {
                             $haystackArrayProducer = $this->matchInlineArraySearchHaystackProducer(
@@ -43567,6 +43594,10 @@ class Compiler {
      */
     private function matchInlineArraySearchHaystackProducer(array $producers, Operand $haystackArg): ?Op\Expr
     {
+        // $arr['k'] ?? [] inline — coalesce merge slot, not ?? RHS empty Array_ (#17980, re-#17000).
+        if ([] !== $this->findEmbeddedCoalesces($haystackArg)) {
+            return null;
+        }
         $arrayProducers = array_values(array_filter(
             $producers,
             static fn (Op\Expr $producer): bool => $producer instanceof Op\Expr\Array_
