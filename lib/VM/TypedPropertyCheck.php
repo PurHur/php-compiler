@@ -199,7 +199,7 @@ final class TypedPropertyCheck
      * ?-> receiver short-circuit: PHP null, scalar/non-object, or uninitialized nullable typed
      * slot after a standalone PropertyFetch (e.g. $a->b?->v, #5220). Chained $x?->y direct read
      * throws via nullsafeFetchPropertyRead (#5361); ??/isset/empty use nullsafeUninitNullableToNull
-     * (#13747). Zend silent short-circuit on int/string/array/etc. (#18026, #18028).
+     * (#13747). Zend is silent on (1)?->p etc. (#18026).
      */
     public static function nullsafeShortCircuitReceiver(Variable $receiver): bool
     {
@@ -207,15 +207,18 @@ final class TypedPropertyCheck
         if (Variable::TYPE_NULL === $resolved->type) {
             return true;
         }
-        if (TypeCheck::isNonObjectPropertyFetchReceiver($receiver)) {
-            if (self::isUninitialized($receiver)) {
-                return self::propertyAllowsNull($receiver);
-            }
 
+        if (self::isUninitialized($receiver) && self::propertyAllowsNull($receiver)) {
             return true;
         }
 
-        return self::isUninitialized($receiver) && self::propertyAllowsNull($receiver);
+        return \in_array($resolved->type, [
+            Variable::TYPE_BOOLEAN,
+            Variable::TYPE_INTEGER,
+            Variable::TYPE_FLOAT,
+            Variable::TYPE_STRING,
+            Variable::TYPE_ARRAY,
+        ], true);
     }
 
     private static function classPropertyAllowsNull(ObjectEntry $owner, string $name): bool

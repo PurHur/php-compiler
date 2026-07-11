@@ -21,19 +21,16 @@ final class NullsafeJitHelper
         if (Variable::TYPE_NULL === $typeByte) {
             return true;
         }
-        if (Variable::TYPE_UNDEFINED === $typeByte) {
-            return $nullablePropertySlot;
+        if (Variable::TYPE_UNDEFINED === $typeByte && $nullablePropertySlot) {
+            return true;
         }
-        if (\in_array($typeByte, [
+
+        return \in_array($typeByte, [
             Variable::TYPE_BOOLEAN,
             Variable::TYPE_INTEGER,
             Variable::TYPE_FLOAT,
             Variable::TYPE_STRING,
             Variable::TYPE_ARRAY,
-        ], true)) {
-            return true;
-        }
-
-        return false;
+        ], true);
     }
 }

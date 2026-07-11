@@ -6590,6 +6590,10 @@ restart:
                         break;
                     }
                     if ($propertyObject->class->allowsDynamicProperties) {
+                        if ($op->nullsafeFetchPropertyRead) {
+                            $result->null();
+                            break;
+                        }
                         $scriptFile = '' !== $frame->scriptPath ? $frame->scriptPath : null;
                         $this->context->errors->undefinedPropertyRead(
                             $propertyObject->class->name,
@@ -6598,6 +6602,10 @@ restart:
                             $frame,
                             $scriptFile
                         );
+                        $result->null();
+                        break;
+                    }
+                    if ($op->nullsafeFetchPropertyRead) {
                         $result->null();
                         break;
                     }

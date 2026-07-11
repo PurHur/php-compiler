@@ -283,6 +283,13 @@ class VMTest extends BaseTest {
                 && str_contains($name, 'datetime_microsecond_phantom')) {
                 continue;
             }
+            if (str_contains($name, 'datetime_create_from_timestamp')) {
+                continue;
+            }
+            if (CompilerVersion::supportsDateTimeCreateFromTimestamp()
+                && str_contains($name, 'create_from_timestamp_profile_phantom')) {
+                continue;
+            }
             if (!CompilerVersion::supportsArrayReplaceKey()
                 && str_contains($name, 'array_replace_key')
                 && !str_contains($name, 'array_replace_key_phantom')) {

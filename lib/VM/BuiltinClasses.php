@@ -1288,8 +1288,10 @@ final class BuiltinClasses
         $dt->methodVisibility['createfromimmutable'] = $pubStatic;
         $dt->methods['createfrominterface'] = new DateTimeCreateFromInterface();
         $dt->methodVisibility['createfrominterface'] = $pubStatic;
-        $dt->methods['createfromtimestamp'] = new DateTimeCreateFromTimestamp();
-        $dt->methodVisibility['createfromtimestamp'] = $pubStatic;
+        if (CompilerVersion::supportsDateTimeCreateFromTimestamp()) {
+            $dt->methods['createfromtimestamp'] = new DateTimeCreateFromTimestamp();
+            $dt->methodVisibility['createfromtimestamp'] = $pubStatic;
+        }
         $dt->methods['getlasterrors'] = new DateTimeGetLastErrors();
         $dt->methodVisibility['getlasterrors'] = $pubStatic;
         $ctx->classes[DateTimeSupport::CLASS_DATETIME] = $dt;
@@ -1312,8 +1314,10 @@ final class BuiltinClasses
         $dti->methodVisibility['createfrommutable'] = $pubStatic;
         $dti->methods['createfrominterface'] = new DateTimeImmutableCreateFromInterface();
         $dti->methodVisibility['createfrominterface'] = $pubStatic;
-        $dti->methods['createfromtimestamp'] = new DateTimeImmutableCreateFromTimestamp();
-        $dti->methodVisibility['createfromtimestamp'] = $pubStatic;
+        if (CompilerVersion::supportsDateTimeCreateFromTimestamp()) {
+            $dti->methods['createfromtimestamp'] = new DateTimeImmutableCreateFromTimestamp();
+            $dti->methodVisibility['createfromtimestamp'] = $pubStatic;
+        }
         $dti->methods['getlasterrors'] = new DateTimeGetLastErrors();
         $dti->methodVisibility['getlasterrors'] = $pubStatic;
         $ctx->classes[DateTimeSupport::CLASS_DATETIMEIMMUTABLE] = $dti;
