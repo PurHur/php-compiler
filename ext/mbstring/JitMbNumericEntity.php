@@ -4,16 +4,131 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\mbstring;
 
+use PHPCompiler\JIT\ArrayBuiltinHelper;
+use PHPCompiler\JIT\Builtin\MbNumericEntity;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringArg;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * Compile-time folding for mb_encode_numericentity() / mb_decode_numericentity() (#7237).
+ * Compile-time folding and runtime lowering for mb_encode_numericentity() / mb_decode_numericentity() (#7237).
  */
 final class JitMbNumericEntity
 {
+    /**
+     * @param JITVariable[] $args
+     */
+    public static function invokeEncodeRuntime(Context $context, array $args): Value
+    {
+        $folded = self::tryEncodeCompileTimeFold($context, $args);
+        if (null !== $folded) {
+            return $folded;
+        }
+
+        $argc = \count($args);
+        if ($argc < 2 || $argc > 4) {
+            throw new \LogicException('mb_encode_numericentity() expects 2 to 4 arguments in this compiler build');
+        }
+
+        $str = JitStringBuiltinArg::lower($context, $args[0], 'mb_encode_numericentity', 0, 'string');
+        $mapScalars = self::lowerConvMapScalars($context, $args[1]);
+        $encoding = self::runtimeEncodingLiteral($args, 2, 'mb_encode_numericentity');
+        $isHexI8 = self::runtimeIsHexI8($context, $args, 3);
+
+        MbNumericEntity::ensureLinked($context);
+        $encPtr = $context->builder->load($context->constantStringFromString($encoding));
+
+        return $context->builder->call(
+            $context->lookupFunction('__compiler_mb_encode_numericentity4'),
+            $str,
+            $mapScalars[0],
+            $mapScalars[1],
+            $mapScalars[2],
+            $mapScalars[3],
+            $encPtr,
+            $isHexI8
+        );
+    }
+
+    /**
+     * @return list<Value>
+     */
+    private static function lowerConvMapScalars(Context $context, JITVariable $arg): array
+    {
+        if (0 !== ($arg->type & JITVariable::IS_NATIVE_ARRAY)) {
+            $elemType = $arg->type & ~JITVariable::IS_NATIVE_ARRAY;
+            if (JITVariable::TYPE_NATIVE_LONG === $elemType && 4 === $arg->nextFreeElement) {
+                $out = [];
+                for ($i = 0; $i < 4; ++$i) {
+                    $elem = $arg->dimFetch(JITVariable::fromConstantInt($context, $i));
+                    if (JITVariable::TYPE_NATIVE_LONG !== $elem->type || JITVariable::KIND_VALUE !== $elem->kind) {
+                        break;
+                    }
+                    $const = $elem->value;
+                    if (!($const instanceof Value && $const->isConstant())) {
+                        break;
+                    }
+                    $out[] = $const;
+                }
+                if (4 === \count($out)) {
+                    return $out;
+                }
+            }
+        }
+
+        $mapHt = ArrayBuiltinHelper::isNativeArray($arg->type)
+            ? ArrayBuiltinHelper::nativeListToHashTable($context, $arg)
+            : ArrayBuiltinHelper::loadHashTable($context, $arg);
+        $readLong = $context->lookupFunction('__hashtable__readLongAt');
+        $i64 = $context->getTypeFromString('int64');
+        $sizeT = $context->getTypeFromString('size_t');
+        $out = [];
+        for ($i = 0; $i < 4; ++$i) {
+            $out[] = $context->builder->call(
+                $readLong,
+                $mapHt,
+                $context->builder->intCast($i64->constInt($i, false), $sizeT)
+            );
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param JITVariable[] $args
+     */
+    public static function invokeDecodeRuntime(Context $context, array $args): Value
+    {
+        $folded = self::tryDecodeCompileTimeFold($context, $args);
+        if (null !== $folded) {
+            return $folded;
+        }
+
+        $argc = \count($args);
+        if ($argc < 2 || $argc > 3) {
+            throw new \LogicException('mb_decode_numericentity() expects 2 to 3 arguments in this compiler build');
+        }
+
+        $str = JitStringBuiltinArg::lower($context, $args[0], 'mb_decode_numericentity', 0, 'string');
+        $mapScalars = self::lowerConvMapScalars($context, $args[1]);
+        $encoding = self::runtimeEncodingLiteral($args, 2, 'mb_decode_numericentity');
+
+        MbNumericEntity::ensureLinked($context);
+        $encPtr = $context->builder->load($context->constantStringFromString($encoding));
+
+        return $context->builder->call(
+            $context->lookupFunction('__compiler_mb_decode_numericentity4'),
+            $str,
+            $mapScalars[0],
+            $mapScalars[1],
+            $mapScalars[2],
+            $mapScalars[3],
+            $encPtr
+        );
+    }
+
     /**
      * @param JITVariable[] $args
      */
@@ -73,31 +188,50 @@ final class JitMbNumericEntity
      */
     private static function compileTimeConvMap(Context $context, JITVariable $var): ?array
     {
-        if (0 === ($var->type & JITVariable::IS_NATIVE_ARRAY)) {
-            return null;
-        }
-        $elemType = $var->type & ~JITVariable::IS_NATIVE_ARRAY;
-        if (JITVariable::TYPE_NATIVE_LONG !== $elemType) {
-            return null;
-        }
-        $count = $var->nextFreeElement;
-        if (0 === $count || 0 !== ($count % 4)) {
-            return null;
-        }
-        $out = [];
-        for ($i = 0; $i < $count; ++$i) {
-            $elem = $var->dimFetch(JITVariable::fromConstantInt($context, $i));
-            if (JITVariable::TYPE_NATIVE_LONG !== $elem->type || JITVariable::KIND_VALUE !== $elem->kind) {
+        if (0 !== ($var->type & JITVariable::IS_NATIVE_ARRAY)) {
+            $elemType = $var->type & ~JITVariable::IS_NATIVE_ARRAY;
+            if (JITVariable::TYPE_NATIVE_LONG !== $elemType) {
                 return null;
             }
-            $const = $elem->value;
-            if (!($const instanceof Value && $const->isConstant())) {
+            $count = $var->nextFreeElement;
+            if (0 === $count || 0 !== ($count % 4)) {
                 return null;
             }
-            $out[] = (int) $const->constInt();
+            $out = [];
+            for ($i = 0; $i < $count; ++$i) {
+                $elem = $var->dimFetch(JITVariable::fromConstantInt($context, $i));
+                if (JITVariable::TYPE_NATIVE_LONG !== $elem->type || JITVariable::KIND_VALUE !== $elem->kind) {
+                    return null;
+                }
+                $const = $elem->value;
+                if (!($const instanceof Value && $const->isConstant())) {
+                    return null;
+                }
+                $out[] = (int) $const->constInt();
+            }
+
+            return $out;
+        }
+        if (\is_array($var->compileTimeArray ?? null)) {
+            $out = [];
+            foreach ($var->compileTimeArray as $elem) {
+                if (JITVariable::TYPE_NATIVE_LONG !== $elem->type || JITVariable::KIND_VALUE !== $elem->kind) {
+                    return null;
+                }
+                $const = $elem->value;
+                if (!($const instanceof Value && $const->isConstant())) {
+                    return null;
+                }
+                $out[] = (int) $const->constInt();
+            }
+            if (0 === \count($out) || 0 !== (\count($out) % 4)) {
+                return null;
+            }
+
+            return $out;
         }
 
-        return $out;
+        return null;
     }
 
     /**
@@ -135,5 +269,43 @@ final class JitMbNumericEntity
         }
 
         return $args[$index]->compileTimeString ?? null;
+    }
+
+    /**
+     * @param JITVariable[] $args
+     */
+    private static function runtimeEncodingLiteral(array $args, int $index, string $function): string
+    {
+        $encoding = self::compileTimeEncoding($args, $index);
+        if (null === $encoding) {
+            throw new \LogicException(
+                $function.'() JIT requires compile-time encoding literal in this compiler build'
+            );
+        }
+        VmMbstring::resolveNumericEntityEncoding($encoding, $function, $index);
+
+        return $encoding;
+    }
+
+    /**
+     * @param JITVariable[] $args
+     */
+    private static function runtimeIsHexI8(Context $context, array $args, int $index): Value
+    {
+        $i8 = $context->getTypeFromString('int8');
+        if (!isset($args[$index])) {
+            return $i8->constInt(0, false);
+        }
+        $boolFold = self::compileTimeBool($args, $index);
+        if (null !== $boolFold) {
+            return $i8->constInt($boolFold ? 1 : 0, false);
+        }
+        if (JITVariable::TYPE_NATIVE_BOOL === $args[$index]->type && JITVariable::KIND_VALUE === $args[$index]->kind) {
+            return $context->builder->zExt($context->helper->loadValue($args[$index]), $i8);
+        }
+
+        throw new \LogicException(
+            'mb_encode_numericentity() is_hex must be a boolean in this compiler build'
+        );
     }
 }

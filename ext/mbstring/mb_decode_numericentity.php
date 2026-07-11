@@ -51,13 +51,6 @@ final class mb_decode_numericentity extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        $folded = JitMbNumericEntity::tryDecodeCompileTimeFold($context, $args);
-        if (null !== $folded) {
-            return $folded;
-        }
-
-        throw new \LogicException(
-            'mb_decode_numericentity() is not lowered for JIT/AOT in this compiler build'
-        );
+        return JitMbNumericEntity::invokeDecodeRuntime($context, $args);
     }
 }

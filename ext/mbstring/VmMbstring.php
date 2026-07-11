@@ -1613,6 +1613,34 @@ final class VmMbstring
             }
             $elems[] = $elem->toInt();
         }
+
+        return self::validateConvMapElements($elems, $function);
+    }
+
+    /**
+     * JIT/AOT helper path — read convmap from packed hashtable (#7237).
+     *
+     * @return list<int>
+     */
+    public static function convMapFromHashTable(\PHPCompiler\VM\HashTable $ht, string $function): array
+    {
+        $elems = [];
+        foreach ($ht->iterateKeyed(true) as [, $elem]) {
+            $elem = $elem->resolveIndirect();
+            if (Variable::TYPE_INTEGER !== $elem->type) {
+                throw new \ValueError(sprintf(
+                    '%s(): Argument #2 ($map) must only be composed of values of type int',
+                    $function
+                ));
+            }
+            $elems[] = $elem->toInt();
+        }
+
+        return self::validateConvMapElements($elems, $function);
+    }
+
+    public static function validateConvMapElements(array $elems, string $function): array
+    {
         if (0 !== (\count($elems) % 4)) {
             throw new \ValueError(sprintf(
                 '%s(): Argument #2 ($map) must have a multiple of 4 elements',
