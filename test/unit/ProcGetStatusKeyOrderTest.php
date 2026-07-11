@@ -38,7 +38,7 @@ final class ProcGetStatusKeyOrderTest extends TestCase
     public function testBuildProcStatusArrayPendingSignalsOnForwardProfile(): void
     {
         if (!CompilerVersion::supportsProcGetStatusPendingSignals()) {
-            $this->markTestSkipped('requires PHP_COMPILER_PROFILE=8.4');
+            $this->markTestSkipped('requires PHP_COMPILER_PROFILE>=8.3');
         }
 
         $status = VmProcessProcOpenNative::buildProcStatusArray(
