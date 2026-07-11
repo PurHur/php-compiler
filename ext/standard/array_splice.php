@@ -29,8 +29,17 @@ final class array_splice extends Internal
     public function execute(Frame $frame): void
     {
         $argc = \count($frame->calledArgs);
-        if ($argc < 2 || $argc > 4) {
-            throw new \LogicException('array_splice() requires two to four arguments in this compiler build');
+        if ($argc < 2) {
+            throw new \ArgumentCountError(\sprintf(
+                'array_splice() expects at least 2 arguments, %d given',
+                $argc
+            ));
+        }
+        if ($argc > 4) {
+            throw new \ArgumentCountError(\sprintf(
+                'array_splice() expects at most 4 arguments, %d given',
+                $argc
+            ));
         }
         $arrayArg = $frame->calledArgs[0];
         VmArray::requireArrayParam($arrayArg, 'array_splice', 1, 'array');
@@ -68,8 +77,17 @@ final class array_splice extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         $argc = \count($args);
-        if ($argc < 2 || $argc > 4) {
-            throw new \LogicException('array_splice() requires two to four arguments in this compiler build');
+        if ($argc < 2) {
+            throw new \ArgumentCountError(\sprintf(
+                'array_splice() expects at least 2 arguments, %d given',
+                $argc
+            ));
+        }
+        if ($argc > 4) {
+            throw new \ArgumentCountError(\sprintf(
+                'array_splice() expects at most 4 arguments, %d given',
+                $argc
+            ));
         }
         $i64 = $context->getTypeFromString('int64');
         $i1 = $context->getTypeFromString('int1');
