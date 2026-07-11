@@ -1309,7 +1309,7 @@ final class ArrayBuiltinHelper
     /**
      * Copy a zero-based native list array into a packed hashtable (indices 0..n-1).
      */
-    private static function nativeListToHashTable(Context $context, Variable $array): Value
+    public static function nativeListToHashTable(Context $context, Variable $array): Value
     {
         $dest = HashTableHelper::alloc($context);
         $elemType = $array->type & ~Variable::IS_NATIVE_ARRAY;

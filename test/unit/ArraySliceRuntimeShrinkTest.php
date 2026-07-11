@@ -9,7 +9,7 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPUnit\Framework\TestCase;
 
-/** array_slice() JIT routes all operands through ArraySliceJitHelper PHP not ArrayBuiltinHelper LLVM (#12410, #14285, #17936). */
+/** array_slice() JIT routes all operands through ArraySliceJitHelper PHP not ArrayBuiltinHelper native LLVM (#12410, #14285, #17936). */
 final class ArraySliceRuntimeShrinkTest extends TestCase
 {
     private const ARRAY_BUILTIN_HELPER_MAX_LINES = 12110;
@@ -31,7 +31,7 @@ final class ArraySliceRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('function buildSlicePreserveKeysFromNativeArray', $arrayBuiltin);
     }
 
-    public function testArrayBuiltinHelperLineBudgetAfterSliceLlvmDeletion(): void
+    public function testArrayBuiltinHelperLineBudgetAfterNativeSliceLlvmDeletion(): void
     {
         $lines = substr_count(
             (string) file_get_contents(__DIR__.'/../../lib/JIT/ArrayBuiltinHelper.php'),
