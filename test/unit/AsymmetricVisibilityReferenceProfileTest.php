@@ -93,7 +93,7 @@ final class AsymmetricVisibilityReferenceProfileTest extends TestCase
             $this->markTestSkipped('asymmetric visibility enabled on PHP 8.4.0+ target');
         }
         $this->expectException(\PHPCompiler\Compiler\CompileFatal::class);
-        $this->expectExceptionMessage(AsymmetricVisibilityRewriter::REFERENCE_PROFILE_ASYMMETRIC_VISIBILITY_HINT);
+        $this->expectExceptionMessage(AsymmetricVisibilityRewriter::MULTIPLE_MODIFIERS_MESSAGE);
         AsymmetricVisibilityRejector::reject(
             file_get_contents(__DIR__.'/../repro/maintainer_gap_asymmetric_double_modifier.php'),
             'asymmetric_double_modifier.php'
@@ -113,7 +113,7 @@ final class AsymmetricVisibilityReferenceProfileTest extends TestCase
             );
             $this->fail('Expected compile failure');
         } catch (\PHPCompiler\Compiler\CompileFatal $e) {
-            $this->assertStringContainsString(AsymmetricVisibilityRewriter::REFERENCE_PROFILE_ASYMMETRIC_VISIBILITY_HINT, $e->getMessage());
+            $this->assertStringContainsString(AsymmetricVisibilityRewriter::MULTIPLE_MODIFIERS_MESSAGE, $e->getMessage());
             $this->assertSame(5, $e->sourceLine);
         }
     }
@@ -131,7 +131,7 @@ final class AsymmetricVisibilityReferenceProfileTest extends TestCase
             );
             $this->fail('Expected compile failure');
         } catch (\PHPCompiler\Compiler\CompileFatal $e) {
-            $this->assertStringContainsString(AsymmetricVisibilityRewriter::REFERENCE_PROFILE_ASYMMETRIC_VISIBILITY_HINT, $e->getMessage());
+            $this->assertStringContainsString(AsymmetricVisibilityRewriter::MULTIPLE_MODIFIERS_MESSAGE, $e->getMessage());
         }
     }
 
@@ -148,7 +148,7 @@ final class AsymmetricVisibilityReferenceProfileTest extends TestCase
             );
             $this->fail('Expected compile failure');
         } catch (\PHPCompiler\Compiler\CompileFatal $e) {
-            $this->assertStringContainsString(AsymmetricVisibilityRewriter::REFERENCE_PROFILE_ASYMMETRIC_VISIBILITY_HINT, $e->getMessage());
+            $this->assertStringContainsString(AsymmetricVisibilityRewriter::MULTIPLE_MODIFIERS_MESSAGE, $e->getMessage());
         }
     }
 
