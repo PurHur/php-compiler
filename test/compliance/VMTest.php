@@ -499,6 +499,15 @@ class VMTest extends BaseTest {
                 && str_contains($name, 'bz2_phantom')) {
                 continue;
             }
+            if (!CompilerVersion::supportsMsgpack()
+                && str_contains($name, 'msgpack')
+                && !str_contains($name, 'extension_loaded_msgpack')) {
+                continue;
+            }
+            if (CompilerVersion::supportsMsgpack()
+                && str_contains($name, 'extension_loaded_msgpack')) {
+                continue;
+            }
             if (!CompilerVersion::supportsBrotli()
                 && (str_contains($name, 'brotli') || str_contains($name, 'brotli_'))
                 && !str_contains($name, 'brotli_phantom')) {

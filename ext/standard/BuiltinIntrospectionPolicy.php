@@ -152,6 +152,9 @@ final class BuiltinIntrospectionPolicy
         if (\in_array($lc, ['class_has_method', 'class_has_property', 'class_has_constant'], true)) {
             return CompilerVersion::supportsClassHasFunctions();
         }
+        if (\in_array($lc, ['msgpack_pack', 'msgpack_unpack'], true)) {
+            return \PHPCompiler\ext\msgpack\MsgpackExtensionPolicy::advertisesExtension();
+        }
 
         return true;
     }
@@ -179,6 +182,9 @@ final class BuiltinIntrospectionPolicy
         }
         if ('ldap' === $ext) {
             return \PHPCompiler\ext\ldap\LdapExtensionPolicy::advertisesExtension();
+        }
+        if ('msgpack' === $ext) {
+            return \PHPCompiler\ext\msgpack\MsgpackExtensionPolicy::advertisesExtension();
         }
 
         return true;
