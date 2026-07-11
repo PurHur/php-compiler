@@ -174,6 +174,9 @@ final class BuiltinIntrospectionPolicy
         if ('brotli' === $ext) {
             return \PHPCompiler\ext\brotli\BrotliExtensionPolicy::advertisesExtension();
         }
+        if ('msgpack' === $ext) {
+            return \PHPCompiler\ext\msgpack\MsgpackExtensionPolicy::advertisesExtension();
+        }
         if ('uri' === $ext) {
             return \PHPCompiler\ext\uri\UriExtensionPolicy::advertisesExtension();
         }

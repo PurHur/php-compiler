@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 4486 |
-| Phase A inventory files (M2 ratio SSOT) | 4486 |
+| PHP files on vm.php path | 4487 |
+| Phase A inventory files (M2 ratio SSOT) | 4487 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 12190 |
+| Source constructs flagged (warnings) | 12191 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -487,6 +487,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/mbstring/mb_trim.php` | 0 | 1 |
 | `ext/mbstring/mb_ucfirst.php` | 0 | 3 |
 | `ext/msgpack/Module.php` | 0 | 3 |
+| `ext/msgpack/MsgpackExtensionPolicy.php` | 0 | 1 |
 | `ext/msgpack/VmMsgpack.php` | 0 | 11 |
 | `ext/msgpack/msgpack_pack.php` | 0 | 3 |
 | `ext/msgpack/msgpack_unpack.php` | 0 | 2 |
@@ -7625,8 +7626,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/msgpack/Module.php`
 
 **Warnings** (review for bootstrap subset):
-- new msgpack_pack (line 17)
-- new msgpack_unpack (line 18)
+- new msgpack_pack (line 42)
+- new msgpack_unpack (line 43)
+- 3 class method(s)
+
+### `ext/msgpack/MsgpackExtensionPolicy.php`
+
+**Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
 ### `ext/msgpack/VmMsgpack.php`
@@ -24125,7 +24131,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/CompilerVersion.php`
 
 **Warnings** (review for bootstrap subset):
-- 179 class method(s)
+- 180 class method(s)
 
 ### `lib/CurlyBraceOffsetRejector.php`
 

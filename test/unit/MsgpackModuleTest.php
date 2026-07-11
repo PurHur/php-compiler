@@ -16,6 +16,8 @@ final class MsgpackModuleTest extends TestCase
 {
     public function test_msgpack_withheld_on_reference_profile(): void
     {
+        self::assertFalse(CompilerVersion::supportsMsgpack());
+
         $runtime = new Runtime();
         $ctx = $runtime->vmContext;
 
@@ -40,6 +42,8 @@ PHP;
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE=8.4');
         try {
+            self::assertTrue(CompilerVersion::supportsMsgpack());
+
             $runtime = new Runtime();
             $ctx = $runtime->vmContext;
 
@@ -66,7 +70,7 @@ PHP;
         }
     }
 
-    public function test_msgpack_scalar_and_array_roundtrip(): void
+    public function test_msgpack_scalar_and_array_roundtrip_on_forward_profile(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE=8.4');
