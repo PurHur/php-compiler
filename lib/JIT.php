@@ -9301,6 +9301,7 @@ class JIT {
                     if ($this->context->scope->toCall instanceof CoreFunc\Internal) {
                         $callArgs = $this->densifyInternalCallArgs($this->context->scope->toCall, $callArgs);
                     }
+                    $this->promoteCompileTimeStringOnCallArgs($block, $callOperands, $callArgs);
                     $this->context->scope->toCall->call($this->context, ...$callArgs);
                     JIT\NoDiscardCallGuard::emitAfterDiscardedReturn($this->context, $this->context->scope->toCall);
                     $this->markNewObjectConstructedAfterCall($this->context->scope->toCall, $callArgs);
@@ -14644,7 +14645,10 @@ class JIT {
         if (!JIT\DomInstanceMethodJit::shouldDeferToVmClassMethodLowering()) {
             return $receiverVar;
         }
-        if ('domdocument' !== $declaringClassLc || 'getelementbyid' !== $methodLc) {
+        if ('domdocument' !== $declaringClassLc) {
+            return $receiverVar;
+        }
+        if (!\in_array($methodLc, ['loadhtml', 'getelementbyid', 'createelement'], true)) {
             return $receiverVar;
         }
         if (null !== $receiverVar->valueBoxAliasPtr || $receiverVar->functionStaticGlobal) {

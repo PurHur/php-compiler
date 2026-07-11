@@ -49,10 +49,6 @@ final class DomInstanceMethodJit
     public static function ensureProxy(Context $context, string $proxyName): void
     {
         $lc = strtolower(ltrim($proxyName, '\\'));
-        if (isset($context->functionProxies[$lc])
-            && !($context->functionProxies[$lc] instanceof Call\ExternalMethod)) {
-            return;
-        }
         if (self::shouldDeferToVmClassMethodLowering()) {
             if ('domdocument::createelement' === $lc) {
                 $context->functionProxies[$lc] = new Call\DomDocumentCreateElement();
@@ -72,6 +68,10 @@ final class DomInstanceMethodJit
             if (!self::isUserScriptDomMethod($lc)) {
                 return;
             }
+        }
+        if (isset($context->functionProxies[$lc])
+            && !($context->functionProxies[$lc] instanceof Call\ExternalMethod)) {
+            return;
         }
         if (!self::isDomInstanceMethodProxy($lc)) {
             return;

@@ -140,11 +140,10 @@ final class DomActiveContextAotTest extends TestCase
         $this->assertStringContainsString('getelementbyid', $source);
     }
 
-    public function testDomDocumentLoadHTMLRestoresScopeAfterNestedEnsureLinked(): void
+    public function testDomDocumentLoadHTMLUserScriptClearsBuilderAfterInvoke(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Call/DomDocumentLoadHTML.php');
-        $this->assertStringContainsString('cloneVariableStorage', $source);
-        $this->assertStringContainsString('resyncNamedBindings', $source);
+        $this->assertStringContainsString('main_cont_after_dom_lh', $source);
     }
 
     public function testDomLoadHTMLLoweringPassesObjectReceiver(): void
