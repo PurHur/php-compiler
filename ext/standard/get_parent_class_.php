@@ -46,7 +46,17 @@ final class get_parent_class_ extends Internal
         $arg = $frame->calledArgs[0]->resolveIndirect();
         if (Variable::TYPE_STRING === $arg->type) {
             if (!$allowString) {
-                VmClassHas::requireObjectOrValidClassName($arg, 'get_parent_class');
+                $className = $arg->toString();
+                $classLc = strtolower(VmReflection::normalizeGlobalIntrospectionName($className));
+                if (!isset($ctx->classes[$classLc])) {
+                    $ctx->autoloadClass($className);
+                }
+                if (!isset($ctx->classes[$classLc])) {
+                    throw new \TypeError(\sprintf(
+                        self::OBJECT_OR_VALID_CLASS_NAME_TYPE_ERROR,
+                        'string'
+                    ));
+                }
             }
             $className = VmReflection::resolveAllowStringClassName(
                 $ctx,
