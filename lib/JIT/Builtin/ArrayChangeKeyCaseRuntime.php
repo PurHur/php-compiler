@@ -11,9 +11,9 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * JIT/AOT link for array_change_key_case() via ArrayChangeKeyCaseJitHelper PHP (#12371).
+ * JIT/AOT link for array_change_key_case() via ArrayChangeKeyCaseJitHelper PHP (#12371, #18024).
  *
- * Standalone AOT compiles {@see ArrayChangeKeyCaseJitHelper} via JitVmHelperLink bridge (#14530); native literal arrays keep LLVM in {@see ArrayBuiltinHelper::buildChangeKeyCaseArray()}.
+ * Standalone AOT compiles {@see ArrayChangeKeyCaseJitHelper} via JitVmHelperLink bridge (#14530); native literal arrays materialize to hashtable then route through PHP (#18024).
  * SSOT: {@see \PHPCompiler\ext\standard\VmArray::changeKeyCase()}
  * php-src: ext/standard/array.c — php_array_change_key_case()
  */
@@ -32,18 +32,22 @@ final class ArrayChangeKeyCaseRuntime
 
     public static function changeKeyCase(Context $context, JITVariable $array, Value $case): Value
     {
-        if (ArrayBuiltinHelper::isNativeArray($array->type)) {
-            return ArrayBuiltinHelper::buildChangeKeyCaseArray($context, $array, $case);
-        }
-
         self::ensureLinked($context);
-        $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
 
         return $context->builder->call(
             $context->lookupFunction(self::ABI_CHANGE),
-            $ht,
+            self::argToHashtable($context, $array),
             $case
         );
+    }
+
+    private static function argToHashtable(Context $context, JITVariable $arg): Value
+    {
+        if (ArrayBuiltinHelper::isNativeArray($arg->type)) {
+            return ArrayBuiltinHelper::nativeListToHashTable($context, $arg);
+        }
+
+        return ArrayBuiltinHelper::loadHashTable($context, $arg);
     }
 
     public static function ensureLinked(Context $context): void
@@ -58,6 +62,13 @@ final class ArrayChangeKeyCaseRuntime
 
     public static function implement(Context $context): void
     {
+        $probe = $context->module->getNamedFunction(self::ABI_CHANGE);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            self::registerLinkedRuntime($context);
+
+            return;
+        }
+
         $savedBlock = null;
         try {
             $savedBlock = $context->builder->getInsertBlock();

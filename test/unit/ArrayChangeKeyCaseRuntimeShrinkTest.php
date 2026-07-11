@@ -10,19 +10,39 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPUnit\Framework\TestCase;
 
-/** array_change_key_case() JIT routes through ArrayChangeKeyCaseJitHelper PHP (#12371, #14530). */
+/** array_change_key_case() JIT routes all operands through ArrayChangeKeyCaseJitHelper PHP not ArrayBuiltinHelper native LLVM (#12371, #14530, #18024). */
 final class ArrayChangeKeyCaseRuntimeShrinkTest extends TestCase
 {
+    private const ARRAY_BUILTIN_HELPER_MAX_LINES = 8801;
+
     public function testArrayChangeKeyCaseRuntimeUsesJitHelperNotDirectLlvmMonolith(): void
     {
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ArrayChangeKeyCaseRuntime.php');
         $this->assertStringContainsString('ArrayChangeKeyCaseJitHelper', $runtime);
-        $this->assertStringContainsString('ArrayBuiltinHelper::buildChangeKeyCaseArray', $runtime);
+        $this->assertStringContainsString('nativeListToHashTable', $runtime);
+        $this->assertStringNotContainsString('ArrayBuiltinHelper::buildChangeKeyCaseArray', $runtime);
         $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);
 
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/array_change_key_case.php');
         $this->assertStringContainsString('ArrayChangeKeyCaseRuntime::changeKeyCase', $builtin);
         $this->assertStringNotContainsString('ArrayBuiltinHelper::buildChangeKeyCaseArray', $builtin);
+
+        $arrayBuiltin = (string) file_get_contents(__DIR__.'/../../lib/JIT/ArrayBuiltinHelper.php');
+        $this->assertStringNotContainsString('function buildChangeKeyCaseArray', $arrayBuiltin);
+        $this->assertStringNotContainsString('function buildChangeKeyCaseHashTable', $arrayBuiltin);
+    }
+
+    public function testArrayBuiltinHelperLineBudgetAfterNativeChangeKeyCaseLlvmDeletion(): void
+    {
+        $lines = substr_count(
+            (string) file_get_contents(__DIR__.'/../../lib/JIT/ArrayBuiltinHelper.php'),
+            "\n"
+        ) + 1;
+        $this->assertLessThanOrEqual(
+            self::ARRAY_BUILTIN_HELPER_MAX_LINES,
+            $lines,
+            'ArrayBuiltinHelper.php LOC after dead array_change_key_case native LLVM deletion (#18024)'
+        );
     }
 
     public function testArrayChangeKeyCaseJitHelperMatchesVmArraySemantics(): void
