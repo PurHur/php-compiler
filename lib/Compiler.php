@@ -34841,6 +34841,9 @@ class Compiler {
                 'Cannot use "'.strtolower($className).'" in the global scope'
             );
         }
+        if (null !== $constName && 'class' === strtolower($constName)) {
+            $this->rejectCompileTimeInvalidExprClassPseudoConst($expr, $block);
+        }
         $op = new OpCode(
             OpCode::TYPE_CLASS_CONST_FETCH,
             $this->compileOperand($destOperand, $block, false),
@@ -34854,6 +34857,142 @@ class Compiler {
         }
 
         return [$op];
+    }
+
+    /**
+     * Zend zend_compile.c — constant invalid `::class` operands are compile-time fatals (#17949).
+     *
+     * @return never
+     */
+    protected function rejectCompileTimeInvalidExprClassPseudoConst(
+        Op\Expr\ClassConstFetch $expr,
+        Block $block
+    ): void {
+        if (null !== $this->staticNameFromOperand($expr->class)) {
+            return;
+        }
+        $classRoot = $this->unwrapOperandChain($expr->class);
+        $varName = Block::resolveVariableName($classRoot);
+        if (null !== $varName && '' !== $varName) {
+            return;
+        }
+        if ($this->operandDerivesFromNew($expr->class, $block)) {
+            return;
+        }
+        if ($this->cfgOperandReferencesScriptVariable($expr->class, $block)) {
+            return;
+        }
+        $children = null !== $block->orig ? $block->orig->children : [];
+        $producer = $this->findCfgExprProducerForOperand($expr->class, $children);
+        if ($producer instanceof Op\Expr\New_
+            || $producer instanceof Op\Expr\Closure
+            || $producer instanceof Op\Expr\ArrowFunction
+            || $producer instanceof Op\Expr\FuncCall
+            || $producer instanceof Op\Expr\MethodCall
+            || $producer instanceof Op\Expr\StaticCall
+        ) {
+            return;
+        }
+        $folded = null;
+        if ($producer instanceof Op\Expr) {
+            $folded = $this->tryFoldCompileTimeExprDefault($producer, $block, $children, true);
+        }
+        if (null === $folded) {
+            $folded = $this->tryFoldCompileTimeOperandDefault($expr->class, $block, $children, true);
+        }
+        if (null === $folded) {
+            return;
+        }
+        if (Variable::TYPE_STRING === $folded->type) {
+            return;
+        }
+        throw new CompileFatal(
+            $expr->getFile() ?: 'unknown',
+            max(1, $expr->getLine()),
+            'Cannot use "::class" on value of type '.$this->compileTimeValueTypeLabel($folded)
+        );
+    }
+
+    protected function compileTimeValueTypeLabel(Variable $value): string
+    {
+        if (Variable::TYPE_OBJECT === $value->type || Variable::TYPE_ENUM_CASE === $value->type) {
+            return 'object';
+        }
+
+        return match ($value->type) {
+            Variable::TYPE_STRING => 'string',
+            Variable::TYPE_INTEGER => 'int',
+            Variable::TYPE_FLOAT => 'float',
+            Variable::TYPE_BOOLEAN => 'bool',
+            Variable::TYPE_NULL => 'null',
+            Variable::TYPE_ARRAY => 'array',
+            default => 'mixed',
+        };
+    }
+
+    /**
+     * @param list<Op> $cfgChildren
+     */
+    protected function findCfgExprProducerForOperand(Operand $operand, array $cfgChildren): ?Op\Expr
+    {
+        $root = $this->unwrapOperandChain($operand);
+        foreach ($cfgChildren as $child) {
+            if (!$child instanceof Op\Expr) {
+                continue;
+            }
+            if (!property_exists($child, 'result') || !$this->operandsReferToSameVariable($child->result, $root)) {
+                continue;
+            }
+
+            return $child;
+        }
+
+        return null;
+    }
+
+    protected function cfgOperandReferencesScriptVariable(Operand $operand, Block $block): bool
+    {
+        $children = null !== $block->orig ? $block->orig->children : [];
+        $producer = $this->findCfgExprProducerForOperand($operand, $children);
+        if ($producer instanceof Op\Expr) {
+            return $this->cfgExprTreeReferencesScriptVariable($producer, $block);
+        }
+        $name = Block::resolveVariableName($this->unwrapOperandChain($operand));
+
+        return null !== $name && '' !== $name;
+    }
+
+    protected function cfgExprTreeReferencesScriptVariable(Op\Expr $expr, Block $block): bool
+    {
+        if ($expr instanceof Op\Expr\BinaryOp) {
+            return $this->cfgOperandReferencesScriptVariable($expr->left, $block)
+                || $this->cfgOperandReferencesScriptVariable($expr->right, $block);
+        }
+        if ($expr instanceof Op\Expr\UnaryMinus
+            || $expr instanceof Op\Expr\UnaryPlus
+            || $expr instanceof Op\Expr\BitwiseNot
+            || $expr instanceof Op\Expr\BooleanNot
+        ) {
+            return $this->cfgOperandReferencesScriptVariable($expr->expr, $block);
+        }
+        if ($expr instanceof Op\Expr\Cast) {
+            return $this->cfgOperandReferencesScriptVariable($expr->expr, $block);
+        }
+        if ($expr instanceof Op\Expr\ArrayDimFetch) {
+            return $this->cfgOperandReferencesScriptVariable($expr->var, $block)
+                || (null !== $expr->dim && $this->cfgOperandReferencesScriptVariable($expr->dim, $block));
+        }
+        if ($expr instanceof Op\Expr\PropertyFetch) {
+            return $this->cfgOperandReferencesScriptVariable($expr->var, $block);
+        }
+        if ($expr instanceof Op\Expr\ClassConstFetch) {
+            return $this->cfgOperandReferencesScriptVariable($expr->class, $block);
+        }
+        if ($expr instanceof Op\Expr\ConstFetch) {
+            return false;
+        }
+
+        return false;
     }
 
     /**
