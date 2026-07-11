@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\StreamIoRuntime;
+use PHPCompiler\JIT\Builtin\StreamLifecycleRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPLLVM\Builder;
@@ -17,6 +19,8 @@ final class JitFopen
      * (int handle, or boolean false on failure) */
     public static function invoke(Context $context, Value $pathStr, Value $modeStr): Value
     {
+        StreamIoRuntime::ensureLinkedForUserScriptLowering($context);
+
         $handle = $context->builder->call(
             $context->lookupFunction('__compiler_fopen'),
             $pathStr,

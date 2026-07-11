@@ -928,7 +928,9 @@ class Context {
         ErrorBridge::ensureStandaloneBodies($this);
         Builtin\ErrorHandlerJitRuntime::ensureStandaloneBodies($this);
         Builtin\ExceptionHandlerJitRuntime::ensureStandaloneBodies($this);
-        Builtin\StreamLifecycleRuntime::ensureDeferredStubsForInventoryEmit($this);
+        if (!$this->isUserScriptAot()) {
+            Builtin\StreamLifecycleRuntime::ensureDeferredStubsForInventoryEmit($this);
+        }
         Builtin\StreamBucketRuntime::ensureDeferredStubsForInventoryEmit($this);
         Builtin\StreamReadRuntime::ensureDeferredStubsForInventoryEmit($this);
         Builtin\AssertFail::ensureStandaloneBodies($this);

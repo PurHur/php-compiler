@@ -68,6 +68,12 @@ final class StreamLifecycleRuntime
         self::implement($context);
     }
 
+    /** Real fclose/feof bridges for user-script stream lowering (#9142). */
+    public static function ensureLinkedForUserScriptLowering(Context $context): void
+    {
+        self::implementRealBridges($context);
+    }
+
     public static function implement(Context $context): void
     {
         $probe = $context->module->getNamedFunction('__compiler_is_resource');
@@ -83,6 +89,11 @@ final class StreamLifecycleRuntime
             return;
         }
 
+        self::implementRealBridges($context);
+    }
+
+    private static function implementRealBridges(Context $context): void
+    {
         $savedBlock = BasicBlockHelper::tryGetInsertBlock($context);
 
         self::ensureJitHelperCompiled($context);
