@@ -621,6 +621,15 @@ class JITTest extends BaseTest {
                 && str_contains($name, 'brotli_phantom')) {
                 continue;
             }
+            if (!CompilerVersion::supportsUri()
+                && str_contains($name, 'uri_rfc3986')
+                && !str_contains($name, 'uri_phantom')) {
+                continue;
+            }
+            if (CompilerVersion::supportsUri()
+                && str_contains($name, 'uri_phantom')) {
+                continue;
+            }
             if (!CompilerVersion::supportsBcmath()
                 && (str_contains($name, 'bcadd')
                     || str_contains($name, 'bcsub')

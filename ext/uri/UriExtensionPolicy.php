@@ -7,14 +7,15 @@ namespace PHPCompiler\ext\uri;
 use PHPCompiler\CompilerVersion;
 
 /**
- * ext/uri surface advertisement — php-src ext/uri/ (#9051).
+ * ext/uri surface advertisement — php-src ext/uri/ (#9051, #17830).
  *
- * PHP 8.4+ ships ext/uri; register when the compiler targets PHP 8.4+.
+ * Withheld on 8.4.0-dev reference profile (matches Zend 8.2 extension_loaded gate).
+ * Enable forward profile via {@code PHP_COMPILER_PROFILE=8.4}.
  */
 final class UriExtensionPolicy
 {
     public static function advertisesExtension(): bool
     {
-        return version_compare(CompilerVersion::VERSION, '8.4', '>=');
+        return CompilerVersion::supportsUri();
     }
 }
