@@ -31,22 +31,22 @@ final class VmUri
     private static array $whatWgState = [];
 
     /**
-     * @return array{scheme: ?string, userinfo: ?string, host: ?string, port: ?int, path: string, query: ?string, fragment: ?string}
+     * @return array{scheme: ?string, userinfo: ?string, host: ?string, port: ?int, path: string, query: ?string, fragment: ?string}|null
      */
-    public static function parseRfc3986(string $uri): array
+    public static function tryParseRfc3986Parts(string $uri): ?array
     {
         $uri = trim($uri);
         if ('' === $uri) {
-            throw self::invalidUriException('URI must not be empty');
+            return null;
         }
 
         $parts = parse_url($uri);
         if (false === $parts) {
-            throw self::invalidUriException('Failed to parse URI');
+            return null;
         }
 
         if (!isset($parts['scheme']) || '' === $parts['scheme']) {
-            throw self::invalidUriException('URI must include a scheme');
+            return null;
         }
 
         $path = $parts['path'] ?? '';
@@ -65,13 +65,27 @@ final class VmUri
         ];
     }
 
+    /**
+     * @return array{scheme: ?string, userinfo: ?string, host: ?string, port: ?int, path: string, query: ?string, fragment: ?string}
+     */
+    public static function parseRfc3986(string $uri): array
+    {
+        $parsed = self::tryParseRfc3986Parts($uri);
+        if (null === $parsed) {
+            throw new \LogicException('Invalid RFC 3986 URI');
+        }
+
+        return $parsed;
+    }
+
     public static function tryParseRfc3986(Context $ctx, string $uri): ?Variable
     {
-        try {
-            return self::newRfc3986UriVariable($ctx, self::parseRfc3986($uri));
-        } catch (\Uri\InvalidUriException) {
+        $parsed = self::tryParseRfc3986Parts($uri);
+        if (null === $parsed) {
             return null;
         }
+
+        return self::newRfc3986UriVariable($ctx, $parsed);
     }
 
     public static function newRfc3986UriVariable(Context $ctx, array $state): Variable
@@ -93,17 +107,16 @@ final class VmUri
 
     public static function tryParseWhatWg(Context $ctx, string $uri): ?Variable
     {
-        try {
-            $state = self::parseRfc3986($uri);
-            $scheme = $state['scheme'] ?? '';
-            if (!\in_array($scheme, ['http', 'https', 'file', 'ws', 'wss'], true)) {
-                return null;
-            }
-
-            return self::newWhatWgUrlVariable($ctx, $state);
-        } catch (\Uri\InvalidUriException) {
+        $state = self::tryParseRfc3986Parts($uri);
+        if (null === $state) {
             return null;
         }
+        $scheme = $state['scheme'] ?? '';
+        if (!\in_array($scheme, ['http', 'https', 'file', 'ws', 'wss'], true)) {
+            return null;
+        }
+
+        return self::newWhatWgUrlVariable($ctx, $state);
     }
 
     public static function newWhatWgUrlVariable(Context $ctx, array $state): Variable
@@ -121,11 +134,6 @@ final class VmUri
     public static function whatWgState(ObjectEntry $object): array
     {
         return self::$whatWgState[$object->id] ?? throw new \LogicException('Url state missing');
-    }
-
-    public static function invalidUriException(string $message): \Uri\InvalidUriException
-    {
-        return new \Uri\InvalidUriException($message);
     }
 
     private static function requireClass(Context $ctx, string $lc, string $label): ClassEntry
