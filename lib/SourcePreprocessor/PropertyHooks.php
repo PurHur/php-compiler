@@ -26,9 +26,6 @@ final class PropertyHooks
     /** Zend 8.2 reference profile — hook block after property name (#12574). */
     public const REFERENCE_PROFILE_UNEXPECTED_BRACE = 'syntax error, unexpected token "{", expecting "," or ";"';
 
-    /** Actionable DX when property-hook syntax is rejected on the reference profile (#17610). */
-    public const REFERENCE_PROFILE_PROPERTY_HOOKS_HINT = 'Property hooks require PHP_COMPILER_PROFILE=8.4 (PHP 8.4 forward profile)';
-
     /** php-src: zend_verify_hooked_property — virtual hooked property + explicit default (#16861, #12995). */
     public const VIRTUAL_HOOKED_DEFAULT_COMPILE_ERROR = 'Cannot specify default value for virtual hooked property %s::$%s';
 
@@ -109,12 +106,10 @@ final class PropertyHooks
         return sprintf(self::VIRTUAL_HOOKED_DEFAULT_COMPILE_ERROR, $className, $propName);
     }
 
-    /** Reference-profile reject with forward-profile env hint (#17610). */
+    /** Zend 8.2 reference-profile parse diagnostic (#18019, zend_language_parser.y). */
     public static function referenceProfileHookRejectMessage(string $zendSyntaxDetail): string
     {
-        return CompilerVersion::supportsPropertyHooks()
-            ? $zendSyntaxDetail
-            : self::REFERENCE_PROFILE_PROPERTY_HOOKS_HINT;
+        return $zendSyntaxDetail;
     }
 
     private function locateReferenceProfileHookSyntaxError(string $code): ?array
