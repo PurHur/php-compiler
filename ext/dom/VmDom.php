@@ -570,6 +570,7 @@ final class VmDom
         $element->isInternal = true;
         $element->parentLc = self::CLASS_NODE;
         $element->properties[] = new ClassProperty(self::PROP_NODE_NAME, null, $strProto);
+        $element->properties[] = new ClassProperty(self::PROP_TAG_NAME, null, $strProto);
         $element->properties[] = new ClassProperty(self::PROP_ATTRIBUTES, $nullProto, $objProto);
         $element->methods['appendchild'] = new ElementAppendChild();
         $element->methodVisibility['appendchild'] = $pub;
@@ -857,6 +858,9 @@ final class VmDom
         $entry = new ObjectEntry($class);
         $entry->constructed = true;
         $entry->getProperty(self::PROP_NODE_NAME)->string($name);
+        if ($entry->hasProperty(self::PROP_TAG_NAME)) {
+            $entry->getProperty(self::PROP_TAG_NAME)->string($name);
+        }
         self::initElementPropertySlots($entry);
 
         $state = new DomNodeState();
@@ -896,6 +900,9 @@ final class VmDom
         $entry = new ObjectEntry($class);
         $entry->constructed = true;
         $entry->getProperty(self::PROP_NODE_NAME)->string($qualifiedName);
+        if ($entry->hasProperty(self::PROP_TAG_NAME)) {
+            $entry->getProperty(self::PROP_TAG_NAME)->string($qualifiedName);
+        }
         self::initElementPropertySlots($entry);
 
         $state = new DomNodeState();
