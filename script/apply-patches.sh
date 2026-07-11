@@ -244,6 +244,9 @@ patch_already_applied() {
     php-cfg-magic-script-const.patch)
       grep -q 'KIND_LINE' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/MagicScriptConst.php" 2>/dev/null
       ;;
+    php-cfg-declare-ticks.patch)
+      grep -q 'SetTickInterval' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null
+      ;;
     php-cfg-magic-line.patch)
       ! grep -q 'MagicConst\\Line' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/AstVisitor/MagicStringResolver.php" 2>/dev/null
       ;;
@@ -4800,6 +4803,54 @@ print("Applied php-cfg-magic-script-const.patch (overlay)")
 PY
 }
 
+apply_php_cfg_declare_ticks_overlay() {
+  local op="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Terminal/SetTickInterval.php"
+  local parser="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php"
+  local overlay_op="$PATCH_DIR/overlays/php-cfg/Op/Terminal/SetTickInterval.php"
+  if grep -q 'SetTickInterval' "$parser" 2>/dev/null; then
+    echo "Skip php-cfg-declare-ticks.patch (already applied)"
+    return 0
+  fi
+  if [[ ! -f "$overlay_op" ]]; then
+    echo "Skip php-cfg-declare-ticks.patch (overlay missing)" >&2
+    return 1
+  fi
+  mkdir -p "$(dirname "$op")"
+  cp "$overlay_op" "$op"
+  python3 - "$parser" <<'PY'
+import sys
+from pathlib import Path
+
+parser_path = Path(sys.argv[1])
+text = parser_path.read_text()
+old = (
+    "        foreach ($node->declares as $item) {\n"
+    "            if ('strict_types' !== $item->key->toLowerString()) {\n"
+    "                continue;\n"
+    "            }\n"
+)
+new = (
+    "        foreach ($node->declares as $item) {\n"
+    "            $key = $item->key->toLowerString();\n"
+    "            if ('ticks' === $key && $item->value instanceof Node\\Scalar\\LNumber) {\n"
+    "                $this->block->children[] = new Op\\Terminal\\SetTickInterval(\n"
+    "                    max(0, (int) $item->value->value),\n"
+    "                    $this->mapAttributes($node)\n"
+    "                );\n"
+    "                continue;\n"
+    "            }\n"
+    "            if ('strict_types' !== $key) {\n"
+    "                continue;\n"
+    "            }\n"
+)
+if old not in text:
+    sys.stderr.write("php-cfg-declare-ticks: Parser.php anchor not found\n")
+    raise SystemExit(1)
+parser_path.write_text(text.replace(old, new, 1))
+print("Applied php-cfg-declare-ticks.patch (overlay)")
+PY
+}
+
 apply_php_cfg_magic_constants_overlay() {
   local target="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/AstVisitor/MagicStringResolver.php"
   local overlay="$PATCH_DIR/overlays/php-cfg/MagicStringResolver.php"
@@ -5774,6 +5825,10 @@ apply_patch() {
     apply_php_cfg_magic_script_const_overlay
     return $?
   fi
+  if [[ "$(basename "$patch")" == "php-cfg-declare-ticks.patch" ]]; then
+    apply_php_cfg_declare_ticks_overlay
+    return $?
+  fi
   if [[ "$(basename "$patch")" == "php-cfg-enum.patch" ]]; then
     apply_php_cfg_enum_overlay
     return $?
@@ -6149,6 +6204,7 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-cfg" ]]; then
   apply_patch "$PATCH_DIR/php-cfg-phi-resolver-skip-forwarded.patch"
   apply_patch "$PATCH_DIR/php-cfg-magic-constants.patch"
   apply_patch "$PATCH_DIR/php-cfg-magic-script-const.patch"
+  apply_patch "$PATCH_DIR/php-cfg-declare-ticks.patch"
   apply_patch "$PATCH_DIR/php-cfg-magic-line.patch"
   apply_patch "$PATCH_DIR/php-cfg-switch-cond-property.patch"
   apply_patch "$PATCH_DIR/php-cfg-loop-resolver-nested.patch"

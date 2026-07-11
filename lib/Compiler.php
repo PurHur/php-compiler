@@ -1955,6 +1955,28 @@ class Compiler {
 
     protected function compileBlock(Block $block) {
         $this->compileOps($block->orig->children, $block);
+        if ($block->tickScopeOpened) {
+            $this->insertTickScopeLeaveBeforeBlockExit($block);
+        }
+    }
+
+    private function insertTickScopeLeaveBeforeBlockExit(Block $block): void
+    {
+        $n = $block->nOpCodes;
+        for ($i = $n - 1; $i >= 0; --$i) {
+            $op = $block->opCodes[$i];
+            if (
+                OpCode::TYPE_JUMP === $op->type
+                || OpCode::TYPE_RETURN === $op->type
+                || OpCode::TYPE_RETURN_VOID === $op->type
+            ) {
+                array_splice($block->opCodes, $i, 0, [new OpCode(OpCode::TYPE_TICK_SCOPE_LEAVE)]);
+                ++$block->nOpCodes;
+
+                return;
+            }
+        }
+        $block->addOpCode(new OpCode(OpCode::TYPE_TICK_SCOPE_LEAVE));
     }
 
     protected function compileOps(array $ops, Block $block): void {
@@ -34094,9 +34116,29 @@ class Compiler {
                 )];
             case 'Terminal_StaticVar':
                 throw new \LogicException('StaticVar must be compiled via compileOps (#4352)');
+            case 'Terminal_SetTickInterval':
+                return $this->compileSetTickInterval($terminal, $block);
             default:
                 $this->throwCompileLogic("Unknown Terminal Type: " . $terminal->getType());
         }
+    }
+
+    /**
+     * @return list<OpCode>
+     */
+    protected function compileSetTickInterval(Op\Terminal $terminal, Block $block): array
+    {
+        if (!$terminal instanceof Op\Terminal\SetTickInterval) {
+            $this->throwCompileLogic('Expected SetTickInterval terminal');
+        }
+        $interval = max(0, $terminal->interval);
+        if (!$block->tickScopeOpened) {
+            $block->tickScopeOpened = true;
+
+            return [new OpCode(OpCode::TYPE_TICK_SCOPE_ENTER, $interval)];
+        }
+
+        return [new OpCode(OpCode::TYPE_TICK_SCOPE_SET, $interval)];
     }
 
 

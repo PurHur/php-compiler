@@ -216,6 +216,15 @@ class OpCode {
     /** empty($container[$dim]): ArrayAccess checks offsetGet truthiness, not isset alone (#14798). */
     const TYPE_EMPTY_DIMENSION = 129;
 
+    /** declare(ticks=N) — enter scope and push previous interval (#3343). */
+    const TYPE_TICK_SCOPE_ENTER = 130;
+
+    /** declare(ticks=N) — update interval within an open tick scope (#3343). */
+    const TYPE_TICK_SCOPE_SET = 131;
+
+    /** End declare(ticks=N) block scope — restore previous interval (#3343). */
+    const TYPE_TICK_SCOPE_LEAVE = 132;
+
     /** `['k' => $v, ...$tail] = $arr` string keys already assigned; empty = numeric spread only (#4889). */
     public array $listSpreadExcludedKeys = [];
 
