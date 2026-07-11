@@ -9852,6 +9852,10 @@ class JIT {
                             }
                             break;
                         }
+                        if ($op->nullsafeFetchPropertyRead) {
+                            JIT\NonObjectPropertyFetchHelper::lowerNullPropertyDest($this->context, $result);
+                            break;
+                        }
                         if ('null' === $nonObjectLabel) {
                             $message = sprintf('Attempt to read property "%s" on null', $propName);
                             if ([] !== $this->context->tryCatch->handlerStack) {
@@ -10005,6 +10009,10 @@ class JIT {
                             && !$this->context->type->object->hasProperty($classId, $name->value)
                             && $this->context->type->object->allowsDynamicProperties($classId)
                         ) {
+                            if ($op->nullsafeFetchPropertyRead) {
+                                JIT\NonObjectPropertyFetchHelper::lowerNullPropertyDest($this->context, $result);
+                                break;
+                            }
                             JIT\UndefinedPropertyFetchHelper::lowerUndefinedDynamicPropertyRead(
                                 $this->context,
                                 $result,
