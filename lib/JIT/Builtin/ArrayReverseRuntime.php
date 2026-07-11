@@ -13,7 +13,7 @@ use PHPLLVM\Value;
 /**
  * JIT/AOT link for array_reverse() via ArrayReverseJitHelper PHP (#12329).
  *
- * Standalone AOT compiles {@see ArrayReverseJitHelper} via JitVmHelperLink (#14244); native literal arrays keep LLVM in {@see ArrayBuiltinHelper::buildReverseArray()}.
+ * Standalone AOT compiles {@see ArrayReverseJitHelper} via JitVmHelperLink (#14244); native literal arrays materialize to hashtable then route through PHP (#17922).
  * SSOT: {@see \PHPCompiler\VM\HashTable::reverseCopy()}
  * php-src: ext/standard/array.c — php_array_reverse()
  */
@@ -32,12 +32,7 @@ final class ArrayReverseRuntime
 
     public static function reverse(Context $context, JITVariable $array, ?Value $preserveKeys = null): Value
     {
-        if (ArrayBuiltinHelper::isNativeArray($array->type)) {
-            return ArrayBuiltinHelper::buildReverseArray($context, $array, $preserveKeys);
-        }
-
         self::ensureLinked($context);
-        $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
         $i1 = $context->getTypeFromString('int1');
         $flag = null === $preserveKeys
             ? $i1->constInt(0, false)
@@ -45,7 +40,7 @@ final class ArrayReverseRuntime
 
         return $context->builder->call(
             $context->lookupFunction(self::ABI_REVERSE),
-            $ht,
+            ArrayBuiltinHelper::loadHashTable($context, $array),
             $flag
         );
     }
