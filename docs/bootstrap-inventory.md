@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 4541 |
-| Phase A inventory files (M2 ratio SSOT) | 4541 |
+| PHP files on vm.php path | 4542 |
+| Phase A inventory files (M2 ratio SSOT) | 4542 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 12319 |
+| Source constructs flagged (warnings) | 12320 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -3275,6 +3275,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/PregEmptyPatternReplaceRuntime.php` | 0 | 2 |
 | `lib/JIT/Builtin/PregExpandRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/PregMatchRuntime.php` | 0 | 3 |
+| `lib/JIT/Builtin/PregReplaceCallbackArrayRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/ProcessExecCaptureLlvm.php` | 0 | 1 |
 | `lib/JIT/Builtin/ProcessIdentityJit.php` | 0 | 3 |
 | `lib/JIT/Builtin/ProcessOpen.php` | 0 | 1 |
@@ -6183,34 +6184,34 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new DOMException (line 3704)
 - new DOMException (line 3745)
 - new DOMException (line 3770)
-- new DOMException (line 4394)
-- new Variable (line 4418)
-- new DOMException (line 4648)
-- new DOMException (line 4729)
-- new DOMException (line 4771)
-- new ObjectEntry (line 4856)
-- new DomNodeState (line 4860)
-- new Variable (line 4867)
-- new ObjectEntry (line 5067)
-- new DomNodeState (line 5071)
-- new Variable (line 5078)
-- new ObjectEntry (line 5098)
-- new DomNodeState (line 5101)
-- new Variable (line 5109)
-- new Variable (line 5254)
-- new DOMException (line 5338)
-- new DOMException (line 5345)
+- new DOMException (line 4408)
+- new Variable (line 4432)
+- new DOMException (line 4662)
+- new DOMException (line 4743)
+- new DOMException (line 4785)
+- new ObjectEntry (line 4870)
+- new DomNodeState (line 4874)
+- new Variable (line 4881)
+- new ObjectEntry (line 5081)
+- new DomNodeState (line 5085)
+- new Variable (line 5092)
+- new ObjectEntry (line 5112)
+- new DomNodeState (line 5115)
+- new Variable (line 5123)
+- new Variable (line 5268)
 - new DOMException (line 5352)
-- new DOMException (line 5356)
 - new DOMException (line 5359)
-- new DOMException (line 5368)
-- new Variable (line 6154)
-- new Variable (line 6167)
-- new DOMException (line 6249)
-- new DOMException (line 6260)
-- new DOMException (line 6326)
-- new DOMException (line 6334)
-- new DOMException (line 6343)
+- new DOMException (line 5366)
+- new DOMException (line 5370)
+- new DOMException (line 5373)
+- new DOMException (line 5382)
+- new Variable (line 6168)
+- new Variable (line 6181)
+- new DOMException (line 6263)
+- new DOMException (line 6274)
+- new DOMException (line 6340)
+- new DOMException (line 6348)
+- new DOMException (line 6357)
 - 302 class method(s)
 - 2 closure(s)
 
@@ -10744,7 +10745,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/ExtensionConstantGroups.php`
 
 **Warnings** (review for bootstrap subset):
-- 4 class method(s)
+- 5 class method(s)
 
 ### `ext/standard/FileGetContentsJitHelper.php`
 
@@ -14728,7 +14729,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/PregJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 11 class method(s)
+- 12 class method(s)
 - 1 closure(s)
 
 ### `ext/standard/PregQuoteJitHelper.php`
@@ -24377,11 +24378,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new CompileError (line 135)
 - new CompileError (line 164)
 - new CompileError (line 182)
-- new CompileError (line 229)
+- new CompileError (line 224)
+- new CompileError (line 242)
 - new CompileError (line 247)
-- new CompileError (line 252)
-- new CompileError (line 272)
-- new CompileError (line 281)
+- new CompileError (line 267)
+- new CompileError (line 276)
 - 23 class method(s)
 
 ### `lib/Compiler/SourceLocation.php`
@@ -26307,9 +26308,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/PregMatchRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 496)
+- new JIT (line 500)
 - 15 class method(s)
 - 2 closure(s)
+
+### `lib/JIT/Builtin/PregReplaceCallbackArrayRuntime.php`
+
+**Warnings** (review for bootstrap subset):
+- 4 class method(s)
 
 ### `lib/JIT/Builtin/ProcessExecCaptureLlvm.php`
 

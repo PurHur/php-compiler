@@ -130,4 +130,28 @@ final class PregJitHelper
             }
         );
     }
+
+    public static function replaceCallbackArrayArgv(HashTable $patterns, string $subject): ?string
+    {
+        $ctx = \PHPCompiler\Web\Superglobals::getActiveContext();
+        if (null === $ctx) {
+            throw new \LogicException(
+                'PregJitHelper::replaceCallbackArrayArgv() requires an active VM context in this compiler build'
+            );
+        }
+
+        $subjectVar = new \PHPCompiler\VM\Variable();
+        $subjectVar->string($subject);
+        $result = VmPregReplaceCallbackArray::invoke($ctx, $patterns, $subjectVar);
+        if (false === $result) {
+            return null;
+        }
+        if (\is_string($result)) {
+            return $result;
+        }
+
+        throw new \LogicException(
+            'preg_replace_callback_array() array subject is not supported for JIT/AOT in this compiler build'
+        );
+    }
 }
