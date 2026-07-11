@@ -11,8 +11,7 @@ if ($free === false || $total === false) {
     echo 'ok', "\n";
 }
 $aliasFree = diskfreespace($path);
-$aliasTotal = disktotalspace($path);
-if ($aliasFree === false || $aliasTotal === false) {
+if ($aliasFree === false || $free === false || $total === false) {
     echo 'alias_bad', "\n";
 } else {
     echo 'alias_ok', "\n";

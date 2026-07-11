@@ -2092,14 +2092,19 @@ final class CompilerVersion
     }
 
     /**
-     * disktotalspace() legacy alias of disk_total_space() (ext/standard/filestat.c, #11922, #17821).
+     * disktotalspace() legacy alias of disk_total_space() (ext/standard/filestat.c, #11922, #18017).
      *
-     * Available whenever disk_total_space() is registered — Zend 8.2+ exposes the alias on the
-     * reference profile (not a forward-profile-only builtin).
+     * Removed from php-src 8.2 reference profile — use disk_total_space(). Not registered here.
      */
     public static function supportsDisktotalspace(): bool
     {
-        return true;
+        return false;
+    }
+
+    /** disktotalspace() visible to function_exists() — matches php-src reference (absent). */
+    public static function advertisesDisktotalspace(): bool
+    {
+        return false;
     }
 
     /**
