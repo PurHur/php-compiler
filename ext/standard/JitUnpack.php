@@ -18,8 +18,17 @@ final class JitUnpack
     {
         UnpackJitRuntime::ensureLinked($context);
         $argc = \count($args);
-        if ($argc < 2 || $argc > 3) {
-            throw new \LogicException('unpack() requires two or three arguments in this compiler build');
+        if ($argc < 2) {
+            throw new \ArgumentCountError(\sprintf(
+                'unpack() expects at least 2 arguments, %d given',
+                $argc
+            ));
+        }
+        if ($argc > 3) {
+            throw new \ArgumentCountError(\sprintf(
+                'unpack() expects at most 3 arguments, %d given',
+                $argc
+            ));
         }
         $fmt = JitStringBuiltinArg::lower($context, $args[0], 'unpack', 0, 'format');
         $data = JitStringBuiltinArg::lower($context, $args[1], 'unpack', 1, 'string');

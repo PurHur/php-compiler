@@ -18,10 +18,8 @@ final class unpack extends Internal
 {
     public function execute(Frame $frame): void
     {
+        $this->requireArgCountRange($frame, 'unpack', 2, 3);
         $argc = \count($frame->calledArgs);
-        if ($argc < 2 || $argc > 3) {
-            throw new \LogicException('unpack() requires two or three arguments in this compiler build');
-        }
         $fmt = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'unpack', 0, 'format');
         $data = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'unpack', 1, 'string');
         $offset = 0;
@@ -59,6 +57,10 @@ final class unpack extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
+        if (!$this->requireArgCountRangeJit($context, $args, 'unpack', 2, 3)) {
+            return $context->constantFromBool(false);
+        }
+
         return \call_user_func_array([JitUnpack::class, 'unpack'], array_merge([$context], $args));
     }
 }

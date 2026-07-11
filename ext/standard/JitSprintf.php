@@ -36,7 +36,10 @@ final class JitSprintf
         }
         $argc = \count($args);
         if ($argc < 1) {
-            throw new \LogicException('sprintf() requires at least one argument');
+            throw new \ArgumentCountError(\sprintf(
+                'sprintf() expects at least 1 argument, %d given',
+                $argc
+            ));
         }
         $fmt = JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'sprintf', 0, 'format');
         $numArgs = $argc - 1;
