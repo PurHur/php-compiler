@@ -9446,6 +9446,44 @@ class JIT {
                             break;
                         }
                     }
+                    if (
+                        $this->context->scope->toCall instanceof CoreFunc\Internal
+                        && isset($callOperands[1])
+                    ) {
+                        $mbFn = strtolower($this->context->scope->toCall->getName());
+                        if ('mb_encode_numericentity' === $mbFn) {
+                            $folded = \PHPCompiler\ext\mbstring\JitMbNumericEntity::tryEncodeCompileTimeFoldFromCallSite(
+                                $this->context,
+                                $block,
+                                $callOperands,
+                                $callArgs
+                            );
+                            if (null !== $folded) {
+                                $this->assignCallResultOperand(
+                                    $block->getOperand($op->arg1),
+                                    $folded,
+                                    $this->calleeReturnsByRef($this->context->scope->toCall)
+                                );
+                                break;
+                            }
+                        }
+                        if ('mb_decode_numericentity' === $mbFn) {
+                            $folded = \PHPCompiler\ext\mbstring\JitMbNumericEntity::tryDecodeCompileTimeFoldFromCallSite(
+                                $this->context,
+                                $block,
+                                $callOperands,
+                                $callArgs
+                            );
+                            if (null !== $folded) {
+                                $this->assignCallResultOperand(
+                                    $block->getOperand($op->arg1),
+                                    $folded,
+                                    $this->calleeReturnsByRef($this->context->scope->toCall)
+                                );
+                                break;
+                            }
+                        }
+                    }
                     $resumeName = $this->context->scope->generatorResumeCallee;
                     $this->context->scope->generatorResumeCallee = null;
                     if (null !== $resumeName) {
@@ -9483,6 +9521,16 @@ class JIT {
                     ) {
                         $this->context->jitCallUserFuncArrayParamsOperand = $callOperands[1];
                     }
+                    $savedMbNumericEntityConvmapOperand = $this->context->jitMbNumericEntityConvmapOperand;
+                    $savedMbNumericEntityConvmapBlock = $this->context->jitMbNumericEntityConvmapBlock;
+                    if (
+                        $this->context->scope->toCall instanceof CoreFunc\Internal
+                        && isset($callOperands[1])
+                        && \in_array(strtolower($this->context->scope->toCall->getName()), ['mb_encode_numericentity', 'mb_decode_numericentity'], true)
+                    ) {
+                        $this->context->jitMbNumericEntityConvmapOperand = $callOperands[1];
+                        $this->context->jitMbNumericEntityConvmapBlock = $block;
+                    }
                     $this->promoteCompileTimeStringOnCallArgs($block, $callOperands, $callArgs);
                     if ($this->context->scope->toCall instanceof CoreFunc\Internal) {
                         $callArgs = $this->densifyInternalCallArgs($this->context->scope->toCall, $callArgs);
@@ -9491,6 +9539,8 @@ class JIT {
                     $this->context->jitUnserializeOptionsOperand = $savedUnserializeOptionsOperand;
                     $this->context->jitJsonEncodeValueOperand = $savedJsonEncodeValueOperand;
                     $this->context->jitCallUserFuncArrayParamsOperand = $savedCallUserFuncArrayOperand;
+                    $this->context->jitMbNumericEntityConvmapOperand = $savedMbNumericEntityConvmapOperand;
+                    $this->context->jitMbNumericEntityConvmapBlock = $savedMbNumericEntityConvmapBlock;
                     $this->markNewObjectConstructedAfterCall($this->context->scope->toCall, $callArgs);
                     $this->context->callerStrictTypes = $prevStrict;
                     $this->assignCallResultOperand(
