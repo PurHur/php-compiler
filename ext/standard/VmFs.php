@@ -2578,6 +2578,14 @@ final class VmFs
 
     public static function handleBlocked(int $handle): bool
     {
+        if (VmPhpMemoryStream::isValidHandle($handle)) {
+            $uri = VmPhpMemoryStream::uriForHandle($handle);
+            // php-src php_stream_memory: blocking flag stays true regardless of stream_set_blocking (#17928).
+            if ('php://memory' === $uri || \str_starts_with($uri, 'php://fd/')) {
+                return true;
+            }
+        }
+
         return self::$handleBlocked[$handle] ?? true;
     }
 
