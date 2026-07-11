@@ -4005,6 +4005,156 @@ class Compiler {
         return null;
     }
 
+    /**
+     * Stmt-level ?? nodes immediately feeding a FuncCall, in execution order (#17981).
+     *
+     * @return list<Op\Expr\BinaryOp\Coalesce>
+     */
+    private function stmtLevelCoalescesBeforeFuncCall(Op $callOp, Block $block): array
+    {
+        if (null === $block->orig) {
+            return [];
+        }
+        $children = $block->orig->children;
+        $callIndex = null;
+        foreach ($children as $i => $child) {
+            if ($child === $callOp) {
+                $callIndex = $i;
+                break;
+            }
+        }
+        if (
+            null === $callIndex
+            && property_exists($callOp, 'result')
+            && null !== $callOp->result
+        ) {
+            foreach ($children as $i => $child) {
+                if (
+                    ($child instanceof Op\Expr\FuncCall || $child instanceof Op\Expr\NsFuncCall)
+                    && null !== $child->result
+                    && (
+                        $child->result === $callOp->result
+                        || $this->operandsReferToSameVariable($child->result, $callOp->result)
+                    )
+                ) {
+                    $callIndex = $i;
+                    break;
+                }
+            }
+        }
+        if (null === $callIndex) {
+            return [];
+        }
+        $coalesces = [];
+        for ($j = $callIndex - 1; $j >= 0; --$j) {
+            $prev = $children[$j];
+            if ($prev instanceof Op\Expr\BinaryOp\Coalesce) {
+                array_unshift($coalesces, $prev);
+
+                continue;
+            }
+            if (
+                $prev instanceof Op\Expr\Assign
+                && $j > 0
+            ) {
+                $maybeCoalesce = $children[$j - 1];
+                if (
+                    $maybeCoalesce instanceof Op\Expr\BinaryOp\Coalesce
+                    && $this->isCoalesceAssignTail($prev, $maybeCoalesce)
+                ) {
+                    array_unshift($coalesces, $maybeCoalesce);
+                    --$j;
+
+                    continue;
+                }
+            }
+            if ($prev instanceof Op\Expr && $this->isInlineExprCallArgProducer($prev)) {
+                continue;
+            }
+
+            break;
+        }
+
+        return $coalesces;
+    }
+
+    /**
+     * Call-arg indices fed by distinct stmt-level ?? temps (not embedded ?? or literals, #17981).
+     *
+     * @return list<int>
+     */
+    private function stmtCoalesceFedCallArgIndices(Op $callOp): array
+    {
+        if (!property_exists($callOp, 'args') || !\is_array($callOp->args)) {
+            return [];
+        }
+        $fedArgIndices = [];
+        foreach ($callOp->args as $idx => $callArg) {
+            if (null === $callArg || $this->isCallArgUnrelatedToPriorStmtCoalesce($callArg)) {
+                continue;
+            }
+            if ([] !== $this->findEmbeddedCoalesces($callArg)) {
+                continue;
+            }
+            $fedArgIndices[] = (int) $idx;
+        }
+
+        return $fedArgIndices;
+    }
+
+    /**
+     * Map a stmt-level ?? to its matching php-cfg call-arg temp when multiple ?? precede one call (#17981).
+     */
+    private function findCallArgForStmtCoalesce(
+        Op $callOp,
+        Op\Expr\BinaryOp\Coalesce $coalesce,
+        Block $block
+    ): ?Operand {
+        $coalesces = $this->stmtLevelCoalescesBeforeFuncCall($callOp, $block);
+        $coalesceIndex = array_search($coalesce, $coalesces, true);
+        if (false === $coalesceIndex || \count($coalesces) < 2) {
+            return null;
+        }
+        $fedArgIndices = $this->stmtCoalesceFedCallArgIndices($callOp);
+        if (\count($fedArgIndices) !== \count($coalesces)) {
+            return null;
+        }
+
+        return $callOp->args[$fedArgIndices[$coalesceIndex] ?? -1] ?? null;
+    }
+
+    /**
+     * Map a php-cfg call-arg temp to its stmt-level ?? when multiple ?? precede one call (#17981).
+     */
+    private function findStmtCoalesceForOrdinalCallArg(
+        Op $callOp,
+        Operand $matchedCallArg,
+        Block $block
+    ): ?Op\Expr\BinaryOp\Coalesce {
+        $coalesces = $this->stmtLevelCoalescesBeforeFuncCall($callOp, $block);
+        if (\count($coalesces) < 2) {
+            return null;
+        }
+        $fedArgIndices = $this->stmtCoalesceFedCallArgIndices($callOp);
+        if (\count($fedArgIndices) !== \count($coalesces)) {
+            return null;
+        }
+        foreach ($fedArgIndices as $ordinal => $argIdx) {
+            $callArg = $callOp->args[$argIdx] ?? null;
+            if (
+                null !== $callArg
+                && (
+                    $callArg === $matchedCallArg
+                    || $this->operandsReferToSameVariable($callArg, $matchedCallArg)
+                )
+            ) {
+                return $coalesces[$ordinal] ?? null;
+            }
+        }
+
+        return null;
+    }
+
     private function callArgHasPriorStmtCoalesce(
         Operand $arg,
         Block $block,
@@ -4184,13 +4334,18 @@ class Compiler {
                 }
             }
             if (null === $targetArg) {
-                $firstArg = $next->args[0] ?? null;
-                if (
-                    null !== $firstArg
-                    && !$this->isCallArgUnrelatedToPriorStmtCoalesce($firstArg)
-                    && $this->onlyInlineCallArgProducersBetweenIndices($ops, $coalesceIdx, $j)
-                ) {
-                    $targetArg = $firstArg;
+                $ordinalTarget = $this->findCallArgForStmtCoalesce($next, $coalesce, $block);
+                if (null !== $ordinalTarget) {
+                    $targetArg = $ordinalTarget;
+                } else {
+                    $firstArg = $next->args[0] ?? null;
+                    if (
+                        null !== $firstArg
+                        && !$this->isCallArgUnrelatedToPriorStmtCoalesce($firstArg)
+                        && $this->onlyInlineCallArgProducersBetweenIndices($ops, $coalesceIdx, $j)
+                    ) {
+                        $targetArg = $firstArg;
+                    }
                 }
             }
             if (null === $targetArg) {
@@ -15067,6 +15222,15 @@ class Compiler {
                 if ($prev instanceof Op\Expr\BinaryOp\Coalesce) {
                     // php-cfg clones call-arg temps from stmt Coalesce.result (#8766, #8902, #9479).
                     if ($j === $i - 1) {
+                        $ordinalCoalesce = $this->findStmtCoalesceForOrdinalCallArg(
+                            $child,
+                            $matchedCallArg,
+                            $block
+                        );
+                        if (null !== $ordinalCoalesce) {
+                            return $ordinalCoalesce;
+                        }
+
                         return $prev;
                     }
                     if (
