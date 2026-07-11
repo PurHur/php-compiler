@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 4510 |
-| Phase A inventory files (M2 ratio SSOT) | 4510 |
+| PHP files on vm.php path | 4511 |
+| Phase A inventory files (M2 ratio SSOT) | 4511 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 12247 |
+| Source constructs flagged (warnings) | 12246 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1761,6 +1761,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VmHttpHeaders.php` | 0 | 3 |
 | `ext/standard/VmHttpLastResponseHeaders.php` | 0 | 4 |
 | `ext/standard/VmHttpResponse.php` | 0 | 2 |
+| `ext/standard/VmHttpResponseConstants.php` | 0 | 1 |
 | `ext/standard/VmHttpTlsNative.php` | 0 | 1 |
 | `ext/standard/VmImage.php` | 0 | 6 |
 | `ext/standard/VmIncludePath.php` | 0 | 1 |
@@ -1906,7 +1907,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VmStreamTransports.php` | 0 | 1 |
 | `ext/standard/VmStreamWrapperMetadata.php` | 0 | 7 |
 | `ext/standard/VmStreamWrapperRegistry.php` | 0 | 1 |
-| `ext/standard/VmString.php` | 0 | 5 |
+| `ext/standard/VmString.php` | 0 | 3 |
 | `ext/standard/VmStripWhitespace.php` | 0 | 1 |
 | `ext/standard/VmSys.php` | 0 | 3 |
 | `ext/standard/VmSysGetTempDirNative.php` | 0 | 1 |
@@ -16320,6 +16321,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 90)
 - 8 class method(s)
 
+### `ext/standard/VmHttpResponseConstants.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `ext/standard/VmHttpTlsNative.php`
 
 **Warnings** (review for bootstrap subset):
@@ -16679,11 +16685,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmPhpCoreConstants.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 324)
-- new Variable (line 330)
-- new Variable (line 336)
-- new Variable (line 342)
-- 16 class method(s)
+- new Variable (line 372)
+- new Variable (line 378)
+- new Variable (line 384)
+- new Variable (line 390)
+- 19 class method(s)
 
 ### `ext/standard/VmPhpFdStream.php`
 
@@ -17509,8 +17515,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new Error (line 1577)
 - new Error (line 1588)
-- new Error (line 3719)
-- new Error (line 3828)
 - 211 class method(s)
 
 ### `ext/standard/VmStripWhitespace.php`
@@ -23352,11 +23356,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/AsymmetricVisibilityRejector.php`
 
 **Warnings** (review for bootstrap subset):
-- new CompileFatal (line 36)
-- new CompileFatal (line 45)
-- new CompileFatal (line 58)
-- new CompileFatal (line 66)
-- new CompileFatal (line 74)
+- new CompileFatal (line 41)
+- new CompileFatal (line 50)
+- new CompileFatal (line 59)
+- new CompileFatal (line 67)
+- new CompileFatal (line 75)
 - 3 class method(s)
 
 ### `lib/BareThrowSyntaxRejector.php`
@@ -24272,7 +24276,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/CompilerVersion.php`
 
 **Warnings** (review for bootstrap subset):
-- 183 class method(s)
+- 185 class method(s)
 
 ### `lib/CurlyBraceOffsetRejector.php`
 

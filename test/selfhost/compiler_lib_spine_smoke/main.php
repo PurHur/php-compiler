@@ -1742,6 +1742,7 @@ require_once __DIR__.'/../../../ext/standard/VmHttpFetchPure.php';
 require_once __DIR__.'/../../../ext/standard/VmHttpHeaders.php';
 require_once __DIR__.'/../../../ext/standard/VmHttpLastResponseHeaders.php';
 require_once __DIR__.'/../../../ext/standard/VmHttpResponse.php';
+require_once __DIR__.'/../../../ext/standard/VmHttpResponseConstants.php';
 require_once __DIR__.'/../../../ext/standard/VmHttpTlsNative.php';
 require_once __DIR__.'/../../../ext/standard/VmImage.php';
 require_once __DIR__.'/../../../ext/standard/VmIncludePath.php';
