@@ -1,0 +1,39 @@
+<?php
+
+declare(strict_types=1);
+
+namespace PHPCompiler\ext\xmlreader;
+
+use PHPCompiler\Frame;
+use PHPCompiler\VM\Builtin\VmClassMethod;
+use PHPCompiler\VM\BuiltinExecute;
+use PHPCompiler\VM\Variable;
+
+/** XMLReader::open() — static file open (php-src ext/xmlreader/php_xmlreader.c; #6135). */
+final class XmlReaderOpen extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('open');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $ctx = $frame->vmContext ?? throw new \LogicException('XMLReader::open() requires VM context');
+        if (\count($frame->calledArgs) < 1) {
+            throw new \ArgumentCountError('XMLReader::open() expects at least 1 argument, 0 given');
+        }
+        $uriVar = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_STRING !== $uriVar->type) {
+            throw new \TypeError('XMLReader::open(): Argument #1 ($uri) must be of type string');
+        }
+        $reader = VmXmlReader::open($ctx, $uriVar->toString(), $frame);
+        BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($reader): void {
+            if (null === $reader) {
+                $ret->bool(false);
+            } else {
+                $ret->object($reader);
+            }
+        });
+    }
+}

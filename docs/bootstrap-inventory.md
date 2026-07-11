@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 4432 |
-| Phase A inventory files (M2 ratio SSOT) | 4432 |
+| PHP files on vm.php path | 4445 |
+| Phase A inventory files (M2 ratio SSOT) | 4445 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 12030 |
+| Source constructs flagged (warnings) | 12063 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -2763,6 +2763,17 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/xml/xml_parse_into_struct.php` | 0 | 4 |
 | `ext/xml/xml_parser_create.php` | 0 | 1 |
 | `ext/xml/xml_parser_free.php` | 0 | 2 |
+| `ext/xmlreader/BuiltinClasses.php` | 0 | 1 |
+| `ext/xmlreader/Module.php` | 0 | 1 |
+| `ext/xmlreader/VmXmlReader.php` | 0 | 11 |
+| `ext/xmlreader/XmlReaderClose.php` | 0 | 3 |
+| `ext/xmlreader/XmlReaderConstants.php` | 0 | 1 |
+| `ext/xmlreader/XmlReaderGetAttribute.php` | 0 | 3 |
+| `ext/xmlreader/XmlReaderIsValid.php` | 0 | 3 |
+| `ext/xmlreader/XmlReaderOpen.php` | 0 | 3 |
+| `ext/xmlreader/XmlReaderPropertySupport.php` | 0 | 2 |
+| `ext/xmlreader/XmlReaderRead.php` | 0 | 3 |
+| `ext/xmlreader/XmlReaderRegistry.php` | 0 | 1 |
 | `ext/zip/BuiltinClasses.php` | 0 | 1 |
 | `ext/zip/Module.php` | 0 | 1 |
 | `ext/zip/VmZipArchive.php` | 0 | 15 |
@@ -3788,7 +3799,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/ReadonlyFunctionRejector.php` | 0 | 2 |
 | `lib/ReadonlyMethodModifierRejector.php` | 0 | 2 |
 | `lib/ReferenceProfileTokenScan.php` | 0 | 1 |
-| `lib/Runtime.php` | 0 | 76 |
+| `lib/Runtime.php` | 0 | 77 |
 | `lib/RuntimeStrictness.php` | 0 | 1 |
 | `lib/SourceBareThrowRewriter.php` | 0 | 1 |
 | `lib/SourcePreprocessor/PropertyHooks.php` | 0 | 4 |
@@ -22415,6 +22426,82 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 26)
 - 2 class method(s)
 
+### `ext/xmlreader/BuiltinClasses.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/xmlreader/Module.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
+### `ext/xmlreader/VmXmlReader.php`
+
+**Warnings** (review for bootstrap subset):
+- new ClassEntry (line 46)
+- new XmlReaderOpen (line 47)
+- new XmlReaderRead (line 50)
+- new XmlReaderClose (line 53)
+- new XmlReaderGetAttribute (line 56)
+- new XmlReaderIsValid (line 59)
+- new Variable (line 64)
+- new ObjectEntry (line 102)
+- new XmlReaderState (line 103)
+- new XmlReaderEvent (line 384)
+- 20 class method(s)
+
+### `ext/xmlreader/XmlReaderClose.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 23)
+- 1 class method(s)
+- 1 closure(s)
+
+### `ext/xmlreader/XmlReaderConstants.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/xmlreader/XmlReaderGetAttribute.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 23)
+- 1 class method(s)
+- 1 closure(s)
+
+### `ext/xmlreader/XmlReaderIsValid.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 23)
+- 1 class method(s)
+- 1 closure(s)
+
+### `ext/xmlreader/XmlReaderOpen.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 24)
+- 1 class method(s)
+- 1 closure(s)
+
+### `ext/xmlreader/XmlReaderPropertySupport.php`
+
+**Warnings** (review for bootstrap subset):
+- new Variable (line 44)
+- 2 class method(s)
+
+### `ext/xmlreader/XmlReaderRead.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 23)
+- 1 class method(s)
+- 1 closure(s)
+
+### `ext/xmlreader/XmlReaderRegistry.php`
+
+**Warnings** (review for bootstrap subset):
+- 5 class method(s)
+
 ### `ext/zip/BuiltinClasses.php`
 
 **Warnings** (review for bootstrap subset):
@@ -29346,46 +29433,47 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ext\dom\Module (line 229)
 - new ext\simplexml\Module (line 230)
 - new ext\xml\Module (line 231)
-- new ext\gd\Module (line 232)
-- new ext\iconv\Module (line 233)
-- new ext\gettext\Module (line 234)
-- new ext\mbstring\Module (line 235)
-- new ext\filter\Module (line 236)
-- new ext\calendar\Module (line 237)
-- new ext\ldap\Module (line 238)
-- new ext\session\Module (line 239)
-- new ext\bcmath\Module (line 240)
-- new ext\stats\Module (line 241)
-- new ext\openssl\Module (line 242)
-- new ext\curl\Module (line 243)
-- new ext\hash\Module (line 244)
-- new ext\posix\Module (line 245)
-- new ext\pcntl\Module (line 246)
-- new ext\sockets\Module (line 247)
-- new ext\ftp\Module (line 248)
-- new ext\ctype\Module (line 249)
-- new ext\tokenizer\Module (line 250)
-- new ext\random\Module (line 251)
-- new ext\igbinary\Module (line 252)
-- new ext\msgpack\Module (line 253)
-- new ext\zstd\Module (line 254)
-- new ext\lzf\Module (line 255)
-- new ext\bz2\Module (line 256)
-- new ext\brotli\Module (line 257)
-- new ext\sodium\Module (line 258)
-- new ext\sqlite3\Module (line 259)
-- new ext\uri\Module (line 260)
-- new ext\standard\Module (line 261)
-- new JIT (line 337)
-- new JITContext (line 351)
-- new SealedClassPreprocessor (line 415)
-- new StaticClassPreprocessor (line 418)
-- new SourcePreprocessor\PropertyHooks (line 421)
-- new State (line 561)
-- new ReflectionProperty (line 588)
-- new ReflectionProperty (line 591)
-- new LintCompiler (line 997)
-- new Variable (line 1127)
+- new ext\xmlreader\Module (line 232)
+- new ext\gd\Module (line 233)
+- new ext\iconv\Module (line 234)
+- new ext\gettext\Module (line 235)
+- new ext\mbstring\Module (line 236)
+- new ext\filter\Module (line 237)
+- new ext\calendar\Module (line 238)
+- new ext\ldap\Module (line 239)
+- new ext\session\Module (line 240)
+- new ext\bcmath\Module (line 241)
+- new ext\stats\Module (line 242)
+- new ext\openssl\Module (line 243)
+- new ext\curl\Module (line 244)
+- new ext\hash\Module (line 245)
+- new ext\posix\Module (line 246)
+- new ext\pcntl\Module (line 247)
+- new ext\sockets\Module (line 248)
+- new ext\ftp\Module (line 249)
+- new ext\ctype\Module (line 250)
+- new ext\tokenizer\Module (line 251)
+- new ext\random\Module (line 252)
+- new ext\igbinary\Module (line 253)
+- new ext\msgpack\Module (line 254)
+- new ext\zstd\Module (line 255)
+- new ext\lzf\Module (line 256)
+- new ext\bz2\Module (line 257)
+- new ext\brotli\Module (line 258)
+- new ext\sodium\Module (line 259)
+- new ext\sqlite3\Module (line 260)
+- new ext\uri\Module (line 261)
+- new ext\standard\Module (line 262)
+- new JIT (line 338)
+- new JITContext (line 352)
+- new SealedClassPreprocessor (line 416)
+- new StaticClassPreprocessor (line 419)
+- new SourcePreprocessor\PropertyHooks (line 422)
+- new State (line 562)
+- new ReflectionProperty (line 589)
+- new ReflectionProperty (line 592)
+- new LintCompiler (line 998)
+- new Variable (line 1128)
 - 53 class method(s)
 
 ### `lib/RuntimeStrictness.php`
@@ -32876,14 +32964,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/ObjectEntry.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 196)
-- new Variable (line 296)
-- new Variable (line 299)
-- new Variable (line 334)
-- new Variable (line 337)
-- new self (line 349)
-- new Variable (line 385)
-- new Variable (line 516)
+- new Variable (line 199)
+- new Variable (line 302)
+- new Variable (line 305)
+- new Variable (line 340)
+- new Variable (line 343)
+- new self (line 355)
+- new Variable (line 391)
+- new Variable (line 522)
 - 24 class method(s)
 
 ### `lib/VM/ObjectHandleSupport.php`
