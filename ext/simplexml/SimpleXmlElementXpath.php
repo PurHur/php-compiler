@@ -1,0 +1,39 @@
+<?php
+
+declare(strict_types=1);
+
+namespace PHPCompiler\ext\simplexml;
+
+use PHPCompiler\Frame;
+use PHPCompiler\VM\Builtin\VmClassMethod;
+use PHPCompiler\VM\Variable;
+
+/** SimpleXMLElement::xpath — descendant element query (php-src ext/simplexml/sxe.c; #18038). */
+final class SimpleXmlElementXpath extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('xpath');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        if (null === $frame->vmContext) {
+            throw new \LogicException('SimpleXMLElement::xpath() requires VM context');
+        }
+        if (\count($frame->calledArgs) < 2) {
+            throw new \LogicException('SimpleXMLElement::xpath() expects at least 1 argument');
+        }
+        $entry = VmSimpleXml::requireElement(
+            $frame->calledArgs[0]->resolveIndirect()->toObject(),
+            'SimpleXMLElement::xpath()'
+        );
+        $pathVar = $frame->calledArgs[1]->resolveIndirect();
+        if (Variable::TYPE_STRING !== $pathVar->type) {
+            throw new \TypeError('SimpleXMLElement::xpath(): Argument #1 ($path) must be of type string');
+        }
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->array(VmSimpleXml::xpath($frame->vmContext, $entry, $pathVar->toString()));
+        }
+    }
+}

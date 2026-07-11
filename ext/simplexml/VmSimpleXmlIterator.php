@@ -1,0 +1,335 @@
+<?php
+
+declare(strict_types=1);
+
+namespace PHPCompiler\ext\simplexml;
+
+use PHPCfg\Func as CfgFunc;
+use PHPCompiler\Frame;
+use PHPCompiler\VM\Builtin\VmClassMethod;
+use PHPCompiler\VM\ClassEntry;
+use PHPCompiler\VM\Context;
+use PHPCompiler\VM\ObjectEntry;
+use PHPCompiler\VM\Variable;
+
+/** SimpleXMLIterator — recursive child iterator (php-src ext/simplexml/sxe.c; #6694). */
+final class VmSimpleXmlIterator
+{
+    public const CLASS_LC = 'simplexmliterator';
+
+    public static function registerClass(Context $ctx): void
+    {
+        if (isset($ctx->classes[self::CLASS_LC])) {
+            return;
+        }
+
+        $pub = CfgFunc::FLAG_PUBLIC;
+        $entry = new ClassEntry('SimpleXMLIterator');
+        $entry->parentLc = VmSimpleXml::CLASS_LC;
+        foreach (['Iterator', 'RecursiveIterator', 'Countable', 'Traversable'] as $iface) {
+            if (isset($ctx->classes[strtolower($iface)])) {
+                $entry->interfaces[] = $iface;
+            }
+        }
+
+        $entry->constructor = new SimpleXmlIteratorConstruct();
+        $entry->methods['__construct'] = $entry->constructor;
+        $entry->methodVisibility['__construct'] = $pub;
+        foreach ([
+            'current' => SimpleXmlIteratorCurrent::class,
+            'key' => SimpleXmlIteratorKey::class,
+            'next' => SimpleXmlIteratorNext::class,
+            'rewind' => SimpleXmlIteratorRewind::class,
+            'valid' => SimpleXmlIteratorValid::class,
+            'count' => SimpleXmlIteratorCount::class,
+            'haschildren' => SimpleXmlIteratorHasChildren::class,
+            'getchildren' => SimpleXmlIteratorGetChildren::class,
+        ] as $lc => $class) {
+            $entry->methods[$lc] = new $class();
+            $entry->methodVisibility[$lc] = $pub;
+        }
+        $entry->methodNames['haschildren'] = 'hasChildren';
+        $entry->methodNames['getchildren'] = 'getChildren';
+
+        $entry->isInternal = true;
+        $ctx->classes[self::CLASS_LC] = $entry;
+    }
+
+    public static function requireIterator(ObjectEntry $entry, string $label): ObjectEntry
+    {
+        if (self::CLASS_LC !== strtolower($entry->class->name)) {
+            throw new \TypeError(sprintf('%s(): Argument must be SimpleXMLIterator, %s given', $label, $entry->class->name));
+        }
+        if (!SimpleXmlRegistry::has($entry)) {
+            throw new \LogicException($label.'(): SimpleXMLIterator has no node state');
+        }
+
+        return $entry;
+    }
+
+    /** @return list<SimpleXmlNodeState> */
+    public static function iterableChildren(ObjectEntry $entry): array
+    {
+        return VmSimpleXml::directElementChildren($entry);
+    }
+
+    public static function wrapChild(Context $ctx, ObjectEntry $iterator, int $index): ObjectEntry
+    {
+        $children = self::iterableChildren($iterator);
+        if (!isset($children[$index])) {
+            throw new \LogicException('SimpleXMLIterator child index out of range');
+        }
+        $class = $ctx->classes[self::CLASS_LC] ?? $iterator->class;
+
+        return VmSimpleXml::wrapIteratorNode(
+            $ctx,
+            $class,
+            $children[$index],
+            SimpleXmlRegistry::documentKey($iterator)
+        );
+    }
+}
+
+final class SimpleXmlIteratorConstruct extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('__construct');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        if (null === $frame->vmContext) {
+            throw new \LogicException('SimpleXMLIterator::__construct() requires VM context');
+        }
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError('SimpleXMLIterator::__construct() expects at least 1 argument, 0 given');
+        }
+        $iterator = $frame->calledArgs[0]->resolveIndirect()->toObject();
+        if (VmSimpleXmlIterator::CLASS_LC !== strtolower($iterator->class->name)) {
+            throw new \LogicException('SimpleXMLIterator::__construct() called on invalid receiver');
+        }
+        $sourceVar = $frame->calledArgs[1]->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $sourceVar->type) {
+            throw new \TypeError('SimpleXMLIterator::__construct(): Argument #1 ($data) must be of type SimpleXMLElement');
+        }
+        $source = $sourceVar->toObject();
+        $sourceClass = strtolower($source->class->name);
+        if (VmSimpleXml::CLASS_LC !== $sourceClass && VmSimpleXmlIterator::CLASS_LC !== $sourceClass) {
+            throw new \TypeError('SimpleXMLIterator::__construct(): Argument #1 ($data) must be of type SimpleXMLElement');
+        }
+        VmSimpleXml::requireElement($source, 'SimpleXMLIterator::__construct()');
+        SimpleXmlRegistry::attach(
+            $iterator,
+            SimpleXmlRegistry::state($source),
+            SimpleXmlRegistry::documentKey($source)
+        );
+        SimpleXmlIteratorStorage::init($iterator);
+    }
+}
+
+final class SimpleXmlIteratorCurrent extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('current');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        if (null === $frame->vmContext) {
+            throw new \LogicException('SimpleXMLIterator::current() requires VM context');
+        }
+        $iterator = VmSimpleXmlIterator::requireIterator(
+            $frame->calledArgs[0]->resolveIndirect()->toObject(),
+            'SimpleXMLIterator::current()'
+        );
+        if (null === $frame->returnVar) {
+            return;
+        }
+        if (!self::validIterator($iterator)) {
+            $frame->returnVar->null();
+
+            return;
+        }
+        $frame->returnVar->object(VmSimpleXmlIterator::wrapChild(
+            $frame->vmContext,
+            $iterator,
+            SimpleXmlIteratorStorage::index($iterator)
+        ));
+    }
+
+    private static function validIterator(ObjectEntry $iterator): bool
+    {
+        $index = SimpleXmlIteratorStorage::index($iterator);
+
+        return $index >= 0 && $index < \count(VmSimpleXmlIterator::iterableChildren($iterator));
+    }
+}
+
+final class SimpleXmlIteratorKey extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('key');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $iterator = VmSimpleXmlIterator::requireIterator(
+            $frame->calledArgs[0]->resolveIndirect()->toObject(),
+            'SimpleXMLIterator::key()'
+        );
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $children = VmSimpleXmlIterator::iterableChildren($iterator);
+        $index = SimpleXmlIteratorStorage::index($iterator);
+        if ($index < 0 || $index >= \count($children)) {
+            $frame->returnVar->null();
+
+            return;
+        }
+        $frame->returnVar->string($children[$index]->name);
+    }
+}
+
+final class SimpleXmlIteratorNext extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('next');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $iterator = VmSimpleXmlIterator::requireIterator(
+            $frame->calledArgs[0]->resolveIndirect()->toObject(),
+            'SimpleXMLIterator::next()'
+        );
+        SimpleXmlIteratorStorage::setIndex($iterator, SimpleXmlIteratorStorage::index($iterator) + 1);
+    }
+}
+
+final class SimpleXmlIteratorRewind extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('rewind');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $iterator = VmSimpleXmlIterator::requireIterator(
+            $frame->calledArgs[0]->resolveIndirect()->toObject(),
+            'SimpleXMLIterator::rewind()'
+        );
+        SimpleXmlIteratorStorage::rewind($iterator);
+    }
+}
+
+final class SimpleXmlIteratorValid extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('valid');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $iterator = VmSimpleXmlIterator::requireIterator(
+            $frame->calledArgs[0]->resolveIndirect()->toObject(),
+            'SimpleXMLIterator::valid()'
+        );
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $index = SimpleXmlIteratorStorage::index($iterator);
+        $frame->returnVar->bool($index >= 0 && $index < \count(VmSimpleXmlIterator::iterableChildren($iterator)));
+    }
+}
+
+final class SimpleXmlIteratorCount extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('count');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $iterator = VmSimpleXmlIterator::requireIterator(
+            $frame->calledArgs[0]->resolveIndirect()->toObject(),
+            'SimpleXMLIterator::count()'
+        );
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->int(\count(VmSimpleXmlIterator::iterableChildren($iterator)));
+        }
+    }
+}
+
+final class SimpleXmlIteratorHasChildren extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('hasChildren');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        if (null === $frame->vmContext) {
+            throw new \LogicException('SimpleXMLIterator::hasChildren() requires VM context');
+        }
+        $iterator = VmSimpleXmlIterator::requireIterator(
+            $frame->calledArgs[0]->resolveIndirect()->toObject(),
+            'SimpleXMLIterator::hasChildren()'
+        );
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $index = SimpleXmlIteratorStorage::index($iterator);
+        $children = VmSimpleXmlIterator::iterableChildren($iterator);
+        if ($index < 0 || $index >= \count($children)) {
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $frame->returnVar->bool([] !== $children[$index]->children);
+    }
+}
+
+final class SimpleXmlIteratorGetChildren extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getChildren');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        if (null === $frame->vmContext) {
+            throw new \LogicException('SimpleXMLIterator::getChildren() requires VM context');
+        }
+        $iterator = VmSimpleXmlIterator::requireIterator(
+            $frame->calledArgs[0]->resolveIndirect()->toObject(),
+            'SimpleXMLIterator::getChildren()'
+        );
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $index = SimpleXmlIteratorStorage::index($iterator);
+        $children = VmSimpleXmlIterator::iterableChildren($iterator);
+        if ($index < 0 || $index >= \count($children)) {
+            throw new \LogicException('SimpleXMLIterator has no current element');
+        }
+        $class = $frame->vmContext->classes[VmSimpleXmlIterator::CLASS_LC] ?? $iterator->class;
+        $child = VmSimpleXml::wrapIteratorNode(
+            $frame->vmContext,
+            $class,
+            $children[$index],
+            SimpleXmlRegistry::documentKey($iterator)
+        );
+        SimpleXmlIteratorStorage::init($child);
+        $frame->returnVar->object($child);
+    }
+}
