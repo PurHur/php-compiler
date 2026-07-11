@@ -6,4 +6,4 @@ ob_start(fn($b, $p) => strtoupper($b));
 echo 'hi';
 echo ob_get_clean();
 --EXPECT--
-HI
+hi
