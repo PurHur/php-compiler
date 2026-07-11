@@ -204,7 +204,7 @@ final class VmFilestatArg
     }
 
     /**
-     * chmod()/mkdir() mode — Z_PARAM_LONG with caller strict_types (#4207, ext/standard/filestat.c).
+     * chmod()/mkdir() mode — Z_PARAM_LONG; internal calls ignore caller strict_types (#17822, #4207).
      *
      * @throws \TypeError
      */
@@ -214,15 +214,11 @@ final class VmFilestatArg
         string $function,
         string $paramName
     ): int {
-        if (InternalStrictArg::isCallerStrict($frame)) {
-            return self::requireIntArg($frame->calledArgs[$argIndex], $function, $argIndex, $paramName);
-        }
-
         return self::parseFileModeArg($frame->calledArgs[$argIndex], $function, $argIndex, $paramName);
     }
 
     /**
-     * Weak-mode file mode coercion — Z_PARAM_LONG decimal cast for numeric strings (#15902, ext/standard/filestat.c).
+     * File mode coercion — zend_strtol(..., 0) for numeric strings (#17819, ext/standard/filestat.c).
      *
      * @throws \TypeError
      */
@@ -232,7 +228,51 @@ final class VmFilestatArg
         int $argIndex,
         string $paramName
     ): int {
-        return VmMath::parseIntBuiltinArg($var, $function, $argIndex + 1, $paramName);
+        $var = $var->resolveIndirect();
+        self::rejectEnumCaseIntArg($var, $function, $argIndex, $paramName);
+        if (Variable::TYPE_ARRAY === $var->type) {
+            throw new \TypeError(self::intTypeError($function, $argIndex, $paramName, 'array'));
+        }
+        if (Variable::TYPE_OBJECT === $var->type) {
+            throw new \TypeError(self::intTypeError(
+                $function,
+                $argIndex,
+                $paramName,
+                EnumCaseSupport::typeNameForVariable($var)
+            ));
+        }
+        if (Variable::TYPE_FLOAT === $var->type) {
+            $f = $var->toFloat();
+            if (!\is_finite($f)) {
+                throw new \TypeError(self::intTypeError($function, $argIndex, $paramName, 'float'));
+            }
+
+            return VmMath::floatToZendLong($f);
+        }
+        if (Variable::TYPE_INTEGER === $var->type) {
+            return $var->toInt();
+        }
+        if (Variable::TYPE_BOOLEAN === $var->type) {
+            return $var->toBool() ? 1 : 0;
+        }
+        if (Variable::TYPE_NULL === $var->type) {
+            return 0;
+        }
+        if (Variable::TYPE_STRING !== $var->type) {
+            throw new \TypeError(self::intTypeError(
+                $function,
+                $argIndex,
+                $paramName,
+                self::vmTypeName($var->type)
+            ));
+        }
+        $s = $var->toString();
+        if ('' === $s || !is_numeric($s)) {
+            throw new \TypeError(self::intTypeError($function, $argIndex, $paramName, 'string'));
+        }
+        $base = VmMath::autodetectBase($s);
+
+        return (int) VmMath::baseToZval($s, $base);
     }
 
     private static function vmTypeName(int $type): string
