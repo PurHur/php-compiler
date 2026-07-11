@@ -7077,6 +7077,52 @@ PHP;
         self::assertStringContainsString('in_array_strict: true', $out);
     }
 
+    /** Issue #17882 — in_array(get_class($anon), get_declared_classes(), true) wires haystack EXEC_RETURN. */
+    public function testInArrayGetClassGetDeclaredClassesHaystackExecReturnSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+declare(strict_types=1);
+
+$anon = new class {
+};
+
+echo in_array(get_class($anon), get_declared_classes(), true) ? "yes\n" : "no\n";
+PHP;
+
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'get_declared_classes_nested_in_array.php');
+
+        $declaredClassesReturnSlot = null;
+        $inArrayHaystackSend = null;
+        $fcallOrdinal = 0;
+        $inArraySends = [];
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                ++$fcallOrdinal;
+                if (3 === $fcallOrdinal) {
+                    $inArraySends = [];
+                }
+            }
+            if (2 === $fcallOrdinal && OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
+                $declaredClassesReturnSlot = $op->arg1;
+            }
+            if (3 === $fcallOrdinal && OpCode::TYPE_ARG_SEND === $op->type) {
+                $inArraySends[] = $op->arg1;
+            }
+        }
+        $inArrayHaystackSend = $inArraySends[1] ?? null;
+
+        self::assertNotNull($declaredClassesReturnSlot, 'get_declared_classes() must emit EXEC_RETURN');
+        self::assertNotNull($inArrayHaystackSend);
+        self::assertSame($declaredClassesReturnSlot, $inArrayHaystackSend, 'in_array haystack must reuse get_declared_classes() slot');
+
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertStringContainsString('yes', $out);
+    }
+
     /** Issue #16312 — stmt follow-on probe() must not clobber prior in_array EXEC_RETURN wiring. */
     public function testInArrayStrictAfterVoidStmtCallWithFollowOnProbe(): void
     {

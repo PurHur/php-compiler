@@ -25658,27 +25658,34 @@ class Compiler {
             && ($mid instanceof Op\Expr\ClassConstFetch || $mid instanceof Op\Expr\ConstFetch)
         ) {
             $producer = $cfgChildren[$producerIndex] ?? null;
+            $priorSibling = $cfgChildren[$producerIndex - 1] ?? null;
             if (
-                ($producer instanceof Op\Expr\FuncCall || $producer instanceof Op\Expr\NsFuncCall
-                    || $producer instanceof Op\Expr\MethodCall || $producer instanceof Op\Expr\StaticCall)
-                && ($consumer instanceof Op\Expr\FuncCall || $consumer instanceof Op\Expr\NsFuncCall)
-                && property_exists($consumer, 'args')
-                && \is_array($consumer->args)
+                !($priorSibling instanceof Op\Expr\FuncCall || $priorSibling instanceof Op\Expr\NsFuncCall)
+                || !$this->isSiblingInlineCallProducerExpr($priorSibling)
             ) {
-                $leadingEmbedded = 0;
-                foreach ($consumer->args as $arg) {
-                    if ($this->isEmbeddedCallLiteralArg($arg)) {
-                        ++$leadingEmbedded;
-                        continue;
+                if (
+                    ($producer instanceof Op\Expr\FuncCall || $producer instanceof Op\Expr\NsFuncCall
+                        || $producer instanceof Op\Expr\MethodCall || $producer instanceof Op\Expr\StaticCall)
+                    && ($consumer instanceof Op\Expr\FuncCall || $consumer instanceof Op\Expr\NsFuncCall)
+                    && property_exists($consumer, 'args')
+                    && \is_array($consumer->args)
+                ) {
+                    $leadingEmbedded = 0;
+                    foreach ($consumer->args as $arg) {
+                        if ($this->isEmbeddedCallLiteralArg($arg)) {
+                            ++$leadingEmbedded;
+                            continue;
+                        }
+                        break;
                     }
-                    break;
+                    if ($leadingEmbedded > 0) {
+                        return $leadingEmbedded;
+                    }
                 }
-                if ($leadingEmbedded > 0) {
-                    return $leadingEmbedded;
-                }
-            }
 
-            return 0;
+                return 0;
+            }
+            // in_array(get_class(), get_declared_classes(), true) — use ordinal path, not haystack shortcut (#17882).
         }
         if ($this->firstSiblingInlineFuncCallProducerIndexActive) {
             // Reentrant siblingMultiArg during firstSibling scan — must not recurse into impl (#16012).
