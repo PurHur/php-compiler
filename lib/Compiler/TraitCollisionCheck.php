@@ -4,13 +4,14 @@ declare(strict_types=1);
 
 namespace PHPCompiler\Compiler;
 
-use PHPCompiler\VM\TraitCompositionConflictMessage;
 use PHPCfg\Op;
 use PHPCfg\Operand;
 use PHPCfg\Script;
 
 /**
  * Compile-time check: horizontal trait method collisions without insteadof (#3416).
+ *
+ * Incompatible trait property composition is deferred to runtime class linkage (#17995).
  *
  * php-src: Zend/zend_traits.c — zend_traits_get_method, horizontal conflict detection
  */
@@ -301,10 +302,6 @@ final class TraitCollisionCheck
 
         /** @var array<string, string> method lc => trait display */
         $traitSources = [];
-        /** @var array<string, string> property lc => trait display */
-        $traitPropertySources = [];
-        /** @var array<string, string> static property lc => trait display */
-        $traitStaticPropertySources = [];
         /** @var array<string, true> trait lc => already applied (php-src dedupes duplicate use entries) */
         $appliedTraits = [];
         foreach ($class['traitUses'] as $useGroup) {
@@ -330,63 +327,8 @@ final class TraitCollisionCheck
                     }
                     $traitSources[$methodLc] = $trait['display'];
                 }
-                foreach ($trait['promotedProperties'] as $propLc => $_) {
-                    if (isset($class['ownProperties'][$propLc])) {
-                        throw new \CompileError(TraitCompositionConflictMessage::incompatibleClassTraitProperty(
-                            $class['display'],
-                            $trait['display'],
-                            $propLc
-                        ));
-                    }
-                    if (isset($traitPropertySources[$propLc])) {
-                        throw new \CompileError(TraitCompositionConflictMessage::incompatibleProperty(
-                            $traitPropertySources[$propLc],
-                            $trait['display'],
-                            $propLc,
-                            $class['display']
-                        ));
-                    }
-                    $traitPropertySources[$propLc] = $trait['display'];
-                }
-                foreach ($trait['instanceProperties'] as $propLc => $_) {
-                    if (isset($class['ownProperties'][$propLc])) {
-                        if ($this->classSatisfiesTraitAbstractPropertyHook($traitLc, $propLc, $classLc)) {
-                            continue;
-                        }
-                        throw new \CompileError(TraitCompositionConflictMessage::incompatibleClassTraitProperty(
-                            $class['display'],
-                            $trait['display'],
-                            $propLc
-                        ));
-                    }
-                    if (isset($traitPropertySources[$propLc])) {
-                        throw new \CompileError(TraitCompositionConflictMessage::incompatibleProperty(
-                            $traitPropertySources[$propLc],
-                            $trait['display'],
-                            $propLc,
-                            $class['display']
-                        ));
-                    }
-                    $traitPropertySources[$propLc] = $trait['display'];
-                }
-                foreach ($trait['staticProperties'] as $propLc => $_) {
-                    if (isset($class['ownStaticProperties'][$propLc])) {
-                        throw new \CompileError(TraitCompositionConflictMessage::incompatibleClassTraitProperty(
-                            $class['display'],
-                            $trait['display'],
-                            $propLc
-                        ));
-                    }
-                    if (isset($traitStaticPropertySources[$propLc])) {
-                        throw new \CompileError(TraitCompositionConflictMessage::incompatibleProperty(
-                            $traitStaticPropertySources[$propLc],
-                            $trait['display'],
-                            $propLc,
-                            $class['display']
-                        ));
-                    }
-                    $traitStaticPropertySources[$propLc] = $trait['display'];
-                }
+                // Incompatible trait property composition is validated at runtime during
+                // class linkage (Zend/zend_inheritance.c), not at parseAndCompile (#17995).
             }
         }
     }

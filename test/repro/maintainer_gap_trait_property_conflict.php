@@ -14,4 +14,4 @@ class C
     public $x = 2;
 }
 
-echo "fail: incompatible trait property composed\n";
+echo "unreachable\n";
