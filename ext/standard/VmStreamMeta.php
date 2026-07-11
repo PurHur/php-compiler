@@ -27,6 +27,18 @@ final class VmStreamMeta
         $eof = null !== $eofOverride ? $eofOverride : \feof($fp);
         $reportedMode = null !== $mode ? $mode : self::defaultReportedMode($uri, $isPhpMemory);
 
+        // php-src php_stream_temp — no timed_out/blocked/eof keys (main/streams/php_stream_temp.c; #17928).
+        if (\str_starts_with($uri, 'php://temp')) {
+            return [
+                'wrapper_type' => 'PHP',
+                'stream_type' => $socketType ?? $phpNativeStreamType ?? 'TEMP',
+                'mode' => $reportedMode,
+                'unread_bytes' => 0,
+                'seekable' => self::supportsSeekable($uri),
+                'uri' => $uri,
+            ];
+        }
+
         // php-src ext/standard/streams.c — array_add_next insertion order (#17428).
         return [
             'timed_out' => false,
