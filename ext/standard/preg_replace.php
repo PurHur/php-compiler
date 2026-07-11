@@ -9,7 +9,6 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\JitLongArg;
-use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\HashTable;
@@ -59,7 +58,13 @@ final class preg_replace extends Internal
 
             return;
         }
-        $replacementVar = VmPreg::requireStringOrArrayArg($frame->calledArgs[1], 'preg_replace', 1, 'replacement');
+        $replacementVar = VmPreg::resolveStringOrArrayReplacement(
+            $frame,
+            $frame->calledArgs[1],
+            'preg_replace',
+            1,
+            'replacement'
+        );
         $subjectVar = VmPreg::resolveStringOrArraySubject(
             $frame,
             $frame->calledArgs[2],
@@ -173,7 +178,14 @@ final class preg_replace extends Internal
             'pattern',
             'array|string'
         );
-        $replacement = JitStringArg::lower($context, $args[1], 'preg_replace() replacement');
+        $replacement = JitStringBuiltinArg::lower(
+            $context,
+            $args[1],
+            'preg_replace',
+            1,
+            'replacement',
+            'array|string'
+        );
         JitInternalStrictArg::rejectNullStringOrArray($context, $args[2], 'preg_replace', 'subject', 3);
         JitPregSubject::requireStringOrArray($context, $args[2], 'preg_replace', 2, 'subject');
         if (JitPregSubject::isStringOrCoercibleNullSubject($args[2])) {
