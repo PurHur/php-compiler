@@ -134,20 +134,14 @@ final class AsymmetricVisibilityRewriter
     }
 
     /**
-     * Reference-profile reject message for multiple-modifier detection (#17695).
+     * Reference-profile reject message for multiple-modifier detection (#12576, #17832).
      *
-     * Unparenthesized `public private(set)` is valid on the 8.4 forward profile; on the Zend 8.2
-     * reference profile emit the forward-profile env hint instead of Zend's duplicate-modifier fatal.
+     * php-src-strict: Zend 8.2 treats unparenthesized `public private(set)` as duplicate access
+     * modifiers — same fatal as `public protected private` etc. Profile gate hints apply only when
+     * syntax is otherwise valid on the forward profile but blocked by {@see CompilerVersion}.
      */
     public static function referenceProfileMultipleModifierMessage(string $source, int $line): string
     {
-        $sourceLine = self::sourceLineAt($source, $line);
-        if ('' !== $sourceLine
-            && !self::lineViolatesDuplicateSetModifierRules($sourceLine)
-            && self::lineHasExplicitReadPlusSetModifier($sourceLine)) {
-            return self::REFERENCE_PROFILE_ASYMMETRIC_VISIBILITY_HINT;
-        }
-
         return self::MULTIPLE_MODIFIERS_MESSAGE;
     }
 
