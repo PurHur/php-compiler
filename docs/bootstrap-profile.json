@@ -523,6 +523,7 @@
         "ext/openssl/openssl_free_key.php",
         "ext/openssl/openssl_get_cipher_methods.php",
         "ext/openssl/openssl_get_md_methods.php",
+        "ext/openssl/openssl_pbkdf2.php",
         "ext/openssl/openssl_pkey_derive.php",
         "ext/openssl/openssl_pkey_export.php",
         "ext/openssl/openssl_pkey_get_private.php",
@@ -4707,9 +4708,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 4473,
+        "inventory_files": 4474,
         "excluded": 0,
-        "eligible": 4473,
+        "eligible": 4474,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
