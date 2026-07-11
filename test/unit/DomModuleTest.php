@@ -28,8 +28,9 @@ final class DomModuleTest extends TestCase
         self::assertTrue(VmReflection::classExists($ctx, 'DOMDocumentType'));
         self::assertTrue(VmReflection::classExists($ctx, 'DOMElement'));
         self::assertTrue(VmReflection::classExists($ctx, 'DOMEntityReference'));
+        self::assertTrue(VmReflection::classExists($ctx, 'DOMEntity'));
+        self::assertTrue(VmReflection::classExists($ctx, 'DOMNotation'));
         self::assertTrue(VmReflection::classExists($ctx, 'DOMAttr'));
-        self::assertTrue(VmReflection::classExists($ctx, 'DOMEntityReference'));
         self::assertTrue(VmReflection::classExists($ctx, 'DOMNode'));
         self::assertTrue(VmReflection::classExists($ctx, 'DOMNodeList'));
         self::assertTrue(VmReflection::classExists($ctx, 'DOMNamedNodeMap'));
