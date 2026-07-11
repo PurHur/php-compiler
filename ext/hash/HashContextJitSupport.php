@@ -11,4 +11,10 @@ final class HashContextJitSupport
 
     /** Internal handle into {@see HashContextJitHelper} state for JIT/AOT (#3357). */
     public const PROP_ID = '__hcId';
+
+    /** Mirrored algorithm name for standalone AOT final (nested helper string returns crash #3357). */
+    public const PROP_ALGO = '__hcAlgo';
+
+    /** Mirrored update buffer for standalone AOT final (#3357). */
+    public const PROP_BUF = '__hcBuf';
 }

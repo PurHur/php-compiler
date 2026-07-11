@@ -64,6 +64,15 @@ final class HashContextJitHelper
         return 1;
     }
 
+    public static function finalize(int $id, bool $raw): string
+    {
+        $entry = self::requireLive($id);
+        $digest = VmHashNative::incrementalFinal($entry['algoId'], $entry['ctx'], $raw);
+        self::$state[$id]['finalized'] = true;
+
+        return $digest;
+    }
+
     public static function copy(int $id): int
     {
         $entry = self::requireLive($id);
