@@ -826,7 +826,6 @@
         "ext/standard/DateConstants.php",
         "ext/standard/DateIntervalFormatJitHelper.php",
         "ext/standard/DateMutationJitHelper.php",
-        "ext/standard/DateTimeFormatJitHelper.php",
         "ext/standard/DefaultTimezoneJitHelper.php",
         "ext/standard/DefineJitHelper.php",
         "ext/standard/Deg2radJitHelper.php",
@@ -3002,7 +3001,6 @@
         "lib/JIT/Builtin/CtypeRuntime.php",
         "lib/JIT/Builtin/DateIntervalFormatRuntime.php",
         "lib/JIT/Builtin/DateMutationRuntime.php",
-        "lib/JIT/Builtin/DateTimeFormatRuntime.php",
         "lib/JIT/Builtin/DefaultTimezoneRuntime.php",
         "lib/JIT/Builtin/DefineRuntime.php",
         "lib/JIT/Builtin/DomInstanceMethodRuntime.php",
@@ -3530,7 +3528,6 @@
         "lib/JIT/Call/ContextRunStackFramesNested.php",
         "lib/JIT/Call/DatePeriodCreateFromISO8601String.php",
         "lib/JIT/Call/DatePeriodIteratorMethod.php",
-        "lib/JIT/Call/DateTimeFormat.php",
         "lib/JIT/Call/DomDocumentCreateElement.php",
         "lib/JIT/Call/DomInstanceMethod.php",
         "lib/JIT/Call/ExceptionGetMessage.php",
@@ -4183,7 +4180,6 @@
         "lib/VM/DatePeriodIteratorJitHelper.php",
         "lib/VM/DatePeriodIteratorState.php",
         "lib/VM/DatePeriodSupport.php",
-        "lib/VM/DateTimeFormatJitHelper.php",
         "lib/VM/DateTimeInterfaceSupport.php",
         "lib/VM/DateTimeSupport.php",
         "lib/VM/DateTimeZoneSupport.php",
@@ -4598,9 +4594,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 4364,
+        "inventory_files": 4360,
         "excluded": 0,
-        "eligible": 4364,
+        "eligible": 4360,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1

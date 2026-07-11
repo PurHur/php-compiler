@@ -326,9 +326,6 @@ PHP;
 
     public function test_dom_node_compare_document_position(): void
     {
-        if (!CompilerVersion::supportsDomNodeCompareDocumentPosition()) {
-            self::markTestSkipped('DOMNode::compareDocumentPosition() withheld on 8.2 reference profile (#15613)');
-        }
         $runtime = new Runtime();
         $code = <<<'PHP'
 <?php
