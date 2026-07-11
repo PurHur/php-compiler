@@ -66,6 +66,35 @@ final class VmMbstring
         return self::coerceEncodingString($var, $function, $argIndex);
     }
 
+    /** php-src mbfl_name2encoding — optional ?string encoding with ValueError on unknown names (#4405). */
+    public static function resolveValidatedEncodingArg(
+        Variable $var,
+        string $function,
+        int $argIndex,
+        string $default
+    ): string {
+        $encoding = self::coerceEncodingArg($var, $function, $argIndex, $default);
+
+        return MbstringEncodingRegistry::assertValid($encoding, $function, $argIndex);
+    }
+
+    /**
+     * mb_strlen() character count (php-src ext/mbstring/mbstring.c PHP_FUNCTION(mb_strlen); #4405).
+     */
+    public static function strlen(string $string, string $encoding): int
+    {
+        if ('UTF-8' === $encoding) {
+            return VmString::utf8CharLength($string);
+        }
+        if ('ASCII' === $encoding || '8BIT' === $encoding || 'ISO-8859-1' === $encoding) {
+            return VmString::byteLength($string);
+        }
+
+        throw new \LogicException(
+            'mb_strlen() requires mbstring for encoding '.$encoding.' in this compiler build'
+        );
+    }
+
     public static function coerceEncodingString(Variable $var, string $function, int $argIndex = 2): string
     {
         $var = $var->resolveIndirect();
