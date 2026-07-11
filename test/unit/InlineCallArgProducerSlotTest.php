@@ -2934,6 +2934,54 @@ PHP;
         self::assertNotSame($classConstSlot, $sendSlots[0], 'arg sends='.json_encode($sendSlots));
     }
 
+    /** Issue #12082 — var_export($u[0] === $u[1]) wires Identical producer, not trailing ArrayDimFetch. */
+    public function testVarExportArrayDimIdenticalUsesIdenticalProducerSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+declare(strict_types=1);
+$o = new stdClass();
+$a = [$o, $o];
+$u = unserialize(serialize($a));
+var_export($u[0] === $u[1]);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'array_dim_identical_var_export.php');
+
+        $identSlot = null;
+        $dimFetchSlots = [];
+        $sendSlots = [];
+        $fcallOrdinal = 0;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_IDENTICAL === $op->type) {
+                $identSlot = $op->arg1;
+            }
+            if (OpCode::TYPE_ARRAY_DIM_FETCH === $op->type) {
+                $dimFetchSlots[] = $op->arg1;
+            }
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                ++$fcallOrdinal;
+                if (3 === $fcallOrdinal) {
+                    $sendSlots = [];
+                }
+            }
+            if (3 === $fcallOrdinal && OpCode::TYPE_ARG_SEND === $op->type) {
+                $sendSlots[] = $op->arg1;
+            }
+        }
+
+        self::assertNotNull($identSlot);
+        self::assertCount(2, $dimFetchSlots);
+        self::assertCount(1, $sendSlots);
+        self::assertSame($identSlot, $sendSlots[0], 'arg sends='.json_encode($sendSlots));
+        self::assertNotSame($dimFetchSlots[1], $sendSlots[0], 'arg sends='.json_encode($sendSlots));
+
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertSame('true', $out);
+    }
+
     /** Issue #9888 / #8796 / #9702 — in_array(enum, [enum, ...]) wires enum needle + inline haystack slots. */
     public function testInArrayEnumNeedleInlineHaystackLooseUsesEnumAndArraySlots(): void
     {

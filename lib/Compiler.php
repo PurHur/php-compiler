@@ -47166,6 +47166,19 @@ class Compiler {
             array_merge($nestedProducerOps, $outerArgSends)
         );
         if (null !== $pendingDimFetchSlot) {
+            // var_export($u[0] === $u[1]) — Identical feeds arg #0, not trailing ArrayDimFetch rhs (#12082).
+            if (null !== $block->orig) {
+                $comparisonProducer = $this->matchBooleanBinaryOpInlineCallArgProducer(
+                    $this->precedingInlineCallArgProducersBeforeCfgOp(
+                        $block->orig->children,
+                        $cfgCallOp
+                    ),
+                    $callArg
+                );
+                if (null !== $comparisonProducer) {
+                    return;
+                }
+            }
             $trueSlot = null;
             foreach (array_reverse(array_merge($block->opCodes, $nestedProducerOps, $outerArgSends)) as $op) {
                 if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
