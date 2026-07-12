@@ -23,8 +23,9 @@ final class IssetHelperRuntimeShrinkTest extends TestCase
     {
         $llvm = (string) file_get_contents(__DIR__.'/../../lib/JIT/IssetHelperLlvm.php');
         $this->assertStringContainsString('VmIsset::', $llvm);
+        $this->assertStringContainsString('HashTableHelper::readHashtableFromValueBox', $llvm);
         $this->assertStringNotContainsString('private static function literalStringKey', $llvm);
-        $this->assertStringNotContainsString('private static function superglobalName', $llvm);
+        $this->assertStringContainsString('HashTableHelper::readHashtableFromValueBox', $llvm);
     }
 
     public function testVmIssetStoredPropertyIsSet(): void

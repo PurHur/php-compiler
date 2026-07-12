@@ -66,7 +66,13 @@ final class CloneWithJitHelper
         if (self::$activeObjAddr === $objAddr) {
             $idx = array_search($propName, self::$pendingProps, true);
             if (false !== $idx) {
-                array_splice(self::$pendingProps, (int) $idx, 1);
+                $next = [];
+                foreach (self::$pendingProps as $i => $p) {
+                    if ($i !== $idx) {
+                        $next[] = $p;
+                    }
+                }
+                self::$pendingProps = $next;
 
                 return true;
             }

@@ -909,6 +909,17 @@ class Context {
         return $this->isUserScriptAot() || $this->shouldUseBootstrapAotStandaloneBodies();
     }
 
+    /**
+     * After preg prelink on a temporary full-init Context, restore user-script standalone bodies (#16075).
+     */
+    public function retrofitUserScriptStandaloneAfterPregPrelink(): void
+    {
+        if (Builtin::LOAD_TYPE_STANDALONE !== $this->loadType || !$this->isUserScriptAot()) {
+            return;
+        }
+        $this->ensureMinimalUserStandaloneBodies();
+    }
+
     private function isUserScriptAot(): bool
     {
         $userScript = getenv('PHP_COMPILER_AOT_USER_SCRIPT');
@@ -2138,6 +2149,28 @@ class Context {
         if (!$this->scope->variables->contains($op)) {
             if ($op instanceof Operand\Literal) {
                 $this->scope->variables[$op] = Variable::fromLiteral($this, $op);
+            } elseif ($op instanceof Operand\BoundVariable
+                && Operand\BoundVariable::SCOPE_OBJECT === $op->scope) {
+                $thisVar = $this->findThisVariable();
+                if (null !== $thisVar) {
+                    $this->scope->variables[$op] = $thisVar;
+
+                    return $thisVar;
+                }
+                throw new \LogicException('BoundVariable SCOPE_OBJECT without $this in JIT scope');
+            } elseif ($op instanceof Operand\BoundVariable && $op->name instanceof Operand) {
+                if ($this->aliasVariableOpByName($op)) {
+                    return $this->scope->variables[$op];
+                }
+                $inner = $this->getVariableFromOpInScopes($op->name);
+                $this->scope->variables[$op] = $inner;
+
+                return $inner;
+            } elseif ($op instanceof Operand\BoundVariable) {
+                throw new \LogicException(
+                    'BoundVariable scope '.$op->scope
+                    .' nameClass '.(is_object($op->name) ? get_class($op->name) : gettype($op->name))
+                );
             } elseif ('this' === OperandName::resolve($op)) {
                 $existing = $this->findThisVariable();
                 if (null !== $existing) {
@@ -2176,6 +2209,13 @@ class Context {
                 );
             } elseif ($op instanceof Operand\Variable && $this->aliasVariableOpByName($op)) {
                 // Distinct Variable operand for an already-allocated scope slot (#12036 inventory argv).
+            } elseif ($op instanceof Operand\BoundVariable
+                && Operand\BoundVariable::SCOPE_OBJECT === $op->scope) {
+                $thisVar = $this->findThisVariable();
+                if (null !== $thisVar) {
+                    return $thisVar;
+                }
+                throw new \LogicException('BoundVariable SCOPE_OBJECT without $this in JIT scope');
             } else {
                 throw new \LogicException("Unknown variable referenced: " . get_class($op));
             }

@@ -51,19 +51,25 @@ final class VmPregPattern
         }
 
         for ($j = $i + 1; $j < $len; $j++) {
-            if ('e' === $pattern[$j]) {
+            $modifier = $pattern[$j];
+            if ('e' === $modifier) {
                 return 'The /e modifier is no longer supported, use preg_replace_callback instead';
             }
-            $mod = match ($pattern[$j]) {
-                'i', 'm', 's', 'x', 'A', 'D', 'U', 'u', 'J' => true,
-                default => null,
-            };
-            if (null === $mod) {
-                return \sprintf("Unknown modifier '%s'", $pattern[$j]);
+            if (!self::isKnownModifier($modifier)) {
+                return \sprintf("Unknown modifier '%s'", $modifier);
             }
         }
 
         return null;
+    }
+
+    /** Nested JIT: match on $pattern[$j] after an e-check mis-lowers (#16075 tier-2). */
+    private static function isKnownModifier(string $modifier): bool
+    {
+        return match ($modifier) {
+            'i', 'm', 's', 'x', 'A', 'D', 'U', 'u', 'J' => true,
+            default => false,
+        };
     }
 
     /**
@@ -92,21 +98,26 @@ final class VmPregPattern
         $regex = \substr($pattern, 1, $i - 1);
         $opts = 0;
         for ($j = $i + 1; $j < $len; $j++) {
-            $opts |= match ($pattern[$j]) {
-                'i' => 0x00000008,
-                'm' => 0x00000400,
-                's' => 0x00000020,
-                'x' => 0x00000080,
-                'A' => 0x80000000,
-                'D' => 0x00000010,
-                'U' => 0x00040000,
-                'u' => self::PCRE2_UTF,
-                'J' => 0x00100000,
-                default => 0,
-            };
+            $opts |= self::modifierOptFlag($pattern[$j]);
         }
 
         return [$regex, $opts];
+    }
+
+    private static function modifierOptFlag(string $modifier): int
+    {
+        return match ($modifier) {
+            'i' => 0x00000008,
+            'm' => 0x00000400,
+            's' => 0x00000020,
+            'x' => 0x00000080,
+            'A' => 0x80000000,
+            'D' => 0x00000010,
+            'U' => 0x00040000,
+            'u' => self::PCRE2_UTF,
+            'J' => 0x00100000,
+            default => 0,
+        };
     }
 
     public static function isValidDelimiter(string $c): bool

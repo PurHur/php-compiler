@@ -17,6 +17,13 @@ final class VmActiveContextInitLlvm
 
     private static bool $scheduled = false;
 
+    /** Reset module-static scheduling between deferred AOT init passes (#16075). */
+    public static function resetPendingState(): void
+    {
+        self::$pending = false;
+        self::$scheduled = false;
+    }
+
     /** Request __init__ emission once DOM instance-method bridges are linked. */
     public static function requestThinStandaloneInit(Context $context): void
     {
