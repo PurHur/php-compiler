@@ -34,7 +34,7 @@ final class htmlspecialchars extends Internal
         if ($argc < 1 || $argc > 4) {
             throw new \LogicException('htmlspecialchars() requires one to four arguments');
         }
-        $string = VmString::coerceStringBuiltinArg(
+        $string = VmString::coerceTypedStringBuiltinArg(
             $frame->calledArgs[0],
             'htmlspecialchars',
             0,
@@ -105,7 +105,7 @@ final class htmlspecialchars extends Internal
             );
         }
 
-        $str = JitStringBuiltinArg::lower($context, $args[0], 'htmlspecialchars', 0, 'string');
+        $str = JitStringBuiltinArg::lowerTypedString($context, $args[0], 'htmlspecialchars', 0, 'string');
         $flags = $context->getTypeFromString('int64')->constInt(self::DEFAULT_FLAGS, false);
         if ($effectiveArgc >= 2) {
             $flags = JitLongArg::lower($context, $args[1], 'htmlspecialchars() flags');
