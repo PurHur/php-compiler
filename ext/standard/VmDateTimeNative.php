@@ -240,7 +240,45 @@ final class VmDateTimeNative
             return $extended;
         }
 
+        $relative = self::tryParseRelativeDateTimeModifier($time, $tzName, $base);
+        if (null !== $relative) {
+            return $relative;
+        }
+
         return self::parseDateTimeAbsolute($time, $tzName);
+    }
+
+    /**
+     * php-src php_date_initialize / timelib — ctor and strtotime relative modifiers (#18327, #10742).
+     *
+     * @return array{timestamp: int, microsecond: int}|null
+     */
+    private static function tryParseRelativeDateTimeModifier(string $time, string $tzName, int $base): ?array
+    {
+        if (str_starts_with($time, '+') || str_starts_with($time, '-')) {
+            $compound = self::tryApplyCompoundSignedRelativeDelta($base, $time, $tzName);
+            if (null !== $compound) {
+                return ['timestamp' => $compound, 'microsecond' => 0];
+            }
+        }
+        if (1 === preg_match(
+            '/^[+-]?\d+\s+(second|seconds|minute|minutes|hour|hours|day|days|week|weeks|month|months|year|years)$/i',
+            $time
+        )) {
+            $modifier = $time;
+            if (!preg_match('/^[+-]/', $modifier)) {
+                $modifier = '+'.$modifier;
+            }
+            try {
+                $timestamp = self::modifyRelative($base, $modifier, $tzName);
+
+                return ['timestamp' => $timestamp, 'microsecond' => 0];
+            } catch (NativeDateMalformedStringException) {
+                return null;
+            }
+        }
+
+        return null;
     }
 
     /**
@@ -865,25 +903,9 @@ final class VmDateTimeNative
             return false;
         }
         $base = $now ?? self::readNow()['timestamp'];
-        if (str_starts_with($time, '+') || str_starts_with($time, '-')) {
-            $compound = self::tryApplyCompoundSignedRelativeDelta($base, $time, $tzName);
-            if (null !== $compound) {
-                return $compound;
-            }
-        }
-        if (1 === preg_match(
-            '/^[+-]?\d+\s+(second|seconds|minute|minutes|hour|hours|day|days|week|weeks|month|months|year|years)$/i',
-            $time
-        )) {
-            $modifier = $time;
-            if (!preg_match('/^[+-]/', $modifier)) {
-                $modifier = '+'.$modifier;
-            }
-            try {
-                return self::modifyRelative($base, $modifier, $tzName);
-            } catch (NativeDateMalformedStringException) {
-                return false;
-            }
+        $relative = self::tryParseRelativeDateTimeModifier($time, $tzName, $base);
+        if (null !== $relative) {
+            return $relative['timestamp'];
         }
         try {
             $parsed = self::parseDateTime($time, $tzName, $base);
