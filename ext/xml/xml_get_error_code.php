@@ -29,12 +29,9 @@ final class xml_get_error_code extends Internal
             return;
         }
 
-        $parserArg = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_INTEGER !== $parserArg->type) {
-            throw new \TypeError('xml_get_error_code(): Argument #1 ($parser) must be of type XMLParser');
-        }
+        $parser = XmlParserSupport::requireParser($frame->calledArgs[0], 'xml_get_error_code', 1);
 
-        $frame->returnVar->int(VmXml::getErrorCode($parserArg->toInt()));
+        $frame->returnVar->int(VmXml::getErrorCode($parser->id));
     }
 
     public function call(Context $context, JITVariable ...$args): Value

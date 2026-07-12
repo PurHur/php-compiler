@@ -15,6 +15,6 @@ final class BuiltinClasses
 {
     public static function register(Context $ctx): void
     {
-        // No OOP surface yet; xml_parser_create() returns a resource in php-src (#3494).
+        XmlParserSupport::registerClass($ctx);
     }
 }

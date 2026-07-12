@@ -28,19 +28,19 @@ final class VmXml
     /** @var array<int, array{errorCode: int, line: int, column: int, byteIndex: int}> */
     private static array $parsers = [];
 
-    private static int $nextParserId = 0;
-
-    public static function parserCreate(): int
+    public static function initParserState(int $parserId): void
     {
-        $id = ++self::$nextParserId;
-        self::$parsers[$id] = [
+        self::$parsers[$parserId] = [
             'errorCode' => 0,
             'line' => 0,
             'column' => 0,
             'byteIndex' => 0,
         ];
+    }
 
-        return $id;
+    public static function hasParserState(int $parserId): bool
+    {
+        return isset(self::$parsers[$parserId]);
     }
 
     public static function parserFree(int $parser): bool

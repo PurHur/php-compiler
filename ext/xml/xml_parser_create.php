@@ -23,7 +23,7 @@ final class xml_parser_create extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $frame->returnVar->int(VmXml::parserCreate());
+        $frame->returnVar->copyFrom(XmlParserSupport::createParser($frame->vmContext));
     }
 
     public function call(Context $context, JITVariable ...$args): Value
