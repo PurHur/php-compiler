@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace PHPCompiler\VM\Builtin;
 
+use PHPCompiler\BuiltinParamNames;
 use PHPCompiler\ext\standard\VmReflection;
 use PHPCompiler\Frame;
+use PHPCompiler\Func\Internal;
+use PHPCompiler\Func\PHP as PhpFunc;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\ReflectionSupport;
 use PHPCompiler\VM\Variable;
@@ -34,12 +37,30 @@ final class ReflectionParameterConstruct extends VmClassMethod
             return;
         }
 
-        $functionName = VmReflection::stringArg(
-            $frame->calledArgs[1],
-            'ReflectionParameter::__construct() function',
-            1
+        $functionName = VmReflection::normalizeGlobalIntrospectionName(
+            VmReflection::stringArg(
+                $frame->calledArgs[1],
+                'ReflectionParameter::__construct() function',
+                1
+            )
         );
-        $func = ReflectionSupport::resolveUserFunction($ctx, $functionName);
+        $func = ReflectionSupport::resolveFunctionForReflection($ctx, $functionName);
+        if ($func instanceof Internal) {
+            $paramNames = BuiltinParamNames::paramNamesForInternalFunction($functionName);
+            if (null === $paramNames) {
+                ReflectionSupport::throwReflectionException(
+                    ReflectionSupport::functionNotFoundMessage($functionName)
+                );
+            }
+            $this->initForInternalFunction($receiver, $functionName, $parameterArg, $paramNames);
+
+            return;
+        }
+        if (!$func instanceof PhpFunc) {
+            ReflectionSupport::throwReflectionException(
+                ReflectionSupport::functionNotFoundMessage($functionName)
+            );
+        }
         $index = $this->resolveParameterIndex($parameterArg, $func->block->paramNames, 'function');
         if (!isset($func->block->paramNames[$index])) {
             ReflectionSupport::throwReflectionException(
@@ -98,6 +119,29 @@ final class ReflectionParameterConstruct extends VmClassMethod
         $receiver->getProperty(ReflectionSupport::PROP_FUNC_NAME)->null();
         $receiver->getProperty(ReflectionSupport::PROP_PARAM_POSITION)->int($position);
         $receiver->getProperty(ReflectionSupport::PROP_PARAM_NAME)->string($params[$position]->name);
+        $receiver->constructed = true;
+    }
+
+    /**
+     * @param list<string> $paramNames
+     */
+    private function initForInternalFunction(
+        ObjectEntry $receiver,
+        string $functionName,
+        Variable $parameterArg,
+        array $paramNames,
+    ): void {
+        $index = $this->resolveParameterIndex($parameterArg, $paramNames, 'function');
+        if (!isset($paramNames[$index])) {
+            ReflectionSupport::throwReflectionException(
+                'Parameter '.$index.' does not exist on function '.$functionName.'()'
+            );
+        }
+        $receiver->getProperty(ReflectionSupport::PROP_FUNC_NAME)->string($functionName);
+        $receiver->getProperty(ReflectionSupport::PROP_CLASS_NAME)->null();
+        $receiver->getProperty(ReflectionSupport::PROP_METHOD_NAME)->null();
+        $receiver->getProperty(ReflectionSupport::PROP_PARAM_INDEX)->int($index);
+        $receiver->getProperty(ReflectionSupport::PROP_PARAM_NAME)->string($paramNames[$index]);
         $receiver->constructed = true;
     }
 
