@@ -34,20 +34,47 @@ final class VmCsv
         $esc = '' === $escape ? '\\' : $escape[0];
 
         $fields = [];
-        $field = '';
-        $inQuotes = false;
         $len = \strlen($line);
         $i = 0;
 
         while ($i <= $len) {
-            $c = $i < $len ? $line[$i] : "\0";
+            $field = '';
+            if ($i < $len) {
+                $field = self::parseField($line, $i, $len, $delim, $enc, $esc);
+            }
+            $fields[] = $field;
+            if ($i >= $len) {
+                break;
+            }
+            if ($line[$i] === $delim) {
+                ++$i;
+            }
+        }
 
-            if ($inQuotes) {
-                if ("\0" === $c) {
-                    break;
-                }
-                // php-src ext/standard/file.c — when escape equals enclosure, only doubled-enclosure
-                // unescaping applies; the escape+next-byte branch is disabled (#9303).
+        return $fields;
+    }
+
+    /**
+     * Parse one CSV field; advances $offset past the field (php-src ext/standard/file.c 2A/2B).
+     */
+    private static function parseField(
+        string $line,
+        int &$offset,
+        int $len,
+        string $delim,
+        string $enc,
+        string $esc,
+    ): string {
+        $i = $offset;
+        $j = $i;
+        while ($j < $len && $line[$j] !== $delim && self::isCsvWhitespace($line[$j])) {
+            ++$j;
+        }
+        if ($j < $len && $line[$j] === $enc) {
+            $i = $j + 1;
+            $field = '';
+            while ($i < $len) {
+                $c = $line[$i];
                 if ($esc !== $enc && $c === $esc && $i + 1 < $len) {
                     $field .= $esc.$line[$i + 1];
                     $i += 2;
@@ -59,36 +86,30 @@ final class VmCsv
                         $i += 2;
                         continue;
                     }
-                    $inQuotes = false;
                     ++$i;
-                    continue;
+                    break;
                 }
                 $field .= $c;
                 ++$i;
-                continue;
             }
+            $offset = $i;
 
-            if ("\0" === $c || $c === $delim) {
-                $fields[] = $field;
-                $field = '';
-                if ("\0" === $c) {
-                    break;
-                }
-                ++$i;
-                continue;
-            }
-
-            if ($c === $enc) {
-                $inQuotes = true;
-                ++$i;
-                continue;
-            }
-
-            $field .= $c;
-            ++$i;
+            return $field;
         }
 
-        return $fields;
+        $field = '';
+        while ($i < $len && $line[$i] !== $delim) {
+            $field .= $line[$i];
+            ++$i;
+        }
+        $offset = $i;
+
+        return $field;
+    }
+
+    private static function isCsvWhitespace(string $byte): bool
+    {
+        return ' ' === $byte || "\t" === $byte || "\n" === $byte || "\r" === $byte || "\v" === $byte || "\f" === $byte;
     }
 
     /** @return bool true when every byte is \\r or \\n (non-empty). */
