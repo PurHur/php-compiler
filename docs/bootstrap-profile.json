@@ -3342,6 +3342,7 @@
         "lib/JIT/Builtin/PregEmptyPatternReplaceRuntime.php",
         "lib/JIT/Builtin/PregExpandRuntime.php",
         "lib/JIT/Builtin/PregMatchRuntime.php",
+        "lib/JIT/Builtin/PregReplaceCallbackArrayRuntime.php",
         "lib/JIT/Builtin/ProcessExecCaptureLlvm.php",
         "lib/JIT/Builtin/ProcessIdentityJit.php",
         "lib/JIT/Builtin/ProcessOpen.php",
@@ -3546,7 +3547,6 @@
         "lib/JIT/Builtin/StringMicrotime.php",
         "lib/JIT/Builtin/StringMkdir.php",
         "lib/JIT/Builtin/StringMktime.php",
-        "lib/JIT/Builtin/StringMultipartStandaloneLlvm.php",
         "lib/JIT/Builtin/StringNCompare.php",
         "lib/JIT/Builtin/StringNaturalCompare.php",
         "lib/JIT/Builtin/StringNetInterfacesJit.php",
@@ -4538,6 +4538,7 @@
         "lib/Web/IncludePathResolver.php",
         "lib/Web/LiteralIncludeDiscovery.php",
         "lib/Web/ManifestValidator.php",
+        "lib/Web/MultipartNativeJitHelper.php",
         "lib/Web/MultipartParser.php",
         "lib/Web/MultipartParserJitHelper.php",
         "lib/Web/Params.php",
@@ -4779,9 +4780,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 4545,
+        "inventory_files": 4546,
         "excluded": 0,
-        "eligible": 4545,
+        "eligible": 4546,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1

@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 4546 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 12333 |
+| Source constructs flagged (warnings) | 12338 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -3237,7 +3237,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/MemoryUsageJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/MetaTagsRuntime.php` | 0 | 2 |
 | `lib/JIT/Builtin/MimeContentTypeRuntime.php` | 0 | 2 |
-| `lib/JIT/Builtin/MultipartRuntime.php` | 0 | 1 |
+| `lib/JIT/Builtin/MultipartRuntime.php` | 0 | 6 |
 | `lib/JIT/Builtin/MultisortRuntime.php` | 0 | 2 |
 | `lib/JIT/Builtin/NaturalSortRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/NonObjectPropertyFetchRuntime.php` | 0 | 3 |
@@ -3484,7 +3484,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringMicrotime.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringMkdir.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringMktime.php` | 0 | 3 |
-| `lib/JIT/Builtin/StringMultipartStandaloneLlvm.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringNCompare.php` | 0 | 2 |
 | `lib/JIT/Builtin/StringNaturalCompare.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringNetInterfacesJit.php` | 0 | 3 |
@@ -4449,6 +4448,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/Web/IncludePathResolver.php` | 0 | 1 |
 | `lib/Web/LiteralIncludeDiscovery.php` | 0 | 2 |
 | `lib/Web/ManifestValidator.php` | 0 | 1 |
+| `lib/Web/MultipartNativeJitHelper.php` | 0 | 1 |
 | `lib/Web/MultipartParser.php` | 0 | 1 |
 | `lib/Web/MultipartParserJitHelper.php` | 0 | 1 |
 | `lib/Web/Params.php` | 0 | 2 |
@@ -26100,7 +26100,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/MultipartRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- 1 class method(s)
+- new phpc_native_ht_alloc (line 178)
+- new phpc_native_ht_set_string_key (line 179)
+- new phpc_native_ht_set_string_key_ht (line 180)
+- new phpc_native_ht_set_string_at (line 181)
+- new phpc_native_ht_set_hashtable_at (line 182)
+- 10 class method(s)
 
 ### `lib/JIT/Builtin/MultisortRuntime.php`
 
@@ -27538,11 +27543,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new JIT (line 185)
 - 6 class method(s)
 - 1 closure(s)
-
-### `lib/JIT/Builtin/StringMultipartStandaloneLlvm.php`
-
-**Warnings** (review for bootstrap subset):
-- 19 class method(s)
 
 ### `lib/JIT/Builtin/StringNCompare.php`
 
@@ -34457,6 +34457,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 5 class method(s)
+
+### `lib/Web/MultipartNativeJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 8 class method(s)
 
 ### `lib/Web/MultipartParser.php`
 
