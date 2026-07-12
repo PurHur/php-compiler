@@ -26,7 +26,7 @@ final class utf8_decode extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('utf8_decode() requires exactly one argument in this compiler build');
         }
-        VmEngineBuiltinDeprecation::emitFunction($frame, 'utf8_decode');
+        Utf8EndecDeprecation::emitVm($frame, 'utf8_decode');
         $data = VmString::coerceStringBuiltinArg(
             $frame->calledArgs[0],
             'utf8_decode',

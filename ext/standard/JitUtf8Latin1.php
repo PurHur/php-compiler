@@ -17,7 +17,6 @@ final class JitUtf8Latin1
 {
     public static function encode(Context $context, Value $src): Value
     {
-        VmEngineBuiltinDeprecation::emitJitFunction($context, 'utf8_encode');
         StringUtf8Latin1::ensureLinked($context);
 
         return $context->builder->call(
@@ -28,7 +27,6 @@ final class JitUtf8Latin1
 
     public static function decode(Context $context, Value $src): Value
     {
-        VmEngineBuiltinDeprecation::emitJitFunction($context, 'utf8_decode');
         StringUtf8Latin1::ensureLinked($context);
 
         return $context->builder->call(
