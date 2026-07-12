@@ -1069,6 +1069,13 @@ final class PropertyHooks
                         if (null !== $detachedBacking) {
                             [$detachedStart, $detachedEnd, $initializer] = $detachedBacking;
                             $removeSpans[] = [$detachedStart, $detachedEnd];
+                        } else {
+                            $priorBacking = $this->findPriorSameNameBackingFieldDecl($body, $declStart, $prop);
+                            if (null !== $priorBacking) {
+                                [$priorStart, $priorEnd, $initializer] = $priorBacking;
+                                $removeSpans[] = [$priorStart, $priorEnd];
+                                $declPrefix = $this->copyBodySegment($body, $offset, $declStart, $removeSpans);
+                            }
                         }
                     }
                 }
@@ -1527,6 +1534,38 @@ final class PropertyHooks
         $initializer = isset($m[1]) ? trim($m[1]) : '';
 
         return [$offset + strlen($m[0]), $initializer];
+    }
+
+    /**
+     * Same-name backing field declared before the hooked property — merge like adjacent (#18171).
+     *
+     * @return array{0: int, 1: int, 2: string}|null [span start, span end, initializer including `=`]
+     */
+    private function findPriorSameNameBackingFieldDecl(string $body, int $searchEnd, string $prop): ?array
+    {
+        if ($searchEnd <= 0) {
+            return null;
+        }
+        $remainder = substr($body, 0, $searchEnd);
+        if (!preg_match_all(
+            '/(?:(?:public|protected|private|static|readonly)\s+)+'
+            .'(?:[\w\\\\|]+(?:\s*\[\s*\])?\s+)+'
+            .'\$'.preg_quote($prop, '/').'\s*(=\s*[^;]+)?;/',
+            $remainder,
+            $matches,
+            PREG_OFFSET_CAPTURE
+        )) {
+            return null;
+        }
+        $last = count($matches[0]) - 1;
+        if ($last < 0) {
+            return null;
+        }
+        $matchStart = $matches[0][$last][1];
+        $matchEnd = $matchStart + strlen($matches[0][$last][0]);
+        $initializer = isset($matches[1][$last]) ? trim($matches[1][$last][0]) : '';
+
+        return [$matchStart, $matchEnd, $initializer];
     }
 
     /**
