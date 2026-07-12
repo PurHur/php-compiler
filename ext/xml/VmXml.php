@@ -11,7 +11,8 @@ use PHPCompiler\VM\Context;
 /**
  * Minimal expat-shaped parser for xml_parse() v1 (#3494, #6058).
  *
- * Well-formedness probe records libxml errors via {@see \PHPCompiler\ext\libxml\VmLibxml}.
+ * Parser diagnostics live on the parser resource; libxml ring buffer only when
+ * libxml_use_internal_errors(true) (#18135).
  */
 final class VmXml
 {
@@ -145,7 +146,9 @@ final class VmXml
         }
 
         self::recordParserError($parser, $error, $data);
-        \PHPCompiler\ext\libxml\VmLibxml::handleError($ctx, $error, $frame);
+        if (\PHPCompiler\ext\libxml\VmLibxml::usingInternalErrors()) {
+            \PHPCompiler\ext\libxml\VmLibxml::handleError($ctx, $error, $frame);
+        }
 
         return false;
     }
@@ -202,7 +205,9 @@ final class VmXml
         $error = self::validateWellFormed($data);
         if (null !== $error) {
             self::recordParserError($parser, $error, $data);
-            \PHPCompiler\ext\libxml\VmLibxml::handleError($ctx, $error, $frame);
+            if (\PHPCompiler\ext\libxml\VmLibxml::usingInternalErrors()) {
+                \PHPCompiler\ext\libxml\VmLibxml::handleError($ctx, $error, $frame);
+            }
 
             return [
                 'status' => 0,
