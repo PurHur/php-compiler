@@ -4,7 +4,7 @@ xml_parse() / xml_parse_into_struct() failures leave error_get_last() unset (#18
 <?php
 $parser = xml_parser_create();
 $ok = @xml_parse($parser, '<a><b></a>', true);
-echo (int) ($ok === false), "\n";
+echo (int) (0 === $ok), "\n";
 echo (int) (null === error_get_last()), "\n";
 
 $parser2 = xml_parser_create();

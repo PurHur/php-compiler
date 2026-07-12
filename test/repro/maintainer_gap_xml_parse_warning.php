@@ -8,8 +8,8 @@ declare(strict_types=1);
 
 $parser = xml_parser_create();
 $ok = @xml_parse($parser, '<a><b></a>', true);
-if (false !== $ok) {
-    echo "fail: xml_parse() should return false\n";
+if (0 !== $ok) {
+    echo "fail: xml_parse() should return 0\n";
     exit(1);
 }
 

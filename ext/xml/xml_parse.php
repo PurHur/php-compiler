@@ -42,14 +42,14 @@ final class xml_parse extends Internal
             $isFinal = Variable::TYPE_NULL === $finalArg->type ? true : (bool) $finalArg->toInt();
         }
 
-        $ok = VmXml::parse(
+        $status = VmXml::parse(
             $frame->vmContext,
             $parserArg->toInt(),
             $data,
             $isFinal,
             $frame
         );
-        $frame->returnVar->bool($ok);
+        $frame->returnVar->int($status);
     }
 
     public function call(Context $context, JITVariable ...$args): Value

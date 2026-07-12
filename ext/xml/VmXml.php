@@ -11,8 +11,8 @@ use PHPCompiler\VM\Context;
 /**
  * Minimal expat-shaped parser for xml_parse() v1 (#3494, #6058).
  *
- * Parser diagnostics live on the parser resource; libxml ring buffer only when
- * libxml_use_internal_errors(true) (#18135).
+ * Parser diagnostics live on the parser resource; expat failures always populate
+ * the libxml error ring (libxml_get_last_error) without php_error() (#18135, #18146).
  */
 final class VmXml
 {
@@ -129,28 +129,26 @@ final class VmXml
         string $data,
         bool $isFinal,
         ?Frame $frame = null
-    ): bool {
+    ): int {
         if (!isset(self::$parsers[$parser])) {
             throw new \ValueError('xml_parse(): Argument #1 ($parser) must be a valid XML parser');
         }
 
         if (!$isFinal) {
-            return true;
+            return 1;
         }
 
         $error = self::validateWellFormed($data);
         if (null === $error) {
             self::recordSuccessfulParse($parser, $data);
 
-            return true;
+            return 1;
         }
 
         self::recordParserError($parser, $error, $data);
-        if (\PHPCompiler\ext\libxml\VmLibxml::usingInternalErrors()) {
-            \PHPCompiler\ext\libxml\VmLibxml::handleError($ctx, $error, $frame);
-        }
+        \PHPCompiler\ext\libxml\VmLibxml::recordError($error);
 
-        return false;
+        return 0;
     }
 
     private static function clearParserDiagnostics(int $parser): void
@@ -205,9 +203,7 @@ final class VmXml
         $error = self::validateWellFormed($data);
         if (null !== $error) {
             self::recordParserError($parser, $error, $data);
-            if (\PHPCompiler\ext\libxml\VmLibxml::usingInternalErrors()) {
-                \PHPCompiler\ext\libxml\VmLibxml::handleError($ctx, $error, $frame);
-            }
+            \PHPCompiler\ext\libxml\VmLibxml::recordError($error);
 
             return [
                 'status' => 0,
@@ -548,11 +544,19 @@ final class VmXml
                 if ([] === $stack || end($stack) !== $name) {
                     $line = 1 + substr_count(substr($content, 0, $scan), "\n");
                     $byteIndex = $scan + \strlen($close[0]);
+                    $expected = [] !== $stack ? (string) end($stack) : '';
+                    $expatLine = $line - 1;
+                    $message = \sprintf(
+                        "Opening and ending tag mismatch: %s line %d and %s\n",
+                        $expected,
+                        $expatLine,
+                        $name
+                    );
 
                     return self::errorRecord(
                         $line,
                         $byteIndex + 1,
-                        'Mismatched tag',
+                        $message,
                         self::XML_ERR_TAG_NAME_MISMATCH,
                         LibxmlConstants::LIBXML_ERR_FATAL,
                         $byteIndex
