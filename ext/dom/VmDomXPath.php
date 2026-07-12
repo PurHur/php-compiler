@@ -60,7 +60,7 @@ final class VmDomXPath
     ): Variable {
         $expression = trim($expression);
         if (self::isBooleanExpression($expression)) {
-            $var = new Variable(Variable::TYPE_BOOL);
+            $var = new Variable(Variable::TYPE_BOOLEAN);
             $var->bool(self::evaluateBoolean($xpath, $expression, $contextNode));
 
             return $var;
