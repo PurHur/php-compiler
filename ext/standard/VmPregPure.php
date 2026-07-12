@@ -350,12 +350,12 @@ final class VmPregPure
         if (0 !== ($opts & VmPregPattern::PCRE2_UTF)) {
             $charIndex = 0;
             $pos = 0;
-            $charLen = VmString::utf8CharLength($subject);
+            $charLen = VmPregUtf8::utf8CharLength($subject);
             while ($pos < $byteOffset && $charIndex < $charLen) {
-                $pos += \strlen(VmString::utf8CharSubstr($subject, $charIndex, 1));
+                $pos += \strlen(VmPregUtf8::utf8CharSubstr($subject, $charIndex, 1));
                 ++$charIndex;
             }
-            $ch = VmString::utf8CharSubstr($subject, $charIndex, 1);
+            $ch = VmPregUtf8::utf8CharSubstr($subject, $charIndex, 1);
 
             return max(1, \strlen($ch));
         }
@@ -586,7 +586,7 @@ final class VmPregPure
         if (0 === ($opts & VmPregPattern::PCRE2_UTF)) {
             return true;
         }
-        if (!VmString::isValidUtf8($subject)) {
+        if (!VmPregUtf8::isValidUtf8($subject)) {
             self::$lastError = StdlibConstants::PREG_BAD_UTF8_ERROR;
 
             return false;
@@ -684,10 +684,10 @@ final class VmPregPure
         /** @var list<array{0: string, 1: int}> $units */
         $units = [];
         if ($utf8) {
-            $charLen = VmString::utf8CharLength($subject);
+            $charLen = VmPregUtf8::utf8CharLength($subject);
             $bytePos = 0;
             for ($i = 0; $i < $charLen; ++$i) {
-                $ch = VmString::utf8CharSubstr($subject, $i, 1);
+                $ch = VmPregUtf8::utf8CharSubstr($subject, $i, 1);
                 $units[] = [$ch, $bytePos];
                 $bytePos += \strlen($ch);
             }
@@ -764,16 +764,14 @@ final class VmPregPure
         int $opts,
         bool $anchoredAttempt
     ): array|null|false {
-        try {
-            return VmPregEngine::match($ast, $groupNameToIndex, $subject, $offset, $opts, $anchoredAttempt);
-        } catch (VmPregBacktrackLimitException) {
-            self::$lastError = StdlibConstants::PREG_BACKTRACK_LIMIT_ERROR;
-
-            return false;
-        } catch (VmPregJitStackLimitException) {
-            self::$lastError = StdlibConstants::PREG_JIT_STACKLIMIT_ERROR;
+        $result = VmPregEngine::match($ast, $groupNameToIndex, $subject, $offset, $opts, $anchoredAttempt);
+        if (false === $result) {
+            self::$lastError = VmPregEngine::consumeLastMatchLimitError()
+                ?: StdlibConstants::PREG_BACKTRACK_LIMIT_ERROR;
 
             return false;
         }
+
+        return $result;
     }
 }

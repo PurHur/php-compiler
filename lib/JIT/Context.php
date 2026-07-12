@@ -2187,6 +2187,13 @@ class Context {
                 );
             } elseif ($op instanceof Operand\Variable && $this->aliasVariableOpByName($op)) {
                 // Distinct Variable operand for an already-allocated scope slot (#12036 inventory argv).
+            } elseif ($op instanceof Operand\BoundVariable
+                && Operand\BoundVariable::SCOPE_OBJECT === $op->scope) {
+                $thisVar = $this->findThisVariable();
+                if (null !== $thisVar) {
+                    return $thisVar;
+                }
+                throw new \LogicException('BoundVariable SCOPE_OBJECT without $this in JIT scope');
             } else {
                 throw new \LogicException("Unknown variable referenced: " . get_class($op));
             }

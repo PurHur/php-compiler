@@ -13,6 +13,13 @@ final class VmPregEngine
 {
     private static ?VmPregCompileException $lastCompileException = null;
 
+    private static int $lastMatchLimitError = 0;
+
+    private bool $compileAborted = false;
+
+    /** @var 0|2|3|6 PREG_* limit error from match path; 0 = none */
+    private int $limitErrorCode = 0;
+
     private const OPT_CASELESS = 0x00000008;
 
     private const OPT_DOTALL = 0x00000020;
@@ -95,6 +102,14 @@ final class VmPregEngine
         return $exception;
     }
 
+    public static function consumeLastMatchLimitError(): int
+    {
+        $code = self::$lastMatchLimitError;
+        self::$lastMatchLimitError = 0;
+
+        return $code;
+    }
+
     /**
      * @return array{0: VmPregAstNode, 1: array<string, int>, 2: int}|null
      */
@@ -103,19 +118,13 @@ final class VmPregEngine
         self::$lastCompileException = null;
         $engine = new self();
         $engine->applyOptions($opts);
-        try {
-            $ast = $engine->parsePattern($regex);
-            if (null === $ast) {
-                return null;
-            }
-            $engine->rootAst = $ast;
-
-            return [$ast, $engine->groupNameToIndex, $engine->nextGroup - 1];
-        } catch (VmPregCompileException $e) {
-            self::$lastCompileException = $e;
-
+        $ast = $engine->parsePattern($regex);
+        if (null === $ast || $engine->compileAborted) {
             return null;
         }
+        $engine->rootAst = $ast;
+
+        return [$ast, $engine->groupNameToIndex, $engine->nextGroup - 1];
     }
 
     /**
@@ -130,7 +139,7 @@ final class VmPregEngine
         int $offset,
         int $opts,
         bool $anchoredAttempt
-    ): ?array {
+    ): array|null|false {
         $engine = new self();
         $engine->applyOptions($opts);
         $engine->groupNameToIndex = $groupNameToIndex;
@@ -149,6 +158,11 @@ final class VmPregEngine
 
                 return self::capturesToOvector($captures);
             }
+            if (0 !== $engine->limitErrorCode) {
+                self::$lastMatchLimitError = $engine->limitErrorCode;
+
+                return false;
+            }
 
             return null;
         }
@@ -159,6 +173,11 @@ final class VmPregEngine
                 $captures[0][0] = $engine->matchStartPos();
 
                 return self::capturesToOvector($captures);
+            }
+            if (0 !== $engine->limitErrorCode) {
+                self::$lastMatchLimitError = $engine->limitErrorCode;
+
+                return false;
             }
         }
 
@@ -197,6 +216,24 @@ final class VmPregEngine
         return $groupNameToIndex[$name] ?? -1;
     }
 
+    private function abortCompile(?string $msg = null, int $pos = 0): null
+    {
+        if (!$this->compileAborted) {
+            self::$lastCompileException = new VmPregCompileException($msg ?? '', $pos);
+            $this->compileAborted = true;
+        }
+
+        return null;
+    }
+
+    public function consumeLimitErrorCode(): int
+    {
+        $code = $this->limitErrorCode;
+        $this->limitErrorCode = 0;
+
+        return $code;
+    }
+
     private function applyOptions(int $opts): void
     {
         $this->caseless = 0 !== ($opts & self::OPT_CASELESS);
@@ -220,8 +257,13 @@ final class VmPregEngine
             return new VmPregAstEmptyNode();
         }
         $node = $this->parseAlternation();
+        if ($this->compileAborted || null === $node) {
+            return null;
+        }
         if (!$this->atEnd()) {
-            throw new VmPregCompileException('unexpected end of pattern', $this->pos);
+            $this->abortCompile('unexpected end of pattern', $this->pos);
+
+            return null;
         }
 
         return $node;
@@ -268,11 +310,15 @@ final class VmPregEngine
         }
         $close = \strpos($this->regex, ')', $this->pos + 2);
         if (false === $close) {
-            throw new VmPregCompileException();
+            $this->abortCompile();
+
+            return false;
         }
         $verb = \substr($this->regex, $this->pos + 2, $close - $this->pos - 2);
         if (!self::isRecognizedPcreVerb($verb)) {
-            throw new VmPregCompileException();
+            $this->abortCompile();
+
+            return false;
         }
         self::applyPcreVerb($verb, $this);
         $this->pos = $close + 1;
@@ -298,7 +344,9 @@ final class VmPregEngine
             'NO_JIT', 'NO_START_OPT', 'NOTEMPTY', 'NOTEMPTY_ATSTART', 'FIRSTLINE', 'FRUSTRATING' => null,
             'ACCEPT', 'COMMIT', 'PRUNE', 'SKIP', 'THEN' => null,
             'FAIL' => null,
-            default => throw new VmPregCompileException(),
+            default => (function () use ($engine): void {
+                $engine->abortCompile();
+            })(),
         };
     }
 
@@ -395,7 +443,7 @@ final class VmPregEngine
                 }
             }
             if ($this->peek() !== '}') {
-                throw new VmPregCompileException();
+                $this->abortCompile(); return new VmPregAstEmptyNode();
             }
             $this->advance(1);
             if ($this->peek() === '?') {
@@ -406,13 +454,15 @@ final class VmPregEngine
             return [$min, $max, $greedy];
         }
 
-        throw new VmPregCompileException();
+        $this->abortCompile(); return new VmPregAstEmptyNode();
     }
 
     private function parseDigits(): int
     {
         if (!\ctype_digit($this->peek())) {
-            throw new VmPregCompileException();
+            $this->abortCompile();
+
+            return 0;
         }
         $n = 0;
         while (\ctype_digit($this->peek())) {
@@ -427,7 +477,7 @@ final class VmPregEngine
     {
         $this->skipExtended();
         if ($this->atEnd()) {
-            throw new VmPregCompileException();
+            $this->abortCompile(); return new VmPregAstEmptyNode();
         }
         $ch = $this->peek();
         if ('(' === $ch) {
@@ -455,7 +505,7 @@ final class VmPregEngine
             return $this->parseEscape();
         }
         if ('|' === $ch || ')' === $ch) {
-            throw new VmPregCompileException();
+            $this->abortCompile(); return new VmPregAstEmptyNode();
         }
         $lit = $this->readLiteralChar();
 
@@ -481,7 +531,7 @@ final class VmPregEngine
                     $this->advance(1);
                 }
                 if ($this->peek() !== ')') {
-                    throw new VmPregCompileException();
+                    $this->abortCompile(); return new VmPregAstEmptyNode();
                 }
                 $this->advance(1);
 
@@ -494,20 +544,20 @@ final class VmPregEngine
                 $this->advance(1);
                 if ('P' === $flag) {
                     if ($this->peek() !== '<') {
-                        throw new VmPregCompileException();
+                        $this->abortCompile(); return new VmPregAstEmptyNode();
                     }
                     $this->advance(1);
                 }
                 $name = $this->parseGroupName();
                 if ($this->peek() !== '>') {
-                    throw new VmPregCompileException();
+                    $this->abortCompile(); return new VmPregAstEmptyNode();
                 }
                 $nameCloseOffset = $this->pos;
                 $this->advance(1);
             } elseif ('R' === $flag || '0' === $flag) {
                 $this->advance(1);
                 if ($this->peek() !== ')') {
-                    throw new VmPregCompileException();
+                    $this->abortCompile(); return new VmPregAstEmptyNode();
                 }
                 $this->advance(1);
 
@@ -515,13 +565,13 @@ final class VmPregEngine
             } elseif ($this->isInlineModifierStart($flag)) {
                 $this->parseInlineModifiers();
                 if ($this->peek() !== ')') {
-                    throw new VmPregCompileException();
+                    $this->abortCompile(); return new VmPregAstEmptyNode();
                 }
                 $this->advance(1);
 
                 return new VmPregAstEmptyNode();
             } else {
-                throw new VmPregCompileException();
+                $this->abortCompile(); return new VmPregAstEmptyNode();
             }
         }
         $index = null;
@@ -532,18 +582,25 @@ final class VmPregEngine
                 if (isset($this->groupNameToIndex[$name])) {
                     $existing = $this->groupNameToIndex[$name];
                     if (!$this->allowDuplicateNames && $existing !== $index) {
-                        throw new VmPregCompileException(
+                        $this->abortCompile(
                             'two named subpatterns have the same name (PCRE2_DUPNAMES not set)',
                             $nameCloseOffset >= 0 ? $nameCloseOffset : $openPos
                         );
+
+                        return new VmPregAstEmptyNode();
                     }
                 }
                 $this->groupNameToIndex[$name] = $index;
             }
         }
         $inner = $this->parseAlternation();
+        if ($this->compileAborted) {
+            return new VmPregAstEmptyNode();
+        }
         if ($this->peek() !== ')') {
-            throw new VmPregCompileException('missing closing parenthesis', $openPos);
+            $this->abortCompile('missing closing parenthesis', $openPos);
+
+            return new VmPregAstEmptyNode();
         }
         $this->advance(1);
         if (!$capture) {
@@ -570,7 +627,7 @@ final class VmPregEngine
             break;
         }
         if (')' !== $this->peek()) {
-            throw new VmPregCompileException();
+            $this->abortCompile(); return new VmPregAstEmptyNode();
         }
         $this->advance(1);
 
@@ -599,7 +656,9 @@ final class VmPregEngine
                 $enable = '+' === $ch;
                 $this->advance(1);
                 if ($this->atEnd() || !$this->isInlineModifierLetter($this->peek())) {
-                    throw new VmPregCompileException();
+                    $this->abortCompile();
+
+                    return;
                 }
                 while (!$this->atEnd() && $this->isInlineModifierLetter($this->peek())) {
                     $this->applyInlineModifier($this->peek(), $enable);
@@ -608,7 +667,9 @@ final class VmPregEngine
                 continue;
             }
             if (!$this->isInlineModifierLetter($ch)) {
-                throw new VmPregCompileException();
+                $this->abortCompile();
+
+                return;
             }
             $this->applyInlineModifier($ch, true);
             $this->advance(1);
@@ -627,7 +688,9 @@ final class VmPregEngine
             'u' => $this->utf = $enable,
             'D' => $this->dollarEndonly = $enable,
             'A' => $this->anchored = $enable,
-            default => throw new VmPregCompileException(),
+            default => (function () use ($engine): void {
+                $engine->abortCompile();
+            })(),
         };
     }
 
@@ -635,7 +698,7 @@ final class VmPregEngine
     {
         $ch = $this->peek();
         if ('' === $ch || !self::isNameStart($ch)) {
-            throw new VmPregCompileException();
+            $this->abortCompile(); return new VmPregAstEmptyNode();
         }
         $start = $this->pos;
         $this->advance(1);
@@ -688,7 +751,7 @@ final class VmPregEngine
             }
         }
         if ($this->peek() !== ']') {
-            throw new VmPregCompileException('missing terminating ] for character class', $openPos);
+            $this->abortCompile('missing terminating ] for character class', $openPos); return new VmPregAstEmptyNode();
         }
         $this->advance(1);
 
@@ -702,7 +765,7 @@ final class VmPregEngine
     {
         $this->advance(1);
         if ($this->atEnd()) {
-            throw new VmPregCompileException();
+            $this->abortCompile(); return new VmPregAstEmptyNode();
         }
         $ch = $this->peek();
         $this->advance(1);
@@ -722,7 +785,7 @@ final class VmPregEngine
     {
         $this->advance(1);
         if ($this->atEnd()) {
-            throw new VmPregCompileException();
+            $this->abortCompile(); return new VmPregAstEmptyNode();
         }
         $ch = $this->peek();
         if ($ch >= '0' && $ch <= '7') {
@@ -746,7 +809,7 @@ final class VmPregEngine
                 $this->advance(1);
             }
             if ('' === $hex) {
-                throw new VmPregCompileException();
+                $this->abortCompile(); return new VmPregAstEmptyNode();
             }
 
             return new VmPregAstCharNode(\chr((int) \hexdec($hex)), $this->caseless);
@@ -823,7 +886,9 @@ final class VmPregEngine
         array &$captures
     ): bool {
         if ($this->backtrackLimit >= 0 && ++$this->backtrackCount > $this->backtrackLimit) {
-            throw new VmPregBacktrackLimitException();
+            $this->limitErrorCode = StdlibConstants::PREG_BACKTRACK_LIMIT_ERROR;
+
+            return false;
         }
 
         return $node->match($this, $subject, $pos, $len, $captures);
@@ -840,13 +905,15 @@ final class VmPregEngine
             return false;
         }
         if (++$this->recursionDepth > $this->jitStackLimit) {
-            throw new VmPregJitStackLimitException();
-        }
-        try {
-            return $this->matchNode($this->rootAst, $subject, $pos, $len, $captures);
-        } finally {
+            $this->limitErrorCode = StdlibConstants::PREG_JIT_STACKLIMIT_ERROR;
             --$this->recursionDepth;
+
+            return false;
         }
+        $matched = $this->matchNode($this->rootAst, $subject, $pos, $len, $captures);
+        --$this->recursionDepth;
+
+        return $matched;
     }
 
     /**
