@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\sockets;
 
 use PHPCompiler\ext\standard\TriggerErrorJitHelper;
 use PHPCompiler\ext\standard\VmFs;
+use PHPCompiler\ext\standard\VmFsStdio;
 use PHPCompiler\ext\standard\VmStreamMeta;
 
 /**
@@ -36,8 +37,12 @@ final class SocketImportStreamJitHelper
     {
         if ($streamHandle > 0) {
             $uri = VmFs::handleUri($streamHandle);
-            if ('MEMORY' === VmStreamMeta::phpNativeStreamType($uri)) {
+            $nativeType = VmStreamMeta::phpNativeStreamType($uri);
+            if ('MEMORY' === $nativeType) {
                 return 'socket_import_stream(): Cannot represent a stream of type MEMORY as a Socket Descriptor';
+            }
+            if (VmFsStdio::isStdioUri($uri)) {
+                return 'socket_import_stream(): Cannot represent a stream of type STDIO as a Socket Descriptor';
             }
         }
 

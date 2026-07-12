@@ -51,7 +51,10 @@ final class disk_free_space extends Internal
             return;
         }
         if (false === $result) {
-            VmFilestatFailure::warnNoSuchFile($frame, $fn);
+            // php-src filestat.c — empty directory returns false without warning (#18387).
+            if ('' !== $path) {
+                VmFilestatFailure::warnNoSuchFile($frame, $fn);
+            }
             $frame->returnVar->bool(false);
         } else {
             $frame->returnVar->float($result);
