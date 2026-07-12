@@ -430,7 +430,8 @@ final class VmDateTimeNative
                 self::throwMalformedDateTime($time);
             }
 
-            return ['timestamp' => (int) $unix, 'microsecond' => 0];
+            // php-src ext/date/php_date.c — @ unix timestamps use offset timezone +00:00 (zone_type 1).
+            return ['timestamp' => (int) $unix, 'microsecond' => 0, 'timezone' => '+00:00'];
         }
         if (1 === preg_match('/^\d+$/', $time)) {
             return ['timestamp' => (int) $time, 'microsecond' => 0];
@@ -619,7 +620,7 @@ final class VmDateTimeNative
                 self::throwMalformedDateTime($date);
             }
 
-            return self::parseResultFromTimestamp((int) $unix, 0);
+            return self::withOffsetTimezoneMetadata(self::parseResultFromTimestamp((int) $unix, 0), 0);
         }
         if (1 === preg_match('/^\d+$/', $date)) {
             return self::parseResultFromTimestamp((int) $date, 0);

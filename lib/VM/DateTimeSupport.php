@@ -1117,6 +1117,12 @@ final class DateTimeSupport
         return $var;
     }
 
+    /** php-src ext/date/php_date.c — TIMELIB_ZONETYPE_OFFSET (1) vs TIMELIB_ZONETYPE_ID (3). */
+    public static function zendTimezoneWireType(string $tzName): int
+    {
+        return null !== VmDateTimeNative::parseNumericTimezoneOffset($tzName) ? 1 : 3;
+    }
+
     /**
      * php-src ext/json/php_json.c — DateTime/DateTimeImmutable json encode wire (#14143).
      *
@@ -1132,7 +1138,7 @@ final class DateTimeSupport
 
         return [
             'date' => VmDateTimeNative::formatZendDateWire($timestamp, $microsecond, $tzName),
-            'timezone_type' => 3,
+            'timezone_type' => self::zendTimezoneWireType($tzName),
             'timezone' => $tzName,
         ];
     }
@@ -1144,9 +1150,11 @@ final class DateTimeSupport
      */
     public static function exportZendJsonWireDateTimeZone(ObjectEntry $zone): array
     {
+        $tzName = self::timezoneName($zone);
+
         return [
-            'timezone_type' => 3,
-            'timezone' => self::timezoneName($zone),
+            'timezone_type' => self::zendTimezoneWireType($tzName),
+            'timezone' => $tzName,
         ];
     }
 
