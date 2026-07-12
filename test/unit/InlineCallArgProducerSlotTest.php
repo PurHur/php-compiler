@@ -4346,6 +4346,30 @@ PHP;
         self::assertSame("key=1\n", $out);
     }
 
+    /** Issue #18183 — consecutive echo var_export($g->current(), true) after bare-yield send (Zend/zend_generators.c). */
+    public function testVarExportNestedGeneratorCurrentDoubleEchoAfterBareYieldSend(): void
+    {
+        $code = <<<'PHP'
+<?php
+function g(): Generator {
+    $x = yield;
+    yield $x * 2;
+}
+$g = g();
+$g->rewind();
+$g->send(3);
+echo var_export($g->current(), true), "\n";
+echo var_export($g->current(), true), "\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'var_export_nested_generator_current_double_echo.php');
+
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertSame("6\n6\n", $out);
+    }
+
     /** var_export($g->valid(), true) after Generator::send assign + prior var_export (Zend/zend_generators.c). */
     public function testVarExportNestedGeneratorValidAfterSendAssignUsesMethodCallProducerSlot(): void
     {
