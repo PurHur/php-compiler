@@ -26662,7 +26662,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/PregMatchRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 509)
+- new JIT (line 514)
 - 15 class method(s)
 - 2 closure(s)
 
@@ -30558,8 +30558,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new State (line 570)
 - new ReflectionProperty (line 597)
 - new ReflectionProperty (line 600)
-- new LintCompiler (line 1006)
-- new Variable (line 1136)
+- new LintCompiler (line 1014)
+- new Variable (line 1144)
 - 53 class method(s)
 
 ### `lib/RuntimeStrictness.php`
