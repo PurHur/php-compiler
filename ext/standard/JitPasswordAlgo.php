@@ -25,6 +25,9 @@ final class JitPasswordAlgo
         int $argIndex,
         string $paramName
     ): Value {
+        if (JITVariable::TYPE_NULL === $arg->type || ($arg->isNullConstant ?? false)) {
+            return $context->getTypeFromString('int64')->constInt(VmPassword::PASSWORD_BCRYPT, false);
+        }
         $folded = self::lowerCompileTimeStringAlgo($context, $arg);
         if (null !== $folded) {
             return $folded;
@@ -106,18 +109,29 @@ final class JitPasswordAlgo
             $context->builder->structGep($valuePtr, $map['type'])
         );
         $i8 = $context->getTypeFromString('int8');
+        $nullTy = $i8->constInt(VmVariable::TYPE_NULL, false);
         $intTy = $i8->constInt(VmVariable::TYPE_INTEGER, false);
         $strTy = $i8->constInt(VmVariable::TYPE_STRING, false);
         $enumTy = $i8->constInt(VmVariable::TYPE_ENUM_CASE, false);
         $i64 = $context->getTypeFromString('int64');
         $bcrypt = $i64->constInt(VmPassword::PASSWORD_BCRYPT, false);
 
+        $nullBlock = BasicBlockHelper::append($context, 'pw_algo_box_null');
+        $typeBlock = BasicBlockHelper::append($context, 'pw_algo_box_type');
         $intBlock = BasicBlockHelper::append($context, 'pw_algo_box_int');
         $strBlock = BasicBlockHelper::append($context, 'pw_algo_box_str');
         $enumBlock = BasicBlockHelper::append($context, 'pw_algo_box_enum');
         $badBlock = BasicBlockHelper::append($context, 'pw_algo_box_bad');
         $doneBlock = BasicBlockHelper::append($context, 'pw_algo_box_done');
 
+        $isNull = $context->builder->icmp(Builder::INT_EQ, $typeByte, $nullTy);
+        $context->builder->branchIf($isNull, $nullBlock, $typeBlock);
+
+        $context->builder->positionAtEnd($nullBlock);
+        $nullEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($typeBlock);
         $isInt = $context->builder->icmp(Builder::INT_EQ, $typeByte, $intTy);
         $context->builder->branchIf($isInt, $intBlock, $strBlock);
 
@@ -192,6 +206,7 @@ final class JitPasswordAlgo
 
         $context->builder->positionAtEnd($doneBlock);
         $phi = $context->builder->phi($i64);
+        $phi->addIncoming($bcrypt, $nullEnd);
         $phi->addIncoming($intVal, $intEnd);
         $phi->addIncoming($bcrypt, $strEnd);
 
