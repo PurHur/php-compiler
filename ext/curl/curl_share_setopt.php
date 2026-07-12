@@ -12,13 +12,13 @@ use PHPCompiler\ext\standard\VmMath;
 use PHPLLVM\Value;
 
 /**
- * curl_setopt() — minimal option setter for CURLOPT_SHARE (php-src ext/curl/interface.c; #6322).
+ * curl_share_setopt() — configure shared lock data (php-src ext/curl/interface.c; #6322).
  */
-final class curl_setopt extends Internal
+final class curl_share_setopt extends Internal
 {
     public function __construct()
     {
-        parent::__construct('curl_setopt');
+        parent::__construct('curl_share_setopt');
     }
 
     public function execute(Frame $frame): void
@@ -26,21 +26,21 @@ final class curl_setopt extends Internal
         $argc = \count($frame->calledArgs);
         if (3 !== $argc) {
             throw new \ArgumentCountError(\sprintf(
-                'curl_setopt() expects exactly 3 arguments, %d given',
+                'curl_share_setopt() expects exactly 3 arguments, %d given',
                 $argc
             ));
         }
         if (null === $frame->returnVar) {
             return;
         }
-        $easy = VmCurlArg::requireEasyObject($frame->calledArgs[0], 'curl_setopt', 1);
-        $option = VmMath::parseIntBuiltinArgForFrame($frame, 1, 'curl_setopt', 2, 'option');
-        $ok = VmCurlEasy::setopt($easy, $option, $frame->calledArgs[2], $frame);
+        $share = VmCurlArg::requireShareObject($frame->calledArgs[0], 'curl_share_setopt', 1);
+        $option = VmMath::parseIntBuiltinArgForFrame($frame, 1, 'curl_share_setopt', 2, 'option');
+        $ok = VmCurlShare::setopt($share, $option, $frame->calledArgs[2], $frame);
         $frame->returnVar->bool($ok);
     }
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('curl_setopt() is not implemented for JIT in this compiler build (issue #6322)');
+        throw new \LogicException('curl_share_setopt() is not implemented for JIT in this compiler build (issue #6322)');
     }
 }

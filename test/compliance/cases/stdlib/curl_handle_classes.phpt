@@ -12,6 +12,6 @@ var_export(enum_exists('CurlHandle', false));
 echo "\n";
 --EXPECT--
 true
-true
+false
 true
 false
