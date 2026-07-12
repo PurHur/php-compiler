@@ -20,11 +20,9 @@ final class ReflectionParameterIsDefaultValueAvailable extends VmClassMethod
     {
         $ctx = VmReflection::requireContext($frame);
         $receiver = ReflectionSupport::requireReflectionParameter($frame, $frame->calledArgs[0]);
-        $block = ReflectionSupport::resolveParameterBlock($ctx, $receiver);
-        $index = ReflectionSupport::parameterIndexForReflection($receiver);
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool(
-                VmReflection::parameterDefaultValueIsAvailable($block, $index)
+                ReflectionSupport::parameterDefaultValueIsAvailableForReflection($ctx, $receiver)
             );
         }
     }
