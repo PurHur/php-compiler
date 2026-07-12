@@ -8,10 +8,8 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Builtin\StringStrcoll;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\InternalStrictArg;
 use PHPLLVM\Value;
 
 /**
@@ -31,8 +29,6 @@ final class strcoll extends Internal
         if (2 !== \count($frame->calledArgs)) {
             throw new \LogicException('strcoll() requires exactly two arguments');
         }
-        InternalStrictArg::rejectNullString($frame->calledArgs[0], 'strcoll', 'string1', 0, $frame);
-        InternalStrictArg::rejectNullString($frame->calledArgs[1], 'strcoll', 'string2', 1, $frame);
         $a = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'strcoll', 0, 'string1');
         $b = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'strcoll', 1, 'string2');
         if (null === $frame->returnVar) {
@@ -49,8 +45,6 @@ final class strcoll extends Internal
         if (2 !== \count($args)) {
             throw new \LogicException('strcoll() requires exactly two arguments');
         }
-        JitInternalStrictArg::rejectNullString($context, $args[0], 'strcoll', 'string1', 1);
-        JitInternalStrictArg::rejectNullString($context, $args[1], 'strcoll', 'string2', 2);
         StringStrcoll::ensureLinked($context);
         $p0 = $this->stringDataPtr($context, JitStringBuiltinArg::lower($context, $args[0], 'strcoll', 0, 'string1'));
         $p1 = $this->stringDataPtr($context, JitStringBuiltinArg::lower($context, $args[1], 'strcoll', 1, 'string2'));
