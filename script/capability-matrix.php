@@ -38,6 +38,7 @@ function collectCapabilities(string $root): array
         'sockets' => new PHPCompiler\ext\sockets\Module(),
         'curl' => new PHPCompiler\ext\curl\Module(),
         'inotify' => new PHPCompiler\ext\inotify\Module(),
+        'uuid' => new PHPCompiler\ext\uuid\Module(),
     ];
 
     $capabilities = [];

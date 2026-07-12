@@ -23,6 +23,7 @@ use PHPCompiler\ext\session\SessionConstants;
 use PHPCompiler\ext\sockets\SocketConstants;
 use PHPCompiler\ext\sodium\SodiumConstants;
 use PHPCompiler\ext\tokenizer\TokenConstants;
+use PHPCompiler\ext\uuid\UuidConstants;
 use PHPCompiler\ext\xml\XmlConstants;
 
 /**
@@ -68,6 +69,7 @@ final class ExtensionConstantGroups
             $groups['ldap'] = LdapConstants::registeredConstants();
         }
         $groups['random'] = RandomConstants::registeredConstants();
+        $groups['uuid'] = UuidConstants::registeredConstants();
         $groups['xml'] = XmlConstants::registeredConstants();
         $groups['sockets'] = SocketConstants::registeredConstants();
         $groups['readline'] = ReadlineConstants::registeredConstants();

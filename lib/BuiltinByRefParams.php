@@ -101,6 +101,8 @@ final class BuiltinByRefParams
             case 'sodium_crypto_secretstream_xchacha20poly1305_pull':
             case 'sodium_crypto_secretstream_xchacha20poly1305_rekey':
                 return [0];
+            case 'uuid_generate':
+                return [0];
         }
 
         return [];

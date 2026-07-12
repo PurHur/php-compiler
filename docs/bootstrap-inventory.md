@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 4555 |
-| Phase A inventory files (M2 ratio SSOT) | 4555 |
+| PHP files on vm.php path | 4561 |
+| Phase A inventory files (M2 ratio SSOT) | 4561 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 12358 |
+| Source constructs flagged (warnings) | 12371 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -2822,6 +2822,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/uri/UriClassMethods.php` | 0 | 4 |
 | `ext/uri/UriExtensionPolicy.php` | 0 | 1 |
 | `ext/uri/VmUri.php` | 0 | 5 |
+| `ext/uuid/Module.php` | 0 | 4 |
+| `ext/uuid/UuidConstants.php` | 0 | 1 |
+| `ext/uuid/UuidFunction.php` | 0 | 1 |
+| `ext/uuid/VmUuid.php` | 0 | 1 |
+| `ext/uuid/uuid_create.php` | 0 | 2 |
+| `ext/uuid/uuid_generate.php` | 0 | 3 |
 | `ext/xml/BuiltinClasses.php` | 0 | 1 |
 | `ext/xml/Module.php` | 0 | 10 |
 | `ext/xml/VmXml.php` | 0 | 1 |
@@ -3903,7 +3909,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/ReadonlyFunctionRejector.php` | 0 | 2 |
 | `lib/ReadonlyMethodModifierRejector.php` | 0 | 2 |
 | `lib/ReferenceProfileTokenScan.php` | 0 | 1 |
-| `lib/Runtime.php` | 0 | 80 |
+| `lib/Runtime.php` | 0 | 81 |
 | `lib/RuntimeStrictness.php` | 0 | 1 |
 | `lib/SourceBareThrowRewriter.php` | 0 | 1 |
 | `lib/SourcePreprocessor/PropertyHooks.php` | 0 | 4 |
@@ -17344,23 +17350,23 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Exception (line 803)
 - new VmSerializeEnumCaseRef (line 853)
 - new VmSerializeEnumCaseRef (line 858)
-- new Variable (line 889)
-- new VmSerializeRefState (line 933)
-- new Variable (line 950)
-- new VmSerializeRefState (line 972)
-- new Variable (line 982)
-- new Variable (line 1032)
-- new Variable (line 1045)
-- new Variable (line 1151)
-- new ObjectEntry (line 1181)
-- new Variable (line 1185)
-- new Frame (line 1204)
-- new Variable (line 1207)
-- new Variable (line 1236)
-- new Variable (line 1252)
-- new Variable (line 1257)
-- new Variable (line 1272)
-- new Exception (line 1295)
+- new Variable (line 902)
+- new VmSerializeRefState (line 952)
+- new Variable (line 969)
+- new VmSerializeRefState (line 991)
+- new Variable (line 1001)
+- new Variable (line 1051)
+- new Variable (line 1064)
+- new Variable (line 1170)
+- new ObjectEntry (line 1200)
+- new Variable (line 1204)
+- new Frame (line 1223)
+- new Variable (line 1226)
+- new Variable (line 1255)
+- new Variable (line 1271)
+- new Variable (line 1276)
+- new Variable (line 1291)
+- new Exception (line 1314)
 - 59 class method(s)
 - 1 closure(s)
 
@@ -22945,6 +22951,42 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ObjectEntry (line 125)
 - new Variable (line 128)
 - 9 class method(s)
+
+### `ext/uuid/Module.php`
+
+**Warnings** (review for bootstrap subset):
+- new VM\Variable (line 20)
+- new uuid_create (line 29)
+- new uuid_generate (line 30)
+- 2 class method(s)
+
+### `ext/uuid/UuidConstants.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/uuid/UuidFunction.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/uuid/VmUuid.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s)
+
+### `ext/uuid/uuid_create.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 25)
+- 1 class method(s)
+
+### `ext/uuid/uuid_generate.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 24)
+- new Variable (line 29)
+- 1 class method(s)
 
 ### `ext/xml/BuiltinClasses.php`
 
@@ -30273,17 +30315,18 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ext\sodium\Module (line 263)
 - new ext\sqlite3\Module (line 264)
 - new ext\uri\Module (line 265)
-- new ext\standard\Module (line 266)
-- new JIT (line 342)
-- new JITContext (line 356)
-- new SealedClassPreprocessor (line 421)
-- new StaticClassPreprocessor (line 424)
-- new SourcePreprocessor\PropertyHooks (line 427)
-- new State (line 567)
-- new ReflectionProperty (line 594)
-- new ReflectionProperty (line 597)
-- new LintCompiler (line 1003)
-- new Variable (line 1133)
+- new ext\uuid\Module (line 266)
+- new ext\standard\Module (line 267)
+- new JIT (line 343)
+- new JITContext (line 357)
+- new SealedClassPreprocessor (line 422)
+- new StaticClassPreprocessor (line 425)
+- new SourcePreprocessor\PropertyHooks (line 428)
+- new State (line 568)
+- new ReflectionProperty (line 595)
+- new ReflectionProperty (line 598)
+- new LintCompiler (line 1004)
+- new Variable (line 1134)
 - 53 class method(s)
 
 ### `lib/RuntimeStrictness.php`
