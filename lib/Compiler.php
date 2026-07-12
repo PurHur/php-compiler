@@ -2465,6 +2465,9 @@ class Compiler {
                         ) {
                             break;
                         }
+                        if ($this->isStmtLoweredByFollowingEchoConcat($ops, $i)) {
+                            break;
+                        }
                         $savedAssignRefFlags = $this->assignRefBindRefFlags;
                         if (
                             $child instanceof Op\Expr\AssignRef
@@ -3209,6 +3212,18 @@ class Compiler {
         $flattened = $this->flattenBinaryConcatFromBlockOps($ops, $echoIndex, $op->expr)
             ?? $this->unwrapConcatListExpr($op->expr)
             ?? $this->flattenBinaryConcatToConcatList($op->expr);
+        if (null !== $flattened) {
+            $scoped = $this->filterCoalescesToEchoConcatScope(
+                $ops,
+                $echoIndex,
+                $op->expr,
+                $flattened,
+                $coalesces
+            );
+            if ([] !== $scoped) {
+                $coalesces = $scoped;
+            }
+        }
         $echoOperand = $op->expr;
         $coalesceSnapshots = [];
         foreach ($coalesces as $coalesce) {
@@ -3266,6 +3281,7 @@ class Compiler {
             }
             $concat = new Op\Expr\ConcatList($parts);
             $concat->result = $flattened->result;
+            $block = $this->compileEchoConcatFuncCallProducers($ops, $echoIndex, $flattened, $block);
             $this->compileOp($concat, $block);
             $var = $this->compileOperand($concat->result, $block, true);
         } else {
@@ -3273,6 +3289,42 @@ class Compiler {
         }
         $line = $op->getLine();
         $block->addOpCode(new OpCode(OpCode::TYPE_ECHO, $var, $line > 0 ? $line : null));
+
+        return $block;
+    }
+
+    /**
+     * php-cfg concat parts reference FuncCall.result temps without original metadata (#18315).
+     *
+     * @param Op[] $ops
+     */
+    private function compileEchoConcatFuncCallProducers(
+        array $ops,
+        int $echoIndex,
+        Op\Expr\ConcatList $flattened,
+        Block $block
+    ): Block {
+        $concatIdx = $this->findConcatStmtIndexForEcho($ops, $echoIndex, $flattened->result);
+        if (null === $concatIdx) {
+            return $block;
+        }
+        $rangeStart = $this->findEchoConcatBundleStart($ops, $concatIdx);
+        foreach ($flattened->list as $part) {
+            for ($j = $rangeStart; $j < $concatIdx; ++$j) {
+                $candidate = $ops[$j] ?? null;
+                if (
+                    !($candidate instanceof Op\Expr\FuncCall || $candidate instanceof Op\Expr\NsFuncCall)
+                    || !$this->operandsChainEqual($candidate->result, $part)
+                ) {
+                    continue;
+                }
+                $split = $this->compileFuncCallAfterChainedCoalesceArgs($candidate, $block);
+                if (null === $split) {
+                    $this->compileOp($candidate, $block);
+                }
+                break;
+            }
+        }
 
         return $block;
     }
@@ -4644,6 +4696,198 @@ class Compiler {
         }
 
         return $found;
+    }
+
+    /**
+     * Drop ?? stmts from earlier echoes when lowering Concat+Echo (#18315, keep #17375).
+     *
+     * @param Op[]                            $ops
+     * @param list<Op\Expr\BinaryOp\Coalesce> $coalesces
+     *
+     * @return list<Op\Expr\BinaryOp\Coalesce>
+     */
+    private function filterCoalescesToEchoConcatScope(
+        array $ops,
+        int $echoIndex,
+        Operand $echoExpr,
+        Op\Expr\ConcatList $flattened,
+        array $coalesces
+    ): array {
+        $allowed = $this->findCoalescesFeedingEchoConcat($ops, $echoIndex, $echoExpr, $flattened);
+        if ([] === $allowed) {
+            return $coalesces;
+        }
+        $allowedIds = [];
+        foreach ($allowed as $coalesce) {
+            $allowedIds[spl_object_id($coalesce)] = true;
+        }
+        $filtered = [];
+        foreach ($coalesces as $coalesce) {
+            if (isset($allowedIds[spl_object_id($coalesce)])) {
+                $filtered[] = $coalesce;
+            }
+        }
+
+        return $filtered;
+    }
+
+    /**
+     * @param Op[] $ops
+     *
+     * @return list<Op\Expr\BinaryOp\Coalesce>
+     */
+    private function findCoalescesFeedingEchoConcat(
+        array $ops,
+        int $echoIndex,
+        Operand $echoExpr,
+        Op\Expr\ConcatList $flattened
+    ): array {
+        $concatIdx = $this->findConcatStmtIndexForEcho($ops, $echoIndex, $echoExpr);
+        $rangeStart = null !== $concatIdx
+            ? $this->findEchoConcatBundleStart($ops, $concatIdx)
+            : max(0, $echoIndex - 8);
+        $rangeEnd = null !== $concatIdx ? $concatIdx : $echoIndex;
+        $found = [];
+        $seen = [];
+        $add = function (Op\Expr\BinaryOp\Coalesce $coalesce) use (&$found, &$seen): void {
+            $id = spl_object_id($coalesce);
+            if (isset($seen[$id])) {
+                return;
+            }
+            $seen[$id] = true;
+            $found[] = $coalesce;
+        };
+        for ($j = $rangeStart; $j < $rangeEnd; ++$j) {
+            if ($ops[$j] instanceof Op\Expr\BinaryOp\Coalesce) {
+                $add($ops[$j]);
+            }
+        }
+        foreach ($flattened->list as $part) {
+            foreach ($this->findEmbeddedCoalesces($part) as $nested) {
+                $add($nested);
+            }
+            $stmtCoalesce = $this->findStmtCoalesceFeedingConcatPart($ops, $rangeStart, $rangeEnd, $part);
+            if (null !== $stmtCoalesce) {
+                $add($stmtCoalesce);
+            }
+        }
+
+        return $found;
+    }
+
+    /**
+     * @param Op[] $ops
+     */
+    private function findConcatStmtIndexForEcho(array $ops, int $echoIndex, Operand $echoExpr): ?int
+    {
+        for ($j = $echoIndex - 1; $j >= 0; --$j) {
+            $candidate = $ops[$j] ?? null;
+            if (
+                $candidate instanceof Op\Expr\BinaryOp\Concat
+                && $this->operandsChainEqual($candidate->result, $echoExpr)
+            ) {
+                return $j;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @param Op[] $ops
+     */
+    private function findEchoConcatBundleStart(array $ops, int $concatIdx): int
+    {
+        $start = $concatIdx;
+        for ($j = $concatIdx - 1; $j >= 0; --$j) {
+            $candidate = $ops[$j] ?? null;
+            if (
+                $candidate instanceof Op\Expr\BinaryOp\Coalesce
+                || $candidate instanceof Op\Expr\ArrayDimFetch
+                || $candidate instanceof Op\Expr\ConstFetch
+                || $candidate instanceof Op\Expr\FuncCall
+                || $candidate instanceof Op\Expr\NsFuncCall
+                || $candidate instanceof Op\Expr\BinaryOp\Concat
+            ) {
+                $start = $j;
+                continue;
+            }
+            break;
+        }
+
+        return $start;
+    }
+
+    /**
+     * @param Op[] $ops
+     */
+    private function findStmtCoalesceFeedingConcatPart(
+        array $ops,
+        int $rangeStart,
+        int $rangeEnd,
+        Operand $part
+    ): ?Op\Expr\BinaryOp\Coalesce {
+        $funcCallIdx = null;
+        for ($j = $rangeStart; $j < $rangeEnd; ++$j) {
+            $candidate = $ops[$j] ?? null;
+            if (
+                ($candidate instanceof Op\Expr\FuncCall || $candidate instanceof Op\Expr\NsFuncCall)
+                && $this->operandsChainEqual($candidate->result, $part)
+            ) {
+                $funcCallIdx = $j;
+                break;
+            }
+        }
+        if (null === $funcCallIdx) {
+            return null;
+        }
+        for ($j = $funcCallIdx - 1; $j >= $rangeStart; --$j) {
+            if ($ops[$j] instanceof Op\Expr\BinaryOp\Coalesce) {
+                return $ops[$j];
+            }
+            if (
+                $ops[$j] instanceof Op\Expr\FuncCall
+                || $ops[$j] instanceof Op\Expr\NsFuncCall
+                || $ops[$j] instanceof Op\Terminal\Echo_
+            ) {
+                break;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Stmt producers before Concat+Echo bundle — defer to compileEchoWithEmbeddedCoalesce (#18315).
+     *
+     * @param Op[] $ops
+     */
+    private function isStmtLoweredByFollowingEchoConcat(array $ops, int $index): bool
+    {
+        $count = \count($ops);
+        for ($j = $index + 1; $j < $count; ++$j) {
+            $next = $ops[$j];
+            if ($next instanceof Op\Terminal\Echo_) {
+                $flattened = $this->flattenBinaryConcatFromBlockOps($ops, $j, $next->expr)
+                    ?? $this->unwrapConcatListExpr($next->expr)
+                    ?? $this->flattenBinaryConcatToConcatList($next->expr);
+                if (null === $flattened) {
+                    return false;
+                }
+                $concatIdx = $this->findConcatStmtIndexForEcho($ops, $j, $next->expr);
+                if (null === $concatIdx) {
+                    return false;
+                }
+                $rangeStart = $this->findEchoConcatBundleStart($ops, $concatIdx);
+
+                return $index >= $rangeStart && $index <= $concatIdx;
+            }
+            if ($next instanceof Op\Terminal\Return || $next instanceof Op\Expr\Assign) {
+                return false;
+            }
+        }
+
+        return false;
     }
 
     /**

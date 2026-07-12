@@ -290,6 +290,15 @@ echo "y=", var_export($a["k"] ?? null, true), "\n";
         );
     }
 
+    /** Issue #18315: prior bare echo ?? must not clobber merge slot for var_export(??, true) . suffix. */
+    public function testEchoVarExportConcatAfterPriorCoalesceEcho(): void
+    {
+        $this->assertVmOutput(
+            file_get_contents(__DIR__ . '/../repro/maintainer_gap_echo_varexport_concat_array_offset.php'),
+            "bcrypt\n'bcrypt'\n"
+        );
+    }
+
     /** Issue #15946 — outer call must use inner callee result, not ?? slot (array_keys after dim ??). */
     public function testArrayDimCoalesceNestedFuncCallArg(): void
     {
