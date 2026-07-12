@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\VM\ErrorReporter;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 
 /**
@@ -18,12 +19,19 @@ final class VmFsTempnam
     public const NOTICE_MESSAGE = "tempnam(): file created in the system's temporary directory";
 
     /**
-     * php-src ext/standard/file.c — null $directory selects system temp dir (#14672).
+     * php-src ext/standard/file.c — null $directory selects system temp dir (#14672);
+     * caller strict_types rejects null (#18244, zend_verify_arg_type).
      */
-    public static function resolveDirectoryArg(Variable $var): string
+    public static function resolveDirectoryArg(Variable $var, Frame $frame): string
     {
         $resolved = $var->resolveIndirect();
         if (Variable::TYPE_NULL === $resolved->type) {
+            if (InternalStrictArg::isCallerStrict($frame)) {
+                throw new \TypeError(
+                    'tempnam(): Argument #1 ($directory) must be of type string, null given'
+                );
+            }
+
             return VmSysGetTempDirNative::resolve();
         }
 
