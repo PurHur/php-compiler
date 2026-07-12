@@ -64,7 +64,7 @@ final class VmInotify
     }
 
     /**
-     * @return list<array<string, int|string>>|false
+     * @return list<array<string, mixed>>|false
      */
     public static function read(int $streamHandle): array|false
     {
@@ -93,7 +93,7 @@ final class VmInotify
     }
 
     /**
-     * @return list<array<string, int|string>>
+     * @return list<array<string, mixed>>
      */
     private static function parseEventBuffer(string $buf): array
     {

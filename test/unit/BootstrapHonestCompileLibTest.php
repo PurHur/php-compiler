@@ -114,6 +114,19 @@ LOG;
         $this->assertStringContainsString('#15602', $body);
     }
 
+    public function testVmInotifyPhpDocAvoidsUnionInsideGenericArrayValue(): void
+    {
+        $path = self::$root.'/ext/inotify/VmInotify.php';
+        $this->assertFileExists($path);
+        $src = (string) file_get_contents($path);
+        $this->assertStringNotContainsString(
+            'int|string>>',
+            $src,
+            'php-types Type::fromDecl() chokes on union inside generic PHPDoc value slot (#18230)'
+        );
+        $this->assertStringContainsString('list<array<string, mixed>>', $src);
+    }
+
     public function testBootstrapSdkFetchRoundTrip(): void
     {
         $pack = self::$root.'/script/bootstrap-sdk-pack.sh';
