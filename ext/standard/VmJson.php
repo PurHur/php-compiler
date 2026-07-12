@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\CompilerVersion;
+use PHPCompiler\ext\dom\DomJsonExport;
 use PHPCompiler\Frame;
 use PHPCompiler\MethodVisibility;
 use PHPCompiler\VM;
@@ -313,6 +314,9 @@ final class VmJson
                 $visited->attach($object);
                 try {
                     $lcClass = strtolower($object->class->name);
+                    if (DomJsonExport::handles($object)) {
+                        return DomJsonExport::exportZendJsonWire($object);
+                    }
                     if (DateTimeSupport::CLASS_DATETIME === $lcClass
                         || DateTimeSupport::CLASS_DATETIMEIMMUTABLE === $lcClass) {
                         return DateTimeSupport::exportZendJsonWireDateTimeLike($object);

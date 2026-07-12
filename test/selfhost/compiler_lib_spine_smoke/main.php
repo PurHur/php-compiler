@@ -188,6 +188,7 @@ require_once __DIR__.'/../../../ext/dom/DomElementTextContentJitHelper.php';
 require_once __DIR__.'/../../../ext/dom/DomExceptionConstants.php';
 require_once __DIR__.'/../../../ext/dom/DomGetElementByIdJitHelper.php';
 require_once __DIR__.'/../../../ext/dom/DomHtmlDocumentPropertySupport.php';
+require_once __DIR__.'/../../../ext/dom/DomJsonExport.php';
 require_once __DIR__.'/../../../ext/dom/DomLivingBuiltinClasses.php';
 require_once __DIR__.'/../../../ext/dom/DomLivingConstants.php';
 require_once __DIR__.'/../../../ext/dom/DomLoadHTMLJitHelper.php';
