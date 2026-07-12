@@ -3073,6 +3073,7 @@ require_once __DIR__.'/../../../lib/Block.php';
 require_once __DIR__.'/../../../lib/BuiltinByRefParams.php';
 require_once __DIR__.'/../../../lib/BuiltinFunctionClassConstant.php';
 require_once __DIR__.'/../../../lib/BuiltinInternalArgInfo.php';
+require_once __DIR__.'/../../../lib/BuiltinInternalTentativeReturnInfo.php';
 require_once __DIR__.'/../../../lib/BuiltinParamNames.php';
 require_once __DIR__.'/../../../lib/BuiltinTypeClassConstant.php';
 require_once __DIR__.'/../../../lib/Cfg/OpSubBlockAccess.php';
@@ -4340,6 +4341,7 @@ require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionMethodGetStaticVariable
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionMethodHasPrototype.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionMethodHasReturnType.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionMethodHasTentativeReturnType.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionMethodGetTentativeReturnType.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionMethodInvoke.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionMethodInvokeArgs.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionMethodIsAccessible.php';

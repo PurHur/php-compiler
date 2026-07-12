@@ -236,6 +236,7 @@ use PHPCompiler\VM\Builtin\ReflectionMethodHasPrototype;
 use PHPCompiler\VM\Builtin\ReflectionMethodGetReturnType;
 use PHPCompiler\VM\Builtin\ReflectionMethodGetStaticVariables;
 use PHPCompiler\VM\Builtin\ReflectionMethodHasReturnType;
+use PHPCompiler\VM\Builtin\ReflectionMethodGetTentativeReturnType;
 use PHPCompiler\VM\Builtin\ReflectionMethodHasTentativeReturnType;
 use PHPCompiler\VM\Builtin\ReflectionMethodInvoke;
 use PHPCompiler\VM\Builtin\ReflectionMethodInvokeArgs;
@@ -642,6 +643,8 @@ final class BuiltinClasses
         $rm->methodVisibility['getreturntype'] = $pub;
         $rm->methods['hastentativereturntype'] = new ReflectionMethodHasTentativeReturnType();
         $rm->methodVisibility['hastentativereturntype'] = $pub;
+        $rm->methods['gettentativereturntype'] = new ReflectionMethodGetTentativeReturnType();
+        $rm->methodVisibility['gettentativereturntype'] = $pub;
         $rm->methods['getprototype'] = new ReflectionMethodGetPrototype();
         $rm->methodVisibility['getprototype'] = $pub;
         $rm->methods['invoke'] = new ReflectionMethodInvoke();

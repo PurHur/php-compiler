@@ -7,6 +7,7 @@ namespace PHPCompiler\VM;
 use PHPCompiler\Block;
 use PHPCompiler\BuiltinByRefParams;
 use PHPCompiler\BuiltinInternalArgInfo;
+use PHPCompiler\BuiltinInternalTentativeReturnInfo;
 use PHPCompiler\BuiltinParamNames;
 use PHPCompiler\Compiler\AttributeEntry;
 use PHPCompiler\Compiler\AttributeNames;
@@ -1824,16 +1825,49 @@ final class ReflectionSupport
     }
 
     /**
-     * php-src: reflection_method_has_tentative_return_type() (#6597).
-     *
-     * User-declared methods in this compiler always store explicit return types on the
-     * declaring Func; inherited ZEND_TYPE_IS_TENTATIVE is not modeled yet — false for VM users.
+     * php-src: reflection_method_has_tentative_return_type() (#6597, #18226).
      */
     public static function reflectedMethodHasTentativeReturnType(Context $ctx, ObjectEntry $reflection): bool
     {
-        self::resolveReflectedMethod($ctx, $reflection);
+        return null !== self::reflectedMethodTentativeReturnTypeLabel($ctx, $reflection);
+    }
 
-        return false;
+    /**
+     * php-src: reflection_method_get_tentative_return_type() (#18226).
+     */
+    public static function reflectedMethodGetTentativeReturnTypeVariable(Context $ctx, ObjectEntry $reflection): Variable
+    {
+        $label = self::reflectedMethodTentativeReturnTypeLabel($ctx, $reflection);
+        if (null === $label) {
+            $out = new Variable(Variable::TYPE_NULL);
+
+            return $out;
+        }
+        $cfgType = ReflectionTypeSupport::cfgTypeFromLabel($label);
+        if (null === $cfgType) {
+            $out = new Variable(Variable::TYPE_NULL);
+
+            return $out;
+        }
+
+        return ReflectionTypeSupport::buildTypeVariable($ctx, $cfgType);
+    }
+
+    /**
+     * Zend tentative return label for internal methods; null when absent (#18226).
+     */
+    public static function reflectedMethodTentativeReturnTypeLabel(Context $ctx, ObjectEntry $reflection): ?string
+    {
+        [$declaring, $methodLc] = self::resolveReflectedMethodDeclaring($ctx, $reflection);
+        if (!$declaring->isInternal) {
+            return null;
+        }
+        $methodName = $declaring->methodNames[$methodLc] ?? self::methodNameFromReflection($reflection);
+
+        return BuiltinInternalTentativeReturnInfo::tentativeReturnTypeLabelForClassMethod(
+            $declaring->name,
+            $methodName
+        );
     }
 
     /**
