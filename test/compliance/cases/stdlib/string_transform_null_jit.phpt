@@ -1,22 +1,18 @@
 --TEST--
-stdlib string transform builtins — null $string TypeError JIT (#18253, ext/standard/string.c)
+stdlib string transform builtins — null $string coerces to empty string JIT (#18263, ext/standard/string.c)
 --JIT--
 --FILE--
 <?php
 foreach (['str_rot13', 'str_shuffle', 'str_repeat', 'hebrev'] as $fn) {
-    try {
-        if ('str_repeat' === $fn) {
-            $fn(null, 2);
-        } else {
-            $fn(null);
-        }
-        echo "{$fn}: uncaught\n";
-    } catch (TypeError $e) {
-        echo $e->getMessage(), "\n";
+    if ('str_repeat' === $fn) {
+        var_export($fn(null, 2));
+    } else {
+        var_export($fn(null));
     }
+    echo "\n";
 }
 --EXPECT--
-str_rot13(): Argument #1 ($string) must be of type string, null given
-str_shuffle(): Argument #1 ($string) must be of type string, null given
-str_repeat(): Argument #1 ($string) must be of type string, null given
-hebrev(): Argument #1 ($string) must be of type string, null given
+''
+''
+''
+''

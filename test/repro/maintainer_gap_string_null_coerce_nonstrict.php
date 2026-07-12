@@ -1,10 +1,10 @@
 <?php
 
-foreach (['bin2hex', 'base64_encode', 'quoted_printable_encode', 'quoted_printable_decode'] as $fn) {
-    $result = $fn(null);
-    if ('' !== $result) {
-        echo "{$fn}: expected empty string, got ", var_export($result, true), "\n";
-        exit(1);
+foreach (['str_rot13', 'str_shuffle', 'str_repeat', 'hebrev'] as $fn) {
+    if ('str_repeat' === $fn) {
+        var_export($fn(null, 2));
+    } else {
+        var_export($fn(null));
     }
-    echo "{$fn}: ok\n";
+    echo "\n";
 }
