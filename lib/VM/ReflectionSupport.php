@@ -139,6 +139,11 @@ final class ReflectionSupport
         return sprintf('Class "%s" does not exist', $className);
     }
 
+    public static function classNotEnumMessage(string $className): string
+    {
+        return sprintf('Class "%s" is not an enum', $className);
+    }
+
     public static function methodNotFoundMessage(string $className, string $method): string
     {
         return sprintf('Method %s::%s() does not exist', $className, $method);
