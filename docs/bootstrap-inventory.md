@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 4594 |
-| Phase A inventory files (M2 ratio SSOT) | 4594 |
+| PHP files on vm.php path | 4596 |
+| Phase A inventory files (M2 ratio SSOT) | 4596 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 12439 |
+| Source constructs flagged (warnings) | 12443 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1253,6 +1253,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitObListHandlers.php` | 0 | 1 |
 | `ext/standard/JitObStart.php` | 0 | 1 |
 | `ext/standard/JitOpendir.php` | 0 | 1 |
+| `ext/standard/JitOpensslRandomPseudoBytes.php` | 0 | 1 |
 | `ext/standard/JitOrd.php` | 0 | 1 |
 | `ext/standard/JitOutputRewriteVars.php` | 0 | 1 |
 | `ext/standard/JitPack.php` | 0 | 2 |
@@ -3713,6 +3714,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Call/HashTablePadCopy.php` | 0 | 2 |
 | `lib/JIT/Call/HashTableUpdateIndex.php` | 0 | 1 |
 | `lib/JIT/Call/HashTableValuesCopy.php` | 0 | 2 |
+| `lib/JIT/Call/HashTableWriteNested.php` | 0 | 2 |
 | `lib/JIT/Call/Native.php` | 0 | 4 |
 | `lib/JIT/Call/ReflectionAttributeGetName.php` | 0 | 1 |
 | `lib/JIT/Call/ReflectionAttributeNewInstance.php` | 0 | 2 |
@@ -3860,7 +3862,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/NestedContextMethodLlvm.php` | 0 | 2 |
 | `lib/JIT/NestedJitCompileScope.php` | 0 | 1 |
 | `lib/JIT/NestedVmActiveContextLlvm.php` | 0 | 2 |
-| `lib/JIT/NestedVmHashTableMethodLlvm.php` | 0 | 1 |
+| `lib/JIT/NestedVmHashTableMethodLlvm.php` | 0 | 2 |
 | `lib/JIT/NestedVmVariableMethodLlvm.php` | 0 | 2 |
 | `lib/JIT/NoDiscardCallGuard.php` | 0 | 2 |
 | `lib/JIT/NonObjectPropertyFetchHelper.php` | 0 | 2 |
@@ -8113,13 +8115,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/openssl/openssl_cipher_iv_length.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 32)
+- new ArgumentCountError (line 34)
 - 2 class method(s)
 
 ### `ext/openssl/openssl_cipher_key_length.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 32)
+- new ArgumentCountError (line 34)
 - 2 class method(s)
 
 ### `ext/openssl/openssl_digest.php`
@@ -12687,6 +12689,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
+
+### `ext/standard/JitOpensslRandomPseudoBytes.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
 
 ### `ext/standard/JitOrd.php`
 
@@ -26662,7 +26669,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/PregMatchRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 514)
+- new JIT (line 509)
 - 15 class method(s)
 - 2 closure(s)
 
@@ -28968,6 +28975,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 32)
 - 2 class method(s)
 
+### `lib/JIT/Call/HashTableWriteNested.php`
+
+**Warnings** (review for bootstrap subset):
+- new Variable (line 73)
+- 4 class method(s)
+
 ### `lib/JIT/Call/Native.php`
 
 **Warnings** (review for bootstrap subset):
@@ -29957,6 +29970,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/NestedVmHashTableMethodLlvm.php`
 
 **Warnings** (review for bootstrap subset):
+- new Call\HashTableWriteNested (line 48)
 - 2 class method(s)
 
 ### `lib/JIT/NestedVmVariableMethodLlvm.php`
@@ -30558,8 +30572,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new State (line 570)
 - new ReflectionProperty (line 597)
 - new ReflectionProperty (line 600)
-- new LintCompiler (line 1014)
-- new Variable (line 1144)
+- new LintCompiler (line 1006)
+- new Variable (line 1136)
 - 53 class method(s)
 
 ### `lib/RuntimeStrictness.php`
