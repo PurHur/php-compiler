@@ -5825,6 +5825,8 @@ restart:
                         }
                         if ($frame->fiberSuspend) {
                             $frame->fiberSuspend = false;
+                            $frame->call = null;
+                            $this->clearOutgoingCallState($frame);
 
                             return self::FIBER_SUSPEND;
                         }
@@ -7623,6 +7625,8 @@ restart:
             }
             if ($frame->fiberSuspend) {
                 $frame->fiberSuspend = false;
+                $frame->call = null;
+                $this->clearOutgoingCallState($frame);
 
                 return self::FIBER_SUSPEND;
             }
