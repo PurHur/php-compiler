@@ -840,9 +840,13 @@ final class ReflectionSupport
         return $entry->isFinal;
     }
 
-    /** php-src zim_ReflectionClass_isIterateable — implements Traversable (#18297). */
+    /** php-src zim_ReflectionClass_isIterateable — concrete Traversable, not interfaces (#18297, #18324). */
     public static function reflectionClassIsIterateable(ClassEntry $entry, Context $ctx): bool
     {
+        if ($entry->isInterface) {
+            return false;
+        }
+
         return InterfaceCheck::entryImplements($entry, 'traversable', $ctx);
     }
 

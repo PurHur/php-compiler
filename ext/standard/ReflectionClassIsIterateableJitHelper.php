@@ -23,6 +23,9 @@ final class ReflectionClassIsIterateableJitHelper
         if (null === $entry) {
             return false;
         }
+        if ($entry->isInterface) {
+            return false;
+        }
 
         return InterfaceCheck::entryImplements($entry, 'traversable', $ctx);
     }
