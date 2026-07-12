@@ -141,6 +141,10 @@ final class VmLocalePure
                 return self::querySetlocale($category, '0');
             }
 
+            if (self::isLcAll($category)) {
+                self::bootstrapTrackingIfNeeded();
+            }
+
             // Bootstrap only for setlocale(LC_ALL, null) queries (#8684). Running it before
             // category mutations (e.g. setlocale(LC_TIME, 'C')) poisons nl_langinfo(CODESET).
             $result = @\setlocale($category, $locale);
@@ -230,9 +234,13 @@ final class VmLocalePure
     private static function querySetlocale(int $category, ?string $mode): string|false
     {
         if (self::isLcAll($category) && null === $mode) {
-            self::bootstrapTrackingIfNeeded();
+            // php-src ext/standard/locale.c — LC_ALL null query reads host state (#18210, #8684).
+            $result = @\setlocale($category, null);
+            if (false === $result || '' === $result) {
+                return false;
+            }
 
-            return self::$preservedLcCtype ?? 'C';
+            return self::normalizeCompositeLocaleName($result);
         }
 
         $result = @\setlocale($category, '0');
@@ -241,5 +249,16 @@ final class VmLocalePure
         }
 
         return $result;
+    }
+
+    /** php-src: LC_ALL query returns a single name, not a composite with semicolons (#8684). */
+    private static function normalizeCompositeLocaleName(string $locale): string
+    {
+        $semi = \strpos($locale, ';');
+        if (false !== $semi) {
+            return \substr($locale, 0, $semi);
+        }
+
+        return $locale;
     }
 }
