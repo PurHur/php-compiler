@@ -729,6 +729,46 @@ PHP;
         self::assertSame('__phpc_property_set_x', $registry['c']['x']['set'] ?? null);
     }
 
+    /** @covers issue #18170 — explicit virtual modifier stripped before php-parser; registry marks virtual */
+    public function testExplicitVirtualModifierStrippedAndMarkedVirtual(): void
+    {
+        $this->skipUnlessPropertyHooksEnabled();
+        $src = <<<'PHP'
+<?php
+class Base {
+    public virtual string $x {
+        get => 'base';
+    }
+}
+PHP;
+        [$out, $registry] = (new PropertyHooks())->process($src);
+        self::assertStringNotContainsString('virtual', $out);
+        self::assertStringContainsString('public string $x;', $out);
+        self::assertTrue($registry['base']['x']['virtual'] ?? false);
+    }
+
+    /** @covers issue #18170 — parent::$prop->get() lowered to parent hook method call */
+    public function testRewriteParentPropertyHookRefGetCall(): void
+    {
+        $this->skipUnlessPropertyHooksEnabled();
+        $src = <<<'PHP'
+<?php
+class Base {
+    public virtual string $x {
+        get => 'base';
+    }
+}
+class Child extends Base {
+    public virtual string $x {
+        get => parent::$x->get() . '-child';
+    }
+}
+PHP;
+        [$out] = (new PropertyHooks())->process($src);
+        self::assertStringContainsString('parent::__phpc_property_get_x()', $out);
+        self::assertStringNotContainsString('parent::$x->get()', $out);
+    }
+
     /** @covers issue #16861 — virtual default + hook block rejected with Zend compile error on forward profile */
     public function testDefaultInitializerWithVirtualPropertyHooksRejectedOnForwardProfile(): void
     {
