@@ -239,6 +239,42 @@ final class VmString
     }
 
     /**
+     * Internal method string param — frame arg index may include $this (#18189, zend_exceptions.c).
+     *
+     * @throws \TypeError when caller strict_types rejects non-string operands
+     */
+    public static function internalMethodStringArgForFrame(
+        Frame $frame,
+        int $frameArgIndex,
+        string $function,
+        int $userArgIndex,
+        string $paramName
+    ): string {
+        if (InternalStrictArg::isCallerStrict($frame)) {
+            $arg = $frame->calledArgs[$frameArgIndex]->resolveIndirect();
+            if (Variable::TYPE_STRING !== $arg->type) {
+                throw new \TypeError(
+                    self::stringBuiltinTypeError(
+                        $function,
+                        $userArgIndex,
+                        $paramName,
+                        VmStreamArg::debugTypeName($arg)
+                    )
+                );
+            }
+
+            return $arg->toString();
+        }
+
+        return self::coerceStringBuiltinArg(
+            $frame->calledArgs[$frameArgIndex],
+            $function,
+            $userArgIndex,
+            $paramName
+        );
+    }
+
+    /**
      * Coerce a path builtin operand (php-src Z_PARAM_PATH; rejects embedded NUL, #4401).
      *
      * @throws \ValueError when the path contains a null byte
