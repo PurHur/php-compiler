@@ -7,6 +7,7 @@ namespace PHPCompiler\VM\Builtin;
 use PHPCompiler\ext\standard\VmReflection;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\ReflectionSupport;
+use PHPCompiler\VM\ReflectionTypeSupport;
 
 /** ReflectionMethod::getTentativeReturnType() — VM (#18226, ext/reflection/php_reflection.c). */
 final class ReflectionMethodGetTentativeReturnType extends VmClassMethod
@@ -23,8 +24,12 @@ final class ReflectionMethodGetTentativeReturnType extends VmClassMethod
         }
         $ctx = VmReflection::requireContext($frame);
         $receiver = ReflectionSupport::requireReflectionMethod($frame, $frame->calledArgs[0]);
-        $frame->returnVar->copyFrom(
-            ReflectionSupport::reflectedMethodGetTentativeReturnTypeVariable($ctx, $receiver)
-        );
+        $declared = ReflectionSupport::reflectedMethodTentativeReturnType($ctx, $receiver);
+        if (null === $declared) {
+            $frame->returnVar->null();
+
+            return;
+        }
+        $frame->returnVar->copyFrom(ReflectionTypeSupport::buildTypeVariable($ctx, $declared));
     }
 }

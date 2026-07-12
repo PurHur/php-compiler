@@ -13,7 +13,7 @@ use PHPLLVM\Value;
 /**
  * JIT/AOT link for array_count_values() via ArrayCountValuesJitHelper PHP (#12331).
  *
- * Standalone AOT compiles {@see ArrayCountValuesJitHelper} via JitVmHelperLink bridge (#14485); native literal arrays keep LLVM in {@see ArrayBuiltinHelper::arrayCountValues()}.
+ * Standalone AOT and native literal arrays materialize to hashtable then route through PHP (#14485, #18232).
  * SSOT: {@see \PHPCompiler\ext\standard\VmArray::countValues()}
  * php-src: ext/standard/array.c — php_array_count_values()
  */
@@ -32,10 +32,10 @@ final class ArrayCountValuesRuntime
 
     public static function countValues(Context $context, JITVariable $array): Value
     {
-        // Route all operands through the PHP helper so warn-and-skip matches VM (#4267, #17398).
-        // Native LLVM array_count_values skips invalid entries without E_WARNING.
         self::ensureLinked($context);
-        $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
+        $ht = ArrayBuiltinHelper::isNativeArray($array->type)
+            ? ArrayBuiltinHelper::nativeListToHashTable($context, $array)
+            : ArrayBuiltinHelper::loadHashTable($context, $array);
 
         return $context->builder->call(
             $context->lookupFunction(self::ABI_COUNT),

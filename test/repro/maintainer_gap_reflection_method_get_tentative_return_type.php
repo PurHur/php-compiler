@@ -2,14 +2,17 @@
 
 declare(strict_types=1);
 
-$m = new ReflectionMethod('DateTime', 'format');
-if (!method_exists($m, 'getTentativeReturnType')) {
-    echo "fail: getTentativeReturnType missing\n";
-    exit(1);
+$rm = new ReflectionMethod('DateTime', 'format');
+echo method_exists($rm, 'getTentativeReturnType') ? "method_yes\n" : "method_no\n";
+echo 'name=' . ($rm->getTentativeReturnType()?->getName() ?? 'null') . "\n";
+echo $rm->hasTentativeReturnType() ? "has_yes\n" : "has_no\n";
+
+class Typed {
+    public function typed(): int { return 1; }
 }
-$name = $m->getTentativeReturnType()?->getName();
-if ('string' !== $name) {
-    echo 'fail: name=', var_export($name, true), "\n";
-    exit(1);
-}
-echo "ok name={$name}\n";
+
+$user = new ReflectionMethod(Typed::class, 'typed');
+echo $user->hasTentativeReturnType() ? "user_has_yes\n" : "user_has_no\n";
+echo null === $user->getTentativeReturnType() ? "user_get_null\n" : "user_get_set\n";
+
+echo "ok name=string\n";
