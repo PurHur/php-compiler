@@ -4314,6 +4314,7 @@ require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionFunctionGetExtensionNam
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionFunctionGetName.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionFunctionGetNamedArguments.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionFunctionGetNumberOfParameters.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionFunctionGetNumberOfRequiredParameters.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionFunctionGetParameters.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionFunctionGetReturnType.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionFunctionGetStaticVariables.php';
