@@ -15,6 +15,7 @@ use PHPCfg\Traverser;
 use PHPCfg\LivenessDetector as CfgLivenessDetector;
 use PHPCfg\Visitor;
 use PHPCfg\Script;
+use PHPCompiler\PHPTypes\CompilerTypeReconstructor;
 use PHPTypes\TypeReconstructor;
 use PhpParser\NodeTraverser;
 use PhpParser\NodeVisitor;
@@ -164,7 +165,7 @@ class Runtime {
         $this->detector = new NullSafeLivenessDetector;
         $this->assignOpResolver = new Optimizer\AssignOp;
 
-        $this->typeReconstructor = new TypeReconstructor;
+        $this->typeReconstructor = new CompilerTypeReconstructor;
     }
 
     /**
