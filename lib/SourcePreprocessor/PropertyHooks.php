@@ -1002,6 +1002,8 @@ final class PropertyHooks
             $propDeclHead = rtrim(substr($body, $declStart, $hookOpen - $declStart));
             $isAbstractHook = (bool) preg_match('/\babstract\b/', $declPrefix.$propDeclHead);
             $isFinalProperty = (bool) preg_match('/\bfinal\b/', $declPrefix.$propDeclHead);
+            // PHP 8.4 explicit `virtual` modifier — strip before nikic/php-parser (#18170, zend_language_parser.y).
+            $isExplicitVirtual = (bool) preg_match('/\bvirtual\b/', $declPrefix.$propDeclHead);
             $isInterfaceHook = 'interface' === $declKind;
             if ($isAbstractHook) {
                 $declPrefix = preg_replace('/\babstract\s+/', '', $declPrefix) ?? $declPrefix;
@@ -1010,6 +1012,10 @@ final class PropertyHooks
             if ($isFinalProperty) {
                 $declPrefix = preg_replace('/\bfinal\s+/', '', $declPrefix) ?? $declPrefix;
                 $propDeclHead = preg_replace('/\bfinal\s+/', '', $propDeclHead) ?? $propDeclHead;
+            }
+            if ($isExplicitVirtual) {
+                $declPrefix = preg_replace('/\bvirtual\s+/', '', $declPrefix) ?? $declPrefix;
+                $propDeclHead = preg_replace('/\bvirtual\s+/', '', $propDeclHead) ?? $propDeclHead;
             }
             $isStatic = (bool) preg_match('/\bstatic\b/', $declPrefix.$propDeclHead);
             $isPromotedCtorParam = $this->isPromotedConstructorParam(
@@ -1100,14 +1106,14 @@ final class PropertyHooks
                 || !empty($propMeta['requiresSet'])
                 || !empty($propMeta['requiresUnset']);
             $isSemicolonOnlyHook = [] === $methods && $hasSemicolonRequirements;
-            if (([] !== $methods && !$usesBacking) || $isAbstractHook || $isInterfaceHook || $isTraitAbstractHook || $isSemicolonOnlyHook) {
+            if (([] !== $methods && !$usesBacking) || $isAbstractHook || $isInterfaceHook || $isTraitAbstractHook || $isSemicolonOnlyHook || $isExplicitVirtual) {
                 if (!isset($this->registry[$lcClass][$prop])) {
                     $this->registry[$lcClass][$prop] = [];
                 }
                 if ($isAbstractHook || $isInterfaceHook || $isTraitAbstractHook || $isSemicolonOnlyHook) {
                     $this->registry[$lcClass][$prop]['abstract'] = true;
                 }
-                if ([] === $methods || !$usesBacking || $isInterfaceHook || $isSemicolonOnlyHook) {
+                if ([] === $methods || !$usesBacking || $isInterfaceHook || $isSemicolonOnlyHook || $isExplicitVirtual) {
                     $this->registry[$lcClass][$prop]['virtual'] = true;
                 }
             }
@@ -1655,6 +1661,7 @@ final class PropertyHooks
         string $body,
         ?string $propertyType = null
     ): string {
+        $body = $this->rewriteParentPropertyHookRefCalls($body);
         $static = $isStatic ? 'static ' : '';
         $typedParams = $params;
         $returnSuffix = '';
@@ -1673,6 +1680,28 @@ final class PropertyHooks
         }
 
         return "    public {$static}function {$method}(){$returnSuffix} {$body}";
+    }
+
+    /**
+     * parent::$prop->get()/set() → parent::__phpc_property_get_*() for VM parent dispatch (#18170, zend_property_hooks.c).
+     */
+    private function rewriteParentPropertyHookRefCalls(string $source): string
+    {
+        $rewritten = preg_replace_callback(
+            '/parent::\$(\w+)->get\(\)/',
+            fn (array $m): string => 'parent::'.self::GET_METHOD_PREFIX.$m[1].'()',
+            $source
+        );
+        if (!is_string($rewritten)) {
+            return $source;
+        }
+        $rewritten = preg_replace_callback(
+            '/parent::\$(\w+)->set\(([^)]*)\)/',
+            fn (array $m): string => 'parent::'.self::SET_METHOD_PREFIX.$m[1].'('.$m[2].')',
+            $rewritten
+        );
+
+        return is_string($rewritten) ? $rewritten : $source;
     }
 
     private function typedSetHookParams(string $params, string $propertyType): string
