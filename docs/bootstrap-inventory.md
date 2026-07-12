@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 4669 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 12609 |
+| Source constructs flagged (warnings) | 12610 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -373,6 +373,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/hash/mhash_keygen_s2k.php` | 0 | 3 |
 | `ext/iconv/CharsetEngine.php` | 0 | 1 |
 | `ext/iconv/CharsetString.php` | 0 | 1 |
+| `ext/iconv/IconvConstants.php` | 0 | 1 |
 | `ext/iconv/IconvEncodingState.php` | 0 | 3 |
 | `ext/iconv/IconvJitHelper.php` | 0 | 1 |
 | `ext/iconv/IconvStringFunction.php` | 0 | 2 |
@@ -7030,6 +7031,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 8 class method(s)
 
+### `ext/iconv/IconvConstants.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `ext/iconv/IconvEncodingState.php`
 
 **Warnings** (review for bootstrap subset):
@@ -10236,12 +10242,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ClassEntry (line 48)
 - new SplFileObjectConstruct (line 68)
 - new ArgumentCountError (line 140)
-- new ArgumentCountError (line 362)
-- new ArgumentCountError (line 392)
-- new ArgumentCountError (line 460)
-- new ArgumentCountError (line 567)
-- new Variable (line 707)
-- new ArgumentCountError (line 750)
+- new ArgumentCountError (line 363)
+- new ArgumentCountError (line 393)
+- new ArgumentCountError (line 461)
+- new ArgumentCountError (line 568)
+- new Variable (line 708)
+- new ArgumentCountError (line 751)
 - 21 class method(s)
 
 ### `ext/spl/SplFileObjectStorage.php`
