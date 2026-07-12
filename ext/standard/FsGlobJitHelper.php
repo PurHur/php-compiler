@@ -30,6 +30,14 @@ final class FsGlobJitHelper
     {
         $result = VmDir::scandir($path, $sortOrder);
         if (false === $result) {
+            $reason = VmFsPhpWrapper::openDirFailureReason($path);
+            TriggerErrorJitHelper::warning(
+                \sprintf('scandir(%s): Failed to open directory: %s', $path, $reason)
+            );
+            if (VmFsPhpWrapper::isPhpWrapperPath($path)) {
+                TriggerErrorJitHelper::warning('scandir(): (errno 0): Success');
+            }
+
             return null;
         }
 
