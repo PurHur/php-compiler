@@ -173,7 +173,7 @@ final class VmPregEngine
     private static function capturesToOvector(array $captures): array
     {
         $max = 0;
-        foreach (\array_keys($captures) as $k) {
+        foreach ($captures as $k => $_) {
             if (\is_int($k) && $k > $max) {
                 $max = $k;
             }
@@ -1033,7 +1033,11 @@ final class VmPregEngine
             $tryOrder[] = $c;
         }
         if ($quant->isGreedy()) {
-            $tryOrder = \array_reverse($tryOrder);
+            $reversed = [];
+            for ($ri = \count($tryOrder) - 1; $ri >= 0; --$ri) {
+                $reversed[] = $tryOrder[$ri];
+            }
+            $tryOrder = $reversed;
         }
         foreach ($tryOrder as $count) {
             $tryCaptures = $saved;
