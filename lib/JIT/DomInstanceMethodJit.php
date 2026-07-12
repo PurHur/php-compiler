@@ -17,23 +17,28 @@ final class DomInstanceMethodJit
     {
         $lc = strtolower(ltrim($proxyName, '\\'));
         if (self::shouldDeferToVmClassMethodLowering()) {
-            return self::isUserScriptDomMethod($lc);
+            return self::isUserScriptDirectMethod($lc);
         }
 
         return (bool) preg_match('/^dom[a-z0-9_]*::[a-z0-9_]+$/', $lc);
     }
 
-    /** User-script AOT: direct LLVM for createElement/loadHTML/getElementById (#17954). */
-    private static function isUserScriptDomMethod(string $proxyLc): bool
+    /** User-script AOT: dedicated LLVM bridges (#17954, #18268). */
+    private static function isUserScriptDirectMethod(string $proxyLc): bool
     {
-        if ('domdocument::createelement' === $proxyLc
-            || 'domdocument::loadhtml' === $proxyLc
-            || 'domdocument::getelementbyid' === $proxyLc) {
-            return true;
-        }
-
-        return false;
+        return isset(self::USER_SCRIPT_DIRECT_METHODS[$proxyLc]);
     }
+
+    /** @var array<string, true> */
+    private const USER_SCRIPT_DIRECT_METHODS = [
+        'domdocument::createelement' => true,
+        'domdocument::loadhtml' => true,
+        'domdocument::getelementbyid' => true,
+        'domdocument::loadxml' => true,
+        'domdocument::savexml' => true,
+        'domdocument::savehtml' => true,
+        'domdocument::savehtmlfile' => true,
+    ];
 
     /** User-script AOT: nested VmDomInstanceInvoke JIT aborts — use VmClassMethod lowering (#15407, #17391). */
     public static function shouldDeferToVmClassMethodLowering(): bool
@@ -65,7 +70,27 @@ final class DomInstanceMethodJit
 
                 return;
             }
-            if (!self::isUserScriptDomMethod($lc)) {
+            if ('domdocument::loadxml' === $lc) {
+                $context->functionProxies[$lc] = new Call\DomDocumentLoadXML();
+
+                return;
+            }
+            if ('domdocument::savexml' === $lc) {
+                $context->functionProxies[$lc] = new Call\DomDocumentSaveXML();
+
+                return;
+            }
+            if ('domdocument::savehtml' === $lc) {
+                $context->functionProxies[$lc] = new Call\DomDocumentSaveHTML();
+
+                return;
+            }
+            if ('domdocument::savehtmlfile' === $lc) {
+                $context->functionProxies[$lc] = new Call\DomDocumentSaveHTMLFile();
+
+                return;
+            }
+            if (!self::isUserScriptDirectMethod($lc)) {
                 return;
             }
         }
@@ -91,6 +116,10 @@ final class DomInstanceMethodJit
             self::ensureProxy($context, 'domdocument::createelement');
             self::ensureProxy($context, 'domdocument::loadhtml');
             self::ensureProxy($context, 'domdocument::getelementbyid');
+            self::ensureProxy($context, 'domdocument::loadxml');
+            self::ensureProxy($context, 'domdocument::savexml');
+            self::ensureProxy($context, 'domdocument::savehtml');
+            self::ensureProxy($context, 'domdocument::savehtmlfile');
 
             return;
         }
