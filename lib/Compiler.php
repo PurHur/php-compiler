@@ -43868,15 +43868,18 @@ class Compiler {
                 }
             }
             if (null !== $cfgCallOp && !$this->isEmbeddedCallLiteralArg($arg)) {
-                $pendingDimFetchSlot = $this->lastPendingCallArgArrayDimFetchSlot($block, $sends);
-                if (null === $pendingDimFetchSlot && (
-                    null !== $dimFetchSlot
-                    || $this->callArgIsDeadInlineHaystackFamilySlot(
-                        $cfgCallOp,
-                        (int) $argIndex,
-                        $calleeName,
-                        $arg
-                    )
+                $pendingDimFetchSlot = null;
+                if (null !== $dimFetchSlot) {
+                    // stream_set_blocking($pipes[1], false) — dim-fetch slot is arg #0 only (#18186).
+                    $pendingDimFetchSlot = $this->lastPendingCallArgArrayDimFetchSlot($block, $sends);
+                    if (null === $pendingDimFetchSlot) {
+                        $pendingDimFetchSlot = $this->pendingCallArgArrayDimFetchSlot($block, $sends, 0);
+                    }
+                } elseif ($this->callArgIsDeadInlineHaystackFamilySlot(
+                    $cfgCallOp,
+                    (int) $argIndex,
+                    $calleeName,
+                    $arg
                 )) {
                     $pendingDimFetchSlot = $this->pendingCallArgArrayDimFetchSlot($block, $sends, 0);
                 }
