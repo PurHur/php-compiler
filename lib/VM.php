@@ -6167,6 +6167,7 @@ restart:
                         $classEntry->readonly = VM\ClassFlags::isReadonly($classFlags);
                         $classEntry->isAbstract = VM\ClassFlags::isAbstract($classFlags);
                         $classEntry->isStatic = VM\ClassFlags::isStatic($classFlags);
+                        $classEntry->isFinal = VM\ClassFlags::isFinal($classFlags);
                     }
                     if ($op->isSealed) {
                         $classEntry->sealed = true;
