@@ -274,23 +274,38 @@ final class JitStat
         $ptr = JitValueBox::pointer($context, $slot);
         $id = (string) (++self::$blockSerial);
         $failBlock = BasicBlockHelper::append($context, 'disk_space_fail_'.$id);
+        $warnBlock = BasicBlockHelper::append($context, 'disk_space_warn_'.$id);
+        $silentFailBlock = BasicBlockHelper::append($context, 'disk_space_silent_fail_'.$id);
         $okBlock = BasicBlockHelper::append($context, 'disk_space_ok_'.$id);
         $doneBlock = BasicBlockHelper::append($context, 'disk_space_done_'.$id);
         $context->builder->branchIf($failed, $failBlock, $okBlock);
 
         $context->builder->positionAtEnd($failBlock);
+        $pathLen = $context->builder->call($context->lookupFunction('__string__strlen'), $str);
+        $isEmpty = $context->builder->icmp(Builder::INT_EQ, $pathLen, $i64->constInt(0, false));
+        $context->builder->branchIf($isEmpty, $silentFailBlock, $warnBlock);
+
+        $context->builder->positionAtEnd($warnBlock);
         self::emitStatWarning($context, $warnFunction.'(): No such file or directory');
+        $context->builder->branch($silentFailBlock);
+
+        $context->builder->positionAtEnd($silentFailBlock);
         $i1 = $context->getTypeFromString('int1');
         JitValueBox::writeBool($context, $slot, $i1->constInt(0, false));
+        $failEnd = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($okBlock);
         JitValueBox::writeLong($context, $slot, $bytes);
+        $okEnd = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($doneBlock);
+        $phi = $context->builder->phi($ptr->typeOf());
+        $phi->addIncoming($ptr, $failEnd);
+        $phi->addIncoming($ptr, $okEnd);
 
-        return $ptr;
+        return $phi;
     }
 
     private static function emitStatWarning(Context $context, string $message): void
