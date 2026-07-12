@@ -14,7 +14,7 @@ use PHPCompiler\JIT\Builtin\StreamIoRuntime;
  */
 final class NestedVmHashTableMethodLlvm
 {
-    /** @var array<string, class-string<Call>> */
+    /** @var array<string, class-string<Call>|string> */
     private const METHOD_HANDLERS = [
         'add' => Call\HashTableAdd::class,
         'append' => Call\HashTableAppend::class,
@@ -25,6 +25,9 @@ final class NestedVmHashTableMethodLlvm
         'keyscopy' => Call\HashTableKeysCopy::class,
         'keysmatchingcopy' => Call\HashTableKeysMatchingCopy::class,
         'exportkeyvaluepairs' => Call\HashTableExportKeyValuePairs::class,
+        'add' => Call\HashTableWriteNested::class,
+        'updateindex' => Call\HashTableWriteNested::class,
+        'append' => Call\HashTableWriteNested::class,
     ];
 
     public static function ensureMethod(Context $context, string $methodLc): bool
@@ -41,7 +44,11 @@ final class NestedVmHashTableMethodLlvm
         if ($context->functionIsRegistered($proxyName)) {
             return true;
         }
-        $context->functionProxies[$proxyName] = new $handler();
+        if (Call\HashTableWriteNested::class === $handler) {
+            $context->functionProxies[$proxyName] = new Call\HashTableWriteNested($methodLc);
+        } else {
+            $context->functionProxies[$proxyName] = new $handler();
+        }
 
         return true;
     }

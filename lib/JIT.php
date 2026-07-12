@@ -15233,8 +15233,8 @@ class JIT {
             return false;
         }
         if (
-            'phpcompiler\\vm\\hashtable' === $declaringClassLc
-            && JIT\NestedVmHashTableMethodLlvm::isNestedHashTableMethod($methodLc)
+            JIT\NestedVmHashTableMethodLlvm::isNestedHashTableMethod($methodLc)
+            && ('phpcompiler\\vm\\hashtable' === $declaringClassLc || 'object' === $declaringClassLc)
         ) {
             if (!JIT\NestedVmHashTableMethodLlvm::ensureMethod($this->context, $methodLc)) {
                 return false;
