@@ -36,6 +36,10 @@ class Module extends ModuleAbstract
             new xml_parse(),
             new xml_parser_free(),
             new xml_get_error_code(),
+            new xml_error_string(),
+            new xml_get_current_line_number(),
+            new xml_get_current_column_number(),
+            new xml_get_current_byte_index(),
             new xml_parse_into_struct(),
         ];
     }
