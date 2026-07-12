@@ -20,6 +20,8 @@ use PHPLLVM\Value;
  */
 final class openssl_random_pseudo_bytes extends Internal
 {
+    private const LENGTH_ERROR = 'openssl_random_pseudo_bytes(): Argument #1 ($length) must be greater than 0';
+
     public function __construct()
     {
         parent::__construct('openssl_random_pseudo_bytes');
@@ -34,6 +36,9 @@ final class openssl_random_pseudo_bytes extends Internal
             );
         }
         $length = self::parseLength($frame->calledArgs[0]->resolveIndirect());
+        if ($length <= 0) {
+            throw new \ValueError(self::LENGTH_ERROR);
+        }
         $bytes = VmString::randomBytes($length);
         if ($argc >= 2) {
             $frame->calledArgs[1]->resolveIndirect()->bool(true);
@@ -53,6 +58,7 @@ final class openssl_random_pseudo_bytes extends Internal
             );
         }
         $length = JitSleep::zParamLong($context, $args[0], 'openssl_random_pseudo_bytes', 1, 'length');
+        JitOpensslRandomPseudoBytes::emitRuntimeLengthGuard($context, $length);
         $result = JitRandomBytes::generate($context, $length);
         if (2 === $argc) {
             $context->builder->call(
