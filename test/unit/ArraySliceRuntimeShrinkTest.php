@@ -12,7 +12,7 @@ use PHPUnit\Framework\TestCase;
 /** array_slice() JIT routes all operands through ArraySliceJitHelper PHP not ArrayBuiltinHelper native LLVM (#12410, #14285, #17936). */
 final class ArraySliceRuntimeShrinkTest extends TestCase
 {
-    private const ARRAY_BUILTIN_HELPER_MAX_LINES = 12110;
+    private const ARRAY_BUILTIN_HELPER_MAX_LINES = 1920;
 
     public function testArraySliceRuntimeUsesJitHelperNotDirectLlvmMonolith(): void
     {

@@ -16,8 +16,8 @@ final class NaturalSortRuntimeShrinkTest extends TestCase
     {
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/NaturalSortRuntime.php');
         $this->assertStringContainsString('NaturalSortJitHelper', $runtime);
-        $this->assertStringContainsString('ArrayBuiltinHelper::natsortByValue', $runtime);
         $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);
+        $this->assertStringNotContainsString('ArrayBuiltinHelper::natsortByValue', $runtime);
 
         $natsort = (string) file_get_contents(__DIR__.'/../../ext/standard/natsort_.php');
         $natcasesort = (string) file_get_contents(__DIR__.'/../../ext/standard/natcasesort_.php');
