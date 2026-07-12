@@ -1521,6 +1521,7 @@
         "ext/standard/LcgJitHelper.php",
         "ext/standard/LdexpJitHelper.php",
         "ext/standard/LevenshteinJitHelper.php",
+        "ext/standard/LibcryptJitHelper.php",
         "ext/standard/LinkJitHelper.php",
         "ext/standard/LocaltimeJitHelper.php",
         "ext/standard/Log10JitHelper.php",
@@ -3352,7 +3353,7 @@
         "lib/JIT/Builtin/LateStaticBindingRuntime.php",
         "lib/JIT/Builtin/Lcg.php",
         "lib/JIT/Builtin/LdapRuntime.php",
-        "lib/JIT/Builtin/LibcryptThinRuntime.php",
+        "lib/JIT/Builtin/LibcryptRuntime.php",
         "lib/JIT/Builtin/ListUnpackRuntime.php",
         "lib/JIT/Builtin/LocaleParser.php",
         "lib/JIT/Builtin/MathAbs.php",
@@ -4903,9 +4904,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 4669,
+        "inventory_files": 4670,
         "excluded": 0,
-        "eligible": 4669,
+        "eligible": 4670,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
