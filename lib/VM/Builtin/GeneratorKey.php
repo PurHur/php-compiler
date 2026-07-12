@@ -24,7 +24,7 @@ final class GeneratorKey extends VmClassMethod
         }
         if ($gen->hasCurrent) {
             $staging = new Variable();
-            $staging->copyFrom($gen->currentKey);
+            $staging->duplicateFrom($gen->currentKey);
             $frame->returnVar->copyFrom($staging);
         } else {
             $frame->returnVar->null();

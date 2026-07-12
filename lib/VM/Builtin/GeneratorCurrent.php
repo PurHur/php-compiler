@@ -23,9 +23,9 @@ final class GeneratorCurrent extends VmClassMethod
             return;
         }
         if ($gen->hasCurrent) {
-            // FUNCCALL result slots may alias generator/$this storage (#1885, #18183).
+            // FUNCCALL result slots may alias generator state storage (#1885, #18183).
             $staging = new Variable();
-            $staging->copyFrom($gen->currentValue);
+            $staging->duplicateFrom($gen->currentSnapshot);
             $frame->returnVar->copyFrom($staging);
         } else {
             $frame->returnVar->null();

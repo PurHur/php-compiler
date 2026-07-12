@@ -4346,6 +4346,30 @@ PHP;
         self::assertSame("key=1\n", $out);
     }
 
+    /** Issue #18183 — consecutive echo var_export($g->current(), true) after bare-yield send (Zend/zend_generators.c). */
+    public function testVarExportNestedGeneratorCurrentDoubleEchoAfterBareYieldSend(): void
+    {
+        $code = <<<'PHP'
+<?php
+function g(): Generator {
+    $x = yield;
+    yield $x * 2;
+}
+$g = g();
+$g->rewind();
+$g->send(3);
+echo var_export($g->current(), true), "\n";
+echo var_export($g->current(), true), "\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'var_export_nested_generator_current_double_echo.php');
+
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertSame("6\n6\n", $out);
+    }
+
     /** var_export($g->valid(), true) after Generator::send assign + prior var_export (Zend/zend_generators.c). */
     public function testVarExportNestedGeneratorValidAfterSendAssignUsesMethodCallProducerSlot(): void
     {
@@ -7228,6 +7252,80 @@ PHP;
         ob_start();
         $runtime->run($block);
         self::assertSame("bool(true)\n", ob_get_clean());
+    }
+
+    /** Issue #18186 — stream_set_blocking($pipes[1], false) wires dim-fetch + hoisted false, not duplicate resource. */
+    public function testStreamSetBlockingProcPipeDimFetchAndFalseUseDistinctArgSlots(): void
+    {
+        $code = <<<'PHP'
+<?php
+$desc = [1 => ['pipe', 'w'], 2 => ['pipe', 'w']];
+$pipes = [];
+$proc = proc_open('true', $desc, $pipes);
+stream_set_blocking($pipes[1], false);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'stream_set_blocking_proc_pipe.php');
+
+        $dimFetchSlot = null;
+        $falseSlot = null;
+        $blockingSends = [];
+        $fcallOrdinal = 0;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                ++$fcallOrdinal;
+                if (2 === $fcallOrdinal) {
+                    $blockingSends = [];
+                }
+                continue;
+            }
+            if (OpCode::TYPE_ARG_SEND === $op->type && 2 === $fcallOrdinal) {
+                $blockingSends[] = $op->arg1;
+            }
+            if (OpCode::TYPE_ARRAY_DIM_FETCH === $op->type) {
+                $dimFetchSlot = $op->arg1;
+            }
+            if (OpCode::TYPE_CONST_FETCH === $op->type) {
+                $falseSlot = $op->arg1;
+            }
+        }
+
+        self::assertNotNull($dimFetchSlot, 'pipes[1] dim-fetch must lower');
+        self::assertNotNull($falseSlot, 'hoisted false ConstFetch must lower');
+        self::assertCount(2, $blockingSends, 'arg sends='.json_encode($blockingSends));
+        self::assertSame($dimFetchSlot, $blockingSends[0], 'arg sends='.json_encode($blockingSends));
+        self::assertSame($falseSlot, $blockingSends[1], 'arg sends='.json_encode($blockingSends));
+        self::assertNotSame($blockingSends[0], $blockingSends[1], 'stream and mode must differ');
+    }
+
+    /** Issue #18186 — proc_get_status after proc_close reaches post-close TypeError once pipes unblock. */
+    public function testProcGetStatusAfterCloseRuntime(): void
+    {
+        $code = <<<'PHP'
+<?php
+$desc = [1 => ['pipe', 'w'], 2 => ['pipe', 'w']];
+$proc = proc_open('true', $desc, $pipes);
+stream_set_blocking($pipes[1], false);
+stream_set_blocking($pipes[2], false);
+while ('' !== (string) stream_get_contents($pipes[1]) || '' !== (string) stream_get_contents($pipes[2])) {
+}
+fclose($pipes[1]);
+fclose($pipes[2]);
+$code = proc_close($proc);
+try {
+    proc_get_status($proc);
+    echo "no-throw\n";
+} catch (TypeError $e) {
+    echo get_class($e), "\n";
+}
+echo 'closed=', $code, "\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'proc_get_status_after_close.php');
+
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("TypeError\nclosed=0\n", ob_get_clean());
     }
 
     /** Issue #15611 — get_defined_constants(true) assign must not steal firstSibling from get_declared_traits haystack. */
