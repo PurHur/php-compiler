@@ -19,6 +19,7 @@ final class ReservedBuiltinClass
         'curlmultihandle' => 'Cannot directly construct CurlMultiHandle, use curl_multi_init() instead',
         'curlsharehandle' => 'Cannot directly construct CurlShareHandle, use curl_share_init() instead',
         'directory' => 'Cannot directly construct Directory, use dir() instead',
+        'xmlparser' => 'Cannot directly construct XMLParser, use xml_parser_create() instead',
     ];
 
     /** @var array<string, string> lc => display name — compile-time implements guard (#13327, #15445) */

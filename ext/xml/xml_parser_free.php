@@ -29,12 +29,9 @@ final class xml_parser_free extends Internal
             return;
         }
 
-        $parserArg = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_INTEGER !== $parserArg->type) {
-            throw new \TypeError('xml_parser_free(): Argument #1 ($parser) must be of type XMLParser');
-        }
+        $parser = XmlParserSupport::requireParser($frame->calledArgs[0], 'xml_parser_free', 1);
 
-        $frame->returnVar->bool(VmXml::parserFree($parserArg->toInt()));
+        $frame->returnVar->bool(VmXml::parserFree($parser->id));
     }
 
     public function call(Context $context, JITVariable ...$args): Value
