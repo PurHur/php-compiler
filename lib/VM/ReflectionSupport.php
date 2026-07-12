@@ -834,6 +834,18 @@ final class ReflectionSupport
         return [$obj, $entry, $ctx];
     }
 
+    /** php-src zim_ReflectionClass_isFinal — ce->ce_flags & ZEND_ACC_FINAL (#18297). */
+    public static function reflectionClassIsFinal(ClassEntry $entry): bool
+    {
+        return $entry->isFinal;
+    }
+
+    /** php-src zim_ReflectionClass_isIterateable — implements Traversable (#18297). */
+    public static function reflectionClassIsIterateable(ClassEntry $entry, Context $ctx): bool
+    {
+        return InterfaceCheck::entryImplements($entry, 'traversable', $ctx);
+    }
+
     /** php-src zim_ReflectionClass_isInstantiable — abstract/interface/trait/enum/static/private ctor (#6302). */
     public static function reflectionClassIsInstantiable(ClassEntry $entry): bool
     {

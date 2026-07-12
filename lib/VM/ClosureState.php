@@ -253,6 +253,7 @@ final class ClosureState
     public static function register(Context $ctx): void
     {
         $entry = new ClassEntry('Closure');
+        $entry->isFinal = true;
         $pubStatic = \PHPCfg\Func::FLAG_PUBLIC | \PHPCfg\Func::FLAG_STATIC;
         $entry->methods['fromcallable'] = new Builtin\ClosureFromCallable();
         $entry->methodVisibility['fromcallable'] = $pubStatic;
