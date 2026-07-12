@@ -9,7 +9,7 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPUnit\Framework\TestCase;
 
-/** array_map() JIT routes null/string-builtin/closure through ArrayMapJitHelper PHP not ArrayBuiltinHelper LLVM (#10183, #14977). */
+/** array_map() JIT routes null/string-builtin/closure through ArrayMapJitHelper PHP not ArrayBuiltinHelper LLVM (#10183, #14977, #18328). */
 final class ArrayMapRuntimeShrinkTest extends TestCase
 {
     public function testArrayMapRuntimeUsesJitHelperNotDirectLlvmMonolith(): void
@@ -34,6 +34,9 @@ final class ArrayMapRuntimeShrinkTest extends TestCase
 
         $arrayBuiltin = (string) file_get_contents(__DIR__.'/../../lib/JIT/ArrayBuiltinHelper.php');
         $this->assertStringContainsString('ArrayMapRuntime::mapMultipleWithClosure', $arrayBuiltin);
+        $this->assertStringNotContainsString('function buildMapArray', $arrayBuiltin);
+        $this->assertStringNotContainsString('function buildMapFromHashTable', $arrayBuiltin);
+        $this->assertStringNotContainsString('function buildMapNullFromHashTable', $arrayBuiltin);
         $this->assertStringNotContainsString('buildMapClosureZipFromMultiple', $arrayBuiltin);
         $this->assertStringNotContainsString('buildMapFromHashTableWithClosure', $arrayBuiltin);
         $this->assertStringNotContainsString('buildMapFromNativeArrayWithClosure', $arrayBuiltin);
