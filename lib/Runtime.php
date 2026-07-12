@@ -908,6 +908,7 @@ class Runtime {
             && ('1' === $prevUserScriptAot || 'true' === strtolower((string) $prevUserScriptAot));
         if ($deferUserScriptAotInit && \function_exists('putenv')) {
             // User-script Context init + nested preg JIT OOMs (#16075); link preg on a non-user init first.
+            JIT\VmActiveContextInitLlvm::resetPendingState();
             putenv('PHP_COMPILER_AOT_USER_SCRIPT=');
             unset($_ENV['PHP_COMPILER_AOT_USER_SCRIPT'], $_SERVER['PHP_COMPILER_AOT_USER_SCRIPT']);
             $this->jitContext = null;
