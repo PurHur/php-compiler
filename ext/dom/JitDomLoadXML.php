@@ -7,7 +7,6 @@ namespace PHPCompiler\ext\dom;
 use PHPCompiler\JIT\Builtin\DomLoadXMLRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
-use PHPCompiler\JIT\NamedOptionalCallArgs;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -20,14 +19,30 @@ final class JitDomLoadXML
             throw new \LogicException('DOMDocument::loadXML() expects receiver and XML string');
         }
 
+        if (JitDomLoadXMLUserScript::shouldUse($context)) {
+            $us = JitDomLoadXMLUserScript::tryInvoke($context, ...$args);
+            if (null !== $us) {
+                return $us;
+            }
+        }
+
+        DomLoadXMLRuntime::ensureLinked($context);
+
         $document = self::loadObjectArg($context, $args[0]);
         $xmlStr = self::loadStringArg($context, $args[1]);
-
-        return $context->builder->call(
+        $raw = $context->builder->call(
             $context->lookupFunction(DomLoadXMLRuntime::ABI_NAME),
             $document,
             $xmlStr
         );
+        $slot = JitValueBox::alloc($context);
+        $i32 = $context->getTypeFromString('int32');
+        $boolArg = 'int1' === $context->getStringFromType($raw->typeOf())
+            ? $context->builder->zext($raw, $i32)
+            : $raw;
+        JitValueBox::writeBool($context, $slot, $boolArg);
+
+        return JitValueBox::normalizeValuePtr($context, $slot);
     }
 
     private static function loadObjectArg(Context $context, JITVariable $arg): Value

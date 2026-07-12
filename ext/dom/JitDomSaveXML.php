@@ -19,6 +19,15 @@ final class JitDomSaveXML
             throw new \LogicException('DOMDocument::saveXML() expects receiver');
         }
 
+        if (JitDomSaveXMLUserScript::shouldUse($context)) {
+            $us = JitDomSaveXMLUserScript::tryInvoke($context);
+            if (null !== $us) {
+                return $us;
+            }
+        }
+
+        DomSaveXMLRuntime::ensureLinked($context);
+
         return self::boxStringResult(
             $context,
             $context->builder->call(
@@ -30,11 +39,15 @@ final class JitDomSaveXML
 
     private static function boxStringResult(Context $context, Value $str): Value
     {
+        $owned = $context->builder->call(
+            $context->lookupFunction('__string__separate'),
+            $str
+        );
         $slot = JitValueBox::alloc($context);
         $context->builder->call(
             $context->lookupFunction('__value__writeString'),
             JitValueBox::pointer($context, $slot),
-            $str
+            $owned
         );
 
         return JitValueBox::normalizeValuePtr($context, $slot);
