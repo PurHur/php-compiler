@@ -2087,16 +2087,18 @@ final class VmDom
         $idAttrByElement = self::parseDoctypeIdAttributes($trimmed);
         $generalEntities = self::parseDoctypeGeneralEntities($trimmed);
         [$elementXml, $elementOffset] = self::stripDoctypeWithOffset($trimmed);
-        $validationError = VmXml::validationErrorRecord($elementXml);
-        if (null !== $validationError) {
-            self::reportDomLibxmlError(
-                $ctx,
-                $validationError['message'],
-                $validationError['code'],
-                $validationError['column'],
-                $frame,
-                $validationError['level']
-            );
+        $validationErrors = VmXml::validationErrorRecords($elementXml);
+        if ([] !== $validationErrors) {
+            foreach ($validationErrors as $validationError) {
+                self::reportDomLibxmlError(
+                    $ctx,
+                    $validationError['message'],
+                    $validationError['code'],
+                    $validationError['column'],
+                    $frame,
+                    $validationError['level']
+                );
+            }
 
             return false;
         }
