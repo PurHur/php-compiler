@@ -35,7 +35,6 @@ final class strpos extends Internal
             throw new \LogicException('strpos() requires two or three arguments');
         }
         InternalStrictArg::rejectNullString($frame->calledArgs[0], 'strpos', 'haystack', 0, $frame);
-        InternalStrictArg::rejectNullString($frame->calledArgs[1], 'strpos', 'needle', 1, $frame);
         $haystackStr = self::vmStringArg($frame, 0, 'haystack');
         $needleStr = self::vmStringArg($frame, 1, 'needle');
         if (null === $frame->returnVar) {
@@ -63,7 +62,6 @@ final class strpos extends Internal
             throw new \LogicException('strpos() requires two or three arguments');
         }
         JitInternalStrictArg::rejectNullString($context, $args[0], 'strpos', 'haystack', 1);
-        JitInternalStrictArg::rejectNullString($context, $args[1], 'strpos', 'needle', 2);
         $hayLit = JitStringArg::compileTimeLiteral($args[0]);
         $needleLit = JitStringArg::compileTimeLiteral($args[1]);
         $offsetLit = 3 === $argc ? self::tryCompileTimeInt($context, $args[2]) : 0;

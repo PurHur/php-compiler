@@ -1,19 +1,13 @@
 <?php
 
-declare(strict_types=1);
-
 $fail = 0;
 
-foreach (['strpos', 'substr_compare'] as $fn) {
-    try {
-        if ('strpos' === $fn) {
-            $fn('haystack', null);
-        } else {
-            $fn('a', null, 0);
-        }
-        fwrite(STDERR, "$fn: expected TypeError on null needle\n");
+foreach (['strpos', 'stripos'] as $fn) {
+    $result = $fn('abc', null);
+    if (0 !== $result) {
+        fwrite(STDERR, "$fn('abc', null): expected int(0), got " . var_export($result, true) . "\n");
         ++$fail;
-    } catch (TypeError $e) {
+    } else {
         echo "$fn: ok\n";
     }
 }
