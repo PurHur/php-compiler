@@ -28422,16 +28422,6 @@ class Compiler {
                 continue;
             }
             if ($child instanceof Op\Expr\FuncCall || $child instanceof Op\Expr\NsFuncCall) {
-                if (
-                    null !== $consumerIndex
-                    && $this->statementLevelFuncCallBeforeHoistedSiblingChain(
-                        $j,
-                        $consumerIndex,
-                        $cfgChildren
-                    )
-                ) {
-                    continue;
-                }
                 ++$base;
                 continue;
             }

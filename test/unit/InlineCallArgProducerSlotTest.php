@@ -4392,6 +4392,31 @@ PHP;
         self::assertSame("send=NULL\nvalid_inline=false\nvalid_stored=false\n", $out);
     }
 
+    /** Issue #18184 — var_export($g2->current(), true) after prior bare-yield send on another generator. */
+    public function testVarExportSecondGeneratorCurrentAfterFirstSendUsesCorrectMethodCallExecReturn(): void
+    {
+        $code = <<<'PHP'
+<?php
+function g(): Generator {
+    $x = yield;
+    yield $x * 2;
+}
+$g = g();
+$g->send(3);
+$g2 = g();
+$g2->rewind();
+$g2->send(3);
+echo var_export($g2->current(), true), "\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'var_export_generator_cross_instance_current.php');
+
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertSame("6\n", $out);
+    }
+
     /** Issue #13830 — var_export(next($a), true) in concat after prior next($a). */
     public function testVarExportNestedNextUsesFuncCallProducerSlot(): void
     {
