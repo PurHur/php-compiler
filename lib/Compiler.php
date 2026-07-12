@@ -36751,7 +36751,8 @@ class Compiler {
             if (OpCode::TYPE_FUNCCALL_INIT === $op->type || OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
                 break;
             }
-            if (!\in_array($op->type, [OpCode::TYPE_ARRAY_DIM_FETCH, OpCode::TYPE_ARRAY_DIM_FETCH_WRITE], true)) {
+            // Write lvalues (TYPE_ARRAYACCESS_OFFSET) are not dim-fetch read results (#10639).
+            if (OpCode::TYPE_ARRAY_DIM_FETCH !== $op->type) {
                 if ([] !== $dimFetchOpcodes) {
                     break;
                 }
@@ -36792,7 +36793,8 @@ class Compiler {
     }
 
     /**
-     * Last ARRAY_DIM_FETCH before pending FUNCCALL_INIT — var_export($meta['k'], …) after earlier dim assigns (#18005).
+     * Last ARRAY_DIM_FETCH (read) before pending FUNCCALL_INIT — var_export($meta['k'], …) after earlier dim assigns (#18005).
+     * Exclude TYPE_ARRAY_DIM_FETCH_WRITE: write lvalues must not feed call args (#10639).
      *
      * @param list<OpCode> $pendingOps
      */
@@ -36805,7 +36807,7 @@ class Compiler {
             if (OpCode::TYPE_FUNCCALL_INIT === $op->type || OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
                 break;
             }
-            if (\in_array($op->type, [OpCode::TYPE_ARRAY_DIM_FETCH, OpCode::TYPE_ARRAY_DIM_FETCH_WRITE], true)) {
+            if (OpCode::TYPE_ARRAY_DIM_FETCH === $op->type) {
                 array_unshift($dimFetchOpcodes, $op);
             }
         }

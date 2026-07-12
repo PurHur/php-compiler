@@ -1267,6 +1267,9 @@ final class Variable {
             case self::TYPE_STRING_OFFSET:
                 $this->string($var->toString());
                 break;
+            case self::TYPE_ARRAYACCESS_OFFSET:
+                $this->copyFrom($var->readArrayAccessOffsetValue());
+                break;
             case self::TYPE_PROPERTY_HOOK_REF:
                 $this->copyFrom($var->propertyHookRef->read());
                 break;
