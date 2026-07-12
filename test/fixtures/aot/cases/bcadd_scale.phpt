@@ -1,5 +1,5 @@
 --TEST--
-AOT: bcadd() smoke (#6100)
+AOT bcadd() — literal scale compiles and runs (#3365, ext/bcmath/bcmath.c)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--

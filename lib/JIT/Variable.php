@@ -99,6 +99,9 @@ final class Variable {
     /** Float literal value when this variable represents a constant double operand. */
     public ?float $compileTimeFloat = null;
 
+    /** Integer literal value when this variable represents a constant long operand. */
+    public ?int $compileTimeLong = null;
+
     /** User/global constant name when this variable holds a compile-time const fetch. */
     public ?string $compileTimeConstantName = null;
 
@@ -505,6 +508,7 @@ final class Variable {
         switch ($type) {
             case self::TYPE_NATIVE_LONG:
                 $value = $context->constantFromInteger($op->value, self::getStringType($type));
+                $literal = (int) $op->value;
                 break;
             case self::TYPE_STRING:
                 $value = $context->builder->load($context->constantStringFromString($op->value));
@@ -595,6 +599,8 @@ final class Variable {
         if (isset($literal)) {
             if (\is_string($literal)) {
                 $var->compileTimeString = $literal;
+            } elseif (\is_int($literal)) {
+                $var->compileTimeLong = $literal;
             } elseif (\is_float($literal)) {
                 $var->compileTimeFloat = $literal;
             }
@@ -604,12 +610,15 @@ final class Variable {
     }
 
     public static function fromConstantInt(Context $context, int $value): Variable {
-        return new Variable(
+        $var = new Variable(
             $context,
             self::TYPE_NATIVE_LONG,
             self::KIND_VALUE,
             $context->constantFromInteger($value)
         );
+        $var->compileTimeLong = $value;
+
+        return $var;
     }
 
     public function castTo(int $type): self {
