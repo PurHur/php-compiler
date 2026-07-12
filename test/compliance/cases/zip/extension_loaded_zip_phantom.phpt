@@ -1,5 +1,5 @@
 --TEST--
-stdlib extension_loaded('zip') withheld on reference profile (#18137, ext/zip/php_zip.c)
+zip extension_loaded('zip') withheld on reference profile (#18137, ext/zip/php_zip.c)
 --FILE--
 <?php
 declare(strict_types=1);
