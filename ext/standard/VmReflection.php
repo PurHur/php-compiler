@@ -2471,6 +2471,35 @@ final class VmReflection
         return self::REFLECTION_IS_PUBLIC;
     }
 
+    /** php-src ReflectionClass::IS_* values returned by getModifiers() (#18335). */
+    public const REFLECTION_CLASS_IS_IMPLICIT_ABSTRACT = 16;
+
+    public const REFLECTION_CLASS_IS_EXPLICIT_ABSTRACT = 64;
+
+    public const REFLECTION_CLASS_IS_FINAL = 32;
+
+    public const REFLECTION_CLASS_IS_READONLY = 65536;
+
+    /** php-src zim_ReflectionClass_get_modifiers — ce->ce_flags class bitmask (#18335). */
+    public static function classEntryToReflectionModifiers(ClassEntry $entry): int
+    {
+        if ($entry->isInterface || $entry->isTrait) {
+            return 0;
+        }
+        $modifiers = 0;
+        if ($entry->isAbstract || [] !== $entry->abstractMethods) {
+            $modifiers |= self::REFLECTION_CLASS_IS_EXPLICIT_ABSTRACT;
+        }
+        if ($entry->isFinal) {
+            $modifiers |= self::REFLECTION_CLASS_IS_FINAL;
+        }
+        if ($entry->readonly) {
+            $modifiers |= self::REFLECTION_CLASS_IS_READONLY;
+        }
+
+        return $modifiers;
+    }
+
     /** php-src zend_get_function_modifiers() for ReflectionMethod::getModifiers() (#7116). */
     public static function cfgMethodFlagsToReflectionModifiers(int $cfgFlags): int
     {
@@ -3326,5 +3355,171 @@ final class VmReflection
             default:
                 return 'mixed';
         }
+    }
+
+    /**
+     * php-src reflection_extension_get_classes — name => ReflectionClass (#18326).
+     */
+    public static function reflectionExtensionClassesTable(Context $ctx, string $extension): HashTable
+    {
+        $ht = new HashTable();
+        $ext = strtolower($extension);
+        $rcClass = $ctx->classes[ReflectionSupport::REFLECTION_CLASS] ?? null;
+        if (null === $rcClass) {
+            return $ht;
+        }
+        foreach ($ctx->classes as $entry) {
+            if (!$entry->isInternal) {
+                continue;
+            }
+            if (self::logicalExtensionForInternalClass($entry->name) !== $ext) {
+                continue;
+            }
+            $name = $entry->name;
+            $obj = new \PHPCompiler\VM\ObjectEntry($rcClass);
+            $obj->constructed = true;
+            $obj->getProperty(ReflectionSupport::PROP_CLASS_NAME)->string($name);
+            $slot = new Variable();
+            $slot->object($obj);
+            $key = new Variable();
+            $key->string($name);
+            $ht->add($key->toString(), $slot);
+        }
+
+        return $ht;
+    }
+
+    public static function logicalExtensionForInternalClass(string $className): ?string
+    {
+        $lc = strtolower(ltrim($className, '\\'));
+        if (\in_array($lc, [
+            '__php_incomplete_class',
+            'assertionerror',
+            'php_user_filter',
+            'directory',
+        ], true)) {
+            return 'standard';
+        }
+        if (str_starts_with($lc, 'dom') || 'domxpath' === $lc) {
+            return 'dom';
+        }
+        if (
+            str_starts_with($lc, 'spl')
+            || str_starts_with($lc, 'recursive')
+            || str_starts_with($lc, 'filter')
+            || str_starts_with($lc, 'regex')
+            || str_starts_with($lc, 'parent')
+            || str_starts_with($lc, 'limit')
+            || str_starts_with($lc, 'glob')
+            || str_starts_with($lc, 'append')
+            || str_starts_with($lc, 'caching')
+            || str_starts_with($lc, 'empty')
+            || str_starts_with($lc, 'norewind')
+            || \in_array($lc, [
+                'arrayiterator', 'arrayobject', 'directoryiterator', 'filesystemiterator',
+                'logicexception', 'badfunctioncallexception', 'badmethodcallexception',
+                'domainexception', 'invalidargumentexception', 'lengthexception',
+                'outofrangeexception', 'outofboundsexception', 'overflowexception',
+                'runtimeexception', 'underflowexception', 'unexpectedvalueexception',
+            ], true)
+        ) {
+            return 'spl';
+        }
+        if (
+            str_starts_with($lc, 'datetime')
+            || \in_array($lc, ['dateinterval', 'dateperiod', 'datetimelocale', 'datetimezone'], true)
+        ) {
+            return 'date';
+        }
+        if (str_starts_with($lc, 'json')) {
+            return 'json';
+        }
+        if ('closure' === $lc || 'generator' === $lc) {
+            return 'core';
+        }
+        if (str_starts_with($lc, 'reflection')) {
+            return 'core';
+        }
+        if (str_starts_with($lc, 'fiber')) {
+            return 'core';
+        }
+        if (str_starts_with($lc, 'weak')) {
+            return 'core';
+        }
+        if ('stdclass' === $lc || 'resource' === $lc) {
+            return 'core';
+        }
+
+        return null;
+    }
+
+    /** php-src reflection_extension_get_version — phpversion($extension) (#18326). */
+    public static function reflectionExtensionVersion(string $extension): string
+    {
+        $version = VmInfo::phpversion($extension);
+        if (false === $version) {
+            return CompilerVersion::reportedPhpVersion();
+        }
+
+        return $version;
+    }
+
+    /**
+     * php-src reflection_extension_get_functions — name => ReflectionFunction (#18326).
+     */
+    public static function reflectionExtensionFunctionsTable(Context $ctx, string $extension): HashTable
+    {
+        $ht = new HashTable();
+        $funcs = ModuleRegistry::getExtensionFunctions($extension) ?? [];
+        $rfClass = $ctx->classes[ReflectionSupport::REFLECTION_FUNCTION] ?? null;
+        if (null === $rfClass) {
+            return $ht;
+        }
+        foreach ($funcs as $name) {
+            $lc = strtolower($name);
+            $func = $ctx->functions[$lc] ?? null;
+            $obj = new \PHPCompiler\VM\ObjectEntry($rfClass);
+            $obj->constructed = true;
+            $obj->reflectionIsInternalFunction = $func instanceof FuncInternal;
+            $obj->getProperty(ReflectionSupport::PROP_FUNC_NAME)->string($name);
+            $slot = new Variable();
+            $slot->object($obj);
+            $key = new Variable();
+            $key->string($name);
+            $ht->add($key->toString(), $slot);
+        }
+
+        return $ht;
+    }
+
+    /**
+     * php-src reflection_extension_get_constants — extension module constants (#18326).
+     */
+    public static function reflectionExtensionConstantsTable(Context $ctx, string $extension): HashTable
+    {
+        $ht = new HashTable();
+        $ext = strtolower($extension);
+        $groups = ExtensionConstantGroups::groups();
+        $constants = $groups[$ext] ?? [];
+        foreach ($constants as $name => $fallback) {
+            $value = $ctx->constantFetchBuiltin($name);
+            if (null === $value) {
+                $value = new Variable();
+                if (\is_int($fallback)) {
+                    $value->int($fallback);
+                } elseif (\is_float($fallback)) {
+                    $value->float($fallback);
+                } elseif (\is_bool($fallback)) {
+                    $value->bool($fallback);
+                } else {
+                    $value->string((string) $fallback);
+                }
+            }
+            $key = new Variable();
+            $key->string($name);
+            $ht->add($name, $value);
+        }
+
+        return $ht;
     }
 }

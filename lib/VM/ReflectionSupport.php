@@ -840,6 +840,18 @@ final class ReflectionSupport
         return $entry->isFinal;
     }
 
+    /** php-src zim_ReflectionClass_isInterface — ce->ce_flags & ZEND_ACC_INTERFACE (#18335). */
+    public static function reflectionClassIsInterface(ClassEntry $entry): bool
+    {
+        return $entry->isInterface;
+    }
+
+    /** php-src zim_ReflectionClass_isTrait — ce->ce_flags & ZEND_ACC_TRAIT (#18335). */
+    public static function reflectionClassIsTrait(ClassEntry $entry): bool
+    {
+        return $entry->isTrait;
+    }
+
     /** php-src zim_ReflectionClass_isIterateable — concrete Traversable, not interfaces (#18297, #18324). */
     public static function reflectionClassIsIterateable(ClassEntry $entry, Context $ctx): bool
     {
@@ -1636,19 +1648,124 @@ final class ReflectionSupport
     /**
      * @return array{name: string, type: string, isOptional: bool}|null
      */
-    private static function internalParameterInfo(Context $ctx, ObjectEntry $reflection): ?array
+    /**
+     * @return array{name: string, type: string, isOptional: bool}|null
+     */
+    public static function internalParameterInfoForReflection(Context $ctx, ObjectEntry $reflection): ?array
     {
         $index = self::parameterIndexForReflection($reflection);
         $classNameVar = $reflection->getProperty(self::PROP_CLASS_NAME)->resolveIndirect();
         if (Variable::TYPE_STRING === $classNameVar->type) {
-            return BuiltinInternalArgInfo::paramInfoForClassMethod(
-                $classNameVar->toString(),
-                self::methodNameFromReflection($reflection),
-                $index
+            $className = $classNameVar->toString();
+            $methodName = self::methodNameFromReflection($reflection);
+            $override = BuiltinParamNames::forClassMethod(
+                strtolower($className).'::'.strtolower($methodName)
             );
+            if (null !== $override && isset($override[$index])) {
+                $info = BuiltinInternalArgInfo::paramInfoForClassMethod($className, $methodName, $index);
+
+                return [
+                    'name' => $override[$index],
+                    'type' => $info['type'] ?? '',
+                    'isOptional' => $info['isOptional'] ?? false,
+                ];
+            }
+
+            return BuiltinInternalArgInfo::paramInfoForClassMethod($className, $methodName, $index);
+        }
+        $functionName = self::functionNameFromReflection($reflection);
+        $override = BuiltinParamNames::forFunction($functionName);
+        if (null !== $override && isset($override[$index])) {
+            $info = BuiltinInternalArgInfo::paramInfoForFunction($functionName, $index);
+
+            return [
+                'name' => $override[$index],
+                'type' => $info['type'] ?? '',
+                'isOptional' => $info['isOptional'] ?? false,
+            ];
         }
 
-        return BuiltinInternalArgInfo::paramInfoForFunction(self::functionNameFromReflection($reflection), $index);
+        return BuiltinInternalArgInfo::paramInfoForFunction($functionName, $index);
+    }
+
+    public static function reflectedMethodParameterCount(
+        Context $ctx,
+        string $className,
+        string $methodName
+    ): int {
+        $entry = VmReflection::resolveClassEntry($ctx, $className);
+        if (null === $entry) {
+            return 0;
+        }
+        $methodLc = strtolower($methodName);
+        $count = \count($entry->methodParameterMetadata[$methodLc] ?? []);
+        if ($count > 0) {
+            return $count;
+        }
+
+        return BuiltinInternalArgInfo::paramCountForClassMethod($className, $methodName) ?? 0;
+    }
+
+    public static function reflectedMethodRequiredParameterCount(
+        Context $ctx,
+        string $className,
+        string $methodName
+    ): int {
+        $entry = VmReflection::resolveClassEntry($ctx, $className);
+        if (null === $entry) {
+            return 0;
+        }
+        $methodLc = strtolower($methodName);
+        $params = $entry->methodParameterMetadata[$methodLc] ?? [];
+        if ([] !== $params) {
+            $required = 0;
+            foreach ($params as $meta) {
+                if (!$meta->isOptional && !$meta->isVariadic) {
+                    ++$required;
+                }
+            }
+
+            return $required;
+        }
+
+        return BuiltinInternalArgInfo::requiredParamCountForClassMethod($className, $methodName) ?? 0;
+    }
+
+    /**
+     * @return list<string>
+     */
+    public static function reflectedMethodParameterNames(
+        Context $ctx,
+        string $className,
+        string $methodName
+    ): array {
+        $entry = VmReflection::resolveClassEntry($ctx, $className);
+        if (null === $entry) {
+            return [];
+        }
+        $methodLc = strtolower($methodName);
+        $params = $entry->methodParameterMetadata[$methodLc] ?? [];
+        if ([] !== $params) {
+            return array_map(static fn ($meta) => $meta->name, $params);
+        }
+        $qualified = strtolower($className).'::'.strtolower($methodName);
+        $override = BuiltinParamNames::forClassMethod($qualified);
+        if (null !== $override) {
+            return $override;
+        }
+        $count = BuiltinInternalArgInfo::paramCountForClassMethod($className, $methodName) ?? 0;
+        $names = [];
+        for ($i = 0; $i < $count; ++$i) {
+            $info = BuiltinInternalArgInfo::paramInfoForClassMethod($className, $methodName, $i);
+            $names[] = $info['name'] ?? 'param'.$i;
+        }
+
+        return $names;
+    }
+
+    private static function internalParameterInfo(Context $ctx, ObjectEntry $reflection): ?array
+    {
+        return self::internalParameterInfoForReflection($ctx, $reflection);
     }
 
     private static function internalCallableName(Context $ctx, ObjectEntry $reflection): string
@@ -1708,6 +1825,10 @@ final class ReflectionSupport
         $params = $entry->methodParameterMetadata[$methodLc] ?? [];
         if ([] !== $params) {
             return array_map(static fn ($meta) => $meta->name, $params);
+        }
+        $override = BuiltinParamNames::forClassMethod(strtolower($entry->name).'::'.$methodLc);
+        if (null !== $override) {
+            return $override;
         }
         if ($entry->isInternal) {
             return BuiltinInternalArgInfo::paramNamesForClassMethod($entry->name, $method);

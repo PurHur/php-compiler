@@ -21,7 +21,11 @@ final class BuiltinParamNames
             'datetimeimmutable::createfromformat' => ['format', 'datetime', 'timezone'],
             'datetime::__construct',
             'datetimeimmutable::__construct' => ['datetime', 'timezone'],
+            'datetime::format' => ['format'],
+            'datetimeimmutable::format' => ['format'],
             'datetimezone::__construct' => ['timezone'],
+            'arrayobject::__construct' => ['array', 'flags', 'iterator_class'],
+            'splfileobject::seek' => ['line'],
             default => null,
         };
     }
