@@ -28422,16 +28422,6 @@ class Compiler {
                 continue;
             }
             if ($child instanceof Op\Expr\FuncCall || $child instanceof Op\Expr\NsFuncCall) {
-                if (
-                    null !== $consumerIndex
-                    && $this->statementLevelFuncCallBeforeHoistedSiblingChain(
-                        $j,
-                        $consumerIndex,
-                        $cfgChildren
-                    )
-                ) {
-                    continue;
-                }
                 ++$base;
                 continue;
             }
@@ -28762,6 +28752,10 @@ class Compiler {
             ? OpCode::TYPE_STATICCALL_INIT
             : OpCode::TYPE_METHODCALL_INIT;
         $needle = strtolower($methodName);
+        $receiverSlot = null;
+        if ($producer instanceof Op\Expr\MethodCall && null !== $producer->var) {
+            $receiverSlot = $block->slotForOperand($producer->var);
+        }
         $ops = array_merge($block->opCodes, $pendingOps);
         foreach ($ops as $i => $op) {
             if ($initType !== $op->type || null === $op->arg2) {
@@ -28769,6 +28763,9 @@ class Compiler {
             }
             $name = $this->resolveCompileTimeStringSlot((int) $op->arg2, $block);
             if ($needle !== strtolower($name ?? '')) {
+                continue;
+            }
+            if (null !== $receiverSlot && (int) $op->arg1 !== $receiverSlot) {
                 continue;
             }
             for ($j = $i + 1, $n = \count($ops); $j < $n; ++$j) {
