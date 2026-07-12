@@ -278,6 +278,7 @@ final class ModuleRegistry
             'readline' => str_starts_with($functionName, 'readline'),
             'bcmath' => str_starts_with($functionName, 'bc'),
             'openssl' => str_starts_with($functionName, 'openssl_'),
+            'zip' => str_starts_with($functionName, 'zip_'),
             default => false,
         };
     }

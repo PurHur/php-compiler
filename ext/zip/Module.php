@@ -8,9 +8,11 @@ use PHPCompiler\ModuleAbstract;
 use PHPCompiler\Runtime;
 
 /**
- * zip extension module entry (php-src ext/zip/php_zip.c; issues #5869, #3337, #6370).
+ * zip extension module entry (php-src ext/zip/php_zip.c; issues #5869, #3337, #6370, #18137).
  *
- * ZipArchive uses pure-PHP store engine ({@see ZipEngine}); procedural zip_* API in {@see VmZipProcedural}.
+ * Register under {@see standard}; advertise logical {@code zip} extension, ZipArchive, and
+ * zip_* procedural API when {@see ZipExtensionPolicy::advertisesExtension()} — withheld on
+ * reference profile (Zend 8.2 harness has no ext/zip).
  */
 class Module extends ModuleAbstract
 {
@@ -22,7 +24,19 @@ class Module extends ModuleAbstract
 
     public function getExtensionName(): string
     {
-        return 'zip';
+        return 'standard';
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function getAdditionalExtensionNames(): array
+    {
+        if (!ZipExtensionPolicy::advertisesExtension()) {
+            return [];
+        }
+
+        return ['zip'];
     }
 
     public function getFunctions(): array
