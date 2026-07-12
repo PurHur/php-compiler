@@ -930,6 +930,7 @@ class Runtime {
             putenv('PHP_COMPILER_AOT_USER_SCRIPT='.$prevUserScriptAot);
             $_ENV['PHP_COMPILER_AOT_USER_SCRIPT'] = $prevUserScriptAot;
             $_SERVER['PHP_COMPILER_AOT_USER_SCRIPT'] = $prevUserScriptAot;
+            $context->retrofitUserScriptStandaloneAfterPregPrelink();
             JIT\VmActiveContextInitLlvm::requestThinStandaloneInit($context);
         }
         $context->setMain($this->loadJit()->compile($block));

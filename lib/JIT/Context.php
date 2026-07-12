@@ -909,6 +909,17 @@ class Context {
         return $this->isUserScriptAot() || $this->shouldUseBootstrapAotStandaloneBodies();
     }
 
+    /**
+     * After preg prelink on a temporary full-init Context, restore user-script standalone bodies (#16075).
+     */
+    public function retrofitUserScriptStandaloneAfterPregPrelink(): void
+    {
+        if (Builtin::LOAD_TYPE_STANDALONE !== $this->loadType || !$this->isUserScriptAot()) {
+            return;
+        }
+        $this->ensureMinimalUserStandaloneBodies();
+    }
+
     private function isUserScriptAot(): bool
     {
         $userScript = getenv('PHP_COMPILER_AOT_USER_SCRIPT');
