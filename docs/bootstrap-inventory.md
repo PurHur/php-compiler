@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 4578 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 12420 |
+| Source constructs flagged (warnings) | 12408 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -3033,7 +3033,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Analyzer.php` | 0 | 1 |
 | `lib/JIT/AotDebugSymbols.php` | 0 | 1 |
 | `lib/JIT/ArrayAccessHelper.php` | 0 | 1 |
-| `lib/JIT/ArrayBuiltinHelper.php` | 0 | 40 |
+| `lib/JIT/ArrayBuiltinHelper.php` | 0 | 28 |
 | `lib/JIT/ArrayFilterCallbackPolicy.php` | 0 | 1 |
 | `lib/JIT/ArrayFindCallbackPolicy.php` | 0 | 1 |
 | `lib/JIT/ArrayFindHelper.php` | 0 | 1 |
@@ -7333,12 +7333,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ClassProperty (line 49)
 - new ClassProperty (line 50)
 - new ClassProperty (line 51)
-- new Variable (line 104)
-- new HashTable (line 122)
-- new Variable (line 135)
-- new ObjectEntry (line 188)
-- new Variable (line 197)
-- 14 class method(s)
+- new Variable (line 109)
+- new HashTable (line 127)
+- new Variable (line 140)
+- new ObjectEntry (line 193)
+- new Variable (line 202)
+- 15 class method(s)
 
 ### `ext/libxml/libxml_clear_errors.php`
 
@@ -24953,46 +24953,34 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/ArrayBuiltinHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 120)
-- new Variable (line 632)
-- new Variable (line 933)
-- new Variable (line 991)
-- new Variable (line 993)
-- new Variable (line 1005)
-- new Variable (line 1098)
-- new Variable (line 1100)
-- new Variable (line 3126)
-- new Variable (line 3162)
-- new Variable (line 3170)
-- new Variable (line 3180)
-- new Variable (line 3191)
-- new Variable (line 3199)
-- new Variable (line 3249)
-- new Variable (line 3270)
-- new Variable (line 3291)
-- new Variable (line 3315)
-- new Variable (line 3344)
-- new Variable (line 3364)
-- new Variable (line 3415)
-- new Variable (line 3423)
-- new Variable (line 5096)
-- new Variable (line 5127)
-- new Variable (line 5144)
-- new Variable (line 5160)
-- new strval (line 5185)
-- new Variable (line 5434)
-- new Variable (line 5450)
-- new Variable (line 5623)
-- new Variable (line 5639)
-- new Variable (line 5687)
-- new Variable (line 5992)
-- new Variable (line 6001)
-- new Variable (line 6487)
-- new Variable (line 6503)
-- new Variable (line 6553)
-- new Variable (line 7059)
-- new Variable (line 7065)
-- 154 class method(s)
+- new Variable (line 117)
+- new Variable (line 629)
+- new Variable (line 930)
+- new Variable (line 988)
+- new Variable (line 990)
+- new Variable (line 1002)
+- new Variable (line 1095)
+- new Variable (line 1097)
+- new Variable (line 2859)
+- new Variable (line 2867)
+- new Variable (line 3666)
+- new Variable (line 3697)
+- new Variable (line 3714)
+- new Variable (line 3730)
+- new strval (line 3755)
+- new Variable (line 4004)
+- new Variable (line 4020)
+- new Variable (line 4193)
+- new Variable (line 4209)
+- new Variable (line 4257)
+- new Variable (line 4562)
+- new Variable (line 4571)
+- new Variable (line 5057)
+- new Variable (line 5073)
+- new Variable (line 5123)
+- new Variable (line 5629)
+- new Variable (line 5635)
+- 132 class method(s)
 
 ### `lib/JIT/ArrayFilterCallbackPolicy.php`
 
@@ -29540,7 +29528,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/InOperatorHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 33)
+- new Variable (line 34)
 - 6 class method(s)
 
 ### `lib/JIT/IncludeBindingEmitHelper.php`
