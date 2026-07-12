@@ -222,6 +222,20 @@ final class VmDateTimeNative
         return self::formatOffset($offset);
     }
 
+    /** php-src ext/date/php_date.c — TIMELIB_ZONETYPE_OFFSET name for `@` unix timestamps (#18388). */
+    public static function unixTimestampTimezoneId(): string
+    {
+        return '+00:00';
+    }
+
+    /**
+     * php-src timelib zone_type for wire export: 1 = offset, 3 = named id.
+     */
+    public static function timezoneTypeForId(string $timezone): int
+    {
+        return null !== self::parseNumericTimezoneOffset($timezone) ? 1 : 3;
+    }
+
     /**
      * @return array{timestamp: int, microsecond: int, timezone?: string}
      */
@@ -430,7 +444,12 @@ final class VmDateTimeNative
                 self::throwMalformedDateTime($time);
             }
 
-            return ['timestamp' => (int) $unix, 'microsecond' => 0];
+            // php-src ext/date/php_date.c — @ unix timestamps use TIMELIB_ZONETYPE_OFFSET (+00:00).
+            return [
+                'timestamp' => (int) $unix,
+                'microsecond' => 0,
+                'timezone' => self::unixTimestampTimezoneId(),
+            ];
         }
         if (1 === preg_match('/^\d+$/', $time)) {
             return ['timestamp' => (int) $time, 'microsecond' => 0];

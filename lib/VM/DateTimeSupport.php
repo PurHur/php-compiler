@@ -1132,7 +1132,7 @@ final class DateTimeSupport
 
         return [
             'date' => VmDateTimeNative::formatZendDateWire($timestamp, $microsecond, $tzName),
-            'timezone_type' => 3,
+            'timezone_type' => VmDateTimeNative::timezoneTypeForId($tzName),
             'timezone' => $tzName,
         ];
     }
@@ -1144,9 +1144,11 @@ final class DateTimeSupport
      */
     public static function exportZendJsonWireDateTimeZone(ObjectEntry $zone): array
     {
+        $tzName = self::timezoneName($zone);
+
         return [
-            'timezone_type' => 3,
-            'timezone' => self::timezoneName($zone),
+            'timezone_type' => VmDateTimeNative::timezoneTypeForId($tzName),
+            'timezone' => $tzName,
         ];
     }
 
