@@ -28,8 +28,8 @@ final class ReflectionMethodConstruct extends VmClassMethod
         $entry = VmReflection::resolveClassFromArg($ctx, $frame->calledArgs[1]);
         $method = VmReflection::stringArg($frame->calledArgs[2], 'ReflectionMethod::__construct() method', 2);
         [$declEntry, $method] = ReflectionSupport::reflectionMethodFromClassAndMethod($ctx, $entry->name, $method);
-        $receiver->getProperty(ReflectionSupport::PROP_CLASS_NAME)->string($declEntry->name);
-        $receiver->getProperty(ReflectionSupport::PROP_METHOD_NAME)->string($method);
+        $receiver->getProperty(ReflectionSupport::PROP_REFLECTION_METHOD_CLASS)->string($declEntry->name);
+        $receiver->getProperty(ReflectionSupport::PROP_REFLECTION_METHOD_FUNC)->string($method);
         $receiver->constructed = true;
     }
 }

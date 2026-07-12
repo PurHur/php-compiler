@@ -145,8 +145,8 @@ final class ReflectionPropertyHookSupport
         }
         $rm = new ObjectEntry($rmClass);
         $rm->constructed = true;
-        $rm->getProperty(ReflectionSupport::PROP_CLASS_NAME)->string($entry->name);
-        $rm->getProperty(ReflectionSupport::PROP_METHOD_NAME)->string('$'.$property.'::'.$hookKind);
+        $rm->getProperty(ReflectionSupport::PROP_REFLECTION_METHOD_CLASS)->string($entry->name);
+        $rm->getProperty(ReflectionSupport::PROP_REFLECTION_METHOD_FUNC)->string('$'.$property.'::'.$hookKind);
         $out = new Variable(Variable::TYPE_OBJECT);
         $out->object($rm);
 
