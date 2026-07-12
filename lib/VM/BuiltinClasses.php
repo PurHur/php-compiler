@@ -226,6 +226,7 @@ use PHPCompiler\VM\Builtin\ReflectionMethodCreateFromMethodName;
 use PHPCompiler\VM\Builtin\ReflectionMethodGetAttributes;
 use PHPCompiler\VM\Builtin\ReflectionMethodGetClosure;
 use PHPCompiler\VM\Builtin\ReflectionMethodGetClosureScopeClass;
+use PHPCompiler\VM\Builtin\ReflectionMethodGetClosureUsedVariables;
 use PHPCompiler\VM\Builtin\ReflectionMethodGetClosureThis;
 use PHPCompiler\VM\Builtin\ReflectionMethodGetName;
 use PHPCompiler\VM\Builtin\ReflectionMethodGetNumberOfParameters;
@@ -653,6 +654,8 @@ final class BuiltinClasses
         $rm->methodVisibility['getclosurescopeclass'] = $pub;
         $rm->methods['getclosurethis'] = new ReflectionMethodGetClosureThis();
         $rm->methodVisibility['getclosurethis'] = $pub;
+        $rm->methods['getclosureusedvariables'] = new ReflectionMethodGetClosureUsedVariables();
+        $rm->methodVisibility['getclosureusedvariables'] = $pub;
         if (CompilerVersion::supportsReflectionCreateFromFactories()) {
             $rm->methods['createfromclosure'] = new ReflectionMethodCreateFromClosure();
             $rm->methodVisibility['createfromclosure'] = $pubStatic;
