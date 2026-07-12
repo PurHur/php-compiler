@@ -86,6 +86,81 @@ final class VmPregNative
     }
 
     /**
+     * preg_replace_callback() match loop for JIT/AOT — LLVM callback fn addr, no closure (#13736, #16075).
+     */
+    public static function pregReplaceCallbackByFnAddr(
+        string $pattern,
+        string $subject,
+        int $callbackFnAddr,
+        int $limit = -1
+    ): ?string {
+        if (0 === $callbackFnAddr) {
+            return null;
+        }
+
+        if (\strlen($pattern) > VmPreg::MAX_PATTERN_BYTES) {
+            self::setLastError(1);
+
+            return null;
+        }
+
+        $result = '';
+        $offset = 0;
+        $len = \strlen($subject);
+        $replacements = 0;
+
+        while ($offset < $len) {
+            if ($limit >= 0 && $replacements >= $limit) {
+                $result .= \substr($subject, $offset);
+
+                break;
+            }
+
+            $matches = [];
+            $matchCount = self::pregMatch(
+                $pattern,
+                $subject,
+                $matches,
+                StdlibConstants::PREG_OFFSET_CAPTURE,
+                $offset
+            );
+            if (false === $matchCount) {
+                return null;
+            }
+            if (0 === $matchCount) {
+                $result .= \substr($subject, $offset);
+
+                break;
+            }
+
+            $full = $matches[0];
+            $matchStart = $full[1];
+            $matchText = $full[0];
+            $matchLen = \strlen($matchText);
+            $result .= \substr($subject, $offset, $matchStart - $offset);
+
+            $stripped = VmPreg::stripMatchOffsets($matches);
+            $ht = VmPregMatches::hostMatchesToHashTable($stripped, 0);
+            $replacement = PregCallbackInvokeJitHelper::invoke($callbackFnAddr, $ht);
+            $result .= (string) $replacement;
+
+            ++$replacements;
+
+            $next = $matchStart + $matchLen;
+            if ($next <= $offset) {
+                self::setLastError(1);
+
+                return null;
+            }
+            $offset = $next;
+        }
+
+        self::setLastError(0);
+
+        return $result;
+    }
+
+    /**
      * preg_replace_callback() match loop for JIT/AOT PHP bridge (#13736).
      *
      * @param callable(array<int|string, string>): string $invokeMatchCallback

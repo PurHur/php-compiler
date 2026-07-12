@@ -125,19 +125,7 @@ final class PregJitHelper
 
     public static function replaceCallbackArgv(string $pattern, string $subject, int $callbackFnAddr): ?string
     {
-        if (0 === $callbackFnAddr) {
-            return null;
-        }
-
-        return VmPregNative::pregReplaceCallbackJit(
-            $pattern,
-            $subject,
-            static function (array $matches) use ($callbackFnAddr): string {
-                $ht = VmPregMatches::hostMatchesToHashTable($matches, 0);
-
-                return PregCallbackInvokeJitHelper::invoke($callbackFnAddr, $ht);
-            }
-        );
+        return VmPregNative::pregReplaceCallbackByFnAddr($pattern, $subject, $callbackFnAddr);
     }
 
     public static function replaceCallbackArrayArgv(HashTable $patterns, string $subject): ?string

@@ -489,10 +489,12 @@ final class PregMatchRuntime
 
         $runtime = $context->runtime;
         $root = \dirname(__DIR__, 3);
+        // VmPregPure is SSOT for preg semantics but must not be nested-JIT compiled here:
+        // VmPregNative delegates to it via external static stubs; inlining VmPregPure pulls
+        // VmPregEngine/VmString paths that fail nested LLVM lowering (#16075 tier-2).
         $paths = [
             $root.'/ext/standard/StdlibConstants.php',
             $root.'/ext/standard/VmPregPattern.php',
-            $root.'/ext/standard/VmPregPure.php',
             $root.'/ext/standard/VmPregNative.php',
             $root.'/ext/standard/VmPregMatches.php',
             $root.self::HELPER_PATH,
