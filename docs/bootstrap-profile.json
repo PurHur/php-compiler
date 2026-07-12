@@ -2918,10 +2918,12 @@
         "ext/zip/Module.php",
         "ext/zip/VmZipArchive.php",
         "ext/zip/ZipArchiveAddFile.php",
+        "ext/zip/ZipArchiveAddFromString.php",
         "ext/zip/ZipArchiveClose.php",
         "ext/zip/ZipArchiveConstants.php",
         "ext/zip/ZipArchiveConstruct.php",
         "ext/zip/ZipArchiveExtractTo.php",
+        "ext/zip/ZipArchiveGetFromName.php",
         "ext/zip/ZipArchiveGetStatusString.php",
         "ext/zip/ZipArchiveOpen.php",
         "ext/zip/ZipArchiveState.php",
@@ -3953,6 +3955,7 @@
         "lib/NullSafeLivenessDetector.php",
         "lib/OpCode.php",
         "lib/OpCodeNames.php",
+        "lib/PHPTypes/CompilerTypeReconstructor.php",
         "lib/PipeOperatorSyntaxRejector.php",
         "lib/Printer.php",
         "lib/PropertyHookSyntaxRejector.php",
@@ -4782,9 +4785,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 4548,
+        "inventory_files": 4551,
         "excluded": 0,
-        "eligible": 4548,
+        "eligible": 4551,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
