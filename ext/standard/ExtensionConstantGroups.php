@@ -73,7 +73,9 @@ final class ExtensionConstantGroups
         $groups['xml'] = XmlConstants::registeredConstants();
         $groups['sockets'] = SocketConstants::registeredConstants();
         $groups['readline'] = ReadlineConstants::registeredConstants();
-        $groups['xsl'] = XslConstants::registeredConstants();
+        if (\PHPCompiler\ext\xsl\XslExtensionPolicy::advertisesExtension()) {
+            $groups['xsl'] = XslConstants::registeredConstants();
+        }
         if (\PHPCompiler\ext\sodium\SodiumExtensionPolicy::advertisesExtension()) {
             $groups['sodium'] = SodiumConstants::registeredConstants();
         }

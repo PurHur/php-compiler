@@ -192,6 +192,9 @@ final class BuiltinIntrospectionPolicy
         if ('zip' === $ext) {
             return \PHPCompiler\ext\zip\ZipExtensionPolicy::advertisesExtension();
         }
+        if ('xsl' === $ext) {
+            return \PHPCompiler\ext\xsl\XslExtensionPolicy::advertisesExtension();
+        }
 
         return true;
     }

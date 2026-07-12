@@ -244,7 +244,8 @@ final class VmReflection
             && !$entry->isInterface
             && !$entry->isTrait
             && !\PHPCompiler\VM\ResourceSupport::isHiddenPseudoClassEntry($entry)
-            && !\PHPCompiler\ext\openssl\VmOpensslObjects::isHiddenClassEntry($entry);
+            && !\PHPCompiler\ext\openssl\VmOpensslObjects::isHiddenClassEntry($entry)
+            && !\PHPCompiler\ext\xsl\VmXsl::isHiddenClassEntry($entry);
     }
 
     public static function enumExists(Context $ctx, string $enumName, bool $autoload = true): bool
