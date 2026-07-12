@@ -80,10 +80,14 @@ final class VmFilestatFailure
     /** php-src dir.c php_opendir — distinguish file vs missing path (#14861, #18418). */
     public static function warnPathOpenDirFailed(Frame $frame, string $function, string $path): void
     {
-        $reason = VmFsPhpWrapper::openDirFailureReason($path);
         self::triggerWarningWithHandlerFirst(
             $frame,
-            \sprintf('%s(%s): Failed to open directory: %s', $function, $path, $reason)
+            \sprintf(
+                '%s(%s): Failed to open directory: %s',
+                $function,
+                $path,
+                VmDirOpenFailure::openDirFailureReason($path)
+            )
         );
     }
 
@@ -98,9 +102,7 @@ final class VmFilestatFailure
     public static function warnScandirFailed(Frame $frame, string $path): void
     {
         self::warnPathOpenDirFailed($frame, 'scandir', $path);
-        if (VmFsPhpWrapper::isPhpWrapperPath($path)) {
-            self::triggerWarningWithHandlerFirst($frame, 'scandir(): (errno 0): Success');
-        }
+        self::triggerWarningWithHandlerFirst($frame, VmDirOpenFailure::scandirFollowupWarning($path));
     }
 
     public static function warnRmdirMissing(Frame $frame, string $path): void
