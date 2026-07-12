@@ -157,6 +157,8 @@ require_once __DIR__.'/../../../ext/curl/curl_upkeep.php';
 require_once __DIR__.'/../../../ext/curl/curl_version.php';
 require_once __DIR__.'/../../../ext/exif/Module.php';
 require_once __DIR__.'/../../../ext/exif/VmExifRead.php';
+require_once __DIR__.'/../../../ext/exif/ExifImagetypeJitHelper.php';
+require_once __DIR__.'/../../../ext/exif/JitExifImagetype.php';
 require_once __DIR__.'/../../../ext/exif/exif_imagetype.php';
 require_once __DIR__.'/../../../ext/exif/exif_read_data.php';
 require_once __DIR__.'/../../../ext/dom/BuiltinClasses.php';
@@ -3450,6 +3452,7 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/StringNetworkServicesStringRetur
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringNl2br.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringOffsetRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringOpendir.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/StringExifImagetype.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringPack.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringParseStr.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringPasswordCrypto.php';
