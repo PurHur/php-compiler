@@ -4347,7 +4347,6 @@ require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionMethodGetStaticVariable
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionMethodHasPrototype.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionMethodHasReturnType.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionMethodHasTentativeReturnType.php';
-require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionMethodGetTentativeReturnType.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionMethodInvoke.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionMethodInvokeArgs.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionMethodIsAccessible.php';
