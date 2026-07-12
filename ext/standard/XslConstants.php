@@ -7,7 +7,7 @@ namespace PHPCompiler\ext\standard;
 /**
  * XSL extension constants (php-src ext/xsl/php_xsl.c; #17799).
  *
- * Registered from ext/standard while ext/xsl functions remain unimplemented.
+ * Registered from ext/xsl when host libxslt is available (#3665, #17799).
  */
 final class XslConstants
 {

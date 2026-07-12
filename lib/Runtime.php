@@ -228,6 +228,7 @@ class Runtime {
         $this->load(new ext\zip\Module);
         $this->load(new ext\libxml\Module);
         $this->load(new ext\dom\Module);
+        $this->load(new ext\xsl\Module);
         $this->load(new ext\simplexml\Module);
         $this->load(new ext\xml\Module);
         $this->load(new ext\xmlreader\Module);

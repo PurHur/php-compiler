@@ -24,7 +24,7 @@ class Module extends ModuleAbstract
 {
     public function getAdditionalExtensionNames(): array
     {
-        return ['json', 'date', 'pcre', 'zlib', 'readline', 'xsl'];
+        return ['json', 'date', 'pcre', 'zlib', 'readline'];
     }
 
     /**
@@ -72,9 +72,6 @@ class Module extends ModuleAbstract
             self::defineModuleConstant($runtime, $name, $value);
         }
         foreach (ReadlineConstants::registeredConstants() as $name => $value) {
-            self::defineModuleConstant($runtime, $name, $value);
-        }
-        foreach (XslConstants::registeredConstants() as $name => $value) {
             self::defineModuleConstant($runtime, $name, $value);
         }
     }
