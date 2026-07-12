@@ -40,9 +40,6 @@ patch_already_applied() {
     php-types-nullsafe.patch)
       grep -q "case 'Expr_NullsafePropertyFetch':" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php" 2>/dev/null
       ;;
-    php-types-dynamic-class-const-fetch.patch)
-      grep -q 'PHP 8.3+ Class::{\$name}' "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php" 2>/dev/null
-      ;;
     php-types-static-var.patch)
       grep -q "case 'Terminal_StaticVar':" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php" 2>/dev/null
       ;;
@@ -6337,8 +6334,6 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-types" ]]; then
   apply_patch "$PATCH_DIR/php-types-throw-expr.patch"
   apply_php_types_fcc_overlay_final_repair
   apply_php_types_compiler_halt_offset_overlay
-  # Dynamic Class::{$name} const fetch — guard Literal name before ->value (#17801).
-  apply_patch "$PATCH_DIR/php-types-dynamic-class-const-fetch.patch"
   # Perf patch last: diffed against the fully-patched TypeReconstructor.php (#16077).
   apply_patch "$PATCH_DIR/php-types-resolver-worklist.patch"
 fi

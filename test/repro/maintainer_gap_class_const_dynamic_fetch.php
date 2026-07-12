@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 /**
- * Issue #17801 — dynamic class const fetch must compile without TypeReconstructor warnings.
+ * Issue #18093 — dynamic class const fetch must compile without TypeReconstructor warnings.
  */
 
 class C
