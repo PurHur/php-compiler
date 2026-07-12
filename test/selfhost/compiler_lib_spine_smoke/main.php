@@ -3414,7 +3414,7 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/StringMethodExists.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringMicrotime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringMkdir.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringMktime.php';
-require_once __DIR__.'/../../../lib/JIT/Builtin/StringMultipartStandaloneLlvm.php';
+require_once __DIR__.'/../../../lib/Web/MultipartNativeJitHelper.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringNCompare.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringNaturalCompare.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringNetInterfacesJit.php';
