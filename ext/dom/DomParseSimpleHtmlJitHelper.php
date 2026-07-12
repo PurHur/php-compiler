@@ -50,57 +50,10 @@ final class DomParseSimpleHtmlJitHelper
 
     private static function extractIdAttribute(string $openTag): ?string
     {
-        $len = \strlen($openTag);
-        $pos = 0;
-        while ($pos < $len) {
-            while ($pos < $len && ctype_space($openTag[$pos])) {
-                ++$pos;
-            }
-            if ($pos >= $len) {
-                break;
-            }
-            $nameEnd = $pos;
-            while ($nameEnd < $len && !ctype_space($openTag[$nameEnd]) && '=' !== $openTag[$nameEnd]) {
-                ++$nameEnd;
-            }
-            $name = strtolower(substr($openTag, $pos, $nameEnd - $pos));
-            $cursor = $nameEnd;
-            while ($cursor < $len && ctype_space($openTag[$cursor])) {
-                ++$cursor;
-            }
-            if ($cursor >= $len || '=' !== $openTag[$cursor]) {
-                $pos = $nameEnd > $pos ? $nameEnd : $pos + 1;
+        $space = strpos($openTag, ' ');
+        $attrPart = false === $space ? '' : substr($openTag, $space);
+        $attrs = VmDom::parseMarkupAttributes($attrPart);
 
-                continue;
-            }
-            ++$cursor;
-            while ($cursor < $len && ctype_space($openTag[$cursor])) {
-                ++$cursor;
-            }
-            if ($cursor >= $len) {
-                break;
-            }
-            $quote = $openTag[$cursor];
-            if ('"' !== $quote && "'" !== $quote) {
-                $pos = $cursor;
-
-                continue;
-            }
-            ++$cursor;
-            $valueStart = $cursor;
-            while ($cursor < $len && $openTag[$cursor] !== $quote) {
-                ++$cursor;
-            }
-            if ($cursor >= $len) {
-                break;
-            }
-            $value = substr($openTag, $valueStart, $cursor - $valueStart);
-            if ('id' === $name) {
-                return $value;
-            }
-            $pos = $cursor + 1;
-        }
-
-        return null;
+        return $attrs['id'] ?? null;
     }
 }
