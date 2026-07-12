@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 4547 |
-| Phase A inventory files (M2 ratio SSOT) | 4547 |
+| PHP files on vm.php path | 4548 |
+| Phase A inventory files (M2 ratio SSOT) | 4548 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 12334 |
+| Source constructs flagged (warnings) | 12340 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1634,6 +1634,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/UrldecodeJitHelper.php` | 0 | 1 |
 | `ext/standard/UrlencodeJitHelper.php` | 0 | 1 |
 | `ext/standard/UsortJitHelper.php` | 0 | 4 |
+| `ext/standard/Utf8EndecDeprecation.php` | 0 | 1 |
 | `ext/standard/Utf8JitHelper.php` | 0 | 1 |
 | `ext/standard/Utf8Latin1JitHelper.php` | 0 | 1 |
 | `ext/standard/ValueSortJitHelper.php` | 0 | 3 |
@@ -3238,7 +3239,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/MemoryUsageJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/MetaTagsRuntime.php` | 0 | 2 |
 | `lib/JIT/Builtin/MimeContentTypeRuntime.php` | 0 | 2 |
-| `lib/JIT/Builtin/MultipartRuntime.php` | 0 | 1 |
+| `lib/JIT/Builtin/MultipartRuntime.php` | 0 | 6 |
 | `lib/JIT/Builtin/MultisortRuntime.php` | 0 | 2 |
 | `lib/JIT/Builtin/NaturalSortRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/NonObjectPropertyFetchRuntime.php` | 0 | 3 |
@@ -3485,7 +3486,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringMicrotime.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringMkdir.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringMktime.php` | 0 | 3 |
-| `lib/JIT/Builtin/StringMultipartStandaloneLlvm.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringNCompare.php` | 0 | 2 |
 | `lib/JIT/Builtin/StringNaturalCompare.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringNetInterfacesJit.php` | 0 | 3 |
@@ -4450,6 +4450,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/Web/IncludePathResolver.php` | 0 | 1 |
 | `lib/Web/LiteralIncludeDiscovery.php` | 0 | 2 |
 | `lib/Web/ManifestValidator.php` | 0 | 1 |
+| `lib/Web/MultipartNativeJitHelper.php` | 0 | 1 |
 | `lib/Web/MultipartParser.php` | 0 | 1 |
 | `lib/Web/MultipartParserJitHelper.php` | 0 | 1 |
 | `lib/Web/Params.php` | 0 | 2 |
@@ -15487,6 +15488,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 78)
 - 5 class method(s)
 
+### `ext/standard/Utf8EndecDeprecation.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s)
+
 ### `ext/standard/Utf8JitHelper.php`
 
 **Warnings** (review for bootstrap subset):
@@ -26106,7 +26112,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/MultipartRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- 1 class method(s)
+- new phpc_native_ht_alloc (line 178)
+- new phpc_native_ht_set_string_key (line 179)
+- new phpc_native_ht_set_string_key_ht (line 180)
+- new phpc_native_ht_set_string_at (line 181)
+- new phpc_native_ht_set_hashtable_at (line 182)
+- 10 class method(s)
 
 ### `lib/JIT/Builtin/MultisortRuntime.php`
 
@@ -27545,11 +27556,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 6 class method(s)
 - 1 closure(s)
 
-### `lib/JIT/Builtin/StringMultipartStandaloneLlvm.php`
-
-**Warnings** (review for bootstrap subset):
-- 19 class method(s)
-
 ### `lib/JIT/Builtin/StringNCompare.php`
 
 **Warnings** (review for bootstrap subset):
@@ -28099,8 +28105,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringUtf8Latin1.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 124)
-- 6 class method(s)
+- new JIT (line 133)
+- 7 class method(s)
 - 1 closure(s)
 
 ### `lib/JIT/Builtin/StringUtf8Runtime.php`
@@ -29063,18 +29069,18 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Call\DatePeriodIteratorMethod (line 896)
 - new Call\DateTimeFormat (line 899)
 - new Call\DateTimeFormat (line 900)
-- new Result (line 1209)
-- new Result (line 1230)
-- new Variable (line 1831)
-- new Variable (line 1968)
-- new Variable (line 2169)
-- new VMVariable (line 2327)
-- new VMVariable (line 2343)
-- new VMVariable (line 2349)
-- new VMVariable (line 2355)
-- new VMVariable (line 2366)
-- new Variable (line 2396)
-- new Variable (line 2436)
+- new Result (line 1211)
+- new Result (line 1232)
+- new Variable (line 1833)
+- new Variable (line 1970)
+- new Variable (line 2171)
+- new VMVariable (line 2329)
+- new VMVariable (line 2345)
+- new VMVariable (line 2351)
+- new VMVariable (line 2357)
+- new VMVariable (line 2368)
+- new Variable (line 2398)
+- new Variable (line 2438)
 - 98 class method(s)
 - 28 closure(s)
 
@@ -34463,6 +34469,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 5 class method(s)
+
+### `lib/Web/MultipartNativeJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 8 class method(s)
 
 ### `lib/Web/MultipartParser.php`
 
