@@ -454,12 +454,39 @@ final class BuiltinParamNames
      */
     public static function paramCountForInternalFunction(string $name): ?int
     {
-        $names = self::forFunction($name);
+        $names = self::paramNamesForInternalFunction($name);
         if (null !== $names) {
             return \count($names);
         }
 
-        return BuiltinInternalArgInfo::paramCountForFunction($name);
+        return null;
+    }
+
+    /**
+     * Parameter names for internal functions (explicit table first, InternalArgInfo fallback; #18337).
+     *
+     * @return list<string>|null
+     */
+    public static function paramNamesForInternalFunction(string $name): ?array
+    {
+        $explicit = self::forFunction($name);
+        if (null !== $explicit) {
+            return $explicit;
+        }
+        $count = BuiltinInternalArgInfo::paramCountForFunction($name);
+        if (null === $count) {
+            return null;
+        }
+        $names = [];
+        for ($i = 0; $i < $count; $i++) {
+            $info = BuiltinInternalArgInfo::paramInfoForFunction($name, $i);
+            if (null === $info) {
+                return null;
+            }
+            $names[] = $info['name'];
+        }
+
+        return $names;
     }
 
     /**

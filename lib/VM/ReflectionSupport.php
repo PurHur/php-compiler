@@ -1517,6 +1517,61 @@ final class ReflectionSupport
         return '' !== self::paramNameFromReflection($reflection);
     }
 
+    /** Declared parameter type for ReflectionParameter::getType()/hasType() (#18337). */
+    public static function declaredParamTypeForReflection(Context $ctx, ObjectEntry $reflection): ?CfgType
+    {
+        if (self::parameterIsInternal($ctx, $reflection)) {
+            return self::internalDeclaredParamType($reflection);
+        }
+        $methodNameVar = $reflection->getProperty(self::PROP_METHOD_NAME)->resolveIndirect();
+        if (Variable::TYPE_STRING === $methodNameVar->type) {
+            $className = self::classNameFromReflection($reflection);
+            $methodName = $methodNameVar->toString();
+            $entry = VmReflection::resolveClassEntry($ctx, $className);
+            if (null === $entry) {
+                return null;
+            }
+            $methodLc = strtolower($methodName);
+            $func = $entry->methods[$methodLc] ?? null;
+            if (!$func instanceof PhpFunc) {
+                return null;
+            }
+            $index = self::paramPositionFromReflection($reflection);
+            $slot = self::parameterScopeSlot($func->block, $index);
+
+            return null !== $slot ? ($func->block->paramDeclaredTypes[$slot] ?? null) : null;
+        }
+
+        $func = self::resolveFunctionForReflectionParameter($ctx, $reflection);
+        $index = self::paramIndexFromReflection($reflection);
+        $slot = self::parameterScopeSlot($func->block, $index);
+
+        return null !== $slot ? ($func->block->paramDeclaredTypes[$slot] ?? null) : null;
+    }
+
+    private static function internalDeclaredParamType(ObjectEntry $reflection): ?CfgType
+    {
+        $index = self::parameterIndexForReflection($reflection);
+        $classNameVar = $reflection->getProperty(self::PROP_CLASS_NAME)->resolveIndirect();
+        if (Variable::TYPE_STRING === $classNameVar->type) {
+            $info = BuiltinInternalArgInfo::paramInfoForClassMethod(
+                $classNameVar->toString(),
+                self::methodNameFromReflection($reflection),
+                $index
+            );
+        } else {
+            $info = BuiltinInternalArgInfo::paramInfoForFunction(
+                self::functionNameFromReflection($reflection),
+                $index
+            );
+        }
+        if (null === $info || '' === trim($info['type'])) {
+            return null;
+        }
+
+        return ReflectionTypeSupport::cfgTypeFromLabel($info['type']);
+    }
+
     public static function parameterIsInternal(Context $ctx, ObjectEntry $reflection): bool
     {
         $classNameVar = $reflection->getProperty(self::PROP_CLASS_NAME)->resolveIndirect();
