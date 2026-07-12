@@ -1208,6 +1208,42 @@ final class PropertyHooks
                 $this->registerHook($lcClass, $prop, 'get', $method, $isStatic, $hookFinal);
                 continue;
             }
+            if (preg_match('/^get\s*\(/s', $rest)) {
+                $rest = preg_replace('/^get\s*/', '', $rest, 1) ?? $rest;
+                if (preg_match('/^\(([^)]*)\)\s*=>\s*/s', $rest, $pm)) {
+                    $params = trim($pm[1]);
+                    $rest = substr($rest, strlen($pm[0])) ?? $rest;
+                    [$expr, $rest] = $this->takeUntilSemicolon($rest);
+                    $usesBacking = $usesBacking || $this->hookTouchesBacking($expr, $prop, $isStatic);
+                    $this->registerHookBacking($lcClass, $prop, 'get', $expr, $isStatic);
+                    $body = '{ return '.$expr.'; }';
+                    $method = self::GET_METHOD_PREFIX.$prop;
+                    $methods[] = $this->hookMethodDecl($isStatic, $method, $params, $body, $propertyType);
+                    $this->registerHook($lcClass, $prop, 'get', $method, $isStatic, $hookFinal);
+                    $this->registerHookParameterizedGet($lcClass, $prop);
+                    continue;
+                }
+                if (!preg_match('/^\(([^)]*)\)\s*\{/s', $rest, $pm)) {
+                    break;
+                }
+                $params = trim($pm[1]);
+                $rest = substr($rest, strlen($pm[0]) - 1);
+                [$body, $rest] = $this->takeBraceBody($rest);
+                $methods = array_merge(
+                    $methods,
+                    $this->lowerGetBlockHook(
+                        $lcClass,
+                        $prop,
+                        $isStatic,
+                        $params,
+                        $body,
+                        $usesBacking,
+                        $propertyType,
+                        $hookFinal
+                    )
+                );
+                continue;
+            }
             if (preg_match('/^get\s*\{/s', $rest)) {
                 $rest = preg_replace('/^get\s*/', '', $rest, 1) ?? $rest;
                 [$body, $rest] = $this->takeBraceBody($rest);
@@ -1394,6 +1430,37 @@ final class PropertyHooks
         $this->registerHook($lcClass, $prop, 'set', $method, $isStatic, $isFinal);
 
         return [$this->hookMethodDecl($isStatic, $method, $params, $body, $propertyType)];
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function lowerGetBlockHook(
+        string $lcClass,
+        string $prop,
+        bool $isStatic,
+        string $params,
+        string $body,
+        bool &$usesBacking,
+        ?string $propertyType = null,
+        bool $isFinal = false
+    ): array {
+        $usesBacking = $usesBacking || $this->hookTouchesBacking($body, $prop, $isStatic);
+        $this->registerHookBackingFromBody($lcClass, $prop, 'get', $body, $isStatic);
+        $this->registerGetHookReadBackingFromBody($lcClass, $prop, $body, $isStatic);
+        $method = self::GET_METHOD_PREFIX.$prop;
+        $this->registerHook($lcClass, $prop, 'get', $method, $isStatic, $isFinal);
+        $this->registerHookParameterizedGet($lcClass, $prop);
+
+        return [$this->hookMethodDecl($isStatic, $method, $params, $body, $propertyType)];
+    }
+
+    private function registerHookParameterizedGet(string $lcClass, string $prop): void
+    {
+        if (!isset($this->registry[$lcClass][$prop])) {
+            $this->registry[$lcClass][$prop] = [];
+        }
+        $this->registry[$lcClass][$prop]['getParameterized'] = true;
     }
 
     /**

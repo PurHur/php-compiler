@@ -286,6 +286,45 @@ PHP;
         self::assertSame('__phpc_property_set_x', $registry['box']['x']['set'] ?? null);
     }
 
+    public function testLowersGetParamBlockHook(): void
+    {
+        $src = <<<'PHP'
+<?php
+class C {
+    private string $_data = 'abcdef';
+    public string $chunk {
+        get ($len) {
+            return substr($this->_data, 0, $len);
+        }
+    }
+}
+PHP;
+        [$out, $registry] = (new PropertyHooks())->process($src);
+        self::assertStringNotContainsString('$chunk {', $out);
+        self::assertStringContainsString('public string $chunk;', $out);
+        self::assertStringContainsString('function __phpc_property_get_chunk($len)', $out);
+        self::assertStringContainsString('return substr($this->_data, 0, $len);', $out);
+        self::assertSame('__phpc_property_get_chunk', $registry['c']['chunk']['get'] ?? null);
+        self::assertTrue($registry['c']['chunk']['getParameterized'] ?? false);
+    }
+
+    public function testLowersGetParamArrowHook(): void
+    {
+        $src = <<<'PHP'
+<?php
+class C {
+    private string $_data = 'abcdef';
+    public string $chunk {
+        get ($len) => substr($this->_data, 0, $len);
+    }
+}
+PHP;
+        [$out, $registry] = (new PropertyHooks())->process($src);
+        self::assertStringContainsString('function __phpc_property_get_chunk($len)', $out);
+        self::assertStringContainsString('return substr($this->_data, 0, $len);', $out);
+        self::assertTrue($registry['c']['chunk']['getParameterized'] ?? false);
+    }
+
     public function testLowersStaticPropertyHooks(): void
     {
         $src = <<<'PHP'
