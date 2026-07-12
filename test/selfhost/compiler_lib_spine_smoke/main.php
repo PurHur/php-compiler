@@ -794,6 +794,7 @@ require_once __DIR__.'/../../../ext/sodium/sodium_crypto_generichash.php';
 require_once __DIR__.'/../../../ext/sodium/sodium_crypto_scalarmult.php';
 require_once __DIR__.'/../../../ext/sodium/sodium_crypto_scalarmult_base.php';
 require_once __DIR__.'/../../../ext/sodium/sodium_crypto_secretbox.php';
+require_once __DIR__.'/../../../ext/sodium/sodium_crypto_secretbox_keygen.php';
 require_once __DIR__.'/../../../ext/sodium/sodium_crypto_secretbox_open.php';
 require_once __DIR__.'/../../../ext/sodium/sodium_crypto_secretstream_xchacha20poly1305_init_pull.php';
 require_once __DIR__.'/../../../ext/sodium/sodium_crypto_secretstream_xchacha20poly1305_init_push.php';

@@ -640,6 +640,15 @@ final class VmSodium
         return self::ffiSecretboxOpen($ciphertext, $nonce, $key);
     }
 
+    public static function secretboxKeygen(): string
+    {
+        if (\function_exists('sodium_crypto_secretbox_keygen')) {
+            return \sodium_crypto_secretbox_keygen();
+        }
+
+        return self::randomKeyBytes(self::CRYPTO_SECRETBOX_KEYBYTES);
+    }
+
     private static function ffiSecretbox(string $message, string $nonce, string $key): string
     {
         $ffi = self::requireFfi();
