@@ -840,6 +840,18 @@ final class ReflectionSupport
         return $entry->isFinal;
     }
 
+    /** php-src zim_ReflectionClass_isInterface — ce->ce_flags & ZEND_ACC_INTERFACE (#18335). */
+    public static function reflectionClassIsInterface(ClassEntry $entry): bool
+    {
+        return $entry->isInterface;
+    }
+
+    /** php-src zim_ReflectionClass_isTrait — ce->ce_flags & ZEND_ACC_TRAIT (#18335). */
+    public static function reflectionClassIsTrait(ClassEntry $entry): bool
+    {
+        return $entry->isTrait;
+    }
+
     /** php-src zim_ReflectionClass_isIterateable — concrete Traversable, not interfaces (#18297, #18324). */
     public static function reflectionClassIsIterateable(ClassEntry $entry, Context $ctx): bool
     {

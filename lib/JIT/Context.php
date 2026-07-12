@@ -859,6 +859,9 @@ class Context {
         $this->functionProxies['reflectionclass::getmethod'] = new Call\ReflectionClassGetMethod();
         $this->functionProxies['reflectionclass::getreflectionconstant'] = new Call\ReflectionClassGetReflectionConstant();
         $this->functionProxies['reflectionclass::isfinal'] = new Call\ReflectionClassIsFinal();
+        $this->functionProxies['reflectionclass::isinterface'] = new Call\ReflectionClassIsInterface();
+        $this->functionProxies['reflectionclass::istrait'] = new Call\ReflectionClassIsTrait();
+        $this->functionProxies['reflectionclass::getmodifiers'] = new Call\ReflectionClassGetModifiers();
         $this->functionProxies['reflectionclass::isiterateable'] = new Call\ReflectionClassIsIterateable();
         if (CompilerVersion::supportsLazyObjectFactories()) {
             $this->functionProxies['reflectionclass::newlazyproxy'] = new Call\ReflectionClassNewLazyProxy();

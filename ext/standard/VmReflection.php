@@ -2400,6 +2400,30 @@ final class VmReflection
         return $modifiers;
     }
 
+    /** php-src ReflectionClass::IS_* values returned by getModifiers() (#18335). */
+    public const REFLECTION_CLASS_IS_EXPLICIT_ABSTRACT = 64;
+
+    public const REFLECTION_CLASS_IS_FINAL = 32;
+
+    public const REFLECTION_CLASS_IS_READONLY = 65536;
+
+    /** php-src zim_ReflectionClass_getModifiers — ce->ce_flags & keep_flags (#18335). */
+    public static function classEntryToReflectionModifiers(ClassEntry $entry): int
+    {
+        $modifiers = 0;
+        if ($entry->isFinal) {
+            $modifiers |= self::REFLECTION_CLASS_IS_FINAL;
+        }
+        if ($entry->isAbstract) {
+            $modifiers |= self::REFLECTION_CLASS_IS_EXPLICIT_ABSTRACT;
+        }
+        if ($entry->readonly) {
+            $modifiers |= self::REFLECTION_CLASS_IS_READONLY;
+        }
+
+        return $modifiers;
+    }
+
     /** php-src ReflectionMethod::IS_* values returned by getModifiers() (#7116). */
     public const REFLECTION_METHOD_IS_STATIC = 16;
 
