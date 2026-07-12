@@ -112,6 +112,9 @@ final class Variable {
     /** proc_open() process handle (#3131). */
     public bool $procResource = false;
 
+    /** GeneratorState current key/value — must not be releaseVmDeadScopeSlot temps (#18184). */
+    public bool $generatorYieldStorage = false;
+
     /** Lvalue proxy for __set dispatch when the property slot does not exist (#146). */
     public ?ObjectEntry $magicSetTarget = null;
 
@@ -1263,6 +1266,9 @@ final class Variable {
                 break;
             case self::TYPE_STRING_OFFSET:
                 $this->string($var->toString());
+                break;
+            case self::TYPE_ARRAYACCESS_OFFSET:
+                $this->copyFrom($var->readArrayAccessOffsetValue());
                 break;
             case self::TYPE_PROPERTY_HOOK_REF:
                 $this->copyFrom($var->propertyHookRef->read());

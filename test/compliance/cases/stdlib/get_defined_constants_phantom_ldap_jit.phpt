@@ -1,6 +1,5 @@
 --TEST--
-get_defined_constants(true) — no phantom ldap bucket when ext/ldap unloaded JIT (#17800)
---JIT--
+get_defined_constants(true) — no ldap bucket without ext/ldap JIT (#18211)
 --FILE--
 <?php
 declare(strict_types=1);

@@ -14,7 +14,6 @@ use PHPCompiler\JIT\ScriptMagic;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\OpCode;
 use PHPCompiler\VM\ErrorReporter;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -38,11 +37,7 @@ final class trigger_error_ extends Internal
         $message = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'trigger_error', 0, 'message');
         $level = ErrorReporter::E_USER_NOTICE;
         if (2 === $argc) {
-            $levelVar = $frame->calledArgs[1]->resolveIndirect();
-            if (Variable::TYPE_INTEGER !== $levelVar->type) {
-                throw new \LogicException('trigger_error() error type must be an integer');
-            }
-            $level = $levelVar->toInt();
+            $level = VmMath::parseIntBuiltinArgForFrame($frame, 1, 'trigger_error', 2, 'error_level');
             if (!ErrorReporter::isUserErrorLevel($level)) {
                 throw new \ValueError('trigger_error(): Argument #2 ($error_level) must be one of E_USER_ERROR, E_USER_WARNING, E_USER_NOTICE, or E_USER_DEPRECATED');
             }
@@ -125,7 +120,7 @@ final class trigger_error_ extends Internal
         }
 
         $levelI32 = $context->builder->trunc(
-            $this->jitLong($context, $arg, 'trigger_error() error type'),
+            JitIntdiv::lowerIntBuiltinArgForCaller($context, $arg, 'trigger_error', 2, 'error_level'),
             $context->getTypeFromString('int32')
         );
         self::jitGuardUserErrorLevel($context, $levelI32);

@@ -110,12 +110,17 @@ final class SplFileObjectStorage
         $state['lineNum'] = 0;
         for ($i = 0; $i < $line; ++$i) {
             if (!self::readLineForIterator($object, true)) {
+                // php-src ext/spl/spl_directory.c — key reflects requested line past EOF (#18304).
+                $state['lineNum'] = $line;
+
                 return;
             }
             self::freeLine($state);
             ++$state['lineNum'];
         }
-        self::readLineForIterator($object, true);
+        if (!self::readLineForIterator($object, true)) {
+            $state['lineNum'] = $line;
+        }
     }
 
     public static function fseek(ObjectEntry $object, int $offset, int $whence = \SEEK_SET): int

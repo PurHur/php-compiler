@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler;
 
+use PHPCompiler\ext\xml\XmlParserSupport;
 use PHPCompiler\ext\xml\VmXml;
 use PHPCompiler\ext\xml\VmXmlStructBuilder;
 use PHPUnit\Framework\TestCase;
@@ -36,7 +37,7 @@ final class XmlParseIntoStructTest extends TestCase
     {
         $runtime = new Runtime();
         $ctx = $runtime->vmContext;
-        $parser = VmXml::parserCreate();
+        $parser = XmlParserSupport::createParser($ctx)->toObject()->id;
         $parsed = VmXml::parseIntoStruct($ctx, $parser, '<a><b/></a>');
         self::assertSame(1, $parsed['status']);
         self::assertSame(3, $parsed['values']->getNumElements());

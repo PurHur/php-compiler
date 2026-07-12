@@ -11,6 +11,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\BuiltinExecute;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -35,6 +36,7 @@ final class iconv extends Internal
         }
         $from = VmIconv::coerceEncodingArg($frame->calledArgs[0], 'iconv', 0, 'from_encoding');
         $to = VmIconv::coerceEncodingArg($frame->calledArgs[1], 'iconv', 1, 'to_encoding');
+        InternalStrictArg::rejectNullString($frame->calledArgs[2], 'iconv', 'string', 2, $frame);
         $input = VmString::coerceStringBuiltinArg($frame->calledArgs[2], 'iconv', 2, 'string');
         if (null === $frame->returnVar) {
             return;

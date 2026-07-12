@@ -37,7 +37,7 @@ final class stream_filter_prepend extends Internal
             1,
             'filtername'
         );
-        $readWrite = VmStreamFilterChain::READ;
+        $readWrite = VmStreamFilterChain::ALL;
         if ($argc >= 3) {
             $readWrite = VmMath::parseIntBuiltinArg(
                 $frame->calledArgs[2]->resolveIndirect(),

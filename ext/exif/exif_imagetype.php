@@ -51,6 +51,6 @@ final class exif_imagetype extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('exif_imagetype() is not implemented for JIT in this compiler build (issue #3400)');
+        return JitExifImagetype::invoke($context, $args);
     }
 }

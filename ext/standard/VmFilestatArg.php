@@ -24,7 +24,7 @@ final class VmFilestatArg
         string $paramName = 'filename',
         ?Frame $frame = null
     ): string {
-        if (null !== $frame) {
+        if (null !== $frame && InternalStrictArg::isCallerStrict($frame)) {
             InternalStrictArg::rejectNullString($var, $function, $paramName, $argIndex, $frame);
         }
 
@@ -73,13 +73,13 @@ final class VmFilestatArg
     }
 
     /**
-     * Z_PARAM_PATH for touch() — null coerces to "" then php_touch returns false (#12878, php_touch).
+     * touch() $filename — typed string; reject null (#18245, ext/standard/file.c).
      *
      * @throws \TypeError when the operand cannot be converted like Zend PHP 8.x
      */
     public static function coercePathArg(Variable $var, string $function): string
     {
-        return VmString::coerceStringBuiltinArg($var, $function, 0, 'filename');
+        return VmString::coerceTypedStringBuiltinArg($var, $function, 0, 'filename');
     }
 
     /**

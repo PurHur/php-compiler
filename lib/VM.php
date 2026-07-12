@@ -2761,7 +2761,7 @@ class VM {
                     $fiber->propertyHookSuspendFrame = $hookFrame;
                     $fiber->status = FiberState::STATUS_SUSPENDED;
                     $out = new Variable();
-                    $out->copyFrom($fiber->suspendReturn);
+                    $out->duplicateFrom($fiber->suspendReturn->resolveIndirect());
 
                     return $out;
                 }
@@ -2795,7 +2795,7 @@ class VM {
         if (self::FIBER_SUSPEND === $result) {
             $fiber->status = FiberState::STATUS_SUSPENDED;
             $out = new Variable();
-            $out->copyFrom($fiber->suspendReturn);
+            $out->duplicateFrom($fiber->suspendReturn->resolveIndirect());
 
             return $out;
         }
@@ -5825,13 +5825,19 @@ restart:
                         }
                         if ($frame->fiberSuspend) {
                             $frame->fiberSuspend = false;
+                            // Pos already advanced past FUNCCALL_EXEC_*; stale callArgEntries
+                            // would replay the prior suspend operand on the next resume (#18162).
                             $frame->call = null;
                             $this->clearOutgoingCallState($frame);
+                            $this->restorePendingOutboundCallAfterInlineNew($frame);
 
                             return self::FIBER_SUSPEND;
                         }
                         $frame->call = null;
-                        $this->clearOutgoingCallState($frame);
+                        $keepReturnSlot = OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type
+                            ? (int) $op->arg1
+                            : null;
+                        $this->clearOutgoingCallState($frame, $keepReturnSlot);
                         $this->restorePendingOutboundCallAfterInlineNew($frame);
                         if (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
                             $this->releaseVmStatementDeadTemps($frame, (int) $op->arg1);
@@ -6161,6 +6167,7 @@ restart:
                         $classEntry->readonly = VM\ClassFlags::isReadonly($classFlags);
                         $classEntry->isAbstract = VM\ClassFlags::isAbstract($classFlags);
                         $classEntry->isStatic = VM\ClassFlags::isStatic($classFlags);
+                        $classEntry->isFinal = VM\ClassFlags::isFinal($classFlags);
                     }
                     if ($op->isSealed) {
                         $classEntry->sealed = true;
@@ -7083,20 +7090,22 @@ restart:
                     }
                     if (null !== $op->arg2) {
                         if (isset($frame->scope[$op->arg2])) {
-                            $gen->currentValue->copyFrom($frame->scope[$op->arg2]->resolveIndirect());
+                            $gen->publishCurrentValue($frame->scope[$op->arg2]->resolveIndirect());
                         } elseif (isset($frame->block->constants[$op->arg2])) {
-                            $gen->currentValue->copyFrom($frame->block->constants[$op->arg2]);
+                            $gen->publishCurrentValue($frame->block->constants[$op->arg2]);
                         } else {
-                            $gen->currentValue->null();
+                            $gen->clearCurrentValue();
                         }
                     } else {
                         $gen->currentValue->null();
+                        $gen->currentSnapshot->null();
+                        $gen->hasCurrent = true;
                     }
                     if (null !== $op->arg3) {
                         if (isset($frame->scope[$op->arg3])) {
-                            $gen->currentKey->copyFrom($frame->scope[$op->arg3]->resolveIndirect());
+                            $gen->currentKey->duplicateFrom($frame->scope[$op->arg3]->resolveIndirect());
                         } elseif (isset($frame->block->constants[$op->arg3])) {
-                            $gen->currentKey->copyFrom($frame->block->constants[$op->arg3]);
+                            $gen->currentKey->duplicateFrom($frame->block->constants[$op->arg3]);
                         } else {
                             $gen->currentKey->int($gen->autoKey++);
                         }
@@ -7106,7 +7115,9 @@ restart:
                     if (null !== $op->arg1) {
                         $gen->yieldResultSlot = $op->arg1;
                     }
-                    $gen->hasCurrent = true;
+                    if (null === $op->arg2) {
+                        $gen->hasCurrent = true;
+                    }
                     $gen->frame = $frame;
                     $frame->generatorYield = true;
                     break;
@@ -7147,8 +7158,7 @@ restart:
                     if (Variable::TYPE_ARRAY === $container->type) {
                         if ($container->toArray()->iterValid()) {
                             $gen->currentKey->copyFrom($container->toArray()->iterCurrentKey());
-                            $gen->currentValue->copyFrom($container->toArray()->iterCurrentValue(false));
-                            $gen->hasCurrent = true;
+                            $gen->publishCurrentValue($container->toArray()->iterCurrentValue(false));
                             $gen->frame = $frame;
                             $frame->pos--;
                             $frame->generatorYield = true;
@@ -7161,8 +7171,7 @@ restart:
                         $inner = $container->toObject()->generatorState;
                         if ($this->advanceGeneratorIteration($inner)) {
                             $gen->currentKey->copyFrom($inner->currentKey);
-                            $gen->currentValue->copyFrom($inner->currentValue);
-                            $gen->hasCurrent = true;
+                            $gen->publishCurrentValue($inner->currentSnapshot);
                             $gen->frame = $frame;
                             $frame->pos--;
                             $frame->generatorYield = true;
@@ -7181,11 +7190,10 @@ restart:
                             $gen->currentKey->copyFrom(
                                 $this->invokeForeachInstanceMethod($frame, $container, 'key')
                             );
-                            $gen->currentValue->copyFrom(
+                            $gen->publishCurrentValue(
                                 $this->invokeForeachInstanceMethod($frame, $container, 'current')
                             );
                             $gen->yieldFromIteratorAdvance = true;
-                            $gen->hasCurrent = true;
                             $gen->frame = $frame;
                             $frame->pos--;
                             $frame->generatorYield = true;
@@ -7627,6 +7635,7 @@ restart:
                 $frame->fiberSuspend = false;
                 $frame->call = null;
                 $this->clearOutgoingCallState($frame);
+                $this->restorePendingOutboundCallAfterInlineNew($frame);
 
                 return self::FIBER_SUSPEND;
             }
@@ -13503,6 +13512,7 @@ restart:
         );
         $frame->call = $class->methods[$methodLc];
         $frame->callArgs = $this->callArgsForStaticMethod($frame, $lcClass, $frame->call, $parentKeywordScope);
+        $frame->callArgEntries = [];
         $frame->builtinCalleeQualifiedMethod = $class->name.'::'.$declaredName;
     }
 
@@ -16675,7 +16685,13 @@ restart:
         if ($this->variableAliasesObjectPropertyCell($frame->scope[$slot])) {
             return;
         }
+        if ($this->variableIsGeneratorYieldStorage($frame->scope[$slot])) {
+            return;
+        }
         $var = $frame->scope[$slot]->resolveIndirect();
+        if ($var->generatorYieldStorage) {
+            return;
+        }
         if (Variable::TYPE_OBJECT === $var->type) {
             try {
                 $objectId = $var->toObject()->id;
@@ -16752,18 +16768,28 @@ restart:
         return null !== $resolved->objectPropertyOwner;
     }
 
+    /** Generator yield key/value cells must survive fcall temp release (#18184). */
+    private function variableIsGeneratorYieldStorage(Variable $var): bool
+    {
+        if ($var->generatorYieldStorage) {
+            return true;
+        }
+
+        return $var->resolveIndirect()->generatorYieldStorage;
+    }
+
     /**
      * Zend fcall end — drop by-value send snapshots and dead inline call-arg temps (#11602).
      */
-    private function clearOutgoingCallState(Frame $frame): void
+    private function clearOutgoingCallState(Frame $frame, ?int $keepReturnSlot = null): void
     {
-        $this->releaseOutgoingCallArgTemps($frame);
+        $this->releaseOutgoingCallArgTemps($frame, $keepReturnSlot);
         $frame->callArgs = [];
         $frame->callArgEntries = [];
         $frame->builtinCalleeQualifiedMethod = null;
     }
 
-    private function releaseOutgoingCallArgTemps(Frame $frame): void
+    private function releaseOutgoingCallArgTemps(Frame $frame, ?int $keepReturnSlot = null): void
     {
         foreach ($frame->callArgEntries as $entry) {
             if ('u' === $entry[0]) {
@@ -16776,10 +16802,13 @@ restart:
                 ObjectLifetime::releaseDirectObject($entry[1]);
                 $slot = $entry[2] ?? null;
             }
-            if (!is_int($slot) || $frame->block->isNamedVariableSlot($slot)) {
+            if (!is_int($slot) || $slot === $keepReturnSlot || $frame->block->isNamedVariableSlot($slot)) {
                 continue;
             }
             if (isset($frame->scope[$slot]) && $this->variableAliasesObjectPropertyCell($frame->scope[$slot])) {
+                continue;
+            }
+            if (isset($frame->scope[$slot]) && $this->variableIsGeneratorYieldStorage($frame->scope[$slot])) {
                 continue;
             }
             // Unhandled match arms re-read the scrutinee on JUMPIF targets after the probe call (#13955).

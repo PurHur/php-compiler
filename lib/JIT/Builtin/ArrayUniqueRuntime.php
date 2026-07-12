@@ -13,7 +13,7 @@ use PHPLLVM\Value;
 /**
  * JIT/AOT link for array_unique() via ArrayUniqueJitHelper PHP (#12341).
  *
- * Standalone AOT compiles {@see ArrayUniqueJitHelper} via JitVmHelperLink bridge (#14385); native literal arrays keep LLVM in {@see ArrayBuiltinHelper::arrayUnique()}.
+ * Standalone AOT and native literal arrays materialize to hashtable then route through PHP (#18221).
  * SSOT: {@see \PHPCompiler\ext\standard\ArrayUniqueJitHelper}
  * php-src: ext/standard/array.c — php_array_unique()
  */
@@ -32,12 +32,10 @@ final class ArrayUniqueRuntime
 
     public static function unique(Context $context, JITVariable $array, int $flags): Value
     {
-        if (ArrayBuiltinHelper::isNativeArray($array->type)) {
-            return ArrayBuiltinHelper::arrayUnique($context, $array, $flags);
-        }
-
         self::ensureLinked($context);
-        $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
+        $ht = ArrayBuiltinHelper::isNativeArray($array->type)
+            ? ArrayBuiltinHelper::nativeListToHashTable($context, $array)
+            : ArrayBuiltinHelper::loadHashTable($context, $array);
         $i64 = $context->getTypeFromString('int64');
 
         return $context->builder->call(

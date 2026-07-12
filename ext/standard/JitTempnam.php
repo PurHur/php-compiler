@@ -11,6 +11,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\JIT\Builtin\SysGetTempDirRuntime;
 use PHPCompiler\JIT\Builtin\StringTempnam;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -22,6 +23,11 @@ final class JitTempnam
     public static function lowerDirectory(Context $context, JITVariable $arg): Value
     {
         if (self::isNullJitArg($arg)) {
+            if ($context->callerStrictTypes) {
+                JitInternalStrictArg::requireString($context, $arg, 'tempnam', 'directory', 1);
+
+                return JitStringArg::lower($context, $arg, 'tempnam() directory');
+            }
             SysGetTempDirRuntime::ensureLinked($context);
 
             return $context->builder->call(

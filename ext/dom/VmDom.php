@@ -2087,15 +2087,18 @@ final class VmDom
         $idAttrByElement = self::parseDoctypeIdAttributes($trimmed);
         $generalEntities = self::parseDoctypeGeneralEntities($trimmed);
         [$elementXml, $elementOffset] = self::stripDoctypeWithOffset($trimmed);
-        $validationError = VmXml::validationErrorRecord($elementXml);
-        if (null !== $validationError) {
-            self::reportDomLibxmlError(
-                $ctx,
-                $validationError['message'],
-                $validationError['code'],
-                $validationError['column'],
-                $frame
-            );
+        $validationErrors = VmXml::validationErrorRecords($elementXml);
+        if ([] !== $validationErrors) {
+            foreach ($validationErrors as $validationError) {
+                self::reportDomLibxmlError(
+                    $ctx,
+                    $validationError['message'],
+                    $validationError['code'],
+                    $validationError['column'],
+                    $frame,
+                    $validationError['level']
+                );
+            }
 
             return false;
         }
@@ -2351,10 +2354,11 @@ final class VmDom
         string $message,
         int $code,
         int $column,
-        ?\PHPCompiler\Frame $frame
+        ?\PHPCompiler\Frame $frame,
+        int $level = LibxmlConstants::LIBXML_ERR_ERROR
     ): void {
         VmLibxml::handleError($ctx, [
-            'level' => LibxmlConstants::LIBXML_ERR_ERROR,
+            'level' => $level,
             'code' => $code,
             'column' => $column,
             'message' => $message,
@@ -2999,21 +3003,95 @@ final class VmDom
     }
 
     /**
+     * Parse HTML/XML markup attribute substring (libxml HTML semantics; #18319).
+     *
+     * Supports double-quoted, single-quoted, and unquoted HTML attribute values.
+     *
      * @return array<string, string>
      */
-    private static function parseAttributes(string $attrString): array
+    public static function parseMarkupAttributes(string $attrString): array
     {
         $attrs = [];
         if ('' === $attrString) {
             return $attrs;
         }
-        if (preg_match_all('/\s([A-Za-z_][\w:.-]*)\s*=\s*"([^"]*)"/', $attrString, $matches, PREG_SET_ORDER)) {
-            foreach ($matches as $match) {
-                $attrs[$match[1]] = $match[2];
+        $len = \strlen($attrString);
+        $pos = 0;
+        while ($pos < $len) {
+            while ($pos < $len && ctype_space($attrString[$pos])) {
+                ++$pos;
             }
+            if ($pos >= $len) {
+                break;
+            }
+            if (!self::isMarkupAttributeNameStart($attrString[$pos])) {
+                ++$pos;
+
+                continue;
+            }
+            $nameStart = $pos;
+            ++$pos;
+            while ($pos < $len && self::isMarkupAttributeNameChar($attrString[$pos])) {
+                ++$pos;
+            }
+            $name = substr($attrString, $nameStart, $pos - $nameStart);
+            while ($pos < $len && ctype_space($attrString[$pos])) {
+                ++$pos;
+            }
+            if ($pos >= $len || '=' !== $attrString[$pos]) {
+                continue;
+            }
+            ++$pos;
+            while ($pos < $len && ctype_space($attrString[$pos])) {
+                ++$pos;
+            }
+            if ($pos >= $len) {
+                break;
+            }
+            $quote = $attrString[$pos];
+            if ('"' === $quote || "'" === $quote) {
+                ++$pos;
+                $valueStart = $pos;
+                while ($pos < $len && $attrString[$pos] !== $quote) {
+                    ++$pos;
+                }
+                $attrs[$name] = substr($attrString, $valueStart, $pos - $valueStart);
+                if ($pos < $len) {
+                    ++$pos;
+                }
+
+                continue;
+            }
+            $valueStart = $pos;
+            while ($pos < $len
+                && !ctype_space($attrString[$pos])
+                && '>' !== $attrString[$pos]
+                && '/' !== $attrString[$pos]
+            ) {
+                ++$pos;
+            }
+            $attrs[$name] = substr($attrString, $valueStart, $pos - $valueStart);
         }
 
         return $attrs;
+    }
+
+    private static function isMarkupAttributeNameStart(string $char): bool
+    {
+        return (bool) preg_match('/[A-Za-z_]/', $char);
+    }
+
+    private static function isMarkupAttributeNameChar(string $char): bool
+    {
+        return (bool) preg_match('/[\w:.-]/', $char);
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private static function parseAttributes(string $attrString): array
+    {
+        return self::parseMarkupAttributes($attrString);
     }
 
     public static function appendChild(Context $ctx, ObjectEntry $parent, ObjectEntry $child): ObjectEntry

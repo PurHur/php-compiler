@@ -1,5 +1,5 @@
 --TEST--
-get_defined_constants(true) — no phantom ldap bucket when ext/ldap unloaded (#17800, ExtensionConstantGroups.php)
+get_defined_constants(true) — no ldap bucket without ext/ldap (#18211, ExtensionConstantGroups.php)
 --FILE--
 <?php
 declare(strict_types=1);

@@ -43,8 +43,8 @@ final class ReflectionClassGetMethod extends VmClassMethod
         }
         $rm = new ObjectEntry($rmClass);
         $rm->constructed = true;
-        $rm->getProperty(ReflectionSupport::PROP_CLASS_NAME)->string($entry->name);
-        $rm->getProperty(ReflectionSupport::PROP_METHOD_NAME)->string($method);
+        $rm->getProperty(ReflectionSupport::PROP_REFLECTION_METHOD_CLASS)->string($entry->name);
+        $rm->getProperty(ReflectionSupport::PROP_REFLECTION_METHOD_FUNC)->string($method);
         if (null !== $frame->returnVar) {
             $out = new Variable(Variable::TYPE_OBJECT);
             $out->object($rm);

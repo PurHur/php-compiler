@@ -231,6 +231,7 @@ class Runtime {
         $this->load(new ext\xsl\Module);
         $this->load(new ext\simplexml\Module);
         $this->load(new ext\xml\Module);
+        $this->load(new ext\xmlrpc\Module);
         $this->load(new ext\xmlreader\Module);
         $this->load(new ext\xmlwriter\Module);
         $this->load(new ext\gd\Module);
@@ -266,6 +267,7 @@ class Runtime {
         $this->load(new ext\sqlite3\Module);
         $this->load(new ext\uri\Module);
         $this->load(new ext\uuid\Module);
+        $this->load(new ext\uploadprogress\Module);
         $this->load(new ext\standard\Module);
     }
 
@@ -901,18 +903,7 @@ class Runtime {
 
     public function standalone(?Block $block, string $outfile, ?string $sourceCode = null, ?string $sourceFilename = null) {
         \PHPCompiler\JIT\Progress::noteFunction('runtime_standalone_begin');
-        $prevUserScriptAot = getenv('PHP_COMPILER_AOT_USER_SCRIPT');
         $needsPregPrelink = Block::containsPregPrelinkBuiltinCalls($block);
-        $deferUserScriptAotInit = $needsPregPrelink
-            && ('1' === $prevUserScriptAot || 'true' === strtolower((string) $prevUserScriptAot));
-        if ($deferUserScriptAotInit && \function_exists('putenv')) {
-            // User-script Context init + nested preg JIT OOMs (#16075); link preg on a non-user init first.
-            JIT\VmActiveContextInitLlvm::resetPendingState();
-            putenv('PHP_COMPILER_AOT_USER_SCRIPT=');
-            unset($_ENV['PHP_COMPILER_AOT_USER_SCRIPT'], $_SERVER['PHP_COMPILER_AOT_USER_SCRIPT']);
-            $this->jitContext = null;
-            $this->jit = null;
-        }
         $context = $this->loadJitContext();
         if (null !== $sourceFilename && '' !== $sourceFilename) {
             $context->setAotSourceFilename($sourceFilename);
@@ -923,14 +914,8 @@ class Runtime {
             throw new \LogicException('yield in the main script is not supported in AOT yet (issue #3115).');
         }
         if ($needsPregPrelink) {
+            // User-script AOT uses PregMatchUserScriptLlvm stubs — no nested-JIT prelink pass (#16075).
             \PHPCompiler\JIT\Builtin\StringPregMatch::ensureLinked($context);
-        }
-        if ($deferUserScriptAotInit && \function_exists('putenv')) {
-            putenv('PHP_COMPILER_AOT_USER_SCRIPT='.$prevUserScriptAot);
-            $_ENV['PHP_COMPILER_AOT_USER_SCRIPT'] = $prevUserScriptAot;
-            $_SERVER['PHP_COMPILER_AOT_USER_SCRIPT'] = $prevUserScriptAot;
-            $context->retrofitUserScriptStandaloneAfterPregPrelink();
-            JIT\Builtin\SuperglobalRefreshRuntime::ensureUserScriptRefreshPrerequisitesAfterPregPrelink($context);
         }
         $context->setMain($this->loadJit()->compile($block));
         \PHPCompiler\JIT\Progress::noteFunction('runtime_standalone_compile_done');

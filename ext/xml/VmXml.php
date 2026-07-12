@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\xml;
 use PHPCompiler\ext\libxml\LibxmlConstants;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\Context;
+use PHPCompiler\VM\ObjectEntry;
 
 /**
  * Minimal expat-shaped parser for xml_parse() v1 (#3494, #6058).
@@ -25,22 +26,29 @@ final class VmXml
     /** libxml/xmlerror.h — XML_ERR_TAG_NAME_MISMATCH (php-src ext/xml/xml.c; #18120). */
     private const XML_ERR_TAG_NAME_MISMATCH = 76;
 
-    /** @var array<int, array{errorCode: int, line: int, column: int, byteIndex: int}> */
+    /** @var array<int, array<string, mixed>> */
     private static array $parsers = [];
 
-    private static int $nextParserId = 0;
-
-    public static function parserCreate(): int
+    public static function initParserState(int $parserId): void
     {
-        $id = ++self::$nextParserId;
-        self::$parsers[$id] = [
-            'errorCode' => 0,
-            'line' => 0,
-            'column' => 0,
-            'byteIndex' => 0,
-        ];
+        self::$parsers[$parserId] = XmlParserHandlers::defaultParserState();
+    }
 
-        return $id;
+    /** @return null|array<string, mixed> */
+    public static function parserState(int $parserId): ?array
+    {
+        return self::$parsers[$parserId] ?? null;
+    }
+
+    /** @param array<string, mixed> $state */
+    public static function replaceParserState(int $parserId, array $state): void
+    {
+        self::$parsers[$parserId] = $state;
+    }
+
+    public static function hasParserState(int $parserId): bool
+    {
+        return isset(self::$parsers[$parserId]);
     }
 
     public static function parserFree(int $parser): bool
@@ -128,7 +136,8 @@ final class VmXml
         int $parser,
         string $data,
         bool $isFinal,
-        ?Frame $frame = null
+        ?Frame $frame = null,
+        ?ObjectEntry $parserObject = null
     ): int {
         if (!isset(self::$parsers[$parser])) {
             throw new \ValueError('xml_parse(): Argument #1 ($parser) must be a valid XML parser');
@@ -141,6 +150,9 @@ final class VmXml
         $error = self::validateWellFormed($data);
         if (null === $error) {
             self::recordSuccessfulParse($parser, $data);
+            if (null !== $parserObject) {
+                VmXmlSaxDispatcher::dispatch($ctx, $parserObject, $data, $frame);
+            }
 
             return 1;
         }
@@ -249,7 +261,33 @@ final class VmXml
      */
     public static function validationErrorRecord(string $data): ?array
     {
-        return self::validateWellFormed($data);
+        $records = self::validationErrorRecords($data);
+
+        return $records[0] ?? null;
+    }
+
+    /**
+     * libxml may emit multiple FATAL errors for one malformed document (e.g. unclosed start tag
+     * plus premature end in outer element — php-src ext/dom/document.c via libxml2; #18332).
+     *
+     * @return list<array{level: int, code: int, column: int, message: string, file: string, line: int}>
+     */
+    public static function validationErrorRecords(string $data): array
+    {
+        $primary = self::validateWellFormed($data);
+        if (null === $primary) {
+            return [];
+        }
+
+        $records = [$primary];
+        if (self::XML_ERR_TAG_NOT_FINISHED === $primary['code']) {
+            $secondary = self::detectPrematureEnd(trim($data));
+            if (null !== $secondary && self::XML_ERR_UNCLOSED_NODE_TAG === $secondary['code']) {
+                $records[] = $secondary;
+            }
+        }
+
+        return $records;
     }
 
     /**

@@ -77,6 +77,11 @@ class Module extends ModuleAbstract
             new mb_encoding_aliases(),
             new mb_convert_kana(),
             new mb_split(),
+            new mb_ereg(),
+            new mb_eregi(),
+            new mb_ereg_replace(),
+            new mb_regex_encoding(),
+            new mb_regex_set_options(),
         ];
     }
 }

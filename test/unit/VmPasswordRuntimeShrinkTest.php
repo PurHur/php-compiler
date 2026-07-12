@@ -45,6 +45,14 @@ final class VmPasswordRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('FFI::cdef', $source);
     }
 
+    public function testJitLibcryptHasNoLibcCryptLlvm(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/JitLibcrypt.php');
+        $this->assertStringContainsString('LibcryptRuntime::', $source);
+        $this->assertStringNotContainsString('LibcryptThinRuntime', $source);
+        $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/LibcryptThinRuntime.php');
+    }
+
     public function testBcryptWorksWithFfiDisabled(): void
     {
         if (!VmPasswordPure::available()) {

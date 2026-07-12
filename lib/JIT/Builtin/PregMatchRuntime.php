@@ -12,6 +12,7 @@ use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPCompiler\JIT\NestedVmActiveContextLlvm;
 use PHPCompiler\JIT\NestedVmHashTableMethodLlvm;
 use PHPCompiler\JIT\NestedVmVariableMethodLlvm;
+use PHPCompiler\JIT\UserScriptAotDeferNestedJit;
 use PHPLLVM\Builder;
 use PHPLLVM\LLVMAbstract\Builder as LLVMBuilderImpl;
 use PHPLLVM\Value;
@@ -92,6 +93,13 @@ final class PregMatchRuntime
 
     public static function implement(Context $context): void
     {
+        if (UserScriptAotDeferNestedJit::shouldDefer($context)) {
+            PregMatchUserScriptLlvm::implement($context);
+            self::registerLinkedRuntime($context);
+
+            return;
+        }
+
         $probe = $context->module->getNamedFunction('__compiler_preg_match');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);
@@ -499,8 +507,7 @@ final class PregMatchRuntime
         $runtime = $context->runtime;
         $root = \dirname(__DIR__, 3);
         // VmPregNative delegates to VmPregPure; compile pattern + native facade — VmPregPure stays
-        // external until nested VmPregEngine lowering completes ($this binding in nested instance
-        // methods — applyInlineModifier property stores target string param not __object__*, #16075).
+        // external until nested VmPregEngine lowering (BoundVariable) is ready (#16075 tier-2 execute).
         // VmPregPattern must compile here (modifier loop avoids nested match-on-offset IR bug).
         $paths = [
             $root.'/ext/standard/StdlibConstants.php',

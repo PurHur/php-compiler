@@ -38,7 +38,7 @@ final class ReflectionClassGetMethod implements Call
             $context,
             $rmObj,
             'ReflectionMethod',
-            'name',
+            'class',
             $classSafe,
             $classLen
         );
@@ -46,7 +46,7 @@ final class ReflectionClassGetMethod implements Call
             $context,
             $rmObj,
             'ReflectionMethod',
-            'method',
+            'name',
             $context->builder->pointerCast($methodData, $i8p),
             $methodLen
         );

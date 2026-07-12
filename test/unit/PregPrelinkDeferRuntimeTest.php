@@ -36,9 +36,9 @@ final class PregPrelinkDeferRuntimeTest extends TestCase
             $source
         );
         $this->assertStringContainsString(
-            'SuperglobalRefreshRuntime::ensureUserScriptRefreshPrerequisitesAfterPregPrelink($context)',
+            'PregMatchUserScriptLlvm stubs',
             $source
         );
-        $this->assertStringContainsString('$this->jitContext = null;', $source);
+        $this->assertStringNotContainsString('$this->jitContext = null;', $source);
     }
 }

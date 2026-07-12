@@ -85,6 +85,8 @@ final class RuntimeShrinkCloseoutTest extends TestCase
             'lib/JIT/Builtin/StringFsDirJit.php' => 'StringFsDirJit',
             'ext/standard/stripcslashes.php' => 'VmString',
             'lib/JIT/Builtin/OpensslSignRuntime.php' => 'OpensslSignJitHelper',
+            'lib/JIT/Builtin/LibcryptRuntime.php' => 'LibcryptJitHelper',
+            'ext/standard/LibcryptJitHelper.php' => 'cryptArgv',
         ];
 
         foreach ($checks as $relativePath => $needle) {
@@ -102,6 +104,7 @@ final class RuntimeShrinkCloseoutTest extends TestCase
         sort($cFiles);
         $this->assertSame([], $cFiles, 'No hand-written C runtime TUs may remain under lib/AOT/runtime/');
         $this->assertFileDoesNotExist($runtimeDir.'/openssl_ev.c', 'openssl_ev.c deleted — OpensslSignJitHelper PHP (#16454)');
+        $this->assertFileDoesNotExist($this->repoRoot.'/lib/JIT/Builtin/LibcryptThinRuntime.php', 'LibcryptThinRuntime deleted — LibcryptRuntime PHP (#9275)');
         $this->assertFileDoesNotExist($this->repoRoot.'/lib/JIT/Builtin/runtime/openssl_ev.c');
     }
 }

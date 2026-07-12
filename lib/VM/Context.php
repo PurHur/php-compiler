@@ -585,18 +585,6 @@ class Context {
         $aliasLc = strtolower($alias);
         $originalLc = strtolower($original);
 
-        if (isset($this->classes[$aliasLc]) || isset($this->classAliases[$aliasLc]) || isset($this->enums[$aliasLc])) {
-            $this->errors->triggerError(
-                \sprintf('Cannot declare class %s, because the name is already in use', $alias),
-                ErrorReporter::E_WARNING,
-                null,
-                $this,
-                $frame
-            );
-
-            return false;
-        }
-
         if (!isset($this->classes[$originalLc])) {
             if (!$autoload || !$this->autoloadClass($original)) {
                 $this->errors->triggerError(
@@ -622,18 +610,32 @@ class Context {
             return false;
         }
 
-        while (isset($this->classAliases[$originalLc])) {
-            $originalLc = $this->classAliases[$originalLc];
+        $canonicalOriginalLc = $originalLc;
+        while (isset($this->classAliases[$canonicalOriginalLc])) {
+            $canonicalOriginalLc = $this->classAliases[$canonicalOriginalLc];
         }
 
-        $entry = $this->classes[$originalLc];
+        $entry = $this->classes[$canonicalOriginalLc];
         if ($entry->isInternal) {
             throw new \ValueError(
                 'class_alias(): Argument #1 ($class) must be a user-defined class name, internal class name given'
             );
         }
+
+        if (isset($this->classes[$aliasLc]) || isset($this->classAliases[$aliasLc]) || isset($this->enums[$aliasLc])) {
+            $this->errors->triggerError(
+                \sprintf('Cannot declare class %s, because the name is already in use', $alias),
+                ErrorReporter::E_WARNING,
+                null,
+                $this,
+                $frame
+            );
+
+            return false;
+        }
+
         $this->classes[$aliasLc] = $entry;
-        $this->classAliases[$aliasLc] = $originalLc;
+        $this->classAliases[$aliasLc] = $canonicalOriginalLc;
         if ($entry->isEnum) {
             $this->enums[$aliasLc] = true;
         }
