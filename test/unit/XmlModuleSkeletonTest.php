@@ -35,14 +35,17 @@ PHP;
         self::assertSame('111', ob_get_clean());
     }
 
-    public function test_xml_parser_create_stub_throws_error(): void
+    public function test_xml_parser_create_returns_xmlparser_object(): void
     {
         $runtime = new Runtime();
-        $fn = new \PHPCompiler\ext\xml\xml_parser_create();
-        $frame = $fn->getFrame($runtime->vmContext);
-
-        $this->expectException(\Error::class);
-        $this->expectExceptionMessage('xml_parser_create() is not implemented in this compiler build (issue #3494)');
-        $fn->execute($frame);
+        $code = <<<'PHP'
+<?php
+$p = xml_parser_create();
+echo is_object($p) ? get_class($p) : gettype($p);
+PHP;
+        $block = $runtime->parseAndCompile($code, 'xml_parser_create.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame('XMLParser', ob_get_clean());
     }
 }

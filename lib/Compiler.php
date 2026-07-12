@@ -28744,38 +28744,15 @@ class Compiler {
         ) {
             return null;
         }
-        $methodName = $this->staticNameFromOperand($producer->name);
-        if (null === $methodName) {
+        // Only pair INIT→EXEC for this cfg producer — never the first same-named call in the block (#18183).
+        $operandSlot = $block->slotForOperand($producer->result);
+        if (null === $operandSlot) {
             return null;
         }
-        $initType = $producer instanceof Op\Expr\StaticCall
-            ? OpCode::TYPE_STATICCALL_INIT
-            : OpCode::TYPE_METHODCALL_INIT;
-        $needle = strtolower($methodName);
-        $receiverSlot = null;
-        if ($producer instanceof Op\Expr\MethodCall && null !== $producer->var) {
-            $receiverSlot = $block->slotForOperand($producer->var);
-        }
         $ops = array_merge($block->opCodes, $pendingOps);
-        foreach ($ops as $i => $op) {
-            if ($initType !== $op->type || null === $op->arg2) {
-                continue;
-            }
-            $name = $this->resolveCompileTimeStringSlot((int) $op->arg2, $block);
-            if ($needle !== strtolower($name ?? '')) {
-                continue;
-            }
-            if (null !== $receiverSlot && (int) $op->arg1 !== $receiverSlot) {
-                continue;
-            }
-            for ($j = $i + 1, $n = \count($ops); $j < $n; ++$j) {
-                $scan = $ops[$j];
-                if (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $scan->type && null !== $scan->arg1) {
-                    return (string) $scan->arg1;
-                }
-                if (OpCode::TYPE_FUNCCALL_INIT === $scan->type) {
-                    break;
-                }
+        foreach ($ops as $op) {
+            if (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type && (int) $op->arg1 === $operandSlot) {
+                return (string) $operandSlot;
             }
         }
 
@@ -43865,15 +43842,18 @@ class Compiler {
                 }
             }
             if (null !== $cfgCallOp && !$this->isEmbeddedCallLiteralArg($arg)) {
-                $pendingDimFetchSlot = $this->lastPendingCallArgArrayDimFetchSlot($block, $sends);
-                if (null === $pendingDimFetchSlot && (
-                    null !== $dimFetchSlot
-                    || $this->callArgIsDeadInlineHaystackFamilySlot(
-                        $cfgCallOp,
-                        (int) $argIndex,
-                        $calleeName,
-                        $arg
-                    )
+                $pendingDimFetchSlot = null;
+                if (null !== $dimFetchSlot) {
+                    // stream_set_blocking($pipes[1], false) — dim-fetch slot is arg #0 only (#18186).
+                    $pendingDimFetchSlot = $this->lastPendingCallArgArrayDimFetchSlot($block, $sends);
+                    if (null === $pendingDimFetchSlot) {
+                        $pendingDimFetchSlot = $this->pendingCallArgArrayDimFetchSlot($block, $sends, 0);
+                    }
+                } elseif ($this->callArgIsDeadInlineHaystackFamilySlot(
+                    $cfgCallOp,
+                    (int) $argIndex,
+                    $calleeName,
+                    $arg
                 )) {
                     $pendingDimFetchSlot = $this->pendingCallArgArrayDimFetchSlot($block, $sends, 0);
                 }
@@ -47506,6 +47486,9 @@ class Compiler {
                     && (string) $send->arg1 !== (string) $execSlot
                 ) {
                     // var_export($g->valid(), true) after prior var_export — dead arg temp must not reuse stale EXEC_RETURN (#17520).
+                    $send->arg1 = $execSlot;
+                } elseif ((string) $send->arg1 !== (string) $execSlot) {
+                    // var_export($g2->current(), true) after earlier var_export — sibling MethodCall EXEC_RETURN (#18183).
                     $send->arg1 = $execSlot;
                 }
             } elseif (1 === $sendOrdinal && null !== $trueSlot && (string) $send->arg1 === (string) $execSlot) {
