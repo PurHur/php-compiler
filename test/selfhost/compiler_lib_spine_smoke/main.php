@@ -1936,6 +1936,7 @@ require_once __DIR__.'/../../../ext/standard/VmPregPattern.php';
 require_once __DIR__.'/../../../ext/standard/VmPregPure.php';
 require_once __DIR__.'/../../../ext/standard/VmPregReplaceCallback.php';
 require_once __DIR__.'/../../../ext/standard/VmPregReplaceCallbackArray.php';
+require_once __DIR__.'/../../../ext/standard/VmPregUtf8.php';
 require_once __DIR__.'/../../../ext/standard/VmPrintR.php';
 require_once __DIR__.'/../../../ext/standard/VmPrintRFloat.php';
 require_once __DIR__.'/../../../ext/standard/VmProcClockTicksPure.php';
