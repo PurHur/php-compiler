@@ -4654,4 +4654,6 @@ require_once __DIR__.'/../../../ext/xsl/XsltRegistry.php';
 require_once __DIR__.'/../../../lib/JIT/Call/HashTableAdd.php';
 require_once __DIR__.'/../../../lib/JIT/Call/HashTableAppend.php';
 require_once __DIR__.'/../../../lib/JIT/Call/HashTableUpdateIndex.php';
+require_once __DIR__.'/../../../ext/standard/JitOpensslRandomPseudoBytes.php';
+require_once __DIR__.'/../../../lib/JIT/Call/HashTableWriteNested.php';
 echo "compiler_lib_spine_smoke bundle OK\n";

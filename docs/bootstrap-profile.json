@@ -1294,6 +1294,7 @@
         "ext/standard/JitObListHandlers.php",
         "ext/standard/JitObStart.php",
         "ext/standard/JitOpendir.php",
+        "ext/standard/JitOpensslRandomPseudoBytes.php",
         "ext/standard/JitOrd.php",
         "ext/standard/JitOutputRewriteVars.php",
         "ext/standard/JitPack.php",
@@ -3776,6 +3777,7 @@
         "lib/JIT/Call/HashTablePadCopy.php",
         "lib/JIT/Call/HashTableUpdateIndex.php",
         "lib/JIT/Call/HashTableValuesCopy.php",
+        "lib/JIT/Call/HashTableWriteNested.php",
         "lib/JIT/Call/Native.php",
         "lib/JIT/Call/ReflectionAttributeGetName.php",
         "lib/JIT/Call/ReflectionAttributeNewInstance.php",
@@ -4828,9 +4830,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 4594,
+        "inventory_files": 4596,
         "excluded": 0,
-        "eligible": 4594,
+        "eligible": 4596,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
