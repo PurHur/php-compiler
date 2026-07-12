@@ -23,6 +23,9 @@ final class VmStreamFilterChain
 
     public const WRITE = 2;
 
+    /** php-src STREAM_FILTER_ALL — omitted $read_write attaches to both chains (0). */
+    public const ALL = 0;
+
     /** @var array<string, true> */
     private const BUILTIN_FILTERS = [
         'zlib.deflate' => true,
@@ -185,7 +188,7 @@ final class VmStreamFilterChain
             self::$streamContexts[$streamHandle] = $frame->vmContext;
         }
         if (0 === ($readWrite & (self::READ | self::WRITE))) {
-            $readWrite = self::READ;
+            $readWrite = self::READ | self::WRITE;
         }
 
         $filterId = self::$nextFilterId++;

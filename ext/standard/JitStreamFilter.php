@@ -159,7 +159,7 @@ final class JitStreamFilter
         );
         $filterName = JitStringBuiltinArg::lower($context, $args[1], $functionName, 1, 'filtername');
         $i64 = $context->getTypeFromString('int64');
-        $readWrite = $i64->constInt(VmStreamFilterChain::READ, false);
+        $readWrite = $i64->constInt(VmStreamFilterChain::ALL, false);
         if ($argc >= 3) {
             $readWrite = $context->builder->truncOrBitCast(
                 JitLongArg::lower($context, $args[2], $functionName.'() read_write'),
