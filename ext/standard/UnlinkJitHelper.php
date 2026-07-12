@@ -16,7 +16,10 @@ final class UnlinkJitHelper
     {
         $ok = VmFs::unlink($path);
         if (!$ok) {
-            TriggerErrorJitHelper::warning(\sprintf('unlink(%s): No such file or directory', $path));
+            $message = VmFsPhpWrapper::isPhpWrapperPath($path)
+                ? VmFsPhpWrapper::unlinkWarningMessage()
+                : \sprintf('unlink(%s): No such file or directory', $path);
+            TriggerErrorJitHelper::warning($message);
         }
 
         return $ok;

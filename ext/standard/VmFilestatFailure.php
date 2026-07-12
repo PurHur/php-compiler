@@ -29,7 +29,10 @@ final class VmFilestatFailure
 
     public static function warnUnlinkFailed(Frame $frame, string $path): void
     {
-        self::triggerWarning($frame, \sprintf('unlink(%s): No such file or directory', $path));
+        $message = VmFsPhpWrapper::isPhpWrapperPath($path)
+            ? VmFsPhpWrapper::unlinkWarningMessage()
+            : \sprintf('unlink(%s): No such file or directory', $path);
+        self::triggerWarning($frame, $message);
     }
 
     public static function warnTouchCreateFailed(Frame $frame, string $path): void
@@ -42,10 +45,11 @@ final class VmFilestatFailure
 
     public static function warnRenameFailed(Frame $frame, string $from, string $to): void
     {
-        self::triggerWarning(
-            $frame,
-            \sprintf('rename(%s,%s): No such file or directory', $from, $to)
-        );
+        $wrapperMessage = VmFsPhpWrapper::renameWarningMessage($from, $to);
+        $message = null !== $wrapperMessage
+            ? $wrapperMessage
+            : \sprintf('rename(%s,%s): No such file or directory', $from, $to);
+        self::triggerWarning($frame, $message);
     }
 
     public static function warnRmdirNotEmpty(Frame $frame, string $path): void
