@@ -26,6 +26,7 @@ final class utf8_encode extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('utf8_encode() requires exactly one argument in this compiler build');
         }
+        Utf8EndecDeprecation::emitVm($frame, 'utf8_encode');
         $data = VmString::coerceStringBuiltinArg(
             $frame->calledArgs[0],
             'utf8_encode',
