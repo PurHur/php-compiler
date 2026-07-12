@@ -26,9 +26,7 @@ final class JitExec
             throw new \LogicException('exec() accepts one to three arguments in this compiler build');
         }
 
-        JitInternalStrictArg::rejectNullString($context, $args[0], 'exec', 'command', 1);
-
-        $cmd = JitStringBuiltinArg::lower($context, $args[0], 'exec', 0, 'command');
+        $cmd = JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'exec', 0, 'command');
         self::rejectEmptyCommand($context, $args[0], $cmd, 'exec');
         $capture = self::capture($context, $cmd);
         $failed = $context->builder->icmp(

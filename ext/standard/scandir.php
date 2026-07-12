@@ -24,8 +24,7 @@ final class scandir extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('scandir() requires one or two arguments in this compiler build');
         }
-        InternalStrictArg::rejectNullString($frame->calledArgs[0], 'scandir', 'directory', 0, $frame);
-        $path = self::vmDirectoryArg($frame->calledArgs[0]);
+        $path = InternalStrictArg::resolveCoercibleStringArg($frame, 0, 'scandir', 'directory');
         VmString::rejectEmptyBuiltinStringArg($path, 'scandir', 0, 'directory');
         $sortingOrder = \SCANDIR_SORT_ASCENDING;
         if (2 === $argc) {

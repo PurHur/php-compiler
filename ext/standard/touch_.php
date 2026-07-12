@@ -31,7 +31,13 @@ final class touch_ extends Internal
         if ($argc < 1 || $argc > 3) {
             throw new \LogicException('touch() requires one to three arguments in this compiler build');
         }
-        $path = VmFilestatArg::coercePathArg($frame->calledArgs[0], self::FUNCTION);
+        $path = VmFilestatArg::coerceFilenameArg(
+            $frame->calledArgs[0],
+            self::FUNCTION,
+            0,
+            'filename',
+            $frame
+        );
         $mtime = null;
         if ($argc >= 2) {
             $mtime = self::parseNullableLong($frame, $frame->calledArgs[1]->resolveIndirect(), 2, 'mtime');
@@ -57,7 +63,7 @@ final class touch_ extends Internal
         if ($argc < 1 || $argc > 3) {
             throw new \LogicException('touch() requires one to three arguments in this compiler build');
         }
-        $path = JitFilestatArg::lowerPath($context, $args[0], self::FUNCTION);
+        $path = JitFilestatArg::lowerFilename($context, $args[0], self::FUNCTION, 0, 'filename');
         $i64 = $context->getTypeFromString('int64');
         $omit = $i64->constInt(self::TOUCH_TIME_OMIT, true);
         $mtime = $omit;

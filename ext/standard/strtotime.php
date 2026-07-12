@@ -36,8 +36,7 @@ final class strtotime extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        InternalStrictArg::rejectNullString($frame->calledArgs[0], 'strtotime', 'datetime', 0, $frame);
-        $time = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'strtotime', 0, 'datetime');
+        $time = InternalStrictArg::resolveCoercibleStringArg($frame, 0, 'strtotime', 'datetime');
         $now = null;
         if (2 === $argc) {
             $baseVar = $frame->calledArgs[1]->resolveIndirect();
