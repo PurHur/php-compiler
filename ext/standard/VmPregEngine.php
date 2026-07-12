@@ -344,9 +344,7 @@ final class VmPregEngine
             'NO_JIT', 'NO_START_OPT', 'NOTEMPTY', 'NOTEMPTY_ATSTART', 'FIRSTLINE', 'FRUSTRATING' => null,
             'ACCEPT', 'COMMIT', 'PRUNE', 'SKIP', 'THEN' => null,
             'FAIL' => null,
-            default => (function () use ($engine): void {
-                $engine->abortCompile();
-            })(),
+            default => $engine->abortCompile(),
         };
     }
 
@@ -688,9 +686,7 @@ final class VmPregEngine
             'u' => $this->utf = $enable,
             'D' => $this->dollarEndonly = $enable,
             'A' => $this->anchored = $enable,
-            default => (function () use ($engine): void {
-                $engine->abortCompile();
-            })(),
+            default => $this->abortCompile(),
         };
     }
 

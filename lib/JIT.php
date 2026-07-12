@@ -6949,7 +6949,21 @@ class JIT {
             $this->prescanFunctionImportedGlobals($block->func);
             $this->emitJitDestructAllowDelref($block);
         }
-        if ([] !== $args) {
+        $thisParamOffset = 0;
+        if ($this->instanceMethodUsesThis($block)) {
+            $thisParamOffset = 1;
+            if ([] !== $args) {
+                $this->context->implicitThisArgument = $args[0];
+            } elseif ($func->countParams() > 0) {
+                // Nested/on-demand method compile may omit argVars; LLVM param 0 is $this (#16075).
+                $this->context->implicitThisArgument = new JIT\Variable(
+                    $this->context,
+                    JIT\Variable::TYPE_OBJECT,
+                    JIT\Variable::KIND_VALUE,
+                    $func->getParam(0)
+                );
+            }
+        } elseif ([] !== $args) {
             $this->context->implicitThisArgument = null;
         }
         // Handle hoisted variables
@@ -6977,7 +6991,6 @@ class JIT {
             }
             unset($this->context->listUnpackMergeNullInitTargets[$blockKey]);
         }
-        $thisParamOffset = 0;
         if (null !== $block->func && $block->orig === $block->func->cfg) {
             $this->context->jitEnclosingBlock = $block;
             $methodLc = strtolower($block->func->name);
@@ -6988,7 +7001,7 @@ class JIT {
                 ?? SourcePreprocessor\PropertyHooks::propertyNameFromGetHookMethod($methodLc);
         }
         if ([] !== $args) {
-            if ($this->instanceMethodUsesThis($block)) {
+            if (0 === $thisParamOffset && $this->instanceMethodUsesThis($block)) {
                 $thisParamOffset = 1;
             }
             foreach ($block->orig->hoistedOperands as $hoisted) {
@@ -14888,14 +14901,21 @@ class JIT {
 
     private function instanceMethodUsesThis(Block $block): bool
     {
-        if (null === $block->func || null === $block->func->class) {
+        if (null === $block->func) {
             return false;
         }
         if (($block->func->flags ?? 0) & \PHPCfg\Func::FLAG_STATIC) {
             return false;
         }
+        if (null !== $block->func->class) {
+            return true;
+        }
+        // Nested file JIT: func->class may be unset while scope carries the declaring class (#16075).
+        if ('' !== $this->context->scope->className) {
+            return true;
+        }
 
-        return true;
+        return str_contains($block->func->getScopedName(), '::');
     }
 
     /**

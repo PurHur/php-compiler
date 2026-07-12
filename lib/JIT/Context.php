@@ -2149,6 +2149,28 @@ class Context {
         if (!$this->scope->variables->contains($op)) {
             if ($op instanceof Operand\Literal) {
                 $this->scope->variables[$op] = Variable::fromLiteral($this, $op);
+            } elseif ($op instanceof Operand\BoundVariable
+                && Operand\BoundVariable::SCOPE_OBJECT === $op->scope) {
+                $thisVar = $this->findThisVariable();
+                if (null !== $thisVar) {
+                    $this->scope->variables[$op] = $thisVar;
+
+                    return $thisVar;
+                }
+                throw new \LogicException('BoundVariable SCOPE_OBJECT without $this in JIT scope');
+            } elseif ($op instanceof Operand\BoundVariable && $op->name instanceof Operand) {
+                if ($this->aliasVariableOpByName($op)) {
+                    return $this->scope->variables[$op];
+                }
+                $inner = $this->getVariableFromOpInScopes($op->name);
+                $this->scope->variables[$op] = $inner;
+
+                return $inner;
+            } elseif ($op instanceof Operand\BoundVariable) {
+                throw new \LogicException(
+                    'BoundVariable scope '.$op->scope
+                    .' nameClass '.(is_object($op->name) ? get_class($op->name) : gettype($op->name))
+                );
             } elseif ('this' === OperandName::resolve($op)) {
                 $existing = $this->findThisVariable();
                 if (null !== $existing) {
