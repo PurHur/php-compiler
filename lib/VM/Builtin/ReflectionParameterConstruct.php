@@ -104,12 +104,9 @@ final class ReflectionParameterConstruct extends VmClassMethod
                 ReflectionSupport::methodNotFoundMessage($entry->name, $method)
             );
         }
-        $params = $entry->methodParameterMetadata[$methodLc] ?? [];
-        $position = $this->resolveParameterIndex($parameterArg, array_map(
-            static fn ($meta) => $meta->name,
-            $params
-        ), 'method');
-        if (!isset($params[$position])) {
+        $paramNames = ReflectionSupport::methodParameterNames($entry, $method);
+        $position = $this->resolveParameterIndex($parameterArg, $paramNames, 'method');
+        if (!isset($paramNames[$position])) {
             ReflectionSupport::throwReflectionException(
                 'Parameter '.$position.' does not exist on method '.$entry->name.'::'.$method.'()'
             );
@@ -118,7 +115,7 @@ final class ReflectionParameterConstruct extends VmClassMethod
         $receiver->getProperty(ReflectionSupport::PROP_METHOD_NAME)->string($method);
         $receiver->getProperty(ReflectionSupport::PROP_FUNC_NAME)->null();
         $receiver->getProperty(ReflectionSupport::PROP_PARAM_POSITION)->int($position);
-        $receiver->getProperty(ReflectionSupport::PROP_PARAM_NAME)->string($params[$position]->name);
+        $receiver->getProperty(ReflectionSupport::PROP_PARAM_NAME)->string($paramNames[$position]);
         $receiver->constructed = true;
     }
 
