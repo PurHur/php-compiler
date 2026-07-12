@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\StringIdate;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Builder;
@@ -67,16 +68,12 @@ final class JitIdate
 
     private static function jitStringArg(Context $context, JITVariable $arg): Value
     {
-        if (JITVariable::TYPE_STRING === $arg->type) {
-            return $context->helper->loadValue($arg);
-        }
-        if (JITVariable::TYPE_VALUE === $arg->type) {
-            return $context->builder->call(
-                $context->lookupFunction('__value__readString'),
-                $arg->value
-            );
-        }
-
-        throw new \LogicException('idate() format must be a string in this compiler build');
+        return JitStringBuiltinArg::lowerStrictOrCoercible(
+            $context,
+            $arg,
+            'idate',
+            0,
+            'format'
+        );
     }
 }
