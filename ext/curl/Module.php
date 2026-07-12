@@ -42,14 +42,7 @@ class Module extends ModuleAbstract
     {
         parent::init($runtime);
         BuiltinClasses::register($runtime->vmContext);
-        foreach ([
-            'CURLOPT_URL' => CurlConstants::CURLOPT_URL,
-            'CURLOPT_RETURNTRANSFER' => CurlConstants::CURLOPT_RETURNTRANSFER,
-            'CURLOPT_POST' => CurlConstants::CURLOPT_POST,
-            'CURLOPT_HTTPHEADER' => CurlConstants::CURLOPT_HTTPHEADER,
-            'CURLE_OK' => CurlConstants::CURLE_OK,
-            'CURLM_OK' => CurlConstants::CURLM_OK,
-        ] as $name => $value) {
+        foreach (CurlConstants::registeredConstants() as $name => $value) {
             $var = new VM\Variable();
             $var->int($value);
             $runtime->vmContext->defineConstant($name, $var);
@@ -62,7 +55,7 @@ class Module extends ModuleAbstract
             return [];
         }
 
-        return [
+        $functions = [
             new curl_escape(),
             new curl_unescape(),
             new curl_version(),
@@ -71,5 +64,17 @@ class Module extends ModuleAbstract
             new curl_upkeep(),
             new curl_file_create(),
         ];
+        if (CurlExtensionPolicy::advertisesShareHandles()) {
+            $functions[] = new curl_share_init();
+            $functions[] = new curl_share_setopt();
+            $functions[] = new curl_share_close();
+        }
+        if (CurlExtensionPolicy::advertisesEasyHandleStubs()) {
+            $functions[] = new curl_init();
+            $functions[] = new curl_setopt();
+            $functions[] = new curl_close();
+        }
+
+        return $functions;
     }
 }

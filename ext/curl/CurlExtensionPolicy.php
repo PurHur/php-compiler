@@ -29,4 +29,16 @@ final class CurlExtensionPolicy
     {
         return self::advertisesExtension();
     }
+
+    /** curl_share_* + minimal easy-handle stubs for CURLOPT_SHARE (#6322). */
+    public static function advertisesShareHandles(): bool
+    {
+        return self::advertisesBuiltins();
+    }
+
+    /** curl_init/curl_setopt/curl_close without libcurl HTTP I/O (#6322). */
+    public static function advertisesEasyHandleStubs(): bool
+    {
+        return self::advertisesShareHandles();
+    }
 }

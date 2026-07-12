@@ -22,10 +22,14 @@ final class BuiltinClasses
         if (CurlExtensionPolicy::advertisesBuiltins()) {
             CurlStringFileBuiltin::register($ctx);
         }
+        if (CurlExtensionPolicy::advertisesEasyHandleStubs()) {
+            VmCurlEasy::registerClass($ctx);
+        }
+        if (CurlExtensionPolicy::advertisesShareHandles()) {
+            VmCurlShare::registerClass($ctx);
+        }
         if (CurlExtensionPolicy::advertisesHandleClasses()) {
-            self::registerCurlHandle($ctx);
             self::registerCurlMultiHandle($ctx);
-            self::registerCurlShareHandle($ctx);
         }
         foreach (array_diff(array_keys($ctx->classes), $before) as $lc) {
             $ctx->classes[$lc]->isInternal = true;
@@ -47,16 +51,6 @@ final class BuiltinClasses
         $ctx->classes['curlfile'] = new ClassEntry('CURLFile');
     }
 
-    /** php-src ext/curl/curl.stub.php — final class CurlHandle (#7266). */
-    private static function registerCurlHandle(Context $ctx): void
-    {
-        if (isset($ctx->classes['curlhandle'])) {
-            return;
-        }
-
-        $ctx->classes['curlhandle'] = new ClassEntry('CurlHandle');
-    }
-
     /** php-src ext/curl/curl.stub.php — final class CurlMultiHandle (#7266). */
     private static function registerCurlMultiHandle(Context $ctx): void
     {
@@ -65,15 +59,5 @@ final class BuiltinClasses
         }
 
         $ctx->classes['curlmultihandle'] = new ClassEntry('CurlMultiHandle');
-    }
-
-    /** php-src ext/curl/curl.stub.php — final class CurlShareHandle (#7266). */
-    private static function registerCurlShareHandle(Context $ctx): void
-    {
-        if (isset($ctx->classes['curlsharehandle'])) {
-            return;
-        }
-
-        $ctx->classes['curlsharehandle'] = new ClassEntry('CurlShareHandle');
     }
 }

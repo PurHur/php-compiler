@@ -19,8 +19,11 @@ final class CurlModuleTest extends TestCase
         $runtime = new Runtime();
         $ctx = $runtime->vmContext;
 
-        foreach (['curl_init', 'curl_setopt', 'curl_exec', 'curl_close'] as $fn) {
-            self::assertFalse(VmReflection::functionExists($ctx, $fn), $fn);
+        foreach (['curl_init', 'curl_setopt', 'curl_close'] as $fn) {
+            self::assertTrue(VmReflection::functionExists($ctx, $fn), $fn);
+        }
+        foreach (['curl_share_init', 'curl_share_setopt', 'curl_share_close'] as $fn) {
+            self::assertTrue(VmReflection::functionExists($ctx, $fn), $fn);
         }
         foreach (['curl_version', 'curl_strerror', 'curl_multi_strerror', 'curl_upkeep', 'curl_file_create'] as $fn) {
             self::assertTrue(VmReflection::functionExists($ctx, $fn), $fn);
@@ -53,17 +56,19 @@ PHP;
         $block = $runtime->parseAndCompile($code, 'curl_module.php');
         ob_start();
         $runtime->run($block);
-        self::assertSame('00001100111011000210', ob_get_clean());
+        self::assertSame('11011100111011000210', ob_get_clean());
     }
 
-    public function test_curl_init_stub_class_throws_logic_exception(): void
+    public function test_curl_init_returns_curl_handle_object(): void
     {
         $runtime = new Runtime();
-        $fn = new \PHPCompiler\ext\curl\curl_init();
-        $frame = $fn->getFrame($runtime->vmContext);
-
-        $this->expectException(\LogicException::class);
-        $this->expectExceptionMessage('curl_init() is not implemented in this compiler build (issue #3325)');
-        $fn->execute($frame);
+        $code = <<<'PHP'
+<?php
+$ch = curl_init('https://example.com');
+echo get_class($ch), "\n";
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'curl_init_handle.php'));
+        self::assertSame("CurlHandle\n", ob_get_clean());
     }
 }
