@@ -1134,6 +1134,12 @@ class Block {
         return null;
     }
 
+    /** Rebind hoisted producer/consumer temps after opcode emission (#14467, trim($obj->prop)). */
+    public function bindOperandScopeSlot(Operand $operand, int $slot): void
+    {
+        $this->scope[$operand] = $slot;
+    }
+
     public function operandForScopeSlot(int $slot): ?Operand
     {
         foreach ($this->scope as $operand) {
