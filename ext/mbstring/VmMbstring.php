@@ -2444,6 +2444,119 @@ final class VmMbstring
             return null;
         }
 
-        return '#'.$pattern.'#u';
+        return self::mbEregRegex($pattern, false);
+    }
+
+    /**
+     * Build PCRE pattern for mb_ereg* (php-src ext/mbstring/php_mbregex.c; #4635).
+     *
+     * Oniguruma semantics are approximated via PCRE u-flag (same approach as mb_split).
+     */
+    public static function mbEregRegex(string $pattern, bool $caseInsensitive): ?string
+    {
+        return '#'.$pattern.'#'.self::mbEregPcreSuffix($caseInsensitive);
+    }
+
+    /**
+     * @return array{matched: bool, registers: array<int, string>}
+     */
+    public static function eregMatch(
+        string $pattern,
+        string $string,
+        bool $caseInsensitive
+    ): array {
+        if (!self::checkEncoding($string, MbstringState::regexEncoding())) {
+            return ['matched' => false, 'registers' => []];
+        }
+
+        $regex = self::mbEregRegex($pattern, $caseInsensitive);
+        if (null === $regex) {
+            return ['matched' => false, 'registers' => []];
+        }
+
+        $matches = [];
+        $result = @preg_match($regex, $string, $matches);
+        if (false === $result || PREG_NO_ERROR !== preg_last_error()) {
+            return ['matched' => false, 'registers' => []];
+        }
+        if (0 === $result) {
+            return ['matched' => false, 'registers' => []];
+        }
+
+        return ['matched' => true, 'registers' => $matches];
+    }
+
+    public static function eregReplace(
+        string $pattern,
+        string $replacement,
+        string $string,
+        bool $caseInsensitive
+    ): string|false {
+        if (!self::checkEncoding($string, MbstringState::regexEncoding())) {
+            return false;
+        }
+
+        $regex = self::mbEregRegex($pattern, $caseInsensitive);
+        if (null === $regex) {
+            return false;
+        }
+
+        $result = @preg_replace($regex, $replacement, $string);
+        if (null === $result) {
+            return false;
+        }
+        if (PREG_NO_ERROR !== preg_last_error()) {
+            return false;
+        }
+
+        return $result;
+    }
+
+    public static function mbEregRegexCompileError(string $pattern, bool $caseInsensitive): ?string
+    {
+        $regex = self::mbEregRegex($pattern, $caseInsensitive);
+        if (null === $regex) {
+            return 'invalid pattern';
+        }
+        @preg_match($regex, '');
+
+        return PREG_NO_ERROR === preg_last_error() ? null : preg_last_error_msg();
+    }
+
+    public static function warnMbEregRegexFailure(
+        Frame $frame,
+        string $function,
+        string $pattern,
+        bool $caseInsensitive
+    ): void {
+        if (null === $frame->vmContext) {
+            return;
+        }
+        $detail = self::mbEregRegexCompileError($pattern, $caseInsensitive) ?? 'invalid pattern';
+        $frame->vmContext->errors->triggerErrorWithHandlerFirst(
+            $function.'(): mbregex compile err: '.$detail,
+            ErrorReporter::E_WARNING,
+            '' !== $frame->scriptPath ? $frame->scriptPath : null,
+            $frame->vmContext,
+            $frame
+        );
+    }
+
+    private static function mbEregPcreSuffix(bool $caseInsensitive): string
+    {
+        $flags = 'u';
+        if ($caseInsensitive) {
+            $flags .= 'i';
+        }
+        foreach (str_split(MbstringState::regexOptions()) as $option) {
+            if ('i' === $option && $caseInsensitive) {
+                continue;
+            }
+            if (\in_array($option, ['m', 's', 'x', 'U'], true) && !str_contains($flags, $option)) {
+                $flags .= $option;
+            }
+        }
+
+        return $flags;
     }
 }

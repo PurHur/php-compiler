@@ -68,6 +68,9 @@ final class BuiltinByRefParams
             case 'preg_match':
             case 'preg_match_all':
                 return [2];
+            case 'mb_ereg':
+            case 'mb_eregi':
+                return [2];
             case 'preg_replace':
                 return [4];
             case 'str_replace':
