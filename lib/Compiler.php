@@ -17897,10 +17897,21 @@ class Compiler {
                 if (
                     null !== $callArg
                     && $this->callArgIsDeadInlineTemporary($callArg)
+                    && $this->callArgIsNewExpression($callArg)
                     && isset($siblingNews[$argIndex])
                     && $siblingNews[$argIndex] instanceof Op\Expr\New_
                 ) {
                     return $siblingNews[$argIndex];
+                }
+                if (
+                    null !== $callArg
+                    && $this->callArgIsDeadInlineTemporary($callArg)
+                    && $this->callArgIsNewExpression($callArg)
+                    && 1 === \count($siblingNews)
+                    && ($producers[$argIndex] ?? null) instanceof Op\Expr\New_
+                    && $siblingNews[0] === $producers[$argIndex]
+                ) {
+                    return $siblingNews[0];
                 }
             }
         }
@@ -33529,6 +33540,13 @@ class Compiler {
             if (
                 !$this->callArgIsNewExpression($callArg)
                 && (!$callArg instanceof Operand || !$this->callArgIsDeadInlineTemporary($callArg))
+            ) {
+                return null;
+            }
+            $positional = $producers[$argIndex] ?? null;
+            if (
+                $positional instanceof Op\Expr\ConstFetch
+                || $positional instanceof Op\Expr\ClassConstFetch
             ) {
                 return null;
             }
