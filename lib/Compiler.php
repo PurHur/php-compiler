@@ -28754,47 +28754,19 @@ class Compiler {
         ) {
             return null;
         }
-        $methodName = $this->staticNameFromOperand($producer->name);
-        if (null === $methodName) {
+        // Only pair INIT→EXEC for this cfg producer — never the first same-named call in the block (#18183).
+        $operandSlot = $block->slotForOperand($producer->result);
+        if (null === $operandSlot) {
             return null;
         }
-        $producerReceiverSlot = null;
-        if ($producer instanceof Op\Expr\MethodCall) {
-            $producerReceiverSlot = $block->slotForOperand($producer->var);
-        }
-        $initType = $producer instanceof Op\Expr\StaticCall
-            ? OpCode::TYPE_STATICCALL_INIT
-            : OpCode::TYPE_METHODCALL_INIT;
-        $needle = strtolower($methodName);
         $ops = array_merge($block->opCodes, $pendingOps);
-        $matched = null;
-        foreach ($ops as $i => $op) {
-            if ($initType !== $op->type || null === $op->arg2) {
-                continue;
-            }
-            $name = $this->resolveCompileTimeStringSlot((int) $op->arg2, $block);
-            if ($needle !== strtolower($name ?? '')) {
-                continue;
-            }
-            if (
-                null !== $producerReceiverSlot
-                && null !== $op->arg1
-                && (int) $op->arg1 !== $producerReceiverSlot
-            ) {
-                continue;
-            }
-            for ($j = $i + 1, $n = \count($ops); $j < $n; ++$j) {
-                $scan = $ops[$j];
-                if (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $scan->type && null !== $scan->arg1) {
-                    $matched = (string) $scan->arg1;
-                }
-                if (OpCode::TYPE_FUNCCALL_INIT === $scan->type) {
-                    break;
-                }
+        foreach ($ops as $op) {
+            if (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type && (int) $op->arg1 === $operandSlot) {
+                return (string) $operandSlot;
             }
         }
 
-        return $matched;
+        return null;
     }
 
     /**

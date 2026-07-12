@@ -9,8 +9,8 @@ function g(): Generator {
 $g = g();
 $g->rewind();
 $g->send(3);
-echo $g->current(), "\n";
-echo $g->current(), "\n";
+echo var_export($g->current(), true), "\n";
+echo var_export($g->current(), true), "\n";
 --EXPECT--
 6
 6
