@@ -1,10 +1,10 @@
 --TEST--
-ext ldap extension_loaded('ldap') false until full ext/ldap ships (#17680, ext/ldap/php_ldap.c)
+ext ldap extension_loaded('ldap') true when ldap_escape ships (#18173, ext/ldap/php_ldap.c)
 --FILE--
 <?php
 declare(strict_types=1);
 
-echo extension_loaded('ldap') ? "fail\n" : "ok\n";
+echo extension_loaded('ldap') ? "ok\n" : "fail\n";
 ?>
 --EXPECT--
 ok

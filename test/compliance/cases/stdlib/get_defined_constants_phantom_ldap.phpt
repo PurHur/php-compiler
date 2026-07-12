@@ -1,12 +1,12 @@
 --TEST--
-get_defined_constants(true) — no phantom ldap bucket when ext/ldap unloaded (#17800, ExtensionConstantGroups.php)
+get_defined_constants(true) — ldap bucket when ext/ldap loaded (#18173, ExtensionConstantGroups.php)
 --FILE--
 <?php
 declare(strict_types=1);
 
-echo extension_loaded('ldap') ? "fail ext\n" : "ok ext\n";
+echo extension_loaded('ldap') ? "ok ext\n" : "fail ext\n";
 $c = get_defined_constants(true);
-echo isset($c['ldap']) ? "fail bucket\n" : "ok bucket\n";
+echo isset($c['ldap']) ? "ok bucket\n" : "fail bucket\n";
 --EXPECT--
 ok ext
 ok bucket
