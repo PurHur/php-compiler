@@ -16,23 +16,12 @@ final class BuiltinInternalArgInfo
     /**
      * php-src ZEND_TYPE_IS_TENTATIVE return labels (ext/reflection/php_reflection.c, #18226).
      *
-     * InternalArgInfo return fields are often the declaring-class type, not the tentative scalar.
-     *
-     * @var array<string, array<string, string>>
+     * Delegates to {@see BuiltinInternalTentativeReturnInfo} (Zend 8.2 snapshot).
      */
-    private const TENTATIVE_CLASS_METHOD_RETURNS = [
-        'datetime' => [
-            'format' => 'string',
-        ],
-        'datetimeimmutable' => [
-            'format' => 'string',
-        ],
-        'datetimeinterface' => [
-            'format' => 'string',
-        ],
-    ];
-
-    private static ?InternalArgInfo $argInfo = null;
+    public static function tentativeReturnTypeForClassMethod(string $class, string $method): ?string
+    {
+        return BuiltinInternalTentativeReturnInfo::tentativeReturnTypeLabelForClassMethod($class, $method);
+    }
 
     public static function paramCountForFunction(string $name): ?int
     {
@@ -94,13 +83,7 @@ final class BuiltinInternalArgInfo
         return false;
     }
 
-    public static function tentativeReturnTypeForClassMethod(string $class, string $method): ?string
-    {
-        $classLc = strtolower($class);
-        $methodLc = strtolower($method);
-
-        return self::TENTATIVE_CLASS_METHOD_RETURNS[$classLc][$methodLc] ?? null;
-    }
+    private static ?InternalArgInfo $argInfo = null;
 
     public static function typeStringAllowsNull(string $type): bool
     {
