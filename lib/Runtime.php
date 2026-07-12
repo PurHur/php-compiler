@@ -923,7 +923,7 @@ class Runtime {
         if (null !== $block && Block::containsGeneratorOpcodesInScriptScope($block)) {
             throw new \LogicException('yield in the main script is not supported in AOT yet (issue #3115).');
         }
-        if ($needsPregPrelink) {
+        if ($needsPregPrelink && !$deferUserScriptAotInit) {
             \PHPCompiler\JIT\Builtin\StringPregMatch::ensureLinked($context);
         }
         if ($deferUserScriptAotInit && \function_exists('putenv')) {
@@ -932,6 +932,9 @@ class Runtime {
             $_SERVER['PHP_COMPILER_AOT_USER_SCRIPT'] = $prevUserScriptAot;
             $context->retrofitUserScriptStandaloneAfterPregPrelink();
             JIT\VmActiveContextInitLlvm::requestThinStandaloneInit($context);
+            if ($needsPregPrelink) {
+                \PHPCompiler\JIT\Builtin\StringPregMatch::ensureLinked($context);
+            }
         }
         $context->setMain($this->loadJit()->compile($block));
         \PHPCompiler\JIT\Progress::noteFunction('runtime_standalone_compile_done');
