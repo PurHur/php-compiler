@@ -34,12 +34,7 @@ final class mb_strlen extends Internal
                 $argc
             ));
         }
-        $str = VmString::coerceTypedStringBuiltinArg(
-            $frame->calledArgs[0],
-            'mb_strlen',
-            0,
-            'string'
-        );
+        $str = VmString::stringBuiltinArgForFrame($frame, 0, 'mb_strlen', 0, 'string');
         if (null === $frame->returnVar) {
             return;
         }
@@ -68,7 +63,7 @@ final class mb_strlen extends Internal
             );
         }
 
-        $str = JitStringBuiltinArg::lowerTypedString($context, $args[0], 'mb_strlen', 0, 'string');
+        $str = JitStringBuiltinArg::lowerCoercible($context, $args[0], 'mb_strlen', 0, 'string');
 
         if (1 === $argc) {
             return JitMbStrlen::utf8LengthFromPtr($context, $str);
