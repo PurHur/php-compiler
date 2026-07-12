@@ -55,7 +55,7 @@ final class VmStreamFstat
         return VmStatPure::normalize([
             'dev' => 12,
             'ino' => 0,
-            'mode' => 33060,
+            'mode' => 33206, // 100666 octal — rw-rw-rw- like php-src php_stream_memory_stat (#18402)
             'nlink' => 1,
             'uid' => 0,
             'gid' => 0,
