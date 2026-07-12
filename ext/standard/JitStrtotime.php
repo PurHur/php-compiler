@@ -23,7 +23,7 @@ final class JitStrtotime
 
         StringStrtotime::ensureLinked($context);
 
-        $time = JitStringBuiltinArg::lower($context, $args[0], 'strtotime', 0, 'datetime');
+        $time = JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'strtotime', 0, 'datetime');
         $hasBase = $context->constantFromBool(2 === $argc && !self::isNullJitArg($args[1]));
         $base = (2 === $argc && !self::isNullJitArg($args[1]))
             ? self::jitOptionalIntArg($context, $args[1], 2)

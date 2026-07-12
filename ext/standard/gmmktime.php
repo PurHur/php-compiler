@@ -8,6 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -32,7 +33,7 @@ final class gmmktime extends Internal
             return;
         }
 
-        $hour = self::parseIntArg($frame->calledArgs[0], 1);
+        $hour = self::parseRequiredIntArg($frame, $frame->calledArgs[0], 1);
         $minute = $argc >= 2 ? self::parseNullableIntArg($frame->calledArgs[1], 2) : null;
         $second = $argc >= 3 ? self::parseNullableIntArg($frame->calledArgs[2], 3) : null;
         $month = $argc >= 4 ? self::parseNullableIntArg($frame->calledArgs[3], 4) : null;
@@ -64,6 +65,23 @@ final class gmmktime extends Internal
             $args[5] ?? null,
             $argc
         );
+    }
+
+    private static function parseRequiredIntArg(Frame $frame, Variable $var, int $position): int
+    {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_NULL === $var->type) {
+            if (InternalStrictArg::isCallerStrict($frame)) {
+                throw new \TypeError(self::intTypeError($position, $var->type));
+            }
+
+            return 0;
+        }
+        if (Variable::TYPE_INTEGER !== $var->type) {
+            throw new \TypeError(self::intTypeError($position, $var->type));
+        }
+
+        return $var->toInt();
     }
 
     private static function parseIntArg(Variable $var, int $position): int

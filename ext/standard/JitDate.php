@@ -14,6 +14,7 @@ use PHPCompiler\JIT\Builtin\StringMicrotime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\JitStringArg;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\ScriptMagic;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -257,9 +258,7 @@ final class JitDate
         if ($argc > 2) {
             throw new \ArgumentCountError("{$function}() expects at most 2 arguments, {$argc} given");
         }
-        JitInternalStrictArg::rejectNullString($context, $args[0], $function, 'format', 1);
-        JitInternalStrictArg::requireString($context, $args[0], $function, 'format', 1);
-        $format = JitStringArg::lower($context, $args[0], "{$function}() argument #1 ($format)");
+        $format = JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], $function, 0, 'format');
         $i64 = $context->getTypeFromString('int64');
         $timestamp = $argc >= 2
             ? JitDateTimestampArg::lowerNullable(

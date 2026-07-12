@@ -126,6 +126,9 @@ final class VmInternalCompare
         string $paramName,
         bool $allowSortingEnum
     ): int {
+        if (Variable::TYPE_NULL === $flagsArg->type) {
+            return StdlibConstants::SORT_REGULAR;
+        }
         if ($allowSortingEnum) {
             $fromEnum = VmArraySort::trySortingOrderInt($flagsArg);
             if (null !== $fromEnum) {
@@ -203,6 +206,9 @@ final class VmInternalCompare
 
     public static function tryResolveJitSortFlags(Context $context, JITVariable $flagsArg): ?int
     {
+        if (JITVariable::TYPE_NULL === $flagsArg->type || ($flagsArg->isNullConstant ?? false)) {
+            return StdlibConstants::SORT_REGULAR;
+        }
         $constName = $flagsArg->compileTimeConstantName ?? null;
         if (null !== $constName) {
             $lookup = strtolower($constName);

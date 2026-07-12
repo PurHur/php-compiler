@@ -44,6 +44,13 @@ final class JitGmmktime
 
     private static function jitIntArg(Context $context, JITVariable $arg, int $position): Value
     {
+        if (JITVariable::TYPE_NULL === $arg->type || ($arg->isNullConstant ?? false)) {
+            if ($context->callerStrictTypes) {
+                throw new \LogicException('gmmktime() argument #'.$position.' must be an integer in this compiler build');
+            }
+
+            return $context->getTypeFromString('int64')->constInt(0, false);
+        }
         if (JITVariable::TYPE_NATIVE_LONG === $arg->type) {
             return $context->helper->loadValue($arg);
         }

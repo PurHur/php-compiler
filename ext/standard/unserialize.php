@@ -33,19 +33,7 @@ final class unserialize extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        InternalStrictArg::rejectNullString(
-            $frame->calledArgs[0],
-            'unserialize',
-            'data',
-            0,
-            $frame
-        );
-        $payload = VmString::coerceStringBuiltinArg(
-            $frame->calledArgs[0],
-            'unserialize',
-            0,
-            'data'
-        );
+        $payload = InternalStrictArg::resolveCoercibleStringArg($frame, 0, 'unserialize', 'data');
         $options = null;
         if ($argc > 1) {
             $optionsVar = $frame->calledArgs[1]->resolveIndirect();
