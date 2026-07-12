@@ -25,7 +25,16 @@ final class PregJitHelper
 
     public static function lastErrorMsg(): string
     {
-        return VmPreg::errorMsgForCode(VmPregNative::lastError());
+        return match (VmPregNative::lastError()) {
+            0 => 'No error',
+            1 => 'Internal error',
+            4 => 'Malformed UTF-8 characters, possibly incorrectly encoded',
+            5 => 'The offset did not correspond to the beginning of a valid UTF-8 code point',
+            2 => 'Backtrack limit exhausted',
+            3 => 'Recursion limit exhausted',
+            6 => 'JIT stack limit exhausted',
+            default => 'Unknown error',
+        };
     }
 
     /** @return int match count, or -1 on PCRE error */

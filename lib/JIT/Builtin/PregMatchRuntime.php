@@ -9,6 +9,8 @@ use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPCompiler\JIT\NestedVmHashTableMethodLlvm;
+use PHPCompiler\JIT\NestedVmVariableMethodLlvm;
 use PHPLLVM\Builder;
 use PHPLLVM\LLVMAbstract\Builder as LLVMBuilderImpl;
 use PHPLLVM\Value;
@@ -490,12 +492,17 @@ final class PregMatchRuntime
         $paths = [
             $root.'/ext/standard/StdlibConstants.php',
             $root.'/ext/standard/VmPregPattern.php',
+            $root.'/ext/standard/VmPregPure.php',
             $root.'/ext/standard/VmPregNative.php',
             $root.'/ext/standard/VmPregMatches.php',
-            $root.'/ext/standard/VmPreg.php',
-            $root.'/ext/standard/PregCallbackInvokeJitHelper.php',
             $root.self::HELPER_PATH,
         ];
+        foreach (['add', 'updateindex', 'append'] as $htMethod) {
+            NestedVmHashTableMethodLlvm::ensureMethod($context, $htMethod);
+        }
+        foreach (['null', 'int', 'string', 'array'] as $varMethod) {
+            NestedVmVariableMethodLlvm::ensureMethod($context, $varMethod);
+        }
         NestedJitCompileScope::run($context, static function () use ($context, $runtime, $paths): void {
             $jit = new JIT($context);
             foreach ($paths as $includePath) {

@@ -13,6 +13,9 @@ final class NestedVmHashTableMethodLlvmTest extends TestCase
     public function testRegistersPadCopyAndGetNumElements(): void
     {
         $this->assertTrue(NestedVmHashTableMethodLlvm::isNestedHashTableMethod('getnumelements'));
+        $this->assertTrue(NestedVmHashTableMethodLlvm::isNestedHashTableMethod('add'));
+        $this->assertTrue(NestedVmHashTableMethodLlvm::isNestedHashTableMethod('append'));
+        $this->assertTrue(NestedVmHashTableMethodLlvm::isNestedHashTableMethod('updateindex'));
         $this->assertTrue(NestedVmHashTableMethodLlvm::isNestedHashTableMethod('padcopy'));
         $this->assertTrue(NestedVmHashTableMethodLlvm::isNestedHashTableMethod('exportkeyvaluepairs'));
         $this->assertTrue(NestedVmHashTableMethodLlvm::isNestedHashTableMethod('valuescopy'));

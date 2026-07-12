@@ -6,6 +6,7 @@ namespace PHPCompiler\JIT\Call;
 
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable;
 use PHPLLVM\Value;
 
@@ -21,5 +22,17 @@ final class HashTableNestedReceiver
         $objPtr = $context->helper->loadValue($receiver);
 
         return $context->builder->bitcast($objPtr, $htPtrTy);
+    }
+
+    /** Nullable Variable return for HashTable mutators (VM add/append/updateIndex). */
+    public static function nullVariableResult(Context $context): Value
+    {
+        $slot = JitValueBox::alloc($context);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeNull'),
+            JitValueBox::pointer($context, $slot)
+        );
+
+        return $slot;
     }
 }

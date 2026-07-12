@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\Test\Unit;
 
+use PHPCompiler\ext\standard\VmPregCompileWarn;
 use PHPCompiler\ext\standard\VmPregNative;
 use PHPCompiler\ext\standard\VmPregPattern;
 use PHPUnit\Framework\TestCase;
@@ -29,7 +30,7 @@ final class VmPregPatternTest extends TestCase
     {
         $this->assertSame(
             'Compilation failed: missing closing parenthesis at offset 1',
-            VmPregPattern::compileWarningMessage('/(/')
+            VmPregCompileWarn::compileWarningMessage('/(/')
         );
     }
 
@@ -38,7 +39,7 @@ final class VmPregPatternTest extends TestCase
     {
         $this->assertSame(
             'Compilation failed: missing terminating ] for character class at offset 1',
-            VmPregPattern::compileWarningMessage('/[/')
+            VmPregCompileWarn::compileWarningMessage('/[/')
         );
     }
 
@@ -47,7 +48,7 @@ final class VmPregPatternTest extends TestCase
     {
         $this->assertSame(
             'Compilation failed: two named subpatterns have the same name (PCRE2_DUPNAMES not set) at offset 12',
-            VmPregPattern::compileWarningMessage('/(?<x>a)(?<x>b)/')
+            VmPregCompileWarn::compileWarningMessage('/(?<x>a)(?<x>b)/')
         );
     }
 
@@ -71,7 +72,7 @@ final class VmPregPatternTest extends TestCase
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/VmPregPure.php');
         $this->assertStringContainsString('VmPregPattern::parsePhpPattern', $source);
-        $this->assertStringContainsString('VmPregPattern::compileWarningMessage', $source);
+        $this->assertStringContainsString('VmPregCompileWarn::compileWarningMessage', $source);
         $native = (string) file_get_contents(__DIR__.'/../../ext/standard/VmPregNative.php');
         $this->assertStringContainsString('VmPregPure::pregMatch', $native);
     }
