@@ -240,7 +240,8 @@ final class PregMatchRuntime
         $context->builder->returnValue($negOne);
 
         $context->builder->positionAtEnd($okBb);
-        $ht = $context->builder->call(self::helperFunction($context, $takeHtHelper));
+        $htRaw = $context->builder->call(self::helperFunction($context, $takeHtHelper));
+        $ht = JitNestedHelperCoerce::coerceToHashtablePtr($context, $htRaw);
         $htNull = $context->builder->icmp(Builder::INT_EQ, $ht, $htPtr->constNull());
         $emptyBb = $fn->appendBasicBlock('preg_match_ex_empty_ht');
         $writeBb = $fn->appendBasicBlock('preg_match_ex_write_ht');
@@ -444,13 +445,14 @@ final class PregMatchRuntime
         $failBb = $fn->appendBasicBlock('preg_split_fail');
         $okBb = $fn->appendBasicBlock('preg_split_ok');
         $context->builder->positionAtEnd($entry);
-        $ht = $context->builder->call(
+        $htRaw = $context->builder->call(
             self::helperFunction($context, self::SPLIT_HELPER),
             $fn->getParam(0),
             $fn->getParam(1),
             $fn->getParam(2),
             $fn->getParam(3)
         );
+        $ht = JitNestedHelperCoerce::coerceToHashtablePtr($context, $htRaw);
         $isNull = $context->builder->icmp(Builder::INT_EQ, $ht, $htPtr->constNull());
         $context->builder->branchIf($isNull, $failBb, $okBb);
 
@@ -506,21 +508,51 @@ final class PregMatchRuntime
             NestedVmVariableMethodLlvm::ensureMethod($context, $varMethod);
         }
         NestedJitCompileScope::run($context, static function () use ($context, $runtime, $paths): void {
-            $jit = new JIT($context);
-            foreach ($paths as $includePath) {
-                $real = \realpath($includePath) ?: $includePath;
-                if ($context->hasJitIncludedFileCompiled($real)) {
-                    continue;
+            $prevUser = getenv('PHP_COMPILER_AOT_USER_SCRIPT');
+            $prevSelf = getenv('PHP_COMPILER_SELFHOST_AOT');
+            if (\function_exists('putenv')) {
+                putenv('PHP_COMPILER_AOT_USER_SCRIPT=');
+                unset($_ENV['PHP_COMPILER_AOT_USER_SCRIPT'], $_SERVER['PHP_COMPILER_AOT_USER_SCRIPT']);
+                putenv('PHP_COMPILER_SELFHOST_AOT=0');
+                $_ENV['PHP_COMPILER_SELFHOST_AOT'] = '0';
+                $_SERVER['PHP_COMPILER_SELFHOST_AOT'] = '0';
+            }
+            try {
+                $jit = new JIT($context);
+                foreach ($paths as $includePath) {
+                    $real = \realpath($includePath) ?: $includePath;
+                    if ($context->hasJitIncludedFileCompiled($real)) {
+                        continue;
+                    }
+                    $block = $runtime->parseAndCompile(
+                        (string) \file_get_contents($includePath),
+                        \basename($includePath)
+                    );
+                    if (null === $block) {
+                        throw new \LogicException(\basename($includePath).' parseAndCompile failed (#9542)');
+                    }
+                    $jit->compile($block);
+                    $context->markJitIncludedFileCompiled($real);
                 }
-                $block = $runtime->parseAndCompile(
-                    (string) \file_get_contents($includePath),
-                    \basename($includePath)
-                );
-                if (null === $block) {
-                    throw new \LogicException(\basename($includePath).' parseAndCompile failed (#9542)');
+            } finally {
+                if (\function_exists('putenv')) {
+                    if (false === $prevUser || '' === (string) $prevUser) {
+                        putenv('PHP_COMPILER_AOT_USER_SCRIPT=');
+                        unset($_ENV['PHP_COMPILER_AOT_USER_SCRIPT'], $_SERVER['PHP_COMPILER_AOT_USER_SCRIPT']);
+                    } else {
+                        putenv('PHP_COMPILER_AOT_USER_SCRIPT='.$prevUser);
+                        $_ENV['PHP_COMPILER_AOT_USER_SCRIPT'] = $prevUser;
+                        $_SERVER['PHP_COMPILER_AOT_USER_SCRIPT'] = $prevUser;
+                    }
+                    if (false === $prevSelf || '' === (string) $prevSelf) {
+                        putenv('PHP_COMPILER_SELFHOST_AOT=');
+                        unset($_ENV['PHP_COMPILER_SELFHOST_AOT'], $_SERVER['PHP_COMPILER_SELFHOST_AOT']);
+                    } else {
+                        putenv('PHP_COMPILER_SELFHOST_AOT='.$prevSelf);
+                        $_ENV['PHP_COMPILER_SELFHOST_AOT'] = $prevSelf;
+                        $_SERVER['PHP_COMPILER_SELFHOST_AOT'] = $prevSelf;
+                    }
                 }
-                $jit->compile($block);
-                $context->markJitIncludedFileCompiled($real);
             }
         });
         foreach (self::COMPILED_HELPERS as $logical) {

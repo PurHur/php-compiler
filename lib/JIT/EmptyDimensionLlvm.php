@@ -181,13 +181,7 @@ final class EmptyDimensionLlvm
 
     private static function hashtableFromValueBox(Context $context, Variable $container): Variable
     {
-        $valPtr = Variable::KIND_VARIABLE === $container->kind
-            ? JitValueBox::pointer($context, $container->value)
-            : $context->helper->loadValue($container);
-        $ht = $context->builder->call(
-            $context->lookupFunction('__value__readHashtable'),
-            $valPtr
-        );
+        $ht = HashTableHelper::readHashtableFromValueBox($context, $container);
 
         return new Variable(
             $context,

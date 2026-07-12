@@ -49,11 +49,19 @@ final class SuperglobalRefreshUserScriptLlvm
     /** Emit __superglobals__refresh native LLVM once prerequisites are linked (#15417). */
     public static function emitRefresh(Context $context): void
     {
+        if ($context->isThinStandaloneAotMain()) {
+            self::ensureDeferredEmitPrerequisites($context);
+        }
+
         $probe = $context->module->getNamedFunction('__superglobals__refresh');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            $context->registerFunction('__superglobals__refresh', $probe);
+            if ($context->isThinStandaloneAotMain() && !self::isUserScriptRefresh($probe)) {
+                self::clearFunctionBody($probe);
+            } else {
+                $context->registerFunction('__superglobals__refresh', $probe);
 
-            return;
+                return;
+            }
         }
 
         $restore = self::captureInsertBlock($context);
@@ -450,6 +458,17 @@ final class SuperglobalRefreshUserScriptLlvm
         }
     }
 
+    /** preg prelink defers user init — link refresh deps without nested Multipart JIT (#16075). */
+    private static function ensureDeferredEmitPrerequisites(Context $context): void
+    {
+        LibcExtern::register($context);
+        ParseStrRuntime::ensureUserScriptLinked($context);
+        MultipartRuntime::ensureUserScriptNoOpPopulateStub($context);
+        EnvironMirrorUserScriptLlvm::ensureLinked($context);
+        self::ensureGlobals($context);
+        self::ensureHeaderQueueExternal($context);
+    }
+
     private static function captureInsertBlock(Context $context): ?\PHPLLVM\BasicBlock
     {
         try {
@@ -467,5 +486,23 @@ final class SuperglobalRefreshUserScriptLlvm
             return;
         }
         $context->builder->clearInsertionPosition();
+    }
+
+    private static function isUserScriptRefresh(LlvmFunction $fn): bool
+    {
+        foreach ($fn->getBasicBlocks() as $block) {
+            if ('sg_user_refresh_entry' === $block->getName()) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static function clearFunctionBody(LlvmFunction $fn): void
+    {
+        foreach (array_reverse($fn->getBasicBlocks()) as $block) {
+            $block->delete();
+        }
     }
 }

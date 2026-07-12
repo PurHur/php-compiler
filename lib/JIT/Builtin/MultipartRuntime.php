@@ -36,6 +36,24 @@ final class MultipartRuntime
         self::implementUserScript($context);
     }
 
+    /** Deferred user init: linkable no-op populate for CLI refresh emit (#16075 tier-2). */
+    public static function ensureUserScriptNoOpPopulateStub(Context $context): void
+    {
+        $probe = $context->module->getNamedFunction(self::LEGACY_RUNTIME_FUNCTION);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction(self::LEGACY_RUNTIME_FUNCTION, $probe);
+
+            return;
+        }
+
+        $fn = null !== $probe ? $probe : self::declareLegacyFunction($context);
+        $entry = $fn->appendBasicBlock('multipart_noop_entry');
+        $context->builder->positionAtEnd($entry);
+        $context->builder->returnVoid();
+        $context->registerFunction(self::LEGACY_RUNTIME_FUNCTION, $fn);
+        $context->builder->clearInsertionPosition();
+    }
+
     public static function implementUserScript(Context $context): void
     {
         $savedBlock = null;
