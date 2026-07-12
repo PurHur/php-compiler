@@ -17,6 +17,7 @@ use PHPCompiler\JIT\Builtin\StringStrcasecmp;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPLLVM\Value;
 
 /**
@@ -29,8 +30,8 @@ final class strcasecmp extends Internal
         if (2 !== count($frame->calledArgs)) {
             throw new \LogicException('strcasecmp() requires exactly two arguments');
         }
-        $a = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'strcasecmp', 0, 'string1');
-        $b = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'strcasecmp', 1, 'string2');
+        $a = self::vmStringArg($frame, 0, 'string1');
+        $b = self::vmStringArg($frame, 1, 'string2');
         if (null === $frame->returnVar) {
             return;
         }
@@ -53,5 +54,19 @@ final class strcasecmp extends Internal
         $i64 = $context->getTypeFromString('int64');
 
         return $context->builder->sExt($raw, $i64);
+    }
+
+    private static function vmStringArg(Frame $frame, int $argIndex, string $paramName): string
+    {
+        if (InternalStrictArg::isCallerStrict($frame)) {
+            return InternalStrictArg::requireString($frame, $argIndex, 'strcasecmp', $paramName)->toString();
+        }
+
+        return VmString::coerceStringBuiltinArg(
+            $frame->calledArgs[$argIndex],
+            'strcasecmp',
+            $argIndex,
+            $paramName
+        );
     }
 }

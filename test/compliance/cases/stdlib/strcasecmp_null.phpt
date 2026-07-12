@@ -1,17 +1,20 @@
 --TEST--
-stdlib strcasecmp() — null operand TypeError (#10990, ext/standard/string.c)
+stdlib strcmp family — null operand TypeError under declare(strict_types=1) (#18355, ext/standard/string.c)
 --FILE--
 <?php
-foreach ([['a', null, 'string2'], [null, 'a', 'string1']] as [$a, $b, $which]) {
+declare(strict_types=1);
+
+foreach (['strcasecmp', 'strnatcmp', 'strnatcasecmp', 'strcoll'] as $fn) {
     try {
-        strcasecmp($a, $b);
-        echo "uncaught $which\n";
+        $fn('a', null);
+        echo "$fn: uncaught\n";
     } catch (TypeError $e) {
-        echo $e->getMessage(), "\n";
+        echo $fn, ': ', $e->getMessage(), "\n";
     }
 }
 ?>
---EXPECTF--
-%A
-strcasecmp(): Argument #2 ($string2) must be of type string, null given
-strcasecmp(): Argument #1 ($string1) must be of type string, null given
+--EXPECT--
+strcasecmp: strcasecmp(): Argument #2 ($string2) must be of type string, null given
+strnatcmp: strnatcmp(): Argument #2 ($string2) must be of type string, null given
+strnatcasecmp: strnatcasecmp(): Argument #2 ($string2) must be of type string, null given
+strcoll: strcoll(): Argument #2 ($string2) must be of type string, null given
