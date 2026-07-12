@@ -658,6 +658,35 @@ PHP;
         self::assertSame("compile-ok x=1 y=a\n", ob_get_clean());
     }
 
+    /** @covers issue #18171 — preceding same-name backing field merges for unset hook block */
+    public function testPrecedingSameNameBackingFieldMergesForUnsetHook(): void
+    {
+        $this->skipUnlessPropertyHooksEnabled();
+        $src = <<<'PHP'
+<?php
+class C {
+    private string $x = 'a';
+    public string $x {
+        get => $this->x;
+        unset { unset($this->x); }
+    }
+}
+$c = new C();
+unset($c->x);
+echo 'PASS_PROPERTY_HOOK_UNSET isset=' . var_export(isset($c->x), true) . "\n";
+PHP;
+        [$out, $registry] = (new PropertyHooks())->process($src);
+        self::assertStringContainsString("public string \$x = 'a';", $out);
+        self::assertStringNotContainsString('private string $x', $out);
+        self::assertSame('__phpc_property_unset_x', $registry['c']['x']['unset'] ?? null);
+
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($src, 'property_hook_unset_preceding_backing.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("PASS_PROPERTY_HOOK_UNSET isset=false\n", ob_get_clean());
+    }
+
     /** @covers issue #10393 — true duplicate same-name field without hook backing use still fails compile */
     public function testDetachedSameNameBackingFieldIsDuplicateProperty(): void
     {

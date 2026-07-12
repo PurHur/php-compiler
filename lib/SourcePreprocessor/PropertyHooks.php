@@ -998,25 +998,18 @@ final class PropertyHooks
             }
             [$open, $close] = $span;
             $hookSource = substr($body, $open + 1, $close - $open - 1);
-            $declPrefix = $this->copyBodySegment($body, $offset, $declStart, $removeSpans);
             $propDeclHead = rtrim(substr($body, $declStart, $hookOpen - $declStart));
-            $isAbstractHook = (bool) preg_match('/\babstract\b/', $declPrefix.$propDeclHead);
-            $isFinalProperty = (bool) preg_match('/\bfinal\b/', $declPrefix.$propDeclHead);
+            $rawDeclPrefix = substr($body, $offset, $declStart - $offset);
+            $modifierSlice = $rawDeclPrefix.$propDeclHead;
+            $isAbstractHook = (bool) preg_match('/\babstract\b/', $modifierSlice);
+            $isFinalProperty = (bool) preg_match('/\bfinal\b/', $modifierSlice);
             $isInterfaceHook = 'interface' === $declKind;
-            if ($isAbstractHook) {
-                $declPrefix = preg_replace('/\babstract\s+/', '', $declPrefix) ?? $declPrefix;
-                $propDeclHead = preg_replace('/\babstract\s+/', '', $propDeclHead) ?? $propDeclHead;
-            }
-            if ($isFinalProperty) {
-                $declPrefix = preg_replace('/\bfinal\s+/', '', $declPrefix) ?? $declPrefix;
-                $propDeclHead = preg_replace('/\bfinal\s+/', '', $propDeclHead) ?? $propDeclHead;
-            }
-            $isStatic = (bool) preg_match('/\bstatic\b/', $declPrefix.$propDeclHead);
+            $isStatic = (bool) preg_match('/\bstatic\b/', $modifierSlice);
             $isPromotedCtorParam = $this->isPromotedConstructorParam(
                 $body,
                 $declStart,
                 $close,
-                $declPrefix,
+                $rawDeclPrefix,
                 $propDeclHead
             );
             $propDecl = preg_replace('/\s+$/', '', $propDeclHead) ?? $propDeclHead;
@@ -1026,7 +1019,7 @@ final class PropertyHooks
             $isTraitDecl = 'trait' === $declKind;
             $skipSemicolonRequiredHooks = $isConcreteClass
                 && $this->isImplicitAsymmetricBackingHookSource($hookSource);
-            $propertyType = $this->propertyTypeFromDeclHead($declPrefix.$propDeclHead);
+            $propertyType = $this->propertyTypeFromDeclHead($modifierSlice);
             [$methods, $usesBacking, $trailing, $asymmetricSetVis] = $this->lowerHooks(
                 $hookSource,
                 $prop,
@@ -1036,7 +1029,7 @@ final class PropertyHooks
                 $propertyType
             );
             $this->rejectAsymmetricDeclSetWithoutSetHook(
-                $declPrefix.$propDeclHead,
+                $modifierSlice,
                 $hookSource,
                 $lcClass,
                 $prop,
@@ -1044,17 +1037,6 @@ final class PropertyHooks
                 $fullCode,
                 $bodyOffsetInFile + $declStart
             );
-            if (null !== $asymmetricSetVis) {
-                $marker = '/*phpc-asymmetric-set:'.$asymmetricSetVis.'*/ ';
-                if (preg_match('/\b(public|protected|private)\b/i', $declPrefix.$propDeclHead)) {
-                    $marker .= '/*phpc-asymmetric-explicit-read*/ ';
-                }
-                if (preg_match('/^(\s*)/', $declPrefix, $indentM)) {
-                    $declPrefix = $indentM[1].$marker.ltrim($declPrefix);
-                } else {
-                    $declPrefix = $marker.$declPrefix;
-                }
-            }
             $sameNameBacking = $usesBacking && $this->hookTouchesBacking($hookSource, $prop, $isStatic);
             $nextOffset = $close + 1;
             $initializer = '';
@@ -1069,9 +1051,42 @@ final class PropertyHooks
                         if (null !== $detachedBacking) {
                             [$detachedStart, $detachedEnd, $initializer] = $detachedBacking;
                             $removeSpans[] = [$detachedStart, $detachedEnd];
+                        } else {
+                            $precedingBacking = $this->findPrecedingSameNameBackingFieldDecl(
+                                $body,
+                                $offset,
+                                $declStart,
+                                $prop
+                            );
+                            if (null !== $precedingBacking) {
+                                [$precStart, $precEnd, $initializer] = $precedingBacking;
+                                $removeSpans[] = [$precStart, $precEnd];
+                            }
                         }
                     }
                 }
+            }
+            $declPrefix = $this->copyBodySegment($body, $offset, $declStart, $removeSpans);
+            if ($isAbstractHook) {
+                $declPrefix = preg_replace('/\babstract\s+/', '', $declPrefix) ?? $declPrefix;
+                $propDeclHead = preg_replace('/\babstract\s+/', '', $propDeclHead) ?? $propDeclHead;
+            }
+            if ($isFinalProperty) {
+                $declPrefix = preg_replace('/\bfinal\s+/', '', $declPrefix) ?? $declPrefix;
+                $propDeclHead = preg_replace('/\bfinal\s+/', '', $propDeclHead) ?? $propDeclHead;
+            }
+            if (null !== $asymmetricSetVis) {
+                $marker = '/*phpc-asymmetric-set:'.$asymmetricSetVis.'*/ ';
+                if (preg_match('/\b(public|protected|private)\b/i', $modifierSlice)) {
+                    $marker .= '/*phpc-asymmetric-explicit-read*/ ';
+                }
+                if (preg_match('/^(\s*)/', $declPrefix, $indentM)) {
+                    $declPrefix = $indentM[1].$marker.ltrim($declPrefix);
+                } else {
+                    $declPrefix = $marker.$declPrefix;
+                }
+            }
+            if ($sameNameBacking) {
                 $mergedDecl = rtrim($propDeclHead);
                 if ('' !== $initializer) {
                     $mergedDecl .= ' '.$initializer;
@@ -1551,6 +1566,39 @@ final class PropertyHooks
         $matchStart = $searchStart + $m[0][1];
         $matchEnd = $matchStart + strlen($m[0][0]);
         $initializer = isset($m[1]) ? trim($m[1][0]) : '';
+
+        return [$matchStart, $matchEnd, $initializer];
+    }
+
+    /**
+     * Same-name backing field declared before the hooked property — merge like forward detached (#18171).
+     *
+     * @return array{0: int, 1: int, 2: string}|null [span start, span end, initializer including `=`]
+     */
+    private function findPrecedingSameNameBackingFieldDecl(
+        string $body,
+        int $searchStart,
+        int $declStart,
+        string $prop
+    ): ?array {
+        if ($searchStart >= $declStart) {
+            return null;
+        }
+        $segment = substr($body, $searchStart, $declStart - $searchStart);
+        if (!preg_match_all(
+            '/(?:(?:public|protected|private|static|readonly)\s+)+'
+            .'(?:[\w\\\\|]+(?:\s*\[\s*\])?\s+)+'
+            .'\$'.preg_quote($prop, '/').'\s*(=\s*[^;]+)?;/',
+            $segment,
+            $matches,
+            PREG_OFFSET_CAPTURE
+        ) || [] === $matches[0]) {
+            return null;
+        }
+        $last = count($matches[0]) - 1;
+        $matchStart = $searchStart + $matches[0][$last][1];
+        $matchEnd = $matchStart + strlen($matches[0][$last][0]);
+        $initializer = isset($matches[1][$last]) ? trim($matches[1][$last][0]) : '';
 
         return [$matchStart, $matchEnd, $initializer];
     }
