@@ -963,6 +963,13 @@ final class ReflectionSupport
 
     public static function methodNameFromReflection(ObjectEntry $reflection): string
     {
+        // ReflectionParameter stores the method on `method`; ReflectionMethod on `name` (#18338).
+        if ($reflection->hasProperty(self::PROP_METHOD_NAME)) {
+            $methodNameVar = $reflection->getProperty(self::PROP_METHOD_NAME)->resolveIndirect();
+            if (Variable::TYPE_STRING === $methodNameVar->type) {
+                return $methodNameVar->toString();
+            }
+        }
         $nameVar = $reflection->getProperty(self::PROP_REFLECTION_METHOD_FUNC)->resolveIndirect();
         if (Variable::TYPE_STRING !== $nameVar->type) {
             throw new \LogicException('ReflectionMethod missing method name');
