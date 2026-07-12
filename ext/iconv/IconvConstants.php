@@ -14,4 +14,13 @@ final class IconvConstants
 
     /** php-src ICONV_CSNMAXLEN */
     public const ENCODING_NAME_MAX_LEN = 64;
+
+    /** @return array<string, int> */
+    public static function registeredConstants(): array
+    {
+        return [
+            'ICONV_MIME_DECODE_STRICT' => self::MIME_DECODE_STRICT,
+            'ICONV_MIME_DECODE_CONTINUE_ON_ERROR' => self::MIME_DECODE_CONTINUE_ON_ERROR,
+        ];
+    }
 }
