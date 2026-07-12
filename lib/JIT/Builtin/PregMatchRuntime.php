@@ -9,6 +9,7 @@ use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPCompiler\JIT\NestedVmActiveContextLlvm;
 use PHPCompiler\JIT\NestedVmHashTableMethodLlvm;
 use PHPCompiler\JIT\NestedVmVariableMethodLlvm;
 use PHPLLVM\Builder;
@@ -507,6 +508,7 @@ final class PregMatchRuntime
         foreach (['null', 'int', 'string', 'array'] as $varMethod) {
             NestedVmVariableMethodLlvm::ensureMethod($context, $varMethod);
         }
+        NestedVmActiveContextLlvm::ensureMethod($context);
         NestedJitCompileScope::run($context, static function () use ($context, $runtime, $paths): void {
             $prevUser = getenv('PHP_COMPILER_AOT_USER_SCRIPT');
             $prevSelf = getenv('PHP_COMPILER_SELFHOST_AOT');
