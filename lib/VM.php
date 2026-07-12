@@ -2761,7 +2761,7 @@ class VM {
                     $fiber->propertyHookSuspendFrame = $hookFrame;
                     $fiber->status = FiberState::STATUS_SUSPENDED;
                     $out = new Variable();
-                    $out->copyFrom($fiber->suspendReturn);
+                    $out->duplicateFrom($fiber->suspendReturn->resolveIndirect());
 
                     return $out;
                 }
@@ -2795,7 +2795,7 @@ class VM {
         if (self::FIBER_SUSPEND === $result) {
             $fiber->status = FiberState::STATUS_SUSPENDED;
             $out = new Variable();
-            $out->copyFrom($fiber->suspendReturn);
+            $out->duplicateFrom($fiber->suspendReturn->resolveIndirect());
 
             return $out;
         }
@@ -5825,6 +5825,11 @@ restart:
                         }
                         if ($frame->fiberSuspend) {
                             $frame->fiberSuspend = false;
+                            // Pos already advanced past FUNCCALL_EXEC_*; stale callArgEntries
+                            // would replay the prior suspend operand on the next resume (#18162).
+                            $frame->call = null;
+                            $this->clearOutgoingCallState($frame);
+                            $this->restorePendingOutboundCallAfterInlineNew($frame);
 
                             return self::FIBER_SUSPEND;
                         }
@@ -7623,6 +7628,9 @@ restart:
             }
             if ($frame->fiberSuspend) {
                 $frame->fiberSuspend = false;
+                $frame->call = null;
+                $this->clearOutgoingCallState($frame);
+                $this->restorePendingOutboundCallAfterInlineNew($frame);
 
                 return self::FIBER_SUSPEND;
             }
@@ -13446,6 +13454,7 @@ restart:
         );
         $frame->call = $class->methods[$methodLc];
         $frame->callArgs = $this->callArgsForStaticMethod($frame, $lcClass, $frame->call, $parentKeywordScope);
+        $frame->callArgEntries = [];
         $frame->builtinCalleeQualifiedMethod = $class->name.'::'.$declaredName;
     }
 
