@@ -20,7 +20,7 @@ final class urlencode extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('urlencode() requires exactly one argument');
         }
-        $subject = VmString::coerceTypedStringBuiltinArg(
+        $subject = VmString::coerceStringBuiltinArg(
             $frame->calledArgs[0],
             'urlencode',
             0,
@@ -48,7 +48,7 @@ final class urlencode extends Internal
             );
         }
 
-        $str = JitStringBuiltinArg::lowerTypedString($context, $args[0], 'urlencode', 0, 'string');
+        $str = JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'urlencode', 0, 'string');
 
         return JitUrlencode::urlencode($context, $str);
     }

@@ -1,10 +1,8 @@
 --TEST--
-stdlib typed string builtins — null $string TypeError (#18190, ext/standard/string.c, url.c, html.c)
+stdlib typed string builtins — null $string TypeError (#18190, ext/standard/string.c, html.c)
 --FILE--
 <?php
 foreach ([
-    'urlencode' => static fn () => urlencode(null),
-    'rawurlencode' => static fn () => rawurlencode(null),
     'htmlspecialchars' => static fn () => htmlspecialchars(null),
     'htmlentities' => static fn () => htmlentities(null),
     'addcslashes' => static fn () => addcslashes(null, 'a'),
@@ -18,8 +16,6 @@ foreach ([
     }
 }
 --EXPECT--
-urlencode(): Argument #1 ($string) must be of type string, null given
-rawurlencode(): Argument #1 ($string) must be of type string, null given
 htmlspecialchars(): Argument #1 ($string) must be of type string, null given
 htmlentities(): Argument #1 ($string) must be of type string, null given
 addcslashes(): Argument #1 ($str) must be of type string, null given

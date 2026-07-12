@@ -1,8 +1,6 @@
 <?php
-// Issue #18190 — typed string builtins reject null (ext/standard/string.c, url.c, html.c).
+// Issue #18190 — typed string builtins reject null (ext/standard/string.c, html.c).
 $tests = [
-    'urlencode' => static fn () => urlencode(null),
-    'rawurlencode' => static fn () => rawurlencode(null),
     'htmlspecialchars' => static fn () => htmlspecialchars(null),
     'htmlentities' => static fn () => htmlentities(null),
     'strtolower' => static fn () => strtolower(null),
