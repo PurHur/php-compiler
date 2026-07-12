@@ -24,7 +24,7 @@ final class quoted_printable_decode extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('quoted_printable_decode() requires exactly one argument in this compiler build');
         }
-        $data = VmString::coerceStringBuiltinArg(
+        $data = VmString::coerceTypedStringBuiltinArg(
             $frame->calledArgs[0],
             'quoted_printable_decode',
             0,
@@ -43,7 +43,7 @@ final class quoted_printable_decode extends Internal
         }
         return JitQuotedPrintableDecode::decode(
             $context,
-            JitStringBuiltinArg::lower($context, $args[0], 'quoted_printable_decode', 0, 'string'),
+            JitStringBuiltinArg::lowerTypedString($context, $args[0], 'quoted_printable_decode', 0, 'string'),
             $args[0]
         );
     }
