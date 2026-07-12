@@ -14,3 +14,4 @@ echo $fiber->resume(), "\n";
 --EXPECT--
 step1
 step2
+

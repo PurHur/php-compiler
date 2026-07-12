@@ -10326,6 +10326,9 @@ restart:
         if (is_array($propMeta) && !empty($propMeta['virtual'])) {
             $prop->propertyHookVirtual = true;
         }
+        if (is_array($propMeta) && !empty($propMeta['getParameterized'])) {
+            $prop->getHookParameterized = true;
+        }
     }
 
     private function classPropertyMeta(ObjectEntry $object, string $propertyName): ?VM\ClassProperty
@@ -13309,6 +13312,13 @@ restart:
         try {
             [$declaringClass, $methodLc] = $this->resolveInstanceMethod($class, $methodLc);
         } catch (\LogicException $e) {
+            $hookInit = $this->initParameterizedPropertyGetMethodCall($frame, $receiver, $methodName);
+            if (true === $hookInit) {
+                return null;
+            }
+            if ($hookInit instanceof Frame) {
+                return $hookInit;
+            }
             if (isset($class->methods['__call'])) {
                 $frame->magicCallMethodName = $methodName;
                 $frame->call = $class->methods['__call'];
@@ -13348,6 +13358,49 @@ restart:
         $frame->callArgs = [$receiver];
         $frame->callArgEntries = [];
         $frame->builtinCalleeQualifiedMethod = $declaringClass->name.'::'.$declaredName;
+
+        return null;
+    }
+
+    /**
+     * PHP 8.4 parameterized get hooks: `$obj->prop($arg)` routes to get-hook method (#18172).
+     *
+     * @return true when handled|Frame on catchable error|null when not applicable
+     */
+    protected function initParameterizedPropertyGetMethodCall(Frame $frame, Variable $receiver, string $methodName): true|Frame|null
+    {
+        $object = $receiver->toObject();
+        $propLc = strtolower($methodName);
+        for ($class = $object->class; null !== $class; $class = $class->parentClass) {
+            foreach ($class->properties as $prop) {
+                if (strtolower($prop->name) !== $propLc) {
+                    continue;
+                }
+                if (null === $prop->getHookMethodLc || !$prop->getHookParameterized) {
+                    return null;
+                }
+                $catchFrame = $this->enforcePropertyReadVisibility($object, $prop->name, $frame);
+                if (null !== $catchFrame) {
+                    return $catchFrame;
+                }
+                $getLc = $prop->getHookMethodLc;
+                if (!isset($class->methods[$getLc])) {
+                    return null;
+                }
+                $func = $class->methods[$getLc];
+                if (!$func instanceof Func\PHP) {
+                    return null;
+                }
+                $frame->call = $func;
+                $frame->callArgs = [$receiver];
+                $frame->callArgEntries = [];
+                $declaredName = $class->methodNames[$getLc] ?? $getLc;
+                $frame->builtinCalleeQualifiedMethod = $class->name.'::'.$declaredName;
+                $frame->propertyHookRawProperty = $prop->name;
+
+                return true;
+            }
+        }
 
         return null;
     }
