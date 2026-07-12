@@ -23,15 +23,13 @@ final class ReflectionParameterGetDefaultValue extends VmClassMethod
         }
         $ctx = VmReflection::requireContext($frame);
         $receiver = ReflectionSupport::requireReflectionParameter($frame, $frame->calledArgs[0]);
-        $block = ReflectionSupport::resolveParameterBlock($ctx, $receiver);
-        $index = ReflectionSupport::parameterIndexForReflection($receiver);
-        if (!VmReflection::parameterDefaultValueIsAvailable($block, $index)) {
+        if (!ReflectionSupport::parameterDefaultValueIsAvailableForReflection($ctx, $receiver)) {
             ReflectionSupport::throwReflectionException(
                 'Parameter '.ReflectionSupport::paramNameFromReflection($receiver)
                 .' does not have a default value'
             );
         }
-        if (!VmReflection::copyParameterDefaultValue($frame->returnVar, $block, $index, $ctx)) {
+        if (!ReflectionSupport::copyParameterDefaultValueForReflection($frame->returnVar, $ctx, $receiver)) {
             $frame->returnVar->null();
         }
     }

@@ -7,6 +7,7 @@ namespace PHPCompiler\VM;
 use PHPCompiler\Block;
 use PHPCompiler\BuiltinByRefParams;
 use PHPCompiler\BuiltinInternalArgInfo;
+use PHPCompiler\BuiltinInternalDefaultValues;
 use PHPCompiler\BuiltinParamNames;
 use PHPCompiler\Compiler\AttributeEntry;
 use PHPCompiler\Compiler\AttributeNames;
@@ -1486,6 +1487,38 @@ final class ReflectionSupport
             || ParamArgumentCountError::parameterHasDefault($block, $index);
     }
 
+    public static function parameterDefaultValueIsAvailableForReflection(
+        Context $ctx,
+        ObjectEntry $reflection,
+    ): bool {
+        if (self::parameterIsInternal($ctx, $reflection)) {
+            return self::internalParameterDefaultValueIsAvailable($ctx, $reflection);
+        }
+        $block = self::resolveParameterBlock($ctx, $reflection);
+        $index = self::parameterIndexForReflection($reflection);
+
+        return self::parameterDefaultValueIsAvailable($block, $index);
+    }
+
+    public static function copyParameterDefaultValueForReflection(
+        Variable $dest,
+        Context $ctx,
+        ObjectEntry $reflection,
+    ): bool {
+        if (self::parameterIsInternal($ctx, $reflection)) {
+            return self::copyInternalParameterDefaultValue($dest, $ctx, $reflection);
+        }
+        $block = self::resolveParameterBlock($ctx, $reflection);
+        $index = self::parameterIndexForReflection($reflection);
+        $value = $ctx->runtime->vm()->evaluateParameterDefaultForReflection($block, $index);
+        if (null === $value) {
+            return false;
+        }
+        $dest->copyFrom($value);
+
+        return true;
+    }
+
     public static function parameterAllowsNull(Context $ctx, ObjectEntry $reflection): bool
     {
         if (self::parameterIsInternal($ctx, $reflection)) {
@@ -1614,6 +1647,54 @@ final class ReflectionSupport
         $index = self::parameterIndexForReflection($reflection);
         $funcName = self::internalCallableName($ctx, $reflection);
         $variadic = BuiltinParamNames::variadicParamIndexForFunction($funcName);
+
+        return null !== $variadic && $variadic === $index;
+    }
+
+    private static function internalParameterDefaultValueIsAvailable(
+        Context $ctx,
+        ObjectEntry $reflection,
+    ): bool {
+        $index = self::parameterIndexForReflection($reflection);
+        $callableLc = strtolower(self::internalCallableName($ctx, $reflection));
+        $info = self::internalParameterInfo($ctx, $reflection);
+
+        return BuiltinInternalDefaultValues::isAvailable(
+            $callableLc,
+            $index,
+            $info,
+            self::internalParameterIsVariadic($ctx, $reflection, $callableLc, $index),
+        );
+    }
+
+    private static function copyInternalParameterDefaultValue(
+        Variable $dest,
+        Context $ctx,
+        ObjectEntry $reflection,
+    ): bool {
+        $index = self::parameterIndexForReflection($reflection);
+        $callableLc = strtolower(self::internalCallableName($ctx, $reflection));
+        $info = self::internalParameterInfo($ctx, $reflection);
+
+        return BuiltinInternalDefaultValues::materialize($dest, $callableLc, $index, $info);
+    }
+
+    private static function internalParameterIsVariadic(
+        Context $ctx,
+        ObjectEntry $reflection,
+        string $callableLc,
+        int $index,
+    ): bool {
+        if (str_contains($callableLc, '::')) {
+            [$class, $method] = explode('::', $callableLc, 2);
+            if (!BuiltinInternalArgInfo::methodIsVariadic($class, $method)) {
+                return false;
+            }
+            $count = BuiltinInternalArgInfo::paramCountForClassMethod($class, $method) ?? 0;
+
+            return $count > 0 && $index === $count - 1;
+        }
+        $variadic = BuiltinParamNames::variadicParamIndexForFunction($callableLc);
 
         return null !== $variadic && $variadic === $index;
     }
