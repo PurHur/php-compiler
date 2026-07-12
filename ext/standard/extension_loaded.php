@@ -7,9 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\InternalStrictArg;
 use PHPLLVM\Value;
 
 /** extension_loaded() — registered extension probe (ext/standard/info.c parity, #3204). */
@@ -28,13 +26,7 @@ final class extension_loaded extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        InternalStrictArg::rejectNullString($frame->calledArgs[0], 'extension_loaded', 'extension', 0, $frame);
-        $name = VmString::coerceStringBuiltinArg(
-            $frame->calledArgs[0],
-            'extension_loaded',
-            0,
-            'extension'
-        );
+        $name = VmString::stringBuiltinArgForFrame($frame, 0, 'extension_loaded', 0, 'extension');
         $frame->returnVar->bool(VmInfo::extension_loaded($name));
     }
 
@@ -43,8 +35,6 @@ final class extension_loaded extends Internal
         if (1 !== \count($args)) {
             throw new \LogicException('extension_loaded() requires exactly one argument');
         }
-        JitInternalStrictArg::rejectNullString($context, $args[0], 'extension_loaded', 'extension', 1);
-
         return JitInfo::extension_loaded($context, $args[0]);
     }
 }
