@@ -121,7 +121,7 @@ PHP;
         $block = $runtime->parseAndCompile($code, 'libxml_dom_loadxml.php');
         ob_start();
         $runtime->run($block);
-        self::assertSame("failed\n1\nfatal\ncode73\nmessage\n0\n", ob_get_clean());
+        self::assertSame("failed\n2\nfatal\ncode73\nmessage\n0\n", ob_get_clean());
     }
 
     public function test_libxml_set_streams_context_accepts_stream_context(): void
