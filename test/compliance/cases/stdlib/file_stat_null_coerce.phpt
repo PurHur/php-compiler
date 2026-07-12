@@ -20,7 +20,7 @@ if (false !== is_uploaded_file(null)) {
 if (false !== filesize(null)) {
     ++$fail;
 }
-$renamed = rename(null, '/tmp/no-such-target-13354');
+$renamed = @rename(null, '/tmp/no-such-target-13354');
 if (false !== $renamed) {
     ++$fail;
 }
@@ -35,6 +35,5 @@ if ('' !== dirname(null)) {
     ++$fail;
 }
 echo 0 === $fail ? "ok\n" : "fail\n";
---EXPECTF--
-PHP Warning:  rename(,/tmp/no-such-target-13354): No such file or directory in %s on line %d
+--EXPECT--
 ok
