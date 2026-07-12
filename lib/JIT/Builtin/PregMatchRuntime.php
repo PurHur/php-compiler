@@ -492,6 +492,9 @@ final class PregMatchRuntime
 
         $runtime = $context->runtime;
         $root = \dirname(__DIR__, 3);
+        // VmPregNative delegates to VmPregPure; compile pattern + native facade — VmPregPure stays
+        // external until nested VmPregEngine lowering (BoundVariable) is ready (#16075 tier-2 execute).
+        // VmPregPattern must compile here (modifier loop avoids nested match-on-offset IR bug).
         $paths = [
             $root.'/ext/standard/StdlibConstants.php',
             $root.'/ext/standard/VmPregPattern.php',
