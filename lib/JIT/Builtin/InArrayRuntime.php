@@ -14,8 +14,8 @@ use PHPLLVM\Value;
 /**
  * JIT/AOT link for in_array() via InArrayJitHelper PHP (#12503).
  *
- * Standalone AOT compiles {@see InArrayJitHelper} via JitVmHelperLink bridge (#14360); native literal arrays keep LLVM in {@see ArrayBuiltinHelper::inArray()}.
- * SSOT: {@see \PHPCompiler\ext\standard\VmArray::contains()}
+ * Standalone AOT and native literal arrays materialize to hashtable then route through PHP (#18153).
+ * SSOT: {@see \PHPCompiler\ext\standard\InArrayJitHelper}
  * php-src: ext/standard/array.c — PHP_FUNCTION(in_array)
  */
 final class InArrayRuntime
@@ -37,13 +37,18 @@ final class InArrayRuntime
         JITVariable $haystack,
         Value $strict
     ): Value {
-        // Packed/boxed hashtables: LLVM scan (array_search-style). PHP bridge kept for
-        // module init / self-host inventory; AOT user scripts use ArrayBuiltinHelper (#3118).
-        if (ArrayBuiltinHelper::isNativeArray($haystack->type)) {
-            return ArrayBuiltinHelper::inArray($context, $needle, $haystack, $strict);
-        }
+        self::ensureLinked($context);
+        $needlePtr = JitValueBox::valuePtrFromVariable($context, $needle);
+        $ht = ArrayBuiltinHelper::isNativeArray($haystack->type)
+            ? ArrayBuiltinHelper::nativeListToHashTable($context, $haystack)
+            : ArrayBuiltinHelper::loadHashTable($context, $haystack);
 
-        return ArrayBuiltinHelper::inArray($context, $needle, $haystack, $strict);
+        return $context->builder->call(
+            $context->lookupFunction(self::ABI_CONTAINS),
+            $needlePtr,
+            $ht,
+            $strict
+        );
     }
 
     public static function ensureLinked(Context $context): void

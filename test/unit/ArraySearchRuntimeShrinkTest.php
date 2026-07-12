@@ -9,15 +9,15 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPUnit\Framework\TestCase;
 
-/** array_search() JIT routes through ArraySearchJitHelper PHP not ArrayBuiltinHelper LLVM (#12514). */
+/** array_search() JIT routes all operands through ArraySearchJitHelper PHP not ArrayBuiltinHelper LLVM (#12514, #18153). */
 final class ArraySearchRuntimeShrinkTest extends TestCase
 {
     public function testArraySearchRuntimeUsesJitHelperNotDirectLlvmMonolith(): void
     {
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ArraySearchRuntime.php');
         $this->assertStringContainsString('ArraySearchJitHelper', $runtime);
-        $this->assertStringContainsString('isNativeArray', $runtime);
-        $this->assertStringContainsString('ArrayBuiltinHelper::arraySearch', $runtime);
+        $this->assertStringContainsString('nativeListToHashTable', $runtime);
+        $this->assertStringNotContainsString('ArrayBuiltinHelper::arraySearch', $runtime);
         $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);
 
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/array_search.php');

@@ -14,8 +14,8 @@ use PHPLLVM\Value;
 /**
  * JIT/AOT link for array_search() via ArraySearchJitHelper PHP (#12514).
  *
- * Standalone AOT compiles {@see ArraySearchJitHelper} via JitVmHelperLink bridge (#14373); native literal arrays keep LLVM in {@see ArrayBuiltinHelper::arraySearch()}.
- * SSOT: {@see \PHPCompiler\ext\standard\VmArray::searchKey()}
+ * Standalone AOT and native literal arrays materialize to hashtable then route through PHP (#18153).
+ * SSOT: {@see \PHPCompiler\ext\standard\ArraySearchJitHelper}
  * php-src: ext/standard/array.c — PHP_FUNCTION(array_search)
  */
 final class ArraySearchRuntime
@@ -37,13 +37,11 @@ final class ArraySearchRuntime
         JITVariable $haystack,
         Value $strict
     ): Value {
-        if (ArrayBuiltinHelper::isNativeArray($haystack->type)) {
-            return ArrayBuiltinHelper::arraySearch($context, $needle, $haystack, $strict);
-        }
-
         self::ensureLinked($context);
         $needlePtr = JitValueBox::valuePtrFromVariable($context, $needle);
-        $ht = ArrayBuiltinHelper::loadHashTable($context, $haystack);
+        $ht = ArrayBuiltinHelper::isNativeArray($haystack->type)
+            ? ArrayBuiltinHelper::nativeListToHashTable($context, $haystack)
+            : ArrayBuiltinHelper::loadHashTable($context, $haystack);
 
         return $context->builder->call(
             $context->lookupFunction(self::ABI_SEARCH),
