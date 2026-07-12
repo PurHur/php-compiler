@@ -48340,6 +48340,19 @@ class Compiler {
         }
 
         $argSends = $this->compileCallArgSends($args, $block, $calleeName, $cfgCallOp);
+        // Hoisted call-arg ConstFetch lands on $block during compileCallArgSends — prepend INIT now (#17697).
+        if (
+            !$initPrependedBeforeArgConstFetch
+            && !$skipPrependForSiblingFuncProducer
+            && !$skipPrependForHaystackFamilyDimFetch
+            && !$skipPrependForExplodeLeadingConstFunc
+            && !$skipPrependForDateSunFunc
+        ) {
+            $initPrependedBeforeArgConstFetch = $this->prependFuncCallInitBeforeTrailingArgConstFetches(
+                $block,
+                $init
+            );
+        }
         [$nestedProducerOps, $outerArgSends] = $this->partitionNestedInlineCallArgProducerOps($argSends);
         $this->rewireArrayBuiltinAdjacentFuncCallArgSendSlots(
             $outerArgSends,
