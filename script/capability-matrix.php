@@ -37,6 +37,7 @@ function collectCapabilities(string $root): array
         'sodium' => new PHPCompiler\ext\sodium\Module(),
         'sockets' => new PHPCompiler\ext\sockets\Module(),
         'curl' => new PHPCompiler\ext\curl\Module(),
+        'zip' => new PHPCompiler\ext\zip\Module(),
         'inotify' => new PHPCompiler\ext\inotify\Module(),
         'uuid' => new PHPCompiler\ext\uuid\Module(),
     ];
