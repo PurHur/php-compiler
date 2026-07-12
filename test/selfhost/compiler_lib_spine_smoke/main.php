@@ -3563,7 +3563,6 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/StreamSocketPairRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StreamSync.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StreamSyncJit.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringAddslashes.php';
-require_once __DIR__.'/../../../lib/JIT/Builtin/StringAddslashesLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringBase64Decode.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringBase64DecodeLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringBase64Encode.php';
