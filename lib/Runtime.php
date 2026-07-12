@@ -231,6 +231,7 @@ class Runtime {
         $this->load(new ext\xsl\Module);
         $this->load(new ext\simplexml\Module);
         $this->load(new ext\xml\Module);
+        $this->load(new ext\xmlrpc\Module);
         $this->load(new ext\xmlreader\Module);
         $this->load(new ext\xmlwriter\Module);
         $this->load(new ext\gd\Module);
