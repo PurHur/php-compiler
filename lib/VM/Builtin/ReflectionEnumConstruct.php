@@ -19,13 +19,19 @@ final class ReflectionEnumConstruct extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        if (\count($frame->calledArgs) < 2) {
-            throw new \LogicException('ReflectionEnum::__construct() expects exactly 1 argument');
+        $argc = \count($frame->calledArgs) - 1;
+        if ($argc !== 1) {
+            throw new \ArgumentCountError(sprintf(
+                'ReflectionEnum::__construct() expects exactly 1 argument, %d given',
+                $argc
+            ));
         }
         $ctx = VmReflection::requireContext($frame);
         $target = VmReflection::resolveClassFromArg($ctx, $frame->calledArgs[1]);
         if (!$target->isEnum) {
-            throw new \LogicException('ReflectionEnum expects an enum class');
+            ReflectionSupport::throwReflectionException(
+                ReflectionSupport::classNotEnumMessage($target->name)
+            );
         }
         $receiver = ReflectionSupport::requireReflectionEnum($frame, $frame->calledArgs[0]);
         $receiver->getProperty(ReflectionSupport::PROP_CLASS_NAME)->string($target->name);
