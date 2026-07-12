@@ -39,10 +39,6 @@ final class VmFsPhpWrapper
     /** php-src dir.c php_opendir / php_scandir — php:// wrappers reject dir_opener (#18418). */
     public static function openDirFailureReason(string $path): string
     {
-        if (self::isPhpWrapperPath($path)) {
-            return 'not implemented';
-        }
-
-        return VmStatPath::isFile($path) ? 'Not a directory' : 'No such file or directory';
+        return VmDirOpenFailure::openDirFailureReason($path);
     }
 }

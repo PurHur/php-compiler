@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 4703 |
-| Phase A inventory files (M2 ratio SSOT) | 4703 |
+| PHP files on vm.php path | 4705 |
+| Phase A inventory files (M2 ratio SSOT) | 4705 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 12683 |
+| Source constructs flagged (warnings) | 12685 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1587,6 +1587,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/ReturnPendingJitHelper.php` | 0 | 1 |
 | `ext/standard/RmdirJitHelper.php` | 0 | 1 |
 | `ext/standard/RoundJitHelper.php` | 0 | 1 |
+| `ext/standard/ScandirFailureJitHelper.php` | 0 | 1 |
 | `ext/standard/ScopeBuiltinJitHelper.php` | 0 | 4 |
 | `ext/standard/SerializeJitHelper.php` | 0 | 2 |
 | `ext/standard/SessionCookieParams.php` | 0 | 4 |
@@ -1748,6 +1749,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VmDir.php` | 0 | 1 |
 | `ext/standard/VmDirArg.php` | 0 | 1 |
 | `ext/standard/VmDirNative.php` | 0 | 1 |
+| `ext/standard/VmDirOpenFailure.php` | 0 | 1 |
 | `ext/standard/VmDirPure.php` | 0 | 1 |
 | `ext/standard/VmDns.php` | 0 | 11 |
 | `ext/standard/VmDnsMx.php` | 0 | 8 |
@@ -12344,7 +12346,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitFsGlob.php`
 
 **Warnings** (review for bootstrap subset):
-- 4 class method(s)
+- 3 class method(s)
 
 ### `ext/standard/JitFseek.php`
 
@@ -15444,6 +15446,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `ext/standard/ScandirFailureJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `ext/standard/ScopeBuiltinJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
@@ -16488,6 +16495,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 10 class method(s)
 
+### `ext/standard/VmDirOpenFailure.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s)
+
 ### `ext/standard/VmDirPure.php`
 
 **Warnings** (review for bootstrap subset):
@@ -16768,7 +16780,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmFsPhpWrapper.php`
 
 **Warnings** (review for bootstrap subset):
-- 3 class method(s)
+- 4 class method(s)
 
 ### `ext/standard/VmFsReadNative.php`
 
@@ -18373,7 +18385,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmVarFormat.php`
 
 **Warnings** (review for bootstrap subset):
-- 4 class method(s)
+- 6 class method(s)
 
 ### `ext/standard/VmVfscanf.php`
 

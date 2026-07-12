@@ -1626,6 +1626,7 @@
         "ext/standard/ReturnPendingJitHelper.php",
         "ext/standard/RmdirJitHelper.php",
         "ext/standard/RoundJitHelper.php",
+        "ext/standard/ScandirFailureJitHelper.php",
         "ext/standard/ScopeBuiltinJitHelper.php",
         "ext/standard/SerializeJitHelper.php",
         "ext/standard/SessionCookieParams.php",
@@ -1790,6 +1791,7 @@
         "ext/standard/VmDir.php",
         "ext/standard/VmDirArg.php",
         "ext/standard/VmDirNative.php",
+        "ext/standard/VmDirOpenFailure.php",
         "ext/standard/VmDirPure.php",
         "ext/standard/VmDns.php",
         "ext/standard/VmDnsMx.php",
@@ -4937,9 +4939,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 4703,
+        "inventory_files": 4705,
         "excluded": 0,
-        "eligible": 4703,
+        "eligible": 4705,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1

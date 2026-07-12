@@ -22,9 +22,12 @@ final class OpendirJitHelper
         }
         $handle = VmDir::opendir($path);
         if (false === $handle) {
-            $reason = VmFsPhpWrapper::openDirFailureReason($path);
             TriggerErrorJitHelper::warning(
-                \sprintf('opendir(%s): Failed to open directory: %s', $path, $reason)
+                \sprintf(
+                    'opendir(%s): Failed to open directory: %s',
+                    $path,
+                    VmDirOpenFailure::openDirFailureReason($path)
+                )
             );
 
             return -1;
