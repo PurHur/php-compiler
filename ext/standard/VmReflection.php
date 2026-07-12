@@ -2159,6 +2159,27 @@ final class VmReflection
     }
 
     /**
+     * get_class_methods() — resolve operand or TypeError when class name is unknown (#18110).
+     *
+     * php-src: ext/standard/basic_functions.c — PHP_FUNCTION(get_class_methods)
+     */
+    public static function requireClassForGetClassMethods(Context $ctx, Variable $arg): ClassEntry
+    {
+        $entry = self::resolveClassForGetClassMethods($ctx, $arg);
+        if (null !== $entry) {
+            return $entry;
+        }
+        $arg = $arg->resolveIndirect();
+        $given = Variable::TYPE_STRING === $arg->type
+            ? 'string'
+            : VmClassHas::vmTypeName($arg->type);
+        throw new \TypeError(\sprintf(
+            'get_class_methods(): Argument #1 ($object_or_class) must be an object or a valid class name, %s given',
+            $given
+        ));
+    }
+
+    /**
      * @return list<string>
      */
     public static function classMethodsList(ClassEntry $entry, int $filter = 7, ?Context $ctx = null): array
