@@ -59,6 +59,68 @@ final class DomDocumentMethodUserScriptLlvm
         );
     }
 
+    public static function ensureLoadXMLBridge(Context $context): void
+    {
+        self::ensureContextBridge(
+            $context,
+            DomLoadXMLRuntime::ABI_NAME,
+            'dom_load_xml_user_script',
+            [
+                $context->getTypeFromString('__object__*'),
+                $context->getTypeFromString('__string__*'),
+            ],
+            $context->getTypeFromString('int1'),
+            'PHPCompiler\\ext\\dom\\DomLoadXMLJitHelper::loadXMLArgv',
+            '/ext/dom/DomLoadXMLJitHelper.php'
+        );
+    }
+
+    public static function ensureSaveHTMLBridge(Context $context): void
+    {
+        self::ensureBridge(
+            $context,
+            DomSaveHTMLRuntime::ABI_NAME,
+            'dom_save_html_user_script',
+            [
+                $context->getTypeFromString('__object__*'),
+            ],
+            $context->getTypeFromString('__string__*'),
+            'PHPCompiler\\ext\\dom\\DomSaveHTMLJitHelper::saveHTMLArgv',
+            '/ext/dom/DomSaveHTMLJitHelper.php'
+        );
+    }
+
+    public static function ensureSaveXMLBridge(Context $context): void
+    {
+        self::ensureBridge(
+            $context,
+            DomSaveXMLRuntime::ABI_NAME,
+            'dom_save_xml_user_script',
+            [
+                $context->getTypeFromString('__object__*'),
+            ],
+            $context->getTypeFromString('__string__*'),
+            'PHPCompiler\\ext\\dom\\DomSaveXMLJitHelper::saveXMLArgv',
+            '/ext/dom/DomSaveXMLJitHelper.php'
+        );
+    }
+
+    public static function ensureSaveHTMLFileBridge(Context $context): void
+    {
+        self::ensureBridge(
+            $context,
+            DomSaveHTMLFileRuntime::ABI_NAME,
+            'dom_save_html_file_user_script',
+            [
+                $context->getTypeFromString('__object__*'),
+                $context->getTypeFromString('__string__*'),
+            ],
+            $context->getTypeFromString('int64'),
+            'PHPCompiler\\ext\\dom\\DomSaveHTMLFileJitHelper::saveHTMLFileArgv',
+            '/ext/dom/DomSaveHTMLFileJitHelper.php'
+        );
+    }
+
     public static function ensureElementTextContentBridge(Context $context): void
     {
         self::ensureBridge(
@@ -87,6 +149,73 @@ final class DomDocumentMethodUserScriptLlvm
             'PHPCompiler\\ext\\dom\\DomSyncElementIdMapJitHelper::syncArgv',
             '/ext/dom/DomSyncElementIdMapJitHelper.php'
         );
+    }
+
+    /**
+     * @param list<\PHPLLVM\Type> $paramTypes
+     */
+    private static function ensureContextBridge(
+        Context $context,
+        string $abi,
+        string $entryBlock,
+        array $paramTypes,
+        \PHPLLVM\Type $returnType,
+        string $helperLogical,
+        string $helperPath
+    ): void {
+        $probe = $context->module->getNamedFunction($abi);
+        if (JitVmHelperLink::hasNamedBridgeEntry($probe, $entryBlock)) {
+            $context->registerFunction($abi, $probe);
+
+            return;
+        }
+
+        self::ensureNestedHelperProxies($context);
+        self::ensureMainModuleHelperCompiled($context, $helperPath, [$helperLogical]);
+
+        $savedBlock = null;
+        try {
+            $savedBlock = $context->builder->getInsertBlock();
+        } catch (\Throwable) {
+        }
+
+        $helperFn = JitVmHelperLink::lookupCompiled($context, $helperLogical, '#18268');
+        $ft = $context->context->functionType($returnType, false, ...$paramTypes);
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction($abi, $ft);
+
+        $entry = JitVmHelperLink::bridgeEntryForEmit($fn, $entryBlock);
+        $context->builder->positionAtEnd($entry);
+        $vmCtx = $context->builder->call(VmActiveContextLlvm::lookupAbi($context));
+        $args = [
+            JitNestedHelperCoerce::coerceArgForHelper(
+                $context,
+                $vmCtx,
+                $helperFn->getParam(0)->typeOf()
+            ),
+        ];
+        for ($i = 0, $n = $fn->countParams(); $i < $n; ++$i) {
+            $args[] = JitNestedHelperCoerce::coerceArgForHelper(
+                $context,
+                $fn->getParam($i),
+                $helperFn->getParam($i + 1)->typeOf()
+            );
+        }
+        $result = $context->builder->call($helperFn, ...$args);
+        if ('void' === $context->getStringFromType($returnType)) {
+            $context->builder->returnVoid();
+        } else {
+            $ret = JitNestedHelperCoerce::coerceBridgeResult($context, $result, $returnType);
+            $context->builder->returnValue($ret);
+        }
+        $context->registerFunction($abi, $fn);
+
+        if (null !== $savedBlock) {
+            $context->builder->positionAtEnd($savedBlock);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
     }
 
     /**
