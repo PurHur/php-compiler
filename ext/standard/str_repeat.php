@@ -31,12 +31,7 @@ final class str_repeat extends Internal
         if (2 !== count($frame->calledArgs)) {
             throw new \LogicException('str_repeat() requires exactly two arguments');
         }
-        $input = VmString::coerceTypedStringBuiltinArg(
-            $frame->calledArgs[0],
-            'str_repeat',
-            0,
-            'string'
-        );
+        $input = VmString::stringBuiltinArgForFrame($frame, 0, 'str_repeat', 0, 'string');
         $times = VmMath::parseIntBuiltinArgForFrame($frame, 1, 'str_repeat', 2, 'times');
         $result = VmString::repeat($input, $times);
         if (null === $frame->returnVar) {
@@ -55,7 +50,7 @@ final class str_repeat extends Internal
 
         return $context->builder->call(
             $context->lookupFunction('__compiler_str_repeat'),
-            JitStringBuiltinArg::lowerTypedString($context, $args[0], 'str_repeat', 0, 'string'),
+            JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'str_repeat', 0, 'string'),
             JitIntdiv::lowerIntBuiltinArg($context, $args[1], 'str_repeat', 2, 'times', true)
         );
     }
