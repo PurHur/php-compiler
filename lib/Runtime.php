@@ -243,6 +243,7 @@ class Runtime {
         $this->load(new ext\session\Module);
         $this->load(new ext\bcmath\Module);
         $this->load(new ext\stats\Module);
+        $this->load(new ext\opcache\Module);
         $this->load(new ext\openssl\Module);
         $this->load(new ext\curl\Module);
         $this->load(new ext\hash\Module);

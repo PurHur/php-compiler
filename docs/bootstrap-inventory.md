@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 4555 |
-| Phase A inventory files (M2 ratio SSOT) | 4555 |
+| PHP files on vm.php path | 4561 |
+| Phase A inventory files (M2 ratio SSOT) | 4561 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 12358 |
+| Source constructs flagged (warnings) | 12386 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -514,6 +514,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/msgpack/VmMsgpack.php` | 0 | 11 |
 | `ext/msgpack/msgpack_pack.php` | 0 | 3 |
 | `ext/msgpack/msgpack_unpack.php` | 0 | 2 |
+| `ext/opcache/Module.php` | 0 | 4 |
+| `ext/opcache/OpcacheFunction.php` | 0 | 1 |
+| `ext/opcache/VmOpcache.php` | 0 | 16 |
+| `ext/opcache/opcache_get_configuration.php` | 0 | 2 |
+| `ext/opcache/opcache_get_status.php` | 0 | 2 |
+| `ext/opcache/opcache_reset.php` | 0 | 2 |
 | `ext/openssl/BuiltinClasses.php` | 0 | 1 |
 | `ext/openssl/JitOpensslCipherIvLength.php` | 0 | 1 |
 | `ext/openssl/JitOpensslCipherKeyLength.php` | 0 | 1 |
@@ -3903,7 +3909,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/ReadonlyFunctionRejector.php` | 0 | 2 |
 | `lib/ReadonlyMethodModifierRejector.php` | 0 | 2 |
 | `lib/ReferenceProfileTokenScan.php` | 0 | 1 |
-| `lib/Runtime.php` | 0 | 80 |
+| `lib/Runtime.php` | 0 | 81 |
 | `lib/RuntimeStrictness.php` | 0 | 1 |
 | `lib/SourceBareThrowRewriter.php` | 0 | 1 |
 | `lib/SourcePreprocessor/PropertyHooks.php` | 0 | 4 |
@@ -7881,6 +7887,57 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new Error (line 58)
 - 2 class method(s)
+
+### `ext/opcache/Module.php`
+
+**Warnings** (review for bootstrap subset):
+- new opcache_get_status (line 19)
+- new opcache_get_configuration (line 20)
+- new opcache_reset (line 21)
+- 1 class method(s)
+
+### `ext/opcache/OpcacheFunction.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s)
+
+### `ext/opcache/VmOpcache.php`
+
+**Warnings** (review for bootstrap subset):
+- new HashTable (line 21)
+- new HashTable (line 31)
+- new HashTable (line 39)
+- new HashTable (line 40)
+- new HashTable (line 45)
+- new HashTable (line 49)
+- new HashTable (line 56)
+- new HashTable (line 67)
+- new HashTable (line 78)
+- new HashTable (line 98)
+- new Variable (line 112)
+- new Variable (line 124)
+- new Variable (line 131)
+- new Variable (line 138)
+- new Variable (line 145)
+- 12 class method(s)
+
+### `ext/opcache/opcache_get_configuration.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 20)
+- 1 class method(s)
+
+### `ext/opcache/opcache_get_status.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/opcache/opcache_reset.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 20)
+- 1 class method(s)
 
 ### `ext/openssl/BuiltinClasses.php`
 
@@ -30253,37 +30310,38 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ext\session\Module (line 243)
 - new ext\bcmath\Module (line 244)
 - new ext\stats\Module (line 245)
-- new ext\openssl\Module (line 246)
-- new ext\curl\Module (line 247)
-- new ext\hash\Module (line 248)
-- new ext\posix\Module (line 249)
-- new ext\inotify\Module (line 250)
-- new ext\pcntl\Module (line 251)
-- new ext\sockets\Module (line 252)
-- new ext\ftp\Module (line 253)
-- new ext\ctype\Module (line 254)
-- new ext\tokenizer\Module (line 255)
-- new ext\random\Module (line 256)
-- new ext\igbinary\Module (line 257)
-- new ext\msgpack\Module (line 258)
-- new ext\zstd\Module (line 259)
-- new ext\lzf\Module (line 260)
-- new ext\bz2\Module (line 261)
-- new ext\brotli\Module (line 262)
-- new ext\sodium\Module (line 263)
-- new ext\sqlite3\Module (line 264)
-- new ext\uri\Module (line 265)
-- new ext\standard\Module (line 266)
-- new JIT (line 342)
-- new JITContext (line 356)
-- new SealedClassPreprocessor (line 421)
-- new StaticClassPreprocessor (line 424)
-- new SourcePreprocessor\PropertyHooks (line 427)
-- new State (line 567)
-- new ReflectionProperty (line 594)
-- new ReflectionProperty (line 597)
-- new LintCompiler (line 1003)
-- new Variable (line 1133)
+- new ext\opcache\Module (line 246)
+- new ext\openssl\Module (line 247)
+- new ext\curl\Module (line 248)
+- new ext\hash\Module (line 249)
+- new ext\posix\Module (line 250)
+- new ext\inotify\Module (line 251)
+- new ext\pcntl\Module (line 252)
+- new ext\sockets\Module (line 253)
+- new ext\ftp\Module (line 254)
+- new ext\ctype\Module (line 255)
+- new ext\tokenizer\Module (line 256)
+- new ext\random\Module (line 257)
+- new ext\igbinary\Module (line 258)
+- new ext\msgpack\Module (line 259)
+- new ext\zstd\Module (line 260)
+- new ext\lzf\Module (line 261)
+- new ext\bz2\Module (line 262)
+- new ext\brotli\Module (line 263)
+- new ext\sodium\Module (line 264)
+- new ext\sqlite3\Module (line 265)
+- new ext\uri\Module (line 266)
+- new ext\standard\Module (line 267)
+- new JIT (line 343)
+- new JITContext (line 357)
+- new SealedClassPreprocessor (line 422)
+- new StaticClassPreprocessor (line 425)
+- new SourcePreprocessor\PropertyHooks (line 428)
+- new State (line 568)
+- new ReflectionProperty (line 595)
+- new ReflectionProperty (line 598)
+- new LintCompiler (line 1004)
+- new Variable (line 1134)
 - 53 class method(s)
 
 ### `lib/RuntimeStrictness.php`

@@ -528,6 +528,12 @@
         "ext/msgpack/VmMsgpack.php",
         "ext/msgpack/msgpack_pack.php",
         "ext/msgpack/msgpack_unpack.php",
+        "ext/opcache/Module.php",
+        "ext/opcache/OpcacheFunction.php",
+        "ext/opcache/VmOpcache.php",
+        "ext/opcache/opcache_get_configuration.php",
+        "ext/opcache/opcache_get_status.php",
+        "ext/opcache/opcache_reset.php",
         "ext/openssl/BuiltinClasses.php",
         "ext/openssl/JitOpensslCipherIvLength.php",
         "ext/openssl/JitOpensslCipherKeyLength.php",
@@ -4789,9 +4795,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 4555,
+        "inventory_files": 4561,
         "excluded": 0,
-        "eligible": 4555,
+        "eligible": 4561,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1

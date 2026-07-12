@@ -25,6 +25,7 @@ function collectCapabilities(string $root): array
         'bcmath' => new PHPCompiler\ext\bcmath\Module(),
         'bz2' => new PHPCompiler\ext\bz2\Module(),
         'stats' => new PHPCompiler\ext\stats\Module(),
+        'opcache' => new PHPCompiler\ext\opcache\Module(),
         'ctype' => new PHPCompiler\ext\ctype\Module(),
         'tokenizer' => new PHPCompiler\ext\tokenizer\Module(),
         'filter' => new PHPCompiler\ext\filter\Module(),
