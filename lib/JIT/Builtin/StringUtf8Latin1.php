@@ -37,13 +37,22 @@ final class StringUtf8Latin1
 
     public static function ensureLinked(Context $context): void
     {
-        $resume = $context->builder->getInsertBlock();
+        $resume = null;
+        try {
+            $resume = $context->builder->getInsertBlock();
+        } catch (\Throwable) {
+        }
         self::implement($context);
         if (null !== $resume) {
             $context->builder->positionAtEnd($resume);
         } else {
             $context->builder->clearInsertionPosition();
         }
+    }
+
+    public static function ensureStandaloneBodies(Context $context): void
+    {
+        self::ensureLinked($context);
     }
 
     public static function implement(Context $context): void

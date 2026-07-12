@@ -954,6 +954,7 @@ class Context {
         Builtin\ProgressNoteRuntime::ensureStandaloneBodies($this);
         Builtin\GcCollectCyclesRuntime::ensureStandaloneBodies($this);
         Builtin\LastErrorRuntime::ensureStandaloneBodies($this);
+        Builtin\StringUtf8Latin1::ensureStandaloneBodies($this);
         Builtin\RewriteVarsRuntime::ensureStandaloneBodies($this);
         Builtin\DefineRuntime::ensureStandaloneBodies($this);
         Builtin\StringStrContains::ensureStandaloneBodies($this);
@@ -1045,6 +1046,7 @@ class Context {
             Builtin\GcCollectCyclesRuntime::ensureStandaloneBodies($this);
             Builtin\ProgressNoteRuntime::ensureStandaloneBodies($this);
             Builtin\LastErrorRuntime::ensureStandaloneBodies($this);
+            Builtin\StringUtf8Latin1::ensureStandaloneBodies($this);
             Builtin\RewriteVarsRuntime::ensureStandaloneBodies($this);
             Builtin\DefineRuntime::ensureStandaloneBodies($this);
             Builtin\SuperglobalRefreshRuntime::ensureStandaloneBodies($this);
