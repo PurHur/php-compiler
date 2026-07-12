@@ -62,6 +62,11 @@ final class VmLibxml
         return $previous;
     }
 
+    public static function usingInternalErrors(): bool
+    {
+        return self::$useInternalErrors;
+    }
+
     /** php-src ext/libxml/libxml.c — libxml_set_streams_context() global IO context (#14495). */
     public static function setStreamsContext(Variable $context): void
     {
