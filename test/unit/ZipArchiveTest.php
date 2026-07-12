@@ -24,6 +24,8 @@ final class ZipArchiveTest extends TestCase
         self::assertTrue(VmReflection::methodExistsOnClass($ctx->classes['ziparchive'], 'open'));
         self::assertTrue(VmReflection::methodExistsOnClass($ctx->classes['ziparchive'], 'close'));
         self::assertTrue(VmReflection::methodExistsOnClass($ctx->classes['ziparchive'], 'addfile'));
+        self::assertTrue(VmReflection::methodExistsOnClass($ctx->classes['ziparchive'], 'addfromstring'));
+        self::assertTrue(VmReflection::methodExistsOnClass($ctx->classes['ziparchive'], 'getfromname'));
         self::assertTrue(VmReflection::methodExistsOnClass($ctx->classes['ziparchive'], 'extractto'));
         self::assertTrue(VmReflection::methodExistsOnClass($ctx->classes['ziparchive'], 'getstatusstring'));
 
