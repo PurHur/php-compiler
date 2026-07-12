@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 4594 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 12438 |
+| Source constructs flagged (warnings) | 12439 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -3908,7 +3908,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/UsortCallbackPolicy.php` | 0 | 1 |
 | `lib/JIT/ValueEchoHelper.php` | 0 | 1 |
 | `lib/JIT/VarFetchHelper.php` | 0 | 1 |
-| `lib/JIT/Variable.php` | 0 | 26 |
+| `lib/JIT/Variable.php` | 0 | 27 |
 | `lib/JIT/VariableFunctionCallHelper.php` | 0 | 1 |
 | `lib/JIT/VariableFunctionCallRuntime.php` | 0 | 3 |
 | `lib/JIT/VariableTypeMapNative.php` | 0 | 2 |
@@ -16954,10 +16954,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmPassword.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 306)
-- new Variable (line 308)
-- new HashTable (line 319)
-- new Variable (line 321)
+- new HashTable (line 309)
+- new Variable (line 311)
+- new HashTable (line 322)
+- new Variable (line 324)
 - 17 class method(s)
 
 ### `ext/standard/VmPasswordNative.php`
@@ -23435,15 +23435,15 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/zip/Module.php`
 
 **Warnings** (review for bootstrap subset):
-- new zip_open (line 35)
-- new zip_close (line 36)
-- new zip_read (line 37)
-- new zip_entry_open (line 38)
-- new zip_entry_close (line 39)
-- new zip_entry_read (line 40)
-- new zip_entry_name (line 41)
-- new zip_entry_filesize (line 42)
-- 3 class method(s)
+- new zip_open (line 49)
+- new zip_close (line 50)
+- new zip_read (line 51)
+- new zip_entry_open (line 52)
+- new zip_entry_close (line 53)
+- new zip_entry_read (line 54)
+- new zip_entry_name (line 55)
+- new zip_entry_filesize (line 56)
+- 4 class method(s)
 
 ### `ext/zip/VmZipArchive.php`
 
@@ -24791,7 +24791,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/CompilerVersion.php`
 
 **Warnings** (review for bootstrap subset):
-- 185 class method(s)
+- 186 class method(s)
 
 ### `lib/CurlyBraceOffsetRejector.php`
 
@@ -26662,7 +26662,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/PregMatchRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 509)
+- new JIT (line 514)
 - 15 class method(s)
 - 2 closure(s)
 
@@ -30239,27 +30239,28 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 421)
 - new Variable (line 443)
 - new Variable (line 498)
-- new Variable (line 536)
-- new Variable (line 579)
-- new Variable (line 593)
-- new Variable (line 613)
-- new self (line 631)
-- new self (line 642)
-- new self (line 651)
-- new self (line 664)
-- new self (line 671)
-- new self (line 678)
-- new self (line 691)
-- new self (line 701)
-- new Variable (line 837)
-- new Variable (line 846)
-- new Variable (line 876)
-- new Variable (line 922)
-- new Variable (line 944)
-- new Variable (line 958)
-- new Variable (line 1002)
-- new Variable (line 1020)
-- new Variable (line 1042)
+- new Variable (line 521)
+- new Variable (line 551)
+- new Variable (line 594)
+- new Variable (line 608)
+- new Variable (line 628)
+- new self (line 646)
+- new self (line 657)
+- new self (line 666)
+- new self (line 679)
+- new self (line 686)
+- new self (line 693)
+- new self (line 706)
+- new self (line 716)
+- new Variable (line 852)
+- new Variable (line 861)
+- new Variable (line 891)
+- new Variable (line 937)
+- new Variable (line 959)
+- new Variable (line 973)
+- new Variable (line 1017)
+- new Variable (line 1035)
+- new Variable (line 1057)
 - 20 class method(s)
 
 ### `lib/JIT/VariableFunctionCallHelper.php`
@@ -30557,8 +30558,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new State (line 570)
 - new ReflectionProperty (line 597)
 - new ReflectionProperty (line 600)
-- new LintCompiler (line 1006)
-- new Variable (line 1136)
+- new LintCompiler (line 1014)
+- new Variable (line 1144)
 - 53 class method(s)
 
 ### `lib/RuntimeStrictness.php`
