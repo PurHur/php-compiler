@@ -7107,6 +7107,62 @@ PHP;
         self::assertSame("x:text\n", ob_get_clean());
     }
 
+    /** Issue #18410 — documentElement->appendChild(createElement) must not feed receiver fetch into inner arg. */
+    public function testDomDocumentElementAppendChildCreateElementUsesDistinctArgSlots(): void
+    {
+        $code = <<<'PHP'
+<?php
+declare(strict_types=1);
+$doc = new DOMDocument();
+$doc->loadXML('<root><a/><b/></root>');
+$list = $doc->getElementsByTagName('a');
+echo 'before=', $list->length, "\n";
+$doc->documentElement->appendChild($doc->createElement('a'));
+echo 'after=', $list->length, "\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'dom_nodelist_live_append_create_element.php');
+
+        $createElementArgSendSlot = null;
+        $documentElementFetchSlot = null;
+        $opCodes = $block->opCodes;
+        $total = \count($opCodes);
+        for ($i = 0; $i < $total; ++$i) {
+            $op = $opCodes[$i];
+            if (OpCode::TYPE_METHODCALL_INIT !== $op->type
+                || null === $op->arg2
+                || !isset($block->constants[$op->arg2])
+                || 'createElement' !== $block->constants[$op->arg2]->toString()) {
+                continue;
+            }
+            for ($j = $i - 1; $j >= 0; --$j) {
+                if (OpCode::TYPE_PROPERTY_FETCH === $opCodes[$j]->type) {
+                    $documentElementFetchSlot = $opCodes[$j]->arg1;
+                    break;
+                }
+            }
+            for ($j = $i + 1; $j < $total; ++$j) {
+                if (OpCode::TYPE_ARG_SEND === $opCodes[$j]->type) {
+                    $createElementArgSendSlot = $opCodes[$j]->arg1;
+                    break;
+                }
+            }
+            break;
+        }
+
+        self::assertNotNull($documentElementFetchSlot, 'missing documentElement fetch slot');
+        self::assertNotNull($createElementArgSendSlot, 'missing createElement ARG_SEND');
+        self::assertNotSame(
+            $documentElementFetchSlot,
+            $createElementArgSendSlot,
+            'createElement tag arg must not alias documentElement fetch slot'
+        );
+
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("before=1\nafter=2\n", ob_get_clean());
+    }
+
     /** Issue #15996 — DateTime literal ctor arg must not alias prior inline NEW slot. */
     public function testDateTimeNewLiteralArgDistinctFromPriorNewResultSlot(): void
     {
