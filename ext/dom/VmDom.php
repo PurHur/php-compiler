@@ -2094,7 +2094,8 @@ final class VmDom
                 $validationError['message'],
                 $validationError['code'],
                 $validationError['column'],
-                $frame
+                $frame,
+                $validationError['level']
             );
 
             return false;
@@ -2351,10 +2352,11 @@ final class VmDom
         string $message,
         int $code,
         int $column,
-        ?\PHPCompiler\Frame $frame
+        ?\PHPCompiler\Frame $frame,
+        int $level = LibxmlConstants::LIBXML_ERR_ERROR
     ): void {
         VmLibxml::handleError($ctx, [
-            'level' => LibxmlConstants::LIBXML_ERR_ERROR,
+            'level' => $level,
             'code' => $code,
             'column' => $column,
             'message' => $message,
