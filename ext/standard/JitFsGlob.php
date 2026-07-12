@@ -66,7 +66,6 @@ final class JitFsGlob
         $context->builder->branchIf($failed, $failBlock, $okBlock);
 
         $context->builder->positionAtEnd($failBlock);
-        self::emitScandirFailureWarnings($context, $argStr, $id);
         $falseSlot = JitValueBox::alloc($context);
         $falsePtr = JitValueBox::pointer($context, $falseSlot);
         JitValueBox::writeBool($context, $falseSlot, $context->getTypeFromString('int1')->constInt(0, false));
@@ -87,14 +86,5 @@ final class JitFsGlob
         $result->addIncoming($okPtr, $okTail);
 
         return $result;
-    }
-
-    private static function emitScandirFailureWarnings(Context $context, Value $pathStr, string $id): void
-    {
-        if ('scandir' !== $id) {
-            return;
-        }
-        JitBuiltinWarning::emitPathOpenFailed($context, $pathStr, 'scandir');
-        JitBuiltinWarning::emit($context, 'scandir(): (errno 2): No such file or directory');
     }
 }
