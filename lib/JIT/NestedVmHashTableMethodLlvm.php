@@ -16,6 +16,9 @@ final class NestedVmHashTableMethodLlvm
 {
     /** @var array<string, class-string<Call>> */
     private const METHOD_HANDLERS = [
+        'add' => Call\HashTableAdd::class,
+        'append' => Call\HashTableAppend::class,
+        'updateindex' => Call\HashTableUpdateIndex::class,
         'getnumelements' => Call\HashTableGetNumElements::class,
         'padcopy' => Call\HashTablePadCopy::class,
         'valuescopy' => Call\HashTableValuesCopy::class,
