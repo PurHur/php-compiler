@@ -236,6 +236,72 @@ final class GeneratorIteratorJitHelper
         return self::boxCurrentOrNull($context, $statePtr);
     }
 
+    /**
+     * Generator::send() resume — auto-continue past bare-yield receive on first send (#18108).
+     */
+    public static function resumeSendAndBoxYield(Context $context, Variable $genVar): Value
+    {
+        $statePtr = self::loadStateFromGeneratorObject($context, $genVar);
+        $map = $context->structFieldMap['__generator_state__'];
+        $valueMap = $context->structFieldMap['__value__'];
+        $i1 = $context->getTypeFromString('int1');
+        $i8 = $context->getTypeFromString('int8');
+        $sizeT = $context->getTypeFromString('size_t');
+        $zero = $sizeT->constInt(0, false);
+        $typeNull = $i8->constInt(Variable::TYPE_NULL, false);
+        $resumeIp = $context->builder->load($context->builder->structGep($statePtr, $map['resume_ip']));
+        $hasCurrent = $context->builder->load($context->builder->structGep($statePtr, $map['has_current']));
+        $done = $context->builder->load($context->builder->structGep($statePtr, $map['done']));
+        $hasReturned = $context->builder->load($context->builder->structGep($statePtr, $map['has_returned']));
+        $wasUnstarted = $context->builder->and(
+            $context->builder->icmp(Builder::INT_EQ, $resumeIp, $zero),
+            $context->builder->and(
+                $context->builder->icmp(Builder::INT_EQ, $hasCurrent, $i1->constInt(0, false)),
+                $context->builder->and(
+                    $context->builder->icmp(Builder::INT_EQ, $done, $i1->constInt(0, false)),
+                    $context->builder->icmp(Builder::INT_EQ, $hasReturned, $i1->constInt(0, false))
+                )
+            )
+        );
+
+        $resumeLc = self::resolveResumeLc($context, $genVar);
+        self::runSingleResume($context, $resumeLc, $statePtr);
+
+        $hasPendingSend = $context->builder->load($context->builder->structGep($statePtr, $map['has_pending_send']));
+        $hasCurrentAfter = $context->builder->load($context->builder->structGep($statePtr, $map['has_current']));
+        $doneAfter = $context->builder->load($context->builder->structGep($statePtr, $map['done']));
+        $currentType = $context->builder->load(
+            $context->builder->structGep(
+                $context->builder->structGep($statePtr, $map['current_value']),
+                $valueMap['type']
+            )
+        );
+        $needsAutoContinue = $context->builder->and(
+            $wasUnstarted,
+            $context->builder->and(
+                $context->builder->icmp(Builder::INT_NE, $hasPendingSend, $i1->constInt(0, false)),
+                $context->builder->and(
+                    $context->builder->icmp(Builder::INT_NE, $hasCurrentAfter, $i1->constInt(0, false)),
+                    $context->builder->and(
+                        $context->builder->icmp(Builder::INT_EQ, $doneAfter, $i1->constInt(0, false)),
+                        $context->builder->icmp(Builder::INT_EQ, $currentType, $typeNull)
+                    )
+                )
+            )
+        );
+
+        $fn = $context->builder->getInsertBlock()->getParent();
+        $continueBb = $fn->appendBasicBlock('gen_send_auto_continue');
+        $skipBb = $fn->appendBasicBlock('gen_send_auto_skip');
+        $context->builder->branchIf($needsAutoContinue, $continueBb, $skipBb);
+        $context->builder->positionAtEnd($continueBb);
+        self::runSingleResume($context, $resumeLc, $statePtr);
+        $context->builder->branch($skipBb);
+        $context->builder->positionAtEnd($skipBb);
+
+        return self::boxCurrentOrNull($context, $statePtr);
+    }
+
     public static function ensureStarted(Context $context, Variable $genVar): void
     {
         $statePtr = self::loadStateFromGeneratorObject($context, $genVar);

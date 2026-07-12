@@ -12303,12 +12303,25 @@ restart:
         if ($gen->done) {
             return false;
         }
+        $sendStartsGenerator = null !== $sendValue && !$gen->started;
         if (null !== $sendValue) {
             $gen->pendingSend->copyFrom($sendValue);
             $gen->hasPendingSend = true;
         }
 
-        return $this->advanceGeneratorIteration($gen);
+        $active = $this->advanceGeneratorIteration($gen);
+        // Zend: first send() on unstarted generator runs through bare-yield receive (#18108).
+        if (
+            $sendStartsGenerator
+            && $active
+            && $gen->hasPendingSend
+            && null !== $gen->yieldResultSlot
+            && Variable::TYPE_NULL === $gen->currentValue->type
+        ) {
+            $active = $this->advanceGeneratorIteration($gen);
+        }
+
+        return $active;
     }
 
     /** Generator::throw() — inject Throwable at yield suspension (Zend zend_generators.c). */
