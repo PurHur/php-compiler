@@ -29,7 +29,7 @@ final class GeneratorThrow extends VmClassMethod
         }
         if ($active && $gen->hasCurrent) {
             $staging = new Variable();
-            $staging->duplicateFrom($gen->currentValue);
+            $staging->duplicateFrom($gen->currentSnapshot);
             $frame->returnVar->copyFrom($staging);
         } else {
             $frame->returnVar->null();

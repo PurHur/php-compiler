@@ -81,7 +81,9 @@ final class GeneratorState
         public readonly array $calledArgs,
     ) {
         $this->currentKey = new Variable();
+        $this->currentKey->generatorYieldStorage = true;
         $this->currentValue = new Variable();
+        $this->currentValue->generatorYieldStorage = true;
         $this->currentSnapshot = new Variable();
         $this->yieldFromContainer = new Variable();
         $this->returnValue = new Variable();

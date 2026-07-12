@@ -28755,16 +28755,54 @@ class Compiler {
         ) {
             return null;
         }
-        // Only pair INIT→EXEC for this cfg producer — never the first same-named call in the block (#18183).
-        $operandSlot = $block->slotForOperand($producer->result);
-        if (null === $operandSlot) {
+        $methodName = $this->staticNameFromOperand($producer->name);
+        if (null === $methodName) {
             return null;
         }
-        $ops = array_merge($block->opCodes, $pendingOps);
-        foreach ($ops as $op) {
-            if (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type && (int) $op->arg1 === $operandSlot) {
-                return (string) $operandSlot;
+        $initType = $producer instanceof Op\Expr\StaticCall
+            ? OpCode::TYPE_STATICCALL_INIT
+            : OpCode::TYPE_METHODCALL_INIT;
+        $needle = strtolower($methodName);
+        // Pair each cfg MethodCall producer with its own EXEC_RETURN — dead operand slots
+        // reuse across repeated same-named calls (#18183, #18184).
+        $producerOrdinal = 0;
+        if (null !== $block->orig) {
+            foreach ($block->orig->children as $child) {
+                if ($child === $producer) {
+                    break;
+                }
+                if ($child instanceof Op\Expr\MethodCall || $child instanceof Op\Expr\StaticCall) {
+                    $priorName = $this->staticNameFromOperand($child->name);
+                    if (null !== $priorName && $needle === strtolower($priorName)) {
+                        ++$producerOrdinal;
+                    }
+                }
             }
+        }
+        $ops = array_merge($block->opCodes, $pendingOps);
+        $seenInit = 0;
+        foreach ($ops as $i => $op) {
+            if ($initType !== $op->type || null === $op->arg2) {
+                continue;
+            }
+            $name = $this->resolveCompileTimeStringSlot((int) $op->arg2, $block);
+            if ($needle !== strtolower($name ?? '')) {
+                continue;
+            }
+            if ($seenInit !== $producerOrdinal) {
+                ++$seenInit;
+                continue;
+            }
+            for ($j = $i + 1, $n = \count($ops); $j < $n; ++$j) {
+                $scan = $ops[$j];
+                if (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $scan->type && null !== $scan->arg1) {
+                    return (string) $scan->arg1;
+                }
+                if (OpCode::TYPE_FUNCCALL_INIT === $scan->type) {
+                    break;
+                }
+            }
+            ++$seenInit;
         }
 
         return null;

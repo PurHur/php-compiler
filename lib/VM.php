@@ -5834,7 +5834,10 @@ restart:
                             return self::FIBER_SUSPEND;
                         }
                         $frame->call = null;
-                        $this->clearOutgoingCallState($frame);
+                        $keepReturnSlot = OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type
+                            ? (int) $op->arg1
+                            : null;
+                        $this->clearOutgoingCallState($frame, $keepReturnSlot);
                         $this->restorePendingOutboundCallAfterInlineNew($frame);
                         if (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
                             $this->releaseVmStatementDeadTemps($frame, (int) $op->arg1);
@@ -16681,7 +16684,13 @@ restart:
         if ($this->variableAliasesObjectPropertyCell($frame->scope[$slot])) {
             return;
         }
+        if ($this->variableIsGeneratorYieldStorage($frame->scope[$slot])) {
+            return;
+        }
         $var = $frame->scope[$slot]->resolveIndirect();
+        if ($var->generatorYieldStorage) {
+            return;
+        }
         if (Variable::TYPE_OBJECT === $var->type) {
             try {
                 $objectId = $var->toObject()->id;
@@ -16758,18 +16767,28 @@ restart:
         return null !== $resolved->objectPropertyOwner;
     }
 
+    /** Generator yield key/value cells must survive fcall temp release (#18184). */
+    private function variableIsGeneratorYieldStorage(Variable $var): bool
+    {
+        if ($var->generatorYieldStorage) {
+            return true;
+        }
+
+        return $var->resolveIndirect()->generatorYieldStorage;
+    }
+
     /**
      * Zend fcall end — drop by-value send snapshots and dead inline call-arg temps (#11602).
      */
-    private function clearOutgoingCallState(Frame $frame): void
+    private function clearOutgoingCallState(Frame $frame, ?int $keepReturnSlot = null): void
     {
-        $this->releaseOutgoingCallArgTemps($frame);
+        $this->releaseOutgoingCallArgTemps($frame, $keepReturnSlot);
         $frame->callArgs = [];
         $frame->callArgEntries = [];
         $frame->builtinCalleeQualifiedMethod = null;
     }
 
-    private function releaseOutgoingCallArgTemps(Frame $frame): void
+    private function releaseOutgoingCallArgTemps(Frame $frame, ?int $keepReturnSlot = null): void
     {
         foreach ($frame->callArgEntries as $entry) {
             if ('u' === $entry[0]) {
@@ -16782,10 +16801,13 @@ restart:
                 ObjectLifetime::releaseDirectObject($entry[1]);
                 $slot = $entry[2] ?? null;
             }
-            if (!is_int($slot) || $frame->block->isNamedVariableSlot($slot)) {
+            if (!is_int($slot) || $slot === $keepReturnSlot || $frame->block->isNamedVariableSlot($slot)) {
                 continue;
             }
             if (isset($frame->scope[$slot]) && $this->variableAliasesObjectPropertyCell($frame->scope[$slot])) {
+                continue;
+            }
+            if (isset($frame->scope[$slot]) && $this->variableIsGeneratorYieldStorage($frame->scope[$slot])) {
                 continue;
             }
             // Unhandled match arms re-read the scrutinee on JUMPIF targets after the probe call (#13955).
