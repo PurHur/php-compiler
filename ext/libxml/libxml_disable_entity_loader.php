@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\libxml;
 
+use PHPCompiler\ext\standard\VmEngineBuiltinDeprecation;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\Variable;
 
@@ -23,6 +24,7 @@ final class libxml_disable_entity_loader extends LibxmlFunction
                 'libxml_disable_entity_loader() expects at most 1 argument, '.$argc.' given'
             );
         }
+        VmEngineBuiltinDeprecation::emitFunction($frame, 'libxml_disable_entity_loader');
         $disable = true;
         if (1 === $argc) {
             $arg = $frame->calledArgs[0]->resolveIndirect();
