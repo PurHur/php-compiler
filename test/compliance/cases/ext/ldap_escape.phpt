@@ -18,7 +18,7 @@ try {
 }
 ?>
 --EXPECT--
-no
+yes
 ext_no
 string(9) "\28a=b\29"
 string(24) "cn\3dadmin\2cou\3dpeople"

@@ -7,8 +7,8 @@ if (extension_loaded('ldap')) {
     exit(1);
 }
 
-if (function_exists('ldap_escape')) {
-    fwrite(STDERR, "FAIL: function_exists('ldap_escape') must be false without ext/ldap\n");
+if (!function_exists('ldap_escape')) {
+    fwrite(STDERR, "FAIL: function_exists('ldap_escape') must be true when ldap_escape builtin ships (#18173)\n");
     exit(1);
 }
 
