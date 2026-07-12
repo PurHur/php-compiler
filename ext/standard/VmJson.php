@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\ext\dom\VmDom;
 use PHPCompiler\CompilerVersion;
 use PHPCompiler\Frame;
 use PHPCompiler\MethodVisibility;
@@ -322,6 +323,11 @@ final class VmJson
                     }
                     if (DatePeriodSupport::CLASS_DATEPERIOD === $lcClass) {
                         return DatePeriodSupport::exportZendJsonWireDatePeriod($object);
+                    }
+                    if (VmDom::CLASS_DOCUMENT === $lcClass) {
+                        // Zend ext/dom/php_dom.c + ext/json/php_json.c — public DOM props are
+                        // uninitialized in php-src; naive export hits ownerDocument cycles (#18292).
+                        return new \stdClass();
                     }
                     if (EnumCaseSupport::isEnumCase($object)) {
                         $backing = new Variable();
