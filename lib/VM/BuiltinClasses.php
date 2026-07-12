@@ -211,6 +211,7 @@ use PHPCompiler\VM\Builtin\ReflectionFunctionGetExtensionName;
 use PHPCompiler\VM\Builtin\ReflectionFunctionGetName;
 use PHPCompiler\VM\Builtin\ReflectionFunctionGetNamedArguments;
 use PHPCompiler\VM\Builtin\ReflectionFunctionGetNumberOfParameters;
+use PHPCompiler\VM\Builtin\ReflectionFunctionGetNumberOfRequiredParameters;
 use PHPCompiler\VM\Builtin\ReflectionFunctionGetParameters;
 use PHPCompiler\VM\Builtin\ReflectionFunctionGetReturnType;
 use PHPCompiler\VM\Builtin\ReflectionFunctionGetStaticVariables;
@@ -232,6 +233,7 @@ use PHPCompiler\VM\Builtin\ReflectionMethodGetClosureUsedVariables;
 use PHPCompiler\VM\Builtin\ReflectionMethodGetClosureThis;
 use PHPCompiler\VM\Builtin\ReflectionMethodGetName;
 use PHPCompiler\VM\Builtin\ReflectionMethodGetNumberOfParameters;
+use PHPCompiler\VM\Builtin\ReflectionMethodGetNumberOfRequiredParameters;
 use PHPCompiler\VM\Builtin\ReflectionMethodGetParameters;
 use PHPCompiler\VM\Builtin\ReflectionMethodGetPrototype;
 use PHPCompiler\VM\Builtin\ReflectionMethodHasPrototype;
@@ -632,6 +634,8 @@ final class BuiltinClasses
         $rm->methodVisibility['getstaticvariables'] = $pub;
         $rm->methods['getnumberofparameters'] = new ReflectionMethodGetNumberOfParameters();
         $rm->methodVisibility['getnumberofparameters'] = $pub;
+        $rm->methods['getnumberofrequiredparameters'] = new ReflectionMethodGetNumberOfRequiredParameters();
+        $rm->methodVisibility['getnumberofrequiredparameters'] = $pub;
         $rm->methods['getname'] = new ReflectionMethodGetName();
         $rm->methodVisibility['getname'] = $pub;
         $rm->methods['getdeclaringclass'] = new ReflectionMethodGetDeclaringClass();
@@ -963,6 +967,7 @@ final class BuiltinClasses
                 'getname' => new ReflectionFunctionGetName(),
                 'getparameters' => new ReflectionFunctionGetParameters(),
                 'getnumberofparameters' => new ReflectionFunctionGetNumberOfParameters(),
+                'getnumberofrequiredparameters' => new ReflectionFunctionGetNumberOfRequiredParameters(),
                 'getreturntype' => new ReflectionFunctionGetReturnType(),
                 'hasreturntype' => new ReflectionFunctionHasReturnType(),
                 'isanonymous' => new ReflectionFunctionIsAnonymous(),

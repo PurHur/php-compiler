@@ -489,6 +489,43 @@ final class BuiltinParamNames
         return $names;
     }
 
+    public static function paramCountForInternalMethod(string $class, string $method): ?int
+    {
+        return BuiltinInternalArgInfo::paramCountForClassMethod($class, $method);
+    }
+
+    public static function requiredParamCountForInternalFunction(string $name): ?int
+    {
+        $names = self::forFunction($name);
+        if (null !== $names) {
+            return self::requiredParamCountFromNames(array_keys($names));
+        }
+
+        return BuiltinInternalArgInfo::requiredParamCountForFunction($name);
+    }
+
+    public static function requiredParamCountForInternalMethod(string $class, string $method): ?int
+    {
+        return BuiltinInternalArgInfo::requiredParamCountForClassMethod($class, $method);
+    }
+
+    /**
+     * @param list<int|string> $names
+     */
+    private static function requiredParamCountFromNames(array $names): int
+    {
+        $required = 0;
+        foreach ($names as $name) {
+            $label = (string) $name;
+            if (str_ends_with($label, '=') || str_starts_with($label, '...')) {
+                break;
+            }
+            ++$required;
+        }
+
+        return $required;
+    }
+
     /**
      * Variadic parameter index for builtins that accept ...$args (issue #10637).
      */
