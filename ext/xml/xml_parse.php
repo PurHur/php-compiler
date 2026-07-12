@@ -44,7 +44,8 @@ final class xml_parse extends Internal
             $parser->id,
             $data,
             $isFinal,
-            $frame
+            $frame,
+            $parser
         );
         $frame->returnVar->int($status);
     }

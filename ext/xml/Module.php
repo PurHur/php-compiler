@@ -41,6 +41,18 @@ class Module extends ModuleAbstract
             new xml_get_current_column_number(),
             new xml_get_current_byte_index(),
             new xml_parse_into_struct(),
+            new xml_set_element_handler(),
+            new xml_set_character_data_handler(),
+            new xml_set_default_handler(),
+            new xml_set_processing_instruction_handler(),
+            new xml_set_unparsed_entity_decl_handler(),
+            new xml_set_notation_decl_handler(),
+            new xml_set_external_entity_ref_handler(),
+            new xml_set_start_namespace_decl_handler(),
+            new xml_set_end_namespace_decl_handler(),
+            new xml_set_object(),
+            new xml_parser_set_option(),
+            new xml_parser_get_option(),
         ];
     }
 }
