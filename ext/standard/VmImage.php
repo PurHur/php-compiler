@@ -156,11 +156,12 @@ final class VmImage
     }
 
     /**
-     * php-src php_getimagesize_from_any() — E_NOTICE only for data: URIs, not regular files (#16434).
+     * php-src php_getimagesize_from_any() — E_NOTICE for data:/php:// wrappers, not regular files (#16434, #18405).
      */
     public static function shouldEmitImageReadNoticeForPath(string $filename): bool
     {
-        return VmDataUri::isDataUri($filename);
+        return VmDataUri::isDataUri($filename)
+            || VmFsPhpWrapper::isPhpWrapperPath($filename);
     }
 
     /**
@@ -198,6 +199,9 @@ final class VmImage
     {
         if (VmDataUri::isDataUri($filename)) {
             return false !== VmDataUri::decode($filename);
+        }
+        if (VmFsPhpWrapper::isPhpWrapperPath($filename)) {
+            return false !== VmFs::fileGetContents($filename);
         }
 
         return is_file($filename) && is_readable($filename);
