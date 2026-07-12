@@ -8,7 +8,6 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\InternalStrictArg;
 use PHPLLVM\Value;
 
 /**
@@ -30,9 +29,8 @@ final class sscanf extends Internal
                 $argc
             ));
         }
-        InternalStrictArg::rejectNullString($frame->calledArgs[0], 'sscanf', 'string', 0, $frame);
-        $input = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'sscanf', 0, 'string');
-        $format = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'sscanf', 1, 'format');
+        $input = VmString::stringBuiltinArgForFrame($frame, 0, 'sscanf', 0, 'string');
+        $format = VmString::stringBuiltinArgForFrame($frame, 1, 'sscanf', 1, 'format');
         $outVars = [];
         for ($i = 2; $i < $argc; ++$i) {
             $outVars[] = $frame->calledArgs[$i];
