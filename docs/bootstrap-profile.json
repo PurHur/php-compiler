@@ -3564,7 +3564,6 @@
         "lib/JIT/Builtin/StreamSync.php",
         "lib/JIT/Builtin/StreamSyncJit.php",
         "lib/JIT/Builtin/StringAddslashes.php",
-        "lib/JIT/Builtin/StringAddslashesLlvm.php",
         "lib/JIT/Builtin/StringBase64Decode.php",
         "lib/JIT/Builtin/StringBase64DecodeLlvm.php",
         "lib/JIT/Builtin/StringBase64Encode.php",
@@ -4926,9 +4925,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 4692,
+        "inventory_files": 4691,
         "excluded": 0,
-        "eligible": 4692,
+        "eligible": 4691,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
