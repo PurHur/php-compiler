@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 4561 |
-| Phase A inventory files (M2 ratio SSOT) | 4561 |
+| PHP files on vm.php path | 4578 |
+| Phase A inventory files (M2 ratio SSOT) | 4578 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 12386 |
+| Source constructs flagged (warnings) | 12420 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -2828,6 +2828,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/uri/UriClassMethods.php` | 0 | 4 |
 | `ext/uri/UriExtensionPolicy.php` | 0 | 1 |
 | `ext/uri/VmUri.php` | 0 | 5 |
+| `ext/uuid/Module.php` | 0 | 4 |
+| `ext/uuid/UuidConstants.php` | 0 | 1 |
+| `ext/uuid/UuidFunction.php` | 0 | 1 |
+| `ext/uuid/VmUuid.php` | 0 | 1 |
+| `ext/uuid/uuid_create.php` | 0 | 2 |
+| `ext/uuid/uuid_generate.php` | 0 | 3 |
 | `ext/xml/BuiltinClasses.php` | 0 | 1 |
 | `ext/xml/Module.php` | 0 | 10 |
 | `ext/xml/VmXml.php` | 0 | 1 |
@@ -2868,8 +2874,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/xmlwriter/XmlWriterStartElement.php` | 0 | 3 |
 | `ext/xmlwriter/XmlWriterText.php` | 0 | 3 |
 | `ext/zip/BuiltinClasses.php` | 0 | 1 |
-| `ext/zip/Module.php` | 0 | 1 |
+| `ext/zip/Module.php` | 0 | 9 |
 | `ext/zip/VmZipArchive.php` | 0 | 17 |
+| `ext/zip/VmZipProcedural.php` | 0 | 1 |
+| `ext/zip/VmZipResourceArg.php` | 0 | 1 |
 | `ext/zip/ZipArchiveAddFile.php` | 0 | 2 |
 | `ext/zip/ZipArchiveAddFromString.php` | 0 | 2 |
 | `ext/zip/ZipArchiveClose.php` | 0 | 1 |
@@ -2882,6 +2890,15 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/zip/ZipClassMethod.php` | 0 | 1 |
 | `ext/zip/ZipEngine.php` | 0 | 1 |
 | `ext/zip/ZipExtensionPolicy.php` | 0 | 1 |
+| `ext/zip/ZipProceduralFunction.php` | 0 | 1 |
+| `ext/zip/zip_close.php` | 0 | 1 |
+| `ext/zip/zip_entry_close.php` | 0 | 1 |
+| `ext/zip/zip_entry_filesize.php` | 0 | 1 |
+| `ext/zip/zip_entry_name.php` | 0 | 1 |
+| `ext/zip/zip_entry_open.php` | 0 | 2 |
+| `ext/zip/zip_entry_read.php` | 0 | 2 |
+| `ext/zip/zip_open.php` | 0 | 1 |
+| `ext/zip/zip_read.php` | 0 | 1 |
 | `ext/zstd/JitZstd.php` | 0 | 1 |
 | `ext/zstd/Module.php` | 0 | 4 |
 | `ext/zstd/VmZstdCore.php` | 0 | 1 |
@@ -3909,7 +3926,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/ReadonlyFunctionRejector.php` | 0 | 2 |
 | `lib/ReadonlyMethodModifierRejector.php` | 0 | 2 |
 | `lib/ReferenceProfileTokenScan.php` | 0 | 1 |
-| `lib/Runtime.php` | 0 | 81 |
+| `lib/Runtime.php` | 0 | 82 |
 | `lib/RuntimeStrictness.php` | 0 | 1 |
 | `lib/SourceBareThrowRewriter.php` | 0 | 1 |
 | `lib/SourcePreprocessor/PropertyHooks.php` | 0 | 4 |
@@ -16246,25 +16263,25 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmFs.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 82)
-- new Variable (line 84)
-- new HashTable (line 99)
-- new Variable (line 101)
-- new HashTable (line 239)
-- new Variable (line 246)
-- new Variable (line 251)
-- new Variable (line 311)
-- new Variable (line 385)
-- new Variable (line 426)
-- new HashTable (line 1574)
-- new Variable (line 1576)
-- new HashTable (line 2430)
-- new Variable (line 2433)
-- new Variable (line 2439)
-- new Variable (line 2445)
-- new Variable (line 2451)
-- new Variable (line 2458)
-- 136 class method(s)
+- new HashTable (line 88)
+- new Variable (line 90)
+- new HashTable (line 105)
+- new Variable (line 107)
+- new HashTable (line 245)
+- new Variable (line 252)
+- new Variable (line 257)
+- new Variable (line 317)
+- new Variable (line 391)
+- new Variable (line 432)
+- new HashTable (line 1649)
+- new Variable (line 1651)
+- new HashTable (line 2511)
+- new Variable (line 2514)
+- new Variable (line 2520)
+- new Variable (line 2526)
+- new Variable (line 2532)
+- new Variable (line 2539)
+- 142 class method(s)
 
 ### `ext/standard/VmFsAccessNative.php`
 
@@ -17401,23 +17418,23 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Exception (line 803)
 - new VmSerializeEnumCaseRef (line 853)
 - new VmSerializeEnumCaseRef (line 858)
-- new Variable (line 889)
-- new VmSerializeRefState (line 933)
-- new Variable (line 950)
-- new VmSerializeRefState (line 972)
-- new Variable (line 982)
-- new Variable (line 1032)
-- new Variable (line 1045)
-- new Variable (line 1151)
-- new ObjectEntry (line 1181)
-- new Variable (line 1185)
-- new Frame (line 1204)
-- new Variable (line 1207)
-- new Variable (line 1236)
-- new Variable (line 1252)
-- new Variable (line 1257)
-- new Variable (line 1272)
-- new Exception (line 1295)
+- new Variable (line 902)
+- new VmSerializeRefState (line 952)
+- new Variable (line 969)
+- new VmSerializeRefState (line 991)
+- new Variable (line 1001)
+- new Variable (line 1051)
+- new Variable (line 1064)
+- new Variable (line 1170)
+- new ObjectEntry (line 1200)
+- new Variable (line 1204)
+- new Frame (line 1223)
+- new Variable (line 1226)
+- new Variable (line 1255)
+- new Variable (line 1271)
+- new Variable (line 1276)
+- new Variable (line 1291)
+- new Exception (line 1314)
 - 59 class method(s)
 - 1 closure(s)
 
@@ -22256,7 +22273,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/strip_tags.php`
 
 **Warnings** (review for bootstrap subset):
-- 7 class method(s)
+- 8 class method(s)
 - 1 closure(s)
 
 ### `ext/standard/stripcslashes.php`
@@ -23003,6 +23020,42 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 128)
 - 9 class method(s)
 
+### `ext/uuid/Module.php`
+
+**Warnings** (review for bootstrap subset):
+- new VM\Variable (line 20)
+- new uuid_create (line 29)
+- new uuid_generate (line 30)
+- 2 class method(s)
+
+### `ext/uuid/UuidConstants.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/uuid/UuidFunction.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/uuid/VmUuid.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s)
+
+### `ext/uuid/uuid_create.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 25)
+- 1 class method(s)
+
+### `ext/uuid/uuid_generate.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 24)
+- new Variable (line 29)
+- 1 class method(s)
+
 ### `ext/xml/BuiltinClasses.php`
 
 **Warnings** (review for bootstrap subset):
@@ -23288,7 +23341,15 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/zip/Module.php`
 
 **Warnings** (review for bootstrap subset):
-- 1 class method(s)
+- new zip_open (line 35)
+- new zip_close (line 36)
+- new zip_read (line 37)
+- new zip_entry_open (line 38)
+- new zip_entry_close (line 39)
+- new zip_entry_read (line 40)
+- new zip_entry_name (line 41)
+- new zip_entry_filesize (line 42)
+- 3 class method(s)
 
 ### `ext/zip/VmZipArchive.php`
 
@@ -23310,6 +23371,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ZipArchiveGetStatusString (line 69)
 - new ZipArchiveState (line 82)
 - 19 class method(s)
+
+### `ext/zip/VmZipProcedural.php`
+
+**Warnings** (review for bootstrap subset):
+- 13 class method(s)
+
+### `ext/zip/VmZipResourceArg.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s)
 
 ### `ext/zip/ZipArchiveAddFile.php`
 
@@ -23372,6 +23443,53 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 7 class method(s)
 
 ### `ext/zip/ZipExtensionPolicy.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/zip/ZipProceduralFunction.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/zip/zip_close.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/zip/zip_entry_close.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/zip/zip_entry_filesize.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/zip/zip_entry_name.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/zip/zip_entry_open.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 22)
+- 1 class method(s)
+
+### `ext/zip/zip_entry_read.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/zip/zip_open.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/zip/zip_read.php`
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
@@ -24857,24 +24975,24 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 3364)
 - new Variable (line 3415)
 - new Variable (line 3423)
-- new Variable (line 5753)
-- new Variable (line 5784)
-- new Variable (line 5801)
-- new Variable (line 5817)
-- new strval (line 5842)
-- new Variable (line 6091)
-- new Variable (line 6107)
-- new Variable (line 6280)
-- new Variable (line 6296)
-- new Variable (line 6344)
-- new Variable (line 6649)
-- new Variable (line 6658)
-- new Variable (line 7144)
-- new Variable (line 7160)
-- new Variable (line 7210)
-- new Variable (line 7716)
-- new Variable (line 7722)
-- 162 class method(s)
+- new Variable (line 5096)
+- new Variable (line 5127)
+- new Variable (line 5144)
+- new Variable (line 5160)
+- new strval (line 5185)
+- new Variable (line 5434)
+- new Variable (line 5450)
+- new Variable (line 5623)
+- new Variable (line 5639)
+- new Variable (line 5687)
+- new Variable (line 5992)
+- new Variable (line 6001)
+- new Variable (line 6487)
+- new Variable (line 6503)
+- new Variable (line 6553)
+- new Variable (line 7059)
+- new Variable (line 7065)
+- 154 class method(s)
 
 ### `lib/JIT/ArrayFilterCallbackPolicy.php`
 
@@ -30331,17 +30449,18 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ext\sodium\Module (line 264)
 - new ext\sqlite3\Module (line 265)
 - new ext\uri\Module (line 266)
-- new ext\standard\Module (line 267)
-- new JIT (line 343)
-- new JITContext (line 357)
-- new SealedClassPreprocessor (line 422)
-- new StaticClassPreprocessor (line 425)
-- new SourcePreprocessor\PropertyHooks (line 428)
-- new State (line 568)
-- new ReflectionProperty (line 595)
-- new ReflectionProperty (line 598)
-- new LintCompiler (line 1004)
-- new Variable (line 1134)
+- new ext\uuid\Module (line 267)
+- new ext\standard\Module (line 268)
+- new JIT (line 344)
+- new JITContext (line 358)
+- new SealedClassPreprocessor (line 423)
+- new StaticClassPreprocessor (line 426)
+- new SourcePreprocessor\PropertyHooks (line 429)
+- new State (line 569)
+- new ReflectionProperty (line 596)
+- new ReflectionProperty (line 599)
+- new LintCompiler (line 1005)
+- new Variable (line 1135)
 - 53 class method(s)
 
 ### `lib/RuntimeStrictness.php`

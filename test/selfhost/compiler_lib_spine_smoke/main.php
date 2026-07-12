@@ -2827,6 +2827,17 @@ require_once __DIR__.'/../../../ext/zip/ZipArchiveState.php';
 require_once __DIR__.'/../../../ext/zip/ZipClassMethod.php';
 require_once __DIR__.'/../../../ext/zip/ZipEngine.php';
 require_once __DIR__.'/../../../ext/zip/ZipExtensionPolicy.php';
+require_once __DIR__.'/../../../ext/zip/VmZipProcedural.php';
+require_once __DIR__.'/../../../ext/zip/VmZipResourceArg.php';
+require_once __DIR__.'/../../../ext/zip/ZipProceduralFunction.php';
+require_once __DIR__.'/../../../ext/zip/zip_close.php';
+require_once __DIR__.'/../../../ext/zip/zip_entry_close.php';
+require_once __DIR__.'/../../../ext/zip/zip_entry_filesize.php';
+require_once __DIR__.'/../../../ext/zip/zip_entry_name.php';
+require_once __DIR__.'/../../../ext/zip/zip_entry_open.php';
+require_once __DIR__.'/../../../ext/zip/zip_entry_read.php';
+require_once __DIR__.'/../../../ext/zip/zip_open.php';
+require_once __DIR__.'/../../../ext/zip/zip_read.php';
 require_once __DIR__.'/../../../ext/zstd/JitZstd.php';
 require_once __DIR__.'/../../../ext/zstd/Module.php';
 require_once __DIR__.'/../../../ext/zstd/VmZstdCore.php';
@@ -4621,4 +4632,10 @@ unset($__spineMimeSample, $__spineMimeEnc, $__spineMimeDec);
 // M2 spine unit: setcookie options array parser Vm inventory (#8698).
 \PHPCompiler\ext\standard\SetcookieOptions::spineSmokeParse();
 
+require_once __DIR__.'/../../../ext/uuid/Module.php';
+require_once __DIR__.'/../../../ext/uuid/UuidConstants.php';
+require_once __DIR__.'/../../../ext/uuid/UuidFunction.php';
+require_once __DIR__.'/../../../ext/uuid/VmUuid.php';
+require_once __DIR__.'/../../../ext/uuid/uuid_create.php';
+require_once __DIR__.'/../../../ext/uuid/uuid_generate.php';
 echo "compiler_lib_spine_smoke bundle OK\n";
