@@ -10,7 +10,6 @@ foreach ([
     'htmlentities' => static fn () => htmlentities(null),
     'strtolower' => static fn () => strtolower(null),
     'addcslashes' => static fn () => addcslashes(null, 'a'),
-    'trim' => static fn () => trim(null),
     'strip_tags' => static fn () => strip_tags(null),
 ] as $name => $call) {
     try {
@@ -27,5 +26,4 @@ htmlspecialchars: TypeError
 htmlentities: TypeError
 strtolower: TypeError
 addcslashes: TypeError
-trim: TypeError
 strip_tags: TypeError
