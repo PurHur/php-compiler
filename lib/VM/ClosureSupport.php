@@ -148,6 +148,10 @@ final class ClosureSupport
                 .self::valueTypeName($newThis).' given'
             );
         }
+        $scopeClass = self::resolveScopeClass($newScope, $newThis, $context);
+        if (self::rejectBindForExplicitScopeFailure($ctx, $newScope, $scopeClass, $frame)) {
+            return null;
+        }
         if (null !== $state->wrappedFunc || null !== $state->methodName) {
             return null;
         }
@@ -171,12 +175,27 @@ final class ClosureSupport
             $stored->copyFrom($boundThis);
             $bound->boundThis = $stored;
         }
-        $scopeClass = self::resolveScopeClass($newScope, $newThis, $context);
+        $bound->boundScopeClass = $scopeClass;
+
+        return self::wrapState($ctx, $bound);
+    }
+
+    /**
+     * Zend rejects explicit scope before other bind failures (#18192, zend_closures.c).
+     *
+     * Applies to user closures and fromCallable wrappers alike.
+     */
+    private static function rejectBindForExplicitScopeFailure(
+        Context $ctx,
+        ?Variable $newScope,
+        ?string $scopeClass,
+        ?Frame $frame
+    ): bool {
         if (null !== $scopeClass && self::isExplicitStringScope($newScope)) {
             if (!self::scopeClassExists($ctx, $scopeClass)) {
                 self::warnScopeClassNotFound($ctx, $frame, $scopeClass);
 
-                return null;
+                return true;
             }
         }
         if (
@@ -186,11 +205,10 @@ final class ClosureSupport
         ) {
             self::warnCannotBindInternalScope($ctx, $frame, $scopeClass);
 
-            return null;
+            return true;
         }
-        $bound->boundScopeClass = $scopeClass;
 
-        return self::wrapState($ctx, $bound);
+        return false;
     }
 
     private static function isExplicitStringScope(?Variable $newScope): bool

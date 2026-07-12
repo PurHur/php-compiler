@@ -25,6 +25,10 @@ class ClosureBindInternalClassVMTest extends BaseTest
             __DIR__ . '/cases/language/closure_bindto_internal_instance.phpt',
             'closure_bindto_internal_instance.phpt'
         );
+        yield 'closure_bindto_internal_class_from_callable.phpt' => self::parsePHPT(
+            __DIR__ . '/cases/language/closure_bindto_internal_class_from_callable.phpt',
+            'closure_bindto_internal_class_from_callable.phpt'
+        );
     }
 
     public function setUp(): void
