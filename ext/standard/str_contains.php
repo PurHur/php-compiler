@@ -31,7 +31,6 @@ final class str_contains extends Internal
     public function execute(Frame $frame): void
     {
         $this->requireExactArgCount($frame, 'str_contains', 2);
-        InternalStrictArg::rejectNullString($frame->calledArgs[0], 'str_contains', 'haystack', 0, $frame);
         InternalStrictArg::rejectNullString($frame->calledArgs[1], 'str_contains', 'needle', 1, $frame);
         $haystackStr = self::vmStringArg($frame, 0, 'haystack');
         $needleStr = self::vmStringArg($frame, 1, 'needle');
@@ -56,7 +55,6 @@ final class str_contains extends Internal
         if (!$this->requireExactJitArgCount($context, $args, 'str_contains', 2)) {
             return $context->getTypeFromString('int1')->constInt(0, false);
         }
-        JitInternalStrictArg::rejectNullString($context, $args[0], 'str_contains', 'haystack', 1);
         JitInternalStrictArg::rejectNullString($context, $args[1], 'str_contains', 'needle', 2);
         $hay = JitStringBuiltinArg::lowerCoercible($context, $args[0], 'str_contains', 0, 'haystack');
         $needle = JitStringBuiltinArg::lowerCoercible($context, $args[1], 'str_contains', 1, 'needle');
