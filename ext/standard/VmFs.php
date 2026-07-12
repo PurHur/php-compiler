@@ -802,8 +802,13 @@ final class VmFs
         if (false === $handle) {
             return false;
         }
+        $outputWrapper = 'php://output' === $path;
+        $failedOutputHandle = $outputWrapper && self::isFailedStreamHandle($handle);
         $total = self::passthruHandleToStdout($handle);
         self::fclose($handle);
+        if ($outputWrapper && ($failedOutputHandle || 0 === $total)) {
+            return -1;
+        }
 
         return $total;
     }

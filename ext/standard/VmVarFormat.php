@@ -35,6 +35,16 @@ final class VmVarFormat
         return 'Resource id #'.$handle;
     }
 
+    public static function formatDebugZvalResource(Variable $var, int $refcount): ?string
+    {
+        $handle = self::resourceDisplayId($var);
+        if (null === $handle) {
+            return null;
+        }
+
+        return 'resource('.$handle.') of type ('.self::resourceTypeLabel($var, $handle).') refcount('.$refcount.")\n";
+    }
+
     private static function resourceDisplayId(Variable $var): ?int
     {
         $var = $var->resolveIndirect();
