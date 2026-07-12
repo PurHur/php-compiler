@@ -24,7 +24,7 @@ final class VmFilestatArg
         string $paramName = 'filename',
         ?Frame $frame = null
     ): string {
-        if (null !== $frame) {
+        if (null !== $frame && InternalStrictArg::isCallerStrict($frame)) {
             InternalStrictArg::rejectNullString($var, $function, $paramName, $argIndex, $frame);
         }
 
