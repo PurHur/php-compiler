@@ -2881,6 +2881,10 @@
         "ext/xml/VmXml.php",
         "ext/xml/VmXmlStructBuilder.php",
         "ext/xml/XmlConstants.php",
+        "ext/xml/xml_error_string.php",
+        "ext/xml/xml_get_current_byte_index.php",
+        "ext/xml/xml_get_current_column_number.php",
+        "ext/xml/xml_get_current_line_number.php",
         "ext/xml/xml_get_error_code.php",
         "ext/xml/xml_parse.php",
         "ext/xml/xml_parse_into_struct.php",
@@ -4785,9 +4789,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 4551,
+        "inventory_files": 4555,
         "excluded": 0,
-        "eligible": 4551,
+        "eligible": 4555,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1

@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 4551 |
-| Phase A inventory files (M2 ratio SSOT) | 4551 |
+| PHP files on vm.php path | 4555 |
+| Phase A inventory files (M2 ratio SSOT) | 4555 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 12347 |
+| Source constructs flagged (warnings) | 12358 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -927,7 +927,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/GcToggleJitHelper.php` | 0 | 1 |
 | `ext/standard/GetBrowserJitHelper.php` | 0 | 1 |
 | `ext/standard/GetClassJitHelper.php` | 0 | 1 |
-| `ext/standard/GetClassMethodsJitHelper.php` | 0 | 2 |
+| `ext/standard/GetClassMethodsJitHelper.php` | 0 | 1 |
 | `ext/standard/GetClassVarsJitHelper.php` | 0 | 1 |
 | `ext/standard/GetDeclaredExcludeDeprecatedJit.php` | 0 | 1 |
 | `ext/standard/GetDefinedConstantsParity.php` | 0 | 1 |
@@ -2823,10 +2823,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/uri/UriExtensionPolicy.php` | 0 | 1 |
 | `ext/uri/VmUri.php` | 0 | 5 |
 | `ext/xml/BuiltinClasses.php` | 0 | 1 |
-| `ext/xml/Module.php` | 0 | 6 |
+| `ext/xml/Module.php` | 0 | 10 |
 | `ext/xml/VmXml.php` | 0 | 1 |
 | `ext/xml/VmXmlStructBuilder.php` | 0 | 18 |
 | `ext/xml/XmlConstants.php` | 0 | 1 |
+| `ext/xml/xml_error_string.php` | 0 | 2 |
+| `ext/xml/xml_get_current_byte_index.php` | 0 | 2 |
+| `ext/xml/xml_get_current_column_number.php` | 0 | 2 |
+| `ext/xml/xml_get_current_line_number.php` | 0 | 2 |
 | `ext/xml/xml_get_error_code.php` | 0 | 2 |
 | `ext/xml/xml_parse.php` | 0 | 2 |
 | `ext/xml/xml_parse_into_struct.php` | 0 | 4 |
@@ -10896,7 +10900,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/GetClassMethodsJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 30)
 - 1 class method(s)
 
 ### `ext/standard/GetClassVarsJitHelper.php`
@@ -11955,7 +11958,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitGetClassMethods.php`
 
 **Warnings** (review for bootstrap subset):
-- new JITVariable (line 202)
+- new JITVariable (line 207)
 - 9 class method(s)
 
 ### `ext/standard/JitGetClassVars.php`
@@ -17234,41 +17237,41 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 2064)
 - new Variable (line 2083)
 - new Variable (line 2099)
-- new Variable (line 2251)
-- new Variable (line 2255)
-- new Error (line 2272)
-- new Error (line 2278)
-- new Error (line 2301)
-- new Error (line 2304)
-- new Variable (line 2322)
-- new Variable (line 2339)
-- new Variable (line 2357)
-- new Variable (line 2521)
-- new ClassProperty (line 2523)
-- new Variable (line 2677)
-- new Variable (line 2681)
-- new Variable (line 2701)
-- new Variable (line 2709)
+- new Variable (line 2272)
+- new Variable (line 2276)
+- new Error (line 2293)
+- new Error (line 2299)
+- new Error (line 2322)
+- new Error (line 2325)
+- new Variable (line 2343)
+- new Variable (line 2360)
+- new Variable (line 2378)
+- new Variable (line 2542)
+- new ClassProperty (line 2544)
+- new Variable (line 2698)
+- new Variable (line 2702)
+- new Variable (line 2722)
 - new Variable (line 2730)
-- new Variable (line 2742)
-- new Variable (line 2757)
-- new Variable (line 2771)
-- new Variable (line 2869)
-- new Variable (line 2877)
-- new Variable (line 3042)
-- new Variable (line 3047)
-- new Error (line 3067)
-- new Error (line 3071)
-- new Variable (line 3156)
-- new Variable (line 3162)
-- new Variable (line 3168)
-- new Variable (line 3208)
-- new Variable (line 3213)
-- new Variable (line 3242)
-- new Variable (line 3252)
-- new Variable (line 3258)
-- new Variable (line 3280)
-- 160 class method(s)
+- new Variable (line 2751)
+- new Variable (line 2763)
+- new Variable (line 2778)
+- new Variable (line 2792)
+- new Variable (line 2890)
+- new Variable (line 2898)
+- new Variable (line 3063)
+- new Variable (line 3068)
+- new Error (line 3088)
+- new Error (line 3092)
+- new Variable (line 3177)
+- new Variable (line 3183)
+- new Variable (line 3189)
+- new Variable (line 3229)
+- new Variable (line 3234)
+- new Variable (line 3263)
+- new Variable (line 3273)
+- new Variable (line 3279)
+- new Variable (line 3301)
+- 161 class method(s)
 - 1 closure(s)
 
 ### `ext/standard/VmRound.php`
@@ -22955,13 +22958,17 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new xml_parse (line 36)
 - new xml_parser_free (line 37)
 - new xml_get_error_code (line 38)
-- new xml_parse_into_struct (line 39)
+- new xml_error_string (line 39)
+- new xml_get_current_line_number (line 40)
+- new xml_get_current_column_number (line 41)
+- new xml_get_current_byte_index (line 42)
+- new xml_parse_into_struct (line 43)
 - 2 class method(s)
 
 ### `ext/xml/VmXml.php`
 
 **Warnings** (review for bootstrap subset):
-- 18 class method(s)
+- 27 class method(s)
 
 ### `ext/xml/VmXmlStructBuilder.php`
 
@@ -22989,6 +22996,30 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
+
+### `ext/xml/xml_error_string.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 26)
+- 2 class method(s)
+
+### `ext/xml/xml_get_current_byte_index.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 26)
+- 2 class method(s)
+
+### `ext/xml/xml_get_current_column_number.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 26)
+- 2 class method(s)
+
+### `ext/xml/xml_get_current_line_number.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 26)
+- 2 class method(s)
 
 ### `ext/xml/xml_get_error_code.php`
 
@@ -24755,38 +24786,38 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 1005)
 - new Variable (line 1098)
 - new Variable (line 1100)
-- new Variable (line 3510)
-- new Variable (line 3546)
-- new Variable (line 3554)
-- new Variable (line 3564)
-- new Variable (line 3575)
-- new Variable (line 3583)
-- new Variable (line 3633)
-- new Variable (line 3654)
-- new Variable (line 3675)
-- new Variable (line 3699)
-- new Variable (line 3728)
-- new Variable (line 3748)
-- new Variable (line 3799)
-- new Variable (line 3807)
-- new Variable (line 6137)
-- new Variable (line 6168)
-- new Variable (line 6185)
-- new Variable (line 6201)
-- new strval (line 6226)
-- new Variable (line 6475)
-- new Variable (line 6491)
-- new Variable (line 6664)
-- new Variable (line 6680)
-- new Variable (line 6728)
-- new Variable (line 7033)
-- new Variable (line 7042)
-- new Variable (line 7528)
-- new Variable (line 7544)
-- new Variable (line 7594)
-- new Variable (line 8100)
-- new Variable (line 8106)
-- 167 class method(s)
+- new Variable (line 3126)
+- new Variable (line 3162)
+- new Variable (line 3170)
+- new Variable (line 3180)
+- new Variable (line 3191)
+- new Variable (line 3199)
+- new Variable (line 3249)
+- new Variable (line 3270)
+- new Variable (line 3291)
+- new Variable (line 3315)
+- new Variable (line 3344)
+- new Variable (line 3364)
+- new Variable (line 3415)
+- new Variable (line 3423)
+- new Variable (line 5753)
+- new Variable (line 5784)
+- new Variable (line 5801)
+- new Variable (line 5817)
+- new strval (line 5842)
+- new Variable (line 6091)
+- new Variable (line 6107)
+- new Variable (line 6280)
+- new Variable (line 6296)
+- new Variable (line 6344)
+- new Variable (line 6649)
+- new Variable (line 6658)
+- new Variable (line 7144)
+- new Variable (line 7160)
+- new Variable (line 7210)
+- new Variable (line 7716)
+- new Variable (line 7722)
+- 162 class method(s)
 
 ### `lib/JIT/ArrayFilterCallbackPolicy.php`
 
@@ -24998,7 +25029,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/ArrayPadRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- 6 class method(s)
+- 7 class method(s)
 
 ### `lib/JIT/Builtin/ArrayPadTypeJit.php`
 
