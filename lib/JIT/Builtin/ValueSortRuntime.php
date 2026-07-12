@@ -43,44 +43,27 @@ final class ValueSortRuntime
 
     public static function asortByValue(Context $context, JITVariable $array): void
     {
-        if (ArrayBuiltinHelper::isNativeArray($array->type)) {
-            ArrayBuiltinHelper::asortByValue($context, $array);
-
-            return;
-        }
-
-        self::ensureLinked($context);
-        $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
-        $context->builder->call($context->lookupFunction(self::ABI_ASORT), $ht);
-        HashTableHelper::storeHashtableInArrayVariable($context, $array, $ht);
+        self::invokeByValueSort($context, $array, self::ABI_ASORT);
     }
 
     public static function asortByValueLocale(Context $context, JITVariable $array): void
     {
-        if (ArrayBuiltinHelper::isNativeArray($array->type)) {
-            ArrayBuiltinHelper::asortByValueLocale($context, $array);
-
-            return;
-        }
-
-        self::ensureLinked($context);
-        $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
-        $context->builder->call($context->lookupFunction(self::ABI_ASORT_LOCALE), $ht);
-        HashTableHelper::storeHashtableInArrayVariable($context, $array, $ht);
+        self::invokeByValueSort($context, $array, self::ABI_ASORT_LOCALE);
     }
 
     public static function arsortByValue(Context $context, JITVariable $array): void
     {
-        if (ArrayBuiltinHelper::isNativeArray($array->type)) {
-            ArrayBuiltinHelper::arsortByValue($context, $array);
+        self::invokeByValueSort($context, $array, self::ABI_ARSORT);
+    }
 
-            return;
-        }
-
+    private static function invokeByValueSort(Context $context, JITVariable $array, string $abi): void
+    {
         self::ensureLinked($context);
         $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
-        $context->builder->call($context->lookupFunction(self::ABI_ARSORT), $ht);
-        HashTableHelper::storeHashtableInArrayVariable($context, $array, $ht);
+        $context->builder->call($context->lookupFunction($abi), $ht);
+        if (ArrayBuiltinHelper::isNativeArray($array->type)) {
+            HashTableHelper::storeHashtableInArrayVariable($context, $array, $ht);
+        }
     }
 
     public static function ensureLinked(Context $context): void

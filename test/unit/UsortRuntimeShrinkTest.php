@@ -9,7 +9,7 @@ use PHPUnit\Framework\TestCase;
 /** usort()/uksort() JIT routes through UsortJitHelper + Sort/KeySort runtimes not ArrayBuiltinHelper LLVM (#15518, #17795). */
 final class UsortRuntimeShrinkTest extends TestCase
 {
-    private const ARRAY_BUILTIN_HELPER_MAX_LINES = 13720;
+    private const ARRAY_BUILTIN_HELPER_MAX_LINES = 1920;
 
     public function testUsortRuntimeUsesJitHelperNotDirectLlvmMonolith(): void
     {

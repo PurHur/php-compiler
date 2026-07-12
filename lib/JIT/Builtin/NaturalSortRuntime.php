@@ -6,13 +6,14 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\Variable as JITVariable;
 
 /**
  * JIT/AOT link for natsort()/natcasesort() via NaturalSortJitHelper PHP (#12753).
  *
- * Standalone AOT compiles {@see NaturalSortJitHelper} via JitVmHelperLink bridge (#14529); native literal arrays keep LLVM in {@see ArrayBuiltinHelper::natsortByValue()} / {@see ArrayBuiltinHelper::natcasesortByValue()}.
+ * Standalone AOT compiles {@see NaturalSortJitHelper} via JitVmHelperLink bridge (#14529); native literal arrays materialize to hashtable then route through PHP (#18407).
  * SSOT: {@see \PHPCompiler\ext\standard\VmArray::natsortCopy()} /
  * {@see \PHPCompiler\ext\standard\VmArray::natcasesortCopy()}
  * php-src: ext/standard/array.c — php_natsort / php_natcasesort
@@ -37,28 +38,22 @@ final class NaturalSortRuntime
 
     public static function natsortByValue(Context $context, JITVariable $array): void
     {
-        if (ArrayBuiltinHelper::isNativeArray($array->type)) {
-            ArrayBuiltinHelper::natsortByValue($context, $array);
-
-            return;
-        }
-
-        self::ensureLinked($context);
-        $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
-        $context->builder->call($context->lookupFunction(self::ABI_NATSORT), $ht);
+        self::invokeNaturalSort($context, $array, self::ABI_NATSORT);
     }
 
     public static function natcasesortByValue(Context $context, JITVariable $array): void
     {
-        if (ArrayBuiltinHelper::isNativeArray($array->type)) {
-            ArrayBuiltinHelper::natcasesortByValue($context, $array);
+        self::invokeNaturalSort($context, $array, self::ABI_NATCASESORT);
+    }
 
-            return;
-        }
-
+    private static function invokeNaturalSort(Context $context, JITVariable $array, string $abi): void
+    {
         self::ensureLinked($context);
         $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
-        $context->builder->call($context->lookupFunction(self::ABI_NATCASESORT), $ht);
+        $context->builder->call($context->lookupFunction($abi), $ht);
+        if (ArrayBuiltinHelper::isNativeArray($array->type)) {
+            HashTableHelper::storeHashtableInArrayVariable($context, $array, $ht);
+        }
     }
 
     public static function ensureLinked(Context $context): void

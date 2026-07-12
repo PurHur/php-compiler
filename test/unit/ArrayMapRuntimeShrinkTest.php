@@ -12,7 +12,7 @@ use PHPUnit\Framework\TestCase;
 /** array_map() JIT routes null/string-builtin/closure through ArrayMapJitHelper PHP not ArrayBuiltinHelper LLVM (#10183, #14977, #18328, #18364). */
 final class ArrayMapRuntimeShrinkTest extends TestCase
 {
-    private const ARRAY_BUILTIN_HELPER_MAX_LINES = 4520;
+    private const ARRAY_BUILTIN_HELPER_MAX_LINES = 1920;
 
     public function testArrayMapRuntimeUsesJitHelperNotDirectLlvmMonolith(): void
     {

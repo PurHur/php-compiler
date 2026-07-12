@@ -14,7 +14,7 @@ use PHPLLVM\Value;
 /**
  * JIT/AOT link for array_fill_keys() via ArrayFillKeysJitHelper PHP (#12487).
  *
- * Standalone AOT compiles {@see ArrayFillKeysJitHelper} via JitVmHelperLink bridge (#14439); native literal arrays keep LLVM in {@see ArrayBuiltinHelper::fillKeys()}.
+ * Standalone AOT compiles {@see ArrayFillKeysJitHelper} via JitVmHelperLink bridge (#14439); native literal arrays materialize to hashtable then route through PHP (#18407).
  * SSOT: {@see \PHPCompiler\ext\standard\VmArray::fillKeys()}
  * php-src: ext/standard/array.c — php_array_fill_keys()
  */
@@ -33,12 +33,10 @@ final class ArrayFillKeysRuntime
 
     public static function fillKeys(Context $context, JITVariable $keys, JITVariable $value): Value
     {
-        if (ArrayBuiltinHelper::isNativeArray($keys->type)) {
-            return ArrayBuiltinHelper::fillKeys($context, $keys, $value);
-        }
-
         self::ensureLinked($context);
-        $keysHt = ArrayBuiltinHelper::loadHashTable($context, $keys);
+        $keysHt = ArrayBuiltinHelper::isNativeArray($keys->type)
+            ? ArrayBuiltinHelper::nativeListToHashTable($context, $keys)
+            : ArrayBuiltinHelper::loadHashTable($context, $keys);
         $valuePtr = JitValueBox::valuePtrFromVariable($context, $value);
 
         return $context->builder->call(
