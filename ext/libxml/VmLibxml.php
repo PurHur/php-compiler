@@ -43,12 +43,12 @@ final class VmLibxml
         $strProto = new Variable(Variable::TYPE_STRING);
         $entry = new ClassEntry('LibXMLError');
         $entry->isInternal = true;
-        $entry->properties[] = new ClassProperty('level', null, $intProto, true);
-        $entry->properties[] = new ClassProperty('code', null, $intProto, true);
-        $entry->properties[] = new ClassProperty('column', null, $intProto, true);
-        $entry->properties[] = new ClassProperty('message', null, $strProto, true);
-        $entry->properties[] = new ClassProperty('file', null, $strProto, true);
-        $entry->properties[] = new ClassProperty('line', null, $intProto, true);
+        $entry->properties[] = new ClassProperty('level', null, $intProto);
+        $entry->properties[] = new ClassProperty('code', null, $intProto);
+        $entry->properties[] = new ClassProperty('column', null, $intProto);
+        $entry->properties[] = new ClassProperty('message', null, $strProto);
+        $entry->properties[] = new ClassProperty('file', null, $strProto);
+        $entry->properties[] = new ClassProperty('line', null, $intProto);
         $ctx->classes[self::CLASS_LC] = $entry;
     }
 
