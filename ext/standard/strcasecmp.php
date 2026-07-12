@@ -15,10 +15,8 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Builtin\StringStrcasecmp;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\InternalStrictArg;
 use PHPLLVM\Value;
 
 /**
@@ -31,8 +29,6 @@ final class strcasecmp extends Internal
         if (2 !== count($frame->calledArgs)) {
             throw new \LogicException('strcasecmp() requires exactly two arguments');
         }
-        InternalStrictArg::rejectNullString($frame->calledArgs[0], 'strcasecmp', 'string1', 0, $frame);
-        InternalStrictArg::rejectNullString($frame->calledArgs[1], 'strcasecmp', 'string2', 1, $frame);
         $a = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'strcasecmp', 0, 'string1');
         $b = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'strcasecmp', 1, 'string2');
         if (null === $frame->returnVar) {
@@ -49,8 +45,6 @@ final class strcasecmp extends Internal
         if (2 !== count($args)) {
             throw new \LogicException('strcasecmp() requires exactly two arguments');
         }
-        JitInternalStrictArg::rejectNullString($context, $args[0], 'strcasecmp', 'string1', 1);
-        JitInternalStrictArg::rejectNullString($context, $args[1], 'strcasecmp', 'string2', 2);
         StringStrcasecmp::ensureLinked($context);
         $p0 = $this->stringDataPtr($context, JitStringBuiltinArg::lowerCoercible($context, $args[0], 'strcasecmp', 0, 'string1'));
         $p1 = $this->stringDataPtr($context, JitStringBuiltinArg::lowerCoercible($context, $args[1], 'strcasecmp', 1, 'string2'));
