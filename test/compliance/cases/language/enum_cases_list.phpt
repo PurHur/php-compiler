@@ -12,10 +12,14 @@ var_export([...E::cases()]);
 echo "\n";
 --EXPECT--
 array (
-  0 => \E::A,
-  1 => \E::B,
+  0 => 
+  \E::A,
+  1 => 
+  \E::B,
 )
 array (
-  0 => \E::A,
-  1 => \E::B,
+  0 => 
+  \E::A,
+  1 => 
+  \E::B,
 )
