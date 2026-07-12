@@ -2133,6 +2133,10 @@ final class VmReflection
     /** Default visibility filter: public only (php-src get_class_methods, basic_functions.c #4756). */
     public const METHOD_FILTER_DEFAULT = \PHPCfg\Func::FLAG_PUBLIC;
 
+    /** php-src basic_functions.c — invalid string class operand for get_class_methods() (#18110). */
+    public const GET_CLASS_METHODS_INVALID_CLASS_TYPE_ERROR =
+        'get_class_methods(): Argument #1 ($object_or_class) must be an object or a valid class name, string given';
+
     /**
      * get_class_methods() operand — object or class name string (#3118).
      */
@@ -2156,6 +2160,19 @@ final class VmReflection
         }
 
         return null;
+    }
+
+    /**
+     * get_class_methods() class resolution — TypeError when string class name is unknown (#18110).
+     */
+    public static function requireClassForGetClassMethods(Context $ctx, Variable $arg): ClassEntry
+    {
+        $entry = self::resolveClassForGetClassMethods($ctx, $arg);
+        if (null === $entry) {
+            throw new \TypeError(self::GET_CLASS_METHODS_INVALID_CLASS_TYPE_ERROR);
+        }
+
+        return $entry;
     }
 
     /**

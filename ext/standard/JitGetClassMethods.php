@@ -60,6 +60,8 @@ final class JitGetClassMethods
 
         self::emitTypeErrorAndAbort($context, self::scalarTypeError($classArg->type));
 
+        self::emitInvalidClassNameAndAbort($context);
+
         return self::returnFalse($context);
     }
 
@@ -188,7 +190,14 @@ final class JitGetClassMethods
             );
         }
 
+        self::emitInvalidClassNameAndAbort($context);
+
         return self::returnFalse($context);
+    }
+
+    private static function emitInvalidClassNameAndAbort(Context $context): void
+    {
+        self::emitTypeErrorAndAbort($context, VmReflection::GET_CLASS_METHODS_INVALID_CLASS_TYPE_ERROR);
     }
 
     /**
