@@ -2,8 +2,13 @@
 
 declare(strict_types=1);
 
-if (!function_exists('ldap_escape')) {
-    echo "FAIL_EXISTS\n";
+if (function_exists('ldap_escape')) {
+    echo "FAIL_ADVERTISED\n";
+    exit(1);
+}
+
+if (extension_loaded('ldap')) {
+    echo "FAIL_EXT\n";
     exit(1);
 }
 
