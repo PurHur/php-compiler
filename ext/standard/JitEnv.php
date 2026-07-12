@@ -9,12 +9,11 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
-use PHPCompiler\JIT\Builtin\EnvLocalRuntime;
 use PHPCompiler\JIT\Builtin\StringGetenv;
 use PHPCompiler\JIT\Builtin\StringGetenvAll;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
-use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitValueBox;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -57,45 +56,16 @@ final class JitEnv
     public static function putenv(Context $context, Value $assignmentStr): Value
     {
         StringGetenv::ensurePutenvLinked($context);
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            EnvLocalRuntime::ensureLinked($context);
-        }
         BasicBlockHelper::ensureOpenInsertBlock($context, 'putenv_emit_cont');
         self::emitPutenvSyntaxGuard($context, $assignmentStr);
 
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            $i8 = $context->getTypeFromString('int8');
-            $i64 = $context->getTypeFromString('int64');
-            $i8p = $context->getTypeFromString('int8*');
-            $map = $context->structFieldMap['__string__'];
-            $one = $i64->constInt(1, false);
-            $len = $context->builder->load(
-                $context->builder->structGep($assignmentStr, $map['length'])
-            );
-            $bytes = $context->builder->structGep($assignmentStr, $map['value']);
-            $bufLen = $context->builder->add($len, $one);
-            $mallocFn = self::lookupMalloc($context);
-            $buf = $context->builder->call($mallocFn, $bufLen);
-            $cStr = $context->builder->pointerCast($buf, $i8p);
-            $context->intrinsic->memcpy($cStr, $bytes, $len, false);
-            $context->builder->store(
-                $i8->constInt(0, false),
-                $context->builder->inBoundsGEP($cStr, $len)
-            );
-            $context->builder->call(
-                $context->lookupFunction('__compiler_env_register_putenv'),
-                $cStr
-            );
-
-            return $context->getTypeFromString('int1')->constInt(1, false);
-        }
-
-        return $context->builder->call(
+        return JitNestedHelperCoerce::callHelper(
+            $context,
             StringGetenv::helperFunction(
                 $context,
                 'PHPCompiler\\ext\\standard\\GetenvJitHelper::putenv'
             ),
-            $assignmentStr
+            [$assignmentStr]
         );
     }
 
@@ -141,20 +111,5 @@ final class JitEnv
         TypeErrorRaise::emitValueError($context, VmEnv::PUTENV_INVALID_SYNTAX_ERROR);
         $context->builder->call($context->lookupFunction('abort'));
         $context->builder->positionAtEnd($ok);
-    }
-
-    private static function lookupMalloc(Context $context): Value
-    {
-        try {
-            return $context->lookupFunction('malloc');
-        } catch (\LogicException) {
-            $i8p = $context->getTypeFromString('int8*');
-            $i64 = $context->getTypeFromString('int64');
-            $ft = $context->context->functionType($i8p, false, $i64);
-            $fn = $context->module->addFunction('malloc', $ft);
-            $context->registerFunction('malloc', $fn);
-
-            return $fn;
-        }
     }
 }

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\NestedJitCompileScope;
@@ -76,9 +77,10 @@ final class StringGetenv
             return;
         }
 
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
         self::ensureJitHelperCompiled($context);
         self::implementGetenvBridge($context);
-        $context->builder->clearInsertionPosition();
+        BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
     }
 
     public static function ensurePutenvLinked(Context $context): void
@@ -156,6 +158,7 @@ final class StringGetenv
             return;
         }
 
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
         $valuePtr = $context->getTypeFromString('__value__*');
         $strPtr = $context->getTypeFromString('__string__*');
         $i8 = $context->getTypeFromString('int8');
@@ -185,7 +188,7 @@ final class StringGetenv
         $context->builder->store($i8->constInt(0, false), $firstByte);
         $context->builder->returnVoid();
         $context->registerFunction(self::ABI_NAME, $fn);
-        $context->builder->clearInsertionPosition();
+        BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
     }
 
     private static function implementGetenvBridge(Context $context): void
