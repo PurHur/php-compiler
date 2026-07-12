@@ -35,7 +35,7 @@ final class JitMbStrlen
             );
         }
 
-        $str = JitStringBuiltinArg::lower($context, $arg, 'mb_strlen', 0, 'string');
+        $str = JitStringBuiltinArg::lowerTypedString($context, $arg, 'mb_strlen', 0, 'string');
 
         return self::utf8LengthFromPtr($context, $str);
     }

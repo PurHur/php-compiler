@@ -44,7 +44,7 @@ final class mb_substr extends Internal
                 $argc
             ));
         }
-        $string = VmString::coerceStringBuiltinArg(
+        $string = VmString::coerceTypedStringBuiltinArg(
             $frame->calledArgs[0],
             'mb_substr',
             0,
