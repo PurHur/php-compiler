@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\JIT\Builtin\StreamCaps;
+use PHPCompiler\JIT\Builtin\StreamIoRuntime;
 use PHPCompiler\JIT\Context;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -14,6 +16,8 @@ final class JitStreamSupports
     /** @return Value */
     public static function invoke(Context $context, Value $handleLong, Value $featureLong): Value
     {
+        StreamIoRuntime::ensureLinkedForUserScriptLowering($context);
+        StreamCaps::ensureLinked($context);
         $ret = $context->builder->call(
             $context->lookupFunction('__compiler_stream_supports'),
             $handleLong,
