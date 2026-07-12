@@ -201,6 +201,15 @@ final class ModuleRegistry
         return self::$extensionFunctions;
     }
 
+    public static function functionRegisteredInBucket(string $functionName, string $extension): bool
+    {
+        $lc = strtolower($functionName);
+        $ext = strtolower($extension);
+        $funcs = self::$extensionFunctions[$ext] ?? [];
+
+        return \in_array($lc, array_map('strtolower', $funcs), true);
+    }
+
     /**
      * Registered extension/builtin names for get_defined_functions() internal bucket (#17415).
      *
@@ -268,19 +277,143 @@ final class ModuleRegistry
 
     private static function functionBelongsToLogicalExtension(string $functionName, string $extension): bool
     {
+        if ('date' === strtolower($extension)) {
+            $lc = strtolower($functionName);
+
+            return str_starts_with($lc, 'date_')
+                || str_starts_with($lc, 'timezone_')
+                || \in_array($lc, self::DATE_EXTENSION_FUNCTIONS, true);
+        }
+
+        return self::functionBelongsToReflectionExtension($functionName, $extension);
+    }
+
+    /**
+     * Owning extension for reflection / get_extension_funcs parity (php-src zend_module_entry, #18357).
+     */
+    public static function reflectionOwningExtension(string $functionName): string
+    {
+        $lc = strtolower($functionName);
+        if (CoreExtensionFunctions::isCoreFunction($lc)) {
+            return 'core';
+        }
+        if (\in_array($lc, self::REFLECTION_STANDARD_TYPE_PREDICATES, true)) {
+            return 'standard';
+        }
+        if (\in_array($lc, self::REFLECTION_STANDARD_DATE_FUNCTIONS, true)) {
+            return 'standard';
+        }
+        $owners = [];
+        foreach (self::$extensionFunctions as $ext => $funcs) {
+            foreach ($funcs as $name) {
+                if ($lc === strtolower($name)) {
+                    $owners[] = $ext;
+                    break;
+                }
+            }
+        }
+        $owners = array_values(array_unique($owners));
+        if (1 === \count($owners) && 'standard' !== $owners[0]) {
+            return $owners[0];
+        }
+        foreach (self::REFLECTION_EXTENSION_ORDER as $extension) {
+            if (self::functionBelongsToReflectionExtension($lc, $extension)) {
+                return $extension;
+            }
+        }
+
+        return 'standard';
+    }
+
+    /** @var list<string> lowercase is_* predicates Zend lists under standard, not Core */
+    private const REFLECTION_STANDARD_TYPE_PREDICATES = [
+        'is_array',
+        'is_bool',
+        'is_double',
+        'is_float',
+        'is_int',
+        'is_integer',
+        'is_long',
+        'is_null',
+        'is_object',
+        'is_string',
+    ];
+
+    /** @var list<string> lowercase date builtins Zend lists under standard reflection */
+    private const REFLECTION_STANDARD_DATE_FUNCTIONS = [
+        'strptime',
+    ];
+
+    /** @var list<string> */
+    private const REFLECTION_EXTENSION_ORDER = [
+        'random',
+        'hash',
+        'spl',
+        'sockets',
+        'openssl',
+        'curl',
+        'json',
+        'date',
+        'pcre',
+        'zlib',
+        'readline',
+        'bcmath',
+        'zip',
+        'exif',
+        'fileinfo',
+    ];
+
+    private static function functionBelongsToReflectionExtension(string $functionName, string $extension): bool
+    {
+        $lc = strtolower($functionName);
+
         return match (strtolower($extension)) {
-            'json' => str_starts_with($functionName, 'json_'),
-            'date' => str_starts_with($functionName, 'date_')
-                || str_starts_with($functionName, 'timezone_')
-                || \in_array($functionName, self::DATE_EXTENSION_FUNCTIONS, true),
-            'pcre' => str_starts_with($functionName, 'preg_'),
-            'zlib' => str_starts_with($functionName, 'gz')
-                || str_starts_with($functionName, 'zlib_')
-                || 'readgzfile' === $functionName,
-            'readline' => str_starts_with($functionName, 'readline'),
-            'bcmath' => str_starts_with($functionName, 'bc'),
-            'openssl' => str_starts_with($functionName, 'openssl_'),
-            'zip' => str_starts_with($functionName, 'zip_'),
+            'random' => \in_array($lc, [
+                'lcg_value',
+                'mt_srand',
+                'srand',
+                'rand',
+                'mt_rand',
+                'mt_getrandmax',
+                'getrandmax',
+                'random_bytes',
+                'random_int',
+            ], true),
+            'hash' => 'hash' === $lc
+                || str_starts_with($lc, 'hash_')
+                || str_starts_with($lc, 'mhash'),
+            'spl' => str_starts_with($lc, 'spl_')
+                || \in_array($lc, [
+                    'class_implements',
+                    'class_parents',
+                    'class_uses',
+                    'iterator_apply',
+                    'iterator_count',
+                    'iterator_to_array',
+                ], true),
+            'sockets' => str_starts_with($lc, 'socket_')
+                && !\in_array($lc, [
+                    'socket_set_blocking',
+                    'socket_get_status',
+                    'socket_set_timeout',
+                ], true),
+            'json' => str_starts_with($lc, 'json_'),
+            'date' => str_starts_with($lc, 'date_')
+                || str_starts_with($lc, 'timezone_'),
+            'pcre' => str_starts_with($lc, 'preg_'),
+            'zlib' => str_starts_with($lc, 'gz')
+                || str_starts_with($lc, 'zlib_')
+                || str_starts_with($lc, 'deflate_')
+                || str_starts_with($lc, 'inflate_')
+                || 'readgzfile' === $lc
+                || 'ob_gzhandler' === $lc,
+            'curl' => str_starts_with($lc, 'curl_'),
+            'readline' => str_starts_with($lc, 'readline'),
+            'bcmath' => str_starts_with($lc, 'bc'),
+            'openssl' => str_starts_with($lc, 'openssl_'),
+            'zip' => str_starts_with($lc, 'zip_'),
+            'exif' => str_starts_with($lc, 'exif_'),
+            'fileinfo' => 'mime_content_type' === $lc,
             default => false,
         };
     }
