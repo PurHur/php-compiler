@@ -16340,10 +16340,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new Variable (line 105)
-- new RecursiveIteratorIterator (line 2889)
-- new RecursiveDirectoryIterator (line 2890)
-- new RecursiveIteratorIterator (line 2991)
-- new RecursiveDirectoryIterator (line 2992)
+- new RecursiveIteratorIterator (line 2890)
+- new RecursiveDirectoryIterator (line 2891)
+- new RecursiveIteratorIterator (line 2992)
+- new RecursiveDirectoryIterator (line 2993)
 - 101 class method(s)
 - 13 closure(s)
 
@@ -34312,11 +34312,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ObjectEntry (line 1015)
 - new ObjectEntry (line 1038)
 - new ObjectEntry (line 1048)
-- new Error (line 1173)
-- new Error (line 1179)
-- new Error (line 1183)
-- new ObjectEntry (line 1185)
-- 79 class method(s)
+- new Error (line 1181)
+- new Error (line 1187)
+- new Error (line 1191)
+- new ObjectEntry (line 1193)
+- 80 class method(s)
 
 ### `lib/VM/DateTimeZoneSupport.php`
 
