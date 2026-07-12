@@ -32,12 +32,7 @@ final class mb_strtolower extends Internal
                 $argc
             ));
         }
-        $string = VmString::coerceTypedStringBuiltinArg(
-            $frame->calledArgs[0],
-            'mb_strtolower',
-            0,
-            'string'
-        );
+        $string = VmString::stringBuiltinArgForFrame($frame, 0, 'mb_strtolower', 0, 'string');
         if (null === $frame->returnVar) {
             return;
         }
