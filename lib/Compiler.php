@@ -2367,11 +2367,19 @@ class Compiler {
                         // Hoisted sibling call-arg producers compile at the consumer via
                         // resolveSiblingInlineCallArgProducerSlot (#9463, #10981, #12421, #13788).
                         break;
+                    } elseif ($this->isFuncCallLoweredByFollowingEchoConcat($child, $ops, $i)) {
+                        break;
                     } elseif (
                         $child instanceof Op\Expr\ConstFetch
                         && $this->isDeferredLeadingConstFetchBeforeSiblingFuncCallConsumer($child, $ops, $i)
                     ) {
                         // explode(PATH_SEPARATOR, get_include_path()) — ConstFetch + sibling FuncCall (#15833).
+                        break;
+                    } elseif (
+                        ($child instanceof Op\Expr\ConstFetch || $child instanceof Op\Expr\ClassConstFetch)
+                        && $this->isConstFetchLoweredByFollowingEchoConcatFuncCall($ops, $i)
+                    ) {
+                        // echo var_export($arr['k'] ?? $d, true) . "\n" — hoisted true before deferred call (#18315).
                         break;
                     } elseif (
                         ($child instanceof Op\Expr\ConstFetch || $child instanceof Op\Expr\ClassConstFetch)
@@ -3214,7 +3222,9 @@ class Compiler {
         foreach ($coalesces as $coalesce) {
             $resultOverride = $this->findCoalesceAssignTarget($ops, $coalesce)
                 ?? $this->findEchoCoalesceAssignTarget($ops, $echoIndex, $coalesce);
-            $block = $this->compileCoalesceForAssign($coalesce, $block, $resultOverride);
+            if (null === $this->slotForCoalesceResult($block, $coalesce)) {
+                $block = $this->compileCoalesceForAssign($coalesce, $block, $resultOverride);
+            }
             if (null !== $resultOverride) {
                 $coalesceSnapshots[] = [$coalesce, $resultOverride];
                 continue;
@@ -3242,6 +3252,9 @@ class Compiler {
             ) {
                 $echoOperand = $snapshot;
             }
+        }
+        if (null !== $flattened) {
+            $block = $this->compileEchoConcatFuncCallPreludes($ops, $echoIndex, $flattened, $block);
         }
         $concat = $flattened;
         if (null !== $concat) {
@@ -3273,6 +3286,65 @@ class Compiler {
         }
         $line = $op->getLine();
         $block->addOpCode(new OpCode(OpCode::TYPE_ECHO, $var, $line > 0 ? $line : null));
+
+        return $block;
+    }
+
+    /**
+     * Compile FuncCall preludes that feed echo-concat operands after ?? merge blocks (#18315).
+     *
+     * @param Op[] $ops
+     */
+    private function compileEchoConcatFuncCallPreludes(
+        array $ops,
+        int $echoIndex,
+        Op\Expr\ConcatList $flattened,
+        Block $block
+    ): Block {
+        $neededResults = [];
+        foreach ($flattened->list as $part) {
+            if (null !== $part) {
+                $neededResults[] = $part;
+            }
+        }
+        for ($j = 0; $j < $echoIndex; ++$j) {
+            $child = $ops[$j];
+            if (
+                !($child instanceof Op\Expr\FuncCall || $child instanceof Op\Expr\NsFuncCall)
+                || !property_exists($child, 'result')
+                || null === $child->result
+            ) {
+                continue;
+            }
+            $feedsConcat = false;
+            foreach ($neededResults as $needed) {
+                if (
+                    $this->operandsChainEqual($needed, $child->result)
+                    || $this->operandsReferToSameVariable($needed, $child->result)
+                ) {
+                    $feedsConcat = true;
+                    break;
+                }
+            }
+            if (!$feedsConcat || null !== $block->slotForOperand($child->result)) {
+                continue;
+            }
+            for ($k = $j - 1; $k >= 0; --$k) {
+                $prev = $ops[$k];
+                if ($prev instanceof Op\Expr\BinaryOp\Coalesce) {
+                    break;
+                }
+                if (
+                    $prev instanceof Op\Expr
+                    && $this->isInlineExprCallArgProducer($prev)
+                    && null !== $prev->result
+                    && null === $block->slotForOperand($prev->result)
+                ) {
+                    $this->compileOp($prev, $block);
+                }
+            }
+            $this->compileOp($child, $block);
+        }
 
         return $block;
     }
@@ -4694,6 +4766,118 @@ class Compiler {
             if ($ops[$j] instanceof Op\Terminal\Return) {
                 return false;
             }
+        }
+
+        return false;
+    }
+
+    /**
+     * echo var_export($arr['k'] ?? $d, true) . "\n" — defer call until ?? merge + concat echo (#18315).
+     *
+     * @param Op[] $ops
+     */
+    private function isFuncCallLoweredByFollowingEchoConcat(Op $call, array $ops, int $index): bool
+    {
+        if (
+            !($call instanceof Op\Expr\FuncCall || $call instanceof Op\Expr\NsFuncCall)
+            || !property_exists($call, 'result')
+            || null === $call->result
+        ) {
+            return false;
+        }
+        $concat = $ops[$index + 1] ?? null;
+        if (
+            !$concat instanceof Op\Expr\BinaryOp\Concat
+            || !(
+                $this->operandsChainEqual($concat->left, $call->result)
+                || $this->operandsReferToSameVariable($concat->left, $call->result)
+            )
+        ) {
+            return false;
+        }
+        for ($j = $index + 2; $j < \count($ops); ++$j) {
+            $next = $ops[$j];
+            if ($next instanceof Op\Terminal\Echo_) {
+                if ($ops[$j - 1] !== $concat) {
+                    return false;
+                }
+                $flattened = $this->flattenBinaryConcatFromBlockOps($ops, $j, $next->expr)
+                    ?? $this->flattenBinaryConcatToConcatList($next->expr);
+                if (null === $flattened) {
+                    return false;
+                }
+                for ($k = $index - 1; $k >= 0; --$k) {
+                    $prev = $ops[$k];
+                    if ($prev instanceof Op\Expr\BinaryOp\Coalesce) {
+                        return $this->isCoalesceLoweredByFollowingEchoConcat($ops, $k);
+                    }
+                    if (!$prev instanceof Op\Expr || !$this->isInlineExprCallArgProducer($prev)) {
+                        break;
+                    }
+                }
+
+                return false;
+            }
+            if ($next instanceof Op\Terminal\Return) {
+                return false;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @param Op[] $ops
+     */
+    private function isConstFetchLoweredByFollowingEchoConcatFuncCall(array $ops, int $index): bool
+    {
+        $next = $ops[$index + 1] ?? null;
+        if (!$next instanceof Op\Expr\FuncCall && !$next instanceof Op\Expr\NsFuncCall) {
+            return false;
+        }
+
+        return $this->isFuncCallLoweredByFollowingEchoConcat($next, $ops, $index + 1);
+    }
+
+    /**
+     * Stmt-level ?? consumed by a FuncCall before echo-concat lowering runs (#18315, re-#11601).
+     *
+     * @param Op[] $ops
+     */
+    private function stmtCoalesceFeedsFuncCallBeforeEcho(
+        Op\Expr\BinaryOp\Coalesce $coalesce,
+        Op $callOp,
+        array $ops,
+        int $coalesceIndex,
+        int $callIndex
+    ): bool {
+        if (!property_exists($callOp, 'args') || !is_array($callOp->args)) {
+            return false;
+        }
+        foreach ($callOp->args as $callArg) {
+            if (
+                null !== $callArg
+                && !$this->isCallArgUnrelatedToPriorStmtCoalesce($callArg)
+                && (
+                    $this->operandsChainEqual($callArg, $coalesce->result)
+                    || $this->operandsReferToSameVariable($callArg, $coalesce->result)
+                    || $this->operandsReferToSameVariable($callArg, $coalesce->left)
+                )
+            ) {
+                return true;
+            }
+        }
+        $firstArg = $callOp->args[0] ?? null;
+        if (
+            null !== $firstArg
+            && !$this->isCallArgUnrelatedToPriorStmtCoalesce($firstArg)
+            && $this->onlyInlineCallArgProducersBetweenIndices($ops, $coalesceIndex, $callIndex)
+            && (
+                $this->operandsChainEqual($firstArg, $coalesce->result)
+                || $this->operandsReferToSameVariable($firstArg, $coalesce->result)
+            )
+        ) {
+            return true;
         }
 
         return false;
