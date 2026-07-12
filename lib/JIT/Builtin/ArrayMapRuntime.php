@@ -26,6 +26,8 @@ final class ArrayMapRuntime
 {
     private const ABI_MAP_NULL = '__array_map__null';
 
+    private const ABI_MAP_NULL_MULTI = '__array_map__null_multi';
+
     private const ABI_MAP_BUILTIN = '__array_map__builtin';
 
     private const ABI_MAP_BUILTIN_MULTI = '__array_map__builtin_multi';
@@ -38,6 +40,8 @@ final class ArrayMapRuntime
 
     private const MAP_NULL = 'PHPCompiler\\ext\\standard\\ArrayMapJitHelper::mapNullIdentity';
 
+    private const MAP_NULL_MULTIPLE = 'PHPCompiler\\ext\\standard\\ArrayMapJitHelper::mapNullZipMultiple';
+
     private const MAP_BUILTIN = 'PHPCompiler\\ext\\standard\\ArrayMapJitHelper::mapWithBuiltin';
 
     private const MAP_BUILTIN_MULTIPLE = 'PHPCompiler\\ext\\standard\\ArrayMapJitHelper::mapWithBuiltinMultiple';
@@ -49,6 +53,7 @@ final class ArrayMapRuntime
     /** @var list<string> */
     private const COMPILED_HELPERS = [
         self::MAP_NULL,
+        self::MAP_NULL_MULTIPLE,
         self::MAP_BUILTIN,
         self::MAP_BUILTIN_MULTIPLE,
         self::MAP_CLOSURE,
@@ -78,6 +83,21 @@ final class ArrayMapRuntime
         }
 
         return self::callMapBuiltin($context, $ht, $context->constantFromString($name));
+    }
+
+    /**
+     * @param list<JITVariable> $arrays
+     */
+    public static function mapNullZipMultiple(Context $context, array $arrays): Value
+    {
+        self::ensureLinked($context);
+        $sources = [];
+        foreach ($arrays as $array) {
+            $sources[] = self::argToHashtable($context, $array);
+        }
+        $packed = self::packHashtablePtrArray($context, $sources);
+
+        return self::callMapNullMultiple($context, $packed);
     }
 
     /**
@@ -139,6 +159,7 @@ final class ArrayMapRuntime
 
         self::ensureJitHelperCompiled($context);
         self::implementIfMissing($context, self::ABI_MAP_NULL, self::implementMapNullBridge(...));
+        self::implementIfMissing($context, self::ABI_MAP_NULL_MULTI, self::implementMapNullMultipleBridge(...));
         self::implementIfMissing($context, self::ABI_MAP_BUILTIN, self::implementMapBuiltinBridge(...));
         self::implementIfMissing($context, self::ABI_MAP_BUILTIN_MULTI, self::implementMapBuiltinMultipleBridge(...));
         self::implementClosureBridges($context);
@@ -215,6 +236,7 @@ final class ArrayMapRuntime
                 false,
                 ...match ($name) {
                     self::ABI_MAP_NULL => [$htPtr],
+                    self::ABI_MAP_NULL_MULTI => [$htPtr],
                     self::ABI_MAP_BUILTIN => [$htPtr, $strPtr],
                     self::ABI_MAP_BUILTIN_MULTI => [$htPtr, $strPtr],
                     default => throw new \LogicException('unknown array_map bridge: '.$name),
@@ -230,6 +252,18 @@ final class ArrayMapRuntime
         $htRaw = JitNestedHelperCoerce::callHelper(
             $context,
             self::helperFunction($context, self::MAP_NULL),
+            [$fn->getParam(0)]
+        );
+        $context->builder->returnValue(JitNestedHelperCoerce::coerceToHashtablePtr($context, $htRaw));
+    }
+
+    private static function implementMapNullMultipleBridge(Context $context, LlvmFunction $fn): void
+    {
+        $entry = $fn->appendBasicBlock('array_map_null_multi_bridge_entry');
+        $context->builder->positionAtEnd($entry);
+        $htRaw = JitNestedHelperCoerce::callHelper(
+            $context,
+            self::helperFunction($context, self::MAP_NULL_MULTIPLE),
             [$fn->getParam(0)]
         );
         $context->builder->returnValue(JitNestedHelperCoerce::coerceToHashtablePtr($context, $htRaw));
@@ -266,6 +300,16 @@ final class ArrayMapRuntime
         return $context->builder->call(
             $context->lookupFunction(self::ABI_MAP_NULL),
             $ht
+        );
+    }
+
+    private static function callMapNullMultiple(Context $context, JITVariable $sources): Value
+    {
+        self::ensureLinked($context);
+
+        return $context->builder->call(
+            $context->lookupFunction(self::ABI_MAP_NULL_MULTI),
+            HashTableHelper::loadHashtablePointer($context, $sources)
         );
     }
 
@@ -361,6 +405,7 @@ final class ArrayMapRuntime
     {
         foreach ([
             self::ABI_MAP_NULL,
+            self::ABI_MAP_NULL_MULTI,
             self::ABI_MAP_BUILTIN,
             self::ABI_MAP_BUILTIN_MULTI,
             self::ABI_MAP_CLOSURE,
@@ -379,6 +424,7 @@ final class ArrayMapRuntime
     {
         foreach ([
             self::ABI_MAP_NULL,
+            self::ABI_MAP_NULL_MULTI,
             self::ABI_MAP_BUILTIN,
             self::ABI_MAP_BUILTIN_MULTI,
             self::ABI_MAP_CLOSURE,

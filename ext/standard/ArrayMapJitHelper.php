@@ -114,6 +114,58 @@ final class ArrayMapJitHelper
     }
 
     /**
+     * Null-callback zip across multiple source arrays (php-src php_array_map).
+     *
+     * @param HashTable $sources packed list of source arrays (JIT bridge)
+     */
+    public static function mapNullZipMultiple(HashTable $sources): HashTable
+    {
+        $tables = [];
+        foreach ($sources->iterate(true) as $value) {
+            $tables[] = $value->resolveIndirect()->toArray();
+        }
+
+        return self::mapNullZipMultipleTables($tables);
+    }
+
+    /**
+     * @param list<HashTable> $sources
+     */
+    private static function mapNullZipMultipleTables(array $sources): HashTable
+    {
+        $out = new HashTable();
+        $first = $sources[0];
+        $destIdx = 0;
+        foreach ($first->iterateKeyed(true) as [$key, $_value]) {
+            $rowArgs = [];
+            foreach ($sources as $ht) {
+                $rowArgs[] = self::valueAtKey($ht, $key);
+            }
+            $mapped = new Variable();
+            $mapped->array(self::buildZipRow($rowArgs));
+            $out->addIndex($destIdx++, $mapped);
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param list<Variable> $values
+     */
+    private static function buildZipRow(array $values): HashTable
+    {
+        $row = new HashTable();
+        $idx = 0;
+        foreach ($values as $value) {
+            $copy = new Variable();
+            $copy->copyFrom($value);
+            $row->addIndex($idx++, $copy);
+        }
+
+        return $row;
+    }
+
+    /**
      * @param list<HashTable> $sources
      */
     private static function mapWithBuiltinMultipleTables(array $sources, string $builtinName): HashTable
