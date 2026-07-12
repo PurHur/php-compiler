@@ -80,6 +80,7 @@ final class StringNl2br
 
         $strPtr = $context->getTypeFromString('__string__*');
         $i8 = $context->getTypeFromString('int8');
+        $i64 = $context->getTypeFromString('int64');
         $ft = $context->context->functionType($strPtr, false, $strPtr, $i8);
         $fn = null !== $probe
             ? $probe
@@ -87,10 +88,11 @@ final class StringNl2br
 
         $entry = $fn->appendBasicBlock('nl2br_bridge_entry');
         $context->builder->positionAtEnd($entry);
+        $useXhtmlI64 = $context->builder->zExt($fn->getParam(1), $i64);
         $result = $context->builder->call(
             self::helperFunction($context, self::NL2BR_HELPER),
             $fn->getParam(0),
-            $fn->getParam(1)
+            $useXhtmlI64
         );
         $context->builder->returnValue($result);
         $context->registerFunction($abiName, $fn);

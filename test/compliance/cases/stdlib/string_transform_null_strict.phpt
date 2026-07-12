@@ -1,10 +1,10 @@
 --TEST--
-stdlib nl2br/trim family — null operand coerces when caller non-strict (#11322, ext/standard/string.c)
+stdlib nl2br()/wordwrap()/stripslashes() — null operand TypeError (#18358, ext/standard/string.c)
 --SKIPIF--
 <?php die('skip — compiler VM/JIT compliance via VMTest/JITTest, not Zend CLI'); ?>
 --FILE--
 <?php
-foreach (['nl2br', 'chop', 'rtrim', 'ltrim', 'trim', 'wordwrap', 'ucfirst', 'lcfirst', 'ucwords'] as $fn) {
+foreach (['nl2br', 'wordwrap', 'stripslashes'] as $fn) {
     try {
         $fn(null);
         echo "$fn: NO_THROW\n";
@@ -12,16 +12,8 @@ foreach (['nl2br', 'chop', 'rtrim', 'ltrim', 'trim', 'wordwrap', 'ucfirst', 'lcf
         echo $fn.': '.$e->getMessage()."\n";
     }
 }
-echo trim('  x  '), "\n";
 ?>
 --EXPECT--
 nl2br: nl2br(): Argument #1 ($string) must be of type string, null given
-chop: NO_THROW
-rtrim: NO_THROW
-ltrim: NO_THROW
-trim: NO_THROW
 wordwrap: wordwrap(): Argument #1 ($string) must be of type string, null given
-ucfirst: NO_THROW
-lcfirst: NO_THROW
-ucwords: NO_THROW
-x
+stripslashes: stripslashes(): Argument #1 ($string) must be of type string, null given

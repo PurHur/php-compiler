@@ -35,7 +35,7 @@ final class wordwrap extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $text = VmString::coerceStringBuiltinArg(
+        $text = VmString::coerceTypedStringBuiltinArg(
             $frame->calledArgs[0],
             'wordwrap',
             0,
@@ -104,7 +104,7 @@ final class wordwrap extends Internal
             $cutI8 = $context->builder->zExt($context->helper->loadValue($args[3]), $i8);
         }
 
-        $text = JitStringBuiltinArg::lower($context, $args[0], 'wordwrap', 0, 'string');
+        $text = JitStringBuiltinArg::lowerTypedString($context, $args[0], 'wordwrap', 0, 'string');
         StringWordwrap::ensureLinked($context);
 
         return $context->builder->call(
