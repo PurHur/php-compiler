@@ -9649,6 +9649,7 @@ class Compiler {
                         || $this->errorSuppressEndBlockCallArgHasTrailingHoistedArrayProducer($endCompiled, $endChild, (int) $argIndex)
                         || $this->errorSuppressEndBlockCallArgHasTrailingArrayDimFetchProducer($endCompiled, $endChild, (int) $argIndex)
                         || $this->errorSuppressEndBlockCallArgHasAdjacentNestedFuncCallProducer($endCompiled, $endChild, (int) $argIndex)
+                        || $this->errorSuppressEndBlockCallArgHasTrailingComparisonProducer($endCompiled, $endChild, (int) $argIndex)
                     ) {
                         continue;
                     }
@@ -37332,6 +37333,9 @@ class Compiler {
         if ($this->errorSuppressEndBlockCallArgHasAdjacentNestedFuncCallProducer($block, $cfgCallOp, $argIndex)) {
             return null;
         }
+        if ($this->errorSuppressEndBlockCallArgHasTrailingComparisonProducer($block, $cfgCallOp, $argIndex)) {
+            return null;
+        }
 
         return $this->errorSuppressEndBlockInnerResultSlot($block);
     }
@@ -37382,6 +37386,52 @@ class Compiler {
         }
 
         return $argIndex === $targetArgIndex;
+    }
+
+    /**
+     * `var_dump($h !== false)` after `@fopen` — hoisted compare feeds dead-temp arg, not @ return (#18185, #13694).
+     */
+    private function errorSuppressEndBlockCallArgHasTrailingComparisonProducer(
+        Block $block,
+        Op $cfgCallOp,
+        int $argIndex
+    ): bool {
+        if (null === $block->orig || !property_exists($cfgCallOp, 'args') || !\is_array($cfgCallOp->args)) {
+            return false;
+        }
+        $callArg = $cfgCallOp->args[$argIndex] ?? null;
+        if (!$callArg instanceof Operand || $this->isEmbeddedCallLiteralArg($callArg)) {
+            return false;
+        }
+        if (!$this->callArgIsDeadInlineTemporary($callArg)) {
+            return false;
+        }
+        $children = $block->orig->children;
+        $callIndex = array_search($cfgCallOp, $children, true);
+        if (!\is_int($callIndex) || $callIndex < 1) {
+            return false;
+        }
+        for ($i = $callIndex - 1; $i >= 0 && $callIndex - $i <= 8; --$i) {
+            $prev = $children[$i] ?? null;
+            if ($prev instanceof Op\Expr\Assign) {
+                continue;
+            }
+            if (!$this->isComparisonInlineCallArgProducer($prev)) {
+                break;
+            }
+            if (
+                null !== $prev->result
+                && (
+                    $this->operandsReferToSameVariable($prev->result, $callArg)
+                    || $this->callArgIsDeadInlineTemporary($callArg)
+                )
+            ) {
+                return true;
+            }
+            break;
+        }
+
+        return false;
     }
 
     /**
