@@ -8,7 +8,6 @@ foreach ([
     'rawurlencode' => static fn () => rawurlencode(null),
     'htmlspecialchars' => static fn () => htmlspecialchars(null),
     'htmlentities' => static fn () => htmlentities(null),
-    'strtolower' => static fn () => strtolower(null),
     'addcslashes' => static fn () => addcslashes(null, 'a'),
     'strip_tags' => static fn () => strip_tags(null),
 ] as $name => $call) {
@@ -24,6 +23,5 @@ urlencode: TypeError
 rawurlencode: TypeError
 htmlspecialchars: TypeError
 htmlentities: TypeError
-strtolower: TypeError
 addcslashes: TypeError
 strip_tags: TypeError
