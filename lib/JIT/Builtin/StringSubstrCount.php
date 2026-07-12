@@ -100,18 +100,16 @@ final class StringSubstrCount
             : $context->module->addFunction($abiName, $ft);
 
         $entry = $fn->appendBasicBlock('substr_count_bridge_entry');
-        $fail = $fn->appendBasicBlock('substr_count_bridge_fail');
-        $body = $fn->appendBasicBlock('substr_count_bridge_body');
         $context->builder->positionAtEnd($entry);
 
-        $hay = $fn->getParam(0);
-        $needle = $fn->getParam(1);
-        $hayNull = $context->builder->icmp(Builder::INT_EQ, $hay, $strPtr->constNull());
-        $needleNull = $context->builder->icmp(Builder::INT_EQ, $needle, $strPtr->constNull());
-        $bad = $context->builder->or($hayNull, $needleNull);
-        $context->builder->branchIf($bad, $fail, $body);
-
-        $context->builder->positionAtEnd($body);
+        // Z_PARAM_STR null → "" before helper (php-src ext/standard/string.c, #18265).
+        $empty = $context->builder->load($context->constantStringFromString(''));
+        $hayParam = $fn->getParam(0);
+        $needleParam = $fn->getParam(1);
+        $hayNull = $context->builder->icmp(Builder::INT_EQ, $hayParam, $strPtr->constNull());
+        $needleNull = $context->builder->icmp(Builder::INT_EQ, $needleParam, $strPtr->constNull());
+        $hay = $context->builder->select($hayNull, $empty, $hayParam);
+        $needle = $context->builder->select($needleNull, $empty, $needleParam);
         $raw = JitNestedHelperCoerce::callHelper(
             $context,
             self::helperFunction($context, self::COUNT_HELPER),
@@ -126,9 +124,6 @@ final class StringSubstrCount
         $context->builder->returnValue(
             JitNestedHelperCoerce::coerceBridgeResult($context, $raw, $i64)
         );
-
-        $context->builder->positionAtEnd($fail);
-        $context->builder->returnValue($i64->constInt(0, false));
     }
 
     private static function helperFunction(Context $context, string $logical): LlvmFunction

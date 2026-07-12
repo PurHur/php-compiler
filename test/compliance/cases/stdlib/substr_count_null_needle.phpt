@@ -1,11 +1,11 @@
 --TEST--
-stdlib substr_count() — null needle TypeError not empty ValueError (#18255, ext/standard/string.c)
+stdlib substr_count() — null needle ValueError not TypeError (#18265, ext/standard/string.c)
 --FILE--
 <?php
 try {
     substr_count('haystack', null);
     echo "null_needle: uncaught\n";
-} catch (TypeError $e) {
+} catch (ValueError $e) {
     echo $e->getMessage(), "\n";
 }
 try {
@@ -15,5 +15,5 @@ try {
     echo $e->getMessage(), "\n";
 }
 --EXPECT--
-substr_count(): Argument #2 ($needle) must be of type string, null given
+substr_count(): Argument #2 ($needle) cannot be empty
 substr_count(): Argument #2 ($needle) cannot be empty
