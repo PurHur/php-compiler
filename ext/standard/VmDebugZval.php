@@ -9,7 +9,6 @@ use PHPCompiler\VM;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\OutputBuffer;
-use PHPCompiler\VM\ResourceSupport;
 use PHPCompiler\VM\TypedPropertyCheck;
 use PHPCompiler\VM\Variable;
 
@@ -76,10 +75,7 @@ final class VmDebugZval
 
             return;
         }
-        $resourceDump = VmVarFormat::formatDebugZvalResource(
-            $var,
-            self::countResourceReferences($vm, $var)
-        );
+        $resourceDump = VmVarFormat::tryFormatDebugZvalDump($var);
         if (null !== $resourceDump) {
             self::write($resourceDump);
 
@@ -161,100 +157,6 @@ final class VmDebugZval
         $vm->visitStrongRefRoots($walk);
 
         return $count;
-    }
-
-    /**
-     * Zend debug_zval_dump resource refcount — 1 + live zvals sharing the resource (#18419).
-     */
-    public static function countResourceReferences(VM $vm, Variable $resourceVar): int
-    {
-        $resourceVar = $resourceVar->resolveIndirect();
-        $targetKey = self::resourceIdentityKey($resourceVar);
-        if (null === $targetKey) {
-            return 1;
-        }
-        $count = 0;
-        $varSeen = [];
-        $containerSeen = [];
-
-        $matches = static function (Variable $var) use ($targetKey): bool {
-            $var = $var->resolveIndirect();
-            $key = self::resourceIdentityKey($var);
-
-            return null !== $key && $key === $targetKey;
-        };
-
-        $walk = static function (Variable $var) use (&$walk, &$count, $matches, &$varSeen, &$containerSeen): void {
-            $varId = \spl_object_id($var);
-            if (isset($varSeen[$varId])) {
-                return;
-            }
-            $varSeen[$varId] = true;
-
-            if ($matches($var)) {
-                ++$count;
-            }
-
-            if (Variable::TYPE_INDIRECT === $var->type) {
-                $target = $var->directIndirectTarget();
-                if (null !== $target) {
-                    $walk($target);
-                }
-
-                return;
-            }
-
-            if (Variable::TYPE_ARRAY === $var->type) {
-                $array = $var->toArray();
-                $arrayId = \spl_object_id($array);
-                if (isset($containerSeen['a'.$arrayId])) {
-                    return;
-                }
-                $containerSeen['a'.$arrayId] = true;
-                foreach ($array->iterate(false) as $element) {
-                    $walk($element);
-                }
-
-                return;
-            }
-
-            if (Variable::TYPE_OBJECT === $var->type) {
-                $object = $var->toObject();
-                $objId = $object->id;
-                if (isset($containerSeen['o'.$objId])) {
-                    return;
-                }
-                $containerSeen['o'.$objId] = true;
-                foreach ($object->propertiesWithNames() as $prop) {
-                    $walk($prop);
-                }
-            }
-        };
-
-        $vm->visitStrongRefRoots($walk);
-
-        return max(1, $count);
-    }
-
-    private static function resourceIdentityKey(Variable $var): ?string
-    {
-        $var = $var->resolveIndirect();
-        if (Variable::TYPE_OBJECT === $var->type && ResourceSupport::isResourceObject($var->toObject())) {
-            $object = $var->toObject();
-            $state = $object->resourceState;
-            if (null !== $state) {
-                return 'r:'.$state->kind.':'.$state->handle;
-            }
-
-            return 'o:'.$object->id;
-        }
-        if (ResourceSupport::isVmResource($var)) {
-            $handle = ResourceSupport::resolveHandle($var);
-
-            return null !== $handle ? 'h:'.$handle : null;
-        }
-
-        return null;
     }
 
     private static function dumpArray(VM $vm, VM\HashTable $table, int $level, ?Frame $frame = null): void

@@ -25,6 +25,18 @@ final class VmVarFormat
         return 'resource('.$handle.') of type ('.self::resourceTypeLabel($var, $handle).")\n";
     }
 
+    /** debug_zval_dump() resource branch — var_dump line + GC refcount (#18419, Zend/zend.c). */
+    public static function tryFormatDebugZvalDump(Variable $var): ?string
+    {
+        $handle = self::resourceDisplayId($var);
+        if (null === $handle) {
+            return null;
+        }
+
+        return 'resource('.$handle.') of type ('.self::resourceTypeLabel($var, $handle)
+            .') refcount('.self::resourceDebugRefcount($var).")\n";
+    }
+
     public static function tryFormatPrintR(Variable $var): ?string
     {
         $handle = self::resourceDisplayId($var);
@@ -33,16 +45,6 @@ final class VmVarFormat
         }
 
         return 'Resource id #'.$handle;
-    }
-
-    public static function formatDebugZvalResource(Variable $var, int $refcount): ?string
-    {
-        $handle = self::resourceDisplayId($var);
-        if (null === $handle) {
-            return null;
-        }
-
-        return 'resource('.$handle.') of type ('.self::resourceTypeLabel($var, $handle).') refcount('.$refcount.")\n";
     }
 
     private static function resourceDisplayId(Variable $var): ?int
@@ -95,5 +97,18 @@ final class VmVarFormat
         }
 
         return 'Unknown';
+    }
+
+    /**
+     * Zend GC_REFCOUNT for Resource object zvals — engine holds persistent refs (#18419).
+     */
+    private static function resourceDebugRefcount(Variable $var): int
+    {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_OBJECT === $var->type && ResourceSupport::isResourceObject($var->toObject())) {
+            return max(1, $var->toObject()->refCount - 2);
+        }
+
+        return 2;
     }
 }
