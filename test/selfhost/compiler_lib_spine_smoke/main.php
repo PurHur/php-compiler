@@ -852,6 +852,7 @@ require_once __DIR__.'/../../../ext/spl/RecursiveCallbackFilterIteratorBuiltin.p
 require_once __DIR__.'/../../../ext/spl/RecursiveTreeIteratorBuiltin.php';
 require_once __DIR__.'/../../../ext/spl/RegexIteratorBuiltin.php';
 require_once __DIR__.'/../../../ext/spl/SplArraySerializeSupport.php';
+require_once __DIR__.'/../../../ext/spl/SplFileIteratorSerializeDeny.php';
 require_once __DIR__.'/../../../ext/spl/SplArrayStorage.php';
 require_once __DIR__.'/../../../ext/spl/SplArrayUserSortMethod.php';
 require_once __DIR__.'/../../../ext/spl/SplClassConstants.php';

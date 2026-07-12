@@ -14,6 +14,7 @@ use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\Context;
 use PHPCompiler\ext\spl\SplArraySerializeSupport;
 use PHPCompiler\ext\spl\SplDllistSerializeSupport;
+use PHPCompiler\ext\spl\SplFileIteratorSerializeDeny;
 use PHPCompiler\ext\spl\SplFixedArraySerializeSupport;
 use PHPCompiler\ext\spl\SplObjectStorageSerializeSupport;
 use PHPCompiler\VM\DateIntervalSupport;
@@ -52,6 +53,7 @@ final class VmSerialize
                 throw new \Exception("Serialization of 'Closure' is not allowed");
             }
             $entry = $value->toObject();
+            SplFileIteratorSerializeDeny::rejectSerialization($entry->class->name);
             self::rejectAnonymousClassSerialization($entry);
             $lcClass = strtolower($entry->class->name);
             if (DateTimeSupport::CLASS_DATETIME === $lcClass || DateTimeSupport::CLASS_DATETIMEIMMUTABLE === $lcClass) {
@@ -172,6 +174,7 @@ final class VmSerialize
             if (0 === strcasecmp($className, 'Closure')) {
                 throw new \Exception("Unserialization of 'Closure' is not allowed");
             }
+            SplFileIteratorSerializeDeny::rejectUnserialization($className);
             if (!self::isClassAllowedForUnserialize($className, $options)) {
                 $parsed = self::parseCustomObjectPayload($payload);
                 if (null === $parsed || !\is_array($parsed[1])) {
@@ -483,6 +486,7 @@ final class VmSerialize
         if (0 === strcasecmp($entry->class->name, 'Closure')) {
             throw new \Exception("Serialization of 'Closure' is not allowed");
         }
+        SplFileIteratorSerializeDeny::rejectSerialization($entry->class->name);
         self::rejectAnonymousClassSerialization($entry);
         $existing = $state->lookupObjectIndex($entry);
         if (null !== $existing) {
