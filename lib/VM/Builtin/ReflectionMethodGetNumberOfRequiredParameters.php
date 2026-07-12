@@ -8,12 +8,12 @@ use PHPCompiler\ext\standard\VmReflection;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\ReflectionSupport;
 
-/** ReflectionMethod::getNumberOfParameters() — VM (#9723, ext/reflection/php_reflection.c). */
-final class ReflectionMethodGetNumberOfParameters extends VmClassMethod
+/** ReflectionMethod::getNumberOfRequiredParameters() — VM (#18325, ext/reflection/php_reflection.c). */
+final class ReflectionMethodGetNumberOfRequiredParameters extends VmClassMethod
 {
     public function __construct()
     {
-        parent::__construct('getNumberOfParameters');
+        parent::__construct('getNumberOfRequiredParameters');
     }
 
     public function execute(Frame $frame): void
@@ -26,8 +26,7 @@ final class ReflectionMethodGetNumberOfParameters extends VmClassMethod
         if (null === $entry) {
             throw new \LogicException('ReflectionMethod refers to unknown class in this compiler build');
         }
-        $methodLc = strtolower($method);
-        $count = ReflectionSupport::methodNumberOfParameters($entry, $method);
+        $count = ReflectionSupport::methodNumberOfRequiredParameters($entry, $method);
         if (null !== $frame->returnVar) {
             $frame->returnVar->int($count);
         }

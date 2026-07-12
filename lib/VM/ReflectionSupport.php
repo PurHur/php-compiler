@@ -1606,6 +1606,90 @@ final class ReflectionSupport
         return self::functionNameFromReflection($reflection);
     }
 
+    public static function methodNumberOfParameters(ClassEntry $entry, string $method): int
+    {
+        $methodLc = strtolower($method);
+        $params = $entry->methodParameterMetadata[$methodLc] ?? [];
+        if ([] !== $params) {
+            return \count($params);
+        }
+        if ($entry->isInternal) {
+            return BuiltinParamNames::paramCountForInternalMethod($entry->name, $method) ?? 0;
+        }
+        $func = $entry->methods[$methodLc] ?? null;
+        if ($func instanceof PhpFunc) {
+            return \count($func->block->paramNames);
+        }
+
+        return BuiltinParamNames::paramCountForInternalMethod($entry->name, $method) ?? 0;
+    }
+
+    public static function methodNumberOfRequiredParameters(ClassEntry $entry, string $method): int
+    {
+        $methodLc = strtolower($method);
+        $params = $entry->methodParameterMetadata[$methodLc] ?? [];
+        if ([] !== $params) {
+            return self::requiredParameterCountFromBlock(
+                self::resolveMethodBlock($entry, $methodLc)
+            );
+        }
+        if ($entry->isInternal) {
+            return BuiltinParamNames::requiredParamCountForInternalMethod($entry->name, $method) ?? 0;
+        }
+        $func = $entry->methods[$methodLc] ?? null;
+        if ($func instanceof PhpFunc) {
+            return self::requiredParameterCountFromBlock($func->block);
+        }
+
+        return BuiltinParamNames::requiredParamCountForInternalMethod($entry->name, $method) ?? 0;
+    }
+
+    /**
+     * @return list<string>
+     */
+    public static function methodParameterNames(ClassEntry $entry, string $method): array
+    {
+        $methodLc = strtolower($method);
+        $params = $entry->methodParameterMetadata[$methodLc] ?? [];
+        if ([] !== $params) {
+            return array_map(static fn ($meta) => $meta->name, $params);
+        }
+        if ($entry->isInternal) {
+            return BuiltinInternalArgInfo::paramNamesForClassMethod($entry->name, $method);
+        }
+        $func = $entry->methods[$methodLc] ?? null;
+        if ($func instanceof PhpFunc) {
+            return $func->block->paramNames;
+        }
+
+        return BuiltinInternalArgInfo::paramNamesForClassMethod($entry->name, $method);
+    }
+
+    private static function resolveMethodBlock(ClassEntry $entry, string $methodLc): Block
+    {
+        $func = $entry->methods[$methodLc] ?? null;
+        if (!$func instanceof PhpFunc) {
+            throw new \LogicException('ReflectionMethod refers to unknown method in this compiler build');
+        }
+
+        return $func->block;
+    }
+
+    private static function requiredParameterCountFromBlock(Block $block): int
+    {
+        $required = 0;
+        for ($i = 0, $n = \count($block->paramNames); $i < $n; ++$i) {
+            if (self::parameterIsVariadic($block, $i)
+                || ParamArgumentCountError::parameterHasDefault($block, $i)
+            ) {
+                break;
+            }
+            ++$required;
+        }
+
+        return $required;
+    }
+
     private static function cfgTypeAllowsPassByValueWithByRef(CfgType $type): bool
     {
         if ($type instanceof CfgType\Nullable) {

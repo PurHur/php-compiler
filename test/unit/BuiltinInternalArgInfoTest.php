@@ -32,4 +32,10 @@ final class BuiltinInternalArgInfoTest extends TestCase
     {
         $this->assertNull(BuiltinInternalArgInfo::paramCountForFunction('not_a_real_builtin_xyz'));
     }
+
+    public function testSplFileObjectSeekMethodParamCount(): void
+    {
+        $this->assertSame(1, BuiltinInternalArgInfo::paramCountForClassMethod('SplFileObject', 'seek'));
+        $this->assertSame(1, BuiltinInternalArgInfo::requiredParamCountForClassMethod('SplFileObject', 'seek'));
+    }
 }
