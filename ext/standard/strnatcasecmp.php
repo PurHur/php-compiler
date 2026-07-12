@@ -10,6 +10,7 @@ use PHPCompiler\JIT\Builtin\StringStrnatcasecmp;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPLLVM\Value;
 
 /**
@@ -27,8 +28,8 @@ final class strnatcasecmp extends Internal
         if (2 !== \count($frame->calledArgs)) {
             throw new \LogicException('strnatcasecmp() requires exactly two arguments');
         }
-        $a = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'strnatcasecmp', 0, 'string1');
-        $b = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'strnatcasecmp', 1, 'string2');
+        $a = self::vmStringArg($frame, 0, 'string1');
+        $b = self::vmStringArg($frame, 1, 'string2');
         if (null === $frame->returnVar) {
             return;
         }
@@ -44,12 +45,26 @@ final class strnatcasecmp extends Internal
             throw new \LogicException('strnatcasecmp() requires exactly two arguments');
         }
         StringStrnatcasecmp::ensureLinked($context);
-        $p0 = $this->stringDataPtr($context, JitStringBuiltinArg::lower($context, $args[0], 'strnatcasecmp', 0, 'string1'));
-        $p1 = $this->stringDataPtr($context, JitStringBuiltinArg::lower($context, $args[1], 'strnatcasecmp', 1, 'string2'));
+        $p0 = $this->stringDataPtr($context, JitStringBuiltinArg::lowerCoercible($context, $args[0], 'strnatcasecmp', 0, 'string1'));
+        $p1 = $this->stringDataPtr($context, JitStringBuiltinArg::lowerCoercible($context, $args[1], 'strnatcasecmp', 1, 'string2'));
         $fn = $context->lookupFunction('strnatcasecmp');
         $raw = $context->builder->call($fn, $p0, $p1);
         $i64 = $context->getTypeFromString('int64');
 
         return $context->builder->sExt($raw, $i64);
+    }
+
+    private static function vmStringArg(Frame $frame, int $argIndex, string $paramName): string
+    {
+        if (InternalStrictArg::isCallerStrict($frame)) {
+            return InternalStrictArg::requireString($frame, $argIndex, 'strnatcasecmp', $paramName)->toString();
+        }
+
+        return VmString::coerceStringBuiltinArg(
+            $frame->calledArgs[$argIndex],
+            'strnatcasecmp',
+            $argIndex,
+            $paramName
+        );
     }
 }
