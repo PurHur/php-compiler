@@ -36,8 +36,8 @@ final class GeneratorSend extends VmClassMethod
             return;
         }
         if ($active && $gen->hasCurrent) {
-            $frame->returnVar->copyFrom($gen->currentValue);
-        } else {
+            GeneratorGetReturn::writeYieldedValueToReturn($frame, $gen);
+        } elseif (null !== $frame->returnVar) {
             $frame->returnVar->null();
         }
     }

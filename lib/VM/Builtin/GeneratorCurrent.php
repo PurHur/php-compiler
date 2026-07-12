@@ -22,11 +22,7 @@ final class GeneratorCurrent extends VmClassMethod
         if (null === $frame->returnVar) {
             return;
         }
-        if ($gen->hasCurrent) {
-            $frame->returnVar->copyFrom($gen->currentValue);
-        } else {
-            $frame->returnVar->null();
-        }
+        GeneratorGetReturn::writeYieldedValueToReturn($frame, $gen);
     }
 
     private static function receiver(Frame $frame): \PHPCompiler\VM\ObjectEntry

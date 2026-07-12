@@ -28762,13 +28762,32 @@ class Compiler {
             ? OpCode::TYPE_STATICCALL_INIT
             : OpCode::TYPE_METHODCALL_INIT;
         $needle = strtolower($methodName);
+        $producerOrdinal = 0;
+        if (null !== $block->orig) {
+            foreach ($block->orig->children as $child) {
+                if ($child === $producer) {
+                    break;
+                }
+                if ($child instanceof Op\Expr\MethodCall || $child instanceof Op\Expr\StaticCall) {
+                    $priorName = $this->staticNameFromOperand($child->name);
+                    if (null !== $priorName && $needle === strtolower($priorName)) {
+                        ++$producerOrdinal;
+                    }
+                }
+            }
+        }
         $ops = array_merge($block->opCodes, $pendingOps);
+        $seenInit = 0;
         foreach ($ops as $i => $op) {
             if ($initType !== $op->type || null === $op->arg2) {
                 continue;
             }
             $name = $this->resolveCompileTimeStringSlot((int) $op->arg2, $block);
             if ($needle !== strtolower($name ?? '')) {
+                continue;
+            }
+            if ($seenInit !== $producerOrdinal) {
+                ++$seenInit;
                 continue;
             }
             for ($j = $i + 1, $n = \count($ops); $j < $n; ++$j) {
@@ -28780,6 +28799,7 @@ class Compiler {
                     break;
                 }
             }
+            ++$seenInit;
         }
 
         return null;

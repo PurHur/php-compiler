@@ -112,6 +112,9 @@ final class Variable {
     /** proc_open() process handle (#3131). */
     public bool $procResource = false;
 
+    /** GeneratorState current key/value — must not be releaseVmDeadScopeSlot temps (#18184). */
+    public bool $generatorYieldStorage = false;
+
     /** Lvalue proxy for __set dispatch when the property slot does not exist (#146). */
     public ?ObjectEntry $magicSetTarget = null;
 
