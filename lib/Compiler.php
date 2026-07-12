@@ -28763,6 +28763,7 @@ class Compiler {
             : OpCode::TYPE_METHODCALL_INIT;
         $needle = strtolower($methodName);
         $ops = array_merge($block->opCodes, $pendingOps);
+        $matched = null;
         foreach ($ops as $i => $op) {
             if ($initType !== $op->type || null === $op->arg2) {
                 continue;
@@ -28774,7 +28775,8 @@ class Compiler {
             for ($j = $i + 1, $n = \count($ops); $j < $n; ++$j) {
                 $scan = $ops[$j];
                 if (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $scan->type && null !== $scan->arg1) {
-                    return (string) $scan->arg1;
+                    $matched = (string) $scan->arg1;
+                    break;
                 }
                 if (OpCode::TYPE_FUNCCALL_INIT === $scan->type) {
                     break;
@@ -28782,7 +28784,7 @@ class Compiler {
             }
         }
 
-        return null;
+        return $matched;
     }
 
     /**
