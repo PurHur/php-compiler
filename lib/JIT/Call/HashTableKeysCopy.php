@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Call;
 
-use PHPCompiler\JIT\ArrayBuiltinHelper;
+use PHPCompiler\JIT\Builtin\ArrayKeysRuntime;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable;
 use PHPLLVM\Value;
 
-/** HashTable::keysCopy() for nested php-in-PHP JIT helpers (#14578 phase 2). */
+/** HashTable::keysCopy() for nested php-in-PHP JIT helpers (#14578 phase 2, #18287). */
 final class HashTableKeysCopy implements Call
 {
     public function call(Context $context, Variable ...$args): Value
@@ -19,10 +19,7 @@ final class HashTableKeysCopy implements Call
             throw new \LogicException('keysCopy() requires a HashTable receiver');
         }
 
-        return ArrayBuiltinHelper::buildKeysArrayFromVariable(
-            $context,
-            self::receiverVariable($context, $args[0])
-        );
+        return ArrayKeysRuntime::keys($context, self::receiverVariable($context, $args[0]));
     }
 
     private static function receiverVariable(Context $context, Variable $receiver): Variable

@@ -14,7 +14,7 @@ use PHPLLVM\Value;
 /**
  * JIT/AOT link for array_keys() via ArrayKeysJitHelper PHP (#12340).
  *
- * Standalone AOT compiles {@see ArrayKeysJitHelper} via JitVmHelperLink bridge (#14387); native literal arrays keep LLVM in {@see ArrayBuiltinHelper::buildKeysArray*}.
+ * Standalone AOT and native literal arrays materialize to hashtable then route through PHP (#14387, #18287).
  * SSOT: {@see \PHPCompiler\VM\HashTable::keysCopy()}
  * php-src: ext/standard/array.c — php_array_keys()
  */
@@ -38,16 +38,11 @@ final class ArrayKeysRuntime
 
     public static function keys(Context $context, JITVariable $array): Value
     {
-        if (ArrayBuiltinHelper::isNativeArray($array->type)) {
-            return ArrayBuiltinHelper::buildKeysArrayFromVariable($context, $array);
-        }
-
         self::ensureLinked($context);
-        $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
 
         return $context->builder->call(
             $context->lookupFunction(self::ABI_KEYS),
-            $ht
+            ArrayBuiltinHelper::loadHashTable($context, $array)
         );
     }
 
@@ -57,18 +52,12 @@ final class ArrayKeysRuntime
         JITVariable $searchValue,
         Value $strict
     ): Value {
-        if (ArrayBuiltinHelper::isNativeArray($array->type)) {
-            return ArrayBuiltinHelper::buildKeysArrayFiltered($context, $array, $searchValue, $strict);
-        }
-
         self::ensureFilteredLinked($context);
-        $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
-        $searchPtr = JitValueBox::valuePtrFromVariable($context, $searchValue);
 
         return $context->builder->call(
             $context->lookupFunction(self::ABI_KEYS_FILTERED),
-            $ht,
-            $searchPtr,
+            ArrayBuiltinHelper::loadHashTable($context, $array),
+            JitValueBox::valuePtrFromVariable($context, $searchValue),
             $strict
         );
     }
