@@ -20,6 +20,18 @@ class Module extends ModuleAbstract
         return 'standard';
     }
 
+    /**
+     * @return list<string>
+     */
+    public function getAdditionalExtensionNames(): array
+    {
+        if (!GdExtensionPolicy::advertisesExtension()) {
+            return [];
+        }
+
+        return ['gd'];
+    }
+
     public function init(Runtime $runtime): void
     {
         parent::init($runtime);
@@ -32,9 +44,15 @@ class Module extends ModuleAbstract
             return [];
         }
 
-        return [
+        $functions = [
             new imagecreate(),
             new imagecreatetruecolor(),
         ];
+        if (GdExtensionPolicy::advertisesDecodeFromString()) {
+            $functions[] = new imagecreatefromstring();
+            $functions[] = new imagepng();
+        }
+
+        return $functions;
     }
 }
