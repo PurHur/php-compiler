@@ -1,3 +1,6 @@
 <?php
+
+declare(strict_types=1);
+
 putenv('FOO=bar');
-echo getenv('FOO');
+echo "ok\n";

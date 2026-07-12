@@ -110,4 +110,10 @@ final class GetenvJitHelper
     {
         return self::$local;
     }
+
+    /** Merge process-local putenv overlay into a VM hashtable (interpreter path, #9814). */
+    public static function mergeLocalOverlayInto(\PHPCompiler\VM\HashTable $ht): void
+    {
+        EnvLocalJitHelperVm::mergeLocalOverlayInto($ht);
+    }
 }

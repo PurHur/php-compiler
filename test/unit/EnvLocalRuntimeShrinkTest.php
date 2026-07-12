@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\Test\Unit;
 
-use PHPCompiler\ext\standard\EnvLocalJitHelperVm;
+use PHPCompiler\ext\standard\EnvLocalJitHelper;
 use PHPCompiler\ext\standard\GetenvJitHelper;
 use PHPCompiler\VM\HashTable;
 use PHPUnit\Framework\TestCase;
@@ -42,8 +42,8 @@ final class EnvLocalRuntimeShrinkTest extends TestCase
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/EnvLocalJitHelper.php');
         $this->assertStringContainsString('GetenvJitHelper::getenv', $source);
         $this->assertStringContainsString('GetenvJitHelper::putenv', $source);
-        $this->assertStringContainsString('GetenvJitHelper::localOverlayEntries', $source);
-        $this->assertStringNotContainsString('mergeLocalOverlayInto', $source);
+        $this->assertStringContainsString('GetenvJitHelper::mergeLocalOverlayInto', $source);
+        $this->assertStringNotContainsString('Variable::string', $source);
     }
 
     public function testEnvLocalRuntimeNoMergeOverlayLlvmEmitter(): void
@@ -62,7 +62,7 @@ final class EnvLocalRuntimeShrinkTest extends TestCase
         }
         GetenvJitHelper::putenv('PHPC_JIT_OVERLAY_TEST=overlay_value');
         $ht = new HashTable();
-        EnvLocalJitHelperVm::mergeLocalOverlayInto($ht);
+        EnvLocalJitHelper::mergeLocalOverlayInto($ht);
         $this->assertSame('overlay_value', $ht->find('PHPC_JIT_OVERLAY_TEST')?->toString());
     }
 }
