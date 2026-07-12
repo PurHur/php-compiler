@@ -78,6 +78,12 @@ final class ReflectionSupport
 
     public const PROP_METHOD_NAME = 'method';
 
+    /** Zend ReflectionMethod::$class — declaring class name string (#18298). */
+    public const PROP_REFLECTION_METHOD_CLASS = 'class';
+
+    /** Zend ReflectionMethod::$name — method name string (#18298). */
+    public const PROP_REFLECTION_METHOD_FUNC = 'name';
+
     public const PROP_PROPERTY_NAME = 'property';
 
     /** Declaring class name on ReflectionProperty instances (#9878). */
@@ -137,6 +143,11 @@ final class ReflectionSupport
     public static function classNotFoundMessage(string $className): string
     {
         return sprintf('Class "%s" does not exist', $className);
+    }
+
+    public static function classNotEnumMessage(string $className): string
+    {
+        return sprintf('Class "%s" is not an enum', $className);
     }
 
     public static function methodNotFoundMessage(string $className, string $method): string
@@ -746,9 +757,17 @@ final class ReflectionSupport
         return $obj;
     }
 
+    public static function isReflectionMethodObject(ObjectEntry $reflection): bool
+    {
+        return strtolower($reflection->class->name) === self::REFLECTION_METHOD;
+    }
+
     public static function classNameFromReflection(ObjectEntry $reflection): string
     {
-        $nameVar = $reflection->getProperty(self::PROP_CLASS_NAME)->resolveIndirect();
+        $propName = self::isReflectionMethodObject($reflection)
+            ? self::PROP_REFLECTION_METHOD_CLASS
+            : self::PROP_CLASS_NAME;
+        $nameVar = $reflection->getProperty($propName)->resolveIndirect();
         if (Variable::TYPE_STRING !== $nameVar->type) {
             throw new \LogicException('ReflectionClass missing target class name');
         }
@@ -916,7 +935,7 @@ final class ReflectionSupport
 
     public static function methodNameFromReflection(ObjectEntry $reflection): string
     {
-        $nameVar = $reflection->getProperty(self::PROP_METHOD_NAME)->resolveIndirect();
+        $nameVar = $reflection->getProperty(self::PROP_REFLECTION_METHOD_FUNC)->resolveIndirect();
         if (Variable::TYPE_STRING !== $nameVar->type) {
             throw new \LogicException('ReflectionMethod missing method name');
         }
@@ -1823,17 +1842,89 @@ final class ReflectionSupport
         return !$type instanceof CfgType\Mixed_;
     }
 
+    /** php-src: reflection_method_is_internal() (#18228). */
+    public static function isReflectionMethodInternal(Context $ctx, ObjectEntry $reflection): bool
+    {
+        [$declaring, $methodLc] = self::resolveReflectedMethodDeclaring($ctx, $reflection);
+        if (!isset($declaring->methods[$methodLc])) {
+            return false;
+        }
+        $func = $declaring->methods[$methodLc];
+
+        return !($func instanceof PhpFunc);
+    }
+
+    /** php-src: reflection_method_is_variadic() (#18228). */
+    public static function isReflectionMethodVariadic(Context $ctx, ObjectEntry $reflection): bool
+    {
+        [$declaring, $methodLc] = self::resolveReflectedMethodDeclaring($ctx, $reflection);
+        if (isset($declaring->methods[$methodLc])) {
+            $func = $declaring->methods[$methodLc];
+            if ($func instanceof PhpFunc) {
+                return null !== $func->block->variadicParamIndex;
+            }
+        }
+        $className = self::classNameFromReflection($reflection);
+        $methodName = self::methodNameFromReflection($reflection);
+
+        return BuiltinInternalArgInfo::methodIsVariadic($className, $methodName);
+    }
+
+    /** php-src: reflection_method_is_constructor() (#18225). */
+    public static function isReflectionMethodConstructor(ObjectEntry $reflection): bool
+    {
+        return '__construct' === strtolower(self::methodNameFromReflection($reflection));
+    }
+
+    /** php-src: reflection_method_is_destructor() (#18225). */
+    public static function isReflectionMethodDestructor(ObjectEntry $reflection): bool
+    {
+        return '__destruct' === strtolower(self::methodNameFromReflection($reflection));
+    }
+
+    /** php-src: reflection_method_is_abstract() (#18225). */
+    public static function isReflectionMethodAbstract(Context $ctx, ObjectEntry $reflection): bool
+    {
+        [$declaring] = self::resolveReflectedMethodDeclaring($ctx, $reflection);
+        if ($declaring->isInterface) {
+            return true;
+        }
+        $flags = self::reflectedMethodCfgFlags($ctx, $reflection);
+
+        return ($flags & \PHPCfg\Func::FLAG_ABSTRACT) !== 0;
+    }
+
     /**
-     * php-src: reflection_method_has_tentative_return_type() (#6597).
+     * php-src: reflection_method_get_tentative_return_type() (#18226).
      *
-     * User-declared methods in this compiler always store explicit return types on the
-     * declaring Func; inherited ZEND_TYPE_IS_TENTATIVE is not modeled yet — false for VM users.
+     * User-declared methods store explicit return types on the declaring Func; tentative
+     * inheritance is not modeled yet — null for VM user methods.
+     */
+    public static function reflectedMethodTentativeReturnType(Context $ctx, ObjectEntry $reflection): ?CfgType
+    {
+        [$declaring, $methodLc] = self::resolveReflectedMethodDeclaring($ctx, $reflection);
+        if (isset($declaring->methods[$methodLc])) {
+            $func = $declaring->methods[$methodLc];
+            if ($func instanceof PhpFunc) {
+                return null;
+            }
+        }
+        $className = self::classNameFromReflection($reflection);
+        $methodName = self::methodNameFromReflection($reflection);
+        $label = BuiltinInternalArgInfo::tentativeReturnTypeForClassMethod($className, $methodName);
+        if (null === $label) {
+            return null;
+        }
+
+        return ReflectionTypeSupport::cfgTypeFromLabel($label);
+    }
+
+    /**
+     * php-src: reflection_method_has_tentative_return_type() (#6597, #18226).
      */
     public static function reflectedMethodHasTentativeReturnType(Context $ctx, ObjectEntry $reflection): bool
     {
-        self::resolveReflectedMethod($ctx, $reflection);
-
-        return false;
+        return null !== self::reflectedMethodTentativeReturnType($ctx, $reflection);
     }
 
     /**
@@ -2023,8 +2114,8 @@ final class ReflectionSupport
         }
         $rm = new ObjectEntry($rmClass);
         $rm->constructed = true;
-        $rm->getProperty(self::PROP_CLASS_NAME)->string($entry->name);
-        $rm->getProperty(self::PROP_METHOD_NAME)->string($methodName);
+        $rm->getProperty(self::PROP_REFLECTION_METHOD_CLASS)->string($entry->name);
+        $rm->getProperty(self::PROP_REFLECTION_METHOD_FUNC)->string($methodName);
 
         return $rm;
     }

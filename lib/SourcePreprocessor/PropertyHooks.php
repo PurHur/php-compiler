@@ -1002,6 +1002,8 @@ final class PropertyHooks
             $propDeclHead = rtrim(substr($body, $declStart, $hookOpen - $declStart));
             $isAbstractHook = (bool) preg_match('/\babstract\b/', $declPrefix.$propDeclHead);
             $isFinalProperty = (bool) preg_match('/\bfinal\b/', $declPrefix.$propDeclHead);
+            // PHP 8.4 explicit `virtual` modifier — strip before nikic/php-parser (#18170, zend_language_parser.y).
+            $isExplicitVirtual = (bool) preg_match('/\bvirtual\b/', $declPrefix.$propDeclHead);
             $isInterfaceHook = 'interface' === $declKind;
             if ($isAbstractHook) {
                 $declPrefix = preg_replace('/\babstract\s+/', '', $declPrefix) ?? $declPrefix;
@@ -1010,6 +1012,10 @@ final class PropertyHooks
             if ($isFinalProperty) {
                 $declPrefix = preg_replace('/\bfinal\s+/', '', $declPrefix) ?? $declPrefix;
                 $propDeclHead = preg_replace('/\bfinal\s+/', '', $propDeclHead) ?? $propDeclHead;
+            }
+            if ($isExplicitVirtual) {
+                $declPrefix = preg_replace('/\bvirtual\s+/', '', $declPrefix) ?? $declPrefix;
+                $propDeclHead = preg_replace('/\bvirtual\s+/', '', $propDeclHead) ?? $propDeclHead;
             }
             $isStatic = (bool) preg_match('/\bstatic\b/', $declPrefix.$propDeclHead);
             $isPromotedCtorParam = $this->isPromotedConstructorParam(
@@ -1069,6 +1075,13 @@ final class PropertyHooks
                         if (null !== $detachedBacking) {
                             [$detachedStart, $detachedEnd, $initializer] = $detachedBacking;
                             $removeSpans[] = [$detachedStart, $detachedEnd];
+                        } else {
+                            $priorBacking = $this->findPriorSameNameBackingFieldDecl($body, $declStart, $prop);
+                            if (null !== $priorBacking) {
+                                [$priorStart, $priorEnd, $initializer] = $priorBacking;
+                                $removeSpans[] = [$priorStart, $priorEnd];
+                                $declPrefix = $this->copyBodySegment($body, $offset, $declStart, $removeSpans);
+                            }
                         }
                     }
                 }
@@ -1093,14 +1106,14 @@ final class PropertyHooks
                 || !empty($propMeta['requiresSet'])
                 || !empty($propMeta['requiresUnset']);
             $isSemicolonOnlyHook = [] === $methods && $hasSemicolonRequirements;
-            if (([] !== $methods && !$usesBacking) || $isAbstractHook || $isInterfaceHook || $isTraitAbstractHook || $isSemicolonOnlyHook) {
+            if (([] !== $methods && !$usesBacking) || $isAbstractHook || $isInterfaceHook || $isTraitAbstractHook || $isSemicolonOnlyHook || $isExplicitVirtual) {
                 if (!isset($this->registry[$lcClass][$prop])) {
                     $this->registry[$lcClass][$prop] = [];
                 }
                 if ($isAbstractHook || $isInterfaceHook || $isTraitAbstractHook || $isSemicolonOnlyHook) {
                     $this->registry[$lcClass][$prop]['abstract'] = true;
                 }
-                if ([] === $methods || !$usesBacking || $isInterfaceHook || $isSemicolonOnlyHook) {
+                if ([] === $methods || !$usesBacking || $isInterfaceHook || $isSemicolonOnlyHook || $isExplicitVirtual) {
                     $this->registry[$lcClass][$prop]['virtual'] = true;
                 }
             }
@@ -1530,6 +1543,38 @@ final class PropertyHooks
     }
 
     /**
+     * Same-name backing field declared before the hooked property — merge like adjacent (#18171).
+     *
+     * @return array{0: int, 1: int, 2: string}|null [span start, span end, initializer including `=`]
+     */
+    private function findPriorSameNameBackingFieldDecl(string $body, int $searchEnd, string $prop): ?array
+    {
+        if ($searchEnd <= 0) {
+            return null;
+        }
+        $remainder = substr($body, 0, $searchEnd);
+        if (!preg_match_all(
+            '/(?:(?:public|protected|private|static|readonly)\s+)+'
+            .'(?:[\w\\\\|]+(?:\s*\[\s*\])?\s+)+'
+            .'\$'.preg_quote($prop, '/').'\s*(=\s*[^;]+)?;/',
+            $remainder,
+            $matches,
+            PREG_OFFSET_CAPTURE
+        )) {
+            return null;
+        }
+        $last = count($matches[0]) - 1;
+        if ($last < 0) {
+            return null;
+        }
+        $matchStart = $matches[0][$last][1];
+        $matchEnd = $matchStart + strlen($matches[0][$last][0]);
+        $initializer = isset($matches[1][$last]) ? trim($matches[1][$last][0]) : '';
+
+        return [$matchStart, $matchEnd, $initializer];
+    }
+
+    /**
      * Same-name backing field separated by other class members — merge like adjacent (#16936, re-#9673).
      *
      * @return array{0: int, 1: int, 2: string}|null [span start, span end, initializer including `=`]
@@ -1616,6 +1661,7 @@ final class PropertyHooks
         string $body,
         ?string $propertyType = null
     ): string {
+        $body = $this->rewriteParentPropertyHookRefCalls($body);
         $static = $isStatic ? 'static ' : '';
         $typedParams = $params;
         $returnSuffix = '';
@@ -1634,6 +1680,28 @@ final class PropertyHooks
         }
 
         return "    public {$static}function {$method}(){$returnSuffix} {$body}";
+    }
+
+    /**
+     * parent::$prop->get()/set() → parent::__phpc_property_get_*() for VM parent dispatch (#18170, zend_property_hooks.c).
+     */
+    private function rewriteParentPropertyHookRefCalls(string $source): string
+    {
+        $rewritten = preg_replace_callback(
+            '/parent::\$(\w+)->get\(\)/',
+            fn (array $m): string => 'parent::'.self::GET_METHOD_PREFIX.$m[1].'()',
+            $source
+        );
+        if (!is_string($rewritten)) {
+            return $source;
+        }
+        $rewritten = preg_replace_callback(
+            '/parent::\$(\w+)->set\(([^)]*)\)/',
+            fn (array $m): string => 'parent::'.self::SET_METHOD_PREFIX.$m[1].'('.$m[2].')',
+            $rewritten
+        );
+
+        return is_string($rewritten) ? $rewritten : $source;
     }
 
     private function typedSetHookParams(string $params, string $propertyType): string

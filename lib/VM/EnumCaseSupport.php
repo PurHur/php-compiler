@@ -368,13 +368,19 @@ final class EnumCaseSupport
 
     private static function objectIdForEnumSort(Variable $value): int
     {
+        [$enumClass, $caseName] = self::resolveEnumCaseIdentity($value);
+        if (null !== $enumClass && '' !== $caseName) {
+            $ordinal = self::enumCaseDeclarationOrdinal($enumClass, $caseName);
+            if ($ordinal >= 0) {
+                return $ordinal;
+            }
+        }
         $value = $value->resolveIndirect();
         if (Variable::TYPE_OBJECT === $value->type && self::isEnumCase($value->toObject())) {
             return $value->toObject()->id;
         }
-        [$enumClass, $caseName] = self::resolveEnumCaseIdentity($value);
 
-        return self::enumCaseDeclarationOrdinal($enumClass, $caseName);
+        return -1;
     }
 
     /**

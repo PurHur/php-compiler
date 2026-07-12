@@ -9649,6 +9649,7 @@ class Compiler {
                         || $this->errorSuppressEndBlockCallArgHasTrailingHoistedArrayProducer($endCompiled, $endChild, (int) $argIndex)
                         || $this->errorSuppressEndBlockCallArgHasTrailingArrayDimFetchProducer($endCompiled, $endChild, (int) $argIndex)
                         || $this->errorSuppressEndBlockCallArgHasAdjacentNestedFuncCallProducer($endCompiled, $endChild, (int) $argIndex)
+                        || $this->errorSuppressEndBlockCallArgHasTrailingComparisonProducer($endCompiled, $endChild, (int) $argIndex)
                     ) {
                         continue;
                     }
@@ -17897,10 +17898,21 @@ class Compiler {
                 if (
                     null !== $callArg
                     && $this->callArgIsDeadInlineTemporary($callArg)
+                    && $this->callArgIsNewExpression($callArg)
                     && isset($siblingNews[$argIndex])
                     && $siblingNews[$argIndex] instanceof Op\Expr\New_
                 ) {
                     return $siblingNews[$argIndex];
+                }
+                if (
+                    null !== $callArg
+                    && $this->callArgIsDeadInlineTemporary($callArg)
+                    && $this->callArgIsNewExpression($callArg)
+                    && 1 === \count($siblingNews)
+                    && ($producers[$argIndex] ?? null) instanceof Op\Expr\New_
+                    && $siblingNews[0] === $producers[$argIndex]
+                ) {
+                    return $siblingNews[0];
                 }
             }
         }
@@ -28422,16 +28434,6 @@ class Compiler {
                 continue;
             }
             if ($child instanceof Op\Expr\FuncCall || $child instanceof Op\Expr\NsFuncCall) {
-                if (
-                    null !== $consumerIndex
-                    && $this->statementLevelFuncCallBeforeHoistedSiblingChain(
-                        $j,
-                        $consumerIndex,
-                        $cfgChildren
-                    )
-                ) {
-                    continue;
-                }
                 ++$base;
                 continue;
             }
@@ -28762,13 +28764,34 @@ class Compiler {
             ? OpCode::TYPE_STATICCALL_INIT
             : OpCode::TYPE_METHODCALL_INIT;
         $needle = strtolower($methodName);
+        // Pair each cfg MethodCall producer with its own EXEC_RETURN — dead operand slots
+        // reuse across repeated same-named calls (#18183, #18184).
+        $producerOrdinal = 0;
+        if (null !== $block->orig) {
+            foreach ($block->orig->children as $child) {
+                if ($child === $producer) {
+                    break;
+                }
+                if ($child instanceof Op\Expr\MethodCall || $child instanceof Op\Expr\StaticCall) {
+                    $priorName = $this->staticNameFromOperand($child->name);
+                    if (null !== $priorName && $needle === strtolower($priorName)) {
+                        ++$producerOrdinal;
+                    }
+                }
+            }
+        }
         $ops = array_merge($block->opCodes, $pendingOps);
+        $seenInit = 0;
         foreach ($ops as $i => $op) {
             if ($initType !== $op->type || null === $op->arg2) {
                 continue;
             }
             $name = $this->resolveCompileTimeStringSlot((int) $op->arg2, $block);
             if ($needle !== strtolower($name ?? '')) {
+                continue;
+            }
+            if ($seenInit !== $producerOrdinal) {
+                ++$seenInit;
                 continue;
             }
             for ($j = $i + 1, $n = \count($ops); $j < $n; ++$j) {
@@ -28780,6 +28803,7 @@ class Compiler {
                     break;
                 }
             }
+            ++$seenInit;
         }
 
         return null;
@@ -33548,6 +33572,13 @@ class Compiler {
             ) {
                 return null;
             }
+            $positional = $producers[$argIndex] ?? null;
+            if (
+                $positional instanceof Op\Expr\ConstFetch
+                || $positional instanceof Op\Expr\ClassConstFetch
+            ) {
+                return null;
+            }
         }
         $offset = 0;
         while ($offset < \count($producers)) {
@@ -36720,7 +36751,8 @@ class Compiler {
             if (OpCode::TYPE_FUNCCALL_INIT === $op->type || OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
                 break;
             }
-            if (!\in_array($op->type, [OpCode::TYPE_ARRAY_DIM_FETCH, OpCode::TYPE_ARRAY_DIM_FETCH_WRITE], true)) {
+            // Write lvalues (TYPE_ARRAYACCESS_OFFSET) are not dim-fetch read results (#10639).
+            if (OpCode::TYPE_ARRAY_DIM_FETCH !== $op->type) {
                 if ([] !== $dimFetchOpcodes) {
                     break;
                 }
@@ -36761,7 +36793,8 @@ class Compiler {
     }
 
     /**
-     * Last ARRAY_DIM_FETCH before pending FUNCCALL_INIT — var_export($meta['k'], …) after earlier dim assigns (#18005).
+     * Last ARRAY_DIM_FETCH (read) before pending FUNCCALL_INIT — var_export($meta['k'], …) after earlier dim assigns (#18005).
+     * Exclude TYPE_ARRAY_DIM_FETCH_WRITE: write lvalues must not feed call args (#10639).
      *
      * @param list<OpCode> $pendingOps
      */
@@ -36774,7 +36807,7 @@ class Compiler {
             if (OpCode::TYPE_FUNCCALL_INIT === $op->type || OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
                 break;
             }
-            if (\in_array($op->type, [OpCode::TYPE_ARRAY_DIM_FETCH, OpCode::TYPE_ARRAY_DIM_FETCH_WRITE], true)) {
+            if (OpCode::TYPE_ARRAY_DIM_FETCH === $op->type) {
                 array_unshift($dimFetchOpcodes, $op);
             }
         }
@@ -37348,6 +37381,9 @@ class Compiler {
         if ($this->errorSuppressEndBlockCallArgHasAdjacentNestedFuncCallProducer($block, $cfgCallOp, $argIndex)) {
             return null;
         }
+        if ($this->errorSuppressEndBlockCallArgHasTrailingComparisonProducer($block, $cfgCallOp, $argIndex)) {
+            return null;
+        }
 
         return $this->errorSuppressEndBlockInnerResultSlot($block);
     }
@@ -37398,6 +37434,52 @@ class Compiler {
         }
 
         return $argIndex === $targetArgIndex;
+    }
+
+    /**
+     * `var_dump($h !== false)` after `@fopen` — hoisted compare feeds dead-temp arg, not @ return (#18185, #13694).
+     */
+    private function errorSuppressEndBlockCallArgHasTrailingComparisonProducer(
+        Block $block,
+        Op $cfgCallOp,
+        int $argIndex
+    ): bool {
+        if (null === $block->orig || !property_exists($cfgCallOp, 'args') || !\is_array($cfgCallOp->args)) {
+            return false;
+        }
+        $callArg = $cfgCallOp->args[$argIndex] ?? null;
+        if (!$callArg instanceof Operand || $this->isEmbeddedCallLiteralArg($callArg)) {
+            return false;
+        }
+        if (!$this->callArgIsDeadInlineTemporary($callArg)) {
+            return false;
+        }
+        $children = $block->orig->children;
+        $callIndex = array_search($cfgCallOp, $children, true);
+        if (!\is_int($callIndex) || $callIndex < 1) {
+            return false;
+        }
+        for ($i = $callIndex - 1; $i >= 0 && $callIndex - $i <= 8; --$i) {
+            $prev = $children[$i] ?? null;
+            if ($prev instanceof Op\Expr\Assign) {
+                continue;
+            }
+            if (!$this->isComparisonInlineCallArgProducer($prev)) {
+                break;
+            }
+            if (
+                null !== $prev->result
+                && (
+                    $this->operandsReferToSameVariable($prev->result, $callArg)
+                    || $this->callArgIsDeadInlineTemporary($callArg)
+                )
+            ) {
+                return true;
+            }
+            break;
+        }
+
+        return false;
     }
 
     /**
@@ -43868,15 +43950,18 @@ class Compiler {
                 }
             }
             if (null !== $cfgCallOp && !$this->isEmbeddedCallLiteralArg($arg)) {
-                $pendingDimFetchSlot = $this->lastPendingCallArgArrayDimFetchSlot($block, $sends);
-                if (null === $pendingDimFetchSlot && (
-                    null !== $dimFetchSlot
-                    || $this->callArgIsDeadInlineHaystackFamilySlot(
-                        $cfgCallOp,
-                        (int) $argIndex,
-                        $calleeName,
-                        $arg
-                    )
+                $pendingDimFetchSlot = null;
+                if (null !== $dimFetchSlot) {
+                    // stream_set_blocking($pipes[1], false) — dim-fetch slot is arg #0 only (#18186).
+                    $pendingDimFetchSlot = $this->lastPendingCallArgArrayDimFetchSlot($block, $sends);
+                    if (null === $pendingDimFetchSlot) {
+                        $pendingDimFetchSlot = $this->pendingCallArgArrayDimFetchSlot($block, $sends, 0);
+                    }
+                } elseif ($this->callArgIsDeadInlineHaystackFamilySlot(
+                    $cfgCallOp,
+                    (int) $argIndex,
+                    $calleeName,
+                    $arg
                 )) {
                     $pendingDimFetchSlot = $this->pendingCallArgArrayDimFetchSlot($block, $sends, 0);
                 }
@@ -47509,6 +47594,9 @@ class Compiler {
                     && (string) $send->arg1 !== (string) $execSlot
                 ) {
                     // var_export($g->valid(), true) after prior var_export — dead arg temp must not reuse stale EXEC_RETURN (#17520).
+                    $send->arg1 = $execSlot;
+                } elseif ((string) $send->arg1 !== (string) $execSlot) {
+                    // var_export($g2->current(), true) after earlier var_export — sibling MethodCall EXEC_RETURN (#18183).
                     $send->arg1 = $execSlot;
                 }
             } elseif (1 === $sendOrdinal && null !== $trueSlot && (string) $send->arg1 === (string) $execSlot) {

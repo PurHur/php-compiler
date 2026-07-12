@@ -42,11 +42,17 @@ final class DomActiveContextAotTest extends TestCase
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/DomInstanceMethodJit.php');
         $this->assertStringContainsString('shouldDeferToVmClassMethodLowering', $source);
         $this->assertStringContainsString('DomDocumentCreateElement', $source);
-        $this->assertStringContainsString('isUserScriptDomMethod', $source);
+        $this->assertStringContainsString('isUserScriptDirectMethod', $source);
         $this->assertStringContainsString('loadhtml', $source);
+        $this->assertStringContainsString('loadxml', $source);
+        $this->assertStringContainsString('savehtml', $source);
+        $this->assertStringContainsString('savexml', $source);
         $this->assertStringContainsString('getelementbyid', $source);
         $this->assertStringContainsString('DomDocumentLoadHTML', $source);
         $this->assertStringContainsString('DomDocumentGetElementById', $source);
+        $this->assertStringContainsString('DomDocumentLoadXML', $source);
+        $this->assertStringContainsString('DomDocumentSaveHTML', $source);
+        $this->assertStringContainsString('DomDocumentSaveXML', $source);
     }
 
     public function testDomLoadHTMLRuntimeSchedulesActiveContextInit(): void
@@ -194,5 +200,15 @@ final class DomActiveContextAotTest extends TestCase
         $this->assertStringContainsString('nodeName', $source);
         $this->assertStringContainsString('tagName', $source);
         $this->assertStringContainsString('textContent', $source);
+    }
+
+    public function testDomSaveLoadUserScriptUsesPureLlvmLowering(): void
+    {
+        $saveHtml = (string) file_get_contents(__DIR__.'/../../ext/dom/JitDomSaveHTMLUserScript.php');
+        $loadXml = (string) file_get_contents(__DIR__.'/../../ext/dom/JitDomLoadXMLUserScript.php');
+        $saveXml = (string) file_get_contents(__DIR__.'/../../ext/dom/JitDomSaveXMLUserScript.php');
+        $this->assertStringContainsString('lastCompileTimeParsedHtml', $saveHtml);
+        $this->assertStringContainsString('lastCompileTimeXml', $loadXml);
+        $this->assertStringContainsString('lastCompileTimeXml', $saveXml);
     }
 }

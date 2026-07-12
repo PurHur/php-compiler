@@ -4346,6 +4346,30 @@ PHP;
         self::assertSame("key=1\n", $out);
     }
 
+    /** Issue #18183 — consecutive echo var_export($g->current(), true) after bare-yield send (Zend/zend_generators.c). */
+    public function testVarExportNestedGeneratorCurrentDoubleEchoAfterBareYieldSend(): void
+    {
+        $code = <<<'PHP'
+<?php
+function g(): Generator {
+    $x = yield;
+    yield $x * 2;
+}
+$g = g();
+$g->rewind();
+$g->send(3);
+echo var_export($g->current(), true), "\n";
+echo var_export($g->current(), true), "\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'var_export_nested_generator_current_double_echo.php');
+
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertSame("6\n6\n", $out);
+    }
+
     /** var_export($g->valid(), true) after Generator::send assign + prior var_export (Zend/zend_generators.c). */
     public function testVarExportNestedGeneratorValidAfterSendAssignUsesMethodCallProducerSlot(): void
     {
@@ -4366,6 +4390,31 @@ PHP;
         $runtime->run($block);
         $out = ob_get_clean();
         self::assertSame("send=NULL\nvalid_inline=false\nvalid_stored=false\n", $out);
+    }
+
+    /** Issue #18184 — var_export($g2->current(), true) after prior bare-yield send on another generator. */
+    public function testVarExportSecondGeneratorCurrentAfterFirstSendUsesCorrectMethodCallExecReturn(): void
+    {
+        $code = <<<'PHP'
+<?php
+function g(): Generator {
+    $x = yield;
+    yield $x * 2;
+}
+$g = g();
+$g->send(3);
+$g2 = g();
+$g2->rewind();
+$g2->send(3);
+echo var_export($g2->current(), true), "\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'var_export_generator_cross_instance_current.php');
+
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertSame("6\n", $out);
     }
 
     /** Issue #13830 — var_export(next($a), true) in concat after prior next($a). */
@@ -6434,6 +6483,74 @@ PHP;
         self::assertStringContainsString('bool(true)', $out);
     }
 
+    /** Issue #18185 — @fopen then var_dump($h !== false) must send comparison bool, not stream resource. */
+    public function testErrorSuppressAssignThenNotIdenticalInsideCallArgUsesComparisonSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+$h = @fopen('php://memory', 'r+');
+var_dump($h !== false);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'suppress_comparison_call_arg.php');
+
+        $notIdenticalResultSlot = null;
+        $outerSendSlot = null;
+        $fcallOrdinal = 0;
+        foreach ($this->reachableBlocksFromEntry($block) as $reachable) {
+            foreach ($reachable->opCodes as $op) {
+                if (OpCode::TYPE_NOT_IDENTICAL === $op->type && null === $notIdenticalResultSlot) {
+                    $notIdenticalResultSlot = $op->arg1;
+                }
+                if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                    ++$fcallOrdinal;
+                }
+                if (OpCode::TYPE_ARG_SEND === $op->type && 2 === $fcallOrdinal) {
+                    $outerSendSlot = $op->arg1;
+                }
+            }
+        }
+
+        self::assertNotNull($notIdenticalResultSlot);
+        self::assertSame($notIdenticalResultSlot, $outerSendSlot);
+
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertStringContainsString('bool(true)', $out);
+    }
+
+    /** @return list<Block> */
+    private function reachableBlocksFromEntry(Block $entry): array
+    {
+        $seen = new \SplObjectStorage();
+        $queue = [$entry];
+        $reachable = [];
+        while ([] !== $queue) {
+            $block = array_shift($queue);
+            if ($seen->contains($block)) {
+                continue;
+            }
+            $seen->attach($block);
+            $reachable[] = $block;
+            foreach ($block->opCodes as $op) {
+                if ($op->block1 instanceof Block && !$seen->contains($op->block1)) {
+                    $queue[] = $op->block1;
+                }
+                if ($op->block2 instanceof Block && !$seen->contains($op->block2)) {
+                    $queue[] = $op->block2;
+                }
+            }
+            foreach ($block->blocks as $child) {
+                if ($child instanceof Block && !$seen->contains($child)) {
+                    $queue[] = $child;
+                }
+            }
+        }
+
+        return $reachable;
+    }
+
     /** Issue #13703 — array_column() inline haystack literal runtime parity with Zend. */
     public function testArrayColumnInlineHaystackTwoArgRuntime(): void
     {
@@ -7228,6 +7345,80 @@ PHP;
         ob_start();
         $runtime->run($block);
         self::assertSame("bool(true)\n", ob_get_clean());
+    }
+
+    /** Issue #18186 — stream_set_blocking($pipes[1], false) wires dim-fetch + hoisted false, not duplicate resource. */
+    public function testStreamSetBlockingProcPipeDimFetchAndFalseUseDistinctArgSlots(): void
+    {
+        $code = <<<'PHP'
+<?php
+$desc = [1 => ['pipe', 'w'], 2 => ['pipe', 'w']];
+$pipes = [];
+$proc = proc_open('true', $desc, $pipes);
+stream_set_blocking($pipes[1], false);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'stream_set_blocking_proc_pipe.php');
+
+        $dimFetchSlot = null;
+        $falseSlot = null;
+        $blockingSends = [];
+        $fcallOrdinal = 0;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                ++$fcallOrdinal;
+                if (2 === $fcallOrdinal) {
+                    $blockingSends = [];
+                }
+                continue;
+            }
+            if (OpCode::TYPE_ARG_SEND === $op->type && 2 === $fcallOrdinal) {
+                $blockingSends[] = $op->arg1;
+            }
+            if (OpCode::TYPE_ARRAY_DIM_FETCH === $op->type) {
+                $dimFetchSlot = $op->arg1;
+            }
+            if (OpCode::TYPE_CONST_FETCH === $op->type) {
+                $falseSlot = $op->arg1;
+            }
+        }
+
+        self::assertNotNull($dimFetchSlot, 'pipes[1] dim-fetch must lower');
+        self::assertNotNull($falseSlot, 'hoisted false ConstFetch must lower');
+        self::assertCount(2, $blockingSends, 'arg sends='.json_encode($blockingSends));
+        self::assertSame($dimFetchSlot, $blockingSends[0], 'arg sends='.json_encode($blockingSends));
+        self::assertSame($falseSlot, $blockingSends[1], 'arg sends='.json_encode($blockingSends));
+        self::assertNotSame($blockingSends[0], $blockingSends[1], 'stream and mode must differ');
+    }
+
+    /** Issue #18186 — proc_get_status after proc_close reaches post-close TypeError once pipes unblock. */
+    public function testProcGetStatusAfterCloseRuntime(): void
+    {
+        $code = <<<'PHP'
+<?php
+$desc = [1 => ['pipe', 'w'], 2 => ['pipe', 'w']];
+$proc = proc_open('true', $desc, $pipes);
+stream_set_blocking($pipes[1], false);
+stream_set_blocking($pipes[2], false);
+while ('' !== (string) stream_get_contents($pipes[1]) || '' !== (string) stream_get_contents($pipes[2])) {
+}
+fclose($pipes[1]);
+fclose($pipes[2]);
+$code = proc_close($proc);
+try {
+    proc_get_status($proc);
+    echo "no-throw\n";
+} catch (TypeError $e) {
+    echo get_class($e), "\n";
+}
+echo 'closed=', $code, "\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'proc_get_status_after_close.php');
+
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("TypeError\nclosed=0\n", ob_get_clean());
     }
 
     /** Issue #15611 — get_defined_constants(true) assign must not steal firstSibling from get_declared_traits haystack. */

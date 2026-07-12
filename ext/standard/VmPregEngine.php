@@ -336,33 +336,16 @@ final class VmPregEngine
 
     private static function applyPcreVerb(string $verb, self $engine): void
     {
-        if ('UTF' === $verb || 'UTF8' === $verb || 'UTF16' === $verb || 'UTF32' === $verb) {
-            $engine->utf = true;
-
-            return;
-        }
-        if ('UCP' === $verb) {
-            $engine->utf = true;
-
-            return;
-        }
-        if ('ANY' === $verb || 'ALLANY' === $verb) {
-            $engine->dotall = true;
-
-            return;
-        }
-        if ('CR' === $verb || 'LF' === $verb || 'CRLF' === $verb || 'ANYCRLF' === $verb
-            || 'BSR_ANYCRLF' === $verb || 'BSR_UNICODE' === $verb || 'NO_JIT' === $verb
-            || 'NO_START_OPT' === $verb || 'NOTEMPTY' === $verb || 'NOTEMPTY_ATSTART' === $verb
-            || 'FIRSTLINE' === $verb || 'FRUSTRATING' === $verb || 'ACCEPT' === $verb
-            || 'COMMIT' === $verb || 'PRUNE' === $verb || 'SKIP' === $verb || 'THEN' === $verb
-            || 'FAIL' === $verb) {
-            return;
-        }
-        if (!$engine->compileAborted) {
-            self::$lastCompileException = new VmPregCompileException('', 0);
-            $engine->compileAborted = true;
-        }
+        match ($verb) {
+            'UTF', 'UTF8', 'UTF16', 'UTF32' => $engine->utf = true,
+            'UCP' => $engine->utf = true,
+            'ANY', 'ALLANY' => $engine->dotall = true,
+            'CR', 'LF', 'CRLF', 'ANYCRLF', 'BSR_ANYCRLF', 'BSR_UNICODE' => null,
+            'NO_JIT', 'NO_START_OPT', 'NOTEMPTY', 'NOTEMPTY_ATSTART', 'FIRSTLINE', 'FRUSTRATING' => null,
+            'ACCEPT', 'COMMIT', 'PRUNE', 'SKIP', 'THEN' => null,
+            'FAIL' => null,
+            default => $engine->abortCompile(),
+        };
     }
 
     /** @var array<string, true> */
@@ -693,28 +676,18 @@ final class VmPregEngine
 
     private function applyInlineModifier(string $letter, bool $enable): void
     {
-        if ('i' === $letter) {
-            $this->caseless = $enable;
-        } elseif ('m' === $letter) {
-            $this->multiline = $enable;
-        } elseif ('s' === $letter) {
-            $this->dotall = $enable;
-        } elseif ('x' === $letter) {
-            $this->extended = $enable;
-        } elseif ('U' === $letter) {
-            $this->defaultGreedy = !$enable;
-        } elseif ('J' === $letter) {
-            $this->allowDuplicateNames = $enable;
-        } elseif ('u' === $letter) {
-            $this->utf = $enable;
-        } elseif ('D' === $letter) {
-            $this->dollarEndonly = $enable;
-        } elseif ('A' === $letter) {
-            $this->anchored = $enable;
-        } elseif (!$this->compileAborted) {
-            self::$lastCompileException = new VmPregCompileException('', 0);
-            $this->compileAborted = true;
-        }
+        match ($letter) {
+            'i' => $this->caseless = $enable,
+            'm' => $this->multiline = $enable,
+            's' => $this->dotall = $enable,
+            'x' => $this->extended = $enable,
+            'U' => $this->defaultGreedy = !$enable,
+            'J' => $this->allowDuplicateNames = $enable, // PCRE2_DUPNAMES (#17584)
+            'u' => $this->utf = $enable,
+            'D' => $this->dollarEndonly = $enable,
+            'A' => $this->anchored = $enable,
+            default => $this->abortCompile(),
+        };
     }
 
     private function parseGroupName(): string

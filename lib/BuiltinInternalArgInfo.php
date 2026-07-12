@@ -13,7 +13,15 @@ use PHPTypes\InternalArgInfo;
  */
 final class BuiltinInternalArgInfo
 {
-    private static ?InternalArgInfo $argInfo = null;
+    /**
+     * php-src ZEND_TYPE_IS_TENTATIVE return labels (ext/reflection/php_reflection.c, #18226).
+     *
+     * Delegates to {@see BuiltinInternalTentativeReturnInfo} (Zend 8.2 snapshot).
+     */
+    public static function tentativeReturnTypeForClassMethod(string $class, string $method): ?string
+    {
+        return BuiltinInternalTentativeReturnInfo::tentativeReturnTypeLabelForClassMethod($class, $method);
+    }
 
     public static function paramCountForFunction(string $name): ?int
     {
@@ -55,6 +63,27 @@ final class BuiltinInternalArgInfo
 
         return self::normalizeParamInfo($info['params'][$index]);
     }
+
+    public static function methodIsVariadic(string $class, string $method): bool
+    {
+        $classLc = strtolower($class);
+        $methodLc = strtolower($method);
+        $methods = self::instance()->methods[$classLc]['methods'] ?? [];
+        $info = $methods[$methodLc] ?? null;
+        if (null === $info) {
+            return false;
+        }
+        foreach ($info['params'] ?? [] as $param) {
+            $name = $param['name'] ?? '';
+            if (str_starts_with($name, '...')) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static ?InternalArgInfo $argInfo = null;
 
     public static function typeStringAllowsNull(string $type): bool
     {

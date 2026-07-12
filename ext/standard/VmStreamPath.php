@@ -24,13 +24,15 @@ final class VmStreamPath
         string $function,
         string $paramName = 'filename'
     ): string {
-        InternalStrictArg::rejectNullString(
-            $frame->calledArgs[$argIndex],
-            $function,
-            $paramName,
-            $argIndex,
-            $frame
-        );
+        if (InternalStrictArg::isCallerStrict($frame)) {
+            InternalStrictArg::rejectNullString(
+                $frame->calledArgs[$argIndex],
+                $function,
+                $paramName,
+                $argIndex,
+                $frame
+            );
+        }
 
         return self::coerceNonEmptyPathArg(
             $frame->calledArgs[$argIndex],

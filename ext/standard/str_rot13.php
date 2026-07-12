@@ -33,12 +33,7 @@ final class str_rot13 extends Internal
         if (1 !== count($frame->calledArgs)) {
             throw new \LogicException('str_rot13() requires exactly one argument');
         }
-        $subject = VmString::coerceStringBuiltinArg(
-            $frame->calledArgs[0],
-            'str_rot13',
-            0,
-            'string'
-        );
+        $subject = VmString::stringBuiltinArgForFrame($frame, 0, 'str_rot13', 0, 'string');
         BuiltinExecute::writeReturn(
             $frame,
             static fn (Variable $ret) => $ret->string(VmString::strRot13($subject))
@@ -54,7 +49,7 @@ final class str_rot13 extends Internal
             throw new \LogicException('str_rot13() requires exactly one argument');
         }
 
-        $str = JitStringBuiltinArg::lower($context, $args[0], 'str_rot13', 0, 'string');
+        $str = JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'str_rot13', 0, 'string');
         StringStrRot13::ensureLinked($context);
 
         return $context->builder->call(

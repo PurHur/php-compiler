@@ -7,12 +7,10 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\ReflectionBuiltinHelper;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\InternalStrictArg;
 use PHPLLVM\Value;
 
 /** class_exists() — whether a user class is registered (issue #1214). */
@@ -29,8 +27,7 @@ final class class_exists_ extends Internal
             throw new \LogicException('class_exists() requires one or two arguments in this compiler build');
         }
         $ctx = VmReflection::requireContext($frame);
-        InternalStrictArg::rejectNullString($frame->calledArgs[0], 'class_exists', 'class', 0, $frame);
-        $name = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'class_exists', 0, 'class');
+        $name = VmString::stringBuiltinArgForFrame($frame, 0, 'class_exists', 0, 'class');
         $autoload = VmReflection::autoloadFlagFromFrame($frame);
         $exists = VmReflection::classExists($ctx, $name, $autoload);
         if (null !== $frame->returnVar) {
@@ -43,7 +40,6 @@ final class class_exists_ extends Internal
         if (\count($args) < 1 || \count($args) > 2) {
             throw new \LogicException('class_exists() requires one or two arguments in this compiler build');
         }
-        JitInternalStrictArg::rejectNullString($context, $args[0], 'class_exists', 'class', 1);
         $literal = JitStringArg::compileTimeLiteral($args[0]);
         if (null !== $literal) {
             return ReflectionBuiltinHelper::classExistsLiteral($context, $literal);
@@ -51,7 +47,7 @@ final class class_exists_ extends Internal
 
         return JitClassExists::invoke(
             $context,
-            JitStringBuiltinArg::lower($context, $args[0], 'class_exists', 0, 'class')
+            JitStringBuiltinArg::lowerCoercible($context, $args[0], 'class_exists', 0, 'class')
         );
     }
 }

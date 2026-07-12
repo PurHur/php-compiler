@@ -29,13 +29,13 @@ final class JitFilestatArg
         return JitStringBuiltinArg::lowerPath($context, $arg, $function, $argIndex, $paramName);
     }
 
-    /** Z_PARAM_PATH for touch() — null coerces to "" (#12878, php_touch). */
+    /** touch() $filename — typed string; reject null (#18245, ext/standard/file.c). */
     public static function lowerPath(
         Context $context,
         JITVariable $arg,
         string $function
     ): Value {
-        return JitStringBuiltinArg::lowerPath($context, $arg, $function, 0, 'filename');
+        return JitStringBuiltinArg::lowerTypedString($context, $arg, $function, 0, 'filename');
     }
 
     public static function guardIntOrString(

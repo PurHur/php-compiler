@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 
@@ -88,6 +89,16 @@ final class MultisortJitHelper
         $rb = $vb->resolveIndirect();
         if ($isString) {
             return \strcmp($ra->toString(), $rb->toString());
+        }
+        if (
+            EnumCaseSupport::isEnumCaseVariable($ra)
+            || EnumCaseSupport::isEnumCaseVariable($rb)
+            || Variable::TYPE_OBJECT === $ra->type
+            || Variable::TYPE_OBJECT === $rb->type
+        ) {
+            VmInternalCompare::assertHomogeneousEnumOrObjectValues([$va, $vb], 'array_multisort()');
+
+            return VmInternalCompare::comparePackedValuesForSort($va, $vb);
         }
 
         return $ra->toInt() <=> $rb->toInt();

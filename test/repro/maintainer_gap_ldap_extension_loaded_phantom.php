@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 if (extension_loaded('ldap')) {
-    fwrite(STDERR, "FAIL: extension_loaded('ldap') must be false without ext/ldap\n");
+    fwrite(STDERR, "FAIL: extension_loaded('ldap') must be false without ext/ldap (php-src-strict)\n");
     exit(1);
 }
 

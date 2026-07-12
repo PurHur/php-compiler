@@ -41,6 +41,7 @@ function collectCapabilities(string $root): array
         'zip' => new PHPCompiler\ext\zip\Module(),
         'inotify' => new PHPCompiler\ext\inotify\Module(),
         'uuid' => new PHPCompiler\ext\uuid\Module(),
+        'uploadprogress' => new PHPCompiler\ext\uploadprogress\Module(),
     ];
 
     $capabilities = [];

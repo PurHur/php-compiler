@@ -30,7 +30,7 @@ final class strtolower extends Internal
         if (1 !== count($frame->calledArgs)) {
             throw new \LogicException('strtolower() requires exactly one argument');
         }
-        $subject = VmString::coerceStringBuiltinArg(
+        $subject = VmString::coerceTypedStringBuiltinArg(
             $frame->calledArgs[0],
             'strtolower',
             0,
@@ -50,7 +50,7 @@ final class strtolower extends Internal
         if (1 !== count($args)) {
             throw new \LogicException('strtolower() requires exactly one argument');
         }
-        $str = JitStringBuiltinArg::lower($context, $args[0], 'strtolower', 0, 'string');
+        $str = JitStringBuiltinArg::lowerTypedString($context, $args[0], 'strtolower', 0, 'string');
         $copy = $context->builder->call($context->lookupFunction('__string__separate'), $str);
         lcfirst::transformAllAscii($context, $copy, ord('A'), ord('Z'), 32);
 

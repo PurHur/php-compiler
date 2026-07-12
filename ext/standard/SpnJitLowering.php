@@ -23,8 +23,8 @@ final class SpnJitLowering
 
         $i64 = $context->getTypeFromString('int64');
         $i32 = $context->getTypeFromString('int32');
-        $strVal = JitStringBuiltinArg::lower($context, $args[0], $name, 0, 'string');
-        $maskVal = JitStringBuiltinArg::lower($context, $args[1], $name, 1, 'characters');
+        $strVal = JitStringBuiltinArg::lowerCoercible($context, $args[0], $name, 0, 'string');
+        $maskVal = JitStringBuiltinArg::lowerCoercible($context, $args[1], $name, 1, 'characters');
         $offset = $argc >= 3
             ? JitIntdiv::lowerIntBuiltinArgForCaller($context, $args[2], $name, 3, 'offset')
             : $i64->constInt(0, false);
