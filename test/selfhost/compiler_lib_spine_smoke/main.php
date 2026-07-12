@@ -1606,6 +1606,7 @@ require_once __DIR__.'/../../../ext/standard/UploadTempJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/UrldecodeJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/UrlencodeJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/UsortJitHelper.php';
+require_once __DIR__.'/../../../ext/standard/Utf8EndecDeprecation.php';
 require_once __DIR__.'/../../../ext/standard/Utf8JitHelper.php';
 require_once __DIR__.'/../../../ext/standard/Utf8Latin1JitHelper.php';
 require_once __DIR__.'/../../../ext/standard/ValueSortJitHelper.php';
