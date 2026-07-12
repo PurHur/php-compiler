@@ -9,20 +9,39 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPUnit\Framework\TestCase;
 
-/** array_sum() JIT routes through ArraySumJitHelper PHP not ArrayBuiltinHelper LLVM (#12590, #14358). */
+/** array_sum() JIT routes all operands through ArraySumJitHelper PHP not ArrayBuiltinHelper LLVM (#12590, #14358, #18133). */
 final class ArraySumRuntimeShrinkTest extends TestCase
 {
+    private const ARRAY_BUILTIN_HELPER_MAX_LINES = 7680;
+
     public function testArraySumRuntimeUsesJitHelperNotDirectLlvmMonolith(): void
     {
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ArraySumRuntime.php');
         $this->assertStringContainsString('ArraySumJitHelper', $runtime);
-        $this->assertStringContainsString('isNativeArray', $runtime);
-        $this->assertStringContainsString('ArrayBuiltinHelper::arraySum', $runtime);
+        $this->assertStringContainsString('nativeListToHashTable', $runtime);
+        $this->assertStringNotContainsString('ArrayBuiltinHelper::arraySum', $runtime);
         $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);
 
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/array_sum.php');
         $this->assertStringContainsString('ArraySumRuntime::sum', $builtin);
         $this->assertStringNotContainsString('ArrayBuiltinHelper::arraySum', $builtin);
+    }
+
+    public function testArrayBuiltinHelperLineBudgetAfterNativeSumLlvmDeletion(): void
+    {
+        $arrayBuiltin = (string) file_get_contents(__DIR__.'/../../lib/JIT/ArrayBuiltinHelper.php');
+        $this->assertStringNotContainsString('function arraySum(', $arrayBuiltin);
+        $this->assertStringNotContainsString('function arraySumNative', $arrayBuiltin);
+        $this->assertStringNotContainsString('function arraySumHashTable', $arrayBuiltin);
+        $this->assertStringNotContainsString('function arraySumAccumulateLongValue', $arrayBuiltin);
+        $this->assertStringNotContainsString('function arraySumAccumulateStringPtr', $arrayBuiltin);
+
+        $lines = substr_count($arrayBuiltin, "\n") + 1;
+        $this->assertLessThanOrEqual(
+            self::ARRAY_BUILTIN_HELPER_MAX_LINES,
+            $lines,
+            'ArrayBuiltinHelper.php LOC after dead array_sum native LLVM deletion (#18133)'
+        );
     }
 
     public function testArraySumJitHelperSumsIntegers(): void
