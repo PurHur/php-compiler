@@ -901,19 +901,8 @@ class Runtime {
 
     public function standalone(?Block $block, string $outfile, ?string $sourceCode = null, ?string $sourceFilename = null) {
         \PHPCompiler\JIT\Progress::noteFunction('runtime_standalone_begin');
-        $prevUserScriptAot = getenv('PHP_COMPILER_AOT_USER_SCRIPT');
         $needsPregPrelink = \is_string($sourceCode)
             && preg_match('/\bpreg_(?:match(?:_all)?|replace(?:_callback(?:_array)?)?|split|grep|filter|quote|last_error)/i', $sourceCode);
-        $deferUserScriptAotInit = $needsPregPrelink
-            && ('1' === $prevUserScriptAot || 'true' === strtolower((string) $prevUserScriptAot));
-        if ($deferUserScriptAotInit && \function_exists('putenv')) {
-            // User-script Context init + nested preg JIT OOMs (#16075); link preg on a non-user init first.
-            JIT\VmActiveContextInitLlvm::resetPendingState();
-            putenv('PHP_COMPILER_AOT_USER_SCRIPT=');
-            unset($_ENV['PHP_COMPILER_AOT_USER_SCRIPT'], $_SERVER['PHP_COMPILER_AOT_USER_SCRIPT']);
-            $this->jitContext = null;
-            $this->jit = null;
-        }
         $context = $this->loadJitContext();
         if (null !== $sourceFilename && '' !== $sourceFilename) {
             $context->setAotSourceFilename($sourceFilename);
@@ -923,18 +912,9 @@ class Runtime {
         if (null !== $block && Block::containsGeneratorOpcodesInScriptScope($block)) {
             throw new \LogicException('yield in the main script is not supported in AOT yet (issue #3115).');
         }
-        if ($needsPregPrelink && !$deferUserScriptAotInit) {
+        if ($needsPregPrelink) {
+            // User-script AOT uses PregMatchUserScriptLlvm stubs — no nested-JIT prelink pass (#16075).
             \PHPCompiler\JIT\Builtin\StringPregMatch::ensureLinked($context);
-        }
-        if ($deferUserScriptAotInit && \function_exists('putenv')) {
-            putenv('PHP_COMPILER_AOT_USER_SCRIPT='.$prevUserScriptAot);
-            $_ENV['PHP_COMPILER_AOT_USER_SCRIPT'] = $prevUserScriptAot;
-            $_SERVER['PHP_COMPILER_AOT_USER_SCRIPT'] = $prevUserScriptAot;
-            $context->retrofitUserScriptStandaloneAfterPregPrelink();
-            JIT\VmActiveContextInitLlvm::requestThinStandaloneInit($context);
-            if ($needsPregPrelink) {
-                \PHPCompiler\JIT\Builtin\StringPregMatch::ensureLinked($context);
-            }
         }
         $context->setMain($this->loadJit()->compile($block));
         \PHPCompiler\JIT\Progress::noteFunction('runtime_standalone_compile_done');

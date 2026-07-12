@@ -16,11 +16,12 @@ final class PregMatchUserScriptLlvmTest extends TestCase
         $this->assertStringContainsString('PregMatchUserScriptLlvm::implement', $source);
     }
 
-    public function testRuntimeLinksPregAfterUserScriptFlagRestore(): void
+    public function testRuntimeLinksPregBeforeMainCompile(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/Runtime.php');
-        $this->assertStringContainsString('if ($needsPregPrelink && !$deferUserScriptAotInit)', $source);
         $this->assertStringContainsString('if ($needsPregPrelink) {', $source);
+        $this->assertStringContainsString('PregMatchUserScriptLlvm stubs', $source);
         $this->assertStringContainsString('StringPregMatch::ensureLinked($context);', $source);
+        $this->assertStringNotContainsString('deferUserScriptAotInit', $source);
     }
 }
