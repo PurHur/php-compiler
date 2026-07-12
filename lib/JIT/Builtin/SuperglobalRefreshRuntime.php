@@ -83,6 +83,15 @@ final class SuperglobalRefreshRuntime
         SuperglobalRefreshUserScriptLlvm::ensurePrerequisites($context);
     }
 
+    /** After preg prelink on a temporary full-init Context — no nested Multipart JIT (#16075). */
+    public static function ensureUserScriptRefreshPrerequisitesAfterPregPrelink(Context $context): void
+    {
+        if (Builtin::LOAD_TYPE_STANDALONE !== $context->loadType) {
+            return;
+        }
+        SuperglobalRefreshUserScriptLlvm::ensureDeferredEmitPrerequisites($context);
+    }
+
     public static function ensureUserScriptRefreshEmit(Context $context): void
     {
         if (Builtin::LOAD_TYPE_STANDALONE !== $context->loadType) {

@@ -902,8 +902,7 @@ class Runtime {
     public function standalone(?Block $block, string $outfile, ?string $sourceCode = null, ?string $sourceFilename = null) {
         \PHPCompiler\JIT\Progress::noteFunction('runtime_standalone_begin');
         $prevUserScriptAot = getenv('PHP_COMPILER_AOT_USER_SCRIPT');
-        $needsPregPrelink = \is_string($sourceCode)
-            && preg_match('/\bpreg_(?:match(?:_all)?|replace(?:_callback(?:_array)?)?|split|grep|filter|quote|last_error)/i', $sourceCode);
+        $needsPregPrelink = Block::containsPregPrelinkBuiltinCalls($block);
         $deferUserScriptAotInit = $needsPregPrelink
             && ('1' === $prevUserScriptAot || 'true' === strtolower((string) $prevUserScriptAot));
         if ($deferUserScriptAotInit && \function_exists('putenv')) {
@@ -931,7 +930,7 @@ class Runtime {
             $_ENV['PHP_COMPILER_AOT_USER_SCRIPT'] = $prevUserScriptAot;
             $_SERVER['PHP_COMPILER_AOT_USER_SCRIPT'] = $prevUserScriptAot;
             $context->retrofitUserScriptStandaloneAfterPregPrelink();
-            JIT\VmActiveContextInitLlvm::requestThinStandaloneInit($context);
+            JIT\Builtin\SuperglobalRefreshRuntime::ensureUserScriptRefreshPrerequisitesAfterPregPrelink($context);
         }
         $context->setMain($this->loadJit()->compile($block));
         \PHPCompiler\JIT\Progress::noteFunction('runtime_standalone_compile_done');

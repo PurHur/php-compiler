@@ -459,7 +459,7 @@ final class SuperglobalRefreshUserScriptLlvm
     }
 
     /** preg prelink defers user init — link refresh deps without nested Multipart JIT (#16075). */
-    private static function ensureDeferredEmitPrerequisites(Context $context): void
+    public static function ensureDeferredEmitPrerequisites(Context $context): void
     {
         LibcExtern::register($context);
         ParseStrRuntime::ensureUserScriptLinked($context);
