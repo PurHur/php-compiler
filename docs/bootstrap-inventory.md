@@ -16707,15 +16707,15 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 317)
 - new Variable (line 391)
 - new Variable (line 432)
-- new HashTable (line 1670)
-- new Variable (line 1672)
-- new HashTable (line 2532)
-- new Variable (line 2535)
-- new Variable (line 2541)
-- new Variable (line 2547)
-- new Variable (line 2553)
-- new Variable (line 2560)
-- 142 class method(s)
+- new HashTable (line 1686)
+- new Variable (line 1688)
+- new HashTable (line 2548)
+- new Variable (line 2551)
+- new Variable (line 2557)
+- new Variable (line 2563)
+- new Variable (line 2569)
+- new Variable (line 2576)
+- 143 class method(s)
 
 ### `ext/standard/VmFsAccessNative.php`
 
@@ -16780,7 +16780,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmFsPhpWrapper.php`
 
 **Warnings** (review for bootstrap subset):
-- 3 class method(s)
+- 4 class method(s)
 
 ### `ext/standard/VmFsReadNative.php`
 

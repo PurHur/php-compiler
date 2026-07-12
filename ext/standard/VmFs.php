@@ -802,13 +802,8 @@ final class VmFs
         if (false === $handle) {
             return false;
         }
-        $outputWrapper = 'php://output' === $path;
-        $failedOutputHandle = $outputWrapper && self::isFailedStreamHandle($handle);
-        $total = self::passthruHandleToStdout($handle);
+        $total = self::passthruHandleToStdout($handle, $path);
         self::fclose($handle);
-        if ($outputWrapper && ($failedOutputHandle || 0 === $total)) {
-            return -1;
-        }
 
         return $total;
     }
@@ -1251,11 +1246,32 @@ final class VmFs
     }
 
     /**
+     * php_stream_passthru sentinel for php://output — Zend returns -1 when bytes
+     * go directly to stdout (ext/standard/streams.c; #18417).
+     *
+     * @param int|false $total
+     *
+     * @return int|false
+     */
+    private static function finalizePassthruResult(int $handle, ?string $path, int|false $total): int|false
+    {
+        if (false === $total) {
+            return false;
+        }
+        $uri = null !== $path && '' !== $path ? $path : self::handleUri($handle);
+        if ('php://output' === $uri) {
+            return -1;
+        }
+
+        return $total;
+    }
+
+    /**
      * Stream remaining bytes from an open VM handle to STDOUT (php_stream_passthru parity).
      *
      * @return int|false Bytes read, or false on I/O failure
      */
-    private static function passthruHandleToStdout(int $handle) {
+    private static function passthruHandleToStdout(int $handle, ?string $path = null) {
         $total = 0;
         while (!self::feof($handle)) {
             $chunk = self::fread($handle, 8192);
@@ -1270,7 +1286,7 @@ final class VmFs
             $total += $readLen;
         }
 
-        return $total;
+        return self::finalizePassthruResult($handle, $path, $total);
     }
 
     /**
