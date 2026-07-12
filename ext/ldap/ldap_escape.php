@@ -49,7 +49,7 @@ final class ldap_escape extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('ldap_escape() is not implemented for JIT in this compiler build (issue #6352)');
+        return JitLdapEscape::invoke($context, $args);
     }
 
     private static function parseFlagsArg(Variable $var): int

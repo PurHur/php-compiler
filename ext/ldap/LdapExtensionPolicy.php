@@ -5,10 +5,9 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\ldap;
 
 /**
- * ext/ldap advertisement — php-src ext/ldap/php_ldap.c (#17680, #6352).
+ * ext/ldap advertisement — php-src ext/ldap/php_ldap.c (#6352, #18173).
  *
- * ldap_escape() is implemented in-tree for compile coverage, but extension_loaded('ldap') and
- * function_exists('ldap_*') stay false until a full ext/ldap module ships (php-src module gate).
+ * ldap_escape() ships on the reference profile; connect/bind/search remain #3369.
  */
 final class LdapExtensionPolicy
 {
@@ -19,6 +18,6 @@ final class LdapExtensionPolicy
 
     public static function advertisesExtension(): bool
     {
-        return false;
+        return true;
     }
 }
