@@ -4335,6 +4335,7 @@ require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionMethodGetNumberOfParame
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionMethodGetParameters.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionMethodGetPrototype.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionMethodGetReturnType.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionMethodGetTentativeReturnType.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionMethodGetStartLine.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionMethodGetStaticVariables.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionMethodHasPrototype.php';
@@ -4343,14 +4344,19 @@ require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionMethodHasTentativeRetur
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionMethodInvoke.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionMethodInvokeArgs.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionMethodIsAccessible.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionMethodIsAbstract.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionMethodIsConstructor.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionMethodIsDeprecated.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionMethodIsDestructor.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionMethodIsFinal.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionMethodIsGenerator.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionMethodIsInternal.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionMethodIsPrivate.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionMethodIsProtected.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionMethodIsPublic.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionMethodIsStatic.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionMethodIsUserDefined.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionMethodIsVariadic.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionMethodSetAccessible.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionNamedTypeGetName.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionNamedTypeIsBuiltin.php';
