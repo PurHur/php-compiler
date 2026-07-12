@@ -28739,6 +28739,82 @@ class Compiler {
     }
 
     /**
+     * var_export(Color::tryFrom(), true) / var_export($o->m(), true) — match INIT→EXEC_RETURN pair (#18164, #17767).
+     *
+     * @param list<OpCode> $pendingOps
+     */
+    private function slotForMethodOrStaticCallInitFollowingExecReturn(
+        Block $block,
+        Op\Expr $producer,
+        array $pendingOps = []
+    ): ?string {
+        if (
+            !$producer instanceof Op\Expr\MethodCall
+            && !$producer instanceof Op\Expr\StaticCall
+        ) {
+            return null;
+        }
+        $methodName = $this->staticNameFromOperand($producer->name);
+        if (null === $methodName) {
+            return null;
+        }
+        $initType = $producer instanceof Op\Expr\StaticCall
+            ? OpCode::TYPE_STATICCALL_INIT
+            : OpCode::TYPE_METHODCALL_INIT;
+        $needle = strtolower($methodName);
+        $ops = array_merge($block->opCodes, $pendingOps);
+        foreach ($ops as $i => $op) {
+            if ($initType !== $op->type || null === $op->arg2) {
+                continue;
+            }
+            $name = $this->resolveCompileTimeStringSlot((int) $op->arg2, $block);
+            if ($needle !== strtolower($name ?? '')) {
+                continue;
+            }
+            for ($j = $i + 1, $n = \count($ops); $j < $n; ++$j) {
+                $scan = $ops[$j];
+                if (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $scan->type && null !== $scan->arg1) {
+                    return (string) $scan->arg1;
+                }
+                if (OpCode::TYPE_FUNCCALL_INIT === $scan->type) {
+                    break;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * var_export(..., true) — hoisted ConstFetch true may not be emitted before ARG_SEND rewire (#18164).
+     */
+    private function slotForVarExportHoistedReturnTruePrelude(Block $block, Op $cfgCallOp): ?string
+    {
+        if (null === $block->orig) {
+            return null;
+        }
+        foreach ($this->hoistedPreludeProducersImmediatelyBeforeCall($cfgCallOp, $block) as $prelude) {
+            if (!$prelude instanceof Op\Expr\ConstFetch) {
+                continue;
+            }
+            $name = $this->staticNameFromOperand($prelude->name);
+            if ('true' !== strtolower($name ?? '')) {
+                continue;
+            }
+            if (null === $block->slotForOperand($prelude->result)) {
+                foreach ($this->compileExpr($prelude, $block) as $op) {
+                    $block->addOpCode($op);
+                }
+            }
+            $slot = $block->slotForOperand($prelude->result);
+
+            return null !== $slot ? (string) $slot : null;
+        }
+
+        return null;
+    }
+
+    /**
      * var_export($it->current(), true) — MethodCall EXEC_RETURN ordinal uses legacy base (#13901, #17251).
      *
      * @param list<Op> $cfgChildren
@@ -28754,6 +28830,12 @@ class Compiler {
             && !$producer instanceof Op\Expr\StaticCall
         ) {
             return null;
+        }
+        if ('var_export' === strtolower($this->resolveCfgFuncCallName($consumer) ?? '')) {
+            $paired = $this->slotForMethodOrStaticCallInitFollowingExecReturn($block, $producer);
+            if (null !== $paired) {
+                return $paired;
+            }
         }
         $producerIndex = array_search($producer, $cfgChildren, true);
         $consumerIndex = array_search($consumer, $cfgChildren, true);
@@ -47305,16 +47387,36 @@ class Compiler {
                     return;
                 }
                 if ($producer instanceof Op\Expr\MethodCall || $producer instanceof Op\Expr\StaticCall) {
-                    $operandSlot = $block->slotForOperand($producer->result);
-                    if (null !== $operandSlot) {
-                        $execSlot = (string) $operandSlot;
+                    if (null === $block->slotForOperand($producer->result)) {
+                        $prevForce = $this->forceDeferredSiblingCallReturnSlot;
+                        $this->forceDeferredSiblingCallReturnSlot = true;
+                        try {
+                            foreach ($this->compileExpr($producer, $block) as $op) {
+                                $block->addOpCode($op);
+                            }
+                        } finally {
+                            $this->forceDeferredSiblingCallReturnSlot = $prevForce;
+                        }
+                    }
+                    $pairedExec = $this->slotForMethodOrStaticCallInitFollowingExecReturn(
+                        $block,
+                        $producer,
+                        $nestedProducerOps
+                    );
+                    if (null !== $pairedExec) {
+                        $execSlot = $pairedExec;
                     } else {
-                        $execSlot = $this->slotForSiblingMethodCallProducerExecReturn(
-                            $block,
-                            $producer,
-                            $cfgCallOp,
-                            $block->orig->children
-                        );
+                        $operandSlot = $block->slotForOperand($producer->result);
+                        if (null !== $operandSlot) {
+                            $execSlot = (string) $operandSlot;
+                        } else {
+                            $execSlot = $this->slotForSiblingMethodCallProducerExecReturn(
+                                $block,
+                                $producer,
+                                $cfgCallOp,
+                                $block->orig->children
+                            );
+                        }
                     }
                 } elseif ($producer instanceof Op\Expr\ArrayDimFetch) {
                     $producers = $this->precedingInlineCallArgProducersBeforeCfgOp(
@@ -47386,6 +47488,9 @@ class Compiler {
                 $trueSlot = $op->arg1;
                 break;
             }
+        }
+        if (null === $trueSlot) {
+            $trueSlot = $this->slotForVarExportHoistedReturnTruePrelude($block, $cfgCallOp);
         }
         $sendOrdinal = 0;
         foreach ($outerArgSends as &$send) {
