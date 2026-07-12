@@ -29,7 +29,7 @@ abstract class DomClassMethod extends VmClassMethod
         ?Frame $frame = null,
         string $paramName = 'value'
     ): string {
-        if (null !== $frame) {
+        if (null !== $frame && InternalStrictArg::isCallerStrict($frame)) {
             InternalStrictArg::rejectNullString($var, $label, $paramName, $index, $frame);
         }
         $var = $var->resolveIndirect();
