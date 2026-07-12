@@ -30,7 +30,7 @@ final class htmlentities extends Internal
         if ($argc < 1 || $argc > 4) {
             throw new \LogicException('htmlentities() requires one to four arguments in this compiler build');
         }
-        $string = VmString::coerceStringBuiltinArg(
+        $string = VmString::coerceTypedStringBuiltinArg(
             $frame->calledArgs[0],
             'htmlentities',
             0,
@@ -107,7 +107,7 @@ final class htmlentities extends Internal
             );
         }
 
-        $str = JitStringBuiltinArg::lower($context, $args[0], 'htmlentities', 0, 'string');
+        $str = JitStringBuiltinArg::lowerTypedString($context, $args[0], 'htmlentities', 0, 'string');
         $flagsLlvm = $context->getTypeFromString('int64')->constInt(ENT_QUOTES | ENT_SUBSTITUTE, false);
         if ($argc >= 2) {
             $flagsLlvm = $flagsKnown

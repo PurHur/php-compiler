@@ -151,9 +151,9 @@ final class InternalStrictArg
     }
 
     /**
-     * Reject null for internal string parameters when caller uses strict_types (#4365, #11322).
+     * Reject null for typed internal string parameters (php-src IS_STRING; #18190, #12640).
      *
-     * Non-strict callers coerce null to "" via VmString::coerceStringBuiltinArg (php-src Z_PARAM_STR).
+     * Z_PARAM_STR without a type hint may still coerce null via {@see VmString::coerceStringBuiltinArg()}.
      */
     public static function rejectNullString(
         Variable $arg,
@@ -162,9 +162,6 @@ final class InternalStrictArg
         int $argIndex,
         Frame $frame
     ): void {
-        if (!self::isCallerStrict($frame)) {
-            return;
-        }
         $v = $arg->resolveIndirect();
         if (Variable::TYPE_NULL === $v->type) {
             throw new \TypeError(self::message($function, $argIndex, $paramName, 'string', $v));
