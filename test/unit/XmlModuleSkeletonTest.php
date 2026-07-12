@@ -35,14 +35,37 @@ PHP;
         self::assertSame('111', ob_get_clean());
     }
 
-    public function test_xml_parser_create_stub_throws_error(): void
+    public function test_xml_parser_create_returns_xmlparser_object(): void
     {
         $runtime = new Runtime();
-        $fn = new \PHPCompiler\ext\xml\xml_parser_create();
-        $frame = $fn->getFrame($runtime->vmContext);
+        $code = <<<'PHP'
+<?php
+$p = xml_parser_create();
+echo is_object($p) ? get_class($p) : gettype($p);
+PHP;
+        $block = $runtime->parseAndCompile($code, 'xml_parser_create.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame('XMLParser', ob_get_clean());
+    }
 
-        $this->expectException(\Error::class);
-        $this->expectExceptionMessage('xml_parser_create() is not implemented in this compiler build (issue #3494)');
-        $fn->execute($frame);
+    public function test_xml_set_element_handler_callbacks(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+function xs($parser, $name, $attrs) { echo "start:$name\n"; }
+function xe($parser, $name) { echo "end:$name\n"; }
+$p = xml_parser_create();
+xml_parser_set_option($p, XML_OPTION_CASE_FOLDING, 0);
+xml_set_element_handler($p, 'xs', 'xe');
+xml_parse($p, '<root><a/></root>', true);
+xml_parser_free($p);
+echo "done\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'xml_set_element_handler.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("start:root\nstart:a\nend:a\nend:root\ndone\n", ob_get_clean());
     }
 }

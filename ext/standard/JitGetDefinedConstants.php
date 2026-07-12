@@ -337,10 +337,7 @@ final class JitGetDefinedConstants
             case VMVariable::TYPE_NULL:
                 return;
             default:
-                throw new \LogicException(
-                    'get_defined_constants() unsupported constant type: '
-                    .VMVariable::getStringType($resolved->type)
-                );
+                return;
         }
     }
 }

@@ -8,21 +8,52 @@ use PHPCompiler\ModuleAbstract;
 use PHPCompiler\Runtime;
 
 /**
- * zip extension module entry (php-src ext/zip/php_zip.c; issue #5869).
+ * zip extension module entry (php-src ext/zip/php_zip.c; issues #5869, #3337, #6370, #18137).
  *
- * ZipArchive parity tracked in #3337; register under {@see standard} so
- * extension_loaded('zip') stays false until libzip ships (#11676).
+ * Register under {@see standard}; advertise logical {@code zip} extension, ZipArchive, and
+ * zip_* procedural API when {@see ZipExtensionPolicy::advertisesExtension()} — withheld on
+ * reference profile (Zend 8.2 harness has no ext/zip).
  */
 class Module extends ModuleAbstract
 {
+    public function init(Runtime $runtime): void
+    {
+        parent::init($runtime);
+        BuiltinClasses::register($runtime->vmContext);
+    }
+
     public function getExtensionName(): string
     {
         return 'standard';
     }
 
-    public function init(Runtime $runtime): void
+    /**
+     * @return list<string>
+     */
+    public function getAdditionalExtensionNames(): array
     {
-        parent::init($runtime);
-        BuiltinClasses::register($runtime->vmContext);
+        if (!ZipExtensionPolicy::advertisesExtension()) {
+            return [];
+        }
+
+        return ['zip'];
+    }
+
+    public function getFunctions(): array
+    {
+        if (!ZipExtensionPolicy::advertisesExtension()) {
+            return [];
+        }
+
+        return [
+            new zip_open(),
+            new zip_close(),
+            new zip_read(),
+            new zip_entry_open(),
+            new zip_entry_close(),
+            new zip_entry_read(),
+            new zip_entry_name(),
+            new zip_entry_filesize(),
+        ];
     }
 }

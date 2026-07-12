@@ -77,8 +77,14 @@ final class ModuleRegistry
             && !\PHPCompiler\ext\openssl\OpensslExtensionPolicy::advertisesExtension();
         $withholdSqlite3Surface = 'sqlite3' === $primary
             && !\PHPCompiler\ext\sqlite3\Sqlite3ExtensionPolicy::advertisesExtension();
+        $withholdLdapSurface = 'ldap' === $primary
+            && !\PHPCompiler\ext\ldap\LdapExtensionPolicy::advertisesExtension();
+        $withholdInotifySurface = 'inotify' === $primary
+            && !\PHPCompiler\ext\inotify\InotifyExtensionPolicy::advertisesExtension();
+        $withholdXslSurface = 'xsl' === $primary
+            && !\PHPCompiler\ext\xsl\XslExtensionPolicy::advertisesExtension();
 
-        if (!$withholdOpensslSurface && !$withholdSqlite3Surface) {
+        if (!$withholdOpensslSurface && !$withholdSqlite3Surface && !$withholdLdapSurface && !$withholdInotifySurface && !$withholdXslSurface) {
             self::register($module->getExtensionName(), $moduleVersion);
         }
         $additional = $module->getAdditionalExtensionNames();
@@ -93,7 +99,7 @@ final class ModuleRegistry
                 continue;
             }
             $fnName = strtolower($func->getName());
-            if ($withholdOpensslSurface || $withholdSqlite3Surface) {
+            if ($withholdOpensslSurface || $withholdSqlite3Surface || $withholdLdapSurface || $withholdInotifySurface || $withholdXslSurface) {
                 self::registerBuiltinLookup($fnName);
 
                 continue;
@@ -195,6 +201,31 @@ final class ModuleRegistry
         return self::$extensionFunctions;
     }
 
+    /**
+     * Registered extension/builtin names for get_defined_functions() internal bucket (#17415).
+     *
+     * php-src: ext/standard/basic_functions.c — PHP_FUNCTION(get_defined_functions)
+     *
+     * @return list<string>
+     */
+    public static function advertisedInternalFunctionNames(): array
+    {
+        $names = [];
+        $seen = [];
+        foreach (self::$extensionFunctions as $funcs) {
+            foreach ($funcs as $name) {
+                $lc = strtolower($name);
+                if (isset($seen[$lc])) {
+                    continue;
+                }
+                $seen[$lc] = true;
+                $names[] = $name;
+            }
+        }
+
+        return $names;
+    }
+
     public static function isRegisteredBuiltinFunction(string $functionName): bool
     {
         return isset(self::$registeredFunctionLookup[strtolower($functionName)]);
@@ -249,6 +280,7 @@ final class ModuleRegistry
             'readline' => str_starts_with($functionName, 'readline'),
             'bcmath' => str_starts_with($functionName, 'bc'),
             'openssl' => str_starts_with($functionName, 'openssl_'),
+            'zip' => str_starts_with($functionName, 'zip_'),
             default => false,
         };
     }

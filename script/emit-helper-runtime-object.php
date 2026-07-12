@@ -194,6 +194,7 @@ if (null !== $unitPath) {
         'helpers' => $helpers,
         'init_symbol' => '__init__'.$initSuffix,
         'shutdown_symbol' => '__shutdown__'.$initSuffix,
+        'init_via_global_ctor' => true,
         'runtime_safe' => !isset($runtimeUnsafe[$unitPath]),
     ], JSON_UNESCAPED_SLASHES)."\n");
     @unlink($dir.'/failed.json');

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\intl;
 
+use PHPCompiler\ext\mbstring\VmMbstring;
 use PHPCompiler\ext\standard\VmMath;
 use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
@@ -55,10 +56,10 @@ final class grapheme_strimwidth extends Internal
             3,
             'width'
         );
-        $trimmarker = $argc >= 4
-            ? VmString::coerceStringBuiltinArg($frame->calledArgs[3], 'grapheme_strimwidth', 3, 'trimmarker')
-            : '';
-        $result = VmGrapheme::strimwidth($string, $start, $width, $trimmarker);
+        $encoding = $argc >= 4
+            ? VmMbstring::coerceEncodingArg($frame->calledArgs[3], 'grapheme_strimwidth', 3)
+            : null;
+        $result = VmGrapheme::strimwidth($string, $start, $width, $encoding);
         BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($result): void {
             if (false === $result) {
                 $ret->bool(false);

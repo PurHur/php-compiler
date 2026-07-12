@@ -9,7 +9,7 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPUnit\Framework\TestCase;
 
-/** sort()/rsort() JIT routes through SortJitHelper PHP not __hashtable__sortPacked LLVM (#12769, #13049). */
+/** sort()/rsort() JIT routes through SortJitHelper PHP not __hashtable__sortPacked LLVM (#12769, #13049, #17775). */
 final class SortRuntimeShrinkTest extends TestCase
 {
     public function testSortRuntimeUsesJitHelperNotDirectLlvmMonolith(): void
@@ -17,7 +17,9 @@ final class SortRuntimeShrinkTest extends TestCase
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/SortRuntime.php');
         $this->assertStringContainsString('SortJitHelper', $runtime);
         $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);
-        $this->assertStringContainsString('ArrayBuiltinHelper::isNativeArray', $runtime);
+        $this->assertStringNotContainsString('ArrayBuiltinHelper::sortPacked', $runtime);
+        $this->assertStringContainsString('loadHashTable', $runtime);
+        $this->assertStringContainsString('storeHashtableInArrayVariable', $runtime);
 
         $sort = (string) file_get_contents(__DIR__.'/../../ext/standard/sort_.php');
         $rsort = (string) file_get_contents(__DIR__.'/../../ext/standard/rsort_.php');
@@ -25,6 +27,19 @@ final class SortRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('SortRuntime::sortPackedReverse', $rsort);
         $this->assertStringNotContainsString('ArrayBuiltinHelper::sortPacked(', $sort);
         $this->assertStringNotContainsString('ArrayBuiltinHelper::sortPackedReverse(', $rsort);
+    }
+
+    public function testSortRuntimeShrinkTestDocMentionsIssue17775(): void
+    {
+        $source = (string) file_get_contents(__FILE__);
+        $this->assertStringContainsString('#17775', $source);
+    }
+
+    public function testHashtableTypeLlvmNoLongerRegistersSortPackedSymbols(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type/HashTable.php');
+        $this->assertStringNotContainsString('__hashtable__sortPacked', $source);
+        $this->assertStringNotContainsString('__hashtable__shufflePacked', $source);
     }
 
     public function testSortJitHelperSortsIntegersAscending(): void

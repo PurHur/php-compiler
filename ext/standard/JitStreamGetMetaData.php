@@ -17,7 +17,13 @@ final class JitStreamGetMetaData
     /** @return Value */
     public static function invoke(Context $context, Value $handleLong): Value
     {
+        $savedBlock = BasicBlockHelper::tryGetInsertBlock($context);
         StreamMeta::ensureLinked($context);
+        if (null !== $savedBlock) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedBlock);
+        } else {
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'stream_get_meta_data_cont');
+        }
 
         $htPtrTy = $context->getTypeFromString('__hashtable__*');
         $nullHt = $htPtrTy->constNull();

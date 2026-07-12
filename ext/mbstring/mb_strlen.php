@@ -14,7 +14,7 @@ use PHPCompiler\VM\Variable as VMVariable;
 use PHPLLVM\Value;
 
 /**
- * mb_strlen() — UTF-8 character count (php-src ext/mbstring/mbstring.c; #158, #5695).
+ * mb_strlen() — UTF-8 character count (php-src ext/mbstring/mbstring.c; #158, #5695, #4405).
  *
  * Full mbstring parity (additional encodings, mb_substr, …) tracked in #4405, #3239.
  */
@@ -29,9 +29,12 @@ final class mb_strlen extends Internal
     {
         $argc = \count($frame->calledArgs);
         if ($argc < 1 || $argc > 2) {
-            throw new \LogicException('mb_strlen() requires one or two arguments');
+            throw new \ArgumentCountError(sprintf(
+                'mb_strlen() expects between 1 and 2 arguments, %d given',
+                $argc
+            ));
         }
-        $str = VmString::coerceStringBuiltinArg(
+        $str = VmString::coerceTypedStringBuiltinArg(
             $frame->calledArgs[0],
             'mb_strlen',
             0,
@@ -40,16 +43,16 @@ final class mb_strlen extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $encoding = 'UTF-8';
-        if (2 === $argc) {
-            $encoding = VmString::coerceStringBuiltinArg(
+        $internal = MbstringState::internalEncoding();
+        $encoding = 2 === $argc
+            ? VmMbstring::resolveValidatedEncodingArg(
                 $frame->calledArgs[1],
                 'mb_strlen',
                 1,
-                'encoding'
-            );
-        }
-        $frame->returnVar->int(self::lengthForEncoding($str, $encoding));
+                $internal
+            )
+            : $internal;
+        $frame->returnVar->int(VmMbstring::strlen($str, $encoding));
     }
 
     public function call(Context $context, Variable ...$args): Value
@@ -65,7 +68,7 @@ final class mb_strlen extends Internal
             );
         }
 
-        $str = JitStringBuiltinArg::lower($context, $args[0], 'mb_strlen', 0, 'string');
+        $str = JitStringBuiltinArg::lowerTypedString($context, $args[0], 'mb_strlen', 0, 'string');
 
         if (1 === $argc) {
             return JitMbStrlen::utf8LengthFromPtr($context, $str);
@@ -77,9 +80,9 @@ final class mb_strlen extends Internal
         if ('UTF-8' === $encoding) {
             return JitMbStrlen::utf8LengthFromPtr($context, $str);
         }
-        if (null !== $encoding && 'ASCII' !== $encoding && '8BIT' !== $encoding) {
+        if (null !== $encoding && 'ASCII' !== $encoding && '8BIT' !== $encoding && 'ISO-8859-1' !== $encoding) {
             throw new \LogicException(
-                'mb_strlen() JIT only supports UTF-8, ASCII, or 8BIT encoding literals in this compiler build'
+                'mb_strlen() JIT only supports UTF-8, ASCII, 8BIT, or ISO-8859-1 encoding literals in this compiler build'
             );
         }
 
@@ -87,20 +90,6 @@ final class mb_strlen extends Internal
 
         return $context->builder->load(
             $context->builder->structGep($str, $offset)
-        );
-    }
-
-    private static function lengthForEncoding(string $str, string $encoding): int
-    {
-        if ('UTF-8' === $encoding) {
-            return VmString::utf8CharLength($str);
-        }
-        if ('ASCII' === $encoding || '8BIT' === $encoding) {
-            return VmString::byteLength($str);
-        }
-
-        throw new \LogicException(
-            'mb_strlen() requires mbstring for encoding '.$encoding.' in this compiler build'
         );
     }
 }

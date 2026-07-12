@@ -25,9 +25,11 @@ function collectCapabilities(string $root): array
         'bcmath' => new PHPCompiler\ext\bcmath\Module(),
         'bz2' => new PHPCompiler\ext\bz2\Module(),
         'stats' => new PHPCompiler\ext\stats\Module(),
+        'opcache' => new PHPCompiler\ext\opcache\Module(),
         'ctype' => new PHPCompiler\ext\ctype\Module(),
         'tokenizer' => new PHPCompiler\ext\tokenizer\Module(),
         'filter' => new PHPCompiler\ext\filter\Module(),
+        'iconv' => new PHPCompiler\ext\iconv\Module(),
         'session' => new PHPCompiler\ext\session\Module(),
         'mbstring' => new PHPCompiler\ext\mbstring\Module(),
         'intl' => new PHPCompiler\ext\intl\Module(),
@@ -36,6 +38,10 @@ function collectCapabilities(string $root): array
         'sodium' => new PHPCompiler\ext\sodium\Module(),
         'sockets' => new PHPCompiler\ext\sockets\Module(),
         'curl' => new PHPCompiler\ext\curl\Module(),
+        'zip' => new PHPCompiler\ext\zip\Module(),
+        'inotify' => new PHPCompiler\ext\inotify\Module(),
+        'uuid' => new PHPCompiler\ext\uuid\Module(),
+        'uploadprogress' => new PHPCompiler\ext\uploadprogress\Module(),
     ];
 
     $capabilities = [];
@@ -166,7 +172,7 @@ function analyzeInternal(PHPCompiler\Func\Internal $fn): array
         $notes[] = 'compile-time string user-function callbacks; closures deferred (#1177, #142)';
     }
     if ('preg_replace_callback_array' === $fn->getName() && str_contains($source, 'VmPregReplaceCallbackArray::invoke')) {
-        $notes[] = 'VM any callable; JIT/AOT deferred (#3568, #1177); closures use VM lowering';
+        $notes[] = 'VM any callable; JIT/AOT via PregReplaceCallbackArrayRuntime + PregJitHelper (#3568)';
     }
     if (\PHPCompiler\JIT\SelfHostBuiltinPolicy::isVmOnlyDeferred($fn->getName())) {
         $deferLib = __DIR__.'/stdlib-jit-deferred-lib.php';

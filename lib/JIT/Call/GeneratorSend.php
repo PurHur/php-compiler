@@ -52,7 +52,7 @@ final class GeneratorSend implements Call
             );
         }
         $context->builder->store($i1->constInt(1, false), $context->builder->structGep($statePtr, $map['has_pending_send']));
-        $activeSlot = GeneratorHelper::resumeAndBoxYield($context, $genVar);
+        $activeSlot = GeneratorHelper::resumeSendAndBoxYield($context, $genVar);
         $context->builder->branch($mergeBlock);
         $context->builder->positionAtEnd($mergeBlock);
         $valuePtrTy = $context->getTypeFromString('__value__*');

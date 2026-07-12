@@ -26,8 +26,12 @@ final class array_push extends Internal
 {
     public function execute(Frame $frame): void
     {
-        if (\count($frame->calledArgs) < 1) {
-            throw new \LogicException('array_push() requires at least one argument');
+        $argc = \count($frame->calledArgs);
+        if ($argc < 1) {
+            throw new \ArgumentCountError(\sprintf(
+                'array_push() expects at least 1 argument, %d given',
+                $argc
+            ));
         }
         $ht = VmArray::requireArrayParam($frame->calledArgs[0], 'array_push', 1, 'array');
         $values = [];
@@ -45,8 +49,12 @@ final class array_push extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (\count($args) < 1) {
-            throw new \LogicException('array_push() requires at least one argument');
+        $argc = \count($args);
+        if ($argc < 1) {
+            throw new \ArgumentCountError(\sprintf(
+                'array_push() expects at least 1 argument, %d given',
+                $argc
+            ));
         }
         if (1 === \count($args) && JITVariable::TYPE_HASHTABLE === $args[0]->type) {
             return ArrayBuiltinHelper::pushMergedCallUnpack($context, $args[0]);

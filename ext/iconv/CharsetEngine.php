@@ -15,6 +15,26 @@ final class CharsetEngine
 
     public const FLAG_TRANSLIT = 2;
 
+    public const ERROR_NONE = 0;
+
+    public const ERROR_ILLEGAL = 1;
+
+    public const ERROR_INCOMPLETE = 2;
+
+    private static int $lastError = self::ERROR_NONE;
+
+    public static function lastError(): int
+    {
+        return self::$lastError;
+    }
+
+    private static function failUtf8(int $error): false
+    {
+        self::$lastError = $error;
+
+        return false;
+    }
+
     /**
      * @return array{0: string, 1: int}|null [canonical encoding, flags]
      */
@@ -58,6 +78,7 @@ final class CharsetEngine
 
     public static function convert(string $fromEncoding, string $toEncoding, string $input): string|false
     {
+        self::$lastError = self::ERROR_NONE;
         $from = self::parseEncodingSpec($fromEncoding);
         $to = self::parseEncodingSpec($toEncoding);
         if (null === $from || null === $to) {
@@ -161,7 +182,7 @@ final class CharsetEngine
                         continue;
                     }
 
-                    return false;
+                    return self::failUtf8(self::ERROR_ILLEGAL);
                 }
                 $cp = (($b & 0x1F) << 6) | ($b2 & 0x3F);
                 if ($cp > 0xFF) {
@@ -171,7 +192,7 @@ final class CharsetEngine
                         continue;
                     }
 
-                    return false;
+                    return self::failUtf8(self::ERROR_ILLEGAL);
                 }
                 $out .= \chr($cp);
                 $i += 2;
@@ -184,7 +205,7 @@ final class CharsetEngine
                 continue;
             }
 
-            return false;
+            return self::failUtf8(self::classifyUtf8Failure($input, $i, $len));
         }
 
         return $out;
@@ -367,7 +388,7 @@ final class CharsetEngine
                         continue;
                     }
 
-                    return null;
+                    return self::failUtf8(self::ERROR_ILLEGAL);
                 }
                 $out[] = (($b & 0x1F) << 6) | ($b2 & 0x3F);
                 $i += 2;
@@ -382,7 +403,7 @@ final class CharsetEngine
                         continue;
                     }
 
-                    return null;
+                    return self::failUtf8(self::ERROR_ILLEGAL);
                 }
                 $out[] = (($b & 0x0F) << 12) | (($b2 & 0x3F) << 6) | ($b3 & 0x3F);
                 $i += 3;
@@ -398,7 +419,7 @@ final class CharsetEngine
                         continue;
                     }
 
-                    return null;
+                    return self::failUtf8(self::ERROR_ILLEGAL);
                 }
                 $out[] = (($b & 0x07) << 18) | (($b2 & 0x3F) << 12) | (($b3 & 0x3F) << 6) | ($b4 & 0x3F);
                 $i += 4;
@@ -409,10 +430,30 @@ final class CharsetEngine
                 continue;
             }
 
-            return null;
+            return self::failUtf8(self::classifyUtf8Failure($input, $i, $len));
         }
 
         return $out;
+    }
+
+    private static function classifyUtf8Failure(string $input, int $i, int $len): int
+    {
+        $b = \ord($input[$i]);
+        if (($b & 0xC0) === 0x80) {
+            return self::ERROR_ILLEGAL;
+        }
+        $need = match (true) {
+            ($b & 0x80) === 0 => 0,
+            ($b & 0xE0) === 0xC0 => 1,
+            ($b & 0xF0) === 0xE0 => 2,
+            ($b & 0xF8) === 0xF0 => 3,
+            default => -1,
+        };
+        if ($need >= 0 && $i + $need >= $len) {
+            return self::ERROR_INCOMPLETE;
+        }
+
+        return self::ERROR_ILLEGAL;
     }
 
     /**

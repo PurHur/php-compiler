@@ -4,11 +4,11 @@ AOT: array_all_key()/array_any_key() optional $strict third parameter (#15704, e
 PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
-function phpc_aot_all_key_returns_int($v, $k)
+function phpc_aot_all_key_returns_int($k, $v)
 {
     return $v == 1 ? 1 : 0;
 }
-function phpc_aot_any_key_returns_int($v, $k)
+function phpc_aot_any_key_returns_int($k, $v)
 {
     return $v == 1 ? 1 : 0;
 }

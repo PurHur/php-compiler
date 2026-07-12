@@ -119,7 +119,7 @@ final class CallUnpackCompileTime
                 $foundInit = true;
                 if (null !== $op->arg2) {
                     $key = self::compileTimeKey($block, $op->arg3);
-                    $value = self::compileTimeValue($block, (int) $op->arg2);
+                    $value = self::compileTimeValueFromSlot($block, (int) $op->arg2, $visited);
                     if (null === $key || null === $value) {
                         return null;
                     }
@@ -129,7 +129,7 @@ final class CallUnpackCompileTime
             }
             if (OpCode::TYPE_ADD_ARRAY_ELEMENT === $op->type && $op->arg1 === $slot) {
                 $key = self::compileTimeKey($block, $op->arg3);
-                $value = self::compileTimeValue($block, (int) $op->arg2);
+                $value = self::compileTimeValueFromSlot($block, (int) $op->arg2, $visited);
                 if (null === $key || null === $value) {
                     return null;
                 }
@@ -170,6 +170,19 @@ final class CallUnpackCompileTime
         $copy->copyFrom($block->constants[$valueSlot]);
 
         return $copy;
+    }
+
+    /**
+     * @param array<int, true> $visited
+     */
+    private static function compileTimeValueFromSlot(Block $block, int $valueSlot, array &$visited = []): ?VmVariable
+    {
+        $literal = self::compileTimeValue($block, $valueSlot);
+        if (null !== $literal) {
+            return $literal;
+        }
+
+        return self::tryCompileTimeArrayFromSlot($block, $valueSlot, $visited);
     }
 
     /**

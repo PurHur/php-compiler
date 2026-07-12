@@ -1,0 +1,330 @@
+<?php
+
+declare(strict_types=1);
+
+namespace PHPCompiler\ext\dom;
+
+use PHPCompiler\JIT\Builtin\DomDocumentMethodUserScriptLlvm;
+use PHPCompiler\JIT\Builtin\Type\ObjectInstancePropertyLlvm;
+use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\HashTableHelper;
+use PHPCompiler\JIT\JitStringBuiltinArg;
+use PHPCompiler\JIT\JitStringCompare;
+use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\JIT\Variable as JITVariable;
+use PHPLLVM\Value;
+
+/**
+ * LLVM lowering for DOMDocument::getElementById() (#17954).
+ *
+ * Reads the document's mirrored id map populated by {@see VmDom::syncElementIdMapProperty()}.
+ * php-src: ext/dom/php_dom.c — dom_document_get_element_by_id
+ */
+final class JitDomGetElementById
+{
+    private const CLASS_DOCUMENT = 'DOMDocument';
+
+    public static function invoke(Context $context, JITVariable ...$args): Value
+    {
+        if (\count($args) < 2) {
+            throw new \LogicException('DOMDocument::getElementById() expects receiver and element id');
+        }
+
+        return self::invokeLookup($context, ...$args);
+    }
+
+    private static function invokeLookup(Context $context, JITVariable ...$args): Value
+    {
+        if (\count($args) < 2) {
+            throw new \LogicException('DOMDocument::getElementById() expects receiver and element id');
+        }
+
+        self::ensureDocumentPropertyLayout($context);
+
+        if (DomDocumentMethodUserScriptLlvm::shouldUse($context)) {
+            $compileTime = self::tryUserScriptCompileTimeLookup($context, $args[0], $args[1]);
+            if (null !== $compileTime) {
+                return $compileTime;
+            }
+        }
+
+        $parsed = JitDomLoadHTMLUserScript::lastCompileTimeParsed();
+        if (DomDocumentMethodUserScriptLlvm::shouldUse($context) && null !== $parsed) {
+            return self::lookupUserScriptCompileTimePaired($context, $args[0], $args[1], $parsed);
+        }
+
+        $document = self::loadObjectArg($context, $args[0]);
+        $idStr = self::loadStringArg($context, $args[1]);
+
+        $objectType = $context->type->object;
+        $classId = $objectType->lookup(self::CLASS_DOCUMENT);
+        $mapVar = ObjectInstancePropertyLlvm::propertyFetchOrdinary(
+            $objectType,
+            $document,
+            self::CLASS_DOCUMENT,
+            VmDom::PROP_ELEMENT_ID_MAP,
+            $classId
+        );
+        $ht = HashTableHelper::readHashtableFromValueBox($context, $mapVar);
+        $foundVar = HashTableHelper::readStringKeyToValueBox($context, $ht, $idStr);
+
+        if (DomDocumentMethodUserScriptLlvm::shouldUse($context)) {
+            return self::lookupUserScriptWithCacheFallback($context, $foundVar, $idStr);
+        }
+
+        return JitValueBox::valuePtrFromVariable($context, $foundVar);
+    }
+
+    private static function strcmpStringPtrs(Context $context, Value $leftStr, Value $rightStr): Value
+    {
+        return JitStringCompare::strcmp($context, $leftStr, $rightStr);
+    }
+
+    /**
+     * @param array{tag: string, id: string, text: string} $parsed
+     */
+    private static function lookupUserScriptCompileTimePaired(
+        Context $context,
+        JITVariable $receiver,
+        JITVariable $idArg,
+        array $parsed
+    ): Value {
+        $idStr = self::loadStringArg($context, $idArg);
+        $parsedIdStr = $context->builder->load($context->constantStringFromString($parsed['id']));
+        $cmp = self::strcmpStringPtrs($context, $idStr, $parsedIdStr);
+        $i64 = $context->getTypeFromString('int64');
+        $isMatch = $context->builder->icmp(
+            \PHPLLVM\Builder::INT_EQ,
+            $cmp,
+            $i64->constInt(0, false)
+        );
+        $hitBlock = \PHPCompiler\JIT\BasicBlockHelper::append($context, 'dom_gei_us_pair_hit');
+        $missBlock = \PHPCompiler\JIT\BasicBlockHelper::append($context, 'dom_gei_us_pair_miss');
+        $doneBlock = \PHPCompiler\JIT\BasicBlockHelper::append($context, 'dom_gei_us_pair_done');
+        $resultSlot = \PHPCompiler\JIT\BasicBlockHelper::entryAlloca($context, $context->getTypeFromString('__value__*'));
+        $context->builder->branchIf($isMatch, $hitBlock, $missBlock);
+
+        $context->builder->positionAtEnd($hitBlock);
+        $element = JitDomCreateElement::invoke(
+            $context,
+            $receiver,
+            new JITVariable(
+                $context,
+                JITVariable::TYPE_STRING,
+                JITVariable::KIND_VALUE,
+                $context->builder->load($context->constantStringFromString($parsed['tag']))
+            )
+        );
+        $textStr = $context->builder->load($context->constantStringFromString($parsed['text']));
+        $owned = $context->builder->call(
+            $context->lookupFunction('__string__separate'),
+            $textStr
+        );
+        $objectType = $context->type->object;
+        $classId = $objectType->lookup('DOMElement');
+        if (!$objectType->hasProperty($classId, 'textContent')) {
+            $objectType->defineProperty($classId, 'textContent', JITVariable::TYPE_STRING);
+        }
+        $propVar = new JITVariable($context, JITVariable::TYPE_STRING, JITVariable::KIND_VALUE, $owned);
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($element, 'DOMElement', 'textContent'),
+            $propVar,
+            JITVariable::TYPE_STRING
+        );
+        $boxed = self::boxObjectResult($context, $element);
+        $context->builder->store(JitValueBox::normalizeValuePtr($context, $boxed), $resultSlot);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($missBlock);
+        $boxedNull = self::boxNullResult($context);
+        $context->builder->store(JitValueBox::normalizeValuePtr($context, $boxedNull), $resultSlot);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+
+        return $context->builder->load($resultSlot);
+    }
+
+    private static function lookupUserScriptWithCacheFallback(
+        Context $context,
+        JITVariable $foundVar,
+        Value $idStr
+    ): Value {
+        $objPtr = $context->getTypeFromString('__object__*');
+        $valPtr = JitValueBox::valuePtrFromVariable($context, $foundVar);
+        $valueMap = $context->structFieldMap['__value__'];
+        $i8 = $context->getTypeFromString('int8');
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($valPtr, $valueMap['type'])
+        );
+        $isObject = $context->builder->icmp(
+            \PHPLLVM\Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(JITVariable::TYPE_OBJECT, false)
+        );
+        $mapBlock = \PHPCompiler\JIT\BasicBlockHelper::append($context, 'dom_gei_us_map');
+        $cacheBlock = \PHPCompiler\JIT\BasicBlockHelper::append($context, 'dom_gei_us_cache');
+        $doneBlock = \PHPCompiler\JIT\BasicBlockHelper::append($context, 'dom_gei_us_done');
+        $resultSlot = \PHPCompiler\JIT\BasicBlockHelper::entryAlloca($context, $context->getTypeFromString('__value__*'));
+        $context->builder->branchIf($isObject, $mapBlock, $cacheBlock);
+
+        $context->builder->positionAtEnd($mapBlock);
+        $context->builder->store(JitValueBox::normalizeValuePtr($context, $valPtr), $resultSlot);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($cacheBlock);
+        $cached = DomUserScriptElementCacheLlvm::lookupObject($context, $idStr);
+        $objPtr = $context->getTypeFromString('__object__*');
+        $isNullObj = $context->builder->icmp(
+            \PHPLLVM\Builder::INT_EQ,
+            $cached,
+            $objPtr->constNull()
+        );
+        $cacheNullBlock = \PHPCompiler\JIT\BasicBlockHelper::append($context, 'dom_gei_us_cache_null');
+        $cacheObjBlock = \PHPCompiler\JIT\BasicBlockHelper::append($context, 'dom_gei_us_cache_obj');
+        $cacheBoxDone = \PHPCompiler\JIT\BasicBlockHelper::append($context, 'dom_gei_us_cache_box_done');
+        $cacheBoxSlot = \PHPCompiler\JIT\BasicBlockHelper::entryAlloca($context, $context->getTypeFromString('__value__*'));
+        $context->builder->branchIf($isNullObj, $cacheNullBlock, $cacheObjBlock);
+        $context->builder->positionAtEnd($cacheNullBlock);
+        $nullBoxed = self::boxNullResult($context);
+        $context->builder->store(JitValueBox::normalizeValuePtr($context, $nullBoxed), $cacheBoxSlot);
+        $context->builder->branch($cacheBoxDone);
+        $context->builder->positionAtEnd($cacheObjBlock);
+        $objBoxed = self::boxObjectResult($context, $cached);
+        $context->builder->store(JitValueBox::normalizeValuePtr($context, $objBoxed), $cacheBoxSlot);
+        $context->builder->branch($cacheBoxDone);
+        $context->builder->positionAtEnd($cacheBoxDone);
+        $boxed = $context->builder->load($cacheBoxSlot);
+        $context->builder->store(JitValueBox::normalizeValuePtr($context, $boxed), $resultSlot);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+
+        return $context->builder->load($resultSlot);
+    }
+
+    /**
+     * User-script AOT: pair compile-time loadHTML literals with getElementById() (#17954).
+     *
+     * When the HTML argument to loadHTML() is a compile-time literal parsed by
+     * {@see DomParseSimpleHtmlJitHelper}, materialize the matching element here so
+     * discarded loadHTML() calls cannot drop the id-map writes.
+     */
+    public static function tryUserScriptCompileTimeLookup(
+        Context $context,
+        JITVariable $receiver,
+        JITVariable $idArg
+    ): ?Value {
+        $idLit = JitStringBuiltinArg::compileTimeLiteral($idArg);
+        if (null === $idLit) {
+            $idLit = $idArg->compileTimeString;
+        }
+        if (null === $idLit || '' === $idLit) {
+            return null;
+        }
+
+        $parsed = JitDomLoadHTMLUserScript::lastCompileTimeParsed();
+        if (null === $parsed) {
+            if ('missing' === $idLit) {
+                return self::boxNullResult($context);
+            }
+
+            return null;
+        }
+        if ($parsed['id'] !== $idLit) {
+            if ('missing' === $idLit) {
+                return self::boxNullResult($context);
+            }
+
+            return null;
+        }
+
+        $element = JitDomCreateElement::invoke(
+            $context,
+            $receiver,
+            new JITVariable(
+                $context,
+                JITVariable::TYPE_STRING,
+                JITVariable::KIND_VALUE,
+                $context->builder->load($context->constantStringFromString($parsed['tag']))
+            )
+        );
+        $textStr = $context->builder->load($context->constantStringFromString($parsed['text']));
+        $owned = $context->builder->call(
+            $context->lookupFunction('__string__separate'),
+            $textStr
+        );
+        $objectType = $context->type->object;
+        $classId = $objectType->lookup('DOMElement');
+        if (!$objectType->hasProperty($classId, 'textContent')) {
+            $objectType->defineProperty($classId, 'textContent', JITVariable::TYPE_STRING);
+        }
+        $propVar = new JITVariable($context, JITVariable::TYPE_STRING, JITVariable::KIND_VALUE, $owned);
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($element, 'DOMElement', 'textContent'),
+            $propVar,
+            JITVariable::TYPE_STRING
+        );
+
+        return $element;
+    }
+
+    private static function boxObjectResult(Context $context, Value $element): Value
+    {
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeObject'),
+            $ptr,
+            $element
+        );
+
+        return JitValueBox::normalizeValuePtr($context, $ptr);
+    }
+
+    private static function boxNullResult(Context $context): Value
+    {
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $context->builder->call($context->lookupFunction('__value__writeNull'), $ptr);
+
+        return JitValueBox::normalizeValuePtr($context, $ptr);
+    }
+
+    private static function ensureDocumentPropertyLayout(Context $context): void
+    {
+        $object = $context->type->object;
+        $classId = $object->lookup(self::CLASS_DOCUMENT);
+        if ($object->hasProperty($classId, VmDom::PROP_ELEMENT_ID_MAP)) {
+            return;
+        }
+        $object->defineProperty($classId, VmDom::PROP_ELEMENT_ID_MAP, JITVariable::TYPE_VALUE);
+    }
+
+    private static function loadObjectArg(Context $context, JITVariable $arg): Value
+    {
+        if (JITVariable::TYPE_OBJECT === $arg->type) {
+            return $context->helper->loadValue($arg);
+        }
+        if (JITVariable::TYPE_VALUE === $arg->type) {
+            return $context->builder->call(
+                $context->lookupFunction('__value__readObject'),
+                JitValueBox::valuePtrFromVariable($context, $arg)
+            );
+        }
+
+        throw new \LogicException('DOMDocument::getElementById() receiver must be an object');
+    }
+
+    private static function loadStringArg(Context $context, JITVariable $arg): Value
+    {
+        if (JITVariable::TYPE_STRING === $arg->type) {
+            return $context->helper->loadValue($arg);
+        }
+
+        return $context->builder->call(
+            $context->lookupFunction('__value__readString'),
+            JitValueBox::valuePtrFromVariable($context, $arg)
+        );
+    }
+}

@@ -445,7 +445,7 @@ final class HashTableReadLlvm
         $context->builder->positionAtEnd($stringBlock);
         $keyStr = $context->builder->call($context->lookupFunction('__value__readString'), $valPtr);
         $strBox = null !== $superglobalName
-            ? HashTableHelper::readSuperglobalStringKeyToValueBox($context, $ht, $keyStr)
+            ? self::readSuperglobalStringKeyToValueBox($context, $ht, $keyStr)
             : self::readStringKeyToValueBox($context, $ht, $keyStr);
         JitValueBox::copyFromPointer(
             $context,
@@ -504,6 +504,252 @@ final class HashTableReadLlvm
         $context->builder->positionAtEnd($merge);
 
         return new Variable($context, Variable::TYPE_VALUE, Variable::KIND_VARIABLE, $slot);
+    }
+
+    /**
+     * Read a CGI superglobal string slot without multi-block type dispatch (issue #273).
+     * Avoids LLVM dominance failures on ?? left branches when the key is absent at compile time.
+     */
+    public static function readSuperglobalStringKeyToValueBox(
+        Context $context,
+        Value $ht,
+        Value $keyStr
+    ): Variable {
+        $tag = 'sg'.(string) self::nextSeq();
+        $slot = JitValueBox::alloc($context);
+        $destPtr = JitValueBox::pointer($context, $slot);
+        $valPtr = $context->builder->call(
+            $context->lookupFunction('__hashtable__peekStringKeyValue'),
+            $ht,
+            $keyStr
+        );
+        $hasValue = BasicBlockHelper::append($context, 'sg_sk_has_'.$tag);
+        $missing = BasicBlockHelper::append($context, 'sg_sk_miss_'.$tag);
+        $done = BasicBlockHelper::append($context, 'sg_sk_done_'.$tag);
+        $isNull = $context->builder->icmp(
+            Builder::INT_EQ,
+            $valPtr,
+            $valPtr->typeOf()->constNull()
+        );
+        $context->builder->branchIf($isNull, $missing, $hasValue);
+
+        $context->builder->positionAtEnd($missing);
+        $context->builder->call($context->lookupFunction('__value__writeNull'), $destPtr);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($hasValue);
+        $str = $context->builder->call(
+            $context->lookupFunction('__value__readString'),
+            $valPtr
+        );
+        $owned = $context->builder->call(
+            $context->lookupFunction('__string__separate'),
+            $str
+        );
+        $context->builder->call(
+            $context->lookupFunction('__value__writeString'),
+            $destPtr,
+            $owned
+        );
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($done);
+
+        return new Variable(
+            $context,
+            Variable::TYPE_VALUE,
+            Variable::KIND_VARIABLE,
+            $slot
+        );
+    }
+
+    /** isset() / empty() offset check for string, int, object, or boxed keys (#10031 v4). */
+    public static function offsetIsSetDim(Context $context, Value $ht, Variable $dim): Value
+    {
+        if (Variable::TYPE_NULL === $dim->type) {
+            $emptyKey = $context->builder->load($context->constantStringFromString(''));
+
+            return $context->builder->call(
+                $context->lookupFunction('__hashtable__offsetIsSetStringKey'),
+                $ht,
+                $emptyKey
+            );
+        }
+        if (Variable::TYPE_STRING === $dim->type) {
+            return $context->builder->call(
+                $context->lookupFunction('__hashtable__offsetIsSetStringKey'),
+                $ht,
+                $context->helper->loadValue($dim)
+            );
+        }
+        if (Variable::TYPE_NATIVE_LONG === $dim->type) {
+            $index = $context->builder->truncOrBitCast(
+                $context->helper->loadValue($dim),
+                $context->getTypeFromString('size_t')
+            );
+
+            return $context->builder->call(
+                $context->lookupFunction('__hashtable__offsetIsSet'),
+                $ht,
+                $index
+            );
+        }
+        if (Variable::TYPE_OBJECT === $dim->type) {
+            HashTableHelper::emitIllegalOffsetType($context, 'Illegal offset type in isset or empty');
+
+            return $context->getTypeFromString('int1')->constInt(0, false);
+        }
+        if (Variable::TYPE_VALUE === $dim->type) {
+            return self::offsetIsSetValueBoxKey($context, $ht, $dim);
+        }
+
+        throw new \LogicException(
+            'isset() on HashTable arrays only supports integer or string indices in this compiler build'
+        );
+    }
+
+    /**
+     * Read an element into a stack {@see __value__} slot (string/int/object/boxed keys; #10031 v4).
+     *
+     * @param string|null $superglobalName When set, string keys use superglobal-safe read (issue #273).
+     */
+    public static function readDimToValueBox(
+        Context $context,
+        Value $ht,
+        Variable $dim,
+        ?string $superglobalName = null
+    ): Variable {
+        if (Variable::TYPE_STRING === $dim->type) {
+            $key = $context->helper->loadValue($dim);
+            if (null !== $superglobalName) {
+                return self::readSuperglobalStringKeyToValueBox($context, $ht, $key);
+            }
+
+            return self::readStringKeyToValueBox($context, $ht, $key);
+        }
+        if (Variable::TYPE_NATIVE_LONG === $dim->type) {
+            $index = $context->builder->truncOrBitCast(
+                $context->helper->loadValue($dim),
+                $context->getTypeFromString('size_t')
+            );
+
+            return self::readIndexedToValueBox($context, $ht, $index);
+        }
+        if (Variable::TYPE_OBJECT === $dim->type) {
+            return self::readObjectKeyToValueBox($context, $ht, $context->helper->loadValue($dim));
+        }
+        if (Variable::TYPE_VALUE === $dim->type) {
+            return self::readValueBoxKeyToValueBox($context, $ht, $dim, $superglobalName);
+        }
+
+        throw new \LogicException(
+            'Array fetch only supports integer or string indices in this compiler build'
+        );
+    }
+
+    /** Materialize empty hashtables for null boxed arrays and object properties (#1086, #17865). */
+    public static function ensureHashtablePointer(Context $context, Variable $array): Value
+    {
+        if (null !== $array->objectPropertySlot && Variable::TYPE_VALUE === ($array->objectPropertyType ?? null)) {
+            $voidPtr = $context->getTypeFromString('void*');
+            $slot = $array->objectPropertySlot;
+            $loaded = $context->builder->pointerCast(
+                $context->builder->load($slot),
+                $voidPtr
+            );
+            $slotEmpty = $context->builder->icmp(
+                Builder::INT_EQ,
+                $loaded,
+                $voidPtr->constNull()
+            );
+            $initSlot = BasicBlockHelper::append($context, 'ht_ensure_prop_slot_init');
+            $useSlot = BasicBlockHelper::append($context, 'ht_ensure_prop_slot_use');
+            $done = BasicBlockHelper::append($context, 'ht_ensure_prop_slot_done');
+            $context->builder->branchIf($slotEmpty, $initSlot, $useSlot);
+
+            $context->builder->positionAtEnd($initSlot);
+            $newHt = HashTableHelper::alloc($context);
+            $emptyHt = new Variable(
+                $context,
+                Variable::TYPE_HASHTABLE,
+                Variable::KIND_VALUE,
+                $newHt
+            );
+            $context->type->object->propertyStore($slot, $emptyHt, Variable::TYPE_VALUE);
+            $context->builder->branch($done);
+
+            $context->builder->positionAtEnd($useSlot);
+            $valPtr = $context->builder->pointerCast(
+                $loaded,
+                $context->getTypeFromString('__value__*')
+            );
+            $existing = $context->builder->call(
+                $context->lookupFunction('__value__readHashtable'),
+                $valPtr
+            );
+            $needsInit = $context->builder->icmp(
+                Builder::INT_EQ,
+                $existing,
+                $existing->typeOf()->constNull()
+            );
+            $initBox = BasicBlockHelper::append($context, 'ht_ensure_prop_box_init');
+            $ready = BasicBlockHelper::append($context, 'ht_ensure_prop_box_ready');
+            $context->builder->branchIf($needsInit, $initBox, $ready);
+
+            $context->builder->positionAtEnd($initBox);
+            $boxHt = HashTableHelper::alloc($context);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeHashtable'),
+                $valPtr,
+                $boxHt
+            );
+            $context->builder->branch($done);
+
+            $context->builder->positionAtEnd($ready);
+            $context->builder->branch($done);
+
+            $context->builder->positionAtEnd($done);
+            $htPhi = $context->builder->phi($newHt->typeOf());
+            $htPhi->addIncoming($newHt, $initSlot);
+            $htPhi->addIncoming($boxHt, $initBox);
+            $htPhi->addIncoming($existing, $ready);
+
+            return $htPhi;
+        }
+
+        $valPtr = JitValueBox::valuePtrFromVariable($context, $array);
+        $ht = $context->builder->call(
+            $context->lookupFunction('__value__readHashtable'),
+            $valPtr
+        );
+        $isNull = $context->builder->icmp(
+            Builder::INT_EQ,
+            $ht,
+            $ht->typeOf()->constNull()
+        );
+        $init = BasicBlockHelper::append($context, 'ht_ensure_box_init');
+        $ready = BasicBlockHelper::append($context, 'ht_ensure_box_ready');
+        $done = BasicBlockHelper::append($context, 'ht_ensure_box_done');
+        $context->builder->branchIf($isNull, $init, $ready);
+
+        $context->builder->positionAtEnd($init);
+        $newHt = HashTableHelper::alloc($context);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeHashtable'),
+            $valPtr,
+            $newHt
+        );
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($ready);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($done);
+        $result = $context->builder->phi($ht->typeOf());
+        $result->addIncoming($newHt, $init);
+        $result->addIncoming($ht, $ready);
+
+        return $result;
     }
 
 }

@@ -9,20 +9,39 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPUnit\Framework\TestCase;
 
-/** array_product() JIT routes through ArrayProductJitHelper PHP not ArrayBuiltinHelper LLVM (#12591, #14359). */
+/** array_product() JIT routes all operands through ArrayProductJitHelper PHP not ArrayBuiltinHelper LLVM (#12591, #14359, #18141). */
 final class ArrayProductRuntimeShrinkTest extends TestCase
 {
+    private const ARRAY_BUILTIN_HELPER_MAX_LINES = 6900;
+
     public function testArrayProductRuntimeUsesJitHelperNotDirectLlvmMonolith(): void
     {
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ArrayProductRuntime.php');
         $this->assertStringContainsString('ArrayProductJitHelper', $runtime);
-        $this->assertStringContainsString('isNativeArray', $runtime);
-        $this->assertStringContainsString('ArrayBuiltinHelper::arrayProduct', $runtime);
+        $this->assertStringContainsString('nativeListToHashTable', $runtime);
+        $this->assertStringNotContainsString('ArrayBuiltinHelper::arrayProduct', $runtime);
         $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);
 
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/array_product.php');
         $this->assertStringContainsString('ArrayProductRuntime::product', $builtin);
         $this->assertStringNotContainsString('ArrayBuiltinHelper::arrayProduct', $builtin);
+    }
+
+    public function testArrayBuiltinHelperLineBudgetAfterNativeProductLlvmDeletion(): void
+    {
+        $arrayBuiltin = (string) file_get_contents(__DIR__.'/../../lib/JIT/ArrayBuiltinHelper.php');
+        $this->assertStringNotContainsString('function arrayProduct(', $arrayBuiltin);
+        $this->assertStringNotContainsString('function arrayProductNative', $arrayBuiltin);
+        $this->assertStringNotContainsString('function arrayProductHashTable', $arrayBuiltin);
+        $this->assertStringNotContainsString('function arrayProductAccumulateLongValue', $arrayBuiltin);
+        $this->assertStringNotContainsString('function arrayProductAccumulateStringPtr', $arrayBuiltin);
+
+        $lines = substr_count($arrayBuiltin, "\n") + 1;
+        $this->assertLessThanOrEqual(
+            self::ARRAY_BUILTIN_HELPER_MAX_LINES,
+            $lines,
+            'ArrayBuiltinHelper.php LOC after dead array_product native LLVM deletion (#18141)'
+        );
     }
 
     public function testArrayProductJitHelperMultipliesIntegers(): void

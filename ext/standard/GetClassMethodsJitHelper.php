@@ -25,13 +25,7 @@ final class GetClassMethodsJitHelper
         }
 
         VmClassHas::requireObjectOrClass($objectOrClass, 'get_class_methods', 'object_or_class');
-        $entry = VmReflection::resolveClassForGetClassMethods($ctx, $objectOrClass);
-        if (null === $entry) {
-            $result = new Variable();
-            $result->bool(false);
-
-            return $result;
-        }
+        $entry = VmReflection::requireClassForGetClassMethods($ctx, $objectOrClass);
 
         return VmReflection::classMethodsArray($entry, VmReflection::METHOD_FILTER_DEFAULT, $ctx);
     }

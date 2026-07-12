@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
@@ -67,6 +68,12 @@ final class StreamLifecycleRuntime
         self::implement($context);
     }
 
+    /** Real fclose/feof bridges for user-script stream lowering (#9142). */
+    public static function ensureLinkedForUserScriptLowering(Context $context): void
+    {
+        self::implementRealBridges($context);
+    }
+
     public static function implement(Context $context): void
     {
         $probe = $context->module->getNamedFunction('__compiler_is_resource');
@@ -82,11 +89,12 @@ final class StreamLifecycleRuntime
             return;
         }
 
-        $savedBlock = null;
-        try {
-            $savedBlock = $context->builder->getInsertBlock();
-        } catch (\Throwable) {
-        }
+        self::implementRealBridges($context);
+    }
+
+    private static function implementRealBridges(Context $context): void
+    {
+        $savedBlock = BasicBlockHelper::tryGetInsertBlock($context);
 
         self::ensureJitHelperCompiled($context);
         foreach (self::ABI_TO_HELPER as $abi => $helper) {
@@ -99,7 +107,7 @@ final class StreamLifecycleRuntime
         self::registerLinkedRuntime($context);
 
         if (null !== $savedBlock) {
-            $context->builder->positionAtEnd($savedBlock);
+            BasicBlockHelper::restoreInsertBlock($context, $savedBlock);
         } else {
             $context->builder->clearInsertionPosition();
         }
@@ -107,6 +115,7 @@ final class StreamLifecycleRuntime
 
     private static function implementStandalone(Context $context): void
     {
+        $savedBlock = BasicBlockHelper::tryGetInsertBlock($context);
         StreamGlobalsJit::implement($context);
         self::implementStandaloneIsResource($context);
         self::implementStandaloneFflush($context);
@@ -114,7 +123,11 @@ final class StreamLifecycleRuntime
         self::implementStandaloneI32RetZero($context, '__compiler_feof');
         self::implementStandaloneI32RetZero($context, '__compiler_pclose');
         self::registerLinkedRuntime($context);
-        $context->builder->clearInsertionPosition();
+        if (null !== $savedBlock) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedBlock);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
     }
 
     private static function implementStandaloneIsResource(Context $context): void

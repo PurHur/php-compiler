@@ -20,7 +20,6 @@ final class VmIni
     private const READONLY_BOOL_DEFAULTS = [
         'enable_dl' => false,
         'short_open_tag' => false,
-        'register_argc_argv' => true,
         'zend.enable_gc' => true,
         'session.use_cookies' => true,
         'session.use_only_cookies' => true,
@@ -103,6 +102,23 @@ final class VmIni
         'error_prepend_string',
         'upload_tmp_dir',
         'sys_temp_dir',
+    ];
+
+    /**
+     * get_cfg_var() compile-time keys that return '' when unset (php-src cfg_get_entry, #12543).
+     *
+     * Other {@see EMPTY_STRING_INI_KEYS} return false from get_cfg_var() — only ini_get() is ''.
+     *
+     * @var list<string>
+     */
+    private const CFG_EMPTY_STRING_KEYS = [
+        'auto_prepend_file',
+        'auto_append_file',
+        'doc_root',
+        'user_dir',
+        'disable_functions',
+        'disable_classes',
+        'mail.add_x_header',
     ];
 
     /** @var list<string> */
@@ -198,6 +214,9 @@ final class VmIni
                 return self::setPcreRecursionLimit($newValue);
             case 'max_execution_time':
                 return self::setMaxExecutionTime($ctx, $newValue);
+            case 'register_argc_argv':
+                // php-src: PHP_INI_PERDIR — not modifiable after startup (#4515).
+                return false;
             default:
                 return false;
         }
@@ -225,7 +244,9 @@ final class VmIni
         if (!in_array($key, self::SUPPORTED_KEYS, true)) {
             $registry = VmIniIntrospection::registryEntry($key);
             if (null !== $registry) {
-                return $registry['local_value'];
+                $local = $registry['local_value'];
+
+                return null === $local ? '' : $local;
             }
 
             return false;
@@ -266,16 +287,18 @@ final class VmIni
                 return (string) self::$pcreRecursionLimit;
             case 'max_execution_time':
                 return self::$maxExecutionTime;
+            case 'register_argc_argv':
+                return self::formatRegisterArgcArgvIniGet(self::$registerArgcArgv);
             default:
                 return false;
         }
     }
 
-    /** get_cfg_var() — php.ini compile-time values (ext/standard/ini.c, #6119). */
+    /** get_cfg_var() — php.ini compile-time values (ext/standard/ini.c, #6119, #17881). */
     public static function getCfgVar(string $option): string|false
     {
         $key = strtolower($option);
-        if (in_array($key, self::EMPTY_STRING_INI_KEYS, true)) {
+        if (in_array($key, self::CFG_EMPTY_STRING_KEYS, true)) {
             return '';
         }
         if (isset(self::READONLY_BOOL_DEFAULTS[$key])) {
@@ -294,11 +317,6 @@ final class VmIni
             return VmAssertState::iniGet($option);
         }
         if (!in_array($key, self::SUPPORTED_KEYS, true)) {
-            $registry = VmIniIntrospection::registryEntry($key);
-            if (null !== $registry) {
-                return $registry['global_value'];
-            }
-
             return false;
         }
 
@@ -319,6 +337,7 @@ final class VmIni
             'pcre.backtrack_limit' => self::CFG_PCRE_BACKTRACK_LIMIT,
             'pcre.jit' => '1',
             'pcre.recursion_limit' => self::CFG_PCRE_RECURSION_LIMIT,
+            'register_argc_argv' => self::formatRegisterArgcArgvIniGet(self::$registerArgcArgv),
             default => false,
         };
     }
@@ -376,6 +395,31 @@ final class VmIni
 
     private static string $maxExecutionTime = self::CFG_MAX_EXECUTION_TIME;
 
+    /** php-src PG(register_argc_argv) — startup/-d only; runtime ini_set() returns false (#4515). */
+    private static bool $registerArgcArgv = true;
+
+    /** True when CLI SAPI should define $argc/$argv (php-src main.c, issue #4374). */
+    public static function registerArgcArgvEnabled(): bool
+    {
+        return self::$registerArgcArgv;
+    }
+
+    /**
+     * Apply php.ini / -d overrides before SAPI argv population (ext/standard/ini.c, #4515).
+     *
+     * @return bool true when the key was applied as a startup-only directive
+     */
+    public static function applyStartupIniOverride(string $option, string $value): bool
+    {
+        if ('register_argc_argv' !== strtolower($option)) {
+            return false;
+        }
+        self::$registerArgcArgv = self::parseBoolIni($value);
+        IniJitHelper::syncRegisterArgcArgv(self::$registerArgcArgv);
+
+        return true;
+    }
+
     /** Observable ini_get('max_execution_time') after set_time_limit / ini_set (#12481). */
     public static function syncMaxExecutionTime(int $seconds): void
     {
@@ -416,6 +460,19 @@ final class VmIni
     public static function getSessionGcMaxLifetime(): int
     {
         return self::$sessionGcMaxLifetime;
+    }
+
+    public static function getSessionSavePath(): string
+    {
+        return self::$sessionSavePath;
+    }
+
+    public static function setSessionSavePathValue(string $newValue): string
+    {
+        $old = self::$sessionSavePath;
+        self::$sessionSavePath = $newValue;
+
+        return $old;
     }
 
     private static function setErrorReporting(Context $ctx, string $newValue) {
@@ -582,6 +639,12 @@ final class VmIni
         return $on ? '1' : '';
     }
 
+    /** register_argc_argv ini_get() always returns "0" or "1" (ext/standard/ini.c, #4515). */
+    public static function formatRegisterArgcArgvIniGet(bool $on): string
+    {
+        return $on ? '1' : '0';
+    }
+
     /**
      * ini_restore() — reset local value to php.ini global default (ext/standard/ini.c, #3205).
      */
@@ -639,6 +702,10 @@ final class VmIni
             case 'max_execution_time':
                 self::$maxExecutionTime = self::CFG_MAX_EXECUTION_TIME;
                 $ctx->executionLimits->applyMaxExecutionTime((int) self::CFG_MAX_EXECUTION_TIME);
+                break;
+            case 'register_argc_argv':
+                self::$registerArgcArgv = true;
+                IniJitHelper::syncRegisterArgcArgv(true);
                 break;
         }
     }
@@ -724,17 +791,15 @@ final class VmIni
             }
             if ($details) {
                 $entry = new HashTable();
-                $global = self::getCfgVar($key);
-                if (false === $global) {
-                    $global = $local;
-                }
+                $global = self::detailGlobalValue($ctx, $key);
+                $local = self::detailLocalValue($ctx, $key);
                 $access = self::INI_ACCESS_ALL;
                 $registry = VmIniIntrospection::registryEntry($key);
                 if (null !== $registry) {
                     $access = $registry['access'];
                 }
-                $entry->add('global_value', self::stringVar($global));
-                $entry->add('local_value', self::stringVar($local));
+                $entry->add('global_value', self::detailVar($global));
+                $entry->add('local_value', self::detailVar($local));
                 $entry->add('access', self::intVar($access));
                 $slot = new Variable();
                 $slot->array($entry);
@@ -778,6 +843,72 @@ final class VmIni
             VmIniIntrospection::MIRRORED_HOST_INI_KEYS,
             ['engine', 'zend.exception_ignore_args'],
         )));
+    }
+
+    private static function detailLocalValue(Context $ctx, string $key): ?string
+    {
+        if ('assert.callback' === $key) {
+            return AssertOptionsJitHelper::getCallbackForOptions();
+        }
+
+        $local = self::get($ctx, $key);
+        if (false === $local) {
+            $registry = VmIniIntrospection::registryEntry($key);
+
+            return null !== $registry ? $registry['local_value'] : null;
+        }
+
+        return self::coalesceIniGetAllDetailValue($key, $local, 'local_value');
+    }
+
+    private static function detailGlobalValue(Context $ctx, string $key): ?string
+    {
+        if ('assert.callback' === $key) {
+            return AssertOptionsJitHelper::getCallbackForOptions();
+        }
+
+        $global = self::getCfgVar($key);
+        if (false === $global) {
+            return self::detailLocalValue($ctx, $key);
+        }
+
+        return self::coalesceIniGetAllDetailValue($key, $global, 'global_value');
+    }
+
+    /**
+     * php-src ini_get_all() exposes NULL for unset PG() entries while ini_get() returns ''.
+     *
+     * @param 'global_value'|'local_value' $slot
+     */
+    private static function coalesceIniGetAllDetailValue(string $key, string $value, string $slot): ?string
+    {
+        if ('' !== $value) {
+            return $value;
+        }
+
+        $registry = VmIniIntrospection::registryEntry($key);
+        if (null !== $registry && null === $registry[$slot]) {
+            return null;
+        }
+
+        return $value;
+    }
+
+    private static function detailVar(?string $value): Variable
+    {
+        if (null === $value) {
+            return self::nullVar();
+        }
+
+        return self::stringVar($value);
+    }
+
+    private static function nullVar(): Variable
+    {
+        $var = new Variable();
+        $var->null();
+
+        return $var;
     }
 
     private static function stringVar(string $value): Variable

@@ -29,6 +29,12 @@ final class DateConstants
 
     public const DATE_RFC3339 = 'Y-m-d\TH:i:sP';
 
+    public const DATE_ISO8601_EXPANDED = 'X-m-d\TH:i:sP';
+
+    public const DATE_RFC3339_EXTENDED = 'Y-m-d\TH:i:s.vP';
+
+    public const DATE_RSS = 'D, d M Y H:i:s O';
+
     public const DATE_W3C = 'Y-m-d\TH:i:sP';
 
     /** Lowercase name => format string for VM\Context::constantFetch(). */
@@ -62,7 +68,22 @@ final class DateConstants
             'DATE_RFC7231' => self::DATE_RFC7231,
             'DATE_RFC2822' => self::DATE_RFC2822,
             'DATE_RFC3339' => self::DATE_RFC3339,
+            'DATE_ISO8601_EXPANDED' => self::DATE_ISO8601_EXPANDED,
+            'DATE_RFC3339_EXTENDED' => self::DATE_RFC3339_EXTENDED,
+            'DATE_RSS' => self::DATE_RSS,
             'DATE_W3C' => self::DATE_W3C,
+        ];
+    }
+
+    /**
+     * @return array<string, int>
+     */
+    public static function sunfuncsConstants(): array
+    {
+        return [
+            'SUNFUNCS_RET_TIMESTAMP' => VmDate::SUNFUNCS_RET_TIMESTAMP,
+            'SUNFUNCS_RET_STRING' => VmDate::SUNFUNCS_RET_STRING,
+            'SUNFUNCS_RET_DOUBLE' => VmDate::SUNFUNCS_RET_DOUBLE,
         ];
     }
 }

@@ -66,7 +66,7 @@ final class StringTriggerErrorJit
 
         LastErrorRuntime::ensureLinked($context);
         SilenceRuntime::ensureLinked($context);
-        ErrorHandlerJitRuntime::ensureLinked($context);
+        ErrorHandlerJitRuntime::ensureLinked($context, true);
 
         if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
             self::implementStandaloneThinAbi($context);

@@ -25,8 +25,12 @@ final class call_user_func_array extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (2 !== \count($frame->calledArgs)) {
-            throw new \LogicException('call_user_func_array() requires exactly two arguments');
+        $argc = \count($frame->calledArgs);
+        if (2 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'call_user_func_array() expects exactly 2 arguments, %d given',
+                $argc
+            ));
         }
         $ctx = VmReflection::requireContext($frame);
         $params = $frame->calledArgs[1]->resolveIndirect();
@@ -48,8 +52,12 @@ final class call_user_func_array extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (2 !== \count($args)) {
-            throw new \LogicException('call_user_func_array() requires exactly two arguments');
+        $argc = \count($args);
+        if (2 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'call_user_func_array() expects exactly 2 arguments, %d given',
+                $argc
+            ));
         }
 
         return JitCallUserFunc::invokeArray(

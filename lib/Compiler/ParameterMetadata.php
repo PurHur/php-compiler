@@ -15,6 +15,7 @@ final class ParameterMetadata
     public function __construct(
         public readonly string $name,
         public readonly array $attributes = [],
+        public readonly bool $isPromoted = false,
     ) {
     }
 }

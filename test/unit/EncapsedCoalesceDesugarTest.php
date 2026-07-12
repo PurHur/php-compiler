@@ -61,6 +61,37 @@ final class EncapsedCoalesceDesugarTest extends TestCase
         $this->assertStringContainsString('echo $__encapsedCoalesce0;', $out);
     }
 
+    public function testDesugarsDollarCurlySimpleVarCoalesce(): void
+    {
+        $code = '<?php echo "${name ?? \'world\'}";';
+        $out = EncapsedCoalesceDesugar::desugar($code);
+        $this->assertStringContainsString('$__encapsedCoalesce0 = ($name ?? \'world\');', $out);
+        $this->assertStringContainsString('echo $__encapsedCoalesce0;', $out);
+    }
+
+    public function testDesugarsDollarCurlyArrayDimCoalesce(): void
+    {
+        $code = '<?php echo "${arr[\'k\'] ?? \'missing\'}";';
+        $out = EncapsedCoalesceDesugar::desugar($code);
+        $this->assertStringContainsString('$__encapsedCoalesce0 = ($arr[\'k\'] ?? \'missing\');', $out);
+        $this->assertStringContainsString('echo $__encapsedCoalesce0;', $out);
+    }
+
+    public function testDesugarsDollarAndBraceCoalesceInOneString(): void
+    {
+        $code = '<?php echo "${name ?? \'a\'}{$other ?? \'b\'}";';
+        $out = EncapsedCoalesceDesugar::desugar($code);
+        $this->assertStringContainsString('$__encapsedCoalesce0 = ($name ?? \'a\');', $out);
+        $this->assertStringContainsString('$__encapsedCoalesce1 = ($other ?? \'b\');', $out);
+        $this->assertStringContainsString('$__encapsedCoalesce0 . $__encapsedCoalesce1', $out);
+    }
+
+    public function testNoOpDollarCurlyWithoutCoalesce(): void
+    {
+        $code = '<?php echo "${name}";';
+        $this->assertSame($code, EncapsedCoalesceDesugar::desugar($code));
+    }
+
     public function testNoOpWithoutCoalesce(): void
     {
         $code = '<?php echo "{$a->p}";';

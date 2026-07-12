@@ -23,6 +23,7 @@ final class gmstrftime extends Internal
         if ($argc > 2) {
             throw new \ArgumentCountError('gmstrftime() expects at most 2 arguments, '.$argc.' given');
         }
+        VmEngineBuiltinDeprecation::emitFunction($frame, 'gmstrftime');
         if (null === $frame->returnVar) {
             return;
         }

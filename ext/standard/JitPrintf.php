@@ -18,7 +18,10 @@ final class JitPrintf
     {
         $argc = \count($args);
         if ($argc < 1) {
-            throw new \LogicException('printf() requires at least one argument');
+            throw new \ArgumentCountError(\sprintf(
+                'printf() expects at least 1 argument, %d given',
+                $argc
+            ));
         }
         $fmt = JitStringBuiltinArg::lowerRequiredString($context, $args[0], 'printf', 0, 'format');
         $numArgs = $argc - 1;

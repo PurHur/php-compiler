@@ -1,5 +1,14 @@
 --TEST--
-Language: typed function-local static variables (#10084, Zend/zend_compile.c)
+Language: typed function-local static variables (#17381, Zend/zend_compile.c)
+--SKIPIF--
+<?php
+if (!class_exists('PHPCompiler\\CompilerVersion')) {
+    require __DIR__ . '/../../../../vendor/autoload.php';
+}
+if (!PHPCompiler\CompilerVersion::supportsTypedFunctionStatic()) {
+    die('skip typed function static disabled on reference profile');
+}
+?>
 --FILE--
 <?php
 declare(strict_types=1);

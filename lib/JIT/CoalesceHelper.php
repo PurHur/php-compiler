@@ -32,7 +32,13 @@ final class CoalesceHelper
         Function_ $func,
         Block $branchBlock
     ): BasicBlock {
-        return $jit->compileSubBlock($func, $branchBlock);
+        $saved = $branchBlock->syntheticCfgBranch ?? false;
+        $branchBlock->syntheticCfgBranch = true;
+        try {
+            return $jit->compileSubBlock($func, $branchBlock);
+        } finally {
+            $branchBlock->syntheticCfgBranch = $saved;
+        }
     }
 
     /**
@@ -104,7 +110,6 @@ final class CoalesceHelper
             self::COMPILED_HELPERS,
             '#10311'
         );
-        $context->builder->clearInsertionPosition();
     }
 
     private static function callTakeLeftBranch(Context $context, Value $typeByte): Value

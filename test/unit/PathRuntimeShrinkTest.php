@@ -33,6 +33,11 @@ final class PathRuntimeShrinkTest extends TestCase
             VmString::basename('/foo/bar/baz.txt', '.txt'),
             PathJitHelper::basenameWithSuffixArgv('/foo/bar/baz.txt', '.txt')
         );
+        $this->assertSame('dir', VmString::basename('/a/dir', 'dir'));
+        $this->assertSame(
+            VmString::basename('/a/dir', 'dir'),
+            PathJitHelper::basenameWithSuffixArgv('/a/dir', 'dir')
+        );
     }
 
     public function testSpineBundleIncludesPathJitHelper(): void

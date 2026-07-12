@@ -57,6 +57,25 @@ final class DomNodeState
     /** Text node payload when {@see DomConstants::XML_TEXT_NODE}. */
     public ?string $textContent = null;
 
+    /** Expanded value for {@see DomConstants::XML_ENTITY_REF_NODE} textContent (php-src ext/dom; #6320). */
+    public ?string $entityReplacementText = null;
+
+    /** Unparsed entity notation name on {@see DomConstants::XML_ENTITY_DECL_NODE}. */
+    public ?string $notationName = null;
+
+    /** Live entities {@see DOMNamedNodeMap} object id on doctype nodes (#6320). */
+    public ?int $entitiesMapId = null;
+
+    /** Live notations {@see DOMNamedNodeMap} object id on doctype nodes (#6320). */
+    public ?int $notationsMapId = null;
+
+    /**
+     * General entity replacement text by name for the owning document (#6320).
+     *
+     * @var array<string, string>
+     */
+    public array $generalEntities = [];
+
     /**
      * Member node ids when {@see DomConstants::XML_NODELIST}.
      *
@@ -89,6 +108,16 @@ final class DomNodeState
 
     /** Owning element object id for {@see DomConstants::XML_TOKENLIST} handles (#16876). */
     public ?int $tokenListElementId = null;
+
+    /** Owning document object id for {@see DomConstants::XML_XPATH} handles (#6066). */
+    public ?int $xpathDocumentId = null;
+
+    /**
+     * Registered namespace prefixes for {@see DomConstants::XML_XPATH} (#6066).
+     *
+     * @var array<string, string>
+     */
+    public array $xpathNamespaces = [];
 
     /**
      * Ordered unique tokens for {@see DomConstants::XML_TOKENLIST} (#16876).

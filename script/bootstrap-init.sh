@@ -6,7 +6,9 @@
 # Usage:
 #   ./script/bootstrap-init.sh
 #   ./script/bootstrap-init.sh --with-composer   # also composer install + apply-patches (Tier 0)
-#   phpc bootstrap init [--with-composer]
+#   ./script/bootstrap-init.sh --sdk-url URL     # fetch Bootstrap SDK tarball first (#15602)
+#   phpc bootstrap init [--with-composer] [--sdk-url URL]
+#   PHP_COMPILER_BOOTSTRAP_SDK=URL phpc bootstrap init
 #
 # See docs/bootstrap-dev-workflow.md
 set -euo pipefail
@@ -16,15 +18,25 @@ cd "${ROOT}"
 
 WITH_COMPOSER=0
 SKIP_VERIFY=0
-for arg in "$@"; do
-  case "${arg}" in
-    --with-composer) WITH_COMPOSER=1 ;;
-    --skip-verify) SKIP_VERIFY=1 ;;
+SDK_URL="${PHP_COMPILER_BOOTSTRAP_SDK:-}"
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --with-composer) WITH_COMPOSER=1; shift ;;
+    --skip-verify) SKIP_VERIFY=1; shift ;;
+    --sdk-url)
+      if [[ $# -lt 2 ]]; then
+        echo "bootstrap-init: --sdk-url requires a value" >&2
+        exit 1
+      fi
+      SDK_URL="$2"
+      shift 2
+      ;;
     -h|--help)
       cat <<'EOF'
-Usage: script/bootstrap-init.sh [--with-composer] [--skip-verify]
+Usage: script/bootstrap-init.sh [--with-composer] [--skip-verify] [--sdk-url URL]
 
 Bootstrap SDK cold start for gen-1+ development:
+  0. Optional: fetch Bootstrap SDK tarball (--sdk-url or PHP_COMPILER_BOOTSTRAP_SDK)
   1. Verify prelinked/bootstrap-gen0/ seed exists
   2. BOOTSTRAP_M5_NO_ZEND=1 make bootstrap-selfhost-link (compiler_minimal)
   3. Optional: composer install + apply-patches (--with-composer, Tier 0 harness)
@@ -33,13 +45,17 @@ Bootstrap SDK cold start for gen-1+ development:
 Options:
   --with-composer  Run composer install + script/apply-patches.sh (PHPUnit / ci-fast path)
   --skip-verify    Skip north-star5-verify-fast tail
+  --sdk-url URL    Download/extract Bootstrap SDK tarball (http(s), file://, or local path)
+
+Environment:
+  PHP_COMPILER_BOOTSTRAP_SDK  Default URL when --sdk-url omitted
 
 Next: docs/bootstrap-dev-workflow.md · phpc doctor --selfhost
 EOF
       exit 0
       ;;
     *)
-      echo "bootstrap-init: unknown argument: ${arg}" >&2
+      echo "bootstrap-init: unknown argument: $1" >&2
       exit 1
       ;;
   esac
@@ -50,12 +66,22 @@ source "$(dirname "$0")/php-env.sh"
 # shellcheck source=selfhost-preflight.sh
 source "$(dirname "$0")/selfhost-preflight.sh"
 
+FETCH_SCRIPT="${ROOT}/script/bootstrap-sdk-fetch.sh"
+if [[ -n "${SDK_URL}" ]]; then
+  if [[ ! -x "${FETCH_SCRIPT}" ]]; then
+    echo "bootstrap-init: ${FETCH_SCRIPT} is not executable" >&2
+    exit 1
+  fi
+  echo "==> bootstrap-init: fetch Bootstrap SDK"
+  "${FETCH_SCRIPT}" "${SDK_URL}"
+fi
+
 PRELINKED_DRIVER="${ROOT}/prelinked/bootstrap-gen0/bin-compile-aot"
 PRELINKED_STAMP="${ROOT}/prelinked/bootstrap-gen0/.m3_compiler_lib_sidecar.sha"
 
 if [[ ! -x "${PRELINKED_DRIVER}" ]]; then
   echo "bootstrap-init: missing ${PRELINKED_DRIVER}" >&2
-  echo "bootstrap-init: clone a release tag with committed gen-0 prelink (#15602)" >&2
+  echo "bootstrap-init: clone a release tag, or: phpc bootstrap init --sdk-url URL (#15602)" >&2
   exit 1
 fi
 if [[ ! -f "${PRELINKED_STAMP}" ]]; then

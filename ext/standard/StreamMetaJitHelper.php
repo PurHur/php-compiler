@@ -27,4 +27,16 @@ final class StreamMetaJitHelper
     {
         return VmFs::streamSetBlocking($handle, 0 !== $mode) ? 1 : 0;
     }
+
+    /** @return 0|1 ABI for __compiler_stream_enable_crypto (#4610) */
+    public static function enableCryptoArgv(
+        int $handle,
+        int $enable,
+        int $hasCryptoMethod,
+        int $cryptoMethod
+    ): int {
+        $method = 0 !== $hasCryptoMethod ? $cryptoMethod : null;
+
+        return VmFs::streamSocketEnableCrypto($handle, 0 !== $enable, $method) ? 1 : 0;
+    }
 }

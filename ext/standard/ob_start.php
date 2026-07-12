@@ -29,7 +29,7 @@ final class ob_start extends Internal
         }
         $handler = null;
         if ($argc >= 1) {
-            $handler = VmObOutput::resolveHandlerName($frame);
+            $handler = VmObOutput::resolveHandler($frame);
         }
         OutputBuffer::start($handler);
         if (null !== $frame->returnVar) {

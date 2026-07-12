@@ -17,9 +17,14 @@ echo in_array('b', $byClass, true) ? '1' : '0';
 echo in_array('c', $byClass, true) ? '1' : '0';
 echo count($byObject), "\n";
 echo in_array('a', $byObject, true) ? '1' : '0';
-echo get_class_methods('MissingClass') ? '1' : '0';
+try {
+    get_class_methods('MissingClass');
+    echo '0';
+} catch (TypeError $e) {
+    echo '1';
+}
 echo "\n";
 --EXPECT--
 1
 1001
-10
+11

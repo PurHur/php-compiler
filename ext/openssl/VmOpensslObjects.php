@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\openssl;
 
+use PHPCompiler\Frame;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\EnumCaseSupport;
@@ -166,6 +167,48 @@ final class VmOpensslObjects
     public static function certificatePem(ObjectEntry $entry): string
     {
         return self::$certStore[$entry->id] ?? '';
+    }
+
+    /**
+     * openssl_x509_fingerprint() — DER digest of X509 PEM or OpenSSLCertificate (ext/openssl/x509.c; #6524).
+     */
+    public static function fingerprintCertificate(
+        Context $ctx,
+        Variable $arg,
+        string $hashAlgo,
+        bool $rawOutput,
+        ?Frame $frame = null,
+    ): Variable {
+        if (!VmOpensslX509Native::digestAvailable($hashAlgo)) {
+            VmOpenssl::userWarningForFrame('openssl_x509_fingerprint(): Unknown digest algorithm', $frame);
+
+            $result = new Variable();
+            $result->bool(false);
+
+            return $result;
+        }
+
+        $pem = self::resolveCertificatePem($ctx, $arg, 'openssl_x509_fingerprint');
+        if (null === $pem || false === VmOpensslX509Native::normalizeCertificatePem($pem)) {
+            VmOpenssl::userWarningForFrame('openssl_x509_fingerprint(): X.509 Certificate cannot be retrieved', $frame);
+
+            $result = new Variable();
+            $result->bool(false);
+
+            return $result;
+        }
+
+        $fingerprint = VmOpensslX509Native::fingerprintCertificatePem($pem, $hashAlgo, $rawOutput);
+        $result = new Variable();
+        if (false === $fingerprint) {
+            VmOpenssl::userWarningForFrame('openssl_x509_fingerprint(): X.509 Fingerprint cannot be generated', $frame);
+            $result->bool(false);
+
+            return $result;
+        }
+        $result->string($fingerprint);
+
+        return $result;
     }
 
     /**

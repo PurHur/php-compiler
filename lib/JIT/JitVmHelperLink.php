@@ -51,6 +51,7 @@ final class JitVmHelperLink
         $runtime = $context->runtime;
         $path = self::resolveHelperPath($relativeHelperPath);
         $basename = \basename($path);
+        NestedVmActiveContextLlvm::ensureMethod($context);
         NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path, $basename, $compileLabel): void {
             $block = $runtime->parseAndCompile((string) \file_get_contents($path), $basename);
             if (null === $block) {
@@ -133,7 +134,21 @@ final class JitVmHelperLink
         if (null !== $savedBlock) {
             $context->builder->positionAtEnd($savedBlock);
         } else {
-            $context->builder->clearInsertionPosition();
+            $fallback = null;
+            if ('' !== $context->activeFunction && isset($context->functions[$context->activeFunction])) {
+                $active = $context->functions[$context->activeFunction];
+                if ($active instanceof LlvmFunction) {
+                    $fallback = $active;
+                }
+            }
+            if (null === $fallback && $context->main instanceof LlvmFunction) {
+                $fallback = $context->main;
+            }
+            if (null !== $fallback && $fallback->countBasicBlocks() > 0) {
+                $context->builder->positionAtEnd($fallback->getEntryBasicBlock());
+            } else {
+                $context->builder->clearInsertionPosition();
+            }
         }
     }
 
@@ -182,7 +197,7 @@ final class JitVmHelperLink
         }
     }
 
-    private static function bridgeEntryForEmit(LlvmFunction $fn, string $entryBlockName): \PHPLLVM\BasicBlock
+    public static function bridgeEntryForEmit(LlvmFunction $fn, string $entryBlockName): \PHPLLVM\BasicBlock
     {
         try {
             foreach ($fn->getBasicBlocks() as $block) {

@@ -21,8 +21,8 @@ echo $doc->saveXML($root), "\n";
 $repl->remove();
 echo $doc->saveXML($root), "\n";
 
-$p = $doc->createElement('p');
 $doc2 = new DOMDocument();
+$p = $doc2->createElement('p');
 $doc2->appendChild($p);
 $span = $doc2->createElement('span');
 $p->after($span);

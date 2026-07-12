@@ -1,9 +1,11 @@
 # Bootstrap SDK platform contract
 
 **Audience:** Compiler / self-host contributors using the Bootstrap SDK (`prelinked/bootstrap-gen0/`, `build/bin-compile-aot-inventory`, spine probes).  
-**Living tracker:** [#15606](https://github.com/PurHur/php-compiler/issues/15606) · **Workflow:** [bootstrap-dev-workflow.md](bootstrap-dev-workflow.md) · **Onboarding:** [GETTING-STARTED.md](GETTING-STARTED.md) § Bootstrap contributors
+**Living tracker:** [#15606](https://github.com/PurHur/php-compiler/issues/15606) · **Machine-readable SSOT:** [bootstrap-sdk-platform.json](bootstrap-sdk-platform.json) · **Workflow:** [bootstrap-dev-workflow.md](bootstrap-dev-workflow.md) · **Onboarding:** [GETTING-STARTED.md](GETTING-STARTED.md) § Bootstrap contributors
 
 This document is the **supported platform contract** for Bootstrap SDK development and CI gates. The User SDK (`phpc run` / `phpc build` for shipped examples) has a wider host matrix for VM-only work; bootstrap prelinks and spine gates do not.
+
+Drift guard: `php script/check-bootstrap-sdk-platform.php` (also in `./script/check-generated-docs.sh`).
 
 ---
 
@@ -59,7 +61,7 @@ Enable with `./phpc bootstrap init --with-composer`.
 | **Linux aarch64 / ARM64** | **Not supported** — no committed prelinked gen-0 for ARM |
 | **Windows** (native or WSL without Docker) | **Not supported** for bootstrap gates |
 | **LLVM 14+** as default bootstrap toolchain | **Not supported** until [#174](https://github.com/PurHur/php-compiler/issues/174) FFI lands; CI still pins LLVM 9 |
-| **Zend-free full dev** (no Composer / no PHPUnit) | **Not a goal yet** — track [#15600](https://github.com/PurHur/php-compiler/issues/15600), [#15599](https://github.com/PurHur/php-compiler/issues/15599) |
+| **Zend-free full dev** (no Composer / no PHPUnit) | **Tier 1 compile** via `./phpc bootstrap init` ([#15600](https://github.com/PurHur/php-compiler/issues/15600)); full PHPUnit harness still Tier 0 — [#15599](https://github.com/PurHur/php-compiler/issues/15599) |
 | **Honest full-spine compile without gen-0 sidecar** | **Not required for daily dev** — release criterion [#15597](https://github.com/PurHur/php-compiler/issues/15597) |
 
 Contributors on unsupported hosts should use **Docker** (`php-compiler:22.04-dev`) for all Tier 1–2 bootstrap work. VM-only User SDK iteration may work on other OSes; do not expect bootstrap spine or prelink gates to pass there.

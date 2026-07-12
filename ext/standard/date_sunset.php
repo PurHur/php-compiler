@@ -24,6 +24,7 @@ final class date_sunset extends Internal
 
     public function execute(Frame $frame): void
     {
+        VmEngineBuiltinDeprecation::emitFunction($frame, 'date_sunset');
         $parsed = VmDateSunFunc::parseArgs($frame, 'date_sunset');
         $result = VmDate::dateSunset(
             $parsed['timestamp'],

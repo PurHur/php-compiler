@@ -366,6 +366,11 @@ final class GeneratorHelper
         return GeneratorIteratorJitHelper::resumeAndBoxYield($context, $genVar);
     }
 
+    public static function resumeSendAndBoxYield(Context $context, Variable $genVar): Value
+    {
+        return GeneratorIteratorJitHelper::resumeSendAndBoxYield($context, $genVar);
+    }
+
     public static function ensureStarted(Context $context, Variable $genVar): void
     {
         GeneratorIteratorJitHelper::ensureStarted($context, $genVar);

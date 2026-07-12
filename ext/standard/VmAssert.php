@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\ErrorReporter;
+use PHPCompiler\VM\ExceptionSupport;
 use PHPCompiler\VM\Variable;
 
 /**
@@ -22,12 +23,36 @@ final class VmAssert
         if (!VmAssertState::isEnabled()) {
             return true;
         }
+        self::validateDescription($description);
         if (boolval::isTruthy($assertion)) {
             return true;
         }
         self::fail($frame, $description);
 
         return false;
+    }
+
+    private static function validateDescription(?Variable $description): void
+    {
+        if (null === $description) {
+            return;
+        }
+        $desc = $description->resolveIndirect();
+        if (EnumCaseSupport::isEnumCaseVariable($desc)) {
+            throw new \TypeError(sprintf(
+                'assert(): Argument #2 ($description) must be of type string|Throwable, %s given',
+                EnumCaseSupport::typeNameForVariable($desc)
+            ));
+        }
+        if (Variable::TYPE_OBJECT === $desc->type) {
+            $object = $desc->toObject();
+            if (!ExceptionSupport::objectImplementsThrowable($object)) {
+                throw new \TypeError(sprintf(
+                    'assert(): Argument #2 ($description) must be of type Throwable|string|null, %s given',
+                    $object->class->name
+                ));
+            }
+        }
     }
 
     private static function fail(Frame $frame, ?Variable $description): void
@@ -61,16 +86,16 @@ final class VmAssert
             return [$default, $default];
         }
         $desc = $description->resolveIndirect();
-        if (EnumCaseSupport::isEnumCaseVariable($desc)) {
-            throw new \TypeError(sprintf(
-                'assert(): Argument #2 ($description) must be of type string|Throwable, %s given',
-                EnumCaseSupport::typeNameForVariable($desc)
-            ));
-        }
         if (Variable::TYPE_STRING === $desc->type) {
             $text = $desc->toString();
 
             return [$text, 'Assertion failed: '.$text];
+        }
+        if (Variable::TYPE_OBJECT === $desc->type) {
+            $object = $desc->toObject();
+            $message = $object->getProperty(ExceptionSupport::PROP_MESSAGE)->resolveIndirect()->toString();
+
+            return [$message, 'Assertion failed: '.$message];
         }
 
         return [$default, $default];

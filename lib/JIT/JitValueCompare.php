@@ -78,6 +78,38 @@ final class JitValueCompare
         return VmValueCompare::notLooseEqualNativeLongToValue($context, $nativeLong, $boxed);
     }
 
+    public static function looseEqualValueToNativeDouble(
+        Context $context,
+        Variable $boxed,
+        Value $nativeDouble
+    ): Value {
+        return VmValueCompare::looseEqualValueToNativeDouble($context, $boxed, $nativeDouble);
+    }
+
+    public static function looseEqualNativeDoubleToValue(
+        Context $context,
+        Value $nativeDouble,
+        Variable $boxed
+    ): Value {
+        return VmValueCompare::looseEqualNativeDoubleToValue($context, $nativeDouble, $boxed);
+    }
+
+    public static function notLooseEqualValueToNativeDouble(
+        Context $context,
+        Variable $boxed,
+        Value $nativeDouble
+    ): Value {
+        return VmValueCompare::notLooseEqualValueToNativeDouble($context, $boxed, $nativeDouble);
+    }
+
+    public static function notLooseEqualNativeDoubleToValue(
+        Context $context,
+        Value $nativeDouble,
+        Variable $boxed
+    ): Value {
+        return VmValueCompare::notLooseEqualNativeDoubleToValue($context, $nativeDouble, $boxed);
+    }
+
     public static function looseEqualHashtableToBool(
         Context $context,
         Value $hashtable,

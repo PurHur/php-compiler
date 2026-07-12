@@ -13,6 +13,7 @@ use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\ReadonlyBridge;
 use PHPCompiler\JIT\Variable;
+use PHPCompiler\ext\standard\strtolower as StdStrtolower;
 use PHPCfg\Operand;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -43,6 +44,10 @@ final class ClassConstFetchRuntime
         ReadonlyBridge::ensureLinked($context);
 
         $nativeName = JitStringArg::lower($context, $nameVar, 'class constant name');
+        $lcName = (new StdStrtolower())->call(
+            $context,
+            new Variable($context, Variable::TYPE_STRING, Variable::KIND_VALUE, $nativeName)
+        );
         $resultSlot = JitValueBox::alloc($context);
         $fn = BasicBlockHelper::parentFunction($context);
         $entry = $context->builder->getInsertBlock();
@@ -84,71 +89,29 @@ final class ClassConstFetchRuntime
 
         $checkBlock = $constChain;
         $context->builder->positionAtEnd($constChain);
+        $htPtrType = $context->getTypeFromString('__hashtable__*');
+        $ht = $htPtrType->constNull();
         foreach ($objectType->allClassNamesById() as $id => $_) {
-            $constants = $objectType->classConstantsForId($id);
-            foreach ($constants as [$constKey, $entry]) {
-                $nextCheck = $fn->appendBasicBlock('class_const_dyn_try_'.$id.'_'.$constKey);
-                $matchBlock = $fn->appendBasicBlock('class_const_dyn_match_'.$id.'_'.$constKey);
-                $context->builder->positionAtEnd($checkBlock);
-                $expectedId = $context->constantFromInteger($id, 'int64');
-                $isId = $context->builder->icmp(Builder::INT_EQ, $classIdVal, $expectedId);
-                $keyGlobal = $context->builder->load($context->constantStringFromString($constKey));
-                $cmp = $context->builder->call(
-                    $context->lookupFunction('strcasecmp'),
-                    self::stringDataPtr($context, $nativeName),
-                    self::stringDataPtr($context, $keyGlobal)
-                );
-                $isName = $context->builder->icmp(Builder::INT_EQ, $cmp, $i32->constInt(0, false));
-                $isMatch = $context->builder->and($isId, $isName);
-                $context->builder->branchIf($isMatch, $matchBlock, $nextCheck);
-
-                $context->builder->positionAtEnd($matchBlock);
-                if ($objectType->isTraitClass(strtolower(ltrim($objectType->classNameForId($id), '\\')))
-                    && !$objectType->isInTraitMethodScopeForTraitId($id, $block)) {
-                    $classLabel = $objectType->classNameForId($id);
-                    ErrorRaise::ensureLinked($context);
-                    ErrorRaise::emitRaise(
-                        $context,
-                        "Cannot access trait constant {$classLabel}::* directly"
-                    );
-                    $context->builder->branch($merge);
-                } else {
-                    if (null !== $jit) {
-                        \PHPCompiler\JIT\ClassConstVisibilityJitGuard::emitBeforeFetch(
-                            $objectType,
-                            $jit,
-                            $block,
-                            $id,
-                            $objectType->classConstDisplayName($id, $constKey)
-                        );
-                        if ($objectType->isEnumClassId($id)) {
-                            \PHPCompiler\JIT\BackedEnumDuplicateJitGuard::emitBeforeEnumCaseFetch(
-                                $objectType,
-                                $jit,
-                                $block,
-                                $id
-                            );
-                        }
-                    }
-                    if ($objectType->isEnumClassId($id)) {
-                        // Enum case singleton lives in module global; write via helper.
-                        ClassConstFetchHelper::writeEnumCaseConstEntryForRuntime(
-                            $objectType,
-                            $context,
-                            $resultSlot,
-                            $id,
-                            $constKey
-                        );
-                    } else {
-                        ClassConstFetchHelper::writeConstEntryForRuntime($context, $resultSlot, $entry);
-                    }
-                    $context->builder->branch($merge);
-                }
-                $checkBlock = $nextCheck;
+            if ([] === $objectType->classConstantsForId($id)) {
+                continue;
             }
+            $expectedId = $context->constantFromInteger($id, 'int64');
+            $isId = $context->builder->icmp(Builder::INT_EQ, $classIdVal, $expectedId);
+            $candidate = $objectType->classConstMapPointerForId($id);
+            $ht = $context->builder->select($isId, $candidate, $ht);
         }
-        $context->builder->positionAtEnd($checkBlock);
-        $context->builder->branch($fail);
+        $valPtr = $context->builder->call(
+            $context->lookupFunction('__hashtable__readStringKeyValue'),
+            $ht,
+            $lcName
+        );
+        $isNull = $context->builder->icmp(Builder::INT_EQ, $valPtr, $valPtr->typeOf()->constNull());
+        $hasValue = $fn->appendBasicBlock('class_const_dyn_has_value');
+        $context->builder->branchIf($isNull, $fail, $hasValue);
+
+        $context->builder->positionAtEnd($hasValue);
+        JitValueBox::copyFromPointer($context, $resultSlot, $valPtr);
+        $context->builder->branch($merge);
 
         $context->builder->positionAtEnd($fail);
         $displayClass = self::displayClassName($objectType, -1, $classOp);

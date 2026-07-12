@@ -31,6 +31,20 @@ final class AsymmetricVisibilityRejector
         $parenSet = AsymmetricVisibilityRewriter::findParenthesizedAsymmetricSetModifierError($code);
         $hasPropertyHooks = null !== PropertyHooks::referenceProfileHookSyntaxError($code);
 
+        if (CompilerVersion::supportsAsymmetricVisibility()) {
+            return $code;
+        }
+
+        // php-src: Zend/zend_compile.c — bare `public private(set)` before parenthesized forms (#18062).
+        $multipleLine = AsymmetricVisibilityRewriter::findMultipleAccessModifierLine($code);
+        if ($multipleLine > 0) {
+            throw new CompileFatal(
+                $filename,
+                $multipleLine,
+                AsymmetricVisibilityRewriter::referenceProfileMultipleModifierMessage($code, $multipleLine)
+            );
+        }
+
         // php-src: Zend/zend_compile.c — asymmetric scope before hook block on reference profile (#16452).
         if ($hasPropertyHooks && !CompilerVersion::supportsPropertyHooks() && null !== $parenSet) {
             throw new CompileFatal(
@@ -47,15 +61,6 @@ final class AsymmetricVisibilityRejector
                 $parenSet['line'],
                 self::parenthesizedSetModifierMessage($parenSet['token'])
             );
-        }
-
-        if (CompilerVersion::supportsAsymmetricVisibility()) {
-            return $code;
-        }
-
-        $multipleLine = AsymmetricVisibilityRewriter::findMultipleAccessModifierLine($code);
-        if ($multipleLine > 0) {
-            throw new CompileFatal($filename, $multipleLine, AsymmetricVisibilityRewriter::MULTIPLE_MODIFIERS_MESSAGE);
         }
 
         if (null !== $parenSet) {

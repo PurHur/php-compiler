@@ -150,6 +150,14 @@ final class EncapsedCoalesceDesugar
     {
         for ($j = $openIdx + 1; $j < $closeIdx; ++$j) {
             $token = $tokens[$j];
+            if (\is_array($token) && \defined('T_DOLLAR_OPEN_CURLY_BRACES') && \T_DOLLAR_OPEN_CURLY_BRACES === $token[0]) {
+                $block = self::consumeDollarCurlyInner($tokens, $j);
+                if (null !== self::findTopLevelCoalesceLine($block['innerTokens'])) {
+                    return true;
+                }
+                $j = $block['end'] - 1;
+                continue;
+            }
             if (!self::isCurlyOpen($token)) {
                 continue;
             }
@@ -191,15 +199,18 @@ final class EncapsedCoalesceDesugar
                 continue;
             }
             if (\is_array($token) && \defined('T_DOLLAR_OPEN_CURLY_BRACES') && \T_DOLLAR_OPEN_CURLY_BRACES === $token[0]) {
-                $legacy = $token[1];
-                if (isset($tokens[$j + 1]) && \is_array($tokens[$j + 1]) && \T_STRING_VARNAME === $tokens[$j + 1][0]) {
-                    $legacy .= $tokens[$j + 1][1];
-                    ++$j;
+                $block = self::consumeDollarCurlyInner($tokens, $j);
+                $innerTokens = $block['innerTokens'];
+                $innerSource = self::dollarInnerTokensToExpression($innerTokens);
+                if (null !== self::findTopLevelCoalesceLine($innerTokens)) {
+                    $var = '$__encapsedCoalesce'.$tempCounter;
+                    ++$tempCounter;
+                    $prelude[] = $var.' = ('.$innerSource.');';
+                    $parts[] = $var;
+                } else {
+                    $parts[] = $innerSource;
                 }
-                if (isset($tokens[$j + 1]) && \is_string($tokens[$j + 1]) && '[' === $tokens[$j + 1]) {
-                    $legacy .= self::consumeBracketSuffix($tokens, $j + 1);
-                }
-                $parts[] = $legacy;
+                $j = $block['end'] - 1;
                 continue;
             }
             if (self::isCurlyOpen($token)) {
@@ -233,25 +244,59 @@ final class EncapsedCoalesceDesugar
 
     /**
      * @param array<int, array{0: int, 1: string, 2: int}|string> $tokens
+     *
+     * @return array{end: int, innerTokens: array<int, array{0: int, 1: string, 2: int}|string>}
      */
-    private static function consumeBracketSuffix(array $tokens, int $openIdx): string
+    private static function consumeDollarCurlyInner(array $tokens, int $dollarIdx): array
     {
+        $innerStart = $dollarIdx + 1;
         $depth = 0;
-        $text = '';
-        for ($j = $openIdx, $c = \count($tokens); $j < $c; ++$j) {
+        $j = $innerStart;
+        $c = \count($tokens);
+        while ($j < $c) {
             $token = $tokens[$j];
-            $text .= \is_array($token) ? $token[1] : $token;
-            if (\is_string($token) && '[' === $token) {
-                ++$depth;
-            } elseif (\is_string($token) && ']' === $token) {
-                --$depth;
-                if (0 === $depth) {
-                    break;
+            if (\is_string($token)) {
+                if (\in_array($token, ['(', '[', '{'], true)) {
+                    ++$depth;
+                } elseif (']' === $token || ')' === $token) {
+                    if ($depth > 0) {
+                        --$depth;
+                    }
+                } elseif ('}' === $token) {
+                    if (0 === $depth) {
+                        break;
+                    }
+                    --$depth;
                 }
             }
+            ++$j;
         }
 
-        return $text;
+        return [
+            'end' => $j + 1,
+            'innerTokens' => \array_slice($tokens, $innerStart, $j - $innerStart),
+        ];
+    }
+
+    /**
+     * @param array<int, array{0: int, 1: string, 2: int}|string> $innerTokens
+     */
+    private static function dollarInnerTokensToExpression(array $innerTokens): string
+    {
+        if ([] === $innerTokens) {
+            return "''";
+        }
+        $first = $innerTokens[0];
+        if (\is_array($first) && (\T_STRING_VARNAME === $first[0] || \T_STRING === $first[0])) {
+            $expr = '$'.$first[1];
+            if (\count($innerTokens) > 1) {
+                $expr .= self::tokensToSource(\array_slice($innerTokens, 1));
+            }
+
+            return $expr;
+        }
+
+        return '('.self::tokensToSource($innerTokens).')';
     }
 
     /**

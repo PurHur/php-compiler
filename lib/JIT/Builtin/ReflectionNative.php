@@ -55,5 +55,26 @@ final class ReflectionNative
                 $context->registerFunction($name, $fn);
             }
         }
+
+        if (CompilerVersion::supportsReflectionFunctionGetNamedArguments()) {
+            foreach (
+                [
+                    ['__compiler_refl_func_named_count', $sizeT, [$i8p]],
+                    ['__compiler_refl_func_named_at', $i8p, [$i8p, $sizeT]],
+                    ['__compiler_refl_method_named_count', $sizeT, [$i8p, $i8p]],
+                    ['__compiler_refl_method_named_at', $i8p, [$i8p, $i8p, $sizeT]],
+                ] as [$name, $ret, $params]
+            ) {
+                $existing = $context->module->getNamedFunction($name);
+                if (null !== $existing) {
+                    $context->registerFunction($name, $existing);
+
+                    continue;
+                }
+                $ft = $context->context->functionType($ret, false, ...$params);
+                $fn = $context->module->addFunction($name, $ft);
+                $context->registerFunction($name, $fn);
+            }
+        }
     }
 }

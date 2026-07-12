@@ -28,6 +28,11 @@ final class GetClassJitHelper
         return self::$namesById[$classId] ?? '';
     }
 
+    public static function debugTypeClassNameFromClassId(int $classId): string
+    {
+        return VmObjectDebugType::fromClassName(self::classNameFromClassId($classId));
+    }
+
     /** @internal test reset */
     public static function resetForTest(): void
     {

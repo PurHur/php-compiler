@@ -14,11 +14,15 @@ final class Utf8Latin1JitHelper
 {
     public static function encode(string $data): string
     {
+        Utf8EndecDeprecation::recordCompiled('utf8_encode');
+
         return VmString::utf8_encode($data);
     }
 
     public static function decode(string $data): string
     {
+        Utf8EndecDeprecation::recordCompiled('utf8_decode');
+
         return VmString::utf8_decode($data);
     }
 }

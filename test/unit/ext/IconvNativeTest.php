@@ -75,4 +75,18 @@ final class IconvNativeTest extends TestCase
         $this->assertSame('ab', CharsetEngine::convert('UTF-8', 'UTF-8//IGNORE', $input));
         $this->assertSame('ab', VmIconv::iconv('UTF-8', 'UTF-8//IGNORE', $input));
     }
+
+    public function testIconvStringHelpersLatin1(): void
+    {
+        $iso = "\xE9\xE8\xE7";
+        $this->assertSame(3, VmIconv::iconvStrlen($iso, 'ISO-8859-1'));
+        $this->assertSame("\xE8\xE7", VmIconv::iconvSubstr($iso, 1, 2, 'ISO-8859-1'));
+        $this->assertSame(1, VmIconv::iconvStrpos($iso, "\xE8", 1, 'ISO-8859-1'));
+        $this->assertSame(0, VmIconv::iconvStrrpos($iso, "\xE9", 'ISO-8859-1'));
+    }
+
+    public function testIconvStrlenRejectsInvalidUtf8(): void
+    {
+        $this->assertFalse(VmIconv::iconvStrlen("\xFF", 'UTF-8'));
+    }
 }

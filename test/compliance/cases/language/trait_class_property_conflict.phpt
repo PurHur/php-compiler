@@ -8,4 +8,4 @@ echo "unreachable\n";
 --EXPECT_EXIT--
 255
 --EXPECTF--
-parseAndCompile failure: target=%s: C and T define the same property ($x) in the composition of C. However, the definition differs and is considered incompatible. Class was composed
+Fatal error: C and T define the same property ($x) in the composition of C. However, the definition differs and is considered incompatible. Class was composed in %s on line %d

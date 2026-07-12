@@ -62,7 +62,9 @@ final class get_debug_type extends Internal
             return;
         }
         if (Variable::TYPE_OBJECT === $v->type) {
-            $frame->returnVar->string($v->toObject()->class->name);
+            $frame->returnVar->string(
+                VmObjectDebugType::fromClassName($v->toObject()->class->name)
+            );
 
             return;
         }
@@ -97,7 +99,7 @@ final class get_debug_type extends Internal
             );
         }
         if (JITVariable::TYPE_OBJECT === $args[0]->type) {
-            return ReflectionBuiltinHelper::getClassName($context, $args[0]);
+            return ReflectionBuiltinHelper::getDebugTypeClassName($context, $args[0]);
         }
         if (JITVariable::TYPE_STRING === $args[0]->type) {
             $this->jitString($context, $args[0], 'get_debug_type() argument #1');

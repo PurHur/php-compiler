@@ -13,6 +13,9 @@ use PHPCompiler\VM\Variable;
  */
 final class VmPhpCoreConstants
 {
+    /** php-src ZEND_ACC_TENTATIVE_RETURN exposed as TENTATIVE_RETURN (PHP 8.4+, zend_attributes.h). */
+    public const TENTATIVE_RETURN = 1;
+
     /**
      * Names registered in Zend get_defined_constants(true)['Core'] with PHP_ prefix.
      *
@@ -22,6 +25,18 @@ final class VmPhpCoreConstants
     private const PATH_CONSTANT_NAMES = [
         'DIRECTORY_SEPARATOR',
         'PATH_SEPARATOR',
+    ];
+
+    /** Zend Core bucket upload error codes (main/main.c). */
+    private const UPLOAD_ERR_VALUES = [
+        'UPLOAD_ERR_OK' => 0,
+        'UPLOAD_ERR_INI_SIZE' => 1,
+        'UPLOAD_ERR_FORM_SIZE' => 2,
+        'UPLOAD_ERR_PARTIAL' => 3,
+        'UPLOAD_ERR_NO_FILE' => 4,
+        'UPLOAD_ERR_NO_TMP_DIR' => 6,
+        'UPLOAD_ERR_CANT_WRITE' => 7,
+        'UPLOAD_ERR_EXTENSION' => 8,
     ];
 
     private const CORE_NAMES = [
@@ -84,6 +99,10 @@ final class VmPhpCoreConstants
         if (null !== $compiler) {
             return self::fromPhpValue($compiler);
         }
+        $forward = self::forwardProfileCoreConstantLoose($name);
+        if (null !== $forward) {
+            return self::fromPhpValue($forward);
+        }
         $canonical = self::canonicalName($name);
         if (null === $canonical || !\defined($canonical)) {
             return null;
@@ -102,6 +121,10 @@ final class VmPhpCoreConstants
         $compiler = self::compilerVersionConstantExact($name);
         if (null !== $compiler) {
             return self::fromPhpValue($compiler);
+        }
+        $forward = self::forwardProfileCoreConstantExact($name);
+        if (null !== $forward) {
+            return self::fromPhpValue($forward);
         }
         if (!\in_array($name, self::CORE_NAMES, true) || !\defined($name)) {
             return null;
@@ -122,6 +145,48 @@ final class VmPhpCoreConstants
                 $entries[$canonical] = $var;
             }
         }
+        foreach (self::categorizedCoreScalarEntries() as $name => $var) {
+            $entries[$name] = $var;
+        }
+
+        return $entries;
+    }
+
+    /**
+     * Zend get_defined_constants(true)['Core'] entries — excludes ext/standard module constants (#4840).
+     *
+     * @return array<string, Variable>
+     */
+    public static function categorizedCoreEntries(): array
+    {
+        $entries = self::categorizedCoreScalarEntries();
+        foreach (self::UPLOAD_ERR_VALUES as $name => $value) {
+            $var = self::fromPhpValue($value);
+            if (null !== $var) {
+                $entries[$name] = $var;
+            }
+        }
+        $entries['DEFAULT_INCLUDE_PATH'] = self::fromPhpValue(self::defaultIncludePath());
+        $entries['PEAR_INSTALL_DIR'] = self::fromPhpValue(self::pearInstallDir());
+        $entries['PEAR_EXTENSION_DIR'] = self::fromPhpValue(self::pearExtensionDir());
+        $zts = self::fromPhpValue((bool) (self::compilerVersionConstantExact('PHP_ZTS') ?? 0));
+        if (null !== $zts) {
+            $entries['ZEND_THREAD_SAFE'] = $zts;
+        }
+        $debug = self::fromPhpValue((bool) (self::compilerVersionConstantExact('PHP_DEBUG') ?? 0));
+        if (null !== $debug) {
+            $entries['ZEND_DEBUG_BUILD'] = $debug;
+        }
+
+        return $entries;
+    }
+
+    /**
+     * @return array<string, Variable>
+     */
+    private static function categorizedCoreScalarEntries(): array
+    {
+        $entries = [];
         foreach (self::CORE_NAMES as $canonical) {
             $value = self::compilerVersionConstantExact($canonical);
             if (null === $value && \defined($canonical)) {
@@ -135,8 +200,82 @@ final class VmPhpCoreConstants
                 $entries[$canonical] = $var;
             }
         }
+        foreach (self::forwardProfileCoreIntConstants() as $canonical => $value) {
+            $var = self::fromPhpValue($value);
+            if (null !== $var) {
+                $entries[$canonical] = $var;
+            }
+        }
 
         return $entries;
+    }
+
+    /**
+     * @return array<string, int>
+     */
+    private static function forwardProfileCoreIntConstants(): array
+    {
+        if (!CompilerVersion::supportsTentativeReturnConstant()) {
+            return [];
+        }
+
+        return [
+            'TENTATIVE_RETURN' => self::TENTATIVE_RETURN,
+        ];
+    }
+
+    private static function forwardProfileCoreConstantLoose(string $name): ?int
+    {
+        $upper = strtoupper($name);
+        foreach (self::forwardProfileCoreIntConstants() as $canonical => $value) {
+            if (strtoupper($canonical) === $upper) {
+                return $value;
+            }
+        }
+
+        return null;
+    }
+
+    private static function forwardProfileCoreConstantExact(string $name): ?int
+    {
+        return self::forwardProfileCoreIntConstants()[$name] ?? null;
+    }
+
+    public static function pathSeparatorValue(): string
+    {
+        return self::pathConstantValue('PATH_SEPARATOR') ?? (self::isWindowsPlatform() ? ';' : ':');
+    }
+
+    public static function directorySeparatorValue(): string
+    {
+        return self::pathConstantValue('DIRECTORY_SEPARATOR') ?? (self::isWindowsPlatform() ? '\\' : '/');
+    }
+
+    private static function defaultIncludePath(): string
+    {
+        if (\defined('DEFAULT_INCLUDE_PATH')) {
+            return (string) \constant('DEFAULT_INCLUDE_PATH');
+        }
+
+        return '.:'.self::pearInstallDir();
+    }
+
+    private static function pearInstallDir(): string
+    {
+        if (\defined('PEAR_INSTALL_DIR')) {
+            return (string) \constant('PEAR_INSTALL_DIR');
+        }
+
+        return '/usr/share/php';
+    }
+
+    private static function pearExtensionDir(): string
+    {
+        if (\defined('PEAR_EXTENSION_DIR')) {
+            return (string) \constant('PEAR_EXTENSION_DIR');
+        }
+
+        return self::pearInstallDir().'/ext';
     }
 
     private static function pathConstantValue(string $name): ?string

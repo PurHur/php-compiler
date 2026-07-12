@@ -22,7 +22,13 @@ final class GeneratorValid extends VmClassMethod
         if (null === $frame->returnVar) {
             return;
         }
-        $frame->returnVar->bool(!$gen->done && ($gen->hasCurrent || null !== $gen->frame));
+        $valid = !$gen->done
+            && !$gen->hasReturned
+            && ($gen->hasCurrent || null !== $gen->frame);
+        // FUNCCALL result slots may alias $this property storage (#1885, #17895).
+        $staging = new Variable();
+        $staging->bool($valid);
+        $frame->returnVar->copyFrom($staging);
     }
 
     private static function receiver(Frame $frame): \PHPCompiler\VM\ObjectEntry

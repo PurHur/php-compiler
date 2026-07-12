@@ -11,46 +11,76 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPUnit\Framework\TestCase;
 
-/** array_flip/values/reverse JIT routes through JitHelper PHP not ArrayBuiltinHelper LLVM (#12329, #14244). */
+/** array_flip/values/reverse JIT routes through JitHelper PHP not ArrayBuiltinHelper LLVM (#12329, #14244, #17922). */
 final class ArrayFlipValuesReverseRuntimeShrinkTest extends TestCase
 {
+    private const ARRAY_BUILTIN_HELPER_MAX_LINES = 12400;
+
     public function testArrayFlipRuntimeUsesJitHelperNotDirectLlvmMonolith(): void
     {
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ArrayFlipRuntime.php');
         $this->assertStringContainsString('ArrayFlipJitHelper', $runtime);
-        $this->assertStringContainsString('isNativeArray', $runtime);
-        $this->assertStringContainsString('ArrayBuiltinHelper::buildFlipArray', $runtime);
+        $this->assertStringContainsString('loadHashTable', $runtime);
+        $this->assertStringNotContainsString('buildFlipArray', $runtime);
         $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);
 
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/array_flip.php');
         $this->assertStringContainsString('ArrayFlipRuntime::flip', $builtin);
         $this->assertStringNotContainsString('ArrayBuiltinHelper::buildFlipArray', $builtin);
+
+        $arrayBuiltin = (string) file_get_contents(__DIR__.'/../../lib/JIT/ArrayBuiltinHelper.php');
+        $this->assertStringNotContainsString('function buildFlipArray', $arrayBuiltin);
+        $this->assertStringNotContainsString('function buildFlipHashTable', $arrayBuiltin);
+        $this->assertStringNotContainsString('function flipStorePackedEntry', $arrayBuiltin);
     }
 
     public function testArrayValuesRuntimeUsesJitHelperNotDirectLlvmMonolith(): void
     {
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ArrayValuesRuntime.php');
         $this->assertStringContainsString('ArrayValuesJitHelper', $runtime);
-        $this->assertStringContainsString('isNativeArray', $runtime);
-        $this->assertStringContainsString('ArrayBuiltinHelper::buildValuesArray', $runtime);
+        $this->assertStringContainsString('loadHashTable', $runtime);
+        $this->assertStringNotContainsString('buildValuesArray', $runtime);
         $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);
 
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/array_values.php');
         $this->assertStringContainsString('ArrayValuesRuntime::values', $builtin);
         $this->assertStringNotContainsString('ArrayBuiltinHelper::buildValuesArray', $builtin);
+
+        $arrayBuiltin = (string) file_get_contents(__DIR__.'/../../lib/JIT/ArrayBuiltinHelper.php');
+        $this->assertStringNotContainsString('function buildValuesArray', $arrayBuiltin);
+        $this->assertStringNotContainsString('function buildValuesFromNativeArray', $arrayBuiltin);
+        $this->assertStringNotContainsString('function buildValuesFromHashTable', $arrayBuiltin);
     }
 
     public function testArrayReverseRuntimeUsesJitHelperNotDirectLlvmMonolith(): void
     {
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ArrayReverseRuntime.php');
         $this->assertStringContainsString('ArrayReverseJitHelper', $runtime);
-        $this->assertStringContainsString('isNativeArray', $runtime);
-        $this->assertStringContainsString('ArrayBuiltinHelper::buildReverseArray', $runtime);
+        $this->assertStringContainsString('loadHashTable', $runtime);
+        $this->assertStringNotContainsString('buildReverseArray', $runtime);
         $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);
 
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/array_reverse.php');
         $this->assertStringContainsString('ArrayReverseRuntime::reverse', $builtin);
         $this->assertStringNotContainsString('ArrayBuiltinHelper::buildReverseArray', $builtin);
+
+        $arrayBuiltin = (string) file_get_contents(__DIR__.'/../../lib/JIT/ArrayBuiltinHelper.php');
+        $this->assertStringNotContainsString('function buildReverseArray', $arrayBuiltin);
+        $this->assertStringNotContainsString('function buildReverseFromNativeArray', $arrayBuiltin);
+        $this->assertStringNotContainsString('function buildReverseFromHashTable', $arrayBuiltin);
+    }
+
+    public function testArrayBuiltinHelperLineBudgetAfterFlipValuesReverseLlvmDeletion(): void
+    {
+        $lines = substr_count(
+            (string) file_get_contents(__DIR__.'/../../lib/JIT/ArrayBuiltinHelper.php'),
+            "\n"
+        ) + 1;
+        $this->assertLessThanOrEqual(
+            self::ARRAY_BUILTIN_HELPER_MAX_LINES,
+            $lines,
+            'ArrayBuiltinHelper.php LOC after dead flip/values/reverse LLVM deletion (#17922)'
+        );
     }
 
     public function testArrayFlipJitHelperMatchesVmArraySemantics(): void

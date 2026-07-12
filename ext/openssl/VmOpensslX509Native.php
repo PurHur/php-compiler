@@ -59,6 +59,74 @@ final class VmOpensslX509Native
     }
 
     /**
+     * Certificate DER digest fingerprint (php-src ext/openssl/x509.c — openssl_x509_fingerprint).
+     *
+     * @return string|false lowercase hex or raw digest bytes when $rawOutput is true
+     */
+    public static function fingerprintCertificatePem(string $pem, string $hashAlgo, bool $rawOutput): string|false
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return false;
+        }
+        if (!self::digestAvailable($hashAlgo)) {
+            return false;
+        }
+
+        $inBio = null;
+        $x509 = null;
+
+        try {
+            $inBio = $ffi->BIO_new_mem_buf($pem, \strlen($pem));
+            if (null === $inBio) {
+                return false;
+            }
+
+            $x509 = $ffi->PEM_read_bio_X509($inBio, null, null, null);
+            if (null === $x509) {
+                return false;
+            }
+
+            $md = $ffi->EVP_get_digestbyname($hashAlgo);
+            if (null === $md) {
+                return false;
+            }
+
+            $digestLen = $ffi->new('unsigned int');
+            $buf = $ffi->new('unsigned char[64]');
+            if (1 !== (int) $ffi->X509_digest($x509, $md, $buf, \FFI::addr($digestLen))) {
+                return false;
+            }
+
+            $len = (int) $digestLen->cdata;
+            if ($len <= 0) {
+                return false;
+            }
+
+            $raw = \FFI::string($buf, $len);
+
+            return $rawOutput ? $raw : \bin2hex($raw);
+        } finally {
+            if (null !== $x509) {
+                $ffi->X509_free($x509);
+            }
+            if (null !== $inBio) {
+                $ffi->BIO_free($inBio);
+            }
+        }
+    }
+
+    public static function digestAvailable(string $hashAlgo): bool
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return false;
+        }
+
+        return null !== $ffi->EVP_get_digestbyname($hashAlgo);
+    }
+
+    /**
      * Parse PEM and return normalized certificate PEM, or false when invalid/unavailable.
      */
     public static function normalizeCertificatePem(string $pem): string|false
@@ -174,6 +242,9 @@ const unsigned char *ASN1_STRING_get0_data(const ASN1_STRING *x);
 int ASN1_STRING_length(const ASN1_STRING *x);
 int i2a_ASN1_INTEGER(BIO *bp, const ASN1_INTEGER *a);
 int X509_get_signature_nid(const X509 *x);
+typedef struct evp_md_st EVP_MD;
+const EVP_MD *EVP_get_digestbyname(const char *name);
+int X509_digest(const X509 *data, const EVP_MD *type, unsigned char *md, unsigned int *len);
 CDEF;
 
         foreach (['libcrypto.so.3', 'libcrypto.so'] as $lib) {

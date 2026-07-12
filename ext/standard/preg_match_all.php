@@ -53,15 +53,10 @@ final class preg_match_all extends Internal
         $hostMatches = [];
         $result = VmPreg::pregMatchAll($pattern, $subject, $hostMatches, $flags, $offset);
 
-        if ($hasMatches) {
-            $target = $frame->calledArgs[2];
-            if (false === $result) {
-                $target->null();
-            } else {
-                $target = $target->resolveIndirect();
-                $ht = VmPregMatches::hostMatchAllToHashTable($hostMatches, $flags);
-                $target->array($ht);
-            }
+        if ($hasMatches && false !== $result) {
+            $target = $frame->calledArgs[2]->resolveIndirect();
+            $ht = VmPregMatches::hostMatchAllToHashTable($hostMatches, $flags);
+            $target->array($ht);
         }
 
         if (null === $frame->returnVar) {

@@ -9,21 +9,44 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPUnit\Framework\TestCase;
 
-/** array_pad() JIT routes through ArrayPadJitHelper PHP not ArrayBuiltinHelper LLVM (#12476, #14286). */
+/** array_pad() JIT routes all operands through ArrayPadJitHelper PHP not ArrayBuiltinHelper LLVM (#12476, #14286, #18121). */
 final class ArrayPadRuntimeShrinkTest extends TestCase
 {
+    private const ARRAY_BUILTIN_HELPER_MAX_LINES = 8230;
+
     public function testArrayPadRuntimeUsesJitHelperNotDirectLlvmMonolith(): void
     {
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ArrayPadRuntime.php');
         $this->assertStringContainsString('ArrayPadJitHelper', $runtime);
+        $this->assertStringContainsString('nativeListToHashTable', $runtime);
         $this->assertStringContainsString('padCopyLegacy', $runtime);
         $this->assertStringContainsString('padCopyTyped', $runtime);
-        $this->assertStringContainsString('LOAD_TYPE_STANDALONE', $runtime);
-        $this->assertStringContainsString('ArrayBuiltinHelper::pad', $runtime);
+        $this->assertStringNotContainsString('ArrayBuiltinHelper::pad', $runtime);
+        $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);
 
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/array_pad.php');
         $this->assertStringContainsString('ArrayPadRuntime::pad', $builtin);
         $this->assertStringNotContainsString('ArrayBuiltinHelper::pad', $builtin);
+
+        $padCopy = (string) file_get_contents(__DIR__.'/../../lib/JIT/Call/HashTablePadCopy.php');
+        $this->assertStringContainsString('ArrayPadRuntime::pad', $padCopy);
+        $this->assertStringNotContainsString('ArrayBuiltinHelper::pad', $padCopy);
+    }
+
+    public function testArrayBuiltinHelperLineBudgetAfterNativePadLlvmDeletion(): void
+    {
+        $arrayBuiltin = (string) file_get_contents(__DIR__.'/../../lib/JIT/ArrayBuiltinHelper.php');
+        $this->assertStringNotContainsString('function pad(', $arrayBuiltin);
+        $this->assertStringNotContainsString('function padWithType', $arrayBuiltin);
+        $this->assertStringNotContainsString('function padHashTable', $arrayBuiltin);
+        $this->assertStringNotContainsString('function copyPackedListHashTable', $arrayBuiltin);
+
+        $lines = substr_count($arrayBuiltin, "\n") + 1;
+        $this->assertLessThanOrEqual(
+            self::ARRAY_BUILTIN_HELPER_MAX_LINES,
+            $lines,
+            'ArrayBuiltinHelper.php LOC after dead array_pad native LLVM deletion (#18121)'
+        );
     }
 
     public function testArrayPadJitHelperMatchesVmPadCopySemantics(): void

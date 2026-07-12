@@ -47,6 +47,9 @@ final class number_format extends Internal
                 'decimals'
             )
             : 0;
+        if ($decimals < 0 && version_compare(CompilerVersion::languageProfileVersion(), '8.4.0', '>=')) {
+            throw new \ValueError('number_format(): Argument #2 ($decimals) must be greater than or equal to 0');
+        }
         $decimalSeparator = isset($frame->calledArgs[2])
             ? VmString::coerceNullableStringBuiltinArg(
                 $frame->calledArgs[2],

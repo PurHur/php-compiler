@@ -869,6 +869,19 @@ final class VmSerialize
         }
         $props = [];
         foreach ($names as $name) {
+            if (!$entry->hasProperty($name)) {
+                $ctx->errors->triggerError(
+                    \sprintf(
+                        'serialize(): "%s" returned as member variable from __sleep() but does not exist',
+                        $name
+                    ),
+                    ErrorReporter::E_WARNING,
+                    null,
+                    $ctx,
+                    $frame
+                );
+                continue;
+            }
             $props[$name] = $entry->getProperty($name)->resolveIndirect();
         }
 
@@ -904,7 +917,13 @@ final class VmSerialize
         foreach ($result->toArray()->iterateKeyed(true) as [, $elem]) {
             $elem = $elem->resolveIndirect();
             if (Variable::TYPE_STRING !== $elem->type) {
-                throw new \LogicException('__sleep() must return an array of strings');
+                $ctx->errors->triggerError(
+                    'serialize(): '.$entry->class->name.'::__sleep() should return an array only containing the names of instance-variables to serialize',
+                    ErrorReporter::E_WARNING,
+                    null,
+                    $ctx,
+                    $frame
+                );
             }
             $names[] = $elem->toString();
         }

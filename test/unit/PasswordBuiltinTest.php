@@ -104,6 +104,27 @@ final class PasswordBuiltinTest extends TestCase
         $this->assertTrue(password_verify('', $hash->toString()));
     }
 
+    public function testHashNullAlgoDefaultsToBcrypt(): void
+    {
+        $runtime = new Runtime();
+        $pass = new VMVariable();
+        $pass->string('secret');
+        $algo = new VMVariable();
+        $algo->null();
+
+        $hashFn = new password_hash();
+        $hashFrame = $hashFn->getFrame($runtime->vmContext);
+        $hashFrame->calledArgs = [$pass, $algo];
+        $hashFrame->returnVar = new VMVariable();
+        $hashFn->execute($hashFrame);
+
+        $hash = $hashFrame->returnVar->resolveIndirect();
+        $this->assertSame(VMVariable::TYPE_STRING, $hash->type);
+        $this->assertSame(60, strlen($hash->toString()));
+        $this->assertSame(0, strncmp($hash->toString(), '$2y$', 4));
+        $this->assertTrue(password_verify('secret', $hash->toString()));
+    }
+
     public function testCryptBcryptAndInvalidSalt(): void
     {
         $runtime = new Runtime();

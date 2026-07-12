@@ -43,7 +43,7 @@ final class FragmentAppendChild extends DomClassMethod
             ));
         }
         $object = $var->toObject();
-        if (!VmDom::isElement($object)) {
+        if (!VmDom::isAppendChildCandidate($object)) {
             throw new \TypeError(sprintf(
                 '%s expects argument #%d to be of type DOMNode, %s given',
                 $label,

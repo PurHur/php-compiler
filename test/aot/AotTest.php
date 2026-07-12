@@ -65,6 +65,20 @@ class AotTest extends BaseTest
                 && str_contains($name, 'str_increment_phantom')) {
                 continue;
             }
+            if (!CompilerVersion::supportsGetObjectId()
+                && str_contains($name, 'get_object_id')
+                && !str_contains($name, 'get_object_id_phantom')
+                && !str_contains($name, 'get_object_id_function_exists_forward')) {
+                continue;
+            }
+            if (CompilerVersion::supportsGetObjectId()
+                && str_contains($name, 'get_object_id_phantom')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsClamp()
+                && str_contains($name, 'clamp')) {
+                continue;
+            }
             if (!CompilerVersion::supportsPhp83ArrayKeyFunctions()
                 && str_contains($name, 'array_first_last_key')
                 && !str_contains($name, 'array_first_last_key_phantom')
@@ -173,6 +187,15 @@ class AotTest extends BaseTest
                 && str_contains($name, 'get_declared_exclude_deprecated_reference_profile')) {
                 continue;
             }
+            if (!CompilerVersion::supportsGetClassAllowString()
+                && str_contains($name, 'get_class_allow_string')
+                && !str_contains($name, 'get_class_allow_string_reference_profile')) {
+                continue;
+            }
+            if (CompilerVersion::supportsGetClassAllowString()
+                && str_contains($name, 'get_class_allow_string_reference_profile')) {
+                continue;
+            }
             if (!CompilerVersion::supportsGetDeclaredExcludeDeprecated()
                 && str_contains($name, 'get_declared_argument_count_error')) {
                 continue;
@@ -202,9 +225,14 @@ class AotTest extends BaseTest
             if (!CompilerVersion::supportsMbStrPad() && str_contains($name, 'mb_str_pad')) {
                 continue;
             }
+            if (!CompilerVersion::supportsGetHandlerIntrospection()
+                && (str_contains($name, 'get_error_handler') || str_contains($name, 'get_exception_handler'))) {
+                continue;
+            }
             if (!CompilerVersion::supportsStreamSupports()
                 && (str_contains($name, 'stream_supports') || str_contains($name, 'stream_meta_seekable'))
-                && !str_contains($name, 'stream_supports_lock')) {
+                && !str_contains($name, 'stream_supports_lock')
+                && !str_contains($name, 'stream_supports_undefined_function_before_const')) {
                 continue;
             }
             // STREAM_SUPPORT_READ/WRITE PHP 8.4 constants; forward profile only (#16846).

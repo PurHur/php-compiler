@@ -52,6 +52,15 @@ final class HelperRuntimeCache
     /** @var array<string, true> unit dir → merged at link time */
     private static array $usedUnits = [];
 
+    /**
+     * User-script AOT previously forced inline compile for stale prelink units (#17954).
+     * ObjectEntry ABI + ext/dom fingerprint deps invalidate stale helper TUs.
+     *
+     * @var array<string, true>
+     */
+    private const USER_SCRIPT_INLINE_ONLY_LOGICALS = [
+    ];
+
     private static bool $loggedHit = false;
 
     public static function enabled(): bool
@@ -194,12 +203,39 @@ final class HelperRuntimeCache
         return \dirname(__DIR__, 2).'/prelinked/helper-runtime/'.self::archKey().'/units';
     }
 
-    /** Per-unit fingerprint: core + the helper source content. */
+    /** Per-unit fingerprint: core + helper source + ext/dom SSOT deps when applicable (#17954). */
     public static function unitFingerprint(string $unitSourceAbsPath): string
     {
         $source = @file_get_contents($unitSourceAbsPath);
+        $material = self::coreFingerprint()."\n".(string) $source;
+        $extra = self::unitDependencyFingerprintMaterial($unitSourceAbsPath);
+        if ('' !== $extra) {
+            $material .= "\n".$extra;
+        }
 
-        return substr(hash('sha256', self::coreFingerprint()."\n".(string) $source), 0, 20);
+        return substr(hash('sha256', $material), 0, 20);
+    }
+
+    /**
+     * Nested helper units embed ext/dom semantics pulled in at emit time; hash SSOT
+     * alongside the helper stub so VmDom edits invalidate stale units (#17954).
+     */
+    private static function unitDependencyFingerprintMaterial(string $unitSourceAbsPath): string
+    {
+        $root = \dirname(__DIR__, 2);
+        if (!str_starts_with($unitSourceAbsPath, $root.'/ext/dom/')) {
+            return '';
+        }
+        $parts = [];
+        foreach ([
+            '/ext/dom/VmDom.php',
+            '/ext/dom/VmDomJitFrame.php',
+            '/ext/dom/DomRegistry.php',
+        ] as $rel) {
+            $parts[] = $rel.':'.@hash_file('sha256', $root.$rel);
+        }
+
+        return implode("\n", $parts);
     }
 
     /** @return array{fingerprint: string, unit: string, helpers: array<string,string>}|null */
@@ -277,6 +313,7 @@ final class HelperRuntimeCache
                         'dir' => $unitDir,
                         'init' => (string) $manifest['init_symbol'],
                         'shutdown' => isset($manifest['shutdown_symbol']) ? (string) $manifest['shutdown_symbol'] : null,
+                        'init_via_global_ctor' => !empty($manifest['init_via_global_ctor']),
                     ];
                 }
             }
@@ -312,6 +349,9 @@ final class HelperRuntimeCache
         $bound = 0;
         foreach ($logicalNames as $logical) {
             $lc = strtolower($logical);
+            if (self::shouldInlineOnlyForUserScript($lc)) {
+                continue;
+            }
             if (isset($context->functions[$lc]) || !isset($index[$lc])) {
                 continue;
             }
@@ -440,7 +480,7 @@ final class HelperRuntimeCache
      * Units emitted before init symbols existed have no manifest entry and
      * keep the old (uninitialized) behavior.
      *
-     * @param array{symbol: string, dir: string, init: ?string, shutdown: ?string} $entry
+     * @param array{symbol: string, dir: string, init: ?string, shutdown: ?string, init_via_global_ctor?: bool} $entry
      */
     private static function wireUnitLifecycle(Context $context, array $entry): void
     {
@@ -449,6 +489,10 @@ final class HelperRuntimeCache
             return;
         }
         self::$wiredLifecycles[$unitDir] = true;
+        if (!empty($entry['init_via_global_ctor'])) {
+            // Unit init runs via llvm.global_ctors at load time (#16075 step 4).
+            return;
+        }
         $voidFn = static function (string $name) use ($context): object {
             $fn = $context->module->getNamedFunction($name);
             if (null !== $fn) {
@@ -460,9 +504,9 @@ final class HelperRuntimeCache
                 $context->context->functionType($context->context->voidType(), false)
             );
         };
-        // User-script AOT: skip cached-unit __init__ until per-unit global_ctors
-        // isolation lands (#16075 step 4). Running unit inits here aliases module
-        // globals and breaks echo of short literals ("0"/"1") and count ternaries.
+        // Legacy units without global ctors: user-script AOT must skip emitInInit
+        // wiring — calling unit inits from script __init__ aliases muldefs-merged
+        // globals (#17069).
         $userAot = getenv('PHP_COMPILER_AOT_USER_SCRIPT');
         $skipInit = '1' === $userAot || 'true' === strtolower((string) $userAot);
         if (!$skipInit && null !== $entry['init'] && '' !== $entry['init']) {
@@ -524,5 +568,15 @@ final class HelperRuntimeCache
     public static function markEmitting(): void
     {
         putenv(self::ENV_EMITTING.'=1');
+    }
+
+    private static function shouldInlineOnlyForUserScript(string $logicalLc): bool
+    {
+        if (!isset(self::USER_SCRIPT_INLINE_ONLY_LOGICALS[$logicalLc])) {
+            return false;
+        }
+        $user = getenv('PHP_COMPILER_AOT_USER_SCRIPT');
+
+        return '1' === $user || 'true' === strtolower((string) $user);
     }
 }

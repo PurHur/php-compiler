@@ -100,7 +100,7 @@ final class AsymmetricVisibilityReferenceProfileTest extends TestCase
         );
     }
 
-    public function testRuntimeRejectsPublicPrivateSetWithZendMessage(): void
+    public function testRuntimeRejectsPublicPrivateSetWithProfileGate(): void
     {
         if (CompilerVersion::supportsAsymmetricVisibility()) {
             $this->markTestSkipped('asymmetric visibility enabled on PHP 8.4.0+ target');
@@ -115,6 +115,23 @@ final class AsymmetricVisibilityReferenceProfileTest extends TestCase
         } catch (\PHPCompiler\Compiler\CompileFatal $e) {
             $this->assertStringContainsString(AsymmetricVisibilityRewriter::MULTIPLE_MODIFIERS_MESSAGE, $e->getMessage());
             $this->assertSame(5, $e->sourceLine);
+        }
+    }
+
+    public function testRuntimeRejectsPublicPrivateSetProfileGateRepro(): void
+    {
+        if (CompilerVersion::supportsAsymmetricVisibility()) {
+            $this->markTestSkipped('asymmetric visibility enabled on PHP 8.4.0+ target');
+        }
+        $runtime = new Runtime();
+        try {
+            $runtime->parseAndCompile(
+                file_get_contents(__DIR__.'/../repro/maintainer_gap_asymmetric_visibility_profile_gate.php'),
+                'maintainer_gap_asymmetric_visibility_profile_gate.php'
+            );
+            $this->fail('Expected compile failure');
+        } catch (\PHPCompiler\Compiler\CompileFatal $e) {
+            $this->assertStringContainsString(AsymmetricVisibilityRewriter::MULTIPLE_MODIFIERS_MESSAGE, $e->getMessage());
         }
     }
 
@@ -196,6 +213,38 @@ final class AsymmetricVisibilityReferenceProfileTest extends TestCase
         } catch (\PHPCompiler\Compiler\CompileFatal $e) {
             $this->assertStringContainsString('syntax error, unexpected token "private"', $e->getMessage());
             $this->assertSame(7, $e->sourceLine);
+        }
+    }
+
+    /** @covers issue #18062 — bare modifier before parenthesized form in same file */
+    public function testRejectorThrowsBareModifierBeforeParenthesizedForm(): void
+    {
+        if (CompilerVersion::supportsAsymmetricVisibility()) {
+            $this->markTestSkipped('asymmetric visibility enabled on PHP 8.4.0+ target');
+        }
+        $this->expectException(\PHPCompiler\Compiler\CompileFatal::class);
+        $this->expectExceptionMessage(AsymmetricVisibilityRewriter::MULTIPLE_MODIFIERS_MESSAGE);
+        AsymmetricVisibilityRejector::reject(
+            file_get_contents(__DIR__.'/../repro/maintainer_gap_asymmetric_visibility_parse_line.php'),
+            'maintainer_gap_asymmetric_visibility_parse_line.php'
+        );
+    }
+
+    public function testRuntimeRejectsBareModifierBeforeParenthesizedForm(): void
+    {
+        if (CompilerVersion::supportsAsymmetricVisibility()) {
+            $this->markTestSkipped('asymmetric visibility enabled on PHP 8.4.0+ target');
+        }
+        $runtime = new Runtime();
+        try {
+            $runtime->parseAndCompile(
+                file_get_contents(__DIR__.'/../repro/maintainer_gap_asymmetric_visibility_parse_line.php'),
+                'maintainer_gap_asymmetric_visibility_parse_line.php'
+            );
+            $this->fail('Expected compile failure');
+        } catch (\PHPCompiler\Compiler\CompileFatal $e) {
+            $this->assertStringContainsString(AsymmetricVisibilityRewriter::MULTIPLE_MODIFIERS_MESSAGE, $e->getMessage());
+            $this->assertSame(6, $e->sourceLine);
         }
     }
 }

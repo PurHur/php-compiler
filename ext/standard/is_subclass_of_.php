@@ -25,8 +25,18 @@ final class is_subclass_of_ extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (2 !== \count($frame->calledArgs) && 3 !== \count($frame->calledArgs)) {
-            throw new \LogicException('is_subclass_of() requires two or three arguments');
+        $argc = \count($frame->calledArgs);
+        if ($argc < 2) {
+            throw new \ArgumentCountError(\sprintf(
+                'is_subclass_of() expects at least 2 arguments, %d given',
+                $argc
+            ));
+        }
+        if ($argc > 3) {
+            throw new \ArgumentCountError(\sprintf(
+                'is_subclass_of() expects at most 3 arguments, %d given',
+                $argc
+            ));
         }
         $ctx = VmReflection::requireContext($frame);
         $parentName = VmReflection::stringArg($frame->calledArgs[1], 'is_subclass_of() class_name', 1);
@@ -50,8 +60,18 @@ final class is_subclass_of_ extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (2 !== \count($args) && 3 !== \count($args)) {
-            throw new \LogicException('is_subclass_of() requires two or three arguments');
+        $argc = \count($args);
+        if ($argc < 2) {
+            throw new \ArgumentCountError(\sprintf(
+                'is_subclass_of() expects at least 2 arguments, %d given',
+                $argc
+            ));
+        }
+        if ($argc > 3) {
+            throw new \ArgumentCountError(\sprintf(
+                'is_subclass_of() expects at most 3 arguments, %d given',
+                $argc
+            ));
         }
         $allowString = $context->constantFromBool(true);
         if (3 === \count($args)) {

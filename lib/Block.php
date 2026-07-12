@@ -63,6 +63,9 @@ class Block {
     /** File-level declare(strict_types=1) for this function body (issue #156). */
     public bool $strictTypes = false;
 
+    /** True when this CFG block emitted declare(ticks=N) enter (#3343). */
+    public bool $tickScopeOpened = false;
+
     /** __COMPILER_HALT_OFFSET__ when the script contains __halt_compiler() (#5455). */
     public ?int $haltCompilerOffset = null;
 
@@ -77,6 +80,9 @@ class Block {
 
     /** Parameter scope slots declared `iterable` (array|Traversable union, #4829). */
     public array $paramIterableSlots = [];
+
+    /** Parameter scope slots declared `callable` (#17742). */
+    public array $paramCallableSlots = [];
 
     /** Parameter scope slots declared standalone `never` (#6633). */
     public array $paramNeverSlots = [];
@@ -805,6 +811,7 @@ class Block {
             $this->paramClassConstraints = $parent->paramClassConstraints;
             $this->paramDeclaredTypeLabels = $parent->paramDeclaredTypeLabels;
             $this->paramIterableSlots = $parent->paramIterableSlots;
+            $this->paramCallableSlots = $parent->paramCallableSlots;
             $this->paramNeverSlots = $parent->paramNeverSlots;
             $this->paramLiteralBoolTypes = $parent->paramLiteralBoolTypes;
             $this->returnLiteralBoolType = $parent->returnLiteralBoolType;
@@ -973,14 +980,12 @@ class Block {
 
     /**
      * Match unhandled-error lowering reads the scrutinee again on JUMPIF targets (#13955).
+     * Concat/?? chains read prefix temps on COALESCE/JUMP merge arms (#17375).
      */
     public function scopeSlotReadInJumpTargets(int $slot): bool
     {
         foreach ($this->opCodes as $op) {
-            if (OpCode::TYPE_JUMPIF !== $op->type) {
-                continue;
-            }
-            foreach ([$op->block1, $op->block2] as $target) {
+            foreach ($this->controlFlowBranchTargets($op) as $target) {
                 if (!$target instanceof self) {
                     continue;
                 }
@@ -995,6 +1000,18 @@ class Block {
     }
 
     /**
+     * @return array<int, self|null>
+     */
+    private function controlFlowBranchTargets(OpCode $op): array
+    {
+        return match ($op->type) {
+            OpCode::TYPE_JUMPIF, OpCode::TYPE_COALESCE => [$op->block1, $op->block2],
+            OpCode::TYPE_JUMP => [$op->block1],
+            default => [],
+        };
+    }
+
+    /**
      * One-level JUMPIF target scan — enough to drop cond-expression temps without
      * treating distant merge/successor blocks as live (#14103 vs #13955 fcall keep).
      * ?: arms that JUMP to a shared merge must still preserve prefix temps (#14133);
@@ -1003,10 +1020,7 @@ class Block {
     public function scopeSlotReadInDirectJumpTargets(int $slot): bool
     {
         foreach ($this->opCodes as $op) {
-            if (OpCode::TYPE_JUMPIF !== $op->type) {
-                continue;
-            }
-            foreach ([$op->block1, $op->block2] as $target) {
+            foreach ($this->controlFlowBranchTargets($op) as $target) {
                 if (!$target instanceof self) {
                     continue;
                 }
@@ -1042,6 +1056,16 @@ class Block {
             ) {
                 return true;
             }
+            if (OpCode::TYPE_COALESCE === $branchOp->type) {
+                foreach ([$branchOp->block1, $branchOp->block2] as $target) {
+                    if (
+                        $target instanceof self
+                        && $this->branchOrJumpMergeReadsScopeSlot($target, $slot, $seen)
+                    ) {
+                        return true;
+                    }
+                }
+            }
             if (OpCode::TYPE_JUMPIF === $branchOp->type) {
                 foreach ([$branchOp->block1, $branchOp->block2] as $target) {
                     if (
@@ -1073,10 +1097,7 @@ class Block {
             }
         }
         foreach ($this->opCodes as $op) {
-            if (OpCode::TYPE_JUMPIF !== $op->type) {
-                continue;
-            }
-            foreach ([$op->block1, $op->block2] as $target) {
+            foreach ($this->controlFlowBranchTargets($op) as $target) {
                 if ($target instanceof self && $target->blockReadsScopeSlotTree($slot, $seen)) {
                     return true;
                 }
@@ -1707,18 +1728,15 @@ class Block {
      */
     public function paramRequiresExactLiteralMatch(int $slot): bool
     {
-        if (isset($this->paramLiteralBoolTypes[$slot])) {
-            return true;
-        }
-        if (!isset($this->paramTypeConstraints[$slot])) {
-            return false;
-        }
-        if (Variable::TYPE_NULL !== $this->paramTypeConstraints[$slot]) {
-            return false;
-        }
-
-        return !isset($this->paramDnfConstraints[$slot])
-            && !isset($this->paramIntersectionConstraints[$slot]);
+        return isset($this->paramLiteralBoolTypes[$slot])
+            || isset($this->paramIterableSlots[$slot])
+            || isset($this->paramCallableSlots[$slot])
+            || (
+                isset($this->paramTypeConstraints[$slot])
+                && Variable::TYPE_NULL === $this->paramTypeConstraints[$slot]
+                && !isset($this->paramDnfConstraints[$slot])
+                && !isset($this->paramIntersectionConstraints[$slot])
+            );
     }
 
     public static function resolveVariableName(Operand $op): ?string
@@ -2924,6 +2942,45 @@ class Block {
                     $codeOp = $block->getOperand($op->arg2);
                     if (!$codeOp instanceof Operand\Literal) {
                         return true;
+                    }
+                }
+                foreach ([$op->block1, $op->block2, $op->block3] as $sub) {
+                    if ($sub instanceof self) {
+                        $stack[] = $sub;
+                    }
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /** func_get_arg(s) / func_num_args() — CallArgv must be stored at each call site (#197, #15907). */
+    public static function usesFuncArgsIntrospection(?self $root): bool
+    {
+        if (null === $root) {
+            return false;
+        }
+        $seen = new \SplObjectStorage();
+        $stack = [$root];
+        while ([] !== $stack) {
+            $block = array_pop($stack);
+            if (!$block instanceof self || $seen->contains($block)) {
+                continue;
+            }
+            $seen->attach($block);
+            foreach ($block->opCodes as $op) {
+                if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                    $nameOp = $block->getOperand($op->arg1);
+                    if ($nameOp instanceof Operand\Literal) {
+                        $lc = strtolower($nameOp->value);
+                        if (
+                            'func_get_args' === $lc
+                            || 'func_get_arg' === $lc
+                            || 'func_num_args' === $lc
+                        ) {
+                            return true;
+                        }
                     }
                 }
                 foreach ([$op->block1, $op->block2, $op->block3] as $sub) {

@@ -49,7 +49,12 @@ final class getenv_ extends Internal
         if (2 === $argc) {
             $localOnly = $frame->calledArgs[1]->resolveIndirect()->toBool();
         }
-        $name = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'getenv', 0, 'name');
+        $name = VmString::coerceTypedNullableStringBuiltinArg($frame->calledArgs[0], 'getenv', 0, 'name');
+        if (null === $name) {
+            $frame->returnVar->array(VmEnv::getAllEnvironmentTable());
+
+            return;
+        }
         $result = VmEnv::getenv($name, $localOnly);
         if (false === $result) {
             $frame->returnVar->bool(false);
@@ -81,7 +86,7 @@ final class getenv_ extends Internal
 
         return JitEnv::getenv(
             $context,
-            JitStringBuiltinArg::lower($context, $args[0], 'getenv', 0, 'name'),
+            JitStringBuiltinArg::lowerRequiredString($context, $args[0], 'getenv', 0, 'name', '?string'),
             $localOnlyI8
         );
     }

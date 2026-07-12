@@ -27,12 +27,8 @@ final class array_first extends Internal
             return;
         }
         $ht = VmArray::requireArray($frame->calledArgs[0]->resolveIndirect(), 'array_first');
+        VmArray::requireNonEmptyFindArray($ht, 'array_first');
         $value = VmArray::valueFirst($ht);
-        if (null === $value) {
-            $frame->returnVar->null();
-
-            return;
-        }
         $frame->returnVar->copyFrom($value);
     }
 

@@ -99,6 +99,9 @@ final class Variable {
     /** Float literal value when this variable represents a constant double operand. */
     public ?float $compileTimeFloat = null;
 
+    /** Integer literal value when this variable represents a constant long operand. */
+    public ?int $compileTimeLong = null;
+
     /** User/global constant name when this variable holds a compile-time const fetch. */
     public ?string $compileTimeConstantName = null;
 
@@ -505,11 +508,27 @@ final class Variable {
         switch ($type) {
             case self::TYPE_NATIVE_LONG:
                 $value = $context->constantFromInteger($op->value, self::getStringType($type));
+                $literal = (int) $op->value;
                 break;
             case self::TYPE_STRING:
-                $value = $context->builder->load($context->constantStringFromString($op->value));
-                $literal = is_string($op->value) ? $op->value : null;
-                break;
+                $slot = BasicBlockHelper::entryAlloca($context, $context->getTypeFromString('__string__*'));
+                $loaded = $context->builder->load($context->constantStringFromString($op->value));
+                $owned = $context->builder->call(
+                    $context->lookupFunction('__string__separate'),
+                    $loaded
+                );
+                $context->builder->store($owned, $slot);
+                $var = new Variable(
+                    $context,
+                    self::TYPE_STRING,
+                    self::KIND_VARIABLE,
+                    $slot
+                );
+                if (is_string($op->value)) {
+                    $var->compileTimeString = $op->value;
+                }
+
+                return $var;
             case self::TYPE_NATIVE_DOUBLE:
                 $floatValue = \is_float($op->value)
                     ? $op->value
@@ -595,6 +614,8 @@ final class Variable {
         if (isset($literal)) {
             if (\is_string($literal)) {
                 $var->compileTimeString = $literal;
+            } elseif (\is_int($literal)) {
+                $var->compileTimeLong = $literal;
             } elseif (\is_float($literal)) {
                 $var->compileTimeFloat = $literal;
             }
@@ -604,12 +625,15 @@ final class Variable {
     }
 
     public static function fromConstantInt(Context $context, int $value): Variable {
-        return new Variable(
+        $var = new Variable(
             $context,
             self::TYPE_NATIVE_LONG,
             self::KIND_VALUE,
             $context->constantFromInteger($value)
         );
+        $var->compileTimeLong = $value;
+
+        return $var;
     }
 
     public function castTo(int $type): self {
@@ -818,9 +842,10 @@ final class Variable {
     public function dimFetch(self $dim, ?Type $expectedType = null, bool $forWrite = false): Variable {
         switch ($this->type) {
             case self::TYPE_STRING:
+                $str = $this->context->helper->loadValue($this);
                 $charPtr = StringOffsetHelper::dimFetch(
                     $this->context,
-                    $this->value,
+                    $str,
                     $dim
                 );
                 if ($forWrite) {

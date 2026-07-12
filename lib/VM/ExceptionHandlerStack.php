@@ -42,6 +42,11 @@ final class ExceptionHandlerStack
         return true;
     }
 
+    public function getActiveHandler(): ?Variable
+    {
+        return $this->activeCopy();
+    }
+
     public function popReturningRemoved(): ?Variable
     {
         if ([] === $this->stack) {

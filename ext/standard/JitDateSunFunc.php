@@ -45,6 +45,8 @@ final class JitDateSunFunc
             return JitValueBox::pointer($context, $slot);
         }
 
+        VmEngineBuiltinDeprecation::emitJitFunction($context, $function);
+
         $timestamp = self::tryCompileTimeLong($context, $args[0]);
         if (null === $timestamp) {
             throw new \LogicException(

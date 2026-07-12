@@ -21,6 +21,12 @@ use PHPCompiler\VM\Builtin\GeneratorValid;
  */
 final class GeneratorState
 {
+    /** Zend zend_generators.c — Generator::rewind() on started generator (#5195). */
+    public const REWIND_ALREADY_RUN_ERROR = 'Cannot rewind a generator that was already run';
+
+    /** Zend zend_generators.c — foreach / iterator_count on closed generator (#5132, #17368). */
+    public const CLOSED_TRAVERSE_ERROR = 'Cannot traverse an already closed generator';
+
     public bool $done = false;
 
     /** True after the generator body has been entered (Zend rewind guard, #5195). */
@@ -33,6 +39,9 @@ final class GeneratorState
     public Variable $currentKey;
 
     public Variable $currentValue;
+
+    /** Snapshot for current() — return slots may alias {@see $currentValue} (#18183). */
+    public Variable $currentSnapshot;
 
     public ?Frame $frame = null;
 
@@ -72,13 +81,31 @@ final class GeneratorState
         public readonly array $calledArgs,
     ) {
         $this->currentKey = new Variable();
+        $this->currentKey->generatorYieldStorage = true;
         $this->currentValue = new Variable();
+        $this->currentValue->generatorYieldStorage = true;
+        $this->currentSnapshot = new Variable();
         $this->yieldFromContainer = new Variable();
         $this->returnValue = new Variable();
         $this->pendingSend = new Variable();
         $this->pendingSend->null();
         $this->pendingThrow = new Variable();
         $this->pendingThrow->null();
+    }
+
+    /** Publish yielded value; keep snapshot for idempotent current() (#18183). */
+    public function publishCurrentValue(Variable $value): void
+    {
+        $this->currentValue->duplicateFrom($value);
+        $this->currentSnapshot->duplicateFrom($this->currentValue);
+        $this->hasCurrent = true;
+    }
+
+    public function clearCurrentValue(): void
+    {
+        $this->hasCurrent = false;
+        $this->currentValue->null();
+        $this->currentSnapshot->null();
     }
 
     public static function register(Context $ctx): void
@@ -109,7 +136,7 @@ final class GeneratorState
     {
         $this->done = true;
         $this->frame = null;
-        $this->hasCurrent = false;
+        $this->clearCurrentValue();
         $this->hasReturned = true;
         if (null !== $value) {
             $this->returnValue->copyFrom($value);
@@ -123,7 +150,7 @@ final class GeneratorState
     {
         $this->done = true;
         $this->frame = null;
-        $this->hasCurrent = false;
+        $this->clearCurrentValue();
     }
 
     public function wrapObject(): ObjectEntry
@@ -135,13 +162,22 @@ final class GeneratorState
         return $entry;
     }
 
+    /** Foreach ITER_RESET — closed generators use traverse error, not rewind (#17368). */
+    public function rewindForForeach(): void
+    {
+        if ($this->done) {
+            throw new \Exception(self::CLOSED_TRAVERSE_ERROR);
+        }
+        $this->rewind();
+    }
+
     public function rewind(): void
     {
         if ($this->started) {
-            throw new \Exception('Cannot rewind a generator that was already run');
+            throw new \Exception(self::REWIND_ALREADY_RUN_ERROR);
         }
         $this->done = false;
-        $this->hasCurrent = false;
+        $this->clearCurrentValue();
         $this->frame = null;
         $this->autoKey = 0;
         $this->yieldFromActive = false;

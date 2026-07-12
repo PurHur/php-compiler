@@ -32,16 +32,26 @@ final class NullsafeHelper
         Function_ $func,
         Block $branchBlock
     ): BasicBlock {
-        return $jit->compileSubBlock($func, $branchBlock);
+        $saved = $branchBlock->syntheticCfgBranch ?? false;
+        $branchBlock->syntheticCfgBranch = true;
+        try {
+            return $jit->compileSubBlock($func, $branchBlock);
+        } finally {
+            $branchBlock->syntheticCfgBranch = $saved;
+        }
     }
 
     /**
-     * i1: receiver is PHP null or uninitialized nullable typed property (#5220, ZEND_NULLSAFE).
+     * i1: receiver short-circuits ?-> (null, scalar/non-object, or uninitialized nullable slot).
      */
     public static function isReceiverNull(JIT $jit, Variable $receiver): Value
     {
         $context = $jit->context;
         $builder = $context->builder;
+        $i1 = $context->getTypeFromString('int1');
+        if (self::receiverAlwaysShortCircuits($receiver->type)) {
+            return $i1->constInt(1, false);
+        }
         if (Variable::TYPE_OBJECT === $receiver->type) {
             $obj = $context->helper->loadValue($receiver);
 
@@ -62,10 +72,21 @@ final class NullsafeHelper
                 $context->structFieldMap['__value__']['type']
             )
         );
-        $i1 = $context->getTypeFromString('int1');
         $nullableSlot = $i1->constInt(self::nullablePropertySlot($context, $receiver) ? 1 : 0, false);
 
         return self::callValueBoxShortCircuits($context, $typeByte, $nullableSlot);
+    }
+
+    private static function receiverAlwaysShortCircuits(int $jitType): bool
+    {
+        return \in_array($jitType, [
+            Variable::TYPE_NULL,
+            Variable::TYPE_NATIVE_LONG,
+            Variable::TYPE_NATIVE_BOOL,
+            Variable::TYPE_NATIVE_DOUBLE,
+            Variable::TYPE_STRING,
+            Variable::TYPE_HASHTABLE,
+        ], true);
     }
 
     private static function nullablePropertySlot(Context $context, Variable $receiver): bool
@@ -109,7 +130,6 @@ final class NullsafeHelper
             self::COMPILED_HELPERS,
             '#10311'
         );
-        $context->builder->clearInsertionPosition();
     }
 
     private static function callValueBoxShortCircuits(Context $context, Value $typeByte, Value $nullableSlot): Value

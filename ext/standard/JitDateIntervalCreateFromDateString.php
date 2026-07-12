@@ -41,7 +41,7 @@ final class JitDateIntervalCreateFromDateString
             return self::emitParseFailure($context, (string) $warning);
         }
 
-        return self::materializeDateInterval($context, $parsed);
+        return self::materializeDateInterval($context, $lit, $parsed);
     }
 
     private static function compileTimeStringArg(JITVariable $arg): ?string
@@ -90,7 +90,7 @@ final class JitDateIntervalCreateFromDateString
     /**
      * @param array{y: int, m: int, d: int, h: int, i: int, s: int, f: float, invert: int} $parsed
      */
-    private static function materializeDateInterval(Context $context, array $parsed): Value
+    private static function materializeDateInterval(Context $context, string $dateString, array $parsed): Value
     {
         $objectType = $context->type->object;
         $classId = $objectType->lookup(self::CLASS_NAME);
@@ -131,6 +131,27 @@ final class JitDateIntervalCreateFromDateString
                 $i1->constInt(0, false)
             ),
             JITVariable::TYPE_NATIVE_BOOL
+        );
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($obj, self::CLASS_NAME, 'from_string'),
+            new JITVariable(
+                $context,
+                JITVariable::TYPE_NATIVE_BOOL,
+                JITVariable::KIND_VALUE,
+                $i1->constInt(1, false)
+            ),
+            JITVariable::TYPE_NATIVE_BOOL
+        );
+        $dateStringVar = new JITVariable(
+            $context,
+            JITVariable::TYPE_STRING,
+            JITVariable::KIND_VALUE,
+            $context->constantFromString($dateString)
+        );
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($obj, self::CLASS_NAME, 'date_string'),
+            $dateStringVar,
+            JITVariable::TYPE_STRING
         );
 
         $slot = JitValueBox::alloc($context);

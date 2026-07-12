@@ -54,14 +54,17 @@ final class VmPassword
     }
 
     /**
-     * Resolve password_hash() $algo — int or string (php-src php_password_algo_find, issue #5039).
+     * Resolve password_hash() $algo — int, string, or null (php-src php_password_algo_find, issue #5039, #18155).
      *
-     * @throws \TypeError when operand is not string|int
+     * @throws \TypeError when operand is not string|int|null
      * @throws \ValueError when algo name/id is not a supported password hashing algorithm
      */
     public static function resolveAlgo(Variable $var, string $function, int $argIndex, string $paramName): int
     {
         $var = $var->resolveIndirect();
+        if (Variable::TYPE_NULL === $var->type) {
+            return self::PASSWORD_BCRYPT;
+        }
         if (EnumCaseSupport::isEnumCaseVariable($var)) {
             throw new \TypeError(\sprintf(
                 '%s(): Argument #%d ($%s) must be of type string|int, %s given',
@@ -211,7 +214,7 @@ final class VmPassword
         return match ($var->type) {
             Variable::TYPE_NULL => 'null',
             Variable::TYPE_BOOLEAN => 'bool',
-            Variable::TYPE_DOUBLE => 'float',
+            Variable::TYPE_FLOAT => 'float',
             Variable::TYPE_STRING => 'string',
             Variable::TYPE_ARRAY => 'array',
             Variable::TYPE_OBJECT => $var->toObject()->class->name,

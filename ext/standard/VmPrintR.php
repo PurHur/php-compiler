@@ -168,7 +168,8 @@ final class VmPrintR
             $openSpaces = 0 === $level ? '' : str_repeat(' ', 4 * ($level + 1));
             $keySpaces = str_repeat(' ', 4 * (0 === $level ? 1 : $level + 2));
             $props = $object->getProperties(ClassEntry::PROP_PURPOSE_DEBUG, $vm, $frame);
-            $lines = ["{$object->class->name} Object\n", "{$openSpaces}(\n"];
+            $className = VmObjectDebugType::fromClassName($object->class->name);
+            $lines = ["{$className} Object\n", "{$openSpaces}(\n"];
             foreach ($props as $name => $value) {
                 $formatted = self::formatNested($vm, $value->resolveIndirect(), $level + 1, $frame, $visited);
                 $lines[] = "{$keySpaces}[{$name}] => ".$formatted."\n";
@@ -190,7 +191,7 @@ final class VmPrintR
     /** php-src ext/standard/var.c — object recursion marker (#11179). */
     private static function formatObjectRecursionMarker(string $className): string
     {
-        return "{$className} Object\n *RECURSION*";
+        return VmObjectDebugType::fromClassName($className)." Object\n *RECURSION*";
     }
 
     private static function formatKey(Variable $key): string

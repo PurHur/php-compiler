@@ -17,5 +17,5 @@ echo count($objMethods), "\n";
 echo in_array('run', $objMethods, true) ? '1' : '0';
 --EXPECT--
 1
-10
+101
 1

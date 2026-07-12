@@ -15,11 +15,9 @@ final class pack extends Internal
 {
     public function execute(Frame $frame): void
     {
-        $argc = \count($frame->calledArgs);
-        if ($argc < 1) {
-            throw new \LogicException('pack() requires at least one argument');
-        }
+        $this->requireAtLeastArgCount($frame, 'pack', 1);
         $fmt = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'pack', 0, 'format');
+        $argc = \count($frame->calledArgs);
         $values = [];
         for ($i = 1; $i < $argc; ++$i) {
             $values[] = $frame->calledArgs[$i]->resolveIndirect();
@@ -32,6 +30,10 @@ final class pack extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
+        if (!$this->requireAtLeastJitArgCount($context, $args, 'pack', 1)) {
+            return $context->constantFromString('');
+        }
+
         return \call_user_func_array([JitPack::class, 'pack'], array_merge([$context], $args));
     }
 }

@@ -216,6 +216,15 @@ class OpCode {
     /** empty($container[$dim]): ArrayAccess checks offsetGet truthiness, not isset alone (#14798). */
     const TYPE_EMPTY_DIMENSION = 129;
 
+    /** declare(ticks=N) — enter scope and push previous interval (#3343). */
+    const TYPE_TICK_SCOPE_ENTER = 130;
+
+    /** declare(ticks=N) — update interval within an open tick scope (#3343). */
+    const TYPE_TICK_SCOPE_SET = 131;
+
+    /** End declare(ticks=N) block scope — restore previous interval (#3343). */
+    const TYPE_TICK_SCOPE_LEAVE = 132;
+
     /** `['k' => $v, ...$tail] = $arr` string keys already assigned; empty = numeric spread only (#4889). */
     public array $listSpreadExcludedKeys = [];
 
@@ -262,6 +271,8 @@ class OpCode {
     public bool $propertyFromConstructorPromotion = false;
     /** TYPE_DECLARE_PROPERTY: PHPCfg visibility flags (#145). */
     public int $propertyVisibility = 0;
+    /** TYPE_DECLARE_PROPERTY / TYPE_DECLARE_STATIC_PROPERTY: cfg declared type for runtime validation (#17996). */
+    public ?\PHPCfg\Op\Type $cfgDeclaredType = null;
     /** TYPE_DECLARE_FUNCTION_STATIC: declared type prototype constant slot (#9998). */
     public ?int $functionStaticTypeSlot = null;
     /** TYPE_DECLARE_FUNCTION_STATIC / TYPE_FUNCTION_STATIC_INIT_STORE: variable name for TypeError (#9998). */
@@ -311,6 +322,8 @@ class OpCode {
     public bool $isEnumCaseDeclare = false;
     /** TYPE_STATICCALL_INIT: source was `parent::` (php-cfg may lower class operand to fqcn). */
     public bool $staticCallParentScope = false;
+    /** TYPE_FROM_CALLABLE: `parent::instanceMethod(...)` bound closure (#17655, zend_compile.c). */
+    public bool $fromCallableParentScope = false;
 
     /** TYPE_INCLUDE: include/require + once/non-once semantics (issue #4426). */
     public int $includeKind = self::INCLUDE_KIND_INCLUDE_ONCE;

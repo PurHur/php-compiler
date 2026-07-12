@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\Test\Unit;
 
 use PHPCompiler\Compiler\CompileFatal;
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\ReadonlyFunctionRejector;
 use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
@@ -12,6 +13,13 @@ use PHPUnit\Framework\TestCase;
 /** @covers issue #10012 */
 final class ReadonlyFunctionCompileCheckTest extends TestCase
 {
+    protected function setUp(): void
+    {
+        if (CompilerVersion::supportsReadonlyFunction()) {
+            $this->markTestSkipped('readonly function syntax enabled on PHP 8.4+ forward profile');
+        }
+    }
+
     public function testTopLevelReadonlyFunctionFailsAtCompileTime(): void
     {
         $runtime = new Runtime();

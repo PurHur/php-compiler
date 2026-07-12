@@ -26,6 +26,7 @@ final class DomNodePropertySupport
             || strtolower(VmDom::PROP_NODE_NAME) === $lc
             || strtolower(VmDom::PROP_TAG_NAME) === $lc
             || strtolower(VmDom::PROP_OWNER_DOCUMENT) === $lc
+            || (VmDom::isElement($object) && strtolower(VmDom::PROP_ATTRIBUTES) === $lc)
             || strtolower(VmDom::PROP_NODE_VALUE) === $lc
             || strtolower(VmDom::PROP_TEXT_CONTENT) === $lc
             || strtolower(VmDom::PROP_BASE_URI) === $lc
@@ -35,6 +36,8 @@ final class DomNodePropertySupport
             || (VmDom::isAttr($object) && strtolower(VmDom::PROP_VALUE) === $lc)
             || (VmDom::isAttr($object) && strtolower(VmDom::PROP_OWNER_ELEMENT) === $lc)
             || (VmDom::isCharacterData($object) && strtolower(VmDom::PROP_DATA) === $lc)
+            || (VmDom::isCharacterData($object) && strtolower(VmDom::PROP_LENGTH) === $lc)
+            || (VmDom::isTextOrCdataNode($object) && strtolower(VmDom::PROP_WHOLE_TEXT) === $lc)
             || (VmDom::isNodeList($object) && strtolower(VmDom::PROP_LENGTH) === $lc);
     }
 
@@ -66,6 +69,14 @@ final class DomNodePropertySupport
             }
 
             return $var;
+        }
+        if (VmDom::isElement($object) && strtolower(VmDom::PROP_ATTRIBUTES) === $lc) {
+            if (null === $ctx) {
+                $ctx = \PHPCompiler\VM\VmActiveContextJitHelper::resolve();
+            }
+            VmDom::ensureElementAttributesMap($ctx, $object);
+
+            return VmDom::elementAttributesVariable($object);
         }
         if (strtolower(VmDom::PROP_NODE_VALUE) === $lc) {
             $value = VmDom::readNodeValue($object);
@@ -129,6 +140,16 @@ final class DomNodePropertySupport
         }
         if (VmDom::isCharacterData($object) && strtolower(VmDom::PROP_DATA) === $lc) {
             $var->string(DomRegistry::state($object)->textContent ?? '');
+
+            return $var;
+        }
+        if (VmDom::isCharacterData($object) && strtolower(VmDom::PROP_LENGTH) === $lc) {
+            $var->int(\strlen(DomRegistry::state($object)->textContent ?? ''));
+
+            return $var;
+        }
+        if (VmDom::isTextOrCdataNode($object) && strtolower(VmDom::PROP_WHOLE_TEXT) === $lc) {
+            $var->string(VmDom::readWholeText($object));
 
             return $var;
         }

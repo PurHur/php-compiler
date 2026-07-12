@@ -38,6 +38,7 @@ final class HighlightEngine
         }
         $tokens = LanguageScanner::tokenize($code);
         $body = self::renderTokens($tokens);
+        $body = \str_replace("\n", '<br />'."\n", $body);
 
         // php-src ext/standard/php_highlight.h — outer wrapper newlines match Zend byte-for-byte (#10308).
         return '<code><span style="color: '.self::COLOR_DEFAULT.'">'."\n".$body."\n".'</span>'."\n".'</code>';
@@ -132,6 +133,9 @@ final class HighlightEngine
         if ($id === $ids['T_VARIABLE']) {
             return self::COLOR_DEFAULT;
         }
+        if ($id === $ids['T_INLINE_HTML']) {
+            return self::COLOR_DEFAULT;
+        }
         if ($id >= 256) {
             return self::COLOR_KEYWORD;
         }
@@ -144,6 +148,8 @@ final class HighlightEngine
         $escaped = \htmlspecialchars($text, \ENT_QUOTES | \ENT_SUBSTITUTE, 'UTF-8');
         $escaped = \str_replace(' ', '&nbsp;', $escaped);
         $escaped = \str_replace("\t", '&nbsp;&nbsp;&nbsp;&nbsp;', $escaped);
+        // php-src ext/standard/php_highlight.h — line breaks inside spans become <br /> (#17557).
+        $escaped = \str_replace("\n", '<br />', $escaped);
 
         return $escaped;
     }

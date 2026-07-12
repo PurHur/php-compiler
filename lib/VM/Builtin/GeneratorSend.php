@@ -36,7 +36,9 @@ final class GeneratorSend extends VmClassMethod
             return;
         }
         if ($active && $gen->hasCurrent) {
-            $frame->returnVar->copyFrom($gen->currentValue);
+            $staging = new Variable();
+            $staging->duplicateFrom($gen->currentSnapshot);
+            $frame->returnVar->copyFrom($staging);
         } else {
             $frame->returnVar->null();
         }

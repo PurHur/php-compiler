@@ -28,8 +28,9 @@ final class DomModuleTest extends TestCase
         self::assertTrue(VmReflection::classExists($ctx, 'DOMDocumentType'));
         self::assertTrue(VmReflection::classExists($ctx, 'DOMElement'));
         self::assertTrue(VmReflection::classExists($ctx, 'DOMEntityReference'));
+        self::assertTrue(VmReflection::classExists($ctx, 'DOMEntity'));
+        self::assertTrue(VmReflection::classExists($ctx, 'DOMNotation'));
         self::assertTrue(VmReflection::classExists($ctx, 'DOMAttr'));
-        self::assertTrue(VmReflection::classExists($ctx, 'DOMEntityReference'));
         self::assertTrue(VmReflection::classExists($ctx, 'DOMNode'));
         self::assertTrue(VmReflection::classExists($ctx, 'DOMNodeList'));
         self::assertTrue(VmReflection::classExists($ctx, 'DOMNamedNodeMap'));
@@ -242,6 +243,28 @@ PHP;
         self::assertSame("1\nNot yet implemented\n", ob_get_clean());
     }
 
+    public function test_dom_document_adopt_node_registered(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+$doc = new DOMDocument();
+$doc->loadXML('<root><a/></root>');
+$node = $doc->documentElement->firstChild;
+echo (int) method_exists($doc, 'adoptNode'), "\n";
+try {
+    $doc->adoptNode($node);
+    echo "no_throw\n";
+} catch (Error $e) {
+    echo $e->getMessage(), "\n";
+}
+PHP;
+        $block = $runtime->parseAndCompile($code, 'dom_adopt_node.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("1\nNot yet implemented\n", ob_get_clean());
+    }
+
     public function test_dom_node_is_supported_and_default_namespace(): void
     {
         $runtime = new Runtime();
@@ -305,7 +328,7 @@ PHP;
     public function test_dom_node_compare_document_position(): void
     {
         if (!CompilerVersion::supportsDomNodeCompareDocumentPosition()) {
-            self::markTestSkipped('DOMNode::compareDocumentPosition() withheld on 8.2 reference profile (#15613)');
+            self::markTestSkipped('DOMNode::compareDocumentPosition() withheld on 8.2 reference profile (#18092)');
         }
         $runtime = new Runtime();
         $code = <<<'PHP'
@@ -446,6 +469,148 @@ PHP;
         ob_start();
         $runtime->run($block);
         self::assertSame("1\nchild\n0\n", ob_get_clean());
+    }
+
+    public function test_dom_text_split_text(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+$doc = new DOMDocument();
+$root = $doc->createElement('root');
+$doc->appendChild($root);
+$text = $doc->createTextNode('hello');
+$root->appendChild($text);
+$tail = $text->splitText(2);
+echo $text->data, "\n";
+echo $tail->data, "\n";
+echo ($tail->previousSibling === $text) ? "prev\n" : "noprev\n";
+echo ($text->nextSibling === $tail) ? "next\n" : "nonext\n";
+echo $doc->saveXML($root), "\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'dom_text_split_text.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("he\nllo\nprev\nnext\n<root>hello</root>\n", ob_get_clean());
+    }
+
+    public function test_dom_text_split_text_offset_validation(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+$doc = new DOMDocument();
+$text = $doc->createTextNode('ab');
+try {
+    $text->splitText(-1);
+    echo "noexception\n";
+} catch (ValueError $e) {
+    echo $e->getMessage(), "\n";
+}
+var_export($doc->createTextNode('a')->splitText(5));
+echo "\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'dom_text_split_text_offset.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame(
+            "DOMText::splitText(): Argument #1 (\$offset) must be greater than or equal to 0\nfalse\n",
+            ob_get_clean()
+        );
+    }
+
+    public function test_dom_text_whitespace_methods(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+$doc = new DOMDocument();
+$root = $doc->createElement('root');
+$doc->appendChild($root);
+$ws = $doc->createTextNode('  ');
+$root->appendChild($ws);
+echo (int) method_exists($ws, 'isElementContentWhitespace'), "\n";
+echo (int) method_exists($ws, 'isWhitespaceInElementContent'), "\n";
+echo (int) $ws->isWhitespaceInElementContent(), "\n";
+echo (int) $ws->isElementContentWhitespace(), "\n";
+$nonWs = $doc->createTextNode('x');
+$root->appendChild($nonWs);
+echo (int) $nonWs->isWhitespaceInElementContent(), "\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'dom_text_whitespace_methods.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("1\n1\n1\n1\n0\n", ob_get_clean());
+    }
+
+    public function test_dom_comment_tree_mutation(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+$doc = new DOMDocument();
+$comment = $doc->createComment('note');
+$doc->appendChild($comment);
+echo get_class($doc->firstChild), "\n";
+echo null === $doc->documentElement ? "null\n" : "set\n";
+$root = $doc->createElement('r');
+$doc->appendChild($root);
+$child = $doc->createElement('c');
+$root->appendChild($child);
+$root->insertBefore($doc->createComment('note'), $child);
+echo $doc->saveXML($root), "\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'dom_comment_tree.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("DOMComment\nnull\n<r><!--note--><c/></r>\n", ob_get_clean());
+    }
+
+    public function test_dom_xpath_query_attribute_predicate(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+$doc = new DOMDocument();
+$doc->loadXML('<root><item id="1">a</item><item id="2">b</item></root>');
+echo (int) class_exists('DOMXPath', false), "\n";
+$xpath = new DOMXPath($doc);
+$nodes = $xpath->query('//item[@id="2"]');
+echo $nodes->length, "\n";
+echo $nodes->item(0)->textContent, "\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'dom_xpath_query.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("1\n1\nb\n", ob_get_clean());
+    }
+
+    public function test_dom_html_document_create_from_string_living_namespace(): void
+    {
+        $previous = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            if (!CompilerVersion::supportsDomLivingStandardNamespace()) {
+                self::markTestSkipped('Dom\\ living-standard namespace withheld without PHP_COMPILER_PROFILE=8.4 (#6506)');
+            }
+            $runtime = new Runtime();
+            $code = <<<'PHP'
+<?php
+echo (int) class_exists('Dom\\HTMLDocument'), "\n";
+$doc = Dom\HTMLDocument::createFromString('<p>hi</p>');
+echo $doc->body->textContent, "\n";
+PHP;
+            $block = $runtime->parseAndCompile($code, 'dom_html_document.php');
+            ob_start();
+            $runtime->run($block);
+            self::assertSame("1\nhi\n", ob_get_clean());
+        } finally {
+            if (false === $previous) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$previous);
+            }
+        }
     }
 
     public function test_runtime_shrink_has_no_dom_c_runtime(): void

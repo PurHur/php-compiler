@@ -11,11 +11,11 @@ namespace PHPCompiler\VM;
  */
 final class ObjectHandleSupport
 {
-    public static function requireObjectId(Variable $var, string $function): int
+    public static function requireObjectId(Variable $var, string $function, ?Context $context = null): int
     {
         $var = $var->resolveIndirect();
         if (EnumCaseSupport::isEnumCaseVariable($var)) {
-            return EnumCaseSupport::objectIdForVariable($var);
+            return EnumCaseSupport::objectIdForVariable($var, $context);
         }
         if (Variable::TYPE_OBJECT !== $var->type) {
             throw new \TypeError(\sprintf(

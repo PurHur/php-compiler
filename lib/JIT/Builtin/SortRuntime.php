@@ -13,7 +13,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 /**
  * JIT/AOT link for sort()/rsort() via SortJitHelper PHP (#12769).
  *
- * Embed and standalone AOT compile the same PHP bridge (#13049).
+ * Embed and standalone AOT compile the same PHP bridge (#13049, #17775).
  * SSOT: {@see \PHPCompiler\ext\standard\VmArray::sortPackedInPlace()} /
  * {@see \PHPCompiler\ext\standard\VmArray::sortPackedReverseInPlace()}
  * php-src: ext/standard/array.c — php_array_sort
@@ -53,72 +53,37 @@ final class SortRuntime
 
     public static function sortPacked(Context $context, JITVariable $array): void
     {
-        if (ArrayBuiltinHelper::isNativeArray($array->type)) {
-            ArrayBuiltinHelper::sortPacked($context, $array);
-
-            return;
-        }
-
-        self::ensureLinked($context);
-        $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
-        $context->builder->call($context->lookupFunction(self::ABI_SORT_PACKED), $ht);
-        HashTableHelper::storeHashtableInArrayVariable($context, $array, $ht);
+        self::invokePackedSort($context, $array, self::ABI_SORT_PACKED);
     }
 
     public static function sortPackedLocale(Context $context, JITVariable $array): void
     {
-        if (ArrayBuiltinHelper::isNativeArray($array->type)) {
-            ArrayBuiltinHelper::sortPackedLocale($context, $array);
-
-            return;
-        }
-
-        self::ensureLinked($context);
-        $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
-        $context->builder->call($context->lookupFunction(self::ABI_SORT_PACKED_LOCALE), $ht);
-        HashTableHelper::storeHashtableInArrayVariable($context, $array, $ht);
+        self::invokePackedSort($context, $array, self::ABI_SORT_PACKED_LOCALE);
     }
 
     public static function sortPackedNatural(Context $context, JITVariable $array): void
     {
-        if (ArrayBuiltinHelper::isNativeArray($array->type)) {
-            ArrayBuiltinHelper::sortPackedNatural($context, $array);
-
-            return;
-        }
-
-        self::ensureLinked($context);
-        $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
-        $context->builder->call($context->lookupFunction(self::ABI_SORT_PACKED_NATURAL), $ht);
-        HashTableHelper::storeHashtableInArrayVariable($context, $array, $ht);
+        self::invokePackedSort($context, $array, self::ABI_SORT_PACKED_NATURAL);
     }
 
     public static function sortPackedNaturalCase(Context $context, JITVariable $array): void
     {
-        if (ArrayBuiltinHelper::isNativeArray($array->type)) {
-            ArrayBuiltinHelper::sortPackedNaturalCase($context, $array);
-
-            return;
-        }
-
-        self::ensureLinked($context);
-        $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
-        $context->builder->call($context->lookupFunction(self::ABI_SORT_PACKED_NATURAL_CASE), $ht);
-        HashTableHelper::storeHashtableInArrayVariable($context, $array, $ht);
+        self::invokePackedSort($context, $array, self::ABI_SORT_PACKED_NATURAL_CASE);
     }
 
     public static function sortPackedReverse(Context $context, JITVariable $array): void
     {
-        if (ArrayBuiltinHelper::isNativeArray($array->type)) {
-            ArrayBuiltinHelper::sortPackedReverse($context, $array);
+        self::invokePackedSort($context, $array, self::ABI_SORT_PACKED_REVERSE);
+    }
 
-            return;
-        }
-
+    private static function invokePackedSort(Context $context, JITVariable $array, string $abi): void
+    {
         self::ensureLinked($context);
         $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
-        $context->builder->call($context->lookupFunction(self::ABI_SORT_PACKED_REVERSE), $ht);
-        HashTableHelper::storeHashtableInArrayVariable($context, $array, $ht);
+        $context->builder->call($context->lookupFunction($abi), $ht);
+        if (ArrayBuiltinHelper::isNativeArray($array->type)) {
+            HashTableHelper::storeHashtableInArrayVariable($context, $array, $ht);
+        }
     }
 
     public static function ensureLinked(Context $context): void

@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\openssl;
 
+use PHPCompiler\ext\standard\JitOpensslRandomPseudoBytes;
 use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
@@ -42,6 +44,7 @@ final class openssl_cipher_key_length extends Internal
             0,
             'cipher_algo'
         );
+        VmString::rejectEmptyBuiltinStringArg($cipher, 'openssl_cipher_key_length', 0, 'cipher_algo');
         $length = VmOpenssl::cipher_key_length($cipher, $frame);
         if (false === $length) {
             $frame->returnVar->bool(false);
@@ -60,6 +63,21 @@ final class openssl_cipher_key_length extends Internal
                 $context,
                 'openssl_cipher_key_length() expects exactly 1 argument, '.$argc.' given'
             );
+            $slot = JitValueBox::alloc($context);
+
+            return JitValueBox::pointer($context, $slot);
+        }
+
+        if ('' === ($args[0]->compileTimeString ?? null)) {
+            $err = BasicBlockHelper::append($context, 'openssl_cipher_key_len_empty_err');
+            $after = BasicBlockHelper::append($context, 'openssl_cipher_key_len_empty_after');
+            $context->builder->branch($err);
+            $context->builder->positionAtEnd($err);
+            JitOpensslRandomPseudoBytes::emitEmptyCipherAlgoError(
+                $context,
+                'openssl_cipher_key_length(): Argument #1 ($cipher_algo) cannot be empty'
+            );
+            $context->builder->positionAtEnd($after);
             $slot = JitValueBox::alloc($context);
 
             return JitValueBox::pointer($context, $slot);

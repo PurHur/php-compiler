@@ -38,6 +38,11 @@ final class JitStringArg
             if (Variable::TYPE_STRING === $arg->type && Variable::KIND_VALUE === $arg->kind) {
                 return self::stringPtrFromVariable($context, $arg);
             }
+            // Slot-backed concat temps carry compileTimeString for other folds but must
+            // read the runtime __string__* written by JitStringConcat (AOT tier-2, #15642).
+            if (Variable::TYPE_STRING === $arg->type && Variable::KIND_VARIABLE === $arg->kind) {
+                return self::materializeStringSlot($context, $context->helper->loadValue($arg));
+            }
 
             return $context->builder->load($context->constantStringFromString($literal));
         }

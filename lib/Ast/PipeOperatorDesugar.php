@@ -17,6 +17,43 @@ final class PipeOperatorDesugar
     /** Pipe binds tighter than comparison (php.net operator precedence). */
     private const PREC_LHS_STOP = 18;
 
+    /** Zend 8.2 profile message for `|>` pipe syntax (#12424, #18007). */
+    public const REFERENCE_PROFILE_UNEXPECTED_GT = 'syntax error, unexpected token ">"';
+
+    /**
+     * @return array{line: int, message: string}|null
+     */
+    public static function referenceProfileSyntaxError(string $code): ?array
+    {
+        if (!str_contains($code, '|>')) {
+            return null;
+        }
+
+        $tokens = token_get_all($code);
+        for ($i = 0, $c = count($tokens); $i < $c; ++$i) {
+            if (!self::isPipeAt($tokens, $i)) {
+                continue;
+            }
+
+            $span = self::pipeSpan($tokens, $i);
+            $gtIdx = $span['endIdx'];
+            $gtToken = $tokens[$gtIdx] ?? null;
+            if (\is_array($gtToken) && isset($gtToken[2])) {
+                $line = (int) $gtToken[2];
+            } else {
+                $offset = self::tokenByteOffset($tokens, $gtIdx);
+                $line = null !== $offset ? self::byteOffsetToLine($code, $offset) : 1;
+            }
+
+            return [
+                'line' => max(1, $line),
+                'message' => self::REFERENCE_PROFILE_UNEXPECTED_GT,
+            ];
+        }
+
+        return null;
+    }
+
     public static function desugar(string $code): string
     {
         if (!CompilerVersion::supportsPipeOperator()) {
@@ -723,5 +760,10 @@ final class PipeOperatorDesugar
         }
 
         return $prefix.$lhs.', '.$suffix;
+    }
+
+    private static function byteOffsetToLine(string $code, int $offset): int
+    {
+        return substr_count(substr($code, 0, max(0, $offset)), "\n") + 1;
     }
 }

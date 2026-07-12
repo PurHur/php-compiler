@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\NestedJitCompileScope;
@@ -25,16 +26,20 @@ final class StreamMetaJit
 
     private const SET_BLOCKING_HELPER = 'PHPCompiler\\ext\\standard\\StreamMetaJitHelper::setBlockingArgv';
 
+    private const ENABLE_CRYPTO_HELPER = 'PHPCompiler\\ext\\standard\\StreamMetaJitHelper::enableCryptoArgv';
+
     /** @var list<string> */
     private const COMPILED_HELPERS = [
         self::GET_META_HELPER,
         self::SET_BLOCKING_HELPER,
+        self::ENABLE_CRYPTO_HELPER,
     ];
 
     /** @var list<string> */
     private const RUNTIME_FUNCTIONS = [
         '__compiler_stream_get_meta_data',
         '__compiler_stream_set_blocking',
+        '__compiler_stream_enable_crypto',
     ];
 
     public static function implement(Context $context): void
@@ -46,20 +51,17 @@ final class StreamMetaJit
             return;
         }
 
-        $savedBlock = null;
-        try {
-            $savedBlock = $context->builder->getInsertBlock();
-        } catch (\Throwable) {
-        }
+        $savedBlock = BasicBlockHelper::tryGetInsertBlock($context);
 
         StreamModeRuntime::ensureLinked($context);
         self::ensureJitHelperCompiled($context);
         self::implementIfMissing($context, '__compiler_stream_get_meta_data', self::implementGetMetaBridge(...));
         self::implementIfMissing($context, '__compiler_stream_set_blocking', self::implementSetBlockingBridge(...));
+        self::implementIfMissing($context, '__compiler_stream_enable_crypto', self::implementEnableCryptoBridge(...));
         self::registerLinkedRuntime($context);
 
         if (null !== $savedBlock) {
-            $context->builder->positionAtEnd($savedBlock);
+            BasicBlockHelper::restoreInsertBlock($context, $savedBlock);
         } else {
             $context->builder->clearInsertionPosition();
         }
@@ -97,6 +99,7 @@ final class StreamMetaJit
         $ft = match ($name) {
             '__compiler_stream_get_meta_data' => $context->context->functionType($htPtr, false, $i64),
             '__compiler_stream_set_blocking' => $context->context->functionType($i32, false, $i64, $i64),
+            '__compiler_stream_enable_crypto' => $context->context->functionType($i32, false, $i64, $i64, $i64, $i64),
             default => throw new \LogicException('StreamMetaJit: unknown function '.$name),
         };
 
@@ -146,6 +149,22 @@ final class StreamMetaJit
             $context,
             self::helperFunction($context, self::SET_BLOCKING_HELPER),
             [$fn->getParam(0), $fn->getParam(1)]
+        );
+        $context->builder->returnValue(
+            JitNestedHelperCoerce::coerceHelperScalarResult($context, $result, $i32)
+        );
+    }
+
+    private static function implementEnableCryptoBridge(Context $context, LlvmFunction $fn): void
+    {
+        $entry = $fn->appendBasicBlock('stream_enable_crypto_bridge_entry');
+        $context->builder->positionAtEnd($entry);
+
+        $i32 = $context->getTypeFromString('int32');
+        $result = JitNestedHelperCoerce::callHelper(
+            $context,
+            self::helperFunction($context, self::ENABLE_CRYPTO_HELPER),
+            [$fn->getParam(0), $fn->getParam(1), $fn->getParam(2), $fn->getParam(3)]
         );
         $context->builder->returnValue(
             JitNestedHelperCoerce::coerceHelperScalarResult($context, $result, $i32)

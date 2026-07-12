@@ -164,11 +164,14 @@ final class VmImage
     }
 
     /**
-     * php-src getimagesizefromstring() — E_NOTICE only when $data is empty (#12930).
+     * php-src getimagesizefromstring() — E_NOTICE on any parse/read failure (#12930, #17961).
+     *
+     * Unlike getimagesize() on regular files (#16434), getimagesizefromstring() always emits
+     * "Error reading from {data}!" when decode fails (ext/standard/image.c).
      */
     public static function shouldEmitImageReadNoticeForBytes(string $data): bool
     {
-        return '' === $data;
+        return true;
     }
 
     /**
@@ -334,7 +337,8 @@ final class VmImage
             if (0xD9 === $marker) {
                 break;
             }
-            if ($marker <= 0xD0 || ($marker >= 0xD1 && $marker <= 0xD7)) {
+            // RSTn markers (0xD0–0xD7) have no length field — php-src ext/standard/image.c php_parsejpeg.
+            if ($marker >= 0xD0 && $marker <= 0xD7) {
                 $pos += 2;
 
                 continue;

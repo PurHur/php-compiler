@@ -16,9 +16,12 @@ final class ArrayPushRuntimeShrinkTest extends TestCase
     {
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ArrayPushRuntime.php');
         $this->assertStringContainsString('ArrayPushJitHelper', $runtime);
-        $this->assertStringContainsString('isNativeArray', $runtime);
-        $this->assertStringContainsString('ArrayBuiltinHelper::push', $runtime);
+        $this->assertStringContainsString('storeHashtableInArrayVariable', $runtime);
+        $this->assertStringNotContainsString('ArrayBuiltinHelper::push', $runtime);
         $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);
+
+        $helper = (string) file_get_contents(__DIR__.'/../../lib/JIT/ArrayBuiltinHelper.php');
+        $this->assertStringNotContainsString('function push(', $helper);
 
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/array_push.php');
         $this->assertStringContainsString('ArrayPushRuntime::push', $builtin);

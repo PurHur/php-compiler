@@ -14,6 +14,7 @@ final class FpowJitHelper
 {
     public static function fpowArgv(float $num, float $exponent): float
     {
-        return VmMath::fpow($num, $exponent);
+        // Leaf for JIT/AOT: pow() lowers to libc when NestedJitCompileScope is active (#17279).
+        return \pow($num, $exponent);
     }
 }

@@ -11,9 +11,9 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * JIT/AOT link for array_chunk() via ArrayChunkJitHelper PHP (#12455).
+ * JIT/AOT link for array_chunk() via ArrayChunkJitHelper PHP (#12455, #17951).
  *
- * Standalone AOT compiles {@see ArrayChunkJitHelper} via JitVmHelperLink (#14289); native literal arrays keep LLVM in {@see ArrayBuiltinHelper::buildChunkArray()}.
+ * Standalone AOT compiles {@see ArrayChunkJitHelper} via JitVmHelperLink (#14289); native literal arrays materialize to hashtable then route through PHP (#17951).
  * SSOT: {@see \PHPCompiler\VM\HashTable::chunkCopy()}
  * php-src: ext/standard/array.c — php_array_chunk()
  */
@@ -36,12 +36,7 @@ final class ArrayChunkRuntime
         Value $size,
         ?Value $preserveKeys = null
     ): Value {
-        if (ArrayBuiltinHelper::isNativeArray($array->type)) {
-            return ArrayBuiltinHelper::buildChunkArray($context, $array, $size, $preserveKeys);
-        }
-
         self::ensureLinked($context);
-        $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
         $i1 = $context->getTypeFromString('int1');
         $flag = null === $preserveKeys
             ? $i1->constInt(0, false)
@@ -49,10 +44,19 @@ final class ArrayChunkRuntime
 
         return $context->builder->call(
             $context->lookupFunction(self::ABI_CHUNK),
-            $ht,
+            self::argToHashtable($context, $array),
             $size,
             $flag
         );
+    }
+
+    private static function argToHashtable(Context $context, JITVariable $arg): Value
+    {
+        if (ArrayBuiltinHelper::isNativeArray($arg->type)) {
+            return ArrayBuiltinHelper::nativeListToHashTable($context, $arg);
+        }
+
+        return ArrayBuiltinHelper::loadHashTable($context, $arg);
     }
 
     public static function ensureLinked(Context $context): void

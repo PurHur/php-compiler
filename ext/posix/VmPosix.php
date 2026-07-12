@@ -398,6 +398,27 @@ final class VmPosix
         return $ok;
     }
 
+    public static function kill(int $pid, int $sig): bool
+    {
+        self::$lastError = 0;
+        if ($pid === self::getpid() && \PHPCompiler\ext\pcntl\VmPcntl::hasHandler($sig)) {
+            \PHPCompiler\ext\pcntl\VmPcntl::markPending($sig);
+
+            return true;
+        }
+        if (!PosixLibcThinAbi::available()) {
+            self::$lastError = 38;
+
+            return false;
+        }
+        $rc = PosixLibcThinAbi::kill($pid, $sig);
+        if (0 !== $rc) {
+            self::$lastError = PosixLibcThinAbi::readErrno();
+        }
+
+        return 0 === $rc;
+    }
+
     private static function setId(string $fn, int $id): bool
     {
         self::$lastError = 0;

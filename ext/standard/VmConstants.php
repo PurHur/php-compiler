@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
-use PHPCompiler\ext\filter\FilterConstants;
 use PHPCompiler\ClassConstVisibility;
 use PHPCfg\Func as CfgFunc;
 use PHPCompiler\VM\Context;
@@ -271,22 +270,27 @@ final class VmConstants
     {
         $result = new HashTable();
         $core = new HashTable();
-        foreach (self::coreConstantEntries($ctx, true) as $name => $value) {
+        foreach (self::categorizedCoreConstantEntries($ctx) as $name => $value) {
             $copy = new Variable();
             $copy->copyFrom($value);
             $core->add($name, $copy);
         }
         $result->add('Core', self::wrapArray($core));
 
-        $filter = self::extensionConstantBucket(FilterConstants::REGISTERED, $ctx);
-        if ($filter->getNumElements() > 0) {
-            $result->add('filter', self::wrapArray($filter));
+        foreach (ExtensionConstantGroups::groups() as $extension => $registered) {
+            if (!ExtensionConstantGroups::shouldMaterializeExtensionBucket($extension)) {
+                continue;
+            }
+            $bucket = self::extensionConstantBucket($registered, $ctx);
+            if ($bucket->getNumElements() > 0) {
+                $result->add($extension, self::wrapArray($bucket));
+            }
         }
 
         if ([] !== $ctx->constants) {
             $user = new HashTable();
             foreach ($ctx->constants as $name => $value) {
-                if (FilterConstants::isRegisteredName($name)) {
+                if (ExtensionConstantGroups::isExtensionConstantName($name)) {
                     continue;
                 }
                 $copy = new Variable();
@@ -302,17 +306,70 @@ final class VmConstants
     }
 
     /**
+     * @return array<string, Variable>
+     */
+    private static function categorizedCoreConstantEntries(Context $ctx): array
+    {
+        $entries = VmPhpCoreConstants::categorizedCoreEntries();
+        foreach (['true', 'false', 'null'] as $fetchName) {
+            $value = $ctx->constantFetch($fetchName);
+            if (null === $value) {
+                continue;
+            }
+            $outName = match ($fetchName) {
+                'true' => 'TRUE',
+                'false' => 'FALSE',
+                'null' => 'NULL',
+                default => strtoupper($fetchName),
+            };
+            $entries[$outName] = $value;
+        }
+        foreach (Context::errorReportingConstantFetchNames() as $fetchName) {
+            $value = $ctx->constantFetch($fetchName);
+            if (null === $value) {
+                continue;
+            }
+            $entries[strtoupper($fetchName)] = $value;
+        }
+        foreach (ExtensionConstantGroups::coreBucketNames() as $name) {
+            if (!isset($ctx->constants[$name])) {
+                continue;
+            }
+            $entries[$name] = $ctx->constants[$name];
+        }
+        foreach (['STDIN', 'STDOUT', 'STDERR'] as $name) {
+            if (!isset($ctx->constants[$name])) {
+                continue;
+            }
+            $entries[$name] = $ctx->constants[$name];
+        }
+
+        return $entries;
+    }
+
+    /**
      * @param array<string, int> $registered
      */
     private static function extensionConstantBucket(array $registered, Context $ctx): HashTable
     {
         $bucket = new HashTable();
         foreach ($registered as $name => $fallback) {
-            $value = $ctx->constants[$name] ?? FilterConstants::variableForName($name);
-            if (null === $value) {
+            $value = $ctx->constants[$name] ?? null;
+            if (null === $value && \is_int($fallback)) {
                 $var = new Variable(Variable::TYPE_INTEGER);
                 $var->int($fallback);
                 $value = $var;
+            } elseif (null === $value && \is_float($fallback)) {
+                $var = new Variable(Variable::TYPE_FLOAT);
+                $var->float($fallback);
+                $value = $var;
+            } elseif (null === $value && \is_string($fallback)) {
+                $var = new Variable(Variable::TYPE_STRING);
+                $var->string($fallback);
+                $value = $var;
+            }
+            if (null === $value) {
+                continue;
             }
             $copy = new Variable();
             $copy->copyFrom($value);

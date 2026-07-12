@@ -199,7 +199,9 @@ final class VmArrayUserSetOps
                 $argc
             );
         }
-        $dataCompare = self::resolveCompareCallback($frame, $frame->calledArgs[$argc - 1], 'array_diff_uassoc', $argc);
+        // php-src: array_diff_uassoc — user key compare + internal data compare (ext/standard/array.c).
+        $keyCompare = self::resolveCompareCallback($frame, $frame->calledArgs[$argc - 1], 'array_diff_uassoc', $argc);
+        $dataCompare = self::internalDataCompareCallable();
         $first = VmArray::requireArrayParam($frame->calledArgs[0], 'array_diff_uassoc', 1, 'array');
         $others = self::collectOtherArrays($frame, 'array_diff_uassoc', 1, $argc - 1);
         if (null === $frame->returnVar) {
@@ -207,7 +209,7 @@ final class VmArrayUserSetOps
         }
         $out = new HashTable();
         foreach ($first->iterateKeyed(true) as [$key, $value]) {
-            if (self::exactPairInAnyOther($key, $value, $others, $dataCompare)) {
+            if (self::pairInAnyOther($key, $value, $others, $keyCompare, $dataCompare)) {
                 continue;
             }
             self::appendToOutput($out, $key, $value);
@@ -230,12 +232,14 @@ final class VmArrayUserSetOps
                 $argc
             );
         }
-        $dataCompare = self::resolveCompareCallback(
+        // php-src: array_intersect_uassoc — user key compare + internal data compare (ext/standard/array.c).
+        $keyCompare = self::resolveCompareCallback(
             $frame,
             $frame->calledArgs[$argc - 1],
             'array_intersect_uassoc',
             $argc
         );
+        $dataCompare = self::internalDataCompareCallable();
         $first = VmArray::requireArrayParam($frame->calledArgs[0], 'array_intersect_uassoc', 1, 'array');
         $others = self::collectOtherArrays($frame, 'array_intersect_uassoc', 1, $argc - 1);
         if (null === $frame->returnVar) {
@@ -243,7 +247,7 @@ final class VmArrayUserSetOps
         }
         $out = new HashTable();
         foreach ($first->iterateKeyed(true) as [$key, $value]) {
-            if (!self::exactPairInAllOthers($key, $value, $others, $dataCompare)) {
+            if (!self::pairInAllOthers($key, $value, $others, $keyCompare, $dataCompare)) {
                 continue;
             }
             self::appendToOutput($out, $key, $value);
@@ -540,6 +544,18 @@ final class VmArrayUserSetOps
         } else {
             $out->add($key->toString(), $stored);
         }
+    }
+
+    /**
+     * php-src php_array_data_compare_string_unstable / zval_compare for uassoc value legs.
+     *
+     * @return callable(Variable, Variable): int
+     */
+    private static function internalDataCompareCallable(): callable
+    {
+        return static function (Variable $left, Variable $right): int {
+            return $left->resolveIndirect()->equals($right->resolveIndirect()) ? 0 : 1;
+        };
     }
 
     /**

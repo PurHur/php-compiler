@@ -1,5 +1,14 @@
 --TEST--
 Language: untyped instance property `new` default compile-rejects (#10693, Zend/zend_compile.c)
+--SKIPIF--
+<?php
+if (!class_exists('PHPCompiler\\CompilerVersion')) {
+    require __DIR__ . '/../../../../vendor/autoload.php';
+}
+if (PHPCompiler\CompilerVersion::supportsPropertyDefaultObjectExpressions()) {
+    die('skip property default new enabled on PHP 8.4 forward profile');
+}
+?>
 --FILE--
 <?php
 class Box {

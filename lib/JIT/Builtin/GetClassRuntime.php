@@ -20,34 +20,54 @@ final class GetClassRuntime
 {
     private const CLASS_NAME_HELPER = 'PHPCompiler\\ext\\standard\\GetClassJitHelper::classNameFromClassId';
 
+    private const DEBUG_TYPE_CLASS_NAME_HELPER = 'PHPCompiler\\ext\\standard\\GetClassJitHelper::debugTypeClassNameFromClassId';
+
     private const ABI_NAME = '__phpc_class_name_from_id';
+
+    private const DEBUG_TYPE_ABI_NAME = '__phpc_debug_type_class_name_from_id';
 
     public static function ensureLinked(Context $context): void
     {
         self::implement($context);
     }
 
+    public static function ensureDebugTypeLinked(Context $context): void
+    {
+        self::implement($context);
+    }
+
     public static function implement(Context $context): void
     {
-        if (null !== self::probeLinked($context)) {
-            return;
-        }
-
         self::ensureJitHelperCompiled($context);
 
         $i64 = $context->getTypeFromString('int64');
         $strPtr = $context->getTypeFromString('__string__*');
-        JitVmHelperLink::ensureBridge(
-            $context,
-            self::ABI_NAME,
-            'get_class_name_bridge_entry',
-            [$i64],
-            $strPtr,
-            self::CLASS_NAME_HELPER,
-            self::helperRelativePath(),
-            [self::CLASS_NAME_HELPER],
-            '#10222'
-        );
+        if (null === self::probeLinked($context, self::ABI_NAME)) {
+            JitVmHelperLink::ensureBridge(
+                $context,
+                self::ABI_NAME,
+                'get_class_name_bridge_entry',
+                [$i64],
+                $strPtr,
+                self::CLASS_NAME_HELPER,
+                self::helperRelativePath(),
+                [self::CLASS_NAME_HELPER],
+                '#10222'
+            );
+        }
+        if (null === self::probeLinked($context, self::DEBUG_TYPE_ABI_NAME)) {
+            JitVmHelperLink::ensureBridge(
+                $context,
+                self::DEBUG_TYPE_ABI_NAME,
+                'get_debug_type_class_name_bridge_entry',
+                [$i64],
+                $strPtr,
+                self::DEBUG_TYPE_CLASS_NAME_HELPER,
+                self::helperRelativePath(),
+                [self::DEBUG_TYPE_CLASS_NAME_HELPER, self::CLASS_NAME_HELPER],
+                '#17443'
+            );
+        }
         $context->builder->clearInsertionPosition();
     }
 
@@ -71,6 +91,16 @@ final class GetClassJitHelper
     public static function classNameFromClassId(int \$classId): string
     {
         return self::\$namesById[\$classId] ?? '';
+    }
+
+    public static function debugTypeClassNameFromClassId(int \$classId): string
+    {
+        \$name = self::classNameFromClassId(\$classId);
+        if (str_contains(\$name, '@anonymous')) {
+            return 'class@anonymous';
+        }
+
+        return \$name;
     }
 }
 
@@ -105,11 +135,11 @@ PHP;
         }
     }
 
-    private static function probeLinked(Context $context): ?LlvmFunction
+    private static function probeLinked(Context $context, string $abiName): ?LlvmFunction
     {
-        $probe = $context->module->getNamedFunction(self::ABI_NAME);
+        $probe = $context->module->getNamedFunction($abiName);
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            $context->registerFunction(self::ABI_NAME, $probe);
+            $context->registerFunction($abiName, $probe);
 
             return $probe;
         }

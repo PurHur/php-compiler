@@ -25,6 +25,9 @@ final class ProcGetStatusKeyOrderTest extends TestCase
         );
 
         $expected = ['command', 'pid', 'running', 'signaled', 'stopped', 'exitcode', 'termsig', 'stopsig'];
+        if (CompilerVersion::supportsProcGetStatusCached()) {
+            $expected[] = 'cached';
+        }
         if (CompilerVersion::supportsProcGetStatusPendingSignals()) {
             $expected[] = 'pending_signals';
         }
@@ -35,7 +38,7 @@ final class ProcGetStatusKeyOrderTest extends TestCase
     public function testBuildProcStatusArrayPendingSignalsOnForwardProfile(): void
     {
         if (!CompilerVersion::supportsProcGetStatusPendingSignals()) {
-            $this->markTestSkipped('requires PHP_COMPILER_PROFILE=8.4');
+            $this->markTestSkipped('requires PHP_COMPILER_PROFILE>=8.3');
         }
 
         $status = VmProcessProcOpenNative::buildProcStatusArray(
@@ -52,5 +55,41 @@ final class ProcGetStatusKeyOrderTest extends TestCase
 
         $this->assertArrayHasKey('pending_signals', $status);
         $this->assertSame([], $status['pending_signals']);
+    }
+
+    public function testBuildProcStatusArrayCachedOnForwardProfile(): void
+    {
+        if (!CompilerVersion::supportsProcGetStatusCached()) {
+            $this->markTestSkipped('requires PHP_COMPILER_PROFILE>=8.3');
+        }
+
+        $running = VmProcessProcOpenNative::buildProcStatusArray(
+            'echo ok',
+            42,
+            true,
+            false,
+            false,
+            -1,
+            0,
+            0,
+            [],
+            false,
+        );
+        $this->assertArrayHasKey('cached', $running);
+        $this->assertFalse($running['cached']);
+
+        $exited = VmProcessProcOpenNative::buildProcStatusArray(
+            'echo ok',
+            42,
+            false,
+            false,
+            false,
+            0,
+            0,
+            0,
+            [],
+            true,
+        );
+        $this->assertTrue($exited['cached']);
     }
 }

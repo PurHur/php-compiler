@@ -19,7 +19,7 @@ final class OpensslModuleTest extends TestCase
         $runtime = new Runtime();
         $ctx = $runtime->vmContext;
 
-        foreach (['openssl_encrypt', 'openssl_decrypt', 'openssl_sign', 'openssl_verify', 'openssl_get_cipher_methods', 'openssl_get_md_methods', 'openssl_pkey_new', 'openssl_pkey_derive', 'openssl_cipher_iv_length', 'openssl_cipher_key_length', 'openssl_digest'] as $fn) {
+        foreach (['openssl_encrypt', 'openssl_decrypt', 'openssl_sign', 'openssl_verify', 'openssl_get_cipher_methods', 'openssl_get_md_methods', 'openssl_pkey_new', 'openssl_pkey_derive', 'openssl_cipher_iv_length', 'openssl_cipher_key_length', 'openssl_digest', 'openssl_pbkdf2'] as $fn) {
             self::assertTrue(VmReflection::functionExists($ctx, $fn), $fn);
         }
 
@@ -36,6 +36,7 @@ echo (int) function_exists('openssl_pkey_derive');
 echo (int) function_exists('openssl_cipher_iv_length');
 echo (int) function_exists('openssl_cipher_key_length');
 echo (int) function_exists('openssl_digest');
+echo (int) function_exists('openssl_pbkdf2');
 echo (int) defined('OPENSSL_RAW_DATA');
 echo OPENSSL_RAW_DATA;
 echo (int) defined('OPENSSL_ZERO_PADDING');
@@ -48,7 +49,7 @@ PHP;
         $block = $runtime->parseAndCompile($code, 'openssl_module.php');
         ob_start();
         $runtime->run($block);
-        self::assertSame('1111111111111121711', ob_get_clean());
+        self::assertSame('11111111111111121711', ob_get_clean());
     }
 
     public function test_openssl_cipher_key_length_aes_256_cbc(): void

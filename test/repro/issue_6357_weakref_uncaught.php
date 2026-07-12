@@ -1,3 +1,3 @@
 <?php
 // Issue #6357 — uncaught error must not secondary-fatal in ExceptionSupport
-$w = WeakReference::create(new stdClass);
+stdClass::undefined();

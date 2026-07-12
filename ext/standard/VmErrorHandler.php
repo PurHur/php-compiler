@@ -51,6 +51,11 @@ final class VmErrorHandler
         return $context->errors->popHandler();
     }
 
+    public static function get(Context $context): Variable
+    {
+        return self::handlerReturnValue($context->errors->getActiveHandler());
+    }
+
     private static function parseMask(?Variable $maskVar): int
     {
         if (null === $maskVar) {

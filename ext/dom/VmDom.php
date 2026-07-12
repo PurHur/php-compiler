@@ -44,6 +44,8 @@ final class VmDom
 
     public const CLASS_TEXT = 'domtext';
 
+    public const CLASS_CDATA = 'domcdatasection';
+
     public const CLASS_CHARACTER_DATA = 'domcharacterdata';
 
     public const CLASS_COMMENT = 'domcomment';
@@ -51,6 +53,10 @@ final class VmDom
     public const CLASS_ATTR = 'domattr';
 
     public const CLASS_ENTITY_REFERENCE = 'domentityreference';
+
+    public const CLASS_ENTITY = 'domentity';
+
+    public const CLASS_NOTATION = 'domnotation';
 
     public const CLASS_DOCUMENT_FRAGMENT = 'domdocumentfragment';
 
@@ -61,6 +67,8 @@ final class VmDom
     public const CLASS_NAMED_NODE_MAP = 'domnamednodemap';
 
     public const CLASS_TOKEN_LIST = 'domtokenlist';
+
+    public const CLASS_XPATH = 'domxpath';
 
     public const PROP_FORMAT_OUTPUT = 'formatOutput';
 
@@ -136,13 +144,27 @@ final class VmDom
 
     public const PROP_DATA = 'data';
 
+    public const PROP_WHOLE_TEXT = 'wholeText';
+
     public const PROP_OWNER_ELEMENT = 'ownerElement';
 
     public const PROP_PUBLIC_ID = 'publicId';
 
     public const PROP_SYSTEM_ID = 'systemId';
 
+    public const PROP_ENTITIES = 'entities';
+
+    public const PROP_NOTATIONS = 'notations';
+
+    public const PROP_NOTATION_NAME = 'notationName';
+
     public const PROP_TARGET = 'target';
+
+    /** JIT/AOT: string id → DOMElement map mirrored from DomRegistry::elementIds (#17954). */
+    public const PROP_ELEMENT_ID_MAP = '__phpcDomElementIdMap';
+
+    /** JIT/AOT: DomRegistry object id for scalar helper bridges (#17954, #16075). */
+    public const PROP_REGISTRY_ID = '__phpcDomRegistryId';
 
     public static function registerClasses(Context $ctx): void
     {
@@ -155,6 +177,7 @@ final class VmDom
         $nullProto = new Variable(Variable::TYPE_NULL);
         $objProto = new Variable(Variable::TYPE_OBJECT);
         $intProto = new Variable(Variable::TYPE_INTEGER);
+        $arrayProto = new Variable(Variable::TYPE_ARRAY);
         $pub = CfgFunc::FLAG_PUBLIC;
 
         $node = new ClassEntry('DOMNode');
@@ -253,12 +276,41 @@ final class VmDom
         $text->isInternal = true;
         $text->parentLc = self::CLASS_CHARACTER_DATA;
         $text->properties[] = new ClassProperty(self::PROP_NODE_NAME, null, $strProto);
+        $text->properties[] = new ClassProperty(self::PROP_WHOLE_TEXT, null, $strProto);
+        $text->methods['splittext'] = new TextSplitText();
+        $text->methodVisibility['splittext'] = $pub;
+        $text->methodNames['splittext'] = 'splitText';
+        $text->methods['iswhitespaceinelementcontent'] = new TextIsWhitespaceInElementContent();
+        $text->methodVisibility['iswhitespaceinelementcontent'] = $pub;
+        $text->methodNames['iswhitespaceinelementcontent'] = 'isWhitespaceInElementContent';
+        $text->methods['iselementcontentwhitespace'] = new TextIsElementContentWhitespace();
+        $text->methodVisibility['iselementcontentwhitespace'] = $pub;
+        $text->methodNames['iselementcontentwhitespace'] = 'isElementContentWhitespace';
         $ctx->classes[self::CLASS_TEXT] = $text;
+
+        $cdata = new ClassEntry('DOMCdataSection');
+        $cdata->isInternal = true;
+        $cdata->parentLc = self::CLASS_TEXT;
+        $cdata->properties[] = new ClassProperty(self::PROP_NODE_NAME, null, $strProto);
+        $ctx->classes[self::CLASS_CDATA] = $cdata;
 
         $characterData = new ClassEntry('DOMCharacterData');
         $characterData->isInternal = true;
         $characterData->parentLc = self::CLASS_NODE;
         $characterData->properties[] = new ClassProperty(self::PROP_DATA, null, $strProto);
+        $characterData->properties[] = new ClassProperty(self::PROP_LENGTH, null, $intProto);
+        $characterData->methods['appenddata'] = new CharacterDataAppendData();
+        $characterData->methodVisibility['appenddata'] = $pub;
+        $characterData->methodNames['appenddata'] = 'appendData';
+        $characterData->methods['deletedata'] = new CharacterDataDeleteData();
+        $characterData->methodVisibility['deletedata'] = $pub;
+        $characterData->methodNames['deletedata'] = 'deleteData';
+        $characterData->methods['insertdata'] = new CharacterDataInsertData();
+        $characterData->methodVisibility['insertdata'] = $pub;
+        $characterData->methodNames['insertdata'] = 'insertData';
+        $characterData->methods['replacedata'] = new CharacterDataReplaceData();
+        $characterData->methodVisibility['replacedata'] = $pub;
+        $characterData->methodNames['replacedata'] = 'replaceData';
         $characterData->methods['substringdata'] = new CharacterDataSubstringData();
         $characterData->methodVisibility['substringdata'] = $pub;
         $characterData->methodNames['substringdata'] = 'substringData';
@@ -275,6 +327,23 @@ final class VmDom
         $entityRef->parentLc = self::CLASS_NODE;
         $entityRef->properties[] = new ClassProperty(self::PROP_NODE_NAME, null, $strProto);
         $ctx->classes[self::CLASS_ENTITY_REFERENCE] = $entityRef;
+
+        $entity = new ClassEntry('DOMEntity');
+        $entity->isInternal = true;
+        $entity->parentLc = self::CLASS_NODE;
+        $entity->properties[] = new ClassProperty(self::PROP_NODE_NAME, null, $strProto);
+        $entity->properties[] = new ClassProperty(self::PROP_PUBLIC_ID, $nullProto, $strProto);
+        $entity->properties[] = new ClassProperty(self::PROP_SYSTEM_ID, $nullProto, $strProto);
+        $entity->properties[] = new ClassProperty(self::PROP_NOTATION_NAME, $nullProto, $strProto);
+        $ctx->classes[self::CLASS_ENTITY] = $entity;
+
+        $notation = new ClassEntry('DOMNotation');
+        $notation->isInternal = true;
+        $notation->parentLc = self::CLASS_NODE;
+        $notation->properties[] = new ClassProperty(self::PROP_NODE_NAME, null, $strProto);
+        $notation->properties[] = new ClassProperty(self::PROP_PUBLIC_ID, $nullProto, $strProto);
+        $notation->properties[] = new ClassProperty(self::PROP_SYSTEM_ID, $nullProto, $strProto);
+        $ctx->classes[self::CLASS_NOTATION] = $notation;
 
         $attr = new ClassEntry('DOMAttr');
         $attr->isInternal = true;
@@ -326,6 +395,9 @@ final class VmDom
         $namedNodeMap->methods['getnameditem'] = new NamedNodeMapGetNamedItem();
         $namedNodeMap->methodVisibility['getnameditem'] = $pub;
         $namedNodeMap->methodNames['getnameditem'] = 'getNamedItem';
+        $namedNodeMap->methods['getnameditemns'] = new NamedNodeMapGetNamedItemNS();
+        $namedNodeMap->methodVisibility['getnameditemns'] = $pub;
+        $namedNodeMap->methodNames['getnameditemns'] = 'getNamedItemNS';
         $namedNodeMap->methods['count'] = new NamedNodeMapCount();
         $namedNodeMap->methodVisibility['count'] = $pub;
         $namedNodeMap->methods['rewind'] = new NamedNodeMapRewind();
@@ -365,6 +437,21 @@ final class VmDom
             $ctx->classes[self::CLASS_TOKEN_LIST] = $tokenList;
         }
 
+        $xpath = new ClassEntry('DOMXPath');
+        $xpath->isInternal = true;
+        $xpathConstruct = new XPathConstruct();
+        $xpath->constructor = $xpathConstruct;
+        $xpath->methods['__construct'] = $xpathConstruct;
+        $xpath->methodVisibility['__construct'] = $pub;
+        $xpath->methods['query'] = new XPathQuery();
+        $xpath->methodVisibility['query'] = $pub;
+        $xpath->methods['evaluate'] = new XPathEvaluate();
+        $xpath->methodVisibility['evaluate'] = $pub;
+        $xpath->methods['registernamespace'] = new XPathRegisterNamespace();
+        $xpath->methodVisibility['registernamespace'] = $pub;
+        $xpath->methodNames['registernamespace'] = 'registerNamespace';
+        $ctx->classes[self::CLASS_XPATH] = $xpath;
+
         $impl = new ClassEntry('DOMImplementation');
         $impl->isInternal = true;
         $impl->methods['createdocument'] = new ImplementationCreateDocument();
@@ -385,6 +472,8 @@ final class VmDom
         $doctype->properties[] = new ClassProperty(self::PROP_NAME, null, $strProto);
         $doctype->properties[] = new ClassProperty(self::PROP_PUBLIC_ID, null, $strProto);
         $doctype->properties[] = new ClassProperty(self::PROP_SYSTEM_ID, null, $strProto);
+        $doctype->properties[] = new ClassProperty(self::PROP_ENTITIES, $nullProto, $objProto);
+        $doctype->properties[] = new ClassProperty(self::PROP_NOTATIONS, $nullProto, $objProto);
         $ctx->classes[self::CLASS_DOCUMENT_TYPE] = $doctype;
 
         $processingInstruction = new ClassEntry('DOMProcessingInstruction');
@@ -414,6 +503,8 @@ final class VmDom
         $document->properties[] = new ClassProperty(self::PROP_XML_VERSION, null, $strProto);
         $document->properties[] = new ClassProperty(self::PROP_XML_STANDALONE, null, $boolProto);
         $document->properties[] = new ClassProperty(self::PROP_DOCUMENT_ELEMENT, $nullProto, $objProto);
+        $document->properties[] = new ClassProperty(self::PROP_ELEMENT_ID_MAP, $nullProto, $arrayProto);
+        $document->properties[] = new ClassProperty(self::PROP_REGISTRY_ID, null, $intProto);
         $document->methods['loadxml'] = new DocumentLoadXML();
         $document->methodVisibility['loadxml'] = $pub;
         $document->methods['load'] = new DocumentLoad();
@@ -440,6 +531,12 @@ final class VmDom
         $document->methods['createcomment'] = new DocumentCreateComment();
         $document->methodVisibility['createcomment'] = $pub;
         $document->methodNames['createcomment'] = 'createComment';
+        $document->methods['createcdatasection'] = new DocumentCreateCDATASection();
+        $document->methodVisibility['createcdatasection'] = $pub;
+        $document->methodNames['createcdatasection'] = 'createCDATASection';
+        $document->methods['createprocessinginstruction'] = new DocumentCreateProcessingInstruction();
+        $document->methodVisibility['createprocessinginstruction'] = $pub;
+        $document->methodNames['createprocessinginstruction'] = 'createProcessingInstruction';
         $document->methods['appendchild'] = new DocumentAppendChild();
         $document->methodVisibility['appendchild'] = $pub;
         $document->methods['savexml'] = new DocumentSaveXML();
@@ -459,6 +556,9 @@ final class VmDom
         $document->methodVisibility['getelementbyid'] = $pub;
         $document->methods['importnode'] = new DocumentImportNode();
         $document->methodVisibility['importnode'] = $pub;
+        $document->methods['adoptnode'] = new DocumentAdoptNode();
+        $document->methodVisibility['adoptnode'] = $pub;
+        $document->methodNames['adoptnode'] = 'adoptNode';
         $document->methods['registernodeclass'] = new DocumentRegisterNodeClass();
         $document->methodVisibility['registernodeclass'] = $pub;
         $document->methodNames['registernodeclass'] = 'registerNodeClass';
@@ -479,6 +579,7 @@ final class VmDom
         $element->isInternal = true;
         $element->parentLc = self::CLASS_NODE;
         $element->properties[] = new ClassProperty(self::PROP_NODE_NAME, null, $strProto);
+        $element->properties[] = new ClassProperty(self::PROP_TAG_NAME, null, $strProto);
         $element->properties[] = new ClassProperty(self::PROP_ATTRIBUTES, $nullProto, $objProto);
         $element->methods['appendchild'] = new ElementAppendChild();
         $element->methodVisibility['appendchild'] = $pub;
@@ -556,6 +657,10 @@ final class VmDom
         $fragment = new ClassEntry('DOMDocumentFragment');
         $fragment->isInternal = true;
         $fragment->parentLc = self::CLASS_NODE;
+        $fragmentConstruct = new FragmentConstruct();
+        $fragment->constructor = $fragmentConstruct;
+        $fragment->methods['__construct'] = $fragmentConstruct;
+        $fragment->methodVisibility['__construct'] = $pub;
         $fragment->properties[] = new ClassProperty(self::PROP_NODE_NAME, null, $strProto);
         $fragment->methods['appendchild'] = new FragmentAppendChild();
         $fragment->methodVisibility['appendchild'] = $pub;
@@ -582,6 +687,12 @@ final class VmDom
         $state->systemId = $systemId;
         DomRegistry::attach($entry, $state);
         self::initDocumentTypePropertySlots($entry, $qualifiedName, $publicId, $systemId);
+        $entitiesMap = self::createNamedNodeMap($ctx, []);
+        $notationsMap = self::createNamedNodeMap($ctx, []);
+        $state->entitiesMapId = $entitiesMap->toObject()->id;
+        $state->notationsMapId = $notationsMap->toObject()->id;
+        $entry->getProperty(self::PROP_ENTITIES)->copyFrom($entitiesMap);
+        $entry->getProperty(self::PROP_NOTATIONS)->copyFrom($notationsMap);
 
         $var = new Variable(Variable::TYPE_OBJECT);
         $var->object($entry);
@@ -623,6 +734,7 @@ final class VmDom
             $state->doctypeSystemId = $dt->systemId;
         }
         DomRegistry::attach($entry, $state);
+        self::ensureChildNodesList($ctx, $entry);
 
         if ('' !== $qualifiedName) {
             $rootVar = null !== $namespaceUri && '' !== $namespaceUri
@@ -682,15 +794,17 @@ final class VmDom
         return $defaultNs === $namespaceUri;
     }
 
-    public static function ensureDocument(ObjectEntry $document): DomNodeState
+    public static function ensureDocument(ObjectEntry $document, bool $deferPropertyInit = false): DomNodeState
     {
         if (!DomRegistry::has($document)) {
             $state = new DomNodeState();
             $state->nodeType = DomConstants::XML_DOCUMENT_NODE;
             $state->nodeName = '#document';
             DomRegistry::attach($document, $state);
-            self::initDocumentLibxmlDefaults($document);
-            self::initNodePropertySlots($document);
+            if (!$deferPropertyInit) {
+                self::initDocumentLibxmlDefaults($document);
+                self::initNodePropertySlots($document);
+            }
         }
 
         return DomRegistry::state($document);
@@ -715,6 +829,48 @@ final class VmDom
         if ($document->hasProperty(self::PROP_XML_STANDALONE)) {
             self::setDocumentBoolSlot($document, self::PROP_XML_STANDALONE, false);
         }
+    }
+
+    /** Mirror DomRegistry object id onto the document for LLVM helper bridges (#17954). */
+    public static function initRegistryIdProperty(ObjectEntry $document): void
+    {
+        if (!$document->hasProperty(self::PROP_REGISTRY_ID)) {
+            return;
+        }
+        $idVar = new Variable();
+        $idVar->int($document->id);
+        $document->getProperty(self::PROP_REGISTRY_ID)->copyFrom($idVar);
+    }
+
+    /** Empty id map for fresh documents; loadHTML replaces via {@see syncElementIdMapProperty()}. */
+    public static function initElementIdMapProperty(ObjectEntry $document): void
+    {
+        if (!$document->hasProperty(self::PROP_ELEMENT_ID_MAP)) {
+            return;
+        }
+        $ht = new HashTable();
+        $var = new Variable();
+        $var->array($ht);
+        $document->getProperty(self::PROP_ELEMENT_ID_MAP)->copyFrom($var);
+    }
+
+    /** Mirror DomRegistry elementIds onto the document for LLVM getElementById() (#17954). */
+    public static function syncElementIdMapProperty(ObjectEntry $document): void
+    {
+        if (!$document->hasProperty(self::PROP_ELEMENT_ID_MAP)) {
+            return;
+        }
+        $state = DomRegistry::state($document);
+        $ht = new HashTable();
+        foreach ($state->elementIds as $id => $objectId) {
+            $entry = DomRegistry::entry($objectId);
+            if (null !== $entry) {
+                $ht->add($id, self::elementVariable($entry));
+            }
+        }
+        $var = new Variable();
+        $var->array($ht);
+        $document->getProperty(self::PROP_ELEMENT_ID_MAP)->copyFrom($var);
     }
 
     private static function setDocumentBoolSlot(ObjectEntry $document, string $propName, bool $value): void
@@ -755,7 +911,10 @@ final class VmDom
         $entry = new ObjectEntry($class);
         $entry->constructed = true;
         $entry->getProperty(self::PROP_NODE_NAME)->string($name);
-        self::initNodePropertySlots($entry);
+        if ($entry->hasProperty(self::PROP_TAG_NAME)) {
+            $entry->getProperty(self::PROP_TAG_NAME)->string($name);
+        }
+        self::initElementPropertySlots($entry);
 
         $state = new DomNodeState();
         $state->nodeType = DomConstants::XML_ELEMENT_NODE;
@@ -772,6 +931,8 @@ final class VmDom
         if (CompilerVersion::supportsDomTokenList()) {
             self::syncElementClassList($ctx, $entry);
         }
+        self::ensureChildNodesList($ctx, $entry);
+        self::ensureElementAttributesMap($ctx, $entry);
 
         $var = new Variable(Variable::TYPE_OBJECT);
         $var->object($entry);
@@ -792,7 +953,10 @@ final class VmDom
         $entry = new ObjectEntry($class);
         $entry->constructed = true;
         $entry->getProperty(self::PROP_NODE_NAME)->string($qualifiedName);
-        self::initNodePropertySlots($entry);
+        if ($entry->hasProperty(self::PROP_TAG_NAME)) {
+            $entry->getProperty(self::PROP_TAG_NAME)->string($qualifiedName);
+        }
+        self::initElementPropertySlots($entry);
 
         $state = new DomNodeState();
         $state->nodeType = DomConstants::XML_ELEMENT_NODE;
@@ -810,6 +974,8 @@ final class VmDom
         if (CompilerVersion::supportsDomTokenList()) {
             self::syncElementClassList($ctx, $entry);
         }
+        self::ensureChildNodesList($ctx, $entry);
+        self::ensureElementAttributesMap($ctx, $entry);
 
         $var = new Variable(Variable::TYPE_OBJECT);
         $var->object($entry);
@@ -1665,18 +1831,173 @@ final class VmDom
         return $entry;
     }
 
+    public static function createCdataSection(Context $ctx, string $data, ?ObjectEntry $ownerDocument = null): ObjectEntry
+    {
+        $class = self::resolveNodeClass($ctx, $ownerDocument, self::CLASS_CDATA);
+
+        $entry = new ObjectEntry($class);
+        $entry->constructed = true;
+        $entry->getProperty(self::PROP_NODE_NAME)->string('#cdata-section');
+        self::initNodePropertySlots($entry);
+
+        $state = new DomNodeState();
+        $state->nodeType = DomConstants::XML_CDATA_SECTION_NODE;
+        $state->nodeName = '#cdata-section';
+        $state->textContent = $data;
+        if (null !== $ownerDocument && self::isDocument($ownerDocument)) {
+            $state->documentId = $ownerDocument->id;
+        }
+        DomRegistry::attach($entry, $state);
+
+        return $entry;
+    }
+
+    public static function characterDataReadContent(ObjectEntry $node): string
+    {
+        if (!self::isCharacterData($node)) {
+            throw new \LogicException('characterDataReadContent() called on non-character-data node');
+        }
+
+        return DomRegistry::state($node)->textContent ?? '';
+    }
+
+    public static function writeCharacterDataContent(ObjectEntry $node, string $content): void
+    {
+        if (!self::isCharacterData($node)) {
+            throw new \LogicException('writeCharacterDataContent() called on non-character-data node');
+        }
+        DomRegistry::state($node)->textContent = $content;
+    }
+
+    public static function characterDataAppendData(ObjectEntry $node, string $arg): void
+    {
+        self::writeCharacterDataContent($node, self::characterDataReadContent($node).$arg);
+    }
+
+    public static function characterDataInsertData(ObjectEntry $node, int $offset, string $arg): void
+    {
+        $data = self::characterDataReadContent($node);
+        $len = \strlen($data);
+        if ($offset < 0 || $offset > $len) {
+            throw new \DOMException('Index size error', DomExceptionConstants::INDEX_SIZE_ERR);
+        }
+        self::writeCharacterDataContent($node, substr($data, 0, $offset).$arg.substr($data, $offset));
+    }
+
+    public static function characterDataDeleteData(ObjectEntry $node, int $offset, int $count): void
+    {
+        $data = self::characterDataReadContent($node);
+        $len = \strlen($data);
+        if ($offset < 0 || $offset > $len || $count < 0) {
+            throw new \DOMException('Index size error', DomExceptionConstants::INDEX_SIZE_ERR);
+        }
+        if ($count > $len - $offset) {
+            $count = $len - $offset;
+        }
+        self::writeCharacterDataContent($node, substr($data, 0, $offset).substr($data, $offset + $count));
+    }
+
+    public static function characterDataReplaceData(ObjectEntry $node, int $offset, int $count, string $arg): void
+    {
+        $data = self::characterDataReadContent($node);
+        $len = \strlen($data);
+        if ($offset < 0 || $offset > $len || $count < 0) {
+            throw new \DOMException('Index size error', DomExceptionConstants::INDEX_SIZE_ERR);
+        }
+        if ($count > $len - $offset) {
+            $count = $len - $offset;
+        }
+        self::writeCharacterDataContent(
+            $node,
+            substr($data, 0, $offset).$arg.substr($data, $offset + $count)
+        );
+    }
+
     public static function characterDataSubstringData(ObjectEntry $node, int $offset, int $count): string
     {
         if (!self::isCharacterData($node)) {
             throw new \LogicException('characterDataSubstringData() called on non-character-data node');
         }
-        $data = DomRegistry::state($node)->textContent ?? '';
+        $data = self::characterDataReadContent($node);
         $len = \strlen($data);
         if ($offset < 0 || $count < 0 || $offset > $len) {
             throw new \DOMException('Index size error', DomExceptionConstants::INDEX_SIZE_ERR);
         }
 
         return substr($data, $offset, $count);
+    }
+
+    /** Adjacent text/CDATA merge (php-src ext/dom/text.c dom_text_whole_text_read; #17527). */
+    public static function readWholeText(ObjectEntry $node): string
+    {
+        if (!self::isTextOrCdataNode($node)) {
+            throw new \LogicException('readWholeText() called on non-text node');
+        }
+        $start = $node;
+        while (true) {
+            $prev = self::siblingEntry($start, self::PROP_PREVIOUS_SIBLING);
+            if (null === $prev || !self::isTextOrCdataNode($prev)) {
+                break;
+            }
+            $start = $prev;
+        }
+        $merged = '';
+        $current = $start;
+        while (null !== $current && self::isTextOrCdataNode($current)) {
+            $merged .= self::characterDataReadContent($current);
+            $current = self::siblingEntry($current, self::PROP_NEXT_SIBLING);
+        }
+
+        return $merged;
+    }
+
+    /** Blank text node probe (php-src ext/dom/text.c dom_text_is_whitespace_in_element_content). */
+    public static function textIsWhitespaceInElementContent(ObjectEntry $node): bool
+    {
+        if (!self::isTextOrCdataNode($node)) {
+            throw new \LogicException('textIsWhitespaceInElementContent() called on non-text node');
+        }
+        $data = self::characterDataReadContent($node);
+        if ('' === $data) {
+            return true;
+        }
+        $len = \strlen($data);
+        for ($i = 0; $i < $len; ++$i) {
+            $ch = $data[$i];
+            if (' ' !== $ch && "\t" !== $ch && "\n" !== $ch && "\r" !== $ch) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    public static function textSplitText(Context $ctx, ObjectEntry $node, int $offset): ?ObjectEntry
+    {
+        if (!self::isTextOrCdataNode($node)) {
+            throw new \LogicException('textSplitText() called on non-text node');
+        }
+        if ($offset < 0) {
+            throw new \ValueError('DOMText::splitText(): Argument #1 ($offset) must be greater than or equal to 0');
+        }
+        $data = self::characterDataReadContent($node);
+        $len = \strlen($data);
+        if ($offset > $len) {
+            return null;
+        }
+        $ownerDocument = self::ownerDocumentEntry($node);
+        $tailNode = self::createTextNode($ctx, substr($data, $offset), $ownerDocument);
+        self::writeCharacterDataContent($node, substr($data, 0, $offset));
+        $state = DomRegistry::state($node);
+        if (null !== $state->parentId) {
+            $parent = DomRegistry::entry($state->parentId);
+            if (null !== $parent) {
+                self::insertAfterSibling($ctx, $parent, $tailNode, $node);
+                self::syncSubtree($ctx, $parent);
+            }
+        }
+
+        return $tailNode;
     }
 
     public static function createEntityReference(
@@ -1721,6 +2042,7 @@ final class VmDom
         $state->nodeType = DomConstants::XML_DOCUMENT_FRAG_NODE;
         $state->nodeName = '#document-fragment';
         DomRegistry::attach($entry, $state);
+        self::ensureChildNodesList($ctx, $entry);
 
         $var = new Variable(Variable::TYPE_OBJECT);
         $var->object($entry);
@@ -1758,10 +2080,12 @@ final class VmDom
     public static function loadXML(Context $ctx, ObjectEntry $document, string $xml, ?\PHPCompiler\Frame $frame = null): bool
     {
         self::ensureDocument($document);
+        self::rejectEmptyLoadSource($xml, 'DOMDocument::loadXML()');
 
         $trimmed = trim($xml);
         $decl = self::parseXmlDeclaration($trimmed);
         $idAttrByElement = self::parseDoctypeIdAttributes($trimmed);
+        $generalEntities = self::parseDoctypeGeneralEntities($trimmed);
         [$elementXml, $elementOffset] = self::stripDoctypeWithOffset($trimmed);
         $validationError = VmXml::validationErrorRecord($elementXml);
         if (null !== $validationError) {
@@ -1770,12 +2094,13 @@ final class VmDom
                 $validationError['message'],
                 $validationError['code'],
                 $validationError['column'],
-                $frame
+                $frame,
+                $validationError['level']
             );
 
             return false;
         }
-        $root = self::parseElementTree($ctx, $elementXml, $trimmed, $elementOffset);
+        $root = self::parseElementTree($ctx, $elementXml, $trimmed, $elementOffset, $generalEntities);
         if (null === $root) {
             return false;
         }
@@ -1788,17 +2113,20 @@ final class VmDom
         $childIds = [];
         $doctypeDecl = self::parseDoctypeDeclaration($trimmed);
         if (null !== $doctypeDecl) {
-            $childIds[] = self::attachDoctypeChild(
+            $doctype = self::attachDoctypeChild(
                 $ctx,
                 $document,
                 $doctypeDecl['name'],
                 $doctypeDecl['publicId'],
                 $doctypeDecl['systemId']
-            )->id;
+            );
+            $childIds[] = $doctype->id;
+            self::populateDoctypeInternalSubset($ctx, $doctype, $document, $trimmed);
         }
         $childIds[] = $root->id;
         $state->childIds = $childIds;
         $state->idAttrByElement = $idAttrByElement;
+        $state->generalEntities = $generalEntities;
         $state->elementIds = [];
         $state->xmlVersion = $decl['version'];
         $state->encoding = $decl['encoding'];
@@ -1837,6 +2165,14 @@ final class VmDom
         }
 
         return self::loadXML($ctx, $document, $contents, $frame);
+    }
+
+    /** php-src ext/dom/document.c — empty $source rejected since PHP 8.0 (#17616). */
+    private static function rejectEmptyLoadSource(string $source, string $method): void
+    {
+        if ('' === $source) {
+            throw new \ValueError($method.': Argument #1 ($source) must not be empty');
+        }
     }
 
     /** Zend dom_document_documenturi_read default for in-memory documents (ext/dom/document.c; #14468). */
@@ -2016,10 +2352,11 @@ final class VmDom
         string $message,
         int $code,
         int $column,
-        ?\PHPCompiler\Frame $frame
+        ?\PHPCompiler\Frame $frame,
+        int $level = LibxmlConstants::LIBXML_ERR_ERROR
     ): void {
         VmLibxml::handleError($ctx, [
-            'level' => LibxmlConstants::LIBXML_ERR_ERROR,
+            'level' => $level,
             'code' => $code,
             'column' => $column,
             'message' => $message,
@@ -2157,6 +2494,13 @@ final class VmDom
                 'systemId' => '',
             ];
         }
+        if (preg_match('/^<!DOCTYPE\s+([A-Za-z_][\w:.-]*)\s*\[[^\]]*\]\s*>/is', $trimmed, $match)) {
+            return [
+                'name' => $match[1],
+                'publicId' => '',
+                'systemId' => '',
+            ];
+        }
 
         return null;
     }
@@ -2195,6 +2539,7 @@ final class VmDom
         string $data,
         ObjectEntry $ownerDocument
     ): ObjectEntry {
+        self::assertValidProcessingInstructionTarget($target);
         $class = self::resolveNodeClass($ctx, $ownerDocument, self::CLASS_PROCESSING_INSTRUCTION);
         $entry = new ObjectEntry($class);
         $entry->constructed = true;
@@ -2281,6 +2626,341 @@ final class VmDom
         return $idAttrs;
     }
 
+    /**
+     * @return array<string, string> general entity name => replacement text
+     */
+    private static function parseDoctypeGeneralEntities(string $xml): array
+    {
+        $entities = [];
+        $subset = self::extractDoctypeInternalSubset($xml);
+        if (null === $subset) {
+            return $entities;
+        }
+        if (preg_match_all('/<!ENTITY\s+([A-Za-z_][\w:.-]*)\s+"([^"]*)"\s*>/', $subset, $matches, PREG_SET_ORDER)) {
+            foreach ($matches as $match) {
+                $entities[$match[1]] = $match[2];
+            }
+        }
+
+        return $entities;
+    }
+
+    private static function extractDoctypeInternalSubset(string $xml): ?string
+    {
+        if (!preg_match('/<!DOCTYPE\s+\S+\s*\[(.*)\]\s*>/s', $xml, $match)) {
+            return null;
+        }
+
+        return $match[1];
+    }
+
+    private static function populateDoctypeInternalSubset(
+        Context $ctx,
+        ObjectEntry $doctype,
+        ObjectEntry $document,
+        string $xml
+    ): void {
+        $subset = self::extractDoctypeInternalSubset($xml);
+        if (null === $subset) {
+            return;
+        }
+
+        /** @var list<int> $entityIds */
+        $entityIds = [];
+        if (preg_match_all('/<!ENTITY\s+([A-Za-z_][\w:.-]*)\s+"([^"]*)"\s*>/', $subset, $entityMatches, PREG_SET_ORDER)) {
+            foreach ($entityMatches as $match) {
+                $entity = self::createEntityDeclaration(
+                    $ctx,
+                    $match[1],
+                    $match[2],
+                    null,
+                    null,
+                    null,
+                    $document
+                );
+                $entityIds[] = $entity->id;
+            }
+        }
+
+        /** @var list<int> $notationIds */
+        $notationIds = [];
+        if (preg_match_all(
+            '/<!NOTATION\s+([A-Za-z_][\w:.-]*)\s+PUBLIC\s+"([^"]*)"\s+"([^"]*)"\s*>/',
+            $subset,
+            $notationMatches,
+            PREG_SET_ORDER
+        )) {
+            foreach ($notationMatches as $match) {
+                $notation = self::createNotationDeclaration(
+                    $ctx,
+                    $match[1],
+                    $match[2],
+                    $match[3],
+                    $document
+                );
+                $notationIds[] = $notation->id;
+            }
+        }
+        if (preg_match_all(
+            '/<!NOTATION\s+([A-Za-z_][\w:.-]*)\s+SYSTEM\s+"([^"]*)"\s*>/',
+            $subset,
+            $notationMatches,
+            PREG_SET_ORDER
+        )) {
+            foreach ($notationMatches as $match) {
+                $notation = self::createNotationDeclaration(
+                    $ctx,
+                    $match[1],
+                    '',
+                    $match[2],
+                    $document
+                );
+                $notationIds[] = $notation->id;
+            }
+        }
+
+        $doctypeState = DomRegistry::state($doctype);
+        $entitiesMap = self::createNamedNodeMap($ctx, $entityIds);
+        $doctypeState->entitiesMapId = $entitiesMap->toObject()->id;
+        $doctype->getProperty(self::PROP_ENTITIES)->copyFrom($entitiesMap);
+
+        $notationsMap = self::createNamedNodeMap($ctx, $notationIds);
+        $doctypeState->notationsMapId = $notationsMap->toObject()->id;
+        $doctype->getProperty(self::PROP_NOTATIONS)->copyFrom($notationsMap);
+    }
+
+    public static function createEntityDeclaration(
+        Context $ctx,
+        string $name,
+        ?string $replacementText,
+        ?string $publicId,
+        ?string $systemId,
+        ?string $notationName,
+        ObjectEntry $ownerDocument
+    ): ObjectEntry {
+        $class = self::resolveNodeClass($ctx, $ownerDocument, self::CLASS_ENTITY);
+        $entry = new ObjectEntry($class);
+        $entry->constructed = true;
+        $state = new DomNodeState();
+        $state->nodeType = DomConstants::XML_ENTITY_DECL_NODE;
+        $state->nodeName = $name;
+        $state->entityReplacementText = $replacementText;
+        $state->publicId = $publicId;
+        $state->systemId = $systemId;
+        $state->notationName = $notationName;
+        $state->documentId = $ownerDocument->id;
+        DomRegistry::attach($entry, $state);
+        self::initEntityPropertySlots(
+            $entry,
+            $name,
+            $publicId ?? '',
+            $systemId ?? '',
+            $notationName
+        );
+
+        return $entry;
+    }
+
+    public static function createNotationDeclaration(
+        Context $ctx,
+        string $name,
+        string $publicId,
+        string $systemId,
+        ObjectEntry $ownerDocument
+    ): ObjectEntry {
+        $class = self::resolveNodeClass($ctx, $ownerDocument, self::CLASS_NOTATION);
+        $entry = new ObjectEntry($class);
+        $entry->constructed = true;
+        $state = new DomNodeState();
+        $state->nodeType = DomConstants::XML_NOTATION_NODE;
+        $state->nodeName = $name;
+        $state->publicId = $publicId;
+        $state->systemId = $systemId;
+        $state->documentId = $ownerDocument->id;
+        DomRegistry::attach($entry, $state);
+        self::initNotationPropertySlots($entry, $name, $publicId, $systemId);
+
+        return $entry;
+    }
+
+    private static function initEntityPropertySlots(
+        ObjectEntry $entry,
+        string $name,
+        string $publicId,
+        string $systemId,
+        ?string $notationName
+    ): void {
+        $entry->getProperty(self::PROP_NODE_NAME)->string($name);
+        if ('' === $publicId) {
+            $entry->getProperty(self::PROP_PUBLIC_ID)->null();
+        } else {
+            $entry->getProperty(self::PROP_PUBLIC_ID)->string($publicId);
+        }
+        if ('' === $systemId) {
+            $entry->getProperty(self::PROP_SYSTEM_ID)->null();
+        } else {
+            $entry->getProperty(self::PROP_SYSTEM_ID)->string($systemId);
+        }
+        if (null === $notationName || '' === $notationName) {
+            $entry->getProperty(self::PROP_NOTATION_NAME)->null();
+        } else {
+            $entry->getProperty(self::PROP_NOTATION_NAME)->string($notationName);
+        }
+        self::initNodePropertySlots($entry);
+    }
+
+    private static function initNotationPropertySlots(
+        ObjectEntry $entry,
+        string $name,
+        string $publicId,
+        string $systemId
+    ): void {
+        $entry->getProperty(self::PROP_NODE_NAME)->string($name);
+        if ('' === $publicId) {
+            $entry->getProperty(self::PROP_PUBLIC_ID)->null();
+        } else {
+            $entry->getProperty(self::PROP_PUBLIC_ID)->string($publicId);
+        }
+        if ('' === $systemId) {
+            $entry->getProperty(self::PROP_SYSTEM_ID)->null();
+        } else {
+            $entry->getProperty(self::PROP_SYSTEM_ID)->string($systemId);
+        }
+        self::initNodePropertySlots($entry);
+    }
+
+    /**
+     * @param array<string, string> $generalEntities
+     */
+    private static function appendParsedTextOrEntityRefs(
+        Context $ctx,
+        ObjectEntry $parent,
+        string $text,
+        ?ObjectEntry $ownerDocument,
+        array $generalEntities
+    ): void {
+        if ('' === $text) {
+            return;
+        }
+        $state = DomRegistry::state($parent);
+        $pos = 0;
+        $len = \strlen($text);
+        $buffer = '';
+        while ($pos < $len) {
+            $amp = strpos($text, '&', $pos);
+            if (false === $amp) {
+                $buffer .= substr($text, $pos);
+                break;
+            }
+            if ($amp > $pos) {
+                $buffer .= substr($text, $pos, $amp - $pos);
+            }
+            $semi = strpos($text, ';', $amp + 1);
+            if (false === $semi) {
+                $buffer .= substr($text, $amp);
+                break;
+            }
+            $refName = substr($text, $amp + 1, $semi - $amp - 1);
+            if (isset($generalEntities[$refName])) {
+                if ('' !== $buffer) {
+                    $textNode = self::createTextNode($ctx, self::decodePredefinedXmlEntities($buffer), $ownerDocument);
+                    $state->childIds[] = $textNode->id;
+                    self::linkChildToParent($textNode, $parent);
+                    $buffer = '';
+                }
+                $entityRef = self::createEntityReferenceFromLoad(
+                    $ctx,
+                    $refName,
+                    $generalEntities[$refName],
+                    $ownerDocument
+                );
+                $state->childIds[] = $entityRef->id;
+                self::linkChildToParent($entityRef, $parent);
+            } else {
+                $decoded = self::decodePredefinedXmlEntity($refName);
+                if (null !== $decoded) {
+                    $buffer .= $decoded;
+                } else {
+                    $buffer .= substr($text, $amp, $semi - $amp + 1);
+                }
+            }
+            $pos = $semi + 1;
+        }
+        if ('' !== $buffer) {
+            $textNode = self::createTextNode($ctx, self::decodePredefinedXmlEntities($buffer), $ownerDocument);
+            $state->childIds[] = $textNode->id;
+            self::linkChildToParent($textNode, $parent);
+        }
+    }
+
+    private static function createEntityReferenceFromLoad(
+        Context $ctx,
+        string $name,
+        string $replacementText,
+        ?ObjectEntry $ownerDocument
+    ): ObjectEntry {
+        $class = self::resolveNodeClass($ctx, $ownerDocument, self::CLASS_ENTITY_REFERENCE);
+        $entry = new ObjectEntry($class);
+        $entry->constructed = true;
+        $entry->getProperty(self::PROP_NODE_NAME)->string($name);
+        self::initNodePropertySlots($entry);
+
+        $state = new DomNodeState();
+        $state->nodeType = DomConstants::XML_ENTITY_REF_NODE;
+        $state->nodeName = $name;
+        $state->entityReplacementText = $replacementText;
+        if (null !== $ownerDocument) {
+            $state->documentId = $ownerDocument->id;
+        }
+        DomRegistry::attach($entry, $state);
+
+        return $entry;
+    }
+
+    private static function decodePredefinedXmlEntities(string $text): string
+    {
+        $pos = 0;
+        $len = \strlen($text);
+        $out = '';
+        while ($pos < $len) {
+            $amp = strpos($text, '&', $pos);
+            if (false === $amp) {
+                $out .= substr($text, $pos);
+                break;
+            }
+            if ($amp > $pos) {
+                $out .= substr($text, $pos, $amp - $pos);
+            }
+            $semi = strpos($text, ';', $amp + 1);
+            if (false === $semi) {
+                $out .= substr($text, $amp);
+                break;
+            }
+            $refName = substr($text, $amp + 1, $semi - $amp - 1);
+            $decoded = self::decodePredefinedXmlEntity($refName);
+            if (null !== $decoded) {
+                $out .= $decoded;
+            } else {
+                $out .= substr($text, $amp, $semi - $amp + 1);
+            }
+            $pos = $semi + 1;
+        }
+
+        return $out;
+    }
+
+    private static function decodePredefinedXmlEntity(string $name): ?string
+    {
+        return match ($name) {
+            'amp' => '&',
+            'lt' => '<',
+            'gt' => '>',
+            'quot' => '"',
+            'apos' => "'",
+            default => null,
+        };
+    }
+
     private static function stripDoctype(string $xml): string
     {
         return self::stripDoctypeWithOffset($xml)[0];
@@ -2344,25 +3024,13 @@ final class VmDom
             return self::appendFragmentChildren($ctx, $parent, $child);
         }
 
-        if (!self::isElement($child) && !self::isEntityReference($child) && !self::isTextNode($child)) {
+        if (!self::isTreeMutationChild($child)) {
             throw new \DOMException('Hierarchy request error');
         }
 
         $parentState = DomRegistry::state($parent);
         if (DomConstants::XML_DOCUMENT_NODE === $parentState->nodeType) {
-            $existing = $parent->getProperty(self::PROP_DOCUMENT_ELEMENT)->resolveIndirect();
-            if (Variable::TYPE_NULL !== $existing->type) {
-                $parentState->childIds[] = $child->id;
-                self::linkChildToParent($child, $parent);
-                self::syncSubtree($ctx, $parent);
-
-                return $child;
-            }
-            $parentState->childIds = [$child->id];
-            $parentState->documentElementName = DomRegistry::state($child)->nodeName;
-            $parent->getProperty(self::PROP_DOCUMENT_ELEMENT)->object($child);
-            self::linkChildToParent($child, $parent);
-            self::propagateDocumentId($child, $parent->id);
+            self::appendDocumentChild($ctx, $parent, $child);
             self::syncSubtree($ctx, $parent);
 
             return $child;
@@ -2374,11 +3042,23 @@ final class VmDom
             throw new \DOMException('Hierarchy request error');
         }
 
+        self::assertSameDocument($parent, $child);
+        self::detachNodeIfAttached($ctx, $child);
         $parentState->childIds[] = $child->id;
         self::linkChildToParent($child, $parent);
         self::syncSubtree($ctx, $parent);
 
         return $child;
+    }
+
+    /** JIT/AOT bridge return — mirrors createElement() Variable wrapping (#17130). */
+    public static function appendChildVariable(Context $ctx, ObjectEntry $parent, ObjectEntry $child): Variable
+    {
+        $entry = self::appendChild($ctx, $parent, $child);
+        $var = new Variable(Variable::TYPE_OBJECT);
+        $var->object($entry);
+
+        return $var;
     }
 
     public static function replaceChild(
@@ -2425,7 +3105,7 @@ final class VmDom
         if (self::isDocumentFragment($newChild)) {
             return self::insertFragmentChildrenBefore($ctx, $parent, $newChild, $refChild);
         }
-        if (!self::isElement($newChild)) {
+        if (!self::isTreeMutationChild($newChild)) {
             throw new \DOMException('Hierarchy request error');
         }
         self::assertSameDocument($parent, $newChild);
@@ -2446,7 +3126,7 @@ final class VmDom
         self::linkChildToParent($newChild, $parent);
         if (self::isDocument($parent)) {
             $existing = $parent->getProperty(self::PROP_DOCUMENT_ELEMENT)->resolveIndirect();
-            if (Variable::TYPE_NULL === $existing->type) {
+            if (Variable::TYPE_NULL === $existing->type && self::isElement($newChild)) {
                 $parent->getProperty(self::PROP_DOCUMENT_ELEMENT)->object($newChild);
                 $parentState->documentElementName = DomRegistry::state($newChild)->nodeName;
             }
@@ -2993,7 +3673,7 @@ final class VmDom
 
             return;
         }
-        if (!self::isElement($child) && !self::isTextNode($child) && !self::isEntityReference($child)) {
+        if (!self::isElement($child) && !self::isTextOrCdataNode($child) && !self::isEntityReference($child)) {
             throw new \DOMException('Hierarchy request error');
         }
         self::assertSameDocument($parent, $child);
@@ -3063,7 +3743,7 @@ final class VmDom
         ?ObjectEntry $refChild
     ): void {
         self::assertMutationParent($parent);
-        if (!self::isElement($newChild) && !self::isTextNode($newChild)) {
+        if (!self::isTreeMutationChild($newChild)) {
             throw new \DOMException('Hierarchy request error');
         }
         self::assertSameDocument($parent, $newChild);
@@ -3224,9 +3904,11 @@ final class VmDom
         ObjectEntry $document,
         string $html,
         int $options = 0,
-        ?\PHPCompiler\Frame $frame = null
+        ?\PHPCompiler\Frame $frame = null,
+        bool $deferDocumentSlotSync = false
     ): bool {
-        self::ensureDocument($document);
+        self::ensureDocument($document, $deferDocumentSlotSync);
+        self::rejectEmptyLoadSource($html, 'DOMDocument::loadHTML()');
 
         $trimmed = trim($html);
         $childIds = [];
@@ -3283,11 +3965,18 @@ final class VmDom
         $state->encoding = null;
         $state->xmlStandalone = false;
         $state->documentElementName = DomRegistry::state($root)->nodeName;
-        $document->getProperty(self::PROP_DOCUMENT_ELEMENT)->copyFrom(self::elementVariable($root));
+        if (!$deferDocumentSlotSync) {
+            $document->getProperty(self::PROP_DOCUMENT_ELEMENT)->copyFrom(self::elementVariable($root));
+        }
         self::linkChildToParent($root, $document);
         self::propagateDocumentId($root, $document->id);
-        self::syncSubtree($ctx, $document);
+        if (!$deferDocumentSlotSync) {
+            self::syncSubtree($ctx, $document);
+        }
         self::reindexDocumentIds($document, $root);
+        if (!$deferDocumentSlotSync) {
+            self::syncElementIdMapProperty($document);
+        }
         $state->documentUri = self::defaultDocumentUri();
 
         return true;
@@ -3346,8 +4035,21 @@ final class VmDom
         if (0 !== ($options & \PHPCompiler\ext\libxml\LibxmlConstants::LIBXML_HTML_NOIMPLIED)) {
             return $trimmed;
         }
-        if (preg_match('/^\s*<(?:!DOCTYPE|html\b)/i', $trimmed)) {
-            return preg_replace('/^\s*<!DOCTYPE[^>]*>\s*/i', '', $trimmed) ?? $trimmed;
+        $pos = 0;
+        $len = \strlen($trimmed);
+        while ($pos < $len && ctype_space($trimmed[$pos])) {
+            ++$pos;
+        }
+        if ($pos < $len && '<' === $trimmed[$pos]) {
+            $rest = substr($trimmed, $pos + 1);
+            if (str_starts_with(strtolower($rest), '!doctype') || str_starts_with(strtolower($rest), 'html')) {
+                $close = strpos($trimmed, '>');
+                if (false !== $close && str_starts_with(strtolower(ltrim(substr($trimmed, $pos + 1))), '!doctype')) {
+                    return ltrim(substr($trimmed, $close + 1));
+                }
+
+                return $trimmed;
+            }
         }
 
         return '<html><body>'.$trimmed.'</body></html>';
@@ -3360,14 +4062,46 @@ final class VmDom
         ?\PHPCompiler\Frame $frame = null
     ): ?ObjectEntry {
         $trimmed = trim($html);
-        if (preg_match('/^<([A-Za-z_][\w:.-]*)(\s[^>]*)?\/>$/s', $trimmed, $selfClose)) {
-            return self::createHtmlElementFromTag($ctx, $selfClose[1], $selfClose[2] ?? '', '', $ownerDocument, $frame);
-        }
-        if (!preg_match('/^<([A-Za-z_][\w:.-]*)(\s[^>]*)?>(.*)<\/\1>\s*$/is', $trimmed, $matches)) {
+        if ('' === $trimmed) {
             return null;
         }
+        $open = self::scanHtmlOpenTagAt($trimmed, 0);
+        if (null === $open) {
+            return null;
+        }
+        if ($open['selfClose']) {
+            return self::createHtmlElementFromTag($ctx, $open['tag'], $open['attrs'], '', $ownerDocument, $frame);
+        }
+        // Avoid PCRE backreferences and \G — VmPregPure lacks them (#17954, compiled loadHTML/AOT).
+        $end = self::findHtmlElementEnd($trimmed, 0);
+        if (null === $end) {
+            if (null === $frame) {
+                return null;
+            }
 
-        $entry = self::createHtmlElementFromTag($ctx, $matches[1], $matches[2] ?? '', $matches[3], $ownerDocument, $frame);
+            return self::createHtmlElementFromTag(
+                $ctx,
+                $open['tag'],
+                $open['attrs'],
+                substr($trimmed, $open['end']),
+                $ownerDocument,
+                $frame
+            );
+        }
+        if ($end !== \strlen($trimmed)) {
+            return null;
+        }
+        $closePos = strrpos(substr($trimmed, 0, $end), '</');
+        if (false === $closePos) {
+            return null;
+        }
+        $close = self::scanHtmlCloseTagAt($trimmed, $closePos);
+        if (null === $close || strtolower($close['tag']) !== strtolower($open['tag'])) {
+            return null;
+        }
+        $inner = substr($trimmed, $open['end'], $closePos - $open['end']);
+
+        $entry = self::createHtmlElementFromTag($ctx, $open['tag'], $open['attrs'], $inner, $ownerDocument, $frame);
         self::syncSubtree($ctx, $entry);
 
         return $entry;
@@ -3403,10 +4137,8 @@ final class VmDom
         $pos = 0;
         $len = \strlen($inner);
         while ($pos < $len) {
-            if (preg_match('/\G\s+/s', $inner, $m, 0, $pos)) {
-                $pos += \strlen($m[0]);
-
-                continue;
+            while ($pos < $len && ctype_space($inner[$pos])) {
+                ++$pos;
             }
             if ($pos >= $len) {
                 break;
@@ -3420,6 +4152,15 @@ final class VmDom
                     self::linkChildToParent($textNode, $parent);
                 }
                 $pos = false === $next ? $len : $next;
+
+                continue;
+            }
+            $comment = VmXml::parseCommentAt($inner, $pos);
+            if (null !== $comment) {
+                $commentNode = self::createComment($ctx, $comment['data'], $ownerDocument);
+                $state->childIds[] = $commentNode->id;
+                self::linkChildToParent($commentNode, $parent);
+                $pos = $comment['end'];
 
                 continue;
             }
@@ -3447,43 +4188,45 @@ final class VmDom
     /** @return null|int byte offset after one HTML element starting at $pos */
     private static function findHtmlElementEnd(string $content, int $pos): ?int
     {
-        if (!isset($content[$pos]) || '<' !== $content[$pos]) {
+        $open = self::scanHtmlOpenTagAt($content, $pos);
+        if (null === $open) {
             return null;
         }
-        if (preg_match('/\G<([A-Za-z_][\w:.-]*)(\s[^>]*)?\/>/is', $content, $selfClose, 0, $pos)) {
-            return $pos + \strlen($selfClose[0]);
-        }
-        if (!preg_match('/\G<([A-Za-z_][\w:.-]*)(\s[^>]*)?>/is', $content, $open, 0, $pos)) {
-            return null;
+        if ($open['selfClose']) {
+            return $open['end'];
         }
 
-        $tag = strtolower($open[1]);
+        $tag = strtolower($open['tag']);
         /** @var list<string> $stack */
         $stack = [$tag];
-        $scan = $pos + \strlen($open[0]);
+        $scan = $open['end'];
         $len = \strlen($content);
         while ($scan < $len && [] !== $stack) {
-            if (preg_match('/\G<\/([A-Za-z_][\w:.-]*)>/is', $content, $close, 0, $scan)) {
-                $name = strtolower($close[1]);
+            if ('<' !== $content[$scan]) {
+                ++$scan;
+
+                continue;
+            }
+            $close = self::scanHtmlCloseTagAt($content, $scan);
+            if (null !== $close) {
+                $name = strtolower($close['tag']);
                 if ([] === $stack || end($stack) !== $name) {
                     return null;
                 }
                 array_pop($stack);
-                $scan += \strlen($close[0]);
+                $scan = $close['end'];
                 if ([] === $stack) {
                     return $scan;
                 }
 
                 continue;
             }
-            if (preg_match('/\G<([A-Za-z_][\w:.-]*)(\s[^>]*)?\/>/is', $content, $nestedSelf, 0, $scan)) {
-                $scan += \strlen($nestedSelf[0]);
-
-                continue;
-            }
-            if (preg_match('/\G<([A-Za-z_][\w:.-]*)(\s[^>]*)?>/is', $content, $nestedOpen, 0, $scan)) {
-                $stack[] = strtolower($nestedOpen[1]);
-                $scan += \strlen($nestedOpen[0]);
+            $nested = self::scanHtmlOpenTagAt($content, $scan);
+            if (null !== $nested) {
+                if (!$nested['selfClose']) {
+                    $stack[] = strtolower($nested['tag']);
+                }
+                $scan = $nested['end'];
 
                 continue;
             }
@@ -3491,6 +4234,104 @@ final class VmDom
         }
 
         return null;
+    }
+
+    /**
+     * @return null|array{tag:string, attrs:string, end:int, selfClose:bool}
+     */
+    private static function scanHtmlOpenTagAt(string $content, int $pos): ?array
+    {
+        if (!isset($content[$pos]) || '<' !== $content[$pos]) {
+            return null;
+        }
+        $len = \strlen($content);
+        $i = $pos + 1;
+        if ($i >= $len || !self::isHtmlTagNameStart($content[$i])) {
+            return null;
+        }
+        $nameStart = $i;
+        ++$i;
+        while ($i < $len && self::isHtmlTagNameChar($content[$i])) {
+            ++$i;
+        }
+        $tag = substr($content, $nameStart, $i - $nameStart);
+        $attrStart = $i;
+        $selfClose = false;
+        while ($i < $len) {
+            $ch = $content[$i];
+            if ('"' === $ch || "'" === $ch) {
+                $quote = $ch;
+                ++$i;
+                while ($i < $len && $content[$i] !== $quote) {
+                    ++$i;
+                }
+                if ($i < $len) {
+                    ++$i;
+                }
+
+                continue;
+            }
+            if ('>' === $ch) {
+                return [
+                    'tag' => $tag,
+                    'attrs' => substr($content, $attrStart, $i - $attrStart),
+                    'end' => $i + 1,
+                    'selfClose' => false,
+                ];
+            }
+            if ('/' === $ch && isset($content[$i + 1]) && '>' === $content[$i + 1]) {
+                return [
+                    'tag' => $tag,
+                    'attrs' => substr($content, $attrStart, $i - $attrStart),
+                    'end' => $i + 2,
+                    'selfClose' => true,
+                ];
+            }
+            ++$i;
+        }
+
+        return null;
+    }
+
+    /** @return null|array{tag:string, end:int} */
+    private static function scanHtmlCloseTagAt(string $content, int $pos): ?array
+    {
+        if (!isset($content[$pos]) || '<' !== $content[$pos]) {
+            return null;
+        }
+        $len = \strlen($content);
+        $i = $pos + 1;
+        if ($i >= $len || '/' !== $content[$i]) {
+            return null;
+        }
+        ++$i;
+        if ($i >= $len || !self::isHtmlTagNameStart($content[$i])) {
+            return null;
+        }
+        $nameStart = $i;
+        ++$i;
+        while ($i < $len && self::isHtmlTagNameChar($content[$i])) {
+            ++$i;
+        }
+        $tag = substr($content, $nameStart, $i - $nameStart);
+        while ($i < $len && ctype_space($content[$i])) {
+            ++$i;
+        }
+        if ($i >= $len || '>' !== $content[$i]) {
+            return null;
+        }
+
+        return ['tag' => $tag, 'end' => $i + 1];
+    }
+
+    private static function isHtmlTagNameStart(string $char): bool
+    {
+        return ctype_alpha($char) || '_' === $char;
+    }
+
+    private static function isHtmlTagNameChar(string $char): bool
+    {
+        return ctype_alnum($char) || '_' === $char || ':' === $char || '.' === $char || '-' === $char;
     }
 
     /** Innermost unclosed/malformed tag for loadHTML libxml warnings (#16190). */
@@ -3562,6 +4403,9 @@ final class VmDom
         if (self::isTextNode($entry)) {
             return DomRegistry::state($entry)->textContent ?? '';
         }
+        if (self::isCommentNode($entry)) {
+            return '<!--'.(DomRegistry::state($entry)->textContent ?? '').'-->';
+        }
 
         throw new \DOMException('Cannot serialize node type in this compiler build');
     }
@@ -3602,11 +4446,6 @@ final class VmDom
         $pos = 0;
         $len = \strlen($xml);
         while ($pos < $len) {
-            if (preg_match('/\G\s+/s', $xml, $m, 0, $pos)) {
-                $pos += \strlen($m[0]);
-
-                continue;
-            }
             if ($pos >= $len) {
                 break;
             }
@@ -3618,12 +4457,19 @@ final class VmDom
 
                 continue;
             }
+            $comment = VmXml::parseCommentAt($xml, $pos);
+            if (null !== $comment) {
+                $children[] = self::createComment($ctx, $comment['data'], null);
+                $pos = $comment['end'];
+
+                continue;
+            }
             $end = self::findElementEnd($xml, $pos);
             if (null === $end) {
                 return null;
             }
             $childXml = substr($xml, $pos, $end - $pos);
-            $child = self::parseElementTree($ctx, $childXml, $xml, $pos);
+            $child = self::parseElementTree($ctx, $childXml, $xml, $pos, []);
             if (null === $child) {
                 return null;
             }
@@ -3634,11 +4480,15 @@ final class VmDom
         return $children;
     }
 
+    /**
+     * @param array<string, string> $generalEntities
+     */
     private static function parseElementTree(
         Context $ctx,
         string $elementXml,
         string $sourceXml,
-        int $baseOffset
+        int $baseOffset,
+        array $generalEntities = []
     ): ?ObjectEntry {
         $trimmed = trim($elementXml);
         if (preg_match('/^<([A-Za-z_][\w:.-]*)(\s[^>]*)?\/>$/s', $trimmed, $selfClose)) {
@@ -3667,21 +4517,32 @@ final class VmDom
         $inner = $matches[3];
         $len = \strlen($inner);
         while ($pos < $len) {
-            if (preg_match('/\G\s+/s', $inner, $m, 0, $pos)) {
-                $pos += \strlen($m[0]);
-
-                continue;
-            }
             if ($pos >= $len) {
                 break;
             }
             if ('<' !== $inner[$pos]) {
                 $next = strpos($inner, '<', $pos);
                 $text = false === $next ? substr($inner, $pos) : substr($inner, $pos, $next - $pos);
-                $textNode = self::createTextNode($ctx, $text, null);
-                $state->childIds[] = $textNode->id;
-                self::linkChildToParent($textNode, $entry);
+                self::appendParsedTextOrEntityRefs($ctx, $entry, $text, null, $generalEntities);
                 $pos = false === $next ? $len : $next;
+
+                continue;
+            }
+            $cdata = VmXml::parseCdataSectionAt($inner, $pos);
+            if (null !== $cdata) {
+                $cdataNode = self::createCdataSection($ctx, $cdata['data'], null);
+                $state->childIds[] = $cdataNode->id;
+                self::linkChildToParent($cdataNode, $entry);
+                $pos = $cdata['end'];
+
+                continue;
+            }
+            $comment = VmXml::parseCommentAt($inner, $pos);
+            if (null !== $comment) {
+                $commentNode = self::createComment($ctx, $comment['data'], null);
+                $state->childIds[] = $commentNode->id;
+                self::linkChildToParent($commentNode, $entry);
+                $pos = $comment['end'];
 
                 continue;
             }
@@ -3690,7 +4551,7 @@ final class VmDom
                 return null;
             }
             $childXml = substr($inner, $pos, $end - $pos);
-            $child = self::parseElementTree($ctx, $childXml, $sourceXml, $innerBase + $pos);
+            $child = self::parseElementTree($ctx, $childXml, $sourceXml, $innerBase + $pos, $generalEntities);
             if (null === $child) {
                 return null;
             }
@@ -3754,6 +4615,18 @@ final class VmDom
 
                 continue;
             }
+            $cdata = VmXml::parseCdataSectionAt($content, $scan);
+            if (null !== $cdata) {
+                $scan = $cdata['end'];
+
+                continue;
+            }
+            $comment = VmXml::parseCommentAt($content, $scan);
+            if (null !== $comment) {
+                $scan = $comment['end'];
+
+                continue;
+            }
             ++$scan;
         }
 
@@ -3772,6 +4645,17 @@ final class VmDom
             }
 
             return str_repeat('  ', $depth).$text;
+        }
+        if (self::isCdataNode($entry)) {
+            return '<![CDATA['.(DomRegistry::state($entry)->textContent ?? '').']]>';
+        }
+        if (self::isCommentNode($entry)) {
+            return '<!--'.(DomRegistry::state($entry)->textContent ?? '').'-->';
+        }
+        if (self::isProcessingInstruction($entry)) {
+            $pi = DomRegistry::state($entry);
+
+            return '<?'.$pi->nodeName.' '.($pi->textContent ?? '').'?>';
         }
         if (self::isEntityReference($entry)) {
             return '&'.self::escapeName(DomRegistry::state($entry)->nodeName).';';
@@ -4097,6 +4981,47 @@ final class VmDom
         return null;
     }
 
+    public static function namedNodeMapGetNamedItemNS(
+        ObjectEntry $namedNodeMap,
+        ?string $namespace,
+        string $localName
+    ): ?ObjectEntry {
+        if (!self::isNamedNodeMap($namedNodeMap)) {
+            throw new \LogicException('DOMNamedNodeMap::getNamedItemNS() called on non-namednodemap in this compiler build');
+        }
+        $wantNs = $namespace ?? '';
+        $state = DomRegistry::state($namedNodeMap);
+        foreach ($state->listNodeIds as $nodeId) {
+            $node = DomRegistry::entry($nodeId);
+            if (null === $node || !self::isAttr($node)) {
+                continue;
+            }
+            $attrState = DomRegistry::state($node);
+            $qName = $attrState->nodeName;
+            if (self::isXmlnsAttributeName($qName)) {
+                continue;
+            }
+            $attrLocal = $attrState->localName ?? self::attributeLocalName($qName);
+            if ($attrLocal !== $localName) {
+                continue;
+            }
+            $ownerElementId = $attrState->ownerElementId;
+            if (null === $ownerElementId) {
+                continue;
+            }
+            $ownerElement = DomRegistry::entry($ownerElementId);
+            if (null === $ownerElement || !self::isElement($ownerElement)) {
+                continue;
+            }
+            [$prefix] = self::splitQualifiedName($qName);
+            if (self::resolveAttributeNamespaceUri($ownerElement, $qName, $prefix) === $wantNs) {
+                return $node;
+            }
+        }
+
+        return null;
+    }
+
     public static function namedNodeMapRewind(ObjectEntry $namedNodeMap): void
     {
         if (!self::isNamedNodeMap($namedNodeMap)) {
@@ -4208,6 +5133,13 @@ final class VmDom
         return self::CLASS_TOKEN_LIST === strtolower($entry->class->name)
             && DomRegistry::has($entry)
             && DomConstants::XML_TOKENLIST === DomRegistry::state($entry)->nodeType;
+    }
+
+    public static function isXPath(ObjectEntry $entry): bool
+    {
+        return self::CLASS_XPATH === strtolower($entry->class->name)
+            && DomRegistry::has($entry)
+            && DomConstants::XML_XPATH === DomRegistry::state($entry)->nodeType;
     }
 
     public static function syncElementClassList(Context $ctx, ObjectEntry $element): void
@@ -4328,6 +5260,28 @@ final class VmDom
         return $ids;
     }
 
+    /** Read DOMElement::$attributes without re-entering managed-property dispatch (#17619). */
+    public static function elementAttributesVariable(ObjectEntry $element): Variable
+    {
+        $props = $element->propertiesWithNames();
+        if (!isset($props[self::PROP_ATTRIBUTES])) {
+            throw new \LogicException('DOMElement attributes property slot is missing');
+        }
+        $var = new Variable();
+        $var->copyFrom($props[self::PROP_ATTRIBUTES]);
+
+        return $var;
+    }
+
+    /** Zend dom_element_attributes_read — empty DOMNamedNodeMap before first attribute (ext/dom/attr.c; #17619). */
+    public static function ensureElementAttributesMap(Context $ctx, ObjectEntry $element): void
+    {
+        if (!self::isElement($element) || !DomRegistry::has($element)) {
+            return;
+        }
+        self::syncElementAttributes($ctx, $element);
+    }
+
     private static function syncElementAttributes(Context $ctx, ObjectEntry $element): void
     {
         if (!self::isElement($element)) {
@@ -4337,7 +5291,12 @@ final class VmDom
         $state = DomRegistry::state($element);
         $attrIds = self::collectAttributeNodeIds($ctx, $element);
 
-        $attrsVar = $element->getProperty(self::PROP_ATTRIBUTES);
+        $props = $element->propertiesWithNames();
+        if (!isset($props[self::PROP_ATTRIBUTES])) {
+            $element->allocateProperty(self::PROP_ATTRIBUTES);
+            $props = $element->propertiesWithNames();
+        }
+        $attrsVar = $props[self::PROP_ATTRIBUTES];
         if (null !== $state->attributesListId) {
             $map = DomRegistry::entry($state->attributesListId);
             if (null !== $map) {
@@ -4478,6 +5437,26 @@ final class VmDom
         }
     }
 
+    /** Zend dom_node_child_nodes_read — empty DOMNodeList before first mutation (ext/dom/node.c; #17617). */
+    public static function ensureChildNodesList(Context $ctx, ObjectEntry $node): void
+    {
+        if (!DomRegistry::has($node)) {
+            return;
+        }
+        if (!self::isElement($node)
+            && !self::isDocument($node)
+            && !self::isDocumentFragment($node)
+        ) {
+            return;
+        }
+        self::initNodePropertySlots($node);
+        $childNodesVar = $node->getProperty(self::PROP_CHILD_NODES)->resolveIndirect();
+        if (Variable::TYPE_OBJECT === $childNodesVar->type && self::isNodeList($childNodesVar->toObject())) {
+            return;
+        }
+        self::syncNodeLinks($ctx, $node);
+    }
+
     private static function syncSubtree(Context $ctx, ObjectEntry $node): void
     {
         if (!DomRegistry::has($node)) {
@@ -4553,6 +5532,7 @@ final class VmDom
             if (null !== $list) {
                 self::updateNodeListMembers($list, $state->childIds);
                 $childNodesVar->object($list);
+                self::syncChildSiblingLinks($state->childIds);
                 if (self::isElement($node)) {
                     self::syncElementAttributes($ctx, $node);
                 }
@@ -4566,6 +5546,7 @@ final class VmDom
                 $state->childNodesListId = $existing->id;
                 self::updateNodeListMembers($existing, $state->childIds);
                 $childNodesVar->object($existing);
+                self::syncChildSiblingLinks($state->childIds);
                 if (self::isElement($node)) {
                     self::syncElementAttributes($ctx, $node);
                 }
@@ -4585,7 +5566,30 @@ final class VmDom
         $state->childNodesListId = $list->id;
         $childNodesVar->copyFrom($listVar);
 
-        foreach ($state->childIds as $index => $childId) {
+        self::syncChildSiblingLinks($state->childIds);
+
+        if (self::isElement($node)) {
+            self::syncElementAttributes($ctx, $node);
+        }
+    }
+
+    /** @param list<int> $childIds */
+    private static function siblingEntry(ObjectEntry $node, string $prop): ?ObjectEntry
+    {
+        if (!$node->hasProperty($prop)) {
+            return null;
+        }
+        $resolved = $node->getProperty($prop)->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $resolved->type) {
+            return null;
+        }
+
+        return $resolved->toObject();
+    }
+
+    private static function syncChildSiblingLinks(array $childIds): void
+    {
+        foreach ($childIds as $index => $childId) {
             $child = DomRegistry::entry($childId);
             if (null === $child) {
                 continue;
@@ -4593,7 +5597,7 @@ final class VmDom
             self::initNodePropertySlots($child);
             $siblingVar = $child->getProperty(self::PROP_NEXT_SIBLING);
             $prevVar = $child->getProperty(self::PROP_PREVIOUS_SIBLING);
-            $prevId = $state->childIds[$index - 1] ?? null;
+            $prevId = $childIds[$index - 1] ?? null;
             if (null !== $prevId) {
                 $prev = DomRegistry::entry($prevId);
                 if (null !== $prev) {
@@ -4604,7 +5608,7 @@ final class VmDom
             } else {
                 $prevVar->null();
             }
-            $nextId = $state->childIds[$index + 1] ?? null;
+            $nextId = $childIds[$index + 1] ?? null;
             if (null !== $nextId) {
                 $next = DomRegistry::entry($nextId);
                 if (null !== $next) {
@@ -4615,10 +5619,6 @@ final class VmDom
             } else {
                 $siblingVar->null();
             }
-        }
-
-        if (self::isElement($node)) {
-            self::syncElementAttributes($ctx, $node);
         }
     }
 
@@ -4952,7 +5952,8 @@ final class VmDom
         if (DomConstants::XML_DOCUMENT_NODE === $state->nodeType) {
             return null;
         }
-        if (DomConstants::XML_TEXT_NODE === $state->nodeType) {
+        if (DomConstants::XML_TEXT_NODE === $state->nodeType
+            || DomConstants::XML_CDATA_SECTION_NODE === $state->nodeType) {
             return $state->textContent ?? '';
         }
         if (DomConstants::XML_ATTRIBUTE_NODE === $state->nodeType) {
@@ -5013,8 +6014,12 @@ final class VmDom
             return '';
         }
         $state = DomRegistry::state($node);
-        if (DomConstants::XML_TEXT_NODE === $state->nodeType) {
+        if (DomConstants::XML_TEXT_NODE === $state->nodeType
+            || DomConstants::XML_CDATA_SECTION_NODE === $state->nodeType) {
             return $state->textContent ?? '';
+        }
+        if (self::isEntityReference($node)) {
+            return $state->entityReplacementText ?? '';
         }
         if (DomConstants::XML_ATTRIBUTE_NODE === $state->nodeType) {
             return $state->textContent ?? '';
@@ -5047,6 +6052,17 @@ final class VmDom
             && DomConstants::XML_TEXT_NODE === DomRegistry::state($entry)->nodeType;
     }
 
+    public static function isCdataNode(ObjectEntry $entry): bool
+    {
+        return DomRegistry::has($entry)
+            && DomConstants::XML_CDATA_SECTION_NODE === DomRegistry::state($entry)->nodeType;
+    }
+
+    public static function isTextOrCdataNode(ObjectEntry $entry): bool
+    {
+        return self::isTextNode($entry) || self::isCdataNode($entry);
+    }
+
     public static function isCommentNode(ObjectEntry $entry): bool
     {
         return DomRegistry::has($entry)
@@ -5055,13 +6071,25 @@ final class VmDom
 
     public static function isCharacterData(ObjectEntry $entry): bool
     {
-        return self::isTextNode($entry) || self::isCommentNode($entry);
+        return self::isTextOrCdataNode($entry) || self::isCommentNode($entry);
     }
 
     public static function isEntityReference(ObjectEntry $entry): bool
     {
         return DomRegistry::has($entry)
             && DomConstants::XML_ENTITY_REF_NODE === DomRegistry::state($entry)->nodeType;
+    }
+
+    public static function isEntity(ObjectEntry $entry): bool
+    {
+        return DomRegistry::has($entry)
+            && DomConstants::XML_ENTITY_DECL_NODE === DomRegistry::state($entry)->nodeType;
+    }
+
+    public static function isNotation(ObjectEntry $entry): bool
+    {
+        return DomRegistry::has($entry)
+            && DomConstants::XML_NOTATION_NODE === DomRegistry::state($entry)->nodeType;
     }
 
     public static function isAttr(ObjectEntry $entry): bool
@@ -5084,15 +6112,47 @@ final class VmDom
 
     public static function isAppendableNode(ObjectEntry $entry): bool
     {
-        return self::isElement($entry) || self::isDocumentFragment($entry);
+        return self::isTreeMutationChild($entry) || self::isDocumentFragment($entry);
     }
 
     public static function isAppendChildCandidate(ObjectEntry $entry): bool
     {
+        return self::isTreeMutationChild($entry) || self::isDocumentFragment($entry);
+    }
+
+    private static function isTreeMutationChild(ObjectEntry $entry): bool
+    {
         return self::isElement($entry)
-            || self::isDocumentFragment($entry)
-            || self::isTextNode($entry)
-            || self::isEntityReference($entry);
+            || self::isTextOrCdataNode($entry)
+            || self::isCommentNode($entry)
+            || self::isEntityReference($entry)
+            || self::isProcessingInstruction($entry);
+    }
+
+    private static function appendDocumentChild(Context $ctx, ObjectEntry $document, ObjectEntry $child): void
+    {
+        self::assertSameDocument($document, $child);
+        self::detachNodeIfAttached($ctx, $child);
+        $parentState = DomRegistry::state($document);
+        $existing = $document->getProperty(self::PROP_DOCUMENT_ELEMENT)->resolveIndirect();
+        if (Variable::TYPE_NULL !== $existing->type) {
+            $parentState->childIds[] = $child->id;
+            self::linkChildToParent($child, $document);
+
+            return;
+        }
+        if (self::isElement($child)) {
+            $parentState->childIds[] = $child->id;
+            $parentState->documentElementName = DomRegistry::state($child)->nodeName;
+            $document->getProperty(self::PROP_DOCUMENT_ELEMENT)->object($child);
+            self::linkChildToParent($child, $document);
+            self::propagateDocumentId($child, $document->id);
+
+            return;
+        }
+        $parentState->childIds[] = $child->id;
+        self::linkChildToParent($child, $document);
+        self::propagateDocumentId($child, $document->id);
     }
 
     public static function isCloneableNode(ObjectEntry $entry): bool
@@ -5132,9 +6192,13 @@ final class VmDom
         ObjectEntry $node,
         bool $deep
     ): ObjectEntry {
-        if (self::isTextNode($node)) {
+        if (self::isTextOrCdataNode($node)) {
             $state = DomRegistry::state($node);
-            $text = self::createTextNode($ctx, $state->textContent ?? '', $document);
+            if (self::isCdataNode($node)) {
+                $text = self::createCdataSection($ctx, $state->textContent ?? '', $document);
+            } else {
+                $text = self::createTextNode($ctx, $state->textContent ?? '', $document);
+            }
             self::linkChildToParent($text, null);
 
             return $text;
@@ -5283,6 +6347,15 @@ final class VmDom
     private static function assertValidXmlName(string $name): void
     {
         if ('' === $name || !preg_match('/^[A-Za-z_:][\w.:-]*$/', $name)) {
+            throw new \DOMException('Invalid Character Error', DomExceptionConstants::INVALID_CHARACTER_ERR);
+        }
+    }
+
+    /** @throws \DOMException when $target is not a valid PI target (php-src dom_document_create_processing_instruction). */
+    private static function assertValidProcessingInstructionTarget(string $target): void
+    {
+        self::assertValidXmlName($target);
+        if (0 === strcasecmp($target, 'xml')) {
             throw new \DOMException('Invalid Character Error', DomExceptionConstants::INVALID_CHARACTER_ERR);
         }
     }
@@ -5480,6 +6553,8 @@ final class VmDom
             self::CLASS_PROCESSING_INSTRUCTION => 'DOMProcessingInstruction',
             self::CLASS_ELEMENT => 'DOMElement',
             self::CLASS_DOCUMENT_FRAGMENT => 'DOMDocumentFragment',
+            self::CLASS_ENTITY => 'DOMEntity',
+            self::CLASS_NOTATION => 'DOMNotation',
             default => $lc,
         };
     }
@@ -5515,6 +6590,15 @@ final class VmDom
         self::ensureDocument($document);
         unset($ctx, $flags);
         if ('' === $filename || !is_file($filename)) {
+            $schemaPath = $filename;
+            if ('' !== $schemaPath && '/' !== $schemaPath[0]) {
+                $schemaPath = getcwd() . '/' . $schemaPath;
+            }
+            if ('' !== $schemaPath) {
+                // Mirror libxml's missing-schema diagnostics closely enough for php-src parity.
+                self::triggerDomWarning($frame, sprintf('I/O warning : failed to load external entity "%s"', $schemaPath));
+                self::triggerDomWarning($frame, sprintf("Failed to locate the main schema resource at '%s'.", $schemaPath));
+            }
             self::triggerDomWarning($frame, 'DOMDocument::schemaValidate(): Invalid Schema');
 
             return false;
@@ -5534,6 +6618,15 @@ final class VmDom
         self::ensureDocument($document);
         unset($ctx);
         if ('' === $filename || !is_file($filename)) {
+            $rngPath = $filename;
+            if ('' !== $rngPath && '/' !== $rngPath[0]) {
+                $rngPath = getcwd() . '/' . $rngPath;
+            }
+            if ('' !== $rngPath) {
+                // Mirror libxml's missing-RNG diagnostics closely enough for php-src parity.
+                self::triggerDomWarning($frame, sprintf('I/O warning : failed to load external entity "%s"', $rngPath));
+                self::triggerDomWarning($frame, sprintf('xmlRelaxNGParse: could not load %s', $rngPath));
+            }
             self::triggerDomWarning($frame, 'DOMDocument::relaxNGValidate(): Invalid RelaxNG');
 
             return false;
@@ -5616,6 +6709,9 @@ final class VmDom
         }
         if (self::isTextNode($entry)) {
             return self::escapeText(DomRegistry::state($entry)->textContent ?? '');
+        }
+        if (self::isCdataNode($entry)) {
+            return DomRegistry::state($entry)->textContent ?? '';
         }
         if (self::isEntityReference($entry)) {
             return '&'.self::escapeName(DomRegistry::state($entry)->nodeName).';';

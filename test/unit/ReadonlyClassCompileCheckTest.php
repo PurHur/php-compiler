@@ -37,7 +37,7 @@ PHP;
         $runtime->parseAndCompile($code, 'readonly_child.php');
     }
 
-    /** @covers issue #9653 */
+    /** @covers issue #18090 */
     public function testReadonlyClassPropertyDefaultFailsAtCompileTime(): void
     {
         $runtime = new Runtime();

@@ -8,6 +8,7 @@ use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable;
 use PHPLLVM;
+use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
@@ -22,6 +23,11 @@ final class ObjectInstancePropertyLlvm
         string $name,
         int $classId
     ): Variable {
+        $classLc = strtolower(str_replace('/', '\\', ltrim($class, '\\')));
+        if (\PHPCompiler\ext\dom\JitDomElementTextContent::isDomElementTextContent($classLc, strtolower($name))) {
+            return \PHPCompiler\ext\dom\JitDomElementTextContent::fetch($object, $obj);
+        }
+
         $context = $object->jitContext();
         $className = $object->classNameForId($classId);
         $nameId = $object->propNameIdFor($name);
@@ -35,6 +41,10 @@ final class ObjectInstancePropertyLlvm
             }
         }
         if (!$hasProp) {
+            $runtimeFetch = self::tryPropertyFetchByRuntimeClass($object, $obj, $name);
+            if (null !== $runtimeFetch) {
+                return $runtimeFetch;
+            }
             $object->defineProperty($classId, $name, $object->externalPropertyJitType($class, $name));
             $nameId = $object->propNameIdAfterDefine($name);
         }
@@ -115,6 +125,99 @@ final class ObjectInstancePropertyLlvm
             }
         }
         throw new \LogicException("Could not find property $name for class $classId");
+    }
+
+    /**
+     * When the static declaring class lacks a JIT slot, resolve via runtime class_id (#17391).
+     */
+    private static function tryPropertyFetchByRuntimeClass(
+        Object_ $object,
+        Value $obj,
+        string $name
+    ): ?Variable {
+        $candidates = [];
+        foreach ($object->allClassNamesById() as $id => $className) {
+            if (null !== $object->resolvePropertySlot($className, $name)) {
+                $candidates[(int) $id] = $className;
+            }
+        }
+        if ([] === $candidates) {
+            return null;
+        }
+        if (1 === \count($candidates)) {
+            $classId = array_key_first($candidates);
+            $className = $candidates[$classId];
+
+            return self::propertyFetchOrdinary($object, $obj, $className, $name, $classId);
+        }
+
+        return self::propertyFetchByRuntimeClassDispatch($object, $obj, $name, $candidates);
+    }
+
+    /**
+     * @param array<int, string> $candidates class_id => class name
+     */
+    private static function propertyFetchByRuntimeClassDispatch(
+        Object_ $object,
+        Value $obj,
+        string $name,
+        array $candidates
+    ): Variable {
+        $context = $object->jitContext();
+        $map = $context->structFieldMap['__object__'];
+        $runtimeClassId = $context->builder->load(
+            $context->builder->structGep($obj, $map['class_id'])
+        );
+        $fn = BasicBlockHelper::parentFunction($context);
+        $entry = $context->builder->getInsertBlock();
+        $done = $fn->appendBasicBlock('prop_fetch_rt_done');
+        $exit = $fn->appendBasicBlock('prop_fetch_rt_exit');
+        $fallback = $fn->appendBasicBlock('prop_fetch_rt_fallback');
+        $resultSlot = BasicBlockHelper::entryAlloca($context, $context->getTypeFromString('__value__'));
+        $valueMap = $context->structFieldMap['__value__'];
+        $context->builder->store(
+            $context->getTypeFromString('int8')->constInt(Variable::TYPE_NULL, false),
+            $context->builder->structGep($resultSlot, $valueMap['type'])
+        );
+        $i64 = $context->getTypeFromString('int64');
+        $checkBlock = $entry;
+        $lastKey = array_key_last($candidates);
+        foreach ($candidates as $classId => $className) {
+            $context->builder->positionAtEnd($checkBlock);
+            $match = $context->builder->icmp(
+                Builder::INT_EQ,
+                $runtimeClassId,
+                $i64->constInt($classId, false)
+            );
+            $caseBlock = $fn->appendBasicBlock('prop_fetch_rt_class_'.$classId);
+            $nextBlock = $classId === $lastKey
+                ? $fallback
+                : $fn->appendBasicBlock('prop_fetch_rt_try_'.$classId);
+            $context->builder->branchIf($match, $caseBlock, $nextBlock);
+            $context->builder->positionAtEnd($caseBlock);
+            $fetched = self::propertyFetchOrdinary($object, $obj, $className, $name, $classId);
+            self::boxFetchedPropertyIntoValue($object, $resultSlot, $fetched, $fetched->objectPropertyType ?? $fetched->type);
+            $context->builder->branch($done);
+            $checkBlock = $nextBlock;
+        }
+        $context->builder->positionAtEnd($checkBlock);
+        $context->builder->branch($fallback);
+        $context->builder->positionAtEnd($fallback);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeNull'),
+            JitValueBox::pointer($context, $resultSlot)
+        );
+        $context->builder->branch($done);
+        $context->builder->positionAtEnd($done);
+        $context->builder->branch($exit);
+        $context->builder->positionAtEnd($exit);
+
+        return new Variable(
+            $context,
+            Variable::TYPE_VALUE,
+            Variable::KIND_VARIABLE,
+            $resultSlot
+        );
     }
 
     public static function boxFetchedPropertyIntoValue(

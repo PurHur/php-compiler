@@ -182,4 +182,39 @@ final class VmSocket
     {
         return null !== $object && 0 === strcasecmp($object->class->name, 'Socket');
     }
+
+    public static function streamHandleForObject(ObjectEntry $object): ?int
+    {
+        $handle = self::$streamHandles[$object->id] ?? null;
+
+        return null !== $handle && VmFs::isValidHandle($handle) ? $handle : null;
+    }
+
+    /** VM object id or JIT object address (ptrToInt). */
+    public static function streamHandleForLookupKey(int $key): ?int
+    {
+        if ($key <= 0) {
+            return null;
+        }
+        $handle = self::$streamHandles[$key] ?? null;
+
+        return null !== $handle && VmFs::isValidHandle($handle) ? $handle : null;
+    }
+
+    /**
+     * socket_export_stream() — return VmFs stream handle for imported Socket (#6349).
+     *
+     * @return Variable|false
+     */
+    public static function exportStream(ObjectEntry $object, Context $ctx): Variable|false
+    {
+        $handle = self::streamHandleForObject($object);
+        if (null === $handle) {
+            return false;
+        }
+        $var = new Variable();
+        $var->streamHandle($handle, $ctx);
+
+        return $var;
+    }
 }

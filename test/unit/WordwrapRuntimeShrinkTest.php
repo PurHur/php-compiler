@@ -8,18 +8,24 @@ use PHPCompiler\ext\standard\WordwrapJitHelper;
 use PHPCompiler\ext\standard\VmString;
 use PHPUnit\Framework\TestCase;
 
-/** wordwrap() user-script AOT defers nested JIT; full builds use WordwrapJitHelper (#14565, #16734). */
+/** wordwrap() JIT routes through WordwrapJitHelper PHP for embed + user-script AOT (#14565, #17724). */
 final class WordwrapRuntimeShrinkTest extends TestCase
 {
     public function testStringWordwrapUsesJitHelperNotLlvmMonolith(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringWordwrap.php');
         $this->assertStringContainsString('WordwrapJitHelper', $source);
-        $this->assertFileExists(__DIR__.'/../../ext/standard/JitWordwrap.php');
+        $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $source);
+        $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $source);
+        $this->assertStringNotContainsString('StringWordwrapLlvm', $source);
+        $this->assertStringNotContainsString('WordwrapLlvmEmit', $source);
+        $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StringWordwrapLlvm.php');
+        $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/WordwrapLlvmEmit.php');
+        $this->assertFileDoesNotExist(__DIR__.'/../../ext/standard/JitWordwrap.php');
 
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/wordwrap.php');
-        $this->assertStringContainsString('JitWordwrap::wrap', $builtin);
-        $this->assertStringContainsString('shouldDeferNestedHelper', $builtin);
+        $this->assertStringContainsString('StringWordwrap::ensureLinked', $builtin);
+        $this->assertStringNotContainsString('JitWordwrap', $builtin);
     }
 
     public function testWordwrapJitHelperDelegatesToVmString(): void
@@ -41,6 +47,8 @@ final class WordwrapRuntimeShrinkTest extends TestCase
     {
         $spine = (string) file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
         $this->assertStringNotContainsString('JitWordwrap.php', $spine);
+        $this->assertStringNotContainsString('StringWordwrapLlvm.php', $spine);
+        $this->assertStringNotContainsString('WordwrapLlvmEmit.php', $spine);
         $this->assertStringContainsString('WordwrapJitHelper.php', $spine);
         $this->assertStringContainsString('StringWordwrap.php', $spine);
     }

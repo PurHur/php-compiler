@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace PHPCompiler\VM;
 
 use PHPCompiler\Block;
+use PHPCompiler\BuiltinByRefParams;
+use PHPCompiler\BuiltinInternalArgInfo;
+use PHPCompiler\BuiltinParamNames;
 use PHPCompiler\Compiler\AttributeEntry;
 use PHPCompiler\Compiler\AttributeNames;
 use PHPCompiler\Compiler\DeprecatedMetadata;
@@ -136,6 +139,11 @@ final class ReflectionSupport
         return sprintf('Class "%s" does not exist', $className);
     }
 
+    public static function classNotEnumMessage(string $className): string
+    {
+        return sprintf('Class "%s" is not an enum', $className);
+    }
+
     public static function methodNotFoundMessage(string $className, string $method): string
     {
         return sprintf('Method %s::%s() does not exist', $className, $method);
@@ -149,6 +157,21 @@ final class ReflectionSupport
     public static function constantNotFoundMessage(string $className, string $constant): string
     {
         return sprintf('Constant %s::%s does not exist', $className, $constant);
+    }
+
+    public static function globalConstantNotFoundMessage(string $constant): string
+    {
+        return sprintf('Constant "%s" does not exist', $constant);
+    }
+
+    public static function isGlobalReflectionConstant(ObjectEntry $reflection): bool
+    {
+        $classVar = $reflection->getProperty(self::PROP_CLASS_NAME)->resolveIndirect();
+        if (Variable::TYPE_STRING !== $classVar->type) {
+            return false;
+        }
+
+        return '' === $classVar->toString();
     }
 
     public static function functionNotFoundMessage(string $functionName): string
@@ -1084,6 +1107,58 @@ final class ReflectionSupport
         return self::resolveUserFunction($ctx, self::functionNameFromReflection($reflection));
     }
 
+    /**
+     * php-src: ext/reflection/php_reflection.c — reflection_function_is_generator().
+     */
+    public static function isReflectionFunctionGenerator(Context $ctx, ObjectEntry $reflection): bool
+    {
+        if ($reflection->reflectionIsInternalFunction ?? false) {
+            return false;
+        }
+        $func = self::resolveFunctionFromReflection($ctx, $reflection);
+
+        return $func->block->isGenerator;
+    }
+
+    /**
+     * php-src: ext/reflection/php_reflection.c — reflection_method_is_generator().
+     */
+    public static function isReflectionMethodGenerator(Context $ctx, ObjectEntry $reflection): bool
+    {
+        $className = self::classNameFromReflection($reflection);
+        $methodName = self::methodNameFromReflection($reflection);
+        $entry = VmReflection::resolveClassEntry($ctx, $className);
+        if (null === $entry) {
+            return false;
+        }
+        $func = self::resolveDeclaredMethodFunc($ctx, $entry, strtolower($methodName));
+        if (!($func instanceof PhpFunc)) {
+            return false;
+        }
+
+        return $func->block->isGenerator;
+    }
+
+    private static function resolveDeclaredMethodFunc(Context $ctx, ClassEntry $entry, string $methodLc): ?Func
+    {
+        $current = $entry;
+        while (null !== $current) {
+            if (isset($current->methods[$methodLc])) {
+                $method = $current->methods[$methodLc];
+                if ($method instanceof Func) {
+                    return $method;
+                }
+            }
+            $parentLc = $current->parentLc ?? '';
+            if ('' === $parentLc) {
+                break;
+            }
+            $current = $ctx->classes[$parentLc] ?? null;
+        }
+
+        return null;
+    }
+
     public static function constantNameFromReflection(ObjectEntry $reflection): string
     {
         $nameVar = $reflection->getProperty(self::PROP_CONSTANT_NAME)->resolveIndirect();
@@ -1293,6 +1368,271 @@ final class ReflectionSupport
         return false;
     }
 
+    public static function parameterIsPromoted(Context $ctx, ObjectEntry $reflection): bool
+    {
+        $classNameVar = $reflection->getProperty(self::PROP_CLASS_NAME)->resolveIndirect();
+        if (Variable::TYPE_STRING !== $classNameVar->type) {
+            return false;
+        }
+        $className = $classNameVar->toString();
+        $method = self::methodNameFromReflection($reflection);
+        $entry = VmReflection::resolveClassEntry($ctx, $className);
+        if (null === $entry) {
+            return false;
+        }
+        $methodLc = strtolower($method);
+        $position = self::paramPositionFromReflection($reflection);
+        $params = $entry->methodParameterMetadata[$methodLc] ?? [];
+        $paramMeta = $params[$position] ?? null;
+
+        return null !== $paramMeta && $paramMeta->isPromoted;
+    }
+
+    public static function resolveParameterBlock(Context $ctx, ObjectEntry $reflection): \PHPCompiler\Block
+    {
+        $classNameVar = $reflection->getProperty(self::PROP_CLASS_NAME)->resolveIndirect();
+        if (Variable::TYPE_STRING === $classNameVar->type) {
+            $className = $classNameVar->toString();
+            $method = self::methodNameFromReflection($reflection);
+            $entry = VmReflection::resolveClassEntry($ctx, $className);
+            if (null === $entry) {
+                throw new \LogicException('ReflectionParameter refers to unknown class in this compiler build');
+            }
+            $methodLc = strtolower($method);
+            $func = $entry->methods[$methodLc] ?? null;
+            if (!$func instanceof \PHPCompiler\Func\PHP) {
+                throw new \LogicException('ReflectionParameter refers to unknown method in this compiler build');
+            }
+
+            return $func->block;
+        }
+
+        return self::resolveFunctionForReflectionParameter($ctx, $reflection)->block;
+    }
+
+    public static function parameterIndexForReflection(ObjectEntry $reflection): int
+    {
+        $classNameVar = $reflection->getProperty(self::PROP_CLASS_NAME)->resolveIndirect();
+        if (Variable::TYPE_STRING === $classNameVar->type) {
+            return self::paramPositionFromReflection($reflection);
+        }
+
+        return self::paramIndexFromReflection($reflection);
+    }
+
+    public static function parameterIsVariadic(\PHPCompiler\Block $block, int $paramIndex): bool
+    {
+        return null !== $block->variadicParamIndex && $block->variadicParamIndex === $paramIndex;
+    }
+
+    public static function parameterIsOptional(Context $ctx, ObjectEntry $reflection): bool
+    {
+        if (self::parameterIsInternal($ctx, $reflection)) {
+            return self::internalParameterIsOptional($ctx, $reflection);
+        }
+        $block = self::resolveParameterBlock($ctx, $reflection);
+        $index = self::parameterIndexForReflection($reflection);
+
+        return self::parameterIsVariadic($block, $index)
+            || ParamArgumentCountError::parameterHasDefault($block, $index);
+    }
+
+    public static function parameterAllowsNull(Context $ctx, ObjectEntry $reflection): bool
+    {
+        if (self::parameterIsInternal($ctx, $reflection)) {
+            return self::internalParameterAllowsNull($ctx, $reflection);
+        }
+        $block = self::resolveParameterBlock($ctx, $reflection);
+        $index = self::parameterIndexForReflection($reflection);
+        $slot = self::parameterScopeSlot($block, $index);
+        if (null === $slot || !isset($block->paramDeclaredTypes[$slot])) {
+            return true;
+        }
+
+        return ReflectionTypeSupport::allowsNullFromCfg($block->paramDeclaredTypes[$slot]);
+    }
+
+    public static function parameterIsPassedByReference(Context $ctx, ObjectEntry $reflection): bool
+    {
+        if (self::parameterIsInternal($ctx, $reflection)) {
+            return self::internalParameterIsPassedByReference($ctx, $reflection);
+        }
+        $block = self::resolveParameterBlock($ctx, $reflection);
+        $index = self::parameterIndexForReflection($reflection);
+
+        return isset($block->paramByRef[$index]);
+    }
+
+    public static function parameterCanBePassedByValue(Context $ctx, ObjectEntry $reflection): bool
+    {
+        if (self::parameterIsInternal($ctx, $reflection)) {
+            return self::internalParameterCanBePassedByValue($ctx, $reflection);
+        }
+        if (!self::parameterIsPassedByReference($ctx, $reflection)) {
+            return true;
+        }
+        $block = self::resolveParameterBlock($ctx, $reflection);
+        $index = self::parameterIndexForReflection($reflection);
+        $slot = self::parameterScopeSlot($block, $index);
+        if (null === $slot || !isset($block->paramDeclaredTypes[$slot])) {
+            return true;
+        }
+
+        return self::cfgTypeAllowsPassByValueWithByRef($block->paramDeclaredTypes[$slot]);
+    }
+
+    /** php-src: ReflectionParameter::isNamed() — PHP 8.0+ always true for declared parameters. */
+    public static function parameterIsNamed(ObjectEntry $reflection): bool
+    {
+        return '' !== self::paramNameFromReflection($reflection);
+    }
+
+    public static function parameterIsInternal(Context $ctx, ObjectEntry $reflection): bool
+    {
+        $classNameVar = $reflection->getProperty(self::PROP_CLASS_NAME)->resolveIndirect();
+        if (Variable::TYPE_STRING === $classNameVar->type) {
+            $entry = VmReflection::resolveClassEntry($ctx, $classNameVar->toString());
+
+            return null !== $entry && $entry->isInternal;
+        }
+        $funcName = self::functionNameFromReflection($reflection);
+        $func = $ctx->functions[strtolower($funcName)] ?? null;
+
+        return $func instanceof Func\Internal;
+    }
+
+    private static function internalParameterIsOptional(Context $ctx, ObjectEntry $reflection): bool
+    {
+        $info = self::internalParameterInfo($ctx, $reflection);
+        if (null !== $info) {
+            return $info['isOptional'];
+        }
+        $index = self::parameterIndexForReflection($reflection);
+        $funcName = self::internalCallableName($ctx, $reflection);
+        $variadic = BuiltinParamNames::variadicParamIndexForFunction($funcName);
+
+        return null !== $variadic && $variadic === $index;
+    }
+
+    private static function internalParameterAllowsNull(Context $ctx, ObjectEntry $reflection): bool
+    {
+        $info = self::internalParameterInfo($ctx, $reflection);
+        if (null === $info) {
+            return true;
+        }
+
+        return BuiltinInternalArgInfo::typeStringAllowsNull($info['type']);
+    }
+
+    private static function internalParameterIsPassedByReference(Context $ctx, ObjectEntry $reflection): bool
+    {
+        $index = self::parameterIndexForReflection($reflection);
+        $callable = self::internalCallableName($ctx, $reflection);
+        if (str_contains($callable, '::')) {
+            return false;
+        }
+
+        return \in_array($index, BuiltinByRefParams::forFunction($callable), true);
+    }
+
+    private static function internalParameterCanBePassedByValue(Context $ctx, ObjectEntry $reflection): bool
+    {
+        if (!self::internalParameterIsPassedByReference($ctx, $reflection)) {
+            return true;
+        }
+        $info = self::internalParameterInfo($ctx, $reflection);
+        if (null === $info) {
+            return true;
+        }
+
+        return BuiltinInternalArgInfo::typeStringAllowsPassByValueWithByRef($info['type']);
+    }
+
+    /**
+     * @return array{name: string, type: string, isOptional: bool}|null
+     */
+    private static function internalParameterInfo(Context $ctx, ObjectEntry $reflection): ?array
+    {
+        $index = self::parameterIndexForReflection($reflection);
+        $classNameVar = $reflection->getProperty(self::PROP_CLASS_NAME)->resolveIndirect();
+        if (Variable::TYPE_STRING === $classNameVar->type) {
+            return BuiltinInternalArgInfo::paramInfoForClassMethod(
+                $classNameVar->toString(),
+                self::methodNameFromReflection($reflection),
+                $index
+            );
+        }
+
+        return BuiltinInternalArgInfo::paramInfoForFunction(self::functionNameFromReflection($reflection), $index);
+    }
+
+    private static function internalCallableName(Context $ctx, ObjectEntry $reflection): string
+    {
+        $classNameVar = $reflection->getProperty(self::PROP_CLASS_NAME)->resolveIndirect();
+        if (Variable::TYPE_STRING === $classNameVar->type) {
+            return $classNameVar->toString().'::'.self::methodNameFromReflection($reflection);
+        }
+
+        return self::functionNameFromReflection($reflection);
+    }
+
+    private static function cfgTypeAllowsPassByValueWithByRef(CfgType $type): bool
+    {
+        if ($type instanceof CfgType\Nullable) {
+            return self::cfgTypeAllowsPassByValueWithByRef($type->type);
+        }
+        if ($type instanceof CfgType\Union_) {
+            foreach ($type->types as $member) {
+                if ($member instanceof CfgType\Literal && 'null' === strtolower($member->name)) {
+                    continue;
+                }
+                if (self::cfgTypeAllowsPassByValueWithByRef($member)) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+        if ($type instanceof CfgType\Intersection) {
+            foreach ($type->types as $member) {
+                if (!self::cfgTypeAllowsPassByValueWithByRef($member)) {
+                    return false;
+                }
+            }
+
+            return [] !== $type->types;
+        }
+        if ($type instanceof CfgType\Literal) {
+            $name = strtolower($type->name);
+
+            return !\in_array($name, ['int', 'float', 'string', 'bool', 'array', 'callable', 'iterable', 'never', 'true', 'false'], true);
+        }
+
+        return true;
+    }
+
+    public static function parameterDefaultValueIsAvailable(\PHPCompiler\Block $block, int $paramIndex): bool
+    {
+        if (self::parameterIsVariadic($block, $paramIndex)) {
+            return false;
+        }
+
+        return ParamArgumentCountError::parameterHasDefault($block, $paramIndex);
+    }
+
+    public static function parameterScopeSlot(\PHPCompiler\Block $block, int $paramIndex): ?int
+    {
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_ARG_RECV !== $op->type || (int) $op->arg2 !== $paramIndex) {
+                continue;
+            }
+
+            return (int) $op->arg1;
+        }
+
+        return null;
+    }
+
     /**
      * @return \PHPCompiler\Func\PHP
      */
@@ -1488,17 +1828,89 @@ final class ReflectionSupport
         return !$type instanceof CfgType\Mixed_;
     }
 
+    /** php-src: reflection_method_is_internal() (#18228). */
+    public static function isReflectionMethodInternal(Context $ctx, ObjectEntry $reflection): bool
+    {
+        [$declaring, $methodLc] = self::resolveReflectedMethodDeclaring($ctx, $reflection);
+        if (!isset($declaring->methods[$methodLc])) {
+            return false;
+        }
+        $func = $declaring->methods[$methodLc];
+
+        return !($func instanceof PhpFunc);
+    }
+
+    /** php-src: reflection_method_is_variadic() (#18228). */
+    public static function isReflectionMethodVariadic(Context $ctx, ObjectEntry $reflection): bool
+    {
+        [$declaring, $methodLc] = self::resolveReflectedMethodDeclaring($ctx, $reflection);
+        if (isset($declaring->methods[$methodLc])) {
+            $func = $declaring->methods[$methodLc];
+            if ($func instanceof PhpFunc) {
+                return null !== $func->block->variadicParamIndex;
+            }
+        }
+        $className = self::classNameFromReflection($reflection);
+        $methodName = self::methodNameFromReflection($reflection);
+
+        return BuiltinInternalArgInfo::methodIsVariadic($className, $methodName);
+    }
+
+    /** php-src: reflection_method_is_constructor() (#18225). */
+    public static function isReflectionMethodConstructor(ObjectEntry $reflection): bool
+    {
+        return '__construct' === strtolower(self::methodNameFromReflection($reflection));
+    }
+
+    /** php-src: reflection_method_is_destructor() (#18225). */
+    public static function isReflectionMethodDestructor(ObjectEntry $reflection): bool
+    {
+        return '__destruct' === strtolower(self::methodNameFromReflection($reflection));
+    }
+
+    /** php-src: reflection_method_is_abstract() (#18225). */
+    public static function isReflectionMethodAbstract(Context $ctx, ObjectEntry $reflection): bool
+    {
+        [$declaring] = self::resolveReflectedMethodDeclaring($ctx, $reflection);
+        if ($declaring->isInterface) {
+            return true;
+        }
+        $flags = self::reflectedMethodCfgFlags($ctx, $reflection);
+
+        return ($flags & \PHPCfg\Func::FLAG_ABSTRACT) !== 0;
+    }
+
     /**
-     * php-src: reflection_method_has_tentative_return_type() (#6597).
+     * php-src: reflection_method_get_tentative_return_type() (#18226).
      *
-     * User-declared methods in this compiler always store explicit return types on the
-     * declaring Func; inherited ZEND_TYPE_IS_TENTATIVE is not modeled yet — false for VM users.
+     * User-declared methods store explicit return types on the declaring Func; tentative
+     * inheritance is not modeled yet — null for VM user methods.
+     */
+    public static function reflectedMethodTentativeReturnType(Context $ctx, ObjectEntry $reflection): ?CfgType
+    {
+        [$declaring, $methodLc] = self::resolveReflectedMethodDeclaring($ctx, $reflection);
+        if (isset($declaring->methods[$methodLc])) {
+            $func = $declaring->methods[$methodLc];
+            if ($func instanceof PhpFunc) {
+                return null;
+            }
+        }
+        $className = self::classNameFromReflection($reflection);
+        $methodName = self::methodNameFromReflection($reflection);
+        $label = BuiltinInternalArgInfo::tentativeReturnTypeForClassMethod($className, $methodName);
+        if (null === $label) {
+            return null;
+        }
+
+        return ReflectionTypeSupport::cfgTypeFromLabel($label);
+    }
+
+    /**
+     * php-src: reflection_method_has_tentative_return_type() (#6597, #18226).
      */
     public static function reflectedMethodHasTentativeReturnType(Context $ctx, ObjectEntry $reflection): bool
     {
-        self::resolveReflectedMethod($ctx, $reflection);
-
-        return false;
+        return null !== self::reflectedMethodTentativeReturnType($ctx, $reflection);
     }
 
     /**

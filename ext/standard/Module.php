@@ -43,9 +43,9 @@ class Module extends ModuleAbstract
     {
         parent::init($runtime);
         \PHPCompiler\VM\OutputBufferHandlers::register(
-            static fn (string $content, string $handlerName, ?\PHPCompiler\VM\Context $ctx): string => VmObOutput::processHandler(
+            static fn (string $content, null|string|\PHPCompiler\VM\Variable|\PHPCompiler\VM\ClosureState $handler, ?\PHPCompiler\VM\Context $ctx): string => VmObOutput::processHandler(
                 $ctx ?? $runtime->vmContext,
-                $handlerName,
+                $handler,
                 $content
             )
         );
@@ -53,121 +53,41 @@ class Module extends ModuleAbstract
         BuiltinEnums::register($runtime->vmContext);
         BuiltinClasses::register($runtime->vmContext);
         VmStdStreamConstants::register($runtime->vmContext);
-        foreach ([
-            'LOCK_SH' => 1,
-            'LOCK_EX' => 2,
-            'LOCK_UN' => 3,
-            'LOCK_NB' => 4,
-            'SEEK_SET' => StdlibConstants::SEEK_SET,
-            'SEEK_CUR' => StdlibConstants::SEEK_CUR,
-            'SEEK_END' => StdlibConstants::SEEK_END,
-            'DEBUG_BACKTRACE_PROVIDE_OBJECT' => VmDebugBacktrace::PROVIDE_OBJECT,
-            'DEBUG_BACKTRACE_IGNORE_ARGS' => VmDebugBacktrace::IGNORE_ARGS,
-            'DEBUG_BACKTRACE_IGNORE_STATIC_ARGS' => VmDebugBacktrace::IGNORE_STATIC_ARGS,
-            'CONNECTION_NORMAL' => VmConnection::NORMAL,
-            'CONNECTION_ABORTED' => VmConnection::ABORTED,
-            'CONNECTION_TIMEOUT' => VmConnection::TIMEOUT,
-            'INFO_GENERAL' => VmInfo::INFO_GENERAL,
-            'INFO_CREDITS' => VmInfo::INFO_CREDITS,
-            'INFO_CONFIGURATION' => VmInfo::INFO_CONFIGURATION,
-            'INFO_MODULES' => VmInfo::INFO_MODULES,
-            'INFO_ENVIRONMENT' => VmInfo::INFO_ENVIRONMENT,
-            'INFO_VARIABLES' => VmInfo::INFO_VARIABLES,
-            'INFO_LICENSE' => VmInfo::INFO_LICENSE,
-            'INFO_ALL' => VmInfo::INFO_ALL,
-            'CREDITS_GROUP' => VmInfo::CREDITS_GROUP,
-            'CREDITS_GENERAL' => VmInfo::CREDITS_GENERAL,
-            'CREDITS_SAPI' => VmInfo::CREDITS_SAPI,
-            'CREDITS_MODULES' => VmInfo::CREDITS_MODULES,
-            'CREDITS_DOCS' => VmInfo::CREDITS_DOCS,
-            'CREDITS_FULLPAGE' => VmInfo::CREDITS_FULLPAGE,
-            'CREDITS_QA' => VmInfo::CREDITS_QA,
-            'CREDITS_WEB' => VmInfo::CREDITS_WEB,
-            'CREDITS_ALL' => VmInfo::CREDITS_ALL,
-            'PHP_QUERY_RFC1738' => VmHttpBuildQuery::ENCODING_RFC1738,
-            'PHP_QUERY_RFC3986' => VmHttpBuildQuery::ENCODING_RFC3986,
-            'PHP_URL_SCHEME' => VmParseUrl::PHP_URL_SCHEME,
-            'PHP_URL_HOST' => VmParseUrl::PHP_URL_HOST,
-            'PHP_URL_PORT' => VmParseUrl::PHP_URL_PORT,
-            'PHP_URL_USER' => VmParseUrl::PHP_URL_USER,
-            'PHP_URL_PASS' => VmParseUrl::PHP_URL_PASS,
-            'PHP_URL_PATH' => VmParseUrl::PHP_URL_PATH,
-            'PHP_URL_QUERY' => VmParseUrl::PHP_URL_QUERY,
-            'PHP_URL_FRAGMENT' => VmParseUrl::PHP_URL_FRAGMENT,
-            'SUNFUNCS_RET_STRING' => VmDate::SUNFUNCS_RET_STRING,
-            'SUNFUNCS_RET_DOUBLE' => VmDate::SUNFUNCS_RET_DOUBLE,
-            'SUNFUNCS_RET_TIMESTAMP' => VmDate::SUNFUNCS_RET_TIMESTAMP,
-            'LOG_EMERG' => StdlibConstants::LOG_EMERG,
-            'LOG_ALERT' => StdlibConstants::LOG_ALERT,
-            'LOG_CRIT' => StdlibConstants::LOG_CRIT,
-            'LOG_ERR' => StdlibConstants::LOG_ERR,
-            'LOG_WARNING' => StdlibConstants::LOG_WARNING,
-            'LOG_NOTICE' => StdlibConstants::LOG_NOTICE,
-            'LOG_INFO' => StdlibConstants::LOG_INFO,
-            'LOG_DEBUG' => StdlibConstants::LOG_DEBUG,
-            'LOG_PID' => StdlibConstants::LOG_PID,
-            'LOG_CONS' => StdlibConstants::LOG_CONS,
-            'LOG_ODELAY' => StdlibConstants::LOG_ODELAY,
-            'LOG_NDELAY' => StdlibConstants::LOG_NDELAY,
-            'LOG_NOWAIT' => StdlibConstants::LOG_NOWAIT,
-            'LOG_PERROR' => StdlibConstants::LOG_PERROR,
-            'LOG_KERN' => StdlibConstants::LOG_KERN,
-            'LOG_USER' => StdlibConstants::LOG_USER,
-            'LOG_MAIL' => StdlibConstants::LOG_MAIL,
-            'LOG_DAEMON' => StdlibConstants::LOG_DAEMON,
-            'LOG_AUTH' => StdlibConstants::LOG_AUTH,
-            'LOG_SYSLOG' => StdlibConstants::LOG_SYSLOG,
-            'LOG_LPR' => StdlibConstants::LOG_LPR,
-            'LOG_NEWS' => StdlibConstants::LOG_NEWS,
-            'LOG_UUCP' => StdlibConstants::LOG_UUCP,
-            'LOG_CRON' => StdlibConstants::LOG_CRON,
-            'LOG_AUTHPRIV' => StdlibConstants::LOG_AUTHPRIV,
-            'LOG_FTP' => StdlibConstants::LOG_FTP,
-            'LOG_LOCAL0' => StdlibConstants::LOG_LOCAL0,
-            'LOG_LOCAL1' => StdlibConstants::LOG_LOCAL1,
-            'LOG_LOCAL2' => StdlibConstants::LOG_LOCAL2,
-            'LOG_LOCAL3' => StdlibConstants::LOG_LOCAL3,
-            'LOG_LOCAL4' => StdlibConstants::LOG_LOCAL4,
-            'LOG_LOCAL5' => StdlibConstants::LOG_LOCAL5,
-            'LOG_LOCAL6' => StdlibConstants::LOG_LOCAL6,
-            'LOG_LOCAL7' => StdlibConstants::LOG_LOCAL7,
-            ...VmLocale::lcConstants(),
-            ...VmLocale::nlLanginfoConstants(),
-            'ZLIB_ENCODING_RAW' => -15,
-            'ZLIB_ENCODING_DEFLATE' => 15,
-            'ZLIB_ENCODING_GZIP' => 31,
-            'STREAM_PF_UNIX' => StdlibConstants::STREAM_PF_UNIX,
-            'STREAM_PF_INET' => StdlibConstants::STREAM_PF_INET,
-            'STREAM_SOCK_STREAM' => StdlibConstants::STREAM_SOCK_STREAM,
-            'STREAM_SOCK_DGRAM' => StdlibConstants::STREAM_SOCK_DGRAM,
-            'STREAM_IPPROTO_IP' => StdlibConstants::STREAM_IPPROTO_IP,
-            'STREAM_CLIENT_PERSISTENT' => StdlibConstants::STREAM_CLIENT_PERSISTENT,
-            'STREAM_CLIENT_ASYNC_CONNECT' => StdlibConstants::STREAM_CLIENT_ASYNC_CONNECT,
-            'STREAM_CLIENT_CONNECT' => StdlibConstants::STREAM_CLIENT_CONNECT,
-            'STREAM_REPORT_ERRORS' => StdlibConstants::STREAM_REPORT_ERRORS,
-            'STREAM_CAST_AS_STREAM' => StdlibConstants::STREAM_CAST_AS_STREAM,
-            'STREAM_CAST_FOR_SELECT' => StdlibConstants::STREAM_CAST_FOR_SELECT,
-            'PSFS_PASS_ON' => StdlibConstants::PSFS_PASS_ON,
-            'PSFS_FEED_ME' => StdlibConstants::PSFS_FEED_ME,
-            'PSFS_FLAG_NORMAL' => StdlibConstants::PSFS_FLAG_NORMAL,
-            'PSFS_FLAG_FLUSH_INC' => StdlibConstants::PSFS_FLAG_FLUSH_INC,
-            'PSFS_FLAG_FLUSH_CLOSE' => StdlibConstants::PSFS_FLAG_FLUSH_CLOSE,
-        ] + VmStreamSupports::constants() + VmStreamNotification::constants() + VmImage::constants() + VmJsonFlags::constants() as $name => $value) {
+        foreach (StdlibModuleConstants::bootstrapIntConstants() as $name => $value) {
             $var = new VM\Variable();
             $var->int($value);
             $runtime->vmContext->defineConstant($name, $var);
         }
-        foreach (DateConstants::registeredConstants() as $name => $value) {
+        foreach (StdlibModuleConstants::bootstrapStringConstants() as $name => $value) {
             $var = new VM\Variable();
             $var->string($value);
             $runtime->vmContext->defineConstant($name, $var);
         }
-        foreach (StdlibConstants::CORE_STRING_BY_NAME as $lc => $value) {
-            $name = strtoupper($lc);
+        foreach (StdlibModuleConstants::bootstrapFloatConstants() as $name => $value) {
             $var = new VM\Variable();
-            $var->string($value);
+            $var->float($value);
             $runtime->vmContext->defineConstant($name, $var);
         }
+        foreach (PcreConstants::registeredConstants() as $name => $value) {
+            self::defineModuleConstant($runtime, $name, $value);
+        }
+        foreach (ReadlineConstants::registeredConstants() as $name => $value) {
+            self::defineModuleConstant($runtime, $name, $value);
+        }
+    }
+
+    /**
+     * @param int|string $value
+     */
+    private static function defineModuleConstant(Runtime $runtime, string $name, int|string $value): void
+    {
+        $var = new VM\Variable();
+        if (\is_int($value)) {
+            $var->int($value);
+        } else {
+            $var->string($value);
+        }
+        $runtime->vmContext->defineConstant($name, $var);
     }
 
     public function getFunctions(): array
@@ -213,6 +133,7 @@ class Module extends ModuleAbstract
             new frexp(),
             new fdiv(),
             ...(CompilerVersion::supportsFpow() ? [new fpow(), new fmin(), new fmax(), new fadd(), new fsub(), new fmul()] : []),
+            ...(CompilerVersion::supportsClamp() ? [new clamp()] : []),
             ...(CompilerVersion::supportsNextafter() ? [new nextafter()] : []),
             new intval(),
             new floatval(),
@@ -500,6 +421,8 @@ class Module extends ModuleAbstract
             ...(VmFastCgi::registersFinishRequestFunction() ? [new fastcgi_finish_request()] : []),
             new header_register_callback(),
             new register_shutdown_function(),
+            new register_tick_function(),
+            new unregister_tick_function(),
             ...(CompilerVersion::supportsReadonlyBuiltin() ? [new readonly_()] : []),
             new setcookie(),
             new setrawcookie(),
@@ -638,6 +561,7 @@ class Module extends ModuleAbstract
             new stream_socket_accept(),
             new stream_socket_pair(),
             new stream_socket_get_name(),
+            new stream_socket_enable_crypto(),
             new fsockopen(),
             new pfsockopen(),
             new stream_set_chunk_size_(),
@@ -816,7 +740,7 @@ class Module extends ModuleAbstract
             ...(CompilerVersion::supportsPhp84ReflectionProbeBuiltins() ? [new attribute_exists_()] : []),
             new get_object_vars_(),
             new get_mangled_object_vars_(),
-            new get_object_id(),
+            ...(CompilerVersion::supportsGetObjectId() ? [new get_object_id()] : []),
             new spl_object_id(),
             new spl_object_hash(),
             new get_class_(),
@@ -833,8 +757,14 @@ class Module extends ModuleAbstract
             new compiler_language_warning_(),
             new set_error_handler_(),
             new restore_error_handler_(),
+            ...(CompilerVersion::supportsGetHandlerIntrospection() ? [
+                new get_error_handler_(),
+            ] : []),
             new set_exception_handler(),
             new restore_exception_handler(),
+            ...(CompilerVersion::supportsGetHandlerIntrospection() ? [
+                new get_exception_handler(),
+            ] : []),
             new error_get_last(),
             new error_clear_last(),
             new exif_tagname(),
@@ -877,6 +807,10 @@ class Module extends ModuleAbstract
             new gzpassthru(),
             new zlib_encode(),
             new zlib_decode(),
+            new deflate_init(),
+            new deflate_add(),
+            new inflate_init(),
+            new inflate_add(),
             new zlib_get_coding_type(),
             new fnmatch(),
             new time(),
@@ -925,6 +859,8 @@ class Module extends ModuleAbstract
             new date_format(),
             new date_timestamp_get(),
             new date_timestamp_set(),
+            new date_date_set(),
+            new date_time_set(),
             new date_timezone_get(),
             new date_timezone_set(),
             new date_get_last_errors(),

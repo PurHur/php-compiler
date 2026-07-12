@@ -34,9 +34,16 @@ echo "{$obj?->prop ?? 'def'}";
 echo "\n";
 echo "x{$a['k1'] ?? '1'}y{$a['k2'] ?? '2'}z";
 echo "\n";
+$name = null;
+echo "${name ?? 'dollar'}";
+echo "\n";
+echo "{$name ?? 'brace'}";
+echo "\n";
 --EXPECT--
 /test/script.php
 1
 nil
 def
 x1y2z
+dollar
+brace

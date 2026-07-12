@@ -55,12 +55,15 @@ final class BootstrapNativeTestHarnessTest extends TestCase
         $makefile = (string) file_get_contents(self::$root.'/Makefile');
         $this->assertStringContainsString('bootstrap-native-test:', $makefile);
         $this->assertStringContainsString('./script/bootstrap-native-test.sh', $makefile);
+        $this->assertStringContainsString('bootstrap-native-test-subset:', $makefile);
+        $this->assertStringContainsString('./script/bootstrap-native-test-subset.sh', $makefile);
     }
 
     public function testBootstrapDevWorkflowDocumentsNativeTestHarnessTier(): void
     {
         $doc = (string) file_get_contents(self::$root.'/docs/bootstrap-dev-workflow.md');
         $this->assertStringContainsString('bootstrap-native-test', $doc);
+        $this->assertStringContainsString('phpc test --native', $doc);
         $this->assertStringContainsString('#15599', $doc);
         $this->assertStringContainsString('Tier 1.5', $doc);
     }

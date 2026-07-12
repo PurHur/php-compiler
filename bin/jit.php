@@ -45,11 +45,13 @@ function run(string $filename, string $code, array $options): void
     }
     $queryArg = is_string($queryString) ? $queryString : null;
     $postArg = is_string($postBody) ? $postBody : null;
+    $scriptName = php_compiler_cli_server_script_name($filename, $options);
     Superglobals::populateFromEnvironment(
         $runtime->vmContext,
         $queryArg,
         $postArg,
-        $scriptFilename
+        $scriptFilename,
+        $scriptName
     );
     $scriptArgv = $options['--script-argv'] ?? null;
     if (is_array($scriptArgv)) {

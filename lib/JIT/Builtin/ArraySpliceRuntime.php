@@ -12,9 +12,9 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * JIT/AOT link for array_splice() via ArraySpliceJitHelper PHP (#13643).
+ * JIT/AOT link for array_splice() via ArraySpliceJitHelper PHP (#13643, #17967).
  *
- * Standalone AOT compiles {@see ArraySpliceJitHelper} via JitVmHelperLink (#14304); native literal arrays keep LLVM in {@see ArrayBuiltinHelper::buildSpliceArray()}.
+ * Standalone AOT compiles {@see ArraySpliceJitHelper} via JitVmHelperLink (#14304); native literal arrays materialize to hashtable then route through PHP (#17967).
  * SSOT: {@see \PHPCompiler\ext\standard\array_splice}
  * php-src: ext/standard/array.c — php_array_splice()
  */
@@ -40,20 +40,8 @@ final class ArraySpliceRuntime
         ?JITVariable $replacement,
         bool $hasReplacementArg
     ): Value {
-        if (ArrayBuiltinHelper::isNativeArray($array->type)) {
-            return ArrayBuiltinHelper::buildSpliceArray(
-                $context,
-                $array,
-                $offset,
-                $hasLength,
-                $length,
-                $replacement,
-                $hasReplacementArg
-            );
-        }
-
         self::ensureLinked($context);
-        $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
+        $ht = self::argToHashtable($context, $array);
         $htPtr = $context->getTypeFromString('__hashtable__*');
         $i1 = $context->getTypeFromString('int1');
         $hasReplFlag = $hasReplacementArg
@@ -76,6 +64,15 @@ final class ArraySpliceRuntime
         HashTableHelper::storeHashtableInArrayVariable($context, $array, $ht);
 
         return $removed;
+    }
+
+    private static function argToHashtable(Context $context, JITVariable $arg): Value
+    {
+        if (ArrayBuiltinHelper::isNativeArray($arg->type)) {
+            return ArrayBuiltinHelper::nativeListToHashTable($context, $arg);
+        }
+
+        return ArrayBuiltinHelper::loadHashTable($context, $arg);
     }
 
     public static function ensureLinked(Context $context): void

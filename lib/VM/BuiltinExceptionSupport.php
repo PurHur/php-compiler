@@ -33,7 +33,8 @@ final class BuiltinExceptionSupport
     public const CLASS_OUT_OF_BOUNDS_EXCEPTION = 'outofboundsexception';
     public const CLASS_DATE_INVALID_TIME_ZONE_EXCEPTION = 'dateinvalidtimezoneexception';
     public const CLASS_DATE_MALFORMED_INTERVAL_EXCEPTION = 'datemalformedintervalexception';
-    public const CLASS_DATE_MALFORMED_STRING = 'datemalformedstring';
+    public const CLASS_DATE_MALFORMED_STRING_EXCEPTION = 'datemalformedstringexception';
+    public const CLASS_DATE_INVALID_OPERATION_EXCEPTION = 'dateinvalidoperationexception';
     public const CLASS_DATE_MALFORMED_PERIOD_EXCEPTION = 'datemalformedperiodexception';
     public const CLASS_DATE_MALFORMED_PERIOD_STRING_EXCEPTION = 'datemalformedperiodstringexception';
     public const CLASS_DATE_ERROR = 'dateerror';
@@ -185,13 +186,33 @@ final class BuiltinExceptionSupport
         string $file = '',
         int $line = 0
     ): Variable {
-        if (!isset($ctx->classes[self::CLASS_DATE_MALFORMED_STRING])) {
+        if (!isset($ctx->classes[self::CLASS_DATE_MALFORMED_STRING_EXCEPTION])) {
             return self::materializeException($ctx, $message, $file, $line);
         }
 
         return self::materializeThrowable(
             $ctx,
-            self::CLASS_DATE_MALFORMED_STRING,
+            self::CLASS_DATE_MALFORMED_STRING_EXCEPTION,
+            $message,
+            $file,
+            $line
+        );
+    }
+
+    /** php-src ext/date/php_date.c — illegal date mutation (#6048). */
+    public static function materializeDateInvalidOperationException(
+        Context $ctx,
+        string $message,
+        string $file = '',
+        int $line = 0
+    ): Variable {
+        if (!isset($ctx->classes[self::CLASS_DATE_INVALID_OPERATION_EXCEPTION])) {
+            return self::materializeException($ctx, $message, $file, $line);
+        }
+
+        return self::materializeThrowable(
+            $ctx,
+            self::CLASS_DATE_INVALID_OPERATION_EXCEPTION,
             $message,
             $file,
             $line

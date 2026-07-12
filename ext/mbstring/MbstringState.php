@@ -22,6 +22,11 @@ final class MbstringState
 
     private static string $httpOutput = 'UTF-8';
 
+    private static string $language = 'neutral';
+
+    /** @var list<string> */
+    private static array $httpInputList = ['UTF-8'];
+
     /** @var list<string> */
     private static array $detectOrder = ['ASCII', 'UTF-8'];
 
@@ -37,8 +42,59 @@ final class MbstringState
     public static function setInternalEncoding(string $canonical): bool
     {
         self::$internalEncoding = $canonical;
+        self::syncHttpInputListFromInternalEncoding();
 
         return true;
+    }
+
+    public static function language(?string $language = null): string|bool
+    {
+        if (null === $language) {
+            return self::$language;
+        }
+        self::$language = MbstringLanguageRegistry::assertValid($language, 'mb_language', 0);
+
+        return true;
+    }
+
+    /**
+     * @return list<string>
+     */
+    public static function httpInputList(): array
+    {
+        return self::$httpInputList;
+    }
+
+    public static function httpInput(?string $type = null): string|array|bool
+    {
+        if (null === $type) {
+            return false;
+        }
+        if (1 !== strlen($type)) {
+            throw new \ValueError(
+                'mb_http_input(): Argument #1 ($type) must be one of "G", "P", "C", "S", "I", or "L"'
+            );
+        }
+        $letter = strtoupper($type[0]);
+        switch ($letter) {
+            case 'G':
+            case 'P':
+            case 'C':
+            case 'S':
+                return false;
+            case 'I':
+                return self::$httpInputList;
+            case 'L':
+                if ([] === self::$httpInputList) {
+                    return false;
+                }
+
+                return implode(',', self::$httpInputList);
+            default:
+                throw new \ValueError(
+                    'mb_http_input(): Argument #1 ($type) must be one of "G", "P", "C", "S", "I", or "L"'
+                );
+        }
     }
 
     public static function httpOutput(?string $encoding = null): string|bool
@@ -218,6 +274,11 @@ final class MbstringState
         }
 
         return true;
+    }
+
+    private static function syncHttpInputListFromInternalEncoding(): void
+    {
+        self::$httpInputList = [self::$internalEncoding];
     }
 
     private static function typeLabel(Variable $var): string

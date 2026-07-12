@@ -7,13 +7,16 @@ namespace PHPCompiler\ext\brotli;
 use PHPCompiler\ModuleAbstract;
 
 /**
- * brotli extension module (kjdev/php-ext-brotli; issue #6814).
+ * brotli extension module (kjdev/php-ext-brotli; issue #6814, #17563).
+ *
+ * Register brotli_compress()/brotli_uncompress() when
+ * {@see BrotliExtensionPolicy::advertisesExtension()} — withheld on reference profile.
  */
 class Module extends ModuleAbstract
 {
     public function getFunctions(): array
     {
-        if (!VmBrotliNative::available()) {
+        if (!BrotliExtensionPolicy::advertisesExtension()) {
             return [];
         }
 

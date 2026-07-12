@@ -118,6 +118,34 @@ final class VmPreg
     }
 
     /**
+     * Z_PARAM_STR_OR_ARR on preg_replace() $replacement — null coerces to '' (delete match) outside strict_types (#17871).
+     *
+     * @throws \TypeError
+     */
+    public static function resolveStringOrArrayReplacement(
+        Frame $frame,
+        Variable $var,
+        string $function,
+        int $argIndex = 1,
+        string $paramName = 'replacement'
+    ): Variable {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_NULL === $var->type) {
+            if (InternalStrictArg::isCallerStrict($frame)) {
+                throw new \TypeError(
+                    self::stringOrArraySubjectTypeError($function, $argIndex, $paramName, 'null')
+                );
+            }
+            $empty = new Variable();
+            $empty->string('');
+
+            return $empty;
+        }
+
+        return self::requireStringOrArrayArg($var, $function, $argIndex, $paramName);
+    }
+
+    /**
      * Z_PARAM_STR_OR_ARR on preg_* $pattern / $replacement (ext/pcre/php_pcre.c).
      *
      * @throws \TypeError
@@ -325,8 +353,19 @@ final class VmPreg
                 }
                 $elemCount = 0;
                 $replaced = self::pregReplaceArrayPatterns($pattern, $replacements, $item, $limit, $elemCount);
-                if (false === $replaced || null === $replaced) {
-                    return $replaced;
+                if (false === $replaced) {
+                    return false;
+                }
+                if (null === $replaced) {
+                    if (StdlibConstants::PREG_BAD_UTF8_ERROR === self::lastError()) {
+                        if (null !== $count) {
+                            $count = $totalCount;
+                        }
+
+                        return $out;
+                    }
+
+                    return null;
                 }
                 $out[$key] = $replaced;
                 $totalCount += $elemCount;
@@ -348,8 +387,19 @@ final class VmPreg
             $stepCount = 0;
             $step = VmPregNative::pregReplace($pat, $repl, $result, $limit, $stepCount);
             self::syncLastErrorFromNative();
-            if (false === $step || null === $step) {
+            if (false === $step) {
                 return false;
+            }
+            if (null === $step) {
+                if (StdlibConstants::PREG_BAD_UTF8_ERROR === self::lastError()) {
+                    if (null !== $count) {
+                        $count = $totalCount;
+                    }
+
+                    return $result;
+                }
+
+                return null;
             }
             $result = $step;
             $totalCount += $stepCount;

@@ -1,14 +1,5 @@
 --TEST--
 stdlib DOMNode::compareDocumentPosition() document order (#14448, ext/dom/node.c)
---SKIPIF--
-<?php
-if (!class_exists('PHPCompiler\\CompilerVersion')) {
-    require __DIR__ . '/../../../../vendor/autoload.php';
-}
-if (!PHPCompiler\CompilerVersion::supportsDomNodeCompareDocumentPosition()) {
-    die('skip DOMNode::compareDocumentPosition() not advertised on PHP 8.2 reference profile (#14448, ext/dom/node.c)');
-}
-?>
 --FILE--
 <?php
 $doc = new DOMDocument();

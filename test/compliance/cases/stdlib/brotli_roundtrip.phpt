@@ -1,5 +1,10 @@
 --TEST--
 stdlib brotli_compress/brotli_uncompress round-trip via libbrotli FFI (#6814, kjdev/php-ext-brotli)
+--SKIPIF--
+<?php
+if (!\PHPCompiler\CompilerVersion::supportsBrotli()) {
+    die('skip brotli withheld on reference profile (#17563)');
+}
 --FILE--
 <?php
 $plain = 'hello brotli';

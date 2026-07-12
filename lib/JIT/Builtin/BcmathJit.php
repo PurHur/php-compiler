@@ -142,33 +142,32 @@ final class BcmathJit
             // fall through
         }
 
-        $i32 = $context->getTypeFromString('int32');
         $i64 = $context->getTypeFromString('int64');
         $str = $context->getTypeFromString('__string__*');
 
         return match ($name) {
             '__compiler_bcscale' => $context->module->addFunction(
                 $name,
-                $context->context->functionType($i64, false, $i64, $i32)
+                $context->context->functionType($i64, false, $i64, $i64)
             ),
             '__compiler_bcadd',
             '__compiler_bcsub',
             '__compiler_bcmul' => $context->module->addFunction(
                 $name,
-                $context->context->functionType($str, false, $str, $str, $i64, $i32, $i64, $i32)
+                $context->context->functionType($str, false, $str, $str, $i64, $i64, $i64, $i64)
             ),
             '__compiler_bcdiv',
             '__compiler_bcmod' => $context->module->addFunction(
                 $name,
-                $context->context->functionType($str, false, $str, $str, $i64, $i32, $i64, $i32)
+                $context->context->functionType($str, false, $str, $str, $i64, $i64, $i64, $i64)
             ),
             '__compiler_bccomp' => $context->module->addFunction(
                 $name,
-                $context->context->functionType($i64, false, $str, $str, $i64, $i32)
+                $context->context->functionType($i64, false, $str, $str, $i64, $i64)
             ),
             '__compiler_bcpowmod' => $context->module->addFunction(
                 $name,
-                $context->context->functionType($str, false, $str, $str, $str, $i64, $i32, $i64, $i32)
+                $context->context->functionType($str, false, $str, $str, $str, $i64, $i64, $i64, $i64)
             ),
             '__compiler_bcround' => $context->module->addFunction(
                 $name,

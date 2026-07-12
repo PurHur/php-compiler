@@ -66,6 +66,35 @@ final class VmMbstring
         return self::coerceEncodingString($var, $function, $argIndex);
     }
 
+    /** php-src mbfl_name2encoding — optional ?string encoding with ValueError on unknown names (#4405). */
+    public static function resolveValidatedEncodingArg(
+        Variable $var,
+        string $function,
+        int $argIndex,
+        string $default
+    ): string {
+        $encoding = self::coerceEncodingArg($var, $function, $argIndex, $default);
+
+        return MbstringEncodingRegistry::assertValid($encoding, $function, $argIndex);
+    }
+
+    /**
+     * mb_strlen() character count (php-src ext/mbstring/mbstring.c PHP_FUNCTION(mb_strlen); #4405).
+     */
+    public static function strlen(string $string, string $encoding): int
+    {
+        if ('UTF-8' === $encoding) {
+            return VmString::utf8CharLength($string);
+        }
+        if ('ASCII' === $encoding || '8BIT' === $encoding || 'ISO-8859-1' === $encoding) {
+            return VmString::byteLength($string);
+        }
+
+        throw new \LogicException(
+            'mb_strlen() requires mbstring for encoding '.$encoding.' in this compiler build'
+        );
+    }
+
     public static function coerceEncodingString(Variable $var, string $function, int $argIndex = 2): string
     {
         $var = $var->resolveIndirect();
@@ -97,6 +126,58 @@ final class VmMbstring
         return MbstringEncodingRegistry::assertValid($name, $function, $argIndex);
     }
 
+    public static function coerceLanguageArg(Variable $var, string $function, int $argIndex = 0): string
+    {
+        $var = $var->resolveIndirect();
+        if (EnumCaseSupport::isEnumCaseVariable($var)) {
+            throw new \TypeError(sprintf(
+                '%s(): Argument #%d ($language) must be of type string, %s given',
+                $function,
+                $argIndex + 1,
+                EnumCaseSupport::typeNameForVariable($var)
+            ));
+        }
+        if (Variable::TYPE_STRING !== $var->type) {
+            throw new \TypeError(sprintf(
+                '%s(): Argument #%d ($language) must be of type string, %s given',
+                $function,
+                $argIndex + 1,
+                self::typeLabel($var)
+            ));
+        }
+
+        return $var->toString();
+    }
+
+    public static function coerceOptionalHttpInputTypeArg(
+        Variable $var,
+        string $function,
+        int $argIndex = 0
+    ): ?string {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_NULL === $var->type) {
+            return null;
+        }
+        if (EnumCaseSupport::isEnumCaseVariable($var)) {
+            throw new \TypeError(sprintf(
+                '%s(): Argument #%d ($type) must be of type ?string, %s given',
+                $function,
+                $argIndex + 1,
+                EnumCaseSupport::typeNameForVariable($var)
+            ));
+        }
+        if (Variable::TYPE_STRING !== $var->type) {
+            throw new \TypeError(sprintf(
+                '%s(): Argument #%d ($type) must be of type ?string, %s given',
+                $function,
+                $argIndex + 1,
+                self::typeLabel($var)
+            ));
+        }
+
+        return $var->toString();
+    }
+
     public static function validateMode(int $mode, string $function, int $argIndex = 1): int
     {
         if ($mode < MbstringConstants::MB_CASE_UPPER || $mode > MbstringConstants::MB_CASE_TITLE) {
@@ -114,6 +195,147 @@ final class VmMbstring
     public static function isHtmlEntitiesEncoding(string $encoding): bool
     {
         return 0 === strcasecmp($encoding, 'HTML-ENTITIES');
+    }
+
+    /**
+     * mb_detect_encoding() — guess byte-string encoding (php-src ext/mbstring/mbstring.c; #3075).
+     *
+     * @param list<string>|null $encodingList
+     */
+    public static function detectEncoding(
+        string $string,
+        ?array $encodingList = null,
+        bool $strict = false
+    ): string|false {
+        $order = $encodingList ?? MbstringState::detectOrder();
+        if (\in_array('UTF-8', $order, true) && VmString::isValidUtf8($string)) {
+            if (!self::isAsciiByteString($string)) {
+                return 'UTF-8';
+            }
+            $utf8Pos = \array_search('UTF-8', $order, true);
+            $asciiPos = \array_search('ASCII', $order, true);
+            if (false === $asciiPos || (false !== $utf8Pos && $utf8Pos < $asciiPos)) {
+                return 'UTF-8';
+            }
+        }
+        foreach ($order as $encoding) {
+            if ('UTF-8' === $encoding) {
+                continue;
+            }
+            if (self::stringMatchesEncoding($string, $encoding, $strict)) {
+                return $encoding;
+            }
+        }
+        if (\in_array('UTF-8', $order, true) && VmString::isValidUtf8($string)) {
+            return 'UTF-8';
+        }
+
+        return false;
+    }
+
+    /**
+     * @return list<string>
+     */
+    public static function coerceDetectEncodingListArg(
+        Variable $var,
+        string $function,
+        int $argIndex = 1
+    ): array {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_NULL === $var->type) {
+            return MbstringState::detectOrder();
+        }
+        if (Variable::TYPE_STRING === $var->type) {
+            return MbstringEncodingRegistry::parseOrderList($function, $argIndex, $var->toString());
+        }
+        if (Variable::TYPE_ARRAY !== $var->type) {
+            throw new \TypeError(sprintf(
+                '%s(): Argument #%d ($encodings) must be of type array|string|null, %s given',
+                $function,
+                $argIndex + 1,
+                self::typeLabel($var)
+            ));
+        }
+
+        $order = [];
+        foreach ($var->toArray()->iterateKeyed(true) as [, $elem]) {
+            $elem = $elem->resolveIndirect();
+            if (EnumCaseSupport::isEnumCaseVariable($elem)) {
+                throw new \TypeError(sprintf(
+                    '%s(): Argument #%d ($encodings) must be of type array|string|null, %s given',
+                    $function,
+                    $argIndex + 1,
+                    EnumCaseSupport::typeNameForVariable($elem)
+                ));
+            }
+            if (Variable::TYPE_STRING !== $elem->type) {
+                throw new \TypeError(sprintf(
+                    '%s(): Argument #%d ($encodings) must be of type array|string|null, %s given',
+                    $function,
+                    $argIndex + 1,
+                    self::typeLabel($elem)
+                ));
+            }
+            $canonical = MbstringEncodingRegistry::resolve($elem->toString());
+            if (null === $canonical) {
+                throw new \ValueError(sprintf(
+                    '%s(): Argument #%d ($encodings) contains invalid encoding "%s"',
+                    $function,
+                    $argIndex + 1,
+                    $elem->toString()
+                ));
+            }
+            $order[] = $canonical;
+        }
+        MbstringEncodingRegistry::assertNonEmptyOrder($function, $argIndex, $order);
+
+        return $order;
+    }
+
+    private static function stringMatchesEncoding(string $string, string $encoding, bool $strict): bool
+    {
+        $canonical = MbstringEncodingRegistry::resolve($encoding) ?? $encoding;
+        if ('UTF-8' === $canonical) {
+            return VmString::isValidUtf8($string);
+        }
+        if ('ASCII' === $canonical) {
+            return self::isAsciiByteString($string);
+        }
+        if ('ISO-8859-1' === $canonical || '8BIT' === $canonical) {
+            if (!$strict) {
+                return true;
+            }
+
+            return self::strictLatin1RoundTrip($string);
+        }
+        if (null !== CharsetEngine::parseEncodingSpec($canonical)) {
+            return self::checkEncoding($string, $canonical);
+        }
+
+        return false;
+    }
+
+    private static function isAsciiByteString(string $string): bool
+    {
+        $len = \strlen($string);
+        for ($i = 0; $i < $len; ++$i) {
+            if (\ord($string[$i]) >= 0x80) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static function strictLatin1RoundTrip(string $string): bool
+    {
+        $utf8 = CharsetEngine::convert('ISO-8859-1', 'UTF-8', $string);
+        if (false === $utf8) {
+            return false;
+        }
+        $back = CharsetEngine::convert('UTF-8', 'ISO-8859-1', $utf8);
+
+        return false !== $back && $back === $string;
     }
 
     /**
@@ -598,6 +820,51 @@ final class VmMbstring
             'mb_strtoupper',
             1
         );
+    }
+
+    /** php-src ext/mbstring/mbstring.c php_mb_ulcfirst — first multibyte char only (#17609). */
+    public static function ucfirst(string $string, string $encoding = 'UTF-8'): string
+    {
+        return self::ulcfirst(
+            $string,
+            MbstringConstants::MB_CASE_TITLE,
+            $encoding,
+            'mb_ucfirst',
+            1
+        );
+    }
+
+    /** php-src ext/mbstring/mbstring.c php_mb_ulcfirst — first multibyte char only (#17609). */
+    public static function lcfirst(string $string, string $encoding = 'UTF-8'): string
+    {
+        return self::ulcfirst(
+            $string,
+            MbstringConstants::MB_CASE_LOWER,
+            $encoding,
+            'mb_lcfirst',
+            1
+        );
+    }
+
+    private static function ulcfirst(
+        string $string,
+        int $mode,
+        string $encoding,
+        string $function,
+        int $encodingArgIndex
+    ): string {
+        $encoding = MbstringEncodingRegistry::assertValid($encoding, $function, $encodingArgIndex);
+        if ('' === $string) {
+            return $string;
+        }
+        $first = self::substr($string, 0, 1, $encoding);
+        $head = self::convertCase($first, $mode, $encoding, $function, $encodingArgIndex);
+        if ($first === $head) {
+            return $string;
+        }
+        $rest = self::substr($string, 1, null, $encoding);
+
+        return $head.$rest;
     }
 
     public static function coerceStartArg(Frame $frame, string $function, int $argIndex): int
@@ -1346,6 +1613,34 @@ final class VmMbstring
             }
             $elems[] = $elem->toInt();
         }
+
+        return self::validateConvMapElements($elems, $function);
+    }
+
+    /**
+     * JIT/AOT helper path — read convmap from packed hashtable (#7237).
+     *
+     * @return list<int>
+     */
+    public static function convMapFromHashTable(\PHPCompiler\VM\HashTable $ht, string $function): array
+    {
+        $elems = [];
+        foreach ($ht->iterateKeyed(true) as [, $elem]) {
+            $elem = $elem->resolveIndirect();
+            if (Variable::TYPE_INTEGER !== $elem->type) {
+                throw new \ValueError(sprintf(
+                    '%s(): Argument #2 ($map) must only be composed of values of type int',
+                    $function
+                ));
+            }
+            $elems[] = $elem->toInt();
+        }
+
+        return self::validateConvMapElements($elems, $function);
+    }
+
+    public static function validateConvMapElements(array $elems, string $function): array
+    {
         if (0 !== (\count($elems) % 4)) {
             throw new \ValueError(sprintf(
                 '%s(): Argument #2 ($map) must have a multiple of 4 elements',

@@ -170,12 +170,29 @@ final class JitGetParentClass
 
     private static function invokeForClassName(Context $context, string $className): Value
     {
+        if (!self::classExists($context, $className)) {
+            self::emitJitTypeErrorAndAbort($context, self::OBJECT_OR_VALID_CLASS_NAME_TYPE_ERROR, 'string');
+
+            return self::returnFalse($context);
+        }
         $parentName = self::resolveParentDisplayName($context, $className);
         if (null === $parentName) {
             return self::returnFalse($context);
         }
 
         return self::returnString($context, $parentName);
+    }
+
+    private static function classExists(Context $context, string $className): bool
+    {
+        $lc = strtolower(ltrim($className, '\\'));
+        $object = $context->type->object;
+        if ($object->hasUserDeclaredClass($className)) {
+            return true;
+        }
+        $vm = $context->runtime->vmContext;
+
+        return null !== $vm && isset($vm->classes[$lc]);
     }
 
     private static function resolveParentDisplayName(Context $context, string $className): ?string

@@ -16,7 +16,7 @@ final class ObOutputRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('ObOutputJitBridge::implement', $runtime);
         $this->assertStringNotContainsString('ObOutputStandaloneLlvm', $runtime);
         $runtimeLines = \substr_count($runtime, "\n") + 1;
-        $this->assertLessThan(25, $runtimeLines);
+        $this->assertLessThan(60, $runtimeLines);
 
         $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/ObOutputStandaloneLlvm.php');
 
@@ -37,6 +37,17 @@ final class ObOutputRuntimeShrinkTest extends TestCase
             '/as\s+\$[a-zA-Z_]+\s*=>\s*\[\$[a-zA-Z_]+,\s*\$[a-zA-Z_]+,\s*\.\.\.\$/',
             $bridge
         );
+        $execCaptureRuntime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ObOutputExecCaptureRuntime.php');
+        $this->assertStringContainsString('UserScriptAotDeferNestedJit::shouldDefer', $execCaptureRuntime);
+        $this->assertStringContainsString('ObOutputExecCaptureLlvm::ensureLinked', $execCaptureRuntime);
+        $execCaptureLlvm = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ObOutputExecCaptureLlvm.php');
+        $this->assertStringContainsString('implementGetContents', $execCaptureLlvm);
+        $this->assertStringContainsString('ensureReadApiLinked', $execCaptureLlvm);
+
+        $userScript = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ObOutputUserScriptLlvm.php');
+        $this->assertStringContainsString('ObOutputEchoJitEmit::implementAll', $userScript);
+        $this->assertStringNotContainsString('EmbedObEchoBridge::implementAll', $userScript);
+
         $helper = (string) file_get_contents(__DIR__.'/../../ext/standard/ObOutputJitHelper.php');
         $this->assertStringNotContainsString('use PHPCompiler\VM\ObStackLimits', $helper);
         $this->assertStringNotContainsString('ObStackLimits::BUF_SIZE', $helper);

@@ -49,11 +49,19 @@ final class SuperglobalRefreshUserScriptLlvm
     /** Emit __superglobals__refresh native LLVM once prerequisites are linked (#15417). */
     public static function emitRefresh(Context $context): void
     {
+        if ($context->isThinStandaloneAotMain()) {
+            self::ensureDeferredEmitPrerequisites($context);
+        }
+
         $probe = $context->module->getNamedFunction('__superglobals__refresh');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            $context->registerFunction('__superglobals__refresh', $probe);
+            if ($context->isThinStandaloneAotMain() && !self::isUserScriptRefresh($probe)) {
+                self::clearFunctionBody($probe);
+            } else {
+                $context->registerFunction('__superglobals__refresh', $probe);
 
-            return;
+                return;
+            }
         }
 
         $restore = self::captureInsertBlock($context);
@@ -129,7 +137,7 @@ final class SuperglobalRefreshUserScriptLlvm
         $afterPostBb = $fn->appendBasicBlock('sg_user_refresh_after_post');
         $context->builder->branchIf($postBodyEmpty, $afterPostBb, $populatePostBb);
         $context->builder->positionAtEnd($populatePostBb);
-        self::populatePostBodyFromCstrSlot($context, $postHt, $filesHt, $contentTypeCstr, $postBodyCstr);
+        self::populatePostBodyFromCstrSlot($context, $postHt, $contentTypeCstr, $postBodyCstr);
         $context->builder->branch($afterPostBb);
         $context->builder->positionAtEnd($afterPostBb);
 
@@ -327,51 +335,15 @@ final class SuperglobalRefreshUserScriptLlvm
     private static function populatePostBodyFromCstrSlot(
         Context $context,
         Value $postHt,
-        Value $filesHt,
         Value $contentTypeCstr,
         Value $postBodyCstr
     ): void {
-        $fn = $context->builder->getInsertBlock()->getParent();
-        $multipartBb = $fn->appendBasicBlock('sg_user_refresh_post_multipart');
-        $urlencodedBb = $fn->appendBasicBlock('sg_user_refresh_post_urlencoded');
-        $doneBb = $fn->appendBasicBlock('sg_user_refresh_post_done');
-
-        $contentType = $context->builder->load($contentTypeCstr);
-        $contentTypeEmpty = self::isCstrEmpty($context, $contentType);
-        $needle = self::literalCstr($context, 'multipart/form-data');
-        $sizeT = $context->getTypeFromString('size_t');
-        $cmp = $context->builder->call(
-            $context->lookupFunction('strncasecmp'),
-            $contentType,
-            $needle,
-            $sizeT->constInt(19, false)
-        );
-        $prefixMatch = $context->builder->icmp(
-            Builder::INT_EQ,
-            $cmp,
-            $context->getTypeFromString('int32')->constInt(0, false)
-        );
-        $isMultipart = $context->builder->and(
-            $context->builder->not($contentTypeEmpty),
-            $prefixMatch
-        );
-        $context->builder->branchIf($isMultipart, $multipartBb, $urlencodedBb);
-
-        $context->builder->positionAtEnd($multipartBb);
         $context->builder->call(
-            $context->lookupFunction('__phpc_parse_multipart_post'),
+            $context->lookupFunction('__compiler_multipart_populate_post_body'),
             $postHt,
-            $filesHt,
-            $contentType,
+            $context->builder->load($contentTypeCstr),
             $context->builder->load($postBodyCstr)
         );
-        $context->builder->branch($doneBb);
-
-        $context->builder->positionAtEnd($urlencodedBb);
-        self::parseFormEncodedFromCstrSlot($context, $postHt, $postBodyCstr);
-        $context->builder->branch($doneBb);
-
-        $context->builder->positionAtEnd($doneBb);
     }
 
     private static function parseCookieFromCstrSlot(Context $context, Value $ht, Value $cstrSlot): void
@@ -486,6 +458,17 @@ final class SuperglobalRefreshUserScriptLlvm
         }
     }
 
+    /** preg prelink defers user init — link refresh deps without nested Multipart JIT (#16075). */
+    private static function ensureDeferredEmitPrerequisites(Context $context): void
+    {
+        LibcExtern::register($context);
+        ParseStrRuntime::ensureUserScriptLinked($context);
+        MultipartRuntime::ensureUserScriptNoOpPopulateStub($context);
+        EnvironMirrorUserScriptLlvm::ensureLinked($context);
+        self::ensureGlobals($context);
+        self::ensureHeaderQueueExternal($context);
+    }
+
     private static function captureInsertBlock(Context $context): ?\PHPLLVM\BasicBlock
     {
         try {
@@ -503,5 +486,23 @@ final class SuperglobalRefreshUserScriptLlvm
             return;
         }
         $context->builder->clearInsertionPosition();
+    }
+
+    private static function isUserScriptRefresh(LlvmFunction $fn): bool
+    {
+        foreach ($fn->getBasicBlocks() as $block) {
+            if ('sg_user_refresh_entry' === $block->getName()) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static function clearFunctionBody(LlvmFunction $fn): void
+    {
+        foreach (array_reverse($fn->getBasicBlocks()) as $block) {
+            $block->delete();
+        }
     }
 }

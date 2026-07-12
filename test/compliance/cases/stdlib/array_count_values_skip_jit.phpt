@@ -6,9 +6,9 @@ var_export(array_count_values([1.5, 2]));
 echo "\n";
 var_export(array_count_values([new stdClass(), 'b', 'b']));
 echo "\n";
---EXPECT--
-PHP Warning:  array_count_values(): Can only count string and integer values, entry skipped
-PHP Warning:  array_count_values(): Can only count string and integer values, entry skipped
+--EXPECTF--
+PHP Warning:  array_count_values(): Can only count string and integer values, entry skipped in %s on line %d
+PHP Warning:  array_count_values(): Can only count string and integer values, entry skipped in %s on line %d
 array (
   2 => 1,
 )

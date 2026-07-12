@@ -87,6 +87,21 @@ final class DeprecatedAttributeTest extends TestCase
         $this->assertTrue($meta->isDeprecatedForReflection());
     }
 
+    public function testFromDocCommentTextDetectsBareDeprecatedTag(): void
+    {
+        $meta = DeprecatedMetadata::fromDocCommentText("/** @deprecated */");
+        $this->assertNotNull($meta);
+        $this->assertTrue($meta->isDeprecatedForReflection());
+    }
+
+    public function testFromDocCommentTextParsesVersionAndMessage(): void
+    {
+        $meta = DeprecatedMetadata::fromDocCommentText("/** @deprecated 8.4 use Other::X */");
+        $this->assertNotNull($meta);
+        $this->assertSame('8.4', $meta->since);
+        $this->assertSame('use Other::X', $meta->message);
+    }
+
     public function testBareDeprecatedMethodCallIsSilent(): void
     {
         $runtime = new Runtime();

@@ -4,19 +4,215 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\ext\standard\phpc_native_ht_alloc;
+use PHPCompiler\ext\standard\phpc_native_ht_set_hashtable_at;
+use PHPCompiler\ext\standard\phpc_native_ht_set_string_at;
+use PHPCompiler\ext\standard\phpc_native_ht_set_string_key;
+use PHPCompiler\ext\standard\phpc_native_ht_set_string_key_ht;
+use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitNestedHelperCoerce;
+use PHPCompiler\JIT\JitVmHelperLink;
+use PHPLLVM\Builder;
+use PHPLLVM\Value;
+use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for user-script multipart POST populate (#15624).
+ * JIT/AOT link for multipart POST populate in user-script CGI refresh (#15624).
  *
- * User-script thin AOT uses {@see StringMultipartStandaloneLlvm} (init-safe LLVM, no nested JIT).
+ * User-script thin AOT uses {@see MultipartNativeJitHelper} (no nested MultipartParser JIT).
  * php-src: main/rfc1867.c
  */
 final class MultipartRuntime
 {
+    private const HELPER_PATH = '/lib/Web/MultipartNativeJitHelper.php';
+
+    private const POPULATE_POST_BODY_NATIVE = 'PHPCompiler\\Web\\MultipartNativeJitHelper::populatePostBodyNative';
+
+    private const LEGACY_RUNTIME_FUNCTION = '__compiler_multipart_populate_post_body';
+
     public static function ensureUserScriptLinked(Context $context): void
     {
+        self::implementUserScript($context);
+    }
+
+    /** Deferred user init: linkable no-op populate for CLI refresh emit (#16075 tier-2). */
+    public static function ensureUserScriptNoOpPopulateStub(Context $context): void
+    {
+        $probe = $context->module->getNamedFunction(self::LEGACY_RUNTIME_FUNCTION);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction(self::LEGACY_RUNTIME_FUNCTION, $probe);
+
+            return;
+        }
+
+        $fn = null !== $probe ? $probe : self::declareLegacyFunction($context);
+        $entry = $fn->appendBasicBlock('multipart_noop_entry');
+        $context->builder->positionAtEnd($entry);
+        $context->builder->returnVoid();
+        $context->registerFunction(self::LEGACY_RUNTIME_FUNCTION, $fn);
+        $context->builder->clearInsertionPosition();
+    }
+
+    public static function implementUserScript(Context $context): void
+    {
+        $savedBlock = null;
+        try {
+            $savedBlock = $context->builder->getInsertBlock();
+        } catch (\Throwable) {
+        }
+
         ParseStrRuntime::ensureUserScriptLinked($context);
-        StringMultipartStandaloneLlvm::ensureLinked($context);
+        self::ensureFilesystemPrerequisites($context);
+        self::ensureNativeHtInternalProxies($context);
+        JitVmHelperLink::ensureCompiled(
+            $context,
+            self::HELPER_PATH,
+            [self::POPULATE_POST_BODY_NATIVE],
+            '#15624'
+        );
+        self::implementLegacyIfNeeded($context);
+        self::registerLinkedRuntime($context);
+
+        if (null !== $savedBlock) {
+            $context->builder->positionAtEnd($savedBlock);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
+    }
+
+    private static function implementLegacyIfNeeded(Context $context): void
+    {
+        $probe = $context->module->getNamedFunction(self::LEGACY_RUNTIME_FUNCTION);
+        if (null !== $probe && self::legacyBridgeBodyComplete($probe)) {
+            $context->registerFunction(self::LEGACY_RUNTIME_FUNCTION, $probe);
+
+            return;
+        }
+
+        $fn = null !== $probe && $probe->countBasicBlocks() > 0
+            ? $probe
+            : self::declareLegacyFunction($context);
+        self::implementLegacyPopulateBridge($context, $fn);
+        $context->registerFunction(self::LEGACY_RUNTIME_FUNCTION, $fn);
+        $context->builder->clearInsertionPosition();
+    }
+
+    private static function declareLegacyFunction(Context $context): LlvmFunction
+    {
+        $htPtr = $context->getTypeFromString('__hashtable__*');
+        $i8p = $context->getTypeFromString('int8*');
+        $void = $context->getTypeFromString('void');
+
+        return $context->module->addFunction(
+            self::LEGACY_RUNTIME_FUNCTION,
+            $context->context->functionType($void, false, $htPtr, $i8p, $i8p)
+        );
+    }
+
+    private static function implementLegacyPopulateBridge(Context $context, LlvmFunction $fn): void
+    {
+        $entry = $fn->appendBasicBlock('multipart_legacy_bridge_entry');
+        $early = $fn->appendBasicBlock('multipart_legacy_bridge_early');
+        $work = $fn->appendBasicBlock('multipart_legacy_bridge_work');
+        $context->builder->positionAtEnd($entry);
+
+        $post = $fn->getParam(0);
+        $contentTypeCstr = $fn->getParam(1);
+        $bodyCstr = $fn->getParam(2);
+        $htPtr = $context->getTypeFromString('__hashtable__*');
+        $nullPost = $context->builder->icmp(Builder::INT_EQ, $post, $htPtr->constNull());
+        $context->builder->branchIf($nullPost, $early, $work);
+
+        $context->builder->positionAtEnd($early);
+        $context->builder->returnVoid();
+
+        $context->builder->positionAtEnd($work);
+        $filesGlobal = $context->module->getNamedGlobal('sg_FILES');
+        if (null === $filesGlobal) {
+            throw new \LogicException('sg_FILES missing before MultipartRuntime legacy bridge (#15624)');
+        }
+        $files = $context->builder->load(
+            $context->builder->pointerCast($filesGlobal, $htPtr->pointerType(0))
+        );
+        $helperFn = JitVmHelperLink::lookupCompiled($context, self::POPULATE_POST_BODY_NATIVE, '#15624');
+        $contentTypeStr = self::cstrToPhpcString($context, $contentTypeCstr);
+        $bodyStr = self::cstrToPhpcString($context, $bodyCstr);
+        $context->builder->call(
+            $helperFn,
+            JitNestedHelperCoerce::ptrToI64($context, $post),
+            JitNestedHelperCoerce::ptrToI64($context, $files),
+            JitNestedHelperCoerce::coerceArgForHelper($context, $contentTypeStr, $helperFn->getParam(2)->typeOf()),
+            JitNestedHelperCoerce::coerceArgForHelper($context, $bodyStr, $helperFn->getParam(3)->typeOf())
+        );
+        $context->builder->returnVoid();
+    }
+
+    private static function cstrToPhpcString(Context $context, Value $cstr): Value
+    {
+        $i64 = $context->getTypeFromString('int64');
+
+        return $context->builder->call(
+            $context->lookupFunction('__string__init'),
+            $context->builder->zExt(
+                $context->builder->call($context->lookupFunction('strlen'), $cstr),
+                $i64
+            ),
+            $cstr
+        );
+    }
+
+    private static function legacyBridgeBodyComplete(LlvmFunction $fn): bool
+    {
+        if (0 === $fn->countBasicBlocks()) {
+            return false;
+        }
+        try {
+            foreach ($fn->getBasicBlocks() as $block) {
+                if (str_contains($block->getName(), 'multipart_legacy_bridge_work')
+                    && null !== $block->getTerminator()) {
+                    return true;
+                }
+            }
+        } catch (\Throwable) {
+        }
+
+        return false;
+    }
+
+    private static function registerLinkedRuntime(Context $context): void
+    {
+        $fn = $context->module->getNamedFunction(self::LEGACY_RUNTIME_FUNCTION);
+        if (null === $fn || 0 === $fn->countBasicBlocks()) {
+            throw new \LogicException(self::LEGACY_RUNTIME_FUNCTION.' missing after MultipartRuntime bridge (#15624)');
+        }
+        $context->registerFunction(self::LEGACY_RUNTIME_FUNCTION, $fn);
+    }
+
+    /** Register phpc_native_ht_* Internal JIT handlers before nested MultipartNativeJitHelper compile (#15624). */
+    private static function ensureNativeHtInternalProxies(Context $context): void
+    {
+        $internals = [
+            new phpc_native_ht_alloc(),
+            new phpc_native_ht_set_string_key(),
+            new phpc_native_ht_set_string_key_ht(),
+            new phpc_native_ht_set_string_at(),
+            new phpc_native_ht_set_hashtable_at(),
+        ];
+        foreach ($internals as $internal) {
+            $lc = strtolower($internal->getName());
+            $existing = $context->functionProxies[$lc] ?? null;
+            if (null === $existing || $existing instanceof Call\ExternalMethod) {
+                $context->functionProxies[$lc] = $internal;
+            }
+        }
+    }
+
+    /** Upload temp paths in {@see MultipartNativeJitHelper} need real tempnam/file_put_contents lowering (#15624). */
+    private static function ensureFilesystemPrerequisites(Context $context): void
+    {
+        SysGetTempDirRuntime::ensureLinked($context);
+        FsDirRuntime::ensureLinked($context);
+        StringFilePutContents::implement($context);
     }
 }

@@ -16,9 +16,11 @@ final class ArrayShiftRuntimeShrinkTest extends TestCase
     {
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ArrayShiftRuntime.php');
         $this->assertStringContainsString('ArrayShiftJitHelper', $runtime);
-        $this->assertStringContainsString('isNativeArray', $runtime);
-        $this->assertStringContainsString('ArrayBuiltinHelper::shiftFirst', $runtime);
+        $this->assertStringNotContainsString('ArrayBuiltinHelper::shiftFirst', $runtime);
         $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);
+
+        $helper = (string) file_get_contents(__DIR__.'/../../lib/JIT/ArrayBuiltinHelper.php');
+        $this->assertStringNotContainsString('function shiftFirst', $helper);
 
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/array_shift.php');
         $this->assertStringContainsString('ArrayShiftRuntime::shift', $builtin);

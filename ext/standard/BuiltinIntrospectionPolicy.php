@@ -29,6 +29,9 @@ final class BuiltinIntrospectionPolicy
         if ('crc32c' === $lc) {
             return CompilerVersion::advertisesCrc32c();
         }
+        if ('disktotalspace' === $lc) {
+            return CompilerVersion::advertisesDisktotalspace();
+        }
         if ('hebrevc' === $lc) {
             return CompilerVersion::advertisesHebrevc();
         }
@@ -65,8 +68,17 @@ final class BuiltinIntrospectionPolicy
         if (\in_array($lc, ['mb_trim', 'mb_ltrim', 'mb_rtrim'], true)) {
             return CompilerVersion::advertisesMbTrimFunctions();
         }
+        if (\in_array($lc, ['mb_ucfirst', 'mb_lcfirst'], true)) {
+            return CompilerVersion::advertisesMbUcfirstLcfirst();
+        }
         if (\in_array($lc, ['str_increment', 'str_decrement'], true)) {
             return CompilerVersion::advertisesStrIncrement();
+        }
+        if ('get_object_id' === $lc) {
+            return CompilerVersion::advertisesGetObjectId();
+        }
+        if ('clamp' === $lc) {
+            return CompilerVersion::advertisesClamp();
         }
         if ('zend_thread_id' === $lc) {
             return CompilerVersion::advertisesZendThreadId();
@@ -74,11 +86,14 @@ final class BuiltinIntrospectionPolicy
         if ('readonly' === $lc) {
             return CompilerVersion::advertisesReadonlyBuiltin();
         }
-        if ('bcround' === $lc) {
+        if (\in_array($lc, ['bcceil', 'bcfloor', 'bcround'], true)) {
             return CompilerVersion::advertisesBcround();
         }
         if (str_starts_with($lc, 'bc')) {
             return CompilerVersion::advertisesBcmath();
+        }
+        if (\in_array($lc, ['get_error_handler', 'get_exception_handler'], true)) {
+            return CompilerVersion::advertisesGetHandlerIntrospection();
         }
         if (\in_array($lc, [
             'http_get_last_response_headers',
@@ -93,8 +108,11 @@ final class BuiltinIntrospectionPolicy
         if ('stream_context_set_options' === $lc) {
             return CompilerVersion::advertisesStreamContextSetOptions();
         }
-        if ('grapheme_str_contains' === $lc || 'grapheme_strimwidth' === $lc) {
-            return IntlExtensionPolicy::advertisesBuiltins();
+        if ('grapheme_str_contains' === $lc) {
+            return IntlExtensionPolicy::advertisesGraphemeStrContains();
+        }
+        if ('grapheme_strimwidth' === $lc) {
+            return IntlExtensionPolicy::advertisesGraphemeStrimwidth();
         }
         if (\in_array($lc, [
             'grapheme_strlen',
@@ -102,6 +120,10 @@ final class BuiltinIntrospectionPolicy
             'grapheme_strpos',
             'grapheme_extract',
             'grapheme_str_split',
+        ], true)) {
+            return IntlExtensionPolicy::advertisesGraphemeCore();
+        }
+        if (\in_array($lc, [
             'grapheme_stripos',
             'grapheme_stristr',
             'grapheme_strrpos',
@@ -123,6 +145,9 @@ final class BuiltinIntrospectionPolicy
         }
         if (\in_array($lc, ['curl_escape', 'curl_unescape'], true)) {
             return CurlExtensionPolicy::advertisesExtension();
+        }
+        if ('ldap_escape' === $lc) {
+            return \PHPCompiler\ext\ldap\LdapExtensionPolicy::advertisesBuiltins();
         }
         if ('fastcgi_finish_request' === $lc) {
             return VmFastCgi::registersFinishRequestFunction();
@@ -148,6 +173,27 @@ final class BuiltinIntrospectionPolicy
         }
         if ('sqlite3' === $ext) {
             return \PHPCompiler\ext\sqlite3\Sqlite3ExtensionPolicy::advertisesExtension();
+        }
+        if ('brotli' === $ext) {
+            return \PHPCompiler\ext\brotli\BrotliExtensionPolicy::advertisesExtension();
+        }
+        if ('msgpack' === $ext) {
+            return \PHPCompiler\ext\msgpack\MsgpackExtensionPolicy::advertisesExtension();
+        }
+        if ('uri' === $ext) {
+            return \PHPCompiler\ext\uri\UriExtensionPolicy::advertisesExtension();
+        }
+        if ('ldap' === $ext) {
+            return \PHPCompiler\ext\ldap\LdapExtensionPolicy::advertisesExtension();
+        }
+        if ('inotify' === $ext) {
+            return \PHPCompiler\ext\inotify\InotifyExtensionPolicy::advertisesExtension();
+        }
+        if ('zip' === $ext) {
+            return \PHPCompiler\ext\zip\ZipExtensionPolicy::advertisesExtension();
+        }
+        if ('xsl' === $ext) {
+            return \PHPCompiler\ext\xsl\XslExtensionPolicy::advertisesExtension();
         }
 
         return true;

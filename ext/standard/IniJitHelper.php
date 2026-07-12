@@ -56,7 +56,6 @@ final class IniJitHelper
     private const READONLY_BOOL_DEFAULTS = [
         'enable_dl' => false,
         'short_open_tag' => false,
-        'register_argc_argv' => true,
         'zend.enable_gc' => true,
         'session.use_cookies' => true,
         'session.use_only_cookies' => true,
@@ -99,6 +98,17 @@ final class IniJitHelper
         'error_prepend_string',
         'upload_tmp_dir',
         'sys_temp_dir',
+    ];
+
+    /** get_cfg_var() compile-time keys that return '' when unset (#12543, #17881). */
+    private const CFG_EMPTY_STRING_KEYS = [
+        'auto_prepend_file',
+        'auto_append_file',
+        'doc_root',
+        'user_dir',
+        'disable_functions',
+        'disable_classes',
+        'mail.add_x_header',
     ];
 
     private const CFG_DISPLAY_ERRORS = '';
@@ -149,6 +159,18 @@ final class IniJitHelper
     private static int $pcreRecursionLimit = 100_000;
 
     private static string $maxExecutionTime = self::CFG_MAX_EXECUTION_TIME;
+
+    private static bool $registerArgcArgv = true;
+
+    public static function syncRegisterArgcArgv(bool $enabled): void
+    {
+        self::$registerArgcArgv = $enabled;
+    }
+
+    public static function registerArgcArgvEnabled(): bool
+    {
+        return self::$registerArgcArgv;
+    }
 
     public static function getUserAgent(): string
     {
@@ -280,6 +302,9 @@ final class IniJitHelper
         if ('max_execution_time' === $key) {
             return self::$maxExecutionTime;
         }
+        if ('register_argc_argv' === $key) {
+            return VmIni::formatRegisterArgcArgvIniGet(self::$registerArgcArgv);
+        }
 
         return null;
     }
@@ -349,6 +374,9 @@ final class IniJitHelper
         if ('max_execution_time' === $key) {
             return self::setMaxExecutionTime($newValue);
         }
+        if ('register_argc_argv' === $key) {
+            return null;
+        }
 
         return null;
     }
@@ -357,7 +385,7 @@ final class IniJitHelper
     public static function iniCfgGet(string $option): ?string
     {
         $key = strtolower($option);
-        if (in_array($key, self::EMPTY_STRING_INI_KEYS, true)) {
+        if (in_array($key, self::CFG_EMPTY_STRING_KEYS, true)) {
             return '';
         }
         if (isset(self::READONLY_BOOL_DEFAULTS[$key])) {
@@ -431,6 +459,9 @@ final class IniJitHelper
         if ('pcre.recursion_limit' === $key) {
             return self::CFG_PCRE_RECURSION_LIMIT;
         }
+        if ('register_argc_argv' === $key) {
+            return VmIni::formatRegisterArgcArgvIniGet(self::$registerArgcArgv);
+        }
 
         return null;
     }
@@ -490,6 +521,9 @@ final class IniJitHelper
             case 'max_execution_time':
                 self::$maxExecutionTime = self::CFG_MAX_EXECUTION_TIME;
                 ExecutionLimitsJitHelper::applyMaxExecutionTime((int) self::CFG_MAX_EXECUTION_TIME);
+                break;
+            case 'register_argc_argv':
+                self::$registerArgcArgv = true;
                 break;
         }
     }

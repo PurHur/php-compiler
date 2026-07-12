@@ -130,13 +130,17 @@ final class AttributeNames
     }
 
     /**
-     * Zend compile-time guard (zend_compile.c, php-src GH-15731, issue #9734).
-     * `#[\AllowDynamicProperties]` has no meaning on enums.
+     * Zend compile-time guard (zend_attributes.c, php-src GH-15731, issue #9734 / #17402).
+     * `#[\AllowDynamicProperties]` is rejected on enums from PHP 8.5+; Zend 8.2 accepts silently.
      *
      * @param list<string> $names
      */
     public static function assertAllowDynamicPropertiesNotOnEnum(array $names, string $enumDisplay): void
     {
+        if (!\PHPCompiler\CompilerVersion::rejectsAllowDynamicPropertiesOnEnum()) {
+            return;
+        }
+
         if (!self::hasAllowDynamicProperties($names)) {
             return;
         }

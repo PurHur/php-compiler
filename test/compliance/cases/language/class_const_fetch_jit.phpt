@@ -1,5 +1,14 @@
 --TEST--
 Language: JIT class constant fetch literal, variable class, dynamic name (#6964)
+--SKIPIF--
+<?php
+if (!class_exists('PHPCompiler\\CompilerVersion')) {
+    require __DIR__ . '/../../../../vendor/autoload.php';
+}
+if (!PHPCompiler\CompilerVersion::supportsDynamicClassConstFetch()) {
+    die('skip dynamic class const fetch disabled on reference profile');
+}
+?>
 --FILE--
 <?php
 class C {

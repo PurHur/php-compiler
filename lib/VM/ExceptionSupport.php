@@ -153,8 +153,9 @@ final class ExceptionSupport
             $msgVar = $frame->calledArgs[$messageArgIndex]->resolveIndirect();
             if (Variable::TYPE_NULL !== $msgVar->type) {
                 $className = $receiver->class->name;
-                $message = VmString::coerceStringBuiltinArg(
-                    $frame->calledArgs[$messageArgIndex],
+                $message = VmString::internalMethodStringArgForFrame(
+                    $frame,
+                    $messageArgIndex,
                     "{$className}::__construct",
                     0,
                     'message'
@@ -220,8 +221,9 @@ final class ExceptionSupport
         if (array_key_exists(1, $frame->calledArgs)) {
             $msgVar = $frame->calledArgs[1]->resolveIndirect();
             if (Variable::TYPE_NULL !== $msgVar->type) {
-                $message = VmString::coerceStringBuiltinArg(
-                    $frame->calledArgs[1],
+                $message = VmString::internalMethodStringArgForFrame(
+                    $frame,
+                    1,
                     "{$className}::__construct",
                     0,
                     'message'
@@ -255,8 +257,9 @@ final class ExceptionSupport
         if (array_key_exists(4, $frame->calledArgs)) {
             $fileVar = $frame->calledArgs[4]->resolveIndirect();
             if (Variable::TYPE_NULL !== $fileVar->type) {
-                $file = VmString::coerceStringBuiltinArg(
-                    $frame->calledArgs[4],
+                $file = VmString::internalMethodStringArgForFrame(
+                    $frame,
+                    4,
                     "{$className}::__construct",
                     3,
                     'filename'

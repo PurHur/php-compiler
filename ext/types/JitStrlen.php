@@ -37,7 +37,17 @@ final class JitStrlen
             return $context->getTypeFromString('int64')->constInt(0, false);
         }
         if (JITVariable::TYPE_VALUE === $arg->type) {
+            $literal = JitStringArg::compileTimeLiteral($arg);
+            if (null !== $literal) {
+                return $context->getTypeFromString('int64')->constInt(\strlen($literal), false);
+            }
+
             return self::lowerLengthFromValueBox($context, $arg);
+        }
+        if (null !== JitStringArg::compileTimeLiteral($arg)) {
+            $literal = JitStringArg::compileTimeLiteral($arg);
+
+            return $context->getTypeFromString('int64')->constInt(\strlen($literal), false);
         }
         $strPtr = self::lowerStringOperand($context, $arg);
         $doneBlock = BasicBlockHelper::append($context, 'strlen_scalar_done');
@@ -70,7 +80,7 @@ final class JitStrlen
             JitInternalStrictArg::requireString($context, $arg, 'strlen', 'string', 1);
         }
 
-        return JitStringArg::lower($context, $arg, 'strlen() string');
+        return JitStringArg::lowerDominating($context, $arg, 'strlen() string');
     }
 
     public static function lowerBoxedStringOperand(Context $context, JITVariable $arg): Value
@@ -127,7 +137,7 @@ final class JitStrlen
             $context->builder->positionAtEnd($coerceBlock);
         }
 
-        return JitStringArg::lower($context, $arg, 'strlen() string');
+        return JitStringArg::lowerDominating($context, $arg, 'strlen() string');
     }
 
     /** @return Value int64 length */
@@ -199,7 +209,7 @@ final class JitStrlen
             $context->builder->branch($mergeBlock);
         }
         $context->builder->positionAtEnd($coerceBlock);
-        $argValue = JitStringArg::lower($context, $arg, 'strlen() string');
+        $argValue = JitStringArg::lowerDominating($context, $arg, 'strlen() string');
         $coerceLen = self::loadStringLength($context, $argValue);
         if (null === $mergeBlock) {
             return $coerceLen;

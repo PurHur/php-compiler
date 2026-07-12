@@ -1027,6 +1027,20 @@ restart:
                     case OpCode::TYPE_DIV:
                         $result = $this->context->builder->div($leftDouble, $rightValue);
                         goto return_double;
+                    case OpCode::TYPE_EQUAL:
+                        $result = JitValueCompare::looseEqualValueToNativeDouble(
+                            $this->context,
+                            $left,
+                            $rightValue
+                        );
+                        goto return_bool;
+                    case OpCode::TYPE_NOT_EQUAL:
+                        $result = JitValueCompare::notLooseEqualValueToNativeDouble(
+                            $this->context,
+                            $left,
+                            $rightValue
+                        );
+                        goto return_bool;
                 }
             }
             if (Variable::TYPE_NATIVE_LONG === $rightType && self::isOrderedCompareOpcode($opcode->type)) {
@@ -1153,6 +1167,20 @@ restart:
                     case OpCode::TYPE_DIV:
                         $result = $this->context->builder->div($leftValue, $rightDouble);
                         goto return_double;
+                    case OpCode::TYPE_EQUAL:
+                        $result = JitValueCompare::looseEqualNativeDoubleToValue(
+                            $this->context,
+                            $leftValue,
+                            $right
+                        );
+                        goto return_bool;
+                    case OpCode::TYPE_NOT_EQUAL:
+                        $result = JitValueCompare::notLooseEqualNativeDoubleToValue(
+                            $this->context,
+                            $leftValue,
+                            $right
+                        );
+                        goto return_bool;
                 }
             }
             if (Variable::TYPE_NATIVE_LONG === $leftType && self::isOrderedCompareOpcode($opcode->type)) {

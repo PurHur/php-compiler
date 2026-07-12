@@ -42,6 +42,9 @@ final class ClassConstDynamicJITTest extends BaseTest
      */
     public function testJitLintDynamicClassConstFixture(string $basename): void
     {
+        if (!CompilerVersion::supportsDynamicClassConstFetch()) {
+            $this->markTestSkipped('dynamic class const fetch disabled on reference profile');
+        }
         if (!LlvmToolchain::isReady(dirname(__DIR__, 2))) {
             $this->markTestSkipped('LLVM 9 toolchain not available');
         }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT;
 
+use PHPCompiler\JIT\Builtin\InArrayRuntime;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\VM\InOperatorJitHelper;
 use PHPLLVM\Value;
@@ -28,7 +29,7 @@ final class InOperatorHelper
     {
         self::guardHaystackIsArray($context, $needle, $haystack);
         $strict = $context->constantFromBool(true);
-        $found = ArrayBuiltinHelper::inArray($context, $needle, $haystack, $strict, 'in_op');
+        $found = InArrayRuntime::inArray($context, $needle, $haystack, $strict);
 
         return new Variable(
             $context,

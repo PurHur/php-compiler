@@ -293,7 +293,7 @@ final class PropertyHookDispatchLlvm
         $meta = $context->runtime->vmContext->propertyHookRegistry[$lcClass][$propertyName]
             ?? $context->runtime->vmContext->propertyHookRegistry[$lcClass][$propLc]
             ?? null;
-        if (!is_array($meta) || empty($meta['virtual']) || isset($meta['set'])) {
+        if (!is_array($meta) || isset($meta['set']) || !isset($meta['get'])) {
             return false;
         }
         if (self::propertyHasDistinctAsymmetricSetVisibility($context, $className, $propertyName, $staticProperty)) {
@@ -313,7 +313,9 @@ final class PropertyHookDispatchLlvm
             return false;
         }
 
-        $message = sprintf('Property %s::$%s is read-only', $className, $propertyName);
+        $message = !empty($meta['virtual'])
+            ? sprintf('Property %s::$%s is read-only', $className, $propertyName)
+            : sprintf('Cannot write property %s::$%s without set hook', $className, $propertyName);
         if (null !== $jit && [] !== $context->tryCatch->handlerStack) {
             TryCatchHelper::emitCatchableErrorMessage($context, $jit, $message);
         } else {

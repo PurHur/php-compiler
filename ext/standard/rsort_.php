@@ -16,7 +16,7 @@ use PHPLLVM\Value;
 /**
  * rsort() — sort by value descending, reindex (subset of PHP; issue #2300, #9123).
  *
- * VM: homogeneous packed string or integer lists. JIT/AOT: __hashtable__sortPackedReverse.
+ * VM: homogeneous packed string or integer lists. JIT/AOT: SortJitHelper via SortRuntime.
  */
 final class rsort_ extends Internal
 {

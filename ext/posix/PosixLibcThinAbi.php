@@ -109,6 +109,16 @@ final class PosixLibcThinAbi
         return (int) $ffi->setpgid($pid, $pgid);
     }
 
+    public static function kill(int $pid, int $sig): int
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return -1;
+        }
+
+        return (int) $ffi->kill($pid, $sig);
+    }
+
     /**
      * times(2) system tick counter since boot — read-only thin ABI (#13524).
      */
@@ -160,6 +170,7 @@ typedef unsigned int uid_t;
 typedef unsigned int gid_t;
 int mknod(const char *pathname, mode_t mode, dev_t dev);
 int mkfifo(const char *pathname, mode_t mode);
+int kill(pid_t pid, int sig);
 int setuid(uid_t uid);
 int setgid(gid_t gid);
 int seteuid(uid_t uid);

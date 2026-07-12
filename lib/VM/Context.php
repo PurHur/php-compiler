@@ -61,6 +61,15 @@ class Context {
 
     public Runtime $runtime;
 
+    /** Active declare(ticks=N) interval; 0 disables tick dispatch (#3343). */
+    public int $tickInterval = 0;
+
+    /** Countdown to next tick callback invocation (#3343). */
+    public int $tickCounter = 0;
+
+    /** @var list<int> Saved tick intervals for nested declare blocks (#3343). */
+    public array $tickIntervalStack = [];
+
     /**
      * Property-hook virtual/backing metadata from {@see \PHPCompiler\SourcePreprocessor\PropertyHooks} (#4687).
      *
@@ -517,9 +526,28 @@ class Context {
                 return false;
             }
         }
-        $this->constants[$name] = clone $value;
+        $this->constants[$name] = EnumCaseSupport::materializeConstantValue($this, $value);
 
         return true;
+    }
+
+    /** True when a live user constant still holds the given object id (#17676). */
+    public function userConstantReferencesObjectId(int $objectId): bool
+    {
+        foreach ($this->constants as $constVar) {
+            $resolved = $constVar->resolveIndirect();
+            if (Variable::TYPE_OBJECT !== $resolved->type) {
+                continue;
+            }
+            try {
+                if ($resolved->toObject()->id === $objectId) {
+                    return true;
+                }
+            } catch (\LogicException) {
+            }
+        }
+
+        return false;
     }
 
     public function declareFunction(Func $func): void {

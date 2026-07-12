@@ -94,6 +94,11 @@ final class ModuleRegistryTest extends TestCase
 
         $this->assertNull(ModuleRegistry::getExtensionFunctions('missing_ext'));
 
+        $advertised = ModuleRegistry::advertisedInternalFunctionNames();
+        $this->assertContains('ctype_alnum', $advertised);
+        $this->assertContains('filter_var', $advertised);
+        $this->assertContains('strlen', $advertised);
+
         unset($runtime);
     }
 }

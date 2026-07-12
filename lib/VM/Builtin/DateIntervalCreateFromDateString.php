@@ -61,9 +61,10 @@ final class DateIntervalCreateFromDateString extends VmClassMethod
             return;
         }
 
-        $interval = DateIntervalSupport::createFromState(
+        $interval = DateIntervalSupport::createFromDateString(
             $frame->vmContext,
-            [...$parsed, 'days' => false]
+            $datetime,
+            $parsed
         );
         BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($interval): void {
             $ret->object($interval);

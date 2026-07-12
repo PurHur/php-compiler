@@ -21,11 +21,22 @@ for ($i = 0; $i < $n; ++$i) {
     ];
 }
 
-echo json_encode(
-    [
-        'user_release_ready' => getenv('_RR_READY') ?: 'no',
-        'mode' => getenv('_RR_MODE') ?: 'quick',
-        'gates' => $gates,
-    ],
-    JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT
-), "\n";
+$honestCompile = null;
+$honestJson = getenv('_RR_HONEST_COMPILE_JSON');
+if (false !== $honestJson && '' !== $honestJson) {
+    $decoded = json_decode($honestJson, true);
+    if (is_array($decoded)) {
+        $honestCompile = $decoded;
+    }
+}
+
+$payload = [
+    'user_release_ready' => getenv('_RR_READY') ?: 'no',
+    'mode' => getenv('_RR_MODE') ?: 'quick',
+    'gates' => $gates,
+];
+if (null !== $honestCompile) {
+    $payload['honest_compile'] = $honestCompile;
+}
+
+echo json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT), "\n";

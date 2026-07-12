@@ -11,23 +11,23 @@ namespace PHPCompiler\VM;
  */
 final class OutputBufferHandlers
 {
-    /** @var null|callable(string, string, ?Context): string */
+    /** @var null|callable(string, null|string|Variable|ClosureState, ?Context): string */
     private static $processor = null;
 
     /**
-     * @param null|callable(string, string, ?Context): string $processor
+     * @param null|callable(string, null|string|Variable|ClosureState, ?Context): string $processor
      */
     public static function register(?callable $processor): void
     {
         self::$processor = $processor;
     }
 
-    public static function apply(string $content, string $handlerName, ?Context $ctx): string
+    public static function apply(string $content, null|string|Variable|ClosureState $handler, ?Context $ctx): string
     {
         if (null === self::$processor) {
             return $content;
         }
 
-        return (self::$processor)($content, $handlerName, $ctx);
+        return (self::$processor)($content, $handler, $ctx);
     }
 }

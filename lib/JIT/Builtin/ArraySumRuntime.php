@@ -13,7 +13,7 @@ use PHPLLVM\Value;
 /**
  * JIT/AOT link for array_sum() via ArraySumJitHelper PHP (#12590).
  *
- * Standalone AOT compiles {@see ArraySumJitHelper} via JitVmHelperLink bridge (#14358); native literal arrays keep LLVM in {@see ArrayBuiltinHelper::arraySum()}.
+ * Standalone AOT and native literal arrays materialize to hashtable then route through PHP (#18133).
  * SSOT: {@see \PHPCompiler\ext\standard\ArraySumJitHelper}
  * php-src: ext/standard/array.c — PHP_FUNCTION(array_sum)
  */
@@ -32,12 +32,10 @@ final class ArraySumRuntime
 
     public static function sum(Context $context, JITVariable $array): Value
     {
-        if (ArrayBuiltinHelper::isNativeArray($array->type)) {
-            return ArrayBuiltinHelper::arraySum($context, $array);
-        }
-
         self::ensureLinked($context);
-        $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
+        $ht = ArrayBuiltinHelper::isNativeArray($array->type)
+            ? ArrayBuiltinHelper::nativeListToHashTable($context, $array)
+            : ArrayBuiltinHelper::loadHashTable($context, $array);
 
         return $context->builder->call(
             $context->lookupFunction(self::ABI_SUM),

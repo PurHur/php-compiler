@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Call;
 
-use PHPCompiler\JIT\ArrayBuiltinHelper;
+use PHPCompiler\JIT\Builtin\ArrayPadRuntime;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
@@ -27,7 +27,7 @@ final class HashTablePadCopy implements Call
             $htVar = new Variable($context, Variable::TYPE_HASHTABLE, Variable::KIND_VALUE, $htPtr);
         }
 
-        return ArrayBuiltinHelper::pad($context, $htVar, self::lengthAsI64($context, $args[1]), $args[2]);
+        return ArrayPadRuntime::pad($context, $htVar, self::lengthAsI64($context, $args[1]), $args[2]);
     }
 
     private static function lengthAsI64(Context $context, Variable $length): Value

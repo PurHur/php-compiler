@@ -8,18 +8,18 @@ if (!function_exists('array_any_key')) {
 }
 
 $a = ['x' => 1, 'y' => 2, 'z' => 3];
-if (!array_any_key($a, fn ($v, $k) => $k === 'y' && $v === 2)) {
+if (!array_any_key($a, fn ($k, $v) => $k === 'y' && $v === 2)) {
     echo "fail: key y value 2\n";
     exit(1);
 }
 
 $b = [10, 20, 30];
-if (!array_any_key($b, fn ($v, $k) => $k === 2 && $v === 30)) {
+if (!array_any_key($b, fn ($k, $v) => $k === 2 && $v === 30)) {
     echo "fail: int key 2\n";
     exit(1);
 }
 
-if (array_any_key($a, fn ($v, $k) => $k === 'missing')) {
+if (array_any_key($a, fn ($k, $v) => $k === 'missing')) {
     echo "fail: no missing key\n";
     exit(1);
 }

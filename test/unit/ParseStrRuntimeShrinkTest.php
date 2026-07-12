@@ -70,7 +70,8 @@ final class ParseStrRuntimeShrinkTest extends TestCase
         $this->assertFileDoesNotExist($this->repoRoot.'/lib/JIT/Builtin/ParseStrNativeLlvm.php');
         $this->assertFileExists($this->repoRoot.'/lib/JIT/Builtin/ParseStrUserScriptDelimitedJit.php');
         $this->assertFileExists($this->repoRoot.'/lib/JIT/Builtin/MultipartRuntime.php');
-        $this->assertFileExists($this->repoRoot.'/lib/JIT/Builtin/StringMultipartStandaloneLlvm.php');
+        $this->assertFileDoesNotExist($this->repoRoot.'/lib/JIT/Builtin/StringMultipartStandaloneLlvm.php');
+        $this->assertFileExists($this->repoRoot.'/lib/Web/MultipartNativeJitHelper.php');
     }
 
     public function testParseStrUserScriptDelimitedJitRestoredForUserScriptAot(): void

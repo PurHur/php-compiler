@@ -1,0 +1,24 @@
+{
+  "issue": 15606,
+  "version": 1,
+  "supported": {
+    "os": "linux",
+    "arch": "x86_64",
+    "llvm_major": 9,
+    "reference_image": "php-compiler:22.04-dev",
+    "ram_ci_gb": 8,
+    "ram_docker_gb": 10,
+    "glibc": true
+  },
+  "non_goals": [
+    "macos",
+    "linux_aarch64",
+    "windows_native",
+    "llvm_14_default_bootstrap"
+  ],
+  "doc": "docs/bootstrap-sdk-platform.md",
+  "related_docs": [
+    "docs/bootstrap-dev-workflow.md",
+    "docs/GETTING-STARTED.md"
+  ]
+}

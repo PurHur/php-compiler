@@ -239,6 +239,42 @@ final class VmString
     }
 
     /**
+     * Internal method string param — frame arg index may include $this (#18189, zend_exceptions.c).
+     *
+     * @throws \TypeError when caller strict_types rejects non-string operands
+     */
+    public static function internalMethodStringArgForFrame(
+        Frame $frame,
+        int $frameArgIndex,
+        string $function,
+        int $userArgIndex,
+        string $paramName
+    ): string {
+        if (InternalStrictArg::isCallerStrict($frame)) {
+            $arg = $frame->calledArgs[$frameArgIndex]->resolveIndirect();
+            if (Variable::TYPE_STRING !== $arg->type) {
+                throw new \TypeError(
+                    self::stringBuiltinTypeError(
+                        $function,
+                        $userArgIndex,
+                        $paramName,
+                        VmStreamArg::debugTypeName($arg)
+                    )
+                );
+            }
+
+            return $arg->toString();
+        }
+
+        return self::coerceStringBuiltinArg(
+            $frame->calledArgs[$frameArgIndex],
+            $function,
+            $userArgIndex,
+            $paramName
+        );
+    }
+
+    /**
      * Coerce a path builtin operand (php-src Z_PARAM_PATH; rejects embedded NUL, #4401).
      *
      * @throws \ValueError when the path contains a null byte
@@ -250,6 +286,10 @@ final class VmString
         int $argIndex = 0,
         string $paramName = 'path'
     ): string {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_NULL === $var->type) {
+            return '';
+        }
         $str = self::coerceStringBuiltinArg($var, $function, $argIndex, $paramName);
         if (str_contains($str, "\0")) {
             throw new \ValueError(
@@ -361,6 +401,69 @@ final class VmString
         }
 
         return self::coerceOperand($var);
+    }
+
+    /**
+     * Coerce a typed ?string builtin operand (php-src Z_PARAM_STR_OR_NULL; string|null only, #17765).
+     *
+     * @throws \TypeError when the operand is not string or null
+     */
+    public static function coerceTypedNullableStringBuiltinArg(
+        Variable $var,
+        string $function,
+        int $argIndex = 0,
+        string $paramName = 'string'
+    ): ?string {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_NULL === $var->type) {
+            return null;
+        }
+        if (Variable::TYPE_STRING === $var->type) {
+            return $var->toString();
+        }
+        if (Variable::TYPE_ARRAY === $var->type) {
+            throw new \TypeError(self::nullableStringBuiltinTypeError($function, $argIndex, $paramName, 'array'));
+        }
+        if (RuntimeStrictness::enforceStringBuiltinParityGuards() && EnumCaseSupport::isEnumCaseVariable($var)) {
+            throw new \TypeError(
+                self::nullableStringBuiltinTypeError(
+                    $function,
+                    $argIndex,
+                    $paramName,
+                    EnumCaseSupport::typeNameForVariable($var)
+                )
+            );
+        }
+        if (Variable::TYPE_OBJECT === $var->type) {
+            throw new \TypeError(
+                self::nullableStringBuiltinTypeError(
+                    $function,
+                    $argIndex,
+                    $paramName,
+                    $var->toObject()->class->name
+                )
+            );
+        }
+
+        throw new \TypeError(
+            self::nullableStringBuiltinTypeError(
+                $function,
+                $argIndex,
+                $paramName,
+                self::builtinScalarTypeName($var)
+            )
+        );
+    }
+
+    private static function builtinScalarTypeName(Variable $var): string
+    {
+        return match ($var->type) {
+            Variable::TYPE_BOOLEAN => 'bool',
+            Variable::TYPE_INTEGER => 'int',
+            Variable::TYPE_FLOAT => 'float',
+            Variable::TYPE_RESOURCE => 'resource',
+            default => 'mixed',
+        };
     }
 
     /**
@@ -2252,7 +2355,8 @@ final class VmString
                 ($ord >= 48 && $ord <= 57)
                 || ($ord >= 65 && $ord <= 90)
                 || ($ord >= 97 && $ord <= 122)
-                || $ch === '-' || $ch === '_' || $ch === '.' || $ch === '~'
+                || $ch === '-' || $ch === '_' || $ch === '.'
+                || (!$formEncoding && $ch === '~')
             ) {
                 $out .= $ch;
             } elseif ($formEncoding && $ch === ' ') {
@@ -3648,7 +3752,7 @@ final class VmString
     public static function strIncrement(string $string): string
     {
         if ('' === $string) {
-            throw new \Error('str_increment(): Argument #1 ($string) must not be empty');
+            throw new \ValueError('str_increment(): Argument #1 ($string) must not be empty');
         }
         if (!self::onlyAsciiAlphanumeric($string)) {
             throw new \ValueError('str_increment(): Argument #1 ($string) must be composed only of alphanumeric ASCII characters');
@@ -3757,7 +3861,7 @@ final class VmString
     public static function strDecrement(string $string): string
     {
         if ('' === $string) {
-            throw new \Error('str_decrement(): Argument #1 ($string) must not be empty');
+            throw new \ValueError('str_decrement(): Argument #1 ($string) must not be empty');
         }
         if (!self::onlyAsciiAlphanumeric($string)) {
             throw new \ValueError('str_decrement(): Argument #1 ($string) must be composed only of alphanumeric ASCII characters');
@@ -5232,7 +5336,8 @@ final class VmString
         $suffixLen = self::byteLength($suffix);
         if ($suffixLen > 0) {
             $baseLen = self::byteLength($base);
-            if ($baseLen >= $suffixLen
+            // php-src basename.c: strip only when basename is strictly longer than suffix.
+            if ($baseLen > $suffixLen
                 && self::compareBytes($base, $suffix, $suffixLen, $baseLen - $suffixLen)) {
                 return self::byteSlice($base, 0, $baseLen - $suffixLen);
             }
@@ -5439,19 +5544,27 @@ final class VmString
      */
     public static function strtok(?string $str, ?string $tok = null): string|false
     {
-        if (null === $str) {
-            if (null === $tok || null === self::$strtokString) {
+        if (null !== $tok) {
+            // php-src: second parameter provided — (re)init; null haystack leaves no buffer (#5515).
+            if (null === $str) {
+                self::strtokReset();
+
                 return false;
             }
-            $delimiter = $tok;
-        } elseif (null !== $tok) {
             self::$strtokString = $str;
             self::$strtokLast = 0;
             $delimiter = $tok;
+        } elseif (null === $str) {
+            if (null === self::$strtokString) {
+                return false;
+            }
+            // One-arg strtok(null): tok = str (null); php-src uses null delimiter (remainder token).
+            $delimiter = '';
         } else {
             if (null === self::$strtokString) {
                 return false;
             }
+            // One-arg strtok($token): continue with delimiter string (php-src tok = str).
             $delimiter = $str;
         }
 

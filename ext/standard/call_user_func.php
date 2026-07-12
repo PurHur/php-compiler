@@ -27,7 +27,10 @@ final class call_user_func extends Internal
     {
         $argc = \count($frame->calledArgs);
         if ($argc < 1) {
-            throw new \LogicException('call_user_func() requires at least one argument');
+            throw new \ArgumentCountError(\sprintf(
+                'call_user_func() expects at least 1 argument, %d given',
+                $argc
+            ));
         }
         $ctx = VmReflection::requireContext($frame);
         $callback = $frame->calledArgs[0];
@@ -67,8 +70,12 @@ final class call_user_func extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (\count($args) < 1) {
-            throw new \LogicException('call_user_func() requires at least one argument');
+        $argc = \count($args);
+        if ($argc < 1) {
+            throw new \ArgumentCountError(\sprintf(
+                'call_user_func() expects at least 1 argument, %d given',
+                $argc
+            ));
         }
 
         return JitCallUserFunc::invoke($context, $args[0], \array_slice($args, 1));

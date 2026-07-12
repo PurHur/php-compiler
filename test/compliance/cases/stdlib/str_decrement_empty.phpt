@@ -1,5 +1,5 @@
 --TEST--
-str_decrement(): empty string throws Error (#9277, php-src)
+str_decrement(): empty string throws ValueError (#18061, ext/standard/string.c)
 --FILE--
 <?php
 try {
@@ -9,5 +9,5 @@ try {
     echo $e->getMessage(), "\n";
 }
 --EXPECT--
-Error
+ValueError
 str_decrement(): Argument #1 ($string) must not be empty

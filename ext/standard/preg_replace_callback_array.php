@@ -14,7 +14,7 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * preg_replace_callback_array() — VM any callable; JIT/AOT string user-function callbacks (#3568).
+ * preg_replace_callback_array() — VM any callable; JIT/AOT via PregReplaceCallbackArrayRuntime (#3568).
  *
  * php-src: ext/pcre/php_pcre.c — PHP_FUNCTION(preg_replace_callback_array)
  */

@@ -2,6 +2,8 @@
 stdlib file/path builtins JIT — null filename coerces to empty string (#13354)
 --FILE--
 <?php
+error_reporting(E_ALL & ~E_DEPRECATED);
+ini_set('display_errors', '1');
 $fail = 0;
 if (false !== file_exists(null)) {
     ++$fail;

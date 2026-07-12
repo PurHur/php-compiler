@@ -7,11 +7,11 @@ namespace PHPCompiler\ext\msgpack;
 use PHPCompiler\ModuleAbstract;
 
 /**
- * msgpack extension module entry (php-src ext/msgpack/msgpack.c; issue #7032).
+ * msgpack extension module entry (php-src ext/msgpack/msgpack.c; #6551, #17994).
  *
- * MessagePack encode/decode tracked in #6551. Register under {@see standard} so
- * extension_loaded('msgpack') and function_exists('msgpack_*') stay false until
- * pack/unpack are implemented (#11986), matching ZipArchive/gd phantom pattern.
+ * Register under {@see standard}; advertise logical {@code msgpack} extension and
+ * msgpack_pack()/msgpack_unpack() when {@see MsgpackExtensionPolicy::advertisesExtension()}
+ * — withheld on reference profile (Zend 8.2 has no ext/msgpack).
  */
 class Module extends ModuleAbstract
 {
@@ -20,8 +20,27 @@ class Module extends ModuleAbstract
         return 'standard';
     }
 
+    /**
+     * @return list<string>
+     */
+    public function getAdditionalExtensionNames(): array
+    {
+        if (!MsgpackExtensionPolicy::advertisesExtension()) {
+            return [];
+        }
+
+        return ['msgpack'];
+    }
+
     public function getFunctions(): array
     {
-        return [];
+        if (!MsgpackExtensionPolicy::advertisesExtension()) {
+            return [];
+        }
+
+        return [
+            new msgpack_pack(),
+            new msgpack_unpack(),
+        ];
     }
 }

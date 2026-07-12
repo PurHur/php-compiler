@@ -31,7 +31,6 @@ final class str_starts_with extends Internal
     public function execute(Frame $frame): void
     {
         $this->requireExactArgCount($frame, 'str_starts_with', 2);
-        InternalStrictArg::rejectNullString($frame->calledArgs[0], 'str_starts_with', 'haystack', 0, $frame);
         InternalStrictArg::rejectNullString($frame->calledArgs[1], 'str_starts_with', 'needle', 1, $frame);
         $haystackStr = self::vmStringArg($frame, 0, 'haystack');
         $needleStr = self::vmStringArg($frame, 1, 'needle');
@@ -46,7 +45,6 @@ final class str_starts_with extends Internal
         if (!$this->requireExactJitArgCount($context, $args, 'str_starts_with', 2)) {
             return $context->getTypeFromString('int1')->constInt(0, false);
         }
-        JitInternalStrictArg::rejectNullString($context, $args[0], 'str_starts_with', 'haystack', 1);
         JitInternalStrictArg::rejectNullString($context, $args[1], 'str_starts_with', 'needle', 2);
         $hay = JitStringBuiltinArg::lowerCoercible($context, $args[0], 'str_starts_with', 0, 'haystack');
         $needle = JitStringBuiltinArg::lowerCoercible($context, $args[1], 'str_starts_with', 1, 'needle');
@@ -56,15 +54,6 @@ final class str_starts_with extends Internal
 
     private static function vmStringArg(Frame $frame, int $argIndex, string $paramName): string
     {
-        if (InternalStrictArg::isCallerStrict($frame)) {
-            return InternalStrictArg::requireString($frame, $argIndex, 'str_starts_with', $paramName)->toString();
-        }
-
-        return VmString::coerceStringBuiltinArg(
-            $frame->calledArgs[$argIndex],
-            'str_starts_with',
-            $argIndex,
-            $paramName
-        );
+        return VmString::stringBuiltinArgForFrame($frame, $argIndex, 'str_starts_with', $argIndex, $paramName);
     }
 }

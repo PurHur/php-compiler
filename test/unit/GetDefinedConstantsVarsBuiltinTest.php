@@ -21,6 +21,11 @@ final class GetDefinedConstantsVarsBuiltinTest extends BaseTest
         foreach ([
             'get_defined_constants_vars.phpt',
             'get_defined_constants_vars_jit.phpt',
+            'get_defined_constants_calendar_group.phpt',
+            'get_defined_constants_categorize.phpt',
+            'get_defined_constants_module_buckets.phpt',
+            'get_defined_constants_phantom_modules.phpt',
+            'get_defined_constants_user_bucket.phpt',
             'get_defined_vars_extract.phpt',
             'get_defined_vars_extract_jit.phpt',
         ] as $file) {

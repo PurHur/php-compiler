@@ -33,11 +33,7 @@ class Module extends ModuleAbstract
         if (IntlExtensionPolicy::advertisesBuiltins()) {
             BuiltinClasses::register($runtime->vmContext);
         }
-        foreach ([
-            'GRAPHEME_EXTR_COUNT' => VmGrapheme::EXTR_COUNT,
-            'GRAPHEME_EXTR_MAXBYTES' => VmGrapheme::EXTR_MAXBYTES,
-            'GRAPHEME_EXTR_MAXCHARS' => VmGrapheme::EXTR_MAXCHARS,
-        ] as $name => $value) {
+        foreach (IntlConstants::registeredConstants() as $name => $value) {
             $var = new VM\Variable();
             $var->int($value);
             $runtime->vmContext->defineConstant($name, $var);
@@ -58,7 +54,6 @@ class Module extends ModuleAbstract
             return [
                 ...$functions,
                 ...IntlExtensionPolicy::profileLocaleParserFunctions(),
-                ...IntlExtensionPolicy::profileGraphemeFunctions(),
             ];
         }
 

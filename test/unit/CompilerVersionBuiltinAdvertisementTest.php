@@ -29,6 +29,11 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsSortingEnum());
     }
 
+    public function testRangeWithheldOnReferenceProfile(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsRange());
+    }
+
     public function testBuiltinStubEnumsWithheldOnReferenceProfile(): void
     {
         $this->assertFalse(CompilerVersion::supportsBuiltinStubEnums());
@@ -57,6 +62,34 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
     public function testMbStrPadWithheldOnReferenceProfileUntilStable84(): void
     {
         $this->assertFalse(CompilerVersion::supportsMbStrPad());
+    }
+
+    public function testMbUcfirstLcfirstWithheldOnReferenceProfileUntilStable84(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsMbUcfirstLcfirst());
+        $this->assertFalse(CompilerVersion::advertisesMbUcfirstLcfirst());
+    }
+
+    public function testGetObjectIdWithheldOnReferenceProfile(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsGetObjectId());
+        $this->assertFalse(CompilerVersion::advertisesGetObjectId());
+    }
+
+    public function testGetObjectIdAdvertisedOnForwardProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.3');
+        try {
+            $this->assertTrue(CompilerVersion::supportsGetObjectId());
+            $this->assertTrue(CompilerVersion::advertisesGetObjectId());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
     }
 
     public function testStrIncrementWithheldOnReferenceProfile(): void
@@ -273,6 +306,22 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         }
     }
 
+    public function testMbUcfirstLcfirstAdvertisedOnForwardProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertTrue(CompilerVersion::supportsMbUcfirstLcfirst());
+            $this->assertTrue(CompilerVersion::advertisesMbUcfirstLcfirst());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     public function testStreamSupportsAdvertisedOnForwardProfile(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
@@ -326,6 +375,24 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         putenv('PHP_COMPILER_PROFILE=8.4');
         try {
             $this->assertTrue(CompilerVersion::supportsRoundingModeEnum());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testDeprecatedAttributeClassAdvertisedOnForwardProfile(): void
+    {
+        $this->assertFalse(CompilerVersion::advertisesDeprecatedAttributeClass());
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertTrue(CompilerVersion::advertisesDeprecatedAttributeClass());
+            $runtime = new Runtime();
+            $this->assertTrue(isset($runtime->vmContext->classes['deprecated']));
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');
@@ -538,6 +605,30 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
     public function testDisktotalspaceNotAdvertisedOnReferenceProfile(): void
     {
         $this->assertFalse(CompilerVersion::supportsDisktotalspace());
+        $this->assertFalse(CompilerVersion::advertisesDisktotalspace());
+        $runtime = new Runtime();
+        $this->assertFalse(isset($runtime->vmContext->functions['disktotalspace']));
+    }
+
+    public function testForwardGatedBuiltinsRegisteredOnProfile84(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertTrue(CompilerVersion::supportsStrxfrm());
+            $this->assertTrue(CompilerVersion::supportsConvertCyrString());
+            $this->assertTrue(CompilerVersion::supportsGetmygrgid());
+            $runtime = new Runtime();
+            foreach (['strxfrm', 'convert_cyr_string', 'getmygrgid'] as $fn) {
+                $this->assertTrue(isset($runtime->vmContext->functions[$fn]), $fn);
+            }
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
     }
 
     public function testCrc32cWithheldOnReferenceProfile(): void
@@ -726,13 +817,13 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         }
     }
 
-    public function testVmRegistersGeneratorToArrayOnDefaultDevProfile(): void
+    public function testVmDoesNotRegisterGeneratorToArrayOnReferenceProfile(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE');
         try {
             $runtime = new Runtime();
-            $this->assertTrue(isset($runtime->vmContext->functions['generator_to_array']));
+            $this->assertFalse(isset($runtime->vmContext->functions['generator_to_array']));
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');

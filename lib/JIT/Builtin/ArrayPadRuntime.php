@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\ArrayBuiltinHelper;
-use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\JitVmHelperLink;
@@ -13,9 +12,9 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * JIT/AOT link for array_pad() via ArrayPadJitHelper PHP (#12476).
+ * JIT/AOT link for array_pad() via ArrayPadJitHelper PHP (#12476, #18121).
  *
- * Standalone AOT compiles {@see ArrayPadJitHelper} via JitVmHelperLink (#14286); native literal arrays may use LLVM in {@see ArrayBuiltinHelper::pad()}.
+ * Standalone AOT and native literal arrays materialize to hashtable then route through PHP (#18121).
  * SSOT: {@see \PHPCompiler\VM\HashTable::padCopy()}
  * php-src: ext/standard/array.c — php_array_pad()
  */
@@ -53,16 +52,8 @@ final class ArrayPadRuntime
         JITVariable $value,
         ?Value $padType
     ): Value {
-        // Standalone AOT keeps LLVM in ArrayBuiltinHelper; embed/JIT uses PHP bridge (#12476).
-        if (null === $padType && (
-            Builtin::LOAD_TYPE_STANDALONE === $context->loadType
-            || ArrayBuiltinHelper::isNativeArray($array->type)
-        )) {
-            return ArrayBuiltinHelper::pad($context, $array, $length, $value);
-        }
-
         self::ensureLinked($context);
-        $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
+        $ht = self::argToHashtable($context, $array);
         $valuePtr = JitValueBox::valuePtrFromVariable($context, $value);
         if (null === $padType) {
             return $context->builder->call(
@@ -80,6 +71,15 @@ final class ArrayPadRuntime
             $valuePtr,
             $padType
         );
+    }
+
+    private static function argToHashtable(Context $context, JITVariable $arg): Value
+    {
+        if (ArrayBuiltinHelper::isNativeArray($arg->type)) {
+            return ArrayBuiltinHelper::nativeListToHashTable($context, $arg);
+        }
+
+        return ArrayBuiltinHelper::loadHashTable($context, $arg);
     }
 
     public static function ensureLinked(Context $context): void

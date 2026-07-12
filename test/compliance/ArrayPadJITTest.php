@@ -28,6 +28,10 @@ final class ArrayPadJITTest extends BaseTest
             __DIR__.'/cases/stdlib/array_pad_float_length_strict_jit.phpt',
             'array_pad_float_length_strict_jit.phpt'
         );
+        yield 'array_pad_type_enum_jit.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/array_pad_type_enum_jit.phpt',
+            'array_pad_type_enum_jit.phpt'
+        );
     }
 
     public function setUp(): void

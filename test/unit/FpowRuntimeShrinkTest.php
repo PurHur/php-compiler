@@ -25,10 +25,11 @@ final class FpowRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('phpc_fpow', $bridge);
     }
 
-    public function testFpowJitHelperDelegatesToVmMath(): void
+    public function testFpowJitHelperDelegatesToPow(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/FpowJitHelper.php');
-        $this->assertStringContainsString('VmMath::fpow', $source);
+        $this->assertStringContainsString('\\pow(', $source);
+        $this->assertStringNotContainsString('return VmMath::fpow', $source);
 
         $this->assertSame(8.0, FpowJitHelper::fpowArgv(2.0, 3.0));
         $this->assertSame(\pow(2.5, 1.5), FpowJitHelper::fpowArgv(2.5, 1.5));

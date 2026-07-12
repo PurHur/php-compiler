@@ -11,11 +11,16 @@ final class DomConstants
 
     public const XML_TEXT_NODE = 3;
 
+    public const XML_CDATA_SECTION_NODE = 4;
+
     public const XML_COMMENT_NODE = 8;
 
     public const XML_ATTRIBUTE_NODE = 2;
 
     public const XML_ENTITY_REF_NODE = 5;
+
+    /** General entity declaration in doctype (php-src XML_ENTITY_DECL_NODE; #6320). */
+    public const XML_ENTITY_DECL_NODE = 17;
 
     public const XML_DOCUMENT_NODE = 9;
 
@@ -25,6 +30,8 @@ final class DomConstants
 
     public const XML_DOCUMENT_FRAG_NODE = 11;
 
+    public const XML_NOTATION_NODE = 12;
+
     /** Internal marker for {@see VmDom::createNodeList()} handles. */
     public const XML_NODELIST = -1;
 
@@ -33,6 +40,9 @@ final class DomConstants
 
     /** Internal marker for {@see VmDom::createTokenList()} handles (#16876). */
     public const XML_TOKENLIST = -3;
+
+    /** Internal marker for {@see VmDom::createXPath()} handles (#6066). */
+    public const XML_XPATH = -4;
 
     /** DOMNode::compareDocumentPosition() flags (php-src ext/dom/node.c; #14448). */
     public const DOCUMENT_POSITION_DISCONNECTED = 0x01;

@@ -11,6 +11,9 @@ namespace PHPCompiler\ext\standard;
  */
 final class VmPregPattern
 {
+    /** PCRE2_UTF — PHP /u pattern modifier (ext/pcre/php_pcre.c). */
+    public const PCRE2_UTF = 0x00080000;
+
     /**
      * Zend ext/pcre/php_pcre.c delimiter/compile failure text (issue #12083).
      */
@@ -48,46 +51,25 @@ final class VmPregPattern
         }
 
         for ($j = $i + 1; $j < $len; $j++) {
-            if ('e' === $pattern[$j]) {
+            $modifier = $pattern[$j];
+            if ('e' === $modifier) {
                 return 'The /e modifier is no longer supported, use preg_replace_callback instead';
             }
-            $mod = match ($pattern[$j]) {
-                'i', 'm', 's', 'x', 'A', 'D', 'U', 'u' => true,
-                default => null,
-            };
-            if (null === $mod) {
-                return \sprintf("Unknown modifier '%s'", $pattern[$j]);
+            if (!self::isKnownModifier($modifier)) {
+                return \sprintf("Unknown modifier '%s'", $modifier);
             }
         }
 
         return null;
     }
 
-    /**
-     * Zend ext/pcre/php_pcre.c compile failure text for preg_*() warnings (#14880).
-     */
-    public static function compileWarningMessage(string $pattern): ?string
+    /** Nested JIT: match on $pattern[$j] after an e-check mis-lowers (#16075 tier-2). */
+    private static function isKnownModifier(string $modifier): bool
     {
-        $delimiterMessage = self::patternWarningMessage($pattern);
-        if (null !== $delimiterMessage) {
-            return $delimiterMessage;
-        }
-        $parsed = self::parsePhpPattern($pattern);
-        if (null === $parsed) {
-            return null;
-        }
-        [$regex, $opts] = $parsed;
-        VmPregEngine::compile($regex, $opts);
-        $exception = VmPregEngine::consumeLastCompileException();
-        if (null === $exception) {
-            return null;
-        }
-
-        return \sprintf(
-            'Compilation failed: %s at offset %d',
-            $exception->compileMessage,
-            1 + $exception->compileOffset
-        );
+        return match ($modifier) {
+            'i', 'm', 's', 'x', 'A', 'D', 'U', 'u', 'J' => true,
+            default => false,
+        };
     }
 
     /**
@@ -116,20 +98,26 @@ final class VmPregPattern
         $regex = \substr($pattern, 1, $i - 1);
         $opts = 0;
         for ($j = $i + 1; $j < $len; $j++) {
-            $opts |= match ($pattern[$j]) {
-                'i' => 0x00000008,
-                'm' => 0x00000400,
-                's' => 0x00000020,
-                'x' => 0x00000080,
-                'A' => 0x80000000,
-                'D' => 0x00000010,
-                'U' => 0x00040000,
-                'u' => 0x00080000,
-                default => 0,
-            };
+            $opts |= self::modifierOptFlag($pattern[$j]);
         }
 
         return [$regex, $opts];
+    }
+
+    private static function modifierOptFlag(string $modifier): int
+    {
+        return match ($modifier) {
+            'i' => 0x00000008,
+            'm' => 0x00000400,
+            's' => 0x00000020,
+            'x' => 0x00000080,
+            'A' => 0x80000000,
+            'D' => 0x00000010,
+            'U' => 0x00040000,
+            'u' => self::PCRE2_UTF,
+            'J' => 0x00100000,
+            default => 0,
+        };
     }
 
     public static function isValidDelimiter(string $c): bool

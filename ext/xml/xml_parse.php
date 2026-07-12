@@ -29,10 +29,7 @@ final class xml_parse extends Internal
             return;
         }
 
-        $parserArg = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_INTEGER !== $parserArg->type) {
-            throw new \TypeError('xml_parse(): Argument #1 ($parser) must be of type XMLParser');
-        }
+        $parser = XmlParserSupport::requireParser($frame->calledArgs[0], 'xml_parse', 1);
         $dataArg = $frame->calledArgs[1]->resolveIndirect();
         $data = Variable::TYPE_STRING === $dataArg->type ? $dataArg->toString() : (string) $dataArg->toInt();
 
@@ -42,14 +39,15 @@ final class xml_parse extends Internal
             $isFinal = Variable::TYPE_NULL === $finalArg->type ? true : (bool) $finalArg->toInt();
         }
 
-        $ok = VmXml::parse(
+        $status = VmXml::parse(
             $frame->vmContext,
-            $parserArg->toInt(),
+            $parser->id,
             $data,
             $isFinal,
-            $frame
+            $frame,
+            $parser
         );
-        $frame->returnVar->bool($ok);
+        $frame->returnVar->int($status);
     }
 
     public function call(Context $context, JITVariable ...$args): Value

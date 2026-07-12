@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\Block;
 use PHPCompiler\CompilerVersion;
 use PHPCompiler\Frame;
 use PHPCompiler\Func;
@@ -61,6 +62,78 @@ final class VmReflection
             $function,
             CompilerVersion::supportsGetDeclaredExcludeDeprecated(...)
         );
+    }
+
+    /** Max positional arity for get_class() on the active profile (ext/standard/basic_functions.c, #17395). */
+    public static function getClassMaxArgCount(): int
+    {
+        return CompilerVersion::supportsGetClassAllowString() ? 2 : 1;
+    }
+
+    /** Max positional arity for get_parent_class() on the active profile (#17395). */
+    public static function getParentClassMaxArgCount(): int
+    {
+        return CompilerVersion::supportsGetClassAllowString() ? 2 : 1;
+    }
+
+    public static function enforceGetClassMaxArgs(int $argc, string $function = 'get_class'): void
+    {
+        $max = self::getClassMaxArgCount();
+        if ($argc > $max) {
+            $suffix = 1 === $max ? '' : 's';
+            throw new \ArgumentCountError(
+                "{$function}() expects at most {$max} argument{$suffix}, {$argc} given"
+            );
+        }
+    }
+
+    public static function enforceGetParentClassMaxArgs(int $argc): void
+    {
+        $max = self::getParentClassMaxArgCount();
+        if ($argc > $max) {
+            $suffix = 1 === $max ? '' : 's';
+            throw new \ArgumentCountError(
+                "get_parent_class() expects at most {$max} argument{$suffix}, {$argc} given"
+            );
+        }
+    }
+
+    /**
+     * get_class()/get_parent_class() $allow_string operand (PHP 8.4, ext/standard/basic_functions.c).
+     */
+    public static function parseAllowStringArg(Frame $frame, string $function, int $argIndex): bool
+    {
+        return VmMath::parseBoolBuiltinArg(
+            $frame->calledArgs[$argIndex]->resolveIndirect(),
+            $function,
+            $argIndex + 1,
+            'allow_string'
+        );
+    }
+
+    /**
+     * Resolve a class-name string operand when $allow_string is true (php-src zend_lookup_class_ex).
+     */
+    public static function resolveAllowStringClassName(
+        Context $ctx,
+        string $className,
+        string $function,
+        string $paramName = 'object'
+    ): string {
+        $classLc = strtolower(self::normalizeGlobalIntrospectionName($className));
+        if (!isset($ctx->classes[$classLc])) {
+            $ctx->autoloadClass($className);
+        }
+        if (!isset($ctx->classes[$classLc])) {
+            throw new \ValueError(\sprintf(
+                '%s(): Argument #1 ($%s) must be an object or a valid class name, "%s" given',
+                $function,
+                $paramName,
+                $className
+            ));
+        }
+
+        return $className;
     }
 
     /**
@@ -171,7 +244,8 @@ final class VmReflection
             && !$entry->isInterface
             && !$entry->isTrait
             && !\PHPCompiler\VM\ResourceSupport::isHiddenPseudoClassEntry($entry)
-            && !\PHPCompiler\ext\openssl\VmOpensslObjects::isHiddenClassEntry($entry);
+            && !\PHPCompiler\ext\openssl\VmOpensslObjects::isHiddenClassEntry($entry)
+            && !\PHPCompiler\ext\xsl\VmXsl::isHiddenClassEntry($entry);
     }
 
     public static function enumExists(Context $ctx, string $enumName, bool $autoload = true): bool
@@ -352,9 +426,6 @@ final class VmReflection
         return $result;
     }
 
-    /** @var list<string>|null */
-    private static ?array $internalFunctionNames = null;
-
     /**
      * Registered ext Module internal function names (php-src internal bucket).
      *
@@ -362,29 +433,23 @@ final class VmReflection
      */
     public static function internalFunctionNameList(bool $excludeDisabled = false): array
     {
-        if (null === self::$internalFunctionNames) {
-            $names = [];
-            $seen = [];
-            foreach ([new Module(), new \PHPCompiler\ext\types\Module()] as $module) {
-                foreach ($module->getFunctions() as $func) {
-                    $name = $func->getName();
-                    $lc = strtolower($name);
-                    if (isset($seen[$lc]) || !self::isVisibleToFunctionExists($name)) {
-                        continue;
-                    }
-                    if (!BuiltinIntrospectionPolicy::functionIsAdvertised($lc)) {
-                        continue;
-                    }
-                    $seen[$lc] = true;
-                    $names[] = $name;
-                }
+        $names = [];
+        $seen = [];
+        foreach (ModuleRegistry::advertisedInternalFunctionNames() as $name) {
+            $lc = strtolower($name);
+            if (isset($seen[$lc]) || !self::isVisibleToFunctionExists($name)) {
+                continue;
             }
-            self::$internalFunctionNames = self::orderInternalFunctionNamesForIntrospection($names);
+            if (!BuiltinIntrospectionPolicy::functionIsAdvertised($lc)) {
+                continue;
+            }
+            $seen[$lc] = true;
+            $names[] = $name;
         }
 
         // php-src exclude_disabled omits ini-disabled functions only — deprecated builtins
         // such as utf8_encode remain listed (basic_functions.c, #16969, #16978).
-        return self::$internalFunctionNames;
+        return self::orderInternalFunctionNamesForIntrospection($names);
     }
 
     /** Zend internal bucket starts with engine introspection builtins (php-src zend_builtin_functions). */
@@ -1622,6 +1687,26 @@ final class VmReflection
         return true;
     }
 
+    public static function parameterDefaultValueIsAvailable(Block $block, int $paramIndex): bool
+    {
+        return ReflectionSupport::parameterDefaultValueIsAvailable($block, $paramIndex);
+    }
+
+    public static function copyParameterDefaultValue(
+        Variable $dest,
+        Block $block,
+        int $paramIndex,
+        Context $ctx,
+    ): bool {
+        $value = $ctx->runtime->vm()->evaluateParameterDefaultForReflection($block, $paramIndex);
+        if (null === $value) {
+            return false;
+        }
+        $dest->copyFrom($value);
+
+        return true;
+    }
+
     public static function copyStaticPropertyDefaultValue(Variable $dest, Variable $storage): bool
     {
         if (!self::staticPropertyHasDefaultValue($storage)) {
@@ -2075,6 +2160,27 @@ final class VmReflection
     }
 
     /**
+     * get_class_methods() — resolve operand or TypeError when class name is unknown (#18110).
+     *
+     * php-src: ext/standard/basic_functions.c — PHP_FUNCTION(get_class_methods)
+     */
+    public static function requireClassForGetClassMethods(Context $ctx, Variable $arg): ClassEntry
+    {
+        $entry = self::resolveClassForGetClassMethods($ctx, $arg);
+        if (null !== $entry) {
+            return $entry;
+        }
+        $arg = $arg->resolveIndirect();
+        $given = Variable::TYPE_STRING === $arg->type
+            ? 'string'
+            : VmClassHas::vmTypeName($arg->type);
+        throw new \TypeError(\sprintf(
+            'get_class_methods(): Argument #1 ($object_or_class) must be an object or a valid class name, %s given',
+            $given
+        ));
+    }
+
+    /**
      * @return list<string>
      */
     public static function classMethodsList(ClassEntry $entry, int $filter = 7, ?Context $ctx = null): array
@@ -2257,6 +2363,41 @@ final class VmReflection
             $entry->constants[$name] = $const;
             $entry->constNames[$name] = strtoupper($name);
         }
+    }
+
+    /** Register ReflectionClassConstant::IS_* class constants (#17360, ext/reflection/php_reflection.c). */
+    public static function registerReflectionClassConstantClassConstants(ClassEntry $entry): void
+    {
+        foreach (
+            [
+                'is_public' => self::REFLECTION_METHOD_IS_PUBLIC,
+                'is_protected' => self::REFLECTION_METHOD_IS_PROTECTED,
+                'is_private' => self::REFLECTION_METHOD_IS_PRIVATE,
+                'is_final' => self::REFLECTION_METHOD_IS_FINAL,
+            ] as $name => $value
+        ) {
+            $const = new Variable();
+            $const->int($value);
+            $entry->constants[$name] = $const;
+            $entry->constNames[$name] = strtoupper($name);
+        }
+    }
+
+    /** php-src reflection_class_constant_get_modifiers() (#17360). */
+    public static function cfgClassConstantFlagsToReflectionModifiers(int $cfgVisibility, bool $isFinal): int
+    {
+        if (($cfgVisibility & \PHPCfg\Func::FLAG_PRIVATE) !== 0) {
+            $modifiers = self::REFLECTION_METHOD_IS_PRIVATE;
+        } elseif (($cfgVisibility & \PHPCfg\Func::FLAG_PROTECTED) !== 0) {
+            $modifiers = self::REFLECTION_METHOD_IS_PROTECTED;
+        } else {
+            $modifiers = self::REFLECTION_METHOD_IS_PUBLIC;
+        }
+        if ($isFinal) {
+            $modifiers |= self::REFLECTION_METHOD_IS_FINAL;
+        }
+
+        return $modifiers;
     }
 
     /** php-src ReflectionMethod::IS_* values returned by getModifiers() (#7116). */

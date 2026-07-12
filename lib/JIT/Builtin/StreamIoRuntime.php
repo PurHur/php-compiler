@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\NestedJitCompileScope;
@@ -70,6 +71,22 @@ final class StreamIoRuntime
         self::implement($context);
     }
 
+    /**
+     * User-script standalone must link real stream I/O when fopen/tmpfile appear in lowering (#9142).
+     *
+     * Inventory init defers heavy emitters; script-level JIT must not leave empty __compiler_fopen ABI.
+     */
+    public static function ensureLinkedForUserScriptLowering(Context $context): void
+    {
+        if (self::allRuntimeFunctionsLinked($context)) {
+            self::registerLinkedRuntime($context);
+
+            return;
+        }
+
+        self::implementBridges($context);
+    }
+
     public static function implement(Context $context): void
     {
         if (self::allRuntimeFunctionsLinked($context)) {
@@ -92,11 +109,7 @@ final class StreamIoRuntime
 
     private static function implementBridges(Context $context): void
     {
-        $savedBlock = null;
-        try {
-            $savedBlock = $context->builder->getInsertBlock();
-        } catch (\Throwable) {
-        }
+        $savedBlock = BasicBlockHelper::tryGetInsertBlock($context);
 
         self::ensureRuntimeAbiDeclared($context);
         self::ensureJitHelperCompiled($context);
@@ -108,7 +121,7 @@ final class StreamIoRuntime
         self::registerLinkedRuntime($context);
 
         if (null !== $savedBlock) {
-            $context->builder->positionAtEnd($savedBlock);
+            BasicBlockHelper::restoreInsertBlock($context, $savedBlock);
         } else {
             $context->builder->clearInsertionPosition();
         }

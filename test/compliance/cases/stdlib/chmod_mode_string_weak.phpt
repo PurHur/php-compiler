@@ -1,5 +1,5 @@
 --TEST--
-stdlib chmod()/mkdir() numeric-string mode coercion without strict_types (#15060, ext/standard/filestat.c)
+stdlib chmod()/mkdir() numeric-string mode coercion without strict_types (#17819, #17860, ext/standard/filestat.c)
 --FILE--
 <?php
 
@@ -10,7 +10,7 @@ $mode = decoct(fileperms($f) & 0777);
 @unlink($f);
 
 $d = sys_get_temp_dir() . '/phpc_mkdir_mode_weak_' . uniqid('', true);
-$mk = @mkdir($d, '0755');
+$mk = @mkdir($d, '0755', true);
 $dmode = is_dir($d) ? decoct(fileperms($d) & 0777) : 'missing';
 @rmdir($d);
 

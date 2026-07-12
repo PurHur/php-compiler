@@ -162,9 +162,17 @@ final class VmClosureCall
      *
      * @param list<Variable> $values
      */
-    public static function sortVariableValues(Context $context, array &$values, ClosureState $closure): void
-    {
-        $cmp = static fn (Variable $a, Variable $b): int => self::invokeTwo($context, $closure, $a, $b);
+    public static function sortVariableValues(
+        Context $context,
+        array &$values,
+        ClosureState $closure,
+        bool $descending = false
+    ): void {
+        $cmp = static function (Variable $a, Variable $b) use ($context, $closure, $descending): int {
+            $result = self::invokeTwo($context, $closure, $a, $b);
+
+            return $descending ? -$result : $result;
+        };
         ZendSort::sort($values, $cmp);
     }
 
@@ -173,9 +181,17 @@ final class VmClosureCall
      *
      * @param list<array{0: Variable, 1: Variable}> $pairs
      */
-    public static function sortKeyedPairsByKey(Context $context, array &$pairs, ClosureState $closure): void
-    {
-        $cmp = static fn (array $a, array $b): int => self::invokeTwo($context, $closure, $a[0], $b[0]);
+    public static function sortKeyedPairsByKey(
+        Context $context,
+        array &$pairs,
+        ClosureState $closure,
+        bool $descending = false
+    ): void {
+        $cmp = static function (array $a, array $b) use ($context, $closure, $descending): int {
+            $result = self::invokeTwo($context, $closure, $a[0], $b[0]);
+
+            return $descending ? -$result : $result;
+        };
         ZendSort::sort($pairs, $cmp);
     }
 
@@ -184,9 +200,17 @@ final class VmClosureCall
      *
      * @param list<array{0: Variable, 1: Variable}> $pairs
      */
-    public static function sortKeyedPairsByValue(Context $context, array &$pairs, ClosureState $closure): void
-    {
-        $cmp = static fn (array $a, array $b): int => self::invokeTwo($context, $closure, $a[1], $b[1]);
+    public static function sortKeyedPairsByValue(
+        Context $context,
+        array &$pairs,
+        ClosureState $closure,
+        bool $descending = false
+    ): void {
+        $cmp = static function (array $a, array $b) use ($context, $closure, $descending): int {
+            $result = self::invokeTwo($context, $closure, $a[1], $b[1]);
+
+            return $descending ? -$result : $result;
+        };
         ZendSort::sort($pairs, $cmp);
     }
 }

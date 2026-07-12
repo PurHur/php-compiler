@@ -109,20 +109,6 @@ final class wordwrap extends Internal
         }
 
         $text = JitStringBuiltinArg::lower($context, $args[0], 'wordwrap', 0, 'string');
-        if (StringWordwrap::shouldDeferNestedHelper($context)) {
-            return JitWordwrap::wrap(
-                $context,
-                $text,
-                $width,
-                $break,
-                $cutI8,
-                $args[0],
-                $args[1] ?? null,
-                $args[2] ?? null,
-                $args[3] ?? null
-            );
-        }
-
         StringWordwrap::ensureLinked($context);
 
         return $context->builder->call(

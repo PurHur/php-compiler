@@ -48,7 +48,9 @@ Daily v1.1.0 release review presenter — aggregates user-facing gates without t
 | Quick + CI doc slice | Set `RELEASE_READINESS_CI_FAST=1` — adds wave3/examples/development-status/spine-count/capability-matrix sync checks | ~minutes |
 | Full (`--full`) | Quick + `capability-matrix.php --check`, `examples-aot-smoke.sh`, `examples-web-smoke.sh`, `CHANGELOG.md` v1.1.0 stub | LLVM + HTTP when available |
 
-Machine output: `./script/release-readiness.sh [--full] --json` → `{"user_release_ready":"yes"|"no","mode":"quick"|"full","gates":[...]}`.
+Machine output: `./script/release-readiness.sh [--full] --json` → `{"user_release_ready":"yes"|"no","mode":"quick"|"full","gates":[...],"honest_compile":{"status":"yes"|"no"|"skip"|"unknown","message":"...","gate_available":true}}`.
+
+**honest_compile metric (#15603):** Quick `--json` runs `bootstrap-honest-compile-metric.sh --check` (wiring only, `status=unknown`). Full `--json` runs the inventory argv sidecar probe when LLVM is available (`status=yes|no|skip`). Informational only — does not flip `user_release_ready`.
 
 **bootstrap-inventory gate (#10531):** `release-readiness.sh` requires `vendor/` (runs `composer install` if missing) and treats `--check` as green only when stdout contains `OK N/N`. A bare `php script/bootstrap-inventory.php --check` without `vendor/` exits **1** — do not rely on a silent skip. File-list drift: `php script/bootstrap-inventory.php`. Optional construct-flag refresh after a self-host probe only: `docs/bootstrap-inventory-live-probe.md` (not required for new vm.php-path files; see #10368).
 

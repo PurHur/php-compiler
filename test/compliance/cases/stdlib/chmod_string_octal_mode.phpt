@@ -1,5 +1,5 @@
 --TEST--
-stdlib chmod() numeric-string mode uses Z_PARAM_LONG decimal cast (#15902, ext/standard/filestat.c)
+stdlib chmod() numeric-string mode uses Z_PARAM_LONG decimal parse (#17819, #17860, ext/standard/filestat.c)
 --FILE--
 <?php
 

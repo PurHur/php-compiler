@@ -2,38 +2,25 @@
 
 declare(strict_types=1);
 
+// Issue #17694 — forward 8.4 profile: grapheme cluster must stay absent without ext/intl.
+putenv('PHP_COMPILER_PROFILE=8.4');
+
+if (extension_loaded('intl')) {
+    fwrite(STDERR, "SKIP: ext/intl loaded\n");
+    exit(0);
+}
+
 $core = [
     'grapheme_strlen',
-    'grapheme_substr',
-    'grapheme_strpos',
-    'grapheme_extract',
     'grapheme_str_split',
+    'grapheme_str_contains',
+    'grapheme_strimwidth',
 ];
 foreach ($core as $name) {
-    if (function_exists($name)) {
-        echo "fail: function_exists true for {$name} without ext/intl on forward 8.4 profile\n";
+    if (function_exists($name) || is_callable($name)) {
+        echo "fail: {$name} visible without ext/intl\n";
         exit(1);
     }
 }
-$s = "a\xCC\x81b";
-if (2 !== grapheme_strlen($s)) {
-    echo "fail: grapheme_strlen\n";
-    exit(1);
-}
-if ("a\xCC\x81" !== grapheme_substr($s, 0, 1)) {
-    echo "fail: grapheme_substr\n";
-    exit(1);
-}
-if (1 !== grapheme_strpos($s, 'b')) {
-    echo "fail: grapheme_strpos\n";
-    exit(1);
-}
-if ('a' . "\xCC\x81" !== grapheme_extract($s, 1)) {
-    echo "fail: grapheme_extract\n";
-    exit(1);
-}
-if (2 !== count(grapheme_str_split($s))) {
-    echo "fail: grapheme_str_split\n";
-    exit(1);
-}
+
 echo "ok\n";

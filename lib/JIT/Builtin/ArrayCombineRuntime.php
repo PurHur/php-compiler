@@ -13,7 +13,7 @@ use PHPLLVM\Value;
 /**
  * JIT/AOT link for array_combine() via ArrayCombineJitHelper PHP (#12502).
  *
- * Standalone AOT compiles {@see ArrayCombineJitHelper} via JitVmHelperLink bridge (#14437); native literal arrays keep LLVM in {@see ArrayBuiltinHelper::combine()}.
+ * Standalone AOT compiles {@see ArrayCombineJitHelper} via JitVmHelperLink bridge (#14437); native literal arrays materialize to hashtable then route through PHP (#18013).
  * SSOT: {@see \PHPCompiler\ext\standard\VmArray::combine()}
  * php-src: ext/standard/array.c — PHP_FUNCTION(array_combine)
  */
@@ -32,23 +32,25 @@ final class ArrayCombineRuntime
 
     public static function combine(Context $context, JITVariable $keys, JITVariable $values): Value
     {
-        if (ArrayBuiltinHelper::isNativeArray($keys->type)
-            || ArrayBuiltinHelper::isNativeArray($values->type)) {
-            return ArrayBuiltinHelper::combine($context, $keys, $values);
-        }
-
         // JitVmHelperLink bridge does not propagate PHP throws from VmArray::combine (#16080).
         ArrayBuiltinHelper::guardCombinePackedListLengthMismatch($context, $keys, $values, 'bridge');
 
         self::ensureLinked($context);
-        $keysHt = ArrayBuiltinHelper::loadHashTable($context, $keys);
-        $valuesHt = ArrayBuiltinHelper::loadHashTable($context, $values);
 
         return $context->builder->call(
             $context->lookupFunction(self::ABI_COMBINE),
-            $keysHt,
-            $valuesHt
+            self::argToHashtable($context, $keys),
+            self::argToHashtable($context, $values)
         );
+    }
+
+    private static function argToHashtable(Context $context, JITVariable $arg): Value
+    {
+        if (ArrayBuiltinHelper::isNativeArray($arg->type)) {
+            return ArrayBuiltinHelper::nativeListToHashTable($context, $arg);
+        }
+
+        return ArrayBuiltinHelper::loadHashTable($context, $arg);
     }
 
     public static function ensureLinked(Context $context): void

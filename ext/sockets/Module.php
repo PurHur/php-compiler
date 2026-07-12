@@ -25,6 +25,11 @@ class Module extends ModuleAbstract
         parent::init($runtime);
         BuiltinEnums::register($runtime->vmContext);
         BuiltinClasses::register($runtime->vmContext);
+        foreach (SocketConstants::registeredConstants() as $name => $value) {
+            $var = new \PHPCompiler\VM\Variable();
+            $var->int($value);
+            $runtime->vmContext->defineConstant($name, $var);
+        }
     }
 
     public function getFunctions(): array
@@ -36,6 +41,9 @@ class Module extends ModuleAbstract
         $fns = [
             new socket_atmark(),
             new socket_import_stream(),
+            new socket_export_stream(),
+            new socket_set_nonblock(),
+            new socket_set_block(),
         ];
 
         return $fns;

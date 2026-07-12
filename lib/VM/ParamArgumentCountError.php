@@ -21,7 +21,7 @@ final class ParamArgumentCountError
         $paramCount = \count($block->paramNames);
         $hasOptional = false;
         for ($i = 0; $i < $paramCount; ++$i) {
-            if (self::paramHasDefault($block, $i)) {
+            if (self::parameterHasDefault($block, $i)) {
                 $hasOptional = true;
                 break;
             }
@@ -121,7 +121,7 @@ final class ParamArgumentCountError
     {
         $paramCount = \count($block->paramNames);
         for ($i = 0; $i < $paramCount; ++$i) {
-            if (self::paramHasDefault($block, $i)) {
+            if (self::parameterHasDefault($block, $i)) {
                 return $i;
             }
         }
@@ -129,7 +129,7 @@ final class ParamArgumentCountError
         return $paramCount;
     }
 
-    private static function paramHasDefault(Block $block, int $paramIndex): bool
+    public static function parameterHasDefault(Block $block, int $paramIndex): bool
     {
         if (isset($block->paramRuntimeDefaultInitBlocks[$paramIndex])) {
             return true;

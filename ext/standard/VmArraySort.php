@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\Frame;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\Variable;
 
@@ -215,6 +216,52 @@ final class VmArraySort
             'Descending' => StdlibConstants::SORT_DESC,
             default => throw new \ValueError('Invalid SortDirection enum value'),
         };
+    }
+
+    /**
+     * usort/uasort/uksort optional SortDirection (#17429, ext/standard/array.c php_usort).
+     *
+     * @return bool true when descending order is requested
+     */
+    public static function resolveUserSortDescending(Frame $frame, string $function): bool
+    {
+        if (!isset($frame->calledArgs[2])) {
+            return false;
+        }
+        $directionArg = $frame->calledArgs[2]->resolveIndirect();
+        $order = self::trySortDirectionOrderInt($directionArg);
+        if (null !== $order) {
+            return StdlibConstants::SORT_DESC === $order;
+        }
+        if (EnumCaseSupport::isEnumCaseVariable($directionArg)) {
+            throw new \TypeError(sprintf(
+                '%s(): Argument #3 ($direction) must be of type SortDirection, %s given',
+                $function,
+                EnumCaseSupport::typeNameForVariable($directionArg)
+            ));
+        }
+        throw new \TypeError(sprintf(
+            '%s(): Argument #3 ($direction) must be of type SortDirection, %s given',
+            $function,
+            VmInternalCompare::vmSortFlagsTypeName($directionArg->type)
+        ));
+    }
+
+    public static function maxUserSortArgCount(): int
+    {
+        return \PHPCompiler\CompilerVersion::supportsSortingEnum() ? 3 : 2;
+    }
+
+    public static function assertUserSortArgCount(Frame $frame, string $function): void
+    {
+        $argc = \count($frame->calledArgs);
+        $max = self::maxUserSortArgCount();
+        if ($argc < 2 || $argc > $max) {
+            if ($max > 2) {
+                throw new \LogicException($function.'() requires two to three arguments');
+            }
+            throw new \LogicException($function.'() requires exactly two arguments');
+        }
     }
 
     /**

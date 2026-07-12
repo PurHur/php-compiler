@@ -32,7 +32,10 @@ abstract class Internal extends Func implements Handler, Call
 
     public function getFrame(Context $context, ?Frame $frame = null): Frame
     {
-        return new Frame($this, null, $frame);
+        $handlerFrame = new Frame($this, null, $frame);
+        $handlerFrame->vmContext = $context;
+
+        return $handlerFrame;
     }
 
     protected function jitString(JITContext $context, JITVariable $arg, string $contextLabel = 'argument'): Value

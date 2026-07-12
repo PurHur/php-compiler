@@ -46,6 +46,33 @@ final class VmFilterTest extends TestCase
         $this->assertFalse($out->toBool());
     }
 
+    public function testValidateIntRejectsOverflowPastPhpIntMax(): void
+    {
+        $v = new Variable();
+        $v->string(\PHP_INT_MAX.'0');
+        $out = VmFilter::filterVar($v, VmFilter::FILTER_VALIDATE_INT);
+        $this->assertSame(Variable::TYPE_BOOLEAN, $out->type);
+        $this->assertFalse($out->toBool());
+    }
+
+    public function testValidateIntAcceptsPhpIntMaxString(): void
+    {
+        $v = new Variable();
+        $v->string((string) \PHP_INT_MAX);
+        $out = VmFilter::filterVar($v, VmFilter::FILTER_VALIDATE_INT);
+        $this->assertSame(Variable::TYPE_INTEGER, $out->type);
+        $this->assertSame(\PHP_INT_MAX, $out->toInt());
+    }
+
+    public function testValidateIntAcceptsPhpIntMinString(): void
+    {
+        $v = new Variable();
+        $v->string((string) \PHP_INT_MIN);
+        $out = VmFilter::filterVar($v, VmFilter::FILTER_VALIDATE_INT);
+        $this->assertSame(Variable::TYPE_INTEGER, $out->type);
+        $this->assertSame(\PHP_INT_MIN, $out->toInt());
+    }
+
     public function testValidateIntAllowHexFlag(): void
     {
         $v = new Variable();
@@ -75,6 +102,21 @@ final class VmFilterTest extends TestCase
         $out = VmFilter::filterVar($v, VmFilter::FILTER_VALIDATE_INT);
         $this->assertSame(Variable::TYPE_BOOLEAN, $out->type);
         $this->assertFalse($out->toBool());
+    }
+
+    public function testSanitizeNumberFloatIntFlags(): void
+    {
+        $v = new Variable();
+        $v->string('1,234.5e2');
+        $flags = new Variable();
+        $flags->int(
+            VmFilter::FILTER_FLAG_ALLOW_FRACTION
+            | VmFilter::FILTER_FLAG_ALLOW_THOUSAND
+            | VmFilter::FILTER_FLAG_ALLOW_SCIENTIFIC
+        );
+        $out = VmFilter::filterVar($v, VmFilter::FILTER_SANITIZE_NUMBER_FLOAT, $flags);
+        $this->assertSame(Variable::TYPE_STRING, $out->type);
+        $this->assertSame('1,234.5e2', $out->toString());
     }
 
     public function testValidateIntAcceptsPlainDecimal(): void
@@ -172,6 +214,30 @@ final class VmFilterTest extends TestCase
     public function testIsValidIpAddressRejectsInvalidIpv4(): void
     {
         $this->assertFalse(VmFilter::isValidIpAddress('999.999.999.999'));
+    }
+
+    public function testValidateMacReturnsStringForValidColonAddress(): void
+    {
+        $v = new Variable();
+        $v->string('00:00:5e:00:53:af');
+        $out = VmFilter::filterVar($v, VmFilter::FILTER_VALIDATE_MAC);
+        $this->assertSame(Variable::TYPE_STRING, $out->type);
+        $this->assertSame('00:00:5e:00:53:af', $out->toString());
+    }
+
+    public function testValidateMacReturnsFalseForInvalidAddress(): void
+    {
+        $v = new Variable();
+        $v->string('not-a-mac');
+        $out = VmFilter::filterVar($v, VmFilter::FILTER_VALIDATE_MAC);
+        $this->assertSame(Variable::TYPE_BOOLEAN, $out->type);
+        $this->assertFalse($out->toBool());
+    }
+
+    public function testIsValidMacAddressAcceptsHyphenFormat(): void
+    {
+        $this->assertTrue(VmFilter::isValidMacAddress('FA-F9-DD-B2-5E-0D'));
+        $this->assertFalse(VmFilter::isValidMacAddress('FA-F9-DD-B2-5E'));
     }
 
     public function testIsIntegerStringRejectsLeadingZeros(): void

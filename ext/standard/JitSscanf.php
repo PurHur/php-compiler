@@ -8,7 +8,6 @@ use PHPCompiler\JIT\Builtin\Sscanf;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
-use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -22,8 +21,6 @@ final class JitSscanf
 {
     public static function parse(Context $context, JITVariable ...$args): Value
     {
-        Sscanf::ensureLinked($context);
-
         $argc = \count($args);
         if ($argc < 2) {
             TypeErrorRaise::emitArgumentCountError(
@@ -43,7 +40,8 @@ final class JitSscanf
             return self::parseCompileTime($context, $strLit, $fmtLit, \array_slice($args, 2));
         }
 
-        JitInternalStrictArg::rejectNullString($context, $args[0], 'sscanf', 'string', 1);
+        Sscanf::ensureLinked($context);
+
         $str = JitStringBuiltinArg::lower($context, $args[0], 'sscanf', 0, 'string');
         $fmt = JitStringBuiltinArg::lower($context, $args[1], 'sscanf', 1, 'format');
         $outCount = $argc - 2;

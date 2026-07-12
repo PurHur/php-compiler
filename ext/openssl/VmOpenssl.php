@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\openssl;
 
 use PHPCompiler\ext\standard\VmHash;
+use PHPCompiler\ext\standard\VmHashNative;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\ErrorReporter;
@@ -59,6 +60,41 @@ final class VmOpenssl
     }
 
     /**
+     * openssl_get_cert_locations() — X509 default path metadata (php-src ext/openssl/openssl.c; #6560).
+     */
+    public static function certLocations(): HashTable
+    {
+        $locations = VmOpensslConfigNative::certLocations();
+        if (null === $locations) {
+            return self::assocStringArrayToHashTable([
+                'default_cert_file' => '',
+                'default_cert_file_env' => 'SSL_CERT_FILE',
+                'default_cert_dir' => '',
+                'default_cert_dir_env' => 'SSL_CERT_DIR',
+                'default_private_dir' => '',
+                'default_default_cert_area' => '',
+                'ini_cafile' => '',
+                'ini_capath' => '',
+            ]);
+        }
+
+        return self::assocStringArrayToHashTable($locations);
+    }
+
+    /**
+     * openssl_get_curve_names() — OBJ_nid2sn names from EC_get_builtin_curves (#6560).
+     */
+    public static function curveNames(): HashTable
+    {
+        $names = VmOpensslConfigNative::curveNames();
+        if (null === $names) {
+            return new HashTable();
+        }
+
+        return self::stringListToHashTable($names);
+    }
+
+    /**
      * openssl_digest() — one-shot digest (EVP_Digest parity via VmHashNative).
      *
      * @return string|false
@@ -77,6 +113,39 @@ final class VmOpenssl
 
             return false;
         }
+    }
+
+    /**
+     * openssl_pbkdf2() — PKCS#5 PBKDF2 via VmHashNative (php-src ext/openssl/kdf.c; #6488).
+     *
+     * @return string|false raw key bytes
+     */
+    public static function pbkdf2(
+        string $password,
+        string $salt,
+        int $keyLength,
+        int $iterations,
+        string $digestAlgo = 'sha1',
+        ?Frame $frame = null
+    ): string|false {
+        if ($keyLength <= 0) {
+            throw new \ValueError('openssl_pbkdf2(): Argument #3 ($key_length) must be greater than 0');
+        }
+        if ($iterations <= 0) {
+            return false;
+        }
+        $method = strtolower($digestAlgo);
+        if (!OpensslCipherRegistry::digestImplemented($method)) {
+            self::userWarning('openssl_pbkdf2(): Unknown digest algorithm', $frame);
+
+            return false;
+        }
+        $derived = VmHashNative::hashPbkdf2($method, $password, $salt, $iterations, $keyLength, true);
+        if ('' === $derived) {
+            return false;
+        }
+
+        return $derived;
     }
 
     /**
@@ -469,6 +538,24 @@ final class VmOpenssl
         }
 
         return $ht;
+    }
+
+    /** @param array<string, string> $items */
+    private static function assocStringArrayToHashTable(array $items): HashTable
+    {
+        $ht = new HashTable();
+        foreach ($items as $key => $value) {
+            $var = new Variable();
+            $var->string($value);
+            $ht->update($key, $var);
+        }
+
+        return $ht;
+    }
+
+    public static function userWarningForFrame(string $message, ?Frame $frame): void
+    {
+        self::userWarning($message, $frame);
     }
 
     private static function userWarning(string $message, ?Frame $frame): void

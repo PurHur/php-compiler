@@ -47,6 +47,8 @@ final class BuiltinByRefParams
                 return [1];
             case 'parse_str':
                 return [1];
+            case 'xml_parse_into_struct':
+                return [2, 3];
             case 'dns_get_mx':
             case 'getmxrr':
                 return [1, 2];
@@ -98,6 +100,8 @@ final class BuiltinByRefParams
             case 'sodium_crypto_secretstream_xchacha20poly1305_push':
             case 'sodium_crypto_secretstream_xchacha20poly1305_pull':
             case 'sodium_crypto_secretstream_xchacha20poly1305_rekey':
+                return [0];
+            case 'uuid_generate':
                 return [0];
         }
 

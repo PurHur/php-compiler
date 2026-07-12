@@ -61,7 +61,7 @@ final class FiberSupport
             throw new NativeFiberError('Cannot suspend a fiber that is not running');
         }
         if (\count($handlerFrame->calledArgs) >= 1) {
-            $fiber->suspendReturn->copyFrom($handlerFrame->calledArgs[0]->resolveIndirect());
+            $fiber->suspendReturn->duplicateFrom($handlerFrame->calledArgs[0]->resolveIndirect());
         } else {
             $fiber->suspendReturn->null();
         }

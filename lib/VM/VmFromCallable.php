@@ -39,8 +39,18 @@ final class VmFromCallable
             $receiverOp = VmBoundMethodCallable::resolveBoundMethodReceiverOperand($block, $callableSlot);
             if (null !== $receiverOp) {
                 $classHint = VmBoundMethodCallable::resolveBoundMethodReceiverClassName($block, $callableSlot);
+                if ($op->fromCallableParentScope) {
+                    $classHint = self::resolveParentScopeClassName($context, $block);
+                }
 
-                return self::fromBoundMethodCallable($context, $block, $receiverOp, $methodLc, $classHint);
+                return self::fromBoundMethodCallable(
+                    $context,
+                    $block,
+                    $receiverOp,
+                    $methodLc,
+                    $classHint,
+                    $op->fromCallableParentScope
+                );
             }
         }
 
@@ -96,12 +106,22 @@ final class VmFromCallable
         Block $block,
         \PHPCfg\Operand $receiverOp,
         string $methodLc,
-        ?string $classHint = null
+        ?string $classHint = null,
+        bool $parentScope = false
     ): JitVariable {
         // Enum case FCC receivers often have userType '' while classHint is the enum FQCN (#6845, #9250).
         $className = self::nonEmptyString($receiverOp->type?->userType)
             ?? self::nonEmptyString($classHint)
             ?? ($context->scope->className !== '' ? $context->scope->className : 'object');
+        if ($parentScope) {
+            $callerLc = self::resolveCallerScopeClassLc($context, $block);
+            if (null !== $callerLc && '' !== $callerLc) {
+                $parentName = $context->type->object->parentClassDisplayName($callerLc);
+                if (null !== $parentName && '' !== $parentName) {
+                    $className = $parentName;
+                }
+            }
+        }
         $declaringClassLc = strtolower(ltrim((string) $className, '\\'));
         $proxyName = self::resolveInstanceProxyName($context, $declaringClassLc, $methodLc, $className);
         $inner = $context->resolveFunctionProxy($proxyName);
@@ -109,6 +129,9 @@ final class VmFromCallable
         $scopeName = self::nonEmptyString($receiverOp->type?->userType)
             ?? self::nonEmptyString($classHint)
             ?? $className;
+        if ($parentScope) {
+            $scopeName = $className;
+        }
         $scopeConst = $context->context->constString((string) $scopeName, true);
         $boundScope = new JitVariable(
             $context,
@@ -121,6 +144,38 @@ final class VmFromCallable
         $closureVar = self::wrapCallableProxy($context, $closureCall);
 
         return $closureVar;
+    }
+
+    private static function resolveParentScopeClassName(Context $context, Block $block): ?string
+    {
+        $callerLc = self::resolveCallerScopeClassLc($context, $block);
+        if (null === $callerLc || '' === $callerLc) {
+            return null;
+        }
+
+        return $context->type->object->parentClassDisplayName($callerLc);
+    }
+
+    private static function resolveParentScopeClassLc(Context $context, Block $block): ?string
+    {
+        $callerLc = self::resolveCallerScopeClassLc($context, $block);
+        if (null === $callerLc || '' === $callerLc) {
+            return null;
+        }
+
+        return $context->type->object->parentClassLc($callerLc);
+    }
+
+    private static function resolveCallerScopeClassLc(Context $context, Block $block): ?string
+    {
+        if (null !== $block->func && null !== $block->func->class) {
+            return strtolower($block->func->class->value);
+        }
+        if ($context->scope->className !== '') {
+            return $context->scope->className;
+        }
+
+        return null;
     }
 
     /** Zend zend_compile_first_class_callable: reject instance methods on Class::m(...) (#7465). */

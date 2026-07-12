@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Builtin\StringParseStr;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringArg;
-use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -29,7 +29,21 @@ final class parse_str extends Internal
     public function execute(Frame $frame): void
     {
         $argc = \count($frame->calledArgs);
-        if (2 !== $argc) {
+        $supportsSeparator = CompilerVersion::supportsParseStrSeparator();
+        if ($argc < 2) {
+            throw new ArgumentCountError(\sprintf(
+                'parse_str() expects exactly 2 arguments, %d given',
+                $argc
+            ));
+        }
+        if ($supportsSeparator) {
+            if ($argc > 3) {
+                throw new ArgumentCountError(\sprintf(
+                    'parse_str() expects at most 3 arguments, %d given',
+                    $argc
+                ));
+            }
+        } elseif ($argc > 2) {
             throw new ArgumentCountError(\sprintf(
                 'parse_str() expects exactly 2 arguments, %d given',
                 $argc
@@ -50,7 +64,12 @@ final class parse_str extends Internal
             ));
         }
 
-        $params = ParseStrEngine::parse($encodedStr);
+        $delimiter = '&';
+        if ($supportsSeparator && 3 === $argc) {
+            $delimiter = VmString::coerceStringBuiltinArg($frame->calledArgs[2], 'parse_str', 2, 'separator');
+        }
+
+        $params = ParseStrEngine::parse($encodedStr, $delimiter);
         $parsed = new \PHPCompiler\VM\HashTable();
         VmParseStr::mergeInto($parsed, $params);
         $replacement = new Variable(Variable::TYPE_ARRAY);
@@ -65,7 +84,29 @@ final class parse_str extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         $argc = \count($args);
-        if (2 !== $argc) {
+        $supportsSeparator = CompilerVersion::supportsParseStrSeparator();
+        if ($argc < 2) {
+            TypeErrorRaise::registerDeclarations($context);
+            TypeErrorRaise::ensureLinked($context);
+            TypeErrorRaise::emitArgumentCountError(
+                $context,
+                \sprintf('parse_str() expects exactly 2 arguments, %d given', $argc)
+            );
+
+            return $context->getTypeFromString('int32')->constInt(0, false);
+        }
+        if ($supportsSeparator) {
+            if ($argc > 3) {
+                TypeErrorRaise::registerDeclarations($context);
+                TypeErrorRaise::ensureLinked($context);
+                TypeErrorRaise::emitArgumentCountError(
+                    $context,
+                    \sprintf('parse_str() expects at most 3 arguments, %d given', $argc)
+                );
+
+                return $context->getTypeFromString('int32')->constInt(0, false);
+            }
+        } elseif ($argc > 2) {
             TypeErrorRaise::registerDeclarations($context);
             TypeErrorRaise::ensureLinked($context);
             TypeErrorRaise::emitArgumentCountError(
@@ -76,13 +117,14 @@ final class parse_str extends Internal
             return $context->getTypeFromString('int32')->constInt(0, false);
         }
 
+        $separator = ($supportsSeparator && 3 === $argc) ? $args[2] : null;
         if (null === JitStringArg::compileTimeLiteral($args[0])) {
             StringParseStr::ensureLinked($context);
         }
-        JitParseStr::parse($context, $args[0], $args[1]);
+        JitParseStr::parse($context, $args[0], $args[1], $separator);
 
-        $nullSlot = JitValueBox::alloc($context);
-        $nullPtr = JitValueBox::pointer($context, $nullSlot);
+        $nullSlot = \PHPCompiler\JIT\JitValueBox::alloc($context);
+        $nullPtr = \PHPCompiler\JIT\JitValueBox::pointer($context, $nullSlot);
         $context->builder->call($context->lookupFunction('__value__writeNull'), $nullPtr);
 
         return $nullPtr;

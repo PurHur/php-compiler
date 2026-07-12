@@ -179,6 +179,145 @@ final class VmValueCompare
     }
 
     /**
+     * Loose == between boxed __value__ and native double (Zend zend_operators.c).
+     */
+    public static function looseEqualValueToNativeDouble(
+        Context $context,
+        Variable $boxed,
+        Value $nativeDouble
+    ): Value {
+        if (!JitValueBox::isValueOperand($boxed)) {
+            throw new \LogicException('Expected boxed __value__ operand');
+        }
+
+        $valuePtr = JitValueBox::valuePtrFromVariable($context, $boxed);
+        $map = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($valuePtr, $map['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $i64 = $context->getTypeFromString('int64');
+        $double = $context->getTypeFromString('double');
+        $falseVal = $context->getTypeFromString('int1')->constInt(0, false);
+
+        $enumCaseTag = $i8->constInt(VmVariable::TYPE_ENUM_CASE, false);
+        $isEnumCase = $context->builder->icmp(Builder::INT_EQ, $typeByte, $enumCaseTag);
+        $objectTag = $i8->constInt(VmVariable::TYPE_OBJECT, false);
+        $isObject = $context->builder->icmp(Builder::INT_EQ, $typeByte, $objectTag);
+        $isEnumOrObject = $context->builder->or($isEnumCase, $isObject);
+
+        $doubleTag = $i8->constInt(Variable::TYPE_NATIVE_DOUBLE, false);
+        $isDouble = $context->builder->icmp(Builder::INT_EQ, $typeByte, $doubleTag);
+        $storedDouble = $context->builder->call(
+            $context->lookupFunction('__value__readDouble'),
+            $valuePtr
+        );
+        $doubleMatches = VmFloatCompare::relationalCompare(
+            $context,
+            OpCode::TYPE_EQUAL,
+            $storedDouble,
+            $nativeDouble
+        );
+
+        $longTag = $i8->constInt(Variable::TYPE_NATIVE_LONG, false);
+        $isLong = $context->builder->icmp(Builder::INT_EQ, $typeByte, $longTag);
+        $storedLong = $context->builder->call(
+            $context->lookupFunction('__value__readLong'),
+            $valuePtr
+        );
+        $longMatches = VmFloatCompare::relationalCompare(
+            $context,
+            OpCode::TYPE_EQUAL,
+            $context->builder->sitofp($storedLong, $double),
+            $nativeDouble
+        );
+
+        $boolTag = $i8->constInt(Variable::TYPE_NATIVE_BOOL, false);
+        $isBool = $context->builder->icmp(Builder::INT_EQ, $typeByte, $boolTag);
+        $boolMatches = VmFloatCompare::relationalCompare(
+            $context,
+            OpCode::TYPE_EQUAL,
+            $context->builder->uitofp(
+                self::readBoolBoxedAsLong($context, $valuePtr),
+                $double
+            ),
+            $nativeDouble
+        );
+
+        $nullTag = $i8->constInt(Variable::TYPE_NULL, false);
+        $isNull = $context->builder->icmp(Builder::INT_EQ, $typeByte, $nullTag);
+        $nullMatches = VmFloatCompare::relationalCompare(
+            $context,
+            OpCode::TYPE_EQUAL,
+            $nativeDouble,
+            $context->constantFromFloat(0.0)
+        );
+
+        $stringTag = $i8->constInt(Variable::TYPE_STRING, false);
+        $isString = $context->builder->icmp(Builder::INT_EQ, $typeByte, $stringTag);
+        $storedStr = $context->builder->call(
+            $context->lookupFunction('__value__readString'),
+            $valuePtr
+        );
+        $stringMatches = $context->builder->and(
+            self::stringIsNumeric($context, $storedStr),
+            VmFloatCompare::relationalCompare(
+                $context,
+                OpCode::TYPE_EQUAL,
+                self::stringToDouble($context, $storedStr),
+                $nativeDouble
+            )
+        );
+
+        $scalarMatches = $context->builder->select(
+            $isDouble,
+            $doubleMatches,
+            $context->builder->select(
+                $isLong,
+                $longMatches,
+                $context->builder->select(
+                    $isBool,
+                    $boolMatches,
+                    $context->builder->select(
+                        $isNull,
+                        $nullMatches,
+                        $context->builder->select($isString, $stringMatches, $falseVal)
+                    )
+                )
+            )
+        );
+
+        return $context->builder->select($isEnumOrObject, $falseVal, $scalarMatches);
+    }
+
+    public static function looseEqualNativeDoubleToValue(
+        Context $context,
+        Value $nativeDouble,
+        Variable $boxed
+    ): Value {
+        return self::looseEqualValueToNativeDouble($context, $boxed, $nativeDouble);
+    }
+
+    public static function notLooseEqualValueToNativeDouble(
+        Context $context,
+        Variable $boxed,
+        Value $nativeDouble
+    ): Value {
+        $same = self::looseEqualValueToNativeDouble($context, $boxed, $nativeDouble);
+        $i1 = $context->getTypeFromString('int1');
+
+        return $context->builder->icmp(Builder::INT_EQ, $same, $i1->constInt(0, false));
+    }
+
+    public static function notLooseEqualNativeDoubleToValue(
+        Context $context,
+        Value $nativeDouble,
+        Variable $boxed
+    ): Value {
+        return self::notLooseEqualValueToNativeDouble($context, $boxed, $nativeDouble);
+    }
+
+    /**
      * Loose == between {@see __hashtable__*} and native bool (Zend: empty array == false).
      */
     public static function looseEqualHashtableToBool(

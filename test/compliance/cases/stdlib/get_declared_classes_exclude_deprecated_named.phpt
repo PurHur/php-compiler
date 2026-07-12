@@ -1,5 +1,13 @@
 --TEST--
 Stdlib: get_declared_classes() exclude_deprecated: named parameter (#4711, basic_functions.c)
+--SKIPIF--
+<?php
+if (getenv('PHP_COMPILER_PROFILE') !== '8.4' && getenv('PHP_COMPILER_PROFILE') !== 'forward') {
+    die('skip requires PHP_COMPILER_PROFILE=8.4');
+}
+?>
+--ENV--
+PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
 #[\Deprecated]

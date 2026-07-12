@@ -17,20 +17,16 @@ final class JitIsResource
 {
     public static function invoke(Context $context, Value $handleLong): Value
     {
+        $restoreBlock = BasicBlockHelper::tryGetInsertBlock($context);
         StreamBucket::ensureLinked($context);
-        $restoreBlock = null;
-        try {
-            $restoreBlock = $context->builder->getInsertBlock();
-        } catch (\Throwable) {
-        }
         $probe = $context->module->getNamedFunction('__compiler_is_resource');
         if (null === $probe || 0 === $probe->countBasicBlocks()) {
             StreamLifecycleRuntime::ensureLinked($context);
         }
         if (null !== $restoreBlock) {
-            $context->builder->positionAtEnd($restoreBlock);
+            BasicBlockHelper::restoreInsertBlock($context, $restoreBlock);
         } else {
-            $context->builder->clearInsertionPosition();
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'is_resource_restore_cont');
         }
 
         $i32 = $context->getTypeFromString('int32');
@@ -56,7 +52,13 @@ final class JitIsResource
         $context->builder->branchIf($isFilterRange, $filterCheck, $streamProbe);
 
         $context->builder->positionAtEnd($filterCheck);
+        $beforeFilterLink = BasicBlockHelper::tryGetInsertBlock($context);
         StreamFilterBuiltin::ensureLinked($context);
+        if (null !== $beforeFilterLink) {
+            BasicBlockHelper::restoreInsertBlock($context, $beforeFilterLink);
+        } else {
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'is_resource_filter_restore_cont');
+        }
         $isFilter = $context->builder->call(
             $context->lookupFunction('__compiler_is_stream_filter_resource'),
             $handleLong

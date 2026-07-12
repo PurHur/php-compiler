@@ -14,6 +14,7 @@ final class NextafterJitHelper
 {
     public static function nextafterArgv(float $num, float $next): float
     {
-        return VmMath::nextafter($num, $next);
+        // Leaf for JIT/AOT: nextafter() lowers to libc when NestedJitCompileScope is active (#17279).
+        return \nextafter($num, $next);
     }
 }

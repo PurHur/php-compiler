@@ -73,7 +73,12 @@ final class is_resource_ extends Internal
             $handle = \PHPCompiler\VM\ResourceSupport::resolveHandle($v);
 
             return null !== $handle
-                && (VmFs::isValidHandle($handle) || VmFs::isFailedStreamHandle($handle));
+                && (
+                    VmFs::isValidHandle($handle)
+                    || VmFs::isFailedStreamHandle($handle)
+                    || VmFs::isZipArchivePlaceholder($handle)
+                    || VmFs::isZipEntryPlaceholder($handle)
+                );
         }
         if ($v->isDirResource()) {
             $handle = \PHPCompiler\VM\ResourceSupport::resolveHandle($v);

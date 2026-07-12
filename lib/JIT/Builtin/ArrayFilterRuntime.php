@@ -11,9 +11,9 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * JIT/AOT link for array_filter() no-callback path via ArrayFilterJitHelper PHP (#12370).
+ * JIT/AOT link for array_filter() no-callback path via ArrayFilterJitHelper PHP (#12370, #17852).
  *
- * Standalone AOT compiles {@see ArrayFilterJitHelper} via JitVmHelperLink bridge (#14386); native literal arrays keep LLVM in {@see ArrayBuiltinHelper::buildFilterArray()}.
+ * Standalone AOT compiles {@see ArrayFilterJitHelper} via JitVmHelperLink bridge (#14386); native literal arrays materialize to hashtable then route through PHP (#17852).
  * SSOT: {@see \PHPCompiler\ext\standard\array_filter}
  * php-src: ext/standard/array.c — php_array_filter()
  */
@@ -32,17 +32,21 @@ final class ArrayFilterRuntime
 
     public static function filterDefault(Context $context, JITVariable $array): Value
     {
-        if (ArrayBuiltinHelper::isNativeArray($array->type)) {
-            return ArrayBuiltinHelper::buildFilterArray($context, $array);
-        }
-
         self::ensureLinked($context);
-        $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
 
         return $context->builder->call(
             $context->lookupFunction(self::ABI_FILTER),
-            $ht
+            self::argToHashtable($context, $array)
         );
+    }
+
+    private static function argToHashtable(Context $context, JITVariable $arg): Value
+    {
+        if (ArrayBuiltinHelper::isNativeArray($arg->type)) {
+            return ArrayBuiltinHelper::nativeListToHashTable($context, $arg);
+        }
+
+        return ArrayBuiltinHelper::loadHashTable($context, $arg);
     }
 
     public static function ensureLinked(Context $context): void

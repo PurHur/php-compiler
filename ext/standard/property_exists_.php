@@ -25,8 +25,12 @@ final class property_exists_ extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (2 !== \count($frame->calledArgs)) {
-            throw new \LogicException('property_exists() requires exactly two arguments');
+        $argc = \count($frame->calledArgs);
+        if (2 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'property_exists() expects exactly 2 arguments, %d given',
+                $argc
+            ));
         }
         $ctx = VmReflection::requireContext($frame);
         self::requireValidObjectOrClass($frame->calledArgs[0]->resolveIndirect());
@@ -39,8 +43,12 @@ final class property_exists_ extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (2 !== \count($args)) {
-            throw new \LogicException('property_exists() requires exactly two arguments');
+        $argc = \count($args);
+        if (2 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'property_exists() expects exactly 2 arguments, %d given',
+                $argc
+            ));
         }
         if (!\in_array($args[1]->type, [
             JITVariable::TYPE_STRING,

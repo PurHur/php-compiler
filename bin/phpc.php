@@ -27,7 +27,7 @@ declare(strict_types=1);
  *   phpc lint --all <dir-or-file> [--json]
  *   phpc lint --bootstrap-inventory [--check] [--json]
  *   phpc init [--profile default|miniwebapp|sessionsweb|apijson|fileupload|throwsweb|selfhostprobe|fastcgiweb] [--force] [target-dir]
- *   phpc test [--fast] [--bootstrap] [--bootstrap-strict] [-- phpunit/ci-local args...]
+ *   phpc test [--fast] [--bootstrap] [--bootstrap-strict] [--native] [-- phpunit/ci-local args...]
  *   phpc doctor [--gates] [--selfhost] [--no-lint] [--jit-probe] [--aot-project-probe [dir]]  Env probes; --gates MiniWebApp; --selfhost NS2 (#2053)
  *   phpc validate-manifest [dir]                 Validate phpc.json schema and paths (issue #263)
  */
@@ -84,10 +84,11 @@ php-compiler CLI
       --json fields: file, line, kind, message, issue, issue_url (when tracked)
   phpc init [--profile default|miniwebapp|sessionsweb|apijson|fileupload|throwsweb|selfhostprobe|fastcgiweb] [--force] [target-dir]
                                               Scaffold web project (default, miniwebapp, sessionsweb, apijson, fileupload, throwsweb, selfhostprobe, or fastcgiweb)
-  phpc bootstrap init [--with-composer] [--skip-verify]
-                                              Bootstrap SDK cold start (gen-0 prelink, Tier 1; #15600)
+  phpc bootstrap init [--with-composer] [--skip-verify] [--sdk-url URL]
+                                              Bootstrap SDK cold start (gen-0 prelink, Tier 1; #15600/#15602)
   phpc test [--fast] [args...]                  Run ci-local.sh (full) or ci-fast.sh (no LLVM)
   phpc test --bootstrap [--strict]              Bootstrap subset (inventory + spine sync; #1961)
+  phpc test --native                            Native harness subset (AOT + VM compliance; #15599)
   phpc doctor [--gates] [--selfhost] [--no-lint] [--jit-probe] [--aot-project-probe [dir]]
                                               Probe environment; LLVM/JIT readiness (#717, #746)
       --gates                                     MiniWebApp ladder + self-host + 005-SessionsWeb (#1969)
@@ -337,9 +338,15 @@ switch ($command) {
         $fast = false;
         $bootstrap = false;
         $bootstrapStrict = false;
+        $native = false;
         while ([] !== $args) {
             if (in_array($args[0], ['--fast', 'fast'], true)) {
                 $fast = true;
+                array_shift($args);
+                continue;
+            }
+            if ('--native' === $args[0]) {
+                $native = true;
                 array_shift($args);
                 continue;
             }
@@ -364,6 +371,18 @@ switch ($command) {
                 continue;
             }
             break;
+        }
+        if ($native) {
+            if ($fast || $bootstrap) {
+                fwrite(STDERR, "phpc test: --native cannot be combined with --fast or --bootstrap\n");
+                exit(1);
+            }
+            $nativeScript = $repoRoot.'/script/bootstrap-native-test-subset.sh';
+            if (!is_executable($nativeScript)) {
+                fwrite(STDERR, "phpc test: {$nativeScript} is not executable\n");
+                exit(1);
+            }
+            exit(runProcess([$nativeScript], $repoRoot));
         }
         if ($bootstrap) {
             if ($fast) {

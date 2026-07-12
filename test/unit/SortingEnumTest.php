@@ -75,4 +75,23 @@ PHP;
         $runtime->run($runtime->parseAndCompile($code, 'sort_sorting_enum.php'));
         $this->assertSame("1,2,3\n1,2,3\n", ob_get_clean());
     }
+
+    /** @covers issue #17429 */
+    public function testUserSortAcceptsSortDirectionNamed(): void
+    {
+        $this->requireSortingEnum();
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+$a = [3, 1, 2];
+usort($a, 'strcmp', direction: SortDirection::Ascending);
+echo implode(',', $a), "\n";
+$b = ['b' => 2, 'a' => 1, 'c' => 3];
+uksort($b, 'strcmp', direction: SortDirection::Descending);
+echo implode(',', array_keys($b)), "\n";
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'usort_sort_direction.php'));
+        $this->assertSame("1,2,3\nc,b,a\n", ob_get_clean());
+    }
 }

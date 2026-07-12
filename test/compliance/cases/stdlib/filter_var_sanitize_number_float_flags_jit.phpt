@@ -1,0 +1,13 @@
+--TEST--
+stdlib filter_var() FILTER_SANITIZE_NUMBER_FLOAT int flags JIT (#17410)
+--FILE--
+<?php
+$s = '1,234.5e2';
+var_export(filter_var(
+    $s,
+    FILTER_SANITIZE_NUMBER_FLOAT,
+    FILTER_FLAG_ALLOW_FRACTION | FILTER_FLAG_ALLOW_THOUSAND | FILTER_FLAG_ALLOW_SCIENTIFIC
+));
+echo "\n";
+--EXPECT--
+'1,234.5e2'

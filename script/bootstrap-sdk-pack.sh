@@ -5,8 +5,12 @@
 # prelinked/bootstrap-gen0/, prelinked/bootstrap-vendor/*.o, and manifest files.
 #
 # Usage:
-#   ./script/bootstrap-sdk-pack.sh
+#   ./script/bootstrap-sdk-pack.sh [TAG]
 #   make bootstrap-sdk-pack
+#   make bootstrap-sdk-pack TAG=v1.0.0
+#
+# Without TAG: build/php-compiler-bootstrap-{spine-sha-prefix}.tar.gz
+# With TAG:     build/php-compiler-bootstrap-{TAG}-linux-x86_64.tar.gz (GitHub Release asset)
 #
 # Extract at repo root (or empty workdir) to seed Tier 1 cold start:
 #   tar xzf build/php-compiler-bootstrap-*.tar.gz
@@ -45,7 +49,16 @@ if [[ ${#SHA} -lt 8 ]]; then
 fi
 
 PREFIX="${SHA:0:12}"
-OUT="${ROOT}/build/php-compiler-bootstrap-${PREFIX}.tar.gz"
+TAG="${1:-}"
+if [[ -n "${TAG}" ]]; then
+  if [[ ! "${TAG}" =~ ^[A-Za-z0-9._-]+$ ]]; then
+    echo "bootstrap-sdk-pack: invalid TAG (use alnum, dot, dash, underscore): ${TAG}" >&2
+    exit 1
+  fi
+  OUT="${ROOT}/build/php-compiler-bootstrap-${TAG}-linux-x86_64.tar.gz"
+else
+  OUT="${ROOT}/build/php-compiler-bootstrap-${PREFIX}.tar.gz"
+fi
 mkdir -p "${ROOT}/build"
 
 rm -f "${OUT}"
@@ -57,4 +70,8 @@ tar -C "${ROOT}" -czf "${OUT}" \
   prelinked/bootstrap-vendor/ircmaxell-php-types.o
 
 BYTES="$(wc -c <"${OUT}" | tr -d '[:space:]')"
-echo "bootstrap-sdk-pack: OK ${OUT} (${BYTES} bytes, spine ${PREFIX}…)"
+if [[ -n "${TAG}" ]]; then
+  echo "bootstrap-sdk-pack: OK ${OUT} (${BYTES} bytes, tag ${TAG}, spine ${PREFIX}…)"
+else
+  echo "bootstrap-sdk-pack: OK ${OUT} (${BYTES} bytes, spine ${PREFIX}…)"
+fi

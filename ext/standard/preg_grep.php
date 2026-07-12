@@ -56,6 +56,9 @@ final class preg_grep extends Internal
             self::rejectNonStringHaystackValue($value);
             $match = VmPreg::pregMatch($pattern, $value->toString());
             if (false === $match) {
+                if (StdlibConstants::PREG_BAD_UTF8_ERROR === VmPreg::lastError()) {
+                    continue;
+                }
                 if (null !== $frame->returnVar) {
                     $frame->returnVar->bool(false);
                 }

@@ -19,7 +19,7 @@ final class JitMcjitEmbed
 
     private const EMPTY_CLASS_PAD = 'private bool $__phpcMcjitClassPad = false;';
 
-    /** Readonly classes cannot declare properties with defaults (#8967, zend_compile.c). */
+    /** MCJIT pad on readonly classes omits default initializer (#8967, zend_compile.c). */
     private const EMPTY_READONLY_CLASS_PAD = 'private bool $__phpcMcjitClassPad;';
 
     private const BOOTSTRAP_CLASS = 'class __phpc_mcjit_embed_bootstrap { public function __toString(): string { return ""; } } ';

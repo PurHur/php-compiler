@@ -12,6 +12,7 @@ use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\BuiltinExecute;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -23,13 +24,15 @@ final class addcslashes extends Internal
         if (2 !== \count($frame->calledArgs)) {
             throw new \LogicException('addcslashes() requires exactly two arguments in this compiler build');
         }
+        InternalStrictArg::rejectNullString($frame->calledArgs[0], 'addcslashes', 'str', 0, $frame);
         $subject = VmString::coerceStringBuiltinArg(
             $frame->calledArgs[0],
             'addcslashes',
             0,
             'str'
         );
-        $charlist = VmString::requireStringBuiltinArg(
+        InternalStrictArg::rejectNullString($frame->calledArgs[1], 'addcslashes', 'characters', 1, $frame);
+        $charlist = VmString::coerceStringBuiltinArg(
             $frame->calledArgs[1],
             'addcslashes',
             1,
@@ -55,7 +58,7 @@ final class addcslashes extends Internal
         }
 
         StringCslashes::ensureLinked($context);
-        $subject = JitStringBuiltinArg::lower($context, $args[0], 'addcslashes', 0, 'str');
+        $subject = JitStringBuiltinArg::lowerTypedString($context, $args[0], 'addcslashes', 0, 'str');
         if (null !== $charlistLit) {
             return $context->builder->call(
                 $context->lookupFunction('__compiler_addcslashes'),
@@ -63,7 +66,7 @@ final class addcslashes extends Internal
                 $context->builder->load($context->constantStringFromString($charlistLit))
             );
         }
-        $charlist = JitStringBuiltinArg::lowerRequiredString($context, $args[1], 'addcslashes', 1, 'characters');
+        $charlist = JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[1], 'addcslashes', 1, 'characters');
 
         return $context->builder->call(
             $context->lookupFunction('__compiler_addcslashes'),

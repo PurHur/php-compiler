@@ -19,7 +19,14 @@ final class JitLocaltime
 
         $ts = null === $timestamp
             ? JitDate::time($context)
-            : self::jitTimestampArg($context, $timestamp);
+            : JitDateTimestampArg::lowerNullable(
+                $context,
+                $timestamp,
+                'localtime',
+                1,
+                'timestamp',
+                JitDate::time($context)
+            );
 
         $slot = JitValueBox::alloc($context);
         $ptr = JitValueBox::pointer($context, $slot);
@@ -31,21 +38,5 @@ final class JitLocaltime
         );
 
         return $ptr;
-    }
-
-    private static function jitTimestampArg(Context $context, JITVariable $arg): Value
-    {
-        $i64 = $context->getTypeFromString('int64');
-        if (JITVariable::TYPE_NATIVE_LONG === $arg->type) {
-            return $context->helper->loadValue($arg);
-        }
-        if (JITVariable::TYPE_VALUE === $arg->type) {
-            return $context->builder->call(
-                $context->lookupFunction('__value__readLong'),
-                $arg->value
-            );
-        }
-
-        throw new \LogicException('localtime() timestamp must be an integer or null in this compiler build');
     }
 }

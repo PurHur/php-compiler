@@ -9,6 +9,7 @@ use PHPCompiler\JIT\Builtin\GetimagesizeJit;
 use PHPCompiler\JIT\Builtin\StringFileGetContents;
 use PHPCompiler\JIT\Builtin\StringTriggerErrorJit;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -74,7 +75,6 @@ final class JitGetimagesize
 
         $tag = 'getimagesize'.(string) ++self::$seq;
         $strPtr = $context->getTypeFromString('__string__*');
-        $htPtr = $context->getTypeFromString('__hashtable__*');
         $i1 = $context->getTypeFromString('int1');
         $falseVal = $i1->constInt(0, false);
         $noticeSource ??= $pathForOpenWarning ?? $data;
@@ -92,8 +92,12 @@ final class JitGetimagesize
         }
 
         $context->builder->positionAtEnd($parseBlock);
-        $ht = $context->builder->call(GetimagesizeJit::helperFunction($context), $data);
-        $parseFailed = $context->builder->icmp(Builder::INT_EQ, $ht, $htPtr->constNull());
+        $htRaw = JitNestedHelperCoerce::callHelper(
+            $context,
+            GetimagesizeJit::helperFunction($context),
+            [$data]
+        );
+        $parseFailed = JitNestedHelperCoerce::isHelperResultNull($context, $htRaw);
         $okBlock = BasicBlockHelper::append($context, $tag.'_ok');
         $context->builder->branchIf($parseFailed, $readFailBlock, $okBlock);
 
@@ -123,6 +127,7 @@ final class JitGetimagesize
         $readFailTail = self::writeFalseAndBranch($context, $doneBlock, $falseVal);
 
         $context->builder->positionAtEnd($okBlock);
+        $ht = JitNestedHelperCoerce::coerceToHashtablePtr($context, $htRaw);
         $context->refcount->addref($ht);
         $okSlot = JitValueBox::alloc($context);
         $okPtr = JitValueBox::pointer($context, $okSlot);

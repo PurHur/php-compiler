@@ -642,6 +642,24 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'result', 'parse_str'));
     }
 
+    /** @covers issue #17320 */
+    public function testParseStrSeparatorNamedParamOnForwardProfile(): void
+    {
+        $previous = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $names = BuiltinParamNames::forFunction('parse_str');
+            self::assertSame(['string', 'result', 'separator'], $names);
+            self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'separator', 'parse_str'));
+        } finally {
+            if (false === $previous) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$previous);
+            }
+        }
+    }
+
     /** @covers issue #17092 */
     public function testTimersAndHttpNamedParamsResolve(): void
     {
@@ -665,6 +683,15 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(['name', 'value', 'expires', 'path', 'domain', 'secure', 'httponly'], $cookie);
         self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($cookie, 'name', 'setcookie'));
         self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($cookie, 'value', 'setcookie'));
+    }
+
+    /** @covers issue #17370 */
+    public function testTokenGetAllFlagsNamedParamResolves(): void
+    {
+        $names = BuiltinParamNames::forFunction('token_get_all');
+        self::assertSame(['source', 'flags'], $names);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'source', 'token_get_all'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'flags', 'token_get_all'));
     }
 
     /** @covers issue #17090 */

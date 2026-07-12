@@ -13,7 +13,7 @@ use PHPLLVM\Value;
 /**
  * JIT/AOT link for array_flip() via ArrayFlipJitHelper PHP (#12329).
  *
- * Standalone AOT compiles {@see ArrayFlipJitHelper} via JitVmHelperLink (#14244); native literal arrays keep LLVM in {@see ArrayBuiltinHelper::buildFlipArray()}.
+ * Standalone AOT compiles {@see ArrayFlipJitHelper} via JitVmHelperLink (#14244); native literal arrays materialize to hashtable then route through PHP (#17922).
  * SSOT: {@see \PHPCompiler\ext\standard\VmArray}
  * php-src: ext/standard/array.c — php_array_flip()
  */
@@ -32,16 +32,11 @@ final class ArrayFlipRuntime
 
     public static function flip(Context $context, JITVariable $array): Value
     {
-        if (ArrayBuiltinHelper::isNativeArray($array->type)) {
-            return ArrayBuiltinHelper::buildFlipArray($context, $array);
-        }
-
         self::ensureLinked($context);
-        $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
 
         return $context->builder->call(
             $context->lookupFunction(self::ABI_FLIP),
-            $ht
+            ArrayBuiltinHelper::loadHashTable($context, $array)
         );
     }
 

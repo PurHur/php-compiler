@@ -9,7 +9,8 @@ namespace PHPCompiler\ext\brotli;
  */
 final class BrotliJitHelper
 {
-    public static function compress(string $data, int $level = VmBrotliNative::DEFAULT_QUALITY, int $mode = VmBrotliNative::MODE_GENERIC): ?string
+    /** Defaults match VmBrotliNative::DEFAULT_QUALITY (11) and MODE_GENERIC (0) — literals for self-host (#3803). */
+    public static function compress(string $data, int $level = 11, int $mode = 0): ?string
     {
         $result = VmBrotliNative::compress($data, $level, $mode);
 

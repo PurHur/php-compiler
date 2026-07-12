@@ -77,6 +77,9 @@ final class NewWithoutParensCompileCheck
     {
         $topLevelNewCount = 0;
         foreach ($ops as $op) {
+            if (!$op instanceof Op) {
+                continue;
+            }
             if ($op instanceof New_) {
                 if (!$atTopLevel) {
                     throw new \CompileError(self::MESSAGE);
@@ -111,12 +114,74 @@ final class NewWithoutParensCompileCheck
         if (null === $prop->defaultVar && null === $prop->defaultBlock) {
             return;
         }
+        if (CompilerVersion::supportsPropertyDefaultObjectExpressions() && !$prop->static) {
+            if (null !== $prop->defaultBlock && [] !== ($prop->defaultBlock->children ?? [])) {
+                $this->walkPropertyDefaultNewExpr($prop->defaultBlock->children, $this->sourceCode, true);
+
+                return;
+            }
+            if ($prop->defaultVar instanceof New_) {
+                if (!NewCtorParens::hasCtorParens($prop->defaultVar, $this->sourceCode)) {
+                    throw new \CompileError(self::MESSAGE);
+                }
+
+                return;
+            }
+            if (!$prop->defaultVar instanceof Op) {
+                return;
+            }
+            $this->walkSubBlocksPropertyDefaultNew($prop->defaultVar, $this->sourceCode, true);
+
+            return;
+        }
         if (null !== $prop->defaultBlock && [] !== ($prop->defaultBlock->children ?? [])) {
             $this->walkOpsRejectAllNew($prop->defaultBlock->children);
+
             return;
         }
         if ($prop->defaultVar instanceof New_) {
             throw new \CompileError(self::MESSAGE);
+        }
+    }
+
+    /**
+     * PHP 8.4+ instance property default: single top-level `new Class(...)` (#18040).
+     *
+     * @param list<Op> $ops
+     */
+    private function walkPropertyDefaultNewExpr(array $ops, ?string $sourceCode, bool $atTopLevel): void
+    {
+        $topLevelNewCount = 0;
+        foreach ($ops as $op) {
+            if (!$op instanceof Op) {
+                continue;
+            }
+            if ($op instanceof New_) {
+                if (!$atTopLevel) {
+                    throw new \CompileError(self::MESSAGE);
+                }
+                if (!NewCtorParens::hasCtorParens($op, $sourceCode)) {
+                    throw new \CompileError(self::MESSAGE);
+                }
+                ++$topLevelNewCount;
+                continue;
+            }
+            if ($atTopLevel && $topLevelNewCount > 0) {
+                throw new \CompileError(self::MESSAGE);
+            }
+            $this->walkSubBlocksPropertyDefaultNew($op, $sourceCode, false);
+        }
+        if ($atTopLevel && $topLevelNewCount > 1) {
+            throw new \CompileError(self::MESSAGE);
+        }
+    }
+
+    private function walkSubBlocksPropertyDefaultNew(Op $op, ?string $sourceCode, bool $atTopLevel): void
+    {
+        foreach ($op->getSubBlocks() as $sub) {
+            if (null !== $sub && property_exists($sub, 'children') && is_array($sub->children)) {
+                $this->walkPropertyDefaultNewExpr($sub->children, $sourceCode, $atTopLevel);
+            }
         }
     }
 
@@ -128,6 +193,9 @@ final class NewWithoutParensCompileCheck
     private function walkOpsRejectAllNew(array $ops): void
     {
         foreach ($ops as $op) {
+            if (!$op instanceof Op) {
+                continue;
+            }
             if ($op instanceof New_) {
                 throw new \CompileError(self::MESSAGE);
             }

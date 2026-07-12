@@ -34,7 +34,10 @@ final class ArrayMapRuntimeShrinkTest extends TestCase
 
         $arrayBuiltin = (string) file_get_contents(__DIR__.'/../../lib/JIT/ArrayBuiltinHelper.php');
         $this->assertStringContainsString('ArrayMapRuntime::mapMultipleWithClosure', $arrayBuiltin);
-        $this->assertStringNotContainsString('buildMapClosureZipFromMultiple($context, $callback, $arrays)', $arrayBuiltin);
+        $this->assertStringNotContainsString('buildMapClosureZipFromMultiple', $arrayBuiltin);
+        $this->assertStringNotContainsString('buildMapFromHashTableWithClosure', $arrayBuiltin);
+        $this->assertStringNotContainsString('buildMapFromNativeArrayWithClosure', $arrayBuiltin);
+        $this->assertStringNotContainsString('closureMapReturnTypeTag', $arrayBuiltin);
     }
 
     public function testArrayMapJitHelperNullIdentityPreservesKeys(): void

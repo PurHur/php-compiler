@@ -25,6 +25,7 @@ final class ExamplesHelloWorldAotRegressionTest extends TestCase
         $this->assertStringContainsString('ensureUserScriptRefreshEmit', $refresh);
         $this->assertStringContainsString('SuperglobalRefreshUserScriptLlvm::implement', $refresh);
         $this->assertStringContainsString('StringHtmlspecialchars::ensureStandaloneBodies', $source);
+        $this->assertStringContainsString('StringHtmlspecialcharsDecode::ensureStandaloneBodies', $source);
         $this->assertStringNotContainsString('StringHtmlspecialcharsStandaloneLlvm', $source);
         $userScript = (string) file_get_contents(dirname(__DIR__, 2).'/lib/JIT/Builtin/SuperglobalRefreshUserScriptLlvm.php');
         $this->assertStringContainsString('EnvironMirrorUserScriptLlvm', $userScript);
@@ -98,7 +99,6 @@ final class ExamplesHelloWorldAotRegressionTest extends TestCase
 
     public function testSimpleWebExampleStandaloneAotBuilds(): void
     {
-        $this->markTestSkipped('001-SimpleWeb AOT still tracked separately from #15417 HelloWorld SIGSEGV fix');
         if (!LlvmToolchain::isReady(dirname(__DIR__, 2))) {
             $this->markTestSkipped(LlvmToolchain::readyFailureReason() ?? 'LLVM 9 toolchain not available');
         }

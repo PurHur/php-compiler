@@ -27,6 +27,9 @@ final class JitGetClassMethods
     private const TYPE_ERROR =
         'get_class_methods(): Argument #1 ($object_or_class) must be of type object|string, %s given';
 
+    private const OBJECT_OR_VALID_CLASS_NAME_TYPE_ERROR =
+        'get_class_methods(): Argument #1 ($object_or_class) must be an object or a valid class name, %s given';
+
     private static int $seq = 0;
 
     public static function invoke(Context $context, JITVariable $classArg): Value
@@ -187,6 +190,8 @@ final class JitGetClassMethods
                 VmReflection::classMethodsList($vm->classes[$lc], $filter, $vm)
             );
         }
+
+        self::emitTypeErrorAndAbort($context, \sprintf(self::OBJECT_OR_VALID_CLASS_NAME_TYPE_ERROR, 'string'));
 
         return self::returnFalse($context);
     }

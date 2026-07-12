@@ -102,6 +102,26 @@ if (!function_exists('php_compiler_cli_is_virtual_code_filename')) {
     }
 }
 
+if (!function_exists('php_compiler_cli_server_script_name')) {
+    /**
+     * $_SERVER['SCRIPT_NAME'] for CLI drivers (Zend sapi/cli, issue #17574).
+     *
+     * @param array<string, mixed> $options
+     */
+    function php_compiler_cli_server_script_name(string $filename, array $options): ?string
+    {
+        $fromOpt = $options['--script-name'] ?? null;
+        if (is_string($fromOpt) && '' !== $fromOpt) {
+            return $fromOpt;
+        }
+        if (php_compiler_cli_is_virtual_code_filename($filename)) {
+            return php_compiler_cli_standard_input_code_filename();
+        }
+
+        return $filename;
+    }
+}
+
 if (!function_exists('php_compiler_cli_apply_ini_overrides')) {
     /**
      * Apply Zend-style {@code -d name=value} overrides to the compiled VM context (#11558).
@@ -112,6 +132,9 @@ if (!function_exists('php_compiler_cli_apply_ini_overrides')) {
     {
         foreach ($overrides as $key => $value) {
             if (!is_string($key) || !is_string($value)) {
+                continue;
+            }
+            if (\PHPCompiler\ext\standard\VmIni::applyStartupIniOverride($key, $value)) {
                 continue;
             }
             \PHPCompiler\ext\standard\VmIni::set($ctx, $key, $value);

@@ -180,7 +180,8 @@ final class VmDebugZval
         }
         $props = $object->getProperties(ClassEntry::PROP_PURPOSE_DEBUG, $vm, $frame);
         $count = \count($props);
-        self::write('object('.$object->class->name.')#'.$object->id.' ('.$count.') refcount('.$object->refCount."){\n");
+        $className = VmObjectDebugType::fromClassName($object->class->name);
+        self::write('object('.$className.')#'.$object->id.' ('.$count.') refcount('.$object->refCount."){\n");
         foreach ($props as $name => $value) {
             self::write(self::indent($level + 1));
             self::write('["'.$name."\"]=>\n");

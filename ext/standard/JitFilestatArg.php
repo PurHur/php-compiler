@@ -7,7 +7,6 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitOperandTypeLabel;
 use PHPCompiler\JIT\JitStringBuiltinArg;
@@ -30,13 +29,13 @@ final class JitFilestatArg
         return JitStringBuiltinArg::lowerPath($context, $arg, $function, $argIndex, $paramName);
     }
 
-    /** Z_PARAM_PATH for touch() — null coerces to "" (#12878, php_touch). */
+    /** touch() $filename — typed string; reject null (#18245, ext/standard/file.c). */
     public static function lowerPath(
         Context $context,
         JITVariable $arg,
         string $function
     ): Value {
-        return JitStringBuiltinArg::lowerPath($context, $arg, $function, 0, 'filename');
+        return JitStringBuiltinArg::lowerTypedString($context, $arg, $function, 0, 'filename');
     }
 
     public static function guardIntOrString(
@@ -120,7 +119,7 @@ final class JitFilestatArg
         );
     }
 
-    /** chmod()/mkdir() mode — strict int or weak numeric-string Z_PARAM_LONG decimal cast (#15902, ext/standard/filestat.c). */
+    /** chmod()/mkdir() mode — Z_PARAM_LONG; honor caller strict_types for string operands (#17927). */
     public static function lowerFileMode(
         Context $context,
         JITVariable $arg,
@@ -128,17 +127,21 @@ final class JitFilestatArg
         int $argIndex,
         string $paramName
     ): Value {
-        JitInternalStrictArg::requireInt($context, $arg, $function, $paramName, $argIndex + 1);
-        if ($context->callerStrictTypes) {
-            return $context->helper->loadValue($arg);
-        }
-        if (JITVariable::TYPE_STRING === $arg->type && null !== $arg->compileTimeString) {
-            $raw = $arg->compileTimeString;
-            if ('' === $raw || !is_numeric($raw)) {
+        if (JITVariable::TYPE_STRING === $arg->type) {
+            if ($context->callerStrictTypes) {
                 self::emitTypeErrorAndAbort(
                     $context,
                     self::intTypeError($function, $argIndex, $paramName, 'string')
                 );
+            }
+            if (null !== $arg->compileTimeString) {
+                $raw = $arg->compileTimeString;
+                if ('' === $raw || !is_numeric($raw)) {
+                    self::emitTypeErrorAndAbort(
+                        $context,
+                        self::intTypeError($function, $argIndex, $paramName, 'string')
+                    );
+                }
             }
         }
 

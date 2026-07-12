@@ -20,9 +20,9 @@ final class ArrayFirstLastJITTest extends BaseTest
             __DIR__.'/cases/stdlib/array_first_last_jit.phpt',
             'array_first_last_jit.phpt'
         );
-        yield 'array_first_last_empty.phpt' => self::parsePHPT(
-            __DIR__.'/cases/stdlib/array_first_last_empty.phpt',
-            'array_first_last_empty.phpt'
+        yield 'array_first_empty.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/array_first_empty.phpt',
+            'array_first_empty.phpt'
         );
         yield 'array_first_last_enum_jit.phpt' => self::parsePHPT(
             __DIR__.'/cases/stdlib/array_first_last_enum_jit.phpt',

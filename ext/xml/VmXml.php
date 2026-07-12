@@ -7,11 +7,13 @@ namespace PHPCompiler\ext\xml;
 use PHPCompiler\ext\libxml\LibxmlConstants;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\Context;
+use PHPCompiler\VM\ObjectEntry;
 
 /**
  * Minimal expat-shaped parser for xml_parse() v1 (#3494, #6058).
  *
- * Well-formedness probe records libxml errors via {@see \PHPCompiler\ext\libxml\VmLibxml}.
+ * Parser diagnostics live on the parser resource; expat failures always populate
+ * the libxml error ring (libxml_get_last_error) without php_error() (#18135, #18146).
  */
 final class VmXml
 {
@@ -21,17 +23,32 @@ final class VmXml
     /** libxml/xmlerror.h — XML_ERR_UNCLOSED_NODE_TAG (php-src ext/libxml/libxml.c; #14467). */
     private const XML_ERR_UNCLOSED_NODE_TAG = 77;
 
-    /** @var array<int, array{errorCode: int}> */
+    /** libxml/xmlerror.h — XML_ERR_TAG_NAME_MISMATCH (php-src ext/xml/xml.c; #18120). */
+    private const XML_ERR_TAG_NAME_MISMATCH = 76;
+
+    /** @var array<int, array<string, mixed>> */
     private static array $parsers = [];
 
-    private static int $nextParserId = 0;
-
-    public static function parserCreate(): int
+    public static function initParserState(int $parserId): void
     {
-        $id = ++self::$nextParserId;
-        self::$parsers[$id] = ['errorCode' => 0];
+        self::$parsers[$parserId] = XmlParserHandlers::defaultParserState();
+    }
 
-        return $id;
+    /** @return null|array<string, mixed> */
+    public static function parserState(int $parserId): ?array
+    {
+        return self::$parsers[$parserId] ?? null;
+    }
+
+    /** @param array<string, mixed> $state */
+    public static function replaceParserState(int $parserId, array $state): void
+    {
+        self::$parsers[$parserId] = $state;
+    }
+
+    public static function hasParserState(int $parserId): bool
+    {
+        return isset(self::$parsers[$parserId]);
     }
 
     public static function parserFree(int $parser): bool
@@ -53,37 +70,175 @@ final class VmXml
         return self::$parsers[$parser]['errorCode'];
     }
 
+    public static function getCurrentLineNumber(int $parser): int
+    {
+        if (!isset(self::$parsers[$parser])) {
+            throw new \ValueError('xml_get_current_line_number(): Argument #1 ($parser) must be a valid XML parser');
+        }
+
+        return self::$parsers[$parser]['line'];
+    }
+
+    public static function getCurrentColumnNumber(int $parser): int
+    {
+        if (!isset(self::$parsers[$parser])) {
+            throw new \ValueError('xml_get_current_column_number(): Argument #1 ($parser) must be a valid XML parser');
+        }
+
+        return self::$parsers[$parser]['column'];
+    }
+
+    public static function getCurrentByteIndex(int $parser): int
+    {
+        if (!isset(self::$parsers[$parser])) {
+            throw new \ValueError('xml_get_current_byte_index(): Argument #1 ($parser) must be a valid XML parser');
+        }
+
+        return self::$parsers[$parser]['byteIndex'];
+    }
+
+    public static function errorString(int $code): string
+    {
+        return self::ERROR_STRINGS[$code] ?? 'Unknown';
+    }
+
+    /** @var array<int, string> expat/libxml codes (php-src ext/xml/xml.c; #18120). */
+    private const ERROR_STRINGS = [
+        0 => 'No error',
+        1 => 'No memory',
+        2 => 'Invalid document start',
+        3 => 'Empty document',
+        4 => 'Not well-formed (invalid token)',
+        5 => 'Invalid document end',
+        6 => 'Invalid hexadecimal character reference',
+        7 => 'Invalid decimal character reference',
+        8 => 'Invalid character reference',
+        9 => 'Invalid character',
+        10 => 'XML_ERR_CHARREF_AT_EOF',
+        11 => 'XML_ERR_CHARREF_IN_PROLOG',
+        12 => 'XML_ERR_CHARREF_IN_EPILOG',
+        13 => 'XML_ERR_CHARREF_IN_DTD',
+        14 => 'XML_ERR_ENTITYREF_AT_EOF',
+        15 => 'XML_ERR_ENTITYREF_IN_PROLOG',
+        16 => 'XML_ERR_ENTITYREF_IN_EPILOG',
+        17 => 'XML_ERR_ENTITYREF_IN_DTD',
+        18 => 'PEReference at end of document',
+        19 => 'PEReference in prolog',
+        20 => 'PEReference in epilog',
+        21 => 'PEReference: forbidden within markup decl in internal subset',
+        self::XML_ERR_TAG_NOT_FINISHED => '> required',
+        self::XML_ERR_TAG_NAME_MISMATCH => 'Mismatched tag',
+        self::XML_ERR_UNCLOSED_NODE_TAG => 'Tag not finished',
+    ];
+
     public static function parse(
         Context $ctx,
         int $parser,
         string $data,
         bool $isFinal,
-        ?Frame $frame = null
-    ): bool {
+        ?Frame $frame = null,
+        ?ObjectEntry $parserObject = null
+    ): int {
         if (!isset(self::$parsers[$parser])) {
             throw new \ValueError('xml_parse(): Argument #1 ($parser) must be a valid XML parser');
         }
 
         if (!$isFinal) {
-            return true;
+            return 1;
         }
 
         $error = self::validateWellFormed($data);
         if (null === $error) {
-            self::$parsers[$parser]['errorCode'] = 0;
+            self::recordSuccessfulParse($parser, $data);
+            if (null !== $parserObject) {
+                VmXmlSaxDispatcher::dispatch($ctx, $parserObject, $data, $frame);
+            }
 
-            return true;
+            return 1;
         }
 
-        self::$parsers[$parser]['errorCode'] = $error['code'];
-        \PHPCompiler\ext\libxml\VmLibxml::handleError($ctx, $error, $frame);
+        self::recordParserError($parser, $error, $data);
+        \PHPCompiler\ext\libxml\VmLibxml::recordError($error);
 
-        return false;
+        return 0;
+    }
+
+    private static function clearParserDiagnostics(int $parser): void
+    {
+        self::$parsers[$parser]['errorCode'] = 0;
+        self::$parsers[$parser]['line'] = 0;
+        self::$parsers[$parser]['column'] = 0;
+        self::$parsers[$parser]['byteIndex'] = 0;
+    }
+
+    private static function recordSuccessfulParse(int $parser, string $data): void
+    {
+        $byteIndex = \strlen($data);
+        self::$parsers[$parser]['errorCode'] = 0;
+        self::$parsers[$parser]['line'] = 1 + substr_count($data, "\n");
+        self::$parsers[$parser]['byteIndex'] = $byteIndex;
+        self::$parsers[$parser]['column'] = $byteIndex + 1;
+    }
+
+    /**
+     * @param array{level: int, code: int, column: int, message: string, file: string, line: int, byteIndex?: int} $error
+     */
+    private static function recordParserError(int $parser, array $error, string $data): void
+    {
+        $byteIndex = $error['byteIndex'] ?? \strlen($data);
+        self::$parsers[$parser]['errorCode'] = $error['code'];
+        self::$parsers[$parser]['line'] = $error['line'];
+        self::$parsers[$parser]['column'] = $error['column'];
+        self::$parsers[$parser]['byteIndex'] = $byteIndex;
     }
 
     public static function isWellFormed(string $data): bool
     {
         return null === self::validateWellFormed($data);
+    }
+
+    /**
+     * xml_parse_into_struct() — build values/index arrays (#3494).
+     *
+     * @return array{status: int, values: HashTable, index: HashTable}
+     */
+    public static function parseIntoStruct(
+        Context $ctx,
+        int $parser,
+        string $data,
+        ?Frame $frame = null
+    ): array {
+        if (!isset(self::$parsers[$parser])) {
+            throw new \ValueError('xml_parse_into_struct(): Argument #1 ($parser) must be a valid XML parser');
+        }
+
+        $error = self::validateWellFormed($data);
+        if (null !== $error) {
+            self::recordParserError($parser, $error, $data);
+            \PHPCompiler\ext\libxml\VmLibxml::recordError($error);
+
+            return [
+                'status' => 0,
+                'values' => new \PHPCompiler\VM\HashTable(),
+                'index' => new \PHPCompiler\VM\HashTable(),
+            ];
+        }
+
+        self::recordSuccessfulParse($parser, $data);
+        $built = VmXmlStructBuilder::build($data);
+        $result = $built->result();
+
+        return [
+            'status' => 1,
+            'values' => $result['values'],
+            'index' => $result['index'],
+        ];
+    }
+
+    /** @return null|int byte offset after one element starting at $pos */
+    public static function findElementEndForStruct(string $content, int $pos): ?int
+    {
+        return self::findElementEnd($content, $pos);
     }
 
     /**
@@ -116,10 +271,10 @@ final class VmXml
     {
         $trimmed = trim($data);
         if ('' === $trimmed) {
-            return self::errorRecord(1, 1, 'Document is empty', 4);
+            return self::errorRecord(1, 1, 'Document is empty', 4, LibxmlConstants::LIBXML_ERR_FATAL, 0);
         }
         if ('<' !== $trimmed[0]) {
-            return self::errorRecord(1, 1, 'Start tag expected, \'<\' not found', 4);
+            return self::errorRecord(1, 1, 'Start tag expected, \'<\' not found', 4, LibxmlConstants::LIBXML_ERR_FATAL, 0);
         }
 
         $unclosed = self::detectUnclosedStartTag($trimmed);
@@ -131,6 +286,11 @@ final class VmXml
             return null;
         }
 
+        $mismatch = self::detectTagMismatch($trimmed, 0);
+        if (null !== $mismatch) {
+            return $mismatch;
+        }
+
         if (!preg_match('/^<([A-Za-z_][\w:.-]*)(\s[^>]*)?>(.*)<\/\1>\s*$/s', $trimmed, $matches)) {
             $premature = self::detectPrematureEnd($trimmed);
             if (null !== $premature) {
@@ -140,7 +300,32 @@ final class VmXml
             return self::errorRecord(1, 1, 'Malformed XML document', 4);
         }
 
-        return self::validateFragment($matches[3]);
+        $error = self::validateFragment($matches[3]);
+        if (null === $error) {
+            return null;
+        }
+
+        return self::adjustFragmentErrorOffset($error, $trimmed, $matches[3]);
+    }
+
+    /**
+     * @param array{level: int, code: int, column: int, message: string, file: string, line: int, byteIndex?: int} $error
+     *
+     * @return array{level: int, code: int, column: int, message: string, file: string, line: int, byteIndex?: int}
+     */
+    private static function adjustFragmentErrorOffset(array $error, string $document, string $fragment): array
+    {
+        if (!isset($error['byteIndex'])) {
+            return $error;
+        }
+        $offset = strpos($document, $fragment);
+        if (false === $offset) {
+            return $error;
+        }
+        $error['byteIndex'] += $offset;
+        $error['column'] = $error['byteIndex'] + 1;
+
+        return $error;
     }
 
     /**
@@ -241,6 +426,56 @@ final class VmXml
     }
 
     /**
+     * Parse a CDATA section at $pos (php-src libxml CDATA; #17526).
+     *
+     * @return null|array{end: int, data: string}
+     */
+    public static function parseCdataSectionAt(string $content, int $pos): ?array
+    {
+        if (!isset($content[$pos]) || '<' !== $content[$pos]) {
+            return null;
+        }
+        if (!str_starts_with(substr($content, $pos), '<![CDATA[')) {
+            return null;
+        }
+        $dataStart = $pos + 9;
+        $endMarker = strpos($content, ']]>', $dataStart);
+        if (false === $endMarker) {
+            return null;
+        }
+
+        return [
+            'end' => $endMarker + 3,
+            'data' => substr($content, $dataStart, $endMarker - $dataStart),
+        ];
+    }
+
+    /**
+     * Parse an XML comment at $pos (php-src libxml comment nodes; #17530).
+     *
+     * @return null|array{end: int, data: string}
+     */
+    public static function parseCommentAt(string $content, int $pos): ?array
+    {
+        if (!isset($content[$pos]) || '<' !== $content[$pos]) {
+            return null;
+        }
+        if (!str_starts_with(substr($content, $pos), '<!--')) {
+            return null;
+        }
+        $dataStart = $pos + 4;
+        $endMarker = strpos($content, '-->', $dataStart);
+        if (false === $endMarker) {
+            return null;
+        }
+
+        return [
+            'end' => $endMarker + 3,
+            'data' => substr($content, $dataStart, $endMarker - $dataStart),
+        ];
+    }
+
+    /**
      * Validate sibling content inside an element (text nodes and child elements).
      *
      * @return null|array{level: int, code: int, column: int, message: string, file: string, line: int}
@@ -264,14 +499,30 @@ final class VmXml
 
                 continue;
             }
+            $cdata = self::parseCdataSectionAt($content, $pos);
+            if (null !== $cdata) {
+                $pos = $cdata['end'];
+
+                continue;
+            }
+            $comment = self::parseCommentAt($content, $pos);
+            if (null !== $comment) {
+                $pos = $comment['end'];
+
+                continue;
+            }
             $end = self::findElementEnd($content, $pos);
             if (null === $end) {
+                $mismatch = self::detectTagMismatch($content, $pos);
+                if (null !== $mismatch) {
+                    return $mismatch;
+                }
                 $unclosed = self::detectUnclosedStartTag(substr($content, $pos));
                 if (null !== $unclosed) {
                     return $unclosed;
                 }
 
-                return self::errorRecord(1, $pos + 1, 'Malformed XML document', 4);
+                return self::errorRecord(1, $pos + 1, 'Malformed XML document', 4, LibxmlConstants::LIBXML_ERR_FATAL, $pos);
             }
             $element = substr($content, $pos, $end - $pos);
             $error = self::validateWellFormed($element);
@@ -279,6 +530,82 @@ final class VmXml
                 return $error;
             }
             $pos = $end;
+        }
+
+        return null;
+    }
+
+    /**
+     * Detect mismatched end tags (libxml XML_ERR_TAG_NAME_MISMATCH / expat code 76; #18120).
+     *
+     * @return null|array{level: int, code: int, column: int, message: string, file: string, line: int, byteIndex: int}
+     */
+    private static function detectTagMismatch(string $content, int $pos): ?array
+    {
+        if (!preg_match('/\G<([A-Za-z_][\w:.-]*)(\s[^>]*)?>/s', $content, $open, 0, $pos)) {
+            return null;
+        }
+
+        /** @var list<string> $stack */
+        $stack = [$open[1]];
+        $scan = $pos + \strlen($open[0]);
+        $len = \strlen($content);
+        while ($scan < $len && [] !== $stack) {
+            if (preg_match('/\G<\/([A-Za-z_][\w:.-]*)>/s', $content, $close, 0, $scan)) {
+                $name = $close[1];
+                if ([] === $stack || end($stack) !== $name) {
+                    $line = 1 + substr_count(substr($content, 0, $scan), "\n");
+                    $byteIndex = $scan + \strlen($close[0]);
+                    $expected = [] !== $stack ? (string) end($stack) : '';
+                    $expatLine = $line - 1;
+                    $message = \sprintf(
+                        "Opening and ending tag mismatch: %s line %d and %s\n",
+                        $expected,
+                        $expatLine,
+                        $name
+                    );
+
+                    return self::errorRecord(
+                        $line,
+                        $byteIndex + 1,
+                        $message,
+                        self::XML_ERR_TAG_NAME_MISMATCH,
+                        LibxmlConstants::LIBXML_ERR_FATAL,
+                        $byteIndex
+                    );
+                }
+                array_pop($stack);
+                $scan += \strlen($close[0]);
+                if ([] === $stack) {
+                    return null;
+                }
+
+                continue;
+            }
+            if (preg_match('/\G<([A-Za-z_][\w:.-]*)(\s[^>]*)?\/>/s', $content, $sc, 0, $scan)) {
+                $scan += \strlen($sc[0]);
+
+                continue;
+            }
+            if (preg_match('/\G<([A-Za-z_][\w:.-]*)(\s[^>]*)?>/s', $content, $nested, 0, $scan)) {
+                $stack[] = $nested[1];
+                $scan += \strlen($nested[0]);
+
+                continue;
+            }
+            $cdata = self::parseCdataSectionAt($content, $scan);
+            if (null !== $cdata) {
+                $scan = $cdata['end'];
+
+                continue;
+            }
+            $comment = self::parseCommentAt($content, $scan);
+            if (null !== $comment) {
+                $scan = $comment['end'];
+
+                continue;
+            }
+            ++$scan;
         }
 
         return null;
@@ -326,6 +653,18 @@ final class VmXml
 
                 continue;
             }
+            $cdata = self::parseCdataSectionAt($content, $scan);
+            if (null !== $cdata) {
+                $scan = $cdata['end'];
+
+                continue;
+            }
+            $comment = self::parseCommentAt($content, $scan);
+            if (null !== $comment) {
+                $scan = $comment['end'];
+
+                continue;
+            }
             ++$scan;
         }
 
@@ -333,16 +672,17 @@ final class VmXml
     }
 
     /**
-     * @return array{level: int, code: int, column: int, message: string, file: string, line: int}
+     * @return array{level: int, code: int, column: int, message: string, file: string, line: int, byteIndex?: int}
      */
     private static function errorRecord(
         int $line,
         int $column,
         string $message,
         int $code,
-        int $level = LibxmlConstants::LIBXML_ERR_FATAL
+        int $level = LibxmlConstants::LIBXML_ERR_FATAL,
+        ?int $byteIndex = null
     ): array {
-        return [
+        $record = [
             'level' => $level,
             'code' => $code,
             'column' => $column,
@@ -350,5 +690,10 @@ final class VmXml
             'file' => '',
             'line' => $line,
         ];
+        if (null !== $byteIndex) {
+            $record['byteIndex'] = $byteIndex;
+        }
+
+        return $record;
     }
 }

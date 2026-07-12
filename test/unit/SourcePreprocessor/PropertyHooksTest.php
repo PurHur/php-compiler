@@ -266,6 +266,65 @@ PHP;
         self::assertTrue($registry['box']['value']['virtual'] ?? false);
     }
 
+    public function testLowersSetParamArrowHook(): void
+    {
+        $src = <<<'PHP'
+<?php
+class Box {
+    private string $stored = 'init';
+    public string $x {
+        get => $this->stored;
+        set($v) => $this->stored = strtoupper($v);
+    }
+}
+PHP;
+        [$out, $registry] = (new PropertyHooks())->process($src);
+        self::assertStringNotContainsString('$x {', $out);
+        self::assertStringContainsString('public string $x;', $out);
+        self::assertStringContainsString('function __phpc_property_set_x($v)', $out);
+        self::assertStringContainsString('$this->stored = strtoupper($v);', $out);
+        self::assertSame('__phpc_property_set_x', $registry['box']['x']['set'] ?? null);
+    }
+
+    public function testLowersGetParamBlockHook(): void
+    {
+        $src = <<<'PHP'
+<?php
+class C {
+    private string $_data = 'abcdef';
+    public string $chunk {
+        get ($len) {
+            return substr($this->_data, 0, $len);
+        }
+    }
+}
+PHP;
+        [$out, $registry] = (new PropertyHooks())->process($src);
+        self::assertStringNotContainsString('$chunk {', $out);
+        self::assertStringContainsString('public string $chunk;', $out);
+        self::assertStringContainsString('function __phpc_property_get_chunk($len)', $out);
+        self::assertStringContainsString('return substr($this->_data, 0, $len);', $out);
+        self::assertSame('__phpc_property_get_chunk', $registry['c']['chunk']['get'] ?? null);
+        self::assertTrue($registry['c']['chunk']['getParameterized'] ?? false);
+    }
+
+    public function testLowersGetParamArrowHook(): void
+    {
+        $src = <<<'PHP'
+<?php
+class C {
+    private string $_data = 'abcdef';
+    public string $chunk {
+        get ($len) => substr($this->_data, 0, $len);
+    }
+}
+PHP;
+        [$out, $registry] = (new PropertyHooks())->process($src);
+        self::assertStringContainsString('function __phpc_property_get_chunk($len)', $out);
+        self::assertStringContainsString('return substr($this->_data, 0, $len);', $out);
+        self::assertTrue($registry['c']['chunk']['getParameterized'] ?? false);
+    }
+
     public function testLowersStaticPropertyHooks(): void
     {
         $src = <<<'PHP'
@@ -470,6 +529,7 @@ PHP;
         self::assertStringContainsString('/*phpc-asymmetric-set:private*/ /*phpc-asymmetric-explicit-read*/ public string $x;', $out);
         self::assertStringContainsString('function __phpc_property_get_x', $out);
         self::assertArrayNotHasKey('set', $registry['c']['x'] ?? []);
+        self::assertArrayNotHasKey('requiresSet', $registry['c']['x'] ?? []);
         self::assertTrue($registry['c']['x']['virtual'] ?? false);
     }
 
@@ -598,6 +658,35 @@ PHP;
         self::assertSame("compile-ok x=1 y=a\n", ob_get_clean());
     }
 
+    /** @covers issue #18171 — same-name backing declared before hooked property with unset block */
+    public function testPriorSameNameBackingFieldMergesWithUnsetBlock(): void
+    {
+        $this->skipUnlessPropertyHooksEnabled();
+        $src = <<<'PHP'
+<?php
+class C {
+    private string $x = 'a';
+    public string $x {
+        get => $this->x;
+        unset { unset($this->x); }
+    }
+}
+$c = new C();
+unset($c->x);
+echo 'isset=' . var_export(isset($c->x), true) . "\n";
+PHP;
+        [$out, $registry] = (new PropertyHooks())->process($src);
+        self::assertStringContainsString("public string \$x = 'a';", $out);
+        self::assertStringNotContainsString('private string $x', $out);
+        self::assertSame('__phpc_property_unset_x', $registry['c']['x']['unset'] ?? null);
+
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($src, 'property_hook_unset_prior_backing.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("isset=false\n", ob_get_clean());
+    }
+
     /** @covers issue #10393 — true duplicate same-name field without hook backing use still fails compile */
     public function testDetachedSameNameBackingFieldIsDuplicateProperty(): void
     {
@@ -638,6 +727,46 @@ PHP;
         self::assertStringContainsString('public readonly int $x;', $out);
         self::assertStringContainsString('__phpc_property_set_x', $out);
         self::assertSame('__phpc_property_set_x', $registry['c']['x']['set'] ?? null);
+    }
+
+    /** @covers issue #18170 — explicit virtual modifier stripped before php-parser; registry marks virtual */
+    public function testExplicitVirtualModifierStrippedAndMarkedVirtual(): void
+    {
+        $this->skipUnlessPropertyHooksEnabled();
+        $src = <<<'PHP'
+<?php
+class Base {
+    public virtual string $x {
+        get => 'base';
+    }
+}
+PHP;
+        [$out, $registry] = (new PropertyHooks())->process($src);
+        self::assertStringNotContainsString('virtual', $out);
+        self::assertStringContainsString('public string $x;', $out);
+        self::assertTrue($registry['base']['x']['virtual'] ?? false);
+    }
+
+    /** @covers issue #18170 — parent::$prop->get() lowered to parent hook method call */
+    public function testRewriteParentPropertyHookRefGetCall(): void
+    {
+        $this->skipUnlessPropertyHooksEnabled();
+        $src = <<<'PHP'
+<?php
+class Base {
+    public virtual string $x {
+        get => 'base';
+    }
+}
+class Child extends Base {
+    public virtual string $x {
+        get => parent::$x->get() . '-child';
+    }
+}
+PHP;
+        [$out] = (new PropertyHooks())->process($src);
+        self::assertStringContainsString('parent::__phpc_property_get_x()', $out);
+        self::assertStringNotContainsString('parent::$x->get()', $out);
     }
 
     /** @covers issue #16861 — virtual default + hook block rejected with Zend compile error on forward profile */
@@ -891,6 +1020,28 @@ PHP;
         self::assertStringContainsString('strtolower($value)', $out);
         self::assertTrue($registry['c']['x']['finalSet'] ?? false);
         self::assertFalse($registry['c']['x']['finalGet'] ?? false);
+    }
+
+    /** @covers issue #17330 — get { } block records distinct read backing for VM dispatch */
+    public function testGetBlockBodyRegistersDistinctReadBacking(): void
+    {
+        $src = <<<'PHP'
+<?php
+class C {
+    private string $stored = 'g';
+    public string $x {
+        get {
+            return $this->stored;
+        }
+        set {
+            $this->stored = strtoupper($value);
+        }
+    }
+}
+PHP;
+        [, $registry] = (new PropertyHooks())->process($src);
+        self::assertSame('stored', $registry['c']['x']['getBacking'] ?? null);
+        self::assertSame('stored', $registry['c']['x']['setBacking'] ?? null);
     }
 
 }

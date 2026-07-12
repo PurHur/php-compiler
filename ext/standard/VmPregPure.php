@@ -38,15 +38,17 @@ final class VmPregPure
             return false;
         }
         [$regex, $opts] = $parsed;
-        $compiled = self::compile($pattern);
-        if (null === $compiled) {
-            return false;
-        }
-
         $normalizedOffset = self::normalizeMatchSubjectOffset($offset, \strlen($subject));
         if (false === $normalizedOffset) {
             self::$lastError = StdlibConstants::PREG_INTERNAL_ERROR;
 
+            return false;
+        }
+        if (!self::ensureUtf8SubjectForOpts($subject, $opts, $normalizedOffset)) {
+            return false;
+        }
+        $compiled = self::compile($pattern);
+        if (null === $compiled) {
             return false;
         }
 
@@ -100,16 +102,18 @@ final class VmPregPure
             return false;
         }
         [$regex, $opts] = $parsed;
-        $compiled = self::compile($pattern);
-        if (null === $compiled) {
-            return false;
-        }
-
         $subjectLen = \strlen($subject);
         $normalizedOffset = self::normalizeMatchSubjectOffset($offset, $subjectLen);
         if (false === $normalizedOffset) {
             self::$lastError = StdlibConstants::PREG_INTERNAL_ERROR;
 
+            return false;
+        }
+        if (!self::ensureUtf8SubjectForOpts($subject, $opts, $normalizedOffset)) {
+            return false;
+        }
+        $compiled = self::compile($pattern);
+        if (null === $compiled) {
             return false;
         }
 
@@ -185,8 +189,19 @@ final class VmPregPure
                 }
                 $elemCount = 0;
                 $replaced = self::pregReplaceString($pattern, $replacement, $item, $limit, $elemCount);
-                if (false === $replaced || null === $replaced) {
-                    return $replaced;
+                if (false === $replaced) {
+                    return false;
+                }
+                if (null === $replaced) {
+                    if (StdlibConstants::PREG_BAD_UTF8_ERROR === self::$lastError) {
+                        if (null !== $count) {
+                            $count = $totalCount;
+                        }
+
+                        return $out;
+                    }
+
+                    return null;
                 }
                 $out[$key] = $replaced;
                 $totalCount += $elemCount;
@@ -214,14 +229,21 @@ final class VmPregPure
         }
         [$regex, $opts] = $parsed;
         if ('' === $regex) {
+            if (!self::ensureUtf8SubjectForOpts($subject, $opts, 0)) {
+                return false;
+            }
+
             return self::pregSplitEmptyPattern(
                 $subject,
                 $limit,
                 $flags,
-                0 !== ($opts & 0x00080000)
+                0 !== ($opts & VmPregPattern::PCRE2_UTF)
             );
         }
 
+        if (!self::ensureUtf8SubjectForOpts($subject, $opts, 0)) {
+            return false;
+        }
         $compiled = self::compile($pattern);
         if (null === $compiled) {
             return false;
@@ -325,15 +347,15 @@ final class VmPregPure
         if ($byteOffset >= \strlen($subject)) {
             return 0;
         }
-        if (0 !== ($opts & 0x00080000)) {
+        if (0 !== ($opts & VmPregPattern::PCRE2_UTF)) {
             $charIndex = 0;
             $pos = 0;
-            $charLen = VmString::utf8CharLength($subject);
+            $charLen = VmPregUtf8::utf8CharLength($subject);
             while ($pos < $byteOffset && $charIndex < $charLen) {
-                $pos += \strlen(VmString::utf8CharSubstr($subject, $charIndex, 1));
+                $pos += \strlen(VmPregUtf8::utf8CharSubstr($subject, $charIndex, 1));
                 ++$charIndex;
             }
-            $ch = VmString::utf8CharSubstr($subject, $charIndex, 1);
+            $ch = VmPregUtf8::utf8CharSubstr($subject, $charIndex, 1);
 
             return max(1, \strlen($ch));
         }
@@ -394,7 +416,7 @@ final class VmPregPure
 
     public static function patternWarningMessage(string $pattern): ?string
     {
-        return VmPregPattern::compileWarningMessage($pattern);
+        return VmPregCompileWarn::compileWarningMessage($pattern);
     }
 
     private static function pregReplaceString(
@@ -407,6 +429,9 @@ final class VmPregPure
         $emptyParsed = PregEmptyPatternReplace::parseEmptyPattern($pattern);
         if (null !== $emptyParsed) {
             [, $opts] = $emptyParsed;
+            if (!self::ensureUtf8SubjectForOpts($subject, $opts, 0)) {
+                return null;
+            }
             self::$lastError = 0;
             $replacements = 0;
             $result = PregEmptyPatternReplace::replace(
@@ -430,6 +455,9 @@ final class VmPregPure
             return null;
         }
         [$regex, $opts] = $parsed;
+        if (!self::ensureUtf8SubjectForOpts($subject, $opts, 0)) {
+            return null;
+        }
         $compiled = self::compile($pattern);
         if (null === $compiled) {
             self::$lastError = 1;
@@ -551,6 +579,32 @@ final class VmPregPure
     }
 
     /**
+     * php-src ext/pcre/php_pcre.c — reject malformed UTF-8 subjects when /u is set.
+     */
+    private static function ensureUtf8SubjectForOpts(string $subject, int $opts, int $offset): bool
+    {
+        if (0 === ($opts & VmPregPattern::PCRE2_UTF)) {
+            return true;
+        }
+        if (!VmPregUtf8::isValidUtf8($subject)) {
+            self::$lastError = StdlibConstants::PREG_BAD_UTF8_ERROR;
+
+            return false;
+        }
+        $subjectLen = \strlen($subject);
+        if ($offset > 0 && $offset < $subjectLen) {
+            $byte = \ord($subject[$offset]);
+            if (($byte & 0xC0) === 0x80) {
+                self::$lastError = StdlibConstants::PREG_BAD_UTF8_OFFSET_ERROR;
+
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
      * @param list<int> $ovector
      * @param array<string, int> $groupNameToIndex
      *
@@ -630,10 +684,10 @@ final class VmPregPure
         /** @var list<array{0: string, 1: int}> $units */
         $units = [];
         if ($utf8) {
-            $charLen = VmString::utf8CharLength($subject);
+            $charLen = VmPregUtf8::utf8CharLength($subject);
             $bytePos = 0;
             for ($i = 0; $i < $charLen; ++$i) {
-                $ch = VmString::utf8CharSubstr($subject, $i, 1);
+                $ch = VmPregUtf8::utf8CharSubstr($subject, $i, 1);
                 $units[] = [$ch, $bytePos];
                 $bytePos += \strlen($ch);
             }
@@ -710,16 +764,14 @@ final class VmPregPure
         int $opts,
         bool $anchoredAttempt
     ): array|null|false {
-        try {
-            return VmPregEngine::match($ast, $groupNameToIndex, $subject, $offset, $opts, $anchoredAttempt);
-        } catch (VmPregBacktrackLimitException) {
-            self::$lastError = StdlibConstants::PREG_BACKTRACK_LIMIT_ERROR;
-
-            return false;
-        } catch (VmPregJitStackLimitException) {
-            self::$lastError = StdlibConstants::PREG_JIT_STACKLIMIT_ERROR;
+        $result = VmPregEngine::match($ast, $groupNameToIndex, $subject, $offset, $opts, $anchoredAttempt);
+        if (false === $result) {
+            self::$lastError = VmPregEngine::consumeLastMatchLimitError()
+                ?: StdlibConstants::PREG_BACKTRACK_LIMIT_ERROR;
 
             return false;
         }
+
+        return $result;
     }
 }

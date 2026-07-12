@@ -7,10 +7,10 @@ namespace PHPCompiler;
 use PHPCompiler\Compiler\CompileFatal;
 
 /**
- * Reject `readonly function` outside class/property contexts (#10012).
+ * Reject `readonly function` outside class/property contexts on the Zend 8.2 reference profile (#10012).
  *
- * php-src: Zend/zend_language_parser.y — `readonly` is valid on classes and typed
- * properties only, not on functions or closures.
+ * PHP 8.4+ forward profile accepts readonly functions (#17657, ZEND_ACC_READONLY_FUNCTION).
+ * php-src: Zend/zend_language_parser.y — `readonly` on classes and typed properties; 8.4+ on functions.
  */
 final class ReadonlyFunctionRejector
 {
@@ -18,6 +18,9 @@ final class ReadonlyFunctionRejector
 
     public static function reject(string $code, string $filename = 'unknown'): string
     {
+        if (CompilerVersion::supportsReadonlyFunction()) {
+            return $code;
+        }
         if (!str_contains($code, 'readonly') || !str_contains($code, 'function')) {
             return $code;
         }

@@ -50,6 +50,7 @@ final class HttpStatusEnumData
             'UnsupportedMediaType' => 415,
             'RequestedRangeNotSatisfiable' => 416,
             'ExpectationFailed' => 417,
+            'TooEarly' => 425,
             'UpgradeRequired' => 426,
             'PreconditionRequired' => 428,
             'TooManyRequests' => 429,

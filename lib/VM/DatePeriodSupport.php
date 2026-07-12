@@ -222,6 +222,22 @@ final class DatePeriodSupport
         return DateTimeSupport::cloneDateTimeLike($start);
     }
 
+    /** php-src date_period_get_end_date — clone of stored end or null for recurrence-count form (#17495). */
+    public static function getEndDate(ObjectEntry $period, ?Context $ctx = null): ?ObjectEntry
+    {
+        self::requireConstructedPeriod($period);
+        $recurrences = self::requireIntProperty($period, 'recurrences')->toInt();
+        if (self::RECURRENCES_END_DATE !== $recurrences) {
+            return null;
+        }
+        $end = self::objectProperty($period, 'end');
+        if (null === $end) {
+            return null;
+        }
+
+        return self::cloneDateTimeForStorage($end, $ctx);
+    }
+
     /** php-src date_period_get_date_interval — clone of stored interval (#16614). */
     public static function getDateInterval(ObjectEntry $period, ?Context $ctx = null): ObjectEntry
     {

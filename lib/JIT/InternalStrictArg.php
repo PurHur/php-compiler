@@ -149,7 +149,7 @@ final class InternalStrictArg
     }
 
     /**
-     * Reject null for internal string parameters when caller uses strict_types (#4365, #11322).
+     * Reject null for typed internal string parameters (php-src IS_STRING; #18190, #12640).
      */
     public static function rejectNullString(
         Context $context,
@@ -158,9 +158,6 @@ final class InternalStrictArg
         string $paramName,
         int $argNumber
     ): void {
-        if (!$context->callerStrictTypes) {
-            return;
-        }
         if (Variable::TYPE_NULL === $arg->type || $arg->isNullConstant) {
             self::raiseTypeErrorAndAbort(
                 $context,

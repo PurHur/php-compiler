@@ -207,7 +207,7 @@ function syntaxRowDefinitions(): array
             'issue' => 4682,
             'notes' => [
                 'Ast\\InOperatorDesugar + InOperatorResolver (#4682); VM InOperator::contains (===)',
-                'JIT TYPE_IN via ArrayBuiltinHelper::inArray strict (#4716); EnumInOperatorJitCompileTest',
+                'JIT TYPE_IN via InArrayRuntime PHP bridge (#4716, #18153); EnumInOperatorJitCompileTest',
             ],
             'probe' => 'enum E: string { case A = "a"; case B = "b"; } echo (E::A in [E::A, E::B]) ? "yes" : "no";',
         ],
@@ -599,9 +599,10 @@ function syntaxRowDefinitions(): array
             'construct' => 'PHP 8.5 pipe operator (`|>`)',
             'opcodes' => ['TYPE_FUNCCALL_INIT', 'TYPE_FUNCCALL_EXEC_RETURN'],
             'issue' => 7219,
-            'aot' => false,
+            'aot' => true,
             'notes' => [
                 'Ast\\PipeOperatorDesugar before php-parser (#3243); lowers $lhs |> f(...) to f($lhs, ...)',
+                'PipeOperatorSyntaxRejector on reference profile (#12424, #18007)',
                 'Bare callable names: $lhs |> strlen → strlen($lhs) (#7219)',
                 'Arrow-fn RHS: $lhs |> fn($p) => expr and parenthesized form (#7219, #11858)',
                 'Chained pipes and parenthesized-callable LHS (#6705, #7219)',
@@ -1316,13 +1317,6 @@ function withheldBuiltinGateDefinitions(): array
             'relPath' => 'ext/standard/getmygrgid.php',
         ],
         [
-            'names' => ['disktotalspace'],
-            'gate' => [PHPCompiler\CompilerVersion::class, 'supportsDisktotalspace'],
-            'since' => '8.3.0',
-            'module' => 'standard',
-            'relPath' => 'ext/standard/disktotalspace.php',
-        ],
-        [
             'names' => ['crc32c'],
             'gate' => [PHPCompiler\CompilerVersion::class, 'supportsCrc32c'],
             'since' => '8.3.0',
@@ -1335,6 +1329,13 @@ function withheldBuiltinGateDefinitions(): array
             'since' => '8.4.0',
             'module' => 'mbstring',
             'relPath' => 'ext/mbstring/mb_str_pad.php',
+        ],
+        [
+            'names' => ['mb_ucfirst', 'mb_lcfirst'],
+            'gate' => [PHPCompiler\CompilerVersion::class, 'supportsMbUcfirstLcfirst'],
+            'since' => '8.3.0',
+            'module' => 'mbstring',
+            'relPath' => 'ext/mbstring/mb_ucfirst.php',
         ],
         [
             'names' => ['mb_trim', 'mb_ltrim', 'mb_rtrim'],

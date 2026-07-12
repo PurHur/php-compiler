@@ -32,6 +32,7 @@
         "psr-4": {
             "PHPCompiler\\": "lib/",
             "PHPCompiler\\ext\\": "ext/",
+            "Uri\\": "ext/uri/Uri/",
             "php\\": "php/"
         },
         "files": [

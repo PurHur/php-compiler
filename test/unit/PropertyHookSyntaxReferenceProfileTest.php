@@ -7,7 +7,7 @@ namespace PHPCompiler;
 use PHPCompiler\SourcePreprocessor\PropertyHooks;
 use PHPUnit\Framework\TestCase;
 
-/** Property-hook syntax rejected on Zend 8.2 reference profile (#14062); forward profile #14432. */
+/** Property-hook syntax rejected on Zend 8.2 reference profile (#14062, #18019); forward profile #14432. */
 final class PropertyHookSyntaxReferenceProfileTest extends TestCase
 {
     private function skipWhenForwardProfile(): void
@@ -49,7 +49,7 @@ final class PropertyHookSyntaxReferenceProfileTest extends TestCase
         $this->expectException(\PHPCompiler\Compiler\CompileFatal::class);
         $this->expectExceptionMessage(PropertyHooks::REFERENCE_PROFILE_UNEXPECTED_BRACE);
         PropertyHookSyntaxRejector::reject(
-            file_get_contents(dirname(__DIR__).'/repro/maintainer_gap_property_hooks_reference_profile.php'),
+            file_get_contents(dirname(__DIR__).'/repro/maintainer_gap_property_hooks_reference_profile_parse.php'),
             'reference_profile.php'
         );
     }
@@ -75,7 +75,7 @@ final class PropertyHookSyntaxReferenceProfileTest extends TestCase
         $runtime = new Runtime();
         try {
             $runtime->parseAndCompile(
-                file_get_contents(dirname(__DIR__).'/repro/maintainer_gap_property_hooks_reference_profile.php'),
+                file_get_contents(dirname(__DIR__).'/repro/maintainer_gap_property_hooks_reference_profile_parse.php'),
                 'reference_profile.php'
             );
             $this->fail('Expected compile failure');

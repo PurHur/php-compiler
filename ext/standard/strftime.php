@@ -23,6 +23,7 @@ final class strftime extends Internal
         if ($argc > 2) {
             throw new \ArgumentCountError('strftime() expects at most 2 arguments, '.$argc.' given');
         }
+        VmEngineBuiltinDeprecation::emitFunction($frame, 'strftime');
         if (null === $frame->returnVar) {
             return;
         }

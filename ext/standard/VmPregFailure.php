@@ -19,7 +19,7 @@ final class VmPregFailure
 
     public static function warnPatternCompileFailure(Frame $frame, string $function, string $pattern): void
     {
-        $detail = VmPregPattern::compileWarningMessage($pattern);
+        $detail = VmPregCompileWarn::compileWarningMessage($pattern);
         if (null === $detail) {
             return;
         }

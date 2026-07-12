@@ -11,9 +11,9 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * JIT/AOT link for array_slice() via ArraySliceJitHelper PHP (#12410).
+ * JIT/AOT link for array_slice() via ArraySliceJitHelper PHP (#12410, #17936).
  *
- * Standalone AOT compiles {@see ArraySliceJitHelper} via JitVmHelperLink (#14285); native literal arrays keep LLVM in {@see ArrayBuiltinHelper::buildSliceArray()}.
+ * Standalone AOT compiles {@see ArraySliceJitHelper} via JitVmHelperLink (#14285); native literal arrays materialize to hashtable then route through PHP (#17936).
  * SSOT: {@see \PHPCompiler\VM\HashTable::sliceCopy()}
  * php-src: ext/standard/array.c — php_array_slice()
  */
@@ -38,12 +38,7 @@ final class ArraySliceRuntime
         Value $length,
         ?Value $preserveKeys = null
     ): Value {
-        if (ArrayBuiltinHelper::isNativeArray($array->type)) {
-            return ArrayBuiltinHelper::buildSliceArray($context, $array, $offset, $hasLength, $length, $preserveKeys);
-        }
-
         self::ensureLinked($context);
-        $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
         $i1 = $context->getTypeFromString('int1');
         $flag = null === $preserveKeys
             ? $i1->constInt(0, false)
@@ -51,12 +46,21 @@ final class ArraySliceRuntime
 
         return $context->builder->call(
             $context->lookupFunction(self::ABI_SLICE),
-            $ht,
+            self::argToHashtable($context, $array),
             $offset,
             $hasLength,
             $length,
             $flag
         );
+    }
+
+    private static function argToHashtable(Context $context, JITVariable $arg): Value
+    {
+        if (ArrayBuiltinHelper::isNativeArray($arg->type)) {
+            return ArrayBuiltinHelper::nativeListToHashTable($context, $arg);
+        }
+
+        return ArrayBuiltinHelper::loadHashTable($context, $arg);
     }
 
     public static function ensureLinked(Context $context): void

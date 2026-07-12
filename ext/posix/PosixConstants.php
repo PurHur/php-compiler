@@ -39,6 +39,35 @@ final class PosixConstants
     /** User-facing unlimited sentinel for posix_setrlimit() (php-src POSIX_RLIMIT_INFINITY). */
     public const RLIMIT_INFINITY = -1;
 
+    /** @return array<string, int> */
+    public static function registeredConstants(): array
+    {
+        return [
+            'POSIX_F_OK' => self::POSIX_F_OK,
+            'POSIX_R_OK' => self::POSIX_R_OK,
+            'POSIX_W_OK' => self::POSIX_W_OK,
+            'POSIX_X_OK' => self::POSIX_X_OK,
+            'POSIX_RLIMIT_CPU' => self::RLIMIT_CPU,
+            'POSIX_RLIMIT_FSIZE' => self::RLIMIT_FSIZE,
+            'POSIX_RLIMIT_DATA' => self::RLIMIT_DATA,
+            'POSIX_RLIMIT_STACK' => self::RLIMIT_STACK,
+            'POSIX_RLIMIT_CORE' => self::RLIMIT_CORE,
+            'POSIX_RLIMIT_RSS' => self::RLIMIT_RSS,
+            'POSIX_RLIMIT_NPROC' => self::RLIMIT_NPROC,
+            'POSIX_RLIMIT_NOFILE' => self::RLIMIT_NOFILE,
+            'POSIX_RLIMIT_MEMLOCK' => self::RLIMIT_MEMLOCK,
+            'POSIX_RLIMIT_AS' => self::RLIMIT_AS,
+            'POSIX_RLIMIT_INFINITY' => self::RLIMIT_INFINITY,
+            'S_IFIFO' => self::S_IFIFO,
+            'S_IFCHR' => self::S_IFCHR,
+            'S_IFDIR' => self::S_IFDIR,
+            'S_IFBLK' => self::S_IFBLK,
+            'S_IFREG' => self::S_IFREG,
+            'S_IFLNK' => self::S_IFLNK,
+            'S_IFSOCK' => self::S_IFSOCK,
+        ];
+    }
+
     /** sysconf(_SC_CLK_TCK) fallback when unavailable. */
     public const CLK_TCK_FALLBACK = 100;
 }

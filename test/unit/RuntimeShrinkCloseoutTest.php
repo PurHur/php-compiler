@@ -67,6 +67,8 @@ final class RuntimeShrinkCloseoutTest extends TestCase
     {
         $checks = [
             'ext/standard/JitSettype.php' => 'JitSettype',
+            'ext/standard/SettypeJitHelper.php' => 'SettypeJitHelper',
+            'lib/JIT/Builtin/SettypeRuntime.php' => 'SettypeRuntime',
             'ext/standard/VmSerialize.php' => 'resolveEnumCaseVariable',
             'ext/standard/VmUnserializeFormat.php' => 'decodePayload',
             'lib/JIT/Builtin/StringUnserialize.php' => 'UnserializeJitHelper',

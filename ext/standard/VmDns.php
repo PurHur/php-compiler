@@ -401,7 +401,7 @@ final class VmDns
     public static function validateDnsGetRecordType(int $type): void
     {
         if ($type <= 0 || 0 !== ($type & ~self::DNS_VALID_TYPE_MASK)) {
-            throw new \ValueError('dns_get_record(): Argument #2 ($type) must be a valid DNS record type');
+            throw new \ValueError('dns_get_record(): Argument #2 ($type) must be a DNS_* constant');
         }
     }
 

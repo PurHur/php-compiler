@@ -16,7 +16,7 @@ use PHPCompiler\VM\Variable;
 final class VmIteratorWalk
 {
     /** Zend ext/spl/php_spl.c — iterator_count() on exhausted Generator (#5132). */
-    private const CLOSED_GENERATOR_ITERATOR_COUNT_ERROR = 'Cannot traverse an already closed generator';
+    private const CLOSED_GENERATOR_ITERATOR_COUNT_ERROR = VM\GeneratorState::CLOSED_TRAVERSE_ERROR;
 
     public static function isIterable(Variable $value, Context $ctx): bool
     {
@@ -185,8 +185,11 @@ final class VmIteratorWalk
 
     private static function countGenerator(VM $vm, VM\GeneratorState $gen): int
     {
-        if ($gen->started) {
+        if ($gen->done) {
             throw new \Exception(self::CLOSED_GENERATOR_ITERATOR_COUNT_ERROR);
+        }
+        if ($gen->started) {
+            throw new \Exception(VM\GeneratorState::REWIND_ALREADY_RUN_ERROR);
         }
         $gen->rewind();
         $count = 0;

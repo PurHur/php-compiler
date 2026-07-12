@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\JIT\Builtin\ErrorHandlerJitRuntime;
 use PHPCompiler\JIT\Call\ExternalMethod;
 use PHPCompiler\JIT\Call\Native;
 use PHPCompiler\JIT\Context;
@@ -24,6 +25,8 @@ final class JitErrorHandler
         JITVariable $callback,
         ?JITVariable $maskArg
     ): Value {
+        ErrorHandlerJitRuntime::ensureLinked($context, true);
+
         $name = $callback->compileTimeString ?? null;
         if (null === $name) {
             throw new \LogicException(ErrorHandlerCallbackPolicy::jitRejectionMessage());
@@ -67,10 +70,26 @@ final class JitErrorHandler
 
     public static function restore(Context $context): Value
     {
+        ErrorHandlerJitRuntime::ensureLinked($context, true);
+
         $slot = JitValueBox::alloc($context);
         $ptr = JitValueBox::pointer($context, $slot);
         $context->builder->call(
             $context->lookupFunction('__phpc_error_handler_restore_apply'),
+            $ptr
+        );
+
+        return $ptr;
+    }
+
+    public static function get(Context $context): Value
+    {
+        ErrorHandlerJitRuntime::ensureLinked($context, true);
+
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $context->builder->call(
+            $context->lookupFunction('__phpc_error_handler_get_apply'),
             $ptr
         );
 

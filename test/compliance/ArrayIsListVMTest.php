@@ -21,6 +21,10 @@ final class ArrayIsListVMTest extends BaseTest
             __DIR__.'/cases/stdlib/array_is_list_type.phpt',
             'array_is_list_type.phpt'
         );
+        yield 'array_is_list_enum_operand.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/array_is_list_enum_operand.phpt',
+            'array_is_list_enum_operand.phpt'
+        );
     }
 
     public function setUp(): void

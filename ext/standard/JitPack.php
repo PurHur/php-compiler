@@ -19,7 +19,10 @@ final class JitPack
         PackJitRuntime::ensureLinked($context);
         $argc = \count($args);
         if ($argc < 1) {
-            throw new \LogicException('pack() requires at least one argument');
+            throw new \ArgumentCountError(\sprintf(
+                'pack() expects at least 1 argument, %d given',
+                $argc
+            ));
         }
         $fmt = JitStringBuiltinArg::lower($context, $args[0], 'pack', 0, 'format');
         $numArgs = $argc - 1;

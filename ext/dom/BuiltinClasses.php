@@ -13,6 +13,7 @@ final class BuiltinClasses
     public static function register(Context $ctx): void
     {
         VmDom::registerClasses($ctx);
+        DomLivingBuiltinClasses::register($ctx);
         self::registerDomExceptionConstants($ctx);
     }
 

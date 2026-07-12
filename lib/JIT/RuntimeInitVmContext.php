@@ -68,5 +68,7 @@ final class RuntimeInitVmContext {
         $ctxVar = new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $ctx);
         $vmContextSlot = $object->propertyFetch($runtimeThis, 'PHPCompiler\\Runtime', 'vmContext');
         $object->propertyStore($vmContextSlot->objectPropertySlot, $ctxVar, Variable::TYPE_OBJECT);
+        VmActiveContextLlvm::ensureGlobal($context);
+        VmActiveContextLlvm::storeContext($context, $ctx);
     }
 }

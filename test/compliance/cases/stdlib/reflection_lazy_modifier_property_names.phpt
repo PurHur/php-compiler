@@ -5,6 +5,9 @@ ReflectionClass::getLazyPropertyNames() — PHP 8.4 lazy modifier (#16954, ext/r
 if (getenv('PHP_COMPILER_PROFILE') !== '8.4' && getenv('PHP_COMPILER_PROFILE') !== '8.5') {
     die('skip lazy property modifier requires PHP_COMPILER_PROFILE=8.4');
 }
+?>
+--ENV--
+PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
 class LazyDecl {

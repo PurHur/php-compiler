@@ -25,9 +25,9 @@ echo "bind ok\n";
 
 $unbound = $fn->bindTo(null);
 echo $unbound === null ? "null\n" : "object\n";
---EXPECT--
-PHP Warning:  Cannot bind an instance to a static closure
-PHP Warning:  Cannot bind an instance to a static closure
+--EXPECTF--
+PHP Warning:  Cannot bind an instance to a static closure in %s on line %d
+PHP Warning:  Cannot bind an instance to a static closure in %s on line %d
 bindTo ok
 bind ok
 object

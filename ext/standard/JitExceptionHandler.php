@@ -95,6 +95,20 @@ final class JitExceptionHandler
         return $ptr;
     }
 
+    public static function get(Context $context): Value
+    {
+        ExceptionHandlerJitRuntime::ensureLinked($context);
+
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $context->builder->call(
+            $context->lookupFunction('__phpc_exception_handler_get_apply'),
+            $ptr
+        );
+
+        return $ptr;
+    }
+
     private static function handlerShim(
         Context $context,
         Native $userFn,

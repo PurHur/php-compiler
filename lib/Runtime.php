@@ -15,6 +15,7 @@ use PHPCfg\Traverser;
 use PHPCfg\LivenessDetector as CfgLivenessDetector;
 use PHPCfg\Visitor;
 use PHPCfg\Script;
+use PHPCompiler\PHPTypes\CompilerTypeReconstructor;
 use PHPTypes\TypeReconstructor;
 use PhpParser\NodeTraverser;
 use PhpParser\NodeVisitor;
@@ -27,6 +28,8 @@ use PHPCompiler\VM\HashTableRegistry;
 use PHPCompiler\JIT\Context as JITContext;
 use PHPCompiler\Ast\AsymmetricVisibilityRewriter;
 use PHPCompiler\Ast\LazyPropertyRewriter;
+use PHPCompiler\Ast\ReadonlyFunctionRewriter;
+use PHPCompiler\Ast\ReadonlyFunctionAnnotator;
 use PHPCompiler\Ast\DnfParenTypeRewriter;
 use PHPCompiler\Ast\GlobalDeprecatedConstRewriter;
 use PHPCompiler\Ast\GlobalTypedConstRewriter;
@@ -144,6 +147,7 @@ class Runtime {
         $astTraverser->addVisitor($this->staticClassAnnotator);
         $astTraverser->addVisitor(new Ast\EnumPropertyCompileCheck());
         $astTraverser->addVisitor(new Ast\GeneratorYieldSourceMarker());
+        $astTraverser->addVisitor(new ReadonlyFunctionAnnotator());
         $astTraverser->addVisitor(new TryCatchElseAttacher());
         $this->parser = new Parser(
             (new ParserFactory)->create(ParserFactory::ONLY_PHP7),
@@ -161,7 +165,7 @@ class Runtime {
         $this->detector = new NullSafeLivenessDetector;
         $this->assignOpResolver = new Optimizer\AssignOp;
 
-        $this->typeReconstructor = new TypeReconstructor;
+        $this->typeReconstructor = new CompilerTypeReconstructor;
     }
 
     /**
@@ -224,20 +228,30 @@ class Runtime {
         $this->load(new ext\zip\Module);
         $this->load(new ext\libxml\Module);
         $this->load(new ext\dom\Module);
+        $this->load(new ext\xsl\Module);
+        $this->load(new ext\simplexml\Module);
         $this->load(new ext\xml\Module);
+        $this->load(new ext\xmlrpc\Module);
+        $this->load(new ext\xmlreader\Module);
+        $this->load(new ext\xmlwriter\Module);
         $this->load(new ext\gd\Module);
+        $this->load(new ext\exif\Module);
         $this->load(new ext\iconv\Module);
         $this->load(new ext\gettext\Module);
         $this->load(new ext\mbstring\Module);
         $this->load(new ext\filter\Module);
         $this->load(new ext\calendar\Module);
+        $this->load(new ext\ldap\Module);
         $this->load(new ext\session\Module);
         $this->load(new ext\bcmath\Module);
         $this->load(new ext\stats\Module);
+        $this->load(new ext\opcache\Module);
         $this->load(new ext\openssl\Module);
         $this->load(new ext\curl\Module);
         $this->load(new ext\hash\Module);
         $this->load(new ext\posix\Module);
+        $this->load(new ext\inotify\Module);
+        $this->load(new ext\pcntl\Module);
         $this->load(new ext\sockets\Module);
         $this->load(new ext\ftp\Module);
         $this->load(new ext\ctype\Module);
@@ -251,6 +265,9 @@ class Runtime {
         $this->load(new ext\brotli\Module);
         $this->load(new ext\sodium\Module);
         $this->load(new ext\sqlite3\Module);
+        $this->load(new ext\uri\Module);
+        $this->load(new ext\uuid\Module);
+        $this->load(new ext\uploadprogress\Module);
         $this->load(new ext\standard\Module);
     }
 
@@ -394,6 +411,7 @@ class Runtime {
         AsymmetricVisibilityRejector::reject($code, $filename);
         LazyPropertyRejector::reject($code, $filename);
         CloneWithSyntaxRejector::reject($code, $filename);
+        PipeOperatorSyntaxRejector::reject($code, $filename);
         ListSpreadAssignSyntaxRejector::reject($code, $filename);
         ReadonlyAnonymousClassSyntaxRejector::reject($code, $filename);
         DnfParenIntersectionSyntaxRejector::reject($code, $filename);
@@ -422,6 +440,7 @@ class Runtime {
         }
         CurlyBraceOffsetRejector::reject($code, $filename);
         ClassConstBraceDerefRejector::reject($code, $filename);
+        ClassConstDynamicFetchRejector::reject($code, $filename);
         EncapsedCoalesceRejector::reject($code, $filename);
         ReadonlyMethodModifierRejector::reject($code, $filename);
         ReadonlyFunctionRejector::reject($code, $filename);
@@ -471,10 +490,15 @@ class Runtime {
      */
     public function prepareSourceForParser(string $code, string $filename = 'unknown'): array
     {
-        [$code, $bareRethrowLines] = $this->preprocessSourceForParse($code, $filename);
-        $code = $this->rewriteSourceBeforeParser($code, $filename);
+        $profileScope = LanguageProfileScope::beginForCompilationUnit($code, $filename);
+        try {
+            [$code, $bareRethrowLines] = $this->preprocessSourceForParse($code, $filename);
+            $code = $this->rewriteSourceBeforeParser($code, $filename);
 
-        return [$code, $bareRethrowLines];
+            return [$code, $bareRethrowLines];
+        } finally {
+            $profileScope->end();
+        }
     }
 
     /**
@@ -517,6 +541,7 @@ class Runtime {
         $code = DnfParenTypeRewriter::rewrite($code);
         $code = AsymmetricVisibilityRewriter::rewrite($code);
         $code = LazyPropertyRewriter::rewrite($code);
+        $code = ReadonlyFunctionRewriter::rewrite($code);
         $code = TypedFunctionStaticRewriter::rewrite($code);
         $code = HexFloatLiteralDesugar::desugar($code);
         $code = NewDereferenceableDesugar::desugar($code);
@@ -878,6 +903,19 @@ class Runtime {
 
     public function standalone(?Block $block, string $outfile, ?string $sourceCode = null, ?string $sourceFilename = null) {
         \PHPCompiler\JIT\Progress::noteFunction('runtime_standalone_begin');
+        $prevUserScriptAot = getenv('PHP_COMPILER_AOT_USER_SCRIPT');
+        $needsPregPrelink = \is_string($sourceCode)
+            && preg_match('/\bpreg_(?:match(?:_all)?|replace(?:_callback(?:_array)?)?|split|grep|filter|quote|last_error)/i', $sourceCode);
+        $deferUserScriptAotInit = $needsPregPrelink
+            && ('1' === $prevUserScriptAot || 'true' === strtolower((string) $prevUserScriptAot));
+        if ($deferUserScriptAotInit && \function_exists('putenv')) {
+            // User-script Context init + nested preg JIT OOMs (#16075); link preg on a non-user init first.
+            JIT\VmActiveContextInitLlvm::resetPendingState();
+            putenv('PHP_COMPILER_AOT_USER_SCRIPT=');
+            unset($_ENV['PHP_COMPILER_AOT_USER_SCRIPT'], $_SERVER['PHP_COMPILER_AOT_USER_SCRIPT']);
+            $this->jitContext = null;
+            $this->jit = null;
+        }
         $context = $this->loadJitContext();
         if (null !== $sourceFilename && '' !== $sourceFilename) {
             $context->setAotSourceFilename($sourceFilename);
@@ -886,6 +924,16 @@ class Runtime {
         // Generator bodies use GeneratorHelper resume lowering; script-scope yield still blocked (#3115).
         if (null !== $block && Block::containsGeneratorOpcodesInScriptScope($block)) {
             throw new \LogicException('yield in the main script is not supported in AOT yet (issue #3115).');
+        }
+        if ($needsPregPrelink) {
+            \PHPCompiler\JIT\Builtin\StringPregMatch::ensureLinked($context);
+        }
+        if ($deferUserScriptAotInit && \function_exists('putenv')) {
+            putenv('PHP_COMPILER_AOT_USER_SCRIPT='.$prevUserScriptAot);
+            $_ENV['PHP_COMPILER_AOT_USER_SCRIPT'] = $prevUserScriptAot;
+            $_SERVER['PHP_COMPILER_AOT_USER_SCRIPT'] = $prevUserScriptAot;
+            $context->retrofitUserScriptStandaloneAfterPregPrelink();
+            JIT\VmActiveContextInitLlvm::requestThinStandaloneInit($context);
         }
         $context->setMain($this->loadJit()->compile($block));
         \PHPCompiler\JIT\Progress::noteFunction('runtime_standalone_compile_done');

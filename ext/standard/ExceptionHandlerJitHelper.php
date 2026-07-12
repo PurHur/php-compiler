@@ -77,6 +77,16 @@ final class ExceptionHandlerJitHelper
         return true;
     }
 
+    /** Active handler name for get_exception_handler() JIT/AOT (#17668). */
+    public static function getCurrentName(): ?string
+    {
+        if (self::$depth <= 0) {
+            return null;
+        }
+
+        return self::nameAt(self::$depth - 1);
+    }
+
     private static function popReturningName(): ?string
     {
         if (self::$depth <= 0) {

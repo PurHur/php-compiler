@@ -56,4 +56,34 @@ final class VmPhpCoreConstantsTest extends TestCase
         $this->assertNull(VmPhpCoreConstants::fetchExact('php_version'));
         $this->assertNotNull(VmPhpCoreConstants::fetchExact('PHP_VERSION'));
     }
+
+    public function testTentativeReturnConstantWithForwardProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertNotNull(VmPhpCoreConstants::fetchExact('TENTATIVE_RETURN'));
+            $this->assertSame(1, VmPhpCoreConstants::fetchExact('TENTATIVE_RETURN')->toInt());
+            $this->assertArrayHasKey('TENTATIVE_RETURN', VmPhpCoreConstants::categorizedCoreEntries());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testTentativeReturnConstantWithheldOnReferenceProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE');
+        try {
+            $this->assertNull(VmPhpCoreConstants::fetchExact('TENTATIVE_RETURN'));
+        } finally {
+            if (false !== $prev) {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
 }

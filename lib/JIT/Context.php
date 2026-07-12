@@ -78,6 +78,12 @@ class Context {
     /** Operand for call_user_func_array() $args during FUNCCALL lowering (#10359). */
     public ?Operand $jitCallUserFuncArrayParamsOperand = null;
 
+    /** Operand for mb_encode/decode_numericentity() convmap during FUNCCALL lowering (#7237, #18035). */
+    public ?Operand $jitMbNumericEntityConvmapOperand = null;
+
+    /** CFG block for {@see self::$jitMbNumericEntityConvmapOperand} (#18035). */
+    public ?Block $jitMbNumericEntityConvmapBlock = null;
+
     /**
      * Backing property name for raw writes inside a lowering set-hook method (#4025).
      *
@@ -191,11 +197,21 @@ class Context {
     /** ?? / ?-> result operands that must receive branch assigns even when php-cfg marks them dead (#99, #3219). */
     public \SplObjectStorage $coalesceAssignTargets;
 
+    /** Scope slot => ?? result operand for runtime reload at chained call-arg send (#17590). */
+    public array $coalesceMergeSlotOperands = [];
+
     /** `return $c ? $a : $b` shared merge operand — emit direct returns per arm (#8555 AOT). */
     public ?Operand $ternarySharedReturnOperand = null;
 
     /** Scope slot for {@see $ternarySharedReturnOperand} on the merge RETURN (#8555). */
     public ?int $ternarySharedReturnSlot = null;
+
+    /**
+     * ?: arm temp slot => phi dest operand when merge-block ECHO still references the arm temp (#18052).
+     *
+     * @var array<int, Operand>
+     */
+    public array $ternaryEchoPhiByAliasSlot = [];
 
     /** Guarded list destruct: assign-path dim fetches compile as unreachable stubs (#4308). */
     public bool $listUnpackSkipAssignPath = false;
@@ -665,6 +681,13 @@ class Context {
 
             return $internal;
         }
+        if (DomInstanceMethodJit::isDomInstanceMethodProxy($lc)) {
+            DomInstanceMethodJit::ensureProxy($this, $lc);
+            if (isset($this->functionProxies[$lc])
+                && !($this->functionProxies[$lc] instanceof Call\ExternalMethod)) {
+                return $this->functionProxies[$lc];
+            }
+        }
 
         return null;
     }
@@ -697,6 +720,9 @@ class Context {
     {
         $normalized = ltrim($name, '\\');
         $lc = strtolower($normalized);
+        if (DomInstanceMethodJit::isDomInstanceMethodProxy($lc)) {
+            DomInstanceMethodJit::ensureProxy($this, $lc);
+        }
         if ($this->functionProxyIsCallable($lc)) {
             return true;
         }
@@ -846,6 +872,10 @@ class Context {
         if (CompilerVersion::supportsReflectionParameterIsSensitiveParameter()) {
             $this->functionProxies['reflectionparameter::issensitiveparameter'] = new Call\ReflectionParameterIsSensitiveParameter();
         }
+        if (CompilerVersion::supportsReflectionFunctionGetNamedArguments()) {
+            $this->functionProxies['reflectionfunction::getnamedarguments'] = new Call\ReflectionFunctionGetNamedArguments();
+            $this->functionProxies['reflectionmethod::getnamedarguments'] = new Call\ReflectionMethodGetNamedArguments();
+        }
         $this->functionProxies['reflectionattribute::getname'] = new Call\ReflectionAttributeGetName();
         $this->functionProxies['reflectionattribute::newinstance'] = new Call\ReflectionAttributeNewInstance();
         $this->functionProxies['reflectionenum::__construct'] = new Call\ReflectionEnumConstruct();
@@ -866,12 +896,28 @@ class Context {
                 $this->functionProxies['dateperiod::'.$dpIterMethod] = new Call\DatePeriodIteratorMethod($dpIterMethod);
             }
         }
+        $this->functionProxies['datetime::format'] = new Call\DateTimeFormat();
+        $this->functionProxies['datetimeimmutable::format'] = new Call\DateTimeFormat();
+        if (CompilerVersion::supportsDomTokenList()) {
+            DomInstanceMethodJit::registerKnownProxies($this);
+        }
     }
 
     /** User examples or bootstrap-aot-link: thin standalone main without session/header reset LLVM (#13571, #14459). */
     public function isThinStandaloneAotMain(): bool
     {
         return $this->isUserScriptAot() || $this->shouldUseBootstrapAotStandaloneBodies();
+    }
+
+    /**
+     * After preg prelink on a temporary full-init Context, restore user-script standalone bodies (#16075).
+     */
+    public function retrofitUserScriptStandaloneAfterPregPrelink(): void
+    {
+        if (Builtin::LOAD_TYPE_STANDALONE !== $this->loadType || !$this->isUserScriptAot()) {
+            return;
+        }
+        $this->ensureMinimalUserStandaloneBodies();
     }
 
     private function isUserScriptAot(): bool
@@ -901,9 +947,15 @@ class Context {
         Builtin\StringJsonDecode::ensureDeferredStubsForInventoryEmit($this);
         Builtin\StringJsonEncode::ensureDeferredStubsForInventoryEmit($this);
         Builtin\StringHtmlspecialchars::ensureStandaloneBodies($this);
+        Builtin\StringHtmlspecialcharsDecode::ensureStandaloneBodies($this);
         ExceptionBridge::ensureStandaloneBodies($this);
         ErrorBridge::ensureStandaloneBodies($this);
-        Builtin\StreamLifecycleRuntime::ensureDeferredStubsForInventoryEmit($this);
+        Builtin\ErrorHandlerJitRuntime::ensureStandaloneBodies($this);
+        Builtin\ExceptionHandlerJitRuntime::ensureStandaloneBodies($this);
+        if (!$this->isUserScriptAot()) {
+            Builtin\StreamLifecycleRuntime::ensureDeferredStubsForInventoryEmit($this);
+        }
+        Builtin\StreamBucketRuntime::ensureDeferredStubsForInventoryEmit($this);
         Builtin\StreamReadRuntime::ensureDeferredStubsForInventoryEmit($this);
         Builtin\AssertFail::ensureStandaloneBodies($this);
         Builtin\JitReturnPending::ensureStandaloneBodies($this);
@@ -913,16 +965,24 @@ class Context {
         Builtin\ProgressNoteRuntime::ensureStandaloneBodies($this);
         Builtin\GcCollectCyclesRuntime::ensureStandaloneBodies($this);
         Builtin\LastErrorRuntime::ensureStandaloneBodies($this);
+        Builtin\StringUtf8Latin1::ensureStandaloneBodies($this);
         Builtin\RewriteVarsRuntime::ensureStandaloneBodies($this);
         Builtin\DefineRuntime::ensureStandaloneBodies($this);
         Builtin\StringStrContains::ensureStandaloneBodies($this);
         Builtin\StatPathRuntime::ensureStandaloneBodies($this);
         Builtin\StringFileGetContents::ensureStandaloneBodies($this);
+        Builtin\StringHashCrypto::ensureStandaloneBodies($this);
+        Builtin\MbNumericEntity::ensureStandaloneBodies($this);
         Builtin\StringReadfile::ensureStandaloneBodies($this);
         Builtin\StringAddslashes::ensureStandaloneBodies($this);
         Builtin\StringStripslashes::ensureStandaloneBodies($this);
         Builtin\StringFilePutContents::ensureStandaloneBodies($this);
         Builtin\SuperglobalNameRuntime::ensureLinked($this);
+        if (DomInstanceMethodJit::shouldDeferToVmClassMethodLowering()) {
+            Builtin\DomStandaloneAotInitRuntime::ensureLinked($this);
+        } elseif (CompilerVersion::supportsDomTokenList()) {
+            Builtin\DomInstanceMethodRuntime::ensureLinked($this);
+        }
     }
 
     /** bootstrap-aot-link fixtures: minimal init + CLI argv / superglobal refresh for standalone main (#14459). */
@@ -957,6 +1017,7 @@ class Context {
                 Builtin\StringUcwords::ensureStandaloneBodies($this);
                 Builtin\StringMetaphone::ensureStandaloneBodies($this);
                 Builtin\StringWordwrap::ensureStandaloneBodies($this);
+                Builtin\MbNumericEntity::ensureStandaloneBodies($this);
                 Builtin\StringBin2hex::ensureStandaloneBodies($this);
                 Builtin\StringBase64Encode::ensureStandaloneBodies($this);
                 Builtin\StringBase64Decode::ensureStandaloneBodies($this);
@@ -996,6 +1057,7 @@ class Context {
             Builtin\GcCollectCyclesRuntime::ensureStandaloneBodies($this);
             Builtin\ProgressNoteRuntime::ensureStandaloneBodies($this);
             Builtin\LastErrorRuntime::ensureStandaloneBodies($this);
+            Builtin\StringUtf8Latin1::ensureStandaloneBodies($this);
             Builtin\RewriteVarsRuntime::ensureStandaloneBodies($this);
             Builtin\DefineRuntime::ensureStandaloneBodies($this);
             Builtin\SuperglobalRefreshRuntime::ensureStandaloneBodies($this);
@@ -1304,7 +1366,13 @@ class Context {
         }
         Builtin\AttributeRegistryLowering::implementLookupFunctions($this);
         Builtin\ParamSensitiveLowering::implementLookupFunctions($this);
+        Builtin\ReflectionNamedArgumentsLowering::implementLookupFunctions($this);
+        VmActiveContextInitLlvm::emitPendingBeforeSeal($this);
         $this->sealInitFunction();
+        $initSuffix = (string) getenv('PHP_COMPILER_INIT_SYMBOL_SUFFIX');
+        if ('' !== $initSuffix) {
+            \PHPCompiler\AOT\HelperUnitGlobalCtor::register($this, '__init__'.$initSuffix);
+        }
         $this->sealInitShutdownReturn($this->shutdownBlock);
         $this->sealInitShutdownReturn($this->headerPreFlushBlock);
 
@@ -2081,6 +2149,28 @@ class Context {
         if (!$this->scope->variables->contains($op)) {
             if ($op instanceof Operand\Literal) {
                 $this->scope->variables[$op] = Variable::fromLiteral($this, $op);
+            } elseif ($op instanceof Operand\BoundVariable
+                && Operand\BoundVariable::SCOPE_OBJECT === $op->scope) {
+                $thisVar = $this->findThisVariable();
+                if (null !== $thisVar) {
+                    $this->scope->variables[$op] = $thisVar;
+
+                    return $thisVar;
+                }
+                throw new \LogicException('BoundVariable SCOPE_OBJECT without $this in JIT scope');
+            } elseif ($op instanceof Operand\BoundVariable && $op->name instanceof Operand) {
+                if ($this->aliasVariableOpByName($op)) {
+                    return $this->scope->variables[$op];
+                }
+                $inner = $this->getVariableFromOpInScopes($op->name);
+                $this->scope->variables[$op] = $inner;
+
+                return $inner;
+            } elseif ($op instanceof Operand\BoundVariable) {
+                throw new \LogicException(
+                    'BoundVariable scope '.$op->scope
+                    .' nameClass '.(is_object($op->name) ? get_class($op->name) : gettype($op->name))
+                );
             } elseif ('this' === OperandName::resolve($op)) {
                 $existing = $this->findThisVariable();
                 if (null !== $existing) {
@@ -2100,6 +2190,9 @@ class Context {
 
                         return $this->scope->variables[$op];
                     }
+                    if ($this->aliasVariableOpFromSlot($block, $op)) {
+                        return $this->scope->variables[$op];
+                    }
                 }
                 // Temporaries can be introduced by CFG transforms after scope variable allocation.
                 // Treat unknown temporaries as boxed __value__ slots to keep self-host emit paths alive.
@@ -2116,6 +2209,13 @@ class Context {
                 );
             } elseif ($op instanceof Operand\Variable && $this->aliasVariableOpByName($op)) {
                 // Distinct Variable operand for an already-allocated scope slot (#12036 inventory argv).
+            } elseif ($op instanceof Operand\BoundVariable
+                && Operand\BoundVariable::SCOPE_OBJECT === $op->scope) {
+                $thisVar = $this->findThisVariable();
+                if (null !== $thisVar) {
+                    return $thisVar;
+                }
+                throw new \LogicException('BoundVariable SCOPE_OBJECT without $this in JIT scope');
             } else {
                 throw new \LogicException("Unknown variable referenced: " . get_class($op));
             }

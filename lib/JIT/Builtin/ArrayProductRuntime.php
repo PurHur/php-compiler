@@ -13,7 +13,7 @@ use PHPLLVM\Value;
 /**
  * JIT/AOT link for array_product() via ArrayProductJitHelper PHP (#12591).
  *
- * Standalone AOT compiles {@see ArrayProductJitHelper} via JitVmHelperLink bridge (#14359); native literal arrays keep LLVM in {@see ArrayBuiltinHelper::arrayProduct()}.
+ * Standalone AOT and native literal arrays materialize to hashtable then route through PHP (#18141).
  * SSOT: {@see \PHPCompiler\ext\standard\ArrayProductJitHelper}
  * php-src: ext/standard/array.c — PHP_FUNCTION(array_product)
  */
@@ -32,12 +32,10 @@ final class ArrayProductRuntime
 
     public static function product(Context $context, JITVariable $array): Value
     {
-        if (ArrayBuiltinHelper::isNativeArray($array->type)) {
-            return ArrayBuiltinHelper::arrayProduct($context, $array);
-        }
-
         self::ensureLinked($context);
-        $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
+        $ht = ArrayBuiltinHelper::isNativeArray($array->type)
+            ? ArrayBuiltinHelper::nativeListToHashTable($context, $array)
+            : ArrayBuiltinHelper::loadHashTable($context, $array);
 
         return $context->builder->call(
             $context->lookupFunction(self::ABI_PRODUCT),

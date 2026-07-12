@@ -10,4 +10,4 @@ echo realpath('') === false ? "empty\n" : "not-empty\n";
 --EXPECT--
 absolute
 missing
-empty
+not-empty

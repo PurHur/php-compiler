@@ -46,9 +46,8 @@ final class JitBcmath
         self::$compileTimeScaleKnown = false;
         Bcmath::ensureLinked($context);
         $i64 = $context->getTypeFromString('int64');
-        $i32 = $context->getTypeFromString('int32');
         $scale = 0 === \count($args) ? $i64->constInt(0, true) : self::lowerScaleArg($context, $args[0], 'bcscale', 0, 'scale');
-        $hasScale = 0 === \count($args) ? $i32->constInt(-1, true) : $i32->constInt(1, true);
+        $hasScale = 0 === \count($args) ? $i64->constInt(-1, true) : $i64->constInt(1, true);
 
         return self::boxLong(
             $context,
@@ -340,9 +339,8 @@ final class JitBcmath
     private static function roundModeAndFlag(Context $context, array $args, int $index, string $function): array
     {
         $i64 = $context->getTypeFromString('int64');
-        $i32 = $context->getTypeFromString('int32');
         if (!isset($args[$index])) {
-            return [$i64->constInt(0, false), $i32->constInt(-1, true)];
+            return [$i64->constInt(0, false), $i64->constInt(-1, true)];
         }
         if (!CompilerVersion::supportsRoundingModeEnum()) {
             throw new \LogicException($function.'() accepts at most three arguments in this compiler build');
@@ -350,7 +348,7 @@ final class JitBcmath
 
         return [
             self::lowerRoundModeArg($context, $args[$index]),
-            $i32->constInt(1, true),
+            $i64->constInt(1, true),
         ];
     }
 
@@ -358,14 +356,13 @@ final class JitBcmath
     private static function scaleAndFlag(Context $context, array $args, int $index, string $function): array
     {
         $i64 = $context->getTypeFromString('int64');
-        $i32 = $context->getTypeFromString('int32');
         if (!isset($args[$index])) {
-            return [$i64->constInt(0, true), $i32->constInt(-1, true)];
+            return [$i64->constInt(0, true), $i64->constInt(-1, true)];
         }
 
         return [
             self::lowerScaleArg($context, $args[$index], $function, $index, 'scale'),
-            $i32->constInt(1, true),
+            $i64->constInt(1, true),
         ];
     }
 
@@ -396,14 +393,44 @@ final class JitBcmath
 
     private static function compileTimeLong(JITVariable $arg): ?int
     {
-        if (JITVariable::TYPE_NATIVE_LONG !== $arg->type || JITVariable::KIND_VALUE !== $arg->kind) {
-            return null;
+        if (null !== ($arg->compileTimeLong ?? null)) {
+            return (int) $arg->compileTimeLong;
         }
-        if (!method_exists($arg->value, 'isConstant') || !$arg->value->isConstant()) {
-            return null;
+        if (JITVariable::TYPE_NATIVE_LONG === $arg->type) {
+            if (JITVariable::KIND_VALUE === $arg->kind) {
+                $const = $arg->value;
+                if ($const instanceof Value && $const->isConstant()) {
+                    return (int) $const->constInt();
+                }
+                if (method_exists($const, 'isConstant') && $const->isConstant()) {
+                    return (int) $const->getConstantValue();
+                }
+            }
+            if (JITVariable::KIND_VARIABLE === $arg->kind) {
+                $const = $arg->value;
+                if ($const instanceof Value && $const->isConstant()) {
+                    return (int) $const->constInt();
+                }
+            }
+        }
+        if (JITVariable::TYPE_NATIVE_DOUBLE === $arg->type && JITVariable::KIND_VALUE === $arg->kind) {
+            $const = $arg->value;
+            if ($const instanceof Value && $const->isConstant()) {
+                return (int) $const->constDouble();
+            }
+        }
+        if (JITVariable::TYPE_VALUE === $arg->type && JITVariable::KIND_VALUE === $arg->kind) {
+            $const = $arg->value;
+            if ($const instanceof Value && $const->isConstant()) {
+                return (int) $const->constInt();
+            }
+        }
+        $numeric = JitStringArg::compileTimeLiteral($arg);
+        if (null !== $numeric && is_numeric($numeric)) {
+            return (int) $numeric;
         }
 
-        return (int) $arg->value->getConstantValue();
+        return null;
     }
 
     private static function compileTimeRoundMode(Context $context, JITVariable $arg): ?int

@@ -16,9 +16,12 @@ final class ArrayUnshiftRuntimeShrinkTest extends TestCase
     {
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ArrayUnshiftRuntime.php');
         $this->assertStringContainsString('ArrayUnshiftJitHelper', $runtime);
-        $this->assertStringContainsString('isNativeArray', $runtime);
-        $this->assertStringContainsString('ArrayBuiltinHelper::unshift', $runtime);
+        $this->assertStringContainsString('storeHashtableInArrayVariable', $runtime);
+        $this->assertStringNotContainsString('ArrayBuiltinHelper::unshift', $runtime);
         $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);
+
+        $helper = (string) file_get_contents(__DIR__.'/../../lib/JIT/ArrayBuiltinHelper.php');
+        $this->assertStringNotContainsString('function unshift(', $helper);
 
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/array_unshift.php');
         $this->assertStringContainsString('ArrayUnshiftRuntime::unshift', $builtin);

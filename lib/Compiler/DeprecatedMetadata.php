@@ -6,6 +6,7 @@ namespace PHPCompiler\Compiler;
 
 use PHPCfg\Op;
 use PHPCompiler\CompilerVersion;
+use PhpParser\Comment;
 use PhpParser\Node;
 
 /**
@@ -27,15 +28,95 @@ final class DeprecatedMetadata
                 return $meta;
             }
         }
-        if (!$op->hasAttribute('attrGroups')) {
-            return null;
-        }
-        $groups = $op->getAttribute('attrGroups');
-        if (!\is_array($groups)) {
-            return null;
+        if ($op->hasAttribute('attrGroups')) {
+            $groups = $op->getAttribute('attrGroups');
+            if (\is_array($groups)) {
+                $fromAttr = self::fromAttrGroups($groups);
+                if (null !== $fromAttr) {
+                    return $fromAttr;
+                }
+            }
         }
 
-        return self::fromAttrGroups($groups);
+        return self::fromOpDocComment($op);
+    }
+
+    /**
+     * Recover @deprecated docblock on class constants (zend_compile.c, ext/reflection/php_reflection.c, #17647).
+     */
+    public static function fromOpDocComment(Op $op): ?self
+    {
+        foreach (self::commentTextChunksFromOp($op) as $chunk) {
+            $meta = self::fromDocCommentText($chunk);
+            if (null !== $meta) {
+                return $meta;
+            }
+        }
+
+        return null;
+    }
+
+    public static function fromDocCommentText(string $text): ?self
+    {
+        if (!preg_match('/@deprecated\b/i', $text)) {
+            return null;
+        }
+        if (preg_match('/@deprecated\s+(\S+)(?:\s+(.*))?\s*(?:\*\/|\*|$)/is', $text, $m)) {
+            $first = trim($m[1]);
+            $rest = isset($m[2]) ? trim($m[2]) : '';
+            $rest = rtrim($rest, "*/ \t\n\r");
+            if (preg_match('/^\d/', $first)) {
+                return new self('' !== $rest ? $rest : null, $first);
+            }
+
+            return new self(trim($first.('' !== $rest ? ' '.$rest : '')), null);
+        }
+
+        return new self(null, null);
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function commentTextChunksFromOp(Op $op): array
+    {
+        $chunks = [];
+        foreach (['comments', 'docComment', 'doccomment'] as $key) {
+            if (!$op->hasAttribute($key)) {
+                continue;
+            }
+            $value = $op->getAttribute($key);
+            if ('comments' === $key && \is_array($value)) {
+                foreach ($value as $comment) {
+                    $text = self::commentObjectText($comment);
+                    if (null !== $text) {
+                        $chunks[] = $text;
+                    }
+                }
+                continue;
+            }
+            $text = self::commentObjectText($value);
+            if (null !== $text) {
+                $chunks[] = $text;
+            }
+        }
+
+        return $chunks;
+    }
+
+    private static function commentObjectText(mixed $comment): ?string
+    {
+        if ($comment instanceof Comment) {
+            return $comment->getText();
+        }
+        if (\is_object($comment) && method_exists($comment, 'getText')) {
+            return $comment->getText();
+        }
+        if (\is_string($comment)) {
+            return $comment;
+        }
+
+        return null;
     }
 
     /**

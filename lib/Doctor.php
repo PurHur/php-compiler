@@ -200,7 +200,9 @@ final class Doctor
         fwrite(STDOUT, "Bootstrap SDK onboarding (#15605)\n");
         fwrite(STDOUT, "   Cold start: ./phpc bootstrap init  (Tier 1; add --with-composer for PHPUnit/ci-fast)\n");
         fwrite(STDOUT, "   Tiered workflow: docs/bootstrap-dev-workflow.md\n");
-        fwrite(STDOUT, "   Platform contract: docs/bootstrap-sdk-platform.md (Linux x86_64, LLVM 9)\n\n");
+        fwrite(STDOUT, "   Platform contract: docs/bootstrap-sdk-platform.md (Linux x86_64, LLVM 9)\n");
+        self::printBootstrapSdkTierTable();
+        fwrite(STDOUT, "\n");
 
         fwrite(STDOUT, "1. Inventory\n");
         fwrite(STDOUT, "   {$inventoryDetail}\n");
@@ -265,6 +267,7 @@ final class Doctor
             fwrite(STDOUT, "   docs/bootstrap-generations.md — generation ladder SSOT\n");
         }
         fwrite(STDOUT, "   phpc test --bootstrap [--strict]\n");
+        fwrite(STDOUT, "   phpc test --native  (Tier 1.5 — AOT smoke + VM compliance manifest; #15599)\n");
         fwrite(STDOUT, "   make bootstrap-wave-check  (opt-in --with-helloworld)\n");
         fwrite(STDOUT, "   ./phpc doctor --gates | grep -i bootstrap_inventory  (#2228)\n\n");
 
@@ -282,6 +285,20 @@ final class Doctor
         fwrite(STDOUT, "\nDocs: docs/bootstrap-dev-workflow.md · docs/bootstrap-sdk-platform.md · docs/bootstrap-selfhost.md · docs/bootstrap-m5-fast-path.md · docs/self-host-target.md\n");
 
         return 0;
+    }
+
+    /**
+     * Gen-1+ tier ladder for bootstrap contributors (#15605, docs/bootstrap-dev-workflow.md).
+     */
+    private static function printBootstrapSdkTierTable(): void
+    {
+        fwrite(STDOUT, "\n   Bootstrap SDK tiers (User SDK = phpc run/build for examples 000–009):\n");
+        fwrite(STDOUT, "   | Tier | When | Entry |\n");
+        fwrite(STDOUT, "   |------|------|-------|\n");
+        fwrite(STDOUT, "   | 0 Harness (Zend) | PHPUnit / doc-sync PRs | composer install, script/apply-patches.sh, ./script/ci-fast.sh |\n");
+        fwrite(STDOUT, "   | 1 Daily compile | Feature work / local AOT | ./build/bin-compile-aot-inventory -o OUT SOURCE.php |\n");
+        fwrite(STDOUT, "   | 1.5 Native smoke | Curated binary smoke without PHPUnit | phpc test --native |\n");
+        fwrite(STDOUT, "   | 2 Bootstrap verify | Before merge; spine or gen-0 edits | make north-star5-verify-fast, make bootstrap-loop-probe |\n");
     }
 
     /**

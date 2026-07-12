@@ -25,7 +25,16 @@ final class PregJitHelper
 
     public static function lastErrorMsg(): string
     {
-        return VmPreg::errorMsgForCode(VmPregNative::lastError());
+        return match (VmPregNative::lastError()) {
+            0 => 'No error',
+            1 => 'Internal error',
+            4 => 'Malformed UTF-8 characters, possibly incorrectly encoded',
+            5 => 'The offset did not correspond to the beginning of a valid UTF-8 code point',
+            2 => 'Backtrack limit exhausted',
+            3 => 'Recursion limit exhausted',
+            6 => 'JIT stack limit exhausted',
+            default => 'Unknown error',
+        };
     }
 
     /** @return int match count, or -1 on PCRE error */
@@ -116,18 +125,30 @@ final class PregJitHelper
 
     public static function replaceCallbackArgv(string $pattern, string $subject, int $callbackFnAddr): ?string
     {
-        if (0 === $callbackFnAddr) {
-            return null;
+        return VmPregNative::pregReplaceCallbackByFnAddr($pattern, $subject, $callbackFnAddr);
+    }
+
+    public static function replaceCallbackArrayArgv(HashTable $patterns, string $subject): ?string
+    {
+        $ctx = \PHPCompiler\Web\Superglobals::getActiveContext();
+        if (null === $ctx) {
+            throw new \LogicException(
+                'PregJitHelper::replaceCallbackArrayArgv() requires an active VM context in this compiler build'
+            );
         }
 
-        return VmPregNative::pregReplaceCallbackJit(
-            $pattern,
-            $subject,
-            static function (array $matches) use ($callbackFnAddr): string {
-                $ht = VmPregMatches::hostMatchesToHashTable($matches, 0);
+        $subjectVar = new \PHPCompiler\VM\Variable();
+        $subjectVar->string($subject);
+        $result = VmPregReplaceCallbackArray::invoke($ctx, $patterns, $subjectVar);
+        if (false === $result) {
+            return null;
+        }
+        if (\is_string($result)) {
+            return $result;
+        }
 
-                return PregCallbackInvokeJitHelper::invoke($callbackFnAddr, $ht);
-            }
+        throw new \LogicException(
+            'preg_replace_callback_array() array subject is not supported for JIT/AOT in this compiler build'
         );
     }
 }

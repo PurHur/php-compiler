@@ -1,14 +1,14 @@
 --TEST--
-date DateMalformedString absent on 8.2 reference profile; bad DateTime throws Exception (#16926, ext/date/php_date.c)
+date DateMalformedStringException absent on 8.2 reference profile; bad DateTime throws Exception (#16926, ext/date/php_date.c)
 --FILE--
 <?php
-var_export(class_exists('DateMalformedString', false));
+var_export(class_exists('DateMalformedStringException', false));
 echo "\n";
 try {
     new DateTime('not-a-valid-date');
     echo "no throw\n";
-} catch (DateMalformedString $e) {
-    echo "wrong: DateMalformedString\n";
+} catch (DateMalformedStringException $e) {
+    echo "wrong: DateMalformedStringException\n";
 } catch (Exception $e) {
     echo get_class($e), "\n";
     echo $e->getMessage(), "\n";

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\JIT\Builtin\StreamLifecycleRuntime;
 use PHPCompiler\JIT\Context;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -15,6 +16,8 @@ final class JitFclose
      * true when fclose succeeds */
     public static function invoke(Context $context, Value $handleLong): Value
     {
+        StreamLifecycleRuntime::ensureLinkedForUserScriptLowering($context);
+
         $ret = $context->builder->call($context->lookupFunction('__compiler_fclose'), $handleLong);
         $i32 = $context->getTypeFromString('int32');
 

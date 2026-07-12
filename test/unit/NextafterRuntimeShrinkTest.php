@@ -22,17 +22,18 @@ final class NextafterRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('phpc_nextafter', $bridge);
     }
 
-    public function testNextafterJitHelperDelegatesToVmMath(): void
+    public function testNextafterJitHelperDelegatesToLibc(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/NextafterJitHelper.php');
-        $this->assertStringContainsString('VmMath::nextafter', $source);
+        $this->assertStringContainsString('\\nextafter(', $source);
+        $this->assertStringNotContainsString('return VmMath::nextafter', $source);
 
         $this->assertSame(
-            VmMath::nextafter(1.0, 2.0),
+            \nextafter(1.0, 2.0),
             NextafterJitHelper::nextafterArgv(1.0, 2.0)
         );
         $this->assertSame(
-            VmMath::nextafter(1.0, 0.0),
+            \nextafter(1.0, 0.0),
             NextafterJitHelper::nextafterArgv(1.0, 0.0)
         );
     }

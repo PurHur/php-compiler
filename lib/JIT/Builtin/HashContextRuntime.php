@@ -17,7 +17,7 @@ final class HashContextRuntime
         } catch (\Throwable) {
         }
 
-        StringHashCrypto::ensureLinked($context);
+        HashContextEmbedBridge::ensureLinked($context);
 
         if (null !== $savedBlock) {
             $context->builder->positionAtEnd($savedBlock);

@@ -29,9 +29,8 @@ final class uksort_ extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (2 !== \count($frame->calledArgs)) {
-            throw new \LogicException('uksort() requires exactly two arguments');
-        }
+        VmArraySort::assertUserSortArgCount($frame, 'uksort');
+        $descending = VmArraySort::resolveUserSortDescending($frame, 'uksort');
         $ht = VmArray::requireArray($frame->calledArgs[0], 'uksort');
         $array = $frame->calledArgs[0]->resolveIndirect();
         $callback = $frame->calledArgs[1]->resolveIndirect();
@@ -59,7 +58,8 @@ final class uksort_ extends Internal
             VmClosureCall::sortKeyedPairsByKey(
                 $frame->vmContext,
                 $pairs,
-                VmClosureCall::resolve($callback)
+                VmClosureCall::resolve($callback),
+                $descending
             );
         } else {
             if (!UsortCallbackPolicy::isVmSupportedType($callback->type)) {
@@ -70,7 +70,11 @@ final class uksort_ extends Internal
                 throw new \LogicException(UsortCallbackPolicy::vmRejectionMessage());
             }
             $compare = VmInternalCompare::resolveStringCallback($name);
-            VmInternalCompare::sortKeyedPairsByKeyWithCompare($pairs, $compare);
+            if ($descending) {
+                VmInternalCompare::sortKeyedPairsByKeyWithCompareDesc($pairs, $compare);
+            } else {
+                VmInternalCompare::sortKeyedPairsByKeyWithCompare($pairs, $compare);
+            }
         }
         $sorted = new HashTable();
         foreach ($pairs as [$key, $value]) {

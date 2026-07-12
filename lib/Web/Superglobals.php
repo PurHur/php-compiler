@@ -83,7 +83,8 @@ final class Superglobals
     public static function exportCgiEnvironment(
         ?string $queryString = null,
         ?string $postBody = null,
-        ?string $scriptFilename = null
+        ?string $scriptFilename = null,
+        ?string $scriptName = null
     ): void {
         if (null !== $queryString) {
             putenv('QUERY_STRING='.$queryString);
@@ -100,6 +101,14 @@ final class Superglobals
                 $_SERVER['REQUEST_METHOD'] = 'POST';
             }
         }
+        if (null !== $scriptName && '' !== $scriptName) {
+            putenv('SCRIPT_NAME='.$scriptName);
+            $_ENV['SCRIPT_NAME'] = $scriptName;
+            $_SERVER['SCRIPT_NAME'] = $scriptName;
+            putenv('PHP_SELF='.$scriptName);
+            $_ENV['PHP_SELF'] = $scriptName;
+            $_SERVER['PHP_SELF'] = $scriptName;
+        }
         if (null !== $scriptFilename && '' !== $scriptFilename) {
             putenv('SCRIPT_FILENAME='.$scriptFilename);
             $_ENV['SCRIPT_FILENAME'] = $scriptFilename;
@@ -111,11 +120,15 @@ final class Superglobals
         Context $context,
         ?string $queryString = null,
         ?string $postBody = null,
-        ?string $scriptFilename = null
+        ?string $scriptFilename = null,
+        ?string $scriptName = null
     ): void {
         self::$activeContext = $context;
         $cgiDefaults = self::shouldPopulateCgiServerDefaults($queryString, $postBody);
-        self::exportCgiEnvironment($queryString, $postBody, $scriptFilename);
+        if ((null === $scriptName || '' === $scriptName) && null !== $scriptFilename && '' !== $scriptFilename) {
+            $scriptName = $scriptFilename;
+        }
+        self::exportCgiEnvironment($queryString, $postBody, $scriptFilename, $scriptName);
         if (null === $queryString) {
             $fromEnv = getenv('QUERY_STRING');
             $queryString = false === $fromEnv ? '' : $fromEnv;
@@ -149,6 +162,11 @@ final class Superglobals
      */
     public static function populateCliArgv(Context $context, array $argv): void
     {
+        if (!\PHPCompiler\ext\standard\VmIni::registerArgcArgvEnabled()) {
+            $context->cliRequestArgv = [];
+
+            return;
+        }
         // Always define both globals (Zend: they exist even when empty).
         $argv = array_values(array_map('strval', $argv));
         $context->cliRequestArgv = $argv;
