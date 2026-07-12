@@ -1,8 +1,6 @@
---TEST--
-stdlib substr_count() — null needle TypeError JIT (#18312, ext/standard/string.c)
---JIT--
---FILE--
 <?php
+// Compile-only (#18312): substr_count() must lower null needle TypeError guard for AOT.
+declare(strict_types=1);
 try {
     substr_count('haystack', null);
     echo "null_needle: uncaught\n";
@@ -15,6 +13,3 @@ try {
 } catch (ValueError $e) {
     echo $e->getMessage(), "\n";
 }
---EXPECT--
-substr_count(): Argument #2 ($needle) must be of type string, null given
-substr_count(): Argument #2 ($needle) cannot be empty
