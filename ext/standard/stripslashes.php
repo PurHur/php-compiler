@@ -24,13 +24,16 @@ final class stripslashes extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('stripslashes() requires exactly one argument in this compiler build');
         }
-        $subject = $frame->calledArgs[0]->resolveIndirect();
+        $subject = VmString::coerceTypedStringBuiltinArg(
+            $frame->calledArgs[0],
+            'stripslashes',
+            0,
+            'string'
+        );
         if (null === $frame->returnVar) {
             return;
         }
-        $frame->returnVar->string(
-            VmString::stripslashes(VmString::coerceStringBuiltinArg($subject, 'stripslashes'))
-        );
+        $frame->returnVar->string(VmString::stripslashes($subject));
     }
 
     public function call(Context $context, JITVariable ...$args): Value
@@ -43,7 +46,7 @@ final class stripslashes extends Internal
 
         return $context->builder->call(
             $context->lookupFunction('__string__stripslashes'),
-            JitStringBuiltinArg::lower($context, $args[0], 'stripslashes', 0, 'string')
+            JitStringBuiltinArg::lowerTypedString($context, $args[0], 'stripslashes', 0, 'string')
         );
     }
 }
