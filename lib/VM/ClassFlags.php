@@ -15,6 +15,8 @@ final class ClassFlags
 
     public const STATIC = 4;
 
+    public const FINAL = 8;
+
     public static function pack(int $classFlags): int
     {
         $packed = 0;
@@ -26,6 +28,9 @@ final class ClassFlags
         }
         if (ClassStatic::fromClassFlags($classFlags)) {
             $packed |= self::STATIC;
+        }
+        if (ClassFinal::fromClassFlags($classFlags)) {
+            $packed |= self::FINAL;
         }
 
         return $packed;
@@ -44,5 +49,10 @@ final class ClassFlags
     public static function isStatic(int $packed): bool
     {
         return 0 !== ($packed & self::STATIC);
+    }
+
+    public static function isFinal(int $packed): bool
+    {
+        return 0 !== ($packed & self::FINAL);
     }
 }
