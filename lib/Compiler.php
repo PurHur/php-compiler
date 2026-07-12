@@ -39178,7 +39178,10 @@ class Compiler {
                             && null !== $cfgCallOp->var
                             && null !== $prelude->result
                             && $this->operandsReferToSameVariable($cfgCallOp->var, $prelude->result);
-                        if (!$propertyFetchIsMethodReceiver) {
+                        $preludeFetchFeedsCallArg = null !== $prelude->result
+                            && ($callArgOperand = $this->cfgCallArgOperand($cfgCallOp, (int) $argIndex, $arg)) instanceof Operand
+                            && $this->operandsReferToSameVariable($callArgOperand, $prelude->result);
+                        if (!$propertyFetchIsMethodReceiver && $preludeFetchFeedsCallArg) {
                             if (null === $this->lastPropertyFetchResultSlotBeforePendingCall($block)) {
                                 foreach ($this->compileExpr($prelude, $block) as $op) {
                                     $block->addOpCode($op);
@@ -45773,6 +45776,24 @@ class Compiler {
             $name = $arg->callArgName;
 
             return is_string($name) && '' !== $name ? $name : null;
+        }
+
+        return null;
+    }
+
+    /**
+     * CFG call argument expression for hoisted producer wiring (#16057, #18410).
+     */
+    private function cfgCallArgOperand(?Op $cfgCallOp, int $argIndex, $loopArg): ?Operand
+    {
+        if (null !== $cfgCallOp && property_exists($cfgCallOp, 'args') && is_array($cfgCallOp->args)) {
+            $cfgArg = $cfgCallOp->args[$argIndex] ?? null;
+            if ($cfgArg instanceof Operand) {
+                return $cfgArg;
+            }
+        }
+        if ($loopArg instanceof Operand) {
+            return $loopArg;
         }
 
         return null;
