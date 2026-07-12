@@ -29,8 +29,8 @@ final class substr_count extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $haystack = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'substr_count', 0, 'haystack');
-        $needle = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'substr_count', 1, 'needle');
+        $haystack = VmString::coerceTypedStringBuiltinArg($frame->calledArgs[0], 'substr_count', 0, 'haystack');
+        $needle = VmString::coerceTypedStringBuiltinArg($frame->calledArgs[1], 'substr_count', 1, 'needle');
         $offset = 0;
         if ($argc >= 3) {
             $offset = VmMath::parseIntBuiltinArgForFrame($frame, 2, 'substr_count', 3, 'offset');
@@ -58,8 +58,8 @@ final class substr_count extends Internal
         $i64 = $context->getTypeFromString('int64');
         $i32 = $context->getTypeFromString('int32');
         $fn = $context->lookupFunction('phpc_substr_count');
-        $hay = JitStringBuiltinArg::lower($context, $args[0], 'substr_count', 0, 'haystack');
-        $needle = JitStringBuiltinArg::lower($context, $args[1], 'substr_count', 1, 'needle');
+        $hay = JitStringBuiltinArg::lowerTypedString($context, $args[0], 'substr_count', 0, 'haystack');
+        $needle = JitStringBuiltinArg::lowerTypedString($context, $args[1], 'substr_count', 1, 'needle');
         $offset = $argc >= 3
             ? JitIntdiv::lowerIntBuiltinArgForCaller($context, $args[2], 'substr_count', 3, 'offset')
             : $i64->constInt(0, false);
