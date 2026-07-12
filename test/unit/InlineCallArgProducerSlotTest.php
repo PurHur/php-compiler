@@ -6483,6 +6483,74 @@ PHP;
         self::assertStringContainsString('bool(true)', $out);
     }
 
+    /** Issue #18185 — @fopen then var_dump($h !== false) must send comparison bool, not stream resource. */
+    public function testErrorSuppressAssignThenNotIdenticalInsideCallArgUsesComparisonSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+$h = @fopen('php://memory', 'r+');
+var_dump($h !== false);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'suppress_comparison_call_arg.php');
+
+        $notIdenticalResultSlot = null;
+        $outerSendSlot = null;
+        $fcallOrdinal = 0;
+        foreach ($this->reachableBlocksFromEntry($block) as $reachable) {
+            foreach ($reachable->opCodes as $op) {
+                if (OpCode::TYPE_NOT_IDENTICAL === $op->type && null === $notIdenticalResultSlot) {
+                    $notIdenticalResultSlot = $op->arg1;
+                }
+                if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                    ++$fcallOrdinal;
+                }
+                if (OpCode::TYPE_ARG_SEND === $op->type && 2 === $fcallOrdinal) {
+                    $outerSendSlot = $op->arg1;
+                }
+            }
+        }
+
+        self::assertNotNull($notIdenticalResultSlot);
+        self::assertSame($notIdenticalResultSlot, $outerSendSlot);
+
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertStringContainsString('bool(true)', $out);
+    }
+
+    /** @return list<Block> */
+    private function reachableBlocksFromEntry(Block $entry): array
+    {
+        $seen = new \SplObjectStorage();
+        $queue = [$entry];
+        $reachable = [];
+        while ([] !== $queue) {
+            $block = array_shift($queue);
+            if ($seen->contains($block)) {
+                continue;
+            }
+            $seen->attach($block);
+            $reachable[] = $block;
+            foreach ($block->opCodes as $op) {
+                if ($op->block1 instanceof Block && !$seen->contains($op->block1)) {
+                    $queue[] = $op->block1;
+                }
+                if ($op->block2 instanceof Block && !$seen->contains($op->block2)) {
+                    $queue[] = $op->block2;
+                }
+            }
+            foreach ($block->blocks as $child) {
+                if ($child instanceof Block && !$seen->contains($child)) {
+                    $queue[] = $child;
+                }
+            }
+        }
+
+        return $reachable;
+    }
+
     /** Issue #13703 — array_column() inline haystack literal runtime parity with Zend. */
     public function testArrayColumnInlineHaystackTwoArgRuntime(): void
     {
