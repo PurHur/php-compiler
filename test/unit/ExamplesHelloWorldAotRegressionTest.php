@@ -99,7 +99,6 @@ final class ExamplesHelloWorldAotRegressionTest extends TestCase
 
     public function testSimpleWebExampleStandaloneAotBuilds(): void
     {
-        $this->markTestSkipped('001-SimpleWeb AOT still tracked separately from #15417 HelloWorld SIGSEGV fix');
         if (!LlvmToolchain::isReady(dirname(__DIR__, 2))) {
             $this->markTestSkipped(LlvmToolchain::readyFailureReason() ?? 'LLVM 9 toolchain not available');
         }

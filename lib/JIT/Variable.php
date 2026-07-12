@@ -511,9 +511,24 @@ final class Variable {
                 $literal = (int) $op->value;
                 break;
             case self::TYPE_STRING:
-                $value = $context->builder->load($context->constantStringFromString($op->value));
-                $literal = is_string($op->value) ? $op->value : null;
-                break;
+                $slot = BasicBlockHelper::entryAlloca($context, $context->getTypeFromString('__string__*'));
+                $loaded = $context->builder->load($context->constantStringFromString($op->value));
+                $owned = $context->builder->call(
+                    $context->lookupFunction('__string__separate'),
+                    $loaded
+                );
+                $context->builder->store($owned, $slot);
+                $var = new Variable(
+                    $context,
+                    self::TYPE_STRING,
+                    self::KIND_VARIABLE,
+                    $slot
+                );
+                if (is_string($op->value)) {
+                    $var->compileTimeString = $op->value;
+                }
+
+                return $var;
             case self::TYPE_NATIVE_DOUBLE:
                 $floatValue = \is_float($op->value)
                     ? $op->value
