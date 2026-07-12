@@ -1876,6 +1876,68 @@ class Block {
     }
 
     /**
+     * True when any block invokes a global function by compile-time literal name (#16075).
+     *
+     * @param string ...$names Lowercase builtin names (e.g. preg_match)
+     */
+    public static function containsLiteralFuncCalls(?self $root, string ...$names): bool
+    {
+        if (null === $root || [] === $names) {
+            return false;
+        }
+        $want = array_fill_keys(array_map('strtolower', $names), true);
+        $seen = new \SplObjectStorage();
+        $stack = [$root];
+        while ([] !== $stack) {
+            $block = array_pop($stack);
+            if (!$block instanceof self || $seen->contains($block)) {
+                continue;
+            }
+            $seen->attach($block);
+            foreach ($block->opCodes as $op) {
+                if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                    try {
+                        $nameOp = $block->getOperand($op->arg1);
+                        if ($nameOp instanceof Operand\Literal && is_string($nameOp->value)) {
+                            $lc = strtolower($nameOp->value);
+                            if (isset($want[$lc])) {
+                                return true;
+                            }
+                        }
+                    } catch (\Throwable) {
+                    }
+                }
+                foreach ([$op->block1, $op->block2, $op->block3] as $sub) {
+                    if ($sub instanceof self) {
+                        $stack[] = $sub;
+                    }
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /** preg_* calls that require standalone AOT prelink before user-script lowering (#16075). */
+    public static function containsPregPrelinkBuiltinCalls(?self $root): bool
+    {
+        return self::containsLiteralFuncCalls(
+            $root,
+            'preg_match',
+            'preg_match_all',
+            'preg_replace',
+            'preg_replace_callback',
+            'preg_replace_callback_array',
+            'preg_split',
+            'preg_grep',
+            'preg_filter',
+            'preg_quote',
+            'preg_last_error',
+            'preg_last_error_msg',
+        );
+    }
+
+    /**
      * @param int ...$types OpCode::TYPE_* values to match
      */
     private static function containsOpcodeTypesSkippingFuncDefs(?self $root, int ...$types): bool

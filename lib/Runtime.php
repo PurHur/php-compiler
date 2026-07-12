@@ -903,8 +903,7 @@ class Runtime {
 
     public function standalone(?Block $block, string $outfile, ?string $sourceCode = null, ?string $sourceFilename = null) {
         \PHPCompiler\JIT\Progress::noteFunction('runtime_standalone_begin');
-        $needsPregPrelink = \is_string($sourceCode)
-            && preg_match('/\bpreg_(?:match(?:_all)?|replace(?:_callback(?:_array)?)?|split|grep|filter|quote|last_error)/i', $sourceCode);
+        $needsPregPrelink = Block::containsPregPrelinkBuiltinCalls($block);
         $context = $this->loadJitContext();
         if (null !== $sourceFilename && '' !== $sourceFilename) {
             $context->setAotSourceFilename($sourceFilename);
