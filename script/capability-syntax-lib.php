@@ -207,7 +207,7 @@ function syntaxRowDefinitions(): array
             'issue' => 4682,
             'notes' => [
                 'Ast\\InOperatorDesugar + InOperatorResolver (#4682); VM InOperator::contains (===)',
-                'JIT TYPE_IN via ArrayBuiltinHelper::inArray strict (#4716); EnumInOperatorJitCompileTest',
+                'JIT TYPE_IN via InArrayRuntime PHP bridge (#4716, #18153); EnumInOperatorJitCompileTest',
             ],
             'probe' => 'enum E: string { case A = "a"; case B = "b"; } echo (E::A in [E::A, E::B]) ? "yes" : "no";',
         ],

@@ -67,33 +67,6 @@ final class VmPregPattern
     }
 
     /**
-     * Zend ext/pcre/php_pcre.c compile failure text for preg_*() warnings (#14880).
-     */
-    public static function compileWarningMessage(string $pattern): ?string
-    {
-        $delimiterMessage = self::patternWarningMessage($pattern);
-        if (null !== $delimiterMessage) {
-            return $delimiterMessage;
-        }
-        $parsed = self::parsePhpPattern($pattern);
-        if (null === $parsed) {
-            return null;
-        }
-        [$regex, $opts] = $parsed;
-        VmPregEngine::compile($regex, $opts);
-        $exception = VmPregEngine::consumeLastCompileException();
-        if (null === $exception) {
-            return null;
-        }
-
-        return \sprintf(
-            'Compilation failed: %s at offset %d',
-            $exception->compileMessage,
-            1 + $exception->compileOffset
-        );
-    }
-
-    /**
      * @return array{0: string, 1: int}|null [regex body, pcre2 option flags]
      */
     public static function parsePhpPattern(string $pattern): ?array
