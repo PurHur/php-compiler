@@ -154,6 +154,16 @@ final class VmLibxml
     }
 
     /**
+     * php-src ext/xml/xml.c — expat failures populate libxml ring without php_error().
+     *
+     * @param array{level: int, code: int, column: int, message: string, file: string, line: int} $record
+     */
+    public static function recordError(array $record): void
+    {
+        self::$errors[] = $record;
+    }
+
+    /**
      * @param array{level: int, code: int, column: int, message: string, file: string, line: int} $record
      */
     public static function handleError(
