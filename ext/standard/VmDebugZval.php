@@ -75,6 +75,12 @@ final class VmDebugZval
 
             return;
         }
+        $resourceDump = VmVarFormat::tryFormatDebugZvalDump($var);
+        if (null !== $resourceDump) {
+            self::write($resourceDump);
+
+            return;
+        }
         if (Variable::TYPE_ARRAY === $var->type) {
             self::dumpArray($vm, $var->toArray(), $level, $frame);
 
