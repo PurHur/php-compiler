@@ -39172,23 +39172,31 @@ class Compiler {
                         $prelude instanceof Op\Expr\PropertyFetch
                         || $prelude instanceof Op\Expr\NullsafePropertyFetch
                     ) {
-                        if (null === $this->lastPropertyFetchResultSlotBeforePendingCall($block)) {
-                            foreach ($this->compileExpr($prelude, $block) as $op) {
-                                $block->addOpCode($op);
+                        // documentElement->C14NFile($tmp) — prelude PropertyFetch is the MethodCall
+                        // receiver, not arg #0; trim($obj->prop) FuncCall path unchanged (#16057).
+                        $propertyFetchIsMethodReceiver = $cfgCallOp instanceof Op\Expr\MethodCall
+                            && null !== $cfgCallOp->var
+                            && null !== $prelude->result
+                            && $this->operandsReferToSameVariable($cfgCallOp->var, $prelude->result);
+                        if (!$propertyFetchIsMethodReceiver) {
+                            if (null === $this->lastPropertyFetchResultSlotBeforePendingCall($block)) {
+                                foreach ($this->compileExpr($prelude, $block) as $op) {
+                                    $block->addOpCode($op);
+                                }
                             }
-                        }
-                        if ($prelude instanceof Op\Expr\PropertyFetch) {
-                            $this->syncPropertyFetchResultToFollowingFuncCallArg($prelude, $block);
-                        }
-                        $propertyFetchArgSlot = $this->lastPropertyFetchResultSlotBeforePendingCall($block);
-                        if (null !== $propertyFetchArgSlot) {
-                            $sends[] = new OpCode(
-                                OpCode::TYPE_ARG_SEND,
-                                $propertyFetchArgSlot,
-                                $nameSlot,
-                                $unpackFlag
-                            );
-                            continue;
+                            if ($prelude instanceof Op\Expr\PropertyFetch) {
+                                $this->syncPropertyFetchResultToFollowingFuncCallArg($prelude, $block);
+                            }
+                            $propertyFetchArgSlot = $this->lastPropertyFetchResultSlotBeforePendingCall($block);
+                            if (null !== $propertyFetchArgSlot) {
+                                $sends[] = new OpCode(
+                                    OpCode::TYPE_ARG_SEND,
+                                    $propertyFetchArgSlot,
+                                    $nameSlot,
+                                    $unpackFlag
+                                );
+                                continue;
+                            }
                         }
                     }
                 }
