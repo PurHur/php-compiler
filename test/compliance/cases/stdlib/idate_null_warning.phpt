@@ -6,5 +6,5 @@ var_export(idate(null));
 echo "\n";
 ?>
 --EXPECTF--
-PHP Warning:  idate format is one char in %s on line %d
+PHP Warning:  idate(): idate format is one char in %s on line %d
 false

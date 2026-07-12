@@ -17,9 +17,9 @@ final class IdateJitHelper
 
     private const ERR_TOKEN = -2;
 
-    private const MSG_FORMAT_ONE_CHAR = 'idate format is one char';
+    private const MSG_FORMAT_ONE_CHAR = 'idate(): idate format is one char';
 
-    private const MSG_UNRECOGNIZED = 'Unrecognized date format token';
+    private const MSG_UNRECOGNIZED = 'idate(): Unrecognized date format token';
 
     public static function idate(string $format, int $timestamp): int
     {

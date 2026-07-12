@@ -17,9 +17,9 @@ use PHPLLVM\Value;
 /** idate() — format local date part as integer (VM VmDate; JIT IdateJitHelper, #6830, #9181). */
 final class idate extends Internal
 {
-    private const MSG_FORMAT_ONE_CHAR = 'idate format is one char';
+    private const MSG_FORMAT_ONE_CHAR = 'idate(): idate format is one char';
 
-    private const MSG_UNRECOGNIZED = 'Unrecognized date format token';
+    private const MSG_UNRECOGNIZED = 'idate(): Unrecognized date format token';
 
     public function __construct()
     {
