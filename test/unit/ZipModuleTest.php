@@ -20,14 +20,20 @@ final class ZipModuleTest extends TestCase
         $ctx = $runtime->vmContext;
 
         self::assertTrue(VmReflection::classExists($ctx, 'ZipArchive'));
+        self::assertTrue(VmReflection::functionExists($ctx, 'zip_open'));
+        self::assertTrue(VmReflection::functionExists($ctx, 'zip_read'));
+        self::assertTrue(VmReflection::functionExists($ctx, 'zip_close'));
+        self::assertTrue(VmReflection::functionExists($ctx, 'zip_entry_name'));
 
         $code = <<<'PHP'
 <?php
 echo (int) class_exists('ZipArchive', false);
+echo "\n";
+echo (int) function_exists('zip_open');
 PHP;
         $block = $runtime->parseAndCompile($code, 'zip_module.php');
         ob_start();
         $runtime->run($block);
-        self::assertSame('1', ob_get_clean());
+        self::assertSame("1\n1", ob_get_clean());
     }
 }

@@ -44,6 +44,12 @@ final class VmFs
     /** @var array<int, true> bz* stream placeholders — I/O via VmBz2StreamPure (#17301) */
     private static array $bzNativePlaceholders = [];
 
+    /** @var array<int, string> zip_open() archive placeholders — state in VmZipProcedural (#6370) */
+    private static array $zipArchivePlaceholders = [];
+
+    /** @var array<int, int> zip_read() entry placeholders — parent archive handle (#6370) */
+    private static array $zipEntryPlaceholders = [];
+
     /** @var array<int, int> host stream identity => outstanding VM handle ids (#3384 pfsockopen persistent) */
     private static array $hostResourceRefcounts = [];
 
@@ -1034,6 +1040,75 @@ final class VmFs
     public static function isBzNativePlaceholder(int $handle): bool
     {
         return isset(self::$bzNativePlaceholders[$handle]);
+    }
+
+    /**
+     * Register a VM stream handle for zip_open() procedural archives (#6370).
+     *
+     * @return int|false
+     */
+    public static function adoptZipArchivePlaceholder(string $path)
+    {
+        $id = VmPhpMemoryStream::open('php://memory', 'r+b');
+        if (false === $id) {
+            return false;
+        }
+        self::$handlePaths[$id] = 'zip://'.$path;
+        self::$zipArchivePlaceholders[$id] = $path;
+
+        return $id;
+    }
+
+    public static function isZipArchivePlaceholder(int $handle): bool
+    {
+        return isset(self::$zipArchivePlaceholders[$handle]);
+    }
+
+    public static function releaseZipArchivePlaceholder(int $handle): void
+    {
+        if (!isset(self::$zipArchivePlaceholders[$handle])) {
+            return;
+        }
+        unset(self::$zipArchivePlaceholders[$handle]);
+        if (VmPhpMemoryStream::isValidHandle($handle)) {
+            VmPhpMemoryStream::close($handle);
+            unset(self::$handlePaths[$handle], self::$handleModes[$handle], self::$handleBlocked[$handle]);
+        }
+    }
+
+    /**
+     * @return int|false
+     */
+    public static function adoptZipEntryPlaceholder(int $archiveHandle)
+    {
+        if (!isset(self::$zipArchivePlaceholders[$archiveHandle])) {
+            return false;
+        }
+        $id = VmPhpMemoryStream::open('php://memory', 'r+b');
+        if (false === $id) {
+            return false;
+        }
+        self::$handlePaths[$id] = 'zip-entry://'.$archiveHandle;
+        self::$zipEntryPlaceholders[$id] = $archiveHandle;
+
+        return $id;
+    }
+
+    public static function isZipEntryPlaceholder(int $handle): bool
+    {
+        return isset(self::$zipEntryPlaceholders[$handle]);
+    }
+
+    public static function releaseZipEntryPlaceholder(int $handle): void
+    {
+        if (!isset(self::$zipEntryPlaceholders[$handle])) {
+            return;
+        }
+        unset(self::$zipEntryPlaceholders[$handle]);
+        if (VmPhpMemoryStream::isValidHandle($handle)) {
+            VmPhpMemoryStream::close($handle);
+            unset(self::$handlePaths[$handle], self::$handleModes[$handle], self::$handleBlocked[$handle]);
+        }
     }
 
     public static function releaseBzNativePlaceholder(int $handle): void
@@ -2390,6 +2465,12 @@ final class VmFs
         }
         if (isset(self::$bzNativePlaceholders[$handle])) {
             return 'bzip2';
+        }
+        if (isset(self::$zipArchivePlaceholders[$handle])) {
+            return 'Zip Archive';
+        }
+        if (isset(self::$zipEntryPlaceholders[$handle])) {
+            return 'Zip Entry';
         }
         if (VmPhpMemoryStream::isValidHandle($handle)) {
             return 'stream';
