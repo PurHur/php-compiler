@@ -63,38 +63,4 @@ final class GeneratorGetReturn extends VmClassMethod
 
         $gen->vm->resumeGenerator($gen);
     }
-
-    /**
-     * Stage yielded key/value into the FUNCCALL result slot — returnVar may alias
-     * $this / generator storage (#1885, #17895, #18184).
-     */
-    public static function writeYieldedKeyToReturn(Frame $frame, GeneratorState $gen): void
-    {
-        if (null === $frame->returnVar) {
-            return;
-        }
-        if ($gen->hasCurrent) {
-            $staging = new Variable();
-            $staging->copyFrom($gen->currentKey);
-            $frame->returnVar->copyFrom($staging);
-        } else {
-            $frame->returnVar->null();
-        }
-    }
-
-    /** @see writeYieldedKeyToReturn */
-    public static function writeYieldedValueToReturn(Frame $frame, GeneratorState $gen): void
-    {
-        if (null === $frame->returnVar) {
-            return;
-        }
-        if (!$gen->hasCurrent) {
-            $frame->returnVar->null();
-
-            return;
-        }
-        $staging = new Variable();
-        $staging->copyFrom($gen->currentValue);
-        $frame->returnVar->copyFrom($staging);
-    }
 }

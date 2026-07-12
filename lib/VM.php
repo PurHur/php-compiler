@@ -7089,20 +7089,22 @@ restart:
                     }
                     if (null !== $op->arg2) {
                         if (isset($frame->scope[$op->arg2])) {
-                            $gen->currentValue->copyFrom($frame->scope[$op->arg2]->resolveIndirect());
+                            $gen->publishCurrentValue($frame->scope[$op->arg2]->resolveIndirect());
                         } elseif (isset($frame->block->constants[$op->arg2])) {
-                            $gen->currentValue->copyFrom($frame->block->constants[$op->arg2]);
+                            $gen->publishCurrentValue($frame->block->constants[$op->arg2]);
                         } else {
-                            $gen->currentValue->null();
+                            $gen->clearCurrentValue();
                         }
                     } else {
                         $gen->currentValue->null();
+                        $gen->currentSnapshot->null();
+                        $gen->hasCurrent = true;
                     }
                     if (null !== $op->arg3) {
                         if (isset($frame->scope[$op->arg3])) {
-                            $gen->currentKey->copyFrom($frame->scope[$op->arg3]->resolveIndirect());
+                            $gen->currentKey->duplicateFrom($frame->scope[$op->arg3]->resolveIndirect());
                         } elseif (isset($frame->block->constants[$op->arg3])) {
-                            $gen->currentKey->copyFrom($frame->block->constants[$op->arg3]);
+                            $gen->currentKey->duplicateFrom($frame->block->constants[$op->arg3]);
                         } else {
                             $gen->currentKey->int($gen->autoKey++);
                         }
@@ -7112,7 +7114,9 @@ restart:
                     if (null !== $op->arg1) {
                         $gen->yieldResultSlot = $op->arg1;
                     }
-                    $gen->hasCurrent = true;
+                    if (null === $op->arg2) {
+                        $gen->hasCurrent = true;
+                    }
                     $gen->frame = $frame;
                     $frame->generatorYield = true;
                     break;
@@ -7153,8 +7157,7 @@ restart:
                     if (Variable::TYPE_ARRAY === $container->type) {
                         if ($container->toArray()->iterValid()) {
                             $gen->currentKey->copyFrom($container->toArray()->iterCurrentKey());
-                            $gen->currentValue->copyFrom($container->toArray()->iterCurrentValue(false));
-                            $gen->hasCurrent = true;
+                            $gen->publishCurrentValue($container->toArray()->iterCurrentValue(false));
                             $gen->frame = $frame;
                             $frame->pos--;
                             $frame->generatorYield = true;
@@ -7167,8 +7170,7 @@ restart:
                         $inner = $container->toObject()->generatorState;
                         if ($this->advanceGeneratorIteration($inner)) {
                             $gen->currentKey->copyFrom($inner->currentKey);
-                            $gen->currentValue->copyFrom($inner->currentValue);
-                            $gen->hasCurrent = true;
+                            $gen->publishCurrentValue($inner->currentSnapshot);
                             $gen->frame = $frame;
                             $frame->pos--;
                             $frame->generatorYield = true;
@@ -7187,11 +7189,10 @@ restart:
                             $gen->currentKey->copyFrom(
                                 $this->invokeForeachInstanceMethod($frame, $container, 'key')
                             );
-                            $gen->currentValue->copyFrom(
+                            $gen->publishCurrentValue(
                                 $this->invokeForeachInstanceMethod($frame, $container, 'current')
                             );
                             $gen->yieldFromIteratorAdvance = true;
-                            $gen->hasCurrent = true;
                             $gen->frame = $frame;
                             $frame->pos--;
                             $frame->generatorYield = true;

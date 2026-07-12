@@ -28422,16 +28422,6 @@ class Compiler {
                 continue;
             }
             if ($child instanceof Op\Expr\FuncCall || $child instanceof Op\Expr\NsFuncCall) {
-                if (
-                    null !== $consumerIndex
-                    && $this->statementLevelFuncCallBeforeHoistedSiblingChain(
-                        $j,
-                        $consumerIndex,
-                        $cfgChildren
-                    )
-                ) {
-                    continue;
-                }
                 ++$base;
                 continue;
             }
@@ -28762,6 +28752,8 @@ class Compiler {
             ? OpCode::TYPE_STATICCALL_INIT
             : OpCode::TYPE_METHODCALL_INIT;
         $needle = strtolower($methodName);
+        // Pair each cfg MethodCall producer with its own EXEC_RETURN — dead operand slots
+        // reuse across repeated same-named calls (#18183, #18184).
         $producerOrdinal = 0;
         if (null !== $block->orig) {
             foreach ($block->orig->children as $child) {
@@ -43888,15 +43880,18 @@ class Compiler {
                 }
             }
             if (null !== $cfgCallOp && !$this->isEmbeddedCallLiteralArg($arg)) {
-                $pendingDimFetchSlot = $this->lastPendingCallArgArrayDimFetchSlot($block, $sends);
-                if (null === $pendingDimFetchSlot && (
-                    null !== $dimFetchSlot
-                    || $this->callArgIsDeadInlineHaystackFamilySlot(
-                        $cfgCallOp,
-                        (int) $argIndex,
-                        $calleeName,
-                        $arg
-                    )
+                $pendingDimFetchSlot = null;
+                if (null !== $dimFetchSlot) {
+                    // stream_set_blocking($pipes[1], false) — dim-fetch slot is arg #0 only (#18186).
+                    $pendingDimFetchSlot = $this->lastPendingCallArgArrayDimFetchSlot($block, $sends);
+                    if (null === $pendingDimFetchSlot) {
+                        $pendingDimFetchSlot = $this->pendingCallArgArrayDimFetchSlot($block, $sends, 0);
+                    }
+                } elseif ($this->callArgIsDeadInlineHaystackFamilySlot(
+                    $cfgCallOp,
+                    (int) $argIndex,
+                    $calleeName,
+                    $arg
                 )) {
                     $pendingDimFetchSlot = $this->pendingCallArgArrayDimFetchSlot($block, $sends, 0);
                 }
@@ -47529,6 +47524,9 @@ class Compiler {
                     && (string) $send->arg1 !== (string) $execSlot
                 ) {
                     // var_export($g->valid(), true) after prior var_export — dead arg temp must not reuse stale EXEC_RETURN (#17520).
+                    $send->arg1 = $execSlot;
+                } elseif ((string) $send->arg1 !== (string) $execSlot) {
+                    // var_export($g2->current(), true) after earlier var_export — sibling MethodCall EXEC_RETURN (#18183).
                     $send->arg1 = $execSlot;
                 }
             } elseif (1 === $sendOrdinal && null !== $trueSlot && (string) $send->arg1 === (string) $execSlot) {

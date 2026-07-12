@@ -22,7 +22,14 @@ final class GeneratorCurrent extends VmClassMethod
         if (null === $frame->returnVar) {
             return;
         }
-        GeneratorGetReturn::writeYieldedValueToReturn($frame, $gen);
+        if ($gen->hasCurrent) {
+            // FUNCCALL result slots may alias generator state storage (#1885, #18183, #18184).
+            $staging = new Variable();
+            $staging->duplicateFrom($gen->currentSnapshot);
+            $frame->returnVar->copyFrom($staging);
+        } else {
+            $frame->returnVar->null();
+        }
     }
 
     private static function receiver(Frame $frame): \PHPCompiler\VM\ObjectEntry

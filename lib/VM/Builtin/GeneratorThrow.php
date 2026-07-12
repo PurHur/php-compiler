@@ -28,8 +28,10 @@ final class GeneratorThrow extends VmClassMethod
             return;
         }
         if ($active && $gen->hasCurrent) {
-            GeneratorGetReturn::writeYieldedValueToReturn($frame, $gen);
-        } elseif (null !== $frame->returnVar) {
+            $staging = new Variable();
+            $staging->duplicateFrom($gen->currentSnapshot);
+            $frame->returnVar->copyFrom($staging);
+        } else {
             $frame->returnVar->null();
         }
     }

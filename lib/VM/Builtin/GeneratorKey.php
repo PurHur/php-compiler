@@ -22,7 +22,13 @@ final class GeneratorKey extends VmClassMethod
         if (null === $frame->returnVar) {
             return;
         }
-        GeneratorGetReturn::writeYieldedKeyToReturn($frame, $gen);
+        if ($gen->hasCurrent) {
+            $staging = new Variable();
+            $staging->duplicateFrom($gen->currentKey);
+            $frame->returnVar->copyFrom($staging);
+        } else {
+            $frame->returnVar->null();
+        }
     }
 
     private static function receiver(Frame $frame): \PHPCompiler\VM\ObjectEntry

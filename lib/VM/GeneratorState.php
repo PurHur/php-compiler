@@ -40,6 +40,9 @@ final class GeneratorState
 
     public Variable $currentValue;
 
+    /** Snapshot for current() — return slots may alias {@see $currentValue} (#18183). */
+    public Variable $currentSnapshot;
+
     public ?Frame $frame = null;
 
     public bool $yieldFromActive = false;
@@ -81,12 +84,28 @@ final class GeneratorState
         $this->currentKey->generatorYieldStorage = true;
         $this->currentValue = new Variable();
         $this->currentValue->generatorYieldStorage = true;
+        $this->currentSnapshot = new Variable();
         $this->yieldFromContainer = new Variable();
         $this->returnValue = new Variable();
         $this->pendingSend = new Variable();
         $this->pendingSend->null();
         $this->pendingThrow = new Variable();
         $this->pendingThrow->null();
+    }
+
+    /** Publish yielded value; keep snapshot for idempotent current() (#18183). */
+    public function publishCurrentValue(Variable $value): void
+    {
+        $this->currentValue->duplicateFrom($value);
+        $this->currentSnapshot->duplicateFrom($this->currentValue);
+        $this->hasCurrent = true;
+    }
+
+    public function clearCurrentValue(): void
+    {
+        $this->hasCurrent = false;
+        $this->currentValue->null();
+        $this->currentSnapshot->null();
     }
 
     public static function register(Context $ctx): void
@@ -117,7 +136,7 @@ final class GeneratorState
     {
         $this->done = true;
         $this->frame = null;
-        $this->hasCurrent = false;
+        $this->clearCurrentValue();
         $this->hasReturned = true;
         if (null !== $value) {
             $this->returnValue->copyFrom($value);
@@ -131,7 +150,7 @@ final class GeneratorState
     {
         $this->done = true;
         $this->frame = null;
-        $this->hasCurrent = false;
+        $this->clearCurrentValue();
     }
 
     public function wrapObject(): ObjectEntry
@@ -158,7 +177,7 @@ final class GeneratorState
             throw new \Exception(self::REWIND_ALREADY_RUN_ERROR);
         }
         $this->done = false;
-        $this->hasCurrent = false;
+        $this->clearCurrentValue();
         $this->frame = null;
         $this->autoKey = 0;
         $this->yieldFromActive = false;
