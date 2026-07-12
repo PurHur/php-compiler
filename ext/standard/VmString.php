@@ -5300,7 +5300,8 @@ final class VmString
         $suffixLen = self::byteLength($suffix);
         if ($suffixLen > 0) {
             $baseLen = self::byteLength($base);
-            if ($baseLen >= $suffixLen
+            // php-src basename.c: strip only when basename is strictly longer than suffix.
+            if ($baseLen > $suffixLen
                 && self::compareBytes($base, $suffix, $suffixLen, $baseLen - $suffixLen)) {
                 return self::byteSlice($base, 0, $baseLen - $suffixLen);
             }
