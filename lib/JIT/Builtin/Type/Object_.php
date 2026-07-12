@@ -1819,17 +1819,6 @@ class Object_ extends Type {
         $aliasLc = strtolower(ltrim($alias, '\\'));
         $originalLc = strtolower(ltrim($original, '\\'));
 
-        if (isset($this->classes[$aliasLc]) || isset($this->classAliasToOriginalLc[$aliasLc])) {
-            $vmContext = $this->context->runtime->vmContext ?? null;
-            if (null !== $vmContext) {
-                $vmContext->errors->triggerError(
-                    \sprintf('Cannot declare class %s, because the name is already in use', $alias),
-                    \PHPCompiler\VM\ErrorReporter::E_WARNING
-                );
-            }
-
-            return false;
-        }
         if (!isset($this->classes[$originalLc])) {
             $vmContext = $this->context->runtime->vmContext ?? null;
             if (null !== $vmContext) {
@@ -1841,36 +1830,49 @@ class Object_ extends Type {
 
             return false;
         }
-        while (isset($this->classAliasToOriginalLc[$originalLc])) {
-            $originalLc = $this->classAliasToOriginalLc[$originalLc];
+        $canonicalOriginalLc = $originalLc;
+        while (isset($this->classAliasToOriginalLc[$canonicalOriginalLc])) {
+            $canonicalOriginalLc = $this->classAliasToOriginalLc[$canonicalOriginalLc];
         }
 
-        $classId = $this->classes[$originalLc];
+        $classId = $this->classes[$canonicalOriginalLc];
         if (isset($this->externalOnlyClassIds[$classId])) {
             throw new \ValueError(
                 'class_alias(): Argument #1 ($class) must be a user-defined class name, internal class name given'
             );
         }
 
-        $this->classes[$aliasLc] = $classId;
-        $this->classAliasToOriginalLc[$aliasLc] = $originalLc;
-        if (isset($this->interfaceClassLcs[$originalLc])) {
-            $this->interfaceClassLcs[$aliasLc] = true;
-            if (isset($this->interfaceExtendsLc[$originalLc])) {
-                $this->interfaceExtendsLc[$aliasLc] = $this->interfaceExtendsLc[$originalLc];
+        if (isset($this->classes[$aliasLc]) || isset($this->classAliasToOriginalLc[$aliasLc])) {
+            $vmContext = $this->context->runtime->vmContext ?? null;
+            if (null !== $vmContext) {
+                $vmContext->errors->triggerError(
+                    \sprintf('Cannot declare class %s, because the name is already in use', $alias),
+                    \PHPCompiler\VM\ErrorReporter::E_WARNING
+                );
             }
-            if (isset($this->classInterfacesLc[$originalLc])) {
-                $this->classInterfacesLc[$aliasLc] = $this->classInterfacesLc[$originalLc];
+
+            return false;
+        }
+
+        $this->classes[$aliasLc] = $classId;
+        $this->classAliasToOriginalLc[$aliasLc] = $canonicalOriginalLc;
+        if (isset($this->interfaceClassLcs[$canonicalOriginalLc])) {
+            $this->interfaceClassLcs[$aliasLc] = true;
+            if (isset($this->interfaceExtendsLc[$canonicalOriginalLc])) {
+                $this->interfaceExtendsLc[$aliasLc] = $this->interfaceExtendsLc[$canonicalOriginalLc];
+            }
+            if (isset($this->classInterfacesLc[$canonicalOriginalLc])) {
+                $this->classInterfacesLc[$aliasLc] = $this->classInterfacesLc[$canonicalOriginalLc];
             }
             unset($this->classAllInterfacesLc[$aliasLc]);
         }
-        if (isset($this->traitClassLcs[$originalLc])) {
+        if (isset($this->traitClassLcs[$canonicalOriginalLc])) {
             $this->traitClassLcs[$aliasLc] = true;
         }
-        if (isset($this->classUsedTraitNames[$originalLc])) {
-            $this->classUsedTraitNames[$aliasLc] = $this->classUsedTraitNames[$originalLc];
+        if (isset($this->classUsedTraitNames[$canonicalOriginalLc])) {
+            $this->classUsedTraitNames[$aliasLc] = $this->classUsedTraitNames[$canonicalOriginalLc];
         }
-        if (isset($this->enums[$originalLc])) {
+        if (isset($this->enums[$canonicalOriginalLc])) {
             $this->enums[$aliasLc] = true;
         }
 
