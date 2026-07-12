@@ -2152,6 +2152,9 @@ class Context {
             } elseif ($op instanceof Operand\BoundVariable
                 && Operand\BoundVariable::SCOPE_OBJECT === $op->scope) {
                 $thisVar = $this->findThisVariable();
+                if (null === $thisVar) {
+                    $thisVar = $this->seedImplicitThisFromActiveLlvmFunction();
+                }
                 if (null !== $thisVar) {
                     $this->scope->variables[$op] = $thisVar;
 
@@ -2235,7 +2238,38 @@ class Context {
             return $this->implicitThisArgument;
         }
 
-        return null;
+        return $this->seedImplicitThisFromActiveLlvmFunction();
+    }
+
+    /**
+     * Queued nested instance methods may omit argVars; LLVM param 0 is $this (#16075).
+     */
+    public function seedImplicitThisFromActiveLlvmFunction(): ?Variable
+    {
+        if (null !== $this->implicitThisArgument) {
+            return $this->implicitThisArgument;
+        }
+        $active = strtolower($this->activeFunction ?? '');
+        if ('' === $active || !str_contains($active, '::')) {
+            return null;
+        }
+        $llvmFn = $this->functions[$active] ?? null;
+        if (null === $llvmFn || $llvmFn->countParams() < 1) {
+            return null;
+        }
+        $thisParam = $llvmFn->getParam(0);
+        $thisTy = $this->getStringFromType($thisParam->typeOf());
+        if ('__object__*' !== $thisTy) {
+            return null;
+        }
+        $this->implicitThisArgument = new Variable(
+            $this,
+            Variable::TYPE_OBJECT,
+            Variable::KIND_VALUE,
+            $thisParam
+        );
+
+        return $this->implicitThisArgument;
     }
 
     public function hasVariableOpInScopes(Operand $op): bool
