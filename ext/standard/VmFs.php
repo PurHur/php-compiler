@@ -642,6 +642,22 @@ final class VmFs
 
             return VmString::byteSlice($body, $offset, $length);
         }
+        if (VmFsStdio::isStdioUri($path) || 'php://output' === $path) {
+            if ('php://stdin' === $path) {
+                $data = self::readPathContentsViaOpen($path, $ctx);
+            } else {
+                // php://stdout|stderr|output — write-only; Zend file_get_contents returns '' (ext/standard/file.c).
+                $data = '';
+            }
+            if (false === $data) {
+                return false;
+            }
+            if (0 !== $offset || null !== $length) {
+                return VmString::byteSlice($data, $offset, $length);
+            }
+
+            return $data;
+        }
         if (VmPhpMemoryStream::isSupportedUri($path)) {
             $data = self::readPathContentsViaOpen($path, $ctx);
             if (false === $data) {
