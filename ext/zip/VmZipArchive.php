@@ -63,6 +63,8 @@ final class VmZipArchive
             'open' => new ZipArchiveOpen(),
             'close' => new ZipArchiveClose(),
             'addfile' => new ZipArchiveAddFile(),
+            'addfromstring' => new ZipArchiveAddFromString(),
+            'getfromname' => new ZipArchiveGetFromName(),
             'extractto' => new ZipArchiveExtractTo(),
             'getstatusstring' => new ZipArchiveGetStatusString(),
         ];
@@ -287,6 +289,64 @@ final class VmZipArchive
         return true;
     }
 
+    public static function addFromString(ObjectEntry $entry, string $name, string $content): bool
+    {
+        $state = self::state($entry);
+        if (!$state->open) {
+            self::setStatus($entry, $state, ZipArchiveConstants::ER_ZIPCLOSED);
+
+            return false;
+        }
+        $size = strlen($content);
+        $crc = self::crc32Unsigned($content);
+        foreach ($state->entries as $idx => $existing) {
+            if ($existing['name'] === $name) {
+                $state->entries[$idx] = [
+                    'name' => $name,
+                    'data' => $content,
+                    'crc' => $crc,
+                    'size' => $size,
+                ];
+                $state->dirty = true;
+                self::syncProperties($entry, $state);
+                self::setStatus($entry, $state, ZipArchiveConstants::ER_OK);
+
+                return true;
+            }
+        }
+        $state->entries[] = [
+            'name' => $name,
+            'data' => $content,
+            'crc' => $crc,
+            'size' => $size,
+        ];
+        $state->dirty = true;
+        self::syncProperties($entry, $state);
+        self::setStatus($entry, $state, ZipArchiveConstants::ER_OK);
+
+        return true;
+    }
+
+    public static function getFromName(ObjectEntry $entry, string $name): string|false
+    {
+        $state = self::state($entry);
+        if (!$state->open) {
+            self::setStatus($entry, $state, ZipArchiveConstants::ER_ZIPCLOSED);
+
+            return false;
+        }
+        foreach ($state->entries as $zipEntry) {
+            if ($zipEntry['name'] === $name) {
+                self::setStatus($entry, $state, ZipArchiveConstants::ER_OK);
+
+                return $zipEntry['data'];
+            }
+        }
+        self::setStatus($entry, $state, ZipArchiveConstants::ER_NOENT);
+
+        return false;
+    }
+
     public static function extractTo(ObjectEntry $entry, string $pathto, ?Variable $files = null): bool
     {
         $state = self::state($entry);
@@ -393,6 +453,8 @@ final class VmZipArchive
     {
         return match ($lc) {
             'addfile' => 'addFile',
+            'addfromstring' => 'addFromString',
+            'getfromname' => 'getFromName',
             'extractto' => 'extractTo',
             'getstatusstring' => 'getStatusString',
             default => $lc,

@@ -189,6 +189,9 @@ final class BuiltinIntrospectionPolicy
         if ('inotify' === $ext) {
             return \PHPCompiler\ext\inotify\InotifyExtensionPolicy::advertisesExtension();
         }
+        if ('zip' === $ext) {
+            return \PHPCompiler\ext\zip\ZipExtensionPolicy::advertisesExtension();
+        }
 
         return true;
     }

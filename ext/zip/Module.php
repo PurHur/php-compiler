@@ -8,18 +8,12 @@ use PHPCompiler\ModuleAbstract;
 use PHPCompiler\Runtime;
 
 /**
- * zip extension module entry (php-src ext/zip/php_zip.c; issue #5869).
+ * zip extension module entry (php-src ext/zip/php_zip.c; issues #5869, #3337).
  *
- * ZipArchive parity tracked in #3337; register under {@see standard} so
- * extension_loaded('zip') stays false until libzip ships (#11676).
+ * ZipArchive uses pure-PHP store engine ({@see ZipEngine}) without libzip.
  */
 class Module extends ModuleAbstract
 {
-    public function getExtensionName(): string
-    {
-        return 'standard';
-    }
-
     public function init(Runtime $runtime): void
     {
         parent::init($runtime);
