@@ -2899,8 +2899,8 @@ class Object_ extends Type {
             $this->defineProperty($id, 'name', Variable::TYPE_STRING);
         }
         if ('reflectionmethod' === $lcname) {
+            $this->defineProperty($id, 'class', Variable::TYPE_STRING);
             $this->defineProperty($id, 'name', Variable::TYPE_STRING);
-            $this->defineProperty($id, 'method', Variable::TYPE_STRING);
         }
         if ('reflectionproperty' === $lcname) {
             $this->defineProperty($id, 'name', Variable::TYPE_STRING);

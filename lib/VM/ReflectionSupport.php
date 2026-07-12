@@ -78,6 +78,12 @@ final class ReflectionSupport
 
     public const PROP_METHOD_NAME = 'method';
 
+    /** Zend ReflectionMethod::$class — declaring class name string (#18298). */
+    public const PROP_REFLECTION_METHOD_CLASS = 'class';
+
+    /** Zend ReflectionMethod::$name — method name string (#18298). */
+    public const PROP_REFLECTION_METHOD_FUNC = 'name';
+
     public const PROP_PROPERTY_NAME = 'property';
 
     /** Declaring class name on ReflectionProperty instances (#9878). */
@@ -751,9 +757,17 @@ final class ReflectionSupport
         return $obj;
     }
 
+    public static function isReflectionMethodObject(ObjectEntry $reflection): bool
+    {
+        return strtolower($reflection->class->name) === self::REFLECTION_METHOD;
+    }
+
     public static function classNameFromReflection(ObjectEntry $reflection): string
     {
-        $nameVar = $reflection->getProperty(self::PROP_CLASS_NAME)->resolveIndirect();
+        $propName = self::isReflectionMethodObject($reflection)
+            ? self::PROP_REFLECTION_METHOD_CLASS
+            : self::PROP_CLASS_NAME;
+        $nameVar = $reflection->getProperty($propName)->resolveIndirect();
         if (Variable::TYPE_STRING !== $nameVar->type) {
             throw new \LogicException('ReflectionClass missing target class name');
         }
@@ -921,7 +935,7 @@ final class ReflectionSupport
 
     public static function methodNameFromReflection(ObjectEntry $reflection): string
     {
-        $nameVar = $reflection->getProperty(self::PROP_METHOD_NAME)->resolveIndirect();
+        $nameVar = $reflection->getProperty(self::PROP_REFLECTION_METHOD_FUNC)->resolveIndirect();
         if (Variable::TYPE_STRING !== $nameVar->type) {
             throw new \LogicException('ReflectionMethod missing method name');
         }
@@ -2100,8 +2114,8 @@ final class ReflectionSupport
         }
         $rm = new ObjectEntry($rmClass);
         $rm->constructed = true;
-        $rm->getProperty(self::PROP_CLASS_NAME)->string($entry->name);
-        $rm->getProperty(self::PROP_METHOD_NAME)->string($methodName);
+        $rm->getProperty(self::PROP_REFLECTION_METHOD_CLASS)->string($entry->name);
+        $rm->getProperty(self::PROP_REFLECTION_METHOD_FUNC)->string($methodName);
 
         return $rm;
     }
