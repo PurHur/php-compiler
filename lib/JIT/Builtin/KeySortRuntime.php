@@ -11,7 +11,7 @@ use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\Variable as JITVariable;
 
 /**
- * JIT/AOT link for ksort()/krsort() via KeySortJitHelper PHP (#12770).
+ * JIT/AOT link for ksort()/krsort() via KeySortJitHelper PHP (#12770, #18381).
  *
  * Embed and standalone AOT compile the same PHP bridge (#13050).
  * SSOT: {@see \PHPCompiler\ext\standard\VmArray::ksortCopy()} /
@@ -43,43 +43,24 @@ final class KeySortRuntime
 
     public static function ksortByKey(Context $context, JITVariable $array): void
     {
-        if (ArrayBuiltinHelper::isNativeArray($array->type)) {
-            ArrayBuiltinHelper::ksortByKey($context, $array);
-
-            return;
-        }
-
-        self::ensureLinked($context);
-        $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
-        $context->builder->call($context->lookupFunction(self::ABI_KSORT), $ht);
-        HashTableHelper::storeHashtableInArrayVariable($context, $array, $ht);
+        self::invokeKeySort($context, $array, self::ABI_KSORT);
     }
 
     public static function ksortByKeyLocale(Context $context, JITVariable $array): void
     {
-        if (ArrayBuiltinHelper::isNativeArray($array->type)) {
-            ArrayBuiltinHelper::ksortByKeyLocale($context, $array);
-
-            return;
-        }
-
-        self::ensureLinked($context);
-        $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
-        $context->builder->call($context->lookupFunction(self::ABI_KSORT_LOCALE), $ht);
-        HashTableHelper::storeHashtableInArrayVariable($context, $array, $ht);
+        self::invokeKeySort($context, $array, self::ABI_KSORT_LOCALE);
     }
 
     public static function krsortByKey(Context $context, JITVariable $array): void
     {
-        if (ArrayBuiltinHelper::isNativeArray($array->type)) {
-            ArrayBuiltinHelper::krsortByKey($context, $array);
+        self::invokeKeySort($context, $array, self::ABI_KRSORT);
+    }
 
-            return;
-        }
-
+    private static function invokeKeySort(Context $context, JITVariable $array, string $abi): void
+    {
         self::ensureLinked($context);
         $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
-        $context->builder->call($context->lookupFunction(self::ABI_KRSORT), $ht);
+        $context->builder->call($context->lookupFunction($abi), $ht);
         HashTableHelper::storeHashtableInArrayVariable($context, $array, $ht);
     }
 

@@ -9,15 +9,19 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPUnit\Framework\TestCase;
 
-/** ksort()/krsort() JIT routes through KeySortJitHelper PHP not __hashtable__sortStringKeys LLVM (#12770, #13050). */
+/** ksort()/krsort() JIT routes all operands through KeySortJitHelper PHP not ArrayBuiltinHelper LLVM (#12770, #13050, #18381). */
 final class KeySortRuntimeShrinkTest extends TestCase
 {
+    private const ARRAY_BUILTIN_HELPER_MAX_LINES = 4520;
+
     public function testKeySortRuntimeUsesJitHelperNotDirectLlvmMonolith(): void
     {
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/KeySortRuntime.php');
         $this->assertStringContainsString('KeySortJitHelper', $runtime);
+        $this->assertStringContainsString('invokeKeySort', $runtime);
+        $this->assertStringNotContainsString('ArrayBuiltinHelper::ksortByKey', $runtime);
+        $this->assertStringNotContainsString('ArrayBuiltinHelper::krsortByKey', $runtime);
         $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);
-        $this->assertStringContainsString('ArrayBuiltinHelper::isNativeArray', $runtime);
 
         $ksort = (string) file_get_contents(__DIR__.'/../../ext/standard/ksort_.php');
         $krsort = (string) file_get_contents(__DIR__.'/../../ext/standard/krsort_.php');
@@ -25,6 +29,30 @@ final class KeySortRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('KeySortRuntime::krsortByKey', $krsort);
         $this->assertStringNotContainsString('ArrayBuiltinHelper::ksortByKey(', $ksort);
         $this->assertStringNotContainsString('ArrayBuiltinHelper::krsortByKey(', $krsort);
+
+        $arrayBuiltin = (string) file_get_contents(__DIR__.'/../../lib/JIT/ArrayBuiltinHelper.php');
+        $this->assertStringNotContainsString('function ksortByKey', $arrayBuiltin);
+        $this->assertStringNotContainsString('function krsortByKey', $arrayBuiltin);
+        $this->assertStringNotContainsString('function krsortPackedListByKey', $arrayBuiltin);
+        $this->assertStringNotContainsString('function sortStringKeys(', $arrayBuiltin);
+        $this->assertStringNotContainsString('__hashtable__sortStringKeys', $arrayBuiltin);
+
+        $hashtableType = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type/HashTable.php');
+        $this->assertStringNotContainsString('__hashtable__sortStringKeys', $hashtableType);
+        $this->assertStringNotContainsString('implementSortStringKeys', $hashtableType);
+    }
+
+    public function testArrayBuiltinHelperLineBudgetAfterKeysortLlvmDeletion(): void
+    {
+        $lines = substr_count(
+            (string) file_get_contents(__DIR__.'/../../lib/JIT/ArrayBuiltinHelper.php'),
+            "\n"
+        ) + 1;
+        $this->assertLessThanOrEqual(
+            self::ARRAY_BUILTIN_HELPER_MAX_LINES,
+            $lines,
+            'ArrayBuiltinHelper.php LOC after dead ksort/krsort LLVM deletion (#18381)'
+        );
     }
 
     public function testKeySortJitHelperSortsStringKeysAscending(): void
@@ -41,6 +69,13 @@ final class KeySortRuntimeShrinkTest extends TestCase
         $this->assertSame(['c', 'b', 'a'], self::keysInOrder($ht));
     }
 
+    public function testKeySortJitHelperReversesPackedListKeys(): void
+    {
+        $ht = self::listTable(10, 20, 30);
+        KeySortJitHelper::krsortByKey($ht);
+        $this->assertSame([2 => 30, 1 => 20, 0 => 10], self::intKeyPairs($ht));
+    }
+
     /** @param array<string, int> $pairs */
     private static function assocTable(array $pairs): HashTable
     {
@@ -54,12 +89,36 @@ final class KeySortRuntimeShrinkTest extends TestCase
         return $ht;
     }
 
+    /** @param list<int> $values */
+    private static function listTable(int ...$values): HashTable
+    {
+        $ht = new HashTable();
+        foreach ($values as $value) {
+            $var = new Variable();
+            $var->int($value);
+            $ht->append($var);
+        }
+
+        return $ht;
+    }
+
     /** @return list<string> */
     private static function keysInOrder(HashTable $ht): array
     {
         $out = [];
         foreach ($ht->iterateKeyed(true) as [$key]) {
             $out[] = $key->resolveIndirect()->toString();
+        }
+
+        return $out;
+    }
+
+    /** @return array<int, int> */
+    private static function intKeyPairs(HashTable $ht): array
+    {
+        $out = [];
+        foreach ($ht->iterateKeyed(true) as [$key, $value]) {
+            $out[$key->resolveIndirect()->toInt()] = $value->resolveIndirect()->toInt();
         }
 
         return $out;
