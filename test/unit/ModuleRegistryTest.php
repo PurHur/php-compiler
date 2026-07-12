@@ -101,4 +101,16 @@ final class ModuleRegistryTest extends TestCase
 
         unset($runtime);
     }
+
+    public function testReflectionOwningExtensionRoutesBundledModules(): void
+    {
+        $this->assertSame('core', ModuleRegistry::reflectionOwningExtension('func_num_args'));
+        $this->assertSame('standard', ModuleRegistry::reflectionOwningExtension('is_array'));
+        $this->assertSame('standard', ModuleRegistry::reflectionOwningExtension('strptime'));
+        $this->assertSame('hash', ModuleRegistry::reflectionOwningExtension('hash_hmac'));
+        $this->assertSame('spl', ModuleRegistry::reflectionOwningExtension('spl_autoload'));
+        $this->assertSame('random', ModuleRegistry::reflectionOwningExtension('mt_rand'));
+        $this->assertSame('curl', ModuleRegistry::reflectionOwningExtension('curl_version'));
+        $this->assertSame('standard', ModuleRegistry::reflectionOwningExtension('socket_get_status'));
+    }
 }

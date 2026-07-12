@@ -567,7 +567,64 @@ final class VmReflection
     /** JIT/AOT self-host ABI helpers — linkable but hidden from user introspection (#15046). */
     public static function isCompilerAbiHelperName(string $functionName): bool
     {
-        return str_starts_with(\strtolower($functionName), '__compiler_');
+        $lc = \strtolower($functionName);
+
+        return str_starts_with($lc, '__compiler_')
+            || str_starts_with($lc, 'phpc_')
+            || str_starts_with($lc, 'web_');
+    }
+
+    /**
+     * Compiler-only builtins absent from Zend reflection tables (#18357).
+     *
+     * @var list<string> lowercase names
+     */
+    private const REFLECTION_HIDDEN_COMPILER_BUILTINS = [
+        'compiler_language_warning',
+    ];
+
+    /**
+     * VM-only builtins absent from Zend 8.2 reflection tables (#18357).
+     *
+     * @var list<string> lowercase names
+     */
+    private const REFLECTION_REFERENCE_PROFILE_HIDDEN = [
+        'array_uasort',
+        'array_uksort',
+        'frexp',
+        'get_debug_backtrace',
+        'get_declared_attributes',
+        'get_declared_functions',
+        'get_declared_variables',
+        'ldexp',
+        'memcmp',
+        'modf',
+        'stream_copy_to_string',
+        'vfscanf',
+    ];
+
+    /** Whether ReflectionExtension::getFunctions() may expose a builtin (php-src reflection_extension_get_functions). */
+    public static function functionIsVisibleInReflection(string $functionName, string $extension = 'standard'): bool
+    {
+        $lc = \strtolower($functionName);
+        if (!self::isVisibleToFunctionExists($lc)) {
+            return false;
+        }
+        if (\in_array($lc, self::REFLECTION_HIDDEN_COMPILER_BUILTINS, true)) {
+            return false;
+        }
+        if (\in_array($lc, self::REFLECTION_REFERENCE_PROFILE_HIDDEN, true)) {
+            return false;
+        }
+        if (!BuiltinIntrospectionPolicy::functionIsAdvertised($lc)) {
+            return false;
+        }
+        $extLc = \strtolower($extension);
+        if ('core' === $extLc) {
+            return 'core' === ModuleRegistry::reflectionOwningExtension($lc);
+        }
+
+        return $extLc === ModuleRegistry::reflectionOwningExtension($lc);
     }
 
     public static function functionExists(Context $ctx, string $functionName): bool
@@ -3471,11 +3528,30 @@ final class VmReflection
     {
         $ht = new HashTable();
         $funcs = ModuleRegistry::getExtensionFunctions($extension) ?? [];
+        if ('standard' === strtolower($extension)) {
+            foreach (ModuleRegistry::extensionFunctionMap() as $bucketFuncs) {
+                foreach ($bucketFuncs as $name) {
+                    $lc = strtolower($name);
+                    if ('standard' !== ModuleRegistry::reflectionOwningExtension($lc)) {
+                        continue;
+                    }
+                    if (ModuleRegistry::functionRegisteredInBucket($lc, 'standard')) {
+                        continue;
+                    }
+                    if (!\in_array($name, $funcs, true)) {
+                        $funcs[] = $name;
+                    }
+                }
+            }
+        }
         $rfClass = $ctx->classes[ReflectionSupport::REFLECTION_FUNCTION] ?? null;
         if (null === $rfClass) {
             return $ht;
         }
         foreach ($funcs as $name) {
+            if (!self::functionIsVisibleInReflection($name, $extension)) {
+                continue;
+            }
             $lc = strtolower($name);
             $func = $ctx->functions[$lc] ?? null;
             $obj = new \PHPCompiler\VM\ObjectEntry($rfClass);
