@@ -288,7 +288,7 @@ final class VmDom
         $text->methodNames['iselementcontentwhitespace'] = 'isElementContentWhitespace';
         $ctx->classes[self::CLASS_TEXT] = $text;
 
-        $cdata = new ClassEntry('DOMCDATASection');
+        $cdata = new ClassEntry('DOMCdataSection');
         $cdata->isInternal = true;
         $cdata->parentLc = self::CLASS_TEXT;
         $cdata->properties[] = new ClassProperty(self::PROP_NODE_NAME, null, $strProto);

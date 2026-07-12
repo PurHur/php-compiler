@@ -14,8 +14,8 @@ echo $child->data, "\n";
 echo $doc->saveXML($child), "\n";
 --EXPECT--
 1
-DOMCDATASection
+DOMCdataSection
 hi
-DOMCDATASection
+DOMCdataSection
 x
 <![CDATA[x]]>
