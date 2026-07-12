@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\filter;
 
 use PHPCompiler\ext\standard\StdlibConstants;
+use PHPCompiler\ext\standard\VmEngineBuiltinDeprecation;
 use PHPCompiler\ext\standard\VmInetPure;
 use PHPCompiler\ext\standard\VmPregNative;
 use PHPCompiler\ext\standard\VmString;
@@ -175,6 +176,9 @@ final class VmFilter
     ): Variable {
         if (self::FILTER_CALLBACK === $filter) {
             throw new \ValueError('filter_var(): Option must be a valid callback');
+        }
+        if (self::FILTER_SANITIZE_STRING === $filter) {
+            VmEngineBuiltinDeprecation::emitConstant(null, 'FILTER_SANITIZE_STRING');
         }
         $subject = self::coerceFilterScalarString($value);
         if (null === $subject) {

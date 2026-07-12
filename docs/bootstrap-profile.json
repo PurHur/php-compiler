@@ -1743,6 +1743,7 @@
         "ext/standard/VmDnsMx.php",
         "ext/standard/VmDnsUdpNative.php",
         "ext/standard/VmDnsUdpPure.php",
+        "ext/standard/VmEngineBuiltinDeprecation.php",
         "ext/standard/VmEnv.php",
         "ext/standard/VmEnvEnvironNative.php",
         "ext/standard/VmEnvPutenvNative.php",
@@ -3342,6 +3343,7 @@
         "lib/JIT/Builtin/PregEmptyPatternReplaceRuntime.php",
         "lib/JIT/Builtin/PregExpandRuntime.php",
         "lib/JIT/Builtin/PregMatchRuntime.php",
+        "lib/JIT/Builtin/PregReplaceCallbackArrayRuntime.php",
         "lib/JIT/Builtin/ProcessExecCaptureLlvm.php",
         "lib/JIT/Builtin/ProcessIdentityJit.php",
         "lib/JIT/Builtin/ProcessOpen.php",
@@ -4779,9 +4781,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 4545,
+        "inventory_files": 4547,
         "excluded": 0,
-        "eligible": 4545,
+        "eligible": 4547,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1

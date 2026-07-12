@@ -1676,6 +1676,7 @@ require_once __DIR__.'/../../../ext/standard/VmEnvEnvironNative.php';
 require_once __DIR__.'/../../../ext/standard/VmEnvPutenvNative.php';
 require_once __DIR__.'/../../../ext/standard/VmErrorHandler.php';
 require_once __DIR__.'/../../../ext/standard/VmErrorLog.php';
+require_once __DIR__.'/../../../ext/standard/VmEngineBuiltinDeprecation.php';
 require_once __DIR__.'/../../../ext/standard/VmEscapeshell.php';
 require_once __DIR__.'/../../../ext/standard/VmEval.php';
 require_once __DIR__.'/../../../ext/standard/VmExceptionHandler.php';

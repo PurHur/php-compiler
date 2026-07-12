@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\filter;
 
+use PHPCompiler\ext\standard\JitBuiltinWarning;
+use PHPCompiler\ext\standard\VmEngineBuiltinDeprecation;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\StringFilterBoolean;
 use PHPCompiler\JIT\Builtin\StringFilterDomain;
@@ -15,6 +17,7 @@ use PHPCompiler\JIT\Builtin\StringFilterSanitize;
 use PHPCompiler\JIT\Builtin\StringFilterUrl;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -1277,6 +1280,7 @@ final class JitFilter
     /** Sanitizing filters via FilterSanitizeJitHelper SSOT (#11419). */
     public static function sanitize(Context $context, JITVariable $value, Value $filterVal, ?Value $flagsVal = null): Value
     {
+        self::emitFilterSanitizeStringDeprecationIfNeeded($context, $filterVal);
         StringFilterSanitize::ensureLinked($context);
         $i64 = $context->getTypeFromString('int64');
         $flags = $flagsVal ?? $i64->constInt(0, false);
@@ -1491,5 +1495,28 @@ final class JitFilter
         $phi->addIncoming($failPtr, $hardFailTail);
 
         return $phi;
+    }
+
+    private static function emitFilterSanitizeStringDeprecationIfNeeded(Context $context, Value $filterVal): void
+    {
+        if (NestedJitCompileScope::isActive()) {
+            return;
+        }
+        $i64 = $context->getTypeFromString('int64');
+        $isSanitizeString = $context->builder->icmp(
+            Builder::INT_EQ,
+            $filterVal,
+            $i64->constInt(VmFilter::FILTER_SANITIZE_STRING, false)
+        );
+        $emitBlock = BasicBlockHelper::append($context, 'fss_dep_emit_'.(++self::$blockSerial));
+        $continueBlock = BasicBlockHelper::append($context, 'fss_dep_cont_'.self::$blockSerial);
+        $context->builder->branchIf($isSanitizeString, $emitBlock, $continueBlock);
+        $context->builder->positionAtEnd($emitBlock);
+        JitBuiltinWarning::emitDeprecated(
+            $context,
+            VmEngineBuiltinDeprecation::constantMessage('FILTER_SANITIZE_STRING')
+        );
+        $context->builder->branch($continueBlock);
+        $context->builder->positionAtEnd($continueBlock);
     }
 }
