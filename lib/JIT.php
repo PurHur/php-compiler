@@ -15855,13 +15855,28 @@ class JIT {
                 $prefixOperands = \array_slice($argOperands, 0, $prefixLen);
                 $userEntries = \array_slice($argEntries, $prefixLen);
                 $userOperands = \array_slice($argOperands, $prefixLen);
-                [$userArgs, $userOps] = JIT\NamedArgs::resolveOutgoing(
+                $calleeNative = $toCall instanceof JIT\Call\Native ? $toCall : null;
+                $compileTime = JIT\NamedArgs::tryCompileTimeResolveOutgoing(
                     $userEntries,
                     $userOperands,
                     $paramNames,
                     $variadicIndex,
-                    $this->jitInternalBuiltinFunctionName($toCall)
+                    $this->jitInternalBuiltinFunctionName($toCall),
+                    $this,
+                    $calleeNative
                 );
+                if (null !== $compileTime) {
+                    [$userArgs, $userOps] = $compileTime;
+                } else {
+                    [$userArgs, $userOps] = JIT\NamedArgs::resolveOutgoing(
+                        $userEntries,
+                        $userOperands,
+                        $paramNames,
+                        $variadicIndex,
+                        $this->jitInternalBuiltinFunctionName($toCall),
+                        $this->context
+                    );
+                }
                 $callArgs = $prefix;
                 foreach ($userArgs as $idx => $value) {
                     $callArgs[$prefixLen + (int) $idx] = $value;

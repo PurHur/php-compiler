@@ -207,7 +207,12 @@ final class CallUnpackCompileTime
         return $out;
     }
 
-    private static function tryCompileTimeValueFromJitVariable(Variable $var): ?VmVariable
+    public static function tryCompileTimeValueFromJitVariable(Variable $var): ?VmVariable
+    {
+        return self::compileTimeValueFromJitVariable($var);
+    }
+
+    private static function compileTimeValueFromJitVariable(Variable $var): ?VmVariable
     {
         if (null !== $var->compileTimeString) {
             $vm = new VmVariable(VmVariable::TYPE_STRING);
