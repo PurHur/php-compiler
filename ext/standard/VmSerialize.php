@@ -39,6 +39,28 @@ final class VmSerialize
 
     public static function serializeValue(Context $ctx, Variable $value, ?Frame $frame = null): string
     {
+        $ownedState = false;
+        $state = $ctx->activeSerializeRefState;
+        if (null === $state) {
+            $state = new VmSerializeRefState();
+            $ctx->activeSerializeRefState = $state;
+            $ownedState = true;
+        }
+        try {
+            return self::serializeValueWithState($ctx, $value, $state, $frame);
+        } finally {
+            if ($ownedState) {
+                $ctx->activeSerializeRefState = null;
+            }
+        }
+    }
+
+    private static function serializeValueWithState(
+        Context $ctx,
+        Variable $value,
+        VmSerializeRefState $state,
+        ?Frame $frame = null
+    ): string {
         $value = $value->resolveIndirect();
         $resourceWire = self::serializeResourceWire($value);
         if (null !== $resourceWire) {
@@ -49,61 +71,11 @@ final class VmSerialize
             return self::encodeEnumCaseLiteral($enumRef->className, $enumRef->caseName);
         }
         if (Variable::TYPE_OBJECT === $value->type) {
-            if (VmClosureCall::isClosure($value)) {
-                throw new \Exception("Serialization of 'Closure' is not allowed");
-            }
-            $entry = $value->toObject();
-            SplFileIteratorSerializeDeny::rejectSerialization($entry->class->name);
-            self::rejectAnonymousClassSerialization($entry);
-            $lcClass = strtolower($entry->class->name);
-            if (DateTimeSupport::CLASS_DATETIME === $lcClass || DateTimeSupport::CLASS_DATETIMEIMMUTABLE === $lcClass) {
-                return DateTimeSupport::encodeZendSerializeWire($entry);
-            }
-            if (DateIntervalSupport::CLASS_DATEINTERVAL === $lcClass) {
-                return DateIntervalSupport::encodeZendSerializeWire($entry);
-            }
-            if (SplArraySerializeSupport::isSplArrayClass($lcClass)) {
-                return SplArraySerializeSupport::encodeZendSerializeWire($entry);
-            }
-            if (SplFixedArraySerializeSupport::isSplFixedArrayClass($lcClass)) {
-                return SplFixedArraySerializeSupport::encodeZendSerializeWire($entry);
-            }
-            if (SplDllistSerializeSupport::isSplDllistClass($lcClass)) {
-                return SplDllistSerializeSupport::encodeZendSerializeWire($entry);
-            }
-            if (SplObjectStorageSerializeSupport::isSplObjectStorageClass($lcClass)) {
-                return SplObjectStorageSerializeSupport::encodeZendSerializeWire(
-                    $ctx,
-                    $entry,
-                    new VmSerializeRefState(),
-                    $frame
-                );
-            }
-            if (self::CLASS_INCOMPLETE === $lcClass) {
-                return self::encodeIncompleteObjectWire($ctx, $entry, null, $frame);
-            }
-            if (self::hasInstanceMethod($entry->class, '__serialize')) {
-                $data = self::invokeSerialize($ctx, $entry);
-                if (Variable::TYPE_ARRAY !== $data->type) {
-                    self::throwSerializeMustReturnArray($entry->class->name);
-                }
-
-                return self::encodeMagicSerializeObject($ctx, $entry, $data, null, $frame);
-            }
-            if (self::implementsLegacySerializable($entry->class)) {
-                $payload = self::invokeLegacySerializableSerialize($ctx, $entry);
-
-                return self::encodeSerializableObject($entry->class->name, $payload);
-            }
-            if (self::hasInstanceMethod($entry->class, '__sleep')) {
-                return self::encodeSleepObject($ctx, $entry, $frame);
-            }
-
-            return self::encodePlainObjectWire($ctx, $entry, $frame);
+            return self::encodeWireObject($ctx, $value->toObject(), $state, $frame);
         }
 
         if (Variable::TYPE_ARRAY === $value->type) {
-            return self::encodeWireArray($ctx, $value, new VmSerializeRefState(), $frame);
+            return self::encodeWireArray($ctx, $value, $state, $frame);
         }
 
         return self::serializeExported(self::exportForSerialize($ctx, $value));
@@ -355,6 +327,8 @@ final class VmSerialize
         $isRoot = null === $state;
         if ($isRoot) {
             $state = new VmSerializeRefState();
+        }
+        if (1 === $state->nextIndex) {
             $state->reserveRootSlot();
         }
 
@@ -492,43 +466,81 @@ final class VmSerialize
         if (null !== $existing) {
             return 'r:'.$existing.';';
         }
-        $state->assignObjectIndex($entry);
 
         $lcClass = strtolower($entry->class->name);
         if (DateTimeSupport::CLASS_DATETIME === $lcClass || DateTimeSupport::CLASS_DATETIMEIMMUTABLE === $lcClass) {
+            $state->assignObjectIndex($entry);
+
             return DateTimeSupport::encodeZendSerializeWire($entry);
         }
         if (DateIntervalSupport::CLASS_DATEINTERVAL === $lcClass) {
+            $state->assignObjectIndex($entry);
+
             return DateIntervalSupport::encodeZendSerializeWire($entry);
         }
         if (SplArraySerializeSupport::isSplArrayClass($lcClass)) {
+            $state->assignObjectIndex($entry);
+
             return SplArraySerializeSupport::encodeZendSerializeWire($entry);
         }
         if (SplFixedArraySerializeSupport::isSplFixedArrayClass($lcClass)) {
+            $state->assignObjectIndex($entry);
+
             return SplFixedArraySerializeSupport::encodeZendSerializeWire($entry);
         }
         if (SplDllistSerializeSupport::isSplDllistClass($lcClass)) {
+            $state->assignObjectIndex($entry);
+
             return SplDllistSerializeSupport::encodeZendSerializeWire($entry);
         }
         if (SplObjectStorageSerializeSupport::isSplObjectStorageClass($lcClass)) {
+            $state->assignObjectIndex($entry);
+
             return SplObjectStorageSerializeSupport::encodeZendSerializeWire($ctx, $entry, $state, $frame);
         }
         if (self::CLASS_INCOMPLETE === $lcClass) {
+            $state->assignObjectIndex($entry);
+
             return self::encodeIncompleteObjectWire($ctx, $entry, $state, $frame);
         }
         if (self::hasInstanceMethod($entry->class, '__serialize')) {
-            $magicData = self::invokeSerialize($ctx, $entry);
-            if (Variable::TYPE_ARRAY !== $magicData->type) {
-                self::throwSerializeMustReturnArray($entry->class->name);
+            if (null !== $ctx->magicSerializeBeingInvoked || 1 !== $state->nextIndex) {
+                $state->assignObjectIndex($entry);
             }
+            $prevMagic = $ctx->magicSerializeBeingInvoked;
+            $ctx->magicSerializeBeingInvoked = $entry;
+            try {
+                $magicData = self::invokeSerialize($ctx, $entry);
+                if (Variable::TYPE_ARRAY !== $magicData->type) {
+                    self::throwSerializeMustReturnArray($entry->class->name);
+                }
 
-            return self::encodeMagicSerializeObject($ctx, $entry, $magicData, $state, $frame);
+                return self::encodeMagicSerializeObject($ctx, $entry, $magicData, $state, $frame);
+            } finally {
+                $ctx->magicSerializeBeingInvoked = $prevMagic;
+            }
         }
         if (self::implementsLegacySerializable($entry->class)) {
-            $payload = self::invokeLegacySerializableSerialize($ctx, $entry);
+            if (null === $ctx->legacySerializableBeingInvoked) {
+                if (1 === $state->nextIndex) {
+                    $state->reserveRootSlot();
+                } else {
+                    $state->assignObjectIndex($entry);
+                }
+            } else {
+                $state->assignObjectIndex($entry);
+            }
+            $prevLegacy = $ctx->legacySerializableBeingInvoked;
+            $ctx->legacySerializableBeingInvoked = $entry;
+            try {
+                $payload = self::invokeLegacySerializableSerialize($ctx, $entry);
 
-            return self::encodeSerializableObject($entry->class->name, $payload);
+                return self::encodeSerializableObject($entry->class->name, $payload);
+            } finally {
+                $ctx->legacySerializableBeingInvoked = $prevLegacy;
+            }
         }
+        $state->assignObjectIndex($entry);
         if (self::hasInstanceMethod($entry->class, '__sleep')) {
             return self::encodeSleepObject($ctx, $entry, $frame);
         }
