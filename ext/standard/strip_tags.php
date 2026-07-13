@@ -9,7 +9,6 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\Builtin\StringStripTags;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\BuiltinExecute;
@@ -28,7 +27,6 @@ final class strip_tags extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('strip_tags() requires one or two arguments in this compiler build');
         }
-        InternalStrictArg::rejectNullString($frame->calledArgs[0], 'strip_tags', 'string', 0, $frame);
         $subject = self::vmStringArg($frame, 0, 'string');
         $allowed = null;
         if (2 === $argc) {
@@ -59,7 +57,6 @@ final class strip_tags extends Internal
             }
         }
 
-        JitInternalStrictArg::rejectNullString($context, $args[0], 'strip_tags', 'string', 1);
         $subject = JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'strip_tags', 0, 'string');
         if (null === $allowed) {
             $allowPtr = $context->builder->load($context->constantStringFromString(''));
