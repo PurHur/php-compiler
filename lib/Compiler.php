@@ -19248,6 +19248,9 @@ class Compiler {
                 }
 
                 $last = $producers[$producerCount - 1] ?? null;
+                if ($last instanceof Op\Expr\Assign) {
+                    $last = $last->expr;
+                }
                 if ($last instanceof Op\Expr\BinaryOp\BitwiseOr
                     || $last instanceof Op\Expr\BinaryOp\BitwiseAnd
                     || $last instanceof Op\Expr\BinaryOp\BitwiseXor
@@ -32870,6 +32873,11 @@ class Compiler {
         ) {
             return null;
         }
+        if (null === $block->slotForOperand($prev->expr)) {
+            foreach ($this->compileExpr($prev->expr, $block) as $op) {
+                $block->addOpCode($op);
+            }
+        }
         $slot = $block->slotForOperand($prev->expr);
         if (null === $slot) {
             $slot = $this->slotForEmittedAssignRhsSlot($block, $prev);
@@ -38900,7 +38908,12 @@ class Compiler {
             return null;
         }
         $producers = $this->precedingInlineCallArgProducersBeforeCfgOp($block->orig->children, $cfgCallOp);
+        $assignProducer = null;
         $last = $producers[\count($producers) - 1] ?? null;
+        if ($last instanceof Op\Expr\Assign) {
+            $assignProducer = $last;
+            $last = $last->expr;
+        }
         if (
             !$last instanceof Op\Expr\BinaryOp\BitwiseOr
             && !$last instanceof Op\Expr\BinaryOp\BitwiseAnd
@@ -41352,6 +41365,16 @@ class Compiler {
                 }
                 if (null === $valueSlot) {
                     $valueSlot = $this->tryResolveUnaryLiteralCallArgSlot($arg, $block, $sends, $cfgCallOp, (int) $argIndex);
+                }
+                if (null === $valueSlot && null !== $cfgCallOp) {
+                    $assignRhsSlot = $this->resolveAdjacentAssignExprCallArgSlot(
+                        $block,
+                        $cfgCallOp,
+                        (int) $argIndex
+                    );
+                    if (null !== $assignRhsSlot) {
+                        $valueSlot = $assignRhsSlot;
+                    }
                 }
                 if (null === $valueSlot) {
                     $valueSlot = $this->tryResolveInlineBitmaskCallArgSlot($arg, $block, $sends, $cfgCallOp, (int) $argIndex);
@@ -45017,6 +45040,9 @@ class Compiler {
                     $bitmaskCallIndex = array_search($cfgCallOp, $block->orig->children, true);
                     if (\is_int($bitmaskCallIndex) && $bitmaskCallIndex > 0) {
                         $bitmaskImmediate = $block->orig->children[$bitmaskCallIndex - 1] ?? null;
+                        if ($bitmaskImmediate instanceof Op\Expr\Assign) {
+                            $bitmaskImmediate = $bitmaskImmediate->expr;
+                        }
                         if (
                             ($bitmaskImmediate instanceof Op\Expr\BinaryOp\BitwiseOr
                                 || $bitmaskImmediate instanceof Op\Expr\BinaryOp\BitwiseAnd
@@ -48713,11 +48739,14 @@ class Compiler {
         if (null === $cfgCallOp || null === $block->orig || !\is_array($cfgCallOp->args ?? null)) {
             return;
         }
-        $callIndex = array_search($cfgCallOp, $block->orig->children, true);
+        $callIndex = $this->cfgCallOpIndex($block, $cfgCallOp);
         if (!\is_int($callIndex) || $callIndex < 1) {
             return;
         }
         $immediate = $block->orig->children[$callIndex - 1] ?? null;
+        if ($immediate instanceof Op\Expr\Assign) {
+            $immediate = $immediate->expr;
+        }
         if (
             !$immediate instanceof Op\Expr\BinaryOp\BitwiseOr
             && !$immediate instanceof Op\Expr\BinaryOp\BitwiseAnd
@@ -48743,22 +48772,24 @@ class Compiler {
             return;
         }
         $bitmaskSlot = null;
-        foreach (array_merge($nestedProducerOps, $outerArgSends, $block->opCodes) as $op) {
-            if (
-                OpCode::TYPE_BITWISE_OR === $op->type
-                || OpCode::TYPE_BITWISE_AND === $op->type
-                || OpCode::TYPE_BITWISE_XOR === $op->type
-            ) {
-                if (null !== $op->arg1) {
-                    $bitmaskSlot = (string) $op->arg1;
-                    break;
-                }
+        if (null !== $immediate->result) {
+            $bitmaskSlot = $block->slotForOperand($immediate->result);
+            if (null !== $bitmaskSlot) {
+                $bitmaskSlot = (string) $bitmaskSlot;
             }
         }
-        if (null === $bitmaskSlot && null !== $immediate->result) {
-            $operandSlot = $block->slotForOperand($immediate->result);
-            if (null !== $operandSlot) {
-                $bitmaskSlot = (string) $operandSlot;
+        if (null === $bitmaskSlot) {
+            foreach (array_reverse(array_merge($nestedProducerOps, $block->opCodes, $outerArgSends)) as $op) {
+                if (
+                    OpCode::TYPE_BITWISE_OR === $op->type
+                    || OpCode::TYPE_BITWISE_AND === $op->type
+                    || OpCode::TYPE_BITWISE_XOR === $op->type
+                ) {
+                    if (null !== $op->arg1) {
+                        $bitmaskSlot = (string) $op->arg1;
+                        break;
+                    }
+                }
             }
         }
         if (null === $bitmaskSlot) {
