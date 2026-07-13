@@ -28,6 +28,7 @@ if (!defined('PHP_COMPILER_LIB_SPINE_SMOKE')) {
 
 
 
+
 require_once __DIR__.'/../../../lib/OpCode.php';
 require_once __DIR__.'/../../../lib/Block.php';
 require_once __DIR__.'/../../../lib/Frame.php';
@@ -4761,38 +4762,10 @@ require_once __DIR__.'/../../../lib/JIT/Call/DomDocumentLoadXML.php';
 require_once __DIR__.'/../../../lib/JIT/Call/DomDocumentSaveHTML.php';
 require_once __DIR__.'/../../../lib/JIT/Call/DomDocumentSaveHTMLFile.php';
 require_once __DIR__.'/../../../lib/JIT/Call/DomDocumentSaveXML.php';
-// VM -r smoke: bootstrap-selfhost-lib-spine-vm-smoke.sh (#1846).
-// VM driver execute: bootstrap-selfhost-vm-driver-execute-probe.sh (#2201).
-
-$vmDriverExecute = getenv('PHP_COMPILER_VM_DRIVER_EXECUTE');
-if (is_string($vmDriverExecute) && ('1' === $vmDriverExecute || 'true' === strtolower($vmDriverExecute))) {
-    // Honest bin/vm.php run() dispatch: main() → run() on -r fixture (#8693, #2201).
-    run('Standard input code', '<?php echo "vm driver ok\n";', []);
-    exit(0);
-}
-
-$vmSpineSmoke = getenv('PHP_COMPILER_VM_SPINE_SMOKE');
-if (is_string($vmSpineSmoke) && ('1' === $vmSpineSmoke || 'true' === strtolower($vmSpineSmoke))) {
-    // Honest bin/vm.php run() dispatch: main() → run() on -r fixture (#8719, #1846).
-    run('Standard input code', '<?php echo "1\n";', []);
-    exit(0);
-}
-
-// M2 spine unit: mb_encode/decode_mimeheader Vm + JIT inventory (#8697).
-$__spineMimeSample = 'Hello 世界';
-$__spineMimeEnc = \PHPCompiler\ext\mbstring\VmMbstring::encodeMimeheader(
-    $__spineMimeSample,
-    'UTF-8',
-    true,
-    "\r\n",
-    0
-);
-$__spineMimeDec = \PHPCompiler\ext\mbstring\VmMbstring::decodeMimeheader($__spineMimeEnc);
-unset($__spineMimeSample, $__spineMimeEnc, $__spineMimeDec);
-
-// M2 spine unit: setcookie options array parser Vm inventory (#8698).
-\PHPCompiler\ext\standard\SetcookieOptions::spineSmokeParse();
-
+require_once __DIR__.'/../../../ext/dom/XPathQuote.php';
+require_once __DIR__.'/../../../ext/session/SessionUserHandler.php';
+require_once __DIR__.'/../../../ext/session/session_register_shutdown.php';
+require_once __DIR__.'/../../../ext/session/session_set_save_handler.php';
 require_once __DIR__.'/../../../ext/dom/DomGetElementsByTagNameJitHelper.php';
 require_once __DIR__.'/../../../ext/dom/DomParseSimpleXmlJitHelper.php';
 require_once __DIR__.'/../../../ext/dom/DomUserScriptLiveTagListLlvm.php';
@@ -4835,4 +4808,36 @@ require_once __DIR__.'/../../../ext/wddx/wddx_serialize_vars.php';
 require_once __DIR__.'/../../../lib/JIT/Call/HashTableFindIndex.php';
 require_once __DIR__.'/../../../lib/JIT/Call/HashTableIterate.php';
 require_once __DIR__.'/../../../lib/JIT/Call/VariableCopyFrom.php';
+// VM -r smoke: bootstrap-selfhost-lib-spine-vm-smoke.sh (#1846).
+// VM driver execute: bootstrap-selfhost-vm-driver-execute-probe.sh (#2201).
+
+$vmDriverExecute = getenv('PHP_COMPILER_VM_DRIVER_EXECUTE');
+if (is_string($vmDriverExecute) && ('1' === $vmDriverExecute || 'true' === strtolower($vmDriverExecute))) {
+    // Honest bin/vm.php run() dispatch: main() → run() on -r fixture (#8693, #2201).
+    run('Standard input code', '<?php echo "vm driver ok\n";', []);
+    exit(0);
+}
+
+$vmSpineSmoke = getenv('PHP_COMPILER_VM_SPINE_SMOKE');
+if (is_string($vmSpineSmoke) && ('1' === $vmSpineSmoke || 'true' === strtolower($vmSpineSmoke))) {
+    // Honest bin/vm.php run() dispatch: main() → run() on -r fixture (#8719, #1846).
+    run('Standard input code', '<?php echo "1\n";', []);
+    exit(0);
+}
+
+// M2 spine unit: mb_encode/decode_mimeheader Vm + JIT inventory (#8697).
+$__spineMimeSample = 'Hello 世界';
+$__spineMimeEnc = \PHPCompiler\ext\mbstring\VmMbstring::encodeMimeheader(
+    $__spineMimeSample,
+    'UTF-8',
+    true,
+    "\r\n",
+    0
+);
+$__spineMimeDec = \PHPCompiler\ext\mbstring\VmMbstring::decodeMimeheader($__spineMimeEnc);
+unset($__spineMimeSample, $__spineMimeEnc, $__spineMimeDec);
+
+// M2 spine unit: setcookie options array parser Vm inventory (#8698).
+\PHPCompiler\ext\standard\SetcookieOptions::spineSmokeParse();
+
 echo "compiler_lib_spine_smoke bundle OK\n";
