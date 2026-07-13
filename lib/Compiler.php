@@ -15330,6 +15330,14 @@ class Compiler {
             'array_diff_assoc',
             'array_udiff',
             'array_uintersect',
+            'array_udiff_assoc',
+            'array_uintersect_assoc',
+            'array_udiff_uassoc',
+            'array_uintersect_uassoc',
+            'array_diff_uassoc',
+            'array_intersect_uassoc',
+            'array_diff_ukey',
+            'array_intersect_ukey',
         ], true);
     }
 
@@ -25449,6 +25457,47 @@ class Compiler {
         }
 
         return false;
+    }
+
+    /**
+     * CFG index after the most recent completed u* diff/intersect stmt (#16045, re-#14021).
+     *
+     * @param list<Op> $cfgChildren
+     */
+    private function cfgStartIndexAfterLastTrailingComparatorStmt(int $beforeIndex, array $cfgChildren): int
+    {
+        for ($i = $beforeIndex - 1; $i >= 0; --$i) {
+            $child = $cfgChildren[$i] ?? null;
+            if (
+                ($child instanceof Op\Expr\FuncCall || $child instanceof Op\Expr\NsFuncCall)
+                && $this->builtinUsesTrailingComparatorCallback($this->resolveCfgFuncCallName($child))
+            ) {
+                return $i + 1;
+            }
+        }
+
+        return 0;
+    }
+
+    /**
+     * Skip INIT_ARRAY ordinals from inline Array_ preludes before a prior u* stmt (#14021).
+     *
+     * @param list<Op> $cfgChildren
+     */
+    private function initArrayOrdinalOffsetBeforeTrailingComparatorStmt(int $callIndex, array $cfgChildren): int
+    {
+        $cfgStart = $this->cfgStartIndexAfterLastTrailingComparatorStmt($callIndex, $cfgChildren);
+        if ($cfgStart <= 0) {
+            return 0;
+        }
+        $offset = 0;
+        for ($i = 0; $i < $cfgStart; ++$i) {
+            if (($cfgChildren[$i] ?? null) instanceof Op\Expr\Array_) {
+                ++$offset;
+            }
+        }
+
+        return $offset;
     }
 
     /** Nth TYPE_INIT_ARRAY in pending emits + block — hoisted sibling array_keys() preludes (#16418). */
@@ -39722,9 +39771,31 @@ class Compiler {
                 }
                 if ($keysArrayProducer instanceof Op\Expr\Array_) {
                     $keysArrayOrdinal = $this->inlineArrayKeysHoistedArrayOrdinal($block, $cfgCallOp);
-                    $keysArraySlot = null !== $keysArrayOrdinal
-                        ? $this->slotForInitArrayOrdinal($block, $keysArrayOrdinal, $sends)
-                        : null;
+                    $keysArraySlot = null;
+                    if (null !== $keysArrayOrdinal) {
+                        $keysCfgChildren = $this->inlineCallArgProducerCfgChildren($block);
+                        if ([] === $keysCfgChildren && null !== $block->orig) {
+                            $keysCfgChildren = $block->orig->children;
+                        }
+                        $keysCallIndex = null;
+                        foreach ($keysCfgChildren as $ki => $kchild) {
+                            if ($kchild === $cfgCallOp) {
+                                $keysCallIndex = $ki;
+                                break;
+                            }
+                        }
+                        $ordinalOffset = is_int($keysCallIndex)
+                            ? $this->initArrayOrdinalOffsetBeforeTrailingComparatorStmt($keysCallIndex, $keysCfgChildren)
+                            : 0;
+                        $keysArraySlot = $this->slotForInitArrayOrdinal(
+                            $block,
+                            $keysArrayOrdinal + $ordinalOffset,
+                            $sends
+                        );
+                        if (null === $keysArraySlot && $ordinalOffset > 0) {
+                            $keysArraySlot = $this->slotForRecentInitArrayCallArg($block);
+                        }
+                    }
                     if (null === $keysArraySlot) {
                         $keysArraySlot = $this->slotForInitArrayProducerBeforeCfgCall(
                             $block,
