@@ -7,7 +7,9 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\JitStringArg;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
@@ -39,7 +41,8 @@ final class preg_filter extends Internal
         $pattern = VmReflection::stringArg($frame->calledArgs[0], 'preg_filter() pattern', 0);
         $replacement = VmReflection::stringArg($frame->calledArgs[1], 'preg_filter() replacement', 1);
         VmPregFailure::warnPatternCompileFailure($frame, 'preg_filter', $pattern);
-        $subjectVar = VmPreg::requireStringOrArraySubject(
+        $subjectVar = VmPreg::resolveStringOrArraySubject(
+            $frame,
             $frame->calledArgs[2],
             'preg_filter',
             2,
@@ -116,12 +119,29 @@ final class preg_filter extends Internal
             ? self::lowerLimit($context, $args[3])
             : $context->getTypeFromString('int64')->constInt(-1, false);
 
+        JitInternalStrictArg::rejectNullStringOrArray($context, $args[2], 'preg_filter', 'subject', 3);
         JitPregSubject::requireStringOrArray($context, $args[2], 'preg_filter', 2, 'subject');
+        $pattern = JitStringArg::lower($context, $args[0], 'preg_filter() pattern');
+        $replacement = JitStringArg::lower($context, $args[1], 'preg_filter() replacement');
+        if (JitPregSubject::isStringOrCoercibleNullSubject($args[2])) {
+            return JitPregFilter::invoke(
+                $context,
+                $pattern,
+                $replacement,
+                new JITVariable(
+                    $context,
+                    JITVariable::TYPE_STRING,
+                    JITVariable::KIND_VALUE,
+                    JitStringBuiltinArg::lower($context, $args[2], 'preg_filter', 2, 'subject', 'array|string')
+                ),
+                $limit
+            );
+        }
 
         return JitPregFilter::invoke(
             $context,
-            JitStringArg::lower($context, $args[0], 'preg_filter() pattern'),
-            JitStringArg::lower($context, $args[1], 'preg_filter() replacement'),
+            $pattern,
+            $replacement,
             $args[2],
             $limit
         );
