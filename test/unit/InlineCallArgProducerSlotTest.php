@@ -5571,6 +5571,45 @@ PHP;
         self::assertSame($bitwiseOrSlot, $sendSlots[1] ?? null, 'flags arg sends='.json_encode($sendSlots));
     }
 
+    /** Regression #10956 — json_encode($s, JSON_HEX_* | …) must send $s then bitmask, not flags twice. */
+    public function testJsonEncodeInlineBitmaskFlagsArgSend(): void
+    {
+        $code = <<<'PHP'
+<?php
+declare(strict_types=1);
+$s = '<>&"\'';
+echo json_encode($s, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT), "\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'json_encode_bitmask.php');
+
+        $bitwiseOrSlot = null;
+        $sendSlots = [];
+        $captureSends = false;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_BITWISE_OR === $op->type) {
+                $bitwiseOrSlot = $op->arg1;
+            }
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                $captureSends = true;
+                $sendSlots = [];
+                continue;
+            }
+            if ($captureSends && OpCode::TYPE_ARG_SEND === $op->type) {
+                $sendSlots[] = $op->arg1;
+                continue;
+            }
+            if ($captureSends && (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type || OpCode::TYPE_FUNCCALL_EXEC_NORETURN === $op->type)) {
+                break;
+            }
+        }
+
+        self::assertNotNull($bitwiseOrSlot, 'expected TYPE_BITWISE_OR slot');
+        self::assertCount(2, $sendSlots, 'json_encode arg sends='.json_encode($sendSlots));
+        self::assertNotSame($sendSlots[0], $sendSlots[1], 'value and flags slots must differ');
+        self::assertSame($bitwiseOrSlot, $sendSlots[1] ?? null, 'flags arg sends='.json_encode($sendSlots));
+    }
+
     /** Issue #16152 — get_html_translation_table(HTML_ENTITIES, ENT_QUOTES | ENT_HTML5) ConstFetch + BitwiseOr slots. */
     public function testGetHtmlTranslationTableConstFetchBitmaskArgSend(): void
     {
