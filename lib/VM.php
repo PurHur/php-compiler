@@ -13376,7 +13376,7 @@ restart:
     {
         $object = $receiver->toObject();
         $propLc = strtolower($methodName);
-        for ($class = $object->class; null !== $class; $class = $class->parentClass) {
+        for ($class = $object->class; null !== $class; ) {
             foreach ($class->properties as $prop) {
                 if (strtolower($prop->name) !== $propLc) {
                     continue;
@@ -13405,6 +13405,10 @@ restart:
 
                 return true;
             }
+            if (null === $class->parentLc) {
+                break;
+            }
+            $class = $this->context->classes[$class->parentLc] ?? null;
         }
 
         return null;

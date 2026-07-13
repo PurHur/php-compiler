@@ -13,6 +13,8 @@ use PHPCfg\Operand;
 use PHPCfg\Operand\Literal;
 use PHPCompiler\Block;
 use PHPCompiler\ClassConstVisibility;
+use PHPCompiler\CompilerVersion;
+use PHPCompiler\ext\dom\DomConstants;
 use PHPCompiler\MethodVisibility;
 use PHPCompiler\PseudoClassScope;
 use PHPCompiler\JIT\BasicBlockHelper;
@@ -2838,6 +2840,16 @@ class Object_ extends Type {
         if ('reflectionattribute' === $lcname) {
             $this->seedExternalClassConstants($id, [
                 'is_instanceof' => \PHPCompiler\VM\ReflectionSupport::REFLECTION_ATTRIBUTE_IS_INSTANCEOF,
+            ]);
+        }
+        if ('domnode' === $lcname && CompilerVersion::supportsDomNodeCompareDocumentPosition()) {
+            $this->seedExternalClassConstants($id, [
+                'document_position_disconnected' => DomConstants::DOCUMENT_POSITION_DISCONNECTED,
+                'document_position_preceding' => DomConstants::DOCUMENT_POSITION_PRECEDING,
+                'document_position_following' => DomConstants::DOCUMENT_POSITION_FOLLOWING,
+                'document_position_contains' => DomConstants::DOCUMENT_POSITION_CONTAINS,
+                'document_position_contained_by' => DomConstants::DOCUMENT_POSITION_CONTAINED_BY,
+                'document_position_implementation_specific' => DomConstants::DOCUMENT_POSITION_IMPLEMENTATION_SPECIFIC,
             ]);
         }
     }

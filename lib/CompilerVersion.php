@@ -2432,14 +2432,20 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.4+ DOMNode::compareDocumentPosition() (ext/dom/node.c, #14448, #17696, #18092).
+     * PHP 8.4+ DOMNode::compareDocumentPosition() (ext/dom/node.c, #14448, #17696, #18092, #18504).
      *
-     * Withheld on 8.4.0-dev reference profile (matches Zend 8.2 method_exists gate).
-     * Enable via stable 8.4.0+ or explicit `PHP_COMPILER_PROFILE=8.4` forward profile.
+     * Default 8.4 development line enables forward DOM APIs; pin `PHP_COMPILER_PROFILE=8.2`
+     * for Zend 8.2 phantom gate (method_exists false).
      */
     public static function supportsDomNodeCompareDocumentPosition(): bool
     {
-        return self::supportsDomApiSince('8.4.0');
+        $raw = getenv('PHP_COMPILER_PROFILE');
+        if (!\is_string($raw) || '' === trim($raw)) {
+            // Default 8.4 development line (#18504); version_compare treats -dev below stable.
+            return version_compare(self::VERSION, '8.4', '>=');
+        }
+
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
     }
 
     /**

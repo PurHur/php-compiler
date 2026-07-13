@@ -39,6 +39,7 @@ final class DomInstanceMethodJit
     private const USER_SCRIPT_GENERIC_DOM_METHODS = [
         'domxpath::evaluate' => true,
         'domxpath::registernamespace' => true,
+        'domnode::comparedocumentposition' => true,
     ];
 
     /** @var array<string, true> */
