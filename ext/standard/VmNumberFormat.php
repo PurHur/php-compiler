@@ -127,26 +127,33 @@ final class VmNumberFormat
 
         $rounded = VmRound::mathRound($number, $roundPlaces, $roundingMode);
 
-        $pow = 1;
-        for ($i = 0; $i < $decimals; ++$i) {
-            $pow *= 10;
+        // php-src ext/standard/number_format.c — php_conv_floating_point / %F after _php_math_round.
+        // Integer frac extraction breaks past ~14 decimals (IEEE double); reuse dtoa fcvt path (#18525).
+        $signedRounded = $negative ? -$rounded : $rounded;
+        $formatted = VmFloatDtoa::formatSprintfF($signedRounded, $decimals);
+        if ('' !== $formatted && '-' === $formatted[0]) {
+            $formatted = \substr($formatted, 1);
+            $negative = true;
         }
 
-        $intPart = (int) floor($rounded);
-        $fracPart = 0;
-        if ($decimals > 0) {
-            $fracPart = (int) round(($rounded - (float) $intPart) * $pow);
-            if ($fracPart >= $pow) {
-                ++$intPart;
-                $fracPart = 0;
+        $dotPos = \strpos($formatted, '.');
+        if (false === $dotPos) {
+            $intDigits = '' === $formatted ? '0' : $formatted;
+            $fracDigits = '';
+        } else {
+            $intDigits = \substr($formatted, 0, $dotPos);
+            if ('' === $intDigits) {
+                $intDigits = '0';
             }
+            $fracDigits = \substr($formatted, $dotPos + 1);
         }
 
-        $intDigits = self::digitsFromInt($intPart);
         $result = self::insertThousands($intDigits, $thousandsSeparator);
 
         if ($decimals > 0) {
-            $fracDigits = self::padLeft(self::digitsFromInt($fracPart), $decimals, '0');
+            while (VmString::byteLength($fracDigits) < $decimals) {
+                $fracDigits .= '0';
+            }
             $result .= $decimalSeparator.$fracDigits;
         }
 
@@ -155,29 +162,6 @@ final class VmNumberFormat
         }
 
         return $result;
-    }
-
-    private static function digitsFromInt(int $value): string
-    {
-        if (0 === $value) {
-            return '0';
-        }
-        $digits = '';
-        while ($value > 0) {
-            $digits = \chr(48 + ($value % 10)).$digits;
-            $value = (int) ($value / 10);
-        }
-
-        return $digits;
-    }
-
-    private static function padLeft(string $digits, int $length, string $pad): string
-    {
-        while (VmString::byteLength($digits) < $length) {
-            $digits = $pad.$digits;
-        }
-
-        return $digits;
     }
 
     private static function insertThousands(string $digits, string $separator): string

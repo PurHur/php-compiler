@@ -60,6 +60,12 @@ final class JitNumberFormat
 
     public static function format(Context $context, JITVariable ...$args): Value
     {
+        // User-standalone init skips StringFormat::ensureLinked (#13571) —
+        // link __compiler_number_format on first call-site lowering (#15642, #18525).
+        if ('1' !== getenv('PHP_COMPILER_HELPER_RUNTIME_EMITTING')) {
+            \PHPCompiler\JIT\Builtin\StringFormat::implementIfDeclared($context, true);
+        }
+
         $argc = \count($args);
 
         if ($context->callerStrictTypes) {
