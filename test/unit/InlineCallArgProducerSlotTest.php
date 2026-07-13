@@ -8330,4 +8330,15 @@ PHP;
         $runtime->run($block);
         self::assertSame('1', ob_get_clean());
     }
+
+    /** Bootstrap spine — foreach assign-in-call with literal RHS must not read Operand::result (#1492). */
+    public function testCurlFileBuiltinRegisterCompilesWithoutAssignInCallRhsOperandCrash(): void
+    {
+        $path = realpath(__DIR__.'/../../ext/curl/CurlFileBuiltin.php');
+        self::assertNotFalse($path);
+
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompileFile($path);
+        self::assertNotNull($block);
+    }
 }

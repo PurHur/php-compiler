@@ -32892,12 +32892,23 @@ class Compiler {
         ) {
             $rhsExpr = $block->orig->children[$callIndex - 2];
         }
-        if (null === $block->slotForOperand($rhsExpr->result)) {
-            foreach ($this->compileExpr($rhsExpr, $block) as $op) {
-                $block->addOpCode($op);
+        if ($rhsExpr instanceof Operand) {
+            $rhsOperand = $rhsExpr;
+        } elseif (property_exists($rhsExpr, 'result') && $rhsExpr->result instanceof Operand) {
+            $rhsOperand = $rhsExpr->result;
+        } else {
+            $slot = $this->slotForEmittedAssignRhsSlot($block, $prev);
+
+            return null !== $slot ? (string) $slot : null;
+        }
+        if (null === $block->slotForOperand($rhsOperand)) {
+            if ($rhsExpr instanceof Op) {
+                foreach ($this->compileExpr($rhsExpr, $block) as $op) {
+                    $block->addOpCode($op);
+                }
             }
         }
-        $slot = $block->slotForOperand($rhsExpr->result);
+        $slot = $block->slotForOperand($rhsOperand);
         if (null === $slot) {
             $slot = $this->slotForEmittedAssignRhsSlot($block, $prev);
         }
