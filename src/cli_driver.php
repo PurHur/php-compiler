@@ -227,6 +227,10 @@ if (!function_exists('php_compiler_cli_dispatch')) {
                     $options['--debug-symbols'] = true;
 
                     break;
+                case '-v':
+                case '--version':
+                    php_compiler_cli_print_version();
+                    exit(0);
                 case '-d':
                     if ($i >= $argc) {
                         die("Option -d requires an argument\n");
@@ -319,7 +323,7 @@ if (!function_exists('php_compiler_cli_dispatch')) {
 
                             break;
                         }
-                        die("Unsupported bare argument {$opt}\n");
+                        php_compiler_cli_usage_error("Unsupported bare argument {$opt}");
                     }
                     $scriptPath = php_compiler_cli_resolve_user_path($opt);
                     $execCode = file_get_contents($scriptPath);
