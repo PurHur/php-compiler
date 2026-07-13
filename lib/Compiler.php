@@ -18263,6 +18263,10 @@ class Compiler {
         if (null !== $nestedCtorNew) {
             return $nestedCtorNew;
         }
+        $positionalInlineNew = $this->matchPositionalInlineNewCallArgProducer($producers, $callArgs, $argIndex);
+        if (null !== $positionalInlineNew) {
+            return $positionalInlineNew;
+        }
         $trailingInlineNew = $this->matchTrailingInlineNewCallArgProducer($producers, $callArgs, $argIndex);
         if (null !== $trailingInlineNew) {
             return $trailingInlineNew;
@@ -34107,6 +34111,32 @@ class Compiler {
     }
 
     /**
+     * array_key_exists($k, new ArrayObject([...])) — positional New_ with Array_ ctor prelude (#18456).
+     *
+     * @param list<Op\Expr> $producers
+     * @param list<Operand|null> $callArgs
+     */
+    private function matchPositionalInlineNewCallArgProducer(
+        array $producers,
+        array $callArgs,
+        int $argIndex
+    ): ?Op\Expr\New_ {
+        $callArg = $callArgs[$argIndex] ?? null;
+        if (
+            null === $callArg
+            || (
+                !$this->callArgIsDeadInlineTemporary($callArg)
+                && !$this->callArgIsNewExpression($callArg)
+            )
+        ) {
+            return null;
+        }
+        $positional = $producers[$argIndex] ?? null;
+
+        return $positional instanceof Op\Expr\New_ ? $positional : null;
+    }
+
+    /**
      * iterator_to_array(new LimitIterator(new ArrayIterator([...]), …)) — trailing inline New_ (#12916).
      *
      * @param list<Op\Expr> $producers
@@ -40462,6 +40492,7 @@ class Compiler {
                     $block->orig->children,
                     $cfgCallOp
                 );
+                $positionalNewProducers = $nestedNewProducers;
                 $nestedNewArgCount = \count($cfgCallOp->args ?? $args);
                 $siblingNews = $this->siblingInlineNewProducersBeforeCfgOp($block, $cfgCallOp);
                 if ([] !== $siblingNews) {
@@ -40489,6 +40520,13 @@ class Compiler {
                         (int) $argIndex,
                         $nestedNewArgCount,
                         $cfgCallOp->args ?? $args
+                    );
+                }
+                if (null === $inlineNewProducer) {
+                    $inlineNewProducer = $this->matchPositionalInlineNewCallArgProducer(
+                        $positionalNewProducers,
+                        $cfgCallOp->args ?? $args,
+                        (int) $argIndex
                     );
                 }
                 if (null === $inlineNewProducer) {
