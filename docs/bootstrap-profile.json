@@ -328,6 +328,7 @@
         "ext/exif/JitExifImagetype.php",
         "ext/exif/Module.php",
         "ext/exif/VmExifRead.php",
+        "ext/exif/VmExifWarning.php",
         "ext/exif/exif_imagetype.php",
         "ext/exif/exif_read_data.php",
         "ext/filter/BuiltinEnums.php",
@@ -605,6 +606,7 @@
         "ext/openssl/OpensslFunction.php",
         "ext/openssl/OpensslSignJitHelper.php",
         "ext/openssl/VmOpenssl.php",
+        "ext/openssl/VmOpensslCipherNative.php",
         "ext/openssl/VmOpensslConfigNative.php",
         "ext/openssl/VmOpensslErrorNative.php",
         "ext/openssl/VmOpensslObjects.php",
@@ -5003,9 +5005,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 4769,
+        "inventory_files": 4771,
         "excluded": 0,
-        "eligible": 4769,
+        "eligible": 4771,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
