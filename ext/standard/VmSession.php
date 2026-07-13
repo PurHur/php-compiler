@@ -91,6 +91,8 @@ final class VmSession
 
     private static string $cookieSamesite = '';
 
+    private static bool $useStrictMode = false;
+
     public static function reset(): void
     {
         self::$active = false;
@@ -100,6 +102,7 @@ final class VmSession
         self::$cacheExpire = self::DEFAULT_CACHE_EXPIRE;
         self::$cacheLimiter = self::DEFAULT_CACHE_LIMITER;
         self::resetCookieParams();
+        self::$useStrictMode = false;
     }
 
     public static function resetCookieParams(): void
@@ -454,6 +457,22 @@ final class VmSession
         return $previous;
     }
 
+    public static function setUseStrictMode(bool $enabled): void
+    {
+        self::$useStrictMode = $enabled;
+    }
+
+    public static function isUseStrictMode(): bool
+    {
+        return self::$useStrictMode;
+    }
+
+    /** php-src session_start read_and_close — close without persisting after read (#18457). */
+    public static function readClose(): void
+    {
+        self::$active = false;
+    }
+
     public static function start(Context $ctx): bool
     {
         if (self::$active) {
@@ -461,7 +480,15 @@ final class VmSession
         }
         $incomingId = self::readCookieId($ctx);
         if ('' !== $incomingId) {
-            self::$id = $incomingId;
+            if (self::$useStrictMode && !self::sessionIdExists($incomingId)) {
+                self::$id = self::generateId();
+                ResponseContext::addHeader(
+                    self::buildSessionSetCookieLine(self::$id),
+                    false
+                );
+            } else {
+                self::$id = $incomingId;
+            }
         } elseif ('' === self::$id) {
             // php-src ext/session/session.c — reuse PS(id) after session_write_close() in-request.
             self::$id = self::generateId();
@@ -690,6 +717,15 @@ final class VmSession
             self::$cookieHttponly,
             self::$cookieSamesite
         );
+    }
+
+    private static function sessionIdExists(string $id): bool
+    {
+        if ('' === $id) {
+            return false;
+        }
+
+        return VmStatPath::isFile(SessionFileStorage::storagePath($id));
     }
 
     private static function readCookieId(Context $ctx): string

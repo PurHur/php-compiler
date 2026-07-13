@@ -1236,6 +1236,7 @@ class Type extends Builtin {
         );
         $this->context->registerFunction('phpc_session_decode_wire', $fnSessionDecodeWire);
         SessionStart::registerRuntimeDeclaration($this->context);
+        SessionStartOptionsRuntime::ensureLinked($this->context);
         $fntypeJsonEncodeValue = $this->context->context->functionType(
             $this->context->getTypeFromString('__string__*'),
             false,
