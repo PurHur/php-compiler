@@ -11,5 +11,5 @@ set_error_handler(static function (int $no, string $msg) use (&$warnings): bool 
 
 $result = @socket_import_stream(STDIN);
 
-echo 'result=', var_export($result, true), "\n";
-echo 'warning=', $warnings[0] ?? 'missing', "\n";
+echo 'is_socket=', is_object($result) && $result instanceof Socket ? 'yes' : 'no', "\n";
+echo 'warning=', $warnings[0] ?? 'none', "\n";

@@ -41,9 +41,6 @@ final class SocketImportStreamJitHelper
             if ('MEMORY' === $nativeType) {
                 return 'socket_import_stream(): Cannot represent a stream of type MEMORY as a Socket Descriptor';
             }
-            if (VmFsStdio::isStdioUri($uri)) {
-                return 'socket_import_stream(): Cannot represent a stream of type STDIO as a Socket Descriptor';
-            }
         }
 
         return 'socket_import_stream(): Unable to import stream';

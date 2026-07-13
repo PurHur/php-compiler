@@ -1,5 +1,5 @@
 --TEST--
-stdlib socket_import_stream(STDIN) — STDIO import succeeds (#18509, supersedes #18389)
+stdlib socket_import_stream(STDIN) — returns Socket for STDIO (#18509, ext/sockets/sockets.c)
 --FILE--
 <?php
 

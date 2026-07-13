@@ -32,7 +32,7 @@ final class fwrite extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $data = VmString::coerceStringBuiltinArg($frame->calledArgs[1], $fn, 1, 'data');
+        $data = VmString::stringBuiltinArgForFrame($frame, 1, $fn, 1, 'data');
         $length = null;
         if (3 === $argc) {
             $length = VmMath::parseNullableIntBuiltinArgForFrame($frame, 2, $fn, 3, 'length');
@@ -58,7 +58,7 @@ final class fwrite extends Internal
             JitLongArg::lower($context, $args[0], $fn.'() handle'),
             $i64
         );
-        $dataStr = JitStringBuiltinArg::lower($context, $args[1], $fn, 1, 'data');
+        $dataStr = JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[1], $fn, 1, 'data');
         if (3 === $argc) {
             $length = JitIntdiv::lowerNullableIntBuiltinArgForCaller($context, $args[2], $fn, 3, 'length');
         } else {
