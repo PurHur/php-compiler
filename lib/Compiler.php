@@ -16906,7 +16906,10 @@ class Compiler {
         if (!$this->callArgUsesHoistedEnumPreludeSlot($callArg)) {
             return null;
         }
-        if ($this->nestedFuncCallFeedsDeadInlineCallArgZero($block, $callOp, $argIndex)) {
+        if (
+            $this->nestedFuncCallFeedsDeadInlineCallArgZero($block, $callOp, $argIndex)
+            || $this->nestedFuncCallFeedsDeadInlineCallArg($block, $callOp, $argIndex)
+        ) {
             return null;
         }
         $preludeProducer = $this->hoistedPreludeProducerForCallArgIndex($callOp, $argIndex, $block);
@@ -22020,7 +22023,10 @@ class Compiler {
         if (null === $ordinal) {
             return null;
         }
-        if ($this->nestedFuncCallFeedsDeadInlineCallArgZero($block, $callOp, $argIndex)) {
+        if (
+            $this->nestedFuncCallFeedsDeadInlineCallArgZero($block, $callOp, $argIndex)
+            || $this->nestedFuncCallFeedsDeadInlineCallArg($block, $callOp, $argIndex)
+        ) {
             return null;
         }
         $producers = $this->hoistedPreludeProducersImmediatelyBeforeCall($callOp, $block);
@@ -22036,6 +22042,18 @@ class Compiler {
                     if (0 === $argIndex) {
                         // tempnam(g(), E::A) — nested FuncCall feeds arg #0, not trailing enum (#10303, #16558).
                         return null;
+                    }
+                    $nestedIndex = array_search($nestedForArgZero, $block->orig->children, true);
+                    if (\is_int($nestedIndex)) {
+                        $targetArg = $this->siblingMultiArgFuncCallProducerTargetArgIndex(
+                            $nestedIndex,
+                            $callIndex,
+                            $block->orig->children
+                        );
+                        if (null !== $targetArg && $targetArg === $argIndex) {
+                            // unpack('i', pack(...), E::A) — middle arg is nested FuncCall (#8866).
+                            return null;
+                        }
                     }
                     $sole = $producers[0] ?? null;
 
@@ -31801,6 +31819,109 @@ class Compiler {
     }
 
     /**
+     * unpack('i', pack('i', 1), E::A) — inline pack string + trailing enum offset (#8866).
+     *
+     * @param list<Operand|null> $args
+     *
+     * @return list<OpCode>|null
+     */
+    private function compileUnpackInlinePackEnumOffsetCallArgSends(
+        array $args,
+        Block $block,
+        Op $cfgCallOp
+    ): ?array {
+        if (null === $block->orig || !\is_array($cfgCallOp->args ?? null)) {
+            return null;
+        }
+        if ('unpack' !== $this->resolveCfgFuncCallName($cfgCallOp)) {
+            return null;
+        }
+        if (3 !== \count($cfgCallOp->args)) {
+            return null;
+        }
+        $stringArg = $cfgCallOp->args[1] ?? null;
+        $offsetArg = $cfgCallOp->args[2] ?? null;
+        if (
+            !$this->callArgIsDeadInlineTemporary($stringArg)
+            || !$this->callArgUsesHoistedEnumPreludeSlot($offsetArg)
+            || !$this->isEmbeddedCallLiteralArg($cfgCallOp->args[0] ?? null)
+        ) {
+            return null;
+        }
+        $producers = $this->precedingInlineCallArgProducersBeforeCfgOp($block->orig->children, $cfgCallOp);
+        $packProducer = null;
+        $enumProducer = null;
+        foreach ($producers as $producer) {
+            if ($producer instanceof Op\Expr\FuncCall || $producer instanceof Op\Expr\NsFuncCall) {
+                $packProducer = $producer;
+            } elseif ($producer instanceof Op\Expr\ClassConstFetch) {
+                $enumProducer = $producer;
+            }
+        }
+        if (null === $packProducer || null === $enumProducer) {
+            return null;
+        }
+        $callIndex = $this->cfgCallOpIndex($block, $cfgCallOp);
+        $packIndex = array_search($packProducer, $block->orig->children, true);
+        if (!\is_int($callIndex) || !\is_int($packIndex)) {
+            return null;
+        }
+        $producerOps = [];
+        if (null === $block->slotForOperand($enumProducer->result)) {
+            foreach ($this->compileExpr($enumProducer, $block) as $op) {
+                $producerOps[] = $op;
+            }
+        }
+        $enumSlot = $block->slotForOperand($enumProducer->result);
+        if (null === $enumSlot) {
+            return null;
+        }
+        if (null === $block->slotForOperand($packProducer->result)) {
+            $prevForce = $this->forceDeferredSiblingCallReturnSlot;
+            $this->forceDeferredSiblingCallReturnSlot = true;
+            try {
+                foreach ($this->compileExpr($packProducer, $block) as $op) {
+                    $producerOps[] = $op;
+                }
+            } finally {
+                $this->forceDeferredSiblingCallReturnSlot = $prevForce;
+            }
+        }
+        $packSlot = $this->slotForInlineFuncCallProducerExecReturnByCfgIndex(
+            $block,
+            $packIndex,
+            $block->orig->children
+        ) ?? $this->slotForLastEmittedInlineCallResultBeforePendingFuncCall($block)
+            ?? $block->slotForOperand($packProducer->result);
+        if (null === $packSlot) {
+            return null;
+        }
+        $sends = [];
+        foreach ($args as $argIndex => $arg) {
+            $valueSlot = match ((int) $argIndex) {
+                1 => (string) $packSlot,
+                2 => (string) $enumSlot,
+                default => null,
+            };
+            $literalProbe = $cfgCallOp->args[(int) $argIndex] ?? $arg;
+            if (null === $valueSlot && $this->isEmbeddedCallLiteralArg($literalProbe)) {
+                $valueSlot = (string) $this->freshLiteralConstantSlot($literalProbe, $block);
+            }
+            if (null === $valueSlot) {
+                $valueSlot = $this->compileOperand($arg, $block, true);
+            }
+            $sends[] = new OpCode(
+                OpCode::TYPE_ARG_SEND,
+                $valueSlot,
+                $this->callArgNameSlot($arg, $block),
+                $this->callArgUnpack($arg) ? 1 : null
+            );
+        }
+
+        return array_merge($producerOps, $sends);
+    }
+
+    /**
      * array_pad([1], 4, 0, ArrayPadType::Positive) — inline Array_ + trailing pad_type ClassConstFetch (#17240).
      *
      * @param list<Operand|null> $args
@@ -33095,6 +33216,41 @@ class Compiler {
         }
 
         return 2 === \count($callOp->args ?? []);
+    }
+
+    /**
+     * unpack('i', pack(...), E::A) — nested FuncCall feeds a middle dead-temp arg, not enum (#8866).
+     */
+    private function nestedFuncCallFeedsDeadInlineCallArg(Block $block, Op $callOp, int $argIndex): bool
+    {
+        if (null === $block->orig) {
+            return false;
+        }
+        $callIndex = $this->cfgCallOpIndex($block, $callOp);
+        if (null === $callIndex) {
+            return false;
+        }
+        $nested = $this->nestedFuncCallProducerBeforeTrailingConstFetchPreludes(
+            $callOp,
+            $callIndex,
+            $block->orig->children
+        );
+        if (
+            !($nested instanceof Op\Expr\FuncCall || $nested instanceof Op\Expr\NsFuncCall)
+        ) {
+            return false;
+        }
+        $nestedIndex = array_search($nested, $block->orig->children, true);
+        if (!\is_int($nestedIndex)) {
+            return false;
+        }
+        $targetArg = $this->siblingMultiArgFuncCallProducerTargetArgIndex(
+            $nestedIndex,
+            $callIndex,
+            $block->orig->children
+        );
+
+        return null !== $targetArg && $targetArg === $argIndex;
     }
 
     /** Stmt-level side-effect builtins — not hoisted multi-arg producers (#16451, #16480). */
@@ -36292,6 +36448,15 @@ class Compiler {
             return [];
         }
         if (null !== $this->findInlineArrayProducerForCallArg($arg, $block, $cfgCallOp)) {
+            return [];
+        }
+        if (
+            null !== $cfgCallOp
+            && (
+                $this->nestedFuncCallFeedsDeadInlineCallArgZero($block, $cfgCallOp, $argIndex)
+                || $this->nestedFuncCallFeedsDeadInlineCallArg($block, $cfgCallOp, $argIndex)
+            )
+        ) {
             return [];
         }
         // register_shutdown_function(fn(...), E::A) — arg #0 is hoisted Closure, not enum prelude (#5751).
@@ -39773,6 +39938,10 @@ class Compiler {
             $arrayPadEnumLengthSends = $this->compileArrayPadInlineArrayClassConstLengthCallArgSends($args, $block, $cfgCallOp);
             if (null !== $arrayPadEnumLengthSends) {
                 return $arrayPadEnumLengthSends;
+            }
+            $unpackPackEnumSends = $this->compileUnpackInlinePackEnumOffsetCallArgSends($args, $block, $cfgCallOp);
+            if (null !== $unpackPackEnumSends) {
+                return $unpackPackEnumSends;
             }
             $extractSends = $this->compileExtractInlineMultiArgCallArgSends($args, $block, $cfgCallOp);
             if (null !== $extractSends) {
