@@ -10,7 +10,6 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\DateTimeSupport;
-use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -41,13 +40,15 @@ final class date_create_immutable extends Internal
 
         $time = 'now';
         if ($argc >= 1) {
-            InternalStrictArg::rejectNullString($frame->calledArgs[0], 'date_create_immutable', 'datetime', 0, $frame);
-            $time = VmString::coerceStringBuiltinArg(
-                $frame->calledArgs[0],
-                'date_create_immutable',
-                0,
-                'datetime'
-            );
+            $timeArg = $frame->calledArgs[0]->resolveIndirect();
+            if (Variable::TYPE_NULL !== $timeArg->type) {
+                $time = VmString::coerceStringBuiltinArg(
+                    $frame->calledArgs[0],
+                    'date_create_immutable',
+                    0,
+                    'datetime'
+                );
+            }
         }
         $timezone = null;
         if ($argc >= 2) {
