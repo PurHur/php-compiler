@@ -13,6 +13,7 @@ final class GcCollectCyclesStandaloneLlvmShrinkTest extends TestCase
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/GcCollectCyclesRuntime.php');
         $this->assertStringContainsString('GcCollectCyclesRegistryJitHelper', $source);
+        $this->assertStringContainsString('GcCollectCyclesStandaloneJitHelper', $source);
         $this->assertStringContainsString('collectCyclesStandalone', $source);
         $this->assertStringNotContainsString('GcCollectCyclesStandaloneLlvm', $source);
         $this->assertStringNotContainsString('gc_register_entry', $source);
@@ -27,8 +28,8 @@ final class GcCollectCyclesStandaloneLlvmShrinkTest extends TestCase
 
     public function testGcCollectCyclesJitHelperDocumentsStandaloneBridge(): void
     {
-        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/GcCollectCyclesJitHelper.php');
+        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/GcCollectCyclesStandaloneJitHelper.php');
         $this->assertStringContainsString('collectCyclesStandalone', $source);
-        $this->assertStringContainsString('collectNativeRegistry', $source);
+        $this->assertStringContainsString('GcCollectCyclesNativeScanJitHelper', $source);
     }
 }

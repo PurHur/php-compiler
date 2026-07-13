@@ -67,9 +67,11 @@ final class GcCollectCyclesCollectRuntimeShrinkTest extends TestCase
     public function testGcCollectCyclesJitHelperDocumentsPhpScan(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/GcCollectCyclesJitHelper.php');
-        $this->assertStringContainsString('collectCyclesEmbed', $source);
+        $bridgeSource = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/GcCollectCyclesCollectRuntime.php');
+        $this->assertStringContainsString('GcCollectCyclesStandaloneJitHelper', $bridgeSource);
         $this->assertStringContainsString('collectCyclesStandalone', $source);
-        $this->assertStringContainsString('collectNativeRegistry', $source);
+        $this->assertStringContainsString('collectCyclesEmbed', $source);
+        $this->assertStringContainsString('GcCollectCyclesNativeScanJitHelper', $source);
         $this->assertStringContainsString('CycleCollector', $source);
         $this->assertStringNotContainsString(
             'native cycle scan stays in',

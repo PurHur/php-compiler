@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 4773 |
-| Phase A inventory files (M2 ratio SSOT) | 4773 |
+| PHP files on vm.php path | 4775 |
+| Phase A inventory files (M2 ratio SSOT) | 4775 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 12827 |
+| Source constructs flagged (warnings) | 12830 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1012,7 +1012,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/FtokJitHelper.php` | 0 | 1 |
 | `ext/standard/FunctionExistsJitHelper.php` | 0 | 1 |
 | `ext/standard/GcCollectCyclesJitHelper.php` | 0 | 1 |
+| `ext/standard/GcCollectCyclesNativeScanJitHelper.php` | 0 | 1 |
 | `ext/standard/GcCollectCyclesRegistryJitHelper.php` | 0 | 1 |
+| `ext/standard/GcCollectCyclesStandaloneJitHelper.php` | 0 | 1 |
 | `ext/standard/GcDestructAllowDelrefJitHelper.php` | 0 | 1 |
 | `ext/standard/GcDestructShutdownJitHelper.php` | 0 | 1 |
 | `ext/standard/GcStatusJitHelper.php` | 0 | 5 |
@@ -3320,7 +3322,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/FtokRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/FunctionExistsRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/FunctionStaticRuntime.php` | 0 | 1 |
-| `lib/JIT/Builtin/GcCollectCyclesCollectRuntime.php` | 0 | 2 |
+| `lib/JIT/Builtin/GcCollectCyclesCollectRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/GcCollectCyclesNativeOpsJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/GcCollectCyclesRuntime.php` | 0 | 5 |
 | `lib/JIT/Builtin/GcStatusRuntime.php` | 0 | 2 |
@@ -11676,12 +11678,22 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/GcCollectCyclesJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 10 class method(s)
+- 8 class method(s)
+
+### `ext/standard/GcCollectCyclesNativeScanJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
 
 ### `ext/standard/GcCollectCyclesRegistryJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
 - 11 class method(s)
+
+### `ext/standard/GcCollectCyclesStandaloneJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 6 class method(s)
 
 ### `ext/standard/GcDestructAllowDelrefJitHelper.php`
 
@@ -26882,8 +26894,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/GcCollectCyclesCollectRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 195)
-- 9 class method(s)
+- new JIT (line 202)
+- 10 class method(s)
+- 1 closure(s)
 
 ### `lib/JIT/Builtin/GcCollectCyclesNativeOpsJit.php`
 

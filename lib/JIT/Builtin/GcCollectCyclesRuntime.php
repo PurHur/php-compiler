@@ -825,12 +825,12 @@ final class GcCollectCyclesRuntime
     private static function collectCyclesHelperFunction(Context $context): LlvmFunction
     {
         $logical = Builtin::LOAD_TYPE_STANDALONE === $context->loadType
-            ? 'PHPCompiler\\ext\\standard\\GcCollectCyclesJitHelper::collectCyclesStandalone'
+            ? 'PHPCompiler\\ext\\standard\\GcCollectCyclesStandaloneJitHelper::collectCyclesStandalone'
             : 'PHPCompiler\\ext\\standard\\GcCollectCyclesJitHelper::collectCyclesEmbed';
         $lc = \strtolower($logical);
         $fn = $context->functions[$lc] ?? null;
         if (null === $fn) {
-            throw new \LogicException($logical.' missing after GcCollectCyclesJitHelper compile (#18630)');
+            throw new \LogicException($logical.' missing after GC collect helper compile (#18630)');
         }
 
         return $fn;
