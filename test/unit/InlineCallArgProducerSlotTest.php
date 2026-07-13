@@ -6556,6 +6556,39 @@ PHP;
         self::assertSame($constSlots[0], $sendSlots[1], 'arg sends='.json_encode($sendSlots));
     }
 
+    /** Issue #18613 — file_get_contents(inline concat, false, null, off, len) wires Concat + ConstFetch slots. */
+    public function testFileGetContentsInlineConcatFalseNullOffsetLengthUsesProducerSlots(): void
+    {
+        $code = <<<'PHP'
+<?php
+declare(strict_types=1);
+$payload = '0123456789';
+echo file_get_contents('data://text/plain,'.$payload, false, null, 3, 4);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'file_get_contents_data_offset_inline.php');
+
+        $concatSlots = [];
+        $constSlots = [];
+        $sendSlots = [];
+        $this->collectOpCodesFromBlock($block, $concatSlots, $sendSlots);
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_CONST_FETCH === $op->type) {
+                $constSlots[] = $op->arg1;
+            }
+        }
+
+        self::assertNotEmpty($concatSlots, 'concat slots='.json_encode($concatSlots));
+        self::assertCount(2, $constSlots, 'const slots='.json_encode($constSlots));
+        self::assertContains($concatSlots[0], $sendSlots, 'arg sends='.json_encode($sendSlots));
+        self::assertNotSame($constSlots[0], $sendSlots[0] ?? null, 'path arg must not bind to false const');
+
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertSame('3456', $out);
+    }
+
     /** Issue #13684 — array_slice($a, array_search(...)) wires hoisted Array_ to arg0, nested FuncCall to arg1. */
     public function testArraySliceNestedIntBuiltinOffsetUsesDistinctProducerSlots(): void
     {
