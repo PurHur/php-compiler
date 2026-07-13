@@ -126,6 +126,7 @@ final class filter_var extends Internal
             $filterVal,
             $i64->constInt(VmFilter::FILTER_VALIDATE_MAC, false)
         );
+        $flags = JitFilter::loadFilterFlags($context, $optionsArg);
 
         $intBlock = BasicBlockHelper::append($context, 'filter_var_int');
         $otherBlock = BasicBlockHelper::append($context, 'filter_var_other');
@@ -149,7 +150,6 @@ final class filter_var extends Internal
         $context->builder->branchIf($isInt, $intBlock, $otherBlock);
 
         $context->builder->positionAtEnd($intBlock);
-        $flags = JitFilter::loadFilterFlags($context, $optionsArg);
         $intResult = JitFilter::validateInt($context, $value, $flags);
         if (null !== $optionsArg && JITVariable::TYPE_NULL !== $optionsArg->type) {
             $intResult = JitFilter::applyNullOnFailure($context, $intResult, $nullOnFailure);
@@ -220,7 +220,7 @@ final class filter_var extends Internal
         $context->builder->branchIf($isSanitize, $sanitizeBlock, $failBlock);
 
         $context->builder->positionAtEnd($ipBlock);
-        $ipResult = JitFilter::validateIp($context, $value);
+        $ipResult = JitFilter::validateIp($context, $value, $flags);
         if (null !== $optionsArg && JITVariable::TYPE_NULL !== $optionsArg->type) {
             $ipResult = JitFilter::applyNullOnFailure($context, $ipResult, $nullOnFailure);
         }
@@ -236,7 +236,6 @@ final class filter_var extends Internal
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($sanitizeBlock);
-        $flags = JitFilter::loadFilterFlags($context, $optionsArg);
         $sanitizeResult = JitFilter::sanitize($context, $value, $filterVal, $flags);
         $sanitizeTail = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);
