@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 4797 |
-| Phase A inventory files (M2 ratio SSOT) | 4797 |
+| PHP files on vm.php path | 4802 |
+| Phase A inventory files (M2 ratio SSOT) | 4802 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 12898 |
+| Source constructs flagged (warnings) | 12905 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -161,6 +161,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/dom/DocumentImportNode.php` | 0 | 1 |
 | `ext/dom/DocumentLoad.php` | 0 | 1 |
 | `ext/dom/DocumentLoadHTML.php` | 0 | 1 |
+| `ext/dom/DocumentLoadHTMLFile.php` | 0 | 1 |
 | `ext/dom/DocumentLoadXML.php` | 0 | 1 |
 | `ext/dom/DocumentNormalizeDocument.php` | 0 | 1 |
 | `ext/dom/DocumentRegisterNodeClass.php` | 0 | 2 |
@@ -180,6 +181,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/dom/DomGetElementsByTagNameJitHelper.php` | 0 | 1 |
 | `ext/dom/DomHtmlDocumentPropertySupport.php` | 0 | 2 |
 | `ext/dom/DomLivingBuiltinClasses.php` | 0 | 18 |
+| `ext/dom/DomLoadHTMLFileJitHelper.php` | 0 | 1 |
 | `ext/dom/DomLoadHTMLJitHelper.php` | 0 | 1 |
 | `ext/dom/DomLoadXMLJitHelper.php` | 0 | 1 |
 | `ext/dom/DomNodeListItemJitHelper.php` | 0 | 1 |
@@ -237,6 +239,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/dom/JitDomGetElementsByTagName.php` | 0 | 1 |
 | `ext/dom/JitDomGetElementsByTagNameUserScript.php` | 0 | 1 |
 | `ext/dom/JitDomLoadHTML.php` | 0 | 1 |
+| `ext/dom/JitDomLoadHTMLFile.php` | 0 | 1 |
 | `ext/dom/JitDomLoadHTMLUserScript.php` | 0 | 4 |
 | `ext/dom/JitDomLoadXML.php` | 0 | 1 |
 | `ext/dom/JitDomLoadXMLUserScript.php` | 0 | 1 |
@@ -307,7 +310,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/dom/TokenListReplace.php` | 0 | 1 |
 | `ext/dom/TokenListSupports.php` | 0 | 1 |
 | `ext/dom/TokenListToggle.php` | 0 | 1 |
-| `ext/dom/VmDom.php` | 0 | 326 |
+| `ext/dom/VmDom.php` | 0 | 327 |
 | `ext/dom/VmDomInstanceInvoke.php` | 0 | 2 |
 | `ext/dom/VmDomJitDispatch.php` | 0 | 15 |
 | `ext/dom/VmDomJitFrame.php` | 0 | 1 |
@@ -3308,6 +3311,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/DomGetElementsByTagNameRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/DomInstanceMethodRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/DomInstanceMethodUserScriptLlvm.php` | 0 | 3 |
+| `lib/JIT/Builtin/DomLoadHTMLFileRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/DomLoadHTMLRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/DomLoadXMLRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/DomNodeListItemRuntime.php` | 0 | 1 |
@@ -3862,6 +3866,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Call/DomDocumentGetElementById.php` | 0 | 1 |
 | `lib/JIT/Call/DomDocumentGetElementsByTagName.php` | 0 | 1 |
 | `lib/JIT/Call/DomDocumentLoadHTML.php` | 0 | 1 |
+| `lib/JIT/Call/DomDocumentLoadHTMLFile.php` | 0 | 1 |
 | `lib/JIT/Call/DomDocumentLoadXML.php` | 0 | 1 |
 | `lib/JIT/Call/DomDocumentSaveHTML.php` | 0 | 1 |
 | `lib/JIT/Call/DomDocumentSaveHTMLFile.php` | 0 | 1 |
@@ -3967,7 +3972,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/CompilerOperandChainNative.php` | 0 | 3 |
 | `lib/JIT/Context.php` | 0 | 76 |
 | `lib/JIT/DnfParamCheck.php` | 0 | 19 |
-| `lib/JIT/DomInstanceMethodJit.php` | 0 | 14 |
+| `lib/JIT/DomInstanceMethodJit.php` | 0 | 15 |
 | `lib/JIT/DynamicObjectReadonlyGuard.php` | 0 | 1 |
 | `lib/JIT/DynamicPropertyDeprecationGuard.php` | 0 | 1 |
 | `lib/JIT/EmitTuMode.php` | 0 | 1 |
@@ -5581,6 +5586,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `ext/dom/DocumentLoadHTMLFile.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `ext/dom/DocumentLoadXML.php`
 
 **Warnings** (review for bootstrap subset):
@@ -5701,6 +5711,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new HtmlDocumentCreateEmpty (line 59)
 - new ClassEntry (line 64)
 - new ClassProperty (line 67)
+- 1 class method(s)
+
+### `ext/dom/DomLoadHTMLFileJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
 ### `ext/dom/DomLoadHTMLJitHelper.php`
@@ -6003,6 +6018,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 3 class method(s)
 
 ### `ext/dom/JitDomLoadHTML.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s)
+
+### `ext/dom/JitDomLoadHTMLFile.php`
 
 **Warnings** (review for bootstrap subset):
 - 3 class method(s)
@@ -6520,178 +6540,179 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new DocumentLoadXML (line 517)
 - new DocumentLoad (line 519)
 - new DocumentLoadHTML (line 521)
-- new DocumentCreateElement (line 524)
-- new DocumentCreateElementNS (line 526)
-- new DocumentCreateAttributeNS (line 528)
-- new DocumentCreateAttribute (line 530)
-- new DocumentCreateDocumentFragment (line 532)
-- new DocumentCreateEntityReference (line 534)
-- new DocumentCreateTextNode (line 537)
-- new DocumentCreateComment (line 540)
-- new DocumentCreateCDATASection (line 543)
-- new DocumentCreateProcessingInstruction (line 546)
-- new DocumentAppendChild (line 549)
-- new DocumentSaveXML (line 551)
-- new DocumentSave (line 553)
-- new DocumentSaveHTML (line 555)
-- new DocumentSaveHTMLFile (line 558)
-- new DocumentGetElementsByTagName (line 561)
-- new DocumentGetElementsByTagNameNS (line 563)
-- new DocumentGetElementById (line 566)
-- new DocumentImportNode (line 568)
-- new DocumentAdoptNode (line 570)
-- new DocumentRegisterNodeClass (line 573)
-- new DocumentNormalizeDocument (line 576)
-- new DocumentXInclude (line 579)
-- new DocumentSchemaValidate (line 581)
-- new DocumentRelaxNGValidate (line 584)
-- new ClassEntry (line 589)
-- new ClassProperty (line 592)
-- new ClassProperty (line 593)
-- new ClassProperty (line 594)
-- new ElementAppendChild (line 595)
-- new ElementGetAttribute (line 597)
-- new ElementGetAttributeNode (line 599)
-- new ElementGetAttributeNS (line 601)
-- new ElementHasAttribute (line 603)
-- new ElementHasAttributeNS (line 605)
-- new ElementRemoveAttribute (line 607)
-- new ElementRemoveAttributeNode (line 609)
-- new ElementSetAttribute (line 611)
-- new ElementSetAttributeNode (line 613)
-- new ElementSetAttributeNS (line 615)
-- new ElementRemoveAttributeNS (line 617)
-- new ElementSetIdAttribute (line 619)
-- new ElementSetIdAttributeNS (line 622)
-- new ElementGetElementsByTagName (line 625)
-- new ElementGetElementsByTagNameNS (line 627)
-- new ElementGetAttributeNames (line 631)
-- new ElementInsertAdjacentHTML (line 636)
-- new ElementInsertAdjacentElement (line 641)
-- new ElementInsertAdjacentText (line 646)
-- new ElementToggleAttribute (line 651)
-- new ElementGetInnerHTML (line 656)
-- new ElementGetOuterHTML (line 659)
-- new ClassProperty (line 664)
-- new ClassEntry (line 668)
-- new FragmentConstruct (line 671)
-- new ClassProperty (line 675)
-- new FragmentAppendChild (line 676)
-- new FragmentAppendXML (line 678)
-- new ObjectEntry (line 692)
-- new DomNodeState (line 694)
-- new Variable (line 708)
-- new ObjectEntry (line 731)
-- new DomNodeState (line 736)
-- new Variable (line 762)
-- new ObjectEntry (line 790)
-- new DomNodeState (line 811)
-- new Variable (line 851)
-- new HashTable (line 862)
-- new Variable (line 863)
-- new HashTable (line 875)
-- new Variable (line 882)
-- new DomNodeState (line 905)
-- new ObjectEntry (line 922)
-- new DomNodeState (line 930)
-- new Variable (line 948)
-- new ObjectEntry (line 964)
-- new DomNodeState (line 972)
-- new Variable (line 991)
-- new ObjectEntry (line 1006)
-- new DomNodeState (line 1014)
-- new Variable (line 1026)
-- new DOMException (line 1043)
-- new Variable (line 1047)
-- new Variable (line 1053)
-- new DOMException (line 1062)
-- new Variable (line 1091)
-- new DOMException (line 1104)
-- new DOMException (line 1117)
-- new Variable (line 1129)
-- new DOMException (line 1195)
-- new DOMException (line 1247)
-- new DOMException (line 1260)
-- new DOMException (line 1283)
-- new DOMException (line 1297)
-- new DOMException (line 1323)
-- new DOMException (line 1378)
-- new DOMException (line 1405)
-- new DOMException (line 1409)
-- new DOMException (line 1422)
-- new DOMException (line 1426)
-- new DOMException (line 1436)
-- new ObjectEntry (line 1807)
-- new DomNodeState (line 1812)
-- new ObjectEntry (line 1828)
-- new DomNodeState (line 1833)
-- new ObjectEntry (line 1849)
-- new DomNodeState (line 1854)
-- new DOMException (line 1893)
-- new DOMException (line 1903)
-- new DOMException (line 1916)
-- new DOMException (line 1935)
-- new ObjectEntry (line 2023)
-- new DomNodeState (line 2028)
-- new Variable (line 2037)
-- new ObjectEntry (line 2047)
-- new DomNodeState (line 2052)
-- new Variable (line 2058)
-- new ObjectEntry (line 2558)
-- new DomNodeState (line 2560)
-- new ObjectEntry (line 2756)
-- new DomNodeState (line 2758)
-- new ObjectEntry (line 2786)
-- new DomNodeState (line 2788)
-- new ObjectEntry (line 2917)
-- new DomNodeState (line 2922)
-- new DOMException (line 3116)
-- new DOMException (line 3130)
-- new Variable (line 3146)
-- new DOMException (line 3160)
-- new DOMException (line 3163)
-- new DOMException (line 3171)
-- new DOMException (line 3197)
-- new DOMException (line 3210)
-- new DOMException (line 3396)
-- new DOMException (line 3593)
-- new DOMException (line 3597)
-- new DOMException (line 3686)
-- new DOMException (line 3690)
-- new DOMException (line 3748)
-- new DOMException (line 3765)
-- new DOMException (line 3794)
-- new DOMException (line 3835)
-- new DOMException (line 3860)
-- new DOMException (line 4528)
-- new Variable (line 4556)
-- new DOMException (line 4786)
-- new DOMException (line 4869)
-- new DOMException (line 4911)
-- new ObjectEntry (line 4996)
-- new DomNodeState (line 5000)
-- new Variable (line 5007)
-- new ObjectEntry (line 5207)
-- new DomNodeState (line 5211)
-- new Variable (line 5218)
-- new ObjectEntry (line 5238)
-- new DomNodeState (line 5241)
-- new Variable (line 5249)
-- new Variable (line 5394)
-- new DOMException (line 5478)
-- new DOMException (line 5485)
-- new DOMException (line 5492)
-- new DOMException (line 5496)
-- new DOMException (line 5499)
-- new DOMException (line 5508)
-- new Variable (line 6294)
-- new Variable (line 6307)
-- new DOMException (line 6389)
-- new DOMException (line 6400)
-- new DOMException (line 6466)
-- new DOMException (line 6474)
-- new DOMException (line 6483)
-- 306 class method(s)
+- new DocumentLoadHTMLFile (line 524)
+- new DocumentCreateElement (line 527)
+- new DocumentCreateElementNS (line 529)
+- new DocumentCreateAttributeNS (line 531)
+- new DocumentCreateAttribute (line 533)
+- new DocumentCreateDocumentFragment (line 535)
+- new DocumentCreateEntityReference (line 537)
+- new DocumentCreateTextNode (line 540)
+- new DocumentCreateComment (line 543)
+- new DocumentCreateCDATASection (line 546)
+- new DocumentCreateProcessingInstruction (line 549)
+- new DocumentAppendChild (line 552)
+- new DocumentSaveXML (line 554)
+- new DocumentSave (line 556)
+- new DocumentSaveHTML (line 558)
+- new DocumentSaveHTMLFile (line 561)
+- new DocumentGetElementsByTagName (line 564)
+- new DocumentGetElementsByTagNameNS (line 566)
+- new DocumentGetElementById (line 569)
+- new DocumentImportNode (line 571)
+- new DocumentAdoptNode (line 573)
+- new DocumentRegisterNodeClass (line 576)
+- new DocumentNormalizeDocument (line 579)
+- new DocumentXInclude (line 582)
+- new DocumentSchemaValidate (line 584)
+- new DocumentRelaxNGValidate (line 587)
+- new ClassEntry (line 592)
+- new ClassProperty (line 595)
+- new ClassProperty (line 596)
+- new ClassProperty (line 597)
+- new ElementAppendChild (line 598)
+- new ElementGetAttribute (line 600)
+- new ElementGetAttributeNode (line 602)
+- new ElementGetAttributeNS (line 604)
+- new ElementHasAttribute (line 606)
+- new ElementHasAttributeNS (line 608)
+- new ElementRemoveAttribute (line 610)
+- new ElementRemoveAttributeNode (line 612)
+- new ElementSetAttribute (line 614)
+- new ElementSetAttributeNode (line 616)
+- new ElementSetAttributeNS (line 618)
+- new ElementRemoveAttributeNS (line 620)
+- new ElementSetIdAttribute (line 622)
+- new ElementSetIdAttributeNS (line 625)
+- new ElementGetElementsByTagName (line 628)
+- new ElementGetElementsByTagNameNS (line 630)
+- new ElementGetAttributeNames (line 634)
+- new ElementInsertAdjacentHTML (line 639)
+- new ElementInsertAdjacentElement (line 644)
+- new ElementInsertAdjacentText (line 649)
+- new ElementToggleAttribute (line 654)
+- new ElementGetInnerHTML (line 659)
+- new ElementGetOuterHTML (line 662)
+- new ClassProperty (line 667)
+- new ClassEntry (line 671)
+- new FragmentConstruct (line 674)
+- new ClassProperty (line 678)
+- new FragmentAppendChild (line 679)
+- new FragmentAppendXML (line 681)
+- new ObjectEntry (line 695)
+- new DomNodeState (line 697)
+- new Variable (line 711)
+- new ObjectEntry (line 734)
+- new DomNodeState (line 739)
+- new Variable (line 765)
+- new ObjectEntry (line 793)
+- new DomNodeState (line 814)
+- new Variable (line 854)
+- new HashTable (line 865)
+- new Variable (line 866)
+- new HashTable (line 878)
+- new Variable (line 885)
+- new DomNodeState (line 908)
+- new ObjectEntry (line 925)
+- new DomNodeState (line 933)
+- new Variable (line 951)
+- new ObjectEntry (line 967)
+- new DomNodeState (line 975)
+- new Variable (line 994)
+- new ObjectEntry (line 1009)
+- new DomNodeState (line 1017)
+- new Variable (line 1029)
+- new DOMException (line 1046)
+- new Variable (line 1050)
+- new Variable (line 1056)
+- new DOMException (line 1065)
+- new Variable (line 1094)
+- new DOMException (line 1107)
+- new DOMException (line 1120)
+- new Variable (line 1132)
+- new DOMException (line 1198)
+- new DOMException (line 1250)
+- new DOMException (line 1263)
+- new DOMException (line 1286)
+- new DOMException (line 1300)
+- new DOMException (line 1326)
+- new DOMException (line 1381)
+- new DOMException (line 1408)
+- new DOMException (line 1412)
+- new DOMException (line 1425)
+- new DOMException (line 1429)
+- new DOMException (line 1439)
+- new ObjectEntry (line 1810)
+- new DomNodeState (line 1815)
+- new ObjectEntry (line 1831)
+- new DomNodeState (line 1836)
+- new ObjectEntry (line 1852)
+- new DomNodeState (line 1857)
+- new DOMException (line 1896)
+- new DOMException (line 1906)
+- new DOMException (line 1919)
+- new DOMException (line 1938)
+- new ObjectEntry (line 2026)
+- new DomNodeState (line 2031)
+- new Variable (line 2040)
+- new ObjectEntry (line 2050)
+- new DomNodeState (line 2055)
+- new Variable (line 2061)
+- new ObjectEntry (line 2594)
+- new DomNodeState (line 2596)
+- new ObjectEntry (line 2792)
+- new DomNodeState (line 2794)
+- new ObjectEntry (line 2822)
+- new DomNodeState (line 2824)
+- new ObjectEntry (line 2953)
+- new DomNodeState (line 2958)
+- new DOMException (line 3152)
+- new DOMException (line 3166)
+- new Variable (line 3182)
+- new DOMException (line 3196)
+- new DOMException (line 3199)
+- new DOMException (line 3207)
+- new DOMException (line 3233)
+- new DOMException (line 3246)
+- new DOMException (line 3432)
+- new DOMException (line 3629)
+- new DOMException (line 3633)
+- new DOMException (line 3722)
+- new DOMException (line 3726)
+- new DOMException (line 3784)
+- new DOMException (line 3801)
+- new DOMException (line 3830)
+- new DOMException (line 3871)
+- new DOMException (line 3896)
+- new DOMException (line 4564)
+- new Variable (line 4592)
+- new DOMException (line 4822)
+- new DOMException (line 4905)
+- new DOMException (line 4947)
+- new ObjectEntry (line 5032)
+- new DomNodeState (line 5036)
+- new Variable (line 5043)
+- new ObjectEntry (line 5243)
+- new DomNodeState (line 5247)
+- new Variable (line 5254)
+- new ObjectEntry (line 5274)
+- new DomNodeState (line 5277)
+- new Variable (line 5285)
+- new Variable (line 5430)
+- new DOMException (line 5514)
+- new DOMException (line 5521)
+- new DOMException (line 5528)
+- new DOMException (line 5532)
+- new DOMException (line 5535)
+- new DOMException (line 5544)
+- new Variable (line 6330)
+- new Variable (line 6343)
+- new DOMException (line 6425)
+- new DOMException (line 6436)
+- new DOMException (line 6502)
+- new DOMException (line 6510)
+- new DOMException (line 6519)
+- 308 class method(s)
 - 2 closure(s)
 
 ### `ext/dom/VmDomInstanceInvoke.php`
@@ -26835,8 +26856,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/DomDocumentMethodUserScriptLlvm.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 553)
-- 23 class method(s)
+- new JIT (line 570)
+- 24 class method(s)
 - 1 closure(s)
 
 ### `lib/JIT/Builtin/DomElementTextContentRuntime.php`
@@ -26865,6 +26886,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new JIT (line 125)
 - 5 class method(s)
 - 1 closure(s)
+
+### `lib/JIT/Builtin/DomLoadHTMLFileRuntime.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
 
 ### `lib/JIT/Builtin/DomLoadHTMLRuntime.php`
 
@@ -30117,6 +30143,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `lib/JIT/Call/DomDocumentLoadHTMLFile.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `lib/JIT/Call/DomDocumentLoadXML.php`
 
 **Warnings** (review for bootstrap subset):
@@ -30798,19 +30829,20 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/DomInstanceMethodJit.php`
 
 **Warnings** (review for bootstrap subset):
-- new Call\DomDocumentCreateElement (line 76)
-- new Call\DomDocumentLoadHTML (line 81)
-- new Call\DomDocumentGetElementById (line 86)
-- new Call\DomDocumentLoadXML (line 91)
-- new Call\DomDocumentSaveXML (line 96)
-- new Call\DomDocumentSaveHTML (line 101)
-- new Call\DomDocumentSaveHTMLFile (line 106)
-- new Call\DomDocumentGetElementsByTagName (line 111)
-- new Call\DomNodeAppendChild (line 116)
-- new Call\DomXPathQuery (line 121)
-- new Call\DomXPathEvaluate (line 126)
-- new Call\DomNodeListItem (line 131)
-- new Call\DomInstanceMethod (line 149)
+- new Call\DomDocumentCreateElement (line 77)
+- new Call\DomDocumentLoadHTML (line 82)
+- new Call\DomDocumentLoadHTMLFile (line 87)
+- new Call\DomDocumentGetElementById (line 92)
+- new Call\DomDocumentLoadXML (line 97)
+- new Call\DomDocumentSaveXML (line 102)
+- new Call\DomDocumentSaveHTML (line 107)
+- new Call\DomDocumentSaveHTMLFile (line 112)
+- new Call\DomDocumentGetElementsByTagName (line 117)
+- new Call\DomNodeAppendChild (line 122)
+- new Call\DomXPathQuery (line 127)
+- new Call\DomXPathEvaluate (line 132)
+- new Call\DomNodeListItem (line 137)
+- new Call\DomInstanceMethod (line 155)
 - 7 class method(s)
 
 ### `lib/JIT/DynamicObjectReadonlyGuard.php`
