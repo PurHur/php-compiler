@@ -228,4 +228,45 @@ final class BackedEnumFromJit
 
         return $ptr;
     }
+
+    /**
+     * Caller strict_types before JIT from/tryFrom native (#18476).
+     */
+    public static function emitCallSiteStrictCheck(
+        Context $context,
+        Call\Native $toCall,
+        Variable $arg,
+    ): void {
+        if (!$context->callerStrictTypes) {
+            return;
+        }
+        $lc = strtolower($toCall->name);
+        if (!str_ends_with($lc, '::from') && !str_ends_with($lc, '::tryfrom')) {
+            return;
+        }
+        $sep = strrpos($lc, '::');
+        if (false === $sep) {
+            return;
+        }
+        $classLc = substr($lc, 0, $sep);
+        $object = $context->type->object;
+        if (!$object->isEnumClassLc($classLc)) {
+            return;
+        }
+        $classId = $object->classes[$classLc] ?? null;
+        if (null === $classId) {
+            return;
+        }
+        $backedType = $object->enumBackedTypeFor($classId);
+        if (null === $backedType) {
+            return;
+        }
+        $method = str_ends_with($lc, '::tryfrom') ? 'tryFrom' : 'from';
+        $function = $object->classNameForId($classId).'::'.$method;
+        if ('int' === $backedType) {
+            InternalStrictArg::requireInt($context, $arg, $function, 'value', 0);
+        } elseif ('string' === $backedType) {
+            InternalStrictArg::requireString($context, $arg, $function, 'value', 0);
+        }
+    }
 }
