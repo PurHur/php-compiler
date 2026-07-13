@@ -93,6 +93,10 @@ final class VmCsv
                 ++$i;
             }
             $offset = $i;
+            // php-src ext/standard/file.c — lone opening enclosure at EOF yields NUL field (#18592).
+            if ($i >= $len && '' === $field) {
+                return "\0";
+            }
 
             return $field;
         }
