@@ -39007,13 +39007,7 @@ class Compiler {
         ) {
             return null;
         }
-        $nonEmbeddedArgIndices = [];
-        foreach ($cfgCallOp->args as $i => $candidateArg) {
-            if (null !== $candidateArg && !$this->isEmbeddedCallLiteralArg($candidateArg)) {
-                $nonEmbeddedArgIndices[] = (int) $i;
-            }
-        }
-        if ($argIndex !== ($nonEmbeddedArgIndices[\count($nonEmbeddedArgIndices) - 1] ?? -1)) {
+        if ($argIndex !== $this->trailingNonEmbeddedCallArgIndex($cfgCallOp)) {
             return null;
         }
         if (null === $block->slotForOperand($last->result)) {
@@ -39023,6 +39017,22 @@ class Compiler {
         }
 
         return $block->slotForOperand($last->result);
+    }
+
+    /** Last call arg index that is not an embedded literal (e.g. json_encode($v, JSON_* | JSON_*)). */
+    private function trailingNonEmbeddedCallArgIndex(Op $cfgCallOp): int
+    {
+        if (!\is_array($cfgCallOp->args ?? null)) {
+            return -1;
+        }
+        $nonEmbeddedArgIndices = [];
+        foreach ($cfgCallOp->args as $i => $candidateArg) {
+            if (null !== $candidateArg && !$this->isEmbeddedCallLiteralArg($candidateArg)) {
+                $nonEmbeddedArgIndices[] = (int) $i;
+            }
+        }
+
+        return $nonEmbeddedArgIndices[\count($nonEmbeddedArgIndices) - 1] ?? -1;
     }
 
     /** file_put_contents($f, 'a', FILE_APPEND | LOCK_EX) — skip adjacent FuncCall rewire (#18523). */
@@ -45175,6 +45185,7 @@ class Compiler {
                     (int) $argIndex
                 );
                 if (null === $bitmaskSlot) {
+                    $trailingBitmaskArgIndex = $this->trailingNonEmbeddedCallArgIndex($cfgCallOp);
                     $bitmaskCallIndex = array_search($cfgCallOp, $block->orig->children, true);
                     if (\is_int($bitmaskCallIndex) && $bitmaskCallIndex > 0) {
                         $bitmaskImmediate = $block->orig->children[$bitmaskCallIndex - 1] ?? null;
@@ -45193,9 +45204,12 @@ class Compiler {
                             }
                         }
                         if (
-                            ($bitmaskImmediate instanceof Op\Expr\BinaryOp\BitwiseOr
+                            (int) $argIndex === $trailingBitmaskArgIndex
+                            && (
+                                $bitmaskImmediate instanceof Op\Expr\BinaryOp\BitwiseOr
                                 || $bitmaskImmediate instanceof Op\Expr\BinaryOp\BitwiseAnd
-                                || $bitmaskImmediate instanceof Op\Expr\BinaryOp\BitwiseXor)
+                                || $bitmaskImmediate instanceof Op\Expr\BinaryOp\BitwiseXor
+                            )
                             && (
                                 $this->callArgIsDeadInlineTemporary($bitmaskArgProbe)
                                 || $this->callArgIsAssignInCallOperand($bitmaskArgProbe)
@@ -45216,7 +45230,10 @@ class Compiler {
                         }
                     }
                 }
-                if (null !== $bitmaskSlot) {
+                if (
+                    null !== $bitmaskSlot
+                    && (int) $argIndex === $this->trailingNonEmbeddedCallArgIndex($cfgCallOp)
+                ) {
                     $valueSlot = (string) $bitmaskSlot;
                 }
             }
@@ -49077,6 +49094,76 @@ class Compiler {
     }
 
     /**
+     * json_encode($s, JSON_HEX_* | …) — arg #0 is a named local; bitmask preludes must not replace value ARG_SEND (#10956).
+     *
+     * @param list<OpCode> $outerArgSends
+     */
+    private function rewireNamedLocalBeforeInlineBitmaskCallArgSendSlots(
+        array &$outerArgSends,
+        Block $block,
+        ?Op $cfgCallOp
+    ): void {
+        if (null === $cfgCallOp || null === $block->orig || \count($cfgCallOp->args ?? []) < 2) {
+            return;
+        }
+        $valueArg = $cfgCallOp->args[0] ?? null;
+        if (!$valueArg instanceof Operand || $this->callArgIsDeadInlineTemporary($valueArg)) {
+            return;
+        }
+        if (!$this->cfgCallPrecededByInlineBitmaskProducer($cfgCallOp, $block)) {
+            return;
+        }
+        $namedSlot = $this->namedLocalCallArgSlotIfBound($valueArg, $block, $cfgCallOp, 0)
+            ?? $this->slotForNamedLocalFromAssignVarOperand($valueArg, $block);
+        if (null === $namedSlot) {
+            $operandSlot = $block->slotForOperand($valueArg);
+            if (null === $operandSlot) {
+                return;
+            }
+            $namedSlot = (int) $operandSlot;
+        }
+        $wired = (string) $this->finalizeOperandSlotForAccess($block, (int) $namedSlot, true);
+        $argSendOrdinal = 0;
+        foreach ($outerArgSends as &$send) {
+            if (OpCode::TYPE_ARG_SEND !== $send->type) {
+                continue;
+            }
+            if (0 === $argSendOrdinal) {
+                $send->arg1 = $wired;
+
+                return;
+            }
+            ++$argSendOrdinal;
+        }
+        unset($send);
+    }
+
+    private function cfgCallPrecededByInlineBitmaskProducer(Op $cfgCallOp, Block $block): bool
+    {
+        $callIndex = $this->cfgCallOpIndex($block, $cfgCallOp);
+        if (!\is_int($callIndex) || $callIndex < 1) {
+            return false;
+        }
+        $immediate = $block->orig->children[$callIndex - 1] ?? null;
+        if ($immediate instanceof Op\Expr\Assign) {
+            $hoistedRhs = $callIndex > 1 ? ($block->orig->children[$callIndex - 2] ?? null) : null;
+            if (
+                $hoistedRhs instanceof Op\Expr\BinaryOp\BitwiseOr
+                || $hoistedRhs instanceof Op\Expr\BinaryOp\BitwiseAnd
+                || $hoistedRhs instanceof Op\Expr\BinaryOp\BitwiseXor
+            ) {
+                $immediate = $hoistedRhs;
+            } else {
+                $immediate = $immediate->expr;
+            }
+        }
+
+        return $immediate instanceof Op\Expr\BinaryOp\BitwiseOr
+            || $immediate instanceof Op\Expr\BinaryOp\BitwiseAnd
+            || $immediate instanceof Op\Expr\BinaryOp\BitwiseXor;
+    }
+
+    /**
      * is_array(file(...)) / count(file(...)) — ARG_SEND must use nested file() EXEC_RETURN, not bitmask OR (#10474).
      *
      * @param list<OpCode> $outerArgSends
@@ -49370,6 +49457,7 @@ class Compiler {
         );
         $this->rewireIsArrayNestedFileCallArgSendSlots($outerArgSends, $nestedProducerOps, $block, $cfgCallOp, $calleeName);
         $this->rewireInlineBitmaskTrailingCallArgSendSlots($outerArgSends, $nestedProducerOps, $block, $cfgCallOp);
+        $this->rewireNamedLocalBeforeInlineBitmaskCallArgSendSlots($outerArgSends, $block, $cfgCallOp);
         $return = [];
         foreach ($outerArgSends as $send) {
             if (OpCode::TYPE_ASSIGN === $send->type) {
