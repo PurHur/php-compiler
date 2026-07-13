@@ -38,6 +38,7 @@ final class DomInstanceMethodJit
         'domdocument::savexml' => true,
         'domdocument::savehtml' => true,
         'domdocument::savehtmlfile' => true,
+        'domdocument::getelementsbytagname' => true,
     ];
 
     /** User-script AOT: nested VmDomInstanceInvoke JIT aborts — use VmClassMethod lowering (#15407, #17391). */
@@ -90,6 +91,11 @@ final class DomInstanceMethodJit
 
                 return;
             }
+            if ('domdocument::getelementsbytagname' === $lc) {
+                $context->functionProxies[$lc] = new Call\DomDocumentGetElementsByTagName();
+
+                return;
+            }
             if (!self::isUserScriptDirectMethod($lc)) {
                 return;
             }
@@ -120,6 +126,7 @@ final class DomInstanceMethodJit
             self::ensureProxy($context, 'domdocument::savexml');
             self::ensureProxy($context, 'domdocument::savehtml');
             self::ensureProxy($context, 'domdocument::savehtmlfile');
+            self::ensureProxy($context, 'domdocument::getelementsbytagname');
 
             return;
         }
