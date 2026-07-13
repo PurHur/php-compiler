@@ -759,6 +759,133 @@ final class VmOpenssl
         ));
     }
 
+    /**
+     * openssl_pkcs12_read() — parse PKCS#12 blob (php-src ext/openssl/pkcs12.c; #6420).
+     *
+     * @return array{cert: string, pkey: string}|false
+     */
+    public static function pkcs12Read(string $pkcs12, string $passphrase, ?Frame $frame = null): array|false
+    {
+        if (!VmOpensslPkcs12Native::available()) {
+            self::userWarning('openssl_pkcs12_read(): OpenSSL PKCS#12 is unavailable in this compiler build', $frame);
+
+            return false;
+        }
+
+        $parsed = VmOpensslPkcs12Native::parsePkcs12($pkcs12, $passphrase);
+        if (false === $parsed) {
+            return false;
+        }
+
+        return $parsed;
+    }
+
+    /**
+     * openssl_pkcs12_export() — create PKCS#12 blob (php-src ext/openssl/pkcs12.c; #6420).
+     *
+     * @param list<string> $extraCertPems
+     */
+    public static function pkcs12Export(
+        Variable $certArg,
+        Variable $keyArg,
+        string $passphrase,
+        ?Variable $optionsVar,
+        ?Frame $frame = null
+    ): string|false {
+        if (!VmOpensslPkcs12Native::available()) {
+            self::userWarning('openssl_pkcs12_export(): OpenSSL PKCS#12 is unavailable in this compiler build', $frame);
+
+            return false;
+        }
+
+        $certPem = self::coerceCertificatePem($certArg, 'openssl_pkcs12_export', 0, 'certificate');
+        $keyPem = self::coercePkeyPem($keyArg, 'openssl_pkcs12_export', 2, 'private_key');
+
+        $friendlyName = '';
+        $extraCerts = [];
+        if (null !== $optionsVar) {
+            $optionsVar = $optionsVar->resolveIndirect();
+            if (Variable::TYPE_ARRAY === $optionsVar->type) {
+                foreach ($optionsVar->toArray()->iterateKeyed(true) as [$keyVar, $valueVar]) {
+                    if (Variable::TYPE_STRING !== $keyVar->type) {
+                        continue;
+                    }
+                    $key = $keyVar->toString();
+                    $valueVar = $valueVar->resolveIndirect();
+                    if ('friendly_name' === $key && Variable::TYPE_STRING === $valueVar->type) {
+                        $friendlyName = $valueVar->toString();
+                    }
+                    if ('extracerts' === $key && Variable::TYPE_ARRAY === $valueVar->type) {
+                        foreach ($valueVar->toArray()->iterateKeyed(true) as [, $certVar]) {
+                            $extraPem = self::coerceCertificatePem(
+                                $certVar,
+                                'openssl_pkcs12_export',
+                                4,
+                                'options'
+                            );
+                            $extraCerts[] = $extraPem;
+                        }
+                    }
+                }
+            }
+        }
+
+        $blob = VmOpensslPkcs12Native::createPkcs12(
+            $certPem,
+            $keyPem,
+            $passphrase,
+            $friendlyName,
+            $extraCerts
+        );
+        if (false === $blob) {
+            return false;
+        }
+
+        return $blob;
+    }
+
+    public static function coerceCertificatePem(
+        Variable $var,
+        string $function,
+        int $argIndex,
+        string $paramName
+    ): string {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_STRING === $var->type) {
+            return $var->toString();
+        }
+        if (Variable::TYPE_OBJECT === $var->type) {
+            if (VmOpensslObjects::isCertificate($var)) {
+                $pem = VmOpensslObjects::certificatePem($var->toObject());
+                if ('' !== $pem) {
+                    return $pem;
+                }
+            }
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #%d ($%s) must be of type OpenSSLCertificate|string, %s given',
+                $function,
+                $argIndex + 1,
+                $paramName,
+                $var->toObject()->class->name
+            ));
+        }
+
+        throw new \TypeError(\sprintf(
+            '%s(): Argument #%d ($%s) must be of type OpenSSLCertificate|string, %s given',
+            $function,
+            $argIndex + 1,
+            $paramName,
+            match ($var->type) {
+                Variable::TYPE_NULL => 'null',
+                Variable::TYPE_BOOLEAN => 'bool',
+                Variable::TYPE_INTEGER => 'int',
+                Variable::TYPE_FLOAT => 'float',
+                Variable::TYPE_ARRAY => 'array',
+                default => 'mixed',
+            }
+        ));
+    }
+
     /** @param list<string> $items */
     private static function stringListToHashTable(array $items): HashTable
     {
