@@ -74,7 +74,7 @@ final class exit_ extends Internal
         if (Variable::TYPE_ENUM_CASE === $v->type) {
             return;
         }
-        if (Variable::TYPE_OBJECT === $v->type && EnumCaseSupport::isEnumCase($v->toObject())) {
+        if (Variable::TYPE_OBJECT === $v->type) {
             return;
         }
 
