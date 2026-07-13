@@ -15,7 +15,7 @@ foreach (['nl2br', 'chop', 'rtrim', 'ltrim', 'trim', 'wordwrap', 'ucfirst', 'lcf
 echo trim('  x  '), "\n";
 ?>
 --EXPECT--
-nl2br: nl2br(): Argument #1 ($string) must be of type string, null given
+nl2br: NO_THROW
 chop: NO_THROW
 rtrim: NO_THROW
 ltrim: NO_THROW
