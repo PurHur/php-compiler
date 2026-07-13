@@ -12,7 +12,6 @@ use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\BuiltinExecute;
-use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -24,14 +23,12 @@ final class addcslashes extends Internal
         if (2 !== \count($frame->calledArgs)) {
             throw new \LogicException('addcslashes() requires exactly two arguments in this compiler build');
         }
-        InternalStrictArg::rejectNullString($frame->calledArgs[0], 'addcslashes', 'str', 0, $frame);
         $subject = VmString::coerceStringBuiltinArg(
             $frame->calledArgs[0],
             'addcslashes',
             0,
             'str'
         );
-        InternalStrictArg::rejectNullString($frame->calledArgs[1], 'addcslashes', 'characters', 1, $frame);
         $charlist = VmString::coerceStringBuiltinArg(
             $frame->calledArgs[1],
             'addcslashes',
@@ -58,7 +55,7 @@ final class addcslashes extends Internal
         }
 
         StringCslashes::ensureLinked($context);
-        $subject = JitStringBuiltinArg::lowerTypedString($context, $args[0], 'addcslashes', 0, 'str');
+        $subject = JitStringBuiltinArg::lower($context, $args[0], 'addcslashes', 0, 'str');
         if (null !== $charlistLit) {
             return $context->builder->call(
                 $context->lookupFunction('__compiler_addcslashes'),

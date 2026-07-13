@@ -1,13 +1,16 @@
 --TEST--
-stdlib typed string builtins — null $string TypeError JIT (#18190, ext/standard/string.c, html.c)
+stdlib string builtins — null $string coerces to empty string JIT (#18483, ext/standard/string.c, html.c)
 --JIT--
 --FILE--
 <?php
 foreach ([
     'htmlspecialchars' => static fn () => htmlspecialchars(null),
     'htmlentities' => static fn () => htmlentities(null),
+    'addslashes' => static fn () => addslashes(null),
+    'stripslashes' => static fn () => stripslashes(null),
     'addcslashes' => static fn () => addcslashes(null, 'a'),
     'strip_tags' => static fn () => strip_tags(null),
+    'wordwrap' => static fn () => wordwrap(null),
 ] as $name => $call) {
     try {
         $call();
@@ -17,7 +20,10 @@ foreach ([
     }
 }
 --EXPECT--
-htmlspecialchars: TypeError
-htmlentities: TypeError
-addcslashes: TypeError
-strip_tags: TypeError
+htmlspecialchars: uncaught
+htmlentities: uncaught
+addslashes: uncaught
+stripslashes: uncaught
+addcslashes: uncaught
+strip_tags: uncaught
+wordwrap: uncaught
