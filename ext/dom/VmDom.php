@@ -3902,7 +3902,7 @@ final class VmDom
         return $object;
     }
 
-    public static function saveXML(ObjectEntry $document, ?ObjectEntry $node = null): string
+    public static function saveXML(ObjectEntry $document, ?ObjectEntry $node = null, int $options = 0): string
     {
         $state = self::ensureDocument($document);
         if (DomConstants::XML_DOCUMENT_NODE !== $state->nodeType) {
@@ -3910,13 +3910,14 @@ final class VmDom
         }
 
         $formatOutput = self::documentFormatOutput($document);
+        $noEmptyTag = 0 !== ($options & \PHPCompiler\ext\libxml\LibxmlConstants::LIBXML_NOEMPTYTAG);
 
         if (null !== $node) {
             if (!self::isDomNode($node)) {
                 throw new \TypeError('DOMDocument::saveXML(): Argument #1 ($node) must be of type DOMNode');
             }
 
-            return self::serializeNode($node, 0, $formatOutput);
+            return self::serializeNode($node, 0, $formatOutput, $noEmptyTag);
         }
 
         $lines = [self::serializeXmlDeclaration($state)];
@@ -3933,15 +3934,16 @@ final class VmDom
             foreach ($state->childIds as $childId) {
                 $child = DomRegistry::entry($childId);
                 if (null !== $child) {
-                    $lines[] = self::serializeNode($child, 0, $formatOutput);
+                    $lines[] = self::serializeNode($child, 0, $formatOutput, $noEmptyTag);
                 }
             }
         } else {
             $rootVar = $document->getProperty(self::PROP_DOCUMENT_ELEMENT)->resolveIndirect();
             if (Variable::TYPE_OBJECT === $rootVar->type) {
-                $lines[] = self::serializeElement($rootVar->toObject(), 0, $formatOutput);
+                $lines[] = self::serializeElement($rootVar->toObject(), 0, $formatOutput, $noEmptyTag);
             } elseif (null !== $state->documentElementName && '' !== $state->documentElementName) {
-                $lines[] = '<'.self::escapeName($state->documentElementName).'/>';
+                $name = self::escapeName($state->documentElementName);
+                $lines[] = $noEmptyTag ? '<'.$name.'></'.$name.'>' : '<'.$name.'/>';
             }
         }
 
@@ -4060,7 +4062,7 @@ final class VmDom
         return true;
     }
 
-    public static function saveHTML(ObjectEntry $document, ?ObjectEntry $node = null): string
+    public static function saveHTML(ObjectEntry $document, ?ObjectEntry $node = null, int $options = 0): string
     {
         $state = self::ensureDocument($document);
         if (DomConstants::XML_DOCUMENT_NODE !== $state->nodeType) {
@@ -4089,7 +4091,8 @@ final class VmDom
             if (Variable::TYPE_OBJECT === $rootVar->type) {
                 $lines[] = self::serializeHtmlNode($rootVar->toObject());
             } elseif (null !== $state->documentElementName && '' !== $state->documentElementName) {
-                $lines[] = '<'.self::escapeName($state->documentElementName).'/>';
+                $name = self::escapeName($state->documentElementName);
+                $lines[] = '<'.$name.'></'.$name.'>';
             }
         }
 
@@ -4520,7 +4523,7 @@ final class VmDom
         $name = self::escapeName($state->nodeName);
         $attrPart = self::serializeAttributes($state);
         if ([] === $state->childIds) {
-            return '<'.$name.$attrPart.'/>';
+            return '<'.$name.$attrPart.'></'.$name.'>';
         }
         $parts = [];
         foreach ($state->childIds as $childId) {
@@ -4737,10 +4740,10 @@ final class VmDom
         return null;
     }
 
-    private static function serializeNode(ObjectEntry $entry, int $depth = 0, bool $format = false): string
+    private static function serializeNode(ObjectEntry $entry, int $depth = 0, bool $format = false, bool $noEmptyTag = false): string
     {
         if (self::isElement($entry)) {
-            return self::serializeElement($entry, $depth, $format);
+            return self::serializeElement($entry, $depth, $format, $noEmptyTag);
         }
         if (self::isTextNode($entry)) {
             $text = self::escapeText(DomRegistry::state($entry)->textContent ?? '');
@@ -4768,13 +4771,15 @@ final class VmDom
         throw new \DOMException('Cannot serialize node type in this compiler build');
     }
 
-    private static function serializeElement(ObjectEntry $entry, int $depth = 0, bool $format = false): string
+    private static function serializeElement(ObjectEntry $entry, int $depth = 0, bool $format = false, bool $noEmptyTag = false): string
     {
         $state = DomRegistry::state($entry);
         $name = self::escapeName($state->nodeName);
         $attrPart = self::serializeAttributes($state);
         if ([] === $state->childIds) {
-            $tag = '<'.$name.$attrPart.'/>';
+            $tag = $noEmptyTag
+                ? '<'.$name.$attrPart.'></'.$name.'>'
+                : '<'.$name.$attrPart.'/>';
 
             return $format ? str_repeat('  ', $depth).$tag : $tag;
         }
@@ -4783,7 +4788,7 @@ final class VmDom
             foreach ($state->childIds as $childId) {
                 $child = DomRegistry::entry($childId);
                 if (null !== $child) {
-                    $parts[] = self::serializeNode($child);
+                    $parts[] = self::serializeNode($child, 0, false, $noEmptyTag);
                 }
             }
 
@@ -4795,7 +4800,7 @@ final class VmDom
         foreach ($state->childIds as $childId) {
             $child = DomRegistry::entry($childId);
             if (null !== $child) {
-                $lines[] = self::serializeNode($child, $depth + 1, true);
+                $lines[] = self::serializeNode($child, $depth + 1, true, $noEmptyTag);
             }
         }
         $lines[] = $indent.'</'.$name.'>';
