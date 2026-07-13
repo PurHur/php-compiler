@@ -27,11 +27,17 @@ final class SuperglobalsBracketRuntimeStandaloneTest extends TestCase
         $this->assertGreaterThan(0, $fn->countBasicBlocks(), '__compiler_parse_str must have LLVM bridge body');
     }
 
-    public function testUserScriptRefreshLinksDelimitedLlvmSubhelpers(): void
+    public function testUserScriptRefreshLinksParseStrRuntimeBridgesNotDelimitedLlvm(): void
     {
         $runtime = new Runtime(Runtime::MODE_AOT);
         $ctx = new Context($runtime, Builtin::LOAD_TYPE_STANDALONE);
         ParseStrRuntime::ensureUserScriptLinked($ctx);
+
+        foreach (['__compiler_parse_str', '__compiler_parse_cookie_header'] as $name) {
+            $bridge = $ctx->module->getNamedFunction($name);
+            $this->assertNotNull($bridge, $name.' must be linked for user-script AOT refresh (#18643)');
+            $this->assertGreaterThan(0, $bridge->countBasicBlocks(), $name.' must have LLVM bridge body');
+        }
 
         foreach (
             [
@@ -42,8 +48,7 @@ final class SuperglobalsBracketRuntimeStandaloneTest extends TestCase
             ] as $name
         ) {
             $legacy = $ctx->module->getNamedFunction($name);
-            $this->assertNotNull($legacy, $name.' must be linked for user-script AOT refresh (#15624)');
-            $this->assertGreaterThan(0, $legacy->countBasicBlocks(), $name.' must have LLVM body');
+            $this->assertNull($legacy, $name.' hand-LLVM must stay deleted — ParseStrNativeJitHelper PHP (#18643)');
         }
     }
 

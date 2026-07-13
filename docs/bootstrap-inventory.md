@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 4776 |
-| Phase A inventory files (M2 ratio SSOT) | 4776 |
+| PHP files on vm.php path | 4778 |
+| Phase A inventory files (M2 ratio SSOT) | 4778 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 12833 |
+| Source constructs flagged (warnings) | 12848 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -718,9 +718,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/random/RandomizerBuiltin.php` | 0 | 26 |
 | `ext/random/SecureInstance.php` | 0 | 1 |
 | `ext/random/Xoshiro256StarStarInstance.php` | 0 | 1 |
-| `ext/session/Module.php` | 0 | 23 |
+| `ext/session/Module.php` | 0 | 25 |
 | `ext/session/SessionConstants.php` | 0 | 1 |
 | `ext/session/SessionFileStorage.php` | 0 | 1 |
+| `ext/session/SessionUserHandler.php` | 0 | 9 |
+| `ext/session/session_register_shutdown.php` | 0 | 1 |
+| `ext/session/session_set_save_handler.php` | 0 | 3 |
 | `ext/simplexml/BuiltinClasses.php` | 0 | 1 |
 | `ext/simplexml/Module.php` | 0 | 4 |
 | `ext/simplexml/SimpleXmlElementAddChild.php` | 0 | 1 |
@@ -1991,7 +1994,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VmScope.php` | 0 | 12 |
 | `ext/standard/VmSerialize.php` | 0 | 43 |
 | `ext/standard/VmSerializeFormat.php` | 0 | 1 |
-| `ext/standard/VmSession.php` | 0 | 16 |
+| `ext/standard/VmSession.php` | 0 | 17 |
 | `ext/standard/VmSessionSerializer.php` | 0 | 5 |
 | `ext/standard/VmSetcookie.php` | 0 | 1 |
 | `ext/standard/VmSettype.php` | 0 | 7 |
@@ -3455,7 +3458,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/ParamSensitiveLowering.php` | 0 | 1 |
 | `lib/JIT/Builtin/ParseStrNativeOpsJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/ParseStrRuntime.php` | 0 | 7 |
-| `lib/JIT/Builtin/ParseStrUserScriptDelimitedJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/ParseUrl.php` | 0 | 1 |
 | `lib/JIT/Builtin/ParseUrlComponentJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/ParseUrlRuntime.php` | 0 | 3 |
@@ -9562,6 +9564,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new session_cache_limiter (line 53)
 - new session_set_cookie_params (line 54)
 - new session_get_cookie_params (line 55)
+- new session_set_save_handler (line 56)
+- new session_register_shutdown (line 57)
 - 2 class method(s)
 
 ### `ext/session/SessionConstants.php`
@@ -9573,6 +9577,31 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 4 class method(s)
+
+### `ext/session/SessionUserHandler.php`
+
+**Warnings** (review for bootstrap subset):
+- new Variable (line 76)
+- new Variable (line 78)
+- new Variable (line 98)
+- new Variable (line 120)
+- new Variable (line 122)
+- new Variable (line 153)
+- new Variable (line 172)
+- new Variable (line 197)
+- 14 class method(s)
+
+### `ext/session/session_register_shutdown.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
+### `ext/session/session_set_save_handler.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 32)
+- 2 class method(s)
+- 2 closure(s)
 
 ### `ext/simplexml/BuiltinClasses.php`
 
@@ -18283,21 +18312,22 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmSession.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 142)
-- new Variable (line 144)
+- new HashTable (line 145)
 - new Variable (line 147)
 - new Variable (line 150)
 - new Variable (line 153)
 - new Variable (line 156)
 - new Variable (line 159)
-- new Variable (line 281)
-- new HashTable (line 528)
-- new HashTable (line 594)
-- new HashTable (line 616)
-- new HashTable (line 749)
-- new HashTable (line 755)
-- new HashTable (line 761)
-- new HashTable (line 766)
+- new Variable (line 162)
+- new Variable (line 284)
+- new HashTable (line 546)
+- new HashTable (line 612)
+- new HashTable (line 634)
+- new HashTable (line 784)
+- new HashTable (line 791)
+- new HashTable (line 798)
+- new HashTable (line 804)
+- new HashTable (line 809)
 - 53 class method(s)
 
 ### `ext/standard/VmSessionSerializer.php`
@@ -27653,18 +27683,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/ParseStrRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new phpc_native_ht_alloc (line 321)
-- new phpc_native_ht_set_string_key (line 322)
-- new phpc_native_ht_set_string_key_ht (line 323)
-- new phpc_native_ht_set_string_at (line 324)
-- new phpc_native_ht_set_hashtable_at (line 325)
+- new phpc_native_ht_alloc (line 320)
+- new phpc_native_ht_set_string_key (line 321)
+- new phpc_native_ht_set_string_key_ht (line 322)
+- new phpc_native_ht_set_string_at (line 323)
+- new phpc_native_ht_set_hashtable_at (line 324)
 - 15 class method(s)
 - 4 closure(s)
-
-### `lib/JIT/Builtin/ParseStrUserScriptDelimitedJit.php`
-
-**Warnings** (review for bootstrap subset):
-- 25 class method(s)
 
 ### `lib/JIT/Builtin/ParseUrl.php`
 
@@ -35673,7 +35698,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/ShutdownQueue.php`
 
 **Warnings** (review for bootstrap subset):
-- 5 class method(s)
+- 6 class method(s)
 
 ### `lib/VM/StringOffsetJitHelper.php`
 

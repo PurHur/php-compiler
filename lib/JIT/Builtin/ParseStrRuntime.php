@@ -81,7 +81,6 @@ final class ParseStrRuntime
         }
 
         self::ensureNativeHtInternalProxies($context);
-        ParseStrUserScriptDelimitedJit::ensureSubhelpers($context);
         JitVmHelperLink::ensureCompiled(
             $context,
             self::USER_SCRIPT_HELPER_PATH,

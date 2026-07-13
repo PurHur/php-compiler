@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
+use PHPCompiler\JIT\InternalStrictArg;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
@@ -16,6 +17,12 @@ final class JitGetHtmlTranslationTable
     /** @return Value */
     public static function invoke(Context $context, JITVariable ...$args): Value
     {
+        if (isset($args[0])) {
+            InternalStrictArg::requireInt($context, $args[0], 'get_html_translation_table', 'table', 1);
+        }
+        if (isset($args[1])) {
+            InternalStrictArg::requireInt($context, $args[1], 'get_html_translation_table', 'flags', 2);
+        }
         $table = self::compileTimeInt($context, $args[0] ?? null, HTML_SPECIALCHARS, 'table');
         $flags = self::compileTimeInt($context, $args[1] ?? null, ENT_QUOTES | ENT_SUBSTITUTE, 'flags');
         $encoding = 'UTF-8';
