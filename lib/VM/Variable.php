@@ -12,6 +12,7 @@ namespace PHPCompiler\VM;
 use PHPTypes\Type;
 use PHPCompiler\GenericArrayTypeSpec;
 use PHPCompiler\OpCode;
+use PHPCompiler\ext\standard\VmScalarType;
 use PHPCompiler\ext\standard\VmString;
 
 final class Variable {
@@ -519,7 +520,8 @@ final class Variable {
                     }
                 }
 
-                return $this->objectToScalarString($vm, 'int')->toInt($vm);
+                // Zend convert_to_long object branch — legacy 1, no __toString (#18444, zend_operators.c).
+                return 1;
             case self::TYPE_ENUM_CASE:
                 $enumInt = EnumCaseSupport::tryCastToInt($this, $vm?->context);
                 if (null !== $enumInt) {
@@ -572,7 +574,8 @@ final class Variable {
                     }
                 }
 
-                return $this->objectToScalarString($vm, 'float')->toFloat($vm);
+                // Zend convert_to_double object branch — legacy 1.0, no __toString (#18444, zend_operators.c).
+                return 1.0;
             case self::TYPE_ENUM_CASE:
                 $enumFloat = EnumCaseSupport::tryCastToFloat($this, $vm?->context);
                 if (null !== $enumFloat) {
@@ -608,7 +611,7 @@ final class Variable {
                 }
                 return (float) $this->string;
             case self::TYPE_OBJECT:
-                return $this->objectToScalarString($vm, 'int')->toNumeric($vm);
+                self::throwObjectNumericCompareError($this);
         }
         throw new \TypeError(sprintf(
             'Unsupported operand types: %s',
@@ -777,7 +780,7 @@ final class Variable {
                     return true;
                 }
 
-                return $this->objectToScalarString($vm, 'bool')->toBool($vm);
+                return $this->objectToBoolViaToString($vm)->toBool($vm);
             case self::TYPE_ENUM_CASE:
                 return true;
             case self::TYPE_PROPERTY_HOOK_REF:
@@ -1150,19 +1153,15 @@ final class Variable {
                 }
                 break;
             case Variable::TYPE_INTEGER:
-                $src = $var->resolveIndirect();
-                $enumInt = EnumCaseSupport::tryCastToInt($src, $vm?->context, $frame);
-                if (null !== $enumInt) {
-                    $this->integer = $enumInt;
+                if (null !== $frame) {
+                    VmScalarType::writeCoercedInt($this, $var, $frame);
                     break;
                 }
                 $this->integer = $var->toInt($vm);
                 break;
             case Variable::TYPE_FLOAT:
-                $src = $var->resolveIndirect();
-                $enumFloat = EnumCaseSupport::tryCastToFloat($src, $vm?->context, $frame);
-                if (null !== $enumFloat) {
-                    $this->float = $enumFloat;
+                if (null !== $frame) {
+                    VmScalarType::writeCoercedFloat($this, $var, $frame);
                     break;
                 }
                 $this->float = $var->toFloat($vm);
@@ -1490,11 +1489,10 @@ restart:
 
                 return $value;
             case self::TYPE_OBJECT:
-                return self::coerceUnaryPlusOperand(
-                    $expr->objectToScalarString($vm, 'int'),
-                    $vm,
-                    $frame
-                );
+                throw new \TypeError(sprintf(
+                    'Unsupported operand types: %s',
+                    self::operandZendTypeName($expr)
+                ));
         }
         throw new \TypeError(sprintf(
             'Unsupported operand types: %s',
@@ -1615,18 +1613,10 @@ restart:
 
                 return $value;
             case self::TYPE_OBJECT:
-                if (self::isEnumCaseOperand($this)) {
-                    throw new \TypeError(sprintf(
-                        'Unsupported operand types: %s',
-                        self::operandZendTypeName($this)
-                    ));
-                }
-
-                return self::toNumericForArithmeticFromVariable(
-                    $this->objectToScalarString($vm, 'int'),
-                    $vm,
-                    $frame
-                );
+                throw new \TypeError(sprintf(
+                    'Unsupported operand types: %s',
+                    self::operandZendTypeName($this)
+                ));
             case self::TYPE_ENUM_CASE:
                 throw new \TypeError(sprintf(
                     'Unsupported operand types: %s',
@@ -1772,11 +1762,10 @@ restart:
     }
 
     /**
-     * Zend cast_object: explicit scalar casts invoke __toString when defined (zend_operators.c).
-     *
-     * @param 'bool'|'int'|'float' $castKind
+     * Zend cast_object IS_BOOL: invoke __toString when defined (zend_operators.c).
+     * Int/float casts use convert_to_long/double — warning + legacy 1 / 1.0 (#18444).
      */
-    private function objectToScalarString(?\PHPCompiler\VM $vm, string $castKind): self
+    private function objectToBoolViaToString(?\PHPCompiler\VM $vm): self
     {
         $var = $this->resolveIndirect();
         if (self::TYPE_OBJECT !== $var->type) {
@@ -1787,12 +1776,6 @@ restart:
             throw new \LogicException('VM required for explicit object scalar cast');
         }
         if (!$vm->hasInstanceMethod($var->object->class, '__tostring')) {
-            if ('int' === $castKind) {
-                throw new \TypeError("Object of class {$className} could not be converted to int");
-            }
-            if ('float' === $castKind) {
-                throw new \TypeError("Object of class {$className} could not be converted to float");
-            }
             throw new \TypeError("Object of class {$className} could not be converted to bool");
         }
         $str = $vm->invokeInstanceMethod($var->object, '__toString')->toString();

@@ -1,5 +1,5 @@
 --TEST--
-Language: (bool)/(int)/(float) object cast — Zend cast_object (#3451)
+Language: (bool)/(int)/(float) object cast — Zend cast_object (#3451, #18444)
 --FILE--
 <?php
 class B {
@@ -15,36 +15,22 @@ class EmptyToString {
 }
 $empty = new EmptyToString();
 echo (bool) $empty ? "true\n" : "false\n";
+echo (int) $empty, "\n";
+echo (float) $empty, "\n";
 
 class NoMagic {}
 $plain = new NoMagic();
 echo (bool) $plain ? "true\n" : "false\n";
-
-$intMsg = 'Object of class NoMagic could not be converted to int';
-try {
-    (int) $plain;
-    echo "no int error\n";
-} catch (TypeError $e) {
-    echo $e->getMessage() === $intMsg ? "TypeError: int\n" : "wrong int\n";
-} catch (Throwable $e) {
-    echo "Throwable: int\n";
-}
-
-$floatMsg = 'Object of class NoMagic could not be converted to float';
-try {
-    (float) $plain;
-    echo "no float error\n";
-} catch (TypeError $e) {
-    echo $e->getMessage() === $floatMsg ? "TypeError: float\n" : "wrong float\n";
-} catch (Throwable $e) {
-    echo "Throwable: float\n";
-}
+echo (int) $plain, "\n";
+echo (float) $plain, "\n";
 ?>
 --EXPECT--
 true
-42
-42
+1
+1
 false
+1
+1
 true
-TypeError: int
-TypeError: float
+1
+1
