@@ -6,6 +6,7 @@ namespace PHPCompiler\VM;
 
 use PHPCompiler\ext\standard\VmCallable;
 use PHPCompiler\ext\standard\VmClosureCall;
+use PHPCompiler\ext\standard\VmSession;
 
 /**
  * FIFO shutdown callback queue (register_shutdown_function parity, issue #3120).
@@ -17,10 +18,18 @@ final class ShutdownQueue
 
     private static bool $running = false;
 
+    private static bool $sessionWriteCloseRegistered = false;
+
     public static function reset(): void
     {
         self::$queue = [];
         self::$running = false;
+        self::$sessionWriteCloseRegistered = false;
+    }
+
+    public static function registerSessionWriteClose(): void
+    {
+        self::$sessionWriteCloseRegistered = true;
     }
 
     public static function register(Variable $callable, Variable ...$args): void
@@ -47,6 +56,9 @@ final class ShutdownQueue
                 continue;
             }
             self::invoke($context, $entry['callable'], ...$entry['args']);
+        }
+        if (self::$sessionWriteCloseRegistered && VmSession::isActive()) {
+            VmSession::writeClose($context);
         }
         self::$running = false;
     }
