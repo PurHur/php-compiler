@@ -28,12 +28,28 @@ final class AttributeClassRegistry
 
     public function isRepeatable(string $attributeClassName): bool
     {
-        $flags = $this->getFlags($attributeClassName);
-        if (null === $flags) {
+        // Zend zend_compile.c: duplicate rejection at compile time applies only to
+        // internal attributes without IS_REPEATABLE (#18709, zend_internal_attribute_get).
+        if (self::isInternalNonRepeatable($attributeClassName)) {
             return false;
         }
 
-        return 0 !== ($flags & AttributeSupport::IS_REPEATABLE);
+        return true;
+    }
+
+    /** Internal compiler attributes that reject duplicates at compile time (Zend/zend_attributes.stub.php). */
+    public static function isInternalNonRepeatable(string $attributeClassName): bool
+    {
+        $base = strtolower(ltrim($attributeClassName, '\\'));
+        $pos = strrpos($base, '\\');
+        $short = false !== $pos ? substr($base, $pos + 1) : $base;
+
+        return \in_array($short, [
+            'attribute',
+            'allowdynamicproperties',
+            'sensitiveparameter',
+            'returntypewillchange',
+        ], true);
     }
 
     public function getFlags(string $attributeClassName): ?int

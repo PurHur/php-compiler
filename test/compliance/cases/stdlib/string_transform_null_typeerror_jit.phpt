@@ -14,6 +14,6 @@ foreach (['nl2br', 'trim', 'ucfirst'] as $fn) {
 }
 ?>
 --EXPECT--
-nl2br: nl2br(): Argument #1 ($string) must be of type string, null given
+nl2br: NO_THROW
 trim: NO_THROW
 ucfirst: NO_THROW

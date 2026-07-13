@@ -1,5 +1,6 @@
 --TEST--
 stdlib strncasecmp() null haystack — JIT coerce to empty string (#18700)
+--JIT--
 --FILE--
 <?php
 echo strncasecmp(null, 'a', 1), "\n";
