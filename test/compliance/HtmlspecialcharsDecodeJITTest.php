@@ -13,10 +13,15 @@ final class HtmlspecialcharsDecodeJITTest extends BaseTest
 
     public static function providePHPTests(): \Generator
     {
-        yield 'htmlspecialchars_decode_jit.phpt' => self::parsePHPT(
-            __DIR__.'/cases/stdlib/htmlspecialchars_decode_jit.phpt',
-            'htmlspecialchars_decode_jit.phpt'
-        );
+        foreach ([
+            'htmlspecialchars_decode_jit.phpt',
+            'htmlspecialchars_decode_null_strict_jit.phpt',
+        ] as $file) {
+            yield $file => self::parsePHPT(
+                __DIR__.'/cases/stdlib/'.$file,
+                $file
+            );
+        }
     }
 
     public function setUp(): void
