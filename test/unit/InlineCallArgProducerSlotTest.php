@@ -7204,6 +7204,43 @@ PHP;
         self::assertSame("2020-01-01T12:00:00+00:00\n", ob_get_clean());
     }
 
+    /** Issue #18456 — array_key_exists() inline new must wire New_ slot, not ctor Array_ prelude. */
+    public function testArrayKeyExistsInlineNewUsesNewProducerSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+array_key_exists(0, new ArrayObject([1]));
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'array_key_exists_inline_new.php');
+
+        $arraySlot = null;
+        $newSlot = null;
+        $akeSends = [];
+        $inArrayKeyExists = false;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_INIT_ARRAY === $op->type && null === $arraySlot) {
+                $arraySlot = $op->arg1;
+            }
+            if (OpCode::TYPE_NEW === $op->type && null === $newSlot) {
+                $newSlot = $op->arg1;
+            }
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                $inArrayKeyExists = true;
+                $akeSends = [];
+            }
+            if ($inArrayKeyExists && OpCode::TYPE_ARG_SEND === $op->type) {
+                $akeSends[] = $op->arg1;
+            }
+        }
+
+        self::assertNotNull($arraySlot, 'ctor array slot');
+        self::assertNotNull($newSlot, 'inline new slot');
+        self::assertCount(2, $akeSends, 'array_key_exists arg sends='.json_encode($akeSends));
+        self::assertSame($newSlot, $akeSends[1] ?? null, 'haystack arg must use New_ slot, not ctor Array_');
+        self::assertNotSame($arraySlot, $akeSends[1] ?? null);
+    }
+
     /** Issue #15422 — in_array/array_search/array_key_exists after UDF with array param. */
     public function testInArrayFamilyAfterUdfArrayParamRuntime(): void
     {
