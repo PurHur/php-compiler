@@ -30,7 +30,7 @@ final class strtoupper extends Internal
         if (1 !== count($frame->calledArgs)) {
             throw new \LogicException('strtoupper() requires exactly one argument');
         }
-        $subject = VmString::coerceTypedStringBuiltinArg(
+        $subject = VmString::coerceStringBuiltinArg(
             $frame->calledArgs[0],
             'strtoupper',
             0,
@@ -50,7 +50,7 @@ final class strtoupper extends Internal
         if (1 !== count($args)) {
             throw new \LogicException('strtoupper() requires exactly one argument');
         }
-        $str = JitStringBuiltinArg::lowerTypedString($context, $args[0], 'strtoupper', 0, 'string');
+        $str = JitStringBuiltinArg::lower($context, $args[0], 'strtoupper', 0, 'string');
         $copy = $context->builder->call($context->lookupFunction('__string__separate'), $str);
         lcfirst::transformAllAscii($context, $copy, ord('a'), ord('z'), -32);
 
