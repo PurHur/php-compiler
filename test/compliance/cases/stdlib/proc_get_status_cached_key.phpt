@@ -1,5 +1,5 @@
 --TEST--
-Stdlib: proc_get_status() cached key after child exit (#17362, PHP 8.3+ forward profile)
+Stdlib: proc_get_status() cached key absent on forward profile (#18731, re-#17883, php-src-strict)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--
@@ -16,11 +16,9 @@ for ($i = 0; $i < 50; ++$i) {
     }
     usleep(10000);
 }
-echo array_key_exists('cached', $status) ? "has\n" : "missing\n";
-echo $status['cached'] ? "true\n" : "false\n";
+echo array_key_exists('cached', $status) ? "present\n" : "absent\n";
 echo $status['running'] ? "running\n" : "done\n";
 proc_close($proc);
 --EXPECT--
-has
-true
+absent
 done

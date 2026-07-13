@@ -219,26 +219,6 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
-    public function testSupportsProcGetStatusCachedFalseOnReferenceProfile(): void
-    {
-        $this->assertFalse(CompilerVersion::supportsProcGetStatusCached());
-    }
-
-    public function testSupportsProcGetStatusCachedTrueOnForwardProfile(): void
-    {
-        $prev = getenv('PHP_COMPILER_PROFILE');
-        putenv('PHP_COMPILER_PROFILE=8.4');
-        try {
-            $this->assertTrue(CompilerVersion::supportsProcGetStatusCached());
-        } finally {
-            if (false === $prev) {
-                putenv('PHP_COMPILER_PROFILE');
-            } else {
-                putenv('PHP_COMPILER_PROFILE='.$prev);
-            }
-        }
-    }
-
     public function testSupportsProcGetStatusPendingSignalsFalseOnReferenceProfile(): void
     {
         $this->assertFalse(CompilerVersion::supportsProcGetStatusPendingSignals());

@@ -9,6 +9,7 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /** get_cfg_var() — read PHP ini cfg values (ext/standard/ini.c, #6119). */
@@ -27,7 +28,12 @@ final class get_cfg_var extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $option = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'get_cfg_var', 0, 'option');
+        $resolved = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_NULL === $resolved->type) {
+            $option = '';
+        } else {
+            $option = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'get_cfg_var', 0, 'option');
+        }
         $result = VmIni::getCfgVar($option);
         if (false === $result) {
             $frame->returnVar->bool(false);
@@ -41,7 +47,11 @@ final class get_cfg_var extends Internal
         if (1 !== \count($args)) {
             throw new \LogicException('get_cfg_var() requires exactly one argument');
         }
-        $optionStr = JitStringBuiltinArg::lowerCoercible($context, $args[0], 'get_cfg_var', 0, 'option');
+        if (JITVariable::TYPE_NULL === $args[0]->type || $args[0]->isNullConstant) {
+            $optionStr = $context->builder->load($context->constantStringFromString(''));
+        } else {
+            $optionStr = JitStringBuiltinArg::lower($context, $args[0], 'get_cfg_var', 0, 'option');
+        }
 
         return JitIni::getCfgVar($context, $optionStr);
     }

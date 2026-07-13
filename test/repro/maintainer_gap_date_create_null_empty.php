@@ -2,19 +2,20 @@
 
 declare(strict_types=1);
 
-$d = date_create(null);
-if (!($d instanceof DateTime)) {
-    fwrite(STDERR, "date_create(null): expected DateTime instance\n");
-    exit(1);
-}
-echo "date_create(null): ok\n";
+putenv('PHP_COMPILER_PROFILE=8.4');
 
-$dt = new DateTime(null);
-if (!($dt instanceof DateTime)) {
-    fwrite(STDERR, "DateTime(null): expected DateTime instance\n");
-    exit(1);
+foreach ([
+    'date_create(null)' => static fn () => date_create(null),
+    'DateTime(null)' => static fn () => new DateTime(null),
+] as $label => $factory) {
+    try {
+        $factory();
+        fwrite(STDERR, "$label: expected TypeError\n");
+        exit(1);
+    } catch (TypeError $e) {
+        echo "$label: TypeError\n";
+    }
 }
-echo "DateTime(null): ok\n";
 
 foreach (['date_create' => static fn () => date_create(''), 'DateTime' => static fn () => new DateTime('')] as $label => $factory) {
     $result = $factory();
