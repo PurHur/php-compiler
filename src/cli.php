@@ -170,6 +170,26 @@ if (!function_exists('php_compiler_cli_resolve_user_path')) {
     }
 }
 
+if (!function_exists('php_compiler_cli_usage_error')) {
+    /** Unknown CLI option — mirror Zend sapi/cli exit code 1 (issue #18691). */
+    function php_compiler_cli_usage_error(string $message): never
+    {
+        fwrite(STDERR, rtrim($message, "\n")."\n");
+        exit(1);
+    }
+}
+
+if (!function_exists('php_compiler_cli_print_version')) {
+    /** Minimal -v/--version banner for bin/* entrypoints (issue #18691, sapi/cli/php_cli.c). */
+    function php_compiler_cli_print_version(): void
+    {
+        $profile = \PHPCompiler\CompilerVersion::reportedPhpVersion();
+        $host = PHP_VERSION;
+        $sapi = PHP_SAPI;
+        echo "PHP Compiler {$profile} (host PHP {$host} ({$sapi}))\n";
+    }
+}
+
 if (!function_exists('php_compiler_cli_user_script_argv_tail')) {
     /**
      * Trailing argv slice for user scripts — strips a leading "--" separator (Zend CLI parity, #4139, #15070).
