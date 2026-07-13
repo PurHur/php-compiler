@@ -1323,11 +1323,6 @@ final class VmString
     {
         $len1 = self::byteLength($string1);
         $len2 = self::byteLength($string2);
-        if ($len1 > 255 || $len2 > 255) {
-            throw new \ValueError(
-                'similar_text(): Argument #1 ($string1) or #2 ($string2) must be less than 256 characters'
-            );
-        }
         if (0 === $len1 && 0 === $len2) {
             if (null !== $percent) {
                 $percent = 0.0;
