@@ -1,0 +1,36 @@
+<?php
+
+declare(strict_types=1);
+
+namespace PHPCompiler\ext\gmp;
+
+use PHPCompiler\ModuleAbstract;
+use PHPCompiler\Runtime;
+use PHPCompiler\VM\Context;
+
+/** gmp extension module entry (php-src ext/gmp/gmp.c; issue #3341). */
+class Module extends ModuleAbstract
+{
+    public function init(Runtime $runtime): void
+    {
+        parent::init($runtime);
+        VmGmpObject::registerClass($runtime->vmContext);
+    }
+
+    public static function registerClasses(Context $ctx): void
+    {
+        VmGmpObject::registerClass($ctx);
+    }
+
+    public function getFunctions(): array
+    {
+        return [
+            new gmp_init(),
+            new gmp_add(),
+            new gmp_sub(),
+            new gmp_mul(),
+            new gmp_cmp(),
+            new gmp_strval(),
+        ];
+    }
+}

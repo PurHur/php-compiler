@@ -4876,4 +4876,15 @@ unset($__spineMimeSample, $__spineMimeEnc, $__spineMimeDec);
 // M2 spine unit: setcookie options array parser Vm inventory (#8698).
 \PHPCompiler\ext\standard\SetcookieOptions::spineSmokeParse();
 
+require_once __DIR__.'/../../../ext/gmp/GmpFunction.php';
+require_once __DIR__.'/../../../ext/gmp/GmpToString.php';
+require_once __DIR__.'/../../../ext/gmp/Module.php';
+require_once __DIR__.'/../../../ext/gmp/VmGmp.php';
+require_once __DIR__.'/../../../ext/gmp/VmGmpObject.php';
+require_once __DIR__.'/../../../ext/gmp/gmp_add.php';
+require_once __DIR__.'/../../../ext/gmp/gmp_cmp.php';
+require_once __DIR__.'/../../../ext/gmp/gmp_init.php';
+require_once __DIR__.'/../../../ext/gmp/gmp_mul.php';
+require_once __DIR__.'/../../../ext/gmp/gmp_strval.php';
+require_once __DIR__.'/../../../ext/gmp/gmp_sub.php';
 echo "compiler_lib_spine_smoke bundle OK\n";

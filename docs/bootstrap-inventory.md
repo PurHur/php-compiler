@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 4814 |
-| Phase A inventory files (M2 ratio SSOT) | 4814 |
+| PHP files on vm.php path | 4825 |
+| Phase A inventory files (M2 ratio SSOT) | 4825 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 12940 |
+| Source constructs flagged (warnings) | 12970 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -393,6 +393,17 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/gettext/gettext.php` | 0 | 1 |
 | `ext/gettext/ngettext.php` | 0 | 1 |
 | `ext/gettext/textdomain.php` | 0 | 2 |
+| `ext/gmp/GmpFunction.php` | 0 | 1 |
+| `ext/gmp/GmpToString.php` | 0 | 1 |
+| `ext/gmp/Module.php` | 0 | 7 |
+| `ext/gmp/VmGmp.php` | 0 | 1 |
+| `ext/gmp/VmGmpObject.php` | 0 | 7 |
+| `ext/gmp/gmp_add.php` | 0 | 2 |
+| `ext/gmp/gmp_cmp.php` | 0 | 2 |
+| `ext/gmp/gmp_init.php` | 0 | 2 |
+| `ext/gmp/gmp_mul.php` | 0 | 2 |
+| `ext/gmp/gmp_strval.php` | 0 | 2 |
+| `ext/gmp/gmp_sub.php` | 0 | 2 |
 | `ext/hash/BuiltinClasses.php` | 0 | 1 |
 | `ext/hash/HashAlgosJitHelper.php` | 0 | 1 |
 | `ext/hash/HashContextDebugInfo.php` | 0 | 3 |
@@ -4149,7 +4160,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/ReadonlyFunctionRejector.php` | 0 | 2 |
 | `lib/ReadonlyMethodModifierRejector.php` | 0 | 2 |
 | `lib/ReferenceProfileTokenScan.php` | 0 | 1 |
-| `lib/Runtime.php` | 0 | 87 |
+| `lib/Runtime.php` | 0 | 88 |
 | `lib/RuntimeStrictness.php` | 0 | 1 |
 | `lib/SourceBareThrowRewriter.php` | 0 | 1 |
 | `lib/SourcePreprocessor/PropertyHooks.php` | 0 | 5 |
@@ -7286,6 +7297,79 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 1 class method(s)
 
 ### `ext/gettext/textdomain.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/gmp/GmpFunction.php`
+
+**Warnings** (review for bootstrap subset):
+- 4 class method(s)
+
+### `ext/gmp/GmpToString.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
+### `ext/gmp/Module.php`
+
+**Warnings** (review for bootstrap subset):
+- new gmp_init (line 28)
+- new gmp_add (line 29)
+- new gmp_sub (line 30)
+- new gmp_mul (line 31)
+- new gmp_cmp (line 32)
+- new gmp_strval (line 33)
+- 3 class method(s)
+
+### `ext/gmp/VmGmp.php`
+
+**Warnings** (review for bootstrap subset):
+- 24 class method(s)
+
+### `ext/gmp/VmGmpObject.php`
+
+**Warnings** (review for bootstrap subset):
+- new Variable (line 24)
+- new ClassEntry (line 27)
+- new ClassProperty (line 29)
+- new GmpToString (line 31)
+- new ObjectEntry (line 43)
+- new Variable (line 45)
+- 3 class method(s)
+
+### `ext/gmp/gmp_add.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/gmp/gmp_cmp.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/gmp/gmp_init.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 22)
+- 1 class method(s)
+
+### `ext/gmp/gmp_mul.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/gmp/gmp_strval.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 22)
+- 1 class method(s)
+
+### `ext/gmp/gmp_sub.php`
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 21)
@@ -32033,42 +32117,43 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ext\ldap\Module (line 245)
 - new ext\session\Module (line 246)
 - new ext\bcmath\Module (line 247)
-- new ext\stats\Module (line 248)
-- new ext\opcache\Module (line 249)
-- new ext\openssl\Module (line 250)
-- new ext\curl\Module (line 251)
-- new ext\hash\Module (line 252)
-- new ext\posix\Module (line 253)
-- new ext\inotify\Module (line 254)
-- new ext\pcntl\Module (line 255)
-- new ext\sockets\Module (line 256)
-- new ext\ftp\Module (line 257)
-- new ext\ctype\Module (line 258)
-- new ext\tokenizer\Module (line 259)
-- new ext\random\Module (line 260)
-- new ext\igbinary\Module (line 261)
-- new ext\msgpack\Module (line 262)
-- new ext\zstd\Module (line 263)
-- new ext\lzf\Module (line 264)
-- new ext\bz2\Module (line 265)
-- new ext\brotli\Module (line 266)
-- new ext\sodium\Module (line 267)
-- new ext\sqlite3\Module (line 268)
-- new ext\uri\Module (line 269)
-- new ext\uuid\Module (line 270)
-- new ext\uploadprogress\Module (line 271)
-- new ext\sysvshm\Module (line 272)
-- new ext\standard\Module (line 273)
-- new JIT (line 349)
-- new JITContext (line 363)
-- new SealedClassPreprocessor (line 428)
-- new StaticClassPreprocessor (line 431)
-- new SourcePreprocessor\PropertyHooks (line 434)
-- new State (line 574)
-- new ReflectionProperty (line 601)
-- new ReflectionProperty (line 604)
-- new LintCompiler (line 1015)
-- new Variable (line 1145)
+- new ext\gmp\Module (line 248)
+- new ext\stats\Module (line 249)
+- new ext\opcache\Module (line 250)
+- new ext\openssl\Module (line 251)
+- new ext\curl\Module (line 252)
+- new ext\hash\Module (line 253)
+- new ext\posix\Module (line 254)
+- new ext\inotify\Module (line 255)
+- new ext\pcntl\Module (line 256)
+- new ext\sockets\Module (line 257)
+- new ext\ftp\Module (line 258)
+- new ext\ctype\Module (line 259)
+- new ext\tokenizer\Module (line 260)
+- new ext\random\Module (line 261)
+- new ext\igbinary\Module (line 262)
+- new ext\msgpack\Module (line 263)
+- new ext\zstd\Module (line 264)
+- new ext\lzf\Module (line 265)
+- new ext\bz2\Module (line 266)
+- new ext\brotli\Module (line 267)
+- new ext\sodium\Module (line 268)
+- new ext\sqlite3\Module (line 269)
+- new ext\uri\Module (line 270)
+- new ext\uuid\Module (line 271)
+- new ext\uploadprogress\Module (line 272)
+- new ext\sysvshm\Module (line 273)
+- new ext\standard\Module (line 274)
+- new JIT (line 350)
+- new JITContext (line 364)
+- new SealedClassPreprocessor (line 429)
+- new StaticClassPreprocessor (line 432)
+- new SourcePreprocessor\PropertyHooks (line 435)
+- new State (line 575)
+- new ReflectionProperty (line 602)
+- new ReflectionProperty (line 605)
+- new LintCompiler (line 1016)
+- new Variable (line 1146)
 - 53 class method(s)
 
 ### `lib/RuntimeStrictness.php`
