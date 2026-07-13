@@ -11,9 +11,6 @@ if (!is_resource($proc)) {
 }
 $status = proc_get_status($proc);
 $expected = ['command', 'pid', 'running', 'signaled', 'stopped', 'exitcode', 'termsig', 'stopsig'];
-if (array_key_exists('cached', $status)) {
-    $expected[] = 'cached';
-}
 if (array_key_exists('pending_signals', $status)) {
     $expected[] = 'pending_signals';
 }

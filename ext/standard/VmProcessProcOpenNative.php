@@ -425,7 +425,6 @@ final class VmProcessProcOpenNative
             $signals['termsig'],
             $signals['stopsig'],
             $pendingSignals,
-            $slot['statusKnown'],
         );
     }
 
@@ -470,7 +469,6 @@ final class VmProcessProcOpenNative
             $signals['termsig'],
             $signals['stopsig'],
             $pendingSignals,
-            true,
         );
     }
 
@@ -491,7 +489,6 @@ final class VmProcessProcOpenNative
         int $termsig,
         int $stopsig,
         array $pendingSignals = [],
-        bool $cached = false,
     ): array {
         $status = [
             'command' => $command,
@@ -503,9 +500,6 @@ final class VmProcessProcOpenNative
             'termsig' => $termsig,
             'stopsig' => $stopsig,
         ];
-        if (CompilerVersion::supportsProcGetStatusCached()) {
-            $status['cached'] = $cached;
-        }
         if (CompilerVersion::supportsProcGetStatusPendingSignals()) {
             $status['pending_signals'] = $pendingSignals;
         }
