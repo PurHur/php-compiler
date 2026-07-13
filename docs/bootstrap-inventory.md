@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 4775 |
-| Phase A inventory files (M2 ratio SSOT) | 4775 |
+| PHP files on vm.php path | 4774 |
+| Phase A inventory files (M2 ratio SSOT) | 4774 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 12830 |
+| Source constructs flagged (warnings) | 12829 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -3454,7 +3454,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/ParamSensitiveLowering.php` | 0 | 1 |
 | `lib/JIT/Builtin/ParseStrNativeOpsJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/ParseStrRuntime.php` | 0 | 7 |
-| `lib/JIT/Builtin/ParseStrUserScriptDelimitedJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/ParseUrl.php` | 0 | 1 |
 | `lib/JIT/Builtin/ParseUrlComponentJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/ParseUrlRuntime.php` | 0 | 3 |
@@ -27645,18 +27644,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/ParseStrRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new phpc_native_ht_alloc (line 321)
-- new phpc_native_ht_set_string_key (line 322)
-- new phpc_native_ht_set_string_key_ht (line 323)
-- new phpc_native_ht_set_string_at (line 324)
-- new phpc_native_ht_set_hashtable_at (line 325)
+- new phpc_native_ht_alloc (line 320)
+- new phpc_native_ht_set_string_key (line 321)
+- new phpc_native_ht_set_string_key_ht (line 322)
+- new phpc_native_ht_set_string_at (line 323)
+- new phpc_native_ht_set_hashtable_at (line 324)
 - 15 class method(s)
 - 4 closure(s)
-
-### `lib/JIT/Builtin/ParseStrUserScriptDelimitedJit.php`
-
-**Warnings** (review for bootstrap subset):
-- 25 class method(s)
 
 ### `lib/JIT/Builtin/ParseUrl.php`
 

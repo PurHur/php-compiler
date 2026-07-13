@@ -87,13 +87,7 @@ final class htmlspecialchars_decode extends Internal
             );
         }
 
-        $str = JitStringBuiltinArg::lowerStrictOrCoercible(
-            $context,
-            $args[0],
-            'htmlspecialchars_decode',
-            0,
-            'string'
-        );
+        $str = JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'htmlspecialchars_decode', 0, 'string');
         $i64 = $context->getTypeFromString('int64');
         $flagsVal = $i64->constInt($flags, false);
         if ($argc >= 2 && null === ($args[1]->compileTimeLong ?? null)) {
