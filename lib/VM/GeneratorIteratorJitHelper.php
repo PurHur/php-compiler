@@ -177,6 +177,46 @@ final class GeneratorIteratorJitHelper
         VmGenerator::clearPendingAndReturnFields($context, $state);
     }
 
+    /**
+     * Zend ext/spl/php_spl.c — iterator_to_array()/iterator_count() on started/closed Generator (#18582).
+     */
+    public static function compileAssertGeneratorIterableForRewind(Context $context, Variable $gen): void
+    {
+        $statePtr = self::loadStateFromGeneratorObject($context, $gen);
+        $map = $context->structFieldMap['__generator_state__'];
+        $i1 = $context->getTypeFromString('int1');
+        $sizeT = $context->getTypeFromString('size_t');
+        $zero = $sizeT->constInt(0, false);
+        $fn = $context->builder->getInsertBlock()->getParent();
+        $checkStarted = $fn->appendBasicBlock('gen_assert_rewind_check_started');
+        $failClosed = $fn->appendBasicBlock('gen_assert_rewind_fail_closed');
+        $failStarted = $fn->appendBasicBlock('gen_assert_rewind_fail_started');
+        $ok = $fn->appendBasicBlock('gen_assert_rewind_ok');
+        $done = $context->builder->load($context->builder->structGep($statePtr, $map['done']));
+        $context->builder->branchIf($done, $failClosed, $checkStarted);
+        $context->builder->positionAtEnd($checkStarted);
+        $resumeIp = $context->builder->load($context->builder->structGep($statePtr, $map['resume_ip']));
+        $hasCurrent = $context->builder->load($context->builder->structGep($statePtr, $map['has_current']));
+        $started = $context->builder->or(
+            $context->builder->icmp(Builder::INT_NE, $resumeIp, $zero),
+            $context->builder->icmp(Builder::INT_NE, $hasCurrent, $i1->constInt(0, false))
+        );
+        $context->builder->branchIf($started, $failStarted, $ok);
+        $context->builder->positionAtEnd($failClosed);
+        TryCatchHelper::emitCatchableClassError(
+            $context,
+            'Exception',
+            GeneratorState::CLOSED_TRAVERSE_ERROR
+        );
+        $context->builder->positionAtEnd($failStarted);
+        TryCatchHelper::emitCatchableClassError(
+            $context,
+            'Exception',
+            GeneratorState::REWIND_ALREADY_RUN_ERROR
+        );
+        $context->builder->positionAtEnd($ok);
+    }
+
     public static function loadStateFromGeneratorObject(Context $context, Variable $genVar): Value
     {
         if (null !== $genVar->generatorStatePtr) {
