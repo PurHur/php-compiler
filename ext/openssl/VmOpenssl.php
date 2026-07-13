@@ -392,6 +392,116 @@ final class VmOpenssl
     }
 
     /**
+     * openssl_encrypt() — symmetric EVP cipher (php-src ext/openssl/openssl.c; #18594).
+     *
+     * @return string|false ciphertext bytes (caller applies base64 unless OPENSSL_RAW_DATA)
+     */
+    public static function encrypt(
+        string $data,
+        string $cipherAlgo,
+        string $passphrase,
+        int $options,
+        string $iv,
+        ?Frame $frame = null
+    ): string|false {
+        if (!VmOpensslCipherNative::available()) {
+            self::userWarning('openssl_encrypt(): OpenSSL cipher encryption is unavailable in this compiler build', $frame);
+
+            return false;
+        }
+
+        $cipher = strtolower($cipherAlgo);
+        if (false === OpensslCipherRegistry::cipherIvLength($cipher)) {
+            self::userWarning('openssl_encrypt(): Unknown cipher algorithm', $frame);
+
+            return false;
+        }
+
+        $ivLen = OpensslCipherRegistry::cipherIvLength($cipher);
+        if (false !== $ivLen && $ivLen > 0 && \strlen($iv) !== $ivLen) {
+            self::userWarning(\sprintf(
+                'openssl_encrypt(): IV passed is only %d bytes long, cipher expects an IV of precisely %d bytes, padding with \\0',
+                \strlen($iv),
+                $ivLen
+            ), $frame);
+
+            return false;
+        }
+
+        $keyLen = OpensslCipherRegistry::cipherKeyLength($cipher);
+        if (false === $keyLen || \strlen($passphrase) !== $keyLen) {
+            self::userWarning('openssl_encrypt(): Invalid key length', $frame);
+
+            return false;
+        }
+
+        $zeroPadding = 0 !== ($options & OpensslConstants::OPENSSL_ZERO_PADDING);
+        $encrypted = VmOpensslCipherNative::encrypt($data, $cipher, $passphrase, $iv, $zeroPadding);
+        if (false === $encrypted) {
+            self::userWarning('openssl_encrypt(): Encryption failed', $frame);
+
+            return false;
+        }
+
+        return $encrypted;
+    }
+
+    /**
+     * openssl_decrypt() — symmetric EVP cipher (php-src ext/openssl/openssl.c; #18594).
+     *
+     * @return string|false plaintext bytes (caller decodes base64 unless OPENSSL_RAW_DATA)
+     */
+    public static function decrypt(
+        string $data,
+        string $cipherAlgo,
+        string $passphrase,
+        int $options,
+        string $iv,
+        ?Frame $frame = null
+    ): string|false {
+        if (!VmOpensslCipherNative::available()) {
+            self::userWarning('openssl_decrypt(): OpenSSL cipher decryption is unavailable in this compiler build', $frame);
+
+            return false;
+        }
+
+        $cipher = strtolower($cipherAlgo);
+        if (false === OpensslCipherRegistry::cipherIvLength($cipher)) {
+            self::userWarning('openssl_decrypt(): Unknown cipher algorithm', $frame);
+
+            return false;
+        }
+
+        $ivLen = OpensslCipherRegistry::cipherIvLength($cipher);
+        if (false !== $ivLen && $ivLen > 0 && \strlen($iv) !== $ivLen) {
+            self::userWarning(\sprintf(
+                'openssl_decrypt(): IV passed is only %d bytes long, cipher expects an IV of precisely %d bytes, padding with \\0',
+                \strlen($iv),
+                $ivLen
+            ), $frame);
+
+            return false;
+        }
+
+        $keyLen = OpensslCipherRegistry::cipherKeyLength($cipher);
+        if (false === $keyLen || \strlen($passphrase) !== $keyLen) {
+            self::userWarning('openssl_decrypt(): Invalid key length', $frame);
+
+            return false;
+        }
+
+        $zeroPadding = 0 !== ($options & OpensslConstants::OPENSSL_ZERO_PADDING);
+        $plain = VmOpensslCipherNative::decrypt($data, $cipher, $passphrase, $iv, $zeroPadding);
+        if (false === $plain) {
+            self::userWarning('openssl_decrypt(): Decryption failed', $frame);
+
+            return false;
+        }
+
+        return $plain;
+    }
+
+    /**
      * @return list<string>|false
      */
     public static function coercePublicKeyPemList(
