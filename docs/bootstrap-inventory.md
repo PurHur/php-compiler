@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 4803 |
-| Phase A inventory files (M2 ratio SSOT) | 4803 |
+| PHP files on vm.php path | 4804 |
+| Phase A inventory files (M2 ratio SSOT) | 4804 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 12907 |
+| Source constructs flagged (warnings) | 12910 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1805,6 +1805,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VmDatePure.php` | 0 | 1 |
 | `ext/standard/VmDateSunFunc.php` | 0 | 3 |
 | `ext/standard/VmDateSunNative.php` | 0 | 1 |
+| `ext/standard/VmDateTimeCreateArg.php` | 0 | 1 |
 | `ext/standard/VmDateTimeNative.php` | 0 | 7 |
 | `ext/standard/VmDebugBacktrace.php` | 0 | 17 |
 | `ext/standard/VmDebugZval.php` | 0 | 2 |
@@ -2861,7 +2862,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/tan.php` | 0 | 1 |
 | `ext/standard/tanh.php` | 0 | 1 |
 | `ext/standard/tempnam.php` | 0 | 1 |
-| `ext/standard/time.php` | 0 | 1 |
+| `ext/standard/time.php` | 0 | 3 |
 | `ext/standard/time_nanosleep.php` | 0 | 3 |
 | `ext/standard/time_sleep_until.php` | 0 | 3 |
 | `ext/standard/timezone_abbreviations_list.php` | 0 | 2 |
@@ -12429,9 +12430,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 22)
-- new JITVariable (line 143)
-- new JITVariable (line 153)
-- new JITVariable (line 161)
+- new JITVariable (line 157)
+- new JITVariable (line 167)
+- new JITVariable (line 175)
 - 6 class method(s)
 
 ### `ext/standard/JitDateCreateFromFormat.php`
@@ -14427,7 +14428,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitTimezoneOpen.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 22)
+- new ArgumentCountError (line 21)
 - new JITVariable (line 57)
 - 3 class method(s)
 
@@ -16936,6 +16937,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 18 class method(s)
+
+### `ext/standard/VmDateTimeCreateArg.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s)
 
 ### `ext/standard/VmDateTimeNative.php`
 
@@ -20625,7 +20631,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/get_cfg_var.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 27)
+- new ArgumentCountError (line 26)
 - 2 class method(s)
 
 ### `ext/standard/get_class_.php`
@@ -23443,6 +23449,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/time.php`
 
 **Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 20)
+- new ArgumentCountError (line 32)
 - 2 class method(s)
 
 ### `ext/standard/time_nanosleep.php`
@@ -23503,7 +23511,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/timezone_open.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 33)
+- new ArgumentCountError (line 32)
 - 2 class method(s)
 - 2 closure(s)
 
@@ -28998,7 +29006,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringHashCryptoLlvm.php`
 
 **Warnings** (review for bootstrap subset):
-- 13 class method(s)
+- 15 class method(s)
 
 ### `lib/JIT/Builtin/StringHashCryptoPhp.php`
 
