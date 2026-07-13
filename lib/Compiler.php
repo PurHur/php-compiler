@@ -34184,7 +34184,7 @@ class Compiler {
         int $argCount,
         array $callArgs = []
     ): ?Op\Expr\New_ {
-        if (0 !== $argIndex || $argCount < 2 || \count($producers) < 2) {
+        if ($argCount < 1 || \count($producers) < 1 || $argIndex >= \count($producers)) {
             return null;
         }
         if ([] !== $callArgs) {
@@ -34203,7 +34203,7 @@ class Compiler {
                 return null;
             }
         }
-        $offset = 0;
+        $offset = $argIndex;
         while ($offset < \count($producers)) {
             $candidate = $producers[$offset];
             if ($candidate instanceof Op\Expr\New_) {
@@ -34247,7 +34247,35 @@ class Compiler {
         }
         $positional = $producers[$argIndex] ?? null;
 
-        return $positional instanceof Op\Expr\New_ ? $positional : null;
+        if ($positional instanceof Op\Expr\New_) {
+            return $positional;
+        }
+        if (
+            $positional instanceof Op\Expr\Array_
+            && null !== $callArg
+            && (
+                $this->callArgIsNewExpression($callArg)
+                || ($callArg instanceof Operand && $this->callArgIsDeadInlineTemporary($callArg))
+            )
+        ) {
+            for ($i = $argIndex + 1, $n = \count($producers); $i < $n; ++$i) {
+                $follow = $producers[$i];
+                if ($follow instanceof Op\Expr\New_) {
+                    return $follow;
+                }
+                if (
+                    $follow instanceof Op\Expr\Array_
+                    || $follow instanceof Op\Expr\ConstFetch
+                    || $follow instanceof Op\Expr\ClassConstFetch
+                ) {
+                    continue;
+                }
+
+                break;
+            }
+        }
+
+        return null;
     }
 
     /**
