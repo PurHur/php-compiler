@@ -48,6 +48,11 @@ class Module extends ModuleAbstract
             new imagecreate(),
             new imagecreatetruecolor(),
         ];
+        if (GdExtensionPolicy::advertisesDrawing()) {
+            $functions[] = new imagecolorallocate();
+            $functions[] = new imagefill();
+            $functions[] = new imagedestroy();
+        }
         if (GdExtensionPolicy::advertisesDecodeFromString()) {
             $functions[] = new imagecreatefromstring();
             $functions[] = new imagepng();
