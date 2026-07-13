@@ -1966,7 +1966,32 @@ final class CompilerVersionGateTest extends TestCase
 
     public function testSupportsDomNodeContainsOnReferenceProfile(): void
     {
-        $this->assertFalse(CompilerVersion::supportsDomNodeContains());
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.2');
+        try {
+            $this->assertFalse(CompilerVersion::supportsDomNodeContains());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testSupportsDomNodeContainsTrueOn84DevDefaultProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE');
+        try {
+            $this->assertTrue(CompilerVersion::supportsDomNodeContains());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
     }
 
     public function testVmRegistersDomNodeContainsOnForwardProfile(): void
@@ -2085,7 +2110,17 @@ final class CompilerVersionGateTest extends TestCase
 
     public function testSupportsDomNodeGetRootNodeOnReferenceProfile(): void
     {
-        $this->assertFalse(CompilerVersion::supportsDomNodeGetRootNode());
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.2');
+        try {
+            $this->assertFalse(CompilerVersion::supportsDomNodeGetRootNode());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
     }
 
     public function testVmRegistersDomNodeGetRootNodeOnForwardProfile(): void
@@ -2123,7 +2158,17 @@ final class CompilerVersionGateTest extends TestCase
 
     public function testSupportsDomNodeIsEqualNodeOnReferenceProfile(): void
     {
-        $this->assertFalse(CompilerVersion::supportsDomNodeIsEqualNode());
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.2');
+        try {
+            $this->assertFalse(CompilerVersion::supportsDomNodeIsEqualNode());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
     }
 
     public function testSupportsDomNodeReplaceChildrenOnForwardProfile(): void
@@ -2143,7 +2188,17 @@ final class CompilerVersionGateTest extends TestCase
 
     public function testSupportsDomNodeReplaceChildrenOnReferenceProfile(): void
     {
-        $this->assertFalse(CompilerVersion::supportsDomNodeReplaceChildren());
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.2');
+        try {
+            $this->assertFalse(CompilerVersion::supportsDomNodeReplaceChildren());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
     }
 
     public function testVmRegistersDomNodeReplaceChildrenOnForwardProfile(): void
@@ -2166,7 +2221,17 @@ final class CompilerVersionGateTest extends TestCase
 
     public function testSupportsDomElementInsertAdjacentHtmlOnReferenceProfile(): void
     {
-        $this->assertFalse(CompilerVersion::supportsDomElementInsertAdjacentHtml());
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.2');
+        try {
+            $this->assertFalse(CompilerVersion::supportsDomElementInsertAdjacentHtml());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
     }
 
     public function testVmRegistersDomElementInsertAdjacentHtmlOnForwardProfile(): void
@@ -2204,7 +2269,17 @@ final class CompilerVersionGateTest extends TestCase
 
     public function testSupportsDomElementInsertAdjacentElementOnReferenceProfile(): void
     {
-        $this->assertFalse(CompilerVersion::supportsDomElementInsertAdjacentElement());
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.2');
+        try {
+            $this->assertFalse(CompilerVersion::supportsDomElementInsertAdjacentElement());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
     }
 
     public function testVmRegistersDomElementInsertAdjacentElementOnForwardProfile(): void
@@ -2242,7 +2317,17 @@ final class CompilerVersionGateTest extends TestCase
 
     public function testSupportsDomElementInsertAdjacentTextOnReferenceProfile(): void
     {
-        $this->assertFalse(CompilerVersion::supportsDomElementInsertAdjacentText());
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.2');
+        try {
+            $this->assertFalse(CompilerVersion::supportsDomElementInsertAdjacentText());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
     }
 
     public function testVmRegistersDomElementInsertAdjacentTextOnForwardProfile(): void
@@ -2280,7 +2365,32 @@ final class CompilerVersionGateTest extends TestCase
 
     public function testSupportsDomElementToggleAttributeOnReferenceProfile(): void
     {
-        $this->assertFalse(CompilerVersion::supportsDomElementToggleAttribute());
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.2');
+        try {
+            $this->assertFalse(CompilerVersion::supportsDomElementToggleAttribute());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testSupportsDomElementToggleAttributeTrueOn84DevDefaultProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE');
+        try {
+            $this->assertTrue(CompilerVersion::supportsDomElementToggleAttribute());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
     }
 
     public function testVmRegistersDomElementToggleAttributeOnForwardProfile(): void
