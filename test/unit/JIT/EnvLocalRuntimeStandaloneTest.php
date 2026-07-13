@@ -36,6 +36,25 @@ final class EnvLocalRuntimeStandaloneTest extends TestCase
         $this->assertNull($ctx->module->getNamedGlobal('phpc_env_local_count'));
     }
 
+    public function testEnsureBootstrapAotStubLinkedDefinesEnvLocalWithoutNestedJit(): void
+    {
+        putenv('PHP_COMPILER_BOOTSTRAP_AOT_LINK=1');
+        $runtime = new Runtime(Runtime::MODE_AOT);
+        $ctx = new Context($runtime, Builtin::LOAD_TYPE_STANDALONE);
+        EnvLocalRuntime::ensureBootstrapAotStubLinked($ctx);
+
+        foreach (
+            [
+                '__compiler_env_local_lookup',
+                '__compiler_env_register_putenv',
+            ] as $name
+        ) {
+            $fn = $ctx->lookupFunction($name);
+            $this->assertNotNull($fn, $name);
+            $this->assertGreaterThan(0, $fn->countBasicBlocks(), $name);
+        }
+    }
+
     public function testPhpcEnvLocalCRuntimeRemovedFromLinker(): void
     {
         $repoRoot = dirname(__DIR__, 3);

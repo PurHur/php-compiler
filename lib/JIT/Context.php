@@ -993,6 +993,7 @@ class Context {
         Builtin\StringJsonDecode::ensureDeferredStubsForInventoryEmit($this);
         Builtin\StringJsonEncode::ensureDeferredStubsForInventoryEmit($this);
         $this->ensureMinimalUserStandaloneBodies();
+        Builtin\EnvLocalRuntime::ensureBootstrapAotStubLinked($this);
         Builtin\CliArgvRuntime::ensureUserScriptMainStubs($this);
         Builtin\SuperglobalRefreshRuntime::ensureStandaloneBodies($this);
     }
