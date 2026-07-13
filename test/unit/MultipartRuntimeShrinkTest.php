@@ -41,4 +41,11 @@ final class MultipartRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('MultipartNativeJitHelper', $multipartRuntime);
         $this->assertStringContainsString('__compiler_multipart_populate_post_body', $multipartRuntime);
     }
+
+    /** isset($_FILES['field']) must use offsetIsSet — upload slots are nested hashtables (#15624). */
+    public function testIssetOnFilesSuperglobalUsesOffsetIsSetNotPeekStringKey(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/IssetHelperLlvm.php');
+        $this->assertStringContainsString("'_FILES' !== \$container->superglobalName", $source);
+    }
 }

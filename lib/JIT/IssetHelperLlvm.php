@@ -274,6 +274,7 @@ final class IssetHelperLlvm
             && Variable::TYPE_HASHTABLE === $container->type
             && Variable::TYPE_STRING === $dim->type
             && null !== $container->superglobalName
+            && '_FILES' !== $container->superglobalName
         ) {
             return self::compileSuperglobalNullReadIsset($context, $container, $dim);
         }
