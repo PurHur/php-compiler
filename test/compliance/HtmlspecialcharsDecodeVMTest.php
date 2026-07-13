@@ -13,7 +13,11 @@ final class HtmlspecialcharsDecodeVMTest extends BaseTest
 
     public static function providePHPTests(): \Generator
     {
-        foreach (['htmlspecialchars_decode.phpt', 'htmlspecialchars_decode_flags.phpt'] as $file) {
+        foreach ([
+            'htmlspecialchars_decode.phpt',
+            'htmlspecialchars_decode_flags.phpt',
+            'htmlspecialchars_decode_null_strict.phpt',
+        ] as $file) {
             yield $file => self::parsePHPT(
                 __DIR__.'/cases/stdlib/'.$file,
                 $file
