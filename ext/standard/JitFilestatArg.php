@@ -132,7 +132,7 @@ final class JitFilestatArg
         return JitLongArg::lower($context, $arg, $function.'() '.$paramName);
     }
 
-    /** chmod() mode — Z_PARAM_LONG with zend_strtol(..., 0) for numeric strings (#18487). */
+    /** chmod() mode — Z_PARAM_LONG decimal numeric strings (#18487, ext/standard/filestat.c). */
     public static function lowerChmodMode(
         Context $context,
         JITVariable $arg,
@@ -145,7 +145,7 @@ final class JitFilestatArg
             $i64 = $context->getTypeFromString('int64');
 
             return $i64->constInt(
-                VmFilestatArg::zendAutoBaseNumericString($arg->compileTimeString),
+                (int) VmMath::baseToZval($arg->compileTimeString, 10),
                 false
             );
         }

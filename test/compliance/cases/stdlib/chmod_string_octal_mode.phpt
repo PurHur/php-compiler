@@ -1,5 +1,5 @@
 --TEST--
-stdlib chmod() numeric-string mode uses zend_strtol auto-base (#18487, ext/standard/filestat.c)
+stdlib chmod() int literal 0644 vs string '0644' mode divergence (#18487, ext/standard/filestat.c)
 --FILE--
 <?php
 
@@ -16,7 +16,7 @@ $strMode = decoct(fileperms($fStr) & 0777);
 @unlink($fStr);
 
 echo 'int_mode=', $intMode, ' str_mode=', $strMode, "\n";
-echo $intMode === '644' && $strMode === '644' ? 'ok' : 'fail', "\n";
+echo $intMode === '644' && $strMode === '204' ? 'ok' : 'fail', "\n";
 --EXPECT--
-int_mode=644 str_mode=644
+int_mode=644 str_mode=204
 ok
