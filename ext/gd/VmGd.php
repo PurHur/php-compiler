@@ -143,6 +143,63 @@ final class VmGd
         return true;
     }
 
+    public static function getWidth(ObjectEntry $image): int|false
+    {
+        $state = GdRegistry::state($image);
+        if (null === $state) {
+            return false;
+        }
+        if ($state->hasRaster()) {
+            return $state->width;
+        }
+        if ($state->hasEncoded()) {
+            $parsed = VmImage::getImageSizeFromBytes($state->encoded);
+            if (false === $parsed) {
+                return false;
+            }
+
+            return (int) $parsed[0];
+        }
+
+        return false;
+    }
+
+    public static function getHeight(ObjectEntry $image): int|false
+    {
+        $state = GdRegistry::state($image);
+        if (null === $state) {
+            return false;
+        }
+        if ($state->hasRaster()) {
+            return $state->height;
+        }
+        if ($state->hasEncoded()) {
+            $parsed = VmImage::getImageSizeFromBytes($state->encoded);
+            if (false === $parsed) {
+                return false;
+            }
+
+            return (int) $parsed[1];
+        }
+
+        return false;
+    }
+
+    public static function colorAt(Frame $frame, ObjectEntry $image, int $x, int $y): int|false
+    {
+        $state = GdRegistry::state($image);
+        if (null === $state || !$state->hasRaster()) {
+            return false;
+        }
+        if ($x < 0 || $y < 0 || $x >= $state->width || $y >= $state->height) {
+            self::warnColorAtOutOfBounds($frame);
+
+            return false;
+        }
+
+        return $state->pixels[$y * $state->width + $x];
+    }
+
     public static function coerceIntArg(Variable $arg, string $function, int $position, string $name): int
     {
         $arg = $arg->resolveIndirect();
@@ -264,11 +321,32 @@ final class VmGd
         return ObjectHandleSupport::vmTypeName($var->type);
     }
 
+    private static function warnColorAtOutOfBounds(Frame $frame): void
+    {
+        if (null === $frame->vmContext) {
+            return;
+        }
+        $frame->vmContext->errors->triggerError(
+            'imagecolorat(): X and Y must be within the image bounds',
+            ErrorReporter::E_WARNING,
+            '' !== $frame->scriptPath ? $frame->scriptPath : null,
+            $frame->vmContext,
+            $frame
+        );
+    }
+
     private static function parameterName(string $function, int $position): string
     {
         return match ($function) {
             'imagepng' => 1 === $position ? 'image' : 'arg',
             'imagecreatefromstring' => 'image',
+            'imagesx', 'imagesy' => 'image',
+            'imagecolorat' => match ($position) {
+                1 => 'image',
+                2 => 'x',
+                3 => 'y',
+                default => 'arg',
+            },
             default => 'arg',
         };
     }
