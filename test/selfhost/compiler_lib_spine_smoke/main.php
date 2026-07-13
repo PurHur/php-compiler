@@ -4772,4 +4772,12 @@ unset($__spineMimeSample, $__spineMimeEnc, $__spineMimeDec);
 // M2 spine unit: setcookie options array parser Vm inventory (#8698).
 \PHPCompiler\ext\standard\SetcookieOptions::spineSmokeParse();
 
+require_once __DIR__.'/../../../ext/dom/DomGetElementsByTagNameJitHelper.php';
+require_once __DIR__.'/../../../ext/dom/JitDomGetElementsByTagName.php';
+require_once __DIR__.'/../../../ext/standard/JitSessionStartOptions.php';
+require_once __DIR__.'/../../../ext/standard/SessionStartOptions.php';
+require_once __DIR__.'/../../../ext/standard/SessionStartOptionsJitHelper.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/DomGetElementsByTagNameRuntime.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/SessionStartOptionsRuntime.php';
+require_once __DIR__.'/../../../lib/JIT/Call/DomDocumentGetElementsByTagName.php';
 echo "compiler_lib_spine_smoke bundle OK\n";

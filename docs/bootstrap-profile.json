@@ -179,6 +179,7 @@
         "ext/dom/DomElementTextContentJitHelper.php",
         "ext/dom/DomExceptionConstants.php",
         "ext/dom/DomGetElementByIdJitHelper.php",
+        "ext/dom/DomGetElementsByTagNameJitHelper.php",
         "ext/dom/DomHtmlDocumentPropertySupport.php",
         "ext/dom/DomLivingBuiltinClasses.php",
         "ext/dom/DomLivingConstants.php",
@@ -230,6 +231,7 @@
         "ext/dom/JitDomCreateElement.php",
         "ext/dom/JitDomElementTextContent.php",
         "ext/dom/JitDomGetElementById.php",
+        "ext/dom/JitDomGetElementsByTagName.php",
         "ext/dom/JitDomLoadHTML.php",
         "ext/dom/JitDomLoadHTMLUserScript.php",
         "ext/dom/JitDomLoadXML.php",
@@ -3294,6 +3296,7 @@
         "lib/JIT/Builtin/DomDocumentMethodUserScriptLlvm.php",
         "lib/JIT/Builtin/DomElementTextContentRuntime.php",
         "lib/JIT/Builtin/DomGetElementByIdRuntime.php",
+        "lib/JIT/Builtin/DomGetElementsByTagNameRuntime.php",
         "lib/JIT/Builtin/DomInstanceMethodRuntime.php",
         "lib/JIT/Builtin/DomInstanceMethodUserScriptLlvm.php",
         "lib/JIT/Builtin/DomLoadHTMLRuntime.php",
@@ -3843,6 +3846,7 @@
         "lib/JIT/Call/DateTimeFormat.php",
         "lib/JIT/Call/DomDocumentCreateElement.php",
         "lib/JIT/Call/DomDocumentGetElementById.php",
+        "lib/JIT/Call/DomDocumentGetElementsByTagName.php",
         "lib/JIT/Call/DomDocumentLoadHTML.php",
         "lib/JIT/Call/DomDocumentLoadXML.php",
         "lib/JIT/Call/DomDocumentSaveHTML.php",
@@ -4949,9 +4953,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 4715,
+        "inventory_files": 4719,
         "excluded": 0,
-        "eligible": 4715,
+        "eligible": 4719,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
