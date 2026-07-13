@@ -15,8 +15,9 @@ final class time extends Internal
 {
     public function execute(Frame $frame): void
     {
-        if (0 !== \count($frame->calledArgs)) {
-            throw new \LogicException('time() takes no arguments');
+        $argc = \count($frame->calledArgs);
+        if (0 !== $argc) {
+            throw new \ArgumentCountError(\sprintf('time() expects exactly 0 arguments, %d given', $argc));
         }
         if (null === $frame->returnVar) {
             return;
@@ -26,8 +27,9 @@ final class time extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (0 !== \count($args)) {
-            throw new \LogicException('time() takes no arguments');
+        $argc = \count($args);
+        if (0 !== $argc) {
+            throw new \ArgumentCountError(\sprintf('time() expects exactly 0 arguments, %d given', $argc));
         }
 
         return JitDate::time($context);

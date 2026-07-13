@@ -10,7 +10,6 @@ use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\StringSubstrCompare;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\JitOperandTypeLabel;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
@@ -38,8 +37,6 @@ final class substr_compare extends Internal
         if ($argc < 3 || $argc > 5) {
             throw new \LogicException('substr_compare() accepts three to five arguments in this compiler build');
         }
-        InternalStrictArg::rejectNullString($frame->calledArgs[0], 'substr_compare', 'haystack', 0, $frame);
-        InternalStrictArg::rejectNullString($frame->calledArgs[1], 'substr_compare', 'needle', 1, $frame);
         $haystack = self::vmStringArg($frame, 0, 'haystack');
         $needle = self::vmStringArg($frame, 1, 'needle');
         $offsetInt = self::requireIntArg($frame->calledArgs[2], 'substr_compare', 3, 'offset');
@@ -77,8 +74,6 @@ final class substr_compare extends Internal
         if ($argc < 3 || $argc > 5) {
             throw new \LogicException('substr_compare() accepts three to five arguments in this compiler build');
         }
-        JitInternalStrictArg::rejectNullString($context, $args[0], 'substr_compare', 'haystack', 1);
-        JitInternalStrictArg::rejectNullString($context, $args[1], 'substr_compare', 'needle', 2);
         $i64 = $context->getTypeFromString('int64');
         $i32 = $context->getTypeFromString('int32');
         $lengthVal = $i64->constInt(-1, false);
@@ -99,8 +94,8 @@ final class substr_compare extends Internal
                 $i32
             );
         }
-        $p0 = $this->stringDataPtr($context, JitStringBuiltinArg::lower($context, $args[0], 'substr_compare', 0, 'haystack'));
-        $p1 = $this->stringDataPtr($context, JitStringBuiltinArg::lower($context, $args[1], 'substr_compare', 1, 'needle'));
+        $p0 = $this->stringDataPtr($context, JitStringBuiltinArg::lowerCoercible($context, $args[0], 'substr_compare', 0, 'haystack'));
+        $p1 = $this->stringDataPtr($context, JitStringBuiltinArg::lowerCoercible($context, $args[1], 'substr_compare', 1, 'needle'));
         $offset = self::lowerStrictIntArg($context, $args[2], 'substr_compare', 3, 'offset');
         $fn = $context->lookupFunction('substr_compare');
         $raw = $context->builder->call($fn, $p0, $p1, $offset, $lengthVal, $ci);

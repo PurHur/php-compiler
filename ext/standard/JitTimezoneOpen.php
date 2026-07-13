@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -24,9 +23,10 @@ final class JitTimezoneOpen
             );
         }
 
-        JitInternalStrictArg::rejectNullString($context, $args[0], 'timezone_open', 'timezone', 1);
-
         $literal = JitStringBuiltinArg::compileTimeLiteral($args[0]);
+        if (null === $literal && (JITVariable::TYPE_NULL === $args[0]->type || $args[0]->isNullConstant)) {
+            $literal = '';
+        }
         if (null === $literal) {
             throw new \LogicException(
                 'timezone_open() requires a compile-time timezone string in this compiler build (issue #4634)'
