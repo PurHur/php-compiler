@@ -1836,6 +1836,7 @@ require_once __DIR__.'/../../../ext/standard/VmDatePure.php';
 require_once __DIR__.'/../../../ext/standard/VmDateSunFunc.php';
 require_once __DIR__.'/../../../ext/standard/VmDateSunNative.php';
 require_once __DIR__.'/../../../ext/standard/VmDateTimeNative.php';
+require_once __DIR__.'/../../../ext/standard/VmDateTimeCreateArg.php';
 require_once __DIR__.'/../../../ext/standard/VmDebugBacktrace.php';
 require_once __DIR__.'/../../../ext/standard/VmDebugZval.php';
 require_once __DIR__.'/../../../ext/standard/VmDir.php';
