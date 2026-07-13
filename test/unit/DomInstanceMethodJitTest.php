@@ -18,6 +18,17 @@ final class DomInstanceMethodJitTest extends TestCase
         $this->assertFalse(DomInstanceMethodJit::isDomInstanceMethodProxy('splobjectstorage::attach'));
     }
 
+    public function testUserScriptRecognizesAppendChildProxies(): void
+    {
+        putenv('PHP_COMPILER_AOT_USER_SCRIPT=1');
+        try {
+            $this->assertTrue(DomInstanceMethodJit::isDomInstanceMethodProxy('domnode::appendchild'));
+            $this->assertTrue(DomInstanceMethodJit::isDomInstanceMethodProxy('domdocument::appendchild'));
+        } finally {
+            putenv('PHP_COMPILER_AOT_USER_SCRIPT');
+        }
+    }
+
     public function testEnsureProxyRegistersCallableLowering(): void
     {
         $this->markTestSkipped('loadJitContext() is too heavy for default unit gate (#17130)');

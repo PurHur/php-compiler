@@ -49,6 +49,8 @@ final class DomActiveContextAotTest extends TestCase
         $this->assertStringContainsString('savexml', $source);
         $this->assertStringContainsString('getelementbyid', $source);
         $this->assertStringContainsString('getelementsbytagname', $source);
+        $this->assertStringContainsString('appendchild', $source);
+        $this->assertStringContainsString('DomInstanceMethod', $source);
         $this->assertStringContainsString('DomDocumentLoadHTML', $source);
         $this->assertStringContainsString('DomDocumentGetElementById', $source);
         $this->assertStringContainsString('DomDocumentGetElementsByTagName', $source);
