@@ -127,6 +127,16 @@ final class VmNumberFormat
 
         $rounded = VmRound::mathRound($number, $roundPlaces, $roundingMode);
 
+        if ($decimals > 14) {
+            return self::formatHighPrecision(
+                $rounded,
+                $decimals,
+                $decimalSeparator,
+                $thousandsSeparator,
+                $negative
+            );
+        }
+
         $pow = 1;
         for ($i = 0; $i < $decimals; ++$i) {
             $pow *= 10;
@@ -196,5 +206,46 @@ final class VmNumberFormat
         }
 
         return $out;
+    }
+
+    /**
+     * php-src ext/standard/number_format.c — php_conv_floating_point() for $decimals > FP digit budget.
+     */
+    private static function formatHighPrecision(
+        float $rounded,
+        int $decimals,
+        string $decimalSeparator,
+        string $thousandsSeparator,
+        bool $negative
+    ): string {
+        $raw = \sprintf('%.'.$decimals.'F', $rounded);
+        if ($negative) {
+            $raw = \ltrim($raw, '-');
+        }
+        $dotPos = \strpos($raw, '.');
+        if (false === $dotPos) {
+            $intDigits = $raw;
+            $fracDigits = \str_repeat('0', $decimals);
+        } else {
+            $intDigits = VmString::byteSlice($raw, 0, $dotPos);
+            $fracDigits = VmString::byteSlice($raw, $dotPos + 1);
+            if (VmString::byteLength($fracDigits) < $decimals) {
+                $fracDigits = self::padLeft($fracDigits, $decimals, '0');
+            } elseif (VmString::byteLength($fracDigits) > $decimals) {
+                $fracDigits = VmString::byteSlice($fracDigits, 0, $decimals);
+            }
+        }
+        if ('' === $intDigits) {
+            $intDigits = '0';
+        }
+        $result = self::insertThousands($intDigits, $thousandsSeparator);
+        if ($decimals > 0) {
+            $result .= $decimalSeparator.$fracDigits;
+        }
+        if ($negative) {
+            return '-'.$result;
+        }
+
+        return $result;
     }
 }
