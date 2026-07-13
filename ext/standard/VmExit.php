@@ -75,19 +75,28 @@ final class VmExit
                 'Object of class '.$case->enumClass->name.' could not be converted to string'
             );
         }
-        if (Variable::TYPE_OBJECT === $v->type && EnumCaseSupport::isEnumCase($v->toObject())) {
+        if (Variable::TYPE_OBJECT === $v->type) {
             $obj = $v->toObject();
-            if (self::isExitStatusEnum($obj->class->name)) {
-                $backing = $obj->enumCaseValue;
-                if (null === $backing) {
-                    throw new \LogicException('ExitStatus case missing backing value');
-                }
+            if (EnumCaseSupport::isEnumCase($obj)) {
+                if (self::isExitStatusEnum($obj->class->name)) {
+                    $backing = $obj->enumCaseValue;
+                    if (null === $backing) {
+                        throw new \LogicException('ExitStatus case missing backing value');
+                    }
 
-                return $backing->toInt();
+                    return $backing->toInt();
+                }
+                throw new \Error(
+                    'Object of class '.$obj->class->name.' could not be converted to string'
+                );
             }
-            throw new \Error(
-                'Object of class '.$obj->class->name.' could not be converted to string'
-            );
+            if ($twoArgForm) {
+                throw self::typeErrorForStatus($v);
+            }
+            $vm = VM::running();
+            echo null !== $vm ? $vm->coerceVariableToString($v, $frame) : 'Object';
+
+            return 0;
         }
 
         throw self::typeErrorForStatus($v);
