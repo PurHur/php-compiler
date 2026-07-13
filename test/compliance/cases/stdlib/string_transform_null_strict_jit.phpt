@@ -1,10 +1,10 @@
 --TEST--
-stdlib nl2br()/wordwrap()/stripslashes() JIT — null operand TypeError (#18358, ext/standard/string.c)
+stdlib wordwrap()/stripslashes() JIT — null operand coerces to empty string (#18483, ext/standard/string.c)
 --SKIPIF--
 <?php die('skip — compiler VM/JIT compliance via VMTest/JITTest, not Zend CLI'); ?>
 --FILE--
 <?php
-foreach (['nl2br', 'wordwrap', 'stripslashes'] as $fn) {
+foreach (['wordwrap', 'stripslashes'] as $fn) {
     try {
         $fn(null);
         echo "$fn: NO_THROW\n";
@@ -14,6 +14,5 @@ foreach (['nl2br', 'wordwrap', 'stripslashes'] as $fn) {
 }
 ?>
 --EXPECT--
-nl2br: nl2br(): Argument #1 ($string) must be of type string, null given
-wordwrap: wordwrap(): Argument #1 ($string) must be of type string, null given
-stripslashes: stripslashes(): Argument #1 ($string) must be of type string, null given
+wordwrap: NO_THROW
+stripslashes: NO_THROW

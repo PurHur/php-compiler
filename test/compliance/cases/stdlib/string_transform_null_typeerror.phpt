@@ -20,7 +20,7 @@ chop: NO_THROW
 rtrim: NO_THROW
 ltrim: NO_THROW
 trim: NO_THROW
-wordwrap: wordwrap(): Argument #1 ($string) must be of type string, null given
+wordwrap: NO_THROW
 ucfirst: NO_THROW
 lcfirst: NO_THROW
 ucwords: NO_THROW

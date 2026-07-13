@@ -24,20 +24,8 @@ final class addcslashes extends Internal
         if (2 !== \count($frame->calledArgs)) {
             throw new \LogicException('addcslashes() requires exactly two arguments in this compiler build');
         }
-        InternalStrictArg::rejectNullString($frame->calledArgs[0], 'addcslashes', 'str', 0, $frame);
-        $subject = VmString::coerceStringBuiltinArg(
-            $frame->calledArgs[0],
-            'addcslashes',
-            0,
-            'str'
-        );
-        InternalStrictArg::rejectNullString($frame->calledArgs[1], 'addcslashes', 'characters', 1, $frame);
-        $charlist = VmString::coerceStringBuiltinArg(
-            $frame->calledArgs[1],
-            'addcslashes',
-            1,
-            'characters'
-        );
+        $subject = InternalStrictArg::resolveCoercibleStringArg($frame, 0, 'addcslashes', 'str');
+        $charlist = InternalStrictArg::resolveCoercibleStringArg($frame, 1, 'addcslashes', 'characters');
         BuiltinExecute::writeReturn(
             $frame,
             static fn (Variable $ret) => $ret->string(VmString::addcslashes($subject, $charlist))
@@ -58,7 +46,7 @@ final class addcslashes extends Internal
         }
 
         StringCslashes::ensureLinked($context);
-        $subject = JitStringBuiltinArg::lowerTypedString($context, $args[0], 'addcslashes', 0, 'str');
+        $subject = JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'addcslashes', 0, 'str');
         if (null !== $charlistLit) {
             return $context->builder->call(
                 $context->lookupFunction('__compiler_addcslashes'),

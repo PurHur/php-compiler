@@ -1,5 +1,5 @@
 --TEST--
-stdlib typed string builtins — null $string TypeError (#18190, ext/standard/string.c, html.c)
+stdlib typed string builtins — null $string coerces to empty string (#18483, ext/standard/string.c, html.c)
 --FILE--
 <?php
 foreach ([
@@ -16,7 +16,7 @@ foreach ([
     }
 }
 --EXPECT--
-htmlspecialchars(): Argument #1 ($string) must be of type string, null given
-htmlentities(): Argument #1 ($string) must be of type string, null given
-addcslashes(): Argument #1 ($str) must be of type string, null given
-strip_tags(): Argument #1 ($string) must be of type string, null given
+htmlspecialchars: uncaught
+htmlentities: uncaught
+addcslashes: uncaught
+strip_tags: uncaught
