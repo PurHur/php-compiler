@@ -619,6 +619,7 @@ require_once __DIR__.'/../../../ext/openssl/VmOpensslX509Native.php';
 require_once __DIR__.'/../../../ext/openssl/openssl_cipher_iv_length.php';
 require_once __DIR__.'/../../../ext/openssl/openssl_cipher_key_length.php';
 require_once __DIR__.'/../../../ext/openssl/openssl_decrypt.php';
+require_once __DIR__.'/../../../ext/openssl/openssl_dh_compute_key.php';
 require_once __DIR__.'/../../../ext/openssl/openssl_digest.php';
 require_once __DIR__.'/../../../ext/openssl/openssl_encrypt.php';
 require_once __DIR__.'/../../../ext/openssl/openssl_error_string.php';
