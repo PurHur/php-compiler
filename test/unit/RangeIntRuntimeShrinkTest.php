@@ -41,4 +41,12 @@ final class RangeIntRuntimeShrinkTest extends TestCase
         $this->assertSame(0, $stepped->findIndex(0)?->resolveIndirect()->toInt());
         $this->assertSame(6, $stepped->findIndex(3)?->resolveIndirect()->toInt());
     }
+
+    public function testDeadBuildIntegerRangeLlvmDeletedFromHashTableWrite(): void
+    {
+        $write = (string) file_get_contents(__DIR__.'/../../lib/JIT/HashTableWriteLlvm.php');
+        $helper = (string) file_get_contents(__DIR__.'/../../lib/JIT/HashTableHelper.php');
+        $this->assertStringNotContainsString('buildIntegerRange', $write);
+        $this->assertStringNotContainsString('buildIntegerRange', $helper);
+    }
 }

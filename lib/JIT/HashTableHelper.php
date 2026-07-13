@@ -308,15 +308,6 @@ final class HashTableHelper
         );
     }
 
-    public static function buildIntegerRange(
-        Context $context,
-        Value $start,
-        Value $end,
-        Value $step
-    ): Value {
-        return HashTableWriteLlvm::buildIntegerRange($context, $start, $end, $step);
-    }
-
     public static function listEntryPointer(Context $context, Value $ht, Value $index): Value
     {
         $map = $context->structFieldMap['__hashtable__'];
