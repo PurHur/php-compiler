@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 4806 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 12914 |
+| Source constructs flagged (warnings) | 12916 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -2864,7 +2864,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/tan.php` | 0 | 1 |
 | `ext/standard/tanh.php` | 0 | 1 |
 | `ext/standard/tempnam.php` | 0 | 1 |
-| `ext/standard/time.php` | 0 | 1 |
+| `ext/standard/time.php` | 0 | 3 |
 | `ext/standard/time_nanosleep.php` | 0 | 3 |
 | `ext/standard/time_sleep_until.php` | 0 | 3 |
 | `ext/standard/timezone_abbreviations_list.php` | 0 | 2 |
@@ -14444,7 +14444,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitTimezoneOpen.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 22)
+- new ArgumentCountError (line 21)
 - new JITVariable (line 57)
 - 3 class method(s)
 
@@ -20647,7 +20647,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/get_cfg_var.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 27)
+- new ArgumentCountError (line 26)
 - 2 class method(s)
 
 ### `ext/standard/get_class_.php`
@@ -23465,6 +23465,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/time.php`
 
 **Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 20)
+- new ArgumentCountError (line 32)
 - 2 class method(s)
 
 ### `ext/standard/time_nanosleep.php`
@@ -23525,7 +23527,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/timezone_open.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 33)
+- new ArgumentCountError (line 32)
 - 2 class method(s)
 - 2 closure(s)
 
@@ -29020,7 +29022,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringHashCryptoLlvm.php`
 
 **Warnings** (review for bootstrap subset):
-- 13 class method(s)
+- 15 class method(s)
 
 ### `lib/JIT/Builtin/StringHashCryptoPhp.php`
 
