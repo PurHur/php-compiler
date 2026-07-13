@@ -30,6 +30,23 @@ PHP, 'match_default_not_last.php');
         $this->assertSame("a\nz\n", ob_get_clean());
     }
 
+    public function testSingleArmFallsThroughToDefaultExpression(): void
+    {
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile(<<<'PHP'
+<?php
+declare(strict_types=1);
+var_export(match (2) {
+    1 => 'a',
+    default => 'b',
+});
+PHP, 'match_default_arm.php');
+        $this->assertNotNull($block);
+        ob_start();
+        $runtime->run($block);
+        $this->assertSame("'b'", ob_get_clean());
+    }
+
     public function testDefaultLastStillCompiles(): void
     {
         $runtime = new Runtime();
