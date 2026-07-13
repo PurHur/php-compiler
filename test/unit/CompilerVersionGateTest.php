@@ -750,6 +750,26 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
+    public function testSupportsReflectionEnumCaseIsBackedFalseOnReferenceProfile(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsReflectionEnumCaseIsBacked());
+    }
+
+    public function testSupportsReflectionEnumCaseIsBackedTrueWhenProfile84(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertTrue(CompilerVersion::supportsReflectionEnumCaseIsBacked());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     public function testSupportsReflectionClassConstantIsDeprecatedFalseOnReferenceProfile(): void
     {
         $this->assertFalse(CompilerVersion::supportsReflectionClassConstantIsDeprecated());

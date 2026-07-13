@@ -427,6 +427,14 @@ class VMTest extends BaseTest {
                 && str_contains($name, 'reflection_enum_unit_case_is_deprecated_profile')) {
                 continue;
             }
+            if (!CompilerVersion::supportsReflectionEnumCaseIsBacked()
+                && str_contains($name, 'reflection_enum_case_is_backed_forward_profile')) {
+                continue;
+            }
+            if (CompilerVersion::supportsReflectionEnumCaseIsBacked()
+                && str_contains($name, 'reflection_enum_case_is_backed_profile')) {
+                continue;
+            }
             if (!CompilerVersion::supportsReflectionFunctionIsDeprecated()
                 && str_contains($name, 'reflection_function_is_deprecated_forward_profile')) {
                 continue;
