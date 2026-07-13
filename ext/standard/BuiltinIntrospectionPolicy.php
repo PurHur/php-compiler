@@ -146,6 +146,15 @@ final class BuiltinIntrospectionPolicy
         if (\in_array($lc, ['curl_escape', 'curl_unescape'], true)) {
             return CurlExtensionPolicy::advertisesExtension();
         }
+        if (\in_array($lc, [
+            'curl_version',
+            'curl_strerror',
+            'curl_multi_strerror',
+            'curl_upkeep',
+            'curl_file_create',
+        ], true)) {
+            return CurlExtensionPolicy::advertisesIntrospectionFunctions();
+        }
         if (\in_array($lc, ['xmlrpc_encode', 'xmlrpc_decode'], true)) {
             return \PHPCompiler\ext\xmlrpc\XmlrpcExtensionPolicy::advertisesExtension();
         }

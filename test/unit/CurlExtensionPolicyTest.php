@@ -19,6 +19,7 @@ final class CurlExtensionPolicyTest extends TestCase
         self::assertFalse(CurlExtensionPolicy::advertisesHandleClasses());
         self::assertTrue(CurlExtensionPolicy::advertisesShareHandles());
         self::assertFalse(CurlExtensionPolicy::advertisesEasyHandleStubs());
+        self::assertFalse(CurlExtensionPolicy::advertisesIntrospectionFunctions());
     }
 
     public function testCurlShareHandleClassAdvertisedWithShareBuiltins(): void
@@ -64,8 +65,8 @@ PHP;
     {
         $runtime = new Runtime();
         $ctx = $runtime->vmContext;
-        foreach (['curl_version', 'curl_strerror', 'curl_multi_strerror', 'curl_upkeep'] as $fn) {
-            self::assertTrue(VmReflection::functionExists($ctx, $fn), $fn);
+        foreach (['curl_version', 'curl_strerror', 'curl_multi_strerror', 'curl_upkeep', 'curl_file_create'] as $fn) {
+            self::assertFalse(VmReflection::functionExists($ctx, $fn), $fn);
         }
         foreach (['curl_escape', 'curl_unescape'] as $fn) {
             self::assertFalse(VmReflection::functionExists($ctx, $fn), $fn);
