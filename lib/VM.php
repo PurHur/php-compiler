@@ -123,7 +123,7 @@ class VM {
      *
      * @param callable(Variable): void $visitVar
      */
-    public function visitStrongRefRoots(callable $visitVar): void
+    public function visitStrongRefRoots(callable $visitVar, bool $includeBuiltinHandler = true): void
     {
         if (null !== $this->executingFrame) {
             $frame = $this->executingFrame;
@@ -132,7 +132,7 @@ class VM {
                 CycleCollector::markFrameRoots($frame, $visitVar);
             }
         }
-        if (null !== $this->builtinHandlerFrameForTrace) {
+        if ($includeBuiltinHandler && null !== $this->builtinHandlerFrameForTrace) {
             CycleCollector::markFrameRoots($this->builtinHandlerFrameForTrace, $visitVar, false);
         }
         foreach ($this->context->runStackFrames() as $frame) {

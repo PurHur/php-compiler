@@ -8,6 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\VM;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\EnumCaseSupport;
+use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\OutputBuffer;
 use PHPCompiler\VM\TypedPropertyCheck;
 use PHPCompiler\VM\Variable;
@@ -75,7 +76,7 @@ final class VmDebugZval
 
             return;
         }
-        $resourceDump = VmVarFormat::tryFormatDebugZvalDump($var);
+        $resourceDump = VmVarFormat::tryFormatDebugZvalDump($vm, $var);
         if (null !== $resourceDump) {
             self::write($resourceDump);
 
@@ -155,6 +156,48 @@ final class VmDebugZval
         };
 
         $vm->visitStrongRefRoots($walk);
+
+        return $count;
+    }
+
+    /**
+     * Count strong Variable slots referencing an object — Zend GC_REFCOUNT for debug_zval_dump (#18419).
+     *
+     * Skips in-flight builtin handler arg temps so internal calls do not inflate refcount display.
+     */
+    public static function countObjectAliases(VM $vm, ObjectEntry $object): int
+    {
+        $targetId = $object->id;
+        $count = 0;
+        $varSeen = [];
+
+        $walk = static function (Variable $var) use (&$walk, &$count, $targetId, &$varSeen): void {
+            $var = $var->resolveIndirect();
+            $varId = \spl_object_id($var);
+            if (isset($varSeen[$varId])) {
+                return;
+            }
+            $varSeen[$varId] = true;
+
+            if (Variable::TYPE_OBJECT === $var->type) {
+                try {
+                    if ($var->toObject()->id === $targetId) {
+                        ++$count;
+                    }
+                } catch (\LogicException) {
+                }
+
+                return;
+            }
+
+            if (Variable::TYPE_ARRAY === $var->type) {
+                foreach ($var->toArray()->iterate(false) as $element) {
+                    $walk($element);
+                }
+            }
+        };
+
+        $vm->visitStrongRefRoots($walk, false);
 
         return $count;
     }
