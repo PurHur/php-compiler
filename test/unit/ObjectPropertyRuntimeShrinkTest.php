@@ -70,6 +70,26 @@ final class ObjectPropertyRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('private function boxFetchedPropertyIntoValue', $object);
     }
 
+    public function testObjectMonolithDelegatesStaticPropertyAccess(): void
+    {
+        $object = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type/Object_.php');
+        $this->assertStringContainsString('ObjectStaticPropertyLlvm::fetch', $object);
+        $this->assertStringContainsString('ObjectStaticPropertyLlvm::store', $object);
+        $this->assertStringContainsString('ObjectStaticPropertyLlvm::unset', $object);
+        $this->assertStringContainsString('ObjectStaticPropertyLlvm::fetchDynamic', $object);
+        $this->assertStringNotContainsString('private function staticPropertyStoreValueBox', $object);
+        $this->assertStringNotContainsString('private function boxStaticFetchedIntoValue', $object);
+        $this->assertStringNotContainsString('private function markStaticPropertyInitialized', $object);
+
+        $llvm = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type/ObjectStaticPropertyLlvm.php');
+        $this->assertStringContainsString('public static function fetch', $llvm);
+        $this->assertStringContainsString('public static function store', $llvm);
+        $this->assertStringContainsString('TypedPropertyUninitGuard::emitBeforeStaticRead', $llvm);
+
+        $lines = substr_count($object, "\n") + 1;
+        $this->assertLessThan(5700, $lines, 'Object_.php LOC after static property LLVM extraction (#18740)');
+    }
+
     public function testEnumStringCastErrorMessageMatchesZend(): void
     {
         $msg = EnumCasePropertyJitHelper::enumStringCastErrorMessage('E');
