@@ -37,6 +37,9 @@ final class SocketImportStreamJitHelper
     {
         if ($streamHandle > 0) {
             $uri = VmFs::handleUri($streamHandle);
+            if (VmFsStdio::isStdioUri($uri)) {
+                return 'socket_import_stream(): Cannot represent a stream of type STDIO as a Socket Descriptor';
+            }
             $nativeType = VmStreamMeta::phpNativeStreamType($uri);
             if ('MEMORY' === $nativeType) {
                 return 'socket_import_stream(): Cannot represent a stream of type MEMORY as a Socket Descriptor';
