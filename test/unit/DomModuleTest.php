@@ -338,8 +338,6 @@ $doc->loadXML('<root><parent><child/></parent><sibling/></root>');
 $parent = $doc->getElementsByTagName('parent')->item(0);
 $child = $doc->getElementsByTagName('child')->item(0);
 $sibling = $doc->getElementsByTagName('sibling')->item(0);
-$contains = DOMNode::DOCUMENT_POSITION_CONTAINS | DOMNode::DOCUMENT_POSITION_PRECEDING;
-$contained = DOMNode::DOCUMENT_POSITION_CONTAINED_BY | DOMNode::DOCUMENT_POSITION_FOLLOWING;
 echo $parent->compareDocumentPosition($child), "\n";
 echo $child->compareDocumentPosition($parent), "\n";
 echo $parent->compareDocumentPosition($sibling), "\n";
