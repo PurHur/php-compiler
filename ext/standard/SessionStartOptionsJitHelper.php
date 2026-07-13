@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
-use PHPCompiler\VM\Context;
 use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\VM\SapiOutput;
 use PHPCompiler\VM\Variable;
@@ -29,25 +28,16 @@ final class SessionStartOptionsJitHelper
         }
         $readAndClose = SessionStartOptions::applyJit($ctx, $options->toArray());
         if (VmSession::isActive()) {
-            $ctx->errors->triggerError(
-                session_start::NOTICE_ALREADY_ACTIVE,
-                ErrorReporter::E_NOTICE,
-                null,
-                $ctx,
-                null
-            );
+            $notice = session_start::NOTICE_ALREADY_ACTIVE;
+            if (TriggerErrorJitHelper::recordTrigger(ErrorReporter::E_NOTICE, $notice, '', 0)) {
+                TriggerErrorJitHelper::stderrPrintCliError(ErrorReporter::E_NOTICE, $notice, '', 0);
+            }
             $out->bool(true);
 
             return;
         }
         if (SapiOutput::headersSent()) {
-            $ctx->errors->triggerError(
-                VmSession::HEADERS_SENT_START_WARNING,
-                ErrorReporter::E_WARNING,
-                null,
-                $ctx,
-                null
-            );
+            TriggerErrorJitHelper::warning(VmSession::HEADERS_SENT_START_WARNING);
             $out->bool(false);
 
             return;
