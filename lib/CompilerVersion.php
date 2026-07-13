@@ -2405,11 +2405,10 @@ final class CompilerVersion
     }
 
     /**
-     * Forward DOM APIs gated like gc_status / str_increment (#15613, #14535).
+     * Forward DOM APIs gated like compareDocumentPosition (#18504, #18608).
      *
-     * On `8.4.0-dev` reference profile (unset `PHP_COMPILER_PROFILE`), withhold PHP 8.3+/8.4+
-     * DOM methods so `method_exists()` matches Zend 8.2. Enable via stable `8.4.0+` or explicit
-     * `PHP_COMPILER_PROFILE=8.3` / `8.4`.
+     * Default `8.4.0-dev` line enables PHP 8.3+/8.4+ DOM methods (`version_compare` treats
+     * `-dev` below stable). Pin `PHP_COMPILER_PROFILE=8.2` to withhold like Zend 8.2.
      */
     private static function supportsDomApiSince(string $since): bool
     {
@@ -2419,7 +2418,11 @@ final class CompilerVersion
 
         $raw = getenv('PHP_COMPILER_PROFILE');
         if (!\is_string($raw) || '' === trim($raw)) {
-            return false;
+            if (preg_match('/^(\d+\.\d+)/', $since, $m)) {
+                return version_compare(self::VERSION, $m[1], '>=');
+            }
+
+            return version_compare(self::VERSION, $since, '>=');
         }
 
         return version_compare(self::languageProfileVersion(), $since, '>=');
@@ -2438,19 +2441,10 @@ final class CompilerVersion
 
     /**
      * PHP 8.4+ DOMNode::compareDocumentPosition() (ext/dom/node.c, #14448, #17696, #18092, #18504).
-     *
-     * Default 8.4 development line enables forward DOM APIs; pin `PHP_COMPILER_PROFILE=8.2`
-     * for Zend 8.2 phantom gate (method_exists false).
      */
     public static function supportsDomNodeCompareDocumentPosition(): bool
     {
-        $raw = getenv('PHP_COMPILER_PROFILE');
-        if (!\is_string($raw) || '' === trim($raw)) {
-            // Default 8.4 development line (#18504); version_compare treats -dev below stable.
-            return version_compare(self::VERSION, '8.4', '>=');
-        }
-
-        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+        return self::supportsDomApiSince('8.4.0');
     }
 
     /**
