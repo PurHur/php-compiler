@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\openssl;
 
+use PHPCompiler\ext\standard\VmFsReadNative;
 use PHPCompiler\ext\standard\VmHash;
 use PHPCompiler\ext\standard\VmHashNative;
 use PHPCompiler\Frame;
@@ -718,7 +719,7 @@ final class VmOpenssl
 
         $material = $arg->toString();
         if ('' !== $material && @\is_file($material)) {
-            $contents = @\file_get_contents($material);
+            $contents = VmFsReadNative::read($material);
             if (false === $contents) {
                 self::userWarning('openssl_pkey_get_private(): Unable to read key file', $frame);
 

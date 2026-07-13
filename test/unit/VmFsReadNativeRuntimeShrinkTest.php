@@ -128,6 +128,9 @@ final class VmFsReadNativeRuntimeShrinkTest extends TestCase
             'ext/simplexml/VmSimpleXml.php',
             'ext/xmlreader/VmXmlReader.php',
             'ext/uploadprogress/VmUploadprogress.php',
+            'ext/openssl/VmOpenssl.php',
+            'ext/openssl/VmOpensslPkeyNative.php',
+            'ext/openssl/VmOpensslSpkiNative.php',
         ];
     }
 

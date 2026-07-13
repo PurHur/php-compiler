@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\openssl;
 
+use PHPCompiler\ext\standard\VmFsReadNative;
+
 /**
  * NETSCAPE SPKAC helpers via libcrypto FFI (php-src ext/openssl/openssl.c; #8690).
  */
@@ -235,7 +237,7 @@ final class VmOpensslSpkiNative
             $ffi->BIO_free($bio);
         }
 
-        $pem = @\file_get_contents($tmp);
+        $pem = VmFsReadNative::read($tmp);
         @\unlink($tmp);
         if (false === $pem || '' === $pem) {
             return false;
