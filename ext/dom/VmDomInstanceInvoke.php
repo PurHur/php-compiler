@@ -69,8 +69,11 @@ final class VmDomInstanceInvoke
             'add' => VmDomJitDispatch::tokenListAdd($ctx, $self, $extra),
             'remove' => VmDomJitDispatch::tokenListRemove($ctx, $self, $extra),
             'contains' => VmDomJitDispatch::tokenListContains($self, $extra),
-            'item' => VmDomJitDispatch::tokenListItem($self, $extra),
+            'item' => VmDomJitDispatch::dispatchItem($ctx, $self, $extra),
             'toggle' => VmDomJitDispatch::tokenListToggle($ctx, $self, $extra),
+            'query' => VmDomJitDispatch::xpathQuery($ctx, $self, $extra),
+            'evaluate' => VmDomJitDispatch::xpathEvaluate($ctx, $self, $extra),
+            'registernamespace' => VmDomJitDispatch::xpathRegisterNamespace($self, $extra),
             default => throw new \Error('Call to undefined method '.$self->class->name.'::'.$methodLc.'()'),
         };
     }

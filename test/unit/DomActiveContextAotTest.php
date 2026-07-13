@@ -58,6 +58,8 @@ final class DomActiveContextAotTest extends TestCase
         $this->assertStringContainsString('DomDocumentLoadXML', $source);
         $this->assertStringContainsString('DomDocumentSaveHTML', $source);
         $this->assertStringContainsString('DomDocumentSaveXML', $source);
+        $this->assertStringContainsString('isUserScriptGenericDomMethod', $source);
+        $this->assertStringContainsString('domxpath::query', $source);
     }
 
     public function testDomLoadHTMLRuntimeSchedulesActiveContextInit(): void

@@ -66,6 +66,36 @@ final class JitDomCreateElement
         return $obj;
     }
 
+    /** User-script AOT: materialize DOMElement with textContent (#18493). */
+    public static function materializeElementWithTextContent(
+        Context $context,
+        string $tag,
+        string $textContent
+    ): Value {
+        $obj = self::materializeElementFromLiteral($context, $tag);
+        if ('' === $textContent) {
+            return $obj;
+        }
+        $objectType = $context->type->object;
+        $classId = $objectType->lookup(self::CLASS_ELEMENT);
+        if (!$objectType->hasProperty($classId, 'textContent')) {
+            $objectType->defineProperty($classId, 'textContent', JITVariable::TYPE_STRING);
+        }
+        $textStr = $context->builder->load($context->constantStringFromString($textContent));
+        $owned = $context->builder->call(
+            $context->lookupFunction('__string__separate'),
+            $textStr
+        );
+        $propVar = new JITVariable($context, JITVariable::TYPE_STRING, JITVariable::KIND_VALUE, $owned);
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($obj, self::CLASS_ELEMENT, 'textContent'),
+            $propVar,
+            JITVariable::TYPE_STRING
+        );
+
+        return $obj;
+    }
+
     private static function materializeElementFromRuntimeName(Context $context, JITVariable $nameArg): Value
     {
         $nameStr = self::loadStringArg($context, $nameArg);
