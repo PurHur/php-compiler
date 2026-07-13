@@ -73,6 +73,7 @@ final class VmCsv
         if ($j < $len && $line[$j] === $enc) {
             $i = $j + 1;
             $field = '';
+            $closed = false;
             while ($i < $len) {
                 $c = $line[$i];
                 if ($esc !== $enc && $c === $esc && $i + 1 < $len) {
@@ -87,14 +88,15 @@ final class VmCsv
                         continue;
                     }
                     ++$i;
+                    $closed = true;
                     break;
                 }
                 $field .= $c;
                 ++$i;
             }
             $offset = $i;
-            // php-src ext/standard/file.c — lone opening enclosure at EOF yields NUL field (#18592).
-            if ($i >= $len && '' === $field) {
+            // php-src ext/standard/file.c PHP 8.2 — unterminated empty enclosure yields NUL (#18592).
+            if (!$closed && '' === $field) {
                 return "\0";
             }
 

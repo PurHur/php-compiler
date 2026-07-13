@@ -1,5 +1,5 @@
 --TEST--
-JIT: str_getcsv() lone quote — unterminated empty enclosure yields NUL byte (#18592, ext/standard/file.c)
+AOT: str_getcsv() lone quote — unterminated empty enclosure yields NUL byte (#18592, ext/standard/file.c)
 --FILE--
 <?php
 $row = str_getcsv('"');
