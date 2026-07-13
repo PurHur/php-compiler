@@ -6,7 +6,6 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\VM\Context;
-use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 
@@ -55,13 +54,7 @@ final class SessionStartOptions
                 );
             }
             if (!self::applyOption($frame, $ctx, $opt, $value)) {
-                $ctx->errors->triggerError(
-                    'session_start(): Setting option "'.$opt.'" failed',
-                    ErrorReporter::E_WARNING,
-                    null !== $frame && '' !== $frame->scriptPath ? $frame->scriptPath : null,
-                    $ctx,
-                    $frame
-                );
+                TriggerErrorJitHelper::warning('session_start(): Setting option "'.$opt.'" failed');
             }
         }
 
