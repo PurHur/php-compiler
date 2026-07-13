@@ -47,7 +47,7 @@ final class substr extends Internal
                 $argc
             ));
         }
-        $string = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'substr', 0, 'string');
+        $string = VmString::coerceTypedStringBuiltinArg($frame->calledArgs[0], 'substr', 0, 'string');
         $offset = $frame->calledArgs[1]->resolveIndirect();
         if (null === $frame->returnVar) {
             return;
@@ -123,7 +123,7 @@ final class substr extends Internal
             }
         }
 
-        $str = JitStringBuiltinArg::lower($context, $args[0], 'substr', 0, 'string');
+        $str = JitStringBuiltinArg::lowerTypedString($context, $args[0], 'substr', 0, 'string');
         $structName = $str->typeOf()->getElementType()->getName();
         $map = $context->structFieldMap[$structName];
         $len = $context->builder->load(

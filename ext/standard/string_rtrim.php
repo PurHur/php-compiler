@@ -38,7 +38,7 @@ final class string_rtrim extends Internal
         if ($argc < 1 || $argc > 3) {
             throw new \LogicException($fn.'() requires one to three arguments');
         }
-        $string = VmString::coerceStringBuiltinArg($frame->calledArgs[0], $fn, 0, 'string');
+        $string = VmString::coerceTypedStringBuiltinArg($frame->calledArgs[0], $fn, 0, 'string');
         [$mask, $mode] = VmString::resolveTrimMaskAndMode(
             \array_slice($frame->calledArgs, 1),
             $fn,
@@ -104,7 +104,7 @@ final class string_rtrim extends Internal
                 $mode = $modeLiteral;
             }
         }
-        $str = JitStringBuiltinArg::lower($context, $args[0], $fn, 0, 'string');
+        $str = JitStringBuiltinArg::lowerTypedString($context, $args[0], $fn, 0, 'string');
         $structName = $str->typeOf()->getElementType()->getName();
         $map = $context->structFieldMap[$structName];
         $len = $context->builder->load(

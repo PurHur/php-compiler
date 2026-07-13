@@ -41,8 +41,7 @@ final class json_decode extends Internal
                 ));
             }
         }
-        InternalStrictArg::rejectNullString($frame->calledArgs[0], 'json_decode', 'json', 0, $frame);
-        $json = VmString::coerceStringBuiltinArg(
+        $json = VmString::coerceTypedStringBuiltinArg(
             $frame->calledArgs[0],
             'json_decode',
             0,
@@ -113,7 +112,7 @@ final class json_decode extends Internal
         }
 
         // assoc=false runtime path is unsupported; still reject enum operands first (#5907).
-        JitStringBuiltinArg::lower($context, $args[0], 'json_decode', 0, 'json');
+        JitStringBuiltinArg::lowerTypedString($context, $args[0], 'json_decode', 0, 'json');
 
         return JitJsonDecode::decodeRuntimeObjectMode($context, $args[0]);
     }
