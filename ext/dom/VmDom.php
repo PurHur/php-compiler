@@ -4092,7 +4092,7 @@ final class VmDom
                 $lines[] = self::serializeHtmlNode($rootVar->toObject());
             } elseif (null !== $state->documentElementName && '' !== $state->documentElementName) {
                 $name = self::escapeName($state->documentElementName);
-                $lines[] = '<'.$name.'></'.$name.'>';
+                $lines[] = '<'.$name.'/>';
             }
         }
 
@@ -4523,7 +4523,7 @@ final class VmDom
         $name = self::escapeName($state->nodeName);
         $attrPart = self::serializeAttributes($state);
         if ([] === $state->childIds) {
-            return '<'.$name.$attrPart.'></'.$name.'>';
+            return '<'.$name.$attrPart.'/>';
         }
         $parts = [];
         foreach ($state->childIds as $childId) {
