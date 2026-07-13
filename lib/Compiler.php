@@ -12079,7 +12079,16 @@ class Compiler {
         if (!property_exists($next, 'args') || !is_array($next->args)) {
             return;
         }
-        foreach ($next->args as $arg) {
+        $singleArgCall = 1 === \count($next->args);
+        foreach ($next->args as $argIndex => $arg) {
+            $callArgOperand = $this->cfgCallArgOperand($next, (int) $argIndex, $arg);
+            $feedsFromFetch = null !== $fetch->result
+                && $callArgOperand instanceof Operand
+                && $this->operandsReferToSameVariable($callArgOperand, $fetch->result);
+            // trim($obj->prop): lone hoisted fetch arg; implode(',', $obj->prop) must not rewire arg #0 (#18427).
+            if (!$feedsFromFetch && !$singleArgCall) {
+                continue;
+            }
             if ($arg instanceof Operand) {
                 $block->bindOperandScopeSlot($arg, $fetchSlot);
             }
