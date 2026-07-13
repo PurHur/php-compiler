@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\VM\Builtin;
 
-use PHPCompiler\ext\standard\VmString;
+use PHPCompiler\ext\standard\VmDateTimeCreateArg;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\DateTimeSupport;
 use PHPCompiler\VM\Variable;
@@ -32,15 +32,13 @@ final class DateTimeImmutableConstruct extends VmClassMethod
         );
         $time = 'now';
         if (isset($frame->calledArgs[1])) {
-            $timeArg = $frame->calledArgs[1]->resolveIndirect();
-            if (Variable::TYPE_NULL !== $timeArg->type) {
-                $time = VmString::coerceStringBuiltinArg(
-                    $frame->calledArgs[1],
-                    'DateTimeImmutable::__construct',
-                    0,
-                    'datetime'
-                );
-            }
+            $time = VmDateTimeCreateArg::coerceDatetime(
+                $frame,
+                $frame->calledArgs[1],
+                'DateTimeImmutable::__construct',
+                0,
+                'datetime'
+            );
         }
         $timezone = null;
         if (isset($frame->calledArgs[2])) {

@@ -40,15 +40,13 @@ final class date_create_immutable extends Internal
 
         $time = 'now';
         if ($argc >= 1) {
-            $timeArg = $frame->calledArgs[0]->resolveIndirect();
-            if (Variable::TYPE_NULL !== $timeArg->type) {
-                $time = VmString::coerceStringBuiltinArg(
-                    $frame->calledArgs[0],
-                    'date_create_immutable',
-                    0,
-                    'datetime'
-                );
-            }
+            $time = VmDateTimeCreateArg::coerceDatetime(
+                $frame,
+                $frame->calledArgs[0],
+                'date_create_immutable',
+                0,
+                'datetime'
+            );
         }
         $timezone = null;
         if ($argc >= 2) {
