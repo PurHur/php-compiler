@@ -324,6 +324,7 @@ require_once __DIR__.'/../../../ext/exif/ExifImagetypeJitHelper.php';
 require_once __DIR__.'/../../../ext/exif/JitExifImagetype.php';
 require_once __DIR__.'/../../../ext/exif/Module.php';
 require_once __DIR__.'/../../../ext/exif/VmExifRead.php';
+require_once __DIR__.'/../../../ext/exif/VmExifWarning.php';
 require_once __DIR__.'/../../../ext/exif/exif_imagetype.php';
 require_once __DIR__.'/../../../ext/exif/exif_read_data.php';
 require_once __DIR__.'/../../../ext/filter/BuiltinEnums.php';
