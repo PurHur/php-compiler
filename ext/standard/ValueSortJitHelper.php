@@ -39,7 +39,7 @@ final class ValueSortJitHelper
     private static function applySortedCopy(HashTable $ht, HashTable $sorted): void
     {
         $pairs = [];
-        foreach ($sorted->iterateKeyed(true) as [$key, $value]) {
+        foreach ($sorted->exportKeyValuePairs(true) as [$key, $value]) {
             $keyCopy = new Variable();
             $keyCopy->copyFrom($key);
             $valCopy = new Variable();
