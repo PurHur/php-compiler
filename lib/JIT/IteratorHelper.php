@@ -47,7 +47,7 @@ final class IteratorHelper
         Context $context,
         Variable $array,
         ?string $containerUserType = null,
-        ?JIT $jit = null
+        ?\PHPCompiler\JIT $jit = null
     ): Variable {
         return VmIteratorForeach::compileValueByRef($context, $array, $containerUserType, $jit);
     }

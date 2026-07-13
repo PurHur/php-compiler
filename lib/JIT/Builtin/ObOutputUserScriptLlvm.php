@@ -42,6 +42,7 @@ final class ObOutputUserScriptLlvm
         ObOutput::registerExternals($context);
         ObOutputExecCaptureRuntime::ensureLinked($context);
         ObOutputEchoJitEmit::implementAll($context);
+        ObOutputJitBridge::finishUserScriptEmit($context);
         self::restoreInsertBlock($context, $restore);
         if (null === $restore) {
             $context->builder->clearInsertionPosition();
