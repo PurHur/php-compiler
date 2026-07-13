@@ -378,9 +378,12 @@ final class ExceptionSupport
      *
      * @return never
      */
-    public static function emitNativeUncaughtFatal(\Throwable $native, ?ObjectEntry $vmEntry = null): void
-    {
-        self::writeNativeUncaughtFatalBlock($native, true, $vmEntry);
+    public static function emitNativeUncaughtFatal(
+        \Throwable $native,
+        ?ObjectEntry $vmEntry = null,
+        bool $displayErrors = false,
+    ): void {
+        self::writeNativeUncaughtFatalBlock($native, true, $vmEntry, $displayErrors);
         throw new ScriptExit(255);
     }
 
@@ -389,9 +392,12 @@ final class ExceptionSupport
      *
      * @return never
      */
-    public static function emitNativeUncaughtFatalWithNext(\Throwable $primary, \Throwable $next): void
-    {
-        self::writeNativeUncaughtFatalBlock($primary, false);
+    public static function emitNativeUncaughtFatalWithNext(
+        \Throwable $primary,
+        \Throwable $next,
+        bool $displayErrors = false,
+    ): void {
+        self::writeNativeUncaughtFatalBlock($primary, false, null, $displayErrors);
         $message = $next->getMessage();
         $file = $next->getFile();
         $line = $next->getLine();
@@ -415,33 +421,54 @@ final class ExceptionSupport
         \Throwable $native,
         bool $includeThrownIn,
         ?ObjectEntry $vmEntry = null,
+        bool $displayErrors = false,
     ): void {
         $class = $native::class;
         $message = $native->getMessage();
         $file = $native->getFile();
         $line = $native->getLine();
-        $fatal = "PHP Fatal error:  Uncaught {$class}: {$message}";
+        $body = "Uncaught {$class}: {$message}";
         if ('' !== $file) {
-            $fatal .= " in {$file}";
+            $body .= " in {$file}";
             if ($line > 0) {
-                $fatal .= ":{$line}";
+                $body .= ":{$line}";
             }
         }
-        fwrite(STDERR, $fatal."\n");
+        $stackTrace = self::formatUncaughtStackTrace($vmEntry);
+        $thrownIn = '';
+        if ($includeThrownIn && '' !== $file && $line > 0) {
+            $thrownIn = "  thrown in {$file} on line {$line}\n";
+        }
+
+        fwrite(STDERR, "PHP Fatal error:  {$body}\n");
         fwrite(STDERR, "Stack trace:\n");
+        fwrite(STDERR, $stackTrace);
+        if ('' !== $thrownIn) {
+            fwrite(STDERR, $thrownIn);
+        }
+
+        // php-src CLI: display_errors mirrors uncaught fatals to stdout without the PHP prefix
+        // (sapi/cli/php_cli.c / main/main.c php_error_cb; issue #18561).
+        if ($displayErrors) {
+            echo "Fatal error: {$body}\n";
+            echo "Stack trace:\n";
+            echo $stackTrace;
+            if ('' !== $thrownIn) {
+                echo $thrownIn;
+            }
+        }
+    }
+
+    private static function formatUncaughtStackTrace(?ObjectEntry $vmEntry): string
+    {
         if (null !== $vmEntry) {
             $trace = ExceptionTrace::resolveTraceVariable($vmEntry);
             if (Variable::TYPE_ARRAY === $trace->type && $trace->toArray()->getNumElements() > 0) {
-                fwrite(STDERR, ExceptionTraceFormat::asString($trace)."\n");
-            } else {
-                fwrite(STDERR, "#0 {main}\n");
+                return ExceptionTraceFormat::asString($trace)."\n";
             }
-        } else {
-            fwrite(STDERR, "#0 {main}\n");
         }
-        if ($includeThrownIn && '' !== $file && $line > 0) {
-            fwrite(STDERR, "  thrown in {$file} on line {$line}\n");
-        }
+
+        return "#0 {main}\n";
     }
 
     /** Safe read for Throwable slots that may stay at typed prototype without a value (#6357). */

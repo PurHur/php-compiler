@@ -9943,7 +9943,11 @@ restart:
             if ($this->context->isolatedPhpFunctionInvoke || $this->context->bubbleUncaughtToNative) {
                 throw $native;
             }
-            VM\ExceptionSupport::emitNativeUncaughtFatal($native, $entry);
+            VM\ExceptionSupport::emitNativeUncaughtFatal(
+                $native,
+                $entry,
+                $this->context->errors->getDisplayErrors(),
+            );
         }
         throw new \Exception($thrown->toString());
     }
@@ -9974,7 +9978,8 @@ restart:
             VM\ExceptionSupport::nativeUncaughtThrowable(
                 $nextEntry,
                 VM\ExceptionSupport::readThrowableMessage($nextEntry)
-            )
+            ),
+            $this->context->errors->getDisplayErrors(),
         );
     }
 
