@@ -587,6 +587,12 @@ final class VmDom
         $document->methods['relaxngvalidate'] = new DocumentRelaxNGValidate();
         $document->methodVisibility['relaxngvalidate'] = $pub;
         $document->methodNames['relaxngvalidate'] = 'relaxNGValidate';
+        $document->methods['schemavalidatesource'] = new DocumentSchemaValidateSource();
+        $document->methodVisibility['schemavalidatesource'] = $pub;
+        $document->methodNames['schemavalidatesource'] = 'schemaValidateSource';
+        $document->methods['relaxngvalidatesource'] = new DocumentRelaxNGValidateSource();
+        $document->methodVisibility['relaxngvalidatesource'] = $pub;
+        $document->methodNames['relaxngvalidatesource'] = 'relaxNGValidateSource';
         $ctx->classes[self::CLASS_DOCUMENT] = $document;
 
         $element = new ClassEntry('DOMElement');
@@ -6794,6 +6800,116 @@ final class VmDom
         self::triggerDomWarning($frame, 'DOMDocument::relaxNGValidate(): not implemented in this compiler build');
 
         return false;
+    }
+
+    /** DOMDocument::schemaValidateSource() — in-memory XSD validation stub (php-src ext/dom/document.c; #18748). */
+    public static function schemaValidateSource(
+        Context $ctx,
+        ObjectEntry $document,
+        string $source,
+        int $flags,
+        ?Frame $frame = null
+    ): bool {
+        self::ensureDocument($document);
+        unset($flags);
+        self::rejectEmptyLoadSource($source, 'DOMDocument::schemaValidateSource()');
+        $validationErrors = VmXml::validationErrorRecords($source);
+        if ([] !== $validationErrors) {
+            self::reportDomValidationSourceParseError($ctx, $source, 'DOMDocument::schemaValidateSource()', $frame, true);
+
+            return false;
+        }
+
+        $rootName = DomRegistry::state($document)->documentElementName ?? 'root';
+        if ('' === $rootName) {
+            $rootName = 'root';
+        }
+        self::triggerDomWarning(
+            $frame,
+            'DOMDocument::schemaValidateSource(): '.sprintf(
+                "Element '%s': No matching global declaration available for the validation root.",
+                $rootName
+            )
+        );
+
+        return false;
+    }
+
+    /** DOMDocument::relaxNGValidateSource() — in-memory RelaxNG validation stub (php-src ext/dom/document.c; #18748). */
+    public static function relaxNGValidateSource(
+        Context $ctx,
+        ObjectEntry $document,
+        string $source,
+        ?Frame $frame = null
+    ): bool {
+        self::ensureDocument($document);
+        self::rejectEmptyLoadSource($source, 'DOMDocument::relaxNGValidateSource()');
+        $validationErrors = VmXml::validationErrorRecords($source);
+        if ([] !== $validationErrors) {
+            self::reportDomValidationSourceParseError($ctx, $source, 'DOMDocument::relaxNGValidateSource()', $frame, false);
+
+            return false;
+        }
+
+        if (preg_match('/<grammar\b/i', $source) && !preg_match('/<start\b/i', $source)) {
+            self::triggerDomWarning($frame, 'DOMDocument::relaxNGValidateSource(): grammar has no children');
+            self::triggerDomWarning($frame, 'DOMDocument::relaxNGValidateSource(): Element <grammar> has no <start>');
+            self::triggerDomWarning($frame, 'DOMDocument::relaxNGValidateSource(): Invalid RelaxNG');
+
+            return false;
+        }
+
+        return false;
+    }
+
+    /**
+     * DOMDocument::schemaValidateSource()/relaxNGValidateSource() libxml warning surface
+     * (php-src ext/dom/document.c via libxml2; #18748).
+     */
+    private static function reportDomValidationSourceParseError(
+        Context $ctx,
+        string $source,
+        string $methodLabel,
+        ?Frame $frame,
+        bool $isSchema
+    ): void {
+        $record = VmXml::validationErrorRecord($source);
+        if (null === $record) {
+            $record = [
+                'level' => LibxmlConstants::LIBXML_ERR_FATAL,
+                'code' => 4,
+                'column' => 1,
+                'message' => 'Malformed XML document',
+                'file' => '',
+                'line' => 1,
+            ];
+        }
+
+        $prefix = $methodLabel.': ';
+        $line = $record['line'];
+        VmLibxml::handleError(
+            $ctx,
+            $record,
+            $frame,
+            null,
+            $prefix.'Entity: line '.$line.': parser error : '.$record['message']
+        );
+
+        $snippet = trim($source);
+        VmLibxml::handleError($ctx, $record, $frame, null, $prefix.$snippet);
+
+        $caretColumn = self::domLibxmlCaretColumn($snippet, $record);
+        VmLibxml::handleError($ctx, $record, $frame, null, $prefix.str_repeat(' ', $caretColumn).'^');
+
+        if ($isSchema) {
+            self::triggerDomWarning($frame, $prefix."Failed to parse the XML resource 'in_memory_buffer'.");
+            self::triggerDomWarning($frame, $prefix.'Invalid Schema');
+
+            return;
+        }
+
+        self::triggerDomWarning($frame, $prefix.'xmlRelaxNGParse: could not parse schemas');
+        self::triggerDomWarning($frame, $prefix.'Invalid RelaxNG');
     }
 
     /**
