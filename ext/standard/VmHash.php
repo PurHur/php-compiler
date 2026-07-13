@@ -16,14 +16,14 @@ final class VmHash
 
     public const HASH_HMAC_UNKNOWN_ALGO_MSG = 'hash_hmac(): Argument #1 ($algo) must be a valid cryptographic hashing algorithm';
 
-    public static function hash(string $algo, string $data, bool $raw = false): string
+    public static function hash(string $algo, string $data, bool $raw = false, string $fn = 'hash'): string
     {
-        self::ensureDigestAlgo($algo);
+        self::ensureDigestAlgo($algo, $fn);
         $lower = \strtolower($algo);
         if (VmHashHostFallback::supportsDigest($lower)) {
             $digest = VmHashHostFallback::hash($lower, $data, $raw);
             if (false === $digest) {
-                throw new \ValueError(self::HASH_UNKNOWN_ALGO_MSG);
+                throw new \ValueError(self::unknownDigestAlgoMsg($fn));
             }
 
             return $digest;
@@ -31,14 +31,14 @@ final class VmHash
 
         $native = VmHashNative::hash($algo, $data, $raw);
         if (false === $native) {
-            throw new \ValueError(self::HASH_UNKNOWN_ALGO_MSG);
+            throw new \ValueError(self::unknownDigestAlgoMsg($fn));
         }
 
         return $native;
     }
 
     /** @throws \ValueError ext/hash/hash.c unknown algo (issue #4186, #13629). */
-    public static function ensureDigestAlgo(string $algo): void
+    public static function ensureDigestAlgo(string $algo, string $fn = 'hash'): void
     {
         if (VmHashNative::supports($algo)) {
             return;
@@ -48,7 +48,7 @@ final class VmHash
             return;
         }
 
-        throw new \ValueError(self::HASH_UNKNOWN_ALGO_MSG);
+        throw new \ValueError(self::unknownDigestAlgoMsg($fn));
     }
 
     /** @throws \ValueError ext/hash/hash.c unknown HMAC algo (issue #4408). */
@@ -163,5 +163,14 @@ final class VmHash
         }
 
         return 0 === $result;
+    }
+
+    private static function unknownDigestAlgoMsg(string $fn): string
+    {
+        if ('hash' === $fn) {
+            return self::HASH_UNKNOWN_ALGO_MSG;
+        }
+
+        return $fn.'(): Argument #1 ($algo) must be a valid hashing algorithm';
     }
 }

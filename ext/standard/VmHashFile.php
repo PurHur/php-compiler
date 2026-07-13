@@ -16,12 +16,13 @@ final class VmHashFile
      */
     public static function hashFile(string $algo, string $path, bool $raw = false) {
         self::rejectEmptyPath($path);
+        VmHash::ensureDigestAlgo($algo, 'hash_file');
         $data = VmFs::fileGetContents($path);
         if (false === $data) {
             return false;
         }
 
-        return VmHash::hash($algo, $data, $raw);
+        return VmHash::hash($algo, $data, $raw, 'hash_file');
     }
 
     /**
