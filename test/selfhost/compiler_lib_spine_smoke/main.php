@@ -607,6 +607,7 @@ require_once __DIR__.'/../../../ext/openssl/VmOpensslObjects.php';
 require_once __DIR__.'/../../../ext/openssl/VmOpensslPkeyDeriveNative.php';
 require_once __DIR__.'/../../../ext/openssl/VmOpensslPkeyNative.php';
 require_once __DIR__.'/../../../ext/openssl/VmOpensslSealNative.php';
+require_once __DIR__.'/../../../ext/openssl/VmOpensslCipherNative.php';
 require_once __DIR__.'/../../../ext/openssl/VmOpensslSignNative.php';
 require_once __DIR__.'/../../../ext/openssl/VmOpensslSpkiNative.php';
 require_once __DIR__.'/../../../ext/openssl/VmOpensslPkcs12Native.php';
