@@ -978,7 +978,6 @@ class Context {
         Builtin\StringStripslashes::ensureStandaloneBodies($this);
         Builtin\StringFilePutContents::ensureStandaloneBodies($this);
         Builtin\SuperglobalNameRuntime::ensureLinked($this);
-        Builtin\EnvLocalRuntime::ensureLinked($this);
         if (DomInstanceMethodJit::shouldDeferToVmClassMethodLowering()) {
             Builtin\DomStandaloneAotInitRuntime::ensureLinked($this);
         } elseif (CompilerVersion::supportsDomTokenList()) {

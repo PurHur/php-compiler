@@ -10,6 +10,9 @@ use PHPCompiler\ext\standard\phpc_native_ht_set_string_at;
 use PHPCompiler\ext\standard\phpc_native_ht_set_string_key;
 use PHPCompiler\ext\standard\phpc_native_ht_set_string_key_ht;
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\MultipartRuntime;
+use PHPCompiler\JIT\Builtin\ParseStrRuntime;
+use PHPCompiler\JIT\Builtin\StringGetenv;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitVmHelperLink;
@@ -26,7 +29,16 @@ final class RequestParseBodyRuntime
 {
     private const HELPER_PATH = '/ext/standard/RequestParseBodyJitHelper.php';
 
+    private const USER_SCRIPT_HELPER_PATH = '/ext/standard/RequestParseBodyNativeJitHelper.php';
+
     private const PARSE_INTO_NATIVE_HELPER = 'PHPCompiler\\ext\\standard\\RequestParseBodyJitHelper::parseIntoNative';
+
+    private const USER_SCRIPT_PARSE_INTO_NATIVE = 'PHPCompiler\\ext\\standard\\RequestParseBodyNativeJitHelper::parseIntoNative';
+
+    /** @var list<string> */
+    private const USER_SCRIPT_COMPILED_HELPERS = [
+        self::USER_SCRIPT_PARSE_INTO_NATIVE,
+    ];
 
     /** @var list<string> */
     private const COMPILED_HELPERS = [
@@ -41,6 +53,82 @@ final class RequestParseBodyRuntime
     public static function ensureLinked(Context $context): void
     {
         self::implement($context);
+    }
+
+    public static function ensureJitHelperCompiled(Context $context): void
+    {
+        if (StreamIoRuntime::shouldDeferHeavyStreamIoEmitters($context)) {
+            return;
+        }
+
+        if ($context->isThinStandaloneAotMain()) {
+            self::ensureUserScriptJitHelperCompiled($context);
+
+            return;
+        }
+
+        $missing = false;
+        foreach (self::COMPILED_HELPERS as $logical) {
+            if (!isset($context->functions[\strtolower($logical)])) {
+                $missing = true;
+                break;
+            }
+        }
+        if (!$missing) {
+            return;
+        }
+
+        self::ensureNativeHtInternalProxies($context);
+        JitVmHelperLink::ensureCompiled(
+            $context,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#16927'
+        );
+    }
+
+    public static function ensureUserScriptJitHelperCompiled(Context $context): void
+    {
+        $missing = false;
+        foreach (self::USER_SCRIPT_COMPILED_HELPERS as $logical) {
+            if (!isset($context->functions[\strtolower($logical)])) {
+                $missing = true;
+                break;
+            }
+        }
+        if (!$missing) {
+            return;
+        }
+
+        MultipartRuntime::ensureUserScriptLinked($context);
+        ParseStrRuntime::ensureUserScriptLinked($context);
+        StringGetenv::ensureJitHelperCompiled($context);
+        self::ensureNativeHtInternalProxies($context);
+        JitVmHelperLink::ensureCompiled(
+            $context,
+            self::USER_SCRIPT_HELPER_PATH,
+            self::USER_SCRIPT_COMPILED_HELPERS,
+            '#5965'
+        );
+    }
+
+    public static function helperFunction(Context $context, string $logical): LlvmFunction
+    {
+        self::ensureJitHelperCompiled($context);
+        $lc = \strtolower($logical);
+        $fn = $context->functions[$lc] ?? null;
+        if (null === $fn) {
+            throw new \LogicException($logical.' missing after RequestParseBody helper compile (#16927)');
+        }
+
+        return $fn;
+    }
+
+    public static function parseIntoNativeHelperLogical(Context $context): string
+    {
+        return $context->isThinStandaloneAotMain()
+            ? self::USER_SCRIPT_PARSE_INTO_NATIVE
+            : self::PARSE_INTO_NATIVE_HELPER;
     }
 
     public static function implement(Context $context): void

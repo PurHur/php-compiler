@@ -15,6 +15,8 @@ use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPCompiler\JIT\Builtin\RequestParseBodyRuntime;
+use PHPCompiler\JIT\Builtin\StreamIoRuntime;
+use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPLLVM\Value;
 
 /**
@@ -79,28 +81,43 @@ final class request_parse_body extends Internal
                 'request_parse_body() expects at most 1 argument, '.$argc.' given'
             );
 
-            return ArrayBuiltinHelper::emptyArray($context);
+            return HashTableHelper::alloc($context);
         }
         if (1 === $argc && JITVariable::TYPE_NULL !== $args[0]->type) {
             ExceptionBridge::emitTypeError($context, 'request_parse_body(): Argument #1 ($options) must be of type ?array');
 
-            return ArrayBuiltinHelper::emptyArray($context);
+            return HashTableHelper::alloc($context);
         }
-
-        RequestParseBodyRuntime::ensureLinked($context);
 
         $postHt = HashTableHelper::alloc($context);
         $filesHt = HashTableHelper::alloc($context);
-        $context->builder->call(
-            $context->lookupFunction('__compiler_request_parse_body'),
-            $postHt,
-            $filesHt
-        );
+        if (StreamIoRuntime::shouldDeferHeavyStreamIoEmitters($context)) {
+            RequestParseBodyRuntime::ensureLinked($context);
+            $context->builder->call(
+                $context->lookupFunction('__compiler_request_parse_body'),
+                $postHt,
+                $filesHt
+            );
+        } else {
+            $helperFn = RequestParseBodyRuntime::helperFunction(
+                $context,
+                RequestParseBodyRuntime::parseIntoNativeHelperLogical($context)
+            );
+            $optionsNull = $helperFn->getParam(2)->typeOf()->constNull();
+            JitNestedHelperCoerce::callHelper(
+                $context,
+                $helperFn,
+                [
+                    JitNestedHelperCoerce::ptrToI64($context, $postHt),
+                    JitNestedHelperCoerce::ptrToI64($context, $filesHt),
+                    $optionsNull,
+                ]
+            );
+        }
 
         $result = HashTableHelper::alloc($context);
-        $i64 = $context->getTypeFromString('int64');
-        $postVar = new \PHPCompiler\JIT\Variable($context, \PHPCompiler\JIT\Variable::TYPE_HASHTABLE, \PHPCompiler\JIT\Variable::KIND_VALUE, $postHt);
-        $filesVar = new \PHPCompiler\JIT\Variable($context, \PHPCompiler\JIT\Variable::TYPE_HASHTABLE, \PHPCompiler\JIT\Variable::KIND_VALUE, $filesHt);
+        $postVar = new JITVariable($context, JITVariable::TYPE_HASHTABLE, JITVariable::KIND_VALUE, $postHt);
+        $filesVar = new JITVariable($context, JITVariable::TYPE_HASHTABLE, JITVariable::KIND_VALUE, $filesHt);
         HashTableHelper::setAtIndex(
             $context,
             $result,
@@ -117,4 +134,3 @@ final class request_parse_body extends Internal
         return $result;
     }
 }
-
