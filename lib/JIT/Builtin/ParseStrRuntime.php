@@ -20,7 +20,7 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
 /**
  * JIT/AOT link for __compiler_parse_str via ParseStrJitHelper PHP (#9295, #14217).
  *
- * Embed compiles {@see ParseStrJitHelper}; user-script AOT uses init-safe LLVM delimited parse (#15624).
+ * Embed compiles {@see ParseStrJitHelper}; user-script AOT compiles {@see ParseStrNativeJitHelper} (#15417).
  * php-src: ext/standard/basic_functions.c — PHP_FUNCTION(parse_str)
  */
 final class ParseStrRuntime
@@ -81,7 +81,12 @@ final class ParseStrRuntime
         }
 
         self::ensureNativeHtInternalProxies($context);
-        ParseStrUserScriptDelimitedJit::ensureSubhelpers($context);
+        JitVmHelperLink::ensureCompiled(
+            $context,
+            self::USER_SCRIPT_HELPER_PATH,
+            self::USER_SCRIPT_COMPILED_HELPERS,
+            '#15417'
+        );
         self::implementIfMissing($context, '__compiler_parse_str', static function (Context $context, LlvmFunction $fn): void {
             self::implementUserScriptParseBridge($context, $fn);
         });
@@ -228,64 +233,12 @@ final class ParseStrRuntime
 
     private static function implementUserScriptParseBridge(Context $context, LlvmFunction $fn): void
     {
-        $entry = $fn->appendBasicBlock('parse_str_bridge_entry');
-        $early = $fn->appendBasicBlock('parse_str_bridge_early');
-        $work = $fn->appendBasicBlock('parse_str_bridge_work');
-        $context->builder->positionAtEnd($entry);
-
-        $dest = $fn->getParam(0);
-        $encoded = $fn->getParam(1);
-        $htPtr = $context->getTypeFromString('__hashtable__*');
-        $nullDest = $context->builder->icmp(Builder::INT_EQ, $dest, $htPtr->constNull());
-        $context->builder->branchIf($nullDest, $early, $work);
-
-        $context->builder->positionAtEnd($early);
-        $context->builder->returnVoid();
-
-        $context->builder->positionAtEnd($work);
-        self::emitUserScriptDelimitedParse($context, $dest, $encoded, false);
-        $context->builder->returnVoid();
+        self::implementParseBridge($context, $fn, self::USER_SCRIPT_PARSE_INTO_NATIVE);
     }
 
     private static function implementUserScriptCookieBridge(Context $context, LlvmFunction $fn): void
     {
-        $entry = $fn->appendBasicBlock('parse_cookie_bridge_entry');
-        $early = $fn->appendBasicBlock('parse_cookie_bridge_early');
-        $work = $fn->appendBasicBlock('parse_cookie_bridge_work');
-        $context->builder->positionAtEnd($entry);
-
-        $dest = $fn->getParam(0);
-        $header = $fn->getParam(1);
-        $htPtr = $context->getTypeFromString('__hashtable__*');
-        $nullDest = $context->builder->icmp(Builder::INT_EQ, $dest, $htPtr->constNull());
-        $context->builder->branchIf($nullDest, $early, $work);
-
-        $context->builder->positionAtEnd($early);
-        $context->builder->returnVoid();
-
-        $context->builder->positionAtEnd($work);
-        self::emitUserScriptDelimitedParse($context, $dest, $header, true);
-        $context->builder->returnVoid();
-    }
-
-    private static function emitUserScriptDelimitedParse(
-        Context $context,
-        \PHPLLVM\Value $dest,
-        \PHPLLVM\Value $encoded,
-        bool $cookiePairDecode
-    ): void {
-        $i8 = $context->getTypeFromString('int8');
-        $i32 = $context->getTypeFromString('int32');
-        $cstr = $context->builder->structGep($encoded, $context->structFieldMap['__string__']['value']);
-        $delimiter = $cookiePairDecode ? $i8->constInt(59, false) : $i8->constInt(38, false);
-        $flags = $cookiePairDecode ? $i32->constInt(1, false) : $i32->constInt(0, false);
-        $context->builder->call(
-            $context->lookupFunction('__phpc_parse_str_parse_delimited_pairs'),
-            $dest,
-            $cstr,
-            $delimiter,
-            $flags
-        );
+        self::implementCookieBridge($context, $fn, self::USER_SCRIPT_PARSE_COOKIE_INTO_NATIVE);
     }
 
     private static function implementCookieBridge(Context $context, LlvmFunction $fn, string $helperLogical): void
