@@ -81,7 +81,7 @@ final class VmSocket
 
         $uri = VmFs::handleUri($handle);
         if (VmFsStdio::isStdioUri($uri)) {
-            return null !== self::socketFdForImportableHandle($handle);
+            return false;
         }
 
         $streamType = VmStreamMeta::streamTypeForUri($uri);

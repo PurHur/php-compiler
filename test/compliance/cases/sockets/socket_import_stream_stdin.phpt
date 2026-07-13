@@ -1,5 +1,5 @@
 --TEST--
-stdlib socket_import_stream(STDIN) — returns Socket for STDIO (#18509, ext/sockets/sockets.c)
+stdlib socket_import_stream(STDIN) — returns false for STDIO (#18553, ext/sockets/sockets.c)
 --FILE--
 <?php
 
@@ -15,5 +15,5 @@ $result = @socket_import_stream(STDIN);
 echo 'is_socket=', is_object($result) && $result instanceof Socket ? 'yes' : 'no', "\n";
 echo 'warning=', $warnings[0] ?? 'none', "\n";
 --EXPECT--
-is_socket=yes
-warning=none
+is_socket=no
+warning=socket_import_stream(): Cannot represent a stream of type STDIO as a Socket Descriptor
