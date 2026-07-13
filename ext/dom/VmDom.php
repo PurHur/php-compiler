@@ -2147,6 +2147,7 @@ final class VmDom
         self::syncSubtree($ctx, $document);
         self::reindexDocumentIds($document, $root);
         $state->documentUri = self::defaultDocumentUri();
+        $state->loadedViaXml = true;
 
         return true;
     }
@@ -4079,25 +4080,26 @@ final class VmDom
                 throw new \TypeError('DOMDocument::saveHTML(): Argument #1 ($node) must be of type ?DOMNode');
             }
 
-            return self::serializeHtmlNode($node);
+            return self::serializeHtmlNode($node, !$state->loadedViaXml);
         }
 
+        $emptySelfClosing = !$state->loadedViaXml;
         $lines = [];
         if ([] !== $state->childIds) {
             foreach ($state->childIds as $childId) {
                 $child = DomRegistry::entry($childId);
                 if (null !== $child) {
-                    $lines[] = self::serializeHtmlNode($child);
+                    $lines[] = self::serializeHtmlNode($child, $emptySelfClosing);
                 }
             }
         } else {
             $lines[] = self::serializeHtmlDoctypeFromDocumentState($state);
             $rootVar = $document->getProperty(self::PROP_DOCUMENT_ELEMENT)->resolveIndirect();
             if (Variable::TYPE_OBJECT === $rootVar->type) {
-                $lines[] = self::serializeHtmlNode($rootVar->toObject());
+                $lines[] = self::serializeHtmlNode($rootVar->toObject(), $emptySelfClosing);
             } elseif (null !== $state->documentElementName && '' !== $state->documentElementName) {
                 $name = self::escapeName($state->documentElementName);
-                $lines[] = '<'.$name.'/>';
+                $lines[] = $emptySelfClosing ? '<'.$name.'/>' : '<'.$name.'></'.$name.'>';
             }
         }
 
@@ -4493,7 +4495,7 @@ final class VmDom
             .' PUBLIC "'.self::escapeAttr($publicId).'" "'.self::escapeAttr($systemId).'">'."\n";
     }
 
-    private static function serializeHtmlNode(ObjectEntry $entry): string
+    private static function serializeHtmlNode(ObjectEntry $entry, bool $emptySelfClosing = true): string
     {
         if (self::isDocumentType($entry)) {
             $dt = DomRegistry::state($entry);
@@ -4510,7 +4512,7 @@ final class VmDom
             return '<?'.$pi->nodeName.' '.($pi->textContent ?? '').'?>';
         }
         if (self::isElement($entry)) {
-            return self::serializeHtmlElement($entry);
+            return self::serializeHtmlElement($entry, $emptySelfClosing);
         }
         if (self::isTextNode($entry)) {
             return DomRegistry::state($entry)->textContent ?? '';
@@ -4522,19 +4524,23 @@ final class VmDom
         throw new \DOMException('Cannot serialize node type in this compiler build');
     }
 
-    private static function serializeHtmlElement(ObjectEntry $entry): string
+    private static function serializeHtmlElement(ObjectEntry $entry, bool $emptySelfClosing = true): string
     {
         $state = DomRegistry::state($entry);
         $name = self::escapeName($state->nodeName);
         $attrPart = self::serializeAttributes($state);
         if ([] === $state->childIds) {
-            return '<'.$name.$attrPart.'/>';
+            if ($emptySelfClosing) {
+                return '<'.$name.$attrPart.'/>';
+            }
+
+            return '<'.$name.$attrPart.'></'.$name.'>';
         }
         $parts = [];
         foreach ($state->childIds as $childId) {
             $child = DomRegistry::entry($childId);
             if (null !== $child) {
-                $parts[] = self::serializeHtmlNode($child);
+                $parts[] = self::serializeHtmlNode($child, $emptySelfClosing);
             }
         }
 

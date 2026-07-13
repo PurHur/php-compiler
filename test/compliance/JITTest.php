@@ -1079,6 +1079,15 @@ class JITTest extends BaseTest {
                 && str_contains($name, 'class_has_functions_phantom')) {
                 continue;
             }
+            if (!CompilerVersion::supportsDomLivingStandardNamespace()
+                && str_contains($name, 'dom_html_document')
+                && !str_contains($name, 'dom_html_document_phantom')) {
+                continue;
+            }
+            if (CompilerVersion::supportsDomLivingStandardNamespace()
+                && str_contains($name, 'dom_html_document_phantom')) {
+                continue;
+            }
             // ?-> LLVM lowering verified in NullsafeJitCompileTest (#3219); MCJIT execute needs jit-runtime-probe (#98).
             if (str_contains(strtolower($case[0]), 'nullsafe')) {
                 continue;
