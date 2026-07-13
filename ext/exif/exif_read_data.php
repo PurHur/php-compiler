@@ -50,6 +50,8 @@ final class exif_read_data extends Internal
         if (false === $data) {
             if (!VmImage::pathPayloadReadable($filename)) {
                 VmStreamOpenFailure::warnFailedToOpen($frame, 'exif_read_data', $filename);
+            } else {
+                VmExifWarning::warnFileNotSupported($frame, 'exif_read_data', $filename);
             }
             $frame->returnVar->bool(false);
 
