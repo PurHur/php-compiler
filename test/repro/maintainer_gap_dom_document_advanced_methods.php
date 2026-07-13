@@ -9,6 +9,8 @@ $methods = [
     'registerNodeClass',
     'schemaValidate',
     'relaxNGValidate',
+    'schemaValidateSource',
+    'relaxNGValidateSource',
 ];
 foreach ($methods as $method) {
     if (!method_exists($doc, $method)) {
