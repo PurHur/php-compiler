@@ -509,11 +509,8 @@ final class ExceptionSupport
             return;
         }
         $lineProp = $obj->getProperty(self::PROP_LINE);
-        $existing = 0;
-        $lineVar = $lineProp->resolveIndirect();
-        if (Variable::TYPE_INTEGER === $lineVar->type) {
-            $existing = $lineVar->toInt();
-        }
+        // Typed int $line may be unset on rethrown builtins (#18579); avoid toInt() fatal.
+        $existing = self::readOptionalIntProperty($obj, self::PROP_LINE) ?? 0;
         // Preserve creation/rethrow line; only stamp inline `throw new` when still unset (#195).
         if ($existing > 0) {
             return;
