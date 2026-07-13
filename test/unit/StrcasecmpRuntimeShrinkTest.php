@@ -38,6 +38,14 @@ final class StrcasecmpRuntimeShrinkTest extends TestCase
         $this->assertSame(-1, CaseCompareJitHelper::strncasecmpArgv('', 'a', 1));
     }
 
+    public function testStrncasecmpNullHaystackCoercesToEmptyString(): void
+    {
+        $this->assertSame(-1, VmString::strncasecmp('', 'a', 1));
+        $this->assertSame(-1, CaseCompareJitHelper::strncasecmpArgv('', 'a', 1));
+        $this->assertSame(1, VmString::strncasecmp('a', '', 1));
+        $this->assertSame(-1, VmString::strncasecmp('ab', 'ABC', 3));
+    }
+
     public function testSpineBundleIncludesCaseCompareJitHelper(): void
     {
         $spine = (string) file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');

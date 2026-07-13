@@ -1204,25 +1204,11 @@ final class VmString
         $lenA = self::byteLength($a);
         $lenB = self::byteLength($b);
         for ($i = 0; $i < $length; ++$i) {
-            if ($i >= $lenA) {
-                if ($i >= $lenB) {
-                    return 0;
-                }
-                if (0 === $lenA) {
-                    return -1;
-                }
-                $ordA = 0;
-                $ordB = self::byteOrd(self::asciiLowerByte($b[$i]));
-            } elseif ($i >= $lenB) {
-                if (0 === $lenB) {
-                    return 1;
-                }
-                $ordA = self::byteOrd(self::asciiLowerByte($a[$i]));
-                $ordB = 0;
-            } else {
-                $ordA = self::byteOrd(self::asciiLowerByte($a[$i]));
-                $ordB = self::byteOrd(self::asciiLowerByte($b[$i]));
+            if ($i >= $lenA || $i >= $lenB) {
+                return $lenA <=> $lenB;
             }
+            $ordA = self::byteOrd(self::asciiLowerByte($a[$i]));
+            $ordB = self::byteOrd(self::asciiLowerByte($b[$i]));
             if ($ordA !== $ordB) {
                 return $ordA - $ordB;
             }
