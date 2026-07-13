@@ -8990,7 +8990,13 @@ restart:
      */
     private function dispatchVmDivisionByZeroError(\DivisionByZeroError $error, Frame $frame): ?Frame
     {
-        $thrown = VM\BuiltinExceptionSupport::materializeDivisionByZeroError($this->context, $error->getMessage());
+        [$file, $line] = VM\ExceptionSupport::userFatalSite($frame);
+        $thrown = VM\BuiltinExceptionSupport::materializeDivisionByZeroError(
+            $this->context,
+            $error->getMessage(),
+            $file,
+            $line
+        );
 
         return $this->dispatchBuiltinThrowable($frame, $thrown);
     }

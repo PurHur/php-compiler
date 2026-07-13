@@ -508,20 +508,15 @@ final class ExceptionSupport
         if (!self::objectImplementsThrowable($obj)) {
             return;
         }
-        $lineProp = $obj->getProperty(self::PROP_LINE);
-        $existing = 0;
-        $lineVar = $lineProp->resolveIndirect();
-        if (Variable::TYPE_INTEGER === $lineVar->type) {
-            $existing = $lineVar->toInt();
-        }
-        // Preserve creation/rethrow line; only stamp inline `throw new` when still unset (#195).
+        // Preserve creation/rethrow line; only stamp inline `throw new` when still unset (#195, #18579).
+        $existing = self::readOptionalIntProperty($obj, self::PROP_LINE) ?? 0;
         if ($existing > 0) {
             return;
         }
         if ($line < 1) {
             $line = 1;
         }
-        $lineProp->int($line);
+        $obj->getProperty(self::PROP_LINE)->int($line);
     }
 
     /**
