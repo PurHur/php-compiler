@@ -29,7 +29,7 @@ final class html_entity_decode extends Internal
         if ($argc < 1 || $argc > 3) {
             throw new \LogicException('html_entity_decode() requires one to three arguments in this compiler build');
         }
-        $string = VmString::coerceStringBuiltinArg(
+        $string = VmString::coerceTypedStringBuiltinArg(
             $frame->calledArgs[0],
             'html_entity_decode',
             0,
@@ -68,7 +68,7 @@ final class html_entity_decode extends Internal
         if ($effectiveArgc >= 3) {
             return JitHtmlEntityDecode::decodeWithEncoding(
                 $context,
-                JitStringBuiltinArg::lower($context, $args[0], 'html_entity_decode', 0, 'string'),
+                JitStringBuiltinArg::lowerTypedString($context, $args[0], 'html_entity_decode', 0, 'string'),
                 $argc >= 2
                     ? JitLongArg::lower($context, $args[1], 'html_entity_decode() flags')
                     : $context->getTypeFromString('int64')->constInt(ENT_QUOTES | ENT_SUBSTITUTE, false),
@@ -94,7 +94,7 @@ final class html_entity_decode extends Internal
             );
         }
 
-        $str = JitStringBuiltinArg::lower($context, $args[0], 'html_entity_decode', 0, 'string');
+        $str = JitStringBuiltinArg::lowerTypedString($context, $args[0], 'html_entity_decode', 0, 'string');
         $i64 = $context->getTypeFromString('int64');
         $flagsVal = $i64->constInt($flags, false);
         if ($argc >= 2 && !$flagsKnown) {

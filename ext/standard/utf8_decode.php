@@ -27,7 +27,7 @@ final class utf8_decode extends Internal
             throw new \LogicException('utf8_decode() requires exactly one argument in this compiler build');
         }
         Utf8EndecDeprecation::emitVm($frame, 'utf8_decode');
-        $data = VmString::coerceStringBuiltinArg(
+        $data = VmString::coerceTypedStringBuiltinArg(
             $frame->calledArgs[0],
             'utf8_decode',
             0,
@@ -47,7 +47,7 @@ final class utf8_decode extends Internal
 
         return JitUtf8Latin1::decode(
             $context,
-            JitStringBuiltinArg::lower($context, $args[0], 'utf8_decode', 0, 'string')
+            JitStringBuiltinArg::lowerTypedString($context, $args[0], 'utf8_decode', 0, 'string')
         );
     }
 }
