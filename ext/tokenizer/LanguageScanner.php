@@ -169,15 +169,17 @@ final class LanguageScanner
             return true;
         }
 
-        if ($this->matchAt('<?')) {
-            $this->pos += 2;
-            $this->pushToken($this->id('T_OPEN_TAG'), '<?', $startLine);
-            $this->inPhp = true;
+        if ($this->matchAt('<?') && !$this->matchAt('<?php') && !$this->matchAt('<?=')) {
+            if (0 !== ($this->flags & self::TOKEN_PARSE)) {
+                $this->pos += 2;
+                $this->pushToken($this->id('T_OPEN_TAG'), '<?', $startLine);
+                $this->inPhp = true;
 
-            return true;
+                return true;
+            }
         }
 
-        if ($this->matchAt('<%')) {
+        if ($this->matchAt('<%') && 0 !== ($this->flags & self::TOKEN_PARSE)) {
             $this->pos += 2;
             $this->pushToken($this->id('T_OPEN_TAG'), '<%', $startLine);
             $this->inPhp = true;
@@ -185,7 +187,7 @@ final class LanguageScanner
             return true;
         }
 
-        $next = \strpos($this->source, '<?', $this->pos);
+        $next = $this->findNextOpenTag($this->pos);
         if (false === $next) {
             $text = \substr($this->source, $this->pos);
             if ('' !== $text) {
@@ -202,6 +204,31 @@ final class LanguageScanner
         }
 
         return true;
+    }
+
+    /**
+     * Next php-src open tag at/after $from (ext/tokenizer/tokenizer.c inline HTML scan; #18468).
+     */
+    private function findNextOpenTag(int $from): int|false
+    {
+        for ($pos = $from; $pos < $this->len; ++$pos) {
+            if ('<' !== $this->source[$pos]) {
+                continue;
+            }
+            if ($this->matchAt('<?php', $pos) || $this->matchAt('<?=', $pos)) {
+                return $pos;
+            }
+            if (0 !== ($this->flags & self::TOKEN_PARSE)) {
+                if ($this->matchAt('<?', $pos) && !$this->matchAt('<?php', $pos) && !$this->matchAt('<?=', $pos)) {
+                    return $pos;
+                }
+                if ($this->matchAt('<%', $pos)) {
+                    return $pos;
+                }
+            }
+        }
+
+        return false;
     }
 
     private function tryCloseTag(): bool
