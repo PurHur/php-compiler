@@ -95,6 +95,15 @@ class Context {
     /** True while serialize/unserialize magic hooks run on an isolated stack (#12069). */
     public bool $isolatedPhpFunctionInvoke = false;
 
+    /** Active serialize() var_hash for nested builtin calls during Serializable/__serialize (#18428). */
+    public ?\PHPCompiler\ext\standard\VmSerializeRefState $activeSerializeRefState = null;
+
+    /** Object whose legacy Serializable::serialize() is running — guards nested serialize($this) (#18428). */
+    public ?ObjectEntry $legacySerializableBeingInvoked = null;
+
+    /** Object whose __serialize() is running — root defers var_hash until nested self (#18428, #11903). */
+    public ?ObjectEntry $magicSerializeBeingInvoked = null;
+
     /**
      * When true, bubble uncaught user throwables as native \Throwable to the embedding host (PHPUnit,
      * library API) instead of emitting a Zend-style fatal block and terminating the VM with ScriptExit.
