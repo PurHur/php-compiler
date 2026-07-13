@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 4802 |
-| Phase A inventory files (M2 ratio SSOT) | 4802 |
+| PHP files on vm.php path | 4803 |
+| Phase A inventory files (M2 ratio SSOT) | 4803 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 12905 |
+| Source constructs flagged (warnings) | 12907 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -3832,7 +3832,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/Type/ObjectExitStatusLlvm.php` | 0 | 2 |
 | `lib/JIT/Builtin/Type/ObjectInstancePropertyLlvm.php` | 0 | 5 |
 | `lib/JIT/Builtin/Type/ObjectStaticPropertyInitLlvm.php` | 0 | 2 |
-| `lib/JIT/Builtin/Type/Object_.php` | 0 | 34 |
+| `lib/JIT/Builtin/Type/ObjectStaticPropertyLlvm.php` | 0 | 5 |
+| `lib/JIT/Builtin/Type/Object_.php` | 0 | 31 |
 | `lib/JIT/Builtin/Type/String_.php` | 0 | 1 |
 | `lib/JIT/Builtin/Type/Value.php` | 0 | 4 |
 | `lib/JIT/Builtin/TypeErrorRaise.php` | 0 | 3 |
@@ -26033,7 +26034,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/CompilerVersion.php`
 
 **Warnings** (review for bootstrap subset):
-- 190 class method(s)
+- 189 class method(s)
 
 ### `lib/CurlyBraceOffsetRejector.php`
 
@@ -29924,6 +29925,15 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 8 class method(s)
 - 1 closure(s)
 
+### `lib/JIT/Builtin/Type/ObjectStaticPropertyLlvm.php`
+
+**Warnings** (review for bootstrap subset):
+- new Variable (line 100)
+- new Variable (line 113)
+- new Variable (line 235)
+- 10 class method(s)
+- 1 closure(s)
+
 ### `lib/JIT/Builtin/Type/Object_.php`
 
 **Warnings** (review for bootstrap subset):
@@ -29942,25 +29952,22 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new VMVariable (line 3213)
 - new VMVariable (line 3231)
 - new ReflectionClassConstant (line 4373)
-- new Variable (line 4737)
-- new Variable (line 4750)
-- new Variable (line 4884)
-- new Variable (line 5151)
-- new Variable (line 5177)
-- new Variable (line 5185)
-- new Variable (line 5208)
-- new Variable (line 5234)
-- new Variable (line 5242)
-- new Variable (line 5316)
-- new Literal (line 5333)
-- new Literal (line 5338)
-- new Literal (line 5343)
-- new Variable (line 5354)
-- new Variable (line 5387)
-- new Variable (line 5410)
-- new Variable (line 5774)
-- 259 class method(s)
-- 9 closure(s)
+- new Variable (line 4734)
+- new Variable (line 4760)
+- new Variable (line 4768)
+- new Variable (line 4791)
+- new Variable (line 4817)
+- new Variable (line 4825)
+- new Variable (line 4899)
+- new Literal (line 4916)
+- new Literal (line 4921)
+- new Literal (line 4926)
+- new Variable (line 4937)
+- new Variable (line 4970)
+- new Variable (line 4993)
+- new Variable (line 5357)
+- 257 class method(s)
+- 8 closure(s)
 
 ### `lib/JIT/Builtin/Type/String_.php`
 
