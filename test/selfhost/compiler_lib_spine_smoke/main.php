@@ -4787,4 +4787,16 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/DomGetElementsByTagNameRuntime.p
 require_once __DIR__.'/../../../lib/JIT/Builtin/SessionStartOptionsRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Call/DomDocumentGetElementsByTagName.php';
 require_once __DIR__.'/../../../lib/JIT/Call/DomNodeAppendChild.php';
+require_once __DIR__.'/../../../ext/dom/DomNodeListItemJitHelper.php';
+require_once __DIR__.'/../../../ext/dom/DomXPathQueryJitHelper.php';
+require_once __DIR__.'/../../../ext/dom/JitDomNodeListItem.php';
+require_once __DIR__.'/../../../ext/dom/JitDomNodeListItemUserScript.php';
+require_once __DIR__.'/../../../ext/dom/JitDomXPathQuery.php';
+require_once __DIR__.'/../../../ext/dom/JitDomXPathQueryUserScript.php';
+require_once __DIR__.'/../../../ext/openssl/openssl_spki_export.php';
+require_once __DIR__.'/../../../ext/openssl/openssl_spki_export_challenge.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/DomNodeListItemRuntime.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/DomXPathQueryRuntime.php';
+require_once __DIR__.'/../../../lib/JIT/Call/DomNodeListItem.php';
+require_once __DIR__.'/../../../lib/JIT/Call/DomXPathQuery.php';
 echo "compiler_lib_spine_smoke bundle OK\n";
