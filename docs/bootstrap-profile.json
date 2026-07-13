@@ -634,6 +634,7 @@
         "ext/openssl/openssl_x509_fingerprint.php",
         "ext/openssl/openssl_x509_parse.php",
         "ext/openssl/openssl_x509_read.php",
+        "ext/openssl/openssl_x509_verify.php",
         "ext/pcntl/Module.php",
         "ext/pcntl/PcntlConstants.php",
         "ext/pcntl/PcntlHostBridge.php",
@@ -4975,9 +4976,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 4741,
+        "inventory_files": 4742,
         "excluded": 0,
-        "eligible": 4741,
+        "eligible": 4742,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
