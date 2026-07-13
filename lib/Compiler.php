@@ -3225,6 +3225,10 @@ class Compiler {
             if (null === $this->slotForCoalesceResult($block, $coalesce)) {
                 $block = $this->compileCoalesceForAssign($coalesce, $block, $resultOverride);
             }
+            $coalesceId = spl_object_id($coalesce);
+            if (isset($this->coalesceMergeBlocks[$coalesceId])) {
+                $block = $this->coalesceMergeBlocks[$coalesceId];
+            }
             if (null !== $resultOverride) {
                 $coalesceSnapshots[] = [$coalesce, $resultOverride];
                 continue;
@@ -4798,12 +4802,25 @@ class Compiler {
         for ($j = $index + 2; $j < \count($ops); ++$j) {
             $next = $ops[$j];
             if ($next instanceof Op\Terminal\Echo_) {
-                if ($ops[$j - 1] !== $concat) {
-                    return false;
-                }
                 $flattened = $this->flattenBinaryConcatFromBlockOps($ops, $j, $next->expr)
                     ?? $this->flattenBinaryConcatToConcatList($next->expr);
                 if (null === $flattened) {
+                    return false;
+                }
+                $feedsEchoConcat = false;
+                foreach ($flattened->list as $part) {
+                    if (
+                        null !== $part
+                        && (
+                            $this->operandsChainEqual($part, $call->result)
+                            || $this->operandsReferToSameVariable($part, $call->result)
+                        )
+                    ) {
+                        $feedsEchoConcat = true;
+                        break;
+                    }
+                }
+                if (!$feedsEchoConcat) {
                     return false;
                 }
                 for ($k = $index - 1; $k >= 0; --$k) {
