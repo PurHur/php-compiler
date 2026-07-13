@@ -149,6 +149,9 @@ final class BuiltinIntrospectionPolicy
         if (\in_array($lc, ['xmlrpc_encode', 'xmlrpc_decode'], true)) {
             return \PHPCompiler\ext\xmlrpc\XmlrpcExtensionPolicy::advertisesExtension();
         }
+        if (\in_array($lc, ['wddx_serialize_value', 'wddx_serialize_vars', 'wddx_deserialize'], true)) {
+            return \PHPCompiler\ext\wddx\WddxExtensionPolicy::advertisesExtension();
+        }
         if ('ldap_escape' === $lc) {
             return \PHPCompiler\ext\ldap\LdapExtensionPolicy::advertisesBuiltins();
         }
@@ -185,6 +188,9 @@ final class BuiltinIntrospectionPolicy
         }
         if ('xmlrpc' === $ext) {
             return \PHPCompiler\ext\xmlrpc\XmlrpcExtensionPolicy::advertisesExtension();
+        }
+        if ('wddx' === $ext) {
+            return \PHPCompiler\ext\wddx\WddxExtensionPolicy::advertisesExtension();
         }
         if ('uri' === $ext) {
             return \PHPCompiler\ext\uri\UriExtensionPolicy::advertisesExtension();
