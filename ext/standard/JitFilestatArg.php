@@ -119,7 +119,7 @@ final class JitFilestatArg
         );
     }
 
-    /** chmod()/mkdir() mode — Z_PARAM_LONG; honor caller strict_types for string operands (#17927). */
+    /** mkdir() mode — Z_PARAM_LONG decimal numeric strings (#17819, ext/standard/filestat.c). */
     public static function lowerFileMode(
         Context $context,
         JITVariable $arg,
@@ -127,25 +127,60 @@ final class JitFilestatArg
         int $argIndex,
         string $paramName
     ): Value {
+        self::guardFileModeString($context, $arg, $function, $argIndex, $paramName);
+
+        return JitLongArg::lower($context, $arg, $function.'() '.$paramName);
+    }
+
+    /** chmod() mode — Z_PARAM_LONG with zend_strtol(..., 0) for numeric strings (#18487). */
+    public static function lowerChmodMode(
+        Context $context,
+        JITVariable $arg,
+        string $function,
+        int $argIndex,
+        string $paramName
+    ): Value {
+        self::guardFileModeString($context, $arg, $function, $argIndex, $paramName);
+        if (JITVariable::TYPE_STRING === $arg->type && null !== $arg->compileTimeString) {
+            $i64 = $context->getTypeFromString('int64');
+
+            return $i64->constInt(
+                VmFilestatArg::zendAutoBaseNumericString($arg->compileTimeString),
+                false
+            );
+        }
         if (JITVariable::TYPE_STRING === $arg->type) {
-            if ($context->callerStrictTypes) {
+            return JitLongArg::lowerZendLong($context, $arg, $function.'() '.$paramName);
+        }
+
+        return JitLongArg::lower($context, $arg, $function.'() '.$paramName);
+    }
+
+    private static function guardFileModeString(
+        Context $context,
+        JITVariable $arg,
+        string $function,
+        int $argIndex,
+        string $paramName
+    ): void {
+        if (JITVariable::TYPE_STRING !== $arg->type) {
+            return;
+        }
+        if ($context->callerStrictTypes) {
+            self::emitTypeErrorAndAbort(
+                $context,
+                self::intTypeError($function, $argIndex, $paramName, 'string')
+            );
+        }
+        if (null !== $arg->compileTimeString) {
+            $raw = $arg->compileTimeString;
+            if ('' === $raw || !is_numeric($raw)) {
                 self::emitTypeErrorAndAbort(
                     $context,
                     self::intTypeError($function, $argIndex, $paramName, 'string')
                 );
             }
-            if (null !== $arg->compileTimeString) {
-                $raw = $arg->compileTimeString;
-                if ('' === $raw || !is_numeric($raw)) {
-                    self::emitTypeErrorAndAbort(
-                        $context,
-                        self::intTypeError($function, $argIndex, $paramName, 'string')
-                    );
-                }
-            }
         }
-
-        return JitLongArg::lower($context, $arg, $function.'() '.$paramName);
     }
 
     public static function coerceIntOrStringJitArg(

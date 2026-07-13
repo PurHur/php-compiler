@@ -15,7 +15,7 @@ $mkdirMode = is_dir($d) ? decoct(fileperms($d) & 0777) : '0';
 @rmdir($d);
 
 echo 'chmod=', $chmodMode, ' mkdir=', $mkdirMode, "\n";
-echo 132 === $chmodMode && '341' === $mkdirMode ? 'ok' : 'fail', "\n";
+echo 420 === $chmodMode && '341' === $mkdirMode ? 'ok' : 'fail', "\n";
 --EXPECT--
-chmod=132 mkdir=341
+chmod=420 mkdir=341
 ok

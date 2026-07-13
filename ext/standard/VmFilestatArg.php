@@ -204,7 +204,28 @@ final class VmFilestatArg
     }
 
     /**
-     * chmod()/mkdir() mode — Z_PARAM_LONG; honor caller strict_types for string operands (#17927, #17822).
+     * chmod() mode — Z_PARAM_LONG with zend_strtol(..., 0) for numeric strings (#18487, ext/standard/filestat.c).
+     *
+     * @throws \TypeError
+     */
+    public static function parseChmodModeArgForFrame(
+        Frame $frame,
+        int $argIndex,
+        string $function,
+        string $paramName
+    ): int {
+        return self::parseFileModeArg(
+            $frame->calledArgs[$argIndex],
+            $function,
+            $argIndex,
+            $paramName,
+            $frame,
+            true
+        );
+    }
+
+    /**
+     * mkdir() mode — Z_PARAM_LONG decimal numeric strings (#17819, #17860, ext/standard/filestat.c).
      *
      * @throws \TypeError
      */
@@ -224,7 +245,7 @@ final class VmFilestatArg
     }
 
     /**
-     * File mode coercion — Z_PARAM_LONG decimal numeric strings (#17819, #17860, ext/standard/filestat.c).
+     * File mode coercion — Z_PARAM_LONG; mkdir() uses decimal strings, chmod() auto-base (#18487).
      *
      * @throws \TypeError
      */
@@ -233,7 +254,8 @@ final class VmFilestatArg
         string $function,
         int $argIndex,
         string $paramName,
-        ?Frame $frame = null
+        ?Frame $frame = null,
+        bool $chmodAutoBase = false
     ): int {
         $var = $var->resolveIndirect();
         self::rejectEnumCaseIntArg($var, $function, $argIndex, $paramName);
@@ -274,7 +296,9 @@ final class VmFilestatArg
                 throw new \TypeError(self::intTypeError($function, $argIndex, $paramName, 'string'));
             }
 
-            return (int) VmMath::baseToZval($s, 10);
+            return $chmodAutoBase
+                ? self::zendAutoBaseNumericString($s)
+                : (int) VmMath::baseToZval($s, 10);
         }
         throw new \TypeError(self::intTypeError(
             $function,
@@ -282,6 +306,25 @@ final class VmFilestatArg
             $paramName,
             self::vmTypeName($var->type)
         ));
+    }
+
+    /**
+     * zend_strtol(..., 0) for chmod() numeric-string modes (#18487, ext/standard/filestat.c).
+     */
+    public static function zendAutoBaseNumericString(string $s): int
+    {
+        $s = \trim($s);
+        if ('' === $s || '0' === $s) {
+            return 0;
+        }
+        if (\strlen($s) >= 2 && '0' === $s[0] && ('x' === $s[1] || 'X' === $s[1])) {
+            return (int) VmMath::baseToZval(\substr($s, 2), 16);
+        }
+        if ('0' === $s[0]) {
+            return (int) VmMath::baseToZval($s, 8);
+        }
+
+        return (int) VmMath::baseToZval($s, 10);
     }
 
     private static function vmTypeName(int $type): string
