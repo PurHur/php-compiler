@@ -19,7 +19,7 @@ final class DomGetElementsByTagNameRuntime
 
     private const HELPER_PATH = '/ext/dom/DomGetElementsByTagNameJitHelper.php';
 
-    private const HELPER = 'PHPCompiler\\ext\\dom\\DomGetElementsByTagNameJitHelper::getElementsByTagNameArgv';
+    private const HELPER = 'PHPCompiler\\ext\\dom\\DomGetElementsByTagNameJitHelper::getElementsByTagNameStringArgv';
 
     /** @var list<string> */
     private const COMPILED_HELPERS = [
@@ -55,9 +55,10 @@ final class DomGetElementsByTagNameRuntime
         JitVmHelperLink::ensureCompiled($context, self::HELPER_PATH, self::COMPILED_HELPERS, '#18461');
 
         $objPtr = $context->getTypeFromString('__object__*');
+        $strPtr = $context->getTypeFromString('__string__*');
         $valuePtr = $context->getTypeFromString('__value__*');
         $helperFn = JitVmHelperLink::lookupCompiled($context, self::HELPER, '#18461');
-        $ft = $context->context->functionType($valuePtr, false, $objPtr, $valuePtr);
+        $ft = $context->context->functionType($valuePtr, false, $objPtr, $strPtr);
         $fn = null !== $probe
             ? $probe
             : $context->module->addFunction(self::ABI_NAME, $ft);

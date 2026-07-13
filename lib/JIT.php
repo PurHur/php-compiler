@@ -15127,6 +15127,9 @@ class JIT {
             } elseif ('getnamedarguments' === $methodLc && $this->context->functionIsRegistered('reflectionfunction::getnamedarguments')) {
                 $className = 'ReflectionFunction';
                 $declaringClassLc = 'reflectionfunction';
+            } elseif ('appendchild' === $methodLc && $this->context->functionIsRegistered('domnode::appendchild')) {
+                $className = 'DOMNode';
+                $declaringClassLc = 'domnode';
             }
         }
 

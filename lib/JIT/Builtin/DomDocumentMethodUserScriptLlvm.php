@@ -46,15 +46,16 @@ final class DomDocumentMethodUserScriptLlvm
 
     public static function ensureGetElementsByTagNameBridge(Context $context): void
     {
-        self::ensureContextObjectValueBridge(
+        self::ensureContextBridge(
             $context,
             DomGetElementsByTagNameRuntime::ABI_NAME,
             'dom_get_elements_by_tag_name_user_script',
             [
                 $context->getTypeFromString('__object__*'),
-                $context->getTypeFromString('__value__*'),
+                $context->getTypeFromString('__string__*'),
             ],
-            'PHPCompiler\\ext\\dom\\DomGetElementsByTagNameJitHelper::getElementsByTagNameArgv',
+            $context->getTypeFromString('__object__*'),
+            'PHPCompiler\\ext\\dom\\DomGetElementsByTagNameJitHelper::getElementsByTagNameStringArgv',
             '/ext/dom/DomGetElementsByTagNameJitHelper.php'
         );
     }
