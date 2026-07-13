@@ -14,6 +14,14 @@ use PHPCompiler\JIT\Variable as JitVariable;
  */
 final class HashTableJitHelper
 {
+    /**
+     * Deep copy for copy-on-write separation (Zend zend_array_dup; #18451).
+     */
+    public static function duplicateCopy(HashTable $ht): HashTable
+    {
+        return $ht->duplicate();
+    }
+
     public static function unsupportedStringKeyElementTypeMessage(int $jitTypeByte): string
     {
         return 'String-key array element type not supported for JIT: '

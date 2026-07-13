@@ -164,6 +164,23 @@ final class JitZendScalarCast
             $context->builder->branch($doneBlock);
         }
         $context->builder->positionAtEnd($afterEnumDispatch);
+        $plainObjectBlock = BasicBlockHelper::append($context, 'int_cast_value_plain_object');
+        $afterPlainObjectCheck = BasicBlockHelper::append($context, 'int_cast_value_after_plain_object');
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(JITVariable::TYPE_OBJECT, false)),
+            $plainObjectBlock,
+            $afterPlainObjectCheck
+        );
+
+        $plainObjectInt = null;
+        $plainObjectEndBlock = null;
+        $context->builder->positionAtEnd($plainObjectBlock);
+        $plainObjPtr = $context->builder->call($context->lookupFunction('__value__readObject'), $valuePtr);
+        $plainObjectInt = JitScalarTypeCoerce::emitPlainObjectToScalar($context, $plainObjPtr, 'int');
+        $plainObjectEndBlock = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($afterPlainObjectCheck);
         $fallbackBlock = BasicBlockHelper::append($context, 'int_cast_value_fallback');
         $context->builder->branchIf(
             $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(JITVariable::TYPE_STRING, false)),
@@ -189,6 +206,9 @@ final class JitZendScalarCast
         $phi->addIncoming($stringInt, $stringEndBlock);
         if (null !== $enumLong && null !== $enumEndBlock) {
             $phi->addIncoming($enumLong, $enumEndBlock);
+        }
+        if (null !== $plainObjectInt && null !== $plainObjectEndBlock) {
+            $phi->addIncoming($plainObjectInt, $plainObjectEndBlock);
         }
         $phi->addIncoming($zero, $fallbackBlock);
 
@@ -286,6 +306,23 @@ final class JitZendScalarCast
             $context->builder->branch($doneBlock);
         }
         $context->builder->positionAtEnd($afterEnumDispatch);
+        $plainObjectBlock = BasicBlockHelper::append($context, 'float_cast_value_plain_object');
+        $afterPlainObjectCheck = BasicBlockHelper::append($context, 'float_cast_value_after_plain_object');
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(JITVariable::TYPE_OBJECT, false)),
+            $plainObjectBlock,
+            $afterPlainObjectCheck
+        );
+
+        $plainObjectDouble = null;
+        $plainObjectEndBlock = null;
+        $context->builder->positionAtEnd($plainObjectBlock);
+        $plainObjPtr = $context->builder->call($context->lookupFunction('__value__readObject'), $valuePtr);
+        $plainObjectDouble = JitScalarTypeCoerce::emitPlainObjectToScalar($context, $plainObjPtr, 'float');
+        $plainObjectEndBlock = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($afterPlainObjectCheck);
         $fallbackBlock = BasicBlockHelper::append($context, 'float_cast_value_fallback');
         $context->builder->branchIf(
             $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(JITVariable::TYPE_STRING, false)),
@@ -313,6 +350,9 @@ final class JitZendScalarCast
         $phi->addIncoming($stringFloat, $stringEndBlock);
         if (null !== $enumDouble && null !== $enumEndBlock) {
             $phi->addIncoming($enumDouble, $enumEndBlock);
+        }
+        if (null !== $plainObjectDouble && null !== $plainObjectEndBlock) {
+            $phi->addIncoming($plainObjectDouble, $plainObjectEndBlock);
         }
         $phi->addIncoming($zero, $fallbackBlock);
 
