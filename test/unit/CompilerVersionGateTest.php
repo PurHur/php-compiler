@@ -54,6 +54,21 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
+    public function testAdvertisesStrIncrementTrueOnForwardProfile84(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertTrue(CompilerVersion::advertisesStrIncrement());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     public function testSupportsGetObjectIdFalseOnReferenceProfile(): void
     {
         $this->assertFalse(CompilerVersion::supportsGetObjectId());

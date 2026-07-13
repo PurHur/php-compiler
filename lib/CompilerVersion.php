@@ -365,10 +365,10 @@ final class CompilerVersion
     }
 
     /**
-     * str_increment()/str_decrement() visible to function_exists() — stable runtime or forward 8.3+ (#16292).
+     * str_increment()/str_decrement() visible to function_exists() — stable runtime or forward 8.3+ (#16292, #18614).
      *
-     * Callable under forward profile via {@see supportsStrIncrement()}; withheld from introspection on 8.4.0-dev
-     * reference harness like Zend 8.2.
+     * Callable under forward profile via {@see supportsStrIncrement()}; withheld on 8.4.0-dev reference harness
+     * (no {@code PHP_COMPILER_PROFILE}) like Zend 8.2.
      */
     public static function advertisesStrIncrement(): bool
     {
@@ -376,17 +376,16 @@ final class CompilerVersion
             return true;
         }
 
+        if (!self::supportsStrIncrement()) {
+            return false;
+        }
+
         $raw = getenv('PHP_COMPILER_PROFILE');
         if (!\is_string($raw) || '' === trim($raw)) {
             return false;
         }
 
-        $profile = self::languageProfileVersion();
-        if (version_compare($profile, '8.4.0', '>=')) {
-            return false;
-        }
-
-        return version_compare($profile, '8.3.0', '>=');
+        return version_compare(self::languageProfileVersion(), '8.3.0', '>=');
     }
 
     /**
