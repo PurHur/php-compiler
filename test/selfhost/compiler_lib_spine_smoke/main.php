@@ -2989,6 +2989,7 @@ require_once __DIR__.'/../../../ext/xml/xml_set_object.php';
 require_once __DIR__.'/../../../ext/xml/xml_set_processing_instruction_handler.php';
 require_once __DIR__.'/../../../ext/xml/xml_set_start_namespace_decl_handler.php';
 require_once __DIR__.'/../../../ext/xml/xml_set_unparsed_entity_decl_handler.php';
+require_once __DIR__.'/../../../ext/xmlrpc/XmlrpcExtensionPolicy.php';
 require_once __DIR__.'/../../../ext/xmlrpc/Module.php';
 require_once __DIR__.'/../../../ext/xmlrpc/VmXmlrpc.php';
 require_once __DIR__.'/../../../ext/xmlrpc/XmlrpcFunction.php';
