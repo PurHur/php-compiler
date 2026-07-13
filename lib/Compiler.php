@@ -134,6 +134,10 @@ class Compiler {
     private array $coalesceResultSlots = [];
     /** spl_object_id(Coalesce) => CFG merge block for chained ?? call-arg lowering (#17590). */
     private array $coalesceMergeBlocks = [];
+    /** spl_object_id(NullsafePropertyFetch|NullsafeMethodCall) => scope slot for ?-> result (#18455). */
+    private array $nullsafeResultSlots = [];
+    /** spl_object_id(NullsafePropertyFetch|NullsafeMethodCall) => CFG merge block (#18455). */
+    private array $nullsafeMergeBlocks = [];
     /** cfgVarRoot / call-arg oid => slot wired by syncCoalesceResultToDistinctFuncCallArg (#15915). */
     private array $syncedCoalesceFuncCallArgSlots = [];
     /** spl_object_id(Coalesce) => ??= lvalue operand when result temp differs (#5337, #17458). */
@@ -481,6 +485,8 @@ class Compiler {
         $this->abstractEnums = [];
         $this->coalesceResultSlots = [];
         $this->coalesceMergeBlocks = [];
+        $this->nullsafeResultSlots = [];
+        $this->nullsafeMergeBlocks = [];
         $this->syncedCoalesceFuncCallArgSlots = [];
         $this->compileTimeEnumBackedTypes = [];
         $this->compileTimeEnumCaseConstNames = [];
@@ -569,6 +575,8 @@ class Compiler {
         $this->abstractEnums = [];
         $this->coalesceResultSlots = [];
         $this->coalesceMergeBlocks = [];
+        $this->nullsafeResultSlots = [];
+        $this->nullsafeMergeBlocks = [];
         $this->syncedCoalesceFuncCallArgSlots = [];
         $this->classCompileRegistry = new ClassCompileRegistry();
         $this->attributeClassRegistry = new AttributeClassRegistry();
@@ -2204,6 +2212,7 @@ class Compiler {
                             $this->throwCompileError("Can't use nullsafe operator in write context");
                         }
                         $block = $this->compileNullsafePropertyFetch($child, $block);
+                        $this->syncNullsafePropertyFetchResultToFollowingFuncCallArg($child, $block);
                     } elseif ($child instanceof Op\Expr\NullsafeMethodCall) {
                         $block = $this->compileNullsafeMethodCall(
                             $child,
@@ -11116,6 +11125,9 @@ class Compiler {
 
                 return [$yieldFromOp];
             case Op\Expr\NullsafePropertyFetch::class:
+                if (null !== $this->slotForNullsafeResult($block, $expr)) {
+                    return [];
+                }
                 $this->compileNullsafePropertyFetch($expr, $block);
 
                 return [];
@@ -12113,6 +12125,71 @@ class Compiler {
     }
 
     /**
+     * var_export($o?->prop) — php-cfg hoists NullsafePropertyFetch before FuncCall (#18455).
+     */
+    private function syncNullsafePropertyFetchResultToFollowingFuncCallArg(
+        Op\Expr\NullsafePropertyFetch $fetch,
+        Block $block
+    ): void {
+        if (null === $block->orig) {
+            return;
+        }
+        $fetchIndex = array_search($fetch, $block->orig->children, true);
+        if (!is_int($fetchIndex)) {
+            return;
+        }
+        $next = $block->orig->children[$fetchIndex + 1] ?? null;
+        if (!$next instanceof Op\Expr\FuncCall && !$next instanceof Op\Expr\NsFuncCall) {
+            return;
+        }
+        $fetchSlot = $this->compiledExpressionPreludeResultSlotBeforePendingFuncCall($block, $fetch);
+        if (null === $fetchSlot) {
+            $fetchSlot = $this->slotForNullsafeResult($block, $fetch);
+        }
+        if (null === $fetchSlot) {
+            $fetchSlot = $block->slotForOperand($fetch->result);
+        }
+        if (null === $fetchSlot) {
+            return;
+        }
+        if (null !== $fetch->result) {
+            $block->bindOperandScopeSlot($fetch->result, $fetchSlot);
+        }
+        if (!property_exists($next, 'args') || !is_array($next->args)) {
+            return;
+        }
+        foreach ($next->args as $argIndex => $arg) {
+            if (!$arg instanceof Operand) {
+                continue;
+            }
+            if (null !== $fetch->result && $this->operandsReferToSameVariable($arg, $fetch->result)) {
+                $block->bindOperandScopeSlot($arg, $fetchSlot);
+                $this->registerSyncedCoalesceFuncCallArgSlot($arg, $fetchSlot);
+                continue;
+            }
+            if (!$this->callArgIsDeadInlineTemporary($arg)) {
+                continue;
+            }
+            $deadTempIndices = [];
+            foreach ($next->args as $i => $candidate) {
+                if (!$candidate instanceof Operand || $this->isEmbeddedCallLiteralArg($candidate)) {
+                    continue;
+                }
+                if ($this->callArgIsDeadInlineTemporary($candidate)) {
+                    $deadTempIndices[] = (int) $i;
+                }
+            }
+            if (1 === \count($deadTempIndices) && (int) $argIndex === $deadTempIndices[0]) {
+                $block->bindOperandScopeSlot($arg, $fetchSlot);
+                $this->registerSyncedCoalesceFuncCallArgSlot($arg, $fetchSlot);
+            }
+        }
+        if (null !== $fetch->result) {
+            $this->registerSyncedCoalesceFuncCallArgSlot($fetch->result, $fetchSlot);
+        }
+    }
+
+    /**
      * Hoisted PropertyFetch before FuncCall — only the consumer arg gets the fetch slot (#14467, #18427).
      *
      * implode(',', $obj->items) must not rewire the separator literal to the property temp.
@@ -12543,6 +12620,8 @@ class Compiler {
         $fetchBlock->addOpCode($fetchJump);
         $endBlock->parents[] = $nullBlock;
         $endBlock->parents[] = $fetchBlock;
+        $nullBlock->parents[] = $block;
+        $fetchBlock->parents[] = $block;
 
         $nullsafeOp = new OpCode(
             OpCode::TYPE_NULLSAFE,
@@ -12553,6 +12632,9 @@ class Compiler {
         $nullsafeOp->block2 = $fetchBlock;
         $nullsafeOp->block3 = $endBlock;
         $block->addOpCode($nullsafeOp);
+
+        $this->nullsafeResultSlots[spl_object_id($expr)] = $resultSlot;
+        $this->nullsafeMergeBlocks[spl_object_id($expr)] = $endBlock;
 
         return $endBlock;
     }
@@ -12832,6 +12914,8 @@ class Compiler {
         $fetchBlock->addOpCode($fetchJump);
         $endBlock->parents[] = $nullBlock;
         $endBlock->parents[] = $fetchBlock;
+        $nullBlock->parents[] = $block;
+        $fetchBlock->parents[] = $block;
 
         $nullsafeOp = new OpCode(
             OpCode::TYPE_NULLSAFE,
@@ -12842,6 +12926,9 @@ class Compiler {
         $nullsafeOp->block2 = $fetchBlock;
         $nullsafeOp->block3 = $endBlock;
         $block->addOpCode($nullsafeOp);
+
+        $this->nullsafeResultSlots[spl_object_id($expr)] = $resultSlot;
+        $this->nullsafeMergeBlocks[spl_object_id($expr)] = $endBlock;
 
         return $endBlock;
     }
@@ -15619,6 +15706,10 @@ class Compiler {
      */
     private function slotForNullsafeResult(Block $block, Op\Expr $nullsafe): ?int
     {
+        $nullsafeId = spl_object_id($nullsafe);
+        if (isset($this->nullsafeResultSlots[$nullsafeId])) {
+            return $this->nullsafeResultSlots[$nullsafeId];
+        }
         $slot = $block->slotForOperand($nullsafe->result);
         if (null !== $slot) {
             return $slot;
@@ -16726,6 +16817,12 @@ class Compiler {
                 $opcodeSlot = $this->compiledExpressionPreludeResultSlotBeforePendingFuncCall($block, $prev);
                 if (null !== $opcodeSlot) {
                     return (string) $opcodeSlot;
+                }
+                if ($prev instanceof Op\Expr\NullsafePropertyFetch) {
+                    $nullsafeSlot = $this->slotForNullsafeResult($block, $prev);
+                    if (null !== $nullsafeSlot) {
+                        return (string) $nullsafeSlot;
+                    }
                 }
             }
             $propertySlot = $block->slotForOperand($prev->result);
@@ -29133,6 +29230,12 @@ class Compiler {
                 return (string) $execReturn;
             }
         }
+        if ($producer instanceof Op\Expr\NullsafePropertyFetch) {
+            $nullsafeSlot = $this->slotForNullsafeResult($block, $producer);
+            if (null !== $nullsafeSlot) {
+                return (string) $nullsafeSlot;
+            }
+        }
         $operandSlot = $block->slotForOperand($producer->result);
 
         return null !== $operandSlot ? (string) $operandSlot : null;
@@ -37083,8 +37186,8 @@ class Compiler {
         Op\Expr $prelude
     ): ?int {
         $expectedTypes = match (true) {
-            $prelude instanceof Op\Expr\PropertyFetch,
-            $prelude instanceof Op\Expr\NullsafePropertyFetch => [OpCode::TYPE_PROPERTY_FETCH],
+            $prelude instanceof Op\Expr\PropertyFetch => [OpCode::TYPE_PROPERTY_FETCH],
+            $prelude instanceof Op\Expr\NullsafePropertyFetch => [OpCode::TYPE_NULLSAFE],
             $prelude instanceof Op\Expr\StaticPropertyFetch => [OpCode::TYPE_STATIC_PROPERTY_FETCH],
             $prelude instanceof Op\Expr\ArrayDimFetch => [OpCode::TYPE_ARRAY_DIM_FETCH, OpCode::TYPE_ARRAY_DIM_FETCH_WRITE],
             $prelude instanceof Op\Expr\InstanceOf_ => [OpCode::TYPE_INSTANCEOF],
