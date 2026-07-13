@@ -29215,6 +29215,117 @@ class Compiler {
     }
 
     /**
+     * var_export(INF, true) twice — hoisted scalar ConstFetch (INF/NAN/…) is arg #0, not prior var_export EXEC_RETURN (#18426).
+     *
+     * @param list<OpCode> $emitOps
+     */
+    private function slotForVarExportHoistedScalarConstArgZero(
+        Block $block,
+        Op $cfgCallOp,
+        array &$emitOps = []
+    ): ?string {
+        if (null === $block->orig || !\is_array($cfgCallOp->args ?? null)) {
+            return null;
+        }
+        $callArg = $cfgCallOp->args[0] ?? null;
+        if (!$this->callArgIsDeadInlineTemporary($callArg)) {
+            return null;
+        }
+        $preludes = $this->hoistedPreludeProducersImmediatelyBeforeCall($cfgCallOp, $block);
+        while ([] !== $preludes) {
+            $tail = $preludes[\count($preludes) - 1];
+            if ($tail instanceof Op\Expr\ConstFetch) {
+                $tailName = strtolower($this->staticNameFromOperand($tail->name) ?? '');
+                if (\in_array($tailName, ['true', 'false', 'null'], true)) {
+                    array_pop($preludes);
+                    continue;
+                }
+            }
+            break;
+        }
+        if ([] === $preludes) {
+            return null;
+        }
+        $argZeroPrelude = $preludes[\count($preludes) - 1];
+        if (
+            $argZeroPrelude instanceof Op\Expr\UnaryMinus
+            || $argZeroPrelude instanceof Op\Expr\UnaryPlus
+        ) {
+            if (null === $block->slotForOperand($argZeroPrelude->result)) {
+                foreach ($this->compileExpr($argZeroPrelude, $block) as $op) {
+                    if ([] !== $emitOps) {
+                        $emitOps[] = $op;
+                    } else {
+                        $block->addOpCode($op);
+                    }
+                }
+            }
+            $slot = $block->slotForOperand($argZeroPrelude->result);
+
+            return null !== $slot ? (string) $slot : null;
+        }
+        if (!$argZeroPrelude instanceof Op\Expr\ConstFetch) {
+            return null;
+        }
+        $name = strtolower($this->staticNameFromOperand($argZeroPrelude->name) ?? '');
+        if (\in_array($name, ['true', 'false', 'null'], true)) {
+            return null;
+        }
+        if (null === $block->slotForOperand($argZeroPrelude->result)) {
+            foreach ($this->compileExpr($argZeroPrelude, $block) as $op) {
+                if ([] !== $emitOps) {
+                    $emitOps[] = $op;
+                } else {
+                    $block->addOpCode($op);
+                }
+            }
+        }
+        $slot = $block->slotForOperand($argZeroPrelude->result);
+        if (null === $slot) {
+            $slot = $this->slotForRecentConstFetchNamedLiteral($block, $name);
+        }
+
+        return null !== $slot ? (string) $slot : null;
+    }
+
+    /** Recent TYPE_CONST_FETCH for a global literal name (dead-temp vs hoisted-result drift, #18426). */
+    private function slotForRecentConstFetchNamedLiteral(Block $block, string $literalName): ?string
+    {
+        $needle = strtolower($literalName);
+        $i = \count($block->opCodes) - 1;
+        while ($i >= 0 && OpCode::TYPE_FUNCCALL_INIT === $block->opCodes[$i]->type) {
+            --$i;
+        }
+        for (; $i >= 0; --$i) {
+            $op = $block->opCodes[$i];
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                break;
+            }
+            if (OpCode::TYPE_CONST_FETCH !== $op->type || null === $op->arg1 || null === $op->arg2) {
+                continue;
+            }
+            $resolved = null;
+            if (\is_string($op->arg2)) {
+                $resolved = strtolower($op->arg2);
+            } elseif (\is_int($op->arg2)) {
+                $const = $block->constants[$op->arg2] ?? null;
+                if (null !== $const && Variable::TYPE_STRING === $const->type) {
+                    $resolved = strtolower($const->toString());
+                } else {
+                    $resolved = strtolower($this->resolveCompileTimeStringSlot($op->arg2, $block) ?? '');
+                }
+            }
+            if ('' === $resolved) {
+                continue;
+            }
+
+            return $needle === $resolved ? (string) $op->arg1 : null;
+        }
+
+        return null;
+    }
+
+    /**
      * var_export($it->current(), true) — MethodCall EXEC_RETURN ordinal uses legacy base (#13901, #17251).
      *
      * @param list<Op> $cfgChildren
@@ -43859,13 +43970,22 @@ class Compiler {
                 && $this->callArgIsDeadInlineTemporary($cfgCallOp->args[0] ?? null)
                 && null !== $block->orig
             ) {
-                $varExportProducerSlot = $this->resolveAdjacentNestedFuncCallArgSlot(
+                $hoistedScalarArgSlot = $this->slotForVarExportHoistedScalarConstArgZero(
                     $block,
                     $cfgCallOp,
-                    0
+                    $sends
                 );
-                if (null !== $varExportProducerSlot) {
-                    $valueSlot = $varExportProducerSlot;
+                if (null !== $hoistedScalarArgSlot) {
+                    $valueSlot = $hoistedScalarArgSlot;
+                } else {
+                    $varExportProducerSlot = $this->resolveAdjacentNestedFuncCallArgSlot(
+                        $block,
+                        $cfgCallOp,
+                        0
+                    );
+                    if (null !== $varExportProducerSlot) {
+                        $valueSlot = $varExportProducerSlot;
+                    }
                 }
             }
             if (
@@ -44525,6 +44645,22 @@ class Compiler {
             $syncedFinalArgSlot = $this->resolveSyncedCoalesceFuncCallArgSlot($callArgOperand ?? $arg);
             if (null !== $syncedFinalArgSlot) {
                 $valueSlot = (string) $syncedFinalArgSlot;
+            }
+            if (
+                null !== $cfgCallOp
+                && 0 === (int) $argIndex
+                && 'var_export' === strtolower($this->resolveCfgFuncCallName($cfgCallOp) ?? '')
+                && $this->callArgIsDeadInlineTemporary($cfgCallOp->args[0] ?? null)
+                && null !== $block->orig
+            ) {
+                $hoistedScalarArgSlot = $this->slotForVarExportHoistedScalarConstArgZero(
+                    $block,
+                    $cfgCallOp,
+                    $sends
+                );
+                if (null !== $hoistedScalarArgSlot) {
+                    $valueSlot = $hoistedScalarArgSlot;
+                }
             }
             $sends[] = new OpCode(OpCode::TYPE_ARG_SEND, $valueSlot, $nameSlot, $unpackFlag);
         }
@@ -48110,19 +48246,24 @@ class Compiler {
                 continue;
             }
             if (0 === $sendOrdinal) {
-                if ([] !== $initSlots && \in_array($send->arg1, $initSlots, true)) {
+                $hoistedScalarArgSlot = $this->slotForVarExportHoistedScalarConstArgZero($block, $cfgCallOp);
+                if (null !== $hoistedScalarArgSlot) {
+                    // var_export(INF, true) twice — arg #0 is hoisted INF/NAN, not prior var_export EXEC_RETURN (#18426).
+                    $send->arg1 = $hoistedScalarArgSlot;
+                } elseif ([] !== $initSlots && \in_array($send->arg1, $initSlots, true)) {
                     $send->arg1 = $execSlot;
                 } elseif (null !== $trueSlot && (string) $send->arg1 === (string) $trueSlot) {
                     // var_export($it->current(), true) / var_export(f(), true) — arg #0 is producer EXEC_RETURN (#17251).
                     $send->arg1 = $execSlot;
                 } elseif (
-                    $callArg instanceof Operand
+                    null === $hoistedScalarArgSlot
+                    && $callArg instanceof Operand
                     && $this->callArgIsDeadInlineTemporary($callArg)
                     && (string) $send->arg1 !== (string) $execSlot
                 ) {
                     // var_export($g->valid(), true) after prior var_export — dead arg temp must not reuse stale EXEC_RETURN (#17520).
                     $send->arg1 = $execSlot;
-                } elseif ((string) $send->arg1 !== (string) $execSlot) {
+                } elseif (null === $hoistedScalarArgSlot && (string) $send->arg1 !== (string) $execSlot) {
                     // var_export($g2->current(), true) after earlier var_export — sibling MethodCall EXEC_RETURN (#18183).
                     $send->arg1 = $execSlot;
                 }
