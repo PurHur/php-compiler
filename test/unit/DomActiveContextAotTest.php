@@ -49,6 +49,9 @@ final class DomActiveContextAotTest extends TestCase
         $this->assertStringContainsString('savexml', $source);
         $this->assertStringContainsString('getelementbyid', $source);
         $this->assertStringContainsString('getelementsbytagname', $source);
+        $this->assertStringContainsString('appendchild', $source);
+        $this->assertStringContainsString('DomNodeAppendChild', $source);
+        $this->assertStringContainsString('domnode::appendchild', $source);
         $this->assertStringContainsString('DomDocumentLoadHTML', $source);
         $this->assertStringContainsString('DomDocumentGetElementById', $source);
         $this->assertStringContainsString('DomDocumentGetElementsByTagName', $source);
@@ -146,6 +149,7 @@ final class DomActiveContextAotTest extends TestCase
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT.php');
         $this->assertStringContainsString('resolveUserScriptDomDocumentReceiver', $source);
         $this->assertStringContainsString('getelementbyid', $source);
+        $this->assertStringContainsString('domnode::appendchild', $source);
     }
 
     public function testDomDocumentLoadHTMLUserScriptClearsBuilderAfterInvoke(): void

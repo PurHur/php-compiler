@@ -39,6 +39,7 @@ final class DomInstanceMethodJit
         'domdocument::savehtml' => true,
         'domdocument::savehtmlfile' => true,
         'domdocument::getelementsbytagname' => true,
+        'domnode::appendchild' => true,
     ];
 
     /** User-script AOT: nested VmDomInstanceInvoke JIT aborts — use VmClassMethod lowering (#15407, #17391). */
@@ -96,6 +97,11 @@ final class DomInstanceMethodJit
 
                 return;
             }
+            if ('domnode::appendchild' === $lc) {
+                $context->functionProxies[$lc] = new Call\DomNodeAppendChild();
+
+                return;
+            }
             if (!self::isUserScriptDirectMethod($lc)) {
                 return;
             }
@@ -127,6 +133,7 @@ final class DomInstanceMethodJit
             self::ensureProxy($context, 'domdocument::savehtml');
             self::ensureProxy($context, 'domdocument::savehtmlfile');
             self::ensureProxy($context, 'domdocument::getelementsbytagname');
+            self::ensureProxy($context, 'domnode::appendchild');
 
             return;
         }
