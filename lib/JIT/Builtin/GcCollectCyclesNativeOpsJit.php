@@ -96,6 +96,80 @@ final class GcCollectCyclesNativeOpsJit
         );
     }
 
+    public static function objectIsConstructed(Context $context, JITVariable $objPtr): Value
+    {
+        GcCollectCyclesRuntime::ensureLinked($context);
+
+        $i8 = $context->getTypeFromString('int8');
+        $i8p = $context->getTypeFromString('int8*');
+        $objPtrTy = $context->getTypeFromString('__object__*');
+        $obj = $context->builder->pointerCast($objPtr->getValue(), $objPtrTy);
+        $constructed = self::loadObjectConstructed($context, $obj);
+
+        return $context->builder->icmp(
+            Builder::INT_NE,
+            $constructed,
+            $i8->constInt(0, false)
+        );
+    }
+
+    public static function invokeDestructor(Context $context, JITVariable $objPtr): void
+    {
+        GcCollectCyclesRuntime::ensureLinked($context);
+
+        $objPtrTy = $context->getTypeFromString('__object__*');
+        $obj = $context->builder->pointerCast($objPtr->getValue(), $objPtrTy);
+        $context->builder->call(
+            $context->lookupFunction('__object__invoke_destructor'),
+            $obj
+        );
+    }
+
+    public static function notifyObjectFreed(Context $context, JITVariable $objPtr): void
+    {
+        GcCollectCyclesRuntime::ensureLinked($context);
+
+        $i8p = $context->getTypeFromString('int8*');
+        $context->builder->call(
+            $context->lookupFunction('phpc_gc_notify_object_freed'),
+            $context->builder->pointerCast($objPtr->getValue(), $i8p)
+        );
+    }
+
+    public static function mmFree(Context $context, JITVariable $objPtr): void
+    {
+        GcCollectCyclesRuntime::ensureLinked($context);
+
+        $i8p = $context->getTypeFromString('int8*');
+        $context->builder->call(
+            $context->lookupFunction('__mm__free'),
+            $context->builder->pointerCast($objPtr->getValue(), $i8p)
+        );
+    }
+
+    private static function loadObjectConstructed(Context $context, Value $obj): Value
+    {
+        $i8 = $context->getTypeFromString('int8');
+        $objMap = $context->structFieldMap['__object__'] ?? null;
+        if (null !== $objMap && isset($objMap['constructed'])) {
+            return $context->builder->load(
+                $context->builder->pointerCast(
+                    $context->builder->structGep($obj, $objMap['constructed']),
+                    $i8->pointerType(0)
+                )
+            );
+        }
+        $i32 = $context->getTypeFromString('int32');
+        $i8p = $context->getTypeFromString('int8*');
+        $raw = $context->builder->pointerCast($obj, $i8p);
+        $constructedPtr = $context->builder->pointerCast(
+            $context->builder->inBoundsGEP($raw, $i32->constInt(16, false)),
+            $i8->pointerType(0)
+        );
+
+        return $context->builder->load($constructedPtr);
+    }
+
     private static function objectHeaderSizeConst(Context $context): Value
     {
         $objTy = $context->getTypeFromString('__object__');
