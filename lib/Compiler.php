@@ -10622,6 +10622,7 @@ class Compiler {
                     }
                 }
                 $rhsSlot = $this->compileOperand($expr->expr, $block, true);
+                $this->reconcileEncapsedConcatListAssignSlots($expr, $block, $destSlot, $rhsSlot);
                 $resultSlot = $this->compileOperand($expr->result, $block, false);
                 $varRoot = Block::cfgVarRoot($expr->var);
                 if (null !== $varRoot) {
@@ -38803,6 +38804,32 @@ class Compiler {
         $callArg = \is_array($callOp->args ?? null) ? ($callOp->args[$argIndex] ?? $arg) : $arg;
         for ($i = $callIndex - 1; $i >= 0; --$i) {
             $child = $block->orig->children[$i];
+            if ($child instanceof Op\Expr\Assign) {
+                if ($this->operandsReferToSameVariable($child->var, $callArg)) {
+                    $assignExpr = $child->expr;
+                    while ($assignExpr instanceof Operand\Temporary && null !== $assignExpr->original) {
+                        $assignExpr = $assignExpr->original;
+                    }
+                    if ($assignExpr instanceof Op\Expr\ConcatList) {
+                        return $assignExpr;
+                    }
+                    if ($i > 0) {
+                        $prior = $block->orig->children[$i - 1];
+                        if (
+                            $prior instanceof Op\Expr\ConcatList
+                            && null !== $prior->result
+                            && (
+                                $this->operandsReferToSameVariable($prior->result, $child->expr)
+                                || $this->operandsReferToSameVariable($prior->result, $assignExpr)
+                            )
+                        ) {
+                            return $prior;
+                        }
+                    }
+                }
+
+                break;
+            }
             if ($child instanceof Op\Expr\ConcatList) {
                 if (null !== $child->result) {
                     if ($this->operandsReferToSameVariable($child->result, $callArg)) {
@@ -45763,7 +45790,55 @@ class Compiler {
             return false;
         }
 
-        return $block->orig->children[$assignIndex - 1] instanceof Op\Expr\BinaryOp;
+        $prev = $block->orig->children[$assignIndex - 1];
+
+        return $prev instanceof Op\Expr\BinaryOp || $prev instanceof Op\Expr\ConcatList;
+    }
+
+    /**
+     * `$ini = "flag = $v"; parse_ini_string($ini)` inside loops — dest must not alias ConcatList temp (#18442).
+     *
+     * @param-out int $destSlot
+     * @param-out int $rhsSlot
+     */
+    private function reconcileEncapsedConcatListAssignSlots(
+        Op\Expr\Assign $assign,
+        Block $block,
+        int &$destSlot,
+        int &$rhsSlot
+    ): void {
+        $concat = $this->concatListProducerFromAssignExpr($assign->expr);
+        if (null === $concat || null === $concat->result) {
+            return;
+        }
+        $producerSlot = $block->slotForOperand($concat->result);
+        if (null === $producerSlot) {
+            return;
+        }
+        $producerSlot = (int) $producerSlot;
+        $rhsSlot = $producerSlot;
+        if ((int) $destSlot === $producerSlot) {
+            $name = Block::resolveVariableName($assign->var);
+            $cvSlot = null !== $name ? $block->slotIndexForVariableName($name) : null;
+            if (null === $cvSlot || (int) $cvSlot === $producerSlot) {
+                $cvSlot = $block->forceFreshVarSlot($assign->var);
+            }
+            $destSlot = (int) $cvSlot;
+        }
+    }
+
+    /** @return ?Op\Expr\ConcatList */
+    private function concatListProducerFromAssignExpr(Operand $expr): ?Op\Expr\ConcatList
+    {
+        $unwrap = $expr;
+        while ($unwrap instanceof Operand\Temporary && null !== $unwrap->original) {
+            $unwrap = $unwrap->original;
+        }
+        if ($unwrap instanceof Op\Expr\ConcatList) {
+            return $unwrap;
+        }
+
+        return $this->unwrapConcatListExpr($expr);
     }
 
     private function blockHasAssignToSlot(Block $block, int $destSlot): bool
