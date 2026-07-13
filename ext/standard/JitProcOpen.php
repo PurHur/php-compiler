@@ -22,6 +22,14 @@ final class JitProcOpen
             throw new \LogicException('proc_open() requires at least three arguments in this compiler build');
         }
 
+        if (JITVariable::TYPE_NULL === $args[0]->type || $args[0]->isNullConstant) {
+            $slot = JitValueBox::alloc($context);
+            $ptr = JitValueBox::pointer($context, $slot);
+            $context->builder->call($context->lookupFunction('__value__writeNull'), $ptr);
+
+            return $ptr;
+        }
+
         $commandStr = JitStringArg::lower($context, $args[0], 'proc_open() command');
         $pipesHt = HashTableHelper::ensureHashtablePointer($context, $args[2]);
 

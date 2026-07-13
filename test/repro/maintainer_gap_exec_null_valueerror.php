@@ -5,14 +5,18 @@ foreach (['shell_exec', 'system', 'passthru'] as $fn) {
         $fn(null);
         fwrite(STDERR, "$fn(null): expected ValueError\n");
         exit(1);
-    } catch (ValueError $e) {
-        echo "$fn(null): ", $e->getMessage(), "\n";
+    } catch (ValueError) {
+        echo "$fn(null): ok\n";
     } catch (TypeError) {
-        fwrite(STDERR, "$fn(null): unexpected TypeError\n");
+        fwrite(STDERR, "$fn(null): got TypeError, expected ValueError\n");
         exit(1);
     }
 }
 
 $pipes = [];
 $result = proc_open(null, [], $pipes);
-echo 'proc_open(null): ', var_export($result, true), "\n";
+if (null !== $result) {
+    fwrite(STDERR, 'proc_open(null): expected NULL, got '.var_export($result, true)."\n");
+    exit(1);
+}
+echo "proc_open(null): ok\n";
