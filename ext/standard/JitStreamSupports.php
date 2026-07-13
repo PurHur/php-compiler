@@ -16,8 +16,12 @@ final class JitStreamSupports
     /** @return Value */
     public static function invoke(Context $context, Value $handleLong, Value $featureLong): Value
     {
+        $savedBlock = \PHPCompiler\JIT\BasicBlockHelper::tryGetInsertBlock($context);
         StreamIoRuntime::ensureLinkedForUserScriptLowering($context);
         StreamCaps::ensureLinked($context);
+        if (null !== $savedBlock) {
+            \PHPCompiler\JIT\BasicBlockHelper::restoreInsertBlock($context, $savedBlock);
+        }
         $ret = $context->builder->call(
             $context->lookupFunction('__compiler_stream_supports'),
             $handleLong,
