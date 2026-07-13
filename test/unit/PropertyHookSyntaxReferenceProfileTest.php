@@ -10,31 +10,31 @@ use PHPUnit\Framework\TestCase;
 /** Property-hook syntax rejected on Zend 8.2 reference profile (#14062, #18019); forward profile #14432. */
 final class PropertyHookSyntaxReferenceProfileTest extends TestCase
 {
-    private function skipWhenForwardProfile(): void
+    private ?string $savedProfile = null;
+
+    protected function setUp(): void
     {
-        if (CompilerVersion::supportsPropertyHooks()) {
-            $this->markTestSkipped('property hooks enabled on PHP 8.4 forward profile');
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        $this->savedProfile = false === $prev ? null : $prev;
+        putenv('PHP_COMPILER_PROFILE=8.2');
+    }
+
+    protected function tearDown(): void
+    {
+        if (null === $this->savedProfile) {
+            putenv('PHP_COMPILER_PROFILE');
+        } else {
+            putenv('PHP_COMPILER_PROFILE='.$this->savedProfile);
         }
     }
 
     public function testSupportsPropertyHooksFalseWhenProfile82(): void
     {
-        $prev = getenv('PHP_COMPILER_PROFILE');
-        putenv('PHP_COMPILER_PROFILE=8.2');
-        try {
-            $this->assertFalse(CompilerVersion::supportsPropertyHooks());
-        } finally {
-            if (false === $prev) {
-                putenv('PHP_COMPILER_PROFILE');
-            } else {
-                putenv('PHP_COMPILER_PROFILE='.$prev);
-            }
-        }
+        $this->assertFalse(CompilerVersion::supportsPropertyHooks());
     }
 
     public function testRejectorThrowsOnDefaultInitializerHook(): void
     {
-        $this->skipWhenForwardProfile();
         $this->expectException(\PHPCompiler\Compiler\CompileFatal::class);
         $this->expectExceptionMessage(PropertyHooks::REFERENCE_PROFILE_UNEXPECTED_ARROW);
         PropertyHookSyntaxRejector::reject(
@@ -45,7 +45,6 @@ final class PropertyHookSyntaxReferenceProfileTest extends TestCase
 
     public function testRejectorThrowsOnHookBlock(): void
     {
-        $this->skipWhenForwardProfile();
         $this->expectException(\PHPCompiler\Compiler\CompileFatal::class);
         $this->expectExceptionMessage(PropertyHooks::REFERENCE_PROFILE_UNEXPECTED_BRACE);
         PropertyHookSyntaxRejector::reject(
@@ -56,7 +55,6 @@ final class PropertyHookSyntaxReferenceProfileTest extends TestCase
 
     public function testRuntimeRejectsDefaultInitializerHook(): void
     {
-        $this->skipWhenForwardProfile();
         $runtime = new Runtime();
         try {
             $runtime->parseAndCompile(
@@ -71,7 +69,6 @@ final class PropertyHookSyntaxReferenceProfileTest extends TestCase
 
     public function testRuntimeRejectsHookBlockSyntax(): void
     {
-        $this->skipWhenForwardProfile();
         $runtime = new Runtime();
         try {
             $runtime->parseAndCompile(
