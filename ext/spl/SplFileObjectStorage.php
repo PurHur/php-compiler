@@ -88,6 +88,11 @@ final class SplFileObjectStorage
         $state = &self::$state[$object->id];
         if (null === $state['currentLine']) {
             if (!self::readLineForIterator($object, true)) {
+                // php-src spl_filesystem_file_read_line — BOF before first line is '' not false (#18429).
+                if (0 === $state['lineNum']) {
+                    return '';
+                }
+
                 return false;
             }
         }
