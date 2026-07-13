@@ -6771,7 +6771,7 @@ final class VmDom
         ?array $nsPrefixes
     ): string|false {
         unset($ctx);
-        if ($exclusive || $withComments || null !== $xpath || null !== $nsPrefixes) {
+        if ($exclusive || null !== $xpath || null !== $nsPrefixes) {
             return false;
         }
         if (!DomRegistry::has($node)) {
@@ -6784,10 +6784,10 @@ final class VmDom
                 return '';
             }
 
-            return self::c14nSerializeNode($rootVar->toObject());
+            return self::c14nSerializeNode($rootVar->toObject(), $withComments);
         }
 
-        return self::c14nSerializeNode($node);
+        return self::c14nSerializeNode($node, $withComments);
     }
 
     /**
@@ -6819,19 +6819,26 @@ final class VmDom
         return $written;
     }
 
-    private static function c14nSerializeNode(ObjectEntry $entry): string|false
+    private static function c14nSerializeNode(ObjectEntry $entry, bool $withComments): string|false
     {
         if (!DomRegistry::has($entry)) {
             return false;
         }
         if (self::isElement($entry)) {
-            return self::c14nSerializeElement($entry);
+            return self::c14nSerializeElement($entry, $withComments);
         }
         if (self::isTextNode($entry)) {
             return self::escapeText(DomRegistry::state($entry)->textContent ?? '');
         }
         if (self::isCdataNode($entry)) {
             return DomRegistry::state($entry)->textContent ?? '';
+        }
+        if (self::isCommentNode($entry)) {
+            if (!$withComments) {
+                return '';
+            }
+
+            return '<!--'.(DomRegistry::state($entry)->textContent ?? '').'-->';
         }
         if (self::isEntityReference($entry)) {
             return '&'.self::escapeName(DomRegistry::state($entry)->nodeName).';';
@@ -6840,7 +6847,7 @@ final class VmDom
         return false;
     }
 
-    private static function c14nSerializeElement(ObjectEntry $entry): string
+    private static function c14nSerializeElement(ObjectEntry $entry, bool $withComments): string
     {
         $state = DomRegistry::state($entry);
         $name = self::escapeName($state->nodeName);
@@ -6854,7 +6861,7 @@ final class VmDom
             if (null === $child) {
                 continue;
             }
-            $chunk = self::c14nSerializeNode($child);
+            $chunk = self::c14nSerializeNode($child, $withComments);
             if (false === $chunk) {
                 continue;
             }
