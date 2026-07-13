@@ -450,6 +450,11 @@ final class VmDom
         $xpath->methods['registernamespace'] = new XPathRegisterNamespace();
         $xpath->methodVisibility['registernamespace'] = $pub;
         $xpath->methodNames['registernamespace'] = 'registerNamespace';
+        if (CompilerVersion::supportsDomXPathQuote()) {
+            $pubStatic = $pub | CfgFunc::FLAG_STATIC;
+            $xpath->methods['quote'] = new XPathQuote();
+            $xpath->methodVisibility['quote'] = $pubStatic;
+        }
         $ctx->classes[self::CLASS_XPATH] = $xpath;
 
         $impl = new ClassEntry('DOMImplementation');

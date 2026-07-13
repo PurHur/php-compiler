@@ -11,6 +11,30 @@ use PHPCompiler\VM\Variable;
 /** DOMXPath evaluation engine (php-src ext/dom/xpath.c; #6066). */
 final class VmDomXPath
 {
+    /** DOMXPath::quote() — escape XPath string literals (php-src ext/dom/xpath.c; #18650). */
+    public static function quote(string $input): string
+    {
+        if (!str_contains($input, "'")) {
+            return "'".$input."'";
+        }
+        if (!str_contains($input, '"')) {
+            return '"'.$input.'"';
+        }
+
+        $parts = [];
+        $remaining = $input;
+        while ('' !== $remaining) {
+            $bytesUntilSingle = strcspn($remaining, "'");
+            $bytesUntilDouble = strcspn($remaining, '"');
+            $quote = $bytesUntilSingle > $bytesUntilDouble ? "'" : '"';
+            $bytesUntilQuote = max($bytesUntilSingle, $bytesUntilDouble);
+            $parts[] = $quote.substr($remaining, 0, $bytesUntilQuote).$quote;
+            $remaining = substr($remaining, $bytesUntilQuote);
+        }
+
+        return 'concat('.implode(',', $parts).')';
+    }
+
     public static function create(Context $ctx, ObjectEntry $document): ObjectEntry
     {
         VmDom::ensureDocument($document);

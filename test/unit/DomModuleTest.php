@@ -120,6 +120,23 @@ PHP;
         self::assertSame("NULL\n1.0\n0\nNULL\nISO-8859-1\n1\n1\n", ob_get_clean());
     }
 
+    public function test_dom_xpath_quote_escapes_literals(): void
+    {
+        if (!CompilerVersion::supportsDomXPathQuote()) {
+            self::markTestSkipped('DOMXPath::quote() withheld on 8.2 reference profile (#18650)');
+        }
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+echo DOMXPath::quote("'quoted' name"), "\n";
+echo DOMXPath::quote("'different' \"quote\" styles"), "\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'dom_xpath_quote.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("\"'quoted' name\"\nconcat(\"'different' \",'".'"quote" styles'."')\n", ob_get_clean());
+    }
+
     public function test_dom_node_contains_descendant_check(): void
     {
         if (!CompilerVersion::supportsDomNodeContains()) {
