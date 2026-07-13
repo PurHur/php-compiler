@@ -166,6 +166,7 @@
         "ext/dom/DocumentNormalizeDocument.php",
         "ext/dom/DocumentRegisterNodeClass.php",
         "ext/dom/DocumentRelaxNGValidate.php",
+        "ext/dom/DocumentSave.php",
         "ext/dom/DocumentSaveHTML.php",
         "ext/dom/DocumentSaveHTMLFile.php",
         "ext/dom/DocumentSaveXML.php",
@@ -4939,9 +4940,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 4705,
+        "inventory_files": 4706,
         "excluded": 0,
-        "eligible": 4705,
+        "eligible": 4706,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
