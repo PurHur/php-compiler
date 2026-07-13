@@ -1546,6 +1546,22 @@ PHP;
         self::assertSame("2\n", ob_get_clean());
     }
 
+    /** Issue #18501 — get_class(new DatePeriod(...)) wires outer sibling New_, not inner DateInterval hoist. */
+    public function testGetClassInlineDatePeriodUsesSiblingNewProducerSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+$s = new DateTime('2020-01-01');
+$e = new DateTime('2020-01-03');
+echo get_class(new DatePeriod($s, new DateInterval('P1D'), $e)), "\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'dateperiod_inline_get_class.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("DatePeriod\n", ob_get_clean());
+    }
+
     /** Issue #10143 — var_export((string) NAN) wires Cast producer, not dead arg temp. */
     public function testStringCastNanConstantUsesCastProducerSlot(): void
     {
