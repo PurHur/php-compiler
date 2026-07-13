@@ -1157,8 +1157,10 @@ final class BuiltinClasses
         $reuc->methodVisibility['getname'] = $pub;
         $reuc->methods['getvalue'] = new ReflectionEnumUnitCaseGetValue();
         $reuc->methodVisibility['getvalue'] = $pub;
-        $reuc->methods['isbacked'] = new ReflectionEnumUnitCaseIsBacked();
-        $reuc->methodVisibility['isbacked'] = $pub;
+        if (CompilerVersion::supportsReflectionEnumCaseIsBacked()) {
+            $reuc->methods['isbacked'] = new ReflectionEnumUnitCaseIsBacked();
+            $reuc->methodVisibility['isbacked'] = $pub;
+        }
         if (CompilerVersion::supportsReflectionEnumUnitCaseIsDeprecated()) {
             $reuc->methods['isdeprecated'] = new ReflectionEnumUnitCaseIsDeprecated();
             $reuc->methodVisibility['isdeprecated'] = $pub;
@@ -1174,8 +1176,10 @@ final class BuiltinClasses
         $rebc->methodVisibility['__construct'] = $pub;
         $rebc->methods['getbackingvalue'] = new ReflectionEnumBackedCaseGetBackingValue();
         $rebc->methodVisibility['getbackingvalue'] = $pub;
-        $rebc->methods['isbacked'] = new ReflectionEnumBackedCaseIsBacked();
-        $rebc->methodVisibility['isbacked'] = $pub;
+        if (CompilerVersion::supportsReflectionEnumCaseIsBacked()) {
+            $rebc->methods['isbacked'] = new ReflectionEnumBackedCaseIsBacked();
+            $rebc->methodVisibility['isbacked'] = $pub;
+        }
         $ctx->classes[ReflectionSupport::REFLECTION_ENUM_BACKED_CASE] = $rebc;
 
         $reflectionType = new ClassEntry('ReflectionType');
