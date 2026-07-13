@@ -126,27 +126,52 @@ final class VmNumberFormat
         }
 
         $rounded = VmRound::mathRound($number, $roundPlaces, $roundingMode);
+        $absRounded = $negative ? -$rounded : $rounded;
 
-        $pow = 1;
-        for ($i = 0; $i < $decimals; ++$i) {
-            $pow *= 10;
-        }
-
-        $intPart = (int) floor($rounded);
-        $fracPart = 0;
         if ($decimals > 0) {
-            $fracPart = (int) round(($rounded - (float) $intPart) * $pow);
-            if ($fracPart >= $pow) {
-                ++$intPart;
-                $fracPart = 0;
-            }
+            return self::formatWithSprintfFraction(
+                $absRounded,
+                $decimals,
+                $decimalSeparator,
+                $thousandsSeparator,
+                $negative
+            );
         }
 
-        $intDigits = self::digitsFromInt($intPart);
+        $intDigits = self::digitsFromInt((int) floor($absRounded));
         $result = self::insertThousands($intDigits, $thousandsSeparator);
 
-        if ($decimals > 0) {
-            $fracDigits = self::padLeft(self::digitsFromInt($fracPart), $decimals, '0');
+        if ($negative) {
+            return '-'.$result;
+        }
+
+        return $result;
+    }
+
+    /**
+     * php-src ext/standard/number_format.c — snprintf / php_conv_floating_point for display precision.
+     *
+     * Integer extraction of the fractional part loses accuracy beyond ~14 decimal digits (IEEE double).
+     */
+    private static function formatWithSprintfFraction(
+        float $absRounded,
+        int $decimals,
+        string $decimalSeparator,
+        string $thousandsSeparator,
+        bool $negative
+    ): string {
+        $formatted = \sprintf('%.'.$decimals.'f', $absRounded);
+        $dotPos = \strpos($formatted, '.');
+        if (false === $dotPos) {
+            $intDigits = $formatted;
+            $fracDigits = '';
+        } else {
+            $intDigits = VmString::byteSlice($formatted, 0, $dotPos);
+            $fracDigits = VmString::byteSlice($formatted, $dotPos + 1);
+        }
+
+        $result = self::insertThousands($intDigits, $thousandsSeparator);
+        if ('' !== $fracDigits) {
             $result .= $decimalSeparator.$fracDigits;
         }
 
@@ -166,15 +191,6 @@ final class VmNumberFormat
         while ($value > 0) {
             $digits = \chr(48 + ($value % 10)).$digits;
             $value = (int) ($value / 10);
-        }
-
-        return $digits;
-    }
-
-    private static function padLeft(string $digits, int $length, string $pad): string
-    {
-        while (VmString::byteLength($digits) < $length) {
-            $digits = $pad.$digits;
         }
 
         return $digits;
