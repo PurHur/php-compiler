@@ -250,6 +250,31 @@ final class VmDomJitDispatch
     }
 
     /**
+     * @param list<Variable> $extra
+     */
+    public static function compareDocumentPosition(ObjectEntry $node, array $extra): Variable
+    {
+        $otherVar = ($extra[0] ?? self::missingArg('compareDocumentPosition', 0))->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $otherVar->type) {
+            throw new \TypeError(
+                'DOMNode::compareDocumentPosition(): Argument #1 ($other) must be of type DOMNode, '
+                .VmDom::typeLabel($otherVar).' given'
+            );
+        }
+        $other = VariableObject::entry($otherVar);
+        if (!VmDom::isDomNode($other)) {
+            throw new \TypeError(
+                'DOMNode::compareDocumentPosition(): Argument #1 ($other) must be of type DOMNode, '
+                .VmDom::typeLabel($otherVar).' given'
+            );
+        }
+        $var = new Variable();
+        $var->int(VmDom::compareDocumentPosition($node, $other));
+
+        return $var;
+    }
+
+    /**
      * @return list<Variable>
      */
     public static function unpackArgs(Variable $argsTable): array

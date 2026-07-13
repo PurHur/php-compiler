@@ -1987,6 +1987,36 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
+    public function testSupportsDomNodeCompareDocumentPositionTrueOn84DevDefaultProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE');
+        try {
+            $this->assertTrue(CompilerVersion::supportsDomNodeCompareDocumentPosition());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testSupportsDomNodeCompareDocumentPositionFalseWhenProfile82(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.2');
+        try {
+            $this->assertFalse(CompilerVersion::supportsDomNodeCompareDocumentPosition());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     public function testSupportsDomNodeCompareDocumentPositionOnForwardProfile(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
@@ -2002,9 +2032,22 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
-    public function testSupportsDomNodeCompareDocumentPositionOnReferenceProfile(): void
+    public function testVmRegistersDomNodeCompareDocumentPositionOnDefaultProfile(): void
     {
-        $this->assertFalse(CompilerVersion::supportsDomNodeCompareDocumentPosition());
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE');
+        try {
+            $runtime = new Runtime();
+            $node = $runtime->vmContext->classes['domnode'] ?? null;
+            $this->assertNotNull($node);
+            $this->assertTrue(isset($node->methods['comparedocumentposition']));
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
     }
 
     public function testVmRegistersDomNodeCompareDocumentPositionOnForwardProfile(): void

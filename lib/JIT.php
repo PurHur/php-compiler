@@ -15130,6 +15130,9 @@ class JIT {
             } elseif ('appendchild' === $methodLc && $this->context->functionIsRegistered('domnode::appendchild')) {
                 $className = 'DOMNode';
                 $declaringClassLc = 'domnode';
+            } elseif ('comparedocumentposition' === $methodLc && $this->context->functionIsRegistered('domnode::comparedocumentposition')) {
+                $className = 'DOMNode';
+                $declaringClassLc = 'domnode';
             }
         }
 

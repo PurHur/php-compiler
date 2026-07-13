@@ -74,6 +74,7 @@ final class VmDomInstanceInvoke
             'query' => VmDomJitDispatch::xpathQuery($ctx, $self, $extra),
             'evaluate' => VmDomJitDispatch::xpathEvaluate($ctx, $self, $extra),
             'registernamespace' => VmDomJitDispatch::xpathRegisterNamespace($self, $extra),
+            'comparedocumentposition' => VmDomJitDispatch::compareDocumentPosition($self, $extra),
             default => throw new \Error('Call to undefined method '.$self->class->name.'::'.$methodLc.'()'),
         };
     }
