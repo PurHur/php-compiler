@@ -6,30 +6,34 @@ namespace PHPCompiler\Test\Unit;
 
 use PHPUnit\Framework\TestCase;
 
-/** Standalone AOT GC registry/collect routes through PHP helpers not StandaloneLlvm (#18630). */
+/**
+ * Standalone AOT GC cycle scan uses GcCollectCyclesStandaloneLlvm (#17015, #18630 regression fix).
+ *
+ * PHP registry scan via GcCollectCyclesNativeScanJitHelper nested JIT breaks module verify;
+ * standalone keeps LLVM cycle scan until array nested-JIT is safe.
+ */
 final class GcCollectCyclesStandaloneLlvmShrinkTest extends TestCase
 {
-    public function testGcCollectCyclesRuntimeUsesPhpRegistryAlways(): void
+    public function testGcCollectCyclesRuntimeUsesStandaloneLlvmForCollect(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/GcCollectCyclesRuntime.php');
+        $this->assertStringContainsString('GcCollectCyclesStandaloneLlvm', $source);
+        $this->assertStringContainsString('usesPhpRegistry', $source);
         $this->assertStringContainsString('GcCollectCyclesRegistryJitHelper', $source);
-        $this->assertStringContainsString('GcCollectCyclesStandaloneJitHelper', $source);
-        $this->assertStringContainsString('collectCyclesStandalone', $source);
-        $this->assertStringNotContainsString('GcCollectCyclesStandaloneLlvm', $source);
-        $this->assertStringNotContainsString('gc_register_entry', $source);
-        $this->assertStringNotContainsString("G_OBJECTS = 'phpc_gc_objects'", $source);
-        $this->assertStringNotContainsString('phpc_gc_marked', $source);
+        $this->assertStringNotContainsString('GcCollectCyclesStandaloneJitHelper', $source);
     }
 
-    public function testStandaloneLlvmDeleted(): void
+    public function testStandaloneLlvmPresent(): void
     {
-        $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/GcCollectCyclesStandaloneLlvm.php');
+        $this->assertFileExists(__DIR__.'/../../lib/JIT/Builtin/GcCollectCyclesStandaloneLlvm.php');
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/GcCollectCyclesStandaloneLlvm.php');
+        $this->assertStringContainsString('implementCollectCyclesImpl', $source);
+        $this->assertStringContainsString('ensureCycleScanInternals', $source);
     }
 
-    public function testGcCollectCyclesJitHelperDocumentsStandaloneBridge(): void
+    public function testNativeScanJitHelperDocumentsFuturePhpPath(): void
     {
-        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/GcCollectCyclesStandaloneJitHelper.php');
-        $this->assertStringContainsString('collectCyclesStandalone', $source);
-        $this->assertStringContainsString('GcCollectCyclesNativeScanJitHelper', $source);
+        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/GcCollectCyclesNativeScanJitHelper.php');
+        $this->assertStringContainsString('GcCollectCyclesRegistryJitHelper', $source);
     }
 }

@@ -10,7 +10,7 @@ use PHPUnit\Framework\TestCase;
 /** GcCollectCycles embed registry routes through GcCollectCyclesRegistryJitHelper PHP (#9541). */
 final class GcCollectCyclesRegistryRuntimeShrinkTest extends TestCase
 {
-    public function testGcCollectCyclesRuntimeUsesRegistryJitHelperOnEmbedAndStandalone(): void
+    public function testGcCollectCyclesRuntimeUsesRegistryJitHelperOnEmbed(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/GcCollectCyclesRuntime.php');
         $this->assertStringContainsString('GcCollectCyclesRegistryJitHelper', $source);
@@ -18,8 +18,7 @@ final class GcCollectCyclesRegistryRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('implementDestructAlreadyInvokedPhpBridge', $source);
         $this->assertStringContainsString('implementDestructMarkInvokedPhpBridge', $source);
         $this->assertStringContainsString('gc_register_php_entry', $source);
-        $this->assertStringNotContainsString('gc_register_entry', $source);
-        $this->assertStringNotContainsString("G_OBJECTS = 'phpc_gc_objects'", $source);
+        $this->assertStringContainsString('usesPhpRegistry', $source);
     }
 
     public function testGcCollectCyclesRegistryJitHelperRoundtrip(): void

@@ -7,23 +7,41 @@ namespace PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT;
 use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPLLVM\BasicBlock;
 use PHPLLVM\Builder;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
  * JIT/AOT link for __compiler_gc_collect_cycles via GcCollectCyclesJitHelper PHP (#9183).
  *
- * Standalone AOT uses {@see GcCollectCyclesStandaloneJitHelper} to avoid Superglobals in nested JIT (#18630).
+ * Native cycle scan remains in {@see GcCollectCyclesRuntime}; stats bookkeeping lives in PHP.
  * php-src: ext/standard/info.c — PHP_FUNCTION(gc_collect_cycles)
  */
 final class GcCollectCyclesCollectRuntime
 {
-    private const EMBED_HELPER_PATH = '/ext/standard/GcCollectCyclesJitHelper.php';
+    private const HELPER_PATH = '/ext/standard/GcCollectCyclesJitHelper.php';
 
-    private const STANDALONE_SCAN_PATH = '/ext/standard/GcCollectCyclesNativeScanJitHelper.php';
+    private const RECORD_COLLECT = 'PHPCompiler\\ext\\standard\\GcCollectCyclesJitHelper::recordNativeCollect';
 
-    private const STANDALONE_HELPER_PATH = '/ext/standard/GcCollectCyclesStandaloneJitHelper.php';
+    private const RUNS = 'PHPCompiler\\ext\\standard\\GcCollectCyclesJitHelper::runs';
+
+    private const TOTAL_COLLECTED = 'PHPCompiler\\ext\\standard\\GcCollectCyclesJitHelper::totalCollected';
+
+    private const IS_RUNNING = 'PHPCompiler\\ext\\standard\\GcCollectCyclesJitHelper::isRunning';
+
+    private const IS_PROTECTED = 'PHPCompiler\\ext\\standard\\GcCollectCyclesJitHelper::isProtected';
+
+    private const COLLECT_EMBED = 'PHPCompiler\\ext\\standard\\GcCollectCyclesJitHelper::collectCyclesEmbed';
+
+    /** @var list<string> */
+    private const COMPILED_HELPERS = [
+        self::RECORD_COLLECT,
+        self::RUNS,
+        self::TOTAL_COLLECTED,
+        self::IS_RUNNING,
+        self::IS_PROTECTED,
+        self::COLLECT_EMBED,
+    ];
 
     public static function ensureCollectHelperCompiled(Context $context): void
     {
@@ -62,14 +80,19 @@ final class GcCollectCyclesCollectRuntime
 
         $context->builder->positionAtEnd($work);
         $implResult = $context->builder->call($context->lookupFunction('phpc_gc_collect_cycles_impl'));
-        self::ensureJitHelperCompiled($context);
-        $collected = $context->builder->call(
-            self::helperFunction($context, 'recordNativeCollect'),
-            $context->builder->sext($implResult, $i64)
-        );
-        self::syncGlobalsFromHelper($context);
-        $resultI64 = $context->builder->sextOrBitCast($collected, $i64);
-        $context->builder->branch($done);
+        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
+            $resultI64 = $context->builder->sext($implResult, $i64);
+            $context->builder->branch($done);
+        } else {
+            self::ensureJitHelperCompiled($context);
+            $collected = $context->builder->call(
+                self::helperFunction($context, self::RECORD_COLLECT),
+                $context->builder->sext($implResult, $i64)
+            );
+            self::syncGlobalsFromHelper($context);
+            $resultI64 = $context->builder->sextOrBitCast($collected, $i64);
+            $context->builder->branch($done);
+        }
 
         $context->builder->positionAtEnd($done);
         $zero = $i64->constInt(0, false);
@@ -88,23 +111,23 @@ final class GcCollectCyclesCollectRuntime
         self::storeGlobalInt(
             $context,
             GcStatusRuntime::G_RUNS,
-            self::helperFunction($context, 'runs')
+            self::helperFunction($context, self::RUNS)
         );
         self::storeGlobalInt(
             $context,
             GcStatusRuntime::G_TOTAL_COLLECTED,
-            self::helperFunction($context, 'totalCollected')
+            self::helperFunction($context, self::TOTAL_COLLECTED)
         );
         self::storeGlobalBool(
             $context,
             GcStatusRuntime::G_RUNNING,
-            self::helperFunction($context, 'isRunning'),
+            self::helperFunction($context, self::IS_RUNNING),
             $i32
         );
         self::storeGlobalBool(
             $context,
             GcStatusRuntime::G_PROTECTED,
-            self::helperFunction($context, 'isProtected'),
+            self::helperFunction($context, self::IS_PROTECTED),
             $i32
         );
     }
@@ -132,56 +155,23 @@ final class GcCollectCyclesCollectRuntime
         $context->builder->store($stored, $context->builder->pointerCast($global, $i32->pointerType(0)));
     }
 
-    private static function helperClass(Context $context): string
-    {
-        return Builtin::LOAD_TYPE_STANDALONE === $context->loadType
-            ? 'PHPCompiler\\ext\\standard\\GcCollectCyclesStandaloneJitHelper'
-            : 'PHPCompiler\\ext\\standard\\GcCollectCyclesJitHelper';
-    }
-
-    private static function helperFunction(Context $context, string $method): LlvmFunction
+    private static function helperFunction(Context $context, string $logical): LlvmFunction
     {
         self::ensureJitHelperCompiled($context);
-        $logical = self::helperClass($context).'::'.$method;
         $lc = \strtolower($logical);
         $fn = $context->functions[$lc] ?? null;
         if (null === $fn) {
-            throw new \LogicException($logical.' missing after GC collect helper compile (#18630)');
+            throw new \LogicException($logical.' missing after GcCollectCyclesJitHelper compile (#9183)');
         }
 
         return $fn;
     }
 
-    /** @return list<string> */
-    private static function compiledHelperMethods(Context $context): array
-    {
-        $methods = ['recordNativeCollect', 'runs', 'totalCollected', 'isRunning', 'isProtected'];
-        $methods[] = Builtin::LOAD_TYPE_STANDALONE === $context->loadType
-            ? 'collectCyclesStandalone'
-            : 'collectCyclesEmbed';
-
-        return $methods;
-    }
-
-  /** @return list<array{0: string, 1: string}> path + compile label */
-    private static function helperCompileUnits(Context $context): array
-    {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            return [
-                [self::STANDALONE_SCAN_PATH, 'GcCollectCyclesNativeScanJitHelper.php'],
-                [self::STANDALONE_HELPER_PATH, 'GcCollectCyclesStandaloneJitHelper.php'],
-            ];
-        }
-
-        return [[self::EMBED_HELPER_PATH, 'GcCollectCyclesJitHelper.php']];
-    }
-
     private static function ensureJitHelperCompiled(Context $context): void
     {
-        $class = self::helperClass($context);
         $missing = false;
-        foreach (self::compiledHelperMethods($context) as $method) {
-            if (!isset($context->functions[\strtolower($class.'::'.$method)])) {
+        foreach (self::COMPILED_HELPERS as $logical) {
+            if (!isset($context->functions[\strtolower($logical)])) {
                 $missing = true;
                 break;
             }
@@ -191,23 +181,56 @@ final class GcCollectCyclesCollectRuntime
         }
 
         $runtime = $context->runtime;
-        $root = \dirname(__DIR__, 3);
-        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $root): void {
-            foreach (self::helperCompileUnits($context) as [$relPath, $label]) {
-                $path = $root.$relPath;
-                $block = $runtime->parseAndCompile((string) \file_get_contents($path), $label);
-                if (null === $block) {
-                    throw new \LogicException($label.' parseAndCompile failed (#18630)');
+        $path = \dirname(__DIR__, 3).self::HELPER_PATH;
+        $savedBuilder = $context->builder;
+        $savedActive = $context->activeFunction;
+        $restoreBlock = self::captureInsertBlock($context);
+        $prevSelfHostAot = \getenv('PHP_COMPILER_SELFHOST_AOT');
+        if (\function_exists('putenv')) {
+            \putenv('PHP_COMPILER_SELFHOST_AOT=0');
+        }
+        try {
+            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'GcCollectCyclesJitHelper.php');
+            if (null === $block) {
+                throw new \LogicException('GcCollectCyclesJitHelper.php parseAndCompile failed (#9183)');
+            }
+            $jit = new JIT($context);
+            $jit->compile($block);
+        } finally {
+            $context->builder = $savedBuilder;
+            self::restoreInsertBlock($context, $restoreBlock);
+            $context->activeFunction = $savedActive;
+            if (\function_exists('putenv')) {
+                if (false === $prevSelfHostAot || null === $prevSelfHostAot) {
+                    \putenv('PHP_COMPILER_SELFHOST_AOT=');
+                } else {
+                    \putenv('PHP_COMPILER_SELFHOST_AOT='.$prevSelfHostAot);
                 }
-                $jit = new JIT($context);
-                $jit->compile($block);
             }
-        });
-        foreach (self::compiledHelperMethods($context) as $method) {
-            $lc = \strtolower($class.'::'.$method);
+        }
+        foreach (self::COMPILED_HELPERS as $logical) {
+            $lc = \strtolower($logical);
             if (!isset($context->functions[$lc])) {
-                throw new \LogicException($lc.' was not compiled for JIT (#18630)');
+                throw new \LogicException($lc.' was not compiled for JIT (#9183)');
             }
+        }
+    }
+
+    private static function captureInsertBlock(Context $context): ?BasicBlock
+    {
+        try {
+            return $context->builder->getInsertBlock();
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    private static function restoreInsertBlock(Context $context, ?BasicBlock $block): void
+    {
+        if (null !== $block) {
+            $context->builder->positionAtEnd($block);
+        } else {
+            $context->builder->clearInsertionPosition();
         }
     }
 }
