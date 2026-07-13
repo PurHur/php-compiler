@@ -40,7 +40,7 @@ final class MultipartRuntime
     public static function ensureUserScriptNoOpPopulateStub(Context $context): void
     {
         $probe = $context->module->getNamedFunction(self::LEGACY_RUNTIME_FUNCTION);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+        if (null !== $probe && self::legacyBridgeBodyComplete($probe)) {
             $context->registerFunction(self::LEGACY_RUNTIME_FUNCTION, $probe);
 
             return;
@@ -90,9 +90,10 @@ final class MultipartRuntime
             return;
         }
 
-        $fn = null !== $probe && $probe->countBasicBlocks() > 0
-            ? $probe
-            : self::declareLegacyFunction($context);
+        $fn = null !== $probe ? $probe : self::declareLegacyFunction($context);
+        if ($fn->countBasicBlocks() > 0 && !self::legacyBridgeBodyComplete($fn)) {
+            self::clearFunctionBody($fn);
+        }
         self::implementLegacyPopulateBridge($context, $fn);
         $context->registerFunction(self::LEGACY_RUNTIME_FUNCTION, $fn);
         $context->builder->clearInsertionPosition();
@@ -136,8 +137,8 @@ final class MultipartRuntime
             $context->builder->pointerCast($filesGlobal, $htPtr->pointerType(0))
         );
         $helperFn = JitVmHelperLink::lookupCompiled($context, self::POPULATE_POST_BODY_NATIVE, '#15624');
-        $contentTypeStr = self::cstrToPhpcString($context, $contentTypeCstr);
-        $bodyStr = self::cstrToPhpcString($context, $bodyCstr);
+        $contentTypeStr = self::cstrDirectToPhpcString($context, $contentTypeCstr);
+        $bodyStr = self::cstrDirectToPhpcString($context, $bodyCstr);
         $context->builder->call(
             $helperFn,
             JitNestedHelperCoerce::ptrToI64($context, $post),
@@ -146,6 +147,20 @@ final class MultipartRuntime
             JitNestedHelperCoerce::coerceArgForHelper($context, $bodyStr, $helperFn->getParam(3)->typeOf())
         );
         $context->builder->returnVoid();
+    }
+
+    private static function cstrDirectToPhpcString(Context $context, Value $cstr): Value
+    {
+        $i64 = $context->getTypeFromString('int64');
+
+        return $context->builder->call(
+            $context->lookupFunction('__string__init'),
+            $context->builder->zExt(
+                $context->builder->call($context->lookupFunction('strlen'), $cstr),
+                $i64
+            ),
+            $cstr
+        );
     }
 
     private static function cstrToPhpcString(Context $context, Value $cstr): Value
@@ -160,6 +175,13 @@ final class MultipartRuntime
             ),
             $cstr
         );
+    }
+
+    private static function clearFunctionBody(LlvmFunction $fn): void
+    {
+        foreach (array_reverse($fn->getBasicBlocks()) as $block) {
+            $block->delete();
+        }
     }
 
     private static function legacyBridgeBodyComplete(LlvmFunction $fn): bool

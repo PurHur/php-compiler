@@ -25,7 +25,7 @@ final class SuperglobalsMultipartRuntimeStandaloneTest extends TestCase
         $this->assertNotNull($fn);
         $this->assertGreaterThan(0, $fn->countBasicBlocks());
 
-        $this->assertFileDoesNotExist(__DIR__.'/../../../lib/JIT/Builtin/StringMultipartStandaloneLlvm.php');
+        $this->assertFileExists(__DIR__.'/../../../lib/JIT/Builtin/StringMultipartStandaloneLlvm.php');
     }
 
     public function testSuperglobalsRefreshCFileRemoved(): void

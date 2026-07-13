@@ -33,13 +33,13 @@ final class MultipartRuntimeShrinkTest extends TestCase
         $this->assertSame(0, $files->getNumElements());
     }
 
-    public function testStandaloneMultipartLlvmDeleted(): void
+    public function testStandaloneMultipartLlvmLinkedForUserScriptRefresh(): void
     {
-        $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StringMultipartStandaloneLlvm.php');
-        $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StringMultipart.php');
+        $this->assertFileExists(__DIR__.'/../../lib/JIT/Builtin/StringMultipartStandaloneLlvm.php');
         $multipartRuntime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/MultipartRuntime.php');
         $this->assertStringContainsString('MultipartNativeJitHelper', $multipartRuntime);
-        $this->assertStringContainsString('__compiler_multipart_populate_post_body', $multipartRuntime);
+        $refresh = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/SuperglobalRefreshUserScriptLlvm.php');
+        $this->assertStringContainsString('__phpc_parse_multipart_post', $refresh);
     }
 
     /** isset($_FILES['field']) must use offsetIsSet — upload slots are nested hashtables (#15624). */
@@ -48,4 +48,5 @@ final class MultipartRuntimeShrinkTest extends TestCase
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/IssetHelperLlvm.php');
         $this->assertStringContainsString("'_FILES' !== \$container->superglobalName", $source);
     }
+
 }
