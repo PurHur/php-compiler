@@ -32849,17 +32849,14 @@ class Compiler {
             return null;
         }
         $callArg = $cfgCallOp->args[$argIndex] ?? $arg;
-        if (!$this->callArgIsDeadInlineTemporary($callArg)) {
+        if (
+            !$this->callArgIsDeadInlineTemporary($callArg)
+            && !$this->callArgIsAssignInCallOperand($callArg)
+        ) {
             return null;
         }
-        $callIndex = null;
-        foreach ($block->orig->children as $i => $child) {
-            if ($child === $cfgCallOp) {
-                $callIndex = $i;
-                break;
-            }
-        }
-        if (null === $callIndex || $callIndex < 1) {
+        $callIndex = $this->cfgCallOpIndex($block, $cfgCallOp);
+        if (!\is_int($callIndex) || $callIndex < 1) {
             return null;
         }
         $prev = $block->orig->children[$callIndex - 1] ?? null;
@@ -32868,17 +32865,39 @@ class Compiler {
         }
         if (
             0 === $argIndex
+            && !$this->callArgIsAssignInCallOperand($callArg)
             && !$this->operandsReferToSameVariable($callArg, $prev->result)
             && !$this->isAssignInCallFromPrecedingProducer($block, $prev)
         ) {
             return null;
         }
-        if (null === $block->slotForOperand($prev->expr)) {
-            foreach ($this->compileExpr($prev->expr, $block) as $op) {
+        $namedDest = $this->slotForHoistedAssignInCallNamedDest($block, $cfgCallOp);
+        if (null !== $namedDest) {
+            return $namedDest;
+        }
+        $rhsExpr = $prev->expr;
+        if (
+            $callIndex > 1
+            && ($block->orig->children[$callIndex - 2] ?? null) instanceof Op\Expr\BinaryOp\BitwiseOr
+        ) {
+            $rhsExpr = $block->orig->children[$callIndex - 2];
+        } elseif (
+            $callIndex > 1
+            && ($block->orig->children[$callIndex - 2] ?? null) instanceof Op\Expr\BinaryOp\BitwiseAnd
+        ) {
+            $rhsExpr = $block->orig->children[$callIndex - 2];
+        } elseif (
+            $callIndex > 1
+            && ($block->orig->children[$callIndex - 2] ?? null) instanceof Op\Expr\BinaryOp\BitwiseXor
+        ) {
+            $rhsExpr = $block->orig->children[$callIndex - 2];
+        }
+        if (null === $block->slotForOperand($rhsExpr->result)) {
+            foreach ($this->compileExpr($rhsExpr, $block) as $op) {
                 $block->addOpCode($op);
             }
         }
-        $slot = $block->slotForOperand($prev->expr);
+        $slot = $block->slotForOperand($rhsExpr->result);
         if (null === $slot) {
             $slot = $this->slotForEmittedAssignRhsSlot($block, $prev);
         }
@@ -33443,6 +33462,52 @@ class Compiler {
         }
 
         return $arg instanceof Operand\Variable && !$this->isNamedVariableOperand($arg);
+    }
+
+    /** php-cfg embeds hoisted `($v = expr)` assign-in-call in the call-arg Temporary (#18524). */
+    private function callArgIsAssignInCallOperand(?Operand $arg): bool
+    {
+        if (!$arg instanceof Operand\Temporary) {
+            return false;
+        }
+        foreach ($arg->ops ?? [] as $embedded) {
+            if ($embedded instanceof Op\Expr\Assign) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * dns_get_record($h, $t = DNS_A | DNS_AAAA) — wire the CV dest, not the stale bitmask temp (#18524).
+     */
+    private function slotForHoistedAssignInCallNamedDest(Block $block, Op $cfgCallOp): ?string
+    {
+        if (null === $block->orig) {
+            return null;
+        }
+        $callIndex = $this->cfgCallOpIndex($block, $cfgCallOp);
+        if (!\is_int($callIndex) || $callIndex < 1) {
+            return null;
+        }
+        $prev = $block->orig->children[$callIndex - 1] ?? null;
+        if (!$prev instanceof Op\Expr\Assign) {
+            return null;
+        }
+        $varRoot = Block::cfgVarRoot($prev->var);
+        if (!$varRoot instanceof Operand) {
+            return null;
+        }
+        $namedDest = $block->slotForNamedAssignDest($varRoot);
+        if (null === $namedDest) {
+            $name = Block::resolveVariableName($varRoot);
+            if (null !== $name && '' !== $name) {
+                $namedDest = $block->slotIndexForVariableName($name);
+            }
+        }
+
+        return null !== $namedDest ? (string) $namedDest : null;
     }
 
     /**
@@ -43582,19 +43647,24 @@ class Compiler {
                     }
                 }
             }
-            if (
-                null !== $cfgCallOp
-                && null !== $calleeName
-                && $this->callArgRequiresByRef($calleeName, (int) $argIndex, $arg, $block)
-            ) {
-                $assignInCallRhs = $this->resolveAssignInCallRhsCallArgSlot(
-                    $block,
-                    $cfgCallOp,
-                    (int) $argIndex,
-                    $arg
-                );
-                if (null !== $assignInCallRhs) {
-                    $valueSlot = $assignInCallRhs;
+            if (null !== $cfgCallOp) {
+                $assignInCallArg = $cfgCallOp->args[(int) $argIndex] ?? $arg;
+                if (
+                    $this->callArgIsAssignInCallOperand($assignInCallArg)
+                    || (
+                        null !== $calleeName
+                        && $this->callArgRequiresByRef($calleeName, (int) $argIndex, $arg, $block)
+                    )
+                ) {
+                    $assignInCallRhs = $this->resolveAssignInCallRhsCallArgSlot(
+                        $block,
+                        $cfgCallOp,
+                        (int) $argIndex,
+                        $arg
+                    );
+                    if (null !== $assignInCallRhs) {
+                        $valueSlot = $assignInCallRhs;
+                    }
                 }
             }
             $procOpenSlot = $this->resolveProcOpenInlineCallArgSlot($block, $cfgCallOp, (int) $argIndex, $sends);
@@ -45041,21 +45111,40 @@ class Compiler {
                     if (\is_int($bitmaskCallIndex) && $bitmaskCallIndex > 0) {
                         $bitmaskImmediate = $block->orig->children[$bitmaskCallIndex - 1] ?? null;
                         if ($bitmaskImmediate instanceof Op\Expr\Assign) {
-                            $bitmaskImmediate = $bitmaskImmediate->expr;
+                            $hoistedRhs = $bitmaskCallIndex > 1
+                                ? ($block->orig->children[$bitmaskCallIndex - 2] ?? null)
+                                : null;
+                            if (
+                                $hoistedRhs instanceof Op\Expr\BinaryOp\BitwiseOr
+                                || $hoistedRhs instanceof Op\Expr\BinaryOp\BitwiseAnd
+                                || $hoistedRhs instanceof Op\Expr\BinaryOp\BitwiseXor
+                            ) {
+                                $bitmaskImmediate = $hoistedRhs;
+                            } else {
+                                $bitmaskImmediate = $bitmaskImmediate->expr;
+                            }
                         }
                         if (
                             ($bitmaskImmediate instanceof Op\Expr\BinaryOp\BitwiseOr
                                 || $bitmaskImmediate instanceof Op\Expr\BinaryOp\BitwiseAnd
                                 || $bitmaskImmediate instanceof Op\Expr\BinaryOp\BitwiseXor)
-                            && $this->callArgIsDeadInlineTemporary($bitmaskArgProbe)
+                            && (
+                                $this->callArgIsDeadInlineTemporary($bitmaskArgProbe)
+                                || $this->callArgIsAssignInCallOperand($bitmaskArgProbe)
+                            )
                             && !$this->callArgOperandExpectsArrayProducer($bitmaskArgProbe)
                         ) {
-                            if (null === $block->slotForOperand($bitmaskImmediate->result)) {
+                            $namedDest = $this->slotForHoistedAssignInCallNamedDest($block, $cfgCallOp);
+                            if (null !== $namedDest) {
+                                $bitmaskSlot = $namedDest;
+                            } elseif (null === $block->slotForOperand($bitmaskImmediate->result)) {
                                 foreach ($this->compileExpr($bitmaskImmediate, $block) as $op) {
                                     $sends[] = $op;
                                 }
+                                $bitmaskSlot = $block->slotForOperand($bitmaskImmediate->result);
+                            } else {
+                                $bitmaskSlot = $block->slotForOperand($bitmaskImmediate->result);
                             }
-                            $bitmaskSlot = $block->slotForOperand($bitmaskImmediate->result);
                         }
                     }
                 }
@@ -48745,7 +48834,16 @@ class Compiler {
         }
         $immediate = $block->orig->children[$callIndex - 1] ?? null;
         if ($immediate instanceof Op\Expr\Assign) {
-            $immediate = $immediate->expr;
+            $hoistedRhs = $callIndex > 1 ? ($block->orig->children[$callIndex - 2] ?? null) : null;
+            if (
+                $hoistedRhs instanceof Op\Expr\BinaryOp\BitwiseOr
+                || $hoistedRhs instanceof Op\Expr\BinaryOp\BitwiseAnd
+                || $hoistedRhs instanceof Op\Expr\BinaryOp\BitwiseXor
+            ) {
+                $immediate = $hoistedRhs;
+            } else {
+                $immediate = $immediate->expr;
+            }
         }
         if (
             !$immediate instanceof Op\Expr\BinaryOp\BitwiseOr
@@ -48765,14 +48863,21 @@ class Compiler {
             return;
         }
         $trailingArg = $cfgCallOp->args[$trailingArgIndex] ?? null;
+        $assignInCallBitmask = ($block->orig->children[$callIndex - 1] ?? null) instanceof Op\Expr\Assign;
         if (
-            !$this->callArgIsDeadInlineTemporary($trailingArg)
-            || $this->callArgOperandExpectsArrayProducer($trailingArg)
+            !$assignInCallBitmask
+            && (
+                !$this->callArgIsDeadInlineTemporary($trailingArg)
+                || $this->callArgOperandExpectsArrayProducer($trailingArg)
+            )
         ) {
             return;
         }
-        $bitmaskSlot = null;
-        if (null !== $immediate->result) {
+        if ($assignInCallBitmask && $this->callArgOperandExpectsArrayProducer($trailingArg)) {
+            return;
+        }
+        $bitmaskSlot = $this->slotForHoistedAssignInCallNamedDest($block, $cfgCallOp);
+        if (null === $bitmaskSlot && null !== $immediate->result) {
             $bitmaskSlot = $block->slotForOperand($immediate->result);
             if (null !== $bitmaskSlot) {
                 $bitmaskSlot = (string) $bitmaskSlot;
@@ -48793,6 +48898,19 @@ class Compiler {
             }
         }
         if (null === $bitmaskSlot) {
+            return;
+        }
+        if ($assignInCallBitmask) {
+            for ($i = \count($outerArgSends) - 1; $i >= 0; --$i) {
+                $send = $outerArgSends[$i];
+                if (OpCode::TYPE_ARG_SEND !== $send->type) {
+                    continue;
+                }
+                $send->arg1 = $bitmaskSlot;
+
+                return;
+            }
+
             return;
         }
         $argSendOrdinal = 0;

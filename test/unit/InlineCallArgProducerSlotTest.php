@@ -5705,6 +5705,40 @@ PHP;
         self::assertStringContainsString('int(1)', ob_get_clean());
     }
 
+    /** Issue #18524 — dns_get_record($host, $t = DNS_A | DNS_AAAA) must wire hoisted BitwiseOr slot. */
+    public function testDnsGetRecordAssignInCallBitmaskArgSend(): void
+    {
+        $code = <<<'PHP'
+<?php
+dns_get_record('php.net', $t = DNS_A | DNS_AAAA);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'dns_assign_in_call.php');
+
+        $bitwiseOrSlot = null;
+        $dnsSendSlots = [];
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_BITWISE_OR === $op->type) {
+                $bitwiseOrSlot = $op->arg1;
+            }
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                $callee = $block->getOperand((int) $op->arg1);
+                if ($callee instanceof Operand\Literal && 'dns_get_record' === (string) $callee->value) {
+                    $dnsSendSlots = [];
+                }
+            }
+            if ([] !== $dnsSendSlots || OpCode::TYPE_ARG_SEND === $op->type) {
+                if (OpCode::TYPE_ARG_SEND === $op->type) {
+                    $dnsSendSlots[] = $op->arg1;
+                }
+            }
+        }
+
+        self::assertNotNull($bitwiseOrSlot, 'expected TYPE_BITWISE_OR slot');
+        self::assertCount(2, $dnsSendSlots, 'arg sends='.json_encode($dnsSendSlots));
+        self::assertSame($bitwiseOrSlot, $dnsSendSlots[1] ?? null, 'type arg must use BitwiseOr slot');
+    }
+
     /** Issue #11409 — chown($path, getmyuid()) wires nested int into trailing arg slot. */
     public function testChownNamedPathNestedGetmyuidArgSend(): void
     {
