@@ -2899,8 +2899,12 @@ class Object_ extends Type {
             $this->defineProperty($id, 'name', Variable::TYPE_STRING);
         }
         if ('reflectionmethod' === $lcname) {
+            $this->setClassParentName('ReflectionMethod', 'ReflectionFunctionAbstract');
             $this->defineProperty($id, 'class', Variable::TYPE_STRING);
             $this->defineProperty($id, 'name', Variable::TYPE_STRING);
+        }
+        if ('reflectionfunction' === $lcname) {
+            $this->setClassParentName('ReflectionFunction', 'ReflectionFunctionAbstract');
         }
         if ('reflectionproperty' === $lcname) {
             $this->defineProperty($id, 'name', Variable::TYPE_STRING);
