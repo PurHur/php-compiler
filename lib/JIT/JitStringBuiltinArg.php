@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT;
 
+use PHPCompiler\ext\standard\VmNullStringParamDeprecation;
 use PHPCompiler\JIT\Builtin\Type\Object_ as JitObjectType;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
+use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\VM\Variable as VmVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -70,6 +72,8 @@ final class JitStringBuiltinArg
 
                 return self::unreachableStringPtr($context);
             }
+
+            self::emitNullStringParamDeprecation($context, $function, $argIndex, $paramName);
 
             return $context->builder->load($context->constantStringFromString(''));
         }
@@ -141,10 +145,35 @@ final class JitStringBuiltinArg
                 return self::unreachableStringPtr($context);
             }
 
+            self::emitNullStringParamDeprecation($context, $function, $argIndex, $paramName);
+
             return $context->builder->load($context->constantStringFromString(''));
         }
 
         return self::lower($context, $arg, $function, $argIndex, $paramName, $expectedType, $arrayExpectedType);
+    }
+
+    private static function emitNullStringParamDeprecation(
+        Context $context,
+        string $function,
+        int $argIndex,
+        string $paramName
+    ): void {
+        $message = VmNullStringParamDeprecation::message($function, $argIndex, $paramName);
+        $i8p = $context->getTypeFromString('int8*');
+        $sizeT = $context->getTypeFromString('size_t');
+        $i32 = $context->getTypeFromString('int32');
+        $msgPtr = $context->builder->pointerCast($context->constantFromString($message), $i8p);
+        $msgLen = $sizeT->constInt(\strlen($message), false);
+        $emptyFile = $context->builder->pointerCast($context->constantFromString(''), $i8p);
+        $context->builder->call(
+            $context->lookupFunction('__compiler_trigger_error'),
+            $msgPtr,
+            $msgLen,
+            $i32->constInt(ErrorReporter::E_DEPRECATED, false),
+            $emptyFile,
+            $i32->constInt(0, false)
+        );
     }
 
     /**

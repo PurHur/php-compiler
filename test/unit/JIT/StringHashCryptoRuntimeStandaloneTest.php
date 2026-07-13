@@ -27,6 +27,8 @@ final class StringHashCryptoRuntimeStandaloneTest extends TestCase
         $this->assertStringContainsString('StringHashHmacAlgos', $jit);
         $this->assertStringContainsString('StringHashAlgos', $jit);
         $this->assertStringContainsString('StringHashCryptoPhp', $jit);
+        $this->assertStringContainsString('implementDeferred', $jit);
+        $this->assertStringContainsString('ensureDeferredEqualsStub', $jit);
         $this->assertStringNotContainsString('StringHashCryptoNativeJit', $jit);
         $this->assertStringNotContainsString('ensureBitcode', $jit);
         $this->assertStringNotContainsString('hash_crypto_jit_runtime.c', $jit);

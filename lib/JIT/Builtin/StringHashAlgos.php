@@ -4,15 +4,20 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\ext\standard\HashAlgosRegistry;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitVmHelperLink;
+use PHPCompiler\JIT\UserScriptAotDeferNestedJit;
+use PHPLLVM\Builder;
+use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
  * JIT/AOT link for __compiler_hash_algos via HashAlgosJitHelper PHP (#14909).
  *
- * Replaces ~88 LOC inline LLVM registry walk.
+ * User-script standalone AOT uses inline registry LLVM (same as {@see StringHashHmacAlgos})
+ * because nested HashAlgosJitHelper emits invalid __hashtable__ bridge types (#3357).
  * SSOT: {@see \PHPCompiler\ext\standard\VmHash::algos()}
  * php-src: ext/hash/hash.c — php_hash_algos()
  */
@@ -43,6 +48,12 @@ final class StringHashAlgos
             return;
         }
 
+        if (UserScriptAotDeferNestedJit::shouldDefer($context)) {
+            self::implementInlineRegistry($context, $probe);
+
+            return;
+        }
+
         JitVmHelperLink::ensureCompiled($context, self::HELPER_PATH, self::COMPILED_HELPERS, '#14909');
         $helperFn = JitVmHelperLink::lookupCompiled($context, self::ALGOS_HELPER, '#14909');
 
@@ -65,5 +76,60 @@ final class StringHashAlgos
         $htRaw = $context->builder->call($helperFn);
         $ht = JitNestedHelperCoerce::coerceToHashtablePtr($context, $htRaw);
         $context->builder->returnValue($ht);
+    }
+
+    private static function implementInlineRegistry(Context $context, ?LlvmFunction $probe): void
+    {
+        $htPtr = $context->getTypeFromString('__hashtable__*');
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction(
+                self::ABI_HASH_ALGOS,
+                $context->context->functionType($htPtr, false)
+            );
+
+        $entry = $fn->appendBasicBlock('hash_algos_inline_entry');
+        $context->builder->positionAtEnd($entry);
+
+        $i64 = $context->getTypeFromString('int64');
+        $ht = $context->builder->call($context->lookupFunction('__hashtable__alloc'));
+        $nullHt = $htPtr->constNull();
+        $isNull = $context->builder->icmp(Builder::INT_EQ, $ht, $nullHt);
+
+        $failBb = $fn->appendBasicBlock('hash_algos_inline_fail');
+        $buildBb = $fn->appendBasicBlock('hash_algos_inline_build');
+        $context->builder->branchIf($isNull, $failBb, $buildBb);
+
+        $context->builder->positionAtEnd($failBb);
+        $context->builder->returnValue($nullHt);
+        $context->builder->clearInsertionPosition();
+
+        $context->builder->positionAtEnd($buildBb);
+        $setAt = $context->lookupFunction('__hashtable__setStringAt');
+        foreach (HashAlgosRegistry::ALL_ALGOS as $index => $algo) {
+            $context->builder->call(
+                $setAt,
+                $ht,
+                $i64->constInt($index, false),
+                self::literalString($context, $algo)
+            );
+        }
+        $context->builder->returnValue($ht);
+        $context->builder->clearInsertionPosition();
+
+        $context->registerFunction(self::ABI_HASH_ALGOS, $fn);
+    }
+
+    private static function literalString(Context $context, string $text): Value
+    {
+        $i64 = $context->getTypeFromString('int64');
+        $charPtr = $context->getTypeFromString('char*');
+        $cstr = $context->builder->pointerCast($context->constantFromString($text), $charPtr);
+
+        return $context->builder->call(
+            $context->lookupFunction('__string__init'),
+            $i64->constInt(\strlen($text), false),
+            $cstr
+        );
     }
 }

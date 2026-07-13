@@ -23,7 +23,7 @@ final class JitPrintf
                 $argc
             ));
         }
-        $fmt = JitStringBuiltinArg::lowerRequiredString($context, $args[0], 'printf', 0, 'format');
+        $fmt = JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'printf', 0, 'format');
         $numArgs = $argc - 1;
         if (0 === $numArgs) {
             $nullArgv = $context->builder->pointerCast(

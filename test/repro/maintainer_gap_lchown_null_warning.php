@@ -1,9 +1,33 @@
 <?php
-// lchown()/lchgrp() null path — warning must name callee (issue #18766)
-@lchown(null, 0);
-$err = error_get_last();
-echo 'lchown=', ($err !== null ? $err['message'] : 'no_error'), PHP_EOL;
 
+$warnings = [];
+set_error_handler(static function (int $errno, string $message) use (&$warnings): bool {
+    if (E_WARNING === $errno) {
+        $warnings[] = $message;
+    }
+
+    return true;
+});
+
+@lchown(null, 0);
 @lchgrp(null, 0);
-$err = error_get_last();
-echo 'lchgrp=', ($err !== null ? $err['message'] : 'no_error'), PHP_EOL;
+
+restore_error_handler();
+
+$lchownOk = false;
+$lchgrpOk = false;
+foreach ($warnings as $message) {
+    if (str_contains($message, 'lchown()')) {
+        $lchownOk = true;
+    }
+    if (str_contains($message, 'lchgrp()')) {
+        $lchgrpOk = true;
+    }
+}
+
+if (!$lchownOk || !$lchgrpOk) {
+    fwrite(STDERR, 'warnings: '.implode(' | ', $warnings)."\n");
+    exit(1);
+}
+
+echo "ok\n";
