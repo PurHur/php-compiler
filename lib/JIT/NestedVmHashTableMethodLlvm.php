@@ -25,6 +25,8 @@ final class NestedVmHashTableMethodLlvm
         'keyscopy' => Call\HashTableKeysCopy::class,
         'keysmatchingcopy' => Call\HashTableKeysMatchingCopy::class,
         'exportkeyvaluepairs' => Call\HashTableExportKeyValuePairs::class,
+        'iterate' => Call\HashTableIterate::class,
+        'findindex' => Call\HashTableFindIndex::class,
         'add' => Call\HashTableWriteNested::class,
         'updateindex' => Call\HashTableWriteNested::class,
         'append' => Call\HashTableWriteNested::class,
