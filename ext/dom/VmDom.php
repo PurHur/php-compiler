@@ -541,6 +541,8 @@ final class VmDom
         $document->methodVisibility['appendchild'] = $pub;
         $document->methods['savexml'] = new DocumentSaveXML();
         $document->methodVisibility['savexml'] = $pub;
+        $document->methods['save'] = new DocumentSave();
+        $document->methodVisibility['save'] = $pub;
         $document->methods['savehtml'] = new DocumentSaveHTML();
         $document->methodVisibility['savehtml'] = $pub;
         $document->methodNames['savehtml'] = 'saveHTML';
@@ -4100,6 +4102,32 @@ final class VmDom
         $written = file_put_contents($filename, $html);
         if (false === $written) {
             return 0;
+        }
+
+        return $written;
+    }
+
+    /**
+     * DOMDocument::save() — write saveXML() bytes to $filename (php-src ext/dom/php_dom.c; #18435).
+     *
+     * @return int|false byte count, or false when the file cannot be written
+     */
+    public static function save(
+        ObjectEntry $document,
+        string $filename,
+        int $options = 0,
+        ?Frame $frame = null
+    ): int|false {
+        unset($options);
+        $xml = self::saveXML($document);
+        $written = @file_put_contents($filename, $xml);
+        if (false === $written) {
+            self::triggerDomWarning(
+                $frame,
+                'DOMDocument::save('.$filename.'): Failed to open stream: No such file or directory'
+            );
+
+            return false;
         }
 
         return $written;
