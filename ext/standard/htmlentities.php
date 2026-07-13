@@ -11,6 +11,7 @@ use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -30,10 +31,10 @@ final class htmlentities extends Internal
         if ($argc < 1 || $argc > 4) {
             throw new \LogicException('htmlentities() requires one to four arguments in this compiler build');
         }
-        $string = VmString::coerceStringBuiltinArg(
-            $frame->calledArgs[0],
-            'htmlentities',
+        $string = InternalStrictArg::resolveCoercibleStringArg(
+            $frame,
             0,
+            'htmlentities',
             'string'
         );
         $flags = ENT_QUOTES | ENT_SUBSTITUTE;
@@ -107,7 +108,7 @@ final class htmlentities extends Internal
             );
         }
 
-        $str = JitStringBuiltinArg::lower($context, $args[0], 'htmlentities', 0, 'string');
+        $str = JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'htmlentities', 0, 'string');
         $flagsLlvm = $context->getTypeFromString('int64')->constInt(ENT_QUOTES | ENT_SUBSTITUTE, false);
         if ($argc >= 2) {
             $flagsLlvm = $flagsKnown

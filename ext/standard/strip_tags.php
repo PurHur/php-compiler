@@ -27,7 +27,7 @@ final class strip_tags extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('strip_tags() requires one or two arguments in this compiler build');
         }
-        $subject = self::vmStringArg($frame, 0, 'string');
+        $subject = InternalStrictArg::resolveCoercibleStringArg($frame, 0, 'strip_tags', 'string');
         $allowed = null;
         if (2 === $argc) {
             $allowed = self::resolveAllowedTagsVm($frame->calledArgs[1]);
@@ -75,15 +75,6 @@ final class strip_tags extends Internal
             $subject,
             $allowPtr
         );
-    }
-
-    private static function vmStringArg(Frame $frame, int $argIndex, string $paramName): string
-    {
-        if (InternalStrictArg::isCallerStrict($frame)) {
-            return InternalStrictArg::requireString($frame, $argIndex, 'strip_tags', $paramName)->toString();
-        }
-
-        return VmString::coerceStringBuiltinArg($frame->calledArgs[$argIndex], 'strip_tags', $argIndex, $paramName);
     }
 
     /**
