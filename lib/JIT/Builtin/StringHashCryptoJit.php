@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\UserScriptAotDeferNestedJit;
 
 /**
@@ -29,32 +30,66 @@ final class StringHashCryptoJit
 
     public static function ensureStandaloneBodies(Context $context): void
     {
+        if (UserScriptAotDeferNestedJit::shouldDefer($context)) {
+            self::implementDeferred($context);
+
+            return;
+        }
+
         StringHashEquals::ensureLinked($context);
         StringHashHmacAlgos::ensureLinked($context);
         StringHashAlgos::ensureLinked($context);
-
-        if (UserScriptAotDeferNestedJit::shouldDefer($context)) {
-            StringHashCryptoLlvm::implement($context);
-        } else {
-            StringHashCryptoPhp::implement($context);
-        }
-
+        StringHashCryptoPhp::implement($context);
         self::registerLinkedRuntime($context);
     }
 
     public static function implement(Context $context): void
     {
+        if (UserScriptAotDeferNestedJit::shouldDefer($context)) {
+            self::implementDeferred($context);
+
+            return;
+        }
+
         StringHashEquals::ensureLinked($context);
         StringHashHmacAlgos::ensureLinked($context);
         StringHashAlgos::ensureLinked($context);
+        StringHashCryptoPhp::implement($context);
+        self::registerLinkedRuntime($context);
+    }
 
-        if (UserScriptAotDeferNestedJit::shouldDefer($context)) {
-            StringHashCryptoLlvm::implement($context);
-        } else {
-            StringHashCryptoPhp::implement($context);
+    private static function implementDeferred(Context $context): void
+    {
+        StringHashCryptoLlvm::implement($context);
+        StringHashHmacAlgos::ensureLinked($context);
+        StringHashAlgos::ensureLinked($context);
+        self::ensureDeferredEqualsStub($context);
+        self::registerLinkedRuntime($context);
+    }
+
+    private static function ensureDeferredEqualsStub(Context $context): void
+    {
+        $abiName = '__compiler_hash_equals';
+        $probe = $context->module->getNamedFunction($abiName);
+        if (null !== $probe && JitVmHelperLink::hasNamedBridgeEntry($probe, 'hash_equals_deferred_stub')) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
         }
 
-        self::registerLinkedRuntime($context);
+        $strPtr = $context->getTypeFromString('__string__*');
+        $i32 = $context->getTypeFromString('int32');
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction(
+                $abiName,
+                $context->context->functionType($i32, false, $strPtr, $strPtr)
+            );
+        $entry = $fn->appendBasicBlock('hash_equals_deferred_stub');
+        $context->builder->positionAtEnd($entry);
+        $context->builder->returnValue($i32->constInt(0, false));
+        $context->registerFunction($abiName, $fn);
+        $context->builder->clearInsertionPosition();
     }
 
     private static function registerLinkedRuntime(Context $context): void
