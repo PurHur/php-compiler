@@ -7701,7 +7701,7 @@ class JIT {
                     $spreadI1 = $this->context->getTypeFromString('int1');
                     $spreadOffset = $spreadI64->constInt($block->constants[$op->arg3]->toInt(), false);
                     if ([] !== $op->listSpreadExcludedKeys) {
-                        $spreadTailHt = JIT\ArrayBuiltinHelper::buildCopyListSpreadTail(
+                        $spreadTailHt = JIT\Builtin\ListSpreadTailRuntime::copyTail(
                             $this->context,
                             $spreadSrc,
                             $spreadOffset,
@@ -7711,7 +7711,7 @@ class JIT {
                         if (!JIT\ListUnpackHelper::isDefinitelyNonArrayAtCompileTime($this->context, $spreadSrc)) {
                             JIT\ListUnpackHelper::emitIsListBranchOrFail($this->context, $spreadSrc);
                         }
-                        $spreadTailHt = JIT\ArrayBuiltinHelper::buildSliceArray(
+                        $spreadTailHt = JIT\Builtin\ArraySliceRuntime::slice(
                             $this->context,
                             $spreadSrc,
                             $spreadOffset,

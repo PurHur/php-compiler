@@ -6,10 +6,10 @@ namespace PHPCompiler\Test\Unit;
 
 use PHPUnit\Framework\TestCase;
 
-/** Dead array_diff/intersect/asort/replace_key LLVM deleted from ArrayBuiltinHelper after PHP runtime bridges (#18407, #18430). */
+/** Dead array_diff/intersect/asort/replace_key/combine/spread LLVM deleted from ArrayBuiltinHelper after PHP runtime bridges (#18407, #18430, #18446). */
 final class ArrayBuiltinHelperDeadLlvmShrinkTest extends TestCase
 {
-    private const ARRAY_BUILTIN_HELPER_MAX_LINES = 1730;
+    private const ARRAY_BUILTIN_HELPER_MAX_LINES = 920;
 
     public function testArrayBuiltinHelperDeadDiffIntersectLlvmRemoved(): void
     {
@@ -36,7 +36,7 @@ final class ArrayBuiltinHelperDeadLlvmShrinkTest extends TestCase
         $this->assertLessThanOrEqual(
             self::ARRAY_BUILTIN_HELPER_MAX_LINES,
             $lines,
-            'ArrayBuiltinHelper.php LOC after dead diff/intersect/asort/replace_key LLVM deletion (#18407, #18430)'
+            'ArrayBuiltinHelper.php LOC after dead diff/intersect/asort/replace_key/spread LLVM deletion (#18407, #18430, #18446)'
         );
     }
 }
