@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 4751 |
-| Phase A inventory files (M2 ratio SSOT) | 4751 |
+| PHP files on vm.php path | 4755 |
+| Phase A inventory files (M2 ratio SSOT) | 4755 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 12779 |
+| Source constructs flagged (warnings) | 12790 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -355,10 +355,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/gd/BuiltinClasses.php` | 0 | 2 |
 | `ext/gd/GdExtensionPolicy.php` | 0 | 1 |
 | `ext/gd/GdFunction.php` | 0 | 3 |
+| `ext/gd/GdImageState.php` | 0 | 3 |
 | `ext/gd/GdRegistry.php` | 0 | 1 |
-| `ext/gd/Module.php` | 0 | 5 |
+| `ext/gd/Module.php` | 0 | 8 |
 | `ext/gd/VmGd.php` | 0 | 3 |
+| `ext/gd/VmGdPng.php` | 0 | 1 |
+| `ext/gd/imagecolorallocate.php` | 0 | 1 |
 | `ext/gd/imagecreatefromstring.php` | 0 | 1 |
+| `ext/gd/imagecreatetruecolor.php` | 0 | 1 |
+| `ext/gd/imagedestroy.php` | 0 | 1 |
+| `ext/gd/imagefill.php` | 0 | 1 |
 | `ext/gd/imagepng.php` | 0 | 1 |
 | `ext/gettext/GettextFunction.php` | 0 | 2 |
 | `ext/gettext/GettextJitHelper.php` | 0 | 1 |
@@ -6975,7 +6981,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/gd/GdExtensionPolicy.php`
 
 **Warnings** (review for bootstrap subset):
-- 2 class method(s)
+- 3 class method(s)
 
 ### `ext/gd/GdFunction.php`
 
@@ -6983,6 +6989,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Error (line 22)
 - new Error (line 27)
 - 2 class method(s)
+
+### `ext/gd/GdImageState.php`
+
+**Warnings** (review for bootstrap subset):
+- new self (line 50)
+- new self (line 57)
+- 4 class method(s)
 
 ### `ext/gd/GdRegistry.php`
 
@@ -6994,18 +7007,46 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new imagecreate (line 48)
 - new imagecreatetruecolor (line 49)
-- new imagecreatefromstring (line 52)
-- new imagepng (line 53)
+- new imagecolorallocate (line 52)
+- new imagefill (line 53)
+- new imagedestroy (line 54)
+- new imagecreatefromstring (line 57)
+- new imagepng (line 58)
 - 4 class method(s)
 
 ### `ext/gd/VmGd.php`
 
 **Warnings** (review for bootstrap subset):
 - new ObjectEntry (line 53)
-- new GdImageState (line 55)
-- 9 class method(s)
+- new ObjectEntry (line 76)
+- 15 class method(s)
+
+### `ext/gd/VmGdPng.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s)
+
+### `ext/gd/imagecolorallocate.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
 
 ### `ext/gd/imagecreatefromstring.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
+### `ext/gd/imagecreatetruecolor.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
+### `ext/gd/imagedestroy.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
+### `ext/gd/imagefill.php`
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
