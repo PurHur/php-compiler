@@ -124,6 +124,10 @@ final class VmFsReadNativeRuntimeShrinkTest extends TestCase
             'ext/standard/VmDateTimeNative.php',
             'ext/zip/ZipEngine.php',
             'ext/zip/VmZipArchive.php',
+            'ext/dom/VmDom.php',
+            'ext/simplexml/VmSimpleXml.php',
+            'ext/xmlreader/VmXmlReader.php',
+            'ext/uploadprogress/VmUploadprogress.php',
         ];
     }
 

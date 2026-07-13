@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\xmlreader;
 
+use PHPCompiler\ext\standard\VmFsReadNative;
 use PHPCompiler\ext\xml\VmXml;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\ClassEntry;
@@ -72,7 +73,7 @@ final class VmXmlReader
 
     public static function open(Context $ctx, string $uri, ?Frame $frame = null): ?ObjectEntry
     {
-        $contents = @file_get_contents($uri);
+        $contents = VmFsReadNative::read($uri);
         if (false === $contents) {
             self::warn($ctx, 'XMLReader::open(): Unable to open source data', $frame);
 

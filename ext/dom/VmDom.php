@@ -8,6 +8,7 @@ use PHPCfg\Func as CfgFunc;
 use PHPCompiler\CompilerVersion;
 use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\ext\standard\VmFs;
+use PHPCompiler\ext\standard\VmFsReadNative;
 use PHPCompiler\ext\libxml\LibxmlConstants;
 use PHPCompiler\ext\libxml\VmLibxml;
 use PHPCompiler\ext\xml\VmXml;
@@ -2160,7 +2161,7 @@ final class VmDom
         ?\PHPCompiler\Frame $frame = null
     ): bool {
         unset($options);
-        $contents = @file_get_contents($filename);
+        $contents = VmFsReadNative::read($filename);
         if (false === $contents) {
             VmLibxml::handleError($ctx, [
                 'level' => 2,
