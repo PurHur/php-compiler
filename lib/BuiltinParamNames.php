@@ -252,7 +252,7 @@ final class BuiltinParamNames
             case 'openssl_cipher_key_length':
                 return ['cipher_algo'];
             case 'hash':
-                return ['algo', 'data', 'binary'];
+                return ['algo', 'data', 'binary', 'options'];
             case 'hash_hmac':
                 return ['algo', 'data', 'key', 'binary'];
             case 'hash_pbkdf2':

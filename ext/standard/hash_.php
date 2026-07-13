@@ -31,17 +31,20 @@ final class hash_ extends Internal
                 $argc
             ));
         }
-        if ($argc > 3) {
+        if (self::maxCalledArgIndex($frame->calledArgs) > 3) {
             throw new \ArgumentCountError(\sprintf(
-                'hash() expects at most 3 arguments, %d given',
+                'hash() expects at most 4 arguments, %d given',
                 $argc
             ));
         }
         $algo = VmString::stringBuiltinArgForFrame($frame, 0, 'hash', 0, 'algo');
         $data = VmString::stringBuiltinArgForFrame($frame, 1, 'hash', 1, 'data');
         $raw = false;
-        if (3 === $argc) {
+        if (isset($frame->calledArgs[2])) {
             $raw = VmMath::parseBoolBuiltinArg($frame->calledArgs[2], 'hash', 3, 'binary');
+        }
+        if (isset($frame->calledArgs[3])) {
+            VmArray::requireArrayParam($frame->calledArgs[3], 'hash', 4, 'options');
         }
         $result = VmHash::hash($algo, $data, $raw);
         BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($result): void {
@@ -58,9 +61,9 @@ final class hash_ extends Internal
                 $argc
             ));
         }
-        if ($argc > 3) {
+        if ($argc > 4) {
             throw new \ArgumentCountError(\sprintf(
-                'hash() expects at most 3 arguments, %d given',
+                'hash() expects at most 4 arguments, %d given',
                 $argc
             ));
         }
@@ -68,11 +71,24 @@ final class hash_ extends Internal
         if (isset($args[2])) {
             $raw = JitBoolArg::lower($context, $args[2], 'hash(): Argument #3 ($binary)');
         }
+
         return JitHash::hash(
             $context,
             JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'hash', 0, 'algo'),
             JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[1], 'hash', 1, 'data'),
             $raw
         );
+    }
+
+    /**
+     * @param array<int, Variable> $calledArgs
+     */
+    private static function maxCalledArgIndex(array $calledArgs): int
+    {
+        if ([] === $calledArgs) {
+            return -1;
+        }
+
+        return max(array_keys($calledArgs));
     }
 }
