@@ -12079,15 +12079,55 @@ class Compiler {
         if (!property_exists($next, 'args') || !is_array($next->args)) {
             return;
         }
-        foreach ($next->args as $arg) {
-            if ($arg instanceof Operand) {
-                $block->bindOperandScopeSlot($arg, $fetchSlot);
+        foreach ($next->args as $argIndex => $arg) {
+            if (!$arg instanceof Operand) {
+                continue;
             }
+            if (!$this->propertyFetchFuncCallArgUsesHoistedFetch($arg, (int) $argIndex, $fetch, $next)) {
+                continue;
+            }
+            $block->bindOperandScopeSlot($arg, $fetchSlot);
             $this->registerSyncedCoalesceFuncCallArgSlot($arg, $fetchSlot);
         }
         if (null !== $fetch->result) {
             $this->registerSyncedCoalesceFuncCallArgSlot($fetch->result, $fetchSlot);
         }
+    }
+
+    /**
+     * Hoisted PropertyFetch before FuncCall — only the consumer arg gets the fetch slot (#14467, #18427).
+     *
+     * implode(',', $obj->items) must not rewire the separator literal to the property temp.
+     */
+    private function propertyFetchFuncCallArgUsesHoistedFetch(
+        Operand $arg,
+        int $argIndex,
+        Op\Expr\PropertyFetch $fetch,
+        Op $callOp
+    ): bool {
+        if ($this->isEmbeddedCallLiteralArg($arg)) {
+            return false;
+        }
+        if (null !== $fetch->result && $this->operandsReferToSameVariable($arg, $fetch->result)) {
+            return true;
+        }
+        if (!$this->callArgIsDeadInlineTemporary($arg)) {
+            return false;
+        }
+        if (!property_exists($callOp, 'args') || !is_array($callOp->args)) {
+            return false;
+        }
+        $deadTempIndices = [];
+        foreach ($callOp->args as $i => $candidate) {
+            if (!$candidate instanceof Operand || $this->isEmbeddedCallLiteralArg($candidate)) {
+                continue;
+            }
+            if ($this->callArgIsDeadInlineTemporary($candidate)) {
+                $deadTempIndices[] = (int) $i;
+            }
+        }
+
+        return 1 === \count($deadTempIndices) && (int) $argIndex === $deadTempIndices[0];
     }
 
     /** Last hoisted TYPE_PROPERTY_FETCH result slot in $block (trim($obj->prop) dead-arg wiring). */
