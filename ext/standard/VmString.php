@@ -288,6 +288,8 @@ final class VmString
     ): string {
         $var = $var->resolveIndirect();
         if (Variable::TYPE_NULL === $var->type) {
+            VmNullStringParamDeprecation::emit(null, $function, $argIndex, $paramName);
+
             return '';
         }
         $str = self::coerceStringBuiltinArg($var, $function, $argIndex, $paramName);

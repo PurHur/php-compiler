@@ -31,7 +31,7 @@ final class lchown_ extends Internal
         }
         $ok = VmFs::lchown($path, $userVar);
         if (!$ok) {
-            VmFilestatFailure::warnNoSuchFile($frame, 'chown');
+            VmFilestatFailure::warnNoSuchFile($frame, 'lchown');
         }
         $frame->returnVar->bool($ok);
     }
