@@ -8474,4 +8474,26 @@ PHP;
         $block = $runtime->parseAndCompileFile($path);
         self::assertNotNull($block);
     }
+
+    /** Issue #8866 — unpack('i', pack('i', 1), E::A) wires pack EXEC_RETURN to arg #1, enum to arg #2. */
+    public function testUnpackInlinePackEnumOffsetCallArgSlots(): void
+    {
+        $code = <<<'PHP'
+<?php
+enum E: int { case A = 5; }
+try {
+    unpack('i', pack('i', 1), E::A);
+} catch (Throwable $e) {
+    echo get_class($e), ': ', $e->getMessage(), "\n";
+}
+PHP;
+        ob_start();
+        $runtime = new Runtime();
+        $runtime->run($runtime->parseAndCompile($code, 'unpack_inline_pack_enum.php'));
+        $out = ob_get_clean();
+        self::assertSame(
+            'TypeError: unpack(): Argument #3 ($offset) must be of type int, E given',
+            trim($out)
+        );
+    }
 }
