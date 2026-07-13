@@ -25,6 +25,10 @@ final class ParseIniBoolKeywordVMTest extends BaseTest
             __DIR__.'/cases/stdlib/parse_ini_loop.phpt',
             'parse_ini_loop.phpt'
         );
+        yield 'parse_ini_file_syntax_warning.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/parse_ini_file_syntax_warning.phpt',
+            'parse_ini_file_syntax_warning.phpt'
+        );
     }
 
     public function setUp(): void
