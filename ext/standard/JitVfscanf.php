@@ -139,6 +139,8 @@ final class JitVfscanf
                     $ptr,
                     $context->getTypeFromString('int32')->constInt(0, false)
                 );
+            } elseif (null === $ht) {
+                $context->builder->call($context->lookupFunction('__value__writeNull'), $ptr);
             } else {
                 $htVar = JitSscanf::materializeVmHashTable($context, $ht);
                 $context->builder->call(
