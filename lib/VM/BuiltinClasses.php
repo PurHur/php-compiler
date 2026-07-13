@@ -634,7 +634,12 @@ final class BuiltinClasses
         $rparam->methodVisibility['ispromoted'] = $pub;
         $ctx->classes[ReflectionSupport::REFLECTION_PARAMETER] = $rparam;
 
+        $rfa = new ClassEntry('ReflectionFunctionAbstract');
+        $rfa->isAbstract = true;
+        $ctx->classes[ReflectionSupport::REFLECTION_FUNCTION_ABSTRACT] = $rfa;
+
         $rm = new ClassEntry('ReflectionMethod');
+        $rm->parentLc = ReflectionSupport::REFLECTION_FUNCTION_ABSTRACT;
         $rm->properties[] = new ClassProperty(ReflectionSupport::PROP_REFLECTION_METHOD_CLASS, null, $strProto);
         $rm->properties[] = new ClassProperty(ReflectionSupport::PROP_REFLECTION_METHOD_FUNC, null, $strProto);
         $rm->properties[] = new ClassProperty(ReflectionSupport::PROP_ACCESSIBLE, $boolFalseDefault, $boolProto);
@@ -978,6 +983,7 @@ final class BuiltinClasses
         $ctx->classes[ReflectionSupport::REFLECTION_PROPERTY] = $rp;
 
         $rf = new ClassEntry('ReflectionFunction');
+        $rf->parentLc = ReflectionSupport::REFLECTION_FUNCTION_ABSTRACT;
         $rf->properties[] = new ClassProperty(ReflectionSupport::PROP_FUNC_NAME, null, $strProto);
         $rf->properties[] = new ClassProperty(ReflectionSupport::PROP_ACCESSIBLE, $boolFalseDefault, $boolProto);
         $rf->constructor = new ReflectionFunctionConstruct();

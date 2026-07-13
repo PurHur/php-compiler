@@ -44,6 +44,8 @@ final class ReflectionSupport
 
     public const REFLECTION_FUNCTION = 'reflectionfunction';
 
+    public const REFLECTION_FUNCTION_ABSTRACT = 'reflectionfunctionabstract';
+
     public const REFLECTION_CONSTANT = 'reflectionconstant';
 
     public const REFLECTION_CLASS_CONSTANT = 'reflectionclassconstant';
