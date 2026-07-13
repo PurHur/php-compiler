@@ -1,15 +1,15 @@
 --TEST--
-stdlib chmod() numeric-string mode uses zend_strtol auto-base (#18487, ext/standard/filestat.c)
+JIT: chmod() numeric-string mode uses zend_strtol auto-base (#18487, ext/standard/filestat.c)
 --FILE--
 <?php
 
-$fInt = sys_get_temp_dir() . '/phpc_chmod_int_' . uniqid('', true) . '.tmp';
+$fInt = sys_get_temp_dir() . '/phpc_chmod_jit_int_' . uniqid('', true) . '.tmp';
 touch($fInt);
 chmod($fInt, 0644);
 $intMode = decoct(fileperms($fInt) & 0777);
 @unlink($fInt);
 
-$fStr = sys_get_temp_dir() . '/phpc_chmod_str_' . uniqid('', true) . '.tmp';
+$fStr = sys_get_temp_dir() . '/phpc_chmod_jit_str_' . uniqid('', true) . '.tmp';
 touch($fStr);
 chmod($fStr, '0644');
 $strMode = decoct(fileperms($fStr) & 0777);
