@@ -33,6 +33,9 @@ class Module extends ModuleAbstract
         if (IntlExtensionPolicy::advertisesBuiltins()) {
             BuiltinClasses::register($runtime->vmContext);
         }
+        if (IntlExtensionPolicy::advertisesNormalizer()) {
+            BuiltinClasses::registerNormalizer($runtime->vmContext);
+        }
         foreach (IntlConstants::registeredConstants() as $name => $value) {
             $var = new VM\Variable();
             $var->int($value);
@@ -50,15 +53,21 @@ class Module extends ModuleAbstract
             $functions[] = new locale_get_region();
             $functions[] = new locale_get_script();
         }
+        $normalizer = IntlExtensionPolicy::advertisesNormalizer()
+            ? [new normalizer_normalize(), new normalizer_is_normalized()]
+            : [];
+
         if (!IntlExtensionPolicy::advertisesBuiltins()) {
             return [
                 ...$functions,
+                ...$normalizer,
                 ...IntlExtensionPolicy::profileLocaleParserFunctions(),
             ];
         }
 
         return [
             ...$functions,
+            ...$normalizer,
             new grapheme_strlen(),
             new grapheme_substr(),
             new grapheme_strpos(),

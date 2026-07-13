@@ -13,6 +13,7 @@ final class IntlExtensionPolicyTest extends TestCase
     public function testGraphemeBuiltinsWithheldUntilIntlLoaded(): void
     {
         self::assertFalse(IntlExtensionPolicy::advertisesBuiltins());
+        self::assertTrue(IntlExtensionPolicy::advertisesNormalizer());
         self::assertFalse(IntlExtensionPolicy::advertisesLocale());
         // locale_get_primary_language/region/script are forward-profile parsers on 8.4.0-dev (#17117).
         self::assertTrue(IntlExtensionPolicy::advertisesLocaleParsers());

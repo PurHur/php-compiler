@@ -96,6 +96,117 @@ final class UnicodeCanonical
     }
 
     /**
+     * NFD normalization (php-src ext/intl/normalizer — FORM_D; issue #5153).
+     */
+    public static function normalizeNfd(string $utf8): string
+    {
+        $codepoints = self::utf8Codepoints($utf8);
+        if ([] === $codepoints && '' !== $utf8) {
+            return $utf8;
+        }
+        $expanded = [];
+        foreach ($codepoints as $cp) {
+            foreach (self::decompose($cp) as $part) {
+                $expanded[] = $part;
+            }
+        }
+        self::canonicalOrder($expanded);
+
+        return self::codepointsToUtf8($expanded);
+    }
+
+    /**
+     * NFC normalization (php-src ext/intl/normalizer — FORM_C; issue #5153).
+     */
+    public static function normalizeNfc(string $utf8): string
+    {
+        $codepoints = self::utf8Codepoints(self::normalizeNfd($utf8));
+        if ([] === $codepoints && '' !== $utf8) {
+            return $utf8;
+        }
+        self::composeCanonical($codepoints);
+
+        return self::codepointsToUtf8($codepoints);
+    }
+
+    public static function isNormalizedNfc(string $utf8): bool
+    {
+        return $utf8 === self::normalizeNfc($utf8);
+    }
+
+    public static function isNormalizedNfd(string $utf8): bool
+    {
+        return $utf8 === self::normalizeNfd($utf8);
+    }
+
+    /**
+     * @param list<int> $codepoints
+     */
+    private static function codepointsToUtf8(array $codepoints): string
+    {
+        $out = '';
+        foreach ($codepoints as $cp) {
+            $out .= self::codepointToUtf8($cp);
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param list<int> $codepoints
+     */
+    private static function composeCanonical(array &$codepoints): void
+    {
+        $count = \count($codepoints);
+        if ($count < 2) {
+            return;
+        }
+        $compose = self::composeMap();
+        $i = 0;
+        while ($i < $count) {
+            if (self::isCombiningMark($codepoints[$i])) {
+                ++$i;
+                continue;
+            }
+            $starter = $codepoints[$i];
+            $j = $i + 1;
+            while ($j < $count && self::isCombiningMark($codepoints[$j])) {
+                $mark = $codepoints[$j];
+                $key = $starter.','.$mark;
+                if (isset($compose[$key])) {
+                    $codepoints[$i] = $compose[$key];
+                    \array_splice($codepoints, $j, 1);
+                    $count = \count($codepoints);
+                    $starter = $codepoints[$i];
+                    continue;
+                }
+                ++$j;
+            }
+            ++$i;
+        }
+    }
+
+    /** @var array<string, int>|null */
+    private static ?array $composeMapCache = null;
+
+    /** @return array<string, int> */
+    private static function composeMap(): array
+    {
+        if (null !== self::$composeMapCache) {
+            return self::$composeMapCache;
+        }
+        $map = [];
+        foreach (self::LATIN1_SUPPLEMENT as $composed => $parts) {
+            if (2 === \count($parts)) {
+                $map[$parts[0].','.$parts[1]] = $composed;
+            }
+        }
+        self::$composeMapCache = $map;
+
+        return $map;
+    }
+
+    /**
      * @param list<int> $codepoints
      */
     private static function graphemeKeyFromCodepoints(array $codepoints, bool $caseInsensitive): string

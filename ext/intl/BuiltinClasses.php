@@ -36,6 +36,20 @@ final class BuiltinClasses
         }
     }
 
+    public static function registerNormalizer(Context $ctx): void
+    {
+        $entry = new ClassEntry('Normalizer');
+        $entry->isInternal = true;
+        foreach (VmNormalizer::classConstants() as $name => $value) {
+            $lc = strtolower($name);
+            $const = new \PHPCompiler\VM\Variable(\PHPCompiler\VM\Variable::TYPE_INTEGER);
+            $const->int($value);
+            $entry->constants[$lc] = $const;
+            $entry->constNames[$lc] = $name;
+        }
+        $ctx->classes['normalizer'] = $entry;
+    }
+
     private static function registerLocaleClass(Context $ctx): void
     {
         $entry = new ClassEntry('Locale');

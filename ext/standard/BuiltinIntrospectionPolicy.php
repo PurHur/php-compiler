@@ -133,6 +133,9 @@ final class BuiltinIntrospectionPolicy
         ], true)) {
             return IntlExtensionPolicy::advertisesBuiltins();
         }
+        if (\in_array($lc, ['normalizer_normalize', 'normalizer_is_normalized'], true)) {
+            return IntlExtensionPolicy::advertisesNormalizer();
+        }
         if (\in_array($lc, [
             'locale_get_primary_language',
             'locale_get_region',
