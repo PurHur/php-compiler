@@ -12645,8 +12645,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitFilestatArg.php`
 
 **Warnings** (review for bootstrap subset):
-- new JITVariable (line 164)
-- 11 class method(s)
+- new JITVariable (line 199)
+- 13 class method(s)
 
 ### `ext/standard/JitFiletype.php`
 
@@ -17019,7 +17019,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new Variable (line 149)
-- 15 class method(s)
+- 17 class method(s)
 
 ### `ext/standard/VmFilestatFailure.php`
 
@@ -21143,8 +21143,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/implode.php`
 
 **Warnings** (review for bootstrap subset):
-- new Error (line 164)
-- new Error (line 184)
+- new Error (line 166)
+- new Error (line 186)
 - 14 class method(s)
 
 ### `ext/standard/in_array.php`
