@@ -944,6 +944,7 @@
         "ext/standard/ArraySumJitHelper.php",
         "ext/standard/ArrayUniqueJitHelper.php",
         "ext/standard/ArrayUnshiftJitHelper.php",
+        "ext/standard/ArrayUserSetOpsJitHelper.php",
         "ext/standard/ArrayValuesJitHelper.php",
         "ext/standard/ArrayWalkJitHelper.php",
         "ext/standard/AsinJitHelper.php",
@@ -3012,6 +3013,7 @@
         "ext/xmlreader/XmlReaderState.php",
         "ext/xmlrpc/Module.php",
         "ext/xmlrpc/VmXmlrpc.php",
+        "ext/xmlrpc/XmlrpcExtensionPolicy.php",
         "ext/xmlrpc/XmlrpcFunction.php",
         "ext/xmlrpc/xmlrpc_decode.php",
         "ext/xmlrpc/xmlrpc_encode.php",
@@ -3266,6 +3268,7 @@
         "lib/JIT/Builtin/ArraySumRuntime.php",
         "lib/JIT/Builtin/ArrayUniqueRuntime.php",
         "lib/JIT/Builtin/ArrayUnshiftRuntime.php",
+        "lib/JIT/Builtin/ArrayUserSetOpsRuntime.php",
         "lib/JIT/Builtin/ArrayValuesRuntime.php",
         "lib/JIT/Builtin/ArrayWalkRuntime.php",
         "lib/JIT/Builtin/AssertFail.php",
@@ -4972,9 +4975,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 4738,
+        "inventory_files": 4741,
         "excluded": 0,
-        "eligible": 4738,
+        "eligible": 4741,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
