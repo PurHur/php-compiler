@@ -23870,13 +23870,14 @@ class Compiler {
                     } elseif (
                         property_exists($callOp, 'args')
                         && is_array($callOp->args)
-                        && $this->callArgsAreDistinctInlineTemporaries($callOp->args)
+                        && $this->hoistedCallArgsAreDistinctInlineTemporaries($callOp->args)
                         && (
                             ($cfgChildren[$i + 1] ?? null) instanceof Op\Expr\ConstFetch
                             || ($cfgChildren[$i + 1] ?? null) instanceof Op\Expr\ClassConstFetch
                         )
                     ) {
                         // glob($dir.'/*', GLOB_MARK) — Concat + ConstFetch hoisted siblings (#13660).
+                        // file_get_contents('data://…,'.$p, false, null, $off, $len) — Concat + ConstFetch preludes (#18613).
                         array_unshift($producers, $child);
                     }
                 }
@@ -33300,6 +33301,29 @@ class Compiler {
         }
 
         return true;
+    }
+
+    /**
+     * Dead inline temps among hoisted call args only — trailing embedded literals allowed (#18613).
+     *
+     * file_get_contents('data://text/plain,'.$p, false, null, 3, 4) hoists Concat + ConstFetch siblings.
+     *
+     * @param list<Operand> $callArgs
+     */
+    private function hoistedCallArgsAreDistinctInlineTemporaries(array $callArgs): bool
+    {
+        $hoistedCount = 0;
+        foreach ($callArgs as $callArg) {
+            if ($this->isEmbeddedCallLiteralArg($callArg)) {
+                continue;
+            }
+            if (!$this->callArgIsDeadInlineTemporary($callArg)) {
+                return false;
+            }
+            ++$hoistedCount;
+        }
+
+        return $hoistedCount >= 2;
     }
 
     /**
