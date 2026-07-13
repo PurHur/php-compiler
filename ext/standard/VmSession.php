@@ -6,7 +6,9 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\ext\session\SessionConstants;
 use PHPCompiler\ext\session\SessionFileStorage;
+use PHPCompiler\ext\session\SessionUserHandler;
 use PHPCompiler\Frame;
+use PHPCompiler\VM;
 use PHPCompiler\VM\BackedEnum;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\EnumCaseSupport;
@@ -103,6 +105,7 @@ final class VmSession
         self::$cacheLimiter = self::DEFAULT_CACHE_LIMITER;
         self::resetCookieParams();
         self::$useStrictMode = false;
+        SessionUserHandler::reset();
     }
 
     public static function resetCookieParams(): void
@@ -337,7 +340,12 @@ final class VmSession
 
     public static function isSupportedModule(string $module): bool
     {
-        return self::DEFAULT_MODULE === strtolower($module);
+        $module = strtolower($module);
+        if ('user' === $module) {
+            return SessionUserHandler::hasHandler();
+        }
+
+        return self::DEFAULT_MODULE === $module;
     }
 
     public static function canChangeSaveHandler(?Frame $frame): bool
@@ -497,6 +505,9 @@ final class VmSession
                 false
             );
         }
+        if (SessionUserHandler::isActiveModule() && !SessionUserHandler::open($ctx)) {
+            return false;
+        }
         self::loadSession($ctx);
         self::$active = true;
 
@@ -509,6 +520,9 @@ final class VmSession
             return false;
         }
         self::saveSession($ctx);
+        if (SessionUserHandler::isActiveModule()) {
+            SessionUserHandler::close($ctx);
+        }
         self::$active = false;
 
         return true;
@@ -520,9 +534,13 @@ final class VmSession
             return false;
         }
         if ('' !== self::$id) {
-            $path = SessionFileStorage::storagePath(self::$id);
-            if (VmStatPath::isFile($path)) {
-                VmFsUnlink::unlink($path);
+            if (SessionUserHandler::isActiveModule()) {
+                SessionUserHandler::destroy($ctx, self::$id);
+            } else {
+                $path = SessionFileStorage::storagePath(self::$id);
+                if (VmStatPath::isFile($path)) {
+                    VmFsUnlink::unlink($path);
+                }
             }
         }
         $ctx->ensureSuperglobal('_SESSION')->array(new HashTable());
@@ -629,6 +647,15 @@ final class VmSession
             return false;
         }
 
+        if (SessionUserHandler::isActiveModule()) {
+            $vm = VM::running();
+            if (null === $vm) {
+                return false;
+            }
+
+            return SessionUserHandler::gc($vm->context, VmIni::getSessionGcMaxlifetime());
+        }
+
         return self::gcExpiredFiles();
     }
 
@@ -724,6 +751,14 @@ final class VmSession
         if ('' === $id) {
             return false;
         }
+        if (SessionUserHandler::isActiveModule()) {
+            $vm = VM::running();
+            if (null === $vm) {
+                return false;
+            }
+
+            return SessionUserHandler::validateId($vm->context, $id);
+        }
 
         return VmStatPath::isFile(SessionFileStorage::storagePath($id));
     }
@@ -747,6 +782,14 @@ final class VmSession
         $sessionVar = $ctx->ensureSuperglobal('_SESSION');
         if ('' === self::$id) {
             $sessionVar->array(new HashTable());
+
+            return;
+        }
+        if (SessionUserHandler::isActiveModule()) {
+            $raw = SessionUserHandler::read($ctx, self::$id);
+            if ('' === $raw || !VmSessionSerializer::decodePhp($ctx, $raw)) {
+                $sessionVar->array(new HashTable());
+            }
 
             return;
         }
@@ -778,6 +821,11 @@ final class VmSession
         }
         $payload = VmSessionSerializer::encodePhp($ctx, $sessionVar->toArray());
         if (false === $payload) {
+            return;
+        }
+        if (SessionUserHandler::isActiveModule()) {
+            SessionUserHandler::write($ctx, self::$id, $payload);
+
             return;
         }
         $dir = SessionFileStorage::storageDir();
