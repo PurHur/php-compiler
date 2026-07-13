@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 4746 |
-| Phase A inventory files (M2 ratio SSOT) | 4746 |
+| PHP files on vm.php path | 4747 |
+| Phase A inventory files (M2 ratio SSOT) | 4747 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 12758 |
+| Source constructs flagged (warnings) | 12765 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -582,7 +582,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/openssl/JitOpensslCipherIvLength.php` | 0 | 1 |
 | `ext/openssl/JitOpensslCipherKeyLength.php` | 0 | 1 |
 | `ext/openssl/JitOpensslSign.php` | 0 | 1 |
-| `ext/openssl/Module.php` | 0 | 29 |
+| `ext/openssl/Module.php` | 0 | 30 |
 | `ext/openssl/OpensslCipherRegistry.php` | 0 | 1 |
 | `ext/openssl/OpensslConstants.php` | 0 | 1 |
 | `ext/openssl/OpensslExtensionPolicy.php` | 0 | 1 |
@@ -591,7 +591,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/openssl/VmOpenssl.php` | 0 | 6 |
 | `ext/openssl/VmOpensslConfigNative.php` | 0 | 1 |
 | `ext/openssl/VmOpensslErrorNative.php` | 0 | 1 |
-| `ext/openssl/VmOpensslObjects.php` | 0 | 15 |
+| `ext/openssl/VmOpensslObjects.php` | 0 | 19 |
 | `ext/openssl/VmOpensslPkeyDeriveNative.php` | 0 | 1 |
 | `ext/openssl/VmOpensslPkeyNative.php` | 0 | 1 |
 | `ext/openssl/VmOpensslSealNative.php` | 0 | 1 |
@@ -623,6 +623,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/openssl/openssl_x509_fingerprint.php` | 0 | 2 |
 | `ext/openssl/openssl_x509_parse.php` | 0 | 2 |
 | `ext/openssl/openssl_x509_read.php` | 0 | 2 |
+| `ext/openssl/openssl_x509_verify.php` | 0 | 2 |
 | `ext/pcntl/Module.php` | 0 | 13 |
 | `ext/pcntl/PcntlConstants.php` | 0 | 1 |
 | `ext/pcntl/PcntlHostBridge.php` | 0 | 2 |
@@ -8523,14 +8524,15 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new openssl_x509_read (line 52)
 - new openssl_x509_parse (line 53)
 - new openssl_x509_fingerprint (line 54)
-- new openssl_free_key (line 55)
-- new openssl_spki_new (line 56)
-- new openssl_spki_verify (line 57)
-- new openssl_spki_export (line 58)
-- new openssl_spki_export_challenge (line 59)
-- new openssl_seal (line 60)
-- new openssl_open (line 61)
-- new openssl_error_string (line 62)
+- new openssl_x509_verify (line 55)
+- new openssl_free_key (line 56)
+- new openssl_spki_new (line 57)
+- new openssl_spki_verify (line 58)
+- new openssl_spki_export (line 59)
+- new openssl_spki_export_challenge (line 60)
+- new openssl_seal (line 61)
+- new openssl_open (line 62)
+- new openssl_error_string (line 63)
 - 2 class method(s)
 
 ### `ext/openssl/OpensslCipherRegistry.php`
@@ -8590,12 +8592,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 185)
 - new Variable (line 195)
 - new Variable (line 202)
-- new Variable (line 221)
-- new Variable (line 228)
-- new Variable (line 244)
-- new HashTable (line 246)
-- new ClassEntry (line 319)
-- 17 class method(s)
+- new Variable (line 231)
+- new Variable (line 243)
+- new Variable (line 251)
+- new Variable (line 258)
+- new Variable (line 277)
+- new Variable (line 284)
+- new Variable (line 300)
+- new HashTable (line 302)
+- new ClassEntry (line 454)
+- 19 class method(s)
 
 ### `ext/openssl/VmOpensslPkeyDeriveNative.php`
 
@@ -8625,7 +8631,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/openssl/VmOpensslX509Native.php`
 
 **Warnings** (review for bootstrap subset):
-- 14 class method(s)
+- 17 class method(s)
 
 ### `ext/openssl/openssl_cipher_iv_length.php`
 
@@ -8780,6 +8786,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 26)
 - 2 class method(s)
+
+### `ext/openssl/openssl_x509_verify.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 28)
+- 3 class method(s)
 
 ### `ext/pcntl/Module.php`
 
