@@ -114,6 +114,9 @@ final class Variable {
     /** Placeholder for a skipped optional parameter after named-arg densification (#9525). */
     public bool $isOptionalOmittedNamedArg = false;
 
+    /** Typed variadic named pack: element checks done at compile time (#18647). */
+    public bool $variadicElementChecksDone = false;
+
     /** {@see __value__} slot holds a nested {@see __hashtable__} (e.g. $_FILES['field']). */
     public bool $valueBoxHashtable = false;
 

@@ -5891,11 +5891,36 @@ restart:
                             $variadicEndIdx = $maxArgIdx;
                         }
                         try {
+                            $variadicArgCount = 0;
+                            for ($i = $recvIdx; $i <= $variadicEndIdx; ++$i) {
+                                if (array_key_exists($i, $frame->calledArgs)) {
+                                    ++$variadicArgCount;
+                                }
+                            }
+                            $namedVariadicPack = null;
+                            if (
+                                1 === $variadicArgCount
+                                && array_key_exists($recvIdx, $frame->calledArgs)
+                            ) {
+                                $sole = $frame->calledArgs[$recvIdx]->resolveIndirect();
+                                if (
+                                    Variable::TYPE_ARRAY === $sole->type
+                                    && !$sole->toArray()->isPackedList()
+                                ) {
+                                    $namedVariadicPack = $sole;
+                                }
+                            }
                             if (TypeCheck::variadicSlotNeedsElementChecks($frame->block, $variadicSlot)) {
                                 $trailing = [];
-                                for ($i = $recvIdx; $i <= $variadicEndIdx; ++$i) {
-                                    if (array_key_exists($i, $frame->calledArgs)) {
-                                        $trailing[] = $frame->calledArgs[$i];
+                                if (null !== $namedVariadicPack) {
+                                    foreach ($namedVariadicPack->toArray()->iterate(true) as $value) {
+                                        $trailing[] = $value;
+                                    }
+                                } else {
+                                    for ($i = $recvIdx; $i <= $variadicEndIdx; ++$i) {
+                                        if (array_key_exists($i, $frame->calledArgs)) {
+                                            $trailing[] = $frame->calledArgs[$i];
+                                        }
                                     }
                                 }
                                 TypeCheck::verifyVariadicElements(
@@ -5911,25 +5936,10 @@ restart:
                                     $frame->block->paramVariadicElementIntersectionDisplayLabels[$variadicSlot] ?? null
                                 );
                             }
-                            $variadicArgCount = 0;
-                            for ($i = $recvIdx; $i <= $variadicEndIdx; ++$i) {
-                                if (array_key_exists($i, $frame->calledArgs)) {
-                                    ++$variadicArgCount;
-                                }
-                            }
-                            if (
-                                1 === $variadicArgCount
-                                && array_key_exists($recvIdx, $frame->calledArgs)
-                            ) {
-                                $sole = $frame->calledArgs[$recvIdx]->resolveIndirect();
-                                if (
-                                    Variable::TYPE_ARRAY === $sole->type
-                                    && !$sole->toArray()->isPackedList()
-                                ) {
-                                    $arg1->copyFrom($sole);
-                                    $this->markScopeSlotInitialized($frame, (int) $op->arg1);
-                                    break;
-                                }
+                            if (null !== $namedVariadicPack) {
+                                $arg1->copyFrom($namedVariadicPack);
+                                $this->markScopeSlotInitialized($frame, (int) $op->arg1);
+                                break;
                             }
                             $arg1->newArray();
                             $packed = $arg1->toArray();
