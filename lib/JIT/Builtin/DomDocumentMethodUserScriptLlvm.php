@@ -91,6 +91,46 @@ final class DomDocumentMethodUserScriptLlvm
         );
     }
 
+    public static function ensureXPathEvaluateBridge(Context $context): void
+    {
+        self::ensureXPathEvaluateBoolBridge($context);
+        self::ensureXPathEvaluateDoubleBridge($context);
+    }
+
+    public static function ensureXPathEvaluateBoolBridge(Context $context): void
+    {
+        self::ensureContextBoolValueBridge(
+            $context,
+            DomXPathEvaluateRuntime::ABI_BOOL,
+            'dom_xpath_evaluate_bool_user_script',
+            [
+                $context->getTypeFromString('__object__*'),
+                $context->getTypeFromString('__string__*'),
+            ],
+            self::BOOL_HELPER,
+            '/ext/dom/DomXPathEvaluateJitHelper.php'
+        );
+    }
+
+    public static function ensureXPathEvaluateDoubleBridge(Context $context): void
+    {
+        self::ensureContextDoubleValueBridge(
+            $context,
+            DomXPathEvaluateRuntime::ABI_DOUBLE,
+            'dom_xpath_evaluate_double_user_script',
+            [
+                $context->getTypeFromString('__object__*'),
+                $context->getTypeFromString('__string__*'),
+            ],
+            self::DOUBLE_HELPER,
+            '/ext/dom/DomXPathEvaluateJitHelper.php'
+        );
+    }
+
+    private const BOOL_HELPER = 'PHPCompiler\\ext\\dom\\DomXPathEvaluateJitHelper::evaluateBoolArgv';
+
+    private const DOUBLE_HELPER = 'PHPCompiler\\ext\\dom\\DomXPathEvaluateJitHelper::evaluateDoubleArgv';
+
     public static function ensureNodeListItemBridge(Context $context): void
     {
         self::ensureNullableObjectValueBridge(
@@ -518,6 +558,149 @@ final class DomDocumentMethodUserScriptLlvm
             if (!isset($context->functions[$lc])) {
                 throw new \LogicException($lc.' was not compiled for user-script DOM loadHTML bridge (#17954)');
             }
+        }
+    }
+
+    /**
+     * @param list<\PHPLLVM\Type> $paramTypes
+     */
+    private static function ensureContextBoolValueBridge(
+        Context $context,
+        string $abi,
+        string $entryBlock,
+        array $paramTypes,
+        string $helperLogical,
+        string $helperPath
+    ): void {
+        $probe = $context->module->getNamedFunction($abi);
+        if (JitVmHelperLink::hasNamedBridgeEntry($probe, $entryBlock)) {
+            $context->registerFunction($abi, $probe);
+
+            return;
+        }
+
+        self::ensureNestedHelperProxies($context);
+        self::ensureMainModuleHelperCompiled($context, $helperPath, [$helperLogical]);
+
+        $savedBlock = null;
+        try {
+            $savedBlock = $context->builder->getInsertBlock();
+        } catch (\Throwable) {
+        }
+
+        $valuePtr = $context->getTypeFromString('__value__*');
+        $i64 = $context->getTypeFromString('int64');
+        $helperFn = JitVmHelperLink::lookupCompiled($context, $helperLogical, '#18526');
+        $ft = $context->context->functionType($valuePtr, false, ...$paramTypes);
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction($abi, $ft);
+
+        $entry = JitVmHelperLink::bridgeEntryForEmit($fn, $entryBlock);
+        $context->builder->positionAtEnd($entry);
+        $vmCtx = $context->builder->call(VmActiveContextLlvm::lookupAbi($context));
+        $args = [
+            JitNestedHelperCoerce::coerceArgForHelper(
+                $context,
+                $vmCtx,
+                $helperFn->getParam(0)->typeOf()
+            ),
+        ];
+        for ($i = 0, $n = $fn->countParams(); $i < $n; ++$i) {
+            $args[] = JitNestedHelperCoerce::coerceArgForHelper(
+                $context,
+                $fn->getParam($i),
+                $helperFn->getParam($i + 1)->typeOf()
+            );
+        }
+        $truthy = $context->builder->call($helperFn, ...$args);
+        $truthy = JitNestedHelperCoerce::coerceBridgeResult($context, $truthy, $i64);
+        $slot = JitValueBox::alloc($context);
+        $destPtr = JitValueBox::pointer($context, $slot);
+        $i1 = $context->getTypeFromString('int1');
+        JitValueBox::writeBool(
+            $context,
+            $destPtr,
+            $context->builder->icmp(Builder::INT_NE, $truthy, $i64->constInt(0, false))
+        );
+        $context->builder->returnValue(JitValueBox::normalizeValuePtr($context, $destPtr));
+        $context->registerFunction($abi, $fn);
+
+        if (null !== $savedBlock) {
+            $context->builder->positionAtEnd($savedBlock);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
+    }
+
+    /**
+     * @param list<\PHPLLVM\Type> $paramTypes
+     */
+    private static function ensureContextDoubleValueBridge(
+        Context $context,
+        string $abi,
+        string $entryBlock,
+        array $paramTypes,
+        string $helperLogical,
+        string $helperPath
+    ): void {
+        $probe = $context->module->getNamedFunction($abi);
+        if (JitVmHelperLink::hasNamedBridgeEntry($probe, $entryBlock)) {
+            $context->registerFunction($abi, $probe);
+
+            return;
+        }
+
+        self::ensureNestedHelperProxies($context);
+        self::ensureMainModuleHelperCompiled($context, $helperPath, [$helperLogical]);
+
+        $savedBlock = null;
+        try {
+            $savedBlock = $context->builder->getInsertBlock();
+        } catch (\Throwable) {
+        }
+
+        $valuePtr = $context->getTypeFromString('__value__*');
+        $doubleTy = $context->getTypeFromString('double');
+        $helperFn = JitVmHelperLink::lookupCompiled($context, $helperLogical, '#18526');
+        $ft = $context->context->functionType($valuePtr, false, ...$paramTypes);
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction($abi, $ft);
+
+        $entry = JitVmHelperLink::bridgeEntryForEmit($fn, $entryBlock);
+        $context->builder->positionAtEnd($entry);
+        $vmCtx = $context->builder->call(VmActiveContextLlvm::lookupAbi($context));
+        $args = [
+            JitNestedHelperCoerce::coerceArgForHelper(
+                $context,
+                $vmCtx,
+                $helperFn->getParam(0)->typeOf()
+            ),
+        ];
+        for ($i = 0, $n = $fn->countParams(); $i < $n; ++$i) {
+            $args[] = JitNestedHelperCoerce::coerceArgForHelper(
+                $context,
+                $fn->getParam($i),
+                $helperFn->getParam($i + 1)->typeOf()
+            );
+        }
+        $number = $context->builder->call($helperFn, ...$args);
+        $number = JitNestedHelperCoerce::coerceBridgeResult($context, $number, $doubleTy);
+        $slot = JitValueBox::alloc($context);
+        $destPtr = JitValueBox::pointer($context, $slot);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeDouble'),
+            $destPtr,
+            $number
+        );
+        $context->builder->returnValue(JitValueBox::normalizeValuePtr($context, $destPtr));
+        $context->registerFunction($abi, $fn);
+
+        if (null !== $savedBlock) {
+            $context->builder->positionAtEnd($savedBlock);
+        } else {
+            $context->builder->clearInsertionPosition();
         }
     }
 }

@@ -37,7 +37,6 @@ final class DomInstanceMethodJit
 
     /** @var array<string, true> */
     private const USER_SCRIPT_GENERIC_DOM_METHODS = [
-        'domxpath::evaluate' => true,
         'domxpath::registernamespace' => true,
         'domnode::comparedocumentposition' => true,
     ];
@@ -54,6 +53,7 @@ final class DomInstanceMethodJit
         'domdocument::getelementsbytagname' => true,
         'domnode::appendchild' => true,
         'domxpath::query' => true,
+        'domxpath::evaluate' => true,
         'domnodelist::item' => true,
     ];
 
@@ -122,6 +122,11 @@ final class DomInstanceMethodJit
 
                 return;
             }
+            if ('domxpath::evaluate' === $lc) {
+                $context->functionProxies[$lc] = new Call\DomXPathEvaluate();
+
+                return;
+            }
             if ('domnodelist::item' === $lc) {
                 $context->functionProxies[$lc] = new Call\DomNodeListItem();
 
@@ -160,6 +165,7 @@ final class DomInstanceMethodJit
             self::ensureProxy($context, 'domdocument::getelementsbytagname');
             self::ensureProxy($context, 'domnode::appendchild');
             self::ensureProxy($context, 'domxpath::query');
+            self::ensureProxy($context, 'domxpath::evaluate');
             self::ensureProxy($context, 'domnodelist::item');
 
             return;
