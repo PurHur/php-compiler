@@ -248,4 +248,22 @@ final class StrGetcsvBuiltinTest extends TestCase
             ["\r"],
         ];
     }
+
+    /** Issue #18592 — lone opening enclosure at EOF yields NUL byte field (php-src file.c). */
+    public function testLoneOpeningEnclosureYieldsNulField(): void
+    {
+        $runtime = new Runtime();
+        $fn = new str_getcsv();
+        $frame = $fn->getFrame($runtime->vmContext);
+        $arg = new VMVariable();
+        $arg->string('"');
+        $frame->calledArgs = [$arg];
+        $frame->returnVar = new VMVariable();
+        $fn->execute($frame);
+        $vals = [];
+        foreach ($frame->returnVar->toArray()->iterate(true) as $v) {
+            $vals[] = $v->resolveIndirect()->toString();
+        }
+        $this->assertSame(["\0"], $vals);
+    }
 }
