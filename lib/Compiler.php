@@ -32871,10 +32871,6 @@ class Compiler {
         ) {
             return null;
         }
-        $namedDest = $this->slotForHoistedAssignInCallNamedDest($block, $cfgCallOp);
-        if (null !== $namedDest) {
-            return $namedDest;
-        }
         $rhsExpr = $prev->expr;
         if (
             $callIndex > 1
