@@ -19,12 +19,16 @@ final class DomDocumentPropertySupport
         if (VmDom::CLASS_DOCUMENT !== strtolower($owner->class->name)) {
             return;
         }
-        if (strtolower(VmDom::PROP_DOCUMENT_ELEMENT) !== strtolower($name)) {
-            return;
+        if (strtolower(VmDom::PROP_DOCUMENT_ELEMENT) === strtolower($name)) {
+            throw new \Error(
+                'Cannot write read-only property DOMDocument::$documentElement'
+            );
         }
-        throw new \Error(
-            'Cannot write read-only property DOMDocument::$documentElement'
-        );
+        if (strtolower(VmDom::PROP_XML_ENCODING) === strtolower($name)) {
+            throw new \Error(
+                'Cannot write read-only property DOMDocument::$xmlEncoding'
+            );
+        }
     }
 
     public static function isManagedProperty(ObjectEntry $object, string $name): bool
@@ -35,6 +39,7 @@ final class DomDocumentPropertySupport
         $lc = strtolower($name);
 
         return strtolower(VmDom::PROP_ENCODING) === $lc
+            || strtolower(VmDom::PROP_XML_ENCODING) === $lc
             || strtolower(VmDom::PROP_XML_VERSION) === $lc
             || strtolower(VmDom::PROP_XML_STANDALONE) === $lc
             || strtolower(VmDom::PROP_DOCUMENT_URI) === $lc
@@ -50,7 +55,8 @@ final class DomDocumentPropertySupport
         $var = new Variable();
         $var->objectPropertyOwner = $object;
         $var->objectPropertyName = $lc;
-        if (strtolower(VmDom::PROP_ENCODING) === $lc) {
+        if (strtolower(VmDom::PROP_ENCODING) === $lc
+            || strtolower(VmDom::PROP_XML_ENCODING) === $lc) {
             if (null === $state->encoding) {
                 $var->null();
             } else {
