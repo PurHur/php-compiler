@@ -42,6 +42,7 @@ function collectCapabilities(string $root): array
         'inotify' => new PHPCompiler\ext\inotify\Module(),
         'uuid' => new PHPCompiler\ext\uuid\Module(),
         'uploadprogress' => new PHPCompiler\ext\uploadprogress\Module(),
+        'sysvshm' => new PHPCompiler\ext\sysvshm\Module(),
     ];
 
     $capabilities = [];

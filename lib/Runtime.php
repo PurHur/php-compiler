@@ -269,6 +269,7 @@ class Runtime {
         $this->load(new ext\uri\Module);
         $this->load(new ext\uuid\Module);
         $this->load(new ext\uploadprogress\Module);
+        $this->load(new ext\sysvshm\Module);
         $this->load(new ext\standard\Module);
     }
 
