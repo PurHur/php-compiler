@@ -31,7 +31,7 @@ final class lchgrp_ extends Internal
         }
         $ok = VmFs::lchgrp($path, $groupVar);
         if (!$ok) {
-            VmFilestatFailure::warnNoSuchFile($frame, 'chgrp');
+            VmFilestatFailure::warnNoSuchFile($frame, 'lchgrp');
         }
         $frame->returnVar->bool($ok);
     }
