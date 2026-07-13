@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\HashTableDuplicateRuntime;
 use PHPCompiler\JIT\CastArrayShared;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
@@ -60,7 +60,7 @@ final class CastArrayValueBoxJit
 
         $context->builder->positionAtEnd($arrayBlock);
         $ht = $context->builder->call($context->lookupFunction('__value__readHashtable'), $valuePtr);
-        $copy = ArrayBuiltinHelper::duplicateHashtable($context, $ht);
+        $copy = HashTableDuplicateRuntime::duplicate($context, $ht);
         $arrayFromHt = HashTableHelper::emptyVariable($context);
         HashTableHelper::storeHashtableInArrayVariable($context, $arrayFromHt, $copy);
         $context->builder->branch($mergeBlock);

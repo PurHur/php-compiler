@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT;
 
 use PHPCompiler\JIT\Builtin\CastArrayRuntime;
+use PHPCompiler\JIT\Builtin\HashTableDuplicateRuntime;
 use PHPCompiler\JIT\CastArrayShared;
 
 /**
@@ -20,7 +21,7 @@ final class CastArrayNativeJit
             $htSrc = 0 !== ($src->type & Variable::IS_NATIVE_ARRAY)
                 ? HashTableHelper::materializeNativeArrayForCall($context, $src)
                 : $context->helper->loadValue($src);
-            $copy = ArrayBuiltinHelper::duplicateHashtable($context, $htSrc);
+            $copy = HashTableDuplicateRuntime::duplicate($context, $htSrc);
 
             return new Variable($context, Variable::TYPE_HASHTABLE, Variable::KIND_VALUE, $copy);
         }
