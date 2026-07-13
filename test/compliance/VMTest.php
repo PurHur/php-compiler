@@ -877,12 +877,6 @@ class VMTest extends BaseTest {
                 && !str_contains($name, 'asymmetric_probes_profile')) {
                 continue;
             }
-            // 8.4-target reject gate; skipped when property hooks enabled (#12574, #14432).
-            if (CompilerVersion::supportsPropertyHooks()
-                && str_contains($name, 'property_hook')
-                && str_contains($name, 'reference_profile')) {
-                continue;
-            }
             if (!CompilerVersion::supportsPropertyHooks()
                 && (str_contains($name, 'property_hook')
                     || str_contains($name, 'property_magic_const'))
@@ -892,10 +886,6 @@ class VMTest extends BaseTest {
             if (!CompilerVersion::supportsPropertyHooks()
                 && (str_contains($name, 'asymmetric_get_only_hook_compile')
                     || str_contains($name, 'asymmetric_get_only_hook_write'))) {
-                continue;
-            }
-            if (CompilerVersion::supportsPropertyHooks()
-                && str_contains($name, 'asymmetric_get_only_hook_reference_profile')) {
                 continue;
             }
             if (!CompilerVersion::supportsPropertyHooks()

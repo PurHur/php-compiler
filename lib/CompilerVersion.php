@@ -978,6 +978,12 @@ final class CompilerVersion
      */
     public static function supportsPropertyHooks(): bool
     {
+        $raw = getenv('PHP_COMPILER_PROFILE');
+        if (!\is_string($raw) || '' === trim($raw)) {
+            // Default 8.4 development line (#15994, #18445); version_compare treats -dev below stable.
+            return version_compare(self::VERSION, '8.4', '>=');
+        }
+
         return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
     }
 
