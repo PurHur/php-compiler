@@ -7,10 +7,8 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\CompilerVersion;
 use PHPCompiler\Frame;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -19,7 +17,6 @@ final class IniOptionArg
 {
     public static function vmOption(Frame $frame, string $function): string
     {
-        InternalStrictArg::rejectNullString($frame->calledArgs[0], $function, 'option', 0, $frame);
         $resolved = $frame->calledArgs[0]->resolveIndirect();
         if (Variable::TYPE_NULL === $resolved->type) {
             return '';
@@ -34,7 +31,6 @@ final class IniOptionArg
 
     public static function jitOption(Context $context, JITVariable $arg, string $function): Value
     {
-        JitInternalStrictArg::rejectNullString($context, $arg, $function, 'option', 1);
         if (JITVariable::TYPE_NULL === $arg->type || $arg->isNullConstant) {
             return $context->builder->load($context->constantStringFromString(''));
         }
