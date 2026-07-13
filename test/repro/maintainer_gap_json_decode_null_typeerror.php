@@ -2,9 +2,6 @@
 
 declare(strict_types=1);
 
-try {
-    json_decode(null);
-    echo "no throw\n";
-} catch (Throwable $e) {
-    echo get_class($e), ': ', $e->getMessage(), "\n";
-}
+// php-src-strict (Zend 8.2): Z_PARAM_STR coerces null to '' — no TypeError (#18617).
+var_export(json_decode(null));
+echo "\n";
