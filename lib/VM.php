@@ -5897,20 +5897,29 @@ restart:
                                     ++$variadicArgCount;
                                 }
                             }
+                            $needsElementChecks = TypeCheck::variadicSlotNeedsElementChecks(
+                                $frame->block,
+                                $variadicSlot
+                            );
                             $namedVariadicPack = null;
+                            $untypedNamedPassthrough = null;
                             if (
                                 1 === $variadicArgCount
                                 && array_key_exists($recvIdx, $frame->calledArgs)
                             ) {
                                 $sole = $frame->calledArgs[$recvIdx]->resolveIndirect();
-                                if (
-                                    Variable::TYPE_ARRAY === $sole->type
-                                    && !$sole->toArray()->isPackedList()
-                                ) {
-                                    $namedVariadicPack = $sole;
+                                if (Variable::TYPE_ARRAY === $sole->type) {
+                                    if ($sole->namedVariadicPack) {
+                                        $namedVariadicPack = $sole;
+                                    } elseif (
+                                        !$needsElementChecks
+                                        && !$sole->toArray()->isPackedList()
+                                    ) {
+                                        $untypedNamedPassthrough = $sole;
+                                    }
                                 }
                             }
-                            if (TypeCheck::variadicSlotNeedsElementChecks($frame->block, $variadicSlot)) {
+                            if ($needsElementChecks) {
                                 $trailing = [];
                                 if (null !== $namedVariadicPack) {
                                     foreach ($namedVariadicPack->toArray()->iterate(true) as $value) {
@@ -5936,8 +5945,8 @@ restart:
                                     $frame->block->paramVariadicElementIntersectionDisplayLabels[$variadicSlot] ?? null
                                 );
                             }
-                            if (null !== $namedVariadicPack) {
-                                $arg1->copyFrom($namedVariadicPack);
+                            if (null !== $namedVariadicPack || null !== $untypedNamedPassthrough) {
+                                $arg1->copyFrom($namedVariadicPack ?? $untypedNamedPassthrough);
                                 $this->markScopeSlotInitialized($frame, (int) $op->arg1);
                                 break;
                             }
