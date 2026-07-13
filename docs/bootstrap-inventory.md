@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 4771 |
-| Phase A inventory files (M2 ratio SSOT) | 4771 |
+| PHP files on vm.php path | 4774 |
+| Phase A inventory files (M2 ratio SSOT) | 4774 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 12820 |
+| Source constructs flagged (warnings) | 12826 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -358,15 +358,18 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/gd/GdFunction.php` | 0 | 3 |
 | `ext/gd/GdImageState.php` | 0 | 3 |
 | `ext/gd/GdRegistry.php` | 0 | 1 |
-| `ext/gd/Module.php` | 0 | 8 |
+| `ext/gd/Module.php` | 0 | 11 |
 | `ext/gd/VmGd.php` | 0 | 3 |
 | `ext/gd/VmGdPng.php` | 0 | 1 |
 | `ext/gd/imagecolorallocate.php` | 0 | 1 |
+| `ext/gd/imagecolorat.php` | 0 | 1 |
 | `ext/gd/imagecreatefromstring.php` | 0 | 1 |
 | `ext/gd/imagecreatetruecolor.php` | 0 | 1 |
 | `ext/gd/imagedestroy.php` | 0 | 1 |
 | `ext/gd/imagefill.php` | 0 | 1 |
 | `ext/gd/imagepng.php` | 0 | 1 |
+| `ext/gd/imagesx.php` | 0 | 1 |
+| `ext/gd/imagesy.php` | 0 | 1 |
 | `ext/gettext/GettextFunction.php` | 0 | 2 |
 | `ext/gettext/GettextJitHelper.php` | 0 | 1 |
 | `ext/gettext/JitGettext.php` | 0 | 10 |
@@ -7033,8 +7036,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new imagecolorallocate (line 52)
 - new imagefill (line 53)
 - new imagedestroy (line 54)
-- new imagecreatefromstring (line 57)
-- new imagepng (line 58)
+- new imagesx (line 55)
+- new imagesy (line 56)
+- new imagecolorat (line 57)
+- new imagecreatefromstring (line 60)
+- new imagepng (line 61)
 - 4 class method(s)
 
 ### `ext/gd/VmGd.php`
@@ -7042,7 +7048,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ObjectEntry (line 53)
 - new ObjectEntry (line 76)
-- 15 class method(s)
+- 19 class method(s)
 
 ### `ext/gd/VmGdPng.php`
 
@@ -7050,6 +7056,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 3 class method(s)
 
 ### `ext/gd/imagecolorallocate.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
+### `ext/gd/imagecolorat.php`
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
@@ -7075,6 +7086,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 2 class method(s)
 
 ### `ext/gd/imagepng.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
+### `ext/gd/imagesx.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
+### `ext/gd/imagesy.php`
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
