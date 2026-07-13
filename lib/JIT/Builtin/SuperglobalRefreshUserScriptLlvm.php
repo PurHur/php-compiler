@@ -41,7 +41,7 @@ final class SuperglobalRefreshUserScriptLlvm
         LibcExtern::register($context);
         self::ensureGlobals($context);
         ParseStrRuntime::ensureUserScriptLinked($context);
-        StringMultipartStandaloneLlvm::ensureLinked($context);
+        MultipartRuntime::ensureUserScriptLinked($context);
         EnvironMirrorUserScriptLlvm::ensureLinked($context);
         self::ensureHeaderQueueExternal($context);
     }
@@ -367,9 +367,8 @@ final class SuperglobalRefreshUserScriptLlvm
 
         $context->builder->positionAtEnd($multipartBb);
         $context->builder->call(
-            $context->lookupFunction('__phpc_parse_multipart_post'),
+            $context->lookupFunction('__compiler_multipart_populate_post_body'),
             $postHt,
-            $filesHt,
             $contentType,
             $context->builder->load($postBodyCstr)
         );
@@ -500,7 +499,7 @@ final class SuperglobalRefreshUserScriptLlvm
         LibcExtern::register($context);
         self::ensureGlobals($context);
         ParseStrRuntime::ensureUserScriptLinked($context);
-        StringMultipartStandaloneLlvm::ensureLinked($context);
+        MultipartRuntime::ensureUserScriptLinked($context);
         EnvironMirrorUserScriptLlvm::ensureLinked($context);
         self::ensureHeaderQueueExternal($context);
     }
