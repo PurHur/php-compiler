@@ -18349,6 +18349,17 @@ class Compiler {
                 ) {
                     return $siblingNews[0];
                 }
+                // iterator_count(new DatePeriod(...)) — inner ctor New_ hoists must not bind arg #0 (#14483).
+                if (
+                    1 === \count($siblingNews)
+                    && 1 === \count($callArgs)
+                    && 0 === $argIndex
+                ) {
+                    $callArg = $callArgs[$argIndex] ?? null;
+                    if (null !== $callArg && $this->callArgIsDeadInlineTemporary($callArg)) {
+                        return $siblingNews[0];
+                    }
+                }
             }
         }
         $siblingInlineNew = $this->matchSiblingInlineNewCallArgProducer($producers, $callArgs, $argIndex);
@@ -40609,6 +40620,7 @@ class Compiler {
                         )
                     ) {
                         $nestedNewProducers = $siblingNews;
+                        $positionalNewProducers = $siblingNews;
                     }
                 }
                 $nestedNewProducerCount = \count($nestedNewProducers);
@@ -40617,6 +40629,17 @@ class Compiler {
                     $cfgCallOp->args ?? $args,
                     (int) $argIndex
                 );
+                if (
+                    null === $inlineNewProducer
+                    && 1 === \count($siblingNews)
+                    && 1 === $nestedNewArgCount
+                    && 0 === (int) $argIndex
+                ) {
+                    $singleArgCallArg = ($cfgCallOp->args ?? $args)[0] ?? null;
+                    if (null !== $singleArgCallArg && $this->callArgIsDeadInlineTemporary($singleArgCallArg)) {
+                        $inlineNewProducer = $siblingNews[0];
+                    }
+                }
                 if (null === $inlineNewProducer) {
                     $inlineNewProducer = $this->matchNestedNewCtorInlineNewProducer(
                         $nestedNewProducers,
