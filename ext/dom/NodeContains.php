@@ -18,10 +18,10 @@ final class NodeContains extends DomClassMethod
     public function execute(Frame $frame): void
     {
         $receiver = $this->domRegistryNodeReceiver($frame, 'DOMNode::contains()');
-        $other = null;
-        if (isset($frame->calledArgs[1])) {
-            $other = $this->optionalDomNodeArg($frame->calledArgs[1], 'DOMNode::contains()', 0);
+        if (!isset($frame->calledArgs[1])) {
+            throw new \ArgumentCountError('DOMNode::contains() expects exactly 1 argument, 0 given');
         }
+        $other = $this->optionalDomNodeArg($frame->calledArgs[1], 'DOMNode::contains()', 0);
         if (null === $frame->returnVar) {
             return;
         }
