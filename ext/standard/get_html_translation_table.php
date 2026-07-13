@@ -38,18 +38,20 @@ final class get_html_translation_table extends Internal
         $flags = ENT_QUOTES | ENT_SUBSTITUTE;
         $encoding = 'UTF-8';
         if ($argc >= 1) {
-            $table = VmMath::parseIntBuiltinArg(
-                $frame->calledArgs[0],
+            $table = VmMath::parseIntBuiltinArgForFrame(
+                $frame,
+                0,
                 'get_html_translation_table',
-                1,
+                0,
                 'table'
             );
         }
         if ($argc >= 2) {
-            $flags = VmMath::parseIntBuiltinArg(
-                $frame->calledArgs[1],
+            $flags = VmMath::parseIntBuiltinArgForFrame(
+                $frame,
+                1,
                 'get_html_translation_table',
-                2,
+                1,
                 'flags'
             );
         }

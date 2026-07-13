@@ -10,6 +10,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -31,10 +32,10 @@ final class htmlspecialchars_decode extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('htmlspecialchars_decode() requires one or two arguments in this compiler build');
         }
-        $string = VmString::coerceStringBuiltinArg(
-            $frame->calledArgs[0],
-            'htmlspecialchars_decode',
+        $string = InternalStrictArg::resolveCoercibleStringArg(
+            $frame,
             0,
+            'htmlspecialchars_decode',
             'string'
         );
         if (null === $frame->returnVar) {
@@ -86,7 +87,13 @@ final class htmlspecialchars_decode extends Internal
             );
         }
 
-        $str = JitStringBuiltinArg::lower($context, $args[0], 'htmlspecialchars_decode', 0, 'string');
+        $str = JitStringBuiltinArg::lowerStrictOrCoercible(
+            $context,
+            $args[0],
+            'htmlspecialchars_decode',
+            0,
+            'string'
+        );
         $i64 = $context->getTypeFromString('int64');
         $flagsVal = $i64->constInt($flags, false);
         if ($argc >= 2 && null === ($args[1]->compileTimeLong ?? null)) {

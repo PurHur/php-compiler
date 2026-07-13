@@ -20,12 +20,7 @@ final class rawurlencode extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('rawurlencode() requires exactly one argument');
         }
-        $subject = VmString::coerceStringBuiltinArg(
-            $frame->calledArgs[0],
-            'rawurlencode',
-            0,
-            'string'
-        );
+        $subject = VmString::stringBuiltinArgForFrame($frame, 0, 'rawurlencode', 0, 'string');
         if (null === $frame->returnVar) {
             return;
         }
