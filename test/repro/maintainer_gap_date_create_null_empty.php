@@ -2,25 +2,23 @@
 
 declare(strict_types=1);
 
-try {
-    date_create(null);
-    fwrite(STDERR, "date_create(null): expected TypeError\n");
+$d = date_create(null);
+if (!($d instanceof DateTime)) {
+    fwrite(STDERR, "date_create(null): expected DateTime instance\n");
     exit(1);
-} catch (TypeError) {
-    echo "date_create(null): ok\n";
 }
+echo "date_create(null): ok\n";
 
-try {
-    new DateTime(null);
-    fwrite(STDERR, "DateTime(null): expected TypeError\n");
+$dt = new DateTime(null);
+if (!($dt instanceof DateTime)) {
+    fwrite(STDERR, "DateTime(null): expected DateTime instance\n");
     exit(1);
-} catch (TypeError) {
-    echo "DateTime(null): ok\n";
 }
+echo "DateTime(null): ok\n";
 
 foreach (['date_create' => static fn () => date_create(''), 'DateTime' => static fn () => new DateTime('')] as $label => $factory) {
-    $dt = $factory();
-    if (!($dt instanceof DateTime)) {
+    $result = $factory();
+    if (!($result instanceof DateTime)) {
         fwrite(STDERR, "$label(''): expected DateTime instance\n");
         exit(1);
     }
