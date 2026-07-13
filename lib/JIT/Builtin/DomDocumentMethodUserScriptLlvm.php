@@ -44,6 +44,23 @@ final class DomDocumentMethodUserScriptLlvm
         );
     }
 
+    public static function ensureLoadHTMLFileBridge(Context $context): void
+    {
+        self::ensureContextBridge(
+            $context,
+            DomLoadHTMLFileRuntime::ABI_NAME,
+            'dom_load_html_file_user_script',
+            [
+                $context->getTypeFromString('__object__*'),
+                $context->getTypeFromString('__string__*'),
+                $context->getTypeFromString('int64'),
+            ],
+            $context->getTypeFromString('int1'),
+            'PHPCompiler\\ext\\dom\\DomLoadHTMLFileJitHelper::loadHTMLFileArgv',
+            '/ext/dom/DomLoadHTMLFileJitHelper.php'
+        );
+    }
+
     public static function ensureGetElementsByTagNameBridge(Context $context): void
     {
         self::ensureContextBridge(

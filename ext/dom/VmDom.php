@@ -521,6 +521,9 @@ final class VmDom
         $document->methods['loadhtml'] = new DocumentLoadHTML();
         $document->methodVisibility['loadhtml'] = $pub;
         $document->methodNames['loadhtml'] = 'loadHTML';
+        $document->methods['loadhtmlfile'] = new DocumentLoadHTMLFile();
+        $document->methodVisibility['loadhtmlfile'] = $pub;
+        $document->methodNames['loadhtmlfile'] = 'loadHTMLFile';
         $document->methods['createelement'] = new DocumentCreateElement();
         $document->methodVisibility['createelement'] = $pub;
         $document->methods['createelementns'] = new DocumentCreateElementNS();
@@ -2181,11 +2184,44 @@ final class VmDom
         return self::loadXML($ctx, $document, $contents, $frame);
     }
 
+    public static function loadHTMLFile(
+        Context $ctx,
+        ObjectEntry $document,
+        string $filename,
+        int $options = 0,
+        ?\PHPCompiler\Frame $frame = null
+    ): bool {
+        self::rejectEmptyFilename($filename, 'DOMDocument::loadHTMLFile()');
+        $contents = VmFsReadNative::read($filename);
+        if (false === $contents) {
+            VmLibxml::handleError($ctx, [
+                'level' => 2,
+                'code' => 4,
+                'column' => 0,
+                'message' => 'failed to load external entity "'.$filename.'"',
+                'file' => null !== $frame ? '' : $filename,
+                'line' => 0,
+            ], $frame, null, 'DOMDocument::loadHTMLFile(): I/O warning : failed to load external entity "'.$filename.'"');
+
+            return false;
+        }
+
+        return self::loadHTML($ctx, $document, $contents, $options, $frame);
+    }
+
     /** php-src ext/dom/document.c — empty $source rejected since PHP 8.0 (#17616). */
     private static function rejectEmptyLoadSource(string $source, string $method): void
     {
         if ('' === $source) {
             throw new \ValueError($method.': Argument #1 ($source) must not be empty');
+        }
+    }
+
+    /** php-src ext/dom/document.c — empty $filename rejected since PHP 8.0 (#18734). */
+    private static function rejectEmptyFilename(string $filename, string $method): void
+    {
+        if ('' === $filename) {
+            throw new \ValueError($method.': Argument #1 ($filename) must not be empty');
         }
     }
 

@@ -44,6 +44,7 @@ final class DomActiveContextAotTest extends TestCase
         $this->assertStringContainsString('DomDocumentCreateElement', $source);
         $this->assertStringContainsString('isUserScriptDirectMethod', $source);
         $this->assertStringContainsString('loadhtml', $source);
+        $this->assertStringContainsString('loadhtmlfile', $source);
         $this->assertStringContainsString('loadxml', $source);
         $this->assertStringContainsString('savehtml', $source);
         $this->assertStringContainsString('savexml', $source);
@@ -53,6 +54,7 @@ final class DomActiveContextAotTest extends TestCase
         $this->assertStringContainsString('DomNodeAppendChild', $source);
         $this->assertStringContainsString('domnode::appendchild', $source);
         $this->assertStringContainsString('DomDocumentLoadHTML', $source);
+        $this->assertStringContainsString('DomDocumentLoadHTMLFile', $source);
         $this->assertStringContainsString('DomDocumentGetElementById', $source);
         $this->assertStringContainsString('DomDocumentGetElementsByTagName', $source);
         $this->assertStringContainsString('DomDocumentLoadXML', $source);

@@ -45,6 +45,7 @@ final class DomInstanceMethodJit
     private const USER_SCRIPT_DIRECT_METHODS = [
         'domdocument::createelement' => true,
         'domdocument::loadhtml' => true,
+        'domdocument::loadhtmlfile' => true,
         'domdocument::getelementbyid' => true,
         'domdocument::loadxml' => true,
         'domdocument::savexml' => true,
@@ -79,6 +80,11 @@ final class DomInstanceMethodJit
             }
             if ('domdocument::loadhtml' === $lc) {
                 $context->functionProxies[$lc] = new Call\DomDocumentLoadHTML();
+
+                return;
+            }
+            if ('domdocument::loadhtmlfile' === $lc) {
+                $context->functionProxies[$lc] = new Call\DomDocumentLoadHTMLFile();
 
                 return;
             }
@@ -157,6 +163,7 @@ final class DomInstanceMethodJit
             self::ensureDomElementPropertyLayout($context);
             self::ensureProxy($context, 'domdocument::createelement');
             self::ensureProxy($context, 'domdocument::loadhtml');
+            self::ensureProxy($context, 'domdocument::loadhtmlfile');
             self::ensureProxy($context, 'domdocument::getelementbyid');
             self::ensureProxy($context, 'domdocument::loadxml');
             self::ensureProxy($context, 'domdocument::savexml');
