@@ -931,54 +931,6 @@ final class HashTableWriteLlvm
         $builder->positionAtEnd($done);
     }
 
-    public static function buildIntegerRange(
-        Context $context,
-        Value $start,
-        Value $end,
-        Value $step
-    ): Value {
-        $ht = HashTableHelper::alloc($context);
-        $i64 = $context->getTypeFromString('int64');
-        $sizeT = $context->getTypeFromString('size_t');
-        $iSlot = $context->builder->alloca($i64, 1, 'range_i');
-        $idxSlot = $context->builder->alloca($sizeT, 1, 'range_idx');
-        $context->builder->store($start, $iSlot);
-        $zero = $sizeT->constInt(0, false);
-        $context->builder->store($zero, $idxSlot);
-
-        $setLong = $context->lookupFunction('__hashtable__setLongAt');
-        $done = BasicBlockHelper::append($context, 'range_done');
-        $loopHead = BasicBlockHelper::append($context, 'range_head');
-        $loopBody = BasicBlockHelper::append($context, 'range_body');
-        $context->builder->branch($loopHead);
-
-        $context->builder->positionAtEnd($loopHead);
-        $i = $context->builder->load($iSlot);
-        $stepPos = $context->builder->icmp(Builder::INT_SGT, $step, $i64->constInt(0, false));
-        $condPos = $context->builder->icmp(Builder::INT_SLE, $i, $end);
-        $condNeg = $context->builder->icmp(Builder::INT_SGE, $i, $end);
-        $inRange = $context->builder->select($stepPos, $condPos, $condNeg);
-        $context->builder->branchIf($inRange, $loopBody, $done);
-
-        $context->builder->positionAtEnd($loopBody);
-        $idx = $context->builder->load($idxSlot);
-        $context->builder->call($setLong, $ht, $idx, $i);
-        $context->builder->store(
-            $context->builder->addNoSignedWrap($i, $step),
-            $iSlot
-        );
-        $one = $sizeT->constInt(1, false);
-        $context->builder->store(
-            $context->builder->addNoSignedWrap($idx, $one),
-            $idxSlot
-        );
-        $context->builder->branch($loopHead);
-
-        $context->builder->positionAtEnd($done);
-
-        return $ht;
-    }
-
     /**
      * Spread merge for string keys: numeric strings append; other strings overwrite (#5072).
      */

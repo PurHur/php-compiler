@@ -141,7 +141,7 @@ final class HashTableHelperShrinkTest extends TestCase
         $this->assertStringContainsString('HashTableWriteLlvm::spreadAddElement', $helper);
         $this->assertStringContainsString('HashTableWriteLlvm::spreadInto', $helper);
         $this->assertStringContainsString('HashTableWriteLlvm::reserveAppendSlot', $helper);
-        $this->assertStringContainsString('HashTableWriteLlvm::buildIntegerRange', $helper);
+        $this->assertStringNotContainsString('buildIntegerRange', $helper);
         $this->assertStringNotContainsString('function buildArrayFill', $helper);
         $this->assertStringNotContainsString('function spreadPackedInto', $helper);
         $this->assertStringNotContainsString('ht_spread_add_str_', $helper);
@@ -150,7 +150,7 @@ final class HashTableHelperShrinkTest extends TestCase
         $this->assertStringContainsString('public static function spreadAddElement', $write);
         $this->assertStringContainsString('public static function spreadInto', $write);
         $this->assertStringContainsString('public static function reserveAppendSlot', $write);
-        $this->assertStringContainsString('public static function buildIntegerRange', $write);
+        $this->assertStringNotContainsString('buildIntegerRange', $write);
         $this->assertStringContainsString('private static function spreadPackedInto', $write);
     }
 
