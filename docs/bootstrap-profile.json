@@ -601,6 +601,7 @@
         "ext/openssl/VmOpensslConfigNative.php",
         "ext/openssl/VmOpensslErrorNative.php",
         "ext/openssl/VmOpensslObjects.php",
+        "ext/openssl/VmOpensslPkcs12Native.php",
         "ext/openssl/VmOpensslPkeyDeriveNative.php",
         "ext/openssl/VmOpensslPkeyNative.php",
         "ext/openssl/VmOpensslSealNative.php",
@@ -620,6 +621,9 @@
         "ext/openssl/openssl_get_md_methods.php",
         "ext/openssl/openssl_open.php",
         "ext/openssl/openssl_pbkdf2.php",
+        "ext/openssl/openssl_pkcs12_export.php",
+        "ext/openssl/openssl_pkcs12_export_to_file.php",
+        "ext/openssl/openssl_pkcs12_read.php",
         "ext/openssl/openssl_pkey_derive.php",
         "ext/openssl/openssl_pkey_export.php",
         "ext/openssl/openssl_pkey_get_private.php",
@@ -4975,9 +4979,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 4741,
+        "inventory_files": 4745,
         "excluded": 0,
-        "eligible": 4741,
+        "eligible": 4745,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
