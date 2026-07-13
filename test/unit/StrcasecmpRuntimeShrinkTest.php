@@ -34,6 +34,8 @@ final class StrcasecmpRuntimeShrinkTest extends TestCase
     {
         $this->assertSame(VmString::strcasecmp('A', 'a'), CaseCompareJitHelper::strcasecmpArgv('A', 'a'));
         $this->assertSame(VmString::strncasecmp('Ab', 'ab', 1), CaseCompareJitHelper::strncasecmpArgv('Ab', 'ab', 1));
+        $this->assertSame(-1, VmString::strncasecmp('', 'a', 1));
+        $this->assertSame(-1, CaseCompareJitHelper::strncasecmpArgv('', 'a', 1));
     }
 
     public function testSpineBundleIncludesCaseCompareJitHelper(): void
