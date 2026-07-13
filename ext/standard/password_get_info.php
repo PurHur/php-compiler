@@ -7,9 +7,8 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitStringArg;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /** password_get_info() — hash metadata (ext/standard/password.c, issue #3649). */
@@ -28,12 +27,14 @@ final class password_get_info extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $hash = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_STRING !== $hash->type) {
-            throw new \LogicException('password_get_info() requires a string hash in this compiler build');
-        }
+        $hash = VmString::coerceStringBuiltinArg(
+            $frame->calledArgs[0],
+            'password_get_info',
+            0,
+            'hash'
+        );
         $frame->returnVar->array(
-            VmPassword::infoToHashTable(VmPassword::getInfo($hash->toString()))
+            VmPassword::infoToHashTable(VmPassword::getInfo($hash))
         );
     }
 
@@ -45,7 +46,7 @@ final class password_get_info extends Internal
 
         return JitPasswordGetInfo::invoke(
             $context,
-            JitStringArg::lower($context, $args[0], 'password_get_info() hash')
+            JitStringBuiltinArg::lower($context, $args[0], 'password_get_info', 0, 'hash')
         );
     }
 }
