@@ -19,6 +19,7 @@ final class MatchVMTest extends BaseTest
                 'match_identical.phpt',
                 'match_literal.phpt',
                 'match_default.phpt',
+                'match_default_arm.phpt',
                 'match_guard.phpt',
                 'match_guard_falsy.phpt',
                 'match_arm_assign.phpt',
