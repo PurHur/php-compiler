@@ -114,6 +114,9 @@ final class VmDirNative
         if (str_contains($path, "\0")) {
             return false;
         }
+        if (VmDirOpenFailure::isNonDirectoryWrapperPath($path)) {
+            return false;
+        }
 
         return VmDirPure::listUnsorted($path);
     }
