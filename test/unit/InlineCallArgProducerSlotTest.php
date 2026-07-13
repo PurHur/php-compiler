@@ -1530,6 +1530,22 @@ PHP;
         self::assertSame([0, 4, 8], $periodSends, 'DatePeriod arg sends='.json_encode($periodSends));
     }
 
+    /** Issue #14483 — iterator_count(new DatePeriod(...)) wires outer sibling New_, not inner hoists. */
+    public function testIteratorCountInlineDatePeriodUsesSiblingNewProducerSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+$s = new DateTime('2020-01-01');
+$e = new DateTime('2020-01-03');
+echo iterator_count(new DatePeriod($s, new DateInterval('P1D'), $e)), "\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'dateperiod_inline_iterator_count.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("2\n", ob_get_clean());
+    }
+
     /** Issue #10143 — var_export((string) NAN) wires Cast producer, not dead arg temp. */
     public function testStringCastNanConstantUsesCastProducerSlot(): void
     {
