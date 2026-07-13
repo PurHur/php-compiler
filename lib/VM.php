@@ -2934,6 +2934,7 @@ class VM {
         }
         if ($this->variableIsGenerator($iterator)) {
             $gen = $iterator->toObject()->generatorState;
+            VmIteratorWalk::assertGeneratorIterableForRewind($gen);
             $gen->rewind();
             $index = 0;
             while ($this->advanceGeneratorIteration($gen)) {

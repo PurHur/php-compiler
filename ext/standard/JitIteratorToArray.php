@@ -147,6 +147,7 @@ final class JitIteratorToArray
         if (null === $gen->generatorStatePtr || null === $gen->generatorResumeName) {
             throw new \LogicException('iterator_to_array() requires a JIT Generator in this compiler build');
         }
+        GeneratorHelper::compileAssertGeneratorIterableForRewind($context, $gen);
         GeneratorHelper::compileIterReset($context, $gen);
         $out = new Variable(
             $context,

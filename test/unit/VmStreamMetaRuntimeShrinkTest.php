@@ -57,6 +57,55 @@ final class VmStreamMetaRuntimeShrinkTest extends TestCase
         VmFs::fclose($handle);
     }
 
+    public function testWrapperTypeForDataUri(): void
+    {
+        $this->assertSame('RFC2397', VmStreamMeta::wrapperTypeForUri('data://text/plain,hello'));
+    }
+
+    public function testWrapperTypeForPhpFilterUri(): void
+    {
+        $this->assertSame('PHP', VmStreamMeta::wrapperTypeForUri('php://filter/read=string.rot13/resource=data://text/plain,hello'));
+    }
+
+    public function testStreamGetMetaDataForDataUri(): void
+    {
+        $handle = VmFs::fopen('data://text/plain,hello', 'r');
+        $this->assertNotFalse($handle);
+        $meta = VmFs::streamGetMetaData($handle);
+        $wrapperType = null;
+        foreach ($meta->iterateKeyed(false) as [$keyVar, $value]) {
+            if (Variable::TYPE_STRING === $keyVar->type && 'wrapper_type' === $keyVar->toString()) {
+                $wrapperType = $value->toString();
+            }
+        }
+        $this->assertSame('RFC2397', $wrapperType);
+        VmFs::fclose($handle);
+    }
+
+    public function testStreamGetMetaDataForPhpFilterUri(): void
+    {
+        $filterUri = 'php://filter/read=string.rot13/resource=data://text/plain,hello';
+        $handle = VmFs::fopen($filterUri, 'r');
+        $this->assertNotFalse($handle);
+        $meta = VmFs::streamGetMetaData($handle);
+        $wrapperType = null;
+        $uri = null;
+        foreach ($meta->iterateKeyed(false) as [$keyVar, $value]) {
+            if (Variable::TYPE_STRING !== $keyVar->type) {
+                continue;
+            }
+            $key = $keyVar->toString();
+            if ('wrapper_type' === $key) {
+                $wrapperType = $value->toString();
+            } elseif ('uri' === $key) {
+                $uri = $value->toString();
+            }
+        }
+        $this->assertSame('PHP', $wrapperType);
+        $this->assertSame($filterUri, $uri);
+        VmFs::fclose($handle);
+    }
+
     public function testBuildMetaArrayForPlainFilePath(): void
     {
         $fp = fopen('php://memory', 'r+');

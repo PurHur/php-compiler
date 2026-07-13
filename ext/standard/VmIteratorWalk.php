@@ -40,6 +40,19 @@ final class VmIteratorWalk
         return $value;
     }
 
+    /**
+     * Zend ext/spl/php_spl.c — iterator_to_array()/iterator_count() on started/closed Generator (#18582, #5132).
+     */
+    public static function assertGeneratorIterableForRewind(VM\GeneratorState $gen): void
+    {
+        if ($gen->done) {
+            throw new \Exception(self::CLOSED_GENERATOR_ITERATOR_COUNT_ERROR);
+        }
+        if ($gen->started) {
+            throw new \Exception(VM\GeneratorState::REWIND_ALREADY_RUN_ERROR);
+        }
+    }
+
     public static function count(VM $vm, Frame $frame, Variable $iterable): int
     {
         $iterable = $iterable->resolveIndirect();
@@ -185,12 +198,7 @@ final class VmIteratorWalk
 
     private static function countGenerator(VM $vm, VM\GeneratorState $gen): int
     {
-        if ($gen->done) {
-            throw new \Exception(self::CLOSED_GENERATOR_ITERATOR_COUNT_ERROR);
-        }
-        if ($gen->started) {
-            throw new \Exception(VM\GeneratorState::REWIND_ALREADY_RUN_ERROR);
-        }
+        self::assertGeneratorIterableForRewind($gen);
         $gen->rewind();
         $count = 0;
         while ($vm->resumeGenerator($gen)) {

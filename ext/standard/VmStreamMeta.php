@@ -44,7 +44,7 @@ final class VmStreamMeta
             'timed_out' => false,
             'blocked' => $blocked ?? true,
             'eof' => $eof,
-            'wrapper_type' => $isPhp ? 'PHP' : 'plainfile',
+            'wrapper_type' => self::wrapperTypeForUri($uri),
             'stream_type' => $socketType ?? $phpNativeStreamType ?? ($isPhp ? 'STDIO' : 'STDIO'),
             'mode' => $reportedMode,
             'unread_bytes' => 0,
@@ -73,6 +73,21 @@ final class VmStreamMeta
         return \str_starts_with($uri, 'php://memory')
             || \str_starts_with($uri, 'php://temp')
             || \str_starts_with($uri, 'php://fd/');
+    }
+
+    /**
+     * php-src ext/standard/streams.c — wrapper_type in stream_get_meta_data (#18580, #18581).
+     */
+    public static function wrapperTypeForUri(string $uri): string
+    {
+        if (\str_starts_with($uri, 'php://')) {
+            return 'PHP';
+        }
+        if (\str_starts_with($uri, 'data://')) {
+            return 'RFC2397';
+        }
+
+        return 'plainfile';
     }
 
     private static function defaultReportedMode(string $uri, bool $isPhpMemory): string

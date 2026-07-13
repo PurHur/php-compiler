@@ -389,4 +389,9 @@ final class GeneratorHelper
     {
         GeneratorIteratorJitHelper::compileIterReset($context, $gen);
     }
+
+    public static function compileAssertGeneratorIterableForRewind(Context $context, Variable $gen): void
+    {
+        GeneratorIteratorJitHelper::compileAssertGeneratorIterableForRewind($context, $gen);
+    }
 }

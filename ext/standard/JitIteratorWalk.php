@@ -135,28 +135,7 @@ final class JitIteratorWalk
 
     private static function countGenerator(Context $context, Variable $gen): Value
     {
-        $statePtr = GeneratorHelper::loadStateFromGeneratorObject($context, $gen);
-        $map = $context->structFieldMap['__generator_state__'];
-        $i1 = $context->getTypeFromString('int1');
-        $sizeT = $context->getTypeFromString('size_t');
-        $zero = $sizeT->constInt(0, false);
-        $resumeIp = $context->builder->load($context->builder->structGep($statePtr, $map['resume_ip']));
-        $hasCurrent = $context->builder->load($context->builder->structGep($statePtr, $map['has_current']));
-        $started = $context->builder->or(
-            $context->builder->icmp(Builder::INT_NE, $resumeIp, $zero),
-            $context->builder->icmp(Builder::INT_NE, $hasCurrent, $i1->constInt(0, false))
-        );
-        $fn = $context->builder->getInsertBlock()->getParent();
-        $okBlock = $fn->appendBasicBlock('iterator_count_gen_ok');
-        $failBlock = $fn->appendBasicBlock('iterator_count_gen_fail');
-        $context->builder->branchIf($started, $failBlock, $okBlock);
-        $context->builder->positionAtEnd($failBlock);
-        TryCatchHelper::emitCatchableClassError(
-            $context,
-            'Exception',
-            self::CLOSED_GENERATOR_ITERATOR_COUNT_ERROR
-        );
-        $context->builder->positionAtEnd($okBlock);
+        GeneratorHelper::compileAssertGeneratorIterableForRewind($context, $gen);
         GeneratorHelper::compileIterReset($context, $gen);
         $countSlot = $context->builder->alloca($context->getTypeFromString('int64'), 1, 'iterator_count_n');
         $context->builder->store(

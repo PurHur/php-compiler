@@ -925,7 +925,12 @@ final class VmFs
             return self::finalizeStreamOpen(VmPhpInputOutputStream::open($path, $mode), $mode);
         }
         if (VmPhpFilterStream::isSupportedUri($path)) {
-            return self::finalizeStreamOpen(VmPhpFilterStream::open($path, $mode, $ctx), $mode);
+            $handle = self::finalizeStreamOpen(VmPhpFilterStream::open($path, $mode, $ctx), $mode);
+            if (false !== $handle) {
+                self::registerStreamPath($handle, $path);
+            }
+
+            return $handle;
         }
         if (VmPhpFdStream::isFdUri($path)) {
             return self::finalizeStreamOpen(VmPhpFdStream::openFromUri($path, $mode), $mode);
@@ -2670,6 +2675,10 @@ final class VmFs
 
     public static function handleUri(int $handle): string
     {
+        $registered = self::$handlePaths[$handle] ?? '';
+        if ('' !== $registered) {
+            return $registered;
+        }
         if (VmUserStream::isValidHandle($handle)) {
             return VmUserStream::uriForHandle($handle);
         }
@@ -2683,7 +2692,7 @@ final class VmFs
             return VmPhpFdStream::uriForHandle($handle);
         }
 
-        return self::$handlePaths[$handle] ?? '';
+        return '';
     }
 
     /** Record fopen URI for JIT/AOT stream handles ({@see StreamPathJitHelper}, #9480). */
