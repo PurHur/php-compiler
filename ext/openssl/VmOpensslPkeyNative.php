@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\openssl;
 
+use PHPCompiler\ext\standard\VmFsReadNative;
+
 /**
  * EVP_PKEY keygen / PEM import-export via libcrypto FFI (php-src ext/openssl/xp.c; #6295).
  */
@@ -164,7 +166,7 @@ final class VmOpensslPkeyNative
             $ffi->BIO_free($bio);
         }
 
-        $pem = @\file_get_contents($tmp);
+        $pem = VmFsReadNative::read($tmp);
         @\unlink($tmp);
         if (false === $pem || '' === $pem) {
             return false;
@@ -222,7 +224,7 @@ final class VmOpensslPkeyNative
             $ffi->BIO_free($bio);
         }
 
-        $pem = @\file_get_contents($tmp);
+        $pem = VmFsReadNative::read($tmp);
         @\unlink($tmp);
         if (false === $pem || '' === $pem) {
             return false;
