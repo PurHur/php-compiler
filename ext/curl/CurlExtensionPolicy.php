@@ -46,4 +46,14 @@ final class CurlExtensionPolicy
     {
         return self::advertisesExtension();
     }
+
+    /**
+     * curl_version/curl_strerror/… — function_exists only when ext/curl is loaded (#18554, #18470).
+     *
+     * Phase-2 stubs may stay registered for direct calls; introspection matches Zend ext/curl/interface.c.
+     */
+    public static function advertisesIntrospectionFunctions(): bool
+    {
+        return self::advertisesExtension();
+    }
 }
