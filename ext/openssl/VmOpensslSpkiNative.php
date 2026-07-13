@@ -76,12 +76,7 @@ final class VmOpensslSpkiNative
             return false;
         }
 
-        $cleaned = self::spkiCleanup($spkac);
-        if ('' === $cleaned) {
-            return false;
-        }
-
-        $spki = $ffi->NETSCAPE_SPKI_b64_decode($cleaned, \strlen($cleaned));
+        $spki = self::decodeSpkiFfi($ffi, $spkac);
         if (null === $spki) {
             return false;
         }
@@ -102,11 +97,151 @@ final class VmOpensslSpkiNative
     }
 
     /**
+     * @return \FFI\CData|null Decoded NETSCAPE_SPKI; caller must NETSCAPE_SPKI_free.
+     */
+    public static function decodeSpki(string $spkac)
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return null;
+        }
+
+        return self::decodeSpkiFfi($ffi, $spkac);
+    }
+
+    public static function spkiExport(string $spkac): string|false
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return false;
+        }
+
+        $spki = self::decodeSpkiFfi($ffi, $spkac);
+        if (null === $spki) {
+            return false;
+        }
+
+        $pub = $ffi->X509_PUBKEY_get($spki->spkac->pubkey);
+        if (null === $pub) {
+            $ffi->NETSCAPE_SPKI_free($spki);
+
+            return false;
+        }
+
+        try {
+            return self::writePublicKeyPem($ffi, $pub);
+        } finally {
+            $ffi->NETSCAPE_SPKI_free($spki);
+            $ffi->EVP_PKEY_free($pub);
+        }
+    }
+
+    public static function spkiExportChallenge(string $spkac): string|false
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return false;
+        }
+
+        $spki = self::decodeSpkiFfi($ffi, $spkac);
+        if (null === $spki) {
+            return false;
+        }
+
+        try {
+            $challenge = $spki->spkac->challenge;
+            if (null === $challenge) {
+                return false;
+            }
+
+            $data = $ffi->ASN1_STRING_get0_data($challenge);
+            if (null === $data) {
+                return false;
+            }
+            $length = (int) $ffi->ASN1_STRING_length($challenge);
+            if ($length < 0) {
+                return false;
+            }
+
+            return \FFI::string($data, $length);
+        } finally {
+            $ffi->NETSCAPE_SPKI_free($spki);
+        }
+    }
+
+    /**
      * php-src php_openssl_spki_cleanup — strip CR/LF before base64 decode.
      */
     public static function spkiCleanup(string $src): string
     {
         return \str_replace(["\n", "\r"], '', $src);
+    }
+
+    /**
+     * @param \FFI $ffi
+     *
+     * @return \FFI\CData|null
+     */
+    private static function decodeSpkiFfi($ffi, string $spkac)
+    {
+        $cleaned = self::spkiCleanup($spkac);
+        if ('' === $cleaned) {
+            return null;
+        }
+
+        return $ffi->NETSCAPE_SPKI_b64_decode($cleaned, \strlen($cleaned));
+    }
+
+    public static function spkiDecodeable(string $spkac): bool
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return false;
+        }
+
+        $spki = self::decodeSpkiFfi($ffi, $spkac);
+        if (null === $spki) {
+            return false;
+        }
+
+        $ffi->NETSCAPE_SPKI_free($spki);
+
+        return true;
+    }
+
+    /**
+     * @param \FFI       $ffi
+     * @param \FFI\CData $pkey
+     */
+    private static function writePublicKeyPem($ffi, $pkey): string|false
+    {
+        $tmp = \tempnam(\sys_get_temp_dir(), 'phpc-spki-pub-');
+        if (false === $tmp) {
+            return false;
+        }
+
+        $bio = $ffi->BIO_new_file($tmp, 'wb');
+        if (null === $bio) {
+            @\unlink($tmp);
+
+            return false;
+        }
+
+        try {
+            if (1 !== (int) $ffi->PEM_write_bio_PUBKEY($bio, $pkey)) {
+                return false;
+            }
+        } finally {
+            $ffi->BIO_free($bio);
+        }
+
+        $pem = @\file_get_contents($tmp);
+        @\unlink($tmp);
+        if (false === $pem || '' === $pem) {
+            return false;
+        }
+
+        return $pem;
     }
 
     /**
@@ -167,6 +302,7 @@ struct NETSCAPE_SPKI_st {
 };
 
 BIO *BIO_new_mem_buf(const void *buf, int len);
+BIO *BIO_new_file(const char *filename, const char *mode);
 void BIO_free(BIO *a);
 EVP_PKEY *PEM_read_bio_PrivateKey(BIO *bp, EVP_PKEY **x, void *cb, void *u);
 void EVP_PKEY_free(EVP_PKEY *pkey);
@@ -180,6 +316,9 @@ char *NETSCAPE_SPKI_b64_encode(NETSCAPE_SPKI *a);
 NETSCAPE_SPKI *NETSCAPE_SPKI_b64_decode(const char *str, int len);
 int NETSCAPE_SPKI_verify(NETSCAPE_SPKI *a, EVP_PKEY *r);
 EVP_PKEY *X509_PUBKEY_get(X509_PUBKEY *key);
+int PEM_write_bio_PUBKEY(BIO *bp, EVP_PKEY *x);
+const unsigned char *ASN1_STRING_get0_data(const ASN1_STRING *x);
+int ASN1_STRING_length(const ASN1_STRING *x);
 CDEF;
 
         foreach (['libcrypto.so.3', 'libcrypto.so'] as $lib) {

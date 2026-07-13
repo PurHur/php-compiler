@@ -248,6 +248,62 @@ final class VmOpenssl
     }
 
     /**
+     * openssl_spki_export() — PEM public key from Netscape SPKAC (php-src ext/openssl/openssl.c; #6423).
+     */
+    public static function spkiExport(string $spkac, ?Frame $frame = null): string|false
+    {
+        if (!VmOpensslSpkiNative::available()) {
+            self::userWarning('openssl_spki_export(): OpenSSL SPKI is unavailable in this compiler build', $frame);
+
+            return false;
+        }
+
+        $cleaned = VmOpensslSpkiNative::spkiCleanup($spkac);
+        if ('' === $cleaned) {
+            self::userWarning('openssl_spki_export(): Invalid SPKAC', $frame);
+
+            return false;
+        }
+
+        $pem = VmOpensslSpkiNative::spkiExport($spkac);
+        if (false === $pem) {
+            if (!VmOpensslSpkiNative::spkiDecodeable($spkac)) {
+                self::userWarning('openssl_spki_export(): Unable to decode supplied SPKAC', $frame);
+            } else {
+                self::userWarning('openssl_spki_export(): Unable to acquire signed public key', $frame);
+            }
+        }
+
+        return $pem;
+    }
+
+    /**
+     * openssl_spki_export_challenge() — challenge string from Netscape SPKAC (php-src ext/openssl/openssl.c; #6423).
+     */
+    public static function spkiExportChallenge(string $spkac, ?Frame $frame = null): string|false
+    {
+        if (!VmOpensslSpkiNative::available()) {
+            self::userWarning('openssl_spki_export_challenge(): OpenSSL SPKI is unavailable in this compiler build', $frame);
+
+            return false;
+        }
+
+        $cleaned = VmOpensslSpkiNative::spkiCleanup($spkac);
+        if ('' === $cleaned) {
+            self::userWarning('openssl_spki_export_challenge(): Invalid SPKAC', $frame);
+
+            return false;
+        }
+
+        $challenge = VmOpensslSpkiNative::spkiExportChallenge($spkac);
+        if (false === $challenge) {
+            self::userWarning('openssl_spki_export_challenge(): Unable to decode SPKAC', $frame);
+        }
+
+        return $challenge;
+    }
+
+    /**
      * openssl_seal() — public-key envelope encryption (php-src ext/openssl/openssl.c; #6523).
      *
      * @param list<string> $publicKeyPems
