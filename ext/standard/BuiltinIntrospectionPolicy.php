@@ -195,6 +195,9 @@ final class BuiltinIntrospectionPolicy
         if ('xsl' === $ext) {
             return \PHPCompiler\ext\xsl\XslExtensionPolicy::advertisesExtension();
         }
+        if ('xmlrpc' === $ext) {
+            return \PHPCompiler\ext\xmlrpc\XmlrpcExtensionPolicy::advertisesExtension();
+        }
 
         return true;
     }

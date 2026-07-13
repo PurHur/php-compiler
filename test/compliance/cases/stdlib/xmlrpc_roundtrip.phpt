@@ -1,5 +1,10 @@
 --TEST--
 stdlib xmlrpc_encode/xmlrpc_decode round-trip (#6579, ext/xmlrpc/xmlrpc.c)
+--SKIPIF--
+<?php
+if (!\PHPCompiler\CompilerVersion::supportsXmlrpc()) {
+    die('skip xmlrpc withheld on reference profile (#18503)');
+}
 --FILE--
 <?php
 declare(strict_types=1);

@@ -7,14 +7,33 @@ namespace PHPCompiler\ext\xmlrpc;
 use PHPCompiler\ModuleAbstract;
 
 /**
- * xmlrpc extension module entry (php-src ext/xmlrpc/xmlrpc.c; issue #6579).
+ * xmlrpc extension module entry (php-src ext/xmlrpc/xmlrpc.c; issue #6579, #18503).
  *
- * PHP-in-PHP XML-RPC encode/decode — no runtime/*.c growth.
+ * Register under {@see standard}; advertise logical {@code xmlrpc} extension and
+ * xmlrpc_encode()/xmlrpc_decode() when {@see XmlrpcExtensionPolicy::advertisesExtension()}
+ * — withheld on reference profile (Zend 8.2 has no ext/xmlrpc).
  */
 class Module extends ModuleAbstract
 {
     /** php-src ext/xmlrpc/php_xmlrpc.h PHP_XMLRPC_VERSION */
     private const XMLRPC_VERSION = '1.0.0RC51';
+
+    public function getExtensionName(): string
+    {
+        return 'standard';
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function getAdditionalExtensionNames(): array
+    {
+        if (!XmlrpcExtensionPolicy::advertisesExtension()) {
+            return [];
+        }
+
+        return ['xmlrpc'];
+    }
 
     public function getExtensionVersion(): string
     {
@@ -23,6 +42,10 @@ class Module extends ModuleAbstract
 
     public function getFunctions(): array
     {
+        if (!XmlrpcExtensionPolicy::advertisesExtension()) {
+            return [];
+        }
+
         return [
             new xmlrpc_encode(),
             new xmlrpc_decode(),
