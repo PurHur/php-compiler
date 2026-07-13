@@ -15,12 +15,23 @@ use PHPCompiler\VM\Variable;
  */
 final class VmMime
 {
+    public static function filenameOrStreamTypeErrorMessage(string $given): string
+    {
+        return \sprintf(
+            'mime_content_type(): Argument #1 ($filename) must be of type resource|string, %s given',
+            $given
+        );
+    }
+
     /**
      * @return string|false
      */
     public static function mimeContentType(Variable $operand)
     {
         $operand = $operand->resolveIndirect();
+        if (Variable::TYPE_NULL === $operand->type) {
+            throw new \TypeError(self::filenameOrStreamTypeErrorMessage('null'));
+        }
         if (EnumCaseSupport::isEnumCaseVariable($operand)) {
             throw new \TypeError(\sprintf(
                 'mime_content_type(): Argument #1 ($filename_or_stream) must be of type string, %s given',
