@@ -9,7 +9,6 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\InternalStrictArg;
 use PHPLLVM\Value;
 
 /** symlink() — VM via VmFs; JIT/AOT via SymlinkJitHelper PHP (#15544). */
@@ -25,10 +24,8 @@ final class symlink_ extends Internal
         if (2 !== \count($frame->calledArgs)) {
             throw new \LogicException('symlink() requires exactly two arguments in this compiler build');
         }
-        InternalStrictArg::rejectNullString($frame->calledArgs[0], 'symlink', 'target', 0, $frame);
-        InternalStrictArg::rejectNullString($frame->calledArgs[1], 'symlink', 'link', 1, $frame);
-        $target = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'symlink', 0, 'target');
-        $linkPath = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'symlink', 1, 'link');
+        $target = VmFilestatArg::coerceFilenameArg($frame->calledArgs[0], 'symlink', 0, 'target', $frame);
+        $linkPath = VmFilestatArg::coerceFilenameArg($frame->calledArgs[1], 'symlink', 1, 'link', $frame);
         $ok = VmFs::symlink($target, $linkPath);
         if (!$ok) {
             VmFilestatFailure::warnNoSuchFile($frame, 'symlink');
@@ -43,8 +40,8 @@ final class symlink_ extends Internal
         if (2 !== \count($args)) {
             throw new \LogicException('symlink() requires exactly two arguments in this compiler build');
         }
-        $target = JitStringBuiltinArg::lower($context, $args[0], 'symlink', 0, 'target');
-        $linkPath = JitStringBuiltinArg::lower($context, $args[1], 'symlink', 1, 'link');
+        $target = JitStringBuiltinArg::lowerPath($context, $args[0], 'symlink', 0, 'target');
+        $linkPath = JitStringBuiltinArg::lowerPath($context, $args[1], 'symlink', 1, 'link');
 
         return JitSymlink::invoke($context, $target, $linkPath);
     }
