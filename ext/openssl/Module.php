@@ -55,6 +55,8 @@ class Module extends ModuleAbstract
             new openssl_free_key(),
             new openssl_spki_new(),
             new openssl_spki_verify(),
+            new openssl_spki_export(),
+            new openssl_spki_export_challenge(),
             new openssl_seal(),
             new openssl_open(),
             new openssl_error_string(),
