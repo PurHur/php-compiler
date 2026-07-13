@@ -187,17 +187,17 @@ final class VmUnserializeFormat
     }
 
     /** @return false */
-    private function fail(): bool
+    private function fail(?int $errorOffset = null): bool
     {
-        self::$lastErrorOffset = $this->pos;
+        self::$lastErrorOffset = $errorOffset ?? $this->pos;
         self::$lastPayloadLength = $this->length;
 
         return false;
     }
 
-    private function failCell(): false
+    private function failCell(?int $errorOffset = null): false
     {
-        $this->fail();
+        $this->fail($errorOffset);
 
         return false;
     }
@@ -425,15 +425,16 @@ final class VmUnserializeFormat
      */
     private function parseArray(int $depth): VmUnserializeCell|false
     {
+        $start = $this->pos;
         if (!$this->expect('a:')) {
-            return $this->failCell();
+            return $this->failCell($start);
         }
         $count = $this->readUnsignedInteger();
         if (null === $count || !$this->expect(':')) {
-            return $this->failCell();
+            return $this->failCell($start);
         }
         if (!$this->expect('{')) {
-            return $this->failCell();
+            return $this->failCell($start);
         }
 
         /** @var array<int|string, VmUnserializeCell> $elements */
