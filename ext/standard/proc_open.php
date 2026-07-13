@@ -50,7 +50,7 @@ final class proc_open extends Internal
 
         $result = VmProcess::procOpen($command, $descriptorSpec, $cwd, $env);
         if (false === $result) {
-            $frame->returnVar->bool(false);
+            $frame->returnVar->null();
 
             return;
         }
@@ -79,11 +79,11 @@ final class proc_open extends Internal
     private static function parseCommand(Variable $arg, string $functionName, int $argNum): string|array
     {
         $arg = $arg->resolveIndirect();
+        if (Variable::TYPE_NULL === $arg->type) {
+            return '';
+        }
         if (Variable::TYPE_STRING === $arg->type) {
-            $command = $arg->toString();
-            VmString::rejectEmptyBuiltinStringArg($command, $functionName, $argNum - 1, 'command');
-
-            return $command;
+            return $arg->toString();
         }
         if (Variable::TYPE_ARRAY === $arg->type) {
             $parts = [];
