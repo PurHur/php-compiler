@@ -127,8 +127,8 @@ final class VmNumberFormat
 
         $rounded = VmRound::mathRound($number, $roundPlaces, $roundingMode);
 
-        if ($decimals > 14) {
-            return self::formatHighPrecision(
+        if ($decimals > 0) {
+            return self::formatWithSprintfFraction(
                 $rounded,
                 $decimals,
                 $decimalSeparator,
@@ -137,26 +137,40 @@ final class VmNumberFormat
             );
         }
 
-        $pow = 1;
-        for ($i = 0; $i < $decimals; ++$i) {
-            $pow *= 10;
-        }
-
-        $intPart = (int) floor($rounded);
-        $fracPart = 0;
-        if ($decimals > 0) {
-            $fracPart = (int) round(($rounded - (float) $intPart) * $pow);
-            if ($fracPart >= $pow) {
-                ++$intPart;
-                $fracPart = 0;
-            }
-        }
-
-        $intDigits = self::digitsFromInt($intPart);
+        $intDigits = self::digitsFromInt((int) floor($rounded));
         $result = self::insertThousands($intDigits, $thousandsSeparator);
 
-        if ($decimals > 0) {
-            $fracDigits = self::padLeft(self::digitsFromInt($fracPart), $decimals, '0');
+        if ($negative) {
+            return '-'.$result;
+        }
+
+        return $result;
+    }
+
+    /**
+     * php-src ext/standard/number_format.c — snprintf / php_conv_floating_point for display precision.
+     *
+     * Integer extraction of the fractional part loses accuracy beyond ~14 decimal digits (IEEE double).
+     */
+    private static function formatWithSprintfFraction(
+        float $rounded,
+        int $decimals,
+        string $decimalSeparator,
+        string $thousandsSeparator,
+        bool $negative
+    ): string {
+        $formatted = \sprintf('%.'.$decimals.'f', $rounded);
+        $dotPos = \strpos($formatted, '.');
+        if (false === $dotPos) {
+            $intDigits = $formatted;
+            $fracDigits = '';
+        } else {
+            $intDigits = VmString::byteSlice($formatted, 0, $dotPos);
+            $fracDigits = VmString::byteSlice($formatted, $dotPos + 1);
+        }
+
+        $result = self::insertThousands($intDigits, $thousandsSeparator);
+        if ('' !== $fracDigits) {
             $result .= $decimalSeparator.$fracDigits;
         }
 
@@ -181,15 +195,6 @@ final class VmNumberFormat
         return $digits;
     }
 
-    private static function padLeft(string $digits, int $length, string $pad): string
-    {
-        while (VmString::byteLength($digits) < $length) {
-            $digits = $pad.$digits;
-        }
-
-        return $digits;
-    }
-
     private static function insertThousands(string $digits, string $separator): string
     {
         $len = VmString::byteLength($digits);
@@ -206,46 +211,5 @@ final class VmNumberFormat
         }
 
         return $out;
-    }
-
-    /**
-     * php-src ext/standard/number_format.c — php_conv_floating_point() for $decimals > FP digit budget.
-     */
-    private static function formatHighPrecision(
-        float $rounded,
-        int $decimals,
-        string $decimalSeparator,
-        string $thousandsSeparator,
-        bool $negative
-    ): string {
-        $raw = \sprintf('%.'.$decimals.'F', $rounded);
-        if ($negative) {
-            $raw = \ltrim($raw, '-');
-        }
-        $dotPos = \strpos($raw, '.');
-        if (false === $dotPos) {
-            $intDigits = $raw;
-            $fracDigits = \str_repeat('0', $decimals);
-        } else {
-            $intDigits = VmString::byteSlice($raw, 0, $dotPos);
-            $fracDigits = VmString::byteSlice($raw, $dotPos + 1);
-            if (VmString::byteLength($fracDigits) < $decimals) {
-                $fracDigits = self::padLeft($fracDigits, $decimals, '0');
-            } elseif (VmString::byteLength($fracDigits) > $decimals) {
-                $fracDigits = VmString::byteSlice($fracDigits, 0, $decimals);
-            }
-        }
-        if ('' === $intDigits) {
-            $intDigits = '0';
-        }
-        $result = self::insertThousands($intDigits, $thousandsSeparator);
-        if ($decimals > 0) {
-            $result .= $decimalSeparator.$fracDigits;
-        }
-        if ($negative) {
-            return '-'.$result;
-        }
-
-        return $result;
     }
 }
