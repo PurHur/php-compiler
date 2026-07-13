@@ -73,6 +73,8 @@ final class JitStringBuiltinArg
                 return self::unreachableStringPtr($context);
             }
 
+            self::emitNullStringParamDeprecation($context, $function, $argIndex, $paramName);
+
             return $context->builder->load($context->constantStringFromString(''));
         }
         if (Variable::TYPE_HASHTABLE === $arg->type) {
