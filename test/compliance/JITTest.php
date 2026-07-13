@@ -1367,6 +1367,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'printf_null_format_typeerror') && !str_contains($name, '_jit')) {
                 continue;
             }
+            // printf(null) E_DEPRECATED writes to SAPI stdout under MCJIT — VM + AOT (#18764); JIT via sprintf_null_deprecated_jit.
+            if (str_contains($name, 'printf_null_deprecated') && !str_contains($name, '_jit')) {
+                continue;
+            }
             // addcslashes() null characters TypeError getMessage in try/catch under strict_types: VM + AOT (#17829); MCJIT pending TypeError introspection (#98).
             if (str_contains($name, 'addcslashes_null_characters_strict_typeerror') && !str_contains($name, '_jit')) {
                 continue;
