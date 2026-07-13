@@ -165,14 +165,16 @@ final class VmImage
     }
 
     /**
-     * php-src getimagesizefromstring() — E_NOTICE on any parse/read failure (#12930, #17961).
+     * php-src php_getimagetype() — E_NOTICE only when fewer than 12 bytes were read (#12930, #18572).
      *
-     * Unlike getimagesize() on regular files (#16434), getimagesizefromstring() always emits
-     * "Error reading from {data}!" when decode fails (ext/standard/image.c).
+     * After signature probes, {@see php_getimagetype} emits "Error reading from …!" only when
+     * `twelve_bytes_read` is false (ext/standard/image.c). Longer payloads that fail all format
+     * checks return IMAGE_FILETYPE_UNKNOWN silently — unlike getimagesize() on regular files
+     * where only data:/php:// paths gate notices (#16434).
      */
     public static function shouldEmitImageReadNoticeForBytes(string $data): bool
     {
-        return true;
+        return \strlen($data) < 12;
     }
 
     /**
