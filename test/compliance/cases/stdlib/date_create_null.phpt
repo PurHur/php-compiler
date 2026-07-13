@@ -1,21 +1,17 @@
 --TEST--
-stdlib date_create(null) / DateTime(null) — null datetime means now (#18682, ext/date/php_date.c)
+stdlib date_create(null) / DateTime(null) — null datetime deprecated on 8.2 profile (#18682, ext/date/php_date.c)
 --FILE--
 <?php
-$d = date_create(null);
-echo $d instanceof DateTime ? "date_create\n" : "bad\n";
-
-$dt = new DateTime(null);
-echo $dt instanceof DateTime ? "DateTime\n" : "bad\n";
-
-$di = new DateTimeImmutable(null);
-echo $di instanceof DateTimeImmutable ? "DateTimeImmutable\n" : "bad\n";
-
-$dim = date_create_immutable(null);
-echo $dim instanceof DateTimeImmutable ? "date_create_immutable\n" : "bad\n";
+error_reporting(E_ALL);
+date_create(null);
+new DateTime(null);
+new DateTimeImmutable(null);
+date_create_immutable(null);
+echo "done\n";
 ?>
---EXPECT--
-date_create
-DateTime
-DateTimeImmutable
-date_create_immutable
+--EXPECTF--
+PHP Deprecated:  date_create(): Passing null to parameter #1 ($datetime) of type string is deprecated in %s on line %d
+PHP Deprecated:  DateTime::__construct(): Passing null to parameter #1 ($datetime) of type string is deprecated in %s on line %d
+PHP Deprecated:  DateTimeImmutable::__construct(): Passing null to parameter #1 ($datetime) of type string is deprecated in %s on line %d
+PHP Deprecated:  date_create_immutable(): Passing null to parameter #1 ($datetime) of type string is deprecated in %s on line %d
+done
