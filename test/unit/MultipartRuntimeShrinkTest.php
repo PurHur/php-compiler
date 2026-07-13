@@ -33,13 +33,16 @@ final class MultipartRuntimeShrinkTest extends TestCase
         $this->assertSame(0, $files->getNumElements());
     }
 
-    public function testStandaloneMultipartLlvmLinkedForUserScriptRefresh(): void
+    public function testStandaloneMultipartRoutesThroughMultipartRuntimeBridge(): void
     {
-        $this->assertFileExists(__DIR__.'/../../lib/JIT/Builtin/StringMultipartStandaloneLlvm.php');
+        $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StringMultipartStandaloneLlvm.php');
         $multipartRuntime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/MultipartRuntime.php');
         $this->assertStringContainsString('MultipartNativeJitHelper', $multipartRuntime);
         $refresh = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/SuperglobalRefreshUserScriptLlvm.php');
-        $this->assertStringContainsString('__phpc_parse_multipart_post', $refresh);
+        $this->assertStringContainsString('MultipartRuntime::ensureUserScriptLinked', $refresh);
+        $this->assertStringContainsString('__compiler_multipart_populate_post_body', $refresh);
+        $this->assertStringNotContainsString('StringMultipartStandaloneLlvm', $refresh);
+        $this->assertStringNotContainsString('__phpc_parse_multipart_post', $refresh);
     }
 
     /** isset($_FILES['field']) must use offsetIsSet — upload slots are nested hashtables (#15624). */

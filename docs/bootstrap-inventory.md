@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 4774 |
-| Phase A inventory files (M2 ratio SSOT) | 4774 |
+| PHP files on vm.php path | 4773 |
+| Phase A inventory files (M2 ratio SSOT) | 4773 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 12826 |
+| Source constructs flagged (warnings) | 12825 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -3679,7 +3679,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringMicrotime.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringMkdir.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringMktime.php` | 0 | 3 |
-| `lib/JIT/Builtin/StringMultipartStandaloneLlvm.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringNCompare.php` | 0 | 2 |
 | `lib/JIT/Builtin/StringNaturalCompare.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringNetInterfacesJit.php` | 0 | 3 |
@@ -28960,11 +28959,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new JIT (line 185)
 - 6 class method(s)
 - 1 closure(s)
-
-### `lib/JIT/Builtin/StringMultipartStandaloneLlvm.php`
-
-**Warnings** (review for bootstrap subset):
-- 19 class method(s)
 
 ### `lib/JIT/Builtin/StringNCompare.php`
 
