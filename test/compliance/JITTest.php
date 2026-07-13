@@ -639,6 +639,11 @@ class JITTest extends BaseTest {
                 && !str_contains($name, 'extension_loaded_xmlrpc')) {
                 continue;
             }
+            if (!CompilerVersion::supportsWddx()
+                && str_contains($name, 'wddx')
+                && !str_contains($name, 'extension_loaded_wddx')) {
+                continue;
+            }
             if (!CompilerVersion::supportsZip()
                 && (str_contains($name, 'zip')
                     || str_contains($name, 'ziparchive'))
