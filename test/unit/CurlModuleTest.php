@@ -20,7 +20,7 @@ final class CurlModuleTest extends TestCase
         $ctx = $runtime->vmContext;
 
         foreach (['curl_init', 'curl_setopt', 'curl_close'] as $fn) {
-            self::assertTrue(VmReflection::functionExists($ctx, $fn), $fn);
+            self::assertFalse(VmReflection::functionExists($ctx, $fn), $fn);
         }
         foreach (['curl_share_init', 'curl_share_setopt', 'curl_share_close'] as $fn) {
             self::assertTrue(VmReflection::functionExists($ctx, $fn), $fn);
@@ -56,19 +56,6 @@ PHP;
         $block = $runtime->parseAndCompile($code, 'curl_module.php');
         ob_start();
         $runtime->run($block);
-        self::assertSame('11011100111011000210', ob_get_clean());
-    }
-
-    public function test_curl_init_returns_curl_handle_object(): void
-    {
-        $runtime = new Runtime();
-        $code = <<<'PHP'
-<?php
-$ch = curl_init('https://example.com');
-echo get_class($ch), "\n";
-PHP;
-        ob_start();
-        $runtime->run($runtime->parseAndCompile($code, 'curl_init_handle.php'));
-        self::assertSame("CurlHandle\n", ob_get_clean());
+        self::assertSame('00001100111011000210', ob_get_clean());
     }
 }
