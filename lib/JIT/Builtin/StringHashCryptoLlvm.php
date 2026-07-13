@@ -42,7 +42,7 @@ final class StringHashCryptoLlvm
 
         self::implementIfMissing($context, '__compiler_hash', 'hc_llvm_hash_entry', self::emitHash(...));
         self::implementIfMissing($context, '__compiler_hash_hmac', 'hc_llvm_hmac_entry', self::emitHmac(...));
-        self::implementNullAbiIfMissing($context, '__compiler_hash_pbkdf2', 'hc_llvm_pbkdf2_stub');
+        self::implementIfMissing($context, '__compiler_hash_pbkdf2', 'hc_llvm_pbkdf2_entry', self::emitPbkdf2(...));
         self::implementNullAbiIfMissing($context, '__compiler_hash_hkdf', 'hc_llvm_hkdf_stub');
     }
 
@@ -260,6 +260,163 @@ final class StringHashCryptoLlvm
         self::formatDigest($context, $fn, $mdBuf, $mdLen, $raw);
     }
 
+    private static function emitPbkdf2(Context $context, LlvmFunction $fn): void
+    {
+        $entry = $fn->appendBasicBlock('hc_llvm_pbkdf2_entry');
+        $context->builder->positionAtEnd($entry);
+
+        $algo = $fn->getParam(0);
+        $password = $fn->getParam(1);
+        $salt = $fn->getParam(2);
+        $iterations64 = $fn->getParam(3);
+        $length64 = $fn->getParam(4);
+        $raw = $fn->getParam(5);
+        $strPtr = $context->getTypeFromString('__string__*');
+        $nullStr = $strPtr->constNull();
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $i8 = $context->getTypeFromString('int8');
+        $i8p = $context->getTypeFromString('int8*');
+
+        $algoCstr = self::stringToCstr($context, $algo, 'hc_pbkdf2_algo');
+        $mdType = $context->builder->call(
+            $context->lookupFunction('EVP_get_digestbyname'),
+            $algoCstr
+        );
+        $fail = $fn->appendBasicBlock('hc_llvm_pbkdf2_fail');
+        $body = $fn->appendBasicBlock('hc_llvm_pbkdf2_body');
+        $context->builder->branchIf(
+            $context->builder->icmp(
+                Builder::INT_EQ,
+                $mdType,
+                $i8p->constNull()
+            ),
+            $fail,
+            $body
+        );
+
+        $context->builder->positionAtEnd($fail);
+        $context->builder->call($context->lookupFunction('free'), $algoCstr);
+        $context->builder->returnValue($nullStr);
+
+        $context->builder->positionAtEnd($body);
+        $context->builder->call($context->lookupFunction('free'), $algoCstr);
+
+        $iterations = $context->builder->truncOrBitCast($iterations64, $i32);
+        $defaultKeyLen = self::pbkdf2DefaultKeyLenFromAlgo($context, $fn, $algo);
+        $lengthZero = $context->builder->icmp(Builder::INT_EQ, $length64, $i64->constInt(0, false));
+        $useDigestLen = $fn->appendBasicBlock('hc_llvm_pbkdf2_keylen_digest');
+        $useArgLen = $fn->appendBasicBlock('hc_llvm_pbkdf2_keylen_arg');
+        $keylenReady = $fn->appendBasicBlock('hc_llvm_pbkdf2_keylen_ready');
+        $context->builder->branchIf($lengthZero, $useDigestLen, $useArgLen);
+
+        $context->builder->positionAtEnd($useDigestLen);
+        $defaultKeyLenZero = $context->builder->icmp(Builder::INT_EQ, $defaultKeyLen, $i32->constInt(0, false));
+        $failDefaultLen = $fn->appendBasicBlock('hc_llvm_pbkdf2_default_keylen_fail');
+        $context->builder->branchIf($defaultKeyLenZero, $failDefaultLen, $keylenReady);
+
+        $context->builder->positionAtEnd($failDefaultLen);
+        $context->builder->returnValue($nullStr);
+
+        $context->builder->positionAtEnd($useArgLen);
+        $argKeyLen = $context->builder->truncOrBitCast($length64, $i32);
+        $context->builder->branch($keylenReady);
+
+        $context->builder->positionAtEnd($keylenReady);
+        $keylenPhi = $context->builder->phi($i32);
+        $keylenPhi->addIncoming($defaultKeyLen, $useDigestLen);
+        $keylenPhi->addIncoming($argKeyLen, $useArgLen);
+
+        $outBuf = $context->builder->alloca($i8, $keylenPhi, 'hc_pbkdf2_out');
+        $passPtr = self::stringData($context, $password);
+        $passLen = self::stringLenI32($context, $password);
+        $saltPtr = self::stringData($context, $salt);
+        $saltLen = self::stringLenI32($context, $salt);
+        $ok = $context->builder->call(
+            $context->lookupFunction('PKCS5_PBKDF2_HMAC'),
+            $passPtr,
+            $passLen,
+            $saltPtr,
+            $saltLen,
+            $iterations,
+            $mdType,
+            $keylenPhi,
+            $outBuf
+        );
+
+        $failDerive = $fn->appendBasicBlock('hc_llvm_pbkdf2_derive_fail');
+        $okDerive = $fn->appendBasicBlock('hc_llvm_pbkdf2_derive_ok');
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $ok, $i32->constInt(0, false)),
+            $failDerive,
+            $okDerive
+        );
+
+        $context->builder->positionAtEnd($failDerive);
+        $context->builder->returnValue($nullStr);
+
+        $context->builder->positionAtEnd($okDerive);
+        self::formatDigest($context, $fn, $outBuf, $keylenPhi, $raw);
+    }
+
+    private static function pbkdf2DefaultKeyLenFromAlgo(Context $context, LlvmFunction $fn, Value $algo): Value
+    {
+        $i32 = $context->getTypeFromString('int32');
+        $slot = $context->builder->alloca($i32, 1, 'hc_pbkdf2_default_keylen');
+        $context->builder->store($i32->constInt(0, false), $slot);
+
+        $algoCstr = self::stringToCstr($context, $algo, 'hc_pbkdf2_keylen_algo');
+        $sha256 = $context->pointerFromStringConstant('sha256');
+        $sha1 = $context->pointerFromStringConstant('sha1');
+        $md5 = $context->pointerFromStringConstant('md5');
+        $done = $fn->appendBasicBlock('hc_pbkdf2_keylen_pick_done');
+
+        $isSha256 = $context->builder->icmp(
+            Builder::INT_EQ,
+            $context->builder->call($context->lookupFunction('strcmp'), $algoCstr, $sha256),
+            $i32->constInt(0, false)
+        );
+        $sha256Bb = $fn->appendBasicBlock('hc_pbkdf2_keylen_pick_sha256');
+        $checkSha1 = $fn->appendBasicBlock('hc_pbkdf2_keylen_pick_sha1');
+        $context->builder->branchIf($isSha256, $sha256Bb, $checkSha1);
+
+        $context->builder->positionAtEnd($sha256Bb);
+        $context->builder->store($i32->constInt(32, false), $slot);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($checkSha1);
+        $isSha1 = $context->builder->icmp(
+            Builder::INT_EQ,
+            $context->builder->call($context->lookupFunction('strcmp'), $algoCstr, $sha1),
+            $i32->constInt(0, false)
+        );
+        $sha1Bb = $fn->appendBasicBlock('hc_pbkdf2_keylen_pick_sha1');
+        $checkMd5 = $fn->appendBasicBlock('hc_pbkdf2_keylen_pick_md5');
+        $context->builder->branchIf($isSha1, $sha1Bb, $checkMd5);
+
+        $context->builder->positionAtEnd($sha1Bb);
+        $context->builder->store($i32->constInt(20, false), $slot);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($checkMd5);
+        $isMd5 = $context->builder->icmp(
+            Builder::INT_EQ,
+            $context->builder->call($context->lookupFunction('strcmp'), $algoCstr, $md5),
+            $i32->constInt(0, false)
+        );
+        $md5Bb = $fn->appendBasicBlock('hc_pbkdf2_keylen_pick_md5');
+        $context->builder->branchIf($isMd5, $md5Bb, $done);
+
+        $context->builder->positionAtEnd($md5Bb);
+        $context->builder->store($i32->constInt(16, false), $slot);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($done);
+        $context->builder->call($context->lookupFunction('free'), $algoCstr);
+
+        return $context->builder->load($slot);
+    }
+
     private static function formatDigest(
         Context $context,
         LlvmFunction $fn,
@@ -387,6 +544,7 @@ final class StringHashCryptoLlvm
             'EVP_get_digestbyname' => [$i8p, false, [$i8p]],
             'EVP_Digest' => [$i32, false, [$i8p, $sizeT, $i8p, $i32p, $i8p, $i8p]],
             'HMAC' => [$i8p, false, [$i8p, $i8p, $i32, $i8p, $sizeT, $i8p, $i32p]],
+            'PKCS5_PBKDF2_HMAC' => [$i32, false, [$i8p, $i32, $i8p, $i32, $i32, $i8p, $i32, $i8p]],
         ];
 
         foreach ($specs as $name => [$ret, $vararg, $params]) {
