@@ -435,7 +435,6 @@ final class ErrorReporter
 
             return;
         }
-        $formatted = $this->formatCliError($level, $message, $file, $line);
         $this->writeCliStderr($level, $message, $file, $line);
         if (self::E_USER_ERROR === $level) {
             $this->abortUserFatal($level, $message, $file, $line);
@@ -495,14 +494,50 @@ final class ErrorReporter
      */
     public static function formatCliErrorLine(int $level, string $message, ?string $file, int $line): string
     {
-        $prefix = match ($level) {
+        return self::formatCliErrorLineWithPrefix(self::cliStderrPrefix($level), $message, $file, $line, true);
+    }
+
+    /**
+     * Zend CLI stdout copy when display_errors=1 (sapi/cli/php_cli.c; issue #18562).
+     *
+     * Omits the leading "PHP " and uses a single space after the colon.
+     */
+    public static function formatCliDisplayErrorLine(int $level, string $message, ?string $file, int $line): string
+    {
+        return self::formatCliErrorLineWithPrefix(self::cliDisplayPrefix($level), $message, $file, $line, false);
+    }
+
+    private static function cliStderrPrefix(int $level): string
+    {
+        return match ($level) {
             self::E_WARNING, self::E_USER_WARNING => 'PHP Warning',
             self::E_NOTICE, self::E_USER_NOTICE => 'PHP Notice',
             self::E_DEPRECATED, self::E_USER_DEPRECATED => 'PHP Deprecated',
             self::E_USER_ERROR => 'PHP Fatal error',
             default => 'PHP Unknown error',
         };
-        $formatted = "{$prefix}:  {$message}";
+    }
+
+    private static function cliDisplayPrefix(int $level): string
+    {
+        return match ($level) {
+            self::E_WARNING, self::E_USER_WARNING => 'Warning',
+            self::E_NOTICE, self::E_USER_NOTICE => 'Notice',
+            self::E_DEPRECATED, self::E_USER_DEPRECATED => 'Deprecated',
+            self::E_USER_ERROR => 'Fatal error',
+            default => 'Unknown error',
+        };
+    }
+
+    private static function formatCliErrorLineWithPrefix(
+        string $prefix,
+        string $message,
+        ?string $file,
+        int $line,
+        bool $stderrSpacing
+    ): string {
+        $colonSpacing = $stderrSpacing ? ':  ' : ': ';
+        $formatted = "{$prefix}{$colonSpacing}{$message}";
         if (null !== $file && '' !== $file) {
             $formatted .= " in {$file}";
             if ($line > 0) {
@@ -514,26 +549,30 @@ final class ErrorReporter
     }
 
     /**
-     * php-src CLI: diagnostics go to stderr when display_errors and error_reporting include the level
-     * (ext/standard/output.c / main/main.c php_error_cb; issue #13486).
+     * php-src CLI: diagnostics go to stderr when error_reporting includes the level;
+     * display_errors=1 mirrors to stdout with the short prefix (main/main.c php_error_cb; #13486, #18562).
      */
     public static function writeCliStderrLine(int $level, string $message, ?string $file, int $line): void
     {
-        fwrite(STDERR, self::formatCliErrorLine($level, $message, $file, $line));
+        self::writeCliErrorOutput($level, $message, $file, $line, false);
     }
 
-    private function formatCliError(int $level, string $message, ?string $file, int $line): string
-    {
-        return self::formatCliErrorLine($level, $message, $file, $line);
+    public static function writeCliErrorOutput(
+        int $level,
+        string $message,
+        ?string $file,
+        int $line,
+        bool $displayErrors
+    ): void {
+        fwrite(STDERR, self::formatCliErrorLine($level, $message, $file, $line));
+        if ($displayErrors) {
+            echo "\n", self::formatCliDisplayErrorLine($level, $message, $file, $line);
+        }
     }
 
     private function writeCliStderr(int $level, string $message, ?string $file, int $line): void
     {
-        $formatted = self::formatCliErrorLine($level, $message, $file, $line);
-        fwrite(STDERR, $formatted);
-        if ($this->displayErrors) {
-            echo $formatted;
-        }
+        self::writeCliErrorOutput($level, $message, $file, $line, $this->displayErrors);
     }
 
     /**
