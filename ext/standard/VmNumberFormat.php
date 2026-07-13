@@ -126,11 +126,10 @@ final class VmNumberFormat
         }
 
         $rounded = VmRound::mathRound($number, $roundPlaces, $roundingMode);
-        $absRounded = $negative ? -$rounded : $rounded;
 
         if ($decimals > 0) {
             return self::formatWithSprintfFraction(
-                $absRounded,
+                $rounded,
                 $decimals,
                 $decimalSeparator,
                 $thousandsSeparator,
@@ -138,7 +137,7 @@ final class VmNumberFormat
             );
         }
 
-        $intDigits = self::digitsFromInt((int) floor($absRounded));
+        $intDigits = self::digitsFromInt((int) floor($rounded));
         $result = self::insertThousands($intDigits, $thousandsSeparator);
 
         if ($negative) {
@@ -154,13 +153,13 @@ final class VmNumberFormat
      * Integer extraction of the fractional part loses accuracy beyond ~14 decimal digits (IEEE double).
      */
     private static function formatWithSprintfFraction(
-        float $absRounded,
+        float $rounded,
         int $decimals,
         string $decimalSeparator,
         string $thousandsSeparator,
         bool $negative
     ): string {
-        $formatted = \sprintf('%.'.$decimals.'f', $absRounded);
+        $formatted = \sprintf('%.'.$decimals.'f', $rounded);
         $dotPos = \strpos($formatted, '.');
         if (false === $dotPos) {
             $intDigits = $formatted;
