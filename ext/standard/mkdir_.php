@@ -7,10 +7,8 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\NamedOptionalCallArgs;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -31,8 +29,7 @@ final class mkdir_ extends Internal
         if (!isset($frame->calledArgs[0])) {
             throw new \ArgumentCountError('mkdir(): Argument #1 ($directory) not passed');
         }
-        InternalStrictArg::rejectNullString($frame->calledArgs[0], 'mkdir', 'directory', 0, $frame);
-        $path = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'mkdir', 0, 'directory');
+        $path = VmFilestatArg::coerceFilenameArg($frame->calledArgs[0], 'mkdir', 0, 'directory', $frame);
         $mode = 0777;
         if (isset($frame->calledArgs[1])) {
             $mode = VmFilestatArg::parseFileModeArgForFrame($frame, 1, 'mkdir', 'permissions');
@@ -65,7 +62,7 @@ final class mkdir_ extends Internal
         if ($argc < 1 || $argc > 3) {
             throw new \LogicException('mkdir() requires one to three arguments in this compiler build');
         }
-        $path = JitStringBuiltinArg::lower($context, $args[0], 'mkdir', 0, 'directory');
+        $path = JitFilestatArg::lowerFilename($context, $args[0], 'mkdir', 0, 'directory');
         $i64 = $context->getTypeFromString('int64');
         $mode = $i64->constInt(0777, false);
         if (isset($args[1]) && !NamedOptionalCallArgs::isOmittedOptional($args[1])) {
