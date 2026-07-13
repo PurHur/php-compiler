@@ -67,6 +67,30 @@ final class PropertyHookSyntaxReferenceProfileTest extends TestCase
         }
     }
 
+    public function testRuntimeRejectsHookBlockOnDefaultProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE');
+        try {
+            $runtime = new Runtime();
+            try {
+                $runtime->parseAndCompile(
+                    file_get_contents(dirname(__DIR__).'/repro/maintainer_gap_property_hooks_profile.php'),
+                    'maintainer_gap_property_hooks_profile.php'
+                );
+                $this->fail('Expected compile failure');
+            } catch (\PHPCompiler\Compiler\CompileFatal $e) {
+                $this->assertStringContainsString(PropertyHooks::REFERENCE_PROFILE_UNEXPECTED_BRACE, $e->getMessage());
+            }
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     public function testRuntimeRejectsHookBlockSyntax(): void
     {
         $runtime = new Runtime();

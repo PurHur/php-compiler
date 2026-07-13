@@ -1,14 +1,17 @@
 --TEST--
-Language: property hooks get/set on default 8.4 profile (#15994, Zend/zend_compile.c)
+Language: property hooks get/set on PHP_COMPILER_PROFILE=8.4 forward profile (#15994, Zend/zend_compile.c)
 --SKIPIF--
 <?php
 if (!class_exists('PHPCompiler\\CompilerVersion')) {
     require __DIR__ . '/../../../../vendor/autoload.php';
 }
+putenv('PHP_COMPILER_PROFILE=8.4');
 if (!PHPCompiler\CompilerVersion::supportsPropertyHooks()) {
-    die('skip property hooks disabled on reference profile');
+    die('skip property hooks require PHP_COMPILER_PROFILE=8.4');
 }
 ?>
+--ENV--
+PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
 class C {
