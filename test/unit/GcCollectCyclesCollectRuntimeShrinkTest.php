@@ -68,6 +68,7 @@ final class GcCollectCyclesCollectRuntimeShrinkTest extends TestCase
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/GcCollectCyclesJitHelper.php');
         $this->assertStringContainsString('collectCyclesEmbed', $source);
+        $this->assertStringContainsString('collectCyclesStandalone', $source);
         $this->assertStringContainsString('collectNativeRegistry', $source);
         $this->assertStringContainsString('CycleCollector', $source);
         $this->assertStringNotContainsString(

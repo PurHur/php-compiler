@@ -11,6 +11,7 @@ use PHPCompiler\Web\Superglobals;
  * gc_collect_cycles() bookkeeping + embed cycle scan for compiled JIT/AOT (#9183, #13882).
  *
  * VM SSOT: {@see CycleCollector}; embed JIT routes native registry scan through PHP here.
+ * Standalone AOT uses {@see collectCyclesStandalone} (registry scan only, no Superglobals).
  * php-src: Zend/zend_gc.c — gc_collect_cycles
  */
 final class GcCollectCyclesJitHelper
@@ -51,6 +52,16 @@ final class GcCollectCyclesJitHelper
         $collected += self::collectNativeRegistry();
 
         return $collected;
+    }
+
+    /** Standalone AOT collect bridge — native registry scan only (#18630). */
+    public static function collectCyclesStandalone(): int
+    {
+        if (!GcToggleJitHelper::isEnabled()) {
+            return 0;
+        }
+
+        return self::collectNativeRegistry();
     }
 
     /**

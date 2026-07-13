@@ -33,6 +33,8 @@ final class GcCollectCyclesCollectRuntime
 
     private const COLLECT_EMBED = 'PHPCompiler\\ext\\standard\\GcCollectCyclesJitHelper::collectCyclesEmbed';
 
+    private const COLLECT_STANDALONE = 'PHPCompiler\\ext\\standard\\GcCollectCyclesJitHelper::collectCyclesStandalone';
+
     /** @var list<string> */
     private const COMPILED_HELPERS = [
         self::RECORD_COLLECT,
@@ -41,6 +43,7 @@ final class GcCollectCyclesCollectRuntime
         self::IS_RUNNING,
         self::IS_PROTECTED,
         self::COLLECT_EMBED,
+        self::COLLECT_STANDALONE,
     ];
 
     public static function ensureCollectHelperCompiled(Context $context): void
@@ -80,19 +83,14 @@ final class GcCollectCyclesCollectRuntime
 
         $context->builder->positionAtEnd($work);
         $implResult = $context->builder->call($context->lookupFunction('phpc_gc_collect_cycles_impl'));
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            $resultI64 = $context->builder->sext($implResult, $i64);
-            $context->builder->branch($done);
-        } else {
-            self::ensureJitHelperCompiled($context);
-            $collected = $context->builder->call(
-                self::helperFunction($context, self::RECORD_COLLECT),
-                $context->builder->sext($implResult, $i64)
-            );
-            self::syncGlobalsFromHelper($context);
-            $resultI64 = $context->builder->sextOrBitCast($collected, $i64);
-            $context->builder->branch($done);
-        }
+        self::ensureJitHelperCompiled($context);
+        $collected = $context->builder->call(
+            self::helperFunction($context, self::RECORD_COLLECT),
+            $context->builder->sext($implResult, $i64)
+        );
+        self::syncGlobalsFromHelper($context);
+        $resultI64 = $context->builder->sextOrBitCast($collected, $i64);
+        $context->builder->branch($done);
 
         $context->builder->positionAtEnd($done);
         $zero = $i64->constInt(0, false);
