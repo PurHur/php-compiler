@@ -20,8 +20,6 @@ use PHPLLVM\Value;
  */
 final class array_diff_key extends Internal
 {
-    use VmArrayAssocSetOps;
-
     public function execute(Frame $frame): void
     {
         $argc = \count($frame->calledArgs);
@@ -47,7 +45,7 @@ final class array_diff_key extends Internal
         $others = self::collectTypedOtherHashTables($frame->calledArgs, 'array_diff_key');
         $out = new HashTable();
         foreach ($firstHt->iterateKeyed(true) as [$key, $value]) {
-            if (self::keyInAnyOther($key, $others)) {
+            if (VmArrayAssocSetOps::keyInAnyOther($key, $others)) {
                 continue;
             }
             $stored = new Variable();

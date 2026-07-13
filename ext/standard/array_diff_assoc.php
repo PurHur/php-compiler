@@ -20,8 +20,6 @@ use PHPLLVM\Value;
  */
 final class array_diff_assoc extends Internal
 {
-    use VmArrayAssocSetOps;
-
     public function execute(Frame $frame): void
     {
         $argc = \count($frame->calledArgs);
@@ -32,7 +30,7 @@ final class array_diff_assoc extends Internal
         if (Variable::TYPE_ARRAY !== $first->type) {
             throw new \LogicException('array_diff_assoc() first argument must be an array in this compiler build');
         }
-        self::guardSetOpOperands($frame, $frame->calledArgs, 'array_diff_assoc');
+        VmArrayAssocSetOps::guardSetOpOperands($frame, $frame->calledArgs, 'array_diff_assoc');
         if (1 === $argc) {
             if (null !== $frame->returnVar) {
                 $frame->returnVar->array($first->toArray()->replaceCopy());
@@ -43,10 +41,10 @@ final class array_diff_assoc extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $others = self::collectOtherHashTables($frame->calledArgs, 'array_diff_assoc');
+        $others = VmArrayAssocSetOps::collectOtherHashTables($frame->calledArgs, 'array_diff_assoc');
         $out = new HashTable();
         foreach ($first->toArray()->iterateKeyed(true) as [$key, $value]) {
-            if (self::pairInAnyOther($key, $value, $others)) {
+            if (VmArrayAssocSetOps::pairInAnyOther($key, $value, $others)) {
                 continue;
             }
             $stored = new Variable();
