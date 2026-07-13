@@ -140,7 +140,9 @@ final class VmArrayValueCallback
         if (null === $frame->vmContext) {
             throw new \LogicException($function.'() requires VM context in this compiler build');
         }
-        if (!VmCallable::isCallable($frame->vmContext, $callback)) {
+        try {
+            VmUserCall::resolveStringCallback($frame->vmContext, $name);
+        } catch (\LogicException) {
             throw new \TypeError(
                 ArrayFindCallbackPolicy::invalidStringCallbackTypeError($function, $name, $argNum)
             );

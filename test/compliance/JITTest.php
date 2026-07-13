@@ -271,7 +271,8 @@ class JITTest extends BaseTest {
                     || (str_contains($name, 'array_first') && !str_contains($name, 'array_first_key') && !str_contains($name, 'array_first_last_key'))
                     || (str_contains($name, 'array_last') && !str_contains($name, 'array_last_key') && !str_contains($name, 'array_first_last_key')))
                 && !str_contains($name, 'php84_array_search_phantom')
-                && !str_contains($name, 'array_any_key_forward_84')) {
+                && !str_contains($name, 'array_any_key_forward_84')
+                && !str_contains($name, 'array_find_phpc_prefix_callback_forward_84')) {
                 continue;
             }
             if (CompilerVersion::supportsPhp84ArraySearchFunctions()
