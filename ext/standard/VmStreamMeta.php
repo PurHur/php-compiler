@@ -18,6 +18,7 @@ final class VmStreamMeta
     public static function buildMetaArray(string $uri, $fp = null, ?bool $eofOverride = null, ?string $mode = null, ?bool $blocked = null): array
     {
         $isPhp = \str_starts_with($uri, 'php://');
+        $isData = VmDataUri::isDataUri($uri);
         $isPhpMemory = \str_starts_with($uri, 'php://memory')
             || \str_starts_with($uri, 'php://temp')
             || \str_starts_with($uri, 'php://fd/');
@@ -32,6 +33,18 @@ final class VmStreamMeta
             return [
                 'wrapper_type' => 'PHP',
                 'stream_type' => $socketType ?? $phpNativeStreamType ?? 'TEMP',
+                'mode' => $reportedMode,
+                'unread_bytes' => 0,
+                'seekable' => self::supportsSeekable($uri),
+                'uri' => $uri,
+            ];
+        }
+
+        // php-src ext/standard/php_stream_rfc2397.c — data:// wrapper metadata (#18580).
+        if ($isData) {
+            return [
+                'wrapper_type' => 'RFC2397',
+                'stream_type' => 'RFC2397',
                 'mode' => $reportedMode,
                 'unread_bytes' => 0,
                 'seekable' => self::supportsSeekable($uri),
