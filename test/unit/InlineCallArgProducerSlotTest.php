@@ -6017,6 +6017,67 @@ PHP;
         self::assertSame("array (\n  'a' => array (\n    'b' => 1,\n    'c' => 2,\n  ),\n)\n", ob_get_clean());
     }
 
+    /** Issue #18571 — array_replace_recursive() must read assigned locals, not trailing hoisted Array_ roots. */
+    public function testArrayReplaceRecursiveAssignedLocalsArgSendWiring(): void
+    {
+        $code = <<<'PHP'
+<?php
+$a = ['k' => ['x' => 1, 'y' => 2]];
+$b = ['k' => ['y' => 9]];
+array_replace_recursive($a, $b);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'array_replace_recursive_assigned_locals.php');
+
+        $assignLvalueSlots = [];
+        $initArrayRootSlots = [];
+        $sendSlots = [];
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_ASSIGN === $op->type && null !== $op->arg2) {
+                $assignLvalueSlots[] = $op->arg2;
+            }
+            if (OpCode::TYPE_INIT_ARRAY === $op->type && null !== $op->arg1) {
+                $initArrayRootSlots[] = $op->arg1;
+            }
+            if (OpCode::TYPE_ARG_SEND === $op->type) {
+                $sendSlots[] = $op->arg1;
+            }
+        }
+
+        $uniqueAssignLvalues = array_values(array_unique($assignLvalueSlots, SORT_REGULAR));
+        self::assertCount(2, $uniqueAssignLvalues, 'assign lvalues='.json_encode($assignLvalueSlots));
+        self::assertCount(2, $sendSlots, 'arg sends='.json_encode($sendSlots));
+        self::assertSame($uniqueAssignLvalues[0], $sendSlots[0], 'arg #1 must read $a named local');
+        self::assertSame($uniqueAssignLvalues[1], $sendSlots[1], 'arg #2 must read $b named local');
+        self::assertNotContains($sendSlots[0], $initArrayRootSlots, 'arg #1 must not reuse hoisted Array_ root');
+        self::assertNotContains($sendSlots[1], $initArrayRootSlots, 'arg #2 must not reuse hoisted Array_ root');
+    }
+
+    /** Issue #18571 — array_replace_recursive() nested merge preserves sibling keys on assigned locals. */
+    public function testArrayReplaceRecursiveAssignedLocalsNestedMergeRuntime(): void
+    {
+        $code = <<<'PHP'
+<?php
+$a = ['k' => ['x' => 1, 'y' => 2]];
+$b = ['k' => ['y' => 9]];
+var_export(array_replace_recursive($a, $b));
+echo "\n";
+$a = ['l' => ['a' => 1, 'b' => ['c' => 3]]];
+$b = ['l' => ['b' => ['d' => 4]]];
+var_export(array_replace_recursive($a, $b));
+echo "\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'array_replace_recursive_assigned_locals_runtime.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame(
+            "array (\n  'k' => array (\n    'x' => 1,\n    'y' => 9,\n  ),\n)\n"
+            ."array (\n  'l' => array (\n    'a' => 1,\n    'b' => array (\n      'c' => 3,\n      'd' => 4,\n    ),\n  ),\n)\n",
+            ob_get_clean()
+        );
+    }
+
     /** Issue #12008 — nested inline array + 4th positional arg must not steal Array_ slots for literals. */
     public function testHttpBuildQueryNestedInlineArrayFourPositionalArgsRuntime(): void
     {

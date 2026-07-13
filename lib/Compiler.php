@@ -14747,6 +14747,20 @@ class Compiler {
         if (!property_exists($callOp, 'args') || !is_array($callOp->args)) {
             return null;
         }
+        $namedMergeCallArg = $callOp->args[$argIndex] ?? $arg;
+        if (
+            $namedMergeCallArg instanceof Operand
+            && null !== Block::resolveVariableName($namedMergeCallArg)
+            && !$this->callArgIsDeadInlineTemporary($namedMergeCallArg)
+            && \in_array(
+                $this->resolveCfgFuncCallName($callOp),
+                ['array_merge', 'array_merge_recursive', 'array_replace', 'array_replace_recursive'],
+                true
+            )
+        ) {
+            // $a = [...]; array_replace_recursive($a, $b) — read assign slots, not trailing hoisted Array_ (#18571).
+            return null;
+        }
         if ('array_combine' === $this->resolveCfgFuncCallName($callOp)) {
             $combineProducers = $this->precedingInlineCallArgProducersBeforeCfgOp($cfgChildren, $callOp);
             $combineMatch = $this->matchArrayCombineInlineProducers($combineProducers, $argIndex);
@@ -39763,6 +39777,39 @@ class Compiler {
         foreach ($args as $argIndex => $arg) {
             $nameSlot = $this->callArgNameSlot($arg, $block);
             $unpackFlag = $this->callArgUnpack($arg) ? 1 : null;
+            $mergeFamilyNamedCallArg = ($cfgCallOp->args[(int) $argIndex] ?? null) ?? $arg;
+            if (
+                null !== $cfgCallOp
+                && $mergeFamilyNamedCallArg instanceof Operand
+                && null !== Block::resolveVariableName($mergeFamilyNamedCallArg)
+                && !$this->callArgIsDeadInlineTemporary($mergeFamilyNamedCallArg)
+                && \in_array(
+                    strtolower($calleeName ?? $this->resolveCfgFuncCallName($cfgCallOp) ?? ''),
+                    ['array_merge', 'array_merge_recursive', 'array_replace', 'array_replace_recursive'],
+                    true
+                )
+            ) {
+                $namedAssignSlot = $this->slotForNamedLocalFromAssignVarOperand($mergeFamilyNamedCallArg, $block);
+                if (null !== $namedAssignSlot) {
+                    $namedAssignDest = $block->slotForNamedAssignDest($mergeFamilyNamedCallArg);
+                    $mergeNamedValueSlot = null !== $namedAssignDest
+                        ? $this->resolveNamedAssignCallArgSlot(
+                            $block,
+                            (int) $namedAssignDest,
+                            $calleeName,
+                            (int) $argIndex,
+                            $mergeFamilyNamedCallArg
+                        )
+                        : (string) $this->finalizeOperandSlotForAccess($block, (int) $namedAssignSlot, true);
+                    $sends[] = new OpCode(
+                        OpCode::TYPE_ARG_SEND,
+                        $mergeNamedValueSlot,
+                        $nameSlot,
+                        $unpackFlag
+                    );
+                    continue;
+                }
+            }
             if (
                 0 === (int) $argIndex
                 && null !== $cfgCallOp
@@ -40979,31 +41026,38 @@ class Compiler {
                     true
                 )
             ) {
-                $mergeProducers = $this->arrayMergeFamilyInlineProducersForCfgCall(
-                    $block->orig->children,
-                    $cfgCallOp
-                );
-                $mergeMatch = $this->matchArrayMergeFamilyFullInlineCallArgProducer(
-                    $mergeProducers,
-                    (int) $argIndex,
-                    \count($cfgCallOp->args ?? []),
-                    $cfgCallOp->args ?? []
-                );
-                if (null === $mergeMatch) {
-                    $mergeMatch = $this->matchArrayMergeFuncCallAndArrayInlineProducers(
-                        $mergeProducers,
-                        (int) $argIndex
-                    );
-                }
-                if ($mergeMatch instanceof Op\Expr\Array_) {
-                    $inlineArray = $mergeMatch;
-                } elseif (
-                    $mergeMatch instanceof Op\Expr\FuncCall
-                    || $mergeMatch instanceof Op\Expr\NsFuncCall
+                $mergeCallArg = ($cfgCallOp->args[(int) $argIndex] ?? null) ?? $arg;
+                if (
+                    $mergeCallArg instanceof Operand
+                    && $this->callArgIsDeadInlineTemporary($mergeCallArg)
+                    && $this->callArgOperandExpectsArrayProducer($mergeCallArg)
                 ) {
-                    // array_merge(array_keys(...), [...]) — arg #0 is sibling FuncCall, not trailing Array_ (#12450, #16418).
-                    $inlineArray = $mergeMatch;
-                    $arrayMergeNestedFuncArg = true;
+                    $mergeProducers = $this->arrayMergeFamilyInlineProducersForCfgCall(
+                        $block->orig->children,
+                        $cfgCallOp
+                    );
+                    $mergeMatch = $this->matchArrayMergeFamilyFullInlineCallArgProducer(
+                        $mergeProducers,
+                        (int) $argIndex,
+                        \count($cfgCallOp->args ?? []),
+                        $cfgCallOp->args ?? []
+                    );
+                    if (null === $mergeMatch) {
+                        $mergeMatch = $this->matchArrayMergeFuncCallAndArrayInlineProducers(
+                            $mergeProducers,
+                            (int) $argIndex
+                        );
+                    }
+                    if ($mergeMatch instanceof Op\Expr\Array_) {
+                        $inlineArray = $mergeMatch;
+                    } elseif (
+                        $mergeMatch instanceof Op\Expr\FuncCall
+                        || $mergeMatch instanceof Op\Expr\NsFuncCall
+                    ) {
+                        // array_merge(array_keys(...), [...]) — arg #0 is sibling FuncCall, not trailing Array_ (#12450, #16418).
+                        $inlineArray = $mergeMatch;
+                        $arrayMergeNestedFuncArg = true;
+                    }
                 }
             }
             if (null === $inlineArray && null !== $cfgCallOp) {
@@ -43522,42 +43576,36 @@ class Compiler {
                     true
                 )
             ) {
-                $mergeProducers = $this->arrayMergeFamilyInlineProducersForCfgCall(
-                    $block->orig->children,
-                    $cfgCallOp
-                );
-                $mergeArgCount = \count($cfgCallOp->args ?? []);
-                if ($mergeArgCount >= 2 && \count($mergeProducers) >= 2) {
-                    if (
-                        0 === (int) $argIndex
-                        && $this->arrayMergeHasLeadingInlineArrayBeforeArrayKeysSibling($block, $cfgCallOp)
-                    ) {
-                        $leadingInitSlot = $this->slotForInitArrayOrdinal($block, 0, $sends);
-                        if (null !== $leadingInitSlot) {
-                            $valueSlot = $leadingInitSlot;
-                            $inlineArrayLiteralArgWired = true;
-                        }
-                    }
-                    if (null === $valueSlot) {
-                    $mergeMapped = $this->matchArrayMergeFamilyFullInlineCallArgProducer(
-                        $mergeProducers,
-                        (int) $argIndex,
-                        $mergeArgCount,
-                        is_array($cfgCallOp->args ?? null) ? $cfgCallOp->args : []
+                $mergeCallArg = ($cfgCallOp->args[(int) $argIndex] ?? null) ?? $arg;
+                if (
+                    $mergeCallArg instanceof Operand
+                    && $this->callArgIsDeadInlineTemporary($mergeCallArg)
+                    && $this->callArgOperandExpectsArrayProducer($mergeCallArg)
+                ) {
+                    $mergeProducers = $this->arrayMergeFamilyInlineProducersForCfgCall(
+                        $block->orig->children,
+                        $cfgCallOp
                     );
-                    if ($mergeMapped instanceof Op\Expr) {
-                        $mergeSlot = $block->slotForOperand($mergeMapped->result);
+                    $mergeArgCount = \count($cfgCallOp->args ?? []);
+                    if ($mergeArgCount >= 2 && \count($mergeProducers) >= 2) {
                         if (
-                            null === $mergeSlot
-                            && $mergeMapped instanceof Op\Expr\Array_
-                            && 0 === (int) $argIndex
+                            0 === (int) $argIndex
+                            && $this->arrayMergeHasLeadingInlineArrayBeforeArrayKeysSibling($block, $cfgCallOp)
                         ) {
-                            $mergeSlot = $this->slotForInitArrayOrdinal($block, 0, $sends);
-                        }
-                        if (null === $mergeSlot) {
-                            foreach ($this->compileExpr($mergeMapped, $block) as $op) {
-                                $sends[] = $op;
+                            $leadingInitSlot = $this->slotForInitArrayOrdinal($block, 0, $sends);
+                            if (null !== $leadingInitSlot) {
+                                $valueSlot = $leadingInitSlot;
+                                $inlineArrayLiteralArgWired = true;
                             }
+                        }
+                        if (null === $valueSlot) {
+                        $mergeMapped = $this->matchArrayMergeFamilyFullInlineCallArgProducer(
+                            $mergeProducers,
+                            (int) $argIndex,
+                            $mergeArgCount,
+                            is_array($cfgCallOp->args ?? null) ? $cfgCallOp->args : []
+                        );
+                        if ($mergeMapped instanceof Op\Expr) {
                             $mergeSlot = $block->slotForOperand($mergeMapped->result);
                             if (
                                 null === $mergeSlot
@@ -43566,14 +43614,27 @@ class Compiler {
                             ) {
                                 $mergeSlot = $this->slotForInitArrayOrdinal($block, 0, $sends);
                             }
-                        }
-                        if (null !== $mergeSlot) {
-                            $valueSlot = (string) $mergeSlot;
-                            if ($mergeMapped instanceof Op\Expr\Array_) {
-                                $inlineArrayLiteralArgWired = true;
+                            if (null === $mergeSlot) {
+                                foreach ($this->compileExpr($mergeMapped, $block) as $op) {
+                                    $sends[] = $op;
+                                }
+                                $mergeSlot = $block->slotForOperand($mergeMapped->result);
+                                if (
+                                    null === $mergeSlot
+                                    && $mergeMapped instanceof Op\Expr\Array_
+                                    && 0 === (int) $argIndex
+                                ) {
+                                    $mergeSlot = $this->slotForInitArrayOrdinal($block, 0, $sends);
+                                }
+                            }
+                            if (null !== $mergeSlot) {
+                                $valueSlot = (string) $mergeSlot;
+                                if ($mergeMapped instanceof Op\Expr\Array_) {
+                                    $inlineArrayLiteralArgWired = true;
+                                }
                             }
                         }
-                    }
+                        }
                     }
                 }
             }
