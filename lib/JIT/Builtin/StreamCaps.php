@@ -14,6 +14,11 @@ final class StreamCaps
         StreamCapsJit::implement($context);
     }
 
+    public static function ensureStandaloneBodies(Context $context): void
+    {
+        StreamCapsRuntime::implement($context);
+    }
+
     public static function implement(Context $context): void
     {
         self::ensureLinked($context);
