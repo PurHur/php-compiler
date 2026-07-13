@@ -93,6 +93,8 @@ final class VmDom
 
     public const PROP_ENCODING = 'encoding';
 
+    public const PROP_XML_ENCODING = 'xmlEncoding';
+
     public const PROP_XML_VERSION = 'xmlVersion';
 
     public const PROP_XML_STANDALONE = 'xmlStandalone';
@@ -506,6 +508,7 @@ final class VmDom
         $document->properties[] = new ClassProperty(self::PROP_RECOVER, null, $boolProto);
         $document->properties[] = new ClassProperty(self::PROP_STRICT_ERROR_CHECKING, null, $boolProto);
         $document->properties[] = new ClassProperty(self::PROP_ENCODING, $nullProto, $strProto);
+        $document->properties[] = new ClassProperty(self::PROP_XML_ENCODING, $nullProto, $strProto);
         $document->properties[] = new ClassProperty(self::PROP_XML_VERSION, null, $strProto);
         $document->properties[] = new ClassProperty(self::PROP_XML_STANDALONE, null, $boolProto);
         $document->properties[] = new ClassProperty(self::PROP_DOCUMENT_ELEMENT, $nullProto, $objProto);
