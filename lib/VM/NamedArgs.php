@@ -143,6 +143,7 @@ final class NamedArgs
     ): void {
         $arrayVar = new Variable();
         $arrayVar->newArray();
+        $arrayVar->namedVariadicPack = true;
         $packed = $arrayVar->toArray();
         $numIdx = 0;
         if (isset($result[$variadicParamIndex])) {

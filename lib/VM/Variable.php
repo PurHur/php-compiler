@@ -116,6 +116,9 @@ final class Variable {
     /** GeneratorState current key/value — must not be releaseVmDeadScopeSlot temps (#18184). */
     public bool $generatorYieldStorage = false;
 
+    /** NamedArgs::assignVariadicArray() overflow pack — typed recv unpacks elements (#18647). */
+    public bool $namedVariadicPack = false;
+
     /** Lvalue proxy for __set dispatch when the property slot does not exist (#146). */
     public ?ObjectEntry $magicSetTarget = null;
 
