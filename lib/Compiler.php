@@ -39100,6 +39100,26 @@ class Compiler {
         if (null === $callIndex) {
             return null;
         }
+        if (
+            0 === $argIndex
+            && $this->callArgIsDeadInlineTemporary($arg)
+        ) {
+            $concatProducer = $this->nonConstInlineProducerBeforeTrailingScalarConstFetchPreludes(
+                $callIndex,
+                $block->orig->children
+            );
+            if ($concatProducer instanceof Op\Expr\BinaryOp\Concat && null !== $concatProducer->result) {
+                if (null === $block->slotForOperand($concatProducer->result)) {
+                    foreach ($this->compileExpr($concatProducer, $block) as $op) {
+                        $emitOps[] = $op;
+                    }
+                }
+                $concatSlot = $block->slotForOperand($concatProducer->result);
+                if (null !== $concatSlot) {
+                    return $concatSlot;
+                }
+            }
+        }
         $chain = $this->chainedConcatInlineCallArgProducersBeforeCall(
             $block->orig->children,
             $callIndex,
@@ -49138,6 +49158,61 @@ class Compiler {
         unset($send);
     }
 
+    /**
+     * file_get_contents('data://…'.$var, false, null, $off, $len) — arg #0 is inline Concat, not hoisted false/null (#18613).
+     *
+     * @param list<OpCode> $outerArgSends
+     */
+    private function rewireConcatBeforeTrailingScalarConstFetchCallArgSendSlots(
+        array &$outerArgSends,
+        Block $block,
+        ?Op $cfgCallOp
+    ): void {
+        if (null === $cfgCallOp || null === $block->orig) {
+            return;
+        }
+        $callArg = $cfgCallOp->args[0] ?? null;
+        if (!$callArg instanceof Operand || !$this->callArgIsDeadInlineTemporary($callArg)) {
+            return;
+        }
+        $callIndex = $this->cfgCallOpIndex($block, $cfgCallOp);
+        if (!\is_int($callIndex) || $callIndex < 2) {
+            return;
+        }
+        $concatProducer = $this->nonConstInlineProducerBeforeTrailingScalarConstFetchPreludes(
+            $callIndex,
+            $block->orig->children
+        );
+        if (!$concatProducer instanceof Op\Expr\BinaryOp\Concat || null === $concatProducer->result) {
+            return;
+        }
+        $concatSlot = $block->slotForOperand($concatProducer->result);
+        if (null === $concatSlot) {
+            foreach ($block->opCodes as $op) {
+                if (OpCode::TYPE_CONCAT === $op->type && null !== $op->arg1) {
+                    $concatSlot = $op->arg1;
+                }
+            }
+        }
+        if (null === $concatSlot) {
+            return;
+        }
+        $wired = (string) $this->finalizeOperandSlotForAccess($block, (int) $concatSlot, true);
+        $argSendOrdinal = 0;
+        foreach ($outerArgSends as &$send) {
+            if (OpCode::TYPE_ARG_SEND !== $send->type) {
+                continue;
+            }
+            if (0 === $argSendOrdinal) {
+                $send->arg1 = $wired;
+
+                return;
+            }
+            ++$argSendOrdinal;
+        }
+        unset($send);
+    }
+
     private function cfgCallPrecededByInlineBitmaskProducer(Op $cfgCallOp, Block $block): bool
     {
         $callIndex = $this->cfgCallOpIndex($block, $cfgCallOp);
@@ -49458,6 +49533,7 @@ class Compiler {
         $this->rewireIsArrayNestedFileCallArgSendSlots($outerArgSends, $nestedProducerOps, $block, $cfgCallOp, $calleeName);
         $this->rewireInlineBitmaskTrailingCallArgSendSlots($outerArgSends, $nestedProducerOps, $block, $cfgCallOp);
         $this->rewireNamedLocalBeforeInlineBitmaskCallArgSendSlots($outerArgSends, $block, $cfgCallOp);
+        $this->rewireConcatBeforeTrailingScalarConstFetchCallArgSendSlots($outerArgSends, $block, $cfgCallOp);
         $return = [];
         foreach ($outerArgSends as $send) {
             if (OpCode::TYPE_ASSIGN === $send->type) {

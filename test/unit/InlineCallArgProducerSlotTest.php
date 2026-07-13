@@ -4811,6 +4811,32 @@ PHP;
         }
     }
 
+    /** Issue #18613 — file_get_contents('data://…'.$var, false, null, $off, $len) wires Concat to arg #0. */
+    public function testFileGetContentsInlineConcatWithTrailingScalarConstFetchArgSend(): void
+    {
+        $code = <<<'PHP'
+<?php
+declare(strict_types=1);
+$payload = '0123456789';
+file_get_contents('data://text/plain,'.$payload, false, null, 3, 4);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'file_get_contents_data_concat_offset.php');
+
+        $concatSlots = [];
+        $sendSlots = [];
+        $this->collectOpCodesFromBlock($block, $concatSlots, $sendSlots);
+
+        self::assertNotEmpty($concatSlots, 'concat slots='.json_encode($concatSlots));
+        self::assertCount(5, $sendSlots, 'arg sends='.json_encode($sendSlots));
+        self::assertSame($concatSlots[0], $sendSlots[0], 'arg sends='.json_encode($sendSlots));
+
+        ob_start();
+        $runtime->run($block);
+        ob_get_clean();
+        $this->addToAssertionCount(1);
+    }
+
     /** Issue #15929 — chained Mul/Div in call operands wires final Div slot, not inner Mul. */
     public function testSprintfMulFloatDivChainUsesFinalDivSlot(): void
     {
