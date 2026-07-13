@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\uploadprogress;
 
+use PHPCompiler\ext\standard\VmFsReadNative;
+
 /**
  * uploadprogress state + PECL file-template lookup (ext/uploadprogress/uploadprogress.c; #6386).
  *
@@ -52,7 +54,7 @@ final class VmUploadprogress
             return null;
         }
 
-        $contents = @file_get_contents($path);
+        $contents = VmFsReadNative::read($path);
         if (false === $contents || '' === $contents) {
             return null;
         }
@@ -103,8 +105,8 @@ final class VmUploadprogress
         }
 
         $data = $maxLength >= 0
-            ? @file_get_contents($path, false, null, 0, $maxLength)
-            : @file_get_contents($path);
+            ? VmFsReadNative::readSlice($path, 0, $maxLength)
+            : VmFsReadNative::read($path);
         if (false === $data) {
             return false;
         }

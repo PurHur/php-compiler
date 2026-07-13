@@ -93,7 +93,7 @@ final class JitExec
         bool $returnLastLine,
         string $function
     ): Value {
-        $cmd = JitStringBuiltinArg::lower($context, $commandArg, $function, 0, 'command');
+        $cmd = JitStringBuiltinArg::lowerStrictOrCoercible($context, $commandArg, $function, 0, 'command');
         self::rejectEmptyCommand($context, $commandArg, $cmd, $function);
         $capture = self::capture($context, $cmd);
         $failed = $context->builder->icmp(

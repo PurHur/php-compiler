@@ -3,8 +3,6 @@ stdlib exec family null command — ValueError not TypeError — JIT (ext/standa
 --JIT--
 --FILE--
 <?php
-declare(strict_types=1);
-
 foreach (['shell_exec', 'system', 'passthru'] as $fn) {
     try {
         $fn(null);

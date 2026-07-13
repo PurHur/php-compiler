@@ -9,6 +9,7 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPLLVM\Value;
 
 /** shell_exec() — VM via VmShellExecNative libc popen; JIT/AOT via __compiler_shell_exec (#8250). */
@@ -27,7 +28,7 @@ final class shell_exec extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $command = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'shell_exec', 0, 'command');
+        $command = InternalStrictArg::resolveCoercibleStringArg($frame, 0, 'shell_exec', 'command');
         VmString::rejectEmptyBuiltinStringArg($command, 'shell_exec', 0, 'command');
         $result = VmShellExecNative::shellExec($command);
         if (false === $result) {
@@ -45,7 +46,7 @@ final class shell_exec extends Internal
             throw new \LogicException('shell_exec() requires exactly one argument');
         }
 
-        $command = JitStringBuiltinArg::lower($context, $args[0], 'shell_exec', 0, 'command');
+        $command = JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'shell_exec', 0, 'command');
         JitStringBuiltinArg::rejectEmpty(
             $context,
             $args[0],

@@ -1,7 +1,5 @@
 <?php
 
-declare(strict_types=1);
-
 foreach (['exec', 'shell_exec', 'system', 'passthru', 'popen'] as $fn) {
     try {
         if ('popen' === $fn) {

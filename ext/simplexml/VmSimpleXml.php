@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\simplexml;
 
 use PHPCfg\Func as CfgFunc;
+use PHPCompiler\ext\standard\VmFsReadNative;
 use PHPCompiler\ext\xml\VmXml;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\ClassEntry;
@@ -108,7 +109,7 @@ final class VmSimpleXml
 
     public static function loadFile(Context $ctx, string $filename, ?Frame $frame = null): ?ObjectEntry
     {
-        $contents = @file_get_contents($filename);
+        $contents = VmFsReadNative::read($filename);
         if (false === $contents) {
             self::warn($ctx, 'simplexml_load_file(): Failed to open stream: No such file or directory', $frame);
 
