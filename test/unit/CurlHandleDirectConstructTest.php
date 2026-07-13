@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\Test\Unit;
 
 use PHPCompiler\ext\curl\BuiltinClasses as CurlBuiltinClasses;
+use PHPCompiler\ext\curl\VmCurlEasy;
 use PHPCompiler\ext\standard\ModuleRegistry;
 use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
@@ -17,6 +18,10 @@ final class CurlHandleDirectConstructTest extends TestCase
         $runtime = new Runtime();
         ModuleRegistry::register('curl');
         CurlBuiltinClasses::register($runtime->vmContext);
+        VmCurlEasy::registerClass($runtime->vmContext);
+        if (!isset($runtime->vmContext->classes['curlmultihandle'])) {
+            $runtime->vmContext->classes['curlmultihandle'] = new \PHPCompiler\VM\ClassEntry('CurlMultiHandle');
+        }
 
         $code = <<<'PHP'
 <?php

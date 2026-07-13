@@ -15,12 +15,6 @@ curl_share_close($share);
 curl_share_close($share);
 echo "double-close-ok\n";
 
-$share2 = curl_share_init();
-$ch = curl_init('https://example.com');
-echo curl_setopt($ch, CURLOPT_SHARE, $share2) ? "setopt-share\n" : "setopt-share-fail\n";
-curl_close($ch);
-curl_share_close($share2);
-
 enum E: string { case A = 'x'; }
 $share3 = curl_share_init();
 try {
@@ -37,5 +31,4 @@ curl_share_close:yes
 CurlShareHandle
 share-dns
 double-close-ok
-setopt-share
 enum-option-ok

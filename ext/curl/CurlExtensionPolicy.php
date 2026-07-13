@@ -36,9 +36,14 @@ final class CurlExtensionPolicy
         return self::advertisesBuiltins();
     }
 
-    /** curl_init/curl_setopt/curl_close without libcurl HTTP I/O (#6322). */
+    /**
+     * curl_init/curl_setopt/curl_close — only when ext/curl is loaded (#18470, #11627).
+     *
+     * Share-handle stubs (#6322) stay on {@see advertisesShareHandles}; easy-handle entrypoints
+     * must not appear in function_exists until extension_loaded('curl') is true (Zend parity).
+     */
     public static function advertisesEasyHandleStubs(): bool
     {
-        return self::advertisesShareHandles();
+        return self::advertisesExtension();
     }
 }

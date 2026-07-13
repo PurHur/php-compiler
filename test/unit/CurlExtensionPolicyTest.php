@@ -18,7 +18,7 @@ final class CurlExtensionPolicyTest extends TestCase
         self::assertFalse(CurlExtensionPolicy::advertisesExtension());
         self::assertFalse(CurlExtensionPolicy::advertisesHandleClasses());
         self::assertTrue(CurlExtensionPolicy::advertisesShareHandles());
-        self::assertTrue(CurlExtensionPolicy::advertisesEasyHandleStubs());
+        self::assertFalse(CurlExtensionPolicy::advertisesEasyHandleStubs());
     }
 
     public function testCurlShareHandleClassAdvertisedWithShareBuiltins(): void
@@ -36,7 +36,7 @@ var_export(class_exists('CURLStringFile', false));
 PHP;
         ob_start();
         $runtime->run($runtime->parseAndCompile($code, 'curl_handle_classes.php'));
-        self::assertSame("true\nfalse\ntrue\ntrue", ob_get_clean());
+        self::assertSame("false\nfalse\ntrue\ntrue", ob_get_clean());
     }
 
     public function testCurlHandleClassesWithheldUntilExtensionAdvertised(): void

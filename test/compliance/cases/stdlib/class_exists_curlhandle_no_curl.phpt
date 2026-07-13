@@ -11,6 +11,6 @@ echo 'share=', (int) class_exists('CurlShareHandle', false), "\n";
 ?>
 --EXPECT--
 curl_loaded=0
-handle=1
+handle=0
 multi=0
 share=1
