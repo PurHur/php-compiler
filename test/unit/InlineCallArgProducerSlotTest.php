@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler;
 
 use PHPUnit\Framework\TestCase;
+use PHPCfg\Operand;
 use PHPCompiler\VM\Variable;
 
 final class InlineCallArgProducerSlotTest extends TestCase
@@ -5617,6 +5618,91 @@ PHP;
         ob_start();
         $runtime->run($block);
         ob_end_clean();
+    }
+
+    /** Issue #18523 — file_put_contents($f, 'a', FILE_APPEND | LOCK_EX) must send BitwiseOr slot, not prior unlink bool return. */
+    public function testFilePutContentsInlineBitmaskAfterUnlinkUsesBitwiseOrSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+declare(strict_types=1);
+$f = sys_get_temp_dir() . '/fpc_inline_' . getmypid() . '.txt';
+@unlink($f);
+$r = file_put_contents($f, 'a', FILE_APPEND | LOCK_EX);
+var_dump($r);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'file_put_contents_inline_bitmask.php');
+
+        $bitwiseOrSlot = null;
+        $unlinkReturnSlot = null;
+        $fpcSendSlots = [];
+        $seen = new \SplObjectStorage();
+        $walk = static function (Block $cfgBlock) use (&$walk, &$seen, &$bitwiseOrSlot, &$unlinkReturnSlot, &$fpcSendSlots): void {
+            if ($seen->contains($cfgBlock)) {
+                return;
+            }
+            $seen->attach($cfgBlock);
+            $inFpc = false;
+            foreach ($cfgBlock->opCodes as $op) {
+                if (OpCode::TYPE_BITWISE_OR === $op->type) {
+                    $bitwiseOrSlot = $op->arg1;
+                }
+                if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                    $callee = $cfgBlock->getOperand((int) $op->arg1);
+                    $calleeName = $callee instanceof Operand\Literal ? (string) $callee->value : '';
+                    if ('unlink' === $calleeName) {
+                        $inFpc = false;
+                    } elseif ('file_put_contents' === $calleeName) {
+                        $inFpc = true;
+                        $fpcSendSlots = [];
+                    } else {
+                        $inFpc = false;
+                    }
+                }
+                if (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
+                    for ($scanIdx = array_search($op, $cfgBlock->opCodes, true) - 1; $scanIdx >= 0; --$scanIdx) {
+                        $scan = $cfgBlock->opCodes[$scanIdx] ?? null;
+                        if (!$scan instanceof OpCode) {
+                            break;
+                        }
+                        if (OpCode::TYPE_FUNCCALL_INIT === $scan->type) {
+                            $callee = $cfgBlock->getOperand((int) $scan->arg1);
+                            if ($callee instanceof Operand\Literal && 'unlink' === (string) $callee->value) {
+                                $unlinkReturnSlot = $op->arg1;
+                            }
+                            break;
+                        }
+                        if (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $scan->type) {
+                            break;
+                        }
+                    }
+                }
+                if ($inFpc && OpCode::TYPE_ARG_SEND === $op->type) {
+                    $fpcSendSlots[] = $op->arg1;
+                }
+                if ($inFpc && OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
+                    $inFpc = false;
+                }
+                if (null !== $op->block1) {
+                    $walk($op->block1);
+                }
+                if (null !== $op->block2) {
+                    $walk($op->block2);
+                }
+            }
+        };
+        $walk($block);
+
+        self::assertNotNull($bitwiseOrSlot, 'expected TYPE_BITWISE_OR slot');
+        self::assertNotNull($unlinkReturnSlot, 'expected unlink EXEC_RETURN slot');
+        self::assertCount(3, $fpcSendSlots, 'file_put_contents arg sends='.json_encode($fpcSendSlots));
+        self::assertSame($bitwiseOrSlot, $fpcSendSlots[2] ?? null, 'flags arg must use BitwiseOr slot');
+        self::assertNotSame($unlinkReturnSlot, $fpcSendSlots[2] ?? null, 'must not reuse unlink bool return slot');
+
+        ob_start();
+        $runtime->run($block);
+        self::assertStringContainsString('int(1)', ob_get_clean());
     }
 
     /** Issue #11409 — chown($path, getmyuid()) wires nested int into trailing arg slot. */

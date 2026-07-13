@@ -212,6 +212,62 @@ final class VmOpensslObjects
     }
 
     /**
+     * openssl_x509_verify() — X509_verify against supplied public key (ext/openssl/x509.c; #6595).
+     */
+    public static function verifyCertificate(
+        Context $ctx,
+        Variable $certArg,
+        Variable $pubKeyArg,
+        int $flags,
+        ?Frame $frame = null,
+    ): Variable {
+        unset($flags);
+
+        if (!VmOpensslX509Native::available()) {
+            VmOpenssl::userWarningForFrame(
+                'openssl_x509_verify(): OpenSSL X.509 verification is unavailable in this compiler build',
+                $frame
+            );
+            $result = new Variable();
+            $result->bool(false);
+
+            return $result;
+        }
+
+        $certPem = self::resolveCertificatePem($ctx, $certArg, 'openssl_x509_verify');
+        if (null === $certPem || false === VmOpensslX509Native::normalizeCertificatePem($certPem)) {
+            VmOpenssl::userWarningForFrame(
+                'openssl_x509_verify(): X.509 Certificate cannot be retrieved',
+                $frame
+            );
+            $result = new Variable();
+            $result->bool(false);
+
+            return $result;
+        }
+
+        $pubKeyPem = self::resolveVerifyPublicKeyPem($pubKeyArg, 'openssl_x509_verify', 1, $frame);
+        if (null === $pubKeyPem) {
+            $result = new Variable();
+            $result->bool(false);
+
+            return $result;
+        }
+
+        $verified = VmOpensslX509Native::verifyCertificatePem($certPem, $pubKeyPem);
+        $result = new Variable();
+        if ($verified < 0) {
+            VmOpenssl::userWarningForFrame('openssl_x509_verify(): Signature verification errored', $frame);
+            $result->int(-1);
+
+            return $result;
+        }
+        $result->int($verified);
+
+        return $result;
+    }
+
+    /**
      * openssl_x509_parse() — X509 PEM or OpenSSLCertificate to metadata array (ext/openssl/xp.c; #6274).
      */
     public static function parseCertificate(Context $ctx, Variable $arg, bool $shortnames): Variable
@@ -309,6 +365,85 @@ final class VmOpensslObjects
         }
 
         return $arg->toString();
+    }
+
+    /**
+     * @return string|null PEM public key, or null when caller should warn + return false
+     */
+    private static function resolveVerifyPublicKeyPem(
+        Variable $arg,
+        string $function,
+        int $argIndex,
+        ?Frame $frame = null,
+    ): ?string {
+        $arg = $arg->resolveIndirect();
+        if (Variable::TYPE_OBJECT === $arg->type) {
+            $object = $arg->toObject();
+            $lc = strtolower($object->class->name);
+            if (self::KEY_LC === $lc) {
+                $pem = self::keyPem($object);
+                if ('' === $pem) {
+                    VmOpenssl::userWarningForFrame(
+                        $function.'(): Don\'t know how to get public key from this private key',
+                        $frame
+                    );
+
+                    return null;
+                }
+                $pub = VmOpensslPkeyNative::exportPublicKeyPem($pem);
+                if (false === $pub) {
+                    VmOpenssl::userWarningForFrame(
+                        $function.'(): Don\'t know how to get public key from this private key',
+                        $frame
+                    );
+
+                    return null;
+                }
+
+                return $pub;
+            }
+            if (self::CERT_LC === $lc) {
+                $pem = self::certificatePem($object);
+                if ('' === $pem) {
+                    return null;
+                }
+                $pub = VmOpensslX509Native::extractPublicKeyPem($pem);
+
+                return false === $pub ? null : $pub;
+            }
+
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #%d ($public_key) must be of type OpenSSLAsymmetricKey|OpenSSLCertificate|string, %s given',
+                $function,
+                $argIndex + 1,
+                $object->class->name
+            ));
+        }
+        if (EnumCaseSupport::isEnumCaseVariable($arg)) {
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #%d ($public_key) must be of type OpenSSLAsymmetricKey|OpenSSLCertificate|string, %s given',
+                $function,
+                $argIndex + 1,
+                EnumCaseSupport::typeNameForVariable($arg)
+            ));
+        }
+        if (Variable::TYPE_STRING !== $arg->type) {
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #%d ($public_key) must be of type OpenSSLAsymmetricKey|OpenSSLCertificate|string, %s given',
+                $function,
+                $argIndex + 1,
+                self::typeLabel($arg)
+            ));
+        }
+
+        $pem = $arg->toString();
+        if (str_contains($pem, 'BEGIN CERTIFICATE')) {
+            $pub = VmOpensslX509Native::extractPublicKeyPem($pem);
+
+            return false === $pub ? null : $pub;
+        }
+
+        return $pem;
     }
 
     private static function registerInternalClass(Context $ctx, string $lc, string $name): void
