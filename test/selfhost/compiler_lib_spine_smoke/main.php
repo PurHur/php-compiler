@@ -1046,6 +1046,8 @@ require_once __DIR__.'/../../../ext/standard/GcCollectCyclesRegistryJitHelper.ph
 require_once __DIR__.'/../../../ext/standard/GcCollectCyclesStandaloneJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/GcDestructAllowDelrefJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/GcDestructShutdownJitHelper.php';
+require_once __DIR__.'/../../../ext/standard/GcDestructTryInvokeJitHelper.php';
+require_once __DIR__.'/../../../ext/standard/GcObjectReleaseStorageJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/GcStatusJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/GcToggleJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/GetBrowserJitHelper.php';
@@ -2633,6 +2635,10 @@ require_once __DIR__.'/../../../ext/standard/phpc_destruct_try_invoke_native.php
 require_once __DIR__.'/../../../ext/standard/phpc_gc_native_child_at.php';
 require_once __DIR__.'/../../../ext/standard/phpc_gc_native_free_object.php';
 require_once __DIR__.'/../../../ext/standard/phpc_gc_native_object_refcount.php';
+require_once __DIR__.'/../../../ext/standard/phpc_object_is_constructed_native.php';
+require_once __DIR__.'/../../../ext/standard/phpc_object_invoke_destructor_native.php';
+require_once __DIR__.'/../../../ext/standard/phpc_gc_notify_object_freed_native.php';
+require_once __DIR__.'/../../../ext/standard/phpc_mm_free_native.php';
 require_once __DIR__.'/../../../ext/standard/phpc_match_unhandled_operand_is_object.php';
 require_once __DIR__.'/../../../ext/standard/phpc_native_ht_alloc.php';
 require_once __DIR__.'/../../../ext/standard/phpc_native_ht_set_hashtable_at.php';
