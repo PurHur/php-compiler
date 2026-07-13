@@ -19,6 +19,7 @@ use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitStringBuiltinArg;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\HashTable;
@@ -45,7 +46,7 @@ final class explode extends Internal
             ));
         }
         $delimiter = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'explode', 0, 'separator');
-        $string = VmString::coerceTypedStringBuiltinArg($frame->calledArgs[1], 'explode', 1, 'string');
+        $string = InternalStrictArg::resolveCoercibleStringArg($frame, 1, 'explode', 'string');
         $limit = \PHP_INT_MAX;
         if (3 === $argc) {
             $limit = VmMath::parseIntBuiltinArgForFrame($frame, 2, 'explode', 3, 'limit');
@@ -107,7 +108,7 @@ final class explode extends Internal
 
         StringExplode::ensureLinked($context);
         $delimiter = JitStringBuiltinArg::lower($context, $args[0], 'explode', 0, 'separator');
-        $haystack = JitStringBuiltinArg::lowerTypedString($context, $args[1], 'explode', 1, 'string');
+        $haystack = JitStringBuiltinArg::lowerCoercible($context, $args[1], 'explode', 1, 'string');
         $i64 = $context->getTypeFromString('int64');
         if (3 === $argc) {
             $limitLit = self::compileTimeLimit($context, $args[2]);

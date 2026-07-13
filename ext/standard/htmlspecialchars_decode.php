@@ -31,7 +31,7 @@ final class htmlspecialchars_decode extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('htmlspecialchars_decode() requires one or two arguments in this compiler build');
         }
-        $string = VmString::coerceTypedStringBuiltinArg(
+        $string = VmString::coerceStringBuiltinArg(
             $frame->calledArgs[0],
             'htmlspecialchars_decode',
             0,
@@ -86,7 +86,7 @@ final class htmlspecialchars_decode extends Internal
             );
         }
 
-        $str = JitStringBuiltinArg::lowerTypedString($context, $args[0], 'htmlspecialchars_decode', 0, 'string');
+        $str = JitStringBuiltinArg::lower($context, $args[0], 'htmlspecialchars_decode', 0, 'string');
         $i64 = $context->getTypeFromString('int64');
         $flagsVal = $i64->constInt($flags, false);
         if ($argc >= 2 && null === ($args[1]->compileTimeLong ?? null)) {
