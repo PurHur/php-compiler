@@ -7,8 +7,7 @@ namespace PHPCompiler\ext\standard;
 /**
  * JIT/AOT GC object registry for compiled embed modules (#9541, php-in-PHP).
  *
- * Replaces LLVM globals phpc_gc_objects[] / phpc_gc_prop_counts[] on embed JIT.
- * Standalone AOT keeps registry in {@see \PHPCompiler\JIT\Builtin\GcCollectCyclesStandaloneLlvm}.
+ * Replaces LLVM globals phpc_gc_objects[] / phpc_gc_prop_counts[] on embed + standalone JIT/AOT.
  * php-src: Zend/zend_gc.c — gc_root_buffer / object tracking
  */
 final class GcCollectCyclesRegistryJitHelper
