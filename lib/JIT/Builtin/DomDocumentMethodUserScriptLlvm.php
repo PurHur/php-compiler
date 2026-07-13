@@ -75,6 +75,37 @@ final class DomDocumentMethodUserScriptLlvm
         );
     }
 
+    public static function ensureXPathQueryBridge(Context $context): void
+    {
+        self::ensureContextBridge(
+            $context,
+            DomXPathQueryRuntime::ABI_NAME,
+            'dom_xpath_query_user_script',
+            [
+                $context->getTypeFromString('__object__*'),
+                $context->getTypeFromString('__string__*'),
+            ],
+            $context->getTypeFromString('__object__*'),
+            'PHPCompiler\\ext\\dom\\DomXPathQueryJitHelper::queryStringArgv',
+            '/ext/dom/DomXPathQueryJitHelper.php'
+        );
+    }
+
+    public static function ensureNodeListItemBridge(Context $context): void
+    {
+        self::ensureNullableObjectValueBridge(
+            $context,
+            DomNodeListItemRuntime::ABI_NAME,
+            'dom_nodelist_item_user_script',
+            [
+                $context->getTypeFromString('__object__*'),
+                $context->getTypeFromString('int64'),
+            ],
+            'PHPCompiler\\ext\\dom\\DomNodeListItemJitHelper::itemIntArgv',
+            '/ext/dom/DomNodeListItemJitHelper.php'
+        );
+    }
+
     public static function ensureLoadXMLBridge(Context $context): void
     {
         self::ensureContextBridge(

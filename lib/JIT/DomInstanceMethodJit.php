@@ -17,7 +17,7 @@ final class DomInstanceMethodJit
     {
         $lc = strtolower(ltrim($proxyName, '\\'));
         if (self::shouldDeferToVmClassMethodLowering()) {
-            return self::isUserScriptDirectMethod($lc);
+            return self::isUserScriptDirectMethod($lc) || self::isUserScriptGenericDomMethod($lc);
         }
 
         return (bool) preg_match('/^dom[a-z0-9_]*::[a-z0-9_]+$/', $lc);
@@ -28,6 +28,18 @@ final class DomInstanceMethodJit
     {
         return isset(self::USER_SCRIPT_DIRECT_METHODS[$proxyLc]);
     }
+
+    /** User-script AOT: generic VmDomInstanceInvoke bridge (#18493). */
+    private static function isUserScriptGenericDomMethod(string $proxyLc): bool
+    {
+        return isset(self::USER_SCRIPT_GENERIC_DOM_METHODS[$proxyLc]);
+    }
+
+    /** @var array<string, true> */
+    private const USER_SCRIPT_GENERIC_DOM_METHODS = [
+        'domxpath::evaluate' => true,
+        'domxpath::registernamespace' => true,
+    ];
 
     /** @var array<string, true> */
     private const USER_SCRIPT_DIRECT_METHODS = [
@@ -40,6 +52,8 @@ final class DomInstanceMethodJit
         'domdocument::savehtmlfile' => true,
         'domdocument::getelementsbytagname' => true,
         'domnode::appendchild' => true,
+        'domxpath::query' => true,
+        'domnodelist::item' => true,
     ];
 
     /** User-script AOT: nested VmDomInstanceInvoke JIT aborts — use VmClassMethod lowering (#15407, #17391). */
@@ -102,7 +116,17 @@ final class DomInstanceMethodJit
 
                 return;
             }
-            if (!self::isUserScriptDirectMethod($lc)) {
+            if ('domxpath::query' === $lc) {
+                $context->functionProxies[$lc] = new Call\DomXPathQuery();
+
+                return;
+            }
+            if ('domnodelist::item' === $lc) {
+                $context->functionProxies[$lc] = new Call\DomNodeListItem();
+
+                return;
+            }
+            if (!self::isUserScriptDirectMethod($lc) && !self::isUserScriptGenericDomMethod($lc)) {
                 return;
             }
         }
@@ -134,6 +158,8 @@ final class DomInstanceMethodJit
             self::ensureProxy($context, 'domdocument::savehtmlfile');
             self::ensureProxy($context, 'domdocument::getelementsbytagname');
             self::ensureProxy($context, 'domnode::appendchild');
+            self::ensureProxy($context, 'domxpath::query');
+            self::ensureProxy($context, 'domnodelist::item');
 
             return;
         }
@@ -150,6 +176,8 @@ final class DomInstanceMethodJit
         'domnode' => ['appendchild'],
         'domelement' => ['setattribute'],
         'domtokenlist' => ['add', 'contains', 'item', 'toggle', 'remove'],
+        'domxpath' => ['query', 'evaluate', 'registernamespace'],
+        'domnodelist' => ['item'],
     ];
 
     private static function ensureDomElementPropertyLayout(Context $context): void
