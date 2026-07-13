@@ -398,20 +398,8 @@ final class VmSprintf
         if (null !== $enumInt) {
             return $enumInt;
         }
-        switch ($var->type) {
-            case Variable::TYPE_INTEGER:
-                return $var->toInt();
-            case Variable::TYPE_FLOAT:
-                return (int) $var->toFloat();
-            case Variable::TYPE_BOOLEAN:
-                return $var->toBool() ? 1 : 0;
-            case Variable::TYPE_NULL:
-                return 0;
-            case Variable::TYPE_STRING:
-                return (int) $var->toString();
-            default:
-                throw new \LogicException('sprintf() %d requires a scalar value in this compiler build');
-        }
+
+        return VmScalarType::zendIntvalOperand($var, $frame);
     }
 
     private static function argToFloat(Variable $var, ?Frame $frame = null): float
@@ -422,20 +410,8 @@ final class VmSprintf
         if (null !== $enumFloat) {
             return $enumFloat;
         }
-        switch ($var->type) {
-            case Variable::TYPE_FLOAT:
-                return $var->toFloat();
-            case Variable::TYPE_INTEGER:
-                return (float) $var->toInt();
-            case Variable::TYPE_BOOLEAN:
-                return $var->toBool() ? 1.0 : 0.0;
-            case Variable::TYPE_NULL:
-                return 0.0;
-            case Variable::TYPE_STRING:
-                return (float) $var->toString();
-            default:
-                throw new \LogicException('sprintf() %f requires a scalar value in this compiler build');
-        }
+
+        return VmScalarType::zendFloatvalOperand($var, $frame);
     }
 
     private static function intToDecimal(int $value): string

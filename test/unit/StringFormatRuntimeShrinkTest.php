@@ -8,6 +8,8 @@ use PHPCompiler\ext\standard\SprintfJitHelper;
 use PHPCompiler\ext\standard\StdlibConstants;
 use PHPCompiler\ext\standard\VmNumberFormat;
 use PHPCompiler\ext\standard\VmSprintf;
+use PHPCompiler\VM\HashTable;
+use PHPCompiler\VM\Variable;
 use PHPUnit\Framework\TestCase;
 
 /** sprintf/printf/number_format JIT routes through SprintfJitHelper PHP not StringFormatJit LLVM (#9131, #13146). */
@@ -39,6 +41,19 @@ final class StringFormatRuntimeShrinkTest extends TestCase
             })()]),
             SprintfJitHelper::sprintfArgv('%03d', $blob)
         );
+    }
+
+    /** Issue #18532 — AOT/JIT sprintf tail coerces array operands like Zend (%d → 0). */
+    public function testSprintfJitHelperCoercesEmptyArrayForPercentD(): void
+    {
+        $emptyArrayBlob = \chr(5);
+        $emptyArrayVar = new Variable();
+        $emptyArrayVar->array(new HashTable());
+        $this->assertSame(
+            VmSprintf::format('%d', [$emptyArrayVar]),
+            SprintfJitHelper::sprintfArgv('%d', $emptyArrayBlob)
+        );
+        $this->assertSame('0', SprintfJitHelper::sprintfArgv('%d', $emptyArrayBlob));
     }
 
     public function testSprintfJitHelperNumberFormatMatchesVmNumberFormat(): void
