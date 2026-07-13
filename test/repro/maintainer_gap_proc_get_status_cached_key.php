@@ -28,6 +28,9 @@ if (\array_key_exists('cached', $status)) {
 }
 
 $expected = ['command', 'pid', 'running', 'signaled', 'stopped', 'exitcode', 'termsig', 'stopsig'];
+if (\array_key_exists('pending_signals', $status)) {
+    $expected[] = 'pending_signals';
+}
 $keys = \array_keys($status);
 if ($keys !== $expected) {
     echo 'fail: keys ', \implode(',', $keys), ' expected ', \implode(',', $expected), "\n";
