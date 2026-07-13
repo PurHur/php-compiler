@@ -41,6 +41,7 @@ final class json_decode extends Internal
                 ));
             }
         }
+        InternalStrictArg::rejectNullString($frame->calledArgs[0], 'json_decode', 'json', 0, $frame);
         $json = VmString::coerceStringBuiltinArg(
             $frame->calledArgs[0],
             'json_decode',
@@ -91,6 +92,7 @@ final class json_decode extends Internal
         if ($argc > 4) {
             throw new \LogicException('json_decode() expects at most 4 arguments');
         }
+        JitInternalStrictArg::rejectNullString($context, $args[0], 'json_decode', 'json', 1);
 
         $depth = self::resolveDepthJit($context, $args);
         $flags = self::resolveFlagsJit($context, $args);
