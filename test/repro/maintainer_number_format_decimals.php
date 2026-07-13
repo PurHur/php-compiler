@@ -10,6 +10,13 @@ if ($out !== $expected) {
     exit(1);
 }
 
+$out2 = number_format(1234.5678, 20);
+$expected2 = '1,234.56780000000003383320';
+if ($out2 !== $expected2) {
+    fwrite(STDERR, "number_format(1234.5678, 20): expected {$expected2}, got {$out2}\n");
+    exit(1);
+}
+
 $neg = number_format(1.5, -1);
 if ('2' !== $neg) {
     fwrite(STDERR, "number_format(1.5, -1): expected 2, got {$neg}\n");
